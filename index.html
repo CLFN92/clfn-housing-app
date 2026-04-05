@@ -1122,15 +1122,15 @@ async function sbUploadFile(path, file) {
 // Get a signed URL for a file (valid 1 hour)
 async function sbGetSignedUrl(path) {
   try {
-    var url = SUPABASE_URL + '/storage/v1/object/sign/' + STORAGE_BUCKET + '/' + path;
-    console.log('[sbGetSignedUrl] POST', url);
+    // URL-encode each path segment so spaces/special chars in filenames work
+    var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
+    var url = SUPABASE_URL + '/storage/v1/object/sign/' + STORAGE_BUCKET + '/' + encodedPath;
     var res = await fetch(url, {
       method: 'POST',
       headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
       body: JSON.stringify({ expiresIn: 3600 })
     });
     var data = await res.json();
-    console.log('[sbGetSignedUrl] status', res.status, 'response', JSON.stringify(data));
     if(res.ok) {
       var signed = data.signedUrl || data.signedURL || null;
       if(signed) {
@@ -1138,16 +1138,14 @@ async function sbGetSignedUrl(path) {
       }
     }
   } catch(e) { console.warn('[sbGetSignedUrl] error:', e); }
-  // Fallback: authenticated URL with token as query param
-  var fb = sbGetFileUrl(path);
-  console.log('[sbGetSignedUrl] fallback URL:', fb);
-  return fb;
+  return sbGetFileUrl(path);
 }
 
-// Get authenticated URL — appends token as ?token= so window.open works in new tab
+// Get authenticated URL with URL-encoded path segments
 function sbGetFileUrl(path) {
   var token = (HOUSING_HEADERS && HOUSING_HEADERS['Authorization'] || '').replace('Bearer ','');
-  var base = SUPABASE_URL + '/storage/v1/object/authenticated/' + STORAGE_BUCKET + '/' + path;
+  var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
+  var base = SUPABASE_URL + '/storage/v1/object/authenticated/' + STORAGE_BUCKET + '/' + encodedPath;
   return token ? (base + '?token=' + encodeURIComponent(token)) : base;
 }
 
