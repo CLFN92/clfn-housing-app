@@ -1121,31 +1121,18 @@ async function sbUploadFile(path, file) {
 
 // Get a signed URL for a file (valid 1 hour)
 async function sbGetSignedUrl(path) {
+  // Use Supabase JS client createSignedUrl if available — handles encoding automatically
   try {
-    // Use createSignedUrl via Supabase JS client if available
     if(window._sb) {
-      var res = await window._sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
-      if(res.data && res.data.signedUrl) return res.data.signedUrl;
+      var r = await window._sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
+      if(r.data && r.data.signedUrl) return r.data.signedUrl;
     }
-    // Fallback: POST to sign endpoint with path in body, not URL
-    var url = SUPABASE_URL + '/storage/v1/object/sign/' + STORAGE_BUCKET;
-    var res2 = await fetch(url, {
-      method: 'POST',
-      headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ expiresIn: 3600, paths: [path] })
-    });
-    if(res2.ok) {
-      var data = await res2.json();
-      // Batch sign returns array
-      var item = Array.isArray(data) ? data[0] : data;
-      var signed = (item && (item.signedUrl || item.signedURL)) || null;
-      if(signed) return signed.startsWith('http') ? signed : (SUPABASE_URL + signed);
-    }
-  } catch(e) { console.warn('[sbGetSignedUrl] error:', e); }
+  } catch(e) { console.warn('createSignedUrl error:', e); }
+  // Fallback: authenticated URL — token in Authorization header via fetch, then blob URL
   return sbGetFileUrl(path);
 }
 
-// Authenticated URL fallback
+// Return authenticated URL with properly encoded path and token
 function sbGetFileUrl(path) {
   var token = (HOUSING_HEADERS && HOUSING_HEADERS['Authorization'] || '').replace('Bearer ','');
   var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
@@ -6973,21 +6960,26 @@ function renderScoresTable() {
 // ── Scorecard document functions ──────────────────────────────────────────────
 
 function scViewFile(path) {
-  // Step 1: try signed URL; Step 2: fall back to authenticated URL with token
   showToast('Opening file…');
-  sbGetSignedUrl(path).then(function(u){
-    console.log('[scViewFile] url resolved:', u);
-    if(u) {
+  // Fetch file as blob using auth header, then open as object URL — works from https://
+  var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
+  var fetchUrl = SUPABASE_URL + '/storage/v1/object/authenticated/' + STORAGE_BUCKET + '/' + encodedPath;
+  fetch(fetchUrl, { headers: sbStorageHeaders() })
+    .then(function(res){
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      return res.blob();
+    })
+    .then(function(blob){
+      var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
-      a.href = u; a.target = '_blank'; a.rel = 'noopener noreferrer';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    } else {
-      showToast('Could not load file — check console (F12) for details');
-    }
-  }).catch(function(e){
-    console.error('[scViewFile] error:', e);
-    showToast('Error opening file: '+(e.message||e));
-  });
+      a.href = url; a.target = '_blank'; a.rel = 'noopener';
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
+    })
+    .catch(function(e){
+      showToast('Could not open file: ' + (e.message||e));
+    });
 }
 
 async function scLoadDocs(app) {
