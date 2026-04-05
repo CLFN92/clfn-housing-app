@@ -15557,7 +15557,10 @@ function hidLoginScreen() {
 async function loadAppDataFromSupabase() {
   try {
     // Applications
-    var appsR = await fetch(SUPABASE_URL+'/rest/v1/housing_applications?select=*&order=submitted_at.desc',{headers:HOUSING_HEADERS});
+    // Fetch all applications — override Supabase default 100-row limit
+    var appsR = await fetch(SUPABASE_URL+'/rest/v1/housing_applications?select=*&order=submitted_at.desc',{
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Range-Unit': 'items', 'Range': '0-9999', 'Prefer': 'count=none' })
+    });
     if(appsR.ok){
       var appsData=await appsR.json();
       applications=appsData.map(function(row){
@@ -15572,7 +15575,7 @@ async function loadAppDataFromSupabase() {
     }
 
     // Housing units
-    var unitsR = await fetch(SUPABASE_URL+'/rest/v1/housing_units?select=*&order=street,num',{headers:HOUSING_HEADERS});
+    var unitsR = await fetch(SUPABASE_URL+'/rest/v1/housing_units?select=*&order=street,num',{ headers: Object.assign({}, HOUSING_HEADERS, { 'Range-Unit': 'items', 'Range': '0-9999', 'Prefer': 'count=none' }) });
     console.log('[CLFN] units fetch status:', unitsR.status, unitsR.ok);
     if(unitsR.ok){
       var unitsData=await unitsR.json();
