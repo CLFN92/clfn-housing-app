@@ -6961,7 +6961,7 @@ function renderScoresTable() {
 
 function scViewFile(path) {
   showToast('Opening file…');
-  // Fetch file as blob using auth header, then open as object URL — works from https://
+  var fileName = path.split('/').pop();
   var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
   var fetchUrl = SUPABASE_URL + '/storage/v1/object/authenticated/' + STORAGE_BUCKET + '/' + encodedPath;
   fetch(fetchUrl, { headers: sbStorageHeaders() })
@@ -6972,7 +6972,8 @@ function scViewFile(path) {
     .then(function(blob){
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
-      a.href = url; a.target = '_blank'; a.rel = 'noopener';
+      a.href = url;
+      a.download = fileName;  // sets correct filename + extension
       document.body.appendChild(a); a.click();
       document.body.removeChild(a);
       setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
