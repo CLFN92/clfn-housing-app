@@ -1122,26 +1122,30 @@ async function sbUploadFile(path, file) {
 // Get a signed URL for a file (valid 1 hour)
 async function sbGetSignedUrl(path) {
   try {
-    // URL-encode each path segment so spaces/special chars in filenames work
-    var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
-    var url = SUPABASE_URL + '/storage/v1/object/sign/' + STORAGE_BUCKET + '/' + encodedPath;
-    var res = await fetch(url, {
+    // Use createSignedUrl via Supabase JS client if available
+    if(window._sb) {
+      var res = await window._sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
+      if(res.data && res.data.signedUrl) return res.data.signedUrl;
+    }
+    // Fallback: POST to sign endpoint with path in body, not URL
+    var url = SUPABASE_URL + '/storage/v1/object/sign/' + STORAGE_BUCKET;
+    var res2 = await fetch(url, {
       method: 'POST',
       headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ expiresIn: 3600 })
+      body: JSON.stringify({ expiresIn: 3600, paths: [path] })
     });
-    var data = await res.json();
-    if(res.ok) {
-      var signed = data.signedUrl || data.signedURL || null;
-      if(signed) {
-        return signed.startsWith('http') ? signed : (SUPABASE_URL + signed);
-      }
+    if(res2.ok) {
+      var data = await res2.json();
+      // Batch sign returns array
+      var item = Array.isArray(data) ? data[0] : data;
+      var signed = (item && (item.signedUrl || item.signedURL)) || null;
+      if(signed) return signed.startsWith('http') ? signed : (SUPABASE_URL + signed);
     }
   } catch(e) { console.warn('[sbGetSignedUrl] error:', e); }
   return sbGetFileUrl(path);
 }
 
-// Get authenticated URL with URL-encoded path segments
+// Authenticated URL fallback
 function sbGetFileUrl(path) {
   var token = (HOUSING_HEADERS && HOUSING_HEADERS['Authorization'] || '').replace('Bearer ','');
   var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
