@@ -1,16 +1,25 @@
 {
   "routes": [
     {
+      "route": "/",
+      "serve": "/index.html",
+      "statusCode": 200
+    },
+    {
       "route": "/*",
       "serve": "/index.html",
       "statusCode": 200
     }
   ],
   "navigationFallback": {
-    "rewrite": "/index.html"
+    "rewrite": "/index.html",
+    "exclude": ["*.css", "*.js", "*.png", "*.jpg", "*.json"]
   },
   "mimeTypes": {
     ".html": "text/html",
     ".json": "application/json"
+  },
+  "globalHeaders": {
+    "Cache-Control": "no-cache"
   }
 }
