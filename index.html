@@ -2190,19 +2190,19 @@ window.sbMigrateAll = async function() {
         <div style="padding:20px;border-bottom:1px solid var(--border);">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">1</div><div><div style="font-size:13px;font-weight:700;color:var(--text);">Applicant</div><div style="font-size:11px;color:var(--muted);">Primary applicant signature</div></div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;"><div class="f"><label>Full Name</label><input type="text" id="sig_name" placeholder="Print full name"/></div><div class="f"><label>Date</label><input type="date" id="sig_date"/></div></div>
-          <div style="border:1.5px solid var(--border);border-radius:8px;background:#fafaf8;position:relative;"><canvas id="sig_canvas_app" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;border-radius:8px 8px 0 0;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button onclick="clearSig('sig_canvas_app')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div>
+          <div style="border:1.5px solid var(--border);border-radius:8px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('sig_canvas_app','canvas')" id="sig_canvas_app_tab_canvas" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:11px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_app','type')" id="sig_canvas_app_tab_type" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_app','wet')" id="sig_canvas_app_tab_wet" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sig_canvas_app_panel_canvas" style="background:#fafaf8;"><canvas id="sig_canvas_app" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_app')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_app_panel_type" style="display:none;padding:16px 14px;background:#fafaf8;"><input type="text" id="sig_canvas_app_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_app_panel_wet" style="display:none;padding:16px 14px;background:#fafaf8;"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_app_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
         </div>
         <!-- Co-Applicant -->
         <div id="sig_coapplicant_block" style="padding:20px;border-bottom:1px solid var(--border);display:none;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">2</div><div><div style="font-size:13px;font-weight:700;color:var(--text);">Co-Applicant</div></div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;"><div class="f"><label>Full Name</label><input type="text" id="sig_co_name" placeholder="Co-applicant full name"/></div><div class="f"><label>Date</label><input type="date" id="sig_co_date"/></div></div>
-          <div style="border:1.5px solid var(--border);border-radius:8px;background:#fafaf8;position:relative;"><canvas id="sig_canvas_co" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;border-radius:8px 8px 0 0;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button onclick="clearSig('sig_canvas_co')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div>
+          <div style="border:1.5px solid var(--border);border-radius:8px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('sig_canvas_co','canvas')" id="sig_canvas_co_tab_canvas" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:11px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_co','type')" id="sig_canvas_co_tab_type" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_co','wet')" id="sig_canvas_co_tab_wet" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sig_canvas_co_panel_canvas" style="background:#fafaf8;"><canvas id="sig_canvas_co" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_co')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_co_panel_type" style="display:none;padding:16px 14px;background:#fafaf8;"><input type="text" id="sig_canvas_co_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_co_panel_wet" style="display:none;padding:16px 14px;background:#fafaf8;"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_co_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
         </div>
         <!-- Staff -->
         <div style="padding:20px;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--surface);border:2px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">3</div><div><div style="font-size:13px;font-weight:700;color:var(--text);">Housing Staff</div><div style="font-size:11px;color:var(--muted);">Employee receiving this application</div></div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;"><div class="f"><label>Staff Full Name</label><input type="text" id="sig_staff" placeholder="Staff full name"/></div><div class="f"><label>Date Received</label><input type="date" id="sig_recv"/></div></div>
-          <div style="border:1.5px solid var(--border);border-radius:8px;background:#fafaf8;position:relative;"><canvas id="sig_canvas_staff" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;border-radius:8px 8px 0 0;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button onclick="clearSig('sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div>
+          <div style="border:1.5px solid var(--border);border-radius:8px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('sig_canvas_staff','canvas')" id="sig_canvas_staff_tab_canvas" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:11px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_staff','type')" id="sig_canvas_staff_tab_type" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_staff','wet')" id="sig_canvas_staff_tab_wet" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sig_canvas_staff_panel_canvas" style="background:#fafaf8;"><canvas id="sig_canvas_staff" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_staff_panel_type" style="display:none;padding:16px 14px;background:#fafaf8;"><input type="text" id="sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_staff_panel_wet" style="display:none;padding:16px 14px;background:#fafaf8;"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
         </div>
       </div>
       <!-- Internal Use -->
@@ -2233,22 +2233,20 @@ window.sbMigrateAll = async function() {
 
 <!-- ═══ INDIVIDUAL SCORECARD VIEW ═══ -->
 <div id="scorecardView" style="display:none;width:100%;">
-  <div style="background:var(--dark);border-bottom:1px solid var(--dark3);padding:10px 24px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;position:sticky;top:0;z-index:10;">
-    <div style="display:flex;align-items:center;">
-      <button onclick="showDash()" style="background:none;border:1px solid #444;color:#aaa;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;transition:all .15s;flex-shrink:0;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>Back
-      </button>
+  <div style="background:var(--dark);border-bottom:1px solid var(--dark3);padding:10px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10;min-width:0;">
+    <button onclick="showDash()" style="background:none;border:1px solid #444;color:#aaa;padding:5px 10px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;flex-shrink:0;transition:all .15s;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>Back
+    </button>
+    <div style="flex:1;min-width:0;text-align:center;">
+      <div id="sc_back_name" style="font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+      <div id="sc_back_id" style="font-size:10px;color:#999;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
     </div>
-    <div style="display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0;">
-      <div id="sc_back_name" style="font-size:14px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;"></div>
-      <div id="sc_back_id" style="font-size:11px;color:#999;margin-top:1px;white-space:nowrap;"></div>
-    </div>
-    <div style="display:flex;justify-content:flex-end;gap:8px;">
-      <button onclick="if(window._currentScorecardApp&&typeof window.openEditModal==='function')window.openEditModal(window._currentScorecardApp.id);" style="background:none;border:1px solid #444;color:#aaa;padding:6px 14px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;flex-shrink:0;transition:all .15s;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='#444';this.style.color='#aaa'">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Open Application
+    <div style="display:flex;gap:6px;flex-shrink:0;">
+      <button onclick="if(window._currentScorecardApp&&typeof window.openEditModal==='function')window.openEditModal(window._currentScorecardApp.id);" style="background:none;border:1px solid #444;color:#aaa;padding:5px 10px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px;transition:all .15s;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='#444';this.style.color='#aaa'">
+        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Open
       </button>
-      <button onclick="printScorecard()" style="background:var(--yellow);border:none;color:#111;padding:6px 14px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;flex-shrink:0;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print / Save PDF
+      <button onclick="printScorecard()" style="background:var(--yellow);border:none;color:#111;padding:5px 10px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print / Save PDF
       </button>
     </div>
   </div>
@@ -3204,13 +3202,7 @@ window.sbMigrateAll = async function() {
               <div class="f"><label>Printed Name</label><input type="text" id="ct_sig_staff_name" placeholder="Full name"/></div>
               <div class="f"><label>Date</label><input type="date" id="ct_sig_staff_date"/></div>
             </div>
-            <div style="border:1.5px solid var(--border);border-radius:7px;background:#fafaf8;">
-              <canvas id="ct_sig_canvas_staff" width="560" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;border-radius:7px 7px 0 0;"></canvas>
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);">
-                <span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span>
-                <button type="button" onclick="clearSig('ct_sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button>
-              </div>
-            </div>
+            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','canvas')" id="ct_sig_canvas_staff_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','type')" id="ct_sig_canvas_staff_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','wet')" id="ct_sig_canvas_staff_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="ct_sig_canvas_staff_panel_canvas" style="background:#fafaf8;"><canvas id="ct_sig_canvas_staff" width="560" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;border-radius:0;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('ct_sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="ct_sig_canvas_staff_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="ct_sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="ct_sig_canvas_staff_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="ct_sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
           </div>
 
           <!-- Contractor signature -->
@@ -3227,13 +3219,7 @@ window.sbMigrateAll = async function() {
               <div class="f"><label>Title / Role</label><input type="text" id="ct_sig_ct_title" placeholder="e.g. Owner, Project Manager"/></div>
               <div class="f"><label>Date</label><input type="date" id="ct_sig_ct_date"/></div>
             </div>
-            <div style="border:1.5px solid var(--border);border-radius:7px;background:#fafaf8;">
-              <canvas id="ct_sig_canvas_ct" width="560" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;border-radius:7px 7px 0 0;"></canvas>
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);">
-                <span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span>
-                <button type="button" onclick="clearSig('ct_sig_canvas_ct')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button>
-              </div>
-            </div>
+            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','canvas')" id="ct_sig_canvas_ct_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','type')" id="ct_sig_canvas_ct_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','wet')" id="ct_sig_canvas_ct_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="ct_sig_canvas_ct_panel_canvas" style="background:#fafaf8;"><canvas id="ct_sig_canvas_ct" width="560" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;border-radius:0;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('ct_sig_canvas_ct')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="ct_sig_canvas_ct_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="ct_sig_canvas_ct_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="ct_sig_canvas_ct_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="ct_sig_canvas_ct_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
           </div>
 
         </div>
@@ -5907,7 +5893,9 @@ function openUnitEditModal(unitId){
 function unitEditStatusChange(){
   var status=(document.getElementById('ue_status')||{}).value||'';
   var row=document.getElementById('ue_assign_row');
-  if(row) row.style.display=(status==='occupied'||status==='reserved')?'flex':'none';
+  // Show tenant section for all statuses except archived/condemned/under_repair
+  var hideStatuses = ['archived','condemned','under_repair'];
+  if(row) row.style.display = hideStatuses.includes(status) ? 'none' : 'flex';
 }
 function closeUnitEditModal(){
   document.getElementById('unitEditModal').style.display='none';
@@ -7977,14 +7965,10 @@ function openSowModal(unitId) {
     }
   }, 100);
 
-  // Show budget badge
+  // Hide budget badge
   setTimeout(function(){
-    var budget = getHmBudgetLimit ? getHmBudgetLimit() : 25000;
     var badge = document.getElementById('sow_budget_badge');
-    if(badge) {
-      badge.style.display = 'inline';
-      badge.textContent = 'HM limit: $' + Math.round(budget).toLocaleString();
-    }
+    if(badge) badge.style.display = 'none';
   }, 50);
 }
 
@@ -8350,10 +8334,14 @@ function addSowItem(data){
   var idx=_sowItemIdx++;
   var catOpts=SOW_CATEGORIES.map(function(cat){return '<option value="'+cat+'"'+(data&&data.category===cat?' selected':'')+'>'+cat+'</option>';}).join('');
   var div=document.createElement('div');div.id='sow_item_'+idx;
-  div.style.cssText='display:grid;grid-template-columns:160px 1fr 100px auto;gap:8px;align-items:start;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;';
+  div.style.cssText='display:grid;grid-template-columns:160px 1fr 110px auto;gap:8px;align-items:start;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;';
   div.innerHTML='<select data-sow="category" style="font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);"><option value="">Category</option>'+catOpts+'</select>'
     +'<input data-sow="description" type="text" placeholder="Describe the work required…" value="'+(data&&data.description?data.description.replace(/"/g,'&quot;'):'')+'" style="font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);"/>'
-    +'<input data-sow="cost" type="number" placeholder="0" min="0" step="100" value="'+(data&&data.cost?parseFloat((data.cost||'').replace(/[^0-9.]/g,''))||'':'')+'" style="font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);" oninput="recalcSowTotal()"/>'
+    +'<div style="display:flex;flex-direction:column;gap:3px;">'
+    +'<input data-sow="cost" type="number" placeholder="Est. $" min="0" step="100" value="'+(data&&data.cost?parseFloat((data.cost||'').replace(/[^0-9.]/g,''))||'':'')+'" style="font-size:11px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);" oninput="recalcSowTotal()" title="Internal estimate (not shown on work order)"/>'
+    +'<input data-sow="quote" type="number" placeholder="Quote $" min="0" step="100" value="'+(data&&data.quote?parseFloat((data.quote||'').replace(/[^0-9.]/g,''))||'':'')+'" style="font-size:11px;padding:5px 6px;border:1px solid #1d4ed833;border-radius:6px;background:#eff6ff;color:var(--text);" title="Contractor quoted price (shown on work order)"/>'
+    +'<div style="font-size:9px;color:var(--muted);text-align:center;line-height:1.2;">Est / Quote</div>'
+    +'</div>'
     +'<button type="button" data-sow-del="'+idx+'" style="background:none;border:1px solid #b91c1c33;color:#b91c1c;border-radius:6px;padding:6px 8px;cursor:pointer;font-size:12px;">✕</button>';
   cont.appendChild(div);
   div.querySelector('[data-sow-del]').addEventListener('click',function(){
@@ -8369,7 +8357,8 @@ function collectSowItems(){
     items.push({
       category:    (row.querySelector('[data-sow="category"]')||{}).value||'',
       description: (row.querySelector('[data-sow="description"]')||{}).value||'',
-      cost:        (row.querySelector('[data-sow="cost"]')||{}).value||''
+      cost:        (row.querySelector('[data-sow="cost"]')||{}).value||'',
+      quote:       (row.querySelector('[data-sow="quote"]')||{}).value||''
     });
   });
   return items;
@@ -8769,6 +8758,139 @@ async function deactivateStaff(id, btn){
   } catch(e){
     showToast('Error: '+e.message);
     if(btn){btn.disabled=false;btn.textContent='Deactivate';}
+  }
+}
+
+
+function printWorkOrder(){
+  saveSOW();
+  var get = function(id){ var el=document.getElementById(id); return el ? el.value.trim() : ''; };
+  var items = collectSowItems().filter(function(it){ return it.category||it.description||it.quote||it.cost; });
+  var today = new Date().toLocaleDateString('en-CA');
+  var address  = get('sow_address');
+  var contractor = get('sow_contractor');
+  var startDate  = get('sow_start_date');
+  var endDate    = get('sow_end_date');
+  var preparedBy = get('sow_prepared_by');
+  var tenantName = get('sow_tenant_name');
+
+  // Quote total — use contractor quote if available, else blank
+  var quoteTotal = 0;
+  var hasQuotes = false;
+  items.forEach(function(it){
+    if(it.quote && parseFloat(it.quote) > 0) {
+      quoteTotal += parseFloat(it.quote);
+      hasQuotes = true;
+    }
+  });
+
+  // Get logo
+  var logoSrc = '';
+  try {
+    var logoImg = document.querySelector('.hlogo');
+    if(logoImg && logoImg.src) logoSrc = logoImg.src;
+  } catch(e) {}
+
+  var itemRows = items.map(function(it, i){
+    var quote = (it.quote && parseFloat(it.quote) > 0)
+      ? '$'+parseFloat(it.quote).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})
+      : '<span style="color:#aaa;">Pending</span>';
+    return '<tr style="'+(i%2===1?'background:#f8f8f8;':'')+'">'
+      +'<td style="padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:10px;color:#444;width:140px;">'+( it.category||'—')+'</td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:10px;color:#222;">'+(it.description||'—')+'</td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:11px;text-align:right;font-weight:600;color:#222;width:110px;">'+quote+'</td>'
+      +'</tr>';
+  }).join('');
+
+  var totalRow = hasQuotes
+    ? '<tr class="total-row"><td colspan="2" style="text-align:right;padding:9px 10px;font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.04em;">Total Quoted Amount</td><td style="text-align:right;padding:9px 10px;font-size:12px;font-weight:bold;">$'+quoteTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</td></tr>'
+    : '<tr><td colspan="3" style="padding:9px 10px;font-size:10px;color:#888;font-style:italic;">Pricing to be confirmed by contractor</td></tr>';
+
+  var html = '<!DOCTYPE html><html lang="en"><head>'
+    +'<meta charset="UTF-8"/>'
+    +'<title>Work Order — CLFN Housing</title>'
+    +'<style>'
+    +'*{box-sizing:border-box;margin:0;padding:0;}'
+    +'body{font-family:Georgia,serif;font-size:11px;color:#111;background:#fff;}'
+    +'@page{size:letter portrait;margin:15mm 15mm 18mm 15mm;}'
+    +'@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.no-print{display:none!important;}}'
+    +'.header{background:#000;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;}'
+    +'.org{font-size:13px;font-weight:bold;color:#F8E41A;}'
+    +'.dept{font-size:10px;color:#ccc;margin-top:2px;}'
+    +'.doc-type{font-size:18px;font-weight:bold;color:#F8E41A;letter-spacing:.05em;}'
+    +'.doc-sub{font-size:9px;color:#aaa;margin-top:3px;}'
+    +'.yellow-bar{background:#F8E41A;height:4px;}'
+    +'.section-title{font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#fff;background:#000;padding:5px 10px;}'
+    +'.section-body{border:1px solid #ddd;border-top:none;padding:12px 14px;}'
+    +'.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;}'
+    +'.field label{display:block;font-size:8px;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;color:#666;margin-bottom:3px;}'
+    +'.field span{display:block;font-size:11px;color:#111;border-bottom:1px solid #e0e0e0;padding-bottom:3px;min-height:15px;}'
+    +'table{width:100%;border-collapse:collapse;}'
+    +'th{background:#000;color:#F8E41A;padding:7px 10px;text-align:left;font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;}'
+    +'th.r{text-align:right;}'
+    +'.total-row td{background:#F8E41A;color:#000;font-weight:bold;padding:9px 10px;}'
+    +'.notice{background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:10px 14px;font-size:10px;color:#7a6000;margin-top:16px;line-height:1.6;}'
+    +'.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:8px;}'
+    +'.sig-box .role{font-size:8px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;color:#666;margin-bottom:6px;}'
+    +'.sig-box .sig-line{height:48px;border-bottom:1.5px solid #333;margin-bottom:5px;}'
+    +'.sig-box .sig-label{font-size:9px;color:#555;}'
+    +'.footer{margin-top:20px;border-top:3px solid #F8E41A;padding-top:8px;display:flex;justify-content:space-between;font-size:8.5px;color:#666;}'
+    +'</style></head><body>'
+    // Header
+    +'<div class="header">'
+      +'<div style="display:flex;align-items:center;gap:14px;">'
+        +(logoSrc?'<img src="'+logoSrc+'" style="height:44px;width:auto;" alt="CLFN"/>':'')
+        +'<div><div class="org">Constance Lake First Nation</div><div class="dept">Housing Department</div></div>'
+      +'</div>'
+      +'<div style="text-align:right;"><div class="doc-type">WORK ORDER</div><div class="doc-sub">Date: '+today+'</div></div>'
+    +'</div>'
+    +'<div class="yellow-bar"></div>'
+    // Project info
+    +'<div style="margin-top:16px;">'
+    +'<div class="section-title">Project Information</div>'
+    +'<div class="section-body">'
+      +'<div class="grid-2" style="margin-bottom:10px;">'
+        +'<div class="field"><label>Unit Address</label><span>'+( address||'—')+'</span></div>'
+        +'<div class="field"><label>Tenant</label><span>'+(tenantName||'—')+'</span></div>'
+        +'<div class="field"><label>Contractor</label><span>'+(contractor||'—')+'</span></div>'
+        +'<div class="field"><label>Issued By</label><span>'+(preparedBy||'—')+'</span></div>'
+        +'<div class="field"><label>Start Date</label><span>'+(startDate||'—')+'</span></div>'
+        +'<div class="field"><label>Completion Date</label><span>'+(endDate||'—')+'</span></div>'
+      +'</div>'
+    +'</div>'
+    // Scope items
+    +'<div style="margin-top:16px;">'
+    +'<div class="section-title">Scope of Work</div>'
+    +'<table><thead><tr>'
+      +'<th>Category</th><th>Description of Work</th><th class="r">Quoted Price</th>'
+    +'</tr></thead><tbody>'
+    +itemRows
+    +totalRow
+    +'</tbody></table>'
+    +'</div>'
+    // Terms notice
+    +'<div class="notice">'
+      +'<strong>Work Authorization:</strong> The contractor is authorized to perform only the work described above. '
+      +'Any additional work or changes to scope must be approved in writing by the CLFN Housing Manager or Executive Director before work commences. '
+      +'Invoices must reference this work order and unit address. Payment is subject to satisfactory completion and inspection.'
+    +'</div>'
+    // Signatures
+    +'<div style="margin-top:24px;">'
+    +'<div class="section-title">Authorization</div>'
+    +'<div class="section-body">'
+      +'<div class="sig-grid">'
+        +'<div class="sig-box"><div class="role">Contractor Representative</div><div class="sig-line"></div><div class="sig-label">Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date: ____________</div><div style="margin-top:8px;font-size:9px;color:#555;">Print name: ____________________________</div></div>'
+        +'<div class="sig-box"><div class="role">CLFN Housing — Authorized Signatory</div><div class="sig-line"></div><div class="sig-label">Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date: ____________</div><div style="margin-top:8px;font-size:9px;color:#555;">Print name: ____________________________</div></div>'
+      +'</div>'
+    +'</div></div>'
+    +'<div class="footer"><span>CLFN Housing Department · Work Order</span><span>Generated: '+today+'</span></div>'
+    +'</body></html>';
+
+  var w = window.open('','_blank');
+  if(w) {
+    w.document.write(html);
+    w.document.close();
+    setTimeout(function(){ w.print(); }, 400);
   }
 }
 
@@ -13276,7 +13398,8 @@ function newApp(){
         <div id="sow_unit_label" style="font-size:11px;color:#888;margin-top:2px;"></div>
       </div>
       <div style="display:flex;gap:8px;">
-        <button type="button" onclick="printSOW()" style="background:none;border:1px solid #555;color:#ccc;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;">🖨 Print</button>
+        <button type="button" onclick="printWorkOrder()" style="background:var(--yellow);border:none;color:#111;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;display:flex;align-items:center;gap:5px;">🏗 Work Order</button>
+        <button type="button" onclick="printSOW()" style="background:none;border:1px solid #555;color:#ccc;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;">🖨 Full SOW</button>
         <button type="button" onclick="closeSowModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
       </div>
     </div>
@@ -13461,13 +13584,7 @@ function newApp(){
               <div class="f"><label>Printed Name</label><input type="text" id="sow_sig_tenant_name" placeholder="Tenant full name"/></div>
               <div class="f"><label>Date</label><input type="date" id="sow_sig_tenant_date"/></div>
             </div>
-            <div style="border:1.5px solid var(--border);border-radius:7px;background:#fafaf8;">
-              <canvas id="sow_sig_canvas_tenant" width="620" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;border-radius:7px 7px 0 0;"></canvas>
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);">
-                <span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span>
-                <button type="button" onclick="clearSig('sow_sig_canvas_tenant')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button>
-              </div>
-            </div>
+            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','canvas')" id="sow_sig_canvas_tenant_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','type')" id="sow_sig_canvas_tenant_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','wet')" id="sow_sig_canvas_tenant_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sow_sig_canvas_tenant_panel_canvas" style="background:#fafaf8;"><canvas id="sow_sig_canvas_tenant" width="620" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('sow_sig_canvas_tenant')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sow_sig_canvas_tenant_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="sow_sig_canvas_tenant_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="sow_sig_canvas_tenant_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="sow_sig_canvas_tenant_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
           </div>
 
           <!-- Employee signature -->
@@ -13483,13 +13600,7 @@ function newApp(){
               <div class="f"><label>Printed Name</label><input type="text" id="sow_sig_staff_name" placeholder="Staff full name"/></div>
               <div class="f"><label>Date</label><input type="date" id="sow_sig_staff_date"/></div>
             </div>
-            <div style="border:1.5px solid var(--border);border-radius:7px;background:#fafaf8;">
-              <canvas id="sow_sig_canvas_staff" width="620" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;border-radius:7px 7px 0 0;"></canvas>
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);">
-                <span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span>
-                <button type="button" onclick="clearSig('sow_sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button>
-              </div>
-            </div>
+            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','canvas')" id="sow_sig_canvas_staff_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','type')" id="sow_sig_canvas_staff_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','wet')" id="sow_sig_canvas_staff_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sow_sig_canvas_staff_panel_canvas" style="background:#fafaf8;"><canvas id="sow_sig_canvas_staff" width="620" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('sow_sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sow_sig_canvas_staff_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="sow_sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="sow_sig_canvas_staff_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="sow_sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
           </div>
 
         </div>
@@ -13656,7 +13767,7 @@ function newApp(){
       <!-- Assignment (shown only for occupied/reserved) -->
       <div id="ue_assign_row" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px;flex-direction:column;gap:12px;">
         <!-- Section header -->
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Tenant Assignment</div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Tenant Assignment — search approved applicants or start a new application</div>
 
         <!-- Current tenant card (shown when already assigned) -->
         <div id="ue_current_tenant" style="display:none;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">
@@ -13675,7 +13786,7 @@ function newApp(){
           <label style="font-size:11.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;">Search Applicant <span style="color:#b91c1c;">*</span></label>
           <div style="position:relative;">
             <input type="text" id="ue_tenant_search"
-              placeholder="Type name or APP-ID to search approved applicants…"
+              placeholder="Search by name or APP-ID…"
               autocomplete="off"
               oninput="ueTenantSearch(this.value)"
               onfocus="ueTenantSearch(this.value)"
@@ -13910,15 +14021,44 @@ function _restoreSigCanvas(canvasId, dataURL) {
   img.src = dataURL;
 }
 function getSigDataURL(canvasId) {
+  // Check active method — typed or wet take priority over canvas
+  var activePanel = document.getElementById(canvasId + '_panel_type');
+  if(activePanel && activePanel.style.display !== 'none') {
+    var typed = document.getElementById(canvasId + '_typed');
+    return typed && typed.value.trim() ? 'typed:' + typed.value.trim() : '';
+  }
+  var wetPanel = document.getElementById(canvasId + '_panel_wet');
+  if(wetPanel && wetPanel.style.display !== 'none') {
+    var ref = document.getElementById(canvasId + '_wet_ref');
+    return ref && ref.value.trim() ? 'wet:' + ref.value.trim() : 'wet:pending';
+  }
+  // Canvas draw mode
   var canvas = document.getElementById(canvasId);
   if (!canvas) return '';
-  // Return empty string if canvas is blank
   var ctx = canvas.getContext('2d');
   var data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
   var hasContent = false;
   for (var i = 3; i < data.length; i += 4) { if (data[i] > 0) { hasContent = true; break; } }
   return hasContent ? canvas.toDataURL('image/png') : '';
 }
+
+// Switch signature method tabs
+function setSigMethod(canvasId, method) {
+  var methods = ['canvas', 'type', 'wet'];
+  methods.forEach(function(m) {
+    var panel = document.getElementById(canvasId + '_panel_' + m);
+    var tab   = document.getElementById(canvasId + '_tab_' + m);
+    if(panel) panel.style.display = (m === method) ? 'block' : 'none';
+    if(tab) {
+      tab.style.borderBottomColor = (m === method) ? 'var(--yellow)' : 'transparent';
+      tab.style.color = (m === method) ? 'var(--text)' : 'var(--muted)';
+      tab.style.fontWeight = (m === method) ? '700' : '600';
+    }
+  });
+  // Init canvas pad when switching to draw mode
+  if(method === 'canvas') _initSigPad(canvasId);
+}
+
 function initSignaturePads() {
   ['sig_canvas_app','sig_canvas_co','sig_canvas_staff'].forEach(_initSigPad);
 }
