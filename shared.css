@@ -1079,3 +1079,8 @@ body.modal-open { overflow: hidden; position: fixed; width: 100%; }
   background: #fff5f5 !important;
 }
 
+
+/* ── Sidebar nav buttons (renos.html) ─────────────────────────────────────── */
+.snav-btn{display:flex;align-items:center;gap:10px;width:100%;padding:9px 16px;background:none;border:none;color:#aaa;font-size:13px;font-weight:500;cursor:pointer;text-align:left;border-radius:0;transition:var(--tr);}
+.snav-btn:hover{background:var(--dark3);color:#fff;}
+.snav-btn.active{background:var(--yellow);color:#111;font-weight:700;}
