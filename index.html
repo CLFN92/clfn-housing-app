@@ -178,7 +178,7 @@ body{font-family:'DM Sans',sans-serif;background:#fafaf8;color:#111;font-size:14
         <button onclick="showForgotPassword()" style="background:none;border:none;font-size:12px;color:#F8E41A;cursor:pointer;padding:0;">Forgot password?</button>
       </div>
 
-      <button id="signin-btn" onclick="startSignIn()"
+      <button id="signin-btn" onclick="this.disabled=true;this.textContent='Signing in…';startSignIn()"
         style="background:#F8E41A;border:none;color:#111;padding:12px;border-radius:8px;font-size:14px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;width:100%;">
         Sign in
       </button>
@@ -3330,17 +3330,25 @@ async function startSignIn() {
 
     // Load data
     await loadAppDataFromSupabase();
+    console.log('[L1] data done');
 
-    // Show home screen
     hidLoginScreen();
+    console.log('[L2] login hidden');
+
     var homeEl = document.getElementById('employeeHomeView');
+    console.log('[L3] homeEl:', homeEl ? 'found' : 'NULL');
     if(homeEl) { homeEl.style.display='flex'; homeEl.style.flexDirection='column'; }
+
     var loginEl = document.getElementById('loginScreen');
     if(loginEl) loginEl.style.display='none';
+    console.log('[L4] login forced hidden');
 
-    // Try full tile render, fall back to just showing the view
-    try { showEmployeeHome(); } catch(e) {
-      console.warn('[HOME]', e.message);
+    try {
+      console.log('[L5] calling showEmployeeHome...');
+      showEmployeeHome();
+      console.log('[L6] showEmployeeHome OK');
+    } catch(e) {
+      console.error('[L5-ERR]', e.message, e.stack);
       var n = document.getElementById('emp_home_name');
       if(n) n.textContent = HOUSING_SESSION.name || 'Welcome';
     }
