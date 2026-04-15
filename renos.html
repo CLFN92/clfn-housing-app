@@ -2955,7 +2955,7 @@ function updateRoleSwitcherVisibility() {
   // Hide role switcher when a real session is active
   var rs = document.getElementById('roleSwitcher');
   if(!rs) return;
-  rs.style.display = (window.CLFN_AUTH && window.CLFN_AUTH.isAuthenticated) ? 'none' : 'block';
+  rs.style.display = 'none';
 }
 
 function updateHeaderUser(role) {
@@ -3735,11 +3735,8 @@ function showRenos(){
   setNavActive('tab_renos');
   hideAllViews();
   var role = window.currentRole || 'employee';
-  if(role === 'housing_manager' || role === 'ed') {
-    var rav = document.getElementById('renoApprovalsView');
-    if(rav){ rav.style.display='flex'; rav.style.flexDirection='column'; }
-    renderRenoApprovalsView();
-  } else {
+  // All roles start on renovations view; approvals accessible via sidebar
+  {
     var rv = document.getElementById('renovationsView');
     if(rv){ rv.style.display='flex'; rv.style.flexDirection='column'; }
     renderRenosView();

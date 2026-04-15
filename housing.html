@@ -1963,9 +1963,47 @@ var _ctApprovalIdx=null; var _raFilter=null; var _currentDetailUnitId=null;
 async function loadHousingData() {
   try {
     var aR = await fetch(SUPABASE_URL+'/rest/v1/housing_applications?select=*&order=created_at.desc&limit=9999',{headers:HOUSING_HEADERS});
-    if(aR.ok) applications = await aR.json();
+    if(aR.ok) {
+      var rawApps = await aR.json();
+      applications = rawApps.map(function(row) {
+        return Object.assign({}, row.data||{}, {
+          id: row.id,
+          status: row.status,
+          score: typeof row.score === 'number' ? row.score : (row.data&&row.data.score)||0,
+          tier: row.tier || (row.data&&row.data.tier) || null,
+          classification: row.classification || null,
+          reserve: row.reserve || null,
+          archived: !!row.archived,
+          assignedUnit: row.assigned_unit_id || null,
+          assignedAddress: row.assigned_address || null,
+          submittedAt: row.submitted_at || null,
+          appDate: row.submitted_at ? row.submitted_at.slice(0,10) : null
+        });
+      });
+    }
     var uR = await fetch(SUPABASE_URL+'/rest/v1/housing_units?select=*&order=street,num&limit=9999',{headers:HOUSING_HEADERS});
-    if(uR.ok) housingUnits = await uR.json();
+    if(uR.ok) {
+      var rawUnits = await uR.json();
+      housingUnits = rawUnits.map(function(row) {
+        return Object.assign({}, row.data||{}, {
+          id: row.id,
+          num: row.num,
+          street: row.street,
+          bedrooms: row.bedrooms,
+          bathrooms: row.bathrooms,
+          type: row.type,
+          foundation: row.foundation,
+          funder: row.funder,
+          status: row.status || 'vacant',
+          accessible: !!row.accessible,
+          isElders: !!row.is_elders,
+          archived: !!row.archived,
+          assignedTo: row.assigned_to,
+          assignedName: row.assigned_name,
+          assignedDate: row.assigned_date
+        });
+      });
+    }
     var cR = await sbLoadContractors(); if(cR) window._contractors = cR;
     var sowR = await fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=*',{headers:HOUSING_HEADERS});
     if(sowR.ok){var sd2=await sowR.json();sd2.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
@@ -4290,6 +4328,31 @@ function showApp(){
   // Show sidebar with step nav
   var sb=document.getElementById('sharedSidebar');if(sb)sb.classList.add('sidebar-open');
   var sn=document.getElementById('stepNav');if(sn)sn.style.display='block';
+}
+
+function showSettingsSection(section) {
+  // Show/hide settings section panels
+  var sections = ['sec_users','sec_scoring','sec_unit','sec_reno','sec_budget','sec_contacts','sec_audit'];
+  sections.forEach(function(id) {
+    var el = document.getElementById(id);
+    if(el) el.style.display = (id === section) ? 'block' : 'none';
+  });
+  // Update tab active states
+  var tabs = document.querySelectorAll('.settings-tab');
+  tabs.forEach(function(t) {
+    var isActive = t.id === 'stab_' + section.replace('sec_','');
+    t.style.borderBottom = isActive ? '2px solid var(--yellow)' : '2px solid transparent';
+    t.style.fontWeight = isActive ? '700' : '500';
+    t.style.color = isActive ? 'var(--text)' : 'var(--muted)';
+  });
+  // Render section-specific content
+  if(section === 'sec_users' && typeof renderHousingUserTable === 'function') renderHousingUserTable();
+  if(section === 'sec_scoring' && typeof renderScoringModelTable === 'function') renderScoringModelTable();
+  if(section === 'sec_unit' && typeof renderUnitScoreTable === 'function') renderUnitScoreTable();
+  if(section === 'sec_reno' && typeof renderRenoScoreTable === 'function') renderRenoScoreTable();
+  if(section === 'sec_budget' && typeof renderBudgetPools === 'function') renderBudgetPools();
+  if(section === 'sec_contacts' && typeof populateContactSettings === 'function') populateContactSettings();
+  if(section === 'sec_audit' && typeof renderAuditLog === 'function') renderAuditLog();
 }
 
 function showSettings(){
