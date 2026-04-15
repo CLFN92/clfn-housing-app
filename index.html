@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <title>CLFN Housing</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="shared.css"/>
 <style>
 .hm-ed-only{display:none;} .ed-only{display:none;}
 /* Login screen critical CSS — fallback if shared.css fails to load */
@@ -24,8 +23,13 @@
 .app-header{background:#111;border-bottom:2px solid #F8E41A;height:60px;display:flex;align-items:center;padding:0 20px;gap:12px;}
 body{font-family:'DM Sans',sans-serif;background:#fafaf8;color:#111;font-size:14px;line-height:1.6;min-height:100vh;}
 </style>
+<style>
+.hm-ed-only{display:none;} .ed-only{display:none;}
+#signin-btn{background:#F8E41A;border:none;color:#111;padding:12px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;width:100%;font-family:DM Sans,sans-serif;}
+</style>
 </head>
 <body>
+
 
 <!-- ─── APPROVAL ACTION MODAL ─── -->
 <div id="approvalModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:800;align-items:center;justify-content:center;padding:20px;">
@@ -230,516 +234,7 @@ body{font-family:'DM Sans',sans-serif;background:#fafaf8;color:#111;font-size:14
 
 
 </body>
-<script>
-// ── Supabase config + data layer ─────────────────────────────────────────────
-var SUPABASE_URL  = 'https://fkhzrbalumzeripzolph.supabase.co';
-var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo';
-var STORAGE_BUCKET = 'housing-files';
 
-// ── Supabase Storage helpers ──────────────────────────────────────────────────
-// All file uploads go through these functions.
-// Path conventions:
-//   tenants/{unitId}/{timestamp}_{filename}
-//   applications/{appId}/{timestamp}_{filename}
-//   contractors/{contractorId}/{bucket}/{timestamp}_{filename}
-//   units/{unitId}/photos/{timestamp}_{filename}
-//   sow/{unitId}/{timestamp}_{filename}
-
-function sbStorageHeaders() {
-  var h = { 'apikey': SUPABASE_ANON };
-  if(HOUSING_HEADERS && HOUSING_HEADERS['Authorization']) {
-    h['Authorization'] = HOUSING_HEADERS['Authorization'];
-  }
-  return h;
-}
-
-// Upload a File object to Supabase Storage. Returns {path, url} or throws.
-async function sbUploadFile(path, file) {
-  var url = SUPABASE_URL + '/storage/v1/object/' + STORAGE_BUCKET + '/' + path;
-  var res = await fetch(url, {
-    method: 'POST',
-    headers: Object.assign({}, sbStorageHeaders(), { 'x-upsert': 'true' }),
-    body: file
-  });
-  if(!res.ok) {
-    var err = await res.text();
-    throw new Error('Upload failed: ' + err);
-  }
-  return { path: path, url: sbGetFileUrl(path) };
-}
-
-// Get a signed URL for a file (valid 1 hour)
-async function sbGetSignedUrl(path) {
-  // Use Supabase JS client createSignedUrl if available — handles encoding automatically
-  try {
-    if(window._sb) {
-      var r = await window._sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
-      if(r.data && r.data.signedUrl) return r.data.signedUrl;
-    }
-  } catch(e) { console.warn('createSignedUrl error:', e); }
-  // Fallback: authenticated URL — token in Authorization header via fetch, then blob URL
-  return sbGetFileUrl(path);
-}
-
-// Return authenticated URL with properly encoded path and token
-function sbGetFileUrl(path) {
-  var token = (HOUSING_HEADERS && HOUSING_HEADERS['Authorization'] || '').replace('Bearer ','');
-  var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
-  var base = SUPABASE_URL + '/storage/v1/object/authenticated/' + STORAGE_BUCKET + '/' + encodedPath;
-  return token ? (base + '?token=' + encodeURIComponent(token)) : base;
-}
-
-// Delete a file from storage
-async function sbDeleteFile(path) {
-  var url = SUPABASE_URL + '/storage/v1/object/' + STORAGE_BUCKET;
-  var res = await fetch(url, {
-    method: 'DELETE',
-    headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ prefixes: [path] })
-  });
-  return res.ok;
-}
-
-// List files under a path prefix
-async function sbListFiles(prefix) {
-  // Remove trailing slash for the prefix
-  var cleanPrefix = prefix.replace(/\/$/, '');
-  var url = SUPABASE_URL + '/storage/v1/object/list/' + STORAGE_BUCKET;
-  var res = await fetch(url, {
-    method: 'POST',
-    headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ prefix: cleanPrefix, limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } })
-  });
-  if(!res.ok) return [];
-  var data = await res.json();
-  return Array.isArray(data) ? data : [];
-}
-
-// Save file metadata to housing_audit_log (so we can list files without storage list calls)
-async function sbSaveFileMeta(entityType, entityId, filePath, fileName, fileSize, fileType) {
-  try {
-    await fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
-      method: 'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
-      body: JSON.stringify({
-        entity_type: entityType,
-        entity_id: String(entityId),
-        action: 'file_uploaded',
-        details: JSON.stringify({ path: filePath, name: fileName, size: fileSize, type: fileType }),
-        actor: window.currentRole || 'staff',
-        created_at: new Date().toISOString()
-      })
-    });
-  } catch(e) { console.warn('File meta save failed:', e); }
-}
-
-// Load file list for an entity from audit log
-async function sbLoadFileMeta(entityType, entityId) {
-  try {
-    var r = await fetch(
-      SUPABASE_URL + '/rest/v1/housing_audit_log?entity_type=eq.'+entityType+'&entity_id=eq.'+encodeURIComponent(String(entityId))+'&action=eq.file_uploaded&order=created_at.desc',
-      { headers: HOUSING_HEADERS }
-    );
-    if(!r.ok) return [];
-    var rows = await r.json();
-    // Filter out deleted files
-    var deleted = rows.filter(function(r){ return r.action === 'file_deleted'; }).map(function(r){ return JSON.parse(r.details||'{}').path; });
-    return rows
-      .filter(function(row){ var d = JSON.parse(row.details||'{}'); return !deleted.includes(d.path); })
-      .map(function(row){
-        var d = JSON.parse(row.details||'{}');
-        return { path: d.path, name: d.name, size: d.size, type: d.type, addedAt: (row.created_at||'').slice(0,10), addedBy: row.actor, logId: row.id };
-      });
-  } catch(e) { return []; }
-}
-
-// Unified upload handler: uploads to Supabase Storage + saves metadata
-// Returns { path, name, size, type, addedAt, addedBy }
-async function sbUploadAndSave(entityType, entityId, file, pathPrefix) {
-  var ts = Date.now();
-  var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  var path = pathPrefix + '/' + ts + '_' + safeName;
-  var result = await sbUploadFile(path, file);
-  await sbSaveFileMeta(entityType, String(entityId), path, file.name, file.size, file.type);
-  return { path: path, name: file.name, size: file.size, type: file.type,
-           addedAt: new Date().toISOString().slice(0,10), addedBy: window.currentRole || 'staff' };
-}
-
-
-window._sb = null;
-document.addEventListener('DOMContentLoaded', function() {
-  try {
-    if(window.supabase && window.supabase.createClient) {
-      window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-      console.log('[CLFN] Supabase client ready');
-    }
-  } catch(e) { console.log('[CLFN] Supabase init failed:', e.message); }
-});
-
-// ══════════════════════════════════════════════════════════════
-// SUPABASE DATA LAYER
-// All localStorage reads/writes have Supabase equivalents here.
-// The app falls back to localStorage if Supabase is unavailable.
-// ══════════════════════════════════════════════════════════════
-
-var _sbReady = false;
-
-function sbClient() {
-  if(!window._sb) {
-    if(window.supabase && window.supabase.createClient) {
-      window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-      _sbReady = true;
-    }
-  }
-  return window._sb;
-}
-
-// ── Map staff table role to housing app role ────────────────────────────────
-function sbMapRole(staffRow) {
-  if(!staffRow) return 'employee';
-  if(staffRow.role === 'ed') return 'ed';
-  if(staffRow.role === 'manager' && (staffRow.department||'').toLowerCase().includes('housing')) return 'housing_manager';
-  return 'employee';
-}
-
-// ── AUTH: Look up staff by email ─────────────────────────────────────────────
-async function sbGetStaffByEmail(email) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?select=*&email=eq.'+encodeURIComponent(email)+'&is_active=eq.true&limit=1', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] || null;
-  } catch(e) { console.warn('[SB] staff lookup failed:', e); return null; }
-}
-
-// ── APPLICATIONS ─────────────────────────────────────────────────────────────
-async function sbLoadApplications() {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_applications?select=*&order=submitted_at.desc&limit=9999', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row) {
-      return Object.assign({}, row.data||{}, {
-        id:row.id, status:row.status, score:row.score, tier:row.tier,
-        classification:row.classification, reserve:row.reserve, archived:row.archived,
-        assignedUnit:row.assigned_unit_id, assignedAddress:row.assigned_address, submittedAt:row.submitted_at
-      });
-    });
-  } catch(e) { console.warn('[SB] load applications failed:', e); return null; }
-}
-
-async function sbSaveApplication(app) {
-  var row = {
-    id: app.id,
-    sp_id: app.spId || null,
-    data: app,
-    status: app.status || 'draft',
-    score: typeof app.score === 'number' ? app.score : null,
-    tier: app.tier || null,
-    classification: app.classification || null,
-    reserve: app.reserve || null,
-    archived: !!app.archived,
-    assigned_unit_id: app.assignedUnit || null,
-    assigned_address: app.assignedAddress || null,
-    submitted_at: app.submittedAt || null,
-    // ── V2 scoring input fields ──
-    urgent_need:           app.urgentNeed           || app.urgent_need           || 'none',
-    health_risk:           app.healthRisk           || app.health_risk           || 'none',
-    persons_over_standard: parseInt(app.personsOverStandard || app.persons_over_standard || 0) || 0,
-    lone_parent:           !!(app.loneParent           || app.lone_parent),
-    elder_in_household:    !!(app.elderInHousehold    || app.elder_in_household),
-    household_disability:  !!(app.householdDisability || app.household_disability),
-    no_prior_tenancy:      (app.noPriorTenancy !== undefined ? !!app.noPriorTenancy : !!(app.no_prior_tenancy !== false)),
-    rent_payment_history:  app.rentPaymentHistory  || app.rent_payment_history  || 'no_history',
-    unit_condition:        app.unitCondition        || app.unit_condition        || 'no_history',
-    tenancy_conduct:       app.tenancyConduct       || app.tenancy_conduct       || 'no_history',
-    income_stability:      app.incomeStability      || app.income_stability      || 'stable',
-    arrears_status:        app.arrearsStatus        || app.arrears_status        || 'none',
-    // ── V2 scoring output fields ──
-    score_v2:              typeof app.score_v2 === 'number' ? app.score_v2 : (typeof app.score === 'number' ? app.score : null),
-    tier_v2:               app.tier_v2 || app.tier || null,
-    score_breakdown_v2:    app.scoreBreakdown || null
-  };
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_applications', {
-      method: 'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body: JSON.stringify(row)
-    });
-    if(!r.ok) { var e=await r.text(); console.warn('[SB] save application failed:', e); return false; }
-    return true;
-  } catch(e) { console.warn('[SB] save application error:', e); return false; }
-}
-
-async function sbSaveAllApplications(apps) {
-  var rows = apps.map(function(app) {
-    return {
-      id: app.id,
-      sp_id: app.spId || null,
-      data: app,
-      status: app.status || 'draft',
-      score: typeof app.score === 'number' ? app.score : null,
-      tier: app.tier || null,
-      classification: app.classification || null,
-      reserve: app.reserve || null,
-      archived: !!app.archived,
-      assigned_unit_id: app.assignedUnit || null,
-      assigned_address: app.assignedAddress || null,
-      submitted_at: app.submittedAt || null
-    };
-  });
-  // Upsert in batches of 100
-  for(var i=0; i<rows.length; i+=100) {
-    var batch = rows.slice(i, i+100);
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_applications', {
-      method: 'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body: JSON.stringify(batch)
-    });
-    if(!r.ok) { console.warn('[SB] batch save applications failed:', await r.text()); return false; }
-  }
-  return true;
-}
-
-// ── HOUSING UNITS ─────────────────────────────────────────────────────────────
-async function sbLoadUnits() {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_units?select=*&order=street,num&limit=9999', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row) {
-      return Object.assign({}, row.data||{}, {
-        id:row.id, num:row.num, street:row.street, bedrooms:row.bedrooms, bathrooms:row.bathrooms,
-        type:row.type, foundation:row.foundation, funder:row.funder, status:row.status,
-        accessible:row.accessible, isElders:row.is_elders, archived:row.archived,
-        assignedTo:row.assigned_to, assignedName:row.assigned_name, assignedDate:row.assigned_date
-      });
-    });
-  } catch(e) { console.warn('[SB] load units failed:', e); return null; }
-}
-
-async function sbSaveUnit(u) {
-  var row = {
-    id:u.id, num:u.num||null, street:u.street||null, bedrooms:u.bedrooms||null,
-    bathrooms:u.bathrooms||null, type:u.type||null, foundation:u.foundation||null,
-    funder:u.funder||null, status:u.status||'vacant', accessible:!!u.accessible,
-    is_elders:!!u.isElders, archived:!!u.archived, assigned_to:u.assignedTo||null,
-    assigned_name:u.assignedName||null, assigned_date:u.assignedDate||null, data:u
-  };
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_units', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify(row)
-    });
-    if(!r.ok){ console.warn('[SB] save unit failed:', await r.text()); return false; }
-    return true;
-  } catch(e){ console.warn('[SB] save unit error:',e); return false; }
-}
-
-async function sbSaveAllUnits(units) {
-  if(!units || !units.length) return true;
-  var rows = units.map(function(u) {
-    return {
-      id: u.id,
-      num: u.num || null,
-      street: u.street || null,
-      bedrooms: u.bedrooms || null,
-      bathrooms: u.bathrooms || null,
-      type: u.type || null,
-      foundation: u.foundation || null,
-      funder: u.funder || null,
-      status: u.status || 'vacant',
-      accessible: !!u.accessible,
-      is_elders: !!u.isElders,
-      archived: !!u.archived,
-      assigned_to: u.assignedTo || null,
-      assigned_name: u.assignedName || null,
-      assigned_date: u.assignedDate || null,
-      data: u
-    };
-  });
-  for(var i=0; i<rows.length; i+=100) {
-    var batch = rows.slice(i, i+100);
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_units', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify(batch)
-    });
-    if(!r.ok){ console.warn('[SB] batch save units failed:', await r.text()); return false; }
-  }
-  return true;
-}
-
-// ── AUDIT LOG ─────────────────────────────────────────────────────────────────
-async function sbLogAudit(appId, action, detail, userRole) {
-  try {
-    await fetch(SUPABASE_URL+'/rest/v1/housing_audit_log', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
-      body:JSON.stringify({ entity_type:'application', entity_id:String(appId||''), action:action, details:JSON.stringify({detail:detail}), actor:userRole||window.currentRole||'staff', created_at:new Date().toISOString() })
-    });
-  } catch(e){ console.warn('[SB] log audit failed:',e); }
-}
-
-async function sbLoadAuditLog(limit) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_audit_log?select=*&order=created_at.desc&limit='+(limit||500), { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row){
-      var d = JSON.parse(row.details||'{}');
-      return { ts:row.created_at, appId:row.entity_id, action:row.action, detail:d.detail||row.details||'', user:row.actor };
-    });
-  } catch(e){ console.warn('[SB] load audit log failed:',e); return null; }
-}
-
-// ── SETTINGS ─────────────────────────────────────────────────────────────────
-async function sbLoadSetting(key) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=value&key=eq.'+encodeURIComponent(key)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].value : null;
-  } catch(e){ return null; }
-}
-
-async function sbSaveSetting(key, value) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_settings', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({key:key, value:value})
-    });
-    if(!r.ok){ console.warn('[SB] save setting failed:', await r.text()); return false; }
-    return true;
-  } catch(e){ console.warn('[SB] save setting error:',e); return false; }
-}
-
-// ── CONTRACTORS ───────────────────────────────────────────────────────────────
-async function sbLoadContractors() {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_contractors?select=*&order=created_at', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row){ return Object.assign({}, row.data||{}, { id:row.id, name:row.name, trade:row.trade, status:row.status }); });
-  } catch(e) { console.warn('[SB] load contractors failed:', e); return null; }
-}
-
-async function sbSaveContractor(ct) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_contractors', {
-      method: 'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body: JSON.stringify({ id:ct.id, name:ct.name||null, trade:ct.trade||null, status:ct.status||'pending_review', data:ct, updated_at:new Date().toISOString() })
-    });
-    if(!r.ok) { console.warn('[SB] save contractor failed:', await r.text()); return false; }
-    return true;
-  } catch(e) { console.warn('[SB] save contractor error:', e); return false; }
-}
-
-// ── SOW ──────────────────────────────────────────────────────────────────────
-async function sbLoadSow(unitId) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=data&unit_id=eq.'+encodeURIComponent(unitId)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].data : null;
-  } catch(e){ return null; }
-}
-
-async function sbSaveSow(unitId, data) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_sow', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({unit_id:unitId, data:data, updated_at:new Date().toISOString()})
-    });
-    return r.ok;
-  } catch(e){ console.warn('[SB] save sow error:',e); return false; }
-}
-
-// ── RENO PROGRESS ─────────────────────────────────────────────────────────────
-async function sbLoadRenoProgress(unitId) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress?select=data&unit_id=eq.'+encodeURIComponent(unitId)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].data : null;
-  } catch(e){ return null; }
-}
-
-async function sbSaveRenoProgress(unitId, data) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({unit_id:unitId, data:data, updated_at:new Date().toISOString()})
-    });
-    return r.ok;
-  } catch(e){ console.warn('[SB] save reno progress error:',e); return false; }
-}
-
-// ── MIGRATE: Push localStorage → Supabase ────────────────────────────────────
-// Run this once from the browser console to seed Supabase with existing data:
-// await sbMigrateAll()
-window.sbMigrateAll = async function() {
-  console.log('[SB MIGRATE] Starting...');
-  showToast('Migration started — check console for progress');
-
-  // Applications
-  var apps = [];
-  try { apps = JSON.parse(localStorage.getItem('clfn_applications')||'[]'); } catch(e){}
-  if(!apps.length) apps = (typeof SP_APPLICATIONS !== 'undefined') ? SP_APPLICATIONS : [];
-  if(apps.length) {
-    var ok = await sbSaveAllApplications(apps);
-    console.log('[SB MIGRATE] Applications:', ok ? apps.length+' saved' : 'FAILED');
-  }
-
-  // Housing units
-  var units = [];
-  try { units = JSON.parse(localStorage.getItem('clfn_housing_units')||'[]'); } catch(e){}
-  if(!units.length) units = (typeof HOUSING_UNITS_DATA !== 'undefined') ? HOUSING_UNITS_DATA : [];
-  if(units.length) {
-    var ok2 = await sbSaveAllUnits(units);
-    console.log('[SB MIGRATE] Housing units:', ok2 ? units.length+' saved' : 'FAILED');
-  }
-
-  // Contractors
-  var contractors = [];
-  var contractors = window._contractors || [];
-  if(contractors.length) {
-    for(var ct of contractors) { await sbSaveContractor(ct); }
-    console.log('[SB MIGRATE] Contractors:', contractors.length+' saved');
-  }
-
-  // Settings
-  var settings = {};
-  settings = window._appSettings || {};
-  if(Object.keys(settings).length) {
-    await sbSaveSetting('app_settings', settings);
-    console.log('[SB MIGRATE] Settings saved');
-  }
-
-  // Scoring model
-  try {
-    var sm = localStorage.getItem('clfn_scoring_model');
-    if(sm) await sbSaveSetting('scoring_model', JSON.parse(sm));
-    var usm = localStorage.getItem('clfn_unit_score_model');
-    if(usm) await sbSaveSetting('unit_score_model', JSON.parse(usm));
-    var rsm = localStorage.getItem('clfn_reno_score_model_v3');
-    if(rsm) await sbSaveSetting('reno_score_model', JSON.parse(rsm));
-    var bp = localStorage.getItem('clfn_budget_pools');
-    if(bp) await sbSaveSetting('budget_pools', JSON.parse(bp));
-    console.log('[SB MIGRATE] Scoring models and budget saved');
-  } catch(e) { console.warn('[SB MIGRATE] Settings partial:', e); }
-
-  console.log('[SB MIGRATE] Complete!');
-  showToast('✓ Migration complete — check console for details');
-};
-
-
-</script>
 </head>
 <body>
 
@@ -3969,516 +3464,7 @@ async function submitAddHousingStaff() {
 
 
 </body>
-<script>
-// ── Supabase config + data layer ─────────────────────────────────────────────
-var SUPABASE_URL  = 'https://fkhzrbalumzeripzolph.supabase.co';
-var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo';
-var STORAGE_BUCKET = 'housing-files';
 
-// ── Supabase Storage helpers ──────────────────────────────────────────────────
-// All file uploads go through these functions.
-// Path conventions:
-//   tenants/{unitId}/{timestamp}_{filename}
-//   applications/{appId}/{timestamp}_{filename}
-//   contractors/{contractorId}/{bucket}/{timestamp}_{filename}
-//   units/{unitId}/photos/{timestamp}_{filename}
-//   sow/{unitId}/{timestamp}_{filename}
-
-function sbStorageHeaders() {
-  var h = { 'apikey': SUPABASE_ANON };
-  if(HOUSING_HEADERS && HOUSING_HEADERS['Authorization']) {
-    h['Authorization'] = HOUSING_HEADERS['Authorization'];
-  }
-  return h;
-}
-
-// Upload a File object to Supabase Storage. Returns {path, url} or throws.
-async function sbUploadFile(path, file) {
-  var url = SUPABASE_URL + '/storage/v1/object/' + STORAGE_BUCKET + '/' + path;
-  var res = await fetch(url, {
-    method: 'POST',
-    headers: Object.assign({}, sbStorageHeaders(), { 'x-upsert': 'true' }),
-    body: file
-  });
-  if(!res.ok) {
-    var err = await res.text();
-    throw new Error('Upload failed: ' + err);
-  }
-  return { path: path, url: sbGetFileUrl(path) };
-}
-
-// Get a signed URL for a file (valid 1 hour)
-async function sbGetSignedUrl(path) {
-  // Use Supabase JS client createSignedUrl if available — handles encoding automatically
-  try {
-    if(window._sb) {
-      var r = await window._sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
-      if(r.data && r.data.signedUrl) return r.data.signedUrl;
-    }
-  } catch(e) { console.warn('createSignedUrl error:', e); }
-  // Fallback: authenticated URL — token in Authorization header via fetch, then blob URL
-  return sbGetFileUrl(path);
-}
-
-// Return authenticated URL with properly encoded path and token
-function sbGetFileUrl(path) {
-  var token = (HOUSING_HEADERS && HOUSING_HEADERS['Authorization'] || '').replace('Bearer ','');
-  var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
-  var base = SUPABASE_URL + '/storage/v1/object/authenticated/' + STORAGE_BUCKET + '/' + encodedPath;
-  return token ? (base + '?token=' + encodeURIComponent(token)) : base;
-}
-
-// Delete a file from storage
-async function sbDeleteFile(path) {
-  var url = SUPABASE_URL + '/storage/v1/object/' + STORAGE_BUCKET;
-  var res = await fetch(url, {
-    method: 'DELETE',
-    headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ prefixes: [path] })
-  });
-  return res.ok;
-}
-
-// List files under a path prefix
-async function sbListFiles(prefix) {
-  // Remove trailing slash for the prefix
-  var cleanPrefix = prefix.replace(/\/$/, '');
-  var url = SUPABASE_URL + '/storage/v1/object/list/' + STORAGE_BUCKET;
-  var res = await fetch(url, {
-    method: 'POST',
-    headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ prefix: cleanPrefix, limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } })
-  });
-  if(!res.ok) return [];
-  var data = await res.json();
-  return Array.isArray(data) ? data : [];
-}
-
-// Save file metadata to housing_audit_log (so we can list files without storage list calls)
-async function sbSaveFileMeta(entityType, entityId, filePath, fileName, fileSize, fileType) {
-  try {
-    await fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
-      method: 'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
-      body: JSON.stringify({
-        entity_type: entityType,
-        entity_id: String(entityId),
-        action: 'file_uploaded',
-        details: JSON.stringify({ path: filePath, name: fileName, size: fileSize, type: fileType }),
-        actor: window.currentRole || 'staff',
-        created_at: new Date().toISOString()
-      })
-    });
-  } catch(e) { console.warn('File meta save failed:', e); }
-}
-
-// Load file list for an entity from audit log
-async function sbLoadFileMeta(entityType, entityId) {
-  try {
-    var r = await fetch(
-      SUPABASE_URL + '/rest/v1/housing_audit_log?entity_type=eq.'+entityType+'&entity_id=eq.'+encodeURIComponent(String(entityId))+'&action=eq.file_uploaded&order=created_at.desc',
-      { headers: HOUSING_HEADERS }
-    );
-    if(!r.ok) return [];
-    var rows = await r.json();
-    // Filter out deleted files
-    var deleted = rows.filter(function(r){ return r.action === 'file_deleted'; }).map(function(r){ return JSON.parse(r.details||'{}').path; });
-    return rows
-      .filter(function(row){ var d = JSON.parse(row.details||'{}'); return !deleted.includes(d.path); })
-      .map(function(row){
-        var d = JSON.parse(row.details||'{}');
-        return { path: d.path, name: d.name, size: d.size, type: d.type, addedAt: (row.created_at||'').slice(0,10), addedBy: row.actor, logId: row.id };
-      });
-  } catch(e) { return []; }
-}
-
-// Unified upload handler: uploads to Supabase Storage + saves metadata
-// Returns { path, name, size, type, addedAt, addedBy }
-async function sbUploadAndSave(entityType, entityId, file, pathPrefix) {
-  var ts = Date.now();
-  var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  var path = pathPrefix + '/' + ts + '_' + safeName;
-  var result = await sbUploadFile(path, file);
-  await sbSaveFileMeta(entityType, String(entityId), path, file.name, file.size, file.type);
-  return { path: path, name: file.name, size: file.size, type: file.type,
-           addedAt: new Date().toISOString().slice(0,10), addedBy: window.currentRole || 'staff' };
-}
-
-
-window._sb = null;
-document.addEventListener('DOMContentLoaded', function() {
-  try {
-    if(window.supabase && window.supabase.createClient) {
-      window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-      console.log('[CLFN] Supabase client ready');
-    }
-  } catch(e) { console.log('[CLFN] Supabase init failed:', e.message); }
-});
-
-// ══════════════════════════════════════════════════════════════
-// SUPABASE DATA LAYER
-// All localStorage reads/writes have Supabase equivalents here.
-// The app falls back to localStorage if Supabase is unavailable.
-// ══════════════════════════════════════════════════════════════
-
-var _sbReady = false;
-
-function sbClient() {
-  if(!window._sb) {
-    if(window.supabase && window.supabase.createClient) {
-      window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-      _sbReady = true;
-    }
-  }
-  return window._sb;
-}
-
-// ── Map staff table role to housing app role ────────────────────────────────
-function sbMapRole(staffRow) {
-  if(!staffRow) return 'employee';
-  if(staffRow.role === 'ed') return 'ed';
-  if(staffRow.role === 'manager' && (staffRow.department||'').toLowerCase().includes('housing')) return 'housing_manager';
-  return 'employee';
-}
-
-// ── AUTH: Look up staff by email ─────────────────────────────────────────────
-async function sbGetStaffByEmail(email) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?select=*&email=eq.'+encodeURIComponent(email)+'&is_active=eq.true&limit=1', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] || null;
-  } catch(e) { console.warn('[SB] staff lookup failed:', e); return null; }
-}
-
-// ── APPLICATIONS ─────────────────────────────────────────────────────────────
-async function sbLoadApplications() {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_applications?select=*&order=submitted_at.desc&limit=9999', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row) {
-      return Object.assign({}, row.data||{}, {
-        id:row.id, status:row.status, score:row.score, tier:row.tier,
-        classification:row.classification, reserve:row.reserve, archived:row.archived,
-        assignedUnit:row.assigned_unit_id, assignedAddress:row.assigned_address, submittedAt:row.submitted_at
-      });
-    });
-  } catch(e) { console.warn('[SB] load applications failed:', e); return null; }
-}
-
-async function sbSaveApplication(app) {
-  var row = {
-    id: app.id,
-    sp_id: app.spId || null,
-    data: app,
-    status: app.status || 'draft',
-    score: typeof app.score === 'number' ? app.score : null,
-    tier: app.tier || null,
-    classification: app.classification || null,
-    reserve: app.reserve || null,
-    archived: !!app.archived,
-    assigned_unit_id: app.assignedUnit || null,
-    assigned_address: app.assignedAddress || null,
-    submitted_at: app.submittedAt || null,
-    // ── V2 scoring input fields ──
-    urgent_need:           app.urgentNeed           || app.urgent_need           || 'none',
-    health_risk:           app.healthRisk           || app.health_risk           || 'none',
-    persons_over_standard: parseInt(app.personsOverStandard || app.persons_over_standard || 0) || 0,
-    lone_parent:           !!(app.loneParent           || app.lone_parent),
-    elder_in_household:    !!(app.elderInHousehold    || app.elder_in_household),
-    household_disability:  !!(app.householdDisability || app.household_disability),
-    no_prior_tenancy:      (app.noPriorTenancy !== undefined ? !!app.noPriorTenancy : !!(app.no_prior_tenancy !== false)),
-    rent_payment_history:  app.rentPaymentHistory  || app.rent_payment_history  || 'no_history',
-    unit_condition:        app.unitCondition        || app.unit_condition        || 'no_history',
-    tenancy_conduct:       app.tenancyConduct       || app.tenancy_conduct       || 'no_history',
-    income_stability:      app.incomeStability      || app.income_stability      || 'stable',
-    arrears_status:        app.arrearsStatus        || app.arrears_status        || 'none',
-    // ── V2 scoring output fields ──
-    score_v2:              typeof app.score_v2 === 'number' ? app.score_v2 : (typeof app.score === 'number' ? app.score : null),
-    tier_v2:               app.tier_v2 || app.tier || null,
-    score_breakdown_v2:    app.scoreBreakdown || null
-  };
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_applications', {
-      method: 'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body: JSON.stringify(row)
-    });
-    if(!r.ok) { var e=await r.text(); console.warn('[SB] save application failed:', e); return false; }
-    return true;
-  } catch(e) { console.warn('[SB] save application error:', e); return false; }
-}
-
-async function sbSaveAllApplications(apps) {
-  var rows = apps.map(function(app) {
-    return {
-      id: app.id,
-      sp_id: app.spId || null,
-      data: app,
-      status: app.status || 'draft',
-      score: typeof app.score === 'number' ? app.score : null,
-      tier: app.tier || null,
-      classification: app.classification || null,
-      reserve: app.reserve || null,
-      archived: !!app.archived,
-      assigned_unit_id: app.assignedUnit || null,
-      assigned_address: app.assignedAddress || null,
-      submitted_at: app.submittedAt || null
-    };
-  });
-  // Upsert in batches of 100
-  for(var i=0; i<rows.length; i+=100) {
-    var batch = rows.slice(i, i+100);
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_applications', {
-      method: 'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body: JSON.stringify(batch)
-    });
-    if(!r.ok) { console.warn('[SB] batch save applications failed:', await r.text()); return false; }
-  }
-  return true;
-}
-
-// ── HOUSING UNITS ─────────────────────────────────────────────────────────────
-async function sbLoadUnits() {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_units?select=*&order=street,num&limit=9999', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row) {
-      return Object.assign({}, row.data||{}, {
-        id:row.id, num:row.num, street:row.street, bedrooms:row.bedrooms, bathrooms:row.bathrooms,
-        type:row.type, foundation:row.foundation, funder:row.funder, status:row.status,
-        accessible:row.accessible, isElders:row.is_elders, archived:row.archived,
-        assignedTo:row.assigned_to, assignedName:row.assigned_name, assignedDate:row.assigned_date
-      });
-    });
-  } catch(e) { console.warn('[SB] load units failed:', e); return null; }
-}
-
-async function sbSaveUnit(u) {
-  var row = {
-    id:u.id, num:u.num||null, street:u.street||null, bedrooms:u.bedrooms||null,
-    bathrooms:u.bathrooms||null, type:u.type||null, foundation:u.foundation||null,
-    funder:u.funder||null, status:u.status||'vacant', accessible:!!u.accessible,
-    is_elders:!!u.isElders, archived:!!u.archived, assigned_to:u.assignedTo||null,
-    assigned_name:u.assignedName||null, assigned_date:u.assignedDate||null, data:u
-  };
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_units', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify(row)
-    });
-    if(!r.ok){ console.warn('[SB] save unit failed:', await r.text()); return false; }
-    return true;
-  } catch(e){ console.warn('[SB] save unit error:',e); return false; }
-}
-
-async function sbSaveAllUnits(units) {
-  if(!units || !units.length) return true;
-  var rows = units.map(function(u) {
-    return {
-      id: u.id,
-      num: u.num || null,
-      street: u.street || null,
-      bedrooms: u.bedrooms || null,
-      bathrooms: u.bathrooms || null,
-      type: u.type || null,
-      foundation: u.foundation || null,
-      funder: u.funder || null,
-      status: u.status || 'vacant',
-      accessible: !!u.accessible,
-      is_elders: !!u.isElders,
-      archived: !!u.archived,
-      assigned_to: u.assignedTo || null,
-      assigned_name: u.assignedName || null,
-      assigned_date: u.assignedDate || null,
-      data: u
-    };
-  });
-  for(var i=0; i<rows.length; i+=100) {
-    var batch = rows.slice(i, i+100);
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_units', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify(batch)
-    });
-    if(!r.ok){ console.warn('[SB] batch save units failed:', await r.text()); return false; }
-  }
-  return true;
-}
-
-// ── AUDIT LOG ─────────────────────────────────────────────────────────────────
-async function sbLogAudit(appId, action, detail, userRole) {
-  try {
-    await fetch(SUPABASE_URL+'/rest/v1/housing_audit_log', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
-      body:JSON.stringify({ entity_type:'application', entity_id:String(appId||''), action:action, details:JSON.stringify({detail:detail}), actor:userRole||window.currentRole||'staff', created_at:new Date().toISOString() })
-    });
-  } catch(e){ console.warn('[SB] log audit failed:',e); }
-}
-
-async function sbLoadAuditLog(limit) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_audit_log?select=*&order=created_at.desc&limit='+(limit||500), { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row){
-      var d = JSON.parse(row.details||'{}');
-      return { ts:row.created_at, appId:row.entity_id, action:row.action, detail:d.detail||row.details||'', user:row.actor };
-    });
-  } catch(e){ console.warn('[SB] load audit log failed:',e); return null; }
-}
-
-// ── SETTINGS ─────────────────────────────────────────────────────────────────
-async function sbLoadSetting(key) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=value&key=eq.'+encodeURIComponent(key)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].value : null;
-  } catch(e){ return null; }
-}
-
-async function sbSaveSetting(key, value) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_settings', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({key:key, value:value})
-    });
-    if(!r.ok){ console.warn('[SB] save setting failed:', await r.text()); return false; }
-    return true;
-  } catch(e){ console.warn('[SB] save setting error:',e); return false; }
-}
-
-// ── CONTRACTORS ───────────────────────────────────────────────────────────────
-async function sbLoadContractors() {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_contractors?select=*&order=created_at', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row){ return Object.assign({}, row.data||{}, { id:row.id, name:row.name, trade:row.trade, status:row.status }); });
-  } catch(e) { console.warn('[SB] load contractors failed:', e); return null; }
-}
-
-async function sbSaveContractor(ct) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_contractors', {
-      method: 'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body: JSON.stringify({ id:ct.id, name:ct.name||null, trade:ct.trade||null, status:ct.status||'pending_review', data:ct, updated_at:new Date().toISOString() })
-    });
-    if(!r.ok) { console.warn('[SB] save contractor failed:', await r.text()); return false; }
-    return true;
-  } catch(e) { console.warn('[SB] save contractor error:', e); return false; }
-}
-
-// ── SOW ──────────────────────────────────────────────────────────────────────
-async function sbLoadSow(unitId) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=data&unit_id=eq.'+encodeURIComponent(unitId)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].data : null;
-  } catch(e){ return null; }
-}
-
-async function sbSaveSow(unitId, data) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_sow', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({unit_id:unitId, data:data, updated_at:new Date().toISOString()})
-    });
-    return r.ok;
-  } catch(e){ console.warn('[SB] save sow error:',e); return false; }
-}
-
-// ── RENO PROGRESS ─────────────────────────────────────────────────────────────
-async function sbLoadRenoProgress(unitId) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress?select=data&unit_id=eq.'+encodeURIComponent(unitId)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].data : null;
-  } catch(e){ return null; }
-}
-
-async function sbSaveRenoProgress(unitId, data) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({unit_id:unitId, data:data, updated_at:new Date().toISOString()})
-    });
-    return r.ok;
-  } catch(e){ console.warn('[SB] save reno progress error:',e); return false; }
-}
-
-// ── MIGRATE: Push localStorage → Supabase ────────────────────────────────────
-// Run this once from the browser console to seed Supabase with existing data:
-// await sbMigrateAll()
-window.sbMigrateAll = async function() {
-  console.log('[SB MIGRATE] Starting...');
-  showToast('Migration started — check console for progress');
-
-  // Applications
-  var apps = [];
-  try { apps = JSON.parse(localStorage.getItem('clfn_applications')||'[]'); } catch(e){}
-  if(!apps.length) apps = (typeof SP_APPLICATIONS !== 'undefined') ? SP_APPLICATIONS : [];
-  if(apps.length) {
-    var ok = await sbSaveAllApplications(apps);
-    console.log('[SB MIGRATE] Applications:', ok ? apps.length+' saved' : 'FAILED');
-  }
-
-  // Housing units
-  var units = [];
-  try { units = JSON.parse(localStorage.getItem('clfn_housing_units')||'[]'); } catch(e){}
-  if(!units.length) units = (typeof HOUSING_UNITS_DATA !== 'undefined') ? HOUSING_UNITS_DATA : [];
-  if(units.length) {
-    var ok2 = await sbSaveAllUnits(units);
-    console.log('[SB MIGRATE] Housing units:', ok2 ? units.length+' saved' : 'FAILED');
-  }
-
-  // Contractors
-  var contractors = [];
-  var contractors = window._contractors || [];
-  if(contractors.length) {
-    for(var ct of contractors) { await sbSaveContractor(ct); }
-    console.log('[SB MIGRATE] Contractors:', contractors.length+' saved');
-  }
-
-  // Settings
-  var settings = {};
-  settings = window._appSettings || {};
-  if(Object.keys(settings).length) {
-    await sbSaveSetting('app_settings', settings);
-    console.log('[SB MIGRATE] Settings saved');
-  }
-
-  // Scoring model
-  try {
-    var sm = localStorage.getItem('clfn_scoring_model');
-    if(sm) await sbSaveSetting('scoring_model', JSON.parse(sm));
-    var usm = localStorage.getItem('clfn_unit_score_model');
-    if(usm) await sbSaveSetting('unit_score_model', JSON.parse(usm));
-    var rsm = localStorage.getItem('clfn_reno_score_model_v3');
-    if(rsm) await sbSaveSetting('reno_score_model', JSON.parse(rsm));
-    var bp = localStorage.getItem('clfn_budget_pools');
-    if(bp) await sbSaveSetting('budget_pools', JSON.parse(bp));
-    console.log('[SB MIGRATE] Scoring models and budget saved');
-  } catch(e) { console.warn('[SB MIGRATE] Settings partial:', e); }
-
-  console.log('[SB MIGRATE] Complete!');
-  showToast('✓ Migration complete — check console for details');
-};
-
-
-</script>
 </head>
 <body>
 
@@ -6097,7 +5083,8 @@ function printSOW(){
 
     +'
 
-</body>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 
 // ── Supabase client ─────────────────────────────────────────────────────────
@@ -6610,19 +5597,26 @@ window.sbMigrateAll = async function() {
 
 
 
+
 var HOUSING_SESSION = { email:'', name:'', role:'', accessToken:'' };
 var HOUSING_HEADERS = { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON, 'Content-Type': 'application/json' };
 window.currentRole = 'employee';
+window._navStack = [];
 window._contractors=[]; window._sowCache={}; window._renoProgress={};
 window._renoBudget={}; window._unitPhotos={}; window._appSettings={};
 var housingUnits=[]; var applications=[]; var auditLog=[];
-window._navStack = window._navStack || [];
+var approvalRole='employee';
 
 
-var NATION_ID='clfn'; var NATION_NAME='Constance Lake First Nation';
-var MODULE_FLAGS={finance:true,renovations:true,contractors:true,match:true};
-function navigateTo(p,q){var u=p;if(q){var s=Object.keys(q).map(function(k){return k+'='+encodeURIComponent(q[k]);}).join('&');u+=(u.indexOf('?')>=0?'&':'?')+s;}window.location.href=u;}
+
+// ── Module navigation stubs for index.html ──────────────────────────────────
+function navigateTo(p,q){
+  var u=p;
+  if(q){var s=Object.keys(q).map(function(k){return k+'='+encodeURIComponent(q[k]);}).join('&');u+=(u.indexOf('?')>=0?'&':'?')+s;}
+  window.location.href=u;
+}
 function showDashboard()          { navigateTo('housing.html',{view:'dashboard'}); }
+function showDash()               { showDashboard(); }
 function showInventory()          { navigateTo('housing.html',{view:'inventory'}); }
 function showMatch()              { navigateTo('housing.html',{view:'match'}); }
 function showTenants()            { navigateTo('housing.html',{view:'tenants'}); }
@@ -6630,755 +5624,301 @@ function showTenantsForRole()     { navigateTo('housing.html',{view:'tenants'});
 function showSettings()           { navigateTo('housing.html',{view:'settings'}); }
 function showWorklist()           { navigateTo('housing.html',{view:'worklist'}); }
 function newApp()                 { navigateTo('housing.html',{view:'newapp'}); }
-function showRenos()              { navigateTo('renos.html',  {view:'renovations'}); }
-function showRenosForRole()       { navigateTo('renos.html',  {view:'renovations'}); }
-function showContractorsForRole() { navigateTo('renos.html',  {view:'contractors'}); }
+function showRenos()              { navigateTo('renos.html'); }
+function showRenosForRole()       { navigateTo('renos.html'); }
+function showContractorsForRole() { navigateTo('renos.html',{view:'contractors'}); }
 function showFinance()            { navigateTo('finance.html'); }
-function showDash()               { showDashboard(); }
-
-// ── Stubs for housing-module-only functions called from shared code ──────────
-function applyTenancyFieldRoles() {}   // housing.html only
-function triggerV2Score()         {}   // housing.html only
-function renderWorklist()         {}   // housing.html only
-function renderDashTable()        {}   // housing.html only
-function updateDashStats()        {}   // housing.html only
-
-// ── Auth panel helpers (needed by showLoginScreen) ───────────────────────────
+// Stubs for functions called by shared code but only needed in housing.html
+function applyTenancyFieldRoles() {}
+function wireDashTable()          {}
+function showScorecard()          {}
+function renderDashTable()        {}
+function updateDashStats()        {}
 function showSignInPanel() {
-  var p = document.getElementById('signin-panel');
-  var v = document.getElementById('verify-panel');
-  var f = document.getElementById('forgot-panel');
-  if(p) p.style.display = '';
-  if(v) v.style.display = 'none';
-  if(f) f.style.display = 'none';
+  var p=document.getElementById('signin-panel');
+  var v=document.getElementById('verify-panel');
+  var f=document.getElementById('forgot-panel');
+  if(p)p.style.display=''; if(v)v.style.display='none'; if(f)f.style.display='none';
 }
 function showForgotPassword() {
-  var p = document.getElementById('signin-panel');
-  var f = document.getElementById('forgot-panel');
-  if(p) p.style.display = 'none';
-  if(f) f.style.display = '';
+  var p=document.getElementById('signin-panel');
+  var f=document.getElementById('forgot-panel');
+  if(p)p.style.display='none'; if(f)f.style.display='';
 }
 
-// ── Helpers ──
-function g(id)  { const e=document.getElementById(id); return e?e.value:''; }
-function fv(id) { const e=document.getElementById(id); return e?e.value:''; }
-function fb(id) { const e=document.getElementById(id); return e?e.checked:false; }
-function fmtD(v) { return v||''; }
-function showToast(msg) {
-  const t=document.createElement('div');
-  t.textContent=msg;
-  t.style.cssText='position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#111;color:#F8E41A;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 4px 24px rgba(0,0,0,0.5);white-space:nowrap;';
-  document.body.appendChild(t);
-  setTimeout(function(){t.remove();},2800);
-}
-function setText(id,val){var e=document.getElementById(id);if(e)e.textContent=val;}
 
-// ── Phone formatter ──
-function auditEntry(appId,action,detail,user){
-  var actor = user||window.currentRole||'Staff';
-  var entry = {ts:new Date().toISOString(),appId:appId,action:action,detail:detail,user:actor};
-  auditLog.unshift(entry);
-  if(auditLog.length>500) auditLog=auditLog.slice(0,500);
-  // audit log saved to Supabase in auditEntry()
-  // Also persist to Supabase so all users see a shared audit trail
-  if(typeof SUPABASE_URL !== 'undefined' && typeof HOUSING_HEADERS !== 'undefined') {
-    fetch(SUPABASE_URL+'/rest/v1/housing_audit_log', {
-      method: 'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'return=minimal'}),
-      body: JSON.stringify({
-        entity_type: 'application',
-        entity_id: String(appId||''),
-        action: action,
-        details: JSON.stringify({detail:detail}),
-        actor: actor,
-        created_at: new Date().toISOString()
-      })
-    }).catch(function(e){ console.warn('Audit log save failed:',e); });
+function loadRememberedEmail(){
+  try{
+    var saved=null;
+    try{saved=localStorage.getItem(HOUSING_REMEMBER_KEY);}catch(e){}
+    if(!saved) saved=hGetCookie(HOUSING_REMEMBER_KEY);
+    if(saved){
+      var emailEl=document.getElementById('signin-email');
+      var remEl=document.getElementById('remember-me');
+      if(emailEl) emailEl.value=saved;
+      if(remEl) remEl.checked=true;
+      setTimeout(function(){var p=document.getElementById('signin-password');if(p)p.focus();},150);
+    }
+  }catch(e){}
+}
+
+function saveRememberedEmail(email,remember){
+  try{
+    if(remember){
+      try{localStorage.setItem(HOUSING_REMEMBER_KEY,email);}catch(e){}
+      hSetCookie(HOUSING_REMEMBER_KEY,email,365);
+    }else{
+      try{localStorage.removeItem(HOUSING_REMEMBER_KEY);}catch(e){}
+      hDeleteCookie(HOUSING_REMEMBER_KEY);
+    }
+  }catch(e){}
+}
+
+async function loadAppDataFromSupabase() {
+  try {
+    // Applications
+    // Fetch ALL applications using pagination (Supabase defaults to 100 rows per page)
+    var allAppsData = [];
+    var appsOffset = 0;
+    var appsPageSize = 1000;
+    while(true) {
+      var appsR = await fetch(
+        SUPABASE_URL+'/rest/v1/housing_applications?select=*&order=submitted_at.desc&limit='+appsPageSize+'&offset='+appsOffset,
+        { headers: HOUSING_HEADERS }
+      );
+      if(!appsR.ok) break;
+      var page = await appsR.json();
+      if(!Array.isArray(page) || !page.length) break;
+      allAppsData = allAppsData.concat(page);
+      if(page.length < appsPageSize) break; // last page
+      appsOffset += appsPageSize;
+    }
+    if(allAppsData.length) {
+      applications = allAppsData.map(function(row){
+        return Object.assign({},row.data||{},{
+          id:row.id, status:row.status, score:row.score, tier:row.tier,
+          classification:row.classification, reserve:row.reserve,
+          archived:!!row.archived, assignedUnit:row.assigned_unit_id,
+          assignedAddress:row.assigned_address, submittedAt:row.submitted_at
+        });
+      });
+    }
+
+    // Housing units
+    // Fetch all units with pagination
+    var allUnitsData = [];
+    var unitsOffset = 0;
+    while(true) {
+      var unitsR = await fetch(
+        SUPABASE_URL+'/rest/v1/housing_units?select=*&order=street,num&limit=1000&offset='+unitsOffset,
+        { headers: HOUSING_HEADERS }
+      );
+      if(!unitsR.ok) break;
+      var uPage = await unitsR.json();
+      if(!Array.isArray(uPage) || !uPage.length) break;
+      allUnitsData = allUnitsData.concat(uPage);
+      if(uPage.length < 1000) break;
+      unitsOffset += 1000;
+    }
+    var unitsR = { ok: allUnitsData.length > 0 }; // compatibility shim
+    console.log('[CLFN] units fetch status:', unitsR.status, unitsR.ok);
+    if(unitsR.ok){
+      var unitsData=allUnitsData;
+      console.log('[CLFN] units rows returned:', unitsData.length);
+      housingUnits=unitsData.map(function(row){
+        return Object.assign({},row.data||{},{
+          id:row.id, num:row.num, street:row.street, bedrooms:row.bedrooms,
+          bathrooms:row.bathrooms, type:row.type, foundation:row.foundation,
+          funder:row.funder, status:row.status, accessible:!!row.accessible,
+          isElders:!!row.is_elders, archived:!!row.archived,
+          assignedTo:row.assigned_to, assignedName:row.assigned_name, assignedDate:row.assigned_date
+        });
+      });
+    }
+
+    // Settings
+    var setR = await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=*',{headers:HOUSING_HEADERS});
+    if(setR.ok){
+      var setData=await setR.json();
+      setData.forEach(function(row){ if(!window._appSettings) window._appSettings={}; window._appSettings[row.key]=row.value; });
+    }
+
+    // Load contractors
+    try {
+      var ctR = await fetch(SUPABASE_URL+'/rest/v1/housing_contractors?select=*&order=created_at',{headers:HOUSING_HEADERS});
+      if(ctR.ok){var ctData=await ctR.json();window._contractors=ctData.map(function(r){return Object.assign({},r.data||{},{id:r.id,name:r.name,trade:r.trade,status:r.status});});}
+    } catch(e){console.warn('Contractors load:',e);}
+    // Load SOW cache
+    try {
+      var sowR=await fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=unit_id,data',{headers:HOUSING_HEADERS});
+      if(sowR.ok){var sd=await sowR.json();window._sowCache={};sd.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
+    } catch(e){console.warn('SOW cache:',e);}
+    // Load reno progress cache
+    try {
+      var rpR=await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress?select=unit_id,data',{headers:HOUSING_HEADERS});
+      if(rpR.ok){var rpd=await rpR.json();window._renoProgress={};rpd.forEach(function(r){window._renoProgress[r.unit_id]=r.data;});}
+    } catch(e){console.warn('Reno progress:',e);}
+    // Load reno budget cache
+    try {
+      var rbR=await fetch(SUPABASE_URL+'/rest/v1/housing_reno_budget?select=unit_id,data',{headers:HOUSING_HEADERS});
+      if(rbR.ok){var rbd=await rbR.json();window._renoBudget={};rbd.forEach(function(r){window._renoBudget[r.unit_id]=r.data;});}
+    } catch(e){console.warn('Reno budget:',e);}
+    // Load unit photos cache
+    try {
+      var upR=await fetch(SUPABASE_URL+'/rest/v1/housing_unit_photos?select=*&order=added_at',{headers:HOUSING_HEADERS});
+      if(upR.ok){var upd=await upR.json();window._unitPhotos={};upd.forEach(function(r){if(!window._unitPhotos[r.unit_id])window._unitPhotos[r.unit_id]=[];window._unitPhotos[r.unit_id].push(r);});}
+    } catch(e){console.warn('Unit photos:',e);}
+    // Load settings cache
+    try {
+      var asR=await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=key,value',{headers:HOUSING_HEADERS});
+      if(asR.ok){var asd=await asR.json();window._appSettings={};asd.forEach(function(r){window._appSettings[r.key]=r.value;});}
+    } catch(e){console.warn('Settings:',e);}
+    // Load contacts
+    try {
+      var conR=await fetch(SUPABASE_URL+'/rest/v1/housing_contacts?select=*&limit=1',{headers:HOUSING_HEADERS});
+      if(conR.ok){var cond=await conR.json();window._contacts=cond.length?(cond[0].data||{}):{}}
+    } catch(e){console.warn('Contacts:',e);}
+
+    showToast('\u2713 Loaded '+applications.length+' applications, '+housingUnits.length+' units');
+    console.info('[CLFN Housing] Data loaded:',applications.length,'apps,',housingUnits.length,'units');
+
+    // Refresh V2 scoring model and tiers from loaded settings
+    try {
+      if(window._appSettings && window._appSettings['scoring_model_v2']) {
+        window.liveV2ScoreModel = window._appSettings['scoring_model_v2'];
+      }
+      if(window._appSettings && window._appSettings['scoring_tiers_v2']) {
+        window.liveV2Tiers = window._appSettings['scoring_tiers_v2'];
+      }
+    } catch(e) {}
+
+    // Rescore all apps with live V2 model
+    if(applications.length && typeof rescoreAllApplications === 'function') {
+      rescoreAllApplications();
+      console.log('[CLFN] Rescored '+applications.length+' applications on V2 model');
+    }
+  } catch(e) {
+    console.error('[CLFN Housing] loadAppData failed:',e);
+    showToast('\u26a0 Could not load data — using cached version');
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// ARCHIVE SYSTEM
-// ══════════════════════════════════════════════════════════════
+async function startSignIn() {
+  var email    = ((document.getElementById('signin-email')||{}).value||'').trim().toLowerCase();
+  var password = (document.getElementById('signin-password')||{}).value||'';
+  var remember = (document.getElementById('remember-me')||{}).checked||false;
+  var errEl    = document.getElementById('signin-error');
+  var btn      = document.getElementById('signin-btn');
 
-// Collect all unit-linked documents into one bundle object
-function hideAllViews(){
-  var ids=['appLayout','settingsView','scorecardView',
-           'dashView','employeeHomeView','worklistView','inventoryView','matchView','tenantsView','renoApprovalsView','renosView','contractorsView'];
-  ids.forEach(function(id){
-    var el=document.getElementById(id);
-    if(el){el.style.display='none';el.style.flex='';}
-  });
-  var _spb=document.getElementById('stepProgressBar');if(_spb)_spb.style.display='none';
-  var _sn=document.getElementById('stepNav');if(_sn)_sn.style.display='none';
-  var apf=document.getElementById('appProgressFoot');if(apf)apf.style.display='none';
-  document.querySelectorAll('.snav-main-btn').forEach(function(b){b.classList.remove('active');});
-  // Collapse sidebar whenever we leave the app form
-  var sb=document.getElementById('sharedSidebar');if(sb)sb.classList.remove('sidebar-open');
+  if(errEl) errEl.style.display='none';
+
+  if(!email||!password){
+    if(errEl){errEl.textContent='Please enter your email and password.';errEl.style.display='block';}
+    return;
+  }
+  if(!email.endsWith('@clfn.on.ca')){
+    if(errEl){errEl.textContent='Only @clfn.on.ca email addresses are permitted to sign in.';errEl.style.display='block';}
+    return;
+  }
+
+  if(btn){btn.disabled=true;btn.textContent='Signing in…';}
+  try {
+    var r = await fetch(SUPABASE_URL+'/auth/v1/token?grant_type=password',{
+      method:'POST', headers:HOUSING_HEADERS, body:JSON.stringify({email:email,password:password})
+    });
+    var data = await r.json();
+    if(!r.ok) throw new Error(data.error_description||data.msg||'Sign-in failed');
+
+    // Check email verification
+    var emailConfirmed = data.user.email_confirmed_at||data.user.confirmed_at;
+    if(!emailConfirmed){
+      var dispEl=document.getElementById('verify-email-display');
+      if(dispEl) dispEl.textContent=email;
+      document.getElementById('signin-panel').style.display='none';
+      document.getElementById('verify-panel').style.display='';
+      if(btn){btn.disabled=false;btn.textContent='Sign in';}
+      return;
+    }
+
+    // Save token and session
+    saveRememberedEmail(email, remember);
+    HOUSING_SESSION.email = email;
+    HOUSING_SESSION.name  = (data.user.user_metadata&&data.user.user_metadata.full_name)||email;
+    HOUSING_SESSION.accessToken = data.access_token;
+    HOUSING_HEADERS['Authorization'] = 'Bearer '+data.access_token;
+    try{sessionStorage.setItem('clfn_housing_token',data.access_token);}catch(e){}
+
+    // Resolve housing role from staff table
+    await resolveHousingRole();
+
+    // Load data and launch app
+    await loadAppDataFromSupabase();
+    hidLoginScreen();
+    showEmployeeHome();
+    showToast('Welcome, '+HOUSING_SESSION.name+' ('+HOUSING_SESSION.role+')');
+
+  } catch(e) {
+    console.error('[HOUSING LOGIN]', e);
+    if(errEl){errEl.textContent=e.message;errEl.style.display='block';}
+  } finally {
+    if(btn){btn.disabled=false;btn.textContent='Sign in';}
+  }
 }
-function _showView(id, renderFn){
-  hideAllViews();
-  var v=document.getElementById(id);
-  if(v){v.style.display='flex';v.style.flexDirection='column';v.style.flex='1';}
-  if(renderFn) renderFn();
-}
-function setNavActive(id){
-  ['tab_app','tab_dash','tab_scores','tab_settings','tab_match','tab_inventory','tab_contractors','tab_tenants','tab_renos','tab_budget'].forEach(function(tid){
-    var b=document.getElementById(tid);
-    if(b){b.classList.remove('nav-active');b.style.background='';b.style.color='';b.style.borderColor='';}
-  });
-  var el=document.getElementById(id);
-  if(el){
-    if(id==='tab_settings'){
-      el.style.background='rgba(248,228,26,0.12)';
-      el.style.color='var(--yellow)';
-      el.style.borderColor='var(--yellow)';
+
+async function resolveHousingRole() {
+  try {
+    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?select=role,department,name&email=eq.'+encodeURIComponent(HOUSING_SESSION.email)+'&is_active=eq.true',
+      {headers:HOUSING_HEADERS});
+    var rows = await r.json();
+    if(rows&&rows.length) {
+      var staffRow = rows[0];
+      HOUSING_SESSION.name = staffRow.name||HOUSING_SESSION.name;
+      var housingRole = sbMapRole(staffRow);
+      HOUSING_SESSION.role = housingRole;
+      window.currentRole = housingRole;
+      window.CLFN_AUTH.isAuthenticated = true;
+      window.CLFN_AUTH.currentRole = housingRole;
+      if(typeof switchRole==='function') switchRole(housingRole);
+      var rs=document.getElementById('roleSwitcher'); if(rs) rs.style.display='none';
+      var sb=document.getElementById('header_addstaff_btn');
+      if(sb) sb.style.display=(housingRole==='ed'||housingRole==='housing_manager')?'flex':'none';
+      // Store real role and setup view-as toggle
+      window._realRole = housingRole;
+      window._viewAsRole = '';
+      if(typeof setupHeaderRoleToggle === 'function') setupHeaderRoleToggle(housingRole);
     } else {
-      el.style.background='var(--yellow)';
-      el.style.color='#111';
-      el.style.borderColor='var(--yellow)';
+      HOUSING_SESSION.role='employee';
+      window.currentRole='employee';
     }
-  }
+  } catch(e) { console.warn('[HOUSING] role lookup failed:', e); HOUSING_SESSION.role='employee'; window.currentRole='employee'; }
 }
 
-
-// ── Inventory view ──
-function updateRoleSwitcherVisibility() {
-  // Hide role switcher when a real session is active
-  var rs = document.getElementById('roleSwitcher');
-  if(!rs) return;
-  rs.style.display = (window.CLFN_AUTH && window.CLFN_AUTH.isAuthenticated) ? 'none' : 'block';
+function hidLoginScreen() {
+  var ls=document.getElementById('loginScreen');
+  if(ls) ls.style.display='none';
+  var rs=document.getElementById('roleSwitcher'); if(rs) rs.style.display='none';
 }
 
-function updateHeaderUser(role) {
-  var roleLabels = {employee:'Employee', housing_manager:'Housing Manager', ed:'Executive Director'};
-  var roleBadges = {employee:'', housing_manager:'HM', ed:'ED'};
-  var label = roleLabels[role] || 'Staff';
-  var badge = roleBadges[role] || '';
-
-  // Avatar initials from role
-  var initials = {employee:'ST', housing_manager:'HM', ed:'ED'};
-  var av = document.getElementById('header_avatar');
-  if(av) av.textContent = initials[role] || '?';
-
-  var nameEl = document.getElementById('header_user_name');
-  if(nameEl) nameEl.textContent = label;
-
-  var badgeEl = document.getElementById('header_role_badge');
-  if(badgeEl) {
-    badgeEl.textContent = badge;
-    badgeEl.style.display = badge ? '' : 'none';
-  }
-
-  // Show Settings button only for HM/ED
-  var settingsBtn = document.getElementById('header_settings_btn');
-  if(settingsBtn) {
-    var show = (role === 'housing_manager' || role === 'ed');
-    settingsBtn.style.display = show ? 'flex' : 'none';
-  }
+function showLoginScreen() {
+  var ls=document.getElementById('loginScreen');
+  if(ls){ls.style.display='flex';}
+  showSignInPanel();
+  var p=document.getElementById('signin-password'); if(p) p.value='';
+  var e=document.getElementById('signin-error'); if(e) e.style.display='none';
 }
 
-
-// ══════════════════════════════════════════════════════════════
-// WORKLIST VIEW
-// Role-aware worklist — employees see their own apps (no score)
-// HM sees action queue, ED sees approval queue
-// ══════════════════════════════════════════════════════════════
-
-function wlSetChip(el) {
-  window._wlActiveChip = el.getAttribute('data-wlchip') || '';
-  renderWorklist();
-}
-function wlOpenApp(el) {
-  var id = el.getAttribute('data-wl-id') || (el.closest('[data-wl-id]') && el.closest('[data-wl-id]').getAttribute('data-wl-id'));
-  if(!id) return;
-  var apps = typeof applications !== 'undefined' ? applications : [];
-  var app = apps.find(function(x){ return x.id === id; });
-  if(!app) return;
-  // Branch by status
-  if(app.status === 'draft' || app.status === 'returned') {
-    // Open the edit form so they can complete/update it
-    if(typeof window.openEditModal === 'function') window.openEditModal(id);
-  } else {
-    // All other statuses — open read-only scorecard
-    if(typeof showScorecard === 'function') showScorecard(app);
-  }
-}
-function wlEditApp(el) {
-  var id = el.getAttribute('data-wl-edit') || (el.closest('[data-wl-edit]') && el.closest('[data-wl-edit]').getAttribute('data-wl-edit'));
-  if(!id) return;
-  if(typeof window.openEditModal === 'function') window.openEditModal(id);
+async function doLogout() {
+  try {
+    await fetch(SUPABASE_URL+'/auth/v1/logout',{method:'POST',headers:HOUSING_HEADERS});
+  } catch(e){}
+  HOUSING_SESSION={email:'',name:'',role:'',accessToken:''};
+  HOUSING_HEADERS['Authorization']='Bearer '+SUPABASE_ANON;
+  window.CLFN_AUTH.isAuthenticated=false;
+  window.currentRole='employee';
+  applications=[]; housingUnits=[];
+  showLoginScreen();
 }
 
-function showWorklist() {
-  if(!window._navSkipPush) pushNav('worklist');
-  hideAllViews();
-  setNavActive('tab_worklist');
-  var view = document.getElementById('worklistView');
-  if(view){ view.style.display='flex'; view.style.flexDirection='column'; }
-  renderWorklist();
-}
-
-function renderWorklist() {
-  var realRole = window._realRole || window.currentRole || 'employee';
-  var role = window._viewAsRole || realRole;
-  var body = document.getElementById('worklist_body');
-  var sub  = document.getElementById('worklist_subtitle');
-  if(!body) return;
-
-  var apps = (typeof applications !== 'undefined') ? applications : [];
-
-  // If no data loaded yet, show loading and try fetching
-  if(!apps.length) {
-    body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px;">Loading applications…</div>';
-    if(typeof loadAppDataFromSupabase === 'function') {
-      loadAppDataFromSupabase().then(function(){ renderWorklist(); });
-    }
-    return;
-  }
-
-  // ── Status map ────────────────────────────────────────────────────────────
-  var SM = {
-    draft:        {label:'Draft',                   c:'#888',    bg:'#f4f4f0'},
-    submitted:    {label:'Awaiting HM Review',      c:'#1d4ed8', bg:'#eff6ff'},
-    file_update:  {label:'File Update',             c:'#1d4ed8', bg:'#eff6ff'},
-    mgr_approved: {label:'Awaiting ED Approval',    c:'#7c3aed', bg:'#faf5ff'},
-    hm_approved:  {label:'File Update Approved',    c:'#15803d', bg:'#f0fdf4'},
-    ed_approved:  {label:'ED Approved',             c:'#15803d', bg:'#f0fdf4'},
-    returned:     {label:'Returned — Action Needed',c:'#b91c1c', bg:'#fef2f2'},
-    declined:     {label:'Declined',                c:'#b91c1c', bg:'#fef2f2'},
-    assigned:     {label:'Assigned',                c:'#15803d', bg:'#f0fdf4'}
-  };
-
-  // ── Subtitle ──────────────────────────────────────────────────────────────
-  var subtitles = {
-    employee:        'Track applications you have submitted. Scores are managed by the Housing Manager.',
-    housing_manager: 'Review and action applications across the queue.',
-    ed:              'Final approvals, recommendations, and recently actioned applications.'
-  };
-  if(sub) sub.textContent = subtitles[role] || '';
-
-  // ── Chip filter definitions ───────────────────────────────────────────────
-  var chipDefs;
-  if(role === 'employee') {
-    chipDefs = [
-      {key:'',          label:'All',            filter: function(a){ return !a.archived; }},
-      {key:'action',    label:'Action Needed',  filter: function(a){ return a.status==='returned'; }, alert:true},
-      {key:'submitted', label:'In Review',      filter: function(a){ return ['submitted','file_update','mgr_approved'].indexOf(a.status)!==-1; }},
-      {key:'approved',  label:'Approved',       filter: function(a){ return ['ed_approved','assigned'].indexOf(a.status)!==-1; }},
-      {key:'draft',     label:'Draft',          filter: function(a){ return a.status==='draft'; }},
-      {key:'declined',  label:'Declined',       filter: function(a){ return a.status==='declined'; }}
-    ];
-  } else if(role === 'housing_manager') {
-    chipDefs = [
-      {key:'',          label:'All Active',     filter: function(a){ return !a.archived; }},
-      {key:'action',    label:'Needs Review',   filter: function(a){ return ['submitted','file_update'].indexOf(a.status)!==-1; }, alert:true},
-      {key:'returned',  label:'Returned',       filter: function(a){ return a.status==='returned'; }, alert:true},
-      {key:'pending',   label:'Awaiting ED',    filter: function(a){ return a.status==='mgr_approved'; }},
-      {key:'approved',  label:'ED Approved',    filter: function(a){ return a.status==='ed_approved'; }},
-      {key:'assigned',  label:'Assigned',       filter: function(a){ return a.status==='assigned'; }}
-    ];
-  } else {
-    chipDefs = [
-      {key:'',          label:'All Active',     filter: function(a){ return !a.archived; }},
-      {key:'action',    label:'Needs Approval', filter: function(a){ return a.status==='mgr_approved'; }, alert:true},
-      {key:'submitted', label:'Awaiting HM',    filter: function(a){ return a.status==='submitted'; }},
-      {key:'approved',  label:'Approved',       filter: function(a){ return a.status==='ed_approved'; }},
-      {key:'assigned',  label:'Assigned',       filter: function(a){ return a.status==='assigned'; }},
-      {key:'declined',  label:'Declined',       filter: function(a){ return a.status==='declined'; }}
-    ];
-  }
-
-  // ── Active chip + search state ────────────────────────────────────────────
-  if(!window._wlActiveChip) window._wlActiveChip = '';
-  if(!window._wlSearch) window._wlSearch = '';
-
-  var activeChipDef = chipDefs.find(function(c){ return c.key === window._wlActiveChip; }) || chipDefs[0];
-
-  // ── Filter apps ───────────────────────────────────────────────────────────
-  var filtered = apps.filter(activeChipDef.filter);
-  var search = (window._wlSearch||'').toLowerCase().trim();
-  if(search) {
-    filtered = filtered.filter(function(a){
-      var name = ((a.fn||'')+' '+(a.ln||'')).toLowerCase();
-      return name.includes(search) || (a.id||'').toLowerCase().includes(search);
-    });
-  }
-  var showScore = (role !== 'employee');
-
-  // ── Chip counts ───────────────────────────────────────────────────────────
-  var chipsHtml = chipDefs.map(function(c){
-    var count = apps.filter(c.filter).length;
-    var isActive = c.key === (window._wlActiveChip||'');
-    var base = isActive
-      ? 'background:var(--dark);border:2px solid var(--yellow);color:#fff;'
-      : (c.alert && count>0 ? 'background:#fef2f2;border:1.5px solid #fecaca;color:#b91c1c;' : 'background:var(--surface);border:1.5px solid var(--border);color:var(--muted);');
-    return '<button data-wlchip="'+c.key+'" onclick="wlSetChip(this)" '
-      + 'style="'+base+'padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;transition:all .12s;">'
-      + c.label + (count ? ' <span style="font-size:11px;opacity:.7;">'+count+'</span>' : '')
-      + '</button>';
-  }).join('');
-
-  // ── Build rows ────────────────────────────────────────────────────────────
-  var sorted = filtered.slice().sort(function(a,b){
-    if(showScore) return (b.score||0)-(a.score||0);
-    return (b.appDate||'').localeCompare(a.appDate||'');
-  });
-
-  var rows = sorted.map(function(a){
-    var sm = SM[a.status] || {label:a.status, c:'#888', bg:'#f4f4f0'};
-    var name = ((a.fn||'')+' '+(a.ln||'')).trim()||'—';
-    var tier = a.tier||'';
-    var tc = tier==='Urgent Priority'?'#b91c1c':tier==='High Priority'?'#1d4ed8':tier==='Medium Priority'?'#7a6000':'#888';
-    // Branch: what action button to show per status per role
-    var actionBtn = '';
-    if(a.status==='returned') {
-      actionBtn = '<button data-wl-edit="'+a.id+'" onclick="event.stopPropagation();wlEditApp(this)" style="background:var(--yellow);border:none;color:#111;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Update →</button>';
-    } else if((role==='housing_manager'&&(a.status==='submitted'||a.status==='file_update')) || (role==='ed'&&a.status==='mgr_approved')) {
-      actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:#1d4ed8;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Review →</button>';
-    } else if((role==='ed'||role==='housing_manager')&&(a.status==='ed_approved'||a.status==='mgr_approved')&&!a.assignedUnit) {
-      actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:#15803d;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
-    }
-    return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-wl-id="'+a.id+'" onclick="wlOpenApp(this)">'
-      + '<td style="padding:11px 14px;font-weight:600;font-size:13px;">'+name+'</td>'
-      + '<td style="padding:11px 14px;font-size:12px;color:var(--muted);">'+a.id+'</td>'
-      + '<td style="padding:11px 14px;font-size:12px;color:var(--muted);">'+(a.appDate||'—')+'</td>'
-      + '<td style="padding:11px 14px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+sm.bg+';color:'+sm.c+';">'+sm.label+'</span></td>'
-      + (showScore ? '<td style="padding:11px 14px;text-align:center;"><span style="font-size:16px;font-weight:800;color:var(--text);">'+(typeof a.score==='number'?a.score:'—')+'</span>'+(tier?'<div style="font-size:9px;color:'+tc+';font-weight:700;margin-top:1px;">'+tier.replace(' Priority','')+'</div>':'')+'</td>' : '')
-      + '<td style="padding:11px 14px;text-align:right;white-space:nowrap;">'+actionBtn+'</td>'
-      + '</tr>';
-  }).join('');
-
-  var emptyMsg = search ? 'No results for "'+search+'"' : 'No applications in this category.';
-
-  body.innerHTML =
-    // Search + chips bar
-    '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">'
-    + '<input id="wl_search_input" type="text" placeholder="🔍  Search by name or ID…" value="'+(window._wlSearch||'')+'" '
-    + 'oninput="window._wlSearch=this.value;clearTimeout(window._wlST);window._wlST=setTimeout(renderWorklist,200)" '
-    + 'style="width:100%;padding:9px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" />'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+chipsHtml+'</div>'
-    + '</div>'
-    // Table
-    + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'
-    + (sorted.length === 0
-        ? '<div style="padding:32px;text-align:center;color:var(--muted);font-size:13px;">'+emptyMsg+'</div>'
-        : '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
-          + '<thead><tr style="background:var(--dark);">'
-          + '<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Applicant</th>'
-          + '<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">ID</th>'
-          + '<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Date</th>'
-          + '<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Status</th>'
-          + (showScore ? '<th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Score</th>' : '')
-          + '<th></th>'
-          + '</tr></thead><tbody>'+rows+'</tbody></table></div>')
-    + '</div>';
-
-  // Re-focus search if it was active
-  if(search) { var si=document.getElementById('wl_search_input'); if(si){ var l=si.value.length; si.focus(); si.setSelectionRange(l,l); } }
-}
-
-function wlSection(title, count, content) {
-  var badge = count !== null ? ' <span style="font-size:12px;font-weight:700;background:var(--yellow);color:#111;padding:1px 8px;border-radius:10px;margin-left:6px;">'+(count||0)+'</span>' : '';
-  return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;">'
-    + '<div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;">'
-    + '<span style="font-size:13px;font-weight:700;">'+title+'</span>'+badge
-    + '</div>'
-    + '<div>'+(content||wlEmpty('None', ''))+'</div>'
-    + '</div>';
-}
-
-function wlEmpty(msg, sub) {
-  return '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">'+msg
-    +(sub?'<div style="font-size:12px;margin-top:4px;">'+sub+'</div>':'')+'</div>';
-}
-
-function renderWlTable(apps, showScore, showReview) {
-  if(!apps||!apps.length) return wlEmpty('None', '');
-  var sorted = apps.slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
-  var rows = sorted.map(function(a){
-    var name = ((a.fn||'')+' '+(a.ln||'')).trim()||'—';
-    var tier = a.tier||'';
-    var tc = tier==='Urgent Priority'?'#b91c1c':tier==='High Priority'?'#1d4ed8':tier==='Medium Priority'?'#7a6000':'#888';
-    return '<tr style="border-bottom:1px solid var(--border);">'
-      + '<td style="padding:10px 14px;font-weight:600;font-size:13px;">'+name+'</td>'
-      + '<td style="padding:10px 14px;font-size:12px;color:var(--muted);">'+a.id+'</td>'
-      + '<td style="padding:10px 14px;font-size:12px;color:var(--muted);">'+(a.appDate||'—')+'</td>'
-      + (showScore ? '<td style="padding:10px 14px;"><span style="font-size:18px;font-weight:800;color:var(--text);">'+(typeof a.score==='number'?a.score:'—')+'</span>'
-          +(tier?'<span style="font-size:10px;font-weight:700;margin-left:6px;color:'+tc+';">'+tier.replace(' Priority','')+'</span>':'')+'</td>' : '')
-      + '<td style="padding:10px 14px;text-align:right;">'
-      + (showReview ? '<button data-wl-id="'+a.id+'" onclick="wlOpenApp(this)" style="background:#1d4ed8;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Review →</button>' : '')
-      + '</td>'
-      + '</tr>';
-  }).join('');
-
-  return '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
-    + '<thead><tr style="background:var(--dark);">'
-    + '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Applicant</th>'
-    + '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">ID</th>'
-    + '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Date</th>'
-    + (showScore ? '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Score</th>' : '')
-    + '<th></th>'
-    + '</tr></thead><tbody>'+rows+'</tbody></table></div>';
-}
-
-
-// ── Header role view-as toggle ─────────────────────────────────────────────
-function setupHeaderRoleToggle(realRole) {
-  var toggleEl = document.getElementById('header_role_toggle');
-  var selectEl = document.getElementById('header_view_as');
-  if(!toggleEl || !selectEl) return;
-  if(realRole === 'ed' || realRole === 'housing_manager') {
-    toggleEl.style.display = 'flex';
-    selectEl.innerHTML = '<option value="">My Role</option>';
-    if(realRole === 'ed') {
-      selectEl.innerHTML += '<option value="housing_manager">Housing Manager</option>';
-    }
-    selectEl.innerHTML += '<option value="employee">Employee</option>';
-    selectEl.value = window._viewAsRole || '';
-  } else {
-    toggleEl.style.display = 'none';
-  }
-}
-
-function headerSwitchViewAs(val) {
-  window._viewAsRole = val || '';
-  var effectiveRole = window._viewAsRole || window._realRole || window.currentRole || 'employee';
-  window.currentRole = effectiveRole;
-  if(typeof switchRole === 'function') switchRole(effectiveRole);
-  // If on worklist, re-render it
-  var wl = document.getElementById('worklistView');
-  if(wl && wl.style.display !== 'none') {
-    window._wlViewAs = val;
-    renderWorklist();
-  }
-  // Re-render home screen
-  if(document.getElementById('employeeHomeView') && document.getElementById('employeeHomeView').style.display !== 'none') {
-    showEmployeeHome();
-  }
-  showToast(val ? 'Viewing as ' + (val === 'housing_manager' ? 'Housing Manager' : 'Employee') : 'Back to your role');
-}
-
-function headerSignOut() {
-  if(HOUSING_SESSION && HOUSING_SESSION.accessToken) {
-    if(confirm('Sign out of CLFN Housing?')) doLogout();
-  } else {
-    switchRole('employee');
-    showToast('Signed out — reset to Employee role.');
-  }
-}
-
-function onAppTypeChange() {
-  var isExisting = document.getElementById('apptype_existing') && document.getElementById('apptype_existing').checked;
-  // Style the labels
-  var newLabel = document.getElementById('apptype_new_label');
-  var exLabel  = document.getElementById('apptype_existing_label');
-  if(newLabel) { newLabel.style.borderColor = isExisting ? 'var(--border)' : 'var(--yellow)'; newLabel.style.background = isExisting ? '' : 'var(--dark)'; }
-  if(exLabel)  { exLabel.style.borderColor  = isExisting ? 'var(--yellow)' : 'var(--border)'; exLabel.style.background  = isExisting ? 'var(--dark)' : ''; }
-  // Show/hide notice
-  var notice = document.getElementById('apptype_existing_notice');
-  if(notice) notice.style.display = isExisting ? 'block' : 'none';
-  // Recalculate score display
-  if(isExisting) {
-    // Clear score panel — not applicable
-    var sc = document.getElementById('sc_score_total');
-    if(sc) sc.textContent = 'N/A';
-    var tier = document.getElementById('sc_score_tier');
-    if(tier){ tier.textContent = 'File Update Only'; tier.style.color = '#888'; }
-    var scoreCard = document.getElementById('scorecardPanel');
-    if(scoreCard) scoreCard.style.opacity = '0.4';
-    var scoreNote = document.getElementById('apptype_score_note');
-    if(scoreNote) scoreNote.style.display = 'block';
-  } else {
-    var scoreCard2 = document.getElementById('scorecardPanel');
-    if(scoreCard2) scoreCard2.style.opacity = '';
-    var scoreNote2 = document.getElementById('apptype_score_note');
-    if(scoreNote2) scoreNote2.style.display = 'none';
-    if(typeof calcScore === 'function') calcScore();
-  }
-}
-
-function getAppType() {
-  var el = document.getElementById('apptype_existing');
-  return (el && el.checked) ? 'existing_tenant' : 'new_housing';
-}
-
-// ── Settings role locks ──
-function applySettingsRoleLocks() {
-  var isED = (window.currentRole === 'ed');
-  var locked = !isED;
-
-  // Selectors for all score/budget editable inputs
-  var editableSelectors = [
-    '#scoring_model_table_wrap input',
-    '#scoring_model_table_wrap select',
-    '[data-usm-id]',
-    '[data-rsm-id]',
-    '#budget_fiscal_year',
-    '#budget_pools_tbody input',
-    '#budget_pools_tbody textarea',
-  ];
-  editableSelectors.forEach(function(sel) {
-    document.querySelectorAll(sel).forEach(function(el) {
-      el.disabled = locked;
-      el.style.opacity = locked ? '0.55' : '1';
-      el.style.cursor = locked ? 'not-allowed' : '';
-    });
-  });
-
-  // Show/hide ED-only action buttons
-  var edOnlyBtns = [
-    'settings_save_scoring_btn','settings_reset_scoring_btn','settings_add_criteria_btn',
-    'settings_save_unit_btn','settings_save_reno_btn','settings_reset_reno_btn',
-    'settings_save_budget_btn',
-  ];
-  edOnlyBtns.forEach(function(id) {
-    var el = document.getElementById(id);
-    if(el) el.style.display = locked ? 'none' : '';
-  });
-
-  // Show lock banner on locked sections
-  var lockMsg = locked ?
-    '<div id="settings_lock_banner" style="display:flex;align-items:center;gap:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:14px;">'+
-    '<span style="font-size:16px;">🔒</span> These values are managed by the <strong>Executive Director</strong> only. You can view but not edit them.</div>' : '';
-
-  ['sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget'].forEach(function(secId) {
-    var sec = document.getElementById(secId);
-    if(!sec) return;
-    var existing = sec.querySelector('#settings_lock_banner');
-    if(existing) existing.remove();
-    if(locked) sec.insertAdjacentHTML('afterbegin', lockMsg);
-  });
-
-  // Show/hide audit log tab (ED only)
-  var auditTab = document.getElementById('stab_audit');
-  if(auditTab) auditTab.style.display = isED ? '' : 'none';
-}
-
-// ── ED-gated save wrappers with audit logging ──
-function edGuard(actionName, fn) {
-  if(window.currentRole !== 'ed') {
-    showToast('Only the Executive Director can change scoring values.');
-    return;
-  }
-  fn();
-  auditEntry('SETTINGS', actionName, actionName + ' updated by ED', 'Executive Director');
-}
-
-function saveScoringModelED() {
-  edGuard('Housing Application Scoring Model updated', function() {
-    // Save scoring model to Supabase housing_settings
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings', {
-    method: 'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-    body: JSON.stringify({ key: 'scoring_model', value: liveScoreModel })
-  }).catch(function(e){ console.warn('Scoring model save failed:',e); });
-    rescoreAllApplications();
-    if(document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none') {
-      updateDashStats(); renderDashTable();
-    }
-    showToast('Application scoring model saved.');
-  });
-}
-function setExportView(viewName) {
-  window._currentExportView = viewName;
-  var wrap = document.getElementById('header_export_wrap');
-  var exportableViews = ['inventory','match','renos','contractors'];
-  if(wrap) wrap.style.display = exportableViews.indexOf(viewName) >= 0 ? 'flex' : 'none';
-}
-
-function toggleHeaderExportMenu() {
-  var m = document.getElementById('header_export_menu');
-  if(!m) return;
-  var open = m.style.display !== 'none';
-  m.style.display = open ? 'none' : 'block';
-  if(!open) {
-    setTimeout(function(){
-      document.addEventListener('click', function closeMenu(e){
-        var wrap = document.getElementById('header_export_wrap');
-        if(wrap && !wrap.contains(e.target)){
-          m.style.display='none';
-          document.removeEventListener('click', closeMenu);
-        }
-      });
-    }, 10);
-  }
-}
-
-function headerExport(format) {
-  var m = document.getElementById('header_export_menu');
-  if(m) m.style.display='none';
-  var view = window._currentExportView;
-  if(view==='inventory')   exportInventory(format);
-  else if(view==='match')  exportMatch(format);
-  else if(view==='renos')  exportRenos(format);
-  else if(view==='contractors') exportContractors(format);
-  else showToast('Nothing to export on this page.');
-}
-
-// ── Shared export engine ──
-function _doExport(format, headers, data, filename, colWidths, pdfLandscape) {
-  if(format==='csv') {
-    var csv = [headers].concat(data).map(function(r){
-      return r.map(function(v){ return '"'+(String(v||'').replace(/"/g,'""'))+'"'; }).join(',');
-    }).join('\r\n');
-    var blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a'); a.href=url; a.download=filename+'.csv'; a.click();
-    URL.revokeObjectURL(url);
-    showToast('CSV exported — '+data.length+' rows');
-
-  } else if(format==='excel') {
-    var loadXLSX = function(cb){
-      if(window.XLSX){ cb(); return; }
-      var s=document.createElement('script');
-      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      s.onload=cb; s.onerror=function(){showToast('Could not load Excel library.');};
-      document.head.appendChild(s);
-    };
-    loadXLSX(function(){
-      var wb = XLSX.utils.book_new();
-      var ws = XLSX.utils.aoa_to_sheet([headers].concat(data));
-      ws['!cols'] = (colWidths||headers.map(function(){return 16;})).map(function(w){return{wch:w};});
-      XLSX.utils.book_append_sheet(wb, ws, 'Data');
-      XLSX.writeFile(wb, filename+'.xlsx');
-      showToast('Excel exported — '+data.length+' rows');
-    });
-
-  } else if(format==='pdf') {
-    var loadjsPDF = function(cb){
-      if(window.jspdf&&window.jspdf.jsPDF){ cb(); return; }
-      var s1=document.createElement('script');
-      s1.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      s1.onload=function(){
-        var s2=document.createElement('script');
-        s2.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
-        s2.onload=cb; s2.onerror=function(){showToast('Could not load PDF library.');};
-        document.head.appendChild(s2);
-      };
-      s1.onerror=function(){showToast('Could not load PDF library.');};
-      document.head.appendChild(s1);
-    };
-    loadjsPDF(function(){
-      var doc = new window.jspdf.jsPDF({orientation: pdfLandscape?'landscape':'portrait', unit:'mm', format:'a4'});
-      doc.setFontSize(13); doc.setFont('helvetica','bold');
-      doc.text('CLFN — '+filename.replace('CLFN_','').replace(/_/g,' '), 14, 16);
-      doc.setFontSize(8); doc.setFont('helvetica','normal');
-      doc.text('Exported: '+new Date().toLocaleDateString('en-CA')+'  |  '+data.length+' records', 14, 22);
-      var totalWidth = pdfLandscape ? 267 : 180;
-      var cellW = colWidths ? colWidths.map(function(w){ return w * totalWidth / colWidths.reduce(function(a,b){return a+b;},0); }) : null;
-      var colStyles = {};
-      if(cellW) cellW.forEach(function(w,i){ colStyles[i]={cellWidth:w}; });
-      doc.autoTable({
-        startY:27, head:[headers], body:data, theme:'striped',
-        headStyles:{fillColor:[17,17,15],textColor:[248,228,26],fontSize:8,fontStyle:'bold'},
-        bodyStyles:{fontSize:7.5},
-        alternateRowStyles:{fillColor:[248,248,246]},
-        columnStyles: colStyles,
-        margin:{left:14,right:14}
-      });
-      doc.save(filename+'.pdf');
-      showToast('PDF exported — '+data.length+' records');
-    });
-  }
-}
-
-// ── Inventory export ──
-function exportInventory(format) {
-  var units = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-  var search=(document.getElementById('inv_search')||{}).value||'';
-  var fStatus=(document.getElementById('inv_filter_status')||{}).value||'';
-  var fType=(document.getElementById('inv_filter_type')||{}).value||'';
-  var fAccess=(document.getElementById('inv_filter_access')||{}).value||'';
-  var rows=units.filter(function(u){
-    if(search&&!(u.street+' '+u.num).toLowerCase().includes(search.toLowerCase())) return false;
-    if(fStatus&&u.status!==fStatus) return false;
-    if(fType){var t=(u.type||'').toLowerCase();if(fType==='detached'&&!t.includes('detached'))return false;if(fType==='duplex'&&!t.includes('duplex'))return false;if(fType==='plex'&&!t.match(/plex/))return false;if(fType==='complex'&&!t.includes('complex'))return false;if(fType==='mobile'&&!t.includes('mobile'))return false;}
-    if(fAccess==='yes'&&!u.accessible)return false;
-    if(fAccess==='no'&&u.accessible)return false;
-    return true;
-  });
-  var headers=['Address','Beds','Baths','Type','Foundation','Accessible','Funder','Status','Tenant','Phase'];
-  var data=rows.map(function(u){return[u.num+' '+u.street,u.bedrooms,(u.bathrooms&&u.bathrooms!=='0'&&u.bathrooms!=='nan')?u.bathrooms:'',(u.type&&u.type!=='0'&&u.type!=='nan')?u.type:'',(u.foundation&&u.foundation!=='nan'&&u.foundation!=='0')?u.foundation:'',u.accessible?'Yes':'No',u.funder||'',u.status,u.assignedName||'',(u.phase&&u.phase!=='nan'&&u.phase!=='0')?u.phase:''];});
-  _doExport(format,headers,data,'CLFN_Housing_Inventory_'+new Date().toISOString().slice(0,10),[28,6,6,18,14,10,12,14,22,8],true);
-}
-
-// ── Match export ──
-function exportMatch(format) {
-  var allApps=(typeof applications!=='undefined'?applications:[]);
-  var search=(document.getElementById('match_search')||{}).value||'';
-  var fTier=(document.getElementById('match_filter_tier')||{}).value||'';
-  var fStatus=(document.getElementById('match_filter_status')||{}).value||'';
-  var rows=allApps.filter(function(a){
-    if(a.status==='draft'||a.status==='archived') return false;
-    if(fTier&&a.tier!==fTier) return false;
-    if(fStatus&&a.status!==fStatus) return false;
-    if(search){var name=((a.fn||'')+' '+(a.ln||'')).toLowerCase();if(!name.includes(search.toLowerCase())&&!(a.id||'').toLowerCase().includes(search.toLowerCase())) return false;}
-    return true;
-  });
-  var headers=['App ID','Name','Score','Tier','Status','Classification','Band Member','Reserve','Bedrooms Needed','Accessibility','Arrears'];
-  var data=rows.map(function(a){return[a.id,(a.fn||'')+' '+(a.ln||''),a.score||0,a.tier||'',a.status,a.classification||'',a.band?'Yes':'No',a.reserve||'',a.bedNeed||'',(a.accessibility?'Yes':'No'),(a.hasArrears?'Yes':'No')];});
-  _doExport(format,headers,data,'CLFN_Match_'+new Date().toISOString().slice(0,10),[16,22,10,16,14,20,12,14,14,12,10],true);
-}
-
-// ── Renovations export ──
-function toggleMobileMenu(){
-  var sidebar  = document.getElementById('sharedSidebar');
-  var backdrop = document.getElementById('sidebarBackdrop');
-  if(!sidebar) return;
-  var isOpen = sidebar.classList.contains('open');
-  if(isOpen){ closeMobileMenu(); } else { openMobileMenu(); }
-}
-function openMobileMenu(){
-  var sidebar  = document.getElementById('sharedSidebar');
-  var backdrop = document.getElementById('sidebarBackdrop');
-  if(sidebar)  sidebar.classList.add('open');
-  if(backdrop) backdrop.classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-function closeMobileMenu(){
-  var sidebar  = document.getElementById('sharedSidebar');
-  var backdrop = document.getElementById('sidebarBackdrop');
-  if(sidebar)  sidebar.classList.remove('open');
-  if(backdrop) backdrop.classList.remove('open');
-  document.body.style.overflow = '';
-}
-function pushNav(viewName) {
-  if(!window._navStack) window._navStack = [];
-  var stack = window._navStack;
-  if(stack.length && stack[stack.length-1] === viewName) return;
-  stack.push(viewName);
-  if(stack.length > 20) stack.shift();
-}
-
-function goBack(){
-  var stack = window._navStack;
-  // Pop current view
-  if(stack.length) stack.pop();
-  // Skip over 'app' entries — handled by closeApplicationForm
-  while(stack.length && stack[stack.length-1] === 'app') stack.pop();
-  // Get previous view
-  var prev = stack.length ? stack[stack.length-1] : null;
-  var navMap = {
-    'home':        showEmployeeHome,
-    'dashboard':   showDashboard,
-    'inventory':   showInventory,
-    'match':       showMatch,
-    'tenants':     showTenants,
-    'renos':       showRenos,
-    'contractors': showContractors,
-    'settings':    showSettings,
-  };
-  window._navSkipPush = true;
-  if(prev && navMap[prev]) {
-    navMap[prev]();
-  } else {
-    showEmployeeHome();
-  }
-  window._navSkipPush = false;
-}
-
-function showDashboard() { navigateTo('housing.html', {view:'dashboard'}); }
 function showEmployeeHome(){
   if(!window._navSkipPush) pushNav('home');
   setExportView(null);
@@ -7718,741 +6258,35 @@ function renderRecentActivity(role) {
   }).join('');
 }
 
-// ══════════════════════════════════════════════════════
-// TENANT FILES
-// ══════════════════════════════════════════════════════
-var _tenantFilesUnitId = null;
-
-async function getTenantFiles(unitId){
-  return await sbLoadFileMeta('tenant', unitId);
-}
-window.CLFN_AUTH = {
-  currentUser:  null,   // { id, name, email } from Supabase/staff table
-  currentRole:  'employee',  // 'employee' | 'housing_manager' | 'ed'
-  employeeId:   null,   // staff table row id
-  isAuthenticated: false,
-
-  // Call this after a successful Supabase login + staff table lookup
-  setSession: function(supabaseUser, staffRow) {
-    this.currentUser     = { id: supabaseUser.id, name: staffRow.name, email: supabaseUser.email };
-    this.currentRole     = staffRow.role || 'employee';
-    this.employeeId      = staffRow.id;
-    this.isAuthenticated = true;
-
-    // Keep window.currentRole in sync (all existing checks read from here)
-    window.currentRole = this.currentRole;
-
-    // Update the UI
-    if(typeof switchRole === 'function') switchRole(this.currentRole);
-    if(typeof updateHeaderUser === 'function') updateHeaderUser(this.currentRole);
-
-    // Hide the demo role switcher — not needed when auth is live
-    var switcher = document.getElementById('roleSwitcher');
-    if(switcher) switcher.style.display = 'none';
-
-    console.log('[CLFN] Session set — '+this.currentUser.name+' ('+this.currentRole+')');
-  },
-
-  // Call this on logout
-  clearSession: function() {
-    this.currentUser     = null;
-    this.currentRole     = 'employee';
-    this.employeeId      = null;
-    this.isAuthenticated = false;
-    window.currentRole   = 'employee';
-    console.log('[CLFN] Session cleared');
-  },
-
-  // Helper used throughout the app — returns the active role
-  getRole: function() {
-    return window.currentRole || this.currentRole || 'employee';
-  },
-
-  // Helper — true if HM or ED
-  isManager: function() {
-    var r = this.getRole();
-    return r === 'housing_manager' || r === 'ed';
-  },
-
-  // Helper — true if ED only
-  isED: function() {
-    return this.getRole() === 'ed';
-  }
-};
-
-// Convenience global alias — existing code can use getRole() anywhere
-function getRole(){ return window.CLFN_AUTH.getRole(); }
-
-
-function switchRole(role){
-  approvalRole=role;
-  window.currentRole=role;
-  ['employee','housing_manager','ed'].forEach(function(r){
-    var btn=document.getElementById('rb_'+r);
-    if(btn){btn.style.background=r===role?'var(--yellow)':'transparent';btn.style.color=r===role?'#111':'#888';btn.style.border=r===role?'none':'1px solid #333';}
-  });
-  var roleLabels={employee:'Employee',housing_manager:'Housing Manager',ed:'Executive Director'};
-  var hud=document.getElementById('header_user_display');
-  if(hud) hud.textContent=roleLabels[role]||role;
-  updateHeaderUser(role);
-  if(window._currentScorecardApp && typeof renderScorecardActions === 'function') renderScorecardActions(window._currentScorecardApp);
-  updateRoleSwitcherVisibility();
-  // Update nav label and visibility based on role
-  var dashLabel = document.getElementById('tab_dash_label');
-  if(dashLabel) dashLabel.textContent = (role === 'housing_manager' || role === 'ed') ? 'Dashboard' : 'Home';
-  var settingsBtn = document.getElementById('tab_settings');
-  if(settingsBtn) settingsBtn.style.display = (role === 'housing_manager' || role === 'ed') ? '' : 'none';
-  var mgmtNav = document.getElementById('sidebar_mgmt_nav');
-  if(mgmtNav) mgmtNav.style.display = (role === 'housing_manager' || role === 'ed') ? '' : 'none';
-  // Apply tenancy field role locks whenever role changes
-  if(typeof applyTenancyFieldRoles === 'function') applyTenancyFieldRoles();
-  // All roles land on the home tile page
-  showEmployeeHome();
-}
-
-var HOUSING_REMEMBER_KEY = 'clfn_housing_email';
-function hSetCookie(name,value,days){try{var exp=new Date(Date.now()+days*864e5).toUTCString();document.cookie=name+'='+encodeURIComponent(value)+';expires='+exp+';path=/;SameSite=Lax';}catch(e){}}
-function hGetCookie(name){try{var m=document.cookie.match(new RegExp('(?:^|; )'+name+'=([^;]*)'));return m?decodeURIComponent(m[1]):null;}catch(e){return null;}}
-function hDeleteCookie(name){try{document.cookie=name+'=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';}catch(e){}}
-function hDeleteCookie(name){try{document.cookie=name+'=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';}catch(e){}}
-function loadRememberedEmail(){
-  try{
-    var saved=null;
-    try{saved=localStorage.getItem(HOUSING_REMEMBER_KEY);}catch(e){}
-    if(!saved) saved=hGetCookie(HOUSING_REMEMBER_KEY);
-    if(saved){
-      var emailEl=document.getElementById('signin-email');
-      var remEl=document.getElementById('remember-me');
-      if(emailEl) emailEl.value=saved;
-      if(remEl) remEl.checked=true;
-      setTimeout(function(){var p=document.getElementById('signin-password');if(p)p.focus();},150);
-    }
-  }catch(e){}
-}
-function saveRememberedEmail(email,remember){
-  try{
-    if(remember){
-      try{localStorage.setItem(HOUSING_REMEMBER_KEY,email);}catch(e){}
-      hSetCookie(HOUSING_REMEMBER_KEY,email,365);
-    }else{
-      try{localStorage.removeItem(HOUSING_REMEMBER_KEY);}catch(e){}
-      hDeleteCookie(HOUSING_REMEMBER_KEY);
-    }
-  }catch(e){}
-}
-
-// ── Forgot password ────────────────────────────────────────────────────────
-async function sendPasswordReset() {
-  var email = ((document.getElementById('forgot-email')||{}).value||'').trim().toLowerCase();
-  var msgEl = document.getElementById('forgot-msg');
-  if(!email || !email.endsWith('@clfn.on.ca')) {
-    if(msgEl){msgEl.textContent='Please enter your @clfn.on.ca email address.';msgEl.style.background='#3b0a0a';msgEl.style.color='#fca5a5';msgEl.style.display='block';}
-    return;
-  }
-  try {
-    await fetch(SUPABASE_URL+'/auth/v1/recover',{method:'POST',headers:HOUSING_HEADERS,body:JSON.stringify({email:email})});
-    if(msgEl){msgEl.textContent='Password reset link sent to '+email+'. Check your inbox.';msgEl.style.background='#052e16';msgEl.style.color='#86efac';msgEl.style.display='block';}
-  } catch(e) {
-    if(msgEl){msgEl.textContent='Could not send reset email: '+e.message;msgEl.style.background='#3b0a0a';msgEl.style.color='#fca5a5';msgEl.style.display='block';}
-  }
-}
-
-// ── Resend verification ────────────────────────────────────────────────────
-async function resendVerification() {
-  var email = (document.getElementById('verify-email-display')||{}).textContent||'';
-  var msgEl = document.getElementById('verify-msg');
-  try {
-    await fetch(SUPABASE_URL+'/auth/v1/resend',{method:'POST',headers:HOUSING_HEADERS,body:JSON.stringify({type:'signup',email:email})});
-    if(msgEl){msgEl.textContent='Verification email resent to '+email;msgEl.style.color='#86efac';msgEl.style.display='block';}
-  } catch(e) {
-    if(msgEl){msgEl.textContent='Could not resend: '+e.message;msgEl.style.color='#fca5a5';msgEl.style.display='block';}
-  }
-}
-
-// ── Forgot password ────────────────────────────────────────────────────────
-async function sendPasswordReset() {
-  var email = ((document.getElementById('forgot-email')||{}).value||'').trim().toLowerCase();
-  var msgEl = document.getElementById('forgot-msg');
-  if(!email || !email.endsWith('@clfn.on.ca')) {
-    if(msgEl){msgEl.textContent='Please enter your @clfn.on.ca email address.';msgEl.style.background='#3b0a0a';msgEl.style.color='#fca5a5';msgEl.style.display='block';}
-    return;
-  }
-  try {
-    await fetch(SUPABASE_URL+'/auth/v1/recover',{method:'POST',headers:HOUSING_HEADERS,body:JSON.stringify({email:email})});
-    if(msgEl){msgEl.textContent='Password reset link sent to '+email+'. Check your inbox.';msgEl.style.background='#052e16';msgEl.style.color='#86efac';msgEl.style.display='block';}
-  } catch(e) {
-    if(msgEl){msgEl.textContent='Could not send reset email: '+e.message;msgEl.style.background='#3b0a0a';msgEl.style.color='#fca5a5';msgEl.style.display='block';}
-  }
-}
-
-// ── Resend verification ────────────────────────────────────────────────────
-async function resendVerification() {
-  var email = (document.getElementById('verify-email-display')||{}).textContent||'';
-  var msgEl = document.getElementById('verify-msg');
-  try {
-    await fetch(SUPABASE_URL+'/auth/v1/resend',{method:'POST',headers:HOUSING_HEADERS,body:JSON.stringify({type:'signup',email:email})});
-    if(msgEl){msgEl.textContent='Verification email resent to '+email;msgEl.style.color='#86efac';msgEl.style.display='block';}
-  } catch(e) {
-    if(msgEl){msgEl.textContent='Could not resend: '+e.message;msgEl.style.color='#fca5a5';msgEl.style.display='block';}
-  }
-}
-
-// ── Sign in ────────────────────────────────────────────────────────────────
-// ── Sign in ────────────────────────────────────────────────────────────────
-async function startSignIn() {
-  var email    = ((document.getElementById('signin-email')||{}).value||'').trim().toLowerCase();
-  var password = (document.getElementById('signin-password')||{}).value||'';
-  var remember = (document.getElementById('remember-me')||{}).checked||false;
-  var errEl    = document.getElementById('signin-error');
-  var btn      = document.getElementById('signin-btn');
-
-  if(errEl) errEl.style.display='none';
-
-  if(!email||!password){
-    if(errEl){errEl.textContent='Please enter your email and password.';errEl.style.display='block';}
-    return;
-  }
-  if(!email.endsWith('@clfn.on.ca')){
-    if(errEl){errEl.textContent='Only @clfn.on.ca email addresses are permitted to sign in.';errEl.style.display='block';}
-    return;
-  }
-
-  if(btn){btn.disabled=true;btn.textContent='Signing in…';}
-  try {
-    var r = await fetch(SUPABASE_URL+'/auth/v1/token?grant_type=password',{
-      method:'POST', headers:HOUSING_HEADERS, body:JSON.stringify({email:email,password:password})
-    });
-    var data = await r.json();
-    if(!r.ok) throw new Error(data.error_description||data.msg||'Sign-in failed');
-
-    // Check email verification
-    var emailConfirmed = data.user.email_confirmed_at||data.user.confirmed_at;
-    if(!emailConfirmed){
-      var dispEl=document.getElementById('verify-email-display');
-      if(dispEl) dispEl.textContent=email;
-      document.getElementById('signin-panel').style.display='none';
-      document.getElementById('verify-panel').style.display='';
-      if(btn){btn.disabled=false;btn.textContent='Sign in';}
-      return;
-    }
-
-    // Save token and session
-    saveRememberedEmail(email, remember);
-    HOUSING_SESSION.email = email;
-    HOUSING_SESSION.name  = (data.user.user_metadata&&data.user.user_metadata.full_name)||email;
-    HOUSING_SESSION.accessToken = data.access_token;
-    HOUSING_HEADERS['Authorization'] = 'Bearer '+data.access_token;
-    try{sessionStorage.setItem('clfn_housing_token',data.access_token);}catch(e){}
-
-    // Resolve housing role from staff table
-    await resolveHousingRole();
-
-    // Load data and launch app
-    await loadAppDataFromSupabase();
-    // Debug overlay - shows on screen
-    var _dbg = document.createElement('div');
-    _dbg.id = '_debug_overlay';
-    _dbg.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#1a1a18;color:#F8E41A;font-family:monospace;font-size:13px;padding:16px;border-bottom:3px solid #F8E41A;';
-    _dbg.innerHTML = '<strong>DEBUG</strong> (tap to dismiss)<br>';
-    document.body.appendChild(_dbg);
-    _dbg.onclick = function(){ _dbg.remove(); };
-
-    function dbg(msg) {
-      _dbg.innerHTML += msg + '<br>';
-      console.log('[DBG] ' + msg);
-    }
-
-    var _ls = document.getElementById('loginScreen');
-    dbg('loginScreen exists: ' + !!_ls);
-    dbg('loginScreen display before: ' + (_ls ? _ls.style.display : 'N/A'));
-
-    if(_ls) { _ls.style.setProperty('display','none','important'); _ls.style.zIndex='-1'; }
-    dbg('loginScreen display after: ' + (_ls ? _ls.style.display : 'N/A'));
-    dbg('loginScreen computed: ' + (_ls ? window.getComputedStyle(_ls).display : 'N/A'));
-
-    var _hv = document.getElementById('employeeHomeView');
-    dbg('homeView exists: ' + !!_hv);
-    dbg('homeView display before: ' + (_hv ? _hv.style.display : 'N/A'));
-
-    try {
-      showEmployeeHome();
-      dbg('showEmployeeHome: OK');
-    } catch(e) {
-      dbg('showEmployeeHome ERROR: ' + e.message);
-    }
-
-    dbg('homeView display after: ' + (_hv ? _hv.style.display : 'N/A'));
-    dbg('homeView computed: ' + (_hv ? window.getComputedStyle(_hv).display : 'N/A'));
-    dbg('Role: ' + window.currentRole);
-    dbg('Tap this bar to dismiss');
-
-    showToast('Welcome, '+HOUSING_SESSION.name+' ('+HOUSING_SESSION.role+')');
-
-  } catch(e) {
-    console.error('[HOUSING LOGIN]', e);
-    if(errEl){errEl.textContent=e.message;errEl.style.display='block';}
-  } finally {
-    if(btn){btn.disabled=false;btn.textContent='Sign in';}
-  }
-}
-
-// ── Resolve housing role from staff table ──────────────────────────────────
-async function resolveHousingRole() {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?select=role,department,name&email=eq.'+encodeURIComponent(HOUSING_SESSION.email)+'&is_active=eq.true',
-      {headers:HOUSING_HEADERS});
-    var rows = await r.json();
-    if(rows&&rows.length) {
-      var staffRow = rows[0];
-      HOUSING_SESSION.name = staffRow.name||HOUSING_SESSION.name;
-      var housingRole = sbMapRole(staffRow);
-      HOUSING_SESSION.role = housingRole;
-      window.currentRole = housingRole;
-      window.CLFN_AUTH.isAuthenticated = true;
-      window.CLFN_AUTH.currentRole = housingRole;
-      if(typeof switchRole==='function') switchRole(housingRole);
-      var rs=document.getElementById('roleSwitcher'); if(rs) rs.style.display='none';
-      var sb=document.getElementById('header_addstaff_btn');
-      if(sb) sb.style.display=(housingRole==='ed'||housingRole==='housing_manager')?'flex':'none';
-      // Store real role and setup view-as toggle
-      window._realRole = housingRole;
-      window._viewAsRole = '';
-      if(typeof setupHeaderRoleToggle === 'function') setupHeaderRoleToggle(housingRole);
-    } else {
-      HOUSING_SESSION.role='employee';
-      window.currentRole='employee';
-    }
-  } catch(e) { console.warn('[HOUSING] role lookup failed:', e); HOUSING_SESSION.role='employee'; window.currentRole='employee'; }
-}
-
-// ── Sign out ───────────────────────────────────────────────────────────────
-async function doLogout() {
-  try {
-    await fetch(SUPABASE_URL+'/auth/v1/logout',{method:'POST',headers:HOUSING_HEADERS});
-  } catch(e){}
-  HOUSING_SESSION={email:'',name:'',role:'',accessToken:''};
-  HOUSING_HEADERS['Authorization']='Bearer '+SUPABASE_ANON;
-  window.CLFN_AUTH.isAuthenticated=false;
-  window.currentRole='employee';
-  applications=[]; housingUnits=[];
-  showLoginScreen();
-}
-
-function showLoginScreen() {
-  var ls=document.getElementById('loginScreen');
-  if(ls){ls.style.display='flex';}
-  showSignInPanel();
-  var p=document.getElementById('signin-password'); if(p) p.value='';
-  var e=document.getElementById('signin-error'); if(e) e.style.display='none';
-}
-function hidLoginScreen() {
-  var ls=document.getElementById('loginScreen');
-  if(ls) ls.style.display='none';
-  var rs=document.getElementById('roleSwitcher'); if(rs) rs.style.display='none';
-}
-
-// ── Global in-memory caches for Supabase data ───────────────────────────────
-window._contractors   = window._contractors   || [];
-window._sowCache      = window._sowCache      || {};  // keyed by unit_id
-window._renoProgress  = window._renoProgress  || {};  // keyed by unit_id
-window._renoBudget    = window._renoBudget    || {};  // keyed by unit_id
-window._unitPhotos    = window._unitPhotos    || {};  // keyed by unit_id
-window._appSettings   = window._appSettings   || {};
-
-// ── Load all data from Supabase into in-memory arrays ────────────────────────
-async function loadAppDataFromSupabase() {
-  try {
-    // Applications
-    // Fetch ALL applications using pagination (Supabase defaults to 100 rows per page)
-    var allAppsData = [];
-    var appsOffset = 0;
-    var appsPageSize = 1000;
-    while(true) {
-      var appsR = await fetch(
-        SUPABASE_URL+'/rest/v1/housing_applications?select=*&order=submitted_at.desc&limit='+appsPageSize+'&offset='+appsOffset,
-        { headers: HOUSING_HEADERS }
-      );
-      if(!appsR.ok) break;
-      var page = await appsR.json();
-      if(!Array.isArray(page) || !page.length) break;
-      allAppsData = allAppsData.concat(page);
-      if(page.length < appsPageSize) break; // last page
-      appsOffset += appsPageSize;
-    }
-    if(allAppsData.length) {
-      applications = allAppsData.map(function(row){
-        return Object.assign({},row.data||{},{
-          id:row.id, status:row.status, score:row.score, tier:row.tier,
-          classification:row.classification, reserve:row.reserve,
-          archived:!!row.archived, assignedUnit:row.assigned_unit_id,
-          assignedAddress:row.assigned_address, submittedAt:row.submitted_at
-        });
-      });
-    }
-
-    // Housing units
-    // Fetch all units with pagination
-    var allUnitsData = [];
-    var unitsOffset = 0;
-    while(true) {
-      var unitsR = await fetch(
-        SUPABASE_URL+'/rest/v1/housing_units?select=*&order=street,num&limit=1000&offset='+unitsOffset,
-        { headers: HOUSING_HEADERS }
-      );
-      if(!unitsR.ok) break;
-      var uPage = await unitsR.json();
-      if(!Array.isArray(uPage) || !uPage.length) break;
-      allUnitsData = allUnitsData.concat(uPage);
-      if(uPage.length < 1000) break;
-      unitsOffset += 1000;
-    }
-    var unitsR = { ok: allUnitsData.length > 0 }; // compatibility shim
-    console.log('[CLFN] units fetch status:', unitsR.status, unitsR.ok);
-    if(unitsR.ok){
-      var unitsData=allUnitsData;
-      console.log('[CLFN] units rows returned:', unitsData.length);
-      housingUnits=unitsData.map(function(row){
-        return Object.assign({},row.data||{},{
-          id:row.id, num:row.num, street:row.street, bedrooms:row.bedrooms,
-          bathrooms:row.bathrooms, type:row.type, foundation:row.foundation,
-          funder:row.funder, status:row.status, accessible:!!row.accessible,
-          isElders:!!row.is_elders, archived:!!row.archived,
-          assignedTo:row.assigned_to, assignedName:row.assigned_name, assignedDate:row.assigned_date
-        });
-      });
-    }
-
-    // Settings
-    var setR = await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=*',{headers:HOUSING_HEADERS});
-    if(setR.ok){
-      var setData=await setR.json();
-      setData.forEach(function(row){ if(!window._appSettings) window._appSettings={}; window._appSettings[row.key]=row.value; });
-    }
-
-    // Load contractors
-    try {
-      var ctR = await fetch(SUPABASE_URL+'/rest/v1/housing_contractors?select=*&order=created_at',{headers:HOUSING_HEADERS});
-      if(ctR.ok){var ctData=await ctR.json();window._contractors=ctData.map(function(r){return Object.assign({},r.data||{},{id:r.id,name:r.name,trade:r.trade,status:r.status});});}
-    } catch(e){console.warn('Contractors load:',e);}
-    // Load SOW cache
-    try {
-      var sowR=await fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=unit_id,data',{headers:HOUSING_HEADERS});
-      if(sowR.ok){var sd=await sowR.json();window._sowCache={};sd.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
-    } catch(e){console.warn('SOW cache:',e);}
-    // Load reno progress cache
-    try {
-      var rpR=await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress?select=unit_id,data',{headers:HOUSING_HEADERS});
-      if(rpR.ok){var rpd=await rpR.json();window._renoProgress={};rpd.forEach(function(r){window._renoProgress[r.unit_id]=r.data;});}
-    } catch(e){console.warn('Reno progress:',e);}
-    // Load reno budget cache
-    try {
-      var rbR=await fetch(SUPABASE_URL+'/rest/v1/housing_reno_budget?select=unit_id,data',{headers:HOUSING_HEADERS});
-      if(rbR.ok){var rbd=await rbR.json();window._renoBudget={};rbd.forEach(function(r){window._renoBudget[r.unit_id]=r.data;});}
-    } catch(e){console.warn('Reno budget:',e);}
-    // Load unit photos cache
-    try {
-      var upR=await fetch(SUPABASE_URL+'/rest/v1/housing_unit_photos?select=*&order=added_at',{headers:HOUSING_HEADERS});
-      if(upR.ok){var upd=await upR.json();window._unitPhotos={};upd.forEach(function(r){if(!window._unitPhotos[r.unit_id])window._unitPhotos[r.unit_id]=[];window._unitPhotos[r.unit_id].push(r);});}
-    } catch(e){console.warn('Unit photos:',e);}
-    // Load settings cache
-    try {
-      var asR=await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=key,value',{headers:HOUSING_HEADERS});
-      if(asR.ok){var asd=await asR.json();window._appSettings={};asd.forEach(function(r){window._appSettings[r.key]=r.value;});}
-    } catch(e){console.warn('Settings:',e);}
-    // Load contacts
-    try {
-      var conR=await fetch(SUPABASE_URL+'/rest/v1/housing_contacts?select=*&limit=1',{headers:HOUSING_HEADERS});
-      if(conR.ok){var cond=await conR.json();window._contacts=cond.length?(cond[0].data||{}):{}}
-    } catch(e){console.warn('Contacts:',e);}
-
-    showToast('\u2713 Loaded '+applications.length+' applications, '+housingUnits.length+' units');
-    console.info('[CLFN Housing] Data loaded:',applications.length,'apps,',housingUnits.length,'units');
-
-    // Refresh V2 scoring model and tiers from loaded settings
-    try {
-      if(window._appSettings && window._appSettings['scoring_model_v2']) {
-        window.liveV2ScoreModel = window._appSettings['scoring_model_v2'];
-      }
-      if(window._appSettings && window._appSettings['scoring_tiers_v2']) {
-        window.liveV2Tiers = window._appSettings['scoring_tiers_v2'];
-      }
-    } catch(e) {}
-
-    // Rescore all apps with live V2 model
-    if(applications.length && typeof rescoreAllApplications === 'function') {
-      rescoreAllApplications();
-      console.log('[CLFN] Rescored '+applications.length+' applications on V2 model');
-    }
-  } catch(e) {
-    console.error('[CLFN Housing] loadAppData failed:',e);
-    showToast('\u26a0 Could not load data — using cached version');
-  }
-}
-
-// (old session restore removed — see DOMContentLoaded below)
-
-// ══════════════════════════════════════════════════════════════
-// STAFF MANAGEMENT — Add users from within the app
-// Same pattern as expense claims app
-// ══════════════════════════════════════════════════════════════
-
-function showAddHousingStaff() {
-  var isED = window.currentRole === 'ed';
-  var modal = document.getElementById('globalModal') || document.getElementById('approvalModal');
-  // Use the existing showToast + a custom modal approach
-  // Build inline modal
-  var overlay = document.createElement('div');
-  overlay.id = 'staffModal';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px;';
-
-  var depts = ['Housing','Administration','Capital Projects & Infrastructure','Human Resources','Finance','Wellness','Medical Services','Choose Life','Ontario Works','Eagles Earth','Water Treatment Plant','Lands & Resources','Chief & Council','Band Reps'];
-  var deptOptions = depts.map(function(d){ return '<option value="'+d+'">'+d+'</option>'; }).join('');
-  var roleOptions = '<option value="employee">Employee</option>'
-    + (isED ? '<option value="manager">Manager</option><option value="ed">Executive Director</option>' : '');
-
-  overlay.innerHTML = '<div style="background:var(--surface);border-radius:14px;width:100%;max-width:520px;box-shadow:0 24px 60px rgba(0,0,0,.5);overflow:hidden;">'
-    + '<div style="background:var(--dark);border-bottom:3px solid var(--yellow);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">'
-    + '<span style="font-size:15px;font-weight:700;color:#fff;">'+(isED?'Add Staff Member — ED':'Add Staff Member')+'</span>'
-    + '<button onclick="closeStaffModal()" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;line-height:1;">&times;</button>'
-    + '</div>'
-    + '<div style="padding:22px;display:flex;flex-direction:column;gap:12px;">'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
-    + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Full Name</label>'
-    + '<input id="hs-name" placeholder="e.g. Edith Moore" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;"></div>'
-    + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Work Email</label>'
-    + '<input id="hs-email" type="email" placeholder="edith.moore@clfn.on.ca" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'
-    + '<div id="hs-email-hint" style="display:none;font-size:11px;color:#b91c1c;margin-top:3px;">&#9888; Must be a @clfn.on.ca address</div></div>'
-    + '</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
-    + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Department</label>'
-    + '<select id="hs-dept" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'+deptOptions+'</select></div>'
-    + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Role</label>'
-    + '<select id="hs-role" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'+roleOptions+'</select></div>'
-    + '</div>'
-    + '<div style="background:#f8f8f6;border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);">'
-    + '&#128274; A login account is created automatically. Default password: <strong>CLFN + FirstName + 2026!</strong>'
-    + '</div>'
-    + '<div id="hs-result" style="display:none;border-radius:8px;padding:10px 14px;font-size:12px;"></div>'
-    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">'
-    + '<button onclick="closeStaffModal()" style="padding:8px 18px;border:1px solid var(--border);border-radius:7px;background:none;font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;">Cancel</button>'
-    + '<button id="hs-submit-btn" onclick="submitAddHousingStaff()" style="padding:8px 18px;background:var(--yellow);border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">+ Add to Staff Directory</button>'
-    + '</div>'
-    + '</div></div>';
-
-  document.body.appendChild(overlay);
-
-  // Wire email hint
-  var emailEl = document.getElementById('hs-email');
-  if(emailEl) emailEl.addEventListener('input', function(){
-    var h = document.getElementById('hs-email-hint');
-    if(h) h.style.display = (this.value && !this.value.endsWith('@clfn.on.ca')) ? 'block' : 'none';
-  });
-}
-
-function editStaff(idOrObj) {
-  var u = (typeof idOrObj === 'object') ? idOrObj : (window._staffCache && window._staffCache[idOrObj]);
-  if(!u) { showToast('Staff record not found'); return; }
-  var existing = document.getElementById('staffModal');
-  if(existing) existing.remove();
-
-  var depts = ['Housing','Administration','Capital Projects & Infrastructure','Human Resources','Finance','Wellness','Medical Services','Choose Life','Ontario Works','Eagles Earth','Water Treatment Plant','Lands & Resources','Chief & Council','Band Reps'];
-  var currentRole = sbMapRole(u);
-  var deptOptions = depts.map(function(d){ return '<option value="'+d+'"'+(u.department===d?' selected':'')+'>'+d+'</option>'; }).join('');
-  var roleOptions = [
-    ['employee','Employee'],
-    ['manager','Housing Manager'],
-    ['ed','Executive Director']
-  ].map(function(r){ return '<option value="'+r[0]+'"'+(currentRole===r[0]||u.role===r[0]?' selected':'')+'>'+r[1]+'</option>'; }).join('');
-
-  var overlay = document.createElement('div');
-  overlay.id = 'staffModal';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px;';
-  overlay.innerHTML = '<div style="background:var(--surface);border-radius:14px;width:100%;max-width:480px;box-shadow:0 24px 60px rgba(0,0,0,.5);overflow:hidden;">'
-    + '<div style="background:var(--dark);border-bottom:3px solid var(--yellow);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">'
-    + '<span style="font-size:15px;font-weight:700;color:#fff;">Edit Staff Member</span>'
-    + '<button onclick="closeStaffModal()" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;line-height:1;">&times;</button>'
-    + '</div>'
-    + '<div style="padding:22px;display:flex;flex-direction:column;gap:14px;">'
-    // Name
-    + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Full Name</label>'
-    + '<input id="es-name" value="'+u.name+'" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;"></div>'
-    // Email (read-only)
-    + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Email (cannot change)</label>'
-    + '<input value="'+u.email+'" readonly style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;background:var(--bg);color:var(--muted);"></div>'
-    // Department + Role
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
-    + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Department</label>'
-    + '<select id="es-dept" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'+deptOptions+'</select></div>'
-    + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Housing Role</label>'
-    + '<select id="es-role" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'+roleOptions+'</select></div>'
-    + '</div>'
-    + '<div id="es-result" style="display:none;border-radius:8px;padding:10px 14px;font-size:12px;"></div>'
-    + '<div style="display:flex;gap:8px;justify-content:flex-end;">'
-    + '<button onclick="closeStaffModal()" style="padding:8px 18px;border:1px solid var(--border);border-radius:7px;background:none;font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;">Cancel</button>'
-    + '<button id="es-submit-btn" onclick="submitEditStaff('+u.id+')" style="padding:8px 18px;background:var(--yellow);border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Save Changes</button>'
-    + '</div>'
-    + '</div></div>';
-  document.body.appendChild(overlay);
-}
-
-async function submitEditStaff(id) {
-  var name = ((document.getElementById('es-name')||{}).value||'').trim();
-  var dept = (document.getElementById('es-dept')||{}).value||'';
-  var role = (document.getElementById('es-role')||{}).value||'employee';
-  var btn  = document.getElementById('es-submit-btn');
-  var res  = document.getElementById('es-result');
-
-  if(!name) { showToast('Please enter a name'); return; }
-  if(btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-
-  // Map role back to staff table format
-  var staffRole = role; // 'employee', 'manager', or 'ed'
-  var staffDept = (role === 'manager') ? 'Housing' : dept;
-
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id, {
-      method: 'PATCH',
-      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'return=minimal'}),
-      body: JSON.stringify({ name: name, department: staffDept, role: staffRole })
-    });
-    if(r.ok) {
-      auditEntry('SETTINGS', 'settings_user_edit', 'Staff updated: '+name+' — Role: '+staffRole, window.currentUser||'ed');
-      closeStaffModal();
-      showToast('✓ Staff member updated');
-      renderHousingUserTable();
-    } else {
-      var err = await r.text();
-      if(res){ res.style.display='block'; res.style.background='#fef2f2'; res.style.color='#b91c1c'; res.textContent='Error: '+err; }
-      if(btn){ btn.disabled=false; btn.textContent='Save Changes'; }
-    }
-  } catch(e) {
-    showToast('Error: '+e.message);
-    if(btn){ btn.disabled=false; btn.textContent='Save Changes'; }
-  }
-}
-
-
-function closeStaffModal() {
-  var m = document.getElementById('staffModal');
-  if(m) m.remove();
-}
-
-async function submitAddHousingStaff() {
-  var name  = ((document.getElementById('hs-name')||{}).value||'').trim();
-  var email = ((document.getElementById('hs-email')||{}).value||'').trim().toLowerCase();
-  var dept  = (document.getElementById('hs-dept')||{}).value||'';
-  var role  = (document.getElementById('hs-role')||{}).value||'employee';
-  var btn   = document.getElementById('hs-submit-btn');
-  var res   = document.getElementById('hs-result');
-
-  if(!name)  { showToast("Please enter the employee's full name"); return; }
-  if(!email||!email.includes('@')) { showToast('Please enter a valid email address'); return; }
-  if(!email.endsWith('@clfn.on.ca')) { showToast('Only @clfn.on.ca email addresses can be registered'); return; }
-
-  if(window.currentRole === 'housing_manager' && (role === 'manager' || role === 'ed')) {
-    showToast('Housing managers can only add employees. Only the ED can add managers.'); return;
-  }
-
-  if(btn){ btn.disabled=true; btn.textContent='Adding…'; }
-
-  try {
-    // Check if already in staff table
-    var checkR = await fetch(SUPABASE_URL+'/rest/v1/staff?select=id&email=eq.'+encodeURIComponent(email),{headers:HOUSING_HEADERS});
-    var existing = await checkR.json();
-    if(existing&&existing.length){ showToast(email+' is already in the staff directory'); if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';} return; }
-
-    var firstName = name.split(' ')[0];
-    var defaultPassword = 'CLFN'+firstName+'2026!';
-
-    // Step 1: Create Supabase Auth account
-    var signupR = await fetch(SUPABASE_URL+'/auth/v1/signup',{
-      method:'POST', headers:HOUSING_HEADERS,
-      body:JSON.stringify({email:email, password:defaultPassword, data:{full_name:name}})
-    });
-    var signupData = await signupR.json();
-    var authCreated = signupR.ok && signupData.user && signupData.user.id;
-    var alreadyInAuth = (signupData.msg||'').includes('already registered') || (signupData.error_description||'').includes('already registered');
-
-    if(!authCreated && !alreadyInAuth) {
-      // Auth failed — show error, do NOT save staff record
-      var errMsg = signupData.msg || signupData.error_description || signupData.error || JSON.stringify(signupData);
-      if(res){
-        res.style.background='#fef2f2'; res.style.border='1px solid #fecaca'; res.style.color='#b91c1c';
-        res.innerHTML = '<strong>Could not create login account.</strong><br>'
-          + '<span style="font-size:11px;">'+errMsg+'</span><br><br>'
-          + 'To fix: Go to <strong>CLFN Housing Supabase → Authentication → Sign In / Providers</strong><br>'
-          + 'Turn off <strong>"Confirm email"</strong> and click Save changes, then try again.';
-        res.style.display='block';
-      }
-      if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';}
-      return;
-    }
-
-    // Step 2: Add to staff table (only after auth succeeds)
-    var staffR = await fetch(SUPABASE_URL+'/rest/v1/staff',{
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
-      body:JSON.stringify({name:name, email:email, role:role, department:dept, is_active:true, manager_email:'kevin.proctor@clfn.on.ca'})
-    });
-
-    if(!staffR.ok){
-      var staffErr = await staffR.text();
-      if(res){
-        res.style.background='#fef2f2'; res.style.border='1px solid #fecaca'; res.style.color='#b91c1c';
-        res.innerHTML = '<strong>Auth account created but staff record failed.</strong><br><span style="font-size:11px;">'+staffErr+'</span>';
-        res.style.display='block';
-      }
-      if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';}
-      return;
-    }
-
-    // Both succeeded
-    if(res){
-      res.style.background='#f0fdf4'; res.style.border='1px solid #86efac'; res.style.color='#166534';
-      res.innerHTML = '<strong>&#10003; '+name+' added successfully!</strong><br>'
-        + 'Email: <code style="background:#dcfce7;padding:2px 6px;border-radius:4px;">'+email+'</code><br>'
-        + 'Password: <code style="background:#dcfce7;padding:2px 6px;border-radius:4px;font-weight:700;">'+defaultPassword+'</code><br>'
-        + '<span style="font-size:11px;opacity:.8;">Share these credentials directly. They can change their password after signing in.</span>';
-      res.style.display='block';
-      showToast('\u2713 '+name+' added successfully');
-    }
-
-    // Refresh user table if visible
-    if(typeof renderHousingUserTable === 'function') renderHousingUserTable();
-    if(btn) btn.style.display='none';
-
-  } catch(e) {
-    showToast('Error: '+e.message);
-    if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';}
-  }
-}
-
-
-
-
-
-
-
-
-
-document.addEventListener('DOMContentLoaded', function() {
-  // Init Supabase client
-  try {
-    if(window.supabase && window.supabase.createClient) {
-      window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-    }
-  } catch(e) { console.log('[CLFN] Supabase init failed:', e.message); }
-
-  // Clear any stuck restore flag
-  try { sessionStorage.removeItem('_restoring'); } catch(e) {}
-
-  // Load remembered email into login form
+document.addEventListener('DOMContentLoaded', async function() {
   loadRememberedEmail();
 
-  // Always show login screen — user signs in fresh each session
-  // (session persistence via sessionStorage token is handled in startSignIn)
+  // Check for stored token (simple session persistence)
+  var storedToken = null;
+  try { storedToken = sessionStorage.getItem('clfn_housing_token'); } catch(e){}
+  if(storedToken) {
+    HOUSING_HEADERS['Authorization'] = 'Bearer '+storedToken;
+    try {
+      var userR = await fetch(SUPABASE_URL+'/auth/v1/user',{headers:HOUSING_HEADERS});
+      if(userR.ok) {
+        var userData = await userR.json();
+        HOUSING_SESSION.email = userData.email.toLowerCase();
+        HOUSING_SESSION.accessToken = storedToken;
+        await resolveHousingRole();
+        await loadAppDataFromSupabase();
+        hidLoginScreen();
+        showEmployeeHome();
+        return;
+      }
+    } catch(e) { console.warn('[HOUSING] session restore failed'); }
+    // Token invalid - reset
+    HOUSING_HEADERS['Authorization'] = 'Bearer '+SUPABASE_ANON;
+    try { sessionStorage.removeItem('clfn_housing_token'); } catch(e){}
+  }
+
+  // No valid session — show login
   showLoginScreen();
 });
-
 </script>
+</body>
 </html>
