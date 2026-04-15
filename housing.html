@@ -2048,6 +2048,83 @@
   </div>
 </div>
 
+
+<!-- addTenantModal -->
+<div id="addTenantModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
+  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
+
+    <!-- Header -->
+    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Tenant Management</div>
+        <div style="font-size:15px;font-weight:700;color:#fff;">Add / Assign a Tenant</div>
+      </div>
+      <button type="button" onclick="closeAddTenantModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+    </div>
+
+    <div style="padding:24px;display:flex;flex-direction:column;gap:0;">
+
+      <!-- Policy notice -->
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 16px;margin-bottom:20px;display:flex;gap:12px;">
+        <span style="font-size:20px;flex-shrink:0;">📋</span>
+        <div>
+          <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:4px;">Application Required</div>
+          <div style="font-size:12px;color:#7a6000;line-height:1.5;">All tenants — including existing residents — must have a current housing application on file. This ensures up-to-date information is captured before unit assignment.</div>
+        </div>
+      </div>
+
+      <!-- Option 1: New application -->
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px;">Option 1 — New Tenant or Update Required</div>
+      <button onclick="closeAddTenantModal();newApp();" style="width:100%;background:var(--yellow);border:none;color:#111;border-radius:10px;padding:14px 18px;cursor:pointer;font-family:DM Sans,sans-serif;text-align:left;display:flex;align-items:center;gap:14px;margin-bottom:20px;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
+        <span style="font-size:26px;">📝</span>
+        <div>
+          <div style="font-size:13px;font-weight:700;">Start a New Application</div>
+          <div style="font-size:11px;font-weight:400;opacity:.8;margin-top:2px;">Opens the full housing application form to collect current information</div>
+        </div>
+        <svg style="margin-left:auto;flex-shrink:0;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+
+      <!-- Option 2: Link existing approved application -->
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px;">Option 2 — Link Approved Application to a Unit</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="f">
+          <label>Unit <span class="r">*</span></label>
+          <select id="at_unit" style="width:100%;">
+            <option value="">— Select a unit —</option>
+          </select>
+        </div>
+        <div style="position:relative;">
+          <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Application ID <span class="r">*</span></label>
+          <input type="text" id="at_appid" placeholder="Type name or APP-ID to search…" autocomplete="off"
+            style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"
+            oninput="atSearchApps(this.value)" onfocus="atSearchApps(this.value)"
+            onblur="setTimeout(function(){var d=document.getElementById('at_app_dropdown');if(d)d.style.display='none';},180)"/>
+          <div id="at_app_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:999;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.15);"></div>
+          <input type="hidden" id="at_appid_val"/>
+          <div id="at_app_selected" style="display:none;margin-top:6px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;font-size:12px;"></div>
+        </div>
+        <div class="f">
+          <label>Move-in Date <span class="r">*</span></label>
+          <input type="date" id="at_date"/>
+        </div>
+        <div class="f">
+          <label>Status</label>
+          <select id="at_status">
+            <option value="occupied">Occupied</option>
+            <option value="reserved">Reserved</option>
+          </select>
+        </div>
+        <div id="at_error" style="display:none;color:#b91c1c;font-size:12px;font-weight:600;padding:8px 12px;background:#fef2f2;border-radius:7px;"></div>
+      </div>
+
+    </div>
+    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg);">
+      <button type="button" onclick="closeAddTenantModal()" class="btn btn-ghost">Cancel</button>
+      <button type="button" onclick="saveAddTenant()" class="btn btn-primary">Assign to Unit</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
