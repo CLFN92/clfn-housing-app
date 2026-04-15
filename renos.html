@@ -3625,6 +3625,22 @@ function switchRole(role){
   showEmployeeHome();
 }
 
+
+// ── Navigation stack ─────────────────────────────────────────────────────────
+window._navStack = window._navStack || [];
+function pushNav(viewName) {
+  if(!window._navStack) window._navStack = [];
+  var stack = window._navStack;
+  if(stack.length && stack[stack.length-1] === viewName) return;
+  stack.push(viewName);
+  if(stack.length > 20) stack.shift();
+}
+function goBack() {
+  var stack = window._navStack || [];
+  if(stack.length) stack.pop();
+  showRenos();
+}
+
 (async function initRenos() {
   // ── Auth: check sessionStorage token (validated on login) ─────────────────
   var token = null;
