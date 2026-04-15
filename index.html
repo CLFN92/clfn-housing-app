@@ -1916,10 +1916,7 @@ function closeMobileMenu(){
   if(document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', attachNavClose);
 
-// ── Show default view on load ──
-document.addEventListener('DOMContentLoaded', function(){
-  if(typeof showDash === 'function') showDash();
-});
+// (show default view removed — index.html stays on login screen)
   } else {
     attachNavClose();
   }
@@ -5658,10 +5655,7 @@ function closeMobileMenu(){
   if(document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', attachNavClose);
 
-// ── Show default view on load ──
-document.addEventListener('DOMContentLoaded', function(){
-  if(typeof showDash === 'function') showDash();
-});
+// (show default view removed — index.html stays on login screen)
   } else {
     attachNavClose();
   }
