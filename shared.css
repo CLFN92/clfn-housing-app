@@ -253,7 +253,7 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 @media(max-width:900px){
   .c2,.c3{grid-template-columns:1fr;}
   .s2,.s3{grid-column:span 1;}
-  .sidebar{width:190px;}
+  /* sidebar width controlled by sidebar-open class */
   .rev-grid{grid-template-columns:1fr;}
   .sig-row{grid-template-columns:1fr;}
 }
