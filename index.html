@@ -8425,7 +8425,20 @@ document.addEventListener('DOMContentLoaded', async function() {
         await resolveHousingRole();
         await loadAppDataFromSupabase();
         hidLoginScreen();
-        showEmployeeHome();
+        // Force-show home view immediately regardless of showEmployeeHome result
+        var _homeEl = document.getElementById('employeeHomeView');
+        if(_homeEl) { _homeEl.style.display='flex'; _homeEl.style.flexDirection='column'; }
+        var _loginEl = document.getElementById('loginScreen');
+        if(_loginEl) _loginEl.style.display='none';
+        try {
+          showEmployeeHome();
+        } catch(she_err) {
+          console.error('[HOME] showEmployeeHome error:', she_err.message, she_err.stack);
+          // Home view is already visible from above — just update the name
+          var _nameEl = document.getElementById('emp_home_name');
+          if(_nameEl) _nameEl.textContent = HOUSING_SESSION.name || 'Welcome';
+        }
+        try { sessionStorage.removeItem('_restoring'); } catch(e) {}
         return;
       }
     } catch(e) {
