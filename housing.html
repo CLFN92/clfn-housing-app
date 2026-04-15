@@ -1530,6 +1530,547 @@
   </div>
 </div>
 
+
+<!-- sowModal -->
+<div id="sowModal" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
+  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:700px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
+
+    <!-- Header -->
+    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;">
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:3px;">Constance Lake First Nation — Housing</div>
+        <div style="font-size:16px;font-weight:700;color:#fff;">Renovation Scope of Work</div>
+        <div id="sow_unit_label" style="font-size:11px;color:#888;margin-top:2px;"></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" onclick="printWorkOrder()" style="background:var(--yellow);border:none;color:#111;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;display:flex;align-items:center;gap:5px;">🏗 Work Order</button>
+        <button type="button" onclick="printSOW()" style="background:none;border:1px solid #555;color:#ccc;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;">🖨 Full SOW</button>
+        <button type="button" onclick="closeSowModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:24px;display:flex;flex-direction:column;gap:0;">
+
+      <!-- ── UNIT INFORMATION ─────────────────────────────────────────────── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Unit Information</div>
+        </div>
+        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="f"><label>Unit Address</label><input id="sow_address" type="text" placeholder="e.g. 11 Musko Road"/></div>
+          <div class="f"><label>Date Prepared</label><input id="sow_date" type="date"/></div>
+          <div class="f"><label>Current Tenant Name</label><input id="sow_tenant_name" type="text" placeholder="Full name of tenant"/></div>
+          <div class="f"><label>Prepared By (Staff)</label><input id="sow_prepared_by" type="text" placeholder="Staff name"/></div>
+          <div class="f" style="position:relative;grid-column:span 2;"><label>Contractor (if assigned)</label>
+            <input id="sow_contractor" type="text" placeholder="Search contractors…" autocomplete="off"
+              oninput="sowContractorSearch(this.value)" onfocus="sowContractorSearch(this.value)"
+              onblur="setTimeout(function(){var d=document.getElementById('sow_ct_dropdown');if(d)d.style.display='none';},180)"/>
+            <input type="hidden" id="sow_contractor_id"/>
+            <div id="sow_ct_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:1100;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.15);"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CONDITION ASSESSMENT ────────────────────────────────────────── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Condition Assessment</div>
+        </div>
+        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="f"><label>Overall Condition</label>
+            <select id="sow_condition">
+              <option value="">— Select —</option>
+              <option value="Good">Good — minor maintenance only</option>
+              <option value="Fair">Fair — moderate repairs needed</option>
+              <option value="Poor">Poor — significant repairs needed</option>
+              <option value="Critical">Critical — unsafe / condemned</option>
+            </select>
+          </div>
+          <div class="f"><label>Estimated Total Cost</label>
+            <input id="sow_total_cost" type="text" placeholder="Auto-calculated" readonly
+              style="background:var(--bg);font-weight:700;color:var(--yellow);font-size:16px;"/>
+          </div>
+          <div class="f"><label>Target Start Date</label><input id="sow_start_date" type="date"/></div>
+          <div class="f"><label>Target Completion Date</label><input id="sow_end_date" type="date"/></div>
+        </div>
+      </div>
+
+      <!-- ── SCOPE OF WORK ITEMS ─────────────────────────────────────────── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Scope of Work Items</div>
+        </div>
+        <div style="padding:16px;">
+          <div id="sow_items" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+          <button type="button" onclick="addSowItem()"
+            style="background:none;border:1.5px dashed var(--border);color:var(--muted);padding:8px 16px;border-radius:8px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;width:100%;transition:all .15s;"
+            onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'"
+            onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add Work Item</button>
+        </div>
+      </div>
+
+      <!-- ── HEALTH & SAFETY ─────────────────────────────────────────────── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Health &amp; Safety Concerns</div>
+        </div>
+        <div style="padding:16px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sow_mold" style="width:15px;height:15px;"/> Mould / Mildew</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sow_asbestos" style="width:15px;height:15px;"/> Asbestos Risk</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sow_electrical" style="width:15px;height:15px;"/> Electrical Hazard</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sow_structural" style="width:15px;height:15px;"/> Structural Concern</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sow_plumbing" style="width:15px;height:15px;"/> Plumbing / Sewage</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sow_fire" style="width:15px;height:15px;"/> Fire Safety</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TENANT ACCOUNTABILITY ───────────────────────────────────────── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Tenant Accountability</div>
+        </div>
+        <div style="padding:16px;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Record factors that affect renovation priority and tenant responsibility.</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
+            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_rent_arrears"/><span class="tsl"></span></label><label for="sow_rent_arrears" style="cursor:pointer;font-size:13px;">Tenant has rent arrears</label></div>
+            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_tenant_damage"/><span class="tsl"></span></label><label for="sow_tenant_damage" style="cursor:pointer;font-size:13px;">Damage caused by tenant</label></div>
+            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_negligence"/><span class="tsl"></span></label><label for="sow_negligence" style="cursor:pointer;font-size:13px;">Negligence (failure to maintain / report issues)</label></div>
+            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_vandalism"/><span class="tsl"></span></label><label for="sow_vandalism" style="cursor:pointer;font-size:13px;">Vandalism</label></div>
+            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_police_report"/><span class="tsl"></span></label><label for="sow_police_report" style="cursor:pointer;font-size:13px;">Police report on file</label></div>
+          </div>
+          <div class="f"><label>Accountability Notes</label>
+            <textarea id="sow_accountability_notes" rows="2" placeholder="Details on tenant responsibility, incident dates, report numbers…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ADDITIONAL NOTES ────────────────────────────────────────────── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Additional Notes</div>
+        </div>
+        <div style="padding:16px;">
+          <div class="f"><label>Special Instructions / Access Requirements</label>
+            <textarea id="sow_notes" rows="3" placeholder="Any additional context, access requirements, tenant considerations…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TERMS & CONDITIONS ────────────────────────────────────────── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;"
+          onclick="var b=document.getElementById('sow_terms_body');var c=document.getElementById('sow_terms_chevron');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Terms &amp; Conditions</div>
+          <svg id="sow_terms_chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div id="sow_terms_body" style="display:none;padding:18px 20px;font-size:12px;color:var(--text);line-height:1.7;">
+          <p style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;">Constance Lake First Nation — Housing Department</p>
+
+          <p style="margin-bottom:14px;color:var(--muted);">By completing and submitting this Scope of Work, the submitting party acknowledges and agrees to the following terms.</p>
+
+          <div style="display:flex;flex-direction:column;gap:12px;">
+
+            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">1. Prioritization of Requests</div>
+              <p style="font-size:12px;color:var(--muted);">Renovation requests are assessed and prioritized based on the urgency of need, health and safety risk to occupants, and the overall condition of the unit. Requests involving immediate hazards — including structural, electrical, plumbing, or fire safety concerns — are given priority consideration over general maintenance and cosmetic work.</p>
+            </div>
+
+            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">2. Funding Eligibility &amp; Unit Qualifying Criteria</div>
+              <p style="font-size:12px;color:var(--muted);">Approval is subject to available funding and the qualifying criteria of the unit under its applicable program (e.g. ISC, CMHC Section 95, CMHC Section 56.1, or Band-funded). Not all units qualify under all funding sources, and funding availability may affect the scope, cost ceiling, or timing of approved work. Requests will be assessed against the current budget allocation for the relevant funding pool.</p>
+            </div>
+
+            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">3. Budget Authority &amp; Approval Routing</div>
+              <p style="font-size:12px;color:var(--muted);">Renovation requests within the Housing Manager's approved budget authority may be approved by the Housing Manager. Any request exceeding that threshold — as established in the Housing Department's current budget policy — requires Executive Director approval before work may commence. No work is to be initiated until all required approvals have been obtained and documented.</p>
+            </div>
+
+            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">4. Tenant Responsibilities</div>
+              <p style="font-size:12px;color:var(--muted);">The tenant is required to provide timely and reasonable access to the unit for inspection, assessment, and the completion of approved work. Damage, negligence, or vandalism attributed to the tenant may reduce the priority of the request and may result in the tenant being held financially responsible for a portion of repair costs, as determined by the Housing Manager.</p>
+            </div>
+
+            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">5. No Guarantee of Approval or Timeline</div>
+              <p style="font-size:12px;color:var(--muted);">Submission of this form does not guarantee approval or a specific completion date. The CLFN Housing Department will communicate decisions in writing. Priority and scheduling are subject to change based on available resources, contractor availability, and emerging urgent needs within the community.</p>
+            </div>
+
+            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">6. Accuracy of Information</div>
+              <p style="font-size:12px;color:var(--muted);">All information provided in this Scope of Work must be accurate and complete. Submitting false or misleading information may result in the request being cancelled, delayed, or referred for further review.</p>
+            </div>
+
+          </div>
+
+          <p style="margin-top:14px;font-size:11px;color:var(--muted);font-style:italic;">By signing below, the tenant and the housing staff member confirm they have read, understood, and agree to these terms.</p>
+        </div>
+      </div>
+
+      <!-- ── SIGNATURES ──────────────────────────────────────────────────── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Signatures &amp; Acknowledgement</div>
+        </div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
+
+          <!-- Tenant signature -->
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:26px;height:26px;border-radius:50%;background:var(--yellow);color:#111;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">T</div>
+              <div>
+                <div style="font-size:12px;font-weight:700;">Tenant</div>
+                <div style="font-size:10px;color:var(--muted);">I acknowledge the scope of work and grant access to the unit</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+              <div class="f"><label>Printed Name</label><input type="text" id="sow_sig_tenant_name" placeholder="Tenant full name"/></div>
+              <div class="f"><label>Date</label><input type="date" id="sow_sig_tenant_date"/></div>
+            </div>
+            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','canvas')" id="sow_sig_canvas_tenant_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','type')" id="sow_sig_canvas_tenant_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','wet')" id="sow_sig_canvas_tenant_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sow_sig_canvas_tenant_panel_canvas" style="background:#fafaf8;"><canvas id="sow_sig_canvas_tenant" width="620" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('sow_sig_canvas_tenant')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sow_sig_canvas_tenant_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="sow_sig_canvas_tenant_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="sow_sig_canvas_tenant_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="sow_sig_canvas_tenant_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+          </div>
+
+          <!-- Employee signature -->
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:26px;height:26px;border-radius:50%;background:var(--surface);border:2px solid var(--border);color:var(--muted);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">S</div>
+              <div>
+                <div style="font-size:12px;font-weight:700;">Housing Staff</div>
+                <div style="font-size:10px;color:var(--muted);">Employee completing this scope of work</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+              <div class="f"><label>Printed Name</label><input type="text" id="sow_sig_staff_name" placeholder="Staff full name"/></div>
+              <div class="f"><label>Date</label><input type="date" id="sow_sig_staff_date"/></div>
+            </div>
+            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','canvas')" id="sow_sig_canvas_staff_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','type')" id="sow_sig_canvas_staff_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','wet')" id="sow_sig_canvas_staff_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sow_sig_canvas_staff_panel_canvas" style="background:#fafaf8;"><canvas id="sow_sig_canvas_staff" width="620" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('sow_sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sow_sig_canvas_staff_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="sow_sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="sow_sig_canvas_staff_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="sow_sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── APPROVALS ───────────────────────────────────────────────────── -->
+      <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;border-color:var(--yellow);">
+        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Approvals</div>
+          <span id="sow_budget_badge" style="display:none;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;background:#fffbeb;color:#7a5c00;"></span>
+        </div>
+        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="f"><label>Housing Manager Name</label><input id="sow_hm_name" type="text" placeholder="Full name"/></div>
+          <div class="f"><label>HM Approval Date</label><input id="sow_hm_date" type="date"/></div>
+          <div class="f"><label>Executive Director Name</label><input id="sow_ed_name" type="text" placeholder="Full name — required if over budget"/></div>
+          <div class="f"><label>ED Approval Date</label><input id="sow_ed_date" type="date"/></div>
+        </div>
+      </div>
+
+
+      <!-- ── AUDIT LOG (internal, not printed) ──────────────────────────── -->
+      <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;">
+        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;"
+          onclick="var b=document.getElementById('sow_audit_body');var c=document.getElementById('sow_audit_chevron');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';if(!open&&typeof renderSowAuditLog==='function')renderSowAuditLog(window._sowUnitId);">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">📋 Audit Log</div>
+            <span style="font-size:10px;color:#666;font-weight:400;text-transform:none;letter-spacing:0;">— internal use only, not printed</span>
+          </div>
+          <svg id="sow_audit_chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transform:rotate(-90deg);transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div id="sow_audit_body" style="display:none;">
+          <div style="padding:0 0 4px 0;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="background:var(--bg);border-bottom:1px solid var(--border);">
+                  <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);white-space:nowrap;">Time</th>
+                  <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Action</th>
+                  <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Detail</th>
+                  <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">By</th>
+                </tr>
+              </thead>
+              <tbody id="sow_audit_tbody">
+                <tr><td colspan="4" style="padding:16px 14px;color:var(--muted);font-style:italic;font-size:12px;">Save the SOW to generate audit entries.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /body -->
+
+    <!-- Footer -->
+    <div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg);position:sticky;bottom:0;">
+      <div id="sow_saved_indicator" style="font-size:12px;color:var(--muted);"></div>
+      <div style="display:flex;gap:10px;">
+        <button type="button" onclick="closeSowModal()" class="btn btn-ghost">Cancel</button>
+        <button type="button" onclick="saveSOW()" class="btn btn-primary">💾 Save Scope of Work</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- unitEditModal -->
+<div id="unitEditModal" style="display:none;position:fixed;inset:0;z-index:700;background:rgba(0,0,0,0.55);align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;">
+  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
+    <!-- Header -->
+    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:3px;">Edit Unit</div>
+        <div id="ue_modal_title" style="font-size:16px;font-weight:700;color:#fff;"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button id="ue_sow_btn" onclick="ueOpenSow()" title="Scope of Work"
+          style="background:none;border:1px solid #555;color:#ccc;border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;white-space:nowrap;"
+          onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'"
+          onmouseout="this.style.borderColor='#555';this.style.color='#ccc'">
+          🔨 SOW
+        </button>
+        <button onclick="closeUnitEditModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+      </div>
+    </div>
+    <!-- Body -->
+    <div style="padding:24px;display:flex;flex-direction:column;gap:16px;">
+
+      <!-- Address row -->
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Address</div>
+        <div style="display:grid;grid-template-columns:80px 1fr;gap:10px;">
+          <div class="f"><label>Number</label><input id="ue_num" type="text"/></div>
+          <div class="f"><label>Street</label><input id="ue_street" type="text"/></div>
+        </div>
+      </div>
+
+      <!-- Unit details -->
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Unit Details</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div class="f"><label>Bedrooms</label>
+            <select id="ue_bedrooms">
+              <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+              <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+            </select>
+          </div>
+          <div class="f"><label>Bathrooms</label><input id="ue_bathrooms" type="text" placeholder="e.g. 1"/></div>
+          <div class="f"><label>Year Built</label><input id="ue_year" type="text" placeholder="e.g. 1998"/></div>
+          <div class="f"><label>Type</label>
+            <select id="ue_type">
+              <option value="">— Select —</option>
+              <option value="detached unit">Detached</option>
+              <option value="duplex unit">Duplex</option>
+              <option value="4-plex unit">4-plex</option>
+              <option value="5-plex unit">5-plex</option>
+              <option value="6-plex unit">6-plex</option>
+              <option value="complex">Complex</option>
+              <option value="mobile unit">Mobile</option>
+            </select>
+          </div>
+          <div class="f"><label>Foundation</label>
+            <select id="ue_foundation">
+              <option value="">— Select —</option>
+              <option value="basement">Basement</option>
+              <option value="crawlspace">Crawlspace</option>
+              <option value="Slab">Slab</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </div>
+          <div class="f"><label>Phase</label><input id="ue_phase" type="text" placeholder="e.g. 15"/></div>
+        </div>
+      </div>
+
+      <!-- Flags -->
+      <div style="display:flex;gap:20px;">
+        <div class="ftog">
+          <label class="tsw"><input id="ue_accessible" type="checkbox"/><span class="tsl"></span></label>
+          <label for="ue_accessible" style="cursor:pointer;">Accessible Unit ♿</label>
+        </div>
+        <div class="ftog">
+          <label class="tsw"><input id="ue_isElders" type="checkbox"/><span class="tsl"></span></label>
+          <label for="ue_isElders" style="cursor:pointer;">Elders Unit</label>
+        </div>
+      </div>
+
+      <!-- Funder -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="f"><label>Funder / Program</label>
+          <select id="ue_funder">
+            <option value="">None / Band</option>
+            <option value="ISC">ISC</option>
+            <option value="CMHC_95">CMHC Section 95</option>
+            <option value="CMHC_56">CMHC Section 56.1</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="f"><label>Status</label>
+          <select id="ue_status" onchange="unitEditStatusChange()">
+            <option value="vacant">Vacant</option>
+            <option value="occupied">Occupied</option>
+            <option value="under_repair">Under Repair</option>
+            <option value="reserved">Reserved</option>
+            <option value="condemned">Condemned</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Assignment (shown only for occupied/reserved) -->
+      <div id="ue_assign_row" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px;flex-direction:column;gap:12px;">
+        <!-- Section header -->
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Tenant Assignment — search approved applicants or start a new application</div>
+
+        <!-- Current tenant card (shown when already assigned) -->
+        <div id="ue_current_tenant" style="display:none;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Currently Assigned</div>
+              <div id="ue_current_tenant_name" style="font-size:14px;font-weight:700;color:var(--text);"></div>
+              <div id="ue_current_tenant_meta" style="font-size:11px;color:var(--muted);margin-top:2px;"></div>
+            </div>
+            <button type="button" onclick="ueRemoveTenant()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:#b91c1c;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;flex-shrink:0;">Remove</button>
+          </div>
+        </div>
+
+        <!-- Applicant search -->
+        <div>
+          <label style="font-size:11.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;">Search Applicant <span style="color:#b91c1c;">*</span></label>
+          <div style="position:relative;">
+            <input type="text" id="ue_tenant_search"
+              placeholder="Search by name or APP-ID…"
+              autocomplete="off"
+              oninput="ueTenantSearch(this.value)"
+              onfocus="ueTenantSearch(this.value)"
+              onblur="setTimeout(function(){var d=document.getElementById('ue_tenant_dropdown');if(d)d.style.display='none';},200)"
+              style="width:100%;box-sizing:border-box;padding:8px 11px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>
+            <div id="ue_tenant_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:500;background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.15);"></div>
+          </div>
+          <input type="hidden" id="ue_assignedTo"/>
+          <input type="hidden" id="ue_assignedName"/>
+        </div>
+
+        <!-- Selected applicant card -->
+        <div id="ue_tenant_selected" style="display:none;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;"></div>
+
+        <!-- Not found — prompt new application -->
+        <div id="ue_tenant_notfound" style="display:none;padding:12px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;">
+          <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:6px;">No approved application found</div>
+          <div style="font-size:12px;color:#7a6000;margin-bottom:10px;">The applicant needs an approved housing application before being assigned to a unit.</div>
+          <button type="button" onclick="closeUnitEditModal();newApp();" class="btn btn-primary" style="font-size:12px;padding:7px 16px;">📝 Start New Application</button>
+        </div>
+
+        <!-- Move-in date -->
+        <div class="f">
+          <label>Move-in Date <span style="color:#b91c1c;">*</span></label>
+          <input type="date" id="ue_assignedDate"/>
+        </div>
+      </div>
+
+      <!-- Budget Approval Indicator (shown when SOW cost exists) -->
+      <div id="ue_budget_indicator" style="display:none;padding:12px 14px;border-radius:8px;font-size:12px;"></div>
+
+      <!-- Tenant -->
+      <div id="ue_sig_section">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Tenant</div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <div style="width:32px;height:32px;border-radius:50%;background:var(--yellow);color:#111;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">T</div>
+            <div>
+              <div id="ue_tenant_display_name" style="font-size:14px;font-weight:700;color:var(--text);">Vacant</div>
+              <div id="ue_tenant_display_meta" style="font-size:11px;color:var(--muted);margin-top:1px;">No tenant assigned</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="f">
+              <label>Tenant Name</label>
+              <input type="text" id="ue_sig_tenant_name" placeholder="Vacant" style="background:var(--bg);"/>
+            </div>
+            <div class="f">
+              <label>Move-in Date</label>
+              <input type="date" id="ue_sig_tenant_date"/>
+            </div>
+          </div>
+        </div>
+
+        <!-- HM approval signature (shown when SOW requires HM or ED approval) -->
+        <div id="ue_sig_hm_block" style="display:none;margin-top:12px;background:var(--bg);border:1.5px solid #1d4ed8;border-radius:8px;padding:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:24px;height:24px;border-radius:50%;background:#1d4ed8;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">HM</div>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:#1d4ed8;">Housing Manager Approval</div>
+                <div style="font-size:10px;color:var(--muted);">Required — renovation within HM budget authority</div>
+              </div>
+            </div>
+            <span id="ue_sig_hm_badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#eff6ff;color:#1d4ed8;">Pending</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div class="f"><label>HM Name</label><input type="text" id="ue_sig_hm_name" placeholder="Full name"/></div>
+            <div class="f"><label>Date</label><input type="date" id="ue_sig_hm_date"/></div>
+            <div class="f"><label>Decision</label>
+              <select id="ue_sig_hm_decision">
+                <option value="">— Pending —</option>
+                <option value="approved">Approved</option>
+                <option value="declined">Declined</option>
+                <option value="deferred">Deferred to ED</option>
+              </select>
+            </div>
+          </div>
+          <div class="f"><label>Notes</label><input type="text" id="ue_sig_hm_notes" placeholder="Optional notes"/></div>
+        </div>
+
+        <!-- ED approval signature (shown when SOW exceeds HM budget limit) -->
+        <div id="ue_sig_ed_block" style="display:none;margin-top:12px;background:var(--bg);border:1.5px solid var(--yellow);border-radius:8px;padding:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:24px;height:24px;border-radius:50%;background:var(--yellow);color:#111;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">ED</div>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:#7a5c00;">Executive Director Approval</div>
+                <div style="font-size:10px;color:var(--muted);">Required — renovation exceeds HM budget authority</div>
+              </div>
+            </div>
+            <span id="ue_sig_ed_badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#fffbeb;color:#7a5c00;">Pending</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div class="f"><label>ED Name</label><input type="text" id="ue_sig_ed_name" placeholder="Full name"/></div>
+            <div class="f"><label>Date</label><input type="date" id="ue_sig_ed_date"/></div>
+            <div class="f"><label>Decision</label>
+              <select id="ue_sig_ed_decision">
+                <option value="">— Pending —</option>
+                <option value="approved">Approved</option>
+                <option value="declined">Declined</option>
+              </select>
+            </div>
+          </div>
+          <div class="f"><label>Notes</label><input type="text" id="ue_sig_ed_notes" placeholder="Optional notes"/></div>
+        </div>
+
+      </div>
+
+      <!-- Notes -->
+      <div class="f"><label>Notes</label><textarea id="ue_notes" rows="2" placeholder="Internal notes about this unit…"></textarea></div>
+
+      <!-- Photos -->
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:8px;">Photos</label>
+        <div id="ue_photo_preview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;min-height:0;"></div>
+        <div id="ue_drop_zone" ondragover="photoDragOver(event,'ue_drop_zone')" ondragleave="photoDragLeave('ue_drop_zone')" ondrop="photoDrop(event,'edit')"
+          style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .15s;background:var(--bg);"
+          onclick="document.getElementById('ue_photo_input').click()">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--muted);margin-bottom:6px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;">Drag photos here or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
+          <div style="font-size:11px;color:var(--muted);">JPG, PNG, WEBP — multiple files supported</div>
+          <input type="file" id="ue_photo_input" accept="image/*" multiple style="display:none;" onchange="handleEditUnitPhotoUpload(this)"/>
+        </div>
+      </div>
+
+    </div>
+    <!-- Footer -->
+    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--bg);">
+      <div id="ue_archive_btn_wrap"></div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="closeUnitEditModal()" class="btn btn-ghost">Cancel</button>
+        <button onclick="saveUnitEdit()" class="btn btn-primary">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -3049,7 +3590,7 @@ function liveAgePoints(ageYears) {
 // ── Rescore all applications from current liveScoreModel ─────────────
 async function rescoreAllApplications() {
   // V2: Call the Edge Function for each application using stored V2 fields
-  showToast('Rescoring ' + applications.length + ' applications…');
+  console.log('[SCORE] Rescoring ' + applications.length + ' applications…');
   var batchSize = 5; // process in small batches to avoid overwhelming the function
   for (var i = 0; i < applications.length; i += batchSize) {
     var batch = applications.slice(i, i + batchSize);
@@ -3137,7 +3678,7 @@ async function rescoreAllApplications() {
       }
     }));
   }
-  showToast('Rescore complete');
+  // (rescore toast removed)
 }
 
 function saveScoringModel() {

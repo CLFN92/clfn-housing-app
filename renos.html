@@ -272,7 +272,7 @@
       <p style="color:var(--muted);font-size:13px;">Manage contractor directory and approval workflow</p>
     </div>
     <button onclick="openAddContractorModal()" style="background:var(--yellow);border:none;color:#111;padding:8px 18px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Application
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>+ Add Contractor
     </button>
   </div>
 
@@ -3638,8 +3638,19 @@ function pushNav(viewName) {
 }
 function goBack() {
   var stack = window._navStack || [];
+  var prev = stack.length > 1 ? stack[stack.length-2] : null;
   if(stack.length) stack.pop();
-  showRenos();
+  // Navigate back based on nav stack
+  if(prev === 'contractors') { showContractors(); }
+  else { 
+    // Go back to whichever renos view makes sense
+    var role = window.currentRole || 'employee';
+    if(role === 'housing_manager' || role === 'ed') {
+      showRenos(); // shows renoApprovalsView for HM/ED
+    } else {
+      showRenos();
+    }
+  }
 }
 
 (async function initRenos() {
