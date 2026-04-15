@@ -272,7 +272,7 @@
       <p style="color:var(--muted);font-size:13px;">Manage contractor directory and approval workflow</p>
     </div>
     <button onclick="openAddContractorModal()" style="background:var(--yellow);border:none;color:#111;padding:8px 18px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>+ Add Contractor
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Contractor
     </button>
   </div>
 
@@ -3637,20 +3637,79 @@ function pushNav(viewName) {
   if(stack.length > 20) stack.shift();
 }
 function goBack() {
-  var stack = window._navStack || [];
-  var prev = stack.length > 1 ? stack[stack.length-2] : null;
-  if(stack.length) stack.pop();
-  // Navigate back based on nav stack
-  if(prev === 'contractors') { showContractors(); }
-  else { 
-    // Go back to whichever renos view makes sense
-    var role = window.currentRole || 'employee';
-    if(role === 'housing_manager' || role === 'ed') {
-      showRenos(); // shows renoApprovalsView for HM/ED
-    } else {
-      showRenos();
-    }
+  // Back always goes to home (index.html) since renos views are top-level
+  window.location.href = 'index.html';
+}
+
+
+// ── Signature pad utilities ─────────────────────────────────
+function clearSig(canvasId) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  canvas.classList.remove('has-sig');
+}
+
+function ctRenderPeople(people) {
+  var list = document.getElementById('ct_people_list');
+  if(!list) return;
+  people = people || [];
+  if(!people.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);font-style:italic;padding:4px 0;">No key contacts added yet.</div>'; return; }
+  list.innerHTML = people.map(function(p, i) {
+    return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">'
+      +'<input type="text" class="ct-person-name" data-pi="'+i+'" value="'+(p.name||'')+'" placeholder="Full name" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
+      +'<input type="tel" class="ct-person-phone" data-pi="'+i+'" value="'+(p.phone||'')+'" placeholder="Phone" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
+      +'<input type="email" class="ct-person-email" data-pi="'+i+'" value="'+(p.email||'')+'" placeholder="Email" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
+      +'<button type="button" onclick="ctRemovePerson('+i+')" style="background:none;border:none;color:#b91c1c;cursor:pointer;font-size:16px;padding:2px 4px;line-height:1;" title="Remove">✕</button>'
+      +'</div>';
+  }).join('');
+}
+
+function _initSigPad(canvasId) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas || _sigPads[canvasId]) return;
+  var ctx = canvas.getContext('2d');
+  var drawing = false;
+  var lastX = 0, lastY = 0;
+  function getPos(e) {
+    var rect = canvas.getBoundingClientRect();
+    var scaleX = canvas.width / rect.width;
+    var scaleY = canvas.height / rect.height;
+    var src = e.touches ? e.touches[0] : e;
+    return { x: (src.clientX - rect.left) * scaleX, y: (src.clientY - rect.top) * scaleY };
   }
+  function start(e) { e.preventDefault(); drawing = true; var p = getPos(e); lastX = p.x; lastY = p.y; }
+  function move(e) {
+    if (!drawing) return; e.preventDefault();
+    var p = getPos(e);
+    ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y);
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.stroke();
+    lastX = p.x; lastY = p.y;
+    canvas.classList.add('has-sig');
+  }
+  function end() { drawing = false; }
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  canvas.addEventListener('mouseup', end);
+  canvas.addEventListener('mouseleave', end);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove', move, { passive: false });
+  canvas.addEventListener('touchend', end);
+  _sigPads[canvasId] = true;
+}
+
+function _restoreSigCanvas(canvasId, dataURL) {
+  if(!dataURL || !dataURL.startsWith('data:')) return;
+  var canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  var img = new Image();
+  img.onload = function() {
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  };
+  img.src = dataURL;
 }
 
 (async function initRenos() {
