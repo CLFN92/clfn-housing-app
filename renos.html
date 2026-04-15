@@ -3655,13 +3655,27 @@ function switchRole(role){
     await loadRenosData();
     initRenosPage();
   } catch(e) {
-    console.error('[RENOS] init failed:', e.message);
+    console.error('[RENOS] init failed:', e.message, e.stack);
+    document.body.innerHTML += '<div style="position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:16px 24px;z-index:9999;font-family:DM Sans,sans-serif;font-size:13px;color:#b91c1c;">' +
+      '<strong>Renos load error:</strong> ' + e.message + '</div>';
   }
 }());
 async function loadRenosData() {
   try {
     var uR = await fetch(SUPABASE_URL+'/rest/v1/housing_units?select=*&order=street,num&limit=9999',{headers:HOUSING_HEADERS});
-    if(uR.ok) housingUnits = await uR.json();
+    if(uR.ok) {
+      var rawU = await uR.json();
+      housingUnits = rawU.map(function(row){
+        return Object.assign({}, row.data||{}, {
+          id:row.id, num:row.num, street:row.street,
+          bedrooms:row.bedrooms, bathrooms:row.bathrooms,
+          type:row.type, foundation:row.foundation, funder:row.funder,
+          status:row.status||'vacant', accessible:!!row.accessible,
+          isElders:!!row.is_elders, archived:!!row.archived,
+          assignedTo:row.assigned_to, assignedName:row.assigned_name
+        });
+      });
+    }
     var cR = await sbLoadContractors(); if(cR) window._contractors = cR;
     var sowR = await fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=*',{headers:HOUSING_HEADERS});
     if(sowR.ok){var sd2=await sowR.json();sd2.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
@@ -3694,7 +3708,7 @@ function setRenosNav(active){
   ['renos','contractors','approvals'].forEach(function(n){var b=document.getElementById('renos-nav-'+n);if(b)b.classList.toggle('active',n===active);});
 }
 function hideAllViews(){
-  ['renovationsView','renoApprovalsView','contractorsView','renosLoadingView'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
+  ['renosView','renovationsView','renoApprovalsView','contractorsView','renosLoadingView'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
 }
 function showRenoApprovals(){
   hideAllViews();setRenosNav('approvals');
@@ -3708,9 +3722,14 @@ function showRenos(){
   setNavActive('tab_renos');
   hideAllViews();
   var role = window.currentRole || 'employee';
-  // All roles start on renovations view; approvals accessible via sidebar
-  {
-    var rv = document.getElementById('renovationsView');
+  if(role === 'housing_manager' || role === 'ed') {
+    // HM/ED see the approvals/management view
+    var rav = document.getElementById('renoApprovalsView');
+    if(rav){ rav.style.display='flex'; rav.style.flexDirection='column'; }
+    renderRenoApprovalsView();
+  } else {
+    // Employees see the renovations list
+    var rv = document.getElementById('renosView');
     if(rv){ rv.style.display='flex'; rv.style.flexDirection='column'; }
     renderRenosView();
   }
