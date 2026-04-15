@@ -4471,79 +4471,7 @@ async function submitAddHousingStaff() {
 </div>
 </div>
 
-<div id="loginScreen" style="display:flex;position:fixed;inset:0;z-index:9999;background:#0f0f0e;align-items:center;justify-content:center;padding:24px;overflow-y:auto;">
-  <div style="width:100%;max-width:420px;display:flex;flex-direction:column;gap:20px;">
 
-    <div style="text-align:center;padding-top:8px;">
-      <div style="font-family:'DM Serif Display',serif;font-size:24px;color:#fff;margin-bottom:4px;">CLFN Housing</div>
-      <div style="font-size:12px;color:#666;">Constance Lake First Nation</div>
-    </div>
-
-    <!-- Sign-in panel -->
-    <div id="signin-panel" style="background:#1a1a18;border:1px solid #2a2a28;border-radius:14px;padding:28px;display:flex;flex-direction:column;gap:14px;">
-      <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:2px;">Sign in to your account</div>
-
-      <div style="display:flex;flex-direction:column;gap:5px;">
-        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#666;">Email</label>
-        <input id="signin-email" type="email" placeholder="you@clfn.on.ca"
-          style="background:#111;border:1px solid #333;border-radius:8px;padding:10px 14px;font-size:14px;color:#fff;font-family:DM Sans,sans-serif;outline:none;width:100%;box-sizing:border-box;"
-          onkeydown="if(event.key==='Enter')document.getElementById('signin-password').focus()"
-          oninput="var e=this.value.trim();var h=document.getElementById('email-domain-hint');if(h){if(e&&!e.endsWith('@clfn.on.ca')){h.style.display='block';}else{h.style.display='none';}}"/>
-        <div id="email-domain-hint" style="display:none;font-size:11px;color:#f87171;margin-top:2px;">&#9888; Must be a @clfn.on.ca email address</div>
-      </div>
-
-      <div style="display:flex;flex-direction:column;gap:5px;">
-        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#666;">Password</label>
-        <input id="signin-password" type="password" placeholder="Password"
-          style="background:#111;border:1px solid #333;border-radius:8px;padding:10px 14px;font-size:14px;color:#fff;font-family:DM Sans,sans-serif;outline:none;width:100%;box-sizing:border-box;"
-          onkeydown="if(event.key==='Enter')startSignIn()"/>
-      </div>
-
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:#888;">
-          <input type="checkbox" id="remember-me" style="width:14px;height:14px;cursor:pointer;accent-color:var(--yellow);">
-          Remember my email
-        </label>
-        <button onclick="showForgotPassword()" style="background:none;border:none;font-size:12px;color:#F8E41A;cursor:pointer;padding:0;">Forgot password?</button>
-      </div>
-
-      <button id="signin-btn" onclick="startSignIn()"
-        style="background:var(--yellow);border:none;color:#111;padding:12px;border-radius:8px;font-size:14px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;width:100%;">
-        Sign in
-      </button>
-      <div id="signin-error" style="display:none;background:#3b0a0a;border:1px solid #7f1d1d;border-radius:8px;padding:10px 14px;font-size:12px;color:#fca5a5;text-align:left;"></div>
-    </div>
-
-    <!-- Email verification panel -->
-    <div id="verify-panel" style="display:none;background:#1a1a18;border:1px solid #2a2a28;border-radius:14px;padding:28px;text-align:center;">
-      <div style="font-size:2rem;margin-bottom:12px;">&#128231;</div>
-      <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:8px;">Check your email</div>
-      <p style="font-size:13px;color:#888;line-height:1.7;margin-bottom:16px;">
-        We sent a verification link to<br>
-        <strong id="verify-email-display" style="color:#fff;"></strong><br><br>
-        Click the link in that email to verify your account, then come back here and sign in again.
-      </p>
-      <button onclick="resendVerification()" style="background:var(--yellow);border:none;color:#111;padding:10px;border-radius:8px;font-size:13px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;width:100%;margin-bottom:10px;">Resend verification email</button>
-      <button onclick="showSignInPanel()" style="background:none;border:none;font-size:12px;color:#F8E41A;cursor:pointer;width:100%;">&#8592; Back to sign in</button>
-      <div id="verify-msg" style="display:none;margin-top:10px;font-size:12px;"></div>
-    </div>
-
-    <!-- Forgot password panel -->
-    <div id="forgot-panel" style="display:none;background:#1a1a18;border:1px solid #2a2a28;border-radius:14px;padding:28px;text-align:center;">
-      <div style="font-size:2rem;margin-bottom:12px;">&#128273;</div>
-      <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:8px;">Reset password</div>
-      <p style="font-size:13px;color:#888;line-height:1.6;margin-bottom:14px;">Enter your CLFN email and we'll send you a password reset link.</p>
-      <input id="forgot-email" type="email" placeholder="you@clfn.on.ca"
-        style="background:#111;border:1px solid #333;border-radius:8px;padding:10px 14px;font-size:14px;color:#fff;font-family:DM Sans,sans-serif;outline:none;width:100%;box-sizing:border-box;margin-bottom:12px;"
-        onkeydown="if(event.key==='Enter')sendPasswordReset()"/>
-      <button onclick="sendPasswordReset()" style="background:var(--yellow);border:none;color:#111;padding:10px;border-radius:8px;font-size:13px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;width:100%;margin-bottom:10px;">Send reset link</button>
-      <button onclick="showSignInPanel()" style="background:none;border:none;font-size:12px;color:#F8E41A;cursor:pointer;width:100%;">&#8592; Back to sign in</button>
-      <div id="forgot-msg" style="display:none;margin-top:10px;font-size:12px;padding:8px 12px;border-radius:6px;"></div>
-    </div>
-
-    <div style="text-align:center;font-size:11px;color:#444;padding-bottom:8px;">Constance Lake First Nation &middot; Housing Department</div>
-  </div>
-</div>
 
 
 
