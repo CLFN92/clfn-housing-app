@@ -98,31 +98,8 @@
 
 <div class="app-wrapper" id="appWrapper">
 <!-- SHARED SIDEBAR -->
-<div id="sidebarBackdrop" onclick="closeMobileMenu()"></div>
-<aside class="sidebar" id="sharedSidebar">
-  <!-- Step nav — shown only when filling an application -->
-  <ul class="snav" id="stepNav" style="display:none;">
-    <li class="active" onclick="goTo(0)"><span class="snum" id="sn0">1</span>Applicant Info</li>
-    <li onclick="goTo(1)"><span class="snum" id="sn1">2</span>Employment &amp; Income</li>
-    <li onclick="goTo(2)"><span class="snum" id="sn2">3</span>Co-Applicant</li>
-    <li onclick="goTo(3)"><span class="snum" id="sn3">4</span>Household Members</li>
-    <li onclick="goTo(4)"><span class="snum" id="sn4">5</span>References</li>
-    <li onclick="goTo(5)"><span class="snum" id="sn5">6</span>Pets &amp; Housing Needs</li>
-    <li onclick="goTo(6)"><span class="snum" id="sn6">7</span>Documents</li>
-    <li onclick="goTo(8)"><span class="snum" id="sn7">8</span>Review &amp; Submit</li>
-  </ul>
-  <!-- Hidden tab IDs kept for JS compatibility -->
-  <span id="tab_app" style="display:none;"></span>
-  <span id="tab_dash" style="display:none;"></span>
-  <span id="tab_settings" style="display:none;"></span>
-  <span id="tab_inventory" style="display:none;"></span>
-  <span id="tab_match" style="display:none;"></span>
-  <span id="tab_tenants" style="display:none;"></span>
-  <span id="tab_renos" style="display:none;"></span>
-  <span id="tab_contractors" style="display:none;"></span>
-  <span id="sidebar_mgmt_nav" style="display:none;"></span>
-  <span id="tab_dash_label" style="display:none;"></span>
-</aside>
+
+
 
 <!-- CONTENT AREA -->
 <div class="content-area">
@@ -10035,7 +10012,7 @@ function rescoreAndSave() {
   // Refresh UI
   if(typeof updateDashStats==='function') updateDashStats();
   if(typeof renderDashTable==='function') renderDashTable();
-  showToast('Rescoring '+applications.length+' applications\u2026');
+  console.log('[SCORE] Rescoring '+applications.length+' apps...');
 }
 
 function confirmResetScoringModelED() {
@@ -14835,7 +14812,7 @@ async function loadAppDataFromSupabase() {
       if(conR.ok){var cond=await conR.json();window._contacts=cond.length?(cond[0].data||{}):{}}
     } catch(e){console.warn('Contacts:',e);}
 
-    showToast('\u2713 Loaded '+applications.length+' applications, '+housingUnits.length+' units');
+    console.info('[CLFN] Loaded '+applications.length+' applications, '+housingUnits.length+' units');
     console.info('[CLFN Housing] Data loaded:',applications.length,'apps,',housingUnits.length,'units');
 
     // Refresh V2 scoring model and tiers from loaded settings
@@ -15133,8 +15110,16 @@ function initHousingPage() {
   // Set up role view switcher
   initRoleSwitcher();
 
+  // Show sidebar nav for HM/ED
+  var mgmtNav = document.getElementById('sidebar_mgmt_nav');
+  if(mgmtNav) mgmtNav.style.display = '';
+
+  // Show settings button for HM/ED
+  var settingsBtn = document.getElementById('tab_settings_btn');
+
   // Apply role-based visibility
   var role = window.currentRole || 'employee';
+  if(settingsBtn) settingsBtn.style.display = (role==='housing_manager'||role==='ed') ? '' : 'none';
   document.querySelectorAll('.hm-ed-only').forEach(function(e){
     e.style.display=(role==='housing_manager'||role==='ed')?'':'none';
   });
@@ -15167,8 +15152,7 @@ function initHousingPage() {
     savedName  = sessionStorage.getItem('clfn_housing_name') || '';
     savedEmail = sessionStorage.getItem('clfn_housing_email_session') || '';
   } catch(e) {}
-  console.log('[HOUSING] token:', token ? 'found' : 'missing', 'role:', savedRole);
-  if(!token) { console.warn('[HOUSING] no token, redirecting'); window.location.href='index.html'; return; }
+  if(!token) { window.location.href='index.html'; return; }
   HOUSING_HEADERS['Authorization'] = 'Bearer '+token;
   HOUSING_SESSION.accessToken=token; HOUSING_SESSION.role=savedRole;
   HOUSING_SESSION.name=savedName; HOUSING_SESSION.email=savedEmail;

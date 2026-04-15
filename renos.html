@@ -67,53 +67,8 @@
 
 <div class="app-wrapper" id="appWrapper">
 <!-- SHARED SIDEBAR -->
-<div id="sidebarBackdrop" onclick="closeMobileMenu()"></div>
-<aside class="sidebar sidebar-open" id="sharedSidebar">
-  <!-- Step nav — shown only when filling an application -->
-  <ul class="snav" id="stepNav" style="display:none;">
-    <li class="active" onclick="goTo(0)"><span class="snum" id="sn0">1</span>Applicant Info</li>
-    <li onclick="goTo(1)"><span class="snum" id="sn1">2</span>Employment &amp; Income</li>
-    <li onclick="goTo(2)"><span class="snum" id="sn2">3</span>Co-Applicant</li>
-    <li onclick="goTo(3)"><span class="snum" id="sn3">4</span>Household Members</li>
-    <li onclick="goTo(4)"><span class="snum" id="sn4">5</span>References</li>
-    <li onclick="goTo(5)"><span class="snum" id="sn5">6</span>Pets &amp; Housing Needs</li>
-    <li onclick="goTo(6)"><span class="snum" id="sn6">7</span>Documents</li>
-    <li onclick="goTo(8)"><span class="snum" id="sn7">8</span>Review &amp; Submit</li>
-  </ul>
-  <!-- Hidden tab IDs kept for JS compatibility -->
-  <span id="tab_app" style="display:none;"></span>
-  <span id="tab_dash" style="display:none;"></span>
-  <span id="tab_settings" style="display:none;"></span>
-  <span id="tab_inventory" style="display:none;"></span>
-  <span id="tab_match" style="display:none;"></span>
-  <span id="tab_tenants" style="display:none;"></span>
-  <span id="tab_renos" style="display:none;"></span>
-  <span id="tab_contractors" style="display:none;"></span>
-  <span id="sidebar_mgmt_nav" style="display:none;"></span>
-  <span id="tab_dash_label" style="display:none;"></span>
 
-  <!-- Main Navigation -->
-  <nav class="snav-main">
-    <button class="snav-main-btn" onclick="showRenos()">
-      <span class="snav-main-icon">🔨</span>
-      <span>Renovations</span>
-    </button>
-    <button class="snav-main-btn" onclick="showContractors()">
-      <span class="snav-main-icon">🧰</span>
-      <span>Contractors</span>
-    </button>
-  </nav>
-  <nav class="snav-main" style="margin-top:auto;border-top:1px solid var(--dark3);padding-top:8px;">
-    <button class="snav-main-btn" onclick="window.location.href='housing.html'">
-      <span class="snav-main-icon">📋</span>
-      <span>Applications</span>
-    </button>
-    <button class="snav-main-btn" onclick="window.location.href='index.html'">
-      <span class="snav-main-icon">🏠</span>
-      <span>Home</span>
-    </button>
-  </nav>
-</aside>
+
 
 <!-- CONTENT AREA -->
 <div class="content-area">
