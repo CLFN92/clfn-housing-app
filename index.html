@@ -5607,6 +5607,51 @@ window._renoBudget={}; window._unitPhotos={}; window._appSettings={};
 var housingUnits=[]; var applications=[]; var auditLog=[];
 var approvalRole='employee';
 
+// Navigation stack
+window._navStack = window._navStack || [];
+function pushNav(viewName) {
+  if(!window._navStack) window._navStack = [];
+  var stack = window._navStack;
+  if(stack.length && stack[stack.length-1] === viewName) return;
+  stack.push(viewName);
+  if(stack.length > 20) stack.shift();
+}
+function goBack() {
+  var stack = window._navStack || [];
+  if(stack.length) stack.pop();
+  showEmployeeHome();
+}
+
+// Utility helpers needed by showEmployeeHome
+function setExportView(v) {}
+function hideAllViews() {
+  ['appLayout','dashView','employeeHomeView','worklistView','inventoryView',
+   'matchView','tenantsView','scorecardView','settingsView'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el){ el.style.display='none'; el.style.flex=''; }
+  });
+}
+function setNavActive(id) {
+  var el = document.getElementById(id);
+  if(el) el.classList.add('nav-active');
+}
+function updateHeaderUser(role) {
+  var el = document.getElementById('header_user_name');
+  if(el) el.textContent = HOUSING_SESSION.name || '';
+  var av = document.getElementById('header_avatar');
+  if(av) av.textContent = (HOUSING_SESSION.name||'S').charAt(0).toUpperCase();
+  var rb = document.getElementById('header_role_badge');
+  if(rb) rb.textContent = {employee:'Employee',housing_manager:'HM',ed:'ED'}[role]||role;
+}
+function updateRoleSwitcherVisibility() {}
+function switchRole(role) {
+  window.currentRole = role;
+  window.CLFN_AUTH.currentRole = role;
+  updateHeaderUser(role);
+}
+function auditEntry() {}
+function getRole() { return window.currentRole || 'employee'; }
+
 // CLFN_AUTH object required by resolveHousingRole
 window.CLFN_AUTH = { isAuthenticated: false, currentRole: 'employee', currentUser: null,
   getRole: function(){ return window.currentRole || 'employee'; },
