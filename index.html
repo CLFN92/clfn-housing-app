@@ -6925,6 +6925,12 @@ async function startSignIn() {
 
     // Resolve housing role from staff table
     await resolveHousingRole();
+    // Save session info for module pages (avoids re-validation on navigation)
+    try {
+      sessionStorage.setItem('clfn_housing_role',  window.currentRole || 'employee');
+      sessionStorage.setItem('clfn_housing_name',  HOUSING_SESSION.name || '');
+      sessionStorage.setItem('clfn_housing_email_session', HOUSING_SESSION.email || '');
+    } catch(e) {}
 
     // Load data and launch app
     await loadAppDataFromSupabase();

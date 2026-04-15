@@ -3653,34 +3653,36 @@ function switchRole(role){
 }
 
 (async function initRenos() {
+  // ── Auth: check sessionStorage token (validated on login) ─────────────────
   var token = null;
-  try { token = sessionStorage.getItem('clfn_housing_token'); } catch(e) {}
-  if (!token) { window.location.href = 'index.html'; return; }
-  HOUSING_HEADERS['Authorization'] = 'Bearer ' + token;
+  var savedRole = null;
+  var savedName = null;
+  var savedEmail = null;
   try {
-    var r = await fetch(SUPABASE_URL + '/auth/v1/user', { headers: HOUSING_HEADERS });
-    if (!r.ok) throw new Error('invalid');
-    var u = await r.json();
-    HOUSING_SESSION.email = u.email.toLowerCase();
-    HOUSING_SESSION.accessToken = token;
-    var sR = await fetch(
-      SUPABASE_URL + '/rest/v1/staff?select=role,department,name&email=eq.'
-      + encodeURIComponent(HOUSING_SESSION.email) + '&is_active=eq.true&limit=1',
-      { headers: HOUSING_HEADERS });
-    if (sR.ok) {
-      var sd = await sR.json(); var row = sd[0] || {};
-      HOUSING_SESSION.name = row.name || u.email;
-      var dept = (row.department || '').toLowerCase();
-      if (row.role === 'ed') window.currentRole = 'ed';
-      else if (row.role === 'manager' && dept.includes('housing')) window.currentRole = 'housing_manager';
-      else window.currentRole = 'employee';
-    }
+    token      = sessionStorage.getItem('clfn_housing_token');
+    savedRole  = sessionStorage.getItem('clfn_housing_role')  || 'employee';
+    savedName  = sessionStorage.getItem('clfn_housing_name')  || '';
+    savedEmail = sessionStorage.getItem('clfn_housing_email_session') || '';
+  } catch(e) {}
+  
+  if (!token) {
+    window.location.href = 'index.html';
+    return;
+  }
+  
+  // Restore session from saved values — no API call needed
+  HOUSING_HEADERS['Authorization'] = 'Bearer ' + token;
+  HOUSING_SESSION.accessToken = token;
+  HOUSING_SESSION.role  = savedRole;
+  HOUSING_SESSION.name  = savedName;
+  HOUSING_SESSION.email = savedEmail;
+  window.currentRole    = savedRole;
+  
+  try {
     await loadRenosData();
     initRenosPage();
   } catch(e) {
-    console.warn('[RENOS] auth:', e.message);
-    sessionStorage.removeItem('clfn_housing_token');
-    window.location.href = 'index.html';
+    console.error('[RENOS] init failed:', e.message);
   }
 }());
 async function loadRenosData() {
