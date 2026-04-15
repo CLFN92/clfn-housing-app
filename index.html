@@ -5607,6 +5607,24 @@ window._renoBudget={}; window._unitPhotos={}; window._appSettings={};
 var housingUnits=[]; var applications=[]; var auditLog=[];
 var approvalRole='employee';
 
+// CLFN_AUTH object required by resolveHousingRole
+window.CLFN_AUTH = { isAuthenticated: false, currentRole: 'employee', currentUser: null,
+  getRole: function(){ return window.currentRole || 'employee'; },
+  isED: function(){ return window.currentRole === 'ed'; },
+  isHM: function(){ return window.currentRole === 'housing_manager'; }
+};
+
+// showToast — slide-up notification
+function showToast(msg, duration) {
+  duration = duration || 3000;
+  var t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(40px);background:#1a1a18;color:#F8E41A;border:1.5px solid #F8E41A;padding:10px 22px;border-radius:20px;font-size:13px;font-weight:600;z-index:99999;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;font-family:DM Sans,sans-serif;';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function(){ t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)'; }, 10);
+  setTimeout(function(){ t.style.opacity='0'; setTimeout(function(){ t.remove(); }, 300); }, duration);
+}
+
 
 
 // ── Module navigation stubs for index.html ──────────────────────────────────
