@@ -3328,46 +3328,33 @@ async function startSignIn() {
     // Resolve housing role from staff table
     await resolveHousingRole();
 
-    // Load data and launch app
-    console.log('[LOGIN] Loading data...');
+    // Load data
     await loadAppDataFromSupabase();
-    console.log('[LOGIN] Data loaded. Hiding login screen...');
+
+    // Show home screen
     hidLoginScreen();
-    console.log('[LOGIN] Login screen hidden. Showing home...');
-    try {
-      // Step through showEmployeeHome manually to find crash point
-      console.log('[LOGIN] Step 1: pushNav');
-      if(!window._navSkipPush) pushNav('home');
-      console.log('[LOGIN] Step 2: setExportView');
-      setExportView(null);
-      console.log('[LOGIN] Step 3: hideAllViews');
-      hideAllViews();
-      console.log('[LOGIN] Step 4: show employeeHomeView');
-      var hv = document.getElementById('employeeHomeView');
-      if(hv) { hv.style.display='flex'; hv.style.flexDirection='column'; }
-      console.log('[LOGIN] Step 5: hide loginScreen');
-      var ls = document.getElementById('loginScreen');
-      if(ls) ls.style.display='none';
-      console.log('[LOGIN] Step 6: renderRecentActivity');
-      if(typeof renderRecentActivity === 'function') renderRecentActivity(window.currentRole||'employee');
-      console.log('[LOGIN] All steps done');
-    } catch(homeErr) {
-      console.error('[LOGIN] step failed:', homeErr.message, homeErr);
-      var hv2 = document.getElementById('employeeHomeView');
-      if(hv2) { hv2.style.display='flex'; hv2.style.flexDirection='column'; }
-      var ls2 = document.getElementById('loginScreen');
-      if(ls2) ls2.style.display='none';
+    var homeEl = document.getElementById('employeeHomeView');
+    if(homeEl) { homeEl.style.display='flex'; homeEl.style.flexDirection='column'; }
+    var loginEl = document.getElementById('loginScreen');
+    if(loginEl) loginEl.style.display='none';
+
+    // Try full tile render, fall back to just showing the view
+    try { showEmployeeHome(); } catch(e) {
+      console.warn('[HOME]', e.message);
+      var n = document.getElementById('emp_home_name');
+      if(n) n.textContent = HOUSING_SESSION.name || 'Welcome';
     }
-    showToast('Welcome, '+HOUSING_SESSION.name+' ('+(window.currentRole||'staff')+')');
+
+    showToast('Welcome, ' + HOUSING_SESSION.name + ' (' + (window.currentRole||'staff') + ')');
     console.log('[LOGIN] Complete. Role:', window.currentRole);
 
   } catch(e) {
-    console.error('[HOUSING LOGIN] Error:', e.message, e);
-    if(errEl){errEl.textContent='Login error: '+e.message;errEl.style.display='block';}
+    console.error('[LOGIN]', e.message);
+    if(errEl){ errEl.textContent = e.message; errEl.style.display='block'; }
   } finally {
-    if(btn){btn.disabled=false;btn.textContent='Sign in';}
+    if(btn){ btn.disabled=false; btn.textContent='Sign in'; }
   }
-}
+}}
 
 // ── Resolve housing role from staff table ──────────────────────────────────
 async function resolveHousingRole() {
@@ -8400,52 +8387,23 @@ async function submitAddHousingStaff() {
 
 
 
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', function() {
+  // Init Supabase client
   try {
     if(window.supabase && window.supabase.createClient) {
       window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
     }
   } catch(e) { console.log('[CLFN] Supabase init failed:', e.message); }
 
+  // Clear any stuck restore flag
+  try { sessionStorage.removeItem('_restoring'); } catch(e) {}
+
+  // Load remembered email into login form
   loadRememberedEmail();
 
-  var storedToken = null;
-  try { storedToken = sessionStorage.getItem('clfn_housing_token'); } catch(e) {}
-  var _alreadyRestoring = false;
-  try { _alreadyRestoring = sessionStorage.getItem('_restoring') === '1'; } catch(e) {}
-  if (storedToken && !_alreadyRestoring) {
-    try { sessionStorage.setItem('_restoring', '1'); } catch(e) {}
-    HOUSING_HEADERS['Authorization'] = 'Bearer ' + storedToken;
-    try {
-      var userR = await fetch(SUPABASE_URL + '/auth/v1/user', { headers: HOUSING_HEADERS });
-      if (userR.ok) {
-        var userData = await userR.json();
-        HOUSING_SESSION.email = userData.email.toLowerCase();
-        HOUSING_SESSION.accessToken = storedToken;
-        await resolveHousingRole();
-        await loadAppDataFromSupabase();
-        hidLoginScreen();
-        // Force-show home view immediately regardless of showEmployeeHome result
-        var _homeEl = document.getElementById('employeeHomeView');
-        if(_homeEl) { _homeEl.style.display='flex'; _homeEl.style.flexDirection='column'; }
-        var _loginEl = document.getElementById('loginScreen');
-        if(_loginEl) _loginEl.style.display='none';
-        try {
-          showEmployeeHome();
-        } catch(she_err) {
-          console.error('[HOME] showEmployeeHome error:', she_err.message, she_err.stack);
-          // Home view is already visible from above — just update the name
-          var _nameEl = document.getElementById('emp_home_name');
-          if(_nameEl) _nameEl.textContent = HOUSING_SESSION.name || 'Welcome';
-        }
-        try { sessionStorage.removeItem('_restoring'); } catch(e) {}
-        return;
-      }
-    } catch(e) {
-      console.error('[HOUSING] session restore failed:', e.message, e);
-      try { sessionStorage.removeItem('_restoring'); } catch(e2) {}
-    }
-  }
+  // Always show login screen — user signs in fresh each session
+  // (session persistence via sessionStorage token is handled in startSignIn)
+  showLoginScreen();
 });
 
 </script>
