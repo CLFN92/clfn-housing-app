@@ -3326,14 +3326,25 @@ async function startSignIn() {
     await resolveHousingRole();
 
     // Load data and launch app
+    console.log('[LOGIN] Loading data...');
     await loadAppDataFromSupabase();
+    console.log('[LOGIN] Data loaded. Hiding login screen...');
     hidLoginScreen();
-    showEmployeeHome();
-    showToast('Welcome, '+HOUSING_SESSION.name+' ('+HOUSING_SESSION.role+')');
+    console.log('[LOGIN] Login screen hidden. Showing home...');
+    try {
+      showEmployeeHome();
+    } catch(homeErr) {
+      console.error('[LOGIN] showEmployeeHome failed:', homeErr);
+      // Fallback: just show the home view directly
+      var hv = document.getElementById('employeeHomeView');
+      if(hv) { hv.style.display='flex'; hv.style.flexDirection='column'; }
+    }
+    showToast('Welcome, '+HOUSING_SESSION.name+' ('+(window.currentRole||'staff')+')');
+    console.log('[LOGIN] Complete. Role:', window.currentRole);
 
   } catch(e) {
-    console.error('[HOUSING LOGIN]', e);
-    if(errEl){errEl.textContent=e.message;errEl.style.display='block';}
+    console.error('[HOUSING LOGIN] Error:', e.message, e);
+    if(errEl){errEl.textContent='Login error: '+e.message;errEl.style.display='block';}
   } finally {
     if(btn){btn.disabled=false;btn.textContent='Sign in';}
   }
