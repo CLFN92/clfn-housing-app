@@ -3580,8 +3580,18 @@ document.addEventListener('DOMContentLoaded', async function() {
         HOUSING_SESSION.accessToken = storedToken;
         await resolveHousingRole();
         await loadAppDataFromSupabase();
+        console.log('[SESSION RESTORE] Data loaded, showing home...');
         hidLoginScreen();
-        showEmployeeHome();
+        console.log('[SESSION RESTORE] Step 1: pushNav');
+        if(!window._navSkipPush) { if(!window._navStack) window._navStack=[]; pushNav('home'); }
+        console.log('[SESSION RESTORE] Step 2: hideAllViews');
+        hideAllViews();
+        console.log('[SESSION RESTORE] Step 3: show home view');
+        var _hv = document.getElementById('employeeHomeView');
+        if(_hv) { _hv.style.display='flex'; _hv.style.flexDirection='column'; }
+        console.log('[SESSION RESTORE] Step 4: renderRecentActivity');
+        if(typeof renderRecentActivity==='function') renderRecentActivity(window.currentRole||'employee');
+        console.log('[SESSION RESTORE] Done - role:', window.currentRole);
         return;
       }
     } catch(e) { console.warn('[HOUSING] session restore failed'); }
@@ -8485,9 +8495,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         showEmployeeHome();
         return;
       }
-    } catch(e) { console.warn('[HOUSING] session restore failed'); }
-    sessionStorage.removeItem('clfn_housing_token');
-    window._sessionRestored = false;
+    } catch(e) {
+      console.error('[HOUSING] session restore failed:', e.message);
+      // Don't remove token — just show login screen cleanly
+    }
   }
 });
 
