@@ -8,6 +8,21 @@
 <link rel="stylesheet" href="shared.css"/>
 <style>
 .hm-ed-only{display:none;} .ed-only{display:none;}
+/* Login screen critical CSS — fallback if shared.css fails to load */
+:root{
+  --yellow:#F8E41A; --bg:#fafaf8; --surface:#fff; --border:#e8e6df;
+  --text:#111110; --muted:#696960; --dark:#111110; --dark2:#1c1c1a;
+  --dark3:#2a2a28; --radius:10px;
+}
+#loginScreen{display:flex;position:fixed;inset:0;z-index:9999;background:#0f0f0e;align-items:center;justify-content:center;padding:24px;overflow-y:auto;}
+#signin-btn{background:#F8E41A !important;border:none;color:#111 !important;padding:12px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;width:100%;font-family:sans-serif;}
+#signin-btn:hover{opacity:.9;}
+#signin-panel{background:#1a1a18;border:1px solid #2a2a28;border-radius:14px;padding:28px;display:flex;flex-direction:column;gap:14px;width:100%;}
+#signin-email,#signin-password{background:#111;border:1px solid #333;border-radius:8px;padding:10px 14px;font-size:14px;color:#fff;font-family:sans-serif;outline:none;width:100%;box-sizing:border-box;}
+#signin-error{background:#3b0a0a;border:1px solid #7f1d1d;border-radius:8px;padding:10px 14px;font-size:13px;color:#fca5a5;}
+#employeeHomeView{display:none;width:100%;}
+.app-header{background:#111;border-bottom:2px solid #F8E41A;height:60px;display:flex;align-items:center;padding:0 20px;gap:12px;}
+body{font-family:'DM Sans',sans-serif;background:#fafaf8;color:#111;font-size:14px;line-height:1.6;min-height:100vh;}
 </style>
 </head>
 <body>
@@ -164,7 +179,7 @@
       </div>
 
       <button id="signin-btn" onclick="startSignIn()"
-        style="background:var(--yellow);border:none;color:#111;padding:12px;border-radius:8px;font-size:14px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;width:100%;">
+        style="background:#F8E41A;border:none;color:#111;padding:12px;border-radius:8px;font-size:14px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;width:100%;">
         Sign in
       </button>
       <div id="signin-error" style="display:none;background:#3b0a0a;border:1px solid #7f1d1d;border-radius:8px;padding:10px 14px;font-size:12px;color:#fca5a5;text-align:left;"></div>
@@ -2354,11 +2369,10 @@ async function renderHousingUserTable(){
 window._navStack = [];
 
 function pushNav(viewName) {
-  // Don't push the same view twice in a row
+  if(!window._navStack) window._navStack = [];
   var stack = window._navStack;
   if(stack.length && stack[stack.length-1] === viewName) return;
   stack.push(viewName);
-  // Cap at 20 entries
   if(stack.length > 20) stack.shift();
 }
 
@@ -2832,7 +2846,7 @@ function switchRole(role){
   var mgmtNav = document.getElementById('sidebar_mgmt_nav');
   if(mgmtNav) mgmtNav.style.display = (role === 'housing_manager' || role === 'ed') ? '' : 'none';
   // Apply tenancy field role locks whenever role changes
-  applyTenancyFieldRoles();
+  if(typeof applyTenancyFieldRoles === 'function') applyTenancyFieldRoles();
   // All roles land on the home tile page
   showEmployeeHome();
 }
@@ -6626,6 +6640,7 @@ window.currentRole = 'employee';
 window._contractors=[]; window._sowCache={}; window._renoProgress={};
 window._renoBudget={}; window._unitPhotos={}; window._appSettings={};
 var housingUnits=[]; var applications=[]; var auditLog=[];
+window._navStack = window._navStack || [];
 
 
 var NATION_ID='clfn'; var NATION_NAME='Constance Lake First Nation';
@@ -6644,6 +6659,13 @@ function showRenosForRole()       { navigateTo('renos.html',  {view:'renovations
 function showContractorsForRole() { navigateTo('renos.html',  {view:'contractors'}); }
 function showFinance()            { navigateTo('finance.html'); }
 function showDash()               { showDashboard(); }
+
+// ── Stubs for housing-module-only functions called from shared code ──────────
+function applyTenancyFieldRoles() {}   // housing.html only
+function triggerV2Score()         {}   // housing.html only
+function renderWorklist()         {}   // housing.html only
+function renderDashTable()        {}   // housing.html only
+function updateDashStats()        {}   // housing.html only
 
 // ── Helpers ──
 function g(id)  { const e=document.getElementById(id); return e?e.value:''; }
@@ -7330,11 +7352,10 @@ function closeMobileMenu(){
   document.body.style.overflow = '';
 }
 function pushNav(viewName) {
-  // Don't push the same view twice in a row
+  if(!window._navStack) window._navStack = [];
   var stack = window._navStack;
   if(stack.length && stack[stack.length-1] === viewName) return;
   stack.push(viewName);
-  // Cap at 20 entries
   if(stack.length > 20) stack.shift();
 }
 
@@ -7805,7 +7826,7 @@ function switchRole(role){
   var mgmtNav = document.getElementById('sidebar_mgmt_nav');
   if(mgmtNav) mgmtNav.style.display = (role === 'housing_manager' || role === 'ed') ? '' : 'none';
   // Apply tenancy field role locks whenever role changes
-  applyTenancyFieldRoles();
+  if(typeof applyTenancyFieldRoles === 'function') applyTenancyFieldRoles();
   // All roles land on the home tile page
   showEmployeeHome();
 }
