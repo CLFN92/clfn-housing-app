@@ -364,22 +364,22 @@
           <label id="apptype_new_label" style="display:flex;align-items:flex-start;gap:12px;padding:14px;border:2px solid var(--yellow);border-radius:10px;cursor:pointer;background:var(--dark);">
             <input type="radio" name="appType" id="apptype_new" value="new_housing" checked onchange="onAppTypeChange()" style="margin-top:2px;accent-color:var(--yellow);"/>
             <div>
-              <div style="font-weight:700;font-size:13px;color:#fff;">New Housing Application</div>
-              <div style="font-size:11px;color:#aaa;margin-top:3px;">Applicant is seeking a new CLFN housing unit. Application will be scored and ranked on the waitlist.</div>
+              <div class="appty-title" style="font-weight:700;font-size:13px;">New Housing Application</div>
+              <div class="appty-desc" style="font-size:11px;margin-top:3px;">Applicant is seeking a new CLFN housing unit. Application will be scored and ranked on the waitlist.</div>
             </div>
           </label>
           <label id="apptype_existing_label" style="display:flex;align-items:flex-start;gap:12px;padding:14px;border:2px solid var(--border);border-radius:10px;cursor:pointer;">
             <input type="radio" name="appType" id="apptype_existing" value="existing_tenant" onchange="onAppTypeChange()" style="margin-top:2px;accent-color:var(--yellow);"/>
             <div>
-              <div style="font-weight:700;font-size:13px;">Existing Tenant — File Update</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:3px;">Applicant is an existing tenant updating their information on file. Application will <em>not</em> be scored or ranked.</div>
+              <div class="appty-title" style="font-weight:700;font-size:13px;">Existing Tenant — File Update</div>
+              <div class="appty-desc" style="font-size:11px;margin-top:3px;">Applicant is an existing tenant updating their information on file. Application will <em>not</em> be scored or ranked.</div>
             </div>
           </label>
           <label id="apptype_transfer_label" style="display:flex;align-items:flex-start;gap:12px;padding:14px;border:2px solid var(--border);border-radius:10px;cursor:pointer;">
-            <input type="radio" name="appType" id="apptype_transfer" value="transfer_request" onchange="onAppTypeChange()" style="margin-top:2px;accent-color:var(--yellow);"/>
+            <input type="radio" name="appType" id="apptype_transfer" value="transfer_request" onchange="onAppTypeChange();prefillTransferFromTenant()" style="margin-top:2px;accent-color:var(--yellow);"/>
             <div>
-              <div style="font-weight:700;font-size:13px;">Existing Tenant — New Housing Request</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:3px;">Current CLFN tenant applying for a different unit. Application <em>will</em> be scored and ranked.</div>
+              <div class="appty-title" style="font-weight:700;font-size:13px;">Existing Tenant — New Housing Request</div>
+              <div class="appty-desc" style="font-size:11px;margin-top:3px;">Current CLFN tenant applying for a different unit. Application <em>will</em> be scored and ranked.</div>
             </div>
           </label>
         </div>
@@ -388,6 +388,20 @@
         </div>
           <div id="apptype_transfer_notice" style="display:none;margin-top:12px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:12px;color:#1d4ed8;">
             🏠 <strong>Transfer Request:</strong> This applicant is a current CLFN tenant seeking a different unit. Complete all scoring fields — this application will be scored and ranked on the waitlist.
+          </div>
+          <div id="apptype_tenant_lookup" style="display:none;margin-top:12px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px;">Pre-fill from Existing Tenant Record</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="transfer_tenant_search" placeholder="Search by name or APP-ID…" 
+                style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);"
+                oninput="transferTenantSearch(this.value)"/>
+              <button type="button" onclick="clearTransferPrefill()" 
+                style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 10px;border-radius:7px;font-size:11px;cursor:pointer;">Clear</button>
+            </div>
+            <div id="transfer_tenant_results" style="margin-top:6px;"></div>
+            <div id="transfer_prefilled_badge" style="display:none;margin-top:8px;padding:6px 10px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;font-size:12px;color:#15803d;">
+              ✓ Pre-filled from existing record — update any fields as needed.
+            </div>
           </div>
       </div>
       <div class="card">
@@ -485,7 +499,7 @@
       </div>
 
       <!-- ── V2: HOUSING NEED ASSESSMENT ── -->
-      <div class="card" style="margin-top:16px;">
+      <div class="card" id="v2_housing_need_card" style="margin-top:16px;">
         <div class="ctitle">Housing Need Assessment</div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">These fields are used to calculate your application priority score under the revised scoring model.</div>
         <div class="fg c2">
@@ -583,7 +597,7 @@
       </div>
 
       <!-- ── V2: TENANCY HISTORY (HM/ED assessed fields) ── -->
-      <div class="card" style="margin-top:16px;">
+      <div class="card" id="v2_tenancy_card" style="margin-top:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
           <div class="ctitle" style="margin:0;">Tenancy History</div>
           <div id="tenancy_hm_badge" style="display:none;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:rgba(248,228,26,0.12);color:var(--yellow);border:1px solid rgba(248,228,26,0.3);">⭐ HM / ED Assessment</div>
@@ -9916,6 +9930,49 @@ function headerSignOut() {
   }
 }
 
+
+function prefillTransferFromTenant() {
+  // When a tenant selects "Transfer Request", pre-populate their info
+  // from their existing assigned application
+  var apps = (typeof applications !== 'undefined') ? applications : [];
+  var units = (typeof housingUnits !== 'undefined') ? housingUnits : [];
+
+  // Find an existing assigned application matching the current form data
+  // Try to match by first/last name already in the form
+  var fn = (document.getElementById('fn')||{}).value||'';
+  var ln = (document.getElementById('ln')||{}).value||'';
+
+  // If form is already filled (editing), don't overwrite
+  if(fn || ln) return;
+
+  // Find the currently logged-in user's existing application
+  var email = window.HOUSING_SESSION && window.HOUSING_SESSION.email || '';
+  var existingApp = apps.find(function(a){
+    return (a.status === 'assigned' || a.status === 'ed_approved') && !a.archived;
+  });
+
+  if(!existingApp) return;
+
+  // Pre-populate fields from existing application
+  var fields = {
+    'fn': existingApp.fn, 'ln': existingApp.ln,
+    'email': existingApp.email, 'phone': existingApp.phone,
+    'address': existingApp.address, 'city': existingApp.city,
+    'postal': existingApp.postal, 'band': existingApp.band,
+    'reserve': existingApp.reserve
+  };
+  Object.keys(fields).forEach(function(id) {
+    var el = document.getElementById(id);
+    if(el && fields[id]) el.value = fields[id];
+  });
+  // Pre-populate checkboxes
+  if(existingApp.band !== undefined) {
+    var bandEl = document.getElementById('band');
+    if(bandEl) bandEl.checked = !!existingApp.band;
+  }
+  showToast('Profile pre-filled from existing application');
+}
+
 function onAppTypeChange() {
   var isExisting = !!(document.getElementById('apptype_existing') && document.getElementById('apptype_existing').checked);
   var isTransfer = !!(document.getElementById('apptype_transfer') && document.getElementById('apptype_transfer').checked);
@@ -9928,6 +9985,12 @@ function onAppTypeChange() {
     if(!el) return;
     el.style.borderColor = active ? 'var(--yellow)' : 'var(--border)';
     el.style.background  = active ? 'var(--dark)'   : '';
+    var title = el.querySelector('.appty-title');
+    var desc  = el.querySelector('.appty-desc');
+    if(title) title.style.color = active ? '#fff'        : 'var(--text)';
+    if(desc)  desc.style.color  = active ? 'rgba(255,255,255,0.8)' : 'var(--muted)';
+    var radio = el.querySelector('input[type="radio"]');
+    if(radio) radio.style.accentColor = active ? 'var(--yellow)' : '';
   }
   styleLabel('apptype_new_label',      isNew);
   styleLabel('apptype_existing_label', isExisting);
@@ -9938,6 +10001,10 @@ function onAppTypeChange() {
   var thCard = document.getElementById('v2_tenancy_card');
   if(hnCard) hnCard.style.display = needsScoring ? '' : 'none';
   if(thCard) thCard.style.display = needsScoring ? '' : 'none';
+
+  // For transfer: show tenant lookup panel
+  var lookupPanel = document.getElementById('apptype_tenant_lookup');
+  if(lookupPanel) lookupPanel.style.display = isTransfer ? 'block' : 'none';
 
   // Show/hide notices
   var exNotice = document.getElementById('apptype_existing_notice');
@@ -9961,6 +10028,110 @@ function onAppTypeChange() {
     if(note) note.style.display = 'block';
   }
 }
+
+// ── Transfer request: search and pre-populate from existing tenant record ──
+function transferTenantSearch(q) {
+  var results = document.getElementById('transfer_tenant_results');
+  if(!results) return;
+  if(!q || q.length < 2) { results.innerHTML = ''; return; }
+  var apps = (typeof applications !== 'undefined') ? applications : [];
+  var qq = q.toLowerCase();
+  // Search assigned tenants + all applicants with a unit
+  var matches = apps.filter(function(a) {
+    if(a.archived) return false;
+    var name = ((a.fn||'') + ' ' + (a.ln||'')).toLowerCase();
+    return name.includes(qq) || (a.id||'').toLowerCase().includes(qq) || (a.assignedAddress||'').toLowerCase().includes(qq);
+  }).slice(0, 6);
+  if(!matches.length) {
+    results.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 0;">No matching records found.</div>';
+    return;
+  }
+  results.innerHTML = matches.map(function(a) {
+    var name = ((a.fn||'') + ' ' + (a.ln||'')).trim() || '—';
+    var addr = a.assignedAddress || 'No unit assigned';
+    var aid = (a.id||'').replace(/"/g,'');
+    return '<div data-tid="' + aid + '" style="padding:7px 10px;border-radius:6px;cursor:pointer;font-size:12px;margin-bottom:3px;background:var(--bg);border:1px solid var(--border);">'
+      + '<strong>' + name + '</strong> <span style="color:var(--muted);">' + aid + '</span>'
+      + '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + addr + '</div></div>';
+  }).join('');
+  // Click delegation
+  results.onclick = function(e) {
+    var el = e.target.closest('[data-tid]');
+    if(el) applyTransferPrefill(el.getAttribute('data-tid'));
+  };
+}
+
+function applyTransferPrefill(appId) {
+  var apps = (typeof applications !== 'undefined') ? applications : [];
+  var src = apps.find(function(a){ return a.id === appId; });
+  if(!src) return;
+
+  // Helper to set a form field value
+  function set(id, val) {
+    var el = document.getElementById(id);
+    if(el && val !== undefined && val !== null) el.value = val;
+  }
+  function setChk(id, val) {
+    var el = document.getElementById(id);
+    if(el) el.checked = !!val;
+  }
+
+  // Personal info (step 0)
+  set('fn', src.fn);
+  set('ln', src.ln);
+  set('dob', src.dob);
+  set('phone', src.phone);
+  set('email', src.email);
+  set('address', src.address);
+  set('city', src.city);
+  set('province', src.province);
+  set('postal', src.postal);
+
+  // Classification / band
+  set('classification', src.classification);
+  setChk('band', src.band);
+  set('reserve', src.reserve);
+  set('bedNeed', src.bedNeed);
+
+  // Mark the current unit as their existing address
+  if(src.assignedAddress) {
+    var currUnit = document.getElementById('currentUnitSearch');
+    if(currUnit) currUnit.value = src.assignedAddress;
+    var hasHouse = document.getElementById('hasHouseToggle');
+    if(hasHouse) { hasHouse.checked = true; var b=document.getElementById('homeCondBlk'); if(b) b.style.display='block'; }
+  }
+
+  // Store source app ID for reference
+  window._transferSourceAppId = appId;
+
+  // Clear search and show badge
+  var search = document.getElementById('transfer_tenant_search');
+  if(search) search.value = ((src.fn||'') + ' ' + (src.ln||'')).trim();
+  var results = document.getElementById('transfer_tenant_results');
+  if(results) {
+    results.innerHTML = '';
+    results.addEventListener('click', function(e) {
+      var el = e.target.closest('[data-transfer-appid]');
+      if(el) applyTransferPrefill(el.getAttribute('data-transfer-appid'));
+    });
+  }
+  var badge = document.getElementById('transfer_prefilled_badge');
+  if(badge) badge.style.display = 'block';
+
+  // Trigger score recalc
+  if(typeof calcScore === 'function') setTimeout(calcScore, 100);
+}
+
+function clearTransferPrefill() {
+  window._transferSourceAppId = null;
+  var search = document.getElementById('transfer_tenant_search');
+  if(search) search.value = '';
+  var results = document.getElementById('transfer_tenant_results');
+  if(results) results.innerHTML = '';
+  var badge = document.getElementById('transfer_prefilled_badge');
+  if(badge) badge.style.display = 'none';
+}
+
 
 function getAppType() {
   var exEl = document.getElementById('apptype_existing');
