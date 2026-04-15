@@ -1090,6 +1090,11 @@ body.modal-open { overflow: hidden; position: fixed; width: 100%; }
 
 </style>
 <style>
+/* index.html overrides — no sidebar needed on login/home page */
+#sharedSidebar { display: none !important; }
+.app-wrapper { display: block !important; }
+.content-area { width: 100% !important; max-width: 100% !important; }
+
 .hm-ed-only{display:none;} .ed-only{display:none;}
 /* Login screen critical CSS — fallback if shared.css fails to load */
 :root{
