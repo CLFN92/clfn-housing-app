@@ -2403,19 +2403,7 @@ function goBack(){
   window._navSkipPush = false;
 }
 
-function showDashboard(){
-  // The actual applications dashboard — HM and ED only
-  var role = window.currentRole || 'employee';
-  if(role !== 'housing_manager' && role !== 'ed') { showToast('Dashboard access requires Housing Manager or Executive Director role.'); return; }
-  if(!window._navSkipPush) pushNav('dashboard');
-  hideAllViews();
-  setNavActive('tab_dash');
-  window._userSetDashFilter = false;
-  var fs = document.getElementById('dashFilterStatus');
-  if(fs) fs.value = '';
-  document.getElementById('dashView').style.display='flex';
-  updateDashStats();renderDashTable();wireDashTable();
-}
+function showDashboard() { navigateTo('housing.html', {view:'dashboard'}); }
 
 function showEmployeeHome(){
   if(!window._navSkipPush) pushNav('home');
@@ -3223,6 +3211,8 @@ function showSignInPanel() {
   document.getElementById('verify-panel').style.display = 'none';
   document.getElementById('forgot-panel').style.display = 'none';
 }
+function wireDashTable()  {}   // housing.html only
+function showScorecard()  {}   // housing.html only
 function showForgotPassword() {
   var email = (document.getElementById('signin-email')||{}).value||'';
   if(email) { var fe=document.getElementById('forgot-email'); if(fe) fe.value=email.trim(); }
@@ -3346,12 +3336,28 @@ async function startSignIn() {
     hidLoginScreen();
     console.log('[LOGIN] Login screen hidden. Showing home...');
     try {
-      showEmployeeHome();
-    } catch(homeErr) {
-      console.error('[LOGIN] showEmployeeHome failed:', homeErr);
-      // Fallback: just show the home view directly
+      // Step through showEmployeeHome manually to find crash point
+      console.log('[LOGIN] Step 1: pushNav');
+      if(!window._navSkipPush) pushNav('home');
+      console.log('[LOGIN] Step 2: setExportView');
+      setExportView(null);
+      console.log('[LOGIN] Step 3: hideAllViews');
+      hideAllViews();
+      console.log('[LOGIN] Step 4: show employeeHomeView');
       var hv = document.getElementById('employeeHomeView');
       if(hv) { hv.style.display='flex'; hv.style.flexDirection='column'; }
+      console.log('[LOGIN] Step 5: hide loginScreen');
+      var ls = document.getElementById('loginScreen');
+      if(ls) ls.style.display='none';
+      console.log('[LOGIN] Step 6: renderRecentActivity');
+      if(typeof renderRecentActivity === 'function') renderRecentActivity(window.currentRole||'employee');
+      console.log('[LOGIN] All steps done');
+    } catch(homeErr) {
+      console.error('[LOGIN] step failed:', homeErr.message, homeErr);
+      var hv2 = document.getElementById('employeeHomeView');
+      if(hv2) { hv2.style.display='flex'; hv2.style.flexDirection='column'; }
+      var ls2 = document.getElementById('loginScreen');
+      if(ls2) ls2.style.display='none';
     }
     showToast('Welcome, '+HOUSING_SESSION.name+' ('+(window.currentRole||'staff')+')');
     console.log('[LOGIN] Complete. Role:', window.currentRole);
@@ -7402,20 +7408,7 @@ function goBack(){
   window._navSkipPush = false;
 }
 
-function showDashboard(){
-  // The actual applications dashboard — HM and ED only
-  var role = window.currentRole || 'employee';
-  if(role !== 'housing_manager' && role !== 'ed') { showToast('Dashboard access requires Housing Manager or Executive Director role.'); return; }
-  if(!window._navSkipPush) pushNav('dashboard');
-  hideAllViews();
-  setNavActive('tab_dash');
-  window._userSetDashFilter = false;
-  var fs = document.getElementById('dashFilterStatus');
-  if(fs) fs.value = '';
-  document.getElementById('dashView').style.display='flex';
-  updateDashStats();renderDashTable();wireDashTable();
-}
-
+function showDashboard() { navigateTo('housing.html', {view:'dashboard'}); }
 function showEmployeeHome(){
   if(!window._navSkipPush) pushNav('home');
   setExportView(null);
@@ -8477,7 +8470,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   var storedToken = null;
   try { storedToken = sessionStorage.getItem('clfn_housing_token'); } catch(e) {}
-  if (storedToken) {
+  if (storedToken && !window._sessionRestored) {
+    window._sessionRestored = true;
     HOUSING_HEADERS['Authorization'] = 'Bearer ' + storedToken;
     try {
       var userR = await fetch(SUPABASE_URL + '/auth/v1/user', { headers: HOUSING_HEADERS });
@@ -8493,6 +8487,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       }
     } catch(e) { console.warn('[HOUSING] session restore failed'); }
     sessionStorage.removeItem('clfn_housing_token');
+    window._sessionRestored = false;
   }
 });
 
