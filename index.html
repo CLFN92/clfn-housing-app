@@ -2835,8 +2835,7 @@ function switchRole(role){
   if(mgmtNav) mgmtNav.style.display = (role === 'housing_manager' || role === 'ed') ? '' : 'none';
   // Apply tenancy field role locks whenever role changes
   if(typeof applyTenancyFieldRoles === 'function') applyTenancyFieldRoles();
-  // All roles land on the home tile page
-  showEmployeeHome();
+  // Navigation is handled by the caller (showEmployeeHome called after resolveHousingRole)
 }
 
 function _saveToggleStates(){
@@ -3591,6 +3590,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if(_hv) { _hv.style.display='flex'; _hv.style.flexDirection='column'; }
         console.log('[SESSION RESTORE] Step 4: renderRecentActivity');
         if(typeof renderRecentActivity==='function') renderRecentActivity(window.currentRole||'employee');
+        try { sessionStorage.removeItem('_restoring'); } catch(e) {}
         console.log('[SESSION RESTORE] Done - role:', window.currentRole);
         return;
       }
@@ -8480,8 +8480,10 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   var storedToken = null;
   try { storedToken = sessionStorage.getItem('clfn_housing_token'); } catch(e) {}
-  if (storedToken && !window._sessionRestored) {
-    window._sessionRestored = true;
+  var _alreadyRestoring = false;
+  try { _alreadyRestoring = sessionStorage.getItem('_restoring') === '1'; } catch(e) {}
+  if (storedToken && !_alreadyRestoring) {
+    try { sessionStorage.setItem('_restoring', '1'); } catch(e) {}
     HOUSING_HEADERS['Authorization'] = 'Bearer ' + storedToken;
     try {
       var userR = await fetch(SUPABASE_URL + '/auth/v1/user', { headers: HOUSING_HEADERS });
@@ -8496,8 +8498,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
       }
     } catch(e) {
-      console.error('[HOUSING] session restore failed:', e.message);
-      // Don't remove token — just show login screen cleanly
+      console.error('[HOUSING] session restore failed:', e.message, e);
+      try { sessionStorage.removeItem('_restoring'); } catch(e2) {}
     }
   }
 });
