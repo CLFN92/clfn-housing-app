@@ -2322,9 +2322,30 @@ async function sbLoadApplications() {
     var data = await r.json();
     return data.map(function(row) {
       return Object.assign({}, row.data||{}, {
+        // Core columns — always override data jsonb
         id:row.id, status:row.status, score:row.score, tier:row.tier,
         classification:row.classification, reserve:row.reserve, archived:row.archived,
-        assignedUnit:row.assigned_unit_id, assignedAddress:row.assigned_address, submittedAt:row.submitted_at
+        assignedUnit:row.assigned_unit_id, assignedAddress:row.assigned_address,
+        submittedAt:row.submitted_at,
+        // App type & transfer
+        appType:         row.app_type          || (row.data||{}).appType          || 'new_housing',
+        transferPending: row.transfer_pending  !== undefined ? !!row.transfer_pending : !!(row.data||{}).transferPending,
+        // V2 scoring inputs — prefer dedicated columns over jsonb
+        urgentNeed:          row.urgent_need           || (row.data||{}).urgentNeed          || 'none',
+        healthRisk:          row.health_risk            || (row.data||{}).healthRisk          || 'none',
+        personsOverStandard: row.persons_over_standard !== undefined ? row.persons_over_standard : ((row.data||{}).personsOverStandard || 0),
+        loneParent:          row.lone_parent            !== undefined ? !!row.lone_parent       : !!(row.data||{}).loneParent,
+        elderInHousehold:    row.elder_in_household     !== undefined ? !!row.elder_in_household: !!(row.data||{}).elderInHousehold,
+        householdDisability: row.household_disability   !== undefined ? !!row.household_disability: !!(row.data||{}).householdDisability,
+        incomeStability:     row.income_stability       || (row.data||{}).incomeStability      || 'stable',
+        arrears_status:      row.arrears_status         || (row.data||{}).arrears_status       || 'none',
+        // Prior tenancy (HM/ED assessed)
+        rentPaymentHistory:  row.rent_payment_history   || (row.data||{}).rentPaymentHistory   || 'no_history',
+        unitCondition:       row.unit_condition         || (row.data||{}).unitCondition        || 'no_history',
+        tenancyConduct:      row.tenancy_conduct        || (row.data||{}).tenancyConduct       || 'no_history',
+        // V2 scoring outputs
+        score_v2:            row.score_v2   !== undefined ? row.score_v2  : (row.data||{}).score_v2,
+        tier_v2:             row.tier_v2                 || (row.data||{}).tier_v2
       });
     });
   } catch(e) { console.warn('[SB] load applications failed:', e); return null; }
@@ -2360,7 +2381,10 @@ async function sbSaveApplication(app) {
     // ── V2 scoring output fields ──
     score_v2:              typeof app.score_v2 === 'number' ? app.score_v2 : (typeof app.score === 'number' ? app.score : null),
     tier_v2:               app.tier_v2 || app.tier || null,
-    score_breakdown_v2:    app.scoreBreakdown || null
+    score_breakdown_v2:    app.scoreBreakdown || null,
+    // ── Application type & transfer ──
+    app_type:              app.appType || app.app_type || 'new_housing',
+    transfer_pending:      !!(app.transferPending || app.transfer_pending)
   };
   try {
     var r = await fetch(SUPABASE_URL+'/rest/v1/housing_applications', {
