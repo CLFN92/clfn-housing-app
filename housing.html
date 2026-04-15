@@ -3188,51 +3188,38 @@ const SCORING_RUBRIC={
 var SCORING_MODEL_KEY = 'clfn_scoring_model';
 
 var DEFAULT_SCORING_MODEL = [
-  // id, category, label, condition_key, min_value, max_value, points, sort_order
-  {id:'r1',  cat:'reserve_status',       label:'On Reserve',              key:'on_reserve',     min:null, max:null, pts:0,  order:10},
-  {id:'r2',  cat:'reserve_status',       label:'Off Reserve',             key:'off_reserve',    min:null, max:null, pts:1,  order:11},
-  {id:'i1',  cat:'income_source',        label:'Employed / Self-Employed',key:'employed',       min:null, max:null, pts:2,  order:20},
-  {id:'i2',  cat:'income_source',        label:'Pension / CPP',           key:'pension',        min:null, max:null, pts:1,  order:21},
-  {id:'i3',  cat:'income_source',        label:'OW / ODSP / EI / Other',  key:'social',         min:null, max:null, pts:0,  order:22},
-  {id:'m1',  cat:'marital_status',       label:'Divorced or Separated',   key:'div_sep',        min:null, max:null, pts:3,  order:30},
-  {id:'m2',  cat:'marital_status',       label:'All other statuses',      key:'other',          min:null, max:null, pts:0,  order:31},
-  {id:'a1',  cat:'household_ages',       label:'0–5 years',               key:'age_0_5',        min:0,    max:5,    pts:3,  order:40},
-  {id:'a2',  cat:'household_ages',       label:'6–12 years',              key:'age_6_12',       min:6,    max:12,   pts:2,  order:41},
-  {id:'a3',  cat:'household_ages',       label:'13–17 years',             key:'age_13_17',      min:13,   max:17,   pts:1,  order:42},
-  {id:'a4',  cat:'household_ages',       label:'18–24 years',             key:'age_18_24',      min:18,   max:24,   pts:1,  order:43},
-  {id:'a5',  cat:'household_ages',       label:'25–44 years',             key:'age_25_44',      min:25,   max:44,   pts:2,  order:44},
-  {id:'a6',  cat:'household_ages',       label:'45–54 years',             key:'age_45_54',      min:45,   max:54,   pts:1,  order:45},
-  {id:'a7',  cat:'household_ages',       label:'55–64 years',             key:'age_55_64',      min:55,   max:64,   pts:2,  order:46},
-  {id:'a8',  cat:'household_ages',       label:'65+ years',               key:'age_65_plus',    min:65,   max:999,  pts:3,  order:47},
-  {id:'ac1', cat:'accessibility',        label:'No accessibility needs',  key:'none',           min:null, max:null, pts:0,  order:50},
-  {id:'ac2', cat:'accessibility',        label:'Has accessibility needs', key:'has_needs',      min:null, max:null, pts:1,  order:51},
-  {id:'mv1', cat:'move_in',              label:'Within 1 year',           key:'within_1yr',     min:null, max:null, pts:3,  order:60},
-  {id:'mv2', cat:'move_in',              label:'1 to 3 years',            key:'1_to_3yr',       min:null, max:null, pts:2,  order:61},
-  {id:'mv3', cat:'move_in',              label:'3+ years',                key:'3_plus_yr',      min:null, max:null, pts:1,  order:62},
-  {id:'mv4', cat:'move_in',              label:'No target date',          key:'no_date',        min:null, max:null, pts:0,  order:63},
-  {id:'hc1', cat:'home_condition',       label:'Good — well maintained',  key:'good',           min:null, max:null, pts:2,  order:70},
-  {id:'hc2', cat:'home_condition',       label:'Average — minor wear',    key:'average',        min:null, max:null, pts:1,  order:71},
-  {id:'hc3', cat:'home_condition',       label:'No house on reserve',     key:'none',           min:null, max:null, pts:0,  order:72},
-  {id:'hc4', cat:'home_condition',       label:'Poor — major repairs',    key:'poor',           min:null, max:null, pts:-2, order:73},
-  {id:'rv1', cat:'renos_estimate',       label:'$0 – $2,500',             key:'range_1',        min:0,    max:2500, pts:0,  order:80},
-  {id:'rv2', cat:'renos_estimate',       label:'$2,501 – $5,000',         key:'range_2',        min:2501, max:5000, pts:-1, order:81},
-  {id:'rv3', cat:'renos_estimate',       label:'$5,001 – $10,000',        key:'range_3',        min:5001, max:10000,pts:-2, order:82},
-  {id:'rv4', cat:'renos_estimate',       label:'$10,001 – $20,000',       key:'range_4',        min:10001,max:20000,pts:-3, order:83},
-  {id:'rv5', cat:'renos_estimate',       label:'$20,001+',                key:'range_5',        min:20001,max:null, pts:-5, order:84},
-  {id:'ar1', cat:'arrears',              label:'$0 — no arrears',         key:'range_0',        min:0,    max:0,    pts:0,  order:90},
-  {id:'ar2', cat:'arrears',              label:'$1 – $500',               key:'range_1',        min:1,    max:500,  pts:0,  order:91},
-  {id:'ar3', cat:'arrears',              label:'$501 – $1,500',           key:'range_2',        min:501,  max:1500, pts:-1, order:92},
-  {id:'ar4', cat:'arrears',              label:'$1,501 – $3,000',         key:'range_3',        min:1501, max:3000, pts:-2, order:93},
-  {id:'ar5', cat:'arrears',              label:'$3,001 – $5,000',         key:'range_4',        min:3001, max:5000, pts:-3, order:94},
-  {id:'ar6', cat:'arrears',              label:'$5,001+',                 key:'range_5',        min:5001, max:null, pts:-5, order:95},
-  {id:'pa1', cat:'payment_arrangement',  label:'0–12 months',             key:'range_1',        min:0,    max:12,   pts:5,  order:100},
-  {id:'pa2', cat:'payment_arrangement',  label:'13–36 months',            key:'range_2',        min:13,   max:36,   pts:4,  order:101},
-  {id:'pa3', cat:'payment_arrangement',  label:'37–60 months',            key:'range_3',        min:37,   max:60,   pts:3,  order:102},
-  {id:'pa4', cat:'payment_arrangement',  label:'61–120 months',           key:'range_4',        min:61,   max:120,  pts:2,  order:103},
-  {id:'pa5', cat:'payment_arrangement',  label:'121–180 months',          key:'range_5',        min:121,  max:180,  pts:1,  order:104},
-  {id:'pa6', cat:'payment_arrangement',  label:'181+ months',             key:'range_6',        min:181,  max:null, pts:0,  order:105},
-  {id:'wl1', cat:'waitlist',             label:'1 point per full year',   key:'per_year',       min:null, max:null, pts:1,  order:110},
-  {id:'bm1', cat:'band_membership',      label:'+1 point per band member',key:'per_member',     min:null, max:null, pts:1,  order:120}
+  // ── Urgent Need / Displacement ──────────────────────────────────────────────
+  {id:'un1', cat:'urgent_need',    label:'No urgent need',                        p:0},
+  {id:'un2', cat:'urgent_need',    label:'Unsafe/overcrowded conditions',         p:5},
+  {id:'un3', cat:'urgent_need',    label:'Eviction / displacement / fire/flood',  p:8},
+  {id:'un4', cat:'urgent_need',    label:'Immediate health/safety emergency',     p:10},
+
+  // ── Health & Safety Risk ─────────────────────────────────────────────────────
+  {id:'hs1', cat:'health_safety',  label:'None (0 pts)',                          p:0},
+  {id:'hs2', cat:'health_safety',  label:'Minor risk — cosmetic/low priority',    p:2},
+  {id:'hs3', cat:'health_safety',  label:'Moderate risk — verified by report',    p:5},
+  {id:'hs4', cat:'health_safety',  label:'Severe risk — structural/health order', p:8},
+
+  // ── Persons Over Occupancy Standard ─────────────────────────────────────────
+  {id:'oc1', cat:'occupancy',      label:'1 pt per person over NOS (max 10 pts)', p:1},
+
+  // ── Income Stability ─────────────────────────────────────────────────────────
+  {id:'is1', cat:'income_stability', label:'Stable income (employment, pension, social assistance)', p:5},
+  {id:'is2', cat:'income_stability', label:'Unstable / no income',                p:0},
+
+  // ── Household Composition ────────────────────────────────────────────────────
+  {id:'hc1', cat:'household_comp', label:'Lone parent household',                 p:3},
+  {id:'hc2', cat:'household_comp', label:'Elder in household (55+)',              p:3},
+  {id:'hc3', cat:'household_comp', label:'Household member with disability',      p:2},
+
+  // ── Prior CLFN Tenancy ───────────────────────────────────────────────────────
+  {id:'pt1', cat:'prior_tenancy',  label:'No prior tenancy — first-time applicant (neutral)', p:0},
+  {id:'pt2', cat:'prior_tenancy',  label:'Good standing — positive tenancy history',          p:3},
+  {id:'pt3', cat:'prior_tenancy',  label:'Mixed record — minor issues',                       p:1},
+  {id:'pt4', cat:'prior_tenancy',  label:'Poor standing — arrears or damage on file',         p:-2},
+
+  // ── Application Age (Waitlist Duration) ──────────────────────────────────────
+  {id:'wa1', cat:'waitlist_age',   label:'1 point per full year on waitlist',     p:1}
 ];
 
 // ── V2 Scoring Model Defaults ──────────────────────────────────────────
@@ -3508,18 +3495,13 @@ function resetV2ScoringModelED() {
 }
 
 var SCORING_CAT_LABELS = {
-  reserve_status:      'Reserve Status',
-  income_source:       'Income Source',
-  marital_status:      'Relationship / Marital Status',
-  household_ages:      'Household Ages',
-  accessibility:       'Accessibility Needs',
-  move_in:             'Move-In Expectation',
-  home_condition:      'Home Condition',
-  renos_estimate:      'Renovation Estimate',
-  arrears:             'CLFN Rent Arrears',
-  payment_arrangement: 'Payment Arrangement',
-  waitlist:            'Waitlist Duration',
-  band_membership:     'Band Membership'
+  urgent_need:       'Urgent Need / Displacement',
+  health_safety:     'Health & Safety Risk',
+  occupancy:         'Persons Over Occupancy Standard',
+  income_stability:  'Income Stability',
+  household_comp:    'Household Composition',
+  prior_tenancy:     'Prior CLFN Tenancy',
+  waitlist_age:      'Application Age (Waitlist Duration)'
 };
 
 // Load or init scoring model
@@ -3699,9 +3681,8 @@ function renderScoringModelTable() {
     grouped[r.cat].push(r);
   });
 
-  var catOrder = ['reserve_status','income_source','marital_status','household_ages',
-                  'accessibility','move_in','home_condition','renos_estimate',
-                  'arrears','payment_arrangement','waitlist','band_membership'];
+  var catOrder = ['urgent_need','health_safety','occupancy',
+                  'income_stability','household_comp','prior_tenancy','waitlist_age'];
 
   var html = '';
   catOrder.forEach(function(cat) {
@@ -3716,17 +3697,8 @@ function renderScoringModelTable() {
     rows.forEach(function(r) {
       var ptsColor = r.pts > 0 ? '#15803d' : r.pts < 0 ? '#b91c1c' : '#888';
       var sign = r.pts > 0 ? '+' : '';
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:7px;margin-bottom:3px;background:var(--bg);">'
-        + '<span style="font-size:13px;color:var(--text);flex:1;">'+r.label+'</span>'
-        + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'
-        +   '<input type="number" value="'+r.pts+'" step="1" min="-20" max="30" '
-        +     'style="width:64px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';text-align:center;font-family:\'DM Sans\',sans-serif;background:var(--surface);" '
-        +     'onchange="updateScoringRow(\''+r.id+'\',this.value);this.style.color=+this.value>0?\'#15803d\':+this.value<0?\'#b91c1c\':\'#888\';" '
-        +     'oninput="this.style.color=+this.value>0?\'#15803d\':+this.value<0?\'#b91c1c\':\'#888\';" />'
-        +   '<span style="font-size:11px;color:var(--muted);width:24px;">pts</span>'
-        +   '<button onclick="deleteScoringRow(\''+r.id+'\')" title="Remove" style="background:none;border:none;color:#888;cursor:pointer;font-size:14px;padding:2px 4px;" onmouseover="this.style.color=\'#b91c1c\'" onmouseout="this.style.color=\'#888\'">✕</button>'
-        + '</div>'
-        + '</div>';
+      var isAuto = (r.id === 'oc1' || r.id === 'wa1');
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:7px;margin-bottom:3px;background:var(--bg);">'        + '<span style="font-size:13px;color:var(--text);flex:1;">'+r.label+'</span>'        + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'        + (isAuto          ? '<span style="font-size:11px;color:var(--muted);font-style:italic;margin-right:4px;">auto-calculated</span>'            + '<input type="number" value="'+r.pts+'" step="1" min="0" max="10" '            +   'style="width:64px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';text-align:center;font-family:\'DM Sans\',sans-serif;background:var(--surface);" '            +   'data-smid="'+r.id+'" oninput="updateV2ScoreModel(this)"/>'            + '<span style="font-size:11px;color:var(--muted);">pts each</span>'          : '<input type="number" value="'+r.pts+'" step="1" min="-20" max="30" '            +   'style="width:64px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';text-align:center;font-family:\'DM Sans\',sans-serif;background:var(--surface);" '            +   'data-smid="'+r.id+'" oninput="updateV2ScoreModel(this)"/>'            + '<span style="font-size:11px;color:var(--muted);">pts</span>'        )        + '<button onclick="deleteV2ScoreCriteria(\''+r.id+'\')" title="Remove" style="background:none;border:none;color:#888;cursor:pointer;font-size:14px;padding:2px 4px;" onmouseover="this.style.color=\'#b91c1c\'" onmouseout="this.style.color=\'#888\'">✕</button>'        + '</div>'        + '</div>';
     });
     html += '</div>';
   });
