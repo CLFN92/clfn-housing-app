@@ -7938,7 +7938,9 @@ async function startSignIn() {
 
     // Load data and launch app
     await loadAppDataFromSupabase();
-    hidLoginScreen();
+    // Hide login screen permanently
+    var _ls = document.getElementById('loginScreen');
+    if(_ls) { _ls.style.setProperty('display','none','important'); _ls.style.zIndex='-1'; }
     showEmployeeHome();
     showToast('Welcome, '+HOUSING_SESSION.name+' ('+HOUSING_SESSION.role+')');
 
