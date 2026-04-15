@@ -6667,6 +6667,22 @@ function renderWorklist()         {}   // housing.html only
 function renderDashTable()        {}   // housing.html only
 function updateDashStats()        {}   // housing.html only
 
+// ── Auth panel helpers (needed by showLoginScreen) ───────────────────────────
+function showSignInPanel() {
+  var p = document.getElementById('signin-panel');
+  var v = document.getElementById('verify-panel');
+  var f = document.getElementById('forgot-panel');
+  if(p) p.style.display = '';
+  if(v) v.style.display = 'none';
+  if(f) f.style.display = 'none';
+}
+function showForgotPassword() {
+  var p = document.getElementById('signin-panel');
+  var f = document.getElementById('forgot-panel');
+  if(p) p.style.display = 'none';
+  if(f) f.style.display = '';
+}
+
 // ── Helpers ──
 function g(id)  { const e=document.getElementById(id); return e?e.value:''; }
 function fv(id) { const e=document.getElementById(id); return e?e.value:''; }
