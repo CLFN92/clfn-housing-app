@@ -3562,47 +3562,7 @@ async function loadAppDataFromSupabase() {
   }
 }
 
-// ── Check for existing session on page load ────────────────────────────────
-document.addEventListener('DOMContentLoaded', async function() {
-  loadRememberedEmail();
-
-  // Check for stored token (simple session persistence)
-  var storedToken = null;
-  try { storedToken = sessionStorage.getItem('clfn_housing_token'); } catch(e){}
-  if(storedToken) {
-    HOUSING_HEADERS['Authorization'] = 'Bearer '+storedToken;
-    try {
-      var userR = await fetch(SUPABASE_URL+'/auth/v1/user',{headers:HOUSING_HEADERS});
-      if(userR.ok) {
-        var userData = await userR.json();
-        HOUSING_SESSION.email = userData.email.toLowerCase();
-        HOUSING_SESSION.accessToken = storedToken;
-        await resolveHousingRole();
-        await loadAppDataFromSupabase();
-        console.log('[SESSION RESTORE] Data loaded, showing home...');
-        hidLoginScreen();
-        console.log('[SESSION RESTORE] Step 1: pushNav');
-        if(!window._navSkipPush) { if(!window._navStack) window._navStack=[]; pushNav('home'); }
-        console.log('[SESSION RESTORE] Step 2: hideAllViews');
-        hideAllViews();
-        console.log('[SESSION RESTORE] Step 3: show home view');
-        var _hv = document.getElementById('employeeHomeView');
-        if(_hv) { _hv.style.display='flex'; _hv.style.flexDirection='column'; }
-        console.log('[SESSION RESTORE] Step 4: renderRecentActivity');
-        if(typeof renderRecentActivity==='function') renderRecentActivity(window.currentRole||'employee');
-        try { sessionStorage.removeItem('_restoring'); } catch(e) {}
-        console.log('[SESSION RESTORE] Done - role:', window.currentRole);
-        return;
-      }
-    } catch(e) { console.warn('[HOUSING] session restore failed'); }
-    // Token invalid - reset
-    HOUSING_HEADERS['Authorization'] = 'Bearer '+SUPABASE_ANON;
-    try { sessionStorage.removeItem('clfn_housing_token'); } catch(e){}
-  }
-
-  // No valid session — show login
-  showLoginScreen();
-});
+// (session restore handled by DOMContentLoaded below)
 
 // ══════════════════════════════════════════════════════════════
 // STAFF MANAGEMENT — Add users from within the app
@@ -8194,36 +8154,7 @@ async function loadAppDataFromSupabase() {
   }
 }
 
-// ── Check for existing session on page load ────────────────────────────────
-document.addEventListener('DOMContentLoaded', async function() {
-  loadRememberedEmail();
-
-  // Check for stored token (simple session persistence)
-  var storedToken = null;
-  try { storedToken = sessionStorage.getItem('clfn_housing_token'); } catch(e){}
-  if(storedToken) {
-    HOUSING_HEADERS['Authorization'] = 'Bearer '+storedToken;
-    try {
-      var userR = await fetch(SUPABASE_URL+'/auth/v1/user',{headers:HOUSING_HEADERS});
-      if(userR.ok) {
-        var userData = await userR.json();
-        HOUSING_SESSION.email = userData.email.toLowerCase();
-        HOUSING_SESSION.accessToken = storedToken;
-        await resolveHousingRole();
-        await loadAppDataFromSupabase();
-        hidLoginScreen();
-        showEmployeeHome();
-        return;
-      }
-    } catch(e) { console.warn('[HOUSING] session restore failed'); }
-    // Token invalid - reset
-    HOUSING_HEADERS['Authorization'] = 'Bearer '+SUPABASE_ANON;
-    try { sessionStorage.removeItem('clfn_housing_token'); } catch(e){}
-  }
-
-  // No valid session — show login
-  showLoginScreen();
-});
+// (old session restore removed — see DOMContentLoaded below)
 
 // ══════════════════════════════════════════════════════════════
 // STAFF MANAGEMENT — Add users from within the app
