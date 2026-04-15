@@ -178,7 +178,18 @@ body{font-family:'DM Sans',sans-serif;background:#fafaf8;color:#111;font-size:14
         <button onclick="showForgotPassword()" style="background:none;border:none;font-size:12px;color:#F8E41A;cursor:pointer;padding:0;">Forgot password?</button>
       </div>
 
-      <button id="signin-btn" onclick="this.disabled=true;this.textContent='Signing in…';startSignIn()"
+      <button id="signin-btn" onclick="
+  this.disabled=true;
+  this.textContent='Signing in…';
+  console.log('[BTN] Sign in clicked');
+  startSignIn().then(function(){
+    var ls=document.getElementById('loginScreen');
+    console.log('[BTN] After signin, loginScreen display:', ls ? ls.style.display : 'NOT FOUND');
+    console.log('[BTN] loginScreen computed:', ls ? window.getComputedStyle(ls).display : 'N/A');
+    var hv=document.getElementById('employeeHomeView');
+    console.log('[BTN] homeView display:', hv ? hv.style.display : 'NOT FOUND');
+  }).catch(function(e){ console.error('[BTN] startSignIn threw:',e); })
+" 
         style="background:#F8E41A;border:none;color:#111;padding:12px;border-radius:8px;font-size:14px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;width:100%;">
         Sign in
       </button>
