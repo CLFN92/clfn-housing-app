@@ -6399,10 +6399,9 @@ var DEFAULT_RENO_SCORE_MODEL = [
 ];
 
 function updateRoleSwitcherVisibility() {
-  // Hide role switcher when a real session is active
+  // Always hide role switcher — real auth only, no demo mode
   var rs = document.getElementById('roleSwitcher');
-  if(!rs) return;
-  rs.style.display = (window.CLFN_AUTH && window.CLFN_AUTH.isAuthenticated) ? 'none' : 'block';
+  if(rs) rs.style.display = 'none';
 }
 
 function updateHeaderUser(role) {

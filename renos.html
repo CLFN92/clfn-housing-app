@@ -3733,13 +3733,16 @@ function showRenoApprovals(){
 function showRenos(){
   if(!window._navSkipPush) pushNav('renos');
   setNavActive('tab_renos');
+  hideAllViews();
   var role = window.currentRole || 'employee';
   if(role === 'housing_manager' || role === 'ed') {
-    setExportView('reno_approvals');
-    _showView('renoApprovalsView', renderRenoApprovalsView);
+    var rav = document.getElementById('renoApprovalsView');
+    if(rav){ rav.style.display='flex'; rav.style.flexDirection='column'; }
+    renderRenoApprovalsView();
   } else {
-    setExportView('renos');
-    _showView('renosView', renderRenosView);
+    var rv = document.getElementById('renovationsView');
+    if(rv){ rv.style.display='flex'; rv.style.flexDirection='column'; }
+    renderRenosView();
   }
 }
 function showRenosSimple(){
