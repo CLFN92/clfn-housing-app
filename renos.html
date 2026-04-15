@@ -2319,6 +2319,7 @@
 // ── Supabase client ─────────────────────────────────────────────────────────
 var SUPABASE_URL  = 'https://fkhzrbalumzeripzolph.supabase.co';
 var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo';
+var _raFilter = null;  // renovation approvals filter
 var STORAGE_BUCKET = 'housing-files';
 
 // ── Supabase Storage helpers ──────────────────────────────────────────────────
@@ -3672,8 +3673,7 @@ function goBack() {
     initRenosPage();
   } catch(e) {
     console.error('[RENOS] init failed:', e.message, e.stack);
-    document.body.innerHTML += '<div style="position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:16px 24px;z-index:9999;font-family:DM Sans,sans-serif;font-size:13px;color:#b91c1c;">' +
-      '<strong>Renos load error:</strong> ' + e.message + '</div>';
+
   }
 }());
 async function loadRenosData() {

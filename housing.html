@@ -3164,9 +3164,19 @@ function renderScoringModelTable() {
   var wrap = document.getElementById('scoring_model_table_wrap');
   if(!wrap) return;
 
+  // Re-read from settings (may have loaded after page init)
+  var model = liveScoreModel;
+  if(window._appSettings && window._appSettings['scoring_model_v2']) {
+    try { var m2 = window._appSettings['scoring_model_v2']; if(m2 && m2.length) model = m2; } catch(e){}
+  }
+  if(!model || !model.length) {
+    wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">No scoring model configured. Settings will appear here after they are saved.</div>';
+    return;
+  }
+
   // Group by category
   var grouped = {};
-  liveScoreModel.forEach(function(r) {
+  model.forEach(function(r) {
     if(!grouped[r.cat]) grouped[r.cat] = [];
     grouped[r.cat].push(r);
   });
@@ -3177,7 +3187,7 @@ function renderScoringModelTable() {
 
   var html = '';
   catOrder.forEach(function(cat) {
-    var rows = grouped[cat];
+    var rows = (grouped||{})[cat];
     if(!rows || !rows.length) return;
     var catLabel = SCORING_CAT_LABELS[cat] || cat;
 
@@ -14633,8 +14643,7 @@ function initHousingPage() {
   } catch(e) {
     console.error('[HOUSING] init failed:', e.message, e.stack);
     // Show error on page instead of blank screen
-    document.body.innerHTML += '<div style="position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:16px 24px;z-index:9999;font-family:DM Sans,sans-serif;font-size:13px;color:#b91c1c;">' +
-      '<strong>Page load error:</strong> ' + e.message + '<br><small>Check browser console for details.</small></div>';
+
   }
 }());
 
