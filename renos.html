@@ -68,7 +68,7 @@
 <div class="app-wrapper" id="appWrapper">
 <!-- SHARED SIDEBAR -->
 <div id="sidebarBackdrop" onclick="closeMobileMenu()"></div>
-<aside class="sidebar" id="sharedSidebar">
+<aside class="sidebar sidebar-open" id="sharedSidebar">
   <!-- Step nav — shown only when filling an application -->
   <ul class="snav" id="stepNav" style="display:none;">
     <li class="active" onclick="goTo(0)"><span class="snum" id="sn0">1</span>Applicant Info</li>
@@ -91,6 +91,28 @@
   <span id="tab_contractors" style="display:none;"></span>
   <span id="sidebar_mgmt_nav" style="display:none;"></span>
   <span id="tab_dash_label" style="display:none;"></span>
+
+  <!-- Main Navigation -->
+  <nav class="snav-main">
+    <button class="snav-main-btn" onclick="showRenos()">
+      <span class="snav-main-icon">🔨</span>
+      <span>Renovations</span>
+    </button>
+    <button class="snav-main-btn" onclick="showContractors()">
+      <span class="snav-main-icon">🧰</span>
+      <span>Contractors</span>
+    </button>
+  </nav>
+  <nav class="snav-main" style="margin-top:auto;border-top:1px solid var(--dark3);padding-top:8px;">
+    <button class="snav-main-btn" onclick="window.location.href='housing.html'">
+      <span class="snav-main-icon">📋</span>
+      <span>Applications</span>
+    </button>
+    <button class="snav-main-btn" onclick="window.location.href='index.html'">
+      <span class="snav-main-icon">🏠</span>
+      <span>Home</span>
+    </button>
+  </nav>
 </aside>
 
 <!-- CONTENT AREA -->
