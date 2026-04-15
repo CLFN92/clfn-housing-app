@@ -382,7 +382,7 @@
       <!-- Application Type Toggle -->
       <div class="card" style="padding:18px 20px;">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:12px;">Application Type</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
           <label id="apptype_new_label" style="display:flex;align-items:flex-start;gap:12px;padding:14px;border:2px solid var(--yellow);border-radius:10px;cursor:pointer;background:var(--dark);">
             <input type="radio" name="appType" id="apptype_new" value="new_housing" checked onchange="onAppTypeChange()" style="margin-top:2px;accent-color:var(--yellow);"/>
             <div>
@@ -397,10 +397,20 @@
               <div style="font-size:11px;color:var(--muted);margin-top:3px;">Applicant is an existing tenant updating their information on file. Application will <em>not</em> be scored or ranked.</div>
             </div>
           </label>
+          <label id="apptype_transfer_label" style="display:flex;align-items:flex-start;gap:12px;padding:14px;border:2px solid var(--border);border-radius:10px;cursor:pointer;">
+            <input type="radio" name="appType" id="apptype_transfer" value="transfer_request" onchange="onAppTypeChange()" style="margin-top:2px;accent-color:var(--yellow);"/>
+            <div>
+              <div style="font-weight:700;font-size:13px;">Existing Tenant — New Housing Request</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:3px;">Current CLFN tenant applying for a different unit. Application <em>will</em> be scored and ranked.</div>
+            </div>
+          </label>
         </div>
         <div id="apptype_existing_notice" style="display:none;margin-top:12px;padding:10px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:12px;color:#7a6000;">
           📋 This application is marked as a <strong>file update only</strong>. It will be saved and linked to the tenant record but will not appear in the scoring queue or waitlist.
         </div>
+          <div id="apptype_transfer_notice" style="display:none;margin-top:12px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:12px;color:#1d4ed8;">
+            🏠 <strong>Transfer Request:</strong> This applicant is a current CLFN tenant seeking a different unit. Complete all scoring fields — this application will be scored and ranked on the waitlist.
+          </div>
       </div>
       <div class="card">
         <div class="ctitle">Personal Information</div>
@@ -6779,7 +6789,7 @@ function showScorecard(app){
   var infoEl=document.getElementById('sc_info_strip');
   if(infoEl){
     var _wfStatus={'draft':'Draft','submitted':'Awaiting HM Review','file_update':'File Update — Awaiting HM','mgr_approved':'Awaiting ED Approval','hm_approved':'File Update Approved','ed_approved':'ED Approved','declined':'Declined','returned':'Returned for Info','housed':'Housed'};
-    var fields=[['Reserve Status',app.reserve||'—'],['Classification',(app.classification||'—').replace(' Housing','')],['App Type',app.appType==='existing_tenant'?'File Update':'New Housing'],['Arrears',app.hasArrears?'Yes':'No'],['Status',_wfStatus[app.status]||((app.status||'draft').replace(/_/g,' '))]];
+    var fields=[['Reserve Status',app.reserve||'—'],['Classification',(app.classification||'—').replace(' Housing','')],['App Type',app.appType==='existing_tenant'?'File Update':app.appType==='transfer_request'?'Transfer Request':'New Housing'],['Arrears',app.hasArrears?'Yes':'No'],['Status',_wfStatus[app.status]||((app.status||'draft').replace(/_/g,' '))]];
     infoEl.innerHTML=fields.map(function(f){return'<div><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:2px;">'+f[0]+'</div><div style="font-size:13px;font-weight:500;color:var(--text);">'+f[1]+'</div></div>';}).join('');
   }
   var bd=app.scoreBreakdown||{};
@@ -9934,38 +9944,57 @@ function headerSignOut() {
 }
 
 function onAppTypeChange() {
-  var isExisting = document.getElementById('apptype_existing') && document.getElementById('apptype_existing').checked;
-  // Style the labels
-  var newLabel = document.getElementById('apptype_new_label');
-  var exLabel  = document.getElementById('apptype_existing_label');
-  if(newLabel) { newLabel.style.borderColor = isExisting ? 'var(--border)' : 'var(--yellow)'; newLabel.style.background = isExisting ? '' : 'var(--dark)'; }
-  if(exLabel)  { exLabel.style.borderColor  = isExisting ? 'var(--yellow)' : 'var(--border)'; exLabel.style.background  = isExisting ? 'var(--dark)' : ''; }
-  // Show/hide notice
-  var notice = document.getElementById('apptype_existing_notice');
-  if(notice) notice.style.display = isExisting ? 'block' : 'none';
-  // Recalculate score display
-  if(isExisting) {
-    // Clear score panel — not applicable
-    var sc = document.getElementById('sc_score_total');
-    if(sc) sc.textContent = 'N/A';
-    var tier = document.getElementById('sc_score_tier');
-    if(tier){ tier.textContent = 'File Update Only'; tier.style.color = '#888'; }
-    var scoreCard = document.getElementById('scorecardPanel');
-    if(scoreCard) scoreCard.style.opacity = '0.4';
-    var scoreNote = document.getElementById('apptype_score_note');
-    if(scoreNote) scoreNote.style.display = 'block';
-  } else {
-    var scoreCard2 = document.getElementById('scorecardPanel');
-    if(scoreCard2) scoreCard2.style.opacity = '';
-    var scoreNote2 = document.getElementById('apptype_score_note');
-    if(scoreNote2) scoreNote2.style.display = 'none';
+  var isExisting = !!(document.getElementById('apptype_existing') && document.getElementById('apptype_existing').checked);
+  var isTransfer = !!(document.getElementById('apptype_transfer') && document.getElementById('apptype_transfer').checked);
+  var isNew      = !isExisting && !isTransfer;
+  var needsScoring = isNew || isTransfer;
+
+  // Style all three labels
+  function styleLabel(id, active) {
+    var el = document.getElementById(id);
+    if(!el) return;
+    el.style.borderColor = active ? 'var(--yellow)' : 'var(--border)';
+    el.style.background  = active ? 'var(--dark)'   : '';
+  }
+  styleLabel('apptype_new_label',      isNew);
+  styleLabel('apptype_existing_label', isExisting);
+  styleLabel('apptype_transfer_label', isTransfer);
+
+  // Show/hide scoring sections
+  var hnCard = document.getElementById('v2_housing_need_card');
+  var thCard = document.getElementById('v2_tenancy_card');
+  if(hnCard) hnCard.style.display = needsScoring ? '' : 'none';
+  if(thCard) thCard.style.display = needsScoring ? '' : 'none';
+
+  // Show/hide notices
+  var exNotice = document.getElementById('apptype_existing_notice');
+  if(exNotice) exNotice.style.display = isExisting ? 'block' : 'none';
+  var trNotice = document.getElementById('apptype_transfer_notice');
+  if(trNotice) trNotice.style.display = isTransfer ? 'block' : 'none';
+
+  // Score panel
+  if(needsScoring) {
+    var sc2 = document.getElementById('scorecardPanel');
+    if(sc2) sc2.style.opacity = '';
+    var note2 = document.getElementById('apptype_score_note');
+    if(note2) note2.style.display = 'none';
     if(typeof calcScore === 'function') calcScore();
+  } else {
+    var sc = document.getElementById('scorecardPanel');
+    if(sc) sc.style.opacity = '0.4';
+    var tier = document.getElementById('sc_score_tier');
+    if(tier) { tier.textContent = 'File Update Only'; tier.style.color = '#888'; }
+    var note = document.getElementById('apptype_score_note');
+    if(note) note.style.display = 'block';
   }
 }
 
 function getAppType() {
-  var el = document.getElementById('apptype_existing');
-  return (el && el.checked) ? 'existing_tenant' : 'new_housing';
+  var exEl = document.getElementById('apptype_existing');
+  var trEl = document.getElementById('apptype_transfer');
+  if(exEl && exEl.checked) return 'existing_tenant';
+  if(trEl && trEl.checked) return 'transfer_request';
+  return 'new_housing';
 }
 
 // ── Settings role locks ──
@@ -14247,16 +14276,22 @@ function confirmAssignment() {
   if(role==='housing_manager'&&app.status!=='mgr_approved'&&app.status!=='ed_approved'){showToast('HM recommendation required — status: '+app.status.replace(/_/g,' '));return;}
 
   // Write unit
+  var isTransferReq = (app.appType === 'transfer_request');
   u.assignedTo=app.id; u.assignedName=name; u.assignedDate=moveIn;
-  u.status='occupied'; u.tenantApprovedBy=role==='ed'?'Executive Director':'Housing Manager';
+  // For transfer requests: mark new unit as 'reserved' not 'occupied'
+  // Tenant stays in current unit until physical move
+  u.status = isTransferReq ? 'reserved' : 'occupied';
+  u.tenantApprovedBy=role==='ed'?'Executive Director':'Housing Manager';
   u.tenantApprovedAt=new Date().toISOString().split('T')[0];
   if(overrideNotes) u.assignmentOverrideNotes = overrideNotes;
+  if(isTransferReq) u.transferPending = true;
   allUnits[unitIdx]=u;
 
   // Write application
   allApps[appIdx].assignedUnit=unitId;
   allApps[appIdx].assignedAddress=(u.num+' '+u.street).trim();
   allApps[appIdx].status='assigned';
+  if(isTransferReq) allApps[appIdx].transferPending = true;
   if(overrideNotes) allApps[appIdx].assignmentOverrideNotes = overrideNotes;
 
   sbSaveUnit(allUnits.find(function(x){return x.id===unitId;})||{}).catch(function(){});
