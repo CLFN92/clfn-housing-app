@@ -15137,7 +15137,7 @@ async function startSignIn() {
     await loadAppDataFromSupabase();
     hidLoginScreen();
     showEmployeeHome();
-    showToast('Welcome, '+HOUSING_SESSION.name+' ('+HOUSING_SESSION.role+')');
+    console.log('[CLFN] Welcome, '+HOUSING_SESSION.name+' ('+HOUSING_SESSION.role+')');
 
   } catch(e) {
     console.error('[HOUSING LOGIN]', e);
