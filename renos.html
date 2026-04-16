@@ -827,8 +827,8 @@
           style="border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:border-color .15s;background:var(--bg);">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--muted);margin-bottom:4px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           <div style="font-size:12px;font-weight:600;color:var(--text);">Drag photos here or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">JPG, PNG, WEBP</div>
-          <input type="file" id="rp_photo_input" accept="image/*" multiple style="display:none;" onchange="handleRenoPhotoUpload(this)"/>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">JPG, PNG, WEBP, PDF</div>
+          <input type="file" id="rp_photo_input" accept="image/*,.pdf,application/pdf" multiple style="display:none;" onchange="handleRenoPhotoUpload(this)"/>
         </div>
       </div>
 
@@ -1561,8 +1561,8 @@
           style="border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:border-color .15s;background:var(--bg);">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--muted);margin-bottom:4px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           <div style="font-size:12px;font-weight:600;color:var(--text);">Drag photos here or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">JPG, PNG, WEBP</div>
-          <input type="file" id="rp_photo_input" accept="image/*" multiple style="display:none;" onchange="handleRenoPhotoUpload(this)"/>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">JPG, PNG, WEBP, PDF</div>
+          <input type="file" id="rp_photo_input" accept="image/*,.pdf,application/pdf" multiple style="display:none;" onchange="handleRenoPhotoUpload(this)"/>
         </div>
       </div>
 
@@ -1925,7 +1925,7 @@
           id="au_drop_zone" style="border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;background:var(--bg);"
           onclick="document.getElementById('au_photo_input').click()">
           <div style="font-size:13px;color:var(--muted);">Drag photos or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
-          <input type="file" id="au_photo_input" accept="image/*" multiple style="display:none;" onchange="handleAddUnitPhotoUpload(this)"/>
+          <input type="file" id="au_photo_input" accept="image/*,.pdf,application/pdf" multiple style="display:none;" onchange="handleAddUnitPhotoUpload(this)"/>
         </div>
       </div>
     </div>
@@ -3820,6 +3820,136 @@ function saveRenoProgress() {
   closeRenoProgress();
   renderRenosView();
   showToast('Progress updated');
+}
+
+
+// ── Reno Budget & Approval Modal ──
+function openRenoBudget(unitId) {
+  if(!unitId) return;
+  window._rbaUnitId = unitId;
+
+  var allUnits = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var u = allUnits.find(function(x){ return x.id===unitId; });
+  if(!u) return;
+
+  var sow = null;
+  sow = (window._sowCache && window._sowCache[unitId]) || null;
+
+  var approval = null;
+  approval = (window._renoBudget && window._renoBudget[unitId]) || null;
+
+  var budgetData = loadBudgetData() || getDefaultBudget();
+  var funder = u.funder || '';
+  var rule = RENO_FUND_RULES[funder] || RENO_FUND_RULES[''];
+  var totalCost = sow ? (parseFloat((sow.totalCost||'').replace(/[^0-9.]/g,''))||0) : 0;
+
+  // Header
+  document.getElementById('rba_unit_header').textContent = u.num+' '+u.street;
+
+  // Summary
+  var critItems = sow && sow.items ? sow.items.filter(function(it){ return CRITICAL_SOW_CATS.some(function(c){ return (it.category||'').includes(c); }); }) : [];
+  var critCost = critItems.reduce(function(s,it){ return s+(parseFloat(it.cost)||0); }, 0);
+  var nonCritCost = totalCost - critCost;
+  document.getElementById('rba_summary').innerHTML =
+    _rbaStat('💰 SOW Total', totalCost ? '$'+Math.round(totalCost).toLocaleString() : 'No SOW', '#111')
+   +_rbaStat('🔴 Critical Systems', critCost ? '$'+Math.round(critCost).toLocaleString() : '—', '#b91c1c')
+   +_rbaStat('🏠 Funder', rule.label, '#1d4ed8');
+
+  // Pool rule
+  document.getElementById('rba_pool_rule').textContent = rule.rule;
+
+  // Eligible pools with balances
+  var poolsHtml = '';
+  rule.pools.forEach(function(pid){
+    var pool = BUDGET_POOLS.find(function(p){ return p.id===pid; });
+    if(!pool) return;
+    var poolData = budgetData.pools[pid]||{allocated:0};
+    var allocated = poolData.allocated||0;
+    // Compute spent from approved renovations only
+    var spent = _getPoolSpent(pid);
+    var available = allocated - spent;
+    var pct = allocated>0 ? Math.min(100,Math.round((spent/allocated)*100)) : 0;
+    var barCol = available<=0?'#b91c1c':available<(allocated*0.2)?'#d97706':'#15803d';
+    poolsHtml += '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
+        +'<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:16px;">'+pool.icon+'</span><span style="font-size:13px;font-weight:700;color:var(--text);">'+pool.label+'</span></div>'
+        +'<div style="text-align:right;">'
+          +'<span style="font-size:13px;font-weight:800;color:'+(available>0?'#15803d':'#b91c1c')+';">$'+Math.max(0,Math.round(available)).toLocaleString()+'</span>'
+          +'<span style="font-size:11px;color:var(--muted);"> / $'+Math.round(allocated).toLocaleString()+' allocated</span>'
+        +'</div>'
+      +'</div>'
+      +'<div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">'
+        +'<div style="height:100%;width:'+pct+'%;background:'+barCol+';border-radius:3px;transition:width .3s;"></div>'
+      +'</div>'
+      +'</div>';
+  });
+  document.getElementById('rba_pools').innerHTML = poolsHtml || '<div style="font-size:12px;color:var(--muted);">No budget pools configured for this funder. Set allocations in Settings.</div>';
+
+  // Allocation input rows — critical first, then general
+  var allocHtml = '';
+  if(critItems.length) {
+    allocHtml += '<div style="font-size:11px;font-weight:700;color:#b91c1c;margin-bottom:4px;text-transform:uppercase;letter-spacing:.6px;">🔴 Critical Systems — Fund First</div>';
+    critItems.forEach(function(it,i){
+      var cost = parseFloat(it.cost)||0;
+      allocHtml += _rbaAllocRow('crit_'+i, it.category||'Critical item', cost, rule.pools, budgetData, approval);
+    });
+    allocHtml += '<div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:10px;margin-bottom:4px;text-transform:uppercase;letter-spacing:.6px;">Other Work Items</div>';
+  }
+  // General allocation input
+  allocHtml += _rbaAllocRow('general', 'Remaining / General Renovation', nonCritCost>0?nonCritCost:totalCost, rule.pools, budgetData, approval);
+  document.getElementById('rba_alloc_rows').innerHTML = allocHtml;
+  _updateRbaAllocSummary(totalCost, rule.pools, budgetData);
+
+  // Listen for changes
+  document.getElementById('rba_alloc_rows').querySelectorAll('input[type="number"]').forEach(function(inp){
+    inp.addEventListener('input', function(){ _updateRbaAllocSummary(totalCost, rule.pools, budgetData); });
+  });
+
+  // Rent-to-own repayment
+  var rtoSection = document.getElementById('rba_repayment_section');
+  rtoSection.style.display = rule.repayment ? 'block' : 'none';
+  if(approval && approval.repayment) {
+    var set = function(id,v){ var el=document.getElementById(id); if(el) el.value=v||''; };
+    set('rba_repay_amt', approval.repayment.amount);
+    set('rba_repay_monthly', approval.repayment.monthly);
+    set('rba_repay_start', approval.repayment.start);
+    set('rba_repay_notes', approval.repayment.notes);
+  }
+
+  // HM pre-fill
+  if(approval) {
+    var setF = function(id,v){ var el=document.getElementById(id); if(el) el.value=v||''; };
+    setF('rba_hm_name', approval.hmName);
+    setF('rba_hm_date', approval.hmDate);
+    setF('rba_hm_notes', approval.hmNotes);
+    setF('rba_ed_name', approval.edName);
+    setF('rba_ed_date', approval.edDate);
+    setF('rba_ed_notes', approval.edNotes);
+  } else {
+    ['rba_hm_name','rba_hm_date','rba_hm_notes','rba_ed_name','rba_ed_date','rba_ed_notes'].forEach(function(id){
+      var el=document.getElementById(id); if(el) el.value='';
+    });
+    var today = new Date().toISOString().slice(0,10);
+    var hmDate = document.getElementById('rba_hm_date'); if(hmDate) hmDate.value=today;
+  }
+
+  // Status badge
+  var badge = document.getElementById('rba_status_badge');
+  if(approval && approval.approved) {
+    badge.textContent='✓ Approved'; badge.style.background='#f0fdf4'; badge.style.color='#15803d';
+  } else if(approval && approval.overBudgetApproved) {
+    badge.textContent='✓ ED Over-Budget Approval'; badge.style.background='#fef9ec'; badge.style.color='#7a6000';
+  } else {
+    badge.textContent='Pending Approval'; badge.style.background='var(--bg)'; badge.style.color='var(--muted)';
+  }
+
+  var modal = document.getElementById('renoBudgetModal');
+  if(modal) modal.style.setProperty('display','flex','important');
+}
+
+function closeRenoBudget() {
+  var modal = document.getElementById('renoBudgetModal');
+  if(modal) modal.style.display='none';
 }
 
 (async function initRenos() {
