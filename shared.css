@@ -828,15 +828,7 @@ body.modal-open { overflow: hidden; position: fixed; width: 100%; }
    RESPONSIVE — iPad (768–1024px) & iPhone (< 480px)
    ══════════════════════════════════════════════════════ */
 
-/* All views: reduce padding on narrow screens */
-@media (max-width: 768px) {
-  #employeeHomeView,
-  #inventoryView, #matchView, #tenantsView,
-  #renosView, #contractorsView {
-    padding: 16px 14px !important;
-  }
-  #employeeHomeView h1 { font-size: 20px !important; }
-}
+/* 768px padding rules consolidated into 680px block */
 
 /* Tile grid: single column on phones */
 @media (max-width: 480px) {

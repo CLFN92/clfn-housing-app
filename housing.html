@@ -5303,7 +5303,7 @@ function hideAllViews(){
 function _showView(id, renderFn){
   hideAllViews();
   var v=document.getElementById(id);
-  if(v){v.style.display='flex';v.style.flexDirection='column';v.style.flex='1';}
+  if(v){v.style.display='flex';v.style.flexDirection='column';}
   if(renderFn) renderFn();
 }
 function setNavActive(id){
