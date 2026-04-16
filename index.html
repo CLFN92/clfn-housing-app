@@ -2492,7 +2492,48 @@ function renderRecentActivity(role) {
 
 document.addEventListener('DOMContentLoaded', function() {
   loadRememberedEmail();
-  // Always show login — module pages handle their own auth via sessionStorage
+
+  // Check for existing session — restore home screen if already logged in
+  var token    = null;
+  var savedRole = null;
+  var savedName = null;
+  try {
+    token     = sessionStorage.getItem('clfn_housing_token');
+    savedRole = sessionStorage.getItem('clfn_housing_role') || 'employee';
+    savedName = sessionStorage.getItem('clfn_housing_name') || '';
+  } catch(e) {}
+
+  if(token) {
+    // Session exists — restore role and show home
+    window.currentRole    = savedRole;
+    window._realRole      = savedRole;
+    window.currentRole    = savedRole;
+    if(window.CLFN_AUTH) {
+      window.CLFN_AUTH.isAuthenticated = true;
+      window.CLFN_AUTH.currentRole     = savedRole;
+    }
+    if(window.HOUSING_SESSION) {
+      window.HOUSING_SESSION.accessToken = token;
+      window.HOUSING_SESSION.name        = savedName;
+      window.HOUSING_SESSION.role        = savedRole;
+    }
+    // Update auth header
+    if(window.HOUSING_HEADERS) {
+      window.HOUSING_HEADERS['Authorization'] = 'Bearer ' + token;
+    }
+    if(typeof updateHeaderUser   === 'function') updateHeaderUser(savedRole);
+    if(typeof hidLoginScreen     === 'function') hidLoginScreen();
+    if(typeof loadAppDataFromSupabase === 'function') {
+      loadAppDataFromSupabase().then(function() {
+        if(typeof showEmployeeHome === 'function') showEmployeeHome();
+      });
+    } else {
+      if(typeof showEmployeeHome === 'function') showEmployeeHome();
+    }
+    return;
+  }
+
+  // No session — show login
   showLoginScreen();
 });
 </script>
