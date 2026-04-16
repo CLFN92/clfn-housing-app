@@ -7113,7 +7113,16 @@ function showScorecard(app){
   // Render rubric directly into sc_rubric_rows
   var scRubricEl=document.getElementById('sc_rubric_rows');
   if(scRubricEl){
-    renderRubricTable(rubricData, scRubricEl);
+    // Seed _lastScoreResult from stored breakdown so rubric renders without re-scoring
+    if(!window._lastScoreResult && app.scoreBreakdown) {
+      window._lastScoreResult = { score: app.score||0, tier: app.tier||'', breakdown: app.scoreBreakdown };
+    }
+    // If no V2 breakdown, fall back to legacy rubric
+    if(window._lastScoreResult && window._lastScoreResult.breakdown && window._lastScoreResult.breakdown.sectionA) {
+      renderRubricTableV2(window._lastScoreResult.breakdown, scRubricEl);
+    } else {
+      renderRubricTable(rubricData, scRubricEl);
+    }
   }
   var edAdj=bd.edAdjustment||app.edAdjustment||0;
   var edReason=bd.edAdjustReason||app.edAdjustReason||'';
