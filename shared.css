@@ -32,7 +32,7 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 /* ── LAYOUT ── */
 .layout{display:flex;min-height:calc(100vh - 64px);flex-direction:column;}
 .app-wrapper{display:flex;min-height:calc(100vh - 64px);background:var(--bg);}
-.content-area{flex:1;display:flex;flex-direction:column;min-width:0;align-items:stretch;}
+.content-area{flex:1;display:flex;flex-direction:column;min-width:0;align-items:center;}
 .dash-view{display:flex;padding:20px 16px;flex-direction:column;gap:16px;width:100%;box-sizing:border-box;max-width:1200px;margin:0 auto;}
 #appLayout{flex:1;display:flex;flex-direction:column;min-width:0;align-items:center;}
 
@@ -478,12 +478,7 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 
 
 /* ── App wrapper + content (mobile) ── */
-@media(max-width:768px){
-.app-wrapper { flex-direction: column; height: auto; min-height: calc(100vh - 64px); }
-.content-area { width: 100%; overflow-x: hidden; }
-.main { padding: 20px 16px; max-width: 100%; box-sizing: border-box; }
-.card { padding: 16px; }
-}
+/* old 768px block removed */
 
 /* ── Grid columns ── */
 .c2, .c3, .fg.c2, .fg.c3 { grid-template-columns: 1fr !important; }
@@ -520,25 +515,7 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 /* ── Tables on mobile — allow scroll ── */
 .dash-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-@media (min-width: 641px) {
-  /* Restore desktop styles */
-  .app-header  { padding: 0 24px; min-height: 64px; }
-  
-  
-  
-  .main        { padding: 36px 44px; max-width: 880px; }
-  .c2          { grid-template-columns: 1fr 1fr !important; }
-  .c3          { grid-template-columns: 1fr 1fr 1fr !important; }
-  .fg.c2       { grid-template-columns: 1fr 1fr !important; }
-  .fg.c3       { grid-template-columns: 1fr 1fr 1fr !important; }
-  .card        { padding: 24px; }
-  .dash-stats  { grid-template-columns: repeat(4, 1fr) !important; }
-  .settings-view { padding: 36px 44px !important; }
-  .settings-form { grid-template-columns: 1fr 1fr !important; }
-  .settings-form-row { grid-column: span 2 !important; }
-  #inv_table th:nth-child(7),
-  #inv_table td:nth-child(7) { display: table-cell; }
-}
+/* old 641px block removed */
 
 @media (min-width: 1024px) {
   .app-header { padding: 0 32px; }
