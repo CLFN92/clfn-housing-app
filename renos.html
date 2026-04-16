@@ -3349,13 +3349,13 @@ function rescoreAndSave() {
       method: 'PATCH',
       headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'return=minimal'}),
       body: JSON.stringify({ score: a.score || 0, tier: a.tier || 'Low Priority' })
-    }).then(function(){ count++; if(count===applications.length) showToast('\u2713 Rescored '+count+' applications'); })
+    }).then(function(){ count++; if(count===applications.length) console.log('[SCORE] Rescored '+count+' applications'); })
       .catch(function(){});
   });
   // Refresh UI
   if(typeof updateDashStats==='function') updateDashStats();
   if(typeof renderDashTable==='function') renderDashTable();
-  showToast('Rescoring '+applications.length+' applications\u2026');
+  console.log('[SCORE] Rescoring '+applications.length+' applications...');
 }
 
 function confirmResetScoringModelED() {

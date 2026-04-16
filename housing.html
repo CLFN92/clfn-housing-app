@@ -10543,7 +10543,7 @@ function rescoreAndSave() {
       method: 'PATCH',
       headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'return=minimal'}),
       body: JSON.stringify({ score: a.score || 0, tier: a.tier || 'Low Priority' })
-    }).then(function(){ count++; if(count===applications.length) showToast('\u2713 Rescored '+count+' applications'); })
+    }).then(function(){ count++; if(count===applications.length) console.log('[SCORE] Rescored '+count+' applications'); })
       .catch(function(){});
   });
   // Refresh UI
@@ -15345,7 +15345,7 @@ async function loadAppDataFromSupabase() {
     }
   } catch(e) {
     console.error('[CLFN Housing] loadAppData failed:',e);
-    showToast('\u26a0 Could not load data — using cached version');
+    console.warn('[CLFN] Could not load data — using cached version');
   }
 }
 
@@ -15614,8 +15614,8 @@ async function loadHousingData() {
       if(window._appSettings['scoring_model_v2']) window.liveV2ScoreModel=window._appSettings['scoring_model_v2'];
     }
     if(applications.length && typeof rescoreAllApplications==='function') rescoreAllApplications();
-    showToast('\u2713 Loaded '+applications.length+' apps, '+housingUnits.length+' units');
-  } catch(e){ console.warn('[HOUSING] data load error:',e); showToast('\u26a0 Could not load data'); }
+    console.log('[CLFN] Loaded '+applications.length+' apps, '+housingUnits.length+' units');
+  } catch(e){ console.warn('[HOUSING] data load error:',e); console.warn('[CLFN] Could not load data'); }
 }
 
 
