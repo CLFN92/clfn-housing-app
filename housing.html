@@ -4524,12 +4524,22 @@ function auditEntry(appId,action,detail,user){
       method: 'POST',
       headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'return=minimal'}),
       body: JSON.stringify({
-        entity_type: 'application',
-        entity_id: String(appId||''),
-        action: action,
-        details: JSON.stringify({detail:detail}),
-        actor: actor,
-        created_at: new Date().toISOString()
+        // New columns (app schema)
+        entity_type: appId && String(appId).startsWith('SOW:')      ? 'sow'
+                   : appId && String(appId).startsWith('CT:')        ? 'contractor'
+                   : appId && String(appId).startsWith('UNIT:')      ? 'unit'
+                   : appId && String(appId) === 'SETTINGS'           ? 'settings'
+                   : 'application',
+        entity_id:   String(appId||''),
+        action:      action,
+        details:     JSON.stringify({detail:detail}),
+        actor:       actor,
+        created_at:  new Date().toISOString(),
+        // Legacy columns (original table schema)
+        app_id:      String(appId||''),
+        detail:      detail,
+        user_role:   actor,
+        ts:          new Date().toISOString()
       })
     }).catch(function(e){ console.warn('Audit log save failed:',e); });
   }
@@ -10403,13 +10413,16 @@ async function renderAuditLog() {
     if(r.ok) {
       var rows = await r.json();
       log = rows.map(function(row) {
-        var d = JSON.parse(row.details||'{}');
+        // Handle both new columns and legacy column names
+        var detailsStr = row.details || '';
+        var d = {};
+        try { d = JSON.parse(detailsStr); } catch(e) {}
         return {
-          ts: row.created_at,
-          appId: row.entity_id||'',
-          action: row.action||'',
-          detail: d.detail||row.details||'',
-          user: row.actor||'Staff'
+          ts:     row.created_at || row.ts || '',
+          appId:  row.entity_id  || row.app_id || '',
+          action: row.action     || '',
+          detail: d.detail       || row.detail || detailsStr || '',
+          user:   row.actor      || row.user_role || 'Staff'
         };
       });
     }
