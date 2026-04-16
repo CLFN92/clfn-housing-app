@@ -3669,6 +3669,159 @@ function _restoreSigCanvas(canvasId, dataURL) {
   img.src = dataURL;
 }
 
+
+// ── Reno Progress Modal ──
+function openRenoProgress(unitId) {
+  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
+  var u = allUnits.find(function(x){ return x.id === unitId; });
+  if(!u) return;
+  var _rpUnitId = unitId;
+  window._rpUnitId = unitId;
+
+  // Populate header
+  var hdr = document.getElementById('rp_unit_header');
+  if(hdr) hdr.textContent = u.num + ' ' + u.street;
+
+  // SOW summary
+  var sow = null;
+  sow = (window._sowCache && window._sowCache[unitId]) || null;
+  var sumEl = document.getElementById('rp_sow_summary');
+  if(sumEl) {
+    if(sow && sow.items && sow.items.length) {
+      sumEl.innerHTML = '<div style="font-size:13px;color:var(--text);">SOW filed: '+sow.items.length+' items — <span style="color:var(--yellow);cursor:pointer;" data-opensow="1">View SOW →</span></div>';
+    } else {
+      sumEl.innerHTML = '<div style="font-size:13px;color:var(--muted);">No Scope of Work filed yet. <span style="color:var(--yellow);cursor:pointer;font-weight:700;" data-createsow="1">Create SOW →</span></div>';
+    }
+    // Wire SOW spans
+    if(sumEl){
+      var sp=sumEl.querySelector('[data-opensow]');
+      if(sp)sp.onclick=function(){openSowModal(unitId);};
+      var sp2=sumEl.querySelector('[data-createsow]');
+      if(sp2)sp2.onclick=function(){closeRenoProgress();openSowModal(unitId);};
+    }
+  }
+
+  // Progress data
+  var prog = null;
+  prog = (window._renoProgress && window._renoProgress[unitId]) || null;
+
+  // Overall progress bar
+  var pct = prog ? (prog.overallPct||0) : 0;
+  var pctEl = document.getElementById('rp_overall_pct');
+  var barEl = document.getElementById('rp_overall_bar');
+  var statusEl = document.getElementById('rp_status_label');
+  if(pctEl) pctEl.textContent = pct + '%';
+  if(barEl) barEl.style.width = pct + '%';
+  if(statusEl) statusEl.textContent = prog ? (prog.status||'In Progress') : 'Not Started';
+
+  // Populate editable fields
+  var sel = document.getElementById('rp_status_select');
+  var pctIn = document.getElementById('rp_pct_input');
+  var contr = document.getElementById('rp_contractor');
+  var tgt = document.getElementById('rp_target_date');
+  var notes = document.getElementById('rp_notes');
+  if(sel) sel.value = prog ? (prog.status||'Not Started') : 'Not Started';
+  if(pctIn) pctIn.value = pct||'';
+  if(contr) contr.value = prog ? (prog.contractor||'') : '';
+  var contrId = document.getElementById('rp_contractor_id');
+  if(contrId) contrId.value = prog ? (prog.contractorId||'') : '';
+  if(tgt) tgt.value = prog ? (prog.targetDate||'') : '';
+  if(notes) notes.value = '';  // Clear notes each time — it's for new updates
+
+  // Render photo preview (stored photos)
+  var photoPreview = document.getElementById('rp_photo_preview');
+  window._rpPendingPhotos = [];
+  if(photoPreview) {
+    var storedPhotos = prog ? (prog.photos||[]) : [];
+    photoPreview.innerHTML = storedPhotos.map(function(src, i) {
+      return '<div style="position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1px solid var(--border);">'
+        +'<img src="'+src+'" style="width:100%;height:100%;object-fit:cover;"/>'
+        +'<button type="button" onclick="removeRenoPhoto('+i+')" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;">✕</button>'
+        +'</div>';
+    }).join('');
+    window._rpStoredPhotos = storedPhotos.slice();
+  }
+
+  // Render update history
+  var histEl = document.getElementById('rp_history');
+  if(histEl) {
+    var updates = prog ? (prog.updates||[]) : [];
+    if(!updates.length) {
+      histEl.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0;">No updates yet.</div>';
+    } else {
+      histEl.innerHTML = updates.slice().reverse().map(function(u) {
+        return '<div style="padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">'
+          +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'
+          +'<span style="font-size:11px;font-weight:700;color:var(--text);">'+u.status+' — '+u.pct+'%</span>'
+          +'<span style="font-size:10px;color:var(--muted);">'+u.date+'</span>'
+          +'</div>'
+          +(u.notes?'<div style="font-size:12px;color:var(--muted);">'+u.notes+'</div>':'')
+          +(u.photos&&u.photos.length?'<div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;">'
+            +u.photos.map(function(s){return '<img src="'+s+'" style="width:48px;height:48px;object-fit:cover;border-radius:5px;border:1px solid var(--border);"/>';}).join('')
+            +'</div>':'')
+          +'</div>';
+      }).join('');
+    }
+  }
+
+  var modal = document.getElementById('renoProgressModal');
+  if(modal){ modal.style.removeProperty('display'); modal.style.setProperty('display','flex','important'); }
+  renderRenoScoreBadge(unitId);
+}
+
+function closeRenoProgress() {
+  var modal = document.getElementById('renoProgressModal');
+  if(modal) modal.style.display = 'none';
+  window._rpPendingPhotos = [];
+  window._rpStoredPhotos = [];
+}
+
+function saveRenoProgress() {
+  var unitId = window._rpUnitId;
+  if(!unitId) return;
+  var get = function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
+  var status   = get('rp_status_select') || 'Not Started';
+  var pct      = parseInt(get('rp_pct_input'))||0;
+  var notes    = get('rp_notes');
+  var contr    = get('rp_contractor');
+  var contrId  = (document.getElementById('rp_contractor_id')||{}).value||'';
+  var tgtDate  = get('rp_target_date');
+  var pending  = window._rpPendingPhotos || [];
+  var stored   = window._rpStoredPhotos || [];
+
+  // Load existing
+  var prog = null;
+  prog = (window._renoProgress && window._renoProgress[unitId]) || null;
+  if(!prog) prog = { updates:[], photos:[] };
+
+  // Append new update entry
+  var today = new Date().toISOString().slice(0,10);
+  if(notes || pending.length) {
+    prog.updates = prog.updates || [];
+    prog.updates.push({ date:today, status:status, pct:pct, notes:notes, photos:pending.slice() });
+  }
+
+  // Update top-level state
+  prog.status     = status;
+  prog.overallPct = pct;
+  prog.contractor   = contr;
+  prog.contractorId = contrId;
+  prog.targetDate = tgtDate;
+  prog.photos     = stored.concat(pending); // all photos
+
+  if(!window._renoProgress) window._renoProgress = {};
+  window._renoProgress[unitId] = prog;
+  fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress', {
+    method: 'POST',
+    headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
+    body: JSON.stringify({ unit_id: unitId, data: prog, updated_at: new Date().toISOString() })
+  }).catch(function(e){ console.warn('Reno progress save failed:',e); });
+
+  closeRenoProgress();
+  renderRenosView();
+  showToast('Progress updated');
+}
+
 (async function initRenos() {
   // ── Auth: check sessionStorage token (validated on login) ─────────────────
   var token = null;
