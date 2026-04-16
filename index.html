@@ -2121,7 +2121,6 @@ async function resolveHousingRole() {
       window.CLFN_AUTH.isAuthenticated = true;
       window.CLFN_AUTH.currentRole = housingRole;
       if(typeof switchRole==='function') switchRole(housingRole);
-      var rs=document.getElementById('roleSwitcher'); if(rs) rs.style.display='none';
       var sb=document.getElementById('header_addstaff_btn');
       if(sb) sb.style.display=(housingRole==='ed'||housingRole==='housing_manager')?'flex':'none';
       // Store real role and setup view-as toggle
@@ -2138,7 +2137,6 @@ async function resolveHousingRole() {
 function hidLoginScreen() {
   var ls=document.getElementById('loginScreen');
   if(ls) ls.style.display='none';
-  var rs=document.getElementById('roleSwitcher'); if(rs) rs.style.display='none';
 }
 
 function showLoginScreen() {
