@@ -960,6 +960,7 @@
     <button onclick="showSettingsSection('sec_budget')" id="stab_budget" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">💰 Reno Budget</button>
     <button onclick="showSettingsSection('sec_contacts')" id="stab_contacts" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">📧 Contacts</button>
     <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;display:none;">📋 Audit Log</button>
+    <button onclick="showSettingsSection('sec_occupancy')" id="stab_occupancy" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;display:none;">🏘 Occupancy</button>
   </div>
 
   <!-- ── USERS ── -->
@@ -1158,6 +1159,37 @@
         </table>
       </div>
     </div>
+  <!-- ── OCCUPANCY STANDARDS SECTION ── -->
+  <div id="sec_occupancy" class="settings-section" style="display:none;">
+    <div class="card" style="padding:0;overflow:hidden;border-color:var(--yellow);">
+      <div style="padding:16px 20px;background:var(--dark);border-bottom:2px solid var(--yellow);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--yellow);">🏘 National Occupancy Standard (NOS)</div>
+          <div style="font-size:11px;color:#888;font-weight:400;margin-top:3px;">ED only — maximum persons allowed per bedroom count. Used to auto-calculate overcrowding on applications.</div>
+        </div>
+        <button id="settings_save_nos_btn" onclick="saveNosTable()" style="background:var(--yellow);border:none;color:#111;padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save NOS Table</button>
+      </div>
+      <div style="padding:20px;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;padding:10px 14px;background:var(--bg);border-radius:8px;line-height:1.6;">
+          The NOS defines the maximum number of people that can appropriately occupy a unit of a given bedroom count.
+          An applicant's household is considered <strong>overcrowded</strong> when the total number of people exceeds the NOS maximum for their current home.
+          Each person over the standard earns 1 point (up to 10) on their application score.
+        </div>
+        <table style="width:100%;border-collapse:collapse;max-width:480px;">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border);">
+              <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Bedroom Count</th>
+              <th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Max Persons (NOS)</th>
+            </tr>
+          </thead>
+          <tbody id="nos_table_tbody"></tbody>
+        </table>
+        <div style="margin-top:16px;padding:10px 14px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--muted);">
+          <strong style="color:var(--text);">Note:</strong> Changes take effect immediately on the next application form score calculation. Existing stored scores are not affected until the next rescore.
+        </div>
+      </div>
+    </div>
+  </div>
   </div>
 
 </div>
@@ -4013,6 +4045,89 @@ function buildV2FormSelects() {
 }
 
 
+
+// ══════════════════════════════════════════════════════════════
+// NOS TABLE — National Occupancy Standard
+// ══════════════════════════════════════════════════════════════
+
+var DEFAULT_NOS_TABLE = {
+  '0': 1,   // Studio / no bedroom — 1 person max
+  '1': 2,   // 1 bedroom — 2 persons max
+  '2': 4,   // 2 bedrooms — 4 persons max
+  '3': 6,   // 3 bedrooms — 6 persons max
+  '4': 8,   // 4 bedrooms — 8 persons max
+  '5': 10   // 5+ bedrooms — 10 persons max
+};
+
+var NOS_BED_LABELS = {
+  '0': 'Studio / 0 bedrooms',
+  '1': '1 bedroom',
+  '2': '2 bedrooms',
+  '3': '3 bedrooms',
+  '4': '4 bedrooms',
+  '5': '5+ bedrooms'
+};
+
+function getNosTable() {
+  // Read from settings (loaded from Supabase), fall back to default
+  if(window._appSettings && window._appSettings['nos_table']) {
+    return Object.assign({}, DEFAULT_NOS_TABLE, window._appSettings['nos_table']);
+  }
+  return Object.assign({}, DEFAULT_NOS_TABLE);
+}
+
+function renderNosTable() {
+  var tbody = document.getElementById('nos_table_tbody');
+  if(!tbody) return;
+  var nos = getNosTable();
+  var isED = (window.currentRole === 'ed');
+
+  tbody.innerHTML = Object.keys(NOS_BED_LABELS).map(function(beds) {
+    var maxPeople = nos[beds] !== undefined ? nos[beds] : DEFAULT_NOS_TABLE[beds];
+    var label = NOS_BED_LABELS[beds];
+    return '<tr style="border-bottom:1px solid var(--border);">'
+      + '<td style="padding:10px 12px;font-size:13px;color:var(--text);">' + label + '</td>'
+      + '<td style="padding:10px 12px;text-align:center;">'
+      +   '<input type="number" data-nos-beds="' + beds + '" value="' + maxPeople + '" '
+      +     'min="1" max="20" step="1" '
+      +     (isED ? '' : 'disabled ')
+      +     'style="width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;'
+      +     'font-size:13px;font-weight:700;color:var(--text);text-align:center;'
+      +     'font-family:DM Sans,sans-serif;background:var(--surface);'
+      +     (isED ? '' : 'opacity:0.55;cursor:not-allowed;')
+      +     '"/>'
+      +   '<span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+function saveNosTable() {
+  if(window.currentRole !== 'ed') {
+    showToast('Only the Executive Director can update the NOS table.');
+    return;
+  }
+  var nos = {};
+  document.querySelectorAll('#nos_table_tbody input[data-nos-beds]').forEach(function(el) {
+    var beds = el.getAttribute('data-nos-beds');
+    nos[beds] = parseInt(el.value) || DEFAULT_NOS_TABLE[beds];
+  });
+
+  // Save to _appSettings and Supabase
+  if(!window._appSettings) window._appSettings = {};
+  window._appSettings['nos_table'] = nos;
+
+  sbSaveSetting('nos_table', nos).then(function(ok) {
+    if(ok) {
+      showToast('\u2713 NOS table saved');
+      auditEntry('SETTINGS', 'nos_table_save', 'NOS table updated by ED', 'Executive Director');
+    } else {
+      showToast('Save failed — check connection');
+    }
+  });
+}
+
+
 // ── Auto-calculate Persons Over Occupancy Standard ───────────────────────────
 function calcPersonsOverStandard() {
   // Count total household members
@@ -4021,9 +4136,16 @@ function calcPersonsOverStandard() {
   var coCount   = (coStatus === 'yes' || coStatus === 'y') ? 1 : 0;
   var totalPeople = 1 + coCount + habCount; // applicant + co-applicant + members
 
-  // NOS: max occupants allowed per bedroom count (Canada NOS standard)
-  // beds:  0   1   2   3   4   5
-  var nosMax  = [1,  2,  4,  6,  8,  10];
+  // NOS: max occupants allowed per bedroom count — read from settings
+  var nosSettings = (typeof getNosTable === 'function') ? getNosTable() : {'0':1,'1':2,'2':4,'3':6,'4':8,'5':10};
+  var nosMax = [
+    nosSettings['0'] || 1,
+    nosSettings['1'] || 2,
+    nosSettings['2'] || 4,
+    nosSettings['3'] || 6,
+    nosSettings['4'] || 8,
+    nosSettings['5'] || 10
+  ];
 
   // Determine how many bedrooms the applicant's current home has
   // We use the current unit's bedrooms if selected, otherwise estimate from people
@@ -9722,7 +9844,7 @@ function closeRenoBudget() {
 
 // ── Settings section tabs ──
 function showSettingsSection(section) {
-  var sections = ['sec_users','sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget','sec_contacts','sec_audit'];
+  var sections = ['sec_users','sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget','sec_contacts','sec_audit','sec_occupancy'];
   sections.forEach(function(id){
     var el=document.getElementById(id);
     if(el) el.style.display=(id===section)?'block':'none';
@@ -9741,6 +9863,7 @@ function showSettingsSection(section) {
   if(section==='sec_budget'      && typeof renderBudgetPools==='function') renderBudgetPools();
   if(section==='sec_contacts'    && typeof populateContactSettings==='function') populateContactSettings();
   if(section==='sec_audit'       && typeof renderAuditLog==='function') renderAuditLog();
+  if(section==='sec_occupancy'   && typeof renderNosTable==='function') renderNosTable();
 }
 
 function ctRenderPeople(people) {
@@ -10347,7 +10470,7 @@ function applySettingsRoleLocks() {
   var edOnlyBtns = [
     'settings_save_scoring_btn','settings_reset_scoring_btn','settings_add_criteria_btn',
     'settings_save_unit_btn','settings_save_reno_btn','settings_reset_reno_btn',
-    'settings_save_budget_btn',
+    'settings_save_budget_btn','settings_save_nos_btn',
   ];
   edOnlyBtns.forEach(function(id) {
     var el = document.getElementById(id);
@@ -10367,9 +10490,28 @@ function applySettingsRoleLocks() {
     if(locked) sec.insertAdjacentHTML('afterbegin', lockMsg);
   });
 
-  // Show/hide audit log tab (ED only)
+  // Show/hide ED-only tabs
   var auditTab = document.getElementById('stab_audit');
   if(auditTab) auditTab.style.display = isED ? '' : 'none';
+  var occTab = document.getElementById('stab_occupancy');
+  if(occTab) occTab.style.display = isED ? '' : 'none';
+
+  // Lock NOS inputs for non-ED
+  document.querySelectorAll('#nos_table_tbody input').forEach(function(el) {
+    el.disabled = locked;
+    el.style.opacity = locked ? '0.55' : '1';
+    el.style.cursor = locked ? 'not-allowed' : '';
+  });
+  var nosBtn = document.getElementById('settings_save_nos_btn');
+  if(nosBtn) nosBtn.style.display = locked ? 'none' : '';
+
+  // Add lock banner to occupancy section
+  var occSec = document.getElementById('sec_occupancy');
+  if(occSec) {
+    var existingOcc = occSec.querySelector('#settings_lock_banner');
+    if(existingOcc) existingOcc.remove();
+    if(locked) occSec.insertAdjacentHTML('afterbegin', lockMsg);
+  }
 }
 
 // ── ED-gated save wrappers with audit logging ──
