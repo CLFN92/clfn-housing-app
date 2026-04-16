@@ -1805,6 +1805,33 @@ function updateHeaderUser(role) {
   if(av) av.textContent = (HOUSING_SESSION.name||'S').charAt(0).toUpperCase();
   var rb = document.getElementById('header_role_badge');
   if(rb) rb.textContent = {employee:'Employee',housing_manager:'HM',ed:'ED'}[role]||role;
+
+  // Show Settings button for HM/ED
+  var sbtn = document.getElementById('header_settings_btn');
+  if(sbtn) sbtn.style.display = (role==='housing_manager'||role==='ed') ? 'inline-flex' : 'none';
+
+  // Show Add Staff button for ED
+  var abtn = document.getElementById('header_addstaff_btn');
+  if(abtn) abtn.style.display = (role==='ed') ? 'inline-flex' : 'none';
+
+  // Show role toggle for ED (can switch to view as HM)
+  var toggle = document.getElementById('header_role_toggle');
+  if(toggle) {
+    toggle.style.display = (role==='ed') ? 'flex' : 'none';
+    var sel = document.getElementById('header_view_as');
+    if(sel && role==='ed') {
+      sel.innerHTML = '<option value="">My Role (ED)</option><option value="housing_manager">View as HM</option><option value="employee">View as Employee</option>';
+      sel.value = '';
+    }
+  }
+}
+
+function headerSwitchViewAs(val) {
+  var role = val || (window._realRole || window.currentRole);
+  if(!window._realRole) window._realRole = window.currentRole;
+  switchRole(val ? val : window._realRole);
+  var sel = document.getElementById('header_view_as');
+  if(sel) sel.value = val;
 }
 function updateRoleSwitcherVisibility() {}
 function switchRole(role) {
