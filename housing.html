@@ -564,7 +564,7 @@
                 </div>
               </div>
             </div>
-            <input type="number" id="persons_over_standard" min="0" max="20" placeholder="0" oninput="triggerV2Score()"/>
+            <input type="number" id="persons_over_standard" min="0" max="20" placeholder="0" readonly style="background:var(--bg);cursor:default;color:var(--text);font-weight:600;" title="Auto-calculated from household size vs. NOS"/>
             <span style="font-size:11px;color:var(--muted);margin-top:3px;">Number of people over the NOS for your current home. 1 pt each, max 10 pts. Tap <strong>?</strong> for the occupancy table.</span>
           </div>
           <div class="f">
@@ -671,7 +671,7 @@
       <div id="step2_error_banner" class="step-error-banner"></div>
       <div class="card">
         <div class="ctitle">Co-Applicant Status</div>
-        <div class="f"><label>Co-Applicant Status</label><select id="co_status" onchange="var b=document.getElementById('coBlk');if(b)b.style.display=this.value==='yes'?'block':'none';"><option value="no">No Co-Applicant</option><option value="yes">Yes — Add Co-Applicant</option></select></div>
+        <div class="f"><label>Co-Applicant Status</label><select id="co_status" onchange="calcPersonsOverStandard();triggerV2Score();var b=document.getElementById('coBlk');if(b)b.style.display=this.value==='yes'?'block':'none';"><option value="no">No Co-Applicant</option><option value="yes">Yes — Add Co-Applicant</option></select></div>
         <div id="coBlk" style="display:none;">
           <div class="divider"></div>
           <div class="fg c2">
@@ -3195,6 +3195,8 @@ function addHab(){
     +'</select></div>'
     +'</div>';
   list.appendChild(div);
+  if(typeof calcPersonsOverStandard === "function") calcPersonsOverStandard();
+  if(typeof triggerV2Score === "function") triggerV2Score();
 }
 function addRef(){
   var list=document.getElementById('refList');
@@ -4010,11 +4012,58 @@ function buildV2FormSelects() {
   }
 }
 
+
+// ── Auto-calculate Persons Over Occupancy Standard ───────────────────────────
+function calcPersonsOverStandard() {
+  // Count total household members
+  var habCount  = document.querySelectorAll('#habList .rrow').length;
+  var coStatus  = (document.getElementById('co_status')||{}).value || 'no';
+  var coCount   = (coStatus === 'yes' || coStatus === 'y') ? 1 : 0;
+  var totalPeople = 1 + coCount + habCount; // applicant + co-applicant + members
+
+  // NOS: max occupants allowed per bedroom count (Canada NOS standard)
+  // beds:  0   1   2   3   4   5
+  var nosMax  = [1,  2,  4,  6,  8,  10];
+
+  // Determine how many bedrooms the applicant's current home has
+  // We use the current unit's bedrooms if selected, otherwise estimate from people
+  var currentUnit = document.getElementById('currentUnitId');
+  var currentBeds = 0;
+  if(currentUnit && currentUnit.value) {
+    var allUnits = (typeof housingUnits !== 'undefined') ? housingUnits : [];
+    var unit = allUnits.find(function(u){ return u.id === currentUnit.value; });
+    if(unit) currentBeds = parseInt(unit.bedrooms) || 0;
+  }
+  // If no current unit selected, use bedrooms field if available
+  if(!currentBeds) {
+    var bedsEl = document.getElementById('au_bedrooms') || document.getElementById('ue_bedrooms');
+    if(bedsEl) currentBeds = parseInt(bedsEl.value) || 0;
+  }
+
+  // Max people allowed in current home per NOS
+  var maxAllowed = nosMax[Math.min(currentBeds, nosMax.length-1)];
+  var over = Math.max(0, Math.min(10, totalPeople - maxAllowed));
+
+  // Update the field
+  var posEl = document.getElementById('persons_over_standard');
+  if(posEl) posEl.value = over;
+
+  // Update display counters
+  var occCo  = document.getElementById('occ_coapplicant'); if(occCo) occCo.textContent = coCount;
+  var occMem = document.getElementById('occ_members');    if(occMem) occMem.textContent = habCount;
+  var occTot = document.getElementById('occ_total');      if(occTot) occTot.textContent = totalPeople;
+  var scSize = document.getElementById('sc_size');        if(scSize) scSize.value = Math.min(7, Math.max(1, totalPeople));
+
+  return over;
+}
+
+
 async function triggerV2Score() {
   var appDate = (document.getElementById('appDate')||{}).value || '';
   var noPrior = (document.getElementById('no_prior_tenancy')||{}).value === 'true';
 
-  // Collect persons over standard — household size vs occupancy standard
+  // Auto-calculate persons over standard from household size
+  calcPersonsOverStandard();
   var personsOver = parseInt((document.getElementById('persons_over_standard')||{}).value || '0') || 0;
 
   // Dependents under 18 from habList
@@ -13074,8 +13123,8 @@ function selectCurrentUnit(el){
   var u = allUnits.find(function(x){ return x.id===id; });
   if(det) det.textContent = u ? u.bedrooms+'-bedroom · '+u.type : '';
   if(sel) sel.style.display='block';
+  if(typeof calcPersonsOverStandard === "function") { calcPersonsOverStandard(); triggerV2Score(); }
 }
-
 function saveApplicant(){ /* auto-save stub - data saved on submit */ }
 function nextStep(){ if(typeof goTo==='function'){ var c=document.getElementById('cur'); goTo((parseInt((c&&c.value)||0)+1)); } }
 function prevStep(){ if(typeof goTo==='function'){ var c=document.getElementById('cur'); goTo((parseInt((c&&c.value)||1)-1)); } }
