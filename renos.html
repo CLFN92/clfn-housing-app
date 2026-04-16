@@ -3824,6 +3824,96 @@ function saveRenoProgress() {
 
 
 // ── Reno Budget & Approval Modal ──
+
+
+function _rbaAllocRow(key, label, suggestedCost, eligiblePools, budgetData, approval) {
+  var prevAlloc = approval && approval.allocations && approval.allocations[key];
+  var poolOpts = eligiblePools.map(function(pid){
+    var pool = BUDGET_POOLS.find(function(p){ return p.id===pid; });
+    return '<option value="'+pid+'"'+(prevAlloc&&prevAlloc.pool===pid?' selected':'')+'>'+((pool&&pool.label)||pid)+'</option>';
+  }).join('');
+  return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;">'
+    +'<div style="font-size:13px;font-weight:600;color:var(--text);">'+label+'</div>'
+    +'<select id="rba_pool_'+key+'" style="padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:12px;font-family:\'DM Sans\',sans-serif;background:var(--surface);color:var(--text);">'+poolOpts+'</select>'
+    +'<input type="number" id="rba_amt_'+key+'" value="'+(prevAlloc?prevAlloc.amount:Math.round(suggestedCost))+'" min="0" step="100" '
+      +'style="width:110px;padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;text-align:right;background:var(--surface);color:var(--text);" placeholder="$"/>'
+    +'</div>';
+}
+function _rbaStat(label, value, col) {
+  return '<div style="text-align:center;">'
+    +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:4px;">'+label+'</div>'
+    +'<div style="font-size:16px;font-weight:800;color:'+col+';">'+value+'</div>'
+    +'</div>';
+}
+function _getPoolSpent(pid) {
+  // Sum all previously approved reno budgets for this pool
+  var total = 0;
+  var allUnits = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  allUnits.forEach(function(u){
+    try{
+      var approval = (window._renoBudget && window._renoBudget[u.id]) || null;
+      if(!approval || !approval.allocations) return;
+      Object.keys(approval.allocations).forEach(function(key){
+        var a = approval.allocations[key];
+        if(a.pool===pid) total += parseFloat(a.amount)||0;
+      });
+    }catch(e){}
+  });
+  return total;
+}
+function _updateRbaAllocSummary(totalCost, eligiblePools, budgetData) {
+  var totalAlloc = 0;
+  document.querySelectorAll('#rba_alloc_rows input[type="number"]').forEach(function(inp){
+    totalAlloc += parseFloat(inp.value)||0;
+  });
+  var diff = totalAlloc - totalCost;
+  var overBudget = false;
+
+  // Check per-pool over-budget
+  var poolTotals = {};
+  document.querySelectorAll('#rba_alloc_rows [id^="rba_pool_"]').forEach(function(sel){
+    var key = sel.id.replace('rba_pool_','');
+    var amtEl = document.getElementById('rba_amt_'+key);
+    var amt = parseFloat((amtEl&&amtEl.value)||0)||0;
+    var pid = sel.value;
+    poolTotals[pid] = (poolTotals[pid]||0)+amt;
+  });
+
+  var poolWarnings = [];
+  eligiblePools.forEach(function(pid){
+    var pool = BUDGET_POOLS.find(function(p){ return p.id===pid; });
+    var poolData = budgetData.pools[pid]||{allocated:0};
+    var allocated = poolData.allocated||0;
+    var spent = _getPoolSpent(pid);
+    var available = allocated - spent;
+    var using = poolTotals[pid]||0;
+    if(using > available) {
+      overBudget = true;
+      poolWarnings.push((pool?pool.label:pid)+' is over available balance by $'+Math.round(using-available).toLocaleString());
+    }
+  });
+
+  var summaryEl = document.getElementById('rba_alloc_summary');
+  var overBudgetSection = document.getElementById('rba_over_budget_section');
+  var statusBadge = document.getElementById('rba_status_badge');
+
+  if(overBudget) {
+    summaryEl.style.background='#fef2f2'; summaryEl.style.border='1px solid #b91c1c';
+    summaryEl.innerHTML = '<div style="color:#b91c1c;font-weight:700;margin-bottom:4px;">⚠️ Over Budget</div>'
+      +'<div style="font-size:11px;color:#b91c1c;">'+poolWarnings.join('<br/>')+'</div>';
+    overBudgetSection.style.display='block';
+    var msg = document.getElementById('rba_over_budget_msg');
+    if(msg) msg.textContent = 'The allocated amounts exceed available pool balances. Executive Director approval and written justification are required.';
+    statusBadge.textContent='Over Budget — ED Approval Required'; statusBadge.style.background='#fef2f2'; statusBadge.style.color='#b91c1c';
+  } else {
+    summaryEl.style.background='#f0fdf4'; summaryEl.style.border='1px solid #bbf7d0';
+    summaryEl.innerHTML = '<div style="color:#15803d;font-weight:700;">✓ Within Budget</div>'
+      +'<div style="font-size:11px;color:#15803d;">Total allocated: $'+Math.round(totalAlloc).toLocaleString()+' of $'+Math.round(totalCost).toLocaleString()+' SOW cost</div>';
+    overBudgetSection.style.display='none';
+    statusBadge.textContent='Pending Approval'; statusBadge.style.background='var(--bg)'; statusBadge.style.color='var(--muted)';
+  }
+}
+
 function openRenoBudget(unitId) {
   if(!unitId) return;
   window._rbaUnitId = unitId;
