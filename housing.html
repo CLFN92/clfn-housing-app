@@ -53,10 +53,12 @@
   </div>
   <!-- User info bar -->
   <div id="header_user_bar" style="display:flex;align-items:center;gap:10px;margin-left:auto;">
-    <div id="roleSwitcher" style="display:none;align-items:center;gap:4px;">
-      <button id="rb_employee" onclick="switchRole('employee')" title="View as Employee" style="width:28px;height:28px;border-radius:50%;background:transparent;border:1px solid #333;color:#888;font-size:9px;font-weight:800;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .15s;">ST</button>
-      <button id="rb_housing_manager" onclick="switchRole('housing_manager')" title="View as Housing Manager" style="width:28px;height:28px;border-radius:50%;background:transparent;border:1px solid #333;color:#888;font-size:9px;font-weight:800;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .15s;">HM</button>
-      <button id="rb_ed" onclick="switchRole('ed')" title="View as Executive Director" style="width:28px;height:28px;border-radius:50%;background:var(--yellow);border:none;color:#111;font-size:9px;font-weight:800;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .15s;">ED</button>
+    <div id="roleSwitcher" style="display:none;align-items:center;gap:6px;">
+      <select id="rb_select" onchange="switchRole(this.value)" style="padding:4px 8px;border:1px solid #444;border-radius:8px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;background:#1a1a18;color:#ccc;cursor:pointer;outline:none;">
+        <option value="ed">Executive Director</option>
+        <option value="housing_manager">Housing Manager</option>
+        <option value="employee">Employee</option>
+      </select>
     </div>
     <div id="header_user_pill" style="display:flex;align-items:center;gap:8px;background:#1a1a18;border:1px solid #333;border-radius:20px;padding:5px 12px 5px 6px;">
       <div id="header_avatar" style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">—</div>
@@ -13187,10 +13189,8 @@ function getRole(){ return window.CLFN_AUTH.getRole(); }
 function switchRole(role){
   approvalRole=role;
   window.currentRole=role;
-  ['employee','housing_manager','ed'].forEach(function(r){
-    var btn=document.getElementById('rb_'+r);
-    if(btn){btn.style.background=r===role?'var(--yellow)':'transparent';btn.style.color=r===role?'#111':'#888';btn.style.border=r===role?'none':'1px solid #333';}
-  });
+  var rbSel=document.getElementById('rb_select');
+  if(rbSel) rbSel.value=role;
   var roleLabels={employee:'Employee',housing_manager:'Housing Manager',ed:'Executive Director'};
   var hud=document.getElementById('header_user_display');
   if(hud) hud.textContent=roleLabels[role]||role;

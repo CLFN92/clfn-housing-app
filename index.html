@@ -1092,10 +1092,12 @@ body{font-family:'DM Sans',sans-serif;background:#fafaf8;color:#111;font-size:14
   </div>
   <!-- User info bar -->
   <div id="header_user_bar" style="display:flex;align-items:center;gap:10px;margin-left:auto;">
-    <div id="roleSwitcher" style="display:none;align-items:center;gap:4px;">
-      <button id="rb_employee" onclick="switchRole('employee')" title="View as Employee" style="width:28px;height:28px;border-radius:50%;background:transparent;border:1px solid #333;color:#888;font-size:9px;font-weight:800;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .15s;">ST</button>
-      <button id="rb_housing_manager" onclick="switchRole('housing_manager')" title="View as Housing Manager" style="width:28px;height:28px;border-radius:50%;background:transparent;border:1px solid #333;color:#888;font-size:9px;font-weight:800;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .15s;">HM</button>
-      <button id="rb_ed" onclick="switchRole('ed')" title="View as Executive Director" style="width:28px;height:28px;border-radius:50%;background:var(--yellow);border:none;color:#111;font-size:9px;font-weight:800;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .15s;">ED</button>
+    <div id="roleSwitcher" style="display:none;align-items:center;gap:6px;">
+      <select id="rb_select" onchange="switchRole(this.value)" style="padding:4px 8px;border:1px solid #444;border-radius:8px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;background:#1a1a18;color:#ccc;cursor:pointer;outline:none;">
+        <option value="ed">Executive Director</option>
+        <option value="housing_manager">Housing Manager</option>
+        <option value="employee">Employee</option>
+      </select>
     </div>
     <div id="header_user_pill" style="display:flex;align-items:center;gap:8px;background:#1a1a18;border:1px solid #333;border-radius:20px;padding:5px 12px 5px 6px;">
       <div id="header_avatar" style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">—</div>
@@ -2268,15 +2270,18 @@ function showEmployeeHome(){
     var sowPendingHM=0, sowPendingED=0, sowApproved=0, sowNoSow=0, sowInProgress=0;
     try {
       var allU=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-      var renoUnits=allU.filter(function(u){return (u.status==='under_repair'||u.status==='condemned')&&!u.archived;});
       var hmLimit2=parseFloat(((window._appSettings||{}).hmBudgetLimit)||25000);
-      renoUnits.forEach(function(u){
-        var sow=null; sow = (window._sowCache && window._sowCache[u.id]) || null;
-        var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
-        if(!sow){sowNoSow++;return;}
+      var sowCache=window._sowCache||{};
+      // Iterate ALL units that have a SOW filed
+      Object.keys(sowCache).forEach(function(unitId){
+        var sow=sowCache[unitId];
+        if(!sow) return;
+        var u=allU.find(function(x){return x.id===unitId;})||{id:unitId};
+        if(u.archived) return;
+        var prog=(window._renoProgress&&window._renoProgress[unitId])||null;
         var cost=parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))||0;
-        var hmDec=(u.unitHmSig&&u.unitHmSig.decision)||'';
-        var edDec=(u.unitEdSig&&u.unitEdSig.decision)||'';
+        var hmDec=(sow.unitHmSig&&sow.unitHmSig.decision)||(u.unitHmSig&&u.unitHmSig.decision)||'';
+        var edDec=(sow.unitEdSig&&sow.unitEdSig.decision)||(u.unitEdSig&&u.unitEdSig.decision)||'';
         var needsED=cost>hmLimit2;
         if(prog&&(prog.overallPct||0)>=100){sowInProgress++; return;}
         if(prog&&(prog.overallPct||0)>0){sowInProgress++; return;}
@@ -2284,7 +2289,7 @@ function showEmployeeHome(){
         else if(hmDec==='approved'&&needsED){sowPendingED++;}
         else{sowPendingHM++;}
       });
-    }catch(e){}
+    }catch(e){console.warn('reno tile stats:',e);}
     var renoTile = tile('🔨','Renovations','showRenos()','#d97706',
       makeStat('Under Repair', underRepair, underRepair>0?'alert':'good') +
       makeStat('Condemned',    condemned,   condemned>0?'alert':'good') +
