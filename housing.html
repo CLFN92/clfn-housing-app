@@ -2399,7 +2399,8 @@ async function sbLoadApplications() {
         tenancyConduct:      row.tenancy_conduct        || (row.data||{}).tenancyConduct       || 'no_history',
         // V2 scoring outputs
         score_v2:            row.score_v2   !== undefined ? row.score_v2  : (row.data||{}).score_v2,
-        tier_v2:             row.tier_v2                 || (row.data||{}).tier_v2
+        tier_v2:             row.tier_v2                 || (row.data||{}).tier_v2,
+        scoreBreakdown:      row.score_breakdown_v2      || (row.data||{}).scoreBreakdown || null
       });
     });
   } catch(e) { console.warn('[SB] load applications failed:', e); return null; }
@@ -3031,8 +3032,7 @@ function goTo(s){
   if(s===7){ goTo(8); return; }
   if(s===8){
     setTimeout(function(){
-      autoPopulateScore();
-      calcScore();
+      triggerV2Score();
       // Populate review summary + approval flow
       if(typeof popReview === 'function') popReview();
       // Show/hide co-applicant signature block based on current co_status
@@ -4451,7 +4451,7 @@ function autoPopulateScore(){
     renos:0,renos_amt:renosCost,arrears:0,arrears_amt:arrealAmt,payment:0,payment_months:payDur,
   };
 
-  calcScore();
+  triggerV2Score();
 }
 
 // ── calcScore ──
@@ -10330,7 +10330,7 @@ function onAppTypeChange() {
     if(sc2) sc2.style.opacity = '';
     var note2 = document.getElementById('apptype_score_note');
     if(note2) note2.style.display = 'none';
-    if(typeof calcScore === 'function') calcScore();
+    if(typeof triggerV2Score === 'function') triggerV2Score();
   } else {
     var sc = document.getElementById('scorecardPanel');
     if(sc) sc.style.opacity = '0.4';
@@ -10549,23 +10549,22 @@ function saveScoringModelED() {
     showToast('Application scoring model saved.');
   });
 }
-function rescoreAndSave() {
+async function rescoreAndSave() {
   if(typeof rescoreAllApplications !== 'function') return;
-  rescoreAllApplications();
-  // Push to Supabase
-  var count = 0;
-  applications.forEach(function(a) {
-    fetch(SUPABASE_URL+'/rest/v1/housing_applications?id=eq.'+a.id, {
-      method: 'PATCH',
-      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'return=minimal'}),
-      body: JSON.stringify({ score: a.score || 0, tier: a.tier || 'Low Priority' })
-    }).then(function(){ count++; if(count===applications.length) console.log('[SCORE] Rescored '+count+' applications'); })
-      .catch(function(){});
-  });
-  // Refresh UI
-  if(typeof updateDashStats==='function') updateDashStats();
-  if(typeof renderDashTable==='function') renderDashTable();
-  console.log('[SCORE] Rescoring '+applications.length+' apps...');
+  var btn = document.getElementById('settings_save_scoring_btn');
+  if(btn) { btn.disabled = true; btn.textContent = 'Rescoring...'; }
+  try {
+    await rescoreAllApplications();
+    showToast('✓ Rescored ' + applications.length + ' applications');
+    if(typeof updateDashStats==='function') updateDashStats();
+    if(typeof renderDashTable==='function') renderDashTable();
+    if(typeof renderMatchView==='function') renderMatchView();
+  } catch(e) {
+    showToast('Rescore failed — check console');
+    console.error('[SCORE] rescoreAndSave error:', e);
+  } finally {
+    if(btn) { btn.disabled = false; btn.textContent = '↺ Rescore All Applications'; }
+  }
 }
 
 function confirmResetScoringModelED() {
@@ -12253,7 +12252,7 @@ function finalSubmit(){
     : 'New housing application submitted by applicant — awaiting Housing Manager review';
   auditEntry(currentAppId||'new', actionLabel, detail, 'Applicant');
   closeModal();approvalState='submitted';renderApprovalFlow();
-  autoPopulateScore();calcScore();
+  triggerV2Score();
   var id=saveApplicationRecord();
   var submittedApp = applications.find(function(a){ return a.id === id; }) || null;
   sendWorkflowEmail('submit', submittedApp);
