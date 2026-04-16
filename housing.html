@@ -54,7 +54,7 @@
   <!-- User info bar -->
   <div id="header_user_bar" style="display:flex;align-items:center;gap:10px;margin-left:auto;">
     <div id="roleSwitcher" style="display:none;align-items:center;gap:6px;">
-      <select id="rb_select" onchange="switchRole(this.value)" style="padding:4px 8px;border:1px solid #444;border-radius:8px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;background:#1a1a18;color:#ccc;cursor:pointer;outline:none;">
+      <select id="rb_select" onchange="switchRole(this.value)" style="padding:5px 10px;border:1px solid #444;border-radius:8px;font-size:12px;font-weight:600;font-family:DM Sans,sans-serif;background:#1a1a18;color:#ccc;cursor:pointer;outline:none;">
         <option value="ed">Executive Director</option>
         <option value="housing_manager">Housing Manager</option>
         <option value="employee">Employee</option>
@@ -9930,12 +9930,7 @@ function ctGetPeople() {
   return people.filter(function(p){ return p && (p.name||p.phone||p.email); });
 }
 
-function updateRoleSwitcherVisibility() {
-  // Hide role switcher when a real session is active
-  var rs = document.getElementById('roleSwitcher');
-  if(!rs) return;
-  rs.style.display = 'none';
-}
+function updateRoleSwitcherVisibility() { /* no-op — dropdown handled by updateHeaderUser */ }
 
 function updateHeaderUser(role) {
   var roleLabels = {employee:'Employee', housing_manager:'Housing Manager', ed:'Executive Director'};
@@ -13527,11 +13522,7 @@ function renderAddUnitPhotoPreview() {
 // ══════════════════════════════════════════════════════
 // MISSING HEADER ELEMENT — header_user_display
 // ══════════════════════════════════════════════════════
-// Patch switchRole to use header_user_name if header_user_display doesn't exist
-(function() {
-  var orig = window.updateHeaderUser;
-  if (typeof orig === 'function') return; // already defined elsewhere
-})();
+
 
 // ══════════════════════════════════════════════════════
 // PHOTO DRAG/DROP HELPERS (addUnitModal)
@@ -15204,7 +15195,7 @@ async function resolveHousingRole() {
       window.CLFN_AUTH.isAuthenticated = true;
       window.CLFN_AUTH.currentRole = housingRole;
       if(typeof switchRole==='function') switchRole(housingRole);
-      var rs=document.getElementById('roleSwitcher'); if(rs) rs.style.display='none';
+      /* roleSwitcher managed by updateHeaderUser */
       var sb=document.getElementById('header_addstaff_btn');
       if(sb) sb.style.display=(housingRole==='ed'||housingRole==='housing_manager')?'flex':'none';
       // Store real role and setup view-as toggle
@@ -15241,7 +15232,7 @@ function showLoginScreen() {
 function hidLoginScreen() {
   var ls=document.getElementById('loginScreen');
   if(ls) ls.style.display='none';
-  var rs=document.getElementById('roleSwitcher'); if(rs) rs.style.display='none';
+  /* roleSwitcher managed by updateHeaderUser */
 }
 
 // ── Global in-memory caches for Supabase data ───────────────────────────────

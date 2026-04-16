@@ -595,9 +595,6 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
   /* Dashboard stats bar — 2x2 grid */
   .dash-stats { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
 
-  /* Role switcher — smaller */
-  #roleSwitcher { padding: 8px 10px; bottom: 10px; right: 10px; }
-  #roleSwitcher button { padding: 4px 8px; font-size: 10px !important; }
 
   /* Inventory table — hide non-essential columns */
   #inv_table .col-hide-mobile { display: none; }
@@ -962,12 +959,6 @@ body.modal-open { overflow: hidden; position: fixed; width: 100%; }
   #scorecardView > div:nth-child(2) { padding: 14px 14px 40px !important; }
 }
 
-/* Role switcher: smaller on mobile */
-@media (max-width: 480px) {
-  #roleSwitcher { bottom: 10px; right: 10px; padding: 8px 10px; }
-  #roleSwitcher button { padding: 4px 7px; font-size: 10px !important; }
-  #roleSwitcher > div:first-child { font-size: 9px !important; margin-bottom: 5px !important; }
-}
 
 /* safe-area support for iPhone X+ */
 @supports (padding: env(safe-area-inset-bottom)) {
@@ -1093,7 +1084,7 @@ body{font-family:'DM Sans',sans-serif;background:#fafaf8;color:#111;font-size:14
   <!-- User info bar -->
   <div id="header_user_bar" style="display:flex;align-items:center;gap:10px;margin-left:auto;">
     <div id="roleSwitcher" style="display:none;align-items:center;gap:6px;">
-      <select id="rb_select" onchange="switchRole(this.value)" style="padding:4px 8px;border:1px solid #444;border-radius:8px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;background:#1a1a18;color:#ccc;cursor:pointer;outline:none;">
+      <select id="rb_select" onchange="switchRole(this.value)" style="padding:5px 10px;border:1px solid #444;border-radius:8px;font-size:12px;font-weight:600;font-family:DM Sans,sans-serif;background:#1a1a18;color:#ccc;cursor:pointer;outline:none;">
         <option value="ed">Executive Director</option>
         <option value="housing_manager">Housing Manager</option>
         <option value="employee">Employee</option>
