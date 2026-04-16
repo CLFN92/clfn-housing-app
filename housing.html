@@ -544,7 +544,7 @@
         <div class="fg c2">
           <div class="f">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-              <label style="margin:0;">Persons Over Occupancy Standard</label>
+              <label style="margin:0;">Persons Over Occupancy Standard <span style="font-size:10px;font-weight:600;background:#eff6ff;color:#1d4ed8;padding:2px 7px;border-radius:10px;letter-spacing:.3px;vertical-align:middle;">AUTO</span></label>
               <div style="position:relative;display:inline-block;">
                 <button type="button" onclick="var t=document.getElementById('occ_tip');t.style.display=t.style.display==='block'?'none':'block';" style="width:18px;height:18px;border-radius:50%;background:var(--border);border:none;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-family:DM Sans,sans-serif;">?</button>
                 <div id="occ_tip" style="display:none;position:absolute;left:0;top:24px;width:320px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;z-index:200;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
@@ -565,7 +565,7 @@
               </div>
             </div>
             <input type="number" id="persons_over_standard" min="0" max="20" placeholder="0" readonly style="background:var(--bg);cursor:default;color:var(--text);font-weight:600;" title="Auto-calculated from household size vs. NOS"/>
-            <span style="font-size:11px;color:var(--muted);margin-top:3px;">Number of people over the NOS for your current home. 1 pt each, max 10 pts. Tap <strong>?</strong> for the occupancy table.</span>
+            <span style="font-size:11px;color:var(--muted);margin-top:3px;"><span style="color:#1d4ed8;font-weight:600;">&#x21BA; Auto-calculated</span> &#8212; updates as members and co-applicant are added. Based on total household size vs. the NOS for your current home. 1 pt per person over the standard, max 10 pts. Tap <strong>?</strong> for the NOS table.</span>
           </div>
           <div class="f">
             <label>Income Stability</label>
