@@ -3774,7 +3774,7 @@ async function rescoreAllApplications() {
           headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON },
           body: JSON.stringify({ application: appData })
         });
-        if (!resp.ok) return;
+        if (!resp.ok) { console.warn('[V2 rescore] HTTP', resp.status, 'for app', app.id); return; }
         var result = await resp.json();
 
         // Apply live tier thresholds
@@ -10556,6 +10556,11 @@ async function rescoreAndSave() {
   try {
     await rescoreAllApplications();
     showToast('✓ Rescored ' + applications.length + ' applications');
+    // Refresh open scorecard if visible
+    if(window._currentScorecardApp) {
+      var fresh = applications.find(function(a){ return a.id === window._currentScorecardApp.id; });
+      if(fresh && typeof showScorecard === 'function') showScorecard(fresh);
+    }
     if(typeof updateDashStats==='function') updateDashStats();
     if(typeof renderDashTable==='function') renderDashTable();
     if(typeof renderMatchView==='function') renderMatchView();
