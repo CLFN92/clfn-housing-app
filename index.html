@@ -1870,6 +1870,114 @@ function wireDashTable()          {}
 function showScorecard()          {}
 function renderDashTable()        {}
 function updateDashStats()        {}
+
+// ── Header handlers (used on the app shell after login) ────────────────────
+function headerSignOut() {
+  if(!confirm('Sign out of CLFN Housing?')) return;
+  // doLogout is defined later in this file — call it if present, otherwise clear manually
+  if(typeof doLogout === 'function') { doLogout(); return; }
+  try {
+    sessionStorage.removeItem('clfn_housing_token');
+    sessionStorage.removeItem('clfn_housing_role');
+    sessionStorage.removeItem('clfn_housing_name');
+    sessionStorage.removeItem('clfn_housing_email_session');
+  } catch(e){}
+  window.location.reload();
+}
+function toggleHeaderExportMenu() {
+  var m = document.getElementById('header_export_menu');
+  if(!m) return;
+  var open = m.style.display !== 'none';
+  m.style.display = open ? 'none' : 'block';
+  if(!open) {
+    setTimeout(function(){
+      document.addEventListener('click', function closeMenu(e){
+        var wrap = document.getElementById('header_export_wrap');
+        if(wrap && !wrap.contains(e.target)){
+          m.style.display='none';
+          document.removeEventListener('click', closeMenu);
+        }
+      });
+    }, 10);
+  }
+}
+function headerExport(format) {
+  var m = document.getElementById('header_export_menu');
+  if(m) m.style.display='none';
+  // index.html shows the home page — export lives on housing.html views
+  navigateTo('housing.html',{view:window._currentExportView||'inventory',export:format});
+}
+function showAddHousingStaff() {
+  var role = window.currentRole || 'employee';
+  if(role !== 'housing_manager' && role !== 'ed') {
+    if(typeof showToast==='function') showToast('Staff management is only accessible to the Housing Manager and Executive Director.');
+    return;
+  }
+  navigateTo('housing.html',{view:'settings',section:'users'});
+}
+// ── Approval modal stubs (modal markup exists in index.html but is currently unused) ──
+function closeApprovalModal() {
+  var m = document.getElementById('approvalModal');
+  if(m) m.style.display='none';
+}
+function confirmApprovalAction() {
+  // Placeholder — approval actions happen on housing.html. If the modal is opened
+  // on index.html, we simply close it and let the user continue to the main app.
+  closeApprovalModal();
+}
+// ── Verification / password reset (Supabase auth endpoints) ──
+async function resendVerification() {
+  var msgEl = document.getElementById('verify-msg');
+  var email = '';
+  var dispEl = document.getElementById('verify-email-display');
+  if(dispEl) email = (dispEl.textContent||'').trim();
+  if(!email){
+    if(msgEl){ msgEl.textContent = 'No email address on file. Please sign in again.'; msgEl.style.color = '#fca5a5'; msgEl.style.display=''; }
+    return;
+  }
+  if(msgEl){ msgEl.textContent = 'Sending…'; msgEl.style.color = '#888'; msgEl.style.display=''; }
+  try {
+    var r = await fetch(SUPABASE_URL+'/auth/v1/resend',{
+      method:'POST',
+      headers:{ 'apikey':SUPABASE_ANON, 'Content-Type':'application/json' },
+      body:JSON.stringify({ type:'signup', email:email })
+    });
+    if(!r.ok){
+      var d; try { d = await r.json(); } catch(e){ d = {}; }
+      throw new Error(d.error_description||d.msg||'Could not resend verification email');
+    }
+    if(msgEl){ msgEl.textContent = 'Verification email resent. Check your inbox.'; msgEl.style.color = '#86efac'; }
+  } catch(e){
+    if(msgEl){ msgEl.textContent = e.message||'Failed to resend.'; msgEl.style.color = '#fca5a5'; }
+  }
+}
+
+async function sendPasswordReset() {
+  var inp = document.getElementById('forgot-email');
+  var msgEl = document.getElementById('forgot-msg');
+  var email = inp ? (inp.value||'').trim() : '';
+  if(!email){
+    if(msgEl){ msgEl.textContent='Enter your email address.'; msgEl.style.color='#fca5a5'; msgEl.style.background='#3b0a0a'; msgEl.style.display=''; }
+    return;
+  }
+  if(msgEl){ msgEl.textContent='Sending reset link…'; msgEl.style.color='#888'; msgEl.style.background='transparent'; msgEl.style.display=''; }
+  try {
+    var r = await fetch(SUPABASE_URL+'/auth/v1/recover',{
+      method:'POST',
+      headers:{ 'apikey':SUPABASE_ANON, 'Content-Type':'application/json' },
+      body:JSON.stringify({ email:email })
+    });
+    // Supabase returns 200 even for unknown emails (to prevent enumeration); treat any non-error as success
+    if(!r.ok){
+      var d; try { d = await r.json(); } catch(e){ d = {}; }
+      throw new Error(d.error_description||d.msg||'Could not send reset link');
+    }
+    if(msgEl){ msgEl.textContent='If that email is registered, a reset link has been sent. Check your inbox.'; msgEl.style.color='#86efac'; msgEl.style.background='rgba(22,101,52,0.2)'; }
+  } catch(e){
+    if(msgEl){ msgEl.textContent=e.message||'Failed to send reset link.'; msgEl.style.color='#fca5a5'; msgEl.style.background='#3b0a0a'; }
+  }
+}
+
 function showSignInPanel() {
   var p=document.getElementById('signin-panel');
   var v=document.getElementById('verify-panel');
@@ -2147,10 +2255,32 @@ function showLoginScreen() {
   var e=document.getElementById('signin-error'); if(e) e.style.display='none';
 }
 
+// Clear ALL client-side state on sign-out so the next user doesn't see stale data
+function _clearLocalClientState(){
+  var lsKeys = [
+    'clfn_applications','clfn_housing_units',
+    'clfn_scoring_model','clfn_scoring_model_v2','clfn_scoring_tiers_v2',
+    'clfn_budget_pools','clfn_reno_score_model_v3','clfn_unit_score_model',
+    'HOUSING_REMEMBER_KEY'
+  ];
+  try { lsKeys.forEach(function(k){ try { localStorage.removeItem(k); } catch(e){} }); } catch(e){}
+  try {
+    ['clfn_housing_token','clfn_housing_role','clfn_housing_name','clfn_housing_email_session']
+      .forEach(function(k){ try { sessionStorage.removeItem(k); } catch(e){} });
+  } catch(e){}
+  var winKeys = [
+    '_contractors','_sowCache','_renoProgress','_appSettings','_renoBudget',
+    '_unitPhotos','_staffCache','_editingUnitId','_rbaUnitId','_sowUnitId',
+    '_currentDetailUnitId','_ctLastSaved','_pendingLookupUser','_currentScorecardApp'
+  ];
+  winKeys.forEach(function(k){ try { window[k] = undefined; delete window[k]; } catch(e){} });
+}
+
 async function doLogout() {
   try {
     await fetch(SUPABASE_URL+'/auth/v1/logout',{method:'POST',headers:HOUSING_HEADERS});
   } catch(e){}
+  _clearLocalClientState();
   HOUSING_SESSION={email:'',name:'',role:'',accessToken:''};
   HOUSING_HEADERS['Authorization']='Bearer '+SUPABASE_ANON;
   window.CLFN_AUTH.isAuthenticated=false;

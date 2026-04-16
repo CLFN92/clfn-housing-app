@@ -1405,13 +1405,6 @@
   </div>
 </div>
 
-
-<!-- ══ LOGIN SCREEN ══ -->
-
-<!-- ══ LOGIN SCREEN ══ -->
-
-</div></div>
-
 <!-- addUnitModal -->
 <div id="addUnitModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:580px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
@@ -3412,22 +3405,20 @@ var liveV2Tiers = (function() {
 
 function saveV2ScoringModel() {
   localStorage.setItem('clfn_scoring_model_v2', JSON.stringify(liveV2ScoreModel));
-  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
-    method: 'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
-    body: JSON.stringify({ key: 'scoring_model_v2', value: liveV2ScoreModel })
-  }).catch(function(){});
+  sbSaveSetting('scoring_model_v2', liveV2ScoreModel).then(function(ok){
+    if(!ok) showToast('Scoring model saved locally but did not reach the server — it may revert on next sign-in.');
+  });
 }
 
 function saveV2Tiers() {
   localStorage.setItem('clfn_scoring_tiers_v2', JSON.stringify(liveV2Tiers));
-  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
-    method: 'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
-    body: JSON.stringify({ key: 'scoring_tiers_v2', value: liveV2Tiers })
-  }).catch(function(){});
-  // Update the Edge Function payload with new tiers on next score call
-  showToast('Tier thresholds saved — rescore all to apply');
+  sbSaveSetting('scoring_tiers_v2', liveV2Tiers).then(function(ok){
+    if(!ok) {
+      showToast('Tier thresholds saved locally but did not reach the server — please retry.');
+      return;
+    }
+    showToast('Tier thresholds saved — rescore all to apply');
+  });
 }
 
 // ── V2 Scoring Editor Renderer ──────────────────────────────────────
@@ -6730,15 +6721,35 @@ function saveContractor(){
 
 function deleteContractor(idx){
   var contractors = (window._contractors || []).slice();
+  // Capture the contractor BEFORE removing it from the array (bug: original code spliced first and then read the wrong index)
+  var delCt = contractors[idx];
+  if(!delCt) { showToast('Contractor not found.'); return; }
   contractors.splice(idx,1);
   window._contractors = contractors;
-  // Delete from Supabase
-  var delCt = contractors[idx] || {};
-  if(delCt.id) {
-    fetch(SUPABASE_URL+'/rest/v1/housing_contractors?id=eq.'+encodeURIComponent(delCt.id), { method:'DELETE', headers:HOUSING_HEADERS }).catch(function(){});
-  }
   renderContractorsView();
-  showToast('Contractor removed.');
+  // Delete from Supabase, surface failures to the user so they know to retry
+  if(delCt.id) {
+    fetch(SUPABASE_URL+'/rest/v1/housing_contractors?id=eq.'+encodeURIComponent(delCt.id), { method:'DELETE', headers:HOUSING_HEADERS })
+      .then(function(r){
+        if(!r.ok) {
+          // Roll back the UI change so the user sees the contractor re-appear and can retry
+          contractors.splice(idx, 0, delCt);
+          window._contractors = contractors;
+          renderContractorsView();
+          showToast('Could not remove contractor — ' + (r.status===401||r.status===403 ? 'permission denied' : 'server error '+r.status));
+          return;
+        }
+        showToast('Contractor removed.');
+      })
+      .catch(function(e){
+        contractors.splice(idx, 0, delCt);
+        window._contractors = contractors;
+        renderContractorsView();
+        showToast('Could not remove contractor — ' + (e.message||'network error'));
+      });
+  } else {
+    showToast('Contractor removed.');
+  }
 }
 
 
@@ -7378,10 +7389,20 @@ function addUserFromResult(name, email, role){
   var settings = window._appSettings || {};
   var users = settings.users || [];
   if(users.find(function(u){return u.email===email;})){ showToast('User already exists'); return; }
+  // Snapshot for rollback
+  var prevUsers = users.slice();
   users.push({name:name, email:email, role:role});
   settings.users = users;
   window._appSettings = settings;
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings',{method:'POST',headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({key:'app_settings',value:settings})}).catch(function(){});
+  sbSaveSetting('app_settings', settings).then(function(ok){
+    if(!ok){
+      // Roll back in-memory change so the UI reflects reality
+      settings.users = prevUsers;
+      window._appSettings = settings;
+      populateSettings();
+      showToast('Could not save — ' + name + ' was NOT added. Please retry.');
+    }
+  });
   var emailEl = document.getElementById('user_lookup_email');
   if(emailEl) emailEl.value='';
   var resultEl = document.getElementById('user_lookup_result');
@@ -7397,10 +7418,18 @@ function removeUser(btn){
   var email = emailCell ? emailCell.textContent.trim() : '';
   if(!email) return;
   var settings = window._appSettings || {};
+  var prevUsers = (settings.users||[]).slice();  // snapshot for rollback
   var removedUser=(settings.users||[]).find(function(u){return u.email===email;});
   settings.users = (settings.users||[]).filter(function(u){ return u.email!==email; });
   window._appSettings = settings;
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings',{method:'POST',headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({key:'app_settings',value:settings})}).catch(function(){});
+  sbSaveSetting('app_settings', settings).then(function(ok){
+    if(!ok){
+      settings.users = prevUsers;
+      window._appSettings = settings;
+      populateSettings();
+      showToast('Could not save — user NOT removed. Please retry.');
+    }
+  });
   auditEntry('SETTINGS','settings_user_remove','User removed: '+(removedUser?removedUser.name+' ('+email+')':email),window.currentRole||'staff');
   populateSettings();
   showToast('User removed');
@@ -9115,8 +9144,16 @@ function loadBudgetData(){
 }
 function saveBudgetData(data){
   if(!window._appSettings) window._appSettings={};
+  var prev = window._appSettings['budget_pools'];
   window._appSettings['budget_pools']=data;
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings',{method:'POST',headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({key:'budget_pools',value:data})}).catch(function(){});
+  sbSaveSetting('budget_pools', data).then(function(ok){
+    if(!ok){
+      // Roll back in-memory so UI reflects reality
+      if(prev === undefined) delete window._appSettings['budget_pools'];
+      else window._appSettings['budget_pools'] = prev;
+      showToast('Could not save budget — changes NOT persisted. Please retry.');
+    }
+  });
 }
 function getDefaultBudget(){
   var obj={fiscalYear:'2025-2026',pools:{}};
@@ -9193,9 +9230,16 @@ function saveBudgetPools(){
   var limitEl = document.getElementById('settings_hm_budget_limit');
   if(limitEl && limitEl.value) {
     var s = window._appSettings || {};
+    var prevLimit = s.hmBudgetLimit;
     s.hmBudgetLimit = parseFloat(limitEl.value)||25000;
     window._appSettings = s;
-    fetch(SUPABASE_URL+'/rest/v1/housing_settings',{method:'POST',headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({key:'app_settings',value:s})}).catch(function(){});
+    sbSaveSetting('app_settings', s).then(function(ok){
+      if(!ok){
+        s.hmBudgetLimit = prevLimit;
+        window._appSettings = s;
+        showToast('Could not save HM budget limit — retry.');
+      }
+    });
   }
   var fyEl = document.getElementById('budget_fiscal_year');
   var data = {fiscalYear: fyEl ? fyEl.value : '2025-2026', pools:{}};
@@ -9207,7 +9251,7 @@ function saveBudgetPools(){
       notes: notesEl ? notesEl.value : ''
     };
   });
-  saveBudgetData(data);
+  saveBudgetData(data);  // saveBudgetData already surfaces its own errors
   var hmLimitEl=document.getElementById('settings_hm_budget_limit');
   auditEntry('SETTINGS','settings_budget_save','Budget allocations saved for '+data.fiscalYear+(hmLimitEl?' — HM limit: $'+hmLimitEl.value:''),window.currentRole||'staff');
   showToast('Budget allocations saved');
@@ -9283,7 +9327,8 @@ function updateUnitScorePts(id,val){
   if(row)row.pts=parseInt(val)||0;
   if(!window._appSettings) window._appSettings={};
   window._appSettings['unit_score_model']=model;
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings',{method:'POST',headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({key:'unit_score_model',value:model})}).catch(function(){});
+  // Fire-and-forget — this runs on every keystroke so we only log, not toast
+  sbSaveSetting('unit_score_model', model);
   var maxScore=0;
   ['bed','acc','eld'].forEach(function(g){
     var mx=Math.max.apply(null,model.filter(function(r){return r.group===g;}).map(function(r){return r.pts;}));
@@ -9300,10 +9345,12 @@ function saveUnitScoreModel(){
   });
   if(!window._appSettings) window._appSettings={};
   window._appSettings['unit_score_model']=model;
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings',{method:'POST',headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({key:'unit_score_model',value:model})}).catch(function(){});
-  auditEntry('SETTINGS','settings_unit_score_save','Unit matching scoring model saved',window.currentRole||'staff');
-  showToast('Unit match scoring saved');
-  renderUnitScoreTable();
+  sbSaveSetting('unit_score_model', model).then(function(ok){
+    if(!ok){ showToast('Unit match scoring did NOT save to server — please retry.'); return; }
+    auditEntry('SETTINGS','settings_unit_score_save','Unit matching scoring model saved',window.currentRole||'staff');
+    showToast('Unit match scoring saved');
+    renderUnitScoreTable();
+  });
 }
 
 // ══ RENOVATION PRIORITY SCORING MODEL ══════════════════════════════════════
@@ -9386,10 +9433,12 @@ function saveRenoScoreModel() {
   });
   if(!window._appSettings) window._appSettings={};
   window._appSettings['reno_score_model']=model;
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings',{method:'POST',headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({key:'reno_score_model',value:model})}).catch(function(){});
-  auditEntry('SETTINGS','settings_reno_score_save','Renovation priority scoring model saved',window.currentRole||'staff');
-  showToast('Renovation scoring saved');
-  renderRenoScoreTable();
+  sbSaveSetting('reno_score_model', model).then(function(ok){
+    if(!ok){ showToast('Renovation scoring did NOT save to server — please retry.'); return; }
+    auditEntry('SETTINGS','settings_reno_score_save','Renovation priority scoring model saved',window.currentRole||'staff');
+    showToast('Renovation scoring saved');
+    renderRenoScoreTable();
+  });
 }
 
 function resetRenoScoreModel() {
@@ -13536,6 +13585,31 @@ function handleAddUnitPhotoUpload(input) {
     reader.readAsDataURL(f);
   });
 }
+// Edit-unit photo upload: unit already exists, so upload straight to Supabase Storage
+// and append the returned path to the unit's photo list (which persists across sessions).
+async function handleEditUnitPhotoUpload(input) {
+  var unitId = window._editingUnitId;
+  if (!unitId) { showToast('No unit being edited'); return; }
+  var files = Array.from(input.files || []).filter(function(f){ return f.type && f.type.startsWith('image/'); });
+  if (!files.length) { input.value = ''; return; }
+  var zone = document.getElementById('ue_drop_zone');
+  if (zone) zone.style.borderColor = 'var(--yellow)';
+  try {
+    var existing = getUnitPhotos(unitId) || [];
+    for (var i = 0; i < files.length; i++) {
+      var rec = await sbUploadAndSave('unit', unitId, files[i], 'units/' + unitId + '/photos');
+      existing.push(rec.path);
+    }
+    saveUnitPhotos(unitId, existing);
+    renderEditUnitPhotoPreview(unitId);
+    showToast('✓ ' + files.length + ' photo' + (files.length > 1 ? 's' : '') + ' uploaded');
+  } catch (e) {
+    console.warn('[EDIT UNIT PHOTO] upload failed:', e);
+    showToast('Photo upload failed: ' + (e.message || 'unknown error'));
+  }
+  if (zone) zone.style.borderColor = 'var(--border)';
+  input.value = '';
+}
 function renderAddUnitPhotoPreview() {
   var el = document.getElementById('au_photo_preview');
   if (!el) return;
@@ -15240,10 +15314,41 @@ async function resolveHousingRole() {
 }
 
 // ── Sign out ───────────────────────────────────────────────────────────────
+// Clear ALL client-side state on sign-out so the next user doesn't see stale data
+function _clearLocalClientState(){
+  // localStorage keys owned by this app
+  var lsKeys = [
+    'clfn_applications','clfn_housing_units',
+    'clfn_scoring_model','clfn_scoring_model_v2','clfn_scoring_tiers_v2',
+    'clfn_budget_pools','clfn_reno_score_model_v3','clfn_unit_score_model',
+    'HOUSING_REMEMBER_KEY'
+  ];
+  try {
+    lsKeys.forEach(function(k){ try { localStorage.removeItem(k); } catch(e){} });
+  } catch(e){}
+  // sessionStorage
+  try {
+    ['clfn_housing_token','clfn_housing_role','clfn_housing_name','clfn_housing_email_session']
+      .forEach(function(k){ try { sessionStorage.removeItem(k); } catch(e){} });
+  } catch(e){}
+  // In-memory window caches — wipe so next user starts fresh
+  var winKeys = [
+    '_contractors','_sowCache','_renoProgress','_appSettings','_renoBudget',
+    '_unitPhotos','_staffCache','_editingUnitId','_rbaUnitId','_sowUnitId',
+    '_currentDetailUnitId','_ctLastSaved','_pendingLookupUser','_currentScorecardApp',
+    '_auStagedPhotos','_ueStagedPhotos','_rpPendingPhotos','_rpStoredPhotos',
+    '_rpUnitId','_tenantFilesUnitId','_appFormReturnTo','_appMenuId',
+    '_userLookupTimer','_ctEditIdx','_ctFilter','_sowWasPreviouslySaved',
+    '_sowAfterContractorSave','_rpAfterContractorSave','_printPanelDoc'
+  ];
+  winKeys.forEach(function(k){ try { window[k] = undefined; delete window[k]; } catch(e){} });
+}
+
 async function doLogout() {
   try {
     await fetch(SUPABASE_URL+'/auth/v1/logout',{method:'POST',headers:HOUSING_HEADERS});
   } catch(e){}
+  _clearLocalClientState();
   HOUSING_SESSION={email:'',name:'',role:'',accessToken:''};
   HOUSING_HEADERS['Authorization']='Bearer '+SUPABASE_ANON;
   window.CLFN_AUTH.isAuthenticated=false;
@@ -15738,5 +15843,6 @@ function initHousingPage() {
 }());
 
 </script>
+</div>
 </body>
 </html>

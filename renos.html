@@ -74,44 +74,6 @@
   <div style="font-size:13px;color:var(--muted);">Loading...</div>
 </div>
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-<!-- ═══ RENOVATIONS VIEW ═══ -->
-<!-- Renovation Search Modal (Employee) -->
-<div id="renoSearchModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;" onclick="if(event.target===this)closeRenoSearch()">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:580px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Renovations</div>
-        <div style="font-size:16px;font-weight:700;color:#fff;">Renovation Work</div>
-      </div>
-      <button type="button" onclick="closeRenoSearch()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
-    </div>
-    <div style="padding:20px 24px;">
-      <!-- Quick actions -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
-        <button onclick="closeRenoSearch();openRenoNewRequest()" style="background:var(--yellow);border:none;color:#111;padding:12px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;text-align:left;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:22px;">📋</span>
-          <div><div style="font-size:12px;font-weight:700;">New SOW Request</div><div style="font-size:10px;font-weight:400;opacity:.8;">Open scope of work form</div></div>
-        </button>
-        <button onclick="closeRenoSearch();openUnitSearch()" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:12px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;text-align:left;display:flex;align-items:center;gap:10px;" onmouseover="this.style.borderColor=&quot;var(--yellow)&quot;" onmouseout="this.style.borderColor=&quot;var(--border)&quot;">
-          <span style="font-size:22px;">🏠</span>
-          <div><div style="font-size:12px;font-weight:700;">Find a Unit</div><div style="font-size:11px;font-weight:400;color:var(--muted);">Search by address</div></div>
-        </button>
-      </div>
-
-      <!-- Units under repair/condemned search -->
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px;">Active Renovations</div>
-      <div style="position:relative;margin-bottom:12px;">
-        <input id="reno_search_input" type="text" placeholder="Search by address…"
-          style="width:100%;box-sizing:border-box;padding:10px 14px 10px 36px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);"
-          oninput="renoSearchFilter(this.value)"/>
-        <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      </div>
-      <div id="reno_search_results" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ RENO APPROVALS VIEW (HM & ED only) ═══ -->
 <div id="renoApprovalsView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
 
   <!-- Back nav -->
@@ -316,46 +278,6 @@
     </div>
   </div>
 </div>
-
-<!-- Contractor Search Modal — Employee entry point -->
-<div id="contractorSearchModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;" onclick="if(event.target===this)closeContractorSearch()">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-    <!-- Header -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Contractors</div>
-        <div style="font-size:16px;font-weight:700;color:#fff;">Contractor Directory</div>
-      </div>
-      <button type="button" onclick="closeContractorSearch()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
-    </div>
-    <div style="padding:20px 24px;">
-
-      <!-- Quick action: Add New -->
-      <button onclick="closeContractorSearch();openAddContractorModal()" style="width:100%;background:var(--yellow);border:none;color:#111;border-radius:10px;padding:13px 18px;cursor:pointer;font-family:DM Sans,sans-serif;text-align:left;display:flex;align-items:center;gap:14px;margin-bottom:18px;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
-        <span style="font-size:24px;">➕</span>
-        <div>
-          <div style="font-size:13px;font-weight:700;">Add New Contractor</div>
-          <div style="font-size:11px;font-weight:400;opacity:.8;margin-top:2px;">Add a contractor to the CLFN directory</div>
-        </div>
-        <svg style="margin-left:auto;flex-shrink:0;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
-
-      <!-- Search -->
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px;">Search Directory</div>
-      <div style="position:relative;margin-bottom:12px;">
-        <input id="ct_search_input" type="text" placeholder="Search by name, trade, or phone…"
-          style="width:100%;box-sizing:border-box;padding:10px 14px 10px 36px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);"
-          oninput="contractorSearchFilter(this.value)"/>
-        <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      </div>
-
-      <!-- Results -->
-      <div id="ct_search_results" style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
-    </div>
-  </div>
-</div>
-
-<!-- Add Contractor Modal -->
 <div id="addContractorModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
     <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:14px 20px;">
@@ -614,50 +536,6 @@
     </div>
   </div>
 </div>
-
-<!-- Edit Application Modal Wrapper (class-toggled) -->
-<div id="editModal" style="display:none;"></div>
-
-<!-- Submit Modal -->
-<div class="modal-overlay" id="submitModal">
-  <div class="modal">
-    <h2>Submit Application?</h2>
-    <p style="color:var(--muted);font-size:13px;margin:12px 0 20px;">This will send the application to the Housing Manager for review. You cannot edit it after submission.</p>
-    <div style="display:flex;gap:10px;justify-content:flex-end;">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="finalSubmit()">Confirm Submit →</button>
-    </div>
-  </div>
-</div>
-
-<!-- Score Popup -->
-<div id="scorePopup" style="display:none;position:fixed;inset:0;z-index:600;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,0.55);" onclick="if(event.target===this){window.closeScorePopup?window.closeScorePopup():(this.style.display='none');}">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,0.4);display:flex;flex-direction:column;">
-    <div style="background:var(--dark);padding:18px 24px;border-bottom:2px solid var(--yellow);border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-      <div>
-        <div id="spopName" style="font-size:18px;color:#fff;font-weight:600;"></div>
-        <div id="spopId"   style="font-size:11px;color:#555;margin-top:2px;"></div>
-      </div>
-      <button onclick="window.closeScorePopup?window.closeScorePopup():(document.getElementById('scorePopup').style.display='none')" style="background:none;border:1px solid #444;color:#aaa;width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;">✕</button>
-    </div>
-    <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;gap:16px;">
-      <div>
-        <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Total Score</div>
-        <div style="display:flex;align-items:baseline;gap:8px;"><span id="spopTotal" style="font-size:52px;font-weight:700;color:var(--text);line-height:1;"></span><span style="font-size:13px;color:var(--muted);">pts</span></div>
-      </div>
-      <div style="text-align:right;"><div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Priority Tier</div><div id="spopTier" style="font-size:13px;font-weight:700;padding:7px 16px;border-radius:8px;"></div></div>
-    </div>
-    <div style="padding:12px 24px 0;"><div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;"><div id="spopBar" style="height:100%;border-radius:3px;transition:width .4s;"></div></div><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;"><span>Low</span><span>Medium</span><span>High</span><span>Urgent</span></div></div>
-    <div style="padding:16px 24px 24px;">
-      <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);">Score Breakdown</div>
-      <div id="spopBreakdown"></div>
-    </div>
-  </div>
-</div>
-
-
-
-<!-- Renovation Budget Approval Modal -->
 <div id="renoBudgetModal" style="display:none;position:fixed;inset:0;z-index:850;background:rgba(0,0,0,0.65);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:720px;box-shadow:0 24px 60px rgba(0,0,0,0.5);overflow:hidden;margin:auto;">
     <!-- Header -->
@@ -838,1095 +716,6 @@
     </div>
   </div>
 </div>
-
-<!-- Tenant Search Modal (Employee) -->
-<div id="tenantSearchModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;" onclick="if(event.target===this)closeTenantSearch()">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Tenants</div>
-        <div style="font-size:16px;font-weight:700;color:#fff;">Find or Add a Tenant</div>
-      </div>
-      <button type="button" onclick="closeTenantSearch()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
-    </div>
-    <div style="padding:20px 24px;background:var(--bg);">
-      <!-- Quick actions -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
-        <button onclick="closeTenantSearch();openAddTenantModal()" style="background:var(--yellow);border:none;color:#111;padding:10px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;text-align:left;display:flex;align-items:center;gap:8px;">
-          <span style="font-size:18px;">➕</span><div><div style="font-size:12px;font-weight:700;">Add New Tenant</div><div style="font-size:10px;font-weight:400;opacity:.8;">Assign to a unit</div></div>
-        </button>
-        <button onclick="closeTenantSearch();openUnitSearch()" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;text-align:left;display:flex;align-items:center;gap:8px;">
-          <span style="font-size:18px;">🏠</span><div><div style="font-size:12px;font-weight:700;">Find a Unit</div><div style="font-size:11px;font-weight:400;color:var(--muted);">Search by address</div></div>
-        </button>
-      </div>
-      <!-- Tenant search -->
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px;">Search Existing Tenants</div>
-      <div style="position:relative;margin-bottom:12px;">
-        <input id="tenant_search_input" type="text" placeholder="Search by name or unit address…"
-          style="width:100%;box-sizing:border-box;padding:10px 14px 10px 36px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);"
-          oninput="tenantSearchFilter(this.value)"/>
-        <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      </div>
-      <div id="tenant_search_results" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
-    </div>
-  </div>
-</div>
-
-<!-- Tenant Files Panel -->
-<div id="tenantFilesPanel" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;padding:20px 16px;" onclick="if(event.target===this)closeTenantFilesPanel()">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,0.35);overflow:hidden;">
-    <!-- Header — sticky inside the flex column -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Tenant Files</div>
-        <div id="tfp_title" style="font-size:15px;font-weight:700;color:#fff;"></div>
-      </div>
-      <button onclick="closeTenantFilesPanel()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;">✕</button>
-    </div>
-    <!-- Scrollable body -->
-    <div style="padding:20px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;">
-      <!-- Upload zone -->
-      <div id="tfp_drop_zone"
-        ondragover="event.preventDefault();this.style.borderColor='var(--yellow)'"
-        ondragleave="this.style.borderColor='var(--border)'"
-        ondrop="tenantFilesDrop(event)"
-        onclick="document.getElementById('tfp_file_input').click()"
-        style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:var(--bg);margin-bottom:16px;transition:border-color .15s;">
-        <div style="font-size:24px;margin-bottom:6px;">📁</div>
-        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;">Drag files here or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
-        <div style="font-size:11px;color:var(--muted);">PDF, images, Word docs — any relevant tenant documents</div>
-        <input type="file" id="tfp_file_input" multiple accept=".pdf,image/*,.doc,.docx,.txt"
-          style="display:none;" onchange="tenantFilesUpload(this)"/>
-      </div>
-      <!-- File list -->
-      <div id="tfp_file_list" style="display:flex;flex-direction:column;gap:8px;"></div>
-      <div id="tfp_empty" style="display:none;padding:24px;text-align:center;color:var(--muted);font-size:13px;font-style:italic;">No files attached yet.</div>
-    </div>
-  </div>
-</div>
-
-<!-- Add Tenant Modal — Application-first gateway -->
-<div id="addTenantModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-
-    <!-- Header -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Tenant Management</div>
-        <div style="font-size:15px;font-weight:700;color:#fff;">Add / Assign a Tenant</div>
-      </div>
-      <button type="button" onclick="closeAddTenantModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
-    </div>
-
-    <div style="padding:24px;display:flex;flex-direction:column;gap:0;">
-
-      <!-- Policy notice -->
-      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 16px;margin-bottom:20px;display:flex;gap:12px;">
-        <span style="font-size:20px;flex-shrink:0;">📋</span>
-        <div>
-          <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:4px;">Application Required</div>
-          <div style="font-size:12px;color:#7a6000;line-height:1.5;">All tenants — including existing residents — must have a current housing application on file. This ensures up-to-date information is captured before unit assignment.</div>
-        </div>
-      </div>
-
-      <!-- Option 1: New application -->
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px;">Option 1 — New Tenant or Update Required</div>
-      <button onclick="closeAddTenantModal();newApp();" style="width:100%;background:var(--yellow);border:none;color:#111;border-radius:10px;padding:14px 18px;cursor:pointer;font-family:DM Sans,sans-serif;text-align:left;display:flex;align-items:center;gap:14px;margin-bottom:20px;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
-        <span style="font-size:26px;">📝</span>
-        <div>
-          <div style="font-size:13px;font-weight:700;">Start a New Application</div>
-          <div style="font-size:11px;font-weight:400;opacity:.8;margin-top:2px;">Opens the full housing application form to collect current information</div>
-        </div>
-        <svg style="margin-left:auto;flex-shrink:0;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
-
-      <!-- Option 2: Link existing approved application -->
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px;">Option 2 — Link Approved Application to a Unit</div>
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        <div class="f">
-          <label>Unit <span class="r">*</span></label>
-          <select id="at_unit" style="width:100%;">
-            <option value="">— Select a unit —</option>
-          </select>
-        </div>
-        <div style="position:relative;">
-          <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Application ID <span class="r">*</span></label>
-          <input type="text" id="at_appid" placeholder="Type name or APP-ID to search…" autocomplete="off"
-            style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"
-            oninput="atSearchApps(this.value)" onfocus="atSearchApps(this.value)"
-            onblur="setTimeout(function(){var d=document.getElementById('at_app_dropdown');if(d)d.style.display='none';},180)"/>
-          <div id="at_app_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:999;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.15);"></div>
-          <input type="hidden" id="at_appid_val"/>
-          <div id="at_app_selected" style="display:none;margin-top:6px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;font-size:12px;"></div>
-        </div>
-        <div class="f">
-          <label>Move-in Date <span class="r">*</span></label>
-          <input type="date" id="at_date"/>
-        </div>
-        <div class="f">
-          <label>Status</label>
-          <select id="at_status">
-            <option value="occupied">Occupied</option>
-            <option value="reserved">Reserved</option>
-          </select>
-        </div>
-        <div id="at_error" style="display:none;color:#b91c1c;font-size:12px;font-weight:600;padding:8px 12px;background:#fef2f2;border-radius:7px;"></div>
-      </div>
-
-    </div>
-    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg);">
-      <button type="button" onclick="closeAddTenantModal()" class="btn btn-ghost">Cancel</button>
-      <button type="button" onclick="saveAddTenant()" class="btn btn-primary">Assign to Unit</button>
-    </div>
-  </div>
-</div>
-
-
-<!-- ── Contractor Approval Panel (slide-in from right) ── -->
-<div id="ctApprovalPanel" style="display:none;position:fixed;inset:0;z-index:850;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:flex-end;" onclick="if(event.target===this)closeCtApprovalPanel()">
-  <div style="background:var(--surface);width:100%;max-width:480px;height:100%;overflow-y:auto;box-shadow:-8px 0 40px rgba(0,0,0,0.3);display:flex;flex-direction:column;">
-    <!-- Panel header -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;flex-shrink:0;">
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Contractor Application</div>
-        <div id="ctap_name" style="font-size:15px;font-weight:700;color:#fff;"></div>
-        <div id="ctap_trade" style="font-size:11px;color:#888;margin-top:1px;"></div>
-      </div>
-      <button onclick="closeCtApprovalPanel()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
-    </div>
-
-    <!-- Status banner -->
-    <div id="ctap_status_banner" style="padding:10px 20px;font-size:12px;font-weight:700;text-align:center;"></div>
-
-    <!-- Panel body -->
-    <div style="padding:20px;flex:1;display:flex;flex-direction:column;gap:16px;">
-
-      <!-- Info summary -->
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:8px 14px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Application Summary</div>
-        </div>
-        <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Phone</div><div id="ctap_phone" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Email</div><div id="ctap_email" style="color:var(--text);word-break:break-all;"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Classification</div><div id="ctap_class" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">HST #</div><div id="ctap_hst" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">WSIB</div><div id="ctap_wsib" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Insurance Expiry</div><div id="ctap_ins" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">TOR Agreed</div><div id="ctap_tor" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Submitted</div><div id="ctap_submitted" style="color:var(--text);"></div></div>
-        </div>
-      </div>
-
-      <!-- Approval flow diagram -->
-      <div class="card" style="padding:14px;">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px;">Approval Flow</div>
-        <div id="ctap_flow" style="display:flex;align-items:center;gap:0;"></div>
-      </div>
-
-      <!-- Action buttons (role-gated) -->
-      <div id="ctap_actions" style="display:flex;flex-direction:column;gap:10px;"></div>
-
-      <!-- Notes input (shown when action needs notes) -->
-      <div id="ctap_notes_wrap" style="display:none;">
-        <div class="f">
-          <label>Notes / Reason <span id="ctap_notes_req" style="color:#b91c1c;"></span></label>
-          <textarea id="ctap_notes" rows="3" placeholder="Add notes explaining this decision…" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);resize:vertical;"></textarea>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <button id="ctap_confirm_btn" onclick="confirmCtAction()" class="btn btn-primary" style="flex:1;"></button>
-          <button onclick="cancelCtAction()" class="btn btn-ghost">Cancel</button>
-        </div>
-      </div>
-
-      <!-- Audit trail -->
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:8px 14px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Audit Trail</div>
-        </div>
-        <div id="ctap_audit" style="padding:14px;display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;"></div>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-<!-- Contractor Search Modal — Employee entry point -->
-<div id="contractorSearchModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;" onclick="if(event.target===this)closeContractorSearch()">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-    <!-- Header -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Contractors</div>
-        <div style="font-size:16px;font-weight:700;color:#fff;">Contractor Directory</div>
-      </div>
-      <button type="button" onclick="closeContractorSearch()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
-    </div>
-    <div style="padding:20px 24px;">
-
-      <!-- Quick action: Add New -->
-      <button onclick="closeContractorSearch();openAddContractorModal()" style="width:100%;background:var(--yellow);border:none;color:#111;border-radius:10px;padding:13px 18px;cursor:pointer;font-family:DM Sans,sans-serif;text-align:left;display:flex;align-items:center;gap:14px;margin-bottom:18px;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
-        <span style="font-size:24px;">➕</span>
-        <div>
-          <div style="font-size:13px;font-weight:700;">Add New Contractor</div>
-          <div style="font-size:11px;font-weight:400;opacity:.8;margin-top:2px;">Add a contractor to the CLFN directory</div>
-        </div>
-        <svg style="margin-left:auto;flex-shrink:0;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
-
-      <!-- Search -->
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px;">Search Directory</div>
-      <div style="position:relative;margin-bottom:12px;">
-        <input id="ct_search_input" type="text" placeholder="Search by name, trade, or phone…"
-          style="width:100%;box-sizing:border-box;padding:10px 14px 10px 36px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);"
-          oninput="contractorSearchFilter(this.value)"/>
-        <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      </div>
-
-      <!-- Results -->
-      <div id="ct_search_results" style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
-    </div>
-  </div>
-</div>
-
-<!-- Add Contractor Modal -->
-<div id="addContractorModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:14px 20px;">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">
-        <div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Constance Lake First Nation — Housing</div>
-          <div id="ct_modal_title" style="font-size:15px;font-weight:700;color:#fff;">Contractor Application</div>
-        </div>
-        <button type="button" onclick="closeAddContractorModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;flex-shrink:0;margin-left:12px;">✕</button>
-      </div>
-      <div style="display:flex;gap:8px;">
-        <button type="button" id="ct_header_print_btn" onclick="printContractorAgreement()" style="background:none;border:1px solid #555;color:#ccc;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">🖨 Print / Save PDF</button>
-        <button type="button" id="ct_header_email_btn" onclick="emailContractorAgreement()" style="background:none;border:1px solid #555;color:#ccc;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">✉ Email to Contractor</button>
-      </div>
-    </div>
-    <div style="padding:24px;display:flex;flex-direction:column;gap:0;">
-
-      <!-- ── Company Information ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Company Information</div>
-        </div>
-        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div class="f" style="grid-column:1/-1"><label>Company / Name <span class="r">*</span></label><input id="ct_name" type="text" placeholder="e.g. Northern Builds Ltd."/></div>
-          <div class="f"><label>Trade / Specialty</label>
-            <select id="ct_trade">
-              <option value="">— Select trade —</option>
-              <optgroup label="General Construction"><option>General Contractor</option><option>Carpentry / Framing</option><option>Concrete &amp; Foundations</option><option>Demolition</option><option>Insulation</option><option>Roofing</option><option>Flooring</option><option>Drywall / Plastering</option><option>Painting &amp; Finishing</option><option>Windows &amp; Doors</option></optgroup>
-              <optgroup label="Mechanical &amp; Utilities"><option>Plumbing</option><option>Electrical</option><option>HVAC / Heating &amp; Cooling</option><option>Mechanical</option><option>Gas Fitting</option><option>Sprinkler / Fire Suppression</option></optgroup>
-              <optgroup label="Exterior &amp; Site Work"><option>Excavation &amp; Grading</option><option>Civil Works</option><option>Landscaping</option><option>Septic &amp; Drainage</option><option>Siding &amp; Cladding</option></optgroup>
-              <optgroup label="Professional Services"><option>Architecture</option><option>Structural Engineering</option><option>Civil Engineering</option><option>Project Management</option><option>Building Inspection</option><option>Environmental Consulting</option><option>Interior Design</option></optgroup>
-              <optgroup label="Accessibility &amp; Specialty"><option>Accessibility Modifications</option><option>Mould Remediation</option><option>Asbestos Abatement</option><option>Energy Efficiency / Retrofits</option></optgroup>
-            </select>
-          </div>
-          <div class="f"><label>Phone</label><input id="ct_phone" type="tel" placeholder="705-000-0000"/></div>
-          <div class="f"><label>Email</label><input id="ct_email" type="email" placeholder="contact@company.com"/></div>
-          <div class="f"><label>Address</label><input id="ct_address" type="text" placeholder="Company address"/></div>
-          <div class="f"><label>HST / Business #</label><input id="ct_hst" type="text" placeholder="123456789 RT0001"/></div>
-        </div>
-      </div>
-
-      <!-- ── Key People ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Key People</div>
-          <button type="button" onclick="ctAddPerson()" style="background:none;border:1px solid #555;color:#ccc;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:4px;">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Person
-          </button>
-        </div>
-        <div style="padding:16px;">
-          <div id="ct_people_list" style="display:flex;flex-direction:column;gap:8px;"></div>
-        </div>
-      </div>
-
-      <!-- ── WSIB ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">WSIB Clearance Certificate</div>
-        </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="f"><label>WSIB Account #</label><input id="ct_wsib_num" type="text" placeholder="1234567"/></div>
-            <div class="f"><label>Expiry Date</label><input id="ct_wsib_expiry" type="date"/></div>
-          </div>
-          <div id="ct_wsib_preview" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-          <div id="ct_wsib_drop" ondragover="ctFileDragOver(event,'ct_wsib_drop')" ondragleave="ctFileDragLeave('ct_wsib_drop')" ondrop="ctFileDrop(event,'wsib')" style="border:2px dashed var(--border);border-radius:8px;padding:12px;text-align:center;cursor:pointer;background:var(--bg);" onclick="document.getElementById('ct_wsib_input').click()">
-            <div style="font-size:12px;font-weight:600;color:var(--text);">📎 Upload WSIB Certificate &nbsp;<span style="color:var(--yellow);">browse</span></div>
-            <input type="file" id="ct_wsib_input" accept=".pdf,image/*" style="display:none;" onchange="ctFileUpload(this,'wsib')"/>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Liability Insurance ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Liability Insurance</div>
-        </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="f"><label>Provider</label><input id="ct_ins_provider" type="text" placeholder="e.g. Intact Insurance"/></div>
-            <div class="f"><label>Policy #</label><input id="ct_ins_policy" type="text" placeholder="Policy number"/></div>
-            <div class="f"><label>Coverage Amount</label><input id="ct_ins_amount" type="text" placeholder="e.g. $2,000,000"/></div>
-            <div class="f"><label>Expiry Date</label><input id="ct_ins_expiry" type="date"/></div>
-          </div>
-          <div id="ct_ins_preview" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-          <div id="ct_ins_drop" ondragover="ctFileDragOver(event,'ct_ins_drop')" ondragleave="ctFileDragLeave('ct_ins_drop')" ondrop="ctFileDrop(event,'insurance')" style="border:2px dashed var(--border);border-radius:8px;padding:12px;text-align:center;cursor:pointer;background:var(--bg);" onclick="document.getElementById('ct_ins_input').click()">
-            <div style="font-size:12px;font-weight:600;color:var(--text);">📎 Upload Insurance Certificate &nbsp;<span style="color:var(--yellow);">browse</span></div>
-            <input type="file" id="ct_ins_input" accept=".pdf,image/*" style="display:none;" onchange="ctFileUpload(this,'insurance')"/>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Other Documents ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Other Documents</div>
-        </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
-          <div id="ct_other_preview" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-          <div id="ct_other_drop" ondragover="ctFileDragOver(event,'ct_other_drop')" ondragleave="ctFileDragLeave('ct_other_drop')" ondrop="ctFileDrop(event,'other')" style="border:2px dashed var(--border);border-radius:8px;padding:12px;text-align:center;cursor:pointer;background:var(--bg);" onclick="document.getElementById('ct_other_input').click()">
-            <div style="font-size:12px;font-weight:600;color:var(--text);">📎 Upload Other Documents &nbsp;<span style="color:var(--yellow);">browse</span></div>
-            <input type="file" id="ct_other_input" multiple accept=".pdf,image/*,.doc,.docx" style="display:none;" onchange="ctFileUpload(this,'other')"/>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Notes ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Notes</div>
-        </div>
-        <div style="padding:16px;">
-          <textarea id="ct_notes" rows="3" placeholder="Rates, availability, past work, special conditions…" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);resize:vertical;"></textarea>
-        </div>
-      </div>
-
-      <!-- ── Business Classification ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Business Classification</div>
-        </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
-          <div style="font-size:12px;color:var(--muted);line-height:1.5;">Select all that apply. Indigenous-owned businesses receive procurement preference in accordance with CLFN purchasing policy.</div>
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);transition:border-color .15s;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="ctUpdateClassBorder(this)">
-              <input type="radio" id="ct_class_internal" name="ct_classification" value="internal_indigenous" style="margin-top:2px;flex-shrink:0;" onchange="ctUpdateClassBorders()"/>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">Internal — Indigenous</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px;">Band-owned enterprise or business majority-owned by a CLFN band member</div>
-              </div>
-            </label>
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);transition:border-color .15s;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="ctUpdateClassBorder(this)">
-              <input type="radio" id="ct_class_external_indigenous" name="ct_classification" value="external_indigenous" style="margin-top:2px;flex-shrink:0;" onchange="ctUpdateClassBorders()"/>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">External — Indigenous</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px;">Indigenous-owned business not affiliated with CLFN</div>
-              </div>
-            </label>
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);transition:border-color .15s;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="ctUpdateClassBorder(this)">
-              <input type="radio" id="ct_class_external" name="ct_classification" value="external_non_indigenous" style="margin-top:2px;flex-shrink:0;" onchange="ctUpdateClassBorders()"/>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">External — Non-Indigenous</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px;">Business with no Indigenous ownership</div>
-              </div>
-            </label>
-          </div>
-          <div class="f" id="ct_class_proof_row" style="display:none;">
-            <label>Proof of Indigenous Ownership <span style="font-size:10px;color:var(--muted);">(optional — band registry, status card, or statutory declaration)</span></label>
-            <input type="text" id="ct_class_proof" placeholder="Document reference or attach via Other Documents"/>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Terms of Reference ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;"
-          onclick="var b=document.getElementById('ct_tor_body');var c=document.getElementById('ct_tor_chev');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Terms of Reference</div>
-          <svg id="ct_tor_chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div id="ct_tor_body" style="display:none;padding:18px 20px;font-size:12px;color:var(--text);line-height:1.7;">
-          <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;">Constance Lake First Nation — Housing Department</p>
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">1. Scope of Engagement</div>
-              <p style="font-size:12px;color:var(--muted);">The contractor agrees to perform only the work described in the approved Scope of Work (SOW) issued by the CLFN Housing Department. No work beyond the approved SOW may commence without written amendment signed by the Housing Manager or Executive Director.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">2. Licensing &amp; Insurance</div>
-              <p style="font-size:12px;color:var(--muted);">The contractor warrants that it holds all required trade licences, WSIB clearance, and liability insurance in force for the duration of the work. Expiry of any required coverage automatically suspends the right to work on CLFN property until coverage is reinstated and verified.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">3. Invoicing &amp; Payment</div>
-              <p style="font-size:12px;color:var(--muted);">Invoices must reference the SOW number, unit address, and work completed. Payment is subject to satisfactory inspection by the Housing Manager. CLFN's standard payment terms are Net 30 days from invoice approval. Holdback provisions apply as per the Construction Act (Ontario).</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">4. On-Reserve Conduct</div>
-              <p style="font-size:12px;color:var(--muted);">The contractor and all workers must conduct themselves respectfully on reserve lands. CLFN reserves the right to remove any individual from the reserve for misconduct. Alcohol, drugs, and firearms are prohibited on all work sites. All workers must check in with the Housing Department on first arrival.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">5. Deficiency &amp; Warranty</div>
-              <p style="font-size:12px;color:var(--muted);">The contractor guarantees all labour and materials for a minimum of one (1) year from the date of completion. Any deficiencies identified during inspection must be rectified within 30 days at no additional cost to CLFN.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">6. Indigenous Procurement Priority</div>
-              <p style="font-size:12px;color:var(--muted);">CLFN is committed to economic reconciliation. Where qualified, Indigenous-owned businesses are given preference in contract awards. Classification provided on this form is subject to verification and must be accurate. Misrepresentation of Indigenous status may result in termination of the engagement and removal from the approved contractor list.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">7. Termination</div>
-              <p style="font-size:12px;color:var(--muted);">CLFN may terminate the engagement with 5 days written notice for convenience, or immediately for cause (including safety violations, misconduct, or material breach of these terms). The contractor is entitled to payment only for work satisfactorily completed to the date of termination.</p>
-            </div>
-          </div>
-          <div style="margin-top:16px;padding:10px 14px;background:rgba(248,228,26,0.07);border:1px solid var(--yellow);border-radius:8px;">
-            <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
-              <input type="checkbox" id="ct_tor_agreed" style="margin-top:2px;flex-shrink:0;"/>
-              <span style="font-size:12px;color:var(--text);">I have read, understood, and agree to these Terms of Reference on behalf of the contractor named above.</span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Signatures ── -->
-      <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Signatures</div>
-        </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
-          <div style="font-size:12px;color:var(--muted);">By signing below, both parties acknowledge the accuracy of the information provided and agreement to the Terms of Reference above.</div>
-
-          <!-- CLFN Employee signature -->
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-              <div style="width:26px;height:26px;border-radius:50%;background:#1d4ed8;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">HM</div>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">CLFN Housing Staff</div>
-                <div style="font-size:10px;color:var(--muted);">Employee taking this application</div>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-              <div class="f"><label>Printed Name</label><input type="text" id="ct_sig_staff_name" placeholder="Full name"/></div>
-              <div class="f"><label>Date</label><input type="date" id="ct_sig_staff_date"/></div>
-            </div>
-            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','canvas')" id="ct_sig_canvas_staff_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','type')" id="ct_sig_canvas_staff_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','wet')" id="ct_sig_canvas_staff_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="ct_sig_canvas_staff_panel_canvas" style="background:#fafaf8;"><canvas id="ct_sig_canvas_staff" width="560" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;border-radius:0;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('ct_sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="ct_sig_canvas_staff_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="ct_sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="ct_sig_canvas_staff_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="ct_sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
-          </div>
-
-          <!-- Contractor signature -->
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-              <div style="width:26px;height:26px;border-radius:50%;background:var(--yellow);color:#111;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">CT</div>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">Contractor Representative</div>
-                <div style="font-size:10px;color:var(--muted);">Authorized signatory for the contracting business</div>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-              <div class="f"><label>Printed Name</label><input type="text" id="ct_sig_ct_name" placeholder="Full name"/></div>
-              <div class="f"><label>Title / Role</label><input type="text" id="ct_sig_ct_title" placeholder="e.g. Owner, Project Manager"/></div>
-              <div class="f"><label>Date</label><input type="date" id="ct_sig_ct_date"/></div>
-            </div>
-            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','canvas')" id="ct_sig_canvas_ct_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','type')" id="ct_sig_canvas_ct_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','wet')" id="ct_sig_canvas_ct_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="ct_sig_canvas_ct_panel_canvas" style="background:#fafaf8;"><canvas id="ct_sig_canvas_ct" width="560" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;border-radius:0;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('ct_sig_canvas_ct')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="ct_sig_canvas_ct_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="ct_sig_canvas_ct_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="ct_sig_canvas_ct_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="ct_sig_canvas_ct_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
-          </div>
-
-        </div>
-      </div>
-
-    </div>
-    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);">
-      <div style="display:flex;gap:8px;">
-        <button type="button" id="ct_print_btn" onclick="printContractorAgreement()" style="display:none;background:none;border:1.5px solid var(--border);color:var(--text);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">🖨 Print / Save PDF</button>
-        <button type="button" id="ct_email_btn" onclick="emailContractorAgreement()" style="display:none;background:none;border:1.5px solid var(--border);color:var(--text);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">✉ Email to Contractor</button>
-      </div>
-      <div style="display:flex;gap:10px;">
-        <button type="button" onclick="closeAddContractorModal()" class="btn btn-ghost">Cancel</button>
-        <button type="button" id="ct_save_btn" onclick="saveContractorAndFinalize()" class="btn btn-primary">Save &amp; Finalize</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Edit Application Modal Wrapper (class-toggled) -->
-<div id="editModal" style="display:none;"></div>
-
-<!-- Submit Modal -->
-<div class="modal-overlay" id="submitModal">
-  <div class="modal">
-    <h2>Submit Application?</h2>
-    <p style="color:var(--muted);font-size:13px;margin:12px 0 20px;">This will send the application to the Housing Manager for review. You cannot edit it after submission.</p>
-    <div style="display:flex;gap:10px;justify-content:flex-end;">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="finalSubmit()">Confirm Submit →</button>
-    </div>
-  </div>
-</div>
-
-<!-- Score Popup -->
-<div id="scorePopup" style="display:none;position:fixed;inset:0;z-index:600;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,0.55);" onclick="if(event.target===this){window.closeScorePopup?window.closeScorePopup():(this.style.display='none');}">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,0.4);display:flex;flex-direction:column;">
-    <div style="background:var(--dark);padding:18px 24px;border-bottom:2px solid var(--yellow);border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-      <div>
-        <div id="spopName" style="font-size:18px;color:#fff;font-weight:600;"></div>
-        <div id="spopId"   style="font-size:11px;color:#555;margin-top:2px;"></div>
-      </div>
-      <button onclick="window.closeScorePopup?window.closeScorePopup():(document.getElementById('scorePopup').style.display='none')" style="background:none;border:1px solid #444;color:#aaa;width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;">✕</button>
-    </div>
-    <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;gap:16px;">
-      <div>
-        <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Total Score</div>
-        <div style="display:flex;align-items:baseline;gap:8px;"><span id="spopTotal" style="font-size:52px;font-weight:700;color:var(--text);line-height:1;"></span><span style="font-size:13px;color:var(--muted);">pts</span></div>
-      </div>
-      <div style="text-align:right;"><div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Priority Tier</div><div id="spopTier" style="font-size:13px;font-weight:700;padding:7px 16px;border-radius:8px;"></div></div>
-    </div>
-    <div style="padding:12px 24px 0;"><div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;"><div id="spopBar" style="height:100%;border-radius:3px;transition:width .4s;"></div></div><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;"><span>Low</span><span>Medium</span><span>High</span><span>Urgent</span></div></div>
-    <div style="padding:16px 24px 24px;">
-      <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);">Score Breakdown</div>
-      <div id="spopBreakdown"></div>
-    </div>
-  </div>
-</div>
-
-
-
-<!-- Renovation Budget Approval Modal -->
-<div id="renoBudgetModal" style="display:none;position:fixed;inset:0;z-index:850;background:rgba(0,0,0,0.65);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:720px;box-shadow:0 24px 60px rgba(0,0,0,0.5);overflow:hidden;margin:auto;">
-    <!-- Header -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Renovation Budget Approval</div>
-        <div id="rba_unit_header" style="font-size:16px;font-weight:700;color:#fff;"></div>
-      </div>
-      <button type="button" onclick="closeRenoBudget()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
-    </div>
-    <div style="padding:24px;display:flex;flex-direction:column;gap:18px;">
-
-      <!-- SOW cost + funder summary -->
-      <div id="rba_summary" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;"></div>
-
-      <!-- Eligible pools -->
-      <div>
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:4px;">Eligible Funding Pools <span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">— based on unit funder</span></div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;" id="rba_pool_rule"></div>
-        <div id="rba_pools" style="display:flex;flex-direction:column;gap:8px;"></div>
-      </div>
-
-      <!-- Fund allocation -->
-      <div>
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px;">Fund Allocation <span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">— critical systems must be funded first</span></div>
-        <div id="rba_alloc_rows" style="display:flex;flex-direction:column;gap:8px;"></div>
-        <div id="rba_alloc_summary" style="margin-top:10px;padding:10px 14px;border-radius:8px;font-size:12px;"></div>
-      </div>
-
-      <!-- Repayment (Rent-to-Own) -->
-      <div id="rba_repayment_section" style="display:none;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 18px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#92400e;margin-bottom:8px;">🏠 Rent-to-Own Repayment</div>
-        <div style="font-size:12px;color:#7a6000;margin-bottom:10px;">Tenant is expected to repay renovation costs. Set a repayment plan below.</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-          <div class="f"><label>Repayment Amount ($)</label><input type="text" id="rba_repay_amt" placeholder="$0" oninput="fmtCurrency(this)"/></div>
-          <div class="f"><label>Monthly Payment ($)</label><input type="text" id="rba_repay_monthly" placeholder="$0" oninput="fmtCurrency(this)"/></div>
-          <div class="f"><label>Start Date</label><input type="date" id="rba_repay_start"/></div>
-        </div>
-        <div class="f" style="margin-top:8px;"><label>Repayment Notes</label><textarea id="rba_repay_notes" rows="2" placeholder="Terms, conditions, agreement reference…"></textarea></div>
-      </div>
-
-      <!-- Over-budget ED approval -->
-      <div id="rba_over_budget_section" style="display:none;background:#fef2f2;border:1.5px solid #b91c1c;border-radius:10px;padding:14px 18px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#b91c1c;margin-bottom:8px;">⚠️ Over Budget — Executive Director Approval Required</div>
-        <div id="rba_over_budget_msg" style="font-size:12px;color:#b91c1c;margin-bottom:10px;"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="f"><label>ED Name <span class="r">*</span></label><input type="text" id="rba_ed_name" placeholder="Executive Director full name"/></div>
-          <div class="f"><label>Approval Date</label><input type="date" id="rba_ed_date"/></div>
-        </div>
-        <div class="f" style="margin-top:8px;"><label>ED Justification Notes <span class="r">*</span></label><textarea id="rba_ed_notes" rows="3" placeholder="Explain why over-budget approval is warranted…"></textarea></div>
-      </div>
-
-      <!-- HM Approval -->
-      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 18px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px;">Housing Manager Approval</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="f"><label>HM Name</label><input type="text" id="rba_hm_name" placeholder="Housing Manager full name"/></div>
-          <div class="f"><label>Approval Date</label><input type="date" id="rba_hm_date"/></div>
-        </div>
-        <div class="f" style="margin-top:8px;"><label>Approval Notes</label><textarea id="rba_hm_notes" rows="2" placeholder="Conditions, priorities, contractor selection notes…"></textarea></div>
-      </div>
-
-    </div>
-    <!-- Footer -->
-    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg);">
-      <div id="rba_status_badge" style="font-size:12px;font-weight:700;padding:5px 14px;border-radius:8px;"></div>
-      <div style="display:flex;gap:10px;">
-        <button type="button" onclick="closeRenoBudget()" class="btn btn-ghost">Cancel</button>
-        <button type="button" onclick="saveRenoBudgetApproval()" class="btn btn-primary">Grant Approval</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Renovation Progress Modal -->
-<div id="renoProgressModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:700px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-    <!-- Header -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Renovation Progress</div>
-        <div id="rp_unit_header" style="font-size:16px;font-weight:700;color:#fff;"></div>
-      </div>
-      <button type="button" onclick="closeRenoProgress()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
-    </div>
-    <div style="padding:24px;display:flex;flex-direction:column;gap:18px;">
-
-      <!-- Renovation Priority Score -->
-      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px 20px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px;">Renovation Priority Score</div>
-        <div id="rp_reno_score_badge"></div>
-      </div>
-
-      <!-- Overall progress -->
-      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px 20px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);">Overall Progress</div>
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span id="rp_status_label" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:#fef9ec;color:#7a6000;">Not Started</span>
-            <span id="rp_overall_pct" style="font-size:20px;font-weight:800;color:var(--text);">0%</span>
-          </div>
-        </div>
-        <div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;">
-          <div id="rp_overall_bar" style="height:100%;background:var(--yellow);border-radius:5px;width:0%;transition:width .4s;"></div>
-        </div>
-      </div>
-
-      <!-- SOW summary -->
-      <div>
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px;">Scope of Work</div>
-        <div id="rp_sow_summary" style="padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;"></div>
-      </div>
-
-      <!-- Progress fields -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="f">
-          <label>Status</label>
-          <select id="rp_status_select">
-            <option value="Not Started">Not Started</option>
-            <option value="In Progress">In Progress</option>
-            <option value="On Hold">On Hold</option>
-            <option value="Completed">Completed</option>
-          </select>
-        </div>
-        <div class="f">
-          <label>% Complete</label>
-          <input type="number" id="rp_pct_input" min="0" max="100" placeholder="0" oninput="var b=document.getElementById('rp_overall_bar');var p=document.getElementById('rp_overall_pct');if(b)b.style.width=(this.value||0)+'%';if(p)p.textContent=(this.value||0)+'%';"/>
-        </div>
-        <div class="f" style="position:relative;">
-          <label>Contractor</label>
-          <input type="text" id="rp_contractor" placeholder="Search contractors…" autocomplete="off"
-            oninput="rpContractorSearch(this.value)"
-            onfocus="rpContractorSearch(this.value)"
-            onblur="setTimeout(function(){var d=document.getElementById('rp_ct_dropdown');if(d)d.style.display='none';},180)"/>
-          <input type="hidden" id="rp_contractor_id"/>
-          <div id="rp_ct_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:999;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.15);"></div>
-        </div>
-        <div class="f">
-          <label>Target Completion</label>
-          <input type="date" id="rp_target_date"/>
-        </div>
-      </div>
-
-      <div class="f">
-        <label>Update Notes</label>
-        <textarea id="rp_notes" rows="3" placeholder="What was done today? Issues, milestones, next steps…"></textarea>
-      </div>
-
-      <!-- Photos -->
-      <div>
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px;">Photos</div>
-        <div id="rp_photo_preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;min-height:0;"></div>
-        <div id="rp_drop_zone"
-          ondragover="this.style.borderColor='var(--yellow)';event.preventDefault();"
-          ondragleave="this.style.borderColor='var(--border)';"
-          ondrop="event.preventDefault();this.style.borderColor='var(--border)';handleRenoPhotoDrop(event);"
-          onclick="document.getElementById('rp_photo_input').click()"
-          style="border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:border-color .15s;background:var(--bg);">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--muted);margin-bottom:4px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          <div style="font-size:12px;font-weight:600;color:var(--text);">Drag photos here or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">JPG, PNG, WEBP, PDF</div>
-          <input type="file" id="rp_photo_input" accept="image/*,.pdf,application/pdf" multiple style="display:none;" onchange="handleRenoPhotoUpload(this)"/>
-        </div>
-      </div>
-
-      <!-- Update history -->
-      <div>
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px;">Update History</div>
-        <div id="rp_history" style="display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto;"></div>
-      </div>
-
-    </div>
-    <!-- Footer -->
-    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:var(--bg);">
-      <button type="button" onclick="openRenoBudget(window._rpUnitId)" style="background:none;border:1.5px solid var(--yellow);color:var(--text);padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;">💰 Budget &amp; Approval</button>
-      <button type="button" onclick="closeRenoProgress()" class="btn btn-ghost">Close</button>
-      <button type="button" onclick="saveRenoProgress()" class="btn btn-primary">Save Update</button>
-    </div>
-  </div>
-</div>
-
-<!-- Tenant Search Modal (Employee) -->
-<div id="tenantSearchModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;" onclick="if(event.target===this)closeTenantSearch()">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Tenants</div>
-        <div style="font-size:16px;font-weight:700;color:#fff;">Find or Add a Tenant</div>
-      </div>
-      <button type="button" onclick="closeTenantSearch()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
-    </div>
-    <div style="padding:20px 24px;background:var(--bg);">
-      <!-- Quick actions -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
-        <button onclick="closeTenantSearch();openAddTenantModal()" style="background:var(--yellow);border:none;color:#111;padding:10px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;text-align:left;display:flex;align-items:center;gap:8px;">
-          <span style="font-size:18px;">➕</span><div><div style="font-size:12px;font-weight:700;">Add New Tenant</div><div style="font-size:10px;font-weight:400;opacity:.8;">Assign to a unit</div></div>
-        </button>
-        <button onclick="closeTenantSearch();openUnitSearch()" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;text-align:left;display:flex;align-items:center;gap:8px;">
-          <span style="font-size:18px;">🏠</span><div><div style="font-size:12px;font-weight:700;">Find a Unit</div><div style="font-size:11px;font-weight:400;color:var(--muted);">Search by address</div></div>
-        </button>
-      </div>
-      <!-- Tenant search -->
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px;">Search Existing Tenants</div>
-      <div style="position:relative;margin-bottom:12px;">
-        <input id="tenant_search_input" type="text" placeholder="Search by name or unit address…"
-          style="width:100%;box-sizing:border-box;padding:10px 14px 10px 36px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);"
-          oninput="tenantSearchFilter(this.value)"/>
-        <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      </div>
-      <div id="tenant_search_results" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
-    </div>
-  </div>
-</div>
-
-<!-- Tenant Files Panel -->
-<div id="tenantFilesPanel" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;padding:20px 16px;" onclick="if(event.target===this)closeTenantFilesPanel()">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,0.35);overflow:hidden;">
-    <!-- Header — sticky inside the flex column -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Tenant Files</div>
-        <div id="tfp_title" style="font-size:15px;font-weight:700;color:#fff;"></div>
-      </div>
-      <button onclick="closeTenantFilesPanel()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;">✕</button>
-    </div>
-    <!-- Scrollable body -->
-    <div style="padding:20px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;">
-      <!-- Upload zone -->
-      <div id="tfp_drop_zone"
-        ondragover="event.preventDefault();this.style.borderColor='var(--yellow)'"
-        ondragleave="this.style.borderColor='var(--border)'"
-        ondrop="tenantFilesDrop(event)"
-        onclick="document.getElementById('tfp_file_input').click()"
-        style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:var(--bg);margin-bottom:16px;transition:border-color .15s;">
-        <div style="font-size:24px;margin-bottom:6px;">📁</div>
-        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;">Drag files here or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
-        <div style="font-size:11px;color:var(--muted);">PDF, images, Word docs — any relevant tenant documents</div>
-        <input type="file" id="tfp_file_input" multiple accept=".pdf,image/*,.doc,.docx,.txt"
-          style="display:none;" onchange="tenantFilesUpload(this)"/>
-      </div>
-      <!-- File list -->
-      <div id="tfp_file_list" style="display:flex;flex-direction:column;gap:8px;"></div>
-      <div id="tfp_empty" style="display:none;padding:24px;text-align:center;color:var(--muted);font-size:13px;font-style:italic;">No files attached yet.</div>
-    </div>
-  </div>
-</div>
-
-<!-- Add Tenant Modal — Application-first gateway -->
-<div id="addTenantModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-
-    <!-- Header -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Tenant Management</div>
-        <div style="font-size:15px;font-weight:700;color:#fff;">Add / Assign a Tenant</div>
-      </div>
-      <button type="button" onclick="closeAddTenantModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
-    </div>
-
-    <div style="padding:24px;display:flex;flex-direction:column;gap:0;">
-
-      <!-- Policy notice -->
-      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 16px;margin-bottom:20px;display:flex;gap:12px;">
-        <span style="font-size:20px;flex-shrink:0;">📋</span>
-        <div>
-          <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:4px;">Application Required</div>
-          <div style="font-size:12px;color:#7a6000;line-height:1.5;">All tenants — including existing residents — must have a current housing application on file. This ensures up-to-date information is captured before unit assignment.</div>
-        </div>
-      </div>
-
-      <!-- Option 1: New application -->
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px;">Option 1 — New Tenant or Update Required</div>
-      <button onclick="closeAddTenantModal();newApp();" style="width:100%;background:var(--yellow);border:none;color:#111;border-radius:10px;padding:14px 18px;cursor:pointer;font-family:DM Sans,sans-serif;text-align:left;display:flex;align-items:center;gap:14px;margin-bottom:20px;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
-        <span style="font-size:26px;">📝</span>
-        <div>
-          <div style="font-size:13px;font-weight:700;">Start a New Application</div>
-          <div style="font-size:11px;font-weight:400;opacity:.8;margin-top:2px;">Opens the full housing application form to collect current information</div>
-        </div>
-        <svg style="margin-left:auto;flex-shrink:0;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
-
-      <!-- Option 2: Link existing approved application -->
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px;">Option 2 — Link Approved Application to a Unit</div>
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        <div class="f">
-          <label>Unit <span class="r">*</span></label>
-          <select id="at_unit" style="width:100%;">
-            <option value="">— Select a unit —</option>
-          </select>
-        </div>
-        <div style="position:relative;">
-          <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Application ID <span class="r">*</span></label>
-          <input type="text" id="at_appid" placeholder="Type name or APP-ID to search…" autocomplete="off"
-            style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"
-            oninput="atSearchApps(this.value)" onfocus="atSearchApps(this.value)"
-            onblur="setTimeout(function(){var d=document.getElementById('at_app_dropdown');if(d)d.style.display='none';},180)"/>
-          <div id="at_app_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:999;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.15);"></div>
-          <input type="hidden" id="at_appid_val"/>
-          <div id="at_app_selected" style="display:none;margin-top:6px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;font-size:12px;"></div>
-        </div>
-        <div class="f">
-          <label>Move-in Date <span class="r">*</span></label>
-          <input type="date" id="at_date"/>
-        </div>
-        <div class="f">
-          <label>Status</label>
-          <select id="at_status">
-            <option value="occupied">Occupied</option>
-            <option value="reserved">Reserved</option>
-          </select>
-        </div>
-        <div id="at_error" style="display:none;color:#b91c1c;font-size:12px;font-weight:600;padding:8px 12px;background:#fef2f2;border-radius:7px;"></div>
-      </div>
-
-    </div>
-    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg);">
-      <button type="button" onclick="closeAddTenantModal()" class="btn btn-ghost">Cancel</button>
-      <button type="button" onclick="saveAddTenant()" class="btn btn-primary">Assign to Unit</button>
-    </div>
-  </div>
-</div>
-
-
-<div id="renoApprovalsView" style="display:none;width:100%;flex-direction:column;padding:clamp(16px,4vw,40px) clamp(14px,3vw,40px);box-sizing:border-box;max-width:1100px;margin:0 auto;"></div>
-<!-- ═══ RENOVATION SCOPE OF WORK MODAL ═══ -->
-<!-- ══ PRINT PANEL ══ -->
-<div id="printPanel" style="display:none;position:fixed;inset:0;z-index:1100;background:#f0f0ec;overflow-y:auto;">
-  <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;">
-    <span id="printPanelTitle" style="color:#fff;font-weight:700;font-size:14px;">Document Preview</span>
-    <div style="display:flex;gap:8px;">
-      <button onclick="triggerPrint()" style="background:var(--yellow);border:none;color:#111;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;">🖨 Print</button>
-      <button onclick="closePrintPanel()" style="background:none;border:1px solid #555;color:#ccc;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;">✕ Close</button>
-    </div>
-  </div>
-  <div id="printPanelBody" style="max-width:900px;margin:0 auto;padding:32px 24px;"></div>
-</div>
-
-<!-- ══ UNIT DETAIL PANEL ══ -->
-<div id="unitDetailPanel" style="display:none;position:fixed;inset:0;z-index:750;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.35);margin:auto;">
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;">
-      <div>
-        <div id="udp_address" style="font-size:15px;font-weight:700;color:#fff;"></div>
-        <div id="udp_type" style="font-size:11px;color:#888;margin-top:2px;"></div>
-      </div>
-      <button onclick="closeUnitDetail()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;">✕</button>
-    </div>
-    <div style="padding:20px;display:flex;flex-direction:column;gap:16px;">
-      <div id="udp_status_row" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
-      <div id="udp_tenant_section" style="display:none;">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;">Tenant</div>
-        <div id="udp_tenant_info" style="font-size:13px;font-weight:600;"></div>
-      </div>
-      <div id="udp_details" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;"></div>
-      <div id="udp_notes_section" style="display:none;">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:6px;">Notes</div>
-        <div id="udp_notes" style="font-size:13px;color:var(--text);"></div>
-      </div>
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;">Photos</div>
-        <div id="udp_photos" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
-      </div>
-      <!-- Tenant files -->
-      <div id="udp_files_section">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px;">Tenant Files</div>
-        <!-- Inline drag and drop zone -->
-        <div id="udp_drop_zone"
-          ondragover="event.preventDefault();document.getElementById('udp_drop_zone').style.borderColor='var(--yellow)';document.getElementById('udp_drop_zone').style.background='var(--yellow-light)'"
-          ondragleave="document.getElementById('udp_drop_zone').style.borderColor='var(--border)';document.getElementById('udp_drop_zone').style.background='var(--bg)'"
-          ondrop="udpFileDrop(event)"
-          onclick="document.getElementById('udp_file_input_inline').click()"
-          style="border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;background:var(--bg);margin-bottom:12px;transition:border-color .15s,background .15s;">
-          <div style="font-size:20px;margin-bottom:4px;">📎</div>
-          <div style="font-size:12px;font-weight:600;color:var(--text);">Drag files here or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">PDF, images, Word docs</div>
-          <input type="file" id="udp_file_input_inline" multiple accept=".pdf,image/*,.doc,.docx,.txt"
-            style="display:none;" onchange="udpFileUploadInline(this)"/>
-        </div>
-        <div id="udp_file_previews" style="display:flex;flex-direction:column;gap:6px;"></div>
-        <div id="udp_files_empty" style="font-size:12px;color:var(--muted);font-style:italic;display:none;">No files attached yet.</div>
-      </div>
-      <div style="display:flex;gap:8px;">
-        <button onclick="openUnitEditFromDetail()" class="btn btn-primary" style="flex:1;">Edit Unit</button>
-        <button onclick="closeUnitDetail()" class="btn btn-ghost">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ══ CONTRACTOR DETAIL PANEL ══ -->
-<div id="contractorDetailPanel" style="display:none;position:fixed;inset:0;z-index:750;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;" onclick="if(event.target===this)closeContractorDetail()">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:580px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-
-    <!-- Header -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;">
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:3px;">Constance Lake First Nation — Housing</div>
-        <div id="cdp_name" style="font-size:16px;font-weight:700;color:#fff;"></div>
-        <div id="cdp_trade" style="font-size:11px;color:#888;margin-top:2px;"></div>
-      </div>
-      <button onclick="closeContractorDetail()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
-    </div>
-
-    <!-- Body -->
-    <div style="padding:24px;display:flex;flex-direction:column;gap:0;">
-
-      <!-- Contact Information -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Contact Information</div>
-        </div>
-        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div>
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Phone</div>
-            <div id="cdp_phone" style="font-size:13px;font-weight:500;color:var(--text);"></div>
-          </div>
-          <div>
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Email</div>
-            <div id="cdp_email" style="font-size:13px;font-weight:500;color:var(--text);word-break:break-all;"></div>
-          </div>
-          <div style="grid-column:span 2;">
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Address</div>
-            <div id="cdp_address" style="font-size:13px;font-weight:500;color:var(--text);"></div>
-          </div>
-          <div>
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">HST #</div>
-            <div id="cdp_hst" style="font-size:13px;font-weight:500;color:var(--text);"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Compliance & Insurance -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Compliance &amp; Insurance</div>
-        </div>
-        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div>
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">WSIB #</div>
-            <div id="cdp_wsib_num" style="font-size:13px;font-weight:500;color:var(--text);"></div>
-          </div>
-          <div>
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">WSIB Expiry</div>
-            <div id="cdp_wsib_expiry" style="font-size:13px;font-weight:600;"></div>
-          </div>
-          <div>
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Insurance Provider</div>
-            <div id="cdp_ins_provider" style="font-size:13px;font-weight:500;color:var(--text);"></div>
-          </div>
-          <div>
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Policy #</div>
-            <div id="cdp_ins_policy" style="font-size:13px;font-weight:500;color:var(--text);"></div>
-          </div>
-          <div>
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Coverage Amount</div>
-            <div id="cdp_ins_amount" style="font-size:13px;font-weight:500;color:var(--text);"></div>
-          </div>
-          <div>
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Insurance Expiry</div>
-            <div id="cdp_ins_expiry" style="font-size:13px;font-weight:600;"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Key Contacts -->
-      <div class="card" id="cdp_people_card" style="margin-bottom:16px;padding:0;overflow:hidden;display:none;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Key Contacts</div>
-        </div>
-        <div id="cdp_people" style="padding:16px;display:flex;flex-direction:column;gap:10px;"></div>
-      </div>
-
-      <!-- Notes -->
-      <div class="card" id="cdp_notes_card" style="margin-bottom:16px;padding:0;overflow:hidden;display:none;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Notes</div>
-        </div>
-        <div style="padding:16px;">
-          <div id="cdp_notes" style="font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap;"></div>
-        </div>
-      </div>
-
-      <!-- Footer actions -->
-      <div style="display:flex;gap:10px;justify-content:flex-end;">
-        <button onclick="closeContractorDetail()" class="btn btn-ghost">Close</button>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-<!-- ══ ADD UNIT MODAL ══ -->
-<div id="addUnitModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:580px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:15px;font-weight:700;color:#fff;">Add New Unit</div>
-      <button onclick="closeAddUnitModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;">✕</button>
-    </div>
-    <div style="padding:24px;display:flex;flex-direction:column;gap:13px;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;">
-        <div class="f"><label>Street Address <span class="r">*</span></label><input type="text" id="au_street" placeholder="e.g. Musko Road"/></div>
-        <div class="f"><label>Unit Number <span class="r">*</span></label><input type="text" id="au_num" placeholder="e.g. 11"/></div>
-        <div class="f"><label>Bedrooms</label><select id="au_bedrooms"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></div>
-        <div class="f"><label>Bathrooms</label><select id="au_bathrooms"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
-        <div class="f"><label>Type</label><select id="au_type"><option value="">— Select —</option><option value="detached unit">Detached</option><option value="duplex unit">Duplex</option><option value="4-plex unit">4-Plex</option><option value="5-plex unit">5-Plex</option><option value="6-plex unit">6-Plex</option><option value="complex">Complex</option><option value="mobile unit">Mobile</option></select></div>
-        <div class="f"><label>Foundation</label><select id="au_foundation"><option value="">— Select —</option><option value="basement">Basement</option><option value="crawlspace">Crawlspace</option><option value="Slab">Slab</option><option value="unknown">Unknown</option></select></div>
-        <div class="f"><label>Funder / Program</label><select id="au_funder"><option value="">None / Band</option><option value="ISC">ISC</option><option value="CMHC_95">CMHC Sec. 95</option><option value="CMHC_56">CMHC Sec. 56.1</option><option value="Other">Other</option></select></div>
-        <div class="f"><label>Phase</label><input type="text" id="au_phase" placeholder="e.g. 15"/></div>
-        <div class="f"><label>Year Built</label><input type="text" id="au_year" placeholder="e.g. 1998"/></div>
-      </div>
-      <div style="display:flex;gap:20px;">
-        <div class="ftog"><label class="tsw"><input type="checkbox" id="au_accessible"/><span class="tsl"></span></label><label for="au_accessible">Accessible ♿</label></div>
-        <div class="ftog"><label class="tsw"><input type="checkbox" id="au_isElders"/><span class="tsl"></span></label><label for="au_isElders">Elders Unit</label></div>
-      </div>
-      <div class="f"><label>Notes</label><textarea id="au_notes" rows="2" placeholder="Internal notes…"></textarea></div>
-      <!-- Photo upload -->
-      <div>
-        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:8px;">Photos</label>
-        <div id="au_photo_preview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;min-height:0;"></div>
-        <div ondragover="photoDragOver(event,'au_drop_zone')" ondragleave="photoDragLeave('au_drop_zone')" ondrop="photoDrop(event,'add')"
-          id="au_drop_zone" style="border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;background:var(--bg);"
-          onclick="document.getElementById('au_photo_input').click()">
-          <div style="font-size:13px;color:var(--muted);">Drag photos or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
-          <input type="file" id="au_photo_input" accept="image/*,.pdf,application/pdf" multiple style="display:none;" onchange="handleAddUnitPhotoUpload(this)"/>
-        </div>
-      </div>
-    </div>
-    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:var(--bg);">
-      <button onclick="closeAddUnitModal()" class="btn btn-ghost">Cancel</button>
-      <button onclick="saveNewUnit()" class="btn btn-primary">Add Unit</button>
-    </div>
-  </div>
-</div>
-
 <div id="sowModal" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:700px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
 
@@ -2201,75 +990,6 @@
       </div>
     </div>
   </div>
-</div>
-
-<div id="unitEditModal" style="display:none;position:fixed;inset:0;z-index:700;background:rgba(0,0,0,0.55);align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-    <!-- Header -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:3px;">Edit Unit</div>
-        <div id="ue_modal_title" style="font-size:16px;font-weight:700;color:#fff;"></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <button id="ue_sow_btn" onclick="ueOpenSow()" title="Scope of Work"
-          style="background:none;border:1px solid #555;color:#ccc;border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;white-space:nowrap;"
-          onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'"
-          onmouseout="this.style.borderColor='#555';this.style.color='#ccc'">
-          🔨 SOW
-        </button>
-        <button onclick="closeUnitEditModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
-      </div>
-    </div>
-    <!-- Body -->
-    <div style="padding:24px;display:flex;flex-direction:column;gap:16px;">
-
-      <!-- Address row -->
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Address</div>
-        <div style="display:grid;grid-template-columns:80px 1fr;gap:10px;">
-          <div class="f"><label>Number</label><input id="ue_num" type="text"/></div>
-          <div class="f"><label>Street</label><input id="ue_street" type="text"/></div>
-        </div>
-      </div>
-
-      <!-- Unit details -->
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Unit Details</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-          <div class="f"><label>Bedrooms</label>
-            <select id="ue_bedrooms">
-              <option value="1">1</option><option value="2">2</option><option value="3">3</option>
-              <option value="4">4</option><option value="5">5</option><option value="6">6</option>
-            </select>
-          </div>
-          <div class="f"><label>Bathrooms</label><input id="ue_bathrooms" type="text" placeholder="e.g. 1"/></div>
-          <div class="f"><label>Year Built</label><input id="ue_year" type="text" placeholder="e.g. 1998"/></div>
-          <div class="f"><label>Type</label>
-            <select id="ue_type">
-              <option value="">— Select —</option>
-              <option value="detached unit">Detached</option>
-              <option value="duplex unit">Duplex</option>
-              <option value="4-plex unit">4-plex</option>
-              <option value="5-plex unit">5-plex</option>
-              <option value="6-plex unit">6-plex</option>
-              <option value="complex">Complex</option>
-              <option value="mobile unit">Mobile</option>
-            </select>
-          </div>
-          <div class="f"><label>Foundation</label>
-            <select id="ue_foundation">
-              <option value="">— Select —</option>
-              <option value="basement">Basement</option>
-              <option value="crawlspace">Crawlspace</option>
-              <option value="Slab">Slab</option>
-              <option value="unknown">Unknown</option>
-            </select>
-          </div>
-          <div class="f"><label>Phase</label><input id="ue_phase" type="text" placeholder="e.g. 15"/></div>
-        </div>
-      </div>
-</div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -2804,6 +1524,60 @@ function showToast(msg) {
   document.body.appendChild(t);
   setTimeout(function(){t.remove();},2800);
 }
+
+// ── Header handlers (cross-page navigation stubs) ──────────────────────────
+// These handlers exist on the always-visible app header. On the renos page,
+// they cross-navigate to the housing page or the login page as appropriate.
+function showDash() {
+  // Return to main housing home page
+  window.location.href = 'housing.html';
+}
+function showSettings() {
+  var role = window.currentRole || 'employee';
+  if(role !== 'housing_manager' && role !== 'ed') {
+    showToast('Settings are only accessible to the Housing Manager and Executive Director.');
+    return;
+  }
+  window.location.href = 'housing.html#settings';
+}
+function showAddHousingStaff() {
+  var role = window.currentRole || 'employee';
+  if(role !== 'housing_manager' && role !== 'ed') {
+    showToast('Staff management is only accessible to the Housing Manager and Executive Director.');
+    return;
+  }
+  window.location.href = 'housing.html#settings-users';
+}
+function headerSignOut() {
+  if(!confirm('Sign out of CLFN Housing?')) return;
+  // Clear Supabase auth session
+  try {
+    if(typeof SUPABASE_URL !== 'undefined' && typeof HOUSING_HEADERS !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.accessToken) {
+      fetch(SUPABASE_URL+'/auth/v1/logout',{method:'POST',headers:HOUSING_HEADERS}).catch(function(){});
+    }
+  } catch(e){}
+  // Clear localStorage — app config that persists across sessions
+  try {
+    ['clfn_applications','clfn_housing_units',
+     'clfn_scoring_model','clfn_scoring_model_v2','clfn_scoring_tiers_v2',
+     'clfn_budget_pools','clfn_reno_score_model_v3','clfn_unit_score_model',
+     'HOUSING_REMEMBER_KEY']
+      .forEach(function(k){ try { localStorage.removeItem(k); } catch(e){} });
+  } catch(e){}
+  // Clear sessionStorage
+  try {
+    ['clfn_housing_token','clfn_housing_role','clfn_housing_name','clfn_housing_email_session']
+      .forEach(function(k){ try { sessionStorage.removeItem(k); } catch(e){} });
+  } catch(e){}
+  // Clear in-memory caches so stale data can't leak to the next page load
+  ['_contractors','_sowCache','_renoProgress','_appSettings','_renoBudget',
+   '_unitPhotos','_staffCache','_editingUnitId','_rbaUnitId','_sowUnitId',
+   '_currentDetailUnitId','_ctLastSaved','_pendingLookupUser']
+    .forEach(function(k){ try { window[k] = undefined; delete window[k]; } catch(e){} });
+  // Redirect to login screen
+  window.location.href = 'index.html';
+}
+
 function auditEntry(appId,action,detail,user){
   var actor = user||window.currentRole||'Staff';
   var entry = {ts:new Date().toISOString(),appId:appId,action:action,detail:detail,user:actor};
@@ -3191,15 +1965,6 @@ function setupHeaderRoleToggle(realRole) {
 }
 
 
-
-function headerSignOut() {
-  if(HOUSING_SESSION && HOUSING_SESSION.accessToken) {
-    if(confirm('Sign out of CLFN Housing?')) doLogout();
-  } else {
-    switchRole('employee');
-    showToast('Signed out — reset to Employee role.');
-  }
-}
 
 function onAppTypeChange() {
   var isExisting = document.getElementById('apptype_existing') && document.getElementById('apptype_existing').checked;
@@ -3726,59 +2491,6 @@ function openRenoProgress(unitId) {
   var modal = document.getElementById('renoProgressModal');
   if(modal){ modal.style.removeProperty('display'); modal.style.setProperty('display','flex','important'); }
   renderRenoScoreBadge(unitId);
-}
-
-function closeRenoProgress() {
-  var modal = document.getElementById('renoProgressModal');
-  if(modal) modal.style.display = 'none';
-  window._rpPendingPhotos = [];
-  window._rpStoredPhotos = [];
-}
-
-function saveRenoProgress() {
-  var unitId = window._rpUnitId;
-  if(!unitId) return;
-  var get = function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
-  var status   = get('rp_status_select') || 'Not Started';
-  var pct      = parseInt(get('rp_pct_input'))||0;
-  var notes    = get('rp_notes');
-  var contr    = get('rp_contractor');
-  var contrId  = (document.getElementById('rp_contractor_id')||{}).value||'';
-  var tgtDate  = get('rp_target_date');
-  var pending  = window._rpPendingPhotos || [];
-  var stored   = window._rpStoredPhotos || [];
-
-  // Load existing
-  var prog = null;
-  prog = (window._renoProgress && window._renoProgress[unitId]) || null;
-  if(!prog) prog = { updates:[], photos:[] };
-
-  // Append new update entry
-  var today = new Date().toISOString().slice(0,10);
-  if(notes || pending.length) {
-    prog.updates = prog.updates || [];
-    prog.updates.push({ date:today, status:status, pct:pct, notes:notes, photos:pending.slice() });
-  }
-
-  // Update top-level state
-  prog.status     = status;
-  prog.overallPct = pct;
-  prog.contractor   = contr;
-  prog.contractorId = contrId;
-  prog.targetDate = tgtDate;
-  prog.photos     = stored.concat(pending); // all photos
-
-  if(!window._renoProgress) window._renoProgress = {};
-  window._renoProgress[unitId] = prog;
-  fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress', {
-    method: 'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-    body: JSON.stringify({ unit_id: unitId, data: prog, updated_at: new Date().toISOString() })
-  }).catch(function(e){ console.warn('Reno progress save failed:',e); });
-
-  closeRenoProgress();
-  renderRenosView();
-  showToast('Progress updated');
 }
 
 
@@ -4511,15 +3223,33 @@ function saveContractor(){
 
 function deleteContractor(idx){
   var contractors = (window._contractors || []).slice();
+  // Capture BEFORE removing (original: spliced first, then read wrong index)
+  var delCt = contractors[idx];
+  if(!delCt) { showToast('Contractor not found.'); return; }
   contractors.splice(idx,1);
   window._contractors = contractors;
-  // Delete from Supabase
-  var delCt = contractors[idx] || {};
-  if(delCt.id) {
-    fetch(SUPABASE_URL+'/rest/v1/housing_contractors?id=eq.'+encodeURIComponent(delCt.id), { method:'DELETE', headers:HOUSING_HEADERS }).catch(function(){});
-  }
   renderContractorsView();
-  showToast('Contractor removed.');
+  if(delCt.id) {
+    fetch(SUPABASE_URL+'/rest/v1/housing_contractors?id=eq.'+encodeURIComponent(delCt.id), { method:'DELETE', headers:HOUSING_HEADERS })
+      .then(function(r){
+        if(!r.ok) {
+          contractors.splice(idx, 0, delCt);
+          window._contractors = contractors;
+          renderContractorsView();
+          showToast('Could not remove contractor — ' + (r.status===401||r.status===403 ? 'permission denied' : 'server error '+r.status));
+          return;
+        }
+        showToast('Contractor removed.');
+      })
+      .catch(function(e){
+        contractors.splice(idx, 0, delCt);
+        window._contractors = contractors;
+        renderContractorsView();
+        showToast('Could not remove contractor — ' + (e.message||'network error'));
+      });
+  } else {
+    showToast('Contractor removed.');
+  }
 }
 
 
@@ -5146,10 +3876,18 @@ function addUserFromResult(name, email, role){
   var settings = window._appSettings || {};
   var users = settings.users || [];
   if(users.find(function(u){return u.email===email;})){ showToast('User already exists'); return; }
+  var prevUsers = users.slice();
   users.push({name:name, email:email, role:role});
   settings.users = users;
   window._appSettings = settings;
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings',{method:'POST',headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({key:'app_settings',value:settings})}).catch(function(){});
+  sbSaveSetting('app_settings', settings).then(function(ok){
+    if(!ok){
+      settings.users = prevUsers;
+      window._appSettings = settings;
+      populateSettings();
+      showToast('Could not save — ' + name + ' was NOT added. Please retry.');
+    }
+  });
   var emailEl = document.getElementById('user_lookup_email');
   if(emailEl) emailEl.value='';
   var resultEl = document.getElementById('user_lookup_result');
@@ -5165,10 +3903,18 @@ function removeUser(btn){
   var email = emailCell ? emailCell.textContent.trim() : '';
   if(!email) return;
   var settings = window._appSettings || {};
+  var prevUsers = (settings.users||[]).slice();
   var removedUser=(settings.users||[]).find(function(u){return u.email===email;});
   settings.users = (settings.users||[]).filter(function(u){ return u.email!==email; });
   window._appSettings = settings;
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings',{method:'POST',headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({key:'app_settings',value:settings})}).catch(function(){});
+  sbSaveSetting('app_settings', settings).then(function(ok){
+    if(!ok){
+      settings.users = prevUsers;
+      window._appSettings = settings;
+      populateSettings();
+      showToast('Could not save — user NOT removed. Please retry.');
+    }
+  });
   auditEntry('SETTINGS','settings_user_remove','User removed: '+(removedUser?removedUser.name+' ('+email+')':email),window.currentRole||'staff');
   populateSettings();
   showToast('User removed');
@@ -5567,6 +4313,138 @@ function ctGetPeople() {
     if(el.classList.contains('ct-person-email')) seen[i].email = el.value.trim();
   });
   return people.filter(function(p){ return p && (p.name||p.phone||p.email); });
+}
+
+// ── Ported from housing.html: shared handlers on active renos modals ─────────
+
+// Currency formatter — used by renoBudgetModal repayment amount field
+function fmtCurrency(input) {
+  var v = input.value.replace(/[^0-9]/g, '');
+  input.value = v ? '$' + parseInt(v, 10).toLocaleString() : '';
+}
+
+// Adds a blank "Key Person" row in the Add Contractor modal
+function ctAddPerson() {
+  var people = ctGetPeople();
+  people.push({name:'', phone:'', email:''});
+  ctRenderPeople(people);
+  var inputs = document.querySelectorAll('.ct-person-name');
+  if(inputs.length) inputs[inputs.length-1].focus();
+}
+
+// Signature UI tab switcher — used by sowModal and addContractorModal signature blocks
+function setSigMethod(canvasId, method) {
+  var methods = ['canvas', 'type', 'wet'];
+  methods.forEach(function(m) {
+    var panel = document.getElementById(canvasId + '_panel_' + m);
+    var tab   = document.getElementById(canvasId + '_tab_' + m);
+    if(panel) panel.style.display = (m === method) ? 'block' : 'none';
+    if(tab) {
+      tab.style.borderBottomColor = (m === method) ? 'var(--yellow)' : 'transparent';
+      tab.style.color = (m === method) ? 'var(--text)' : 'var(--muted)';
+      tab.style.fontWeight = (m === method) ? '700' : '600';
+    }
+  });
+}
+
+// Reads signature data from a signature pad (canvas/type/wet tri-state)
+function getSigDataURL(canvasId) {
+  var activePanel = document.getElementById(canvasId + '_panel_type');
+  if(activePanel && activePanel.style.display !== 'none') {
+    var typed = document.getElementById(canvasId + '_typed');
+    return typed && typed.value.trim() ? 'typed:' + typed.value.trim() : '';
+  }
+  var wetPanel = document.getElementById(canvasId + '_panel_wet');
+  if(wetPanel && wetPanel.style.display !== 'none') {
+    var ref = document.getElementById(canvasId + '_wet_ref');
+    return ref && ref.value.trim() ? 'wet:' + ref.value.trim() : 'wet:pending';
+  }
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return '';
+  var ctx = canvas.getContext('2d');
+  var data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  var hasContent = false;
+  for (var i = 3; i < data.length; i += 4) { if (data[i] > 0) { hasContent = true; break; } }
+  return hasContent ? canvas.toDataURL('image/png') : '';
+}
+
+// Funding-program rules used by the renovation budget approval flow
+var RENO_FUND_RULES = {
+  'ISC':        { pools:['rrap','band','ofnlp'],         label:'ISC House',         rule:'Eligible: RRAP Funds + Band Funds + OFNLP' },
+  'CMHC_95':    { pools:['cmhc','band','ofnlp'],         label:'CMHC Section 95',   rule:'Eligible: CMHC Replacement Funds + Band Funds + OFNLP' },
+  'CMHC_56':    { pools:['cmhc','band','ofnlp'],         label:'CMHC Section 56.1', rule:'Eligible: CMHC Replacement Funds + Band Funds + OFNLP' },
+  'rent_to_own':{ pools:['rrap','isc','band','ofnlp'],   label:'Rent-to-Own',       rule:'Eligible: RRAP + ISC + Band Funds + OFNLP. Tenant repayment expected.', repayment:true },
+  '':           { pools:['band','ofnlp'],                label:'Band / None',       rule:'Eligible: Band Funds + OFNLP (all units eligible for OFNLP)' },
+};
+
+// Renovation budget approval — called from renoBudgetModal footer
+function saveRenoBudgetApproval() {
+  var unitId = window._rbaUnitId;
+  if(!unitId) return;
+
+  var allUnits = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var u = allUnits.find(function(x){ return x.id===unitId; });
+  var funder = u ? (u.funder||'') : '';
+  var rule = RENO_FUND_RULES[funder] || RENO_FUND_RULES[''];
+
+  // Collect allocations
+  var allocations = {};
+  var totalAlloc = 0;
+  document.querySelectorAll('#rba_alloc_rows [id^="rba_pool_"]').forEach(function(sel){
+    var key = sel.id.replace('rba_pool_','');
+    var amtEl = document.getElementById('rba_amt_'+key);
+    var amt = parseFloat((amtEl&&amtEl.value)||0)||0;
+    allocations[key] = { pool:sel.value, amount:amt };
+    totalAlloc += amt;
+  });
+
+  // Check over-budget
+  var budgetData = loadBudgetData() || getDefaultBudget();
+  var overBudget = false;
+  rule.pools.forEach(function(pid){
+    var poolData = budgetData.pools[pid]||{allocated:0};
+    var available = (poolData.allocated||0) - _getPoolSpent(pid);
+    var using = 0;
+    Object.keys(allocations).forEach(function(k){ if(allocations[k].pool===pid) using+=allocations[k].amount; });
+    if(using > available) overBudget = true;
+  });
+
+  var get = function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
+
+  if(overBudget) {
+    var edName = get('rba_ed_name');
+    var edNotes = get('rba_ed_notes');
+    if(!edName || !edNotes) {
+      showToast('Over-budget requests require ED name and written justification.');
+      return;
+    }
+  }
+
+  var approval = {
+    unitId:unitId, approvedAt:new Date().toISOString(), approved:true,
+    overBudgetApproved:overBudget,
+    allocations:allocations, totalAllocated:totalAlloc,
+    hmName:get('rba_hm_name'), hmDate:get('rba_hm_date'), hmNotes:get('rba_hm_notes'),
+    edName:overBudget?get('rba_ed_name'):'', edDate:overBudget?get('rba_ed_date'):'', edNotes:overBudget?get('rba_ed_notes'):'',
+  };
+
+  if(rule.repayment) {
+    approval.repayment = {
+      amount:get('rba_repay_amt'), monthly:get('rba_repay_monthly'),
+      start:get('rba_repay_start'), notes:get('rba_repay_notes')
+    };
+  }
+
+  if(!window._renoBudget) window._renoBudget = {};
+  window._renoBudget[unitId] = approval;
+  fetch(SUPABASE_URL+'/rest/v1/housing_reno_budget', {
+    method: 'POST',
+    headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
+    body: JSON.stringify({ unit_id: unitId, data: approval, updated_at: new Date().toISOString() })
+  }).catch(function(e){ console.warn('Reno budget save failed:',e); });
+  closeRenoBudget();
+  renderRenosView();
+  showToast(overBudget ? 'Over-budget approval saved — ED sign-off recorded' : 'Budget approval granted');
 }
 
 function openSowModal(unitId) {
@@ -6898,8 +5776,15 @@ function loadBudgetData(){
 }
 function saveBudgetData(data){
   if(!window._appSettings) window._appSettings={};
+  var prev = window._appSettings['budget_pools'];
   window._appSettings['budget_pools']=data;
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings',{method:'POST',headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({key:'budget_pools',value:data})}).catch(function(){});
+  sbSaveSetting('budget_pools', data).then(function(ok){
+    if(!ok){
+      if(prev === undefined) delete window._appSettings['budget_pools'];
+      else window._appSettings['budget_pools'] = prev;
+      showToast('Could not save budget — changes NOT persisted. Please retry.');
+    }
+  });
 }
 function getDefaultBudget(){
   var obj={fiscalYear:'2025-2026',pools:{}};
@@ -6976,9 +5861,16 @@ function saveBudgetPools(){
   var limitEl = document.getElementById('settings_hm_budget_limit');
   if(limitEl && limitEl.value) {
     var s = window._appSettings || {};
+    var prevLimit = s.hmBudgetLimit;
     s.hmBudgetLimit = parseFloat(limitEl.value)||25000;
     window._appSettings = s;
-    fetch(SUPABASE_URL+'/rest/v1/housing_settings',{method:'POST',headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({key:'app_settings',value:s})}).catch(function(){});
+    sbSaveSetting('app_settings', s).then(function(ok){
+      if(!ok){
+        s.hmBudgetLimit = prevLimit;
+        window._appSettings = s;
+        showToast('Could not save HM budget limit — retry.');
+      }
+    });
   }
   var fyEl = document.getElementById('budget_fiscal_year');
   var data = {fiscalYear: fyEl ? fyEl.value : '2025-2026', pools:{}};
@@ -6990,7 +5882,7 @@ function saveBudgetPools(){
       notes: notesEl ? notesEl.value : ''
     };
   });
-  saveBudgetData(data);
+  saveBudgetData(data);  // has its own error handling
   var hmLimitEl=document.getElementById('settings_hm_budget_limit');
   auditEntry('SETTINGS','settings_budget_save','Budget allocations saved for '+data.fiscalYear+(hmLimitEl?' — HM limit: $'+hmLimitEl.value:''),window.currentRole||'staff');
   showToast('Budget allocations saved');
@@ -7066,7 +5958,8 @@ function updateUnitScorePts(id,val){
   if(row)row.pts=parseInt(val)||0;
   if(!window._appSettings) window._appSettings={};
   window._appSettings['unit_score_model']=model;
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings',{method:'POST',headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({key:'unit_score_model',value:model})}).catch(function(){});
+  // Fire-and-forget — runs on every keystroke
+  sbSaveSetting('unit_score_model', model);
   var maxScore=0;
   ['bed','acc','eld'].forEach(function(g){
     var mx=Math.max.apply(null,model.filter(function(r){return r.group===g;}).map(function(r){return r.pts;}));
@@ -7083,10 +5976,12 @@ function saveUnitScoreModel(){
   });
   if(!window._appSettings) window._appSettings={};
   window._appSettings['unit_score_model']=model;
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings',{method:'POST',headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({key:'unit_score_model',value:model})}).catch(function(){});
-  auditEntry('SETTINGS','settings_unit_score_save','Unit matching scoring model saved',window.currentRole||'staff');
-  showToast('Unit match scoring saved');
-  renderUnitScoreTable();
+  sbSaveSetting('unit_score_model', model).then(function(ok){
+    if(!ok){ showToast('Unit match scoring did NOT save to server — please retry.'); return; }
+    auditEntry('SETTINGS','settings_unit_score_save','Unit matching scoring model saved',window.currentRole||'staff');
+    showToast('Unit match scoring saved');
+    renderUnitScoreTable();
+  });
 }
 
 // ══ RENOVATION PRIORITY SCORING MODEL ══════════════════════════════════════
@@ -7169,10 +6064,12 @@ function saveRenoScoreModel() {
   });
   if(!window._appSettings) window._appSettings={};
   window._appSettings['reno_score_model']=model;
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings',{method:'POST',headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({key:'reno_score_model',value:model})}).catch(function(){});
-  auditEntry('SETTINGS','settings_reno_score_save','Renovation priority scoring model saved',window.currentRole||'staff');
-  showToast('Renovation scoring saved');
-  renderRenoScoreTable();
+  sbSaveSetting('reno_score_model', model).then(function(ok){
+    if(!ok){ showToast('Renovation scoring did NOT save to server — please retry.'); return; }
+    auditEntry('SETTINGS','settings_reno_score_save','Renovation priority scoring model saved',window.currentRole||'staff');
+    showToast('Renovation scoring saved');
+    renderRenoScoreTable();
+  });
 }
 
 function resetRenoScoreModel() {
@@ -8143,4 +7040,7 @@ function exportRenoApprovalsPDF() {
   setTimeout(function(){w.focus();w.print();},400);
 }
 </script>
+</div>
+</div>
+</body>
 </html>
