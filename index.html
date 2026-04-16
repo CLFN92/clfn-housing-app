@@ -1810,7 +1810,10 @@ function updateRoleSwitcherVisibility() {}
 function switchRole(role) {
   window.currentRole = role;
   window.CLFN_AUTH.currentRole = role;
+  sessionStorage.setItem('clfn_housing_role', role);
   updateHeaderUser(role);
+  // Re-render home tiles for new role
+  if(typeof showEmployeeHome === 'function') showEmployeeHome();
 }
 function auditEntry() {}
 function getRole() { return window.currentRole || 'employee'; }

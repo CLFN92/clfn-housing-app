@@ -4067,8 +4067,16 @@ function closeRenoBudget() {
 }());
 async function loadRenosData() {
   try {
-    var uR = await fetch(SUPABASE_URL+'/rest/v1/housing_units?select=*&order=street,num&limit=9999',{headers:HOUSING_HEADERS});
-    if(uR.ok) {
+    // Fetch all data in parallel for faster load
+    var results = await Promise.all([
+      fetch(SUPABASE_URL+'/rest/v1/housing_units?select=*&order=street,num&limit=9999',{headers:HOUSING_HEADERS}),
+      fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=*',{headers:HOUSING_HEADERS}),
+      fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress?select=*',{headers:HOUSING_HEADERS}),
+      fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=key,value',{headers:HOUSING_HEADERS}),
+      sbLoadContractors()
+    ]);
+    var uR = results[0], sowR = results[1], rpR = results[2], stR = results[3], cR = results[4];
+    if(uR && uR.ok) {
       var rawU = await uR.json();
       housingUnits = rawU.map(function(row){
         return Object.assign({}, row.data||{}, {
@@ -4081,13 +4089,10 @@ async function loadRenosData() {
         });
       });
     }
-    var cR = await sbLoadContractors(); if(cR) window._contractors = cR;
-    var sowR = await fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=*',{headers:HOUSING_HEADERS});
-    if(sowR.ok){var sd2=await sowR.json();sd2.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
-    var rpR = await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress?select=*',{headers:HOUSING_HEADERS});
-    if(rpR.ok){var rpd=await rpR.json();rpd.forEach(function(r){window._renoProgress[r.unit_id]=r.data;});}
-    var stR = await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=key,value',{headers:HOUSING_HEADERS});
-    if(stR.ok){var stD=await stR.json();window._appSettings={};stD.forEach(function(r){window._appSettings[r.key]=r.value;});}
+    if(cR) window._contractors = cR;
+    if(sowR && sowR.ok){var sd2=await sowR.json();sd2.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
+    if(rpR && rpR.ok){var rpd=await rpR.json();rpd.forEach(function(r){window._renoProgress[r.unit_id]=r.data;});}
+    if(stR && stR.ok){var stD=await stR.json();window._appSettings={};stD.forEach(function(r){window._appSettings[r.key]=r.value;});}
   } catch(e){console.warn('[RENOS] data load error:',e);}
 }
 function initRenosPage() {
