@@ -32,9 +32,9 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 /* ── LAYOUT ── */
 .layout{display:flex;min-height:calc(100vh - 64px);flex-direction:column;}
 .app-wrapper{display:flex;min-height:calc(100vh - 64px);background:var(--bg);}
-.content-area{flex:1;display:flex;flex-direction:column;min-width:0;align-items:center;}
+.content-area{flex:1;display:flex;flex-direction:column;min-width:0;}
 .dash-view{display:flex;padding:20px 16px;flex-direction:column;gap:16px;width:100%;box-sizing:border-box;max-width:1200px;margin:0 auto;}
-#appLayout{flex:1;display:flex;flex-direction:column;min-width:0;align-items:center;}
+#appLayout{flex:1;display:flex;flex-direction:column;min-width:0;}
 
 /* ── SIDEBAR ── */
 
@@ -148,7 +148,7 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 
 /* step pages */
 .sp{display:none;}
-.sp.on{display:block;animation:fup .22s ease;}
+.sp.on{display:block;width:100%;box-sizing:border-box;animation:fup .22s ease;}
 @keyframes fup{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
 /* review */
