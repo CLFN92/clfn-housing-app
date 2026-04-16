@@ -4307,9 +4307,33 @@ function triggerV2Score() {
     // Store for save chain
     window._appScore = { total: _score, tier: _tier, breakdown: result.breakdown };
 
+    // Auto-save V2 fields to Supabase whenever score changes
+    if (window.currentAppId) {
+      var v2Patch = {
+        score: _score, tier: _tier, score_v2: _score, tier_v2: _tier,
+        score_breakdown_v2: result.breakdown,
+        urgent_need: appData.urgentNeed,
+        health_risk: appData.healthRisk,
+        persons_over_standard: parseInt(appData.personsOverStandard) || 0,
+        lone_parent: appData.loneParent,
+        elder_in_household: appData.elderInHousehold,
+        household_disability: appData.householdDisability,
+        income_stability: appData.incomeStability,
+        rent_payment_history: appData.rentPaymentHistory,
+        unit_condition: appData.unitCondition,
+        tenancy_conduct: appData.tenancyConduct,
+        no_prior_tenancy: appData.noPriorTenancy,
+        arrears_status: appData.arrearsStatus
+      };
+      fetch(SUPABASE_URL + '/rest/v1/housing_applications?id=eq.' + encodeURIComponent(window.currentAppId), {
+        method: 'PATCH',
+        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify(v2Patch)
+      }).catch(function(e) { console.warn('[V2 autosave] failed:', e); });
+    }
+
   } catch(err) {
-    console.warn('[V2 Score] Edge Function call failed:', err.message);
-    // Silently fail — don't block the form
+    console.warn('[V2 Score] calculation failed:', err.message);
   }
 }
 
