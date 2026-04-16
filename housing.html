@@ -931,8 +931,8 @@
 </div><!-- end scorecardView -->
 
 <!-- ═══ SETTINGS VIEW ═══ -->
-<div id="settingsView" style="display:none;width:100%;flex-direction:column;max-width:1200px;margin:0 auto;box-sizing:border-box;padding:clamp(14px,3vw,28px);min-height:200px;">
-<div class="settings-view" style="display:flex;flex-direction:column;gap:0;">
+<div id="settingsView" style="display:none;width:100%;flex-direction:column;max-width:1200px;margin:0 auto;box-sizing:border-box;">
+<div class="settings-view" style="display:flex;flex-direction:column;gap:0;padding:clamp(14px,3vw,28px);">
   <div style="border-bottom:1px solid var(--border);padding:10px 0;margin-bottom:20px;">
     <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:inline-flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> Back
@@ -1150,35 +1150,69 @@
     </div>
   <!-- ── OCCUPANCY STANDARDS SECTION ── -->
   <div id="sec_occupancy" class="settings-section" style="display:none;">
-    <div class="card" style="padding:0;overflow:hidden;border-color:var(--yellow);">
-      <div style="padding:16px 20px;background:var(--dark);border-bottom:2px solid var(--yellow);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-        <div>
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--yellow);">🏘 National Occupancy Standard (NOS)</div>
-          <div style="font-size:11px;color:#888;font-weight:400;margin-top:3px;">ED only — maximum persons allowed per bedroom count. Used to auto-calculate overcrowding on applications.</div>
-        </div>
-        <button id="settings_save_nos_btn" onclick="saveNosTable()" style="background:var(--yellow);border:none;color:#111;padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save NOS Table</button>
-      </div>
-      <div style="padding:20px;">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;padding:10px 14px;background:var(--bg);border-radius:8px;line-height:1.6;">
-          The NOS defines the maximum number of people that can appropriately occupy a unit of a given bedroom count.
-          An applicant's household is considered <strong>overcrowded</strong> when the total number of people exceeds the NOS maximum for their current home.
-          Each person over the standard earns 1 point (up to 10) on their application score.
-        </div>
-        <table style="width:100%;border-collapse:collapse;max-width:480px;">
-          <thead>
-            <tr style="border-bottom:2px solid var(--border);">
-              <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Bedroom Count</th>
-              <th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Max Persons (NOS)</th>
-            </tr>
-          </thead>
-          <tbody id="nos_table_tbody"><tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 12px;font-size:13px;color:var(--text);">Studio / 0 bedrooms</td><td style="padding:10px 12px;text-align:center;"><input type="number" data-nos-beds="0" value="1" min="1" max="20" step="1" style="width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);"/><span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span></td></tr><tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 12px;font-size:13px;color:var(--text);">1 bedroom</td><td style="padding:10px 12px;text-align:center;"><input type="number" data-nos-beds="1" value="2" min="1" max="20" step="1" style="width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);"/><span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span></td></tr><tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 12px;font-size:13px;color:var(--text);">2 bedrooms</td><td style="padding:10px 12px;text-align:center;"><input type="number" data-nos-beds="2" value="4" min="1" max="20" step="1" style="width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);"/><span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span></td></tr><tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 12px;font-size:13px;color:var(--text);">3 bedrooms</td><td style="padding:10px 12px;text-align:center;"><input type="number" data-nos-beds="3" value="6" min="1" max="20" step="1" style="width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);"/><span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span></td></tr><tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 12px;font-size:13px;color:var(--text);">4 bedrooms</td><td style="padding:10px 12px;text-align:center;"><input type="number" data-nos-beds="4" value="8" min="1" max="20" step="1" style="width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);"/><span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span></td></tr><tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 12px;font-size:13px;color:var(--text);">5+ bedrooms</td><td style="padding:10px 12px;text-align:center;"><input type="number" data-nos-beds="5" value="10" min="1" max="20" step="1" style="width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);"/><span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span></td></tr></tbody>
-        </table>
-        <div style="margin-top:16px;padding:10px 14px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--muted);">
-          <strong style="color:var(--text);">Note:</strong> Changes take effect immediately on the next application form score calculation. Existing stored scores are not affected until the next rescore.
-        </div>
-      </div>
-    </div>
+  <div style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:20px;">
+    <h3 style="margin:0 0 16px;font-size:16px;">National Occupancy Standard (NOS)</h3>
+    <p style="font-size:13px;color:#666;margin-bottom:16px;">Maximum persons allowed per bedroom count. ED only.</p>
+    <table style="width:100%;max-width:480px;border-collapse:collapse;">
+      <thead><tr style="border-bottom:2px solid #eee;">
+        <th style="text-align:left;padding:8px;font-size:12px;color:#666;">Bedrooms</th>
+        <th style="text-align:center;padding:8px;font-size:12px;color:#666;">Max Persons</th>
+      </tr></thead>
+      <tbody id="nos_table_tbody">
+        <tr style="border-bottom:1px solid #eee;">
+          <td style="padding:10px 8px;font-size:13px;">Studio / 0 bedrooms</td>
+          <td style="padding:10px 8px;text-align:center;">
+            <input type="number" data-nos-beds="0" value="1" min="1" max="20"
+              style="width:64px;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-align:center;"/>
+            <span style="font-size:11px;color:#888;margin-left:4px;">persons</span>
+          </td>
+        </tr>
+        <tr style="border-bottom:1px solid #eee;">
+          <td style="padding:10px 8px;font-size:13px;">1 bedroom</td>
+          <td style="padding:10px 8px;text-align:center;">
+            <input type="number" data-nos-beds="1" value="2" min="1" max="20"
+              style="width:64px;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-align:center;"/>
+            <span style="font-size:11px;color:#888;margin-left:4px;">persons</span>
+          </td>
+        </tr>
+        <tr style="border-bottom:1px solid #eee;">
+          <td style="padding:10px 8px;font-size:13px;">2 bedrooms</td>
+          <td style="padding:10px 8px;text-align:center;">
+            <input type="number" data-nos-beds="2" value="4" min="1" max="20"
+              style="width:64px;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-align:center;"/>
+            <span style="font-size:11px;color:#888;margin-left:4px;">persons</span>
+          </td>
+        </tr>
+        <tr style="border-bottom:1px solid #eee;">
+          <td style="padding:10px 8px;font-size:13px;">3 bedrooms</td>
+          <td style="padding:10px 8px;text-align:center;">
+            <input type="number" data-nos-beds="3" value="6" min="1" max="20"
+              style="width:64px;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-align:center;"/>
+            <span style="font-size:11px;color:#888;margin-left:4px;">persons</span>
+          </td>
+        </tr>
+        <tr style="border-bottom:1px solid #eee;">
+          <td style="padding:10px 8px;font-size:13px;">4 bedrooms</td>
+          <td style="padding:10px 8px;text-align:center;">
+            <input type="number" data-nos-beds="4" value="8" min="1" max="20"
+              style="width:64px;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-align:center;"/>
+            <span style="font-size:11px;color:#888;margin-left:4px;">persons</span>
+          </td>
+        </tr>
+        <tr style="border-bottom:1px solid #eee;">
+          <td style="padding:10px 8px;font-size:13px;">5+ bedrooms</td>
+          <td style="padding:10px 8px;text-align:center;">
+            <input type="number" data-nos-beds="5" value="10" min="1" max="20"
+              style="width:64px;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-align:center;"/>
+            <span style="font-size:11px;color:#888;margin-left:4px;">persons</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <button id="settings_save_nos_btn" onclick="saveNosTable()"       style="margin-top:16px;background:#F8E41A;border:none;padding:8px 20px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">Save NOS Table</button>
   </div>
+</div>
+
   </div>
 
 </div>
