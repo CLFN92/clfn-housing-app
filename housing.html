@@ -2157,6 +2157,17 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="submitModal">
+  <div class="modal">
+    <h2>Submit Application?</h2>
+    <p style="color:var(--muted);font-size:13px;margin:12px 0 20px;">This will send the application to the Housing Manager for review. You cannot edit it after submission.</p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="finalSubmit()">Confirm Submit →</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
