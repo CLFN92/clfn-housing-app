@@ -23,6 +23,11 @@
   </div>
   <!-- User info bar -->
   <div id="header_user_bar" style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+    <div id="roleSwitcher" style="display:none;align-items:center;gap:4px;">
+      <button id="rb_employee" onclick="switchRole('employee')" title="View as Employee" style="width:28px;height:28px;border-radius:50%;background:transparent;border:1px solid #333;color:#888;font-size:9px;font-weight:800;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .15s;">ST</button>
+      <button id="rb_housing_manager" onclick="switchRole('housing_manager')" title="View as Housing Manager" style="width:28px;height:28px;border-radius:50%;background:transparent;border:1px solid #333;color:#888;font-size:9px;font-weight:800;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .15s;">HM</button>
+      <button id="rb_ed" onclick="switchRole('ed')" title="View as Executive Director" style="width:28px;height:28px;border-radius:50%;background:var(--yellow);border:none;color:#111;font-size:9px;font-weight:800;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .15s;">ED</button>
+    </div>
     <div id="header_user_pill" style="display:flex;align-items:center;gap:8px;background:#1a1a18;border:1px solid #333;border-radius:20px;padding:5px 12px 5px 6px;">
       <div id="header_avatar" style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">—</div>
       <span id="header_user_name" style="font-size:12px;font-weight:600;color:#fff;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Guest</span><span id="header_user_display" style="display:none;"></span>
@@ -3549,27 +3554,12 @@ function getRole(){ return window.CLFN_AUTH.getRole(); }
 
 
 function switchRole(role){
-  approvalRole=role;
-  window.currentRole=role;
-  ['employee','housing_manager','ed'].forEach(function(r){
-    var btn=document.getElementById('rb_'+r);
-    if(btn){btn.style.background=r===role?'var(--yellow)':'transparent';btn.style.color=r===role?'#111':'#888';btn.style.border=r===role?'none':'1px solid #333';}
-  });
-  var roleLabels={employee:'Employee',housing_manager:'Housing Manager',ed:'Executive Director'};
-  var hud=document.getElementById('header_user_display');
-  if(hud) hud.textContent=roleLabels[role]||role;
+  window.currentRole = role;
+  if(window.CLFN_AUTH) window.CLFN_AUTH.currentRole = role;
+  sessionStorage.setItem('clfn_housing_role', role);
   updateHeaderUser(role);
-  if(window._currentScorecardApp && typeof renderScorecardActions === 'function') renderScorecardActions(window._currentScorecardApp);
-  updateRoleSwitcherVisibility();
-  // Update nav label and visibility based on role
-  var dashLabel = document.getElementById('tab_dash_label');
-  if(dashLabel) dashLabel.textContent = (role === 'housing_manager' || role === 'ed') ? 'Dashboard' : 'Home';
-  var settingsBtn = document.getElementById('tab_settings');
-  if(settingsBtn) settingsBtn.style.display = (role === 'housing_manager' || role === 'ed') ? '' : 'none';
-    // Apply tenancy field role locks whenever role changes
-  applyTenancyFieldRoles();
-  // All roles land on the home tile page
-  showEmployeeHome();
+  // Re-render current renos view for new role
+  showRenos();
 }
 
 
