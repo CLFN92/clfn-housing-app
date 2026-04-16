@@ -59,12 +59,7 @@
       + Staff
     </button>
     <!-- Role view toggle — header level, ED/HM only -->
-    <div id="header_role_toggle" style="display:none;align-items:center;gap:6px;">
-      <span style="font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">View as</span>
-      <select id="header_view_as" onchange="headerSwitchViewAs(this.value)" style="padding:5px 10px;border:1px solid #333;border-radius:7px;font-size:12px;font-weight:600;font-family:DM Sans,sans-serif;background:#1a1a18;color:#ccc;cursor:pointer;">
-        <option value="">My Role</option>
-      </select>
-    </div>
+    
     <button onclick="showSettings()" id="header_settings_btn" style="background:none;border:1px solid #444;color:#ccc;border-radius:8px;padding:6px 14px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:none;align-items:center;gap:6px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='#444';this.style.color='#ccc'">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       Settings
@@ -3181,8 +3176,6 @@ function renderWlTable(apps, showScore, showReview) {
 
 // ── Header role view-as toggle ─────────────────────────────────────────────
 function setupHeaderRoleToggle(realRole) {
-  var toggleEl = document.getElementById('header_role_toggle');
-  var selectEl = document.getElementById('header_view_as');
   if(!toggleEl || !selectEl) return;
   if(realRole === 'ed' || realRole === 'housing_manager') {
     toggleEl.style.display = 'flex';
@@ -3197,23 +3190,7 @@ function setupHeaderRoleToggle(realRole) {
   }
 }
 
-function headerSwitchViewAs(val) {
-  window._viewAsRole = val || '';
-  var effectiveRole = window._viewAsRole || window._realRole || window.currentRole || 'employee';
-  window.currentRole = effectiveRole;
-  if(typeof switchRole === 'function') switchRole(effectiveRole);
-  // If on worklist, re-render it
-  var wl = document.getElementById('worklistView');
-  if(wl && wl.style.display !== 'none') {
-    window._wlViewAs = val;
-    renderWorklist();
-  }
-  // Re-render home screen
-  if(document.getElementById('employeeHomeView') && document.getElementById('employeeHomeView').style.display !== 'none') {
-    showEmployeeHome();
-  }
-  showToast(val ? 'Viewing as ' + (val === 'housing_manager' ? 'Housing Manager' : 'Employee') : 'Back to your role');
-}
+
 
 function headerSignOut() {
   if(HOUSING_SESSION && HOUSING_SESSION.accessToken) {
