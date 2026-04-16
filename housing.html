@@ -3292,37 +3292,37 @@ var SCORING_MODEL_KEY = 'clfn_scoring_model';
 
 var DEFAULT_SCORING_MODEL = [
   // ── Urgent Need / Displacement ──────────────────────────────────────────────
-  {id:'un1', cat:'urgent_need',    label:'No urgent need',                        p:0},
-  {id:'un2', cat:'urgent_need',    label:'Unsafe/overcrowded conditions',         p:5},
-  {id:'un3', cat:'urgent_need',    label:'Eviction / displacement / fire/flood',  p:8},
-  {id:'un4', cat:'urgent_need',    label:'Immediate health/safety emergency',     p:10},
+  {id:'un1', cat:'urgent_need',    label:'No urgent need',                        pts:0,  p:0},
+  {id:'un2', cat:'urgent_need',    label:'Unsafe / overcrowded conditions',       pts:5,  p:5},
+  {id:'un3', cat:'urgent_need',    label:'Eviction / displacement / fire / flood',pts:8,  p:8},
+  {id:'un4', cat:'urgent_need',    label:'Immediate health / safety emergency',   pts:10, p:10},
 
   // ── Health & Safety Risk ─────────────────────────────────────────────────────
-  {id:'hs1', cat:'health_safety',  label:'None (0 pts)',                          p:0},
-  {id:'hs2', cat:'health_safety',  label:'Minor risk — cosmetic/low priority',    p:2},
-  {id:'hs3', cat:'health_safety',  label:'Moderate risk — verified by report',    p:5},
-  {id:'hs4', cat:'health_safety',  label:'Severe risk — structural/health order', p:8},
+  {id:'hs1', cat:'health_safety',  label:'None',                                  pts:0,  p:0},
+  {id:'hs2', cat:'health_safety',  label:'Minor risk — cosmetic / low priority',  pts:2,  p:2},
+  {id:'hs3', cat:'health_safety',  label:'Moderate risk — verified by report',    pts:5,  p:5},
+  {id:'hs4', cat:'health_safety',  label:'Severe risk — structural / health order',pts:8, p:8},
 
   // ── Persons Over Occupancy Standard ─────────────────────────────────────────
-  {id:'oc1', cat:'occupancy',      label:'1 pt per person over NOS (max 10 pts)', p:1},
+  {id:'oc1', cat:'occupancy',      label:'1 pt per person over NOS (max 10 pts)', pts:1,  p:1},
 
   // ── Income Stability ─────────────────────────────────────────────────────────
-  {id:'is1', cat:'income_stability', label:'Stable income (employment, pension, social assistance)', p:5},
-  {id:'is2', cat:'income_stability', label:'Unstable / no income',                p:0},
+  {id:'is1', cat:'income_stability', label:'Stable income — employment, pension, social assistance', pts:5, p:5},
+  {id:'is2', cat:'income_stability', label:'Unstable / no income',                pts:0,  p:0},
 
   // ── Household Composition ────────────────────────────────────────────────────
-  {id:'hc1', cat:'household_comp', label:'Lone parent household',                 p:3},
-  {id:'hc2', cat:'household_comp', label:'Elder in household (55+)',              p:3},
-  {id:'hc3', cat:'household_comp', label:'Household member with disability',      p:2},
+  {id:'hc1', cat:'household_comp', label:'Lone parent household',                 pts:3,  p:3},
+  {id:'hc2', cat:'household_comp', label:'Elder in household (55+)',              pts:3,  p:3},
+  {id:'hc3', cat:'household_comp', label:'Household member with disability',      pts:2,  p:2},
 
   // ── Prior CLFN Tenancy ───────────────────────────────────────────────────────
-  {id:'pt1', cat:'prior_tenancy',  label:'No prior tenancy — first-time applicant (neutral)', p:0},
-  {id:'pt2', cat:'prior_tenancy',  label:'Good standing — positive tenancy history',          p:3},
-  {id:'pt3', cat:'prior_tenancy',  label:'Mixed record — minor issues',                       p:1},
-  {id:'pt4', cat:'prior_tenancy',  label:'Poor standing — arrears or damage on file',         p:-2},
+  {id:'pt1', cat:'prior_tenancy',  label:'No prior tenancy — first-time applicant (neutral)', pts:0,  p:0},
+  {id:'pt2', cat:'prior_tenancy',  label:'Good standing — positive tenancy history',          pts:3,  p:3},
+  {id:'pt3', cat:'prior_tenancy',  label:'Mixed record — minor issues',                       pts:1,  p:1},
+  {id:'pt4', cat:'prior_tenancy',  label:'Poor standing — arrears or damage on file',         pts:-2, p:-2},
 
   // ── Application Age (Waitlist Duration) ──────────────────────────────────────
-  {id:'wa1', cat:'waitlist_age',   label:'1 point per full year on waitlist',     p:1}
+  {id:'wa1', cat:'waitlist_age',   label:'1 point per full year on waitlist',     pts:1,  p:1}
 ];
 
 // ── V2 Scoring Model Defaults ──────────────────────────────────────────
@@ -3609,10 +3609,22 @@ var SCORING_CAT_LABELS = {
 
 // Load or init scoring model
 var liveScoreModel = (function() {
+  function normalize(arr) {
+    // Ensure all entries use 'pts' key (normalize from 'p' if needed)
+    return arr.map(function(r) {
+      if(r.pts === undefined && r.p !== undefined) r = Object.assign({}, r, {pts: r.p});
+      return r;
+    });
+  }
   try {
-    var stored = window._appSettings && window._appSettings['scoring_model'] ? JSON.stringify(window._appSettings['scoring_model']) : null;
-    return stored ? JSON.parse(stored) : DEFAULT_SCORING_MODEL.slice();
-  } catch(e) { return DEFAULT_SCORING_MODEL.slice(); }
+    // Prefer scoring_model_v2 (new format), fall back to scoring_model, then default
+    var src = (window._appSettings && window._appSettings['scoring_model_v2']) ||
+              (window._appSettings && window._appSettings['scoring_model']) || null;
+    if(src && src.length) return normalize(JSON.parse(JSON.stringify(src)));
+    var stored = localStorage.getItem('clfn_scoring_model_v2') || localStorage.getItem('clfn_scoring_model');
+    if(stored) return normalize(JSON.parse(stored));
+    return normalize(DEFAULT_SCORING_MODEL.slice());
+  } catch(e) { return normalize(DEFAULT_SCORING_MODEL.slice()); }
 })();
 
 
@@ -3914,6 +3926,90 @@ function applyTenancyFieldRoles() {
 }
 
 // ── triggerV2Score — calls the Edge Function and updates display ──
+
+// ── Build V2 form selects from live scoring model ──────────────────────────
+function buildV2FormSelects() {
+  var model = liveScoreModel;
+  // Re-read from appSettings in case they loaded after init
+  if(window._appSettings) {
+    var src = window._appSettings['scoring_model_v2'] || window._appSettings['scoring_model'];
+    if(src && src.length) {
+      model = src.map(function(r) {
+        if(r.pts === undefined && r.p !== undefined) return Object.assign({}, r, {pts: r.p});
+        return r;
+      });
+    }
+  }
+
+  // Helper: get rows for a category
+  function catRows(cat) {
+    return model.filter(function(r) { return r.cat === cat; });
+  }
+
+  // urgent_need select
+  var unSel = document.getElementById('urgent_need');
+  if(unSel) {
+    var unRows = catRows('urgent_need');
+    if(unRows.length) {
+      var curVal = unSel.value;
+      unSel.innerHTML = unRows.map(function(r, i) {
+        var pts = (r.pts !== undefined ? r.pts : (r.p||0));
+        var val = i === 0 ? 'none' : 'level_'+i;
+        // Map by position: un1=none, un2=level_2, un3=level_3, un4=level_4
+        val = r.id === 'un1' ? 'none' : r.id === 'un2' ? 'overcrowded' : r.id === 'un3' ? 'eviction' : 'emergency';
+        return '<option value="'+val+'">'+ r.label + (pts > 0 ? ' (+'+pts+' pts)' : ' ('+pts+' pts)') +'</option>';
+      }).join('');
+      if(curVal) unSel.value = curVal;
+    }
+  }
+
+  // health_risk select
+  var hrSel = document.getElementById('health_risk');
+  if(hrSel) {
+    var hrRows = catRows('health_safety');
+    if(hrRows.length) {
+      var curHr = hrSel.value;
+      hrSel.innerHTML = hrRows.map(function(r) {
+        var pts = (r.pts !== undefined ? r.pts : (r.p||0));
+        var val = r.id === 'hs1' ? 'none' : r.id === 'hs2' ? 'minor' : r.id === 'hs3' ? 'moderate' : 'severe';
+        return '<option value="'+val+'">'+r.label+' ('+pts+' pts)</option>';
+      }).join('');
+      if(curHr) hrSel.value = curHr;
+    }
+  }
+
+  // income_stability select
+  var isSel = document.getElementById('income_stability');
+  if(isSel) {
+    var isRows = catRows('income_stability');
+    if(isRows.length) {
+      var curIs = isSel.value;
+      isSel.innerHTML = isRows.map(function(r) {
+        var pts = (r.pts !== undefined ? r.pts : (r.p||0));
+        var val = r.id === 'is1' ? 'stable' : 'unstable';
+        return '<option value="'+val+'">'+r.label+' ('+pts+' pts)</option>';
+      }).join('');
+      if(curIs) isSel.value = curIs;
+    }
+  }
+
+  // Update household composition pt labels
+  var hcRows = catRows('household_comp');
+  hcRows.forEach(function(r) {
+    var pts = (r.pts !== undefined ? r.pts : (r.p||0));
+    var labelId = r.id === 'hc1' ? 'lp_pts_label' : r.id === 'hc2' ? 'ei_pts_label' : 'hd_pts_label';
+    var el = document.getElementById(labelId);
+    if(el) el.textContent = '(+'+pts+' pts)';
+  });
+
+  // Update occupancy per-person label
+  var ocRows = catRows('occupancy');
+  if(ocRows.length) {
+    var ocEl = document.getElementById('oc_pts_label');
+    if(ocEl) ocEl.textContent = '('+ocRows[0].pts+' pt each, max 10 pts)';
+  }
+}
+
 async function triggerV2Score() {
   var appDate = (document.getElementById('appDate')||{}).value || '';
   var noPrior = (document.getElementById('no_prior_tenancy')||{}).value === 'true';
@@ -13048,6 +13144,7 @@ function newApp(){
 
   // Apply role-based field locks and run initial V2 score
   applyTenancyFieldRoles();
+  buildV2FormSelects();
   triggerV2Score();
 }
 
