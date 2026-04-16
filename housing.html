@@ -2168,6 +2168,17 @@
   </div>
 </div>
 
+<div id="printPanel" style="display:none;position:fixed;inset:0;z-index:1100;background:#f0f0ec;overflow-y:auto;">
+  <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;">
+    <span id="printPanelTitle" style="color:#fff;font-weight:700;font-size:14px;">Document Preview</span>
+    <div style="display:flex;gap:8px;">
+      <button onclick="triggerPrint()" style="background:var(--yellow);border:none;color:#111;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;">🖨 Print</button>
+      <button onclick="closePrintPanel()" style="background:none;border:1px solid #555;color:#ccc;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;">✕ Close</button>
+    </div>
+  </div>
+  <div id="printPanelBody" style="max-width:900px;margin:0 auto;padding:32px 24px;"></div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -2741,7 +2752,7 @@ function switchViewRole(role){
 
 
 let cur = 0;
-const STEPS = 8; // 7 visible steps (0-6) + review (8) = 8 total
+const STEPS = 9; // 7 visible steps (0-6) + review (8) = 8 total
 const uploadedFiles = [];
 const DRAFT_KEY = 'clfn_housing_draft';
 let currentAppId = null;
