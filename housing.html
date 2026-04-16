@@ -55,7 +55,7 @@
   <div id="header_user_bar" style="display:flex;align-items:center;gap:10px;margin-left:auto;">
     <div id="header_user_pill" style="display:flex;align-items:center;gap:8px;background:#1a1a18;border:1px solid #333;border-radius:20px;padding:5px 12px 5px 6px;">
       <div id="header_avatar" style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">—</div>
-      <span id="header_user_name" style="font-size:12px;font-weight:600;color:#fff;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Guest</span><span id="header_user_display" style="display:none;"></span>
+      <span id="header_user_name" style="font-size:12px;font-weight:600;color:#fff;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span><span id="header_user_display" style="display:none;"></span>
       <span id="header_role_badge" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:#333;color:#aaa;"></span>
       <div id="headerRoleSwitcher" style="display:flex;align-items:center;gap:4px;margin-right:12px;"></div>
         <button onclick="headerSignOut()" style="background:none;border:none;color:#666;font-size:11px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;padding:0 0 0 4px;" onmouseover="this.style.color='#ccc'" onmouseout="this.style.color='#666'">sign out</button>
@@ -942,8 +942,8 @@
 </div><!-- end scorecardView -->
 
 <!-- ═══ SETTINGS VIEW ═══ -->
-<div id="settingsView" style="display:none;width:100%;flex-direction:column;max-width:1200px;margin:0 auto;box-sizing:border-box;">
-<div class="settings-view" style="display:flex;flex-direction:column;">
+<div id="settingsView" style="display:none;width:100%;flex-direction:column;max-width:1200px;margin:0 auto;box-sizing:border-box;padding:clamp(14px,3vw,28px);min-height:200px;">
+<div class="settings-view" style="display:flex;flex-direction:column;gap:0;">
   <div style="border-bottom:1px solid var(--border);padding:10px 0;margin-bottom:20px;">
     <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:inline-flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> Back
@@ -4079,28 +4079,24 @@ function getNosTable() {
 function renderNosTable() {
   var tbody = document.getElementById('nos_table_tbody');
   if(!tbody) return;
-  var nos = getNosTable();
+  var defaults = {'0':1,'1':2,'2':4,'3':6,'4':8,'5':10};
+  var bedLabels = {'0':'Studio / 0 bedrooms','1':'1 bedroom','2':'2 bedrooms','3':'3 bedrooms','4':'4 bedrooms','5':'5+ bedrooms'};
+  var nos = defaults;
+  try { if(typeof getNosTable === 'function') nos = getNosTable(); } catch(e) { nos = defaults; }
   var isED = (window.currentRole === 'ed');
-
-  tbody.innerHTML = Object.keys(NOS_BED_LABELS).map(function(beds) {
-    var maxPeople = nos[beds] !== undefined ? nos[beds] : DEFAULT_NOS_TABLE[beds];
-    var label = NOS_BED_LABELS[beds];
+  tbody.innerHTML = Object.keys(bedLabels).map(function(beds) {
+    var maxPeople = (nos[beds] !== undefined) ? nos[beds] : defaults[beds];
+    var label = bedLabels[beds];
+    var inputStyle = 'width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);' + (isED ? '' : 'opacity:0.55;cursor:not-allowed;');
     return '<tr style="border-bottom:1px solid var(--border);">'
       + '<td style="padding:10px 12px;font-size:13px;color:var(--text);">' + label + '</td>'
       + '<td style="padding:10px 12px;text-align:center;">'
-      +   '<input type="number" data-nos-beds="' + beds + '" value="' + maxPeople + '" '
-      +     'min="1" max="20" step="1" '
-      +     (isED ? '' : 'disabled ')
-      +     'style="width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;'
-      +     'font-size:13px;font-weight:700;color:var(--text);text-align:center;'
-      +     'font-family:DM Sans,sans-serif;background:var(--surface);'
-      +     (isED ? '' : 'opacity:0.55;cursor:not-allowed;')
-      +     '"/>'
-      +   '<span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span>'
-      + '</td>'
-      + '</tr>';
+      + '<input type="number" data-nos-beds="' + beds + '" value="' + maxPeople + '" min="1" max="20" step="1" ' + (isED ? '' : 'disabled ') + 'style="' + inputStyle + '"/>'
+      + '<span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span>'
+      + '</td></tr>';
   }).join('');
 }
+
 
 function saveNosTable() {
   if(window.currentRole !== 'ed') {
