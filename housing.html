@@ -64,7 +64,6 @@
       <div id="header_avatar" style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">—</div>
       <span id="header_user_name" style="font-size:12px;font-weight:600;color:#fff;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span><span id="header_user_display" style="display:none;"></span>
       <span id="header_role_badge" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:#333;color:#aaa;"></span>
-      <div id="headerRoleSwitcher" style="display:flex;align-items:center;gap:4px;margin-right:12px;"></div>
         <button onclick="headerSignOut()" style="background:none;border:none;color:#666;font-size:11px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;padding:0 0 0 4px;" onmouseover="this.style.color='#ccc'" onmouseout="this.style.color='#666'">sign out</button>
     </div>
     <!-- Global export button — shown when on an exportable view -->
@@ -2724,31 +2723,9 @@ window.sbMigrateAll = async function() {
 
 
 window._realRole=null; window._viewAsRole=null;
-function initRoleSwitcher(){
-  var r=window.currentRole||'employee'; window._realRole=r; window._viewAsRole=r;
-  var c=document.getElementById('headerRoleSwitcher');
-  if(!c) return;
-  if(r!=='ed'&&r!=='housing_manager'){c.style.display='none';return;}
-  c.style.display='flex'; renderRoleSwitcher();
-}
-function renderRoleSwitcher(){
-  var c=document.getElementById('headerRoleSwitcher'); if(!c) return;
-  var real=window._realRole||window.currentRole;
-  var view=window._viewAsRole||real;
-  var opts=real==='ed'?[{v:'ed',l:'ED'},{v:'housing_manager',l:'HM'}]:[{v:'housing_manager',l:'HM'}];
-  c.innerHTML=opts.map(function(o){
-    var a=view===o.v;
-    return '<button onclick="switchViewRole(\''+o.v+'\')" style="padding:4px 12px;font-size:11px;font-weight:700;border-radius:12px;border:1px solid '+(a?'var(--yellow)':'rgba(255,255,255,0.2)')+';background:'+(a?'var(--yellow)':'none')+';color:'+(a?'#111':'#fff')+';cursor:pointer;margin:0 2px;">'+o.l+'</button>';
-  }).join('');
-}
-function switchViewRole(role){
-  if(window._realRole!=='ed'&&role==='ed') return;
-  window._viewAsRole=role; window.currentRole=role;
-  renderRoleSwitcher();
-  if(typeof renderWorklist==='function') renderWorklist();
-  if(typeof renderDashTable==='function') renderDashTable();
-  showToast('Viewing as '+(role==='ed'?'Executive Director':'Housing Manager'));
-}
+function initRoleSwitcher(){ /* no-op - dropdown handles role switching */ }
+function renderRoleSwitcher(){ /* no-op - dropdown handles role switching */ }
+function switchViewRole(role){ switchRole(role); }
 
 
 // ── Preview from Dash ──
@@ -3776,6 +3753,7 @@ async function rescoreAllApplications() {
         });
         if (!resp.ok) { console.warn('[V2 rescore] HTTP', resp.status, 'for app', app.id); return; }
         var result = await resp.json();
+        console.log('[V2 rescore] app', app.id, 'score:', result.score, 'breakdown:', JSON.stringify(result.breakdown));
 
         // Apply live tier thresholds
         var _rt = window.liveV2Tiers || { critical: 80, high: 60, medium: 40 };
@@ -4262,6 +4240,7 @@ async function triggerV2Score() {
     });
     if (!resp.ok) throw new Error('Score function error ' + resp.status);
     var result = await resp.json();
+    console.log('[triggerV2Score] result:', JSON.stringify(result));
 
     // Apply live tier thresholds (ED-adjustable) to override Edge Function tier
     var _score = result.score;
@@ -10556,10 +10535,18 @@ async function rescoreAndSave() {
   try {
     await rescoreAllApplications();
     showToast('✓ Rescored ' + applications.length + ' applications');
-    // Refresh open scorecard if visible
-    if(window._currentScorecardApp) {
-      var fresh = applications.find(function(a){ return a.id === window._currentScorecardApp.id; });
-      if(fresh && typeof showScorecard === 'function') showScorecard(fresh);
+    // Reload data from Supabase to get fresh breakdowns, then refresh scorecard
+    if(typeof sbLoadApplications === 'function') {
+      sbLoadApplications().then(function(fresh) {
+        if(fresh) {
+          applications = fresh;
+          if(window._currentScorecardApp) {
+            var updated = applications.find(function(a){ return a.id === window._currentScorecardApp.id; });
+            if(updated && typeof showScorecard === 'function') showScorecard(updated);
+          }
+          if(typeof renderMatchView === 'function' && document.getElementById('matchView') && document.getElementById('matchView').style.display !== 'none') renderMatchView();
+        }
+      });
     }
     if(typeof updateDashStats==='function') updateDashStats();
     if(typeof renderDashTable==='function') renderDashTable();
