@@ -2947,6 +2947,12 @@ function goTo(s){
     clearStepErrors('step5','step5_error_banner');
   }
 
+  // Auto-save draft on every forward step
+  if(s > cur) {
+    var _ds = saveApplicationRecord();
+    if(_ds) { var _da = applications.find(function(a){ return a.id===_ds; }); if(_da) sbSaveApplication(_da).catch(function(){}); }
+  }
+
   // ── All validation passed — now switch steps ──
   var _stepCur=document.getElementById('step'+cur); if(_stepCur) _stepCur.classList.remove('on');
   var _stepS=document.getElementById('step'+s); if(_stepS) _stepS.classList.add('on');
