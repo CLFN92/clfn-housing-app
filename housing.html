@@ -106,9 +106,13 @@
 <div class="content-area">
 <!-- ═══ EMPLOYEE HOME VIEW ═══ -->
 <div id="employeeHomeView" style="display:none;width:100%;flex-direction:column;padding:clamp(16px,4vw,40px) clamp(14px,3vw,40px);box-sizing:border-box;max-width:1100px;margin:0 auto;">
-  <div style="margin-bottom:28px;">
-    <h1 style="font-family:'DM Serif Display',serif;font-size:26px;font-weight:400;margin-bottom:6px;">Welcome, <span id="emp_home_name" style="color:var(--yellow);"></span></h1>
-    <p id="emp_home_subtitle" style="color:var(--muted);font-size:13px;"></p>
+  <!-- Greeting block — brand: CLFN serif heading, yellow accent, muted meta line -->
+  <div style="margin-bottom:28px;position:relative;padding-left:16px;">
+    <!-- Yellow accent bar anchored to the left of the heading -->
+    <div style="position:absolute;left:0;top:6px;bottom:6px;width:4px;background:var(--yellow);border-radius:2px;"></div>
+    <div id="emp_home_date" style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;"></div>
+    <h1 style="font-family:'DM Serif Display',serif;font-size:30px;font-weight:400;line-height:1.15;margin:0 0 6px 0;">Welcome back, <span id="emp_home_name" style="color:var(--yellow);"></span></h1>
+    <p id="emp_home_subtitle" style="color:var(--muted);font-size:14px;margin:0;"></p>
   </div>
 
   <!-- Dynamic role-aware tile grid -->
@@ -13804,12 +13808,33 @@ function showEmployeeHome(){
   hideAllViews();
   setNavActive('tab_dash');
   var role = window.currentRole || 'employee';
-  var roleLabels = {employee:'Staff', housing_manager:'Housing Manager', ed:'Executive Director'};
+  var roleLabels = {
+    employee: 'Staff',
+    housing_employee_l1: 'Staff',
+    housing_employee_l2: 'Staff',
+    housing_manager: 'Housing Manager',
+    ed: 'Executive Director',
+    cfo: 'CFO',
+    finance_l1: 'Finance'
+  };
   var subtitles = {
     employee: 'Select a tile below to get started.',
-    housing_manager: 'Good to have you back. Here\'s your overview.',
-    ed: 'Good to have you back. Here\'s your overview.'
+    housing_employee_l1: 'Select a tile below to get started.',
+    housing_employee_l2: 'Select a tile below to get started.',
+    housing_manager: "Here's what's happening across housing today.",
+    ed: "Here's what's happening across housing today.",
+    cfo: "Here's an overview of finance activity.",
+    finance_l1: 'Select a tile below to get started.'
   };
+
+  // Today's date — formatted "THURSDAY · APRIL 17, 2026" for the uppercase meta line.
+  var dateEl = document.getElementById('emp_home_date');
+  if(dateEl){
+    var d = new Date();
+    var dayStr   = d.toLocaleDateString('en-US', { weekday: 'long' });
+    var dateStr  = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    dateEl.textContent = dayStr + ' · ' + dateStr;
+  }
 
   var nameEl = document.getElementById('emp_home_name');
   if(nameEl) nameEl.textContent = roleLabels[role] || 'Staff';
@@ -13940,18 +13965,13 @@ function showEmployeeHome(){
       makeStat('Approved',           ctApproved,   ctApproved>0?'good':'neutral') +
       (ctDeclined>0?makeStat('Declined', ctDeclined, 'alert'):''));
 
-        var settingsTile = '<div onclick="showSettings()" style="background:var(--surface);border:1px solid var(--border);border-top:3px solid #6b7280;border-radius:12px;padding:18px 20px;cursor:pointer;transition:box-shadow .15s;"'
-      +' onmouseover="this.style.boxShadow=&quot;0 4px 20px rgba(0,0,0,0.1)&quot;" onmouseout="this.style.boxShadow=&quot;&quot;">'
-      +'<div style="display:flex;align-items:center;gap:12px;"><span style="font-size:22px;">⚙️</span>'
-      +'<div><div style="font-weight:700;font-size:14px;">Settings</div>'
-      +'<div style="font-size:12px;color:var(--muted);">Scoring models, users &amp; contacts</div></div></div>'
-      +'</div>';
+        // Settings tile removed — Settings is accessible via the gear icon in the header.
 
     tilesEl.style.gridTemplateColumns = 'repeat(auto-fill,minmax(240px,1fr))';
 
     // ── Module gating (Phase A0) ─────────────────────────────────────
     // Optional-module tiles only render if CLFN_MODULES.isEnabled() returns true.
-    // Core-module tiles (Applications, Worklist, Inventory, Tenants, Settings) always render.
+    // Core-module tiles (Applications, Worklist, Inventory, Tenants) always render.
     var mods = window.CLFN_MODULES;
     var matchTileOut = (mods && mods.isEnabled('match'))        ? matchTile : '';
     var renoTileOut  = (mods && mods.isEnabled('renovations'))  ? renoTile  : '';
@@ -13970,7 +13990,7 @@ function showEmployeeHome(){
         +'</div>';
     }
 
-    tilesEl.innerHTML = newAppTile + worklistTile + appTile + invTile + matchTileOut + tenantTile + renoTileOut + ctTileOut + financeTile + settingsTile;
+    tilesEl.innerHTML = newAppTile + worklistTile + appTile + invTile + matchTileOut + tenantTile + renoTileOut + ctTileOut + financeTile;
 
   } else {
     // ── Employee: simple tiles ──
