@@ -2740,17 +2740,25 @@ function getData(){ return loadData(); }
 
 
 // Toast notification (replaces alert() - works on all platforms)
+// Legacy toast() — kept as a success/info indicator for every existing
+// call site. In F3 we unified styling so it's now green and anchored to
+// the top of the screen (was black, bottom). Error toasts go through
+// _toastError() which uses red + persistent.
 function toast(msg, duration) {
   var el = document.getElementById('app-toast');
   if (!el) { console.log(msg); return; }
+  _positionToast(el);
+  el.style.background = '#16a34a';   // green, matches _toastSuccess
+  el.style.color = '#fff';
   el.textContent = msg;
   el.style.opacity = '1';
   el.style.transform = 'translateX(-50%) translateY(0)';
   clearTimeout(el._t);
   el._t = setTimeout(function(){
     el.style.opacity = '0';
-    el.style.transform = 'translateX(-50%) translateY(20px)';
-  }, duration || 3000);
+    el.style.transform = 'translateX(-50%) translateY(-20px)';
+    el.style.background = ''; el.style.color = '';
+  }, duration || 2500);
 }
 
 function seedIfEmpty(){
@@ -3006,7 +3014,7 @@ function searchTenants(q) {
   var ql = q.trim().toLowerCase();
   var matches = d.tenants.filter(function(t){
     return tenantName(t).toLowerCase().includes(ql) ||
-      t.unit.toLowerCase().includes(ql) ||
+      (t.unit||'').toLowerCase().includes(ql) ||
       (t.phone||'').includes(ql) ||
       (t.email||'').toLowerCase().includes(ql);
   }).slice(0, 8);
@@ -3018,11 +3026,15 @@ function searchTenants(q) {
   }
   resultsEl.style.display = 'block';
   resultsEl.innerHTML = matches.map(function(t){
-    var initials = t.first[0]+t.last[0];
-    return '<div class="tenant-search-result" onclick="selectTenantProfile('+JSON.stringify(t.id)+')">'+
+    var initials = ((t.first||'')[0]||'') + ((t.last||'')[0]||'');
+    if (!initials) initials = '?';
+    var safeId = (t.id||'').replace(/'/g, "\\'");  // defensive; UUIDs won't contain single quotes but older IDs might
+    var unitLabel = (t.unit||'').toString();
+    var typeLabel = (t.type||'').toString().replace(/-/g,' ');
+    return '<div class="tenant-search-result" onclick="selectTenantProfile(\''+safeId+'\')">'+
       '<div class="tsr-avatar">'+initials+'</div>'+
       '<div><div class="tsr-name">'+tenantName(t)+'</div>'+
-      '<div class="tsr-meta">'+t.unit+' &middot; '+t.type.replace(/-/g,' ')+'</div></div>'+
+      '<div class="tsr-meta">'+unitLabel+' &middot; '+typeLabel+'</div></div>'+
     '</div>';
   }).join('');
 }
@@ -3044,7 +3056,8 @@ function renderTenantProfile(tid) {
   var totals = calcAllTotals(d);
   var v = totals[tid] || {};
   var grand = (v.rent||0)+(v.loan||0)+(v.arrangement||0);
-  var initials = t.first[0]+t.last[0];
+  var initials = ((t.first||'')[0]||'') + ((t.last||'')[0]||'');
+  if (!initials) initials = '?';
   var inCol = isInCollections(tid);
   var isActive = t.active !== false; // default active
   var typeLabels = {'band-on':'Band On-Reserve','band-off':'Band Off-Reserve','band-staff':'Band Office Staff','clea':'CLEA','community':'Community Member'};
@@ -6878,7 +6891,7 @@ function dashSearchTenants(query) {
   var d = getData();
   var matches = d.tenants.filter(function(t){
     return (tenantName(t).toLowerCase().includes(q) ||
-            t.unit.toLowerCase().includes(q) ||
+            (t.unit||'').toLowerCase().includes(q) ||
             (t.phone||'').toLowerCase().includes(q) ||
             (t.email||'').toLowerCase().includes(q));
   }).slice(0, 8);
@@ -6889,11 +6902,15 @@ function dashSearchTenants(query) {
   }
   resultsEl.style.display='block';
   resultsEl.innerHTML = matches.map(function(t){
-    var initials = t.first[0]+t.last[0];
-    return '<div class="tenant-search-result" onclick="dashSelectTenant(\''+t.id+'\')">'+
+    var initials = ((t.first||'')[0]||'') + ((t.last||'')[0]||'');
+    if (!initials) initials = '?';
+    var safeId = (t.id||'').replace(/'/g, "\\'");
+    var unitLabel = (t.unit||'').toString();
+    var typeLabel = (t.type||'').toString().replace(/-/g,' ');
+    return '<div class="tenant-search-result" onclick="dashSelectTenant(\''+safeId+'\')">'+
       '<div class="tsr-avatar">'+initials+'</div>'+
       '<div><div class="tsr-name">'+tenantName(t)+'</div>'+
-      '<div class="tsr-meta">'+t.unit+' &middot; '+t.type.replace(/-/g,' ')+'</div></div>'+
+      '<div class="tsr-meta">'+unitLabel+' &middot; '+typeLabel+'</div></div>'+
     '</div>';
   }).join('');
 }
@@ -8262,6 +8279,6 @@ function clearAndReseed() {
     </div>
   </div>
 </div>
-<div id="app-toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#111;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;opacity:0;transition:all .25s ease;pointer-events:none;max-width:90vw;text-align:center;"></div>
+<div id="app-toast" style="position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-20px);background:#111;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:500;z-index:99999;opacity:0;transition:all .25s ease;pointer-events:none;max-width:calc(100vw - 40px);text-align:center;box-shadow:0 4px 16px rgba(0,0,0,0.15);"></div>
 </body>
 </html>
