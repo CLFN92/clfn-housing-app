@@ -39,9 +39,34 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 /* ── PAGE HEADER (Back button + sub-header band) ── */
 /* Used by every top-level view (Dashboard, Worklist, Inventory, Match, Tenants, Settings, Renos, Contractors, Reno Approvals). */
 /* Structure: <div class="page-back-row"><button class="back-btn-yellow"/></div> <div class="page-header-bar"><h1/><p/>…</div> */
-/* The negative top margin pulls the Back button up tight against the app header, */
-/* neutralizing the generous clamp() top padding on each view container. */
-.page-back-row{margin:-28px 0 8px 0;}
+
+/* Every view that uses this pattern: tight top padding so the Back button sits close to the app header. */
+/* Primary approach using :has() (modern browsers). */
+[id$="View"]:has(> .page-back-row:first-child),
+.dash-view:has(> .page-back-row:first-child),
+.settings-view:has(> .page-back-row:first-child){
+  padding-top:12px !important;
+}
+/* Explicit per-view fallback (supports all browsers). Inline style `padding` declarations */
+/* on view containers would normally win, but `!important` here trumps them. */
+#worklistView,
+#dashView,
+#settingsView,
+.settings-view,
+#inventoryView,
+#matchView,
+#tenantsView,
+#renoApprovalsView,
+#renosView,
+#contractorsView{
+  padding-top:12px !important;
+}
+/* The role_queue_banner div on the dashboard adds its own spacing before the back row; */
+/* collapse it when empty so the back button still sits tight. */
+#role_queue_banner:empty{display:none;}
+#role_queue_banner{padding:0 !important;}
+
+.page-back-row{margin:0 0 10px 0;}
 .back-btn-yellow{
   background:var(--yellow);border:1.5px solid var(--yellow);color:#111;
   padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;
