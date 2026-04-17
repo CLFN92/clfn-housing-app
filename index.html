@@ -55,12 +55,18 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 #tenantsView,
 #renoApprovalsView,
 #renosView,
-#contractorsView{
+#contractorsView,
+.settings-view.settings-view,
+#settingsView.settings-view,
+#settingsView .settings-view,
+#settingsView > .settings-view,
+div.settings-view[style]{
   padding-top:0 !important;
 }
 #role_queue_banner:empty{display:none !important;}
 #role_queue_banner{padding:0 !important;margin:0 !important;}
-#dashView > .page-back-row{margin-bottom:-6px;}
+#dashView > .page-back-row,
+#settingsView .settings-view > .page-back-row{margin-bottom:-6px;}
 .page-back-row{margin:12px 0 10px 0;}
 .back-btn-yellow{
   background:var(--yellow);border:1.5px solid var(--yellow);color:#111;

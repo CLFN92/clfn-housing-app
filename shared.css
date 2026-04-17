@@ -54,7 +54,15 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 #tenantsView,
 #renoApprovalsView,
 #renosView,
-#contractorsView{
+#contractorsView,
+/* .settings-view has its own `padding: 16px 12px !important` rules inside media queries at */
+/* lines ~564 and ~628. Those are !important too. Doubled class + attribute selector */
+/* bumps specificity above both (0,0,2,0) > (0,0,1,0). */
+.settings-view.settings-view,
+#settingsView.settings-view,
+#settingsView .settings-view,
+#settingsView > .settings-view,
+div.settings-view[style]{
   padding-top:0 !important;
 }
 /* The role_queue_banner div on the dashboard adds its own spacing before the back row; */
@@ -64,7 +72,10 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 /* The dashboard uses inline `gap:16px` on its flex column, which adds 16px between */
 /* .page-back-row and the next sibling (.page-header-bar). That makes the title card */
 /* sit lower on the dashboard than on other views. Pull it back up. */
-#dashView > .page-back-row{margin-bottom:-6px;}
+/* The .settings-view class also has the same gap:16px pattern (from shared.css line ~394) */
+/* though the inline style sometimes overrides it. */
+#dashView > .page-back-row,
+#settingsView .settings-view > .page-back-row{margin-bottom:-6px;}
 
 /* Fixed gap between the app header and the Back button, same on every view. */
 .page-back-row{margin:12px 0 10px 0;}
