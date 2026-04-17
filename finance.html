@@ -898,7 +898,7 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
             <option value="former">Former (moved out &mdash; balance only)</option>
           </select>
         </div>
-        <div class="f"><label>Unit / Address <span style="color:var(--muted);font-weight:400;">(required if Active)</span></label><input id="tn-unit" placeholder="e.g. Unit 12"/></div>
+        <div class="f"><label>Unit / Address <span style="color:var(--muted);font-weight:400;">(required if Active)</span></label><input id="tn-unit" list="housingUnitsList" placeholder="Start typing address or unit number..." autocomplete="off"/><datalist id="housingUnitsList"></datalist></div>
         <div class="f"><label>Tenant Type</label>
           <select id="tn-type">
             <option value="band-on">Band Member - On-Reserve</option>
@@ -2087,25 +2087,53 @@ function _emptyStore(){
 }
 
 // ── Toasts ─────────────────────────────────────────────────────────────────
-// Persistent red toast for failures so the user can't miss them, auto-
-// dismissing green toast for successes. Mirrors housing.html's pattern.
+// Top-of-screen placement so errors are immediately visible without
+// scrolling. Persistent red toast for failures so the user can't miss
+// them, auto-dismissing green toast for successes.
+function _positionToast(el){
+  // Override whatever bottom positioning the existing toast element has
+  // and anchor it to the top of the viewport.
+  el.style.position = 'fixed';
+  el.style.top = '20px';
+  el.style.bottom = '';               // clear any bottom:20px from old styles
+  el.style.left = '50%';
+  el.style.transform = 'translateX(-50%) translateY(0)';
+  el.style.zIndex = '99999';
+  el.style.padding = '12px 20px';
+  el.style.borderRadius = '8px';
+  el.style.fontSize = '14px';
+  el.style.fontWeight = '500';
+  el.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
+  el.style.maxWidth = 'calc(100vw - 40px)';
+}
 function _toastSuccess(msg){
-  if (typeof toast === 'function') { toast(msg, 1500); return; }
-  console.log('[finance] ' + msg);
+  var el = document.getElementById('app-toast');
+  if (!el) { console.log('[finance] ' + msg); return; }
+  _positionToast(el);
+  el.style.background = '#16a34a';
+  el.style.color = '#fff';
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(function(){
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(-50%) translateY(-20px)';
+    el.style.background = ''; el.style.color = '';
+  }, 2000);
 }
 function _toastError(msg){
   var el = document.getElementById('app-toast');
   if (!el) { console.error('[finance] ' + msg); return; }
+  _positionToast(el);
   el.textContent = '⚠ ' + msg;
   el.style.background = '#b91c1c';
   el.style.color = '#fff';
   el.style.opacity = '1';
-  el.style.transform = 'translateX(-50%) translateY(0)';
   clearTimeout(el._t);
   // No auto-dismiss — user must see this. Click dismisses.
   el.onclick = function(){
     el.style.opacity = '0';
-    el.style.transform = 'translateX(-50%) translateY(20px)';
+    el.style.transform = 'translateX(-50%) translateY(-20px)';
     el.style.background = ''; el.style.color = '';
     el.onclick = null;
   };
@@ -2491,12 +2519,57 @@ async function _bootLoadFinanceData(){
     _memStore = Object.assign(_emptyStore(), results);
     console.log('[finance] hydrated:',
       _FIN_TABLES.map(function(s){ return s.key + '=' + (results[s.key]||[]).length; }).join(', '));
+
+    // Also load housing_units — read-only cache used by the unit picker in
+    // Add Tenant modal. Not part of the finance write path; just a lookup.
+    try {
+      var ur = await _fetchFromSupabase('housing_units?select=id,num,street,status,assigned_name&order=street,num&limit=10000');
+      if (ur.ok) {
+        var urows = await ur.json();
+        window._housingUnits = urows || [];
+        console.log('[finance] housing_units loaded: ' + window._housingUnits.length);
+        _populateUnitDatalist();
+      } else {
+        window._housingUnits = [];
+      }
+    } catch(e) {
+      console.warn('[finance boot] housing_units failed:', e);
+      window._housingUnits = [];
+    }
   } catch(e) {
     console.error('[finance boot] fatal:', e);
     _memStore = _emptyStore();
     _toastError('Failed to load finance data. Some views may be empty.');
   }
   return _memStore;
+}
+
+// Build the <datalist> options for the unit picker. Called after the
+// housing_units cache is populated. Idempotent.
+function _populateUnitDatalist(){
+  var dl = document.getElementById('housingUnitsList');
+  if (!dl) return;
+  var units = (window._housingUnits || []).filter(function(u){ return !u.archived; });
+  // Format: "<num> <street> — <status>" e.g. "42 Main St — vacant"
+  dl.innerHTML = units.map(function(u){
+    var label = ((u.num||'') + ' ' + (u.street||'')).trim() || ('Unit ' + (u.id||'').slice(0,8));
+    var meta  = u.status ? (' — ' + u.status) : '';
+    if (u.assigned_name) meta += ' (currently: ' + u.assigned_name + ')';
+    return '<option value="' + label.replace(/"/g, '&quot;') + '" data-unit-id="' + u.id + '">' + label + meta + '</option>';
+  }).join('');
+}
+
+// Resolve a typed unit string back to a housing_units.id. Returns null if
+// the user typed free text that doesn't match any unit (we still persist
+// the text in tenant.unit for display; only unit_id FK is nullable).
+function _resolveUnitId(typedValue){
+  if (!typedValue) return null;
+  var target = typedValue.trim().toLowerCase();
+  var match = (window._housingUnits || []).find(function(u){
+    var label = ((u.num||'') + ' ' + (u.street||'')).trim().toLowerCase();
+    return label === target;
+  });
+  return match ? match.id : null;
 }
 
 // ── Diff + write ───────────────────────────────────────────────────────────
@@ -2605,7 +2678,19 @@ function saveData(d){
 // ── Audit writer ───────────────────────────────────────────────────────────
 // Inserts one row into finance_audit_log. Fire-and-forget. Failures are
 // loud because an audit miss is a compliance gap.
+//
+// IMPORTANT: tenant_id on audit rows is tricky. The schema has a FK
+// (tenant_id → tenants.id ON DELETE RESTRICT) which races with the tenant
+// upsert itself on CREATE_TENANT actions — the audit row may reach Supabase
+// before the tenant does, failing the FK check. Workaround: do NOT populate
+// the top-level tenant_id column for now; always embed tenant context in
+// the detail JSON instead. Reports that need per-tenant audit history can
+// filter on detail->>'tenant_id' until we drop/relax the FK in F3B.
 function _writeAuditEntry(entry){
+  var detail = Object.assign({}, entry.detail || {});
+  if (entry.tenant_id) detail.tenant_id = entry.tenant_id;
+  if (entry.entity_id) detail.entity_id = entry.entity_id;
+
   var row = {
     nation_id: _NATION(),
     actor_email: _ACTOR(),
@@ -2613,9 +2698,9 @@ function _writeAuditEntry(entry){
     action: entry.action,
     entity_type: entry.entity_type || 'unknown',
     entity_id: entry.entity_id || null,
-    tenant_id: entry.tenant_id || null,
+    // Intentionally NOT set: tenant_id (FK race risk). See comment above.
     summary: entry.summary || '(no summary)',
-    detail: entry.detail || null
+    detail: detail
   };
   var headers = Object.assign({}, FINANCE_HEADERS || {}, {
     'Prefer': 'return=minimal', 'Content-Type': 'application/json'
@@ -4708,6 +4793,11 @@ function saveTenant() {
   var autoPayEl = document.getElementById('tn-autopay');
   var autoPay   = !!(autoPayEl && autoPayEl.checked);
 
+  // Resolve the typed unit text back to a housing_units.id if it matches
+  // a known unit. Free-typed text without a match is still kept as the
+  // display string but stores null for the FK (acceptable per schema).
+  var unitId = unit ? _resolveUnitId(unit) : null;
+
   var d = getData();
   var t = {
     id: uid(),
@@ -4719,6 +4809,7 @@ function saveTenant() {
     autoPay: autoPay, autoPayType: null,
     notes: notes,
     status: status,               // persists to tenants.status
+    currentUnitId: unitId,        // FK to housing_units.id (resolved above)
     active: status === 'active'   // legacy UI field for older views
   };
   d.tenants.push(t);
@@ -6712,6 +6803,8 @@ function openModal(id,extra){
   if(id==='modalUtilityCharge')document.getElementById('utilChargeTitle').textContent='Post '+(currentUtilityType==='gas'?'Gas':'Hydro')+' Charge';
   if(id==='modalUtilityPayment')document.getElementById('utilPayTitle').textContent='Record '+(currentUtilityType==='gas'?'Gas':'Hydro')+' Payment';
   populateModalSelects(id);
+  // Ensure unit picker datalist is current if Add Tenant is opening
+  if(id==='modalAddTenant' && typeof _populateUnitDatalist === 'function') _populateUnitDatalist();
   document.getElementById(id).classList.add('on');
   // Auto-init payment modal
   if(id==='modalRentPayment'){
