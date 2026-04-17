@@ -892,7 +892,13 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
       <div class="fg c2" style="gap:14px;">
         <div class="f"><label>First Name <span class="r">*</span></label><input id="tn-first" placeholder="First name"/></div>
         <div class="f"><label>Last Name <span class="r">*</span></label><input id="tn-last" placeholder="Last name"/></div>
-        <div class="f"><label>Unit / Address <span class="r">*</span></label><input id="tn-unit" placeholder="e.g. Unit 12"/></div>
+        <div class="f"><label>Status <span class="r">*</span></label>
+          <select id="tn-status">
+            <option value="active">Active (currently in a unit)</option>
+            <option value="former">Former (moved out &mdash; balance only)</option>
+          </select>
+        </div>
+        <div class="f"><label>Unit / Address <span style="color:var(--muted);font-weight:400;">(required if Active)</span></label><input id="tn-unit" placeholder="e.g. Unit 12"/></div>
         <div class="f"><label>Tenant Type</label>
           <select id="tn-type">
             <option value="band-on">Band Member - On-Reserve</option>
@@ -903,6 +909,7 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
           </select>
         </div>
         <div class="f"><label>Monthly Rent ($)</label><input id="tn-rent" type="number" placeholder="0.00" step="0.01"/></div>
+        <div class="f"><label>Opening Balance Owed ($) <span style="color:var(--muted);font-weight:400;">(optional)</span></label><input id="tn-open-bal" type="number" placeholder="0.00" step="0.01"/></div>
         <div class="f"><label>Invoice Preference</label>
           <select id="tn-inv-pref"><option value="email">Email Invoice</option><option value="print">Print / Mail</option></select>
         </div>
@@ -4662,31 +4669,98 @@ function resolveCollection(id) {
 }
 
 
-// \u2500\u2500 ADD TENANT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ── ADD TENANT ──────────────────────────────────────────────────────────────
+// Handles both active tenants (with a current housing unit) and former
+// tenants (moved out but still owe money — need statements/collections).
+// Unit is optional. If an opening balance is entered, a seed rent_ledger
+// row is created with entry_type='opening_balance' so subsequent ledger
+// math Just Works.
 function saveTenant() {
-  var first = (document.getElementById('nt-first')||{}).value||'';
-  var last  = (document.getElementById('nt-last')||{}).value||'';
-  var unit  = (document.getElementById('nt-unit')||{}).value||'';
-  var type  = (document.getElementById('nt-type')||{}).value||'band-on';
-  var rent  = parseFloat((document.getElementById('nt-rent')||{}).value)||0;
-  var invPref = (document.getElementById('nt-invpref')||{}).value||'print';
-  var phone = (document.getElementById('nt-phone')||{}).value||'';
-  var email = (document.getElementById('nt-email')||{}).value||'';
-  var notes = (document.getElementById('nt-notes')||{}).value||'';
-  if (!first||!last) { toast('First and last name required.'); return; }
-  if (!unit) { toast('Unit / address required.'); return; }
+  // The modal markup uses tn-* IDs; the original handler read nt-* and
+  // therefore never captured any input. Both prefixes are checked here so
+  // we're resilient if the markup is touched later.
+  function v(id1, id2){
+    var el = document.getElementById(id1) || (id2 ? document.getElementById(id2) : null);
+    return el ? (el.value||'').trim() : '';
+  }
+  var first   = v('tn-first', 'nt-first');
+  var last    = v('tn-last',  'nt-last');
+  var unit    = v('tn-unit',  'nt-unit');              // now optional
+  var type    = v('tn-type',  'nt-type') || 'community';
+  var rent    = parseFloat(v('tn-rent', 'nt-rent')) || 0;
+  var invPref = v('tn-inv-pref', 'nt-invpref') || 'email';
+  var phone   = v('tn-phone', 'nt-phone');
+  var email   = v('tn-email', 'nt-email');
+  var hydroA  = v('tn-hydro-acct', '');
+  var gasA    = v('tn-gas-acct',   '');
+  var notes   = v('tn-notes', 'nt-notes');
+  var status  = v('tn-status', '') || 'active';         // NEW — active | former
+  var openBal = parseFloat(v('tn-open-bal', '')) || 0;  // NEW — opening arrears
+
+  if (!first || !last) { toast('First and last name required.'); return; }
+
+  // If marked Former but no unit, that's fine. If marked Active, require unit.
+  if (status === 'active' && !unit) {
+    toast('Unit required for an active tenant. Pick Former if they no longer have a unit.');
+    return;
+  }
+
+  var autoPayEl = document.getElementById('tn-autopay');
+  var autoPay   = !!(autoPayEl && autoPayEl.checked);
+
   var d = getData();
-  var t = {id:uid(),first:first,last:last,unit:unit,type:type,rent:rent,
-    invPref:invPref,phone:phone,email:email,notes:notes,autoPay:false,autoPayType:null,active:true};
+  var t = {
+    id: uid(),
+    first: first, last: last,
+    unit: unit, type: type, rent: rent,
+    invPref: invPref,
+    phone: phone, email: email,
+    hydroAcct: hydroA, gasAcct: gasA,
+    autoPay: autoPay, autoPayType: null,
+    notes: notes,
+    status: status,               // persists to tenants.status
+    active: status === 'active'   // legacy UI field for older views
+  };
   d.tenants.push(t);
-  d.auditLog = d.auditLog||[];
-  d.auditLog.push({id:uid(),ts:new Date().toISOString(),user:CURRENT_USER,action:'create',
-    entity:'tenant',entityId:t.id,description:'New tenant added: '+tenantName(t)+' \u2014 '+unit,before:null,after:t});
+
+  // If an opening balance was entered, create a seed ledger row. Charge is
+  // positive (tenant owes), which translates to entry_type='opening_balance'
+  // in the mapper. Auto-signed: the user enters a positive number and it's
+  // recorded as a debit (money owed).
+  if (openBal > 0) {
+    d.rentLedger = d.rentLedger || [];
+    d.rentLedger.push({
+      id: uid(),
+      tenantId: t.id,
+      unitId: null,
+      date: today(),
+      desc: 'Opening balance at account creation',
+      charge: openBal, payment: 0,
+      type: 'opening',
+      method: '', status: 'posted', ref: ''
+    });
+  }
+
   saveData(d);
+
+  // Rich per-action audit entry (complements the blanket saveData audit).
+  writeAuditEntry({
+    action: 'create_tenant',
+    entity_type: 'tenant',
+    entity_id:   t.id,
+    tenant_id:   t.id,
+    summary:     'Added ' + (status === 'former' ? 'former' : 'active') +
+                 ' tenant ' + tenantName(t) +
+                 (unit ? ' (' + unit + ')' : '') +
+                 (openBal > 0 ? ' with opening balance $' + openBal.toFixed(2) : ''),
+    detail: { unit: unit, status: status, openingBalance: openBal }
+  });
+
   closeModal('modalAddTenant');
   renderDashboard();
   selectTenantProfile(t.id);
   showPage('tenants');
+  toast('Tenant added.');
 }
 
 // \u2500\u2500 COLLECTIONS FLAG \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
