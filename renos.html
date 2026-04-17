@@ -1002,11 +1002,92 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script>
 
+// ═══════════════════════════════════════════════════════════════════════════
+// NATION CONFIG (multi-tenant foundation) — mirrored from housing.html
+// ═══════════════════════════════════════════════════════════════════════════
+// Each page is self-contained for now; Phase C will extract this to shared.js.
+(function initNationConfig(){
+  var REGISTRY = {
+    'clfn': {
+      id: 'clfn',
+      display_name: 'Constance Lake First Nation',
+      display_short: 'CLFN',
+      supabase_url:  'https://fkhzrbalumzeripzolph.supabase.co',
+      supabase_anon: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo',
+      storage_bucket: 'housing-files',
+      branding: {
+        primary_color: '#F8E41A',
+        dark_color:    '#000000',
+        font_serif:    'DM Serif Display',
+        font_sans:     'DM Sans'
+      },
+      modules_enabled: {
+        renovations: true,
+        finance:     false,
+        contractors: true,
+        match:       true
+      }
+    }
+  };
+  function resolveNationId(){
+    var host = (window.location.hostname || '').toLowerCase();
+    if(!host || host === 'localhost' || host.startsWith('127.') || host.startsWith('192.168.')) return 'clfn';
+    if(host.indexOf('azurestaticapps.net') !== -1) return 'clfn';
+    var first = host.split('.')[0];
+    if(first && REGISTRY[first]) return first;
+    console.warn('[nation] unknown subdomain "'+first+'" — falling back to clfn');
+    return 'clfn';
+  }
+  var nationId = resolveNationId();
+  var config = REGISTRY[nationId];
+  if(!config) throw new Error('[nation] no config registered for nation "'+nationId+'"');
+  window.NATION_CONFIG = Object.freeze(JSON.parse(JSON.stringify(config)));
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MODULES REGISTRY — mirrored from housing.html
+// ═══════════════════════════════════════════════════════════════════════════
+(function initModules(){
+  var CORE = Object.freeze([
+    'applications','applications_dashboard','scoring','inventory',
+    'tenants','audit_log','exports','reports','settings'
+  ]);
+  var OPTIONAL = Object.freeze({
+    renovations: { depends_on: [], auto_enables: ['contractors'] },
+    finance:     { depends_on: [], auto_enables: [] },
+    contractors: { depends_on: [], auto_enables: [] },
+    match:       { depends_on: ['applications','inventory'], auto_enables: [] }
+  });
+  var VALID = CORE.concat(Object.keys(OPTIONAL));
+  function assertModule(name){
+    if(VALID.indexOf(name) === -1) throw new Error('[modules] unknown module "'+name+'". Valid: '+VALID.join(', '));
+    return name;
+  }
+  function isCore(name){ assertModule(name); return CORE.indexOf(name) !== -1; }
+  function isEnabled(name){
+    assertModule(name);
+    if(isCore(name)) return true;
+    var cfg = (window.NATION_CONFIG && window.NATION_CONFIG.modules_enabled) || {};
+    if(cfg[name] === true) return true;
+    for(var k in OPTIONAL){
+      if(cfg[k] === true && OPTIONAL[k].auto_enables.indexOf(name) !== -1) return true;
+    }
+    return false;
+  }
+  function listEnabled(){ return VALID.filter(isEnabled); }
+  function listOptional(){ return Object.keys(OPTIONAL); }
+  window.CLFN_MODULES = Object.freeze({
+    CORE: CORE, OPTIONAL: OPTIONAL,
+    assertModule: assertModule, isCore: isCore, isEnabled: isEnabled,
+    listEnabled: listEnabled, listOptional: listOptional
+  });
+})();
+
 // ── Supabase client ─────────────────────────────────────────────────────────
-var SUPABASE_URL  = 'https://fkhzrbalumzeripzolph.supabase.co';
-var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo';
+var SUPABASE_URL   = window.NATION_CONFIG.supabase_url;
+var SUPABASE_ANON  = window.NATION_CONFIG.supabase_anon;
 var _raFilter = null;  // renovation approvals filter
-var STORAGE_BUCKET = 'housing-files';
+var STORAGE_BUCKET = window.NATION_CONFIG.storage_bucket || 'housing-files';
 
 // ── Supabase Storage helpers ──────────────────────────────────────────────────
 // All file uploads go through these functions.

@@ -966,6 +966,7 @@
     <button onclick="showSettingsSection('sec_reno_score')" id="stab_reno_score" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">🔨 Reno Priority</button>
     <button onclick="showSettingsSection('sec_budget')" id="stab_budget" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">💰 Reno Budget</button>
     <button onclick="showSettingsSection('sec_contacts')" id="stab_contacts" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">📧 Contacts</button>
+    <button onclick="showSettingsSection('sec_nation');renderNationPanel();" id="stab_nation" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">🌐 Nation</button>
     <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;display:none;">📋 Audit Log</button>
     <button onclick="showSettingsSection('sec_occupancy')" id="stab_occupancy" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;display:none;">🏘 Occupancy</button>
   </div>
@@ -1164,6 +1165,19 @@
           </tr></thead>
           <tbody id="audit_log_tbody"></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+  <!-- ── NATION / MODULES (read-only) ── -->
+  <div id="sec_nation" class="settings-section" style="display:none;">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:16px 20px;background:var(--dark);border-bottom:2px solid var(--yellow);">
+        <div class="ctitle" style="margin:0;">🌐 Nation &amp; Modules</div>
+        <div style="font-size:11px;color:#888;font-weight:400;margin-top:2px;">Which nation this app is running for, and which optional modules your nation has licensed. Read-only — to change, contact your platform administrator.</div>
+      </div>
+      <div style="padding:20px;">
+        <div id="nation_panel_identity" style="margin-bottom:20px;"></div>
+        <div id="nation_panel_modules"></div>
       </div>
     </div>
   </div>
@@ -2217,10 +2231,158 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/emailjs-com/3.2.0/email.min.js"></script>
 <script>
 
+// ═══════════════════════════════════════════════════════════════════════════
+// NATION CONFIG (multi-tenant foundation)
+// ═══════════════════════════════════════════════════════════════════════════
+// This app is a multi-tenant SaaS platform. Each First Nation customer gets
+// its own Supabase project, its own branding, and its own enabled modules.
+// Detection is driven by the hostname the user visits:
+//   clfn.housingapp.com    → CLFN config
+//   nation2.housingapp.com → Nation 2 config
+//   localhost / preview    → defaults to CLFN (first customer)
+//
+// For now, all nation configs are embedded in this build. A later phase will
+// fetch configs from a platform CDN or shared registry.
+
+(function initNationConfig(){
+  // ── Registry of known nations ──────────────────────────────────────
+  // Add new nations here. Each entry is an independent Supabase project.
+  var REGISTRY = {
+    'clfn': {
+      id: 'clfn',
+      display_name: 'Constance Lake First Nation',
+      display_short: 'CLFN',
+      supabase_url:  'https://fkhzrbalumzeripzolph.supabase.co',
+      supabase_anon: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo',
+      storage_bucket: 'housing-files',
+      branding: {
+        primary_color: '#F8E41A',   // CLFN yellow
+        dark_color:    '#000000',
+        font_serif:    'DM Serif Display',
+        font_sans:     'DM Sans'
+        // logo_url handled by existing .app-logo markup; future phase lifts into config
+      },
+      // Optional modules only — core modules are never gated.
+      modules_enabled: {
+        renovations: true,
+        finance:     false,    // launches later
+        contractors: true,
+        match:       true
+      }
+    }
+    // Future nations go here. Example:
+    // ,'nation2': { id:'nation2', display_name:'...', supabase_url:'...', ... }
+  };
+
+  // ── Subdomain → nation resolution ──────────────────────────────────
+  // Strips the first DNS label from the hostname and looks it up. Falls back
+  // to CLFN for localhost / 127.0.0.1 / preview builds / Azure Static Web Apps
+  // preview URLs (which use random subdomains like white-ground-0635e2610...).
+  function resolveNationId(){
+    var host = (window.location.hostname || '').toLowerCase();
+    if(!host || host === 'localhost' || host.startsWith('127.') || host.startsWith('192.168.')){
+      return 'clfn';  // dev default
+    }
+    // Azure Static Web Apps preview subdomain (e.g. white-ground-abc.2.azurestaticapps.net)
+    if(host.indexOf('azurestaticapps.net') !== -1) return 'clfn';
+    // Extract first label: "clfn.housingapp.com" → "clfn"
+    var first = host.split('.')[0];
+    if(first && REGISTRY[first]) return first;
+    // Fallback if unknown subdomain: log loudly so misconfig is caught, but don't break.
+    console.warn('[nation] unknown subdomain "'+first+'" — falling back to clfn');
+    return 'clfn';
+  }
+
+  var nationId = resolveNationId();
+  var config = REGISTRY[nationId];
+  if(!config){
+    throw new Error('[nation] no config registered for nation "'+nationId+'"');
+  }
+
+  // Expose immutable config object.
+  window.NATION_CONFIG = Object.freeze(JSON.parse(JSON.stringify(config)));
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MODULES REGISTRY
+// ═══════════════════════════════════════════════════════════════════════════
+// Separates "what this app can do" from "what this nation has licensed."
+// Core modules are always on. Optional modules are gated per-nation.
+// Any UI element that's module-specific MUST check CLFN_MODULES.isEnabled().
+
+(function initModules(){
+  // Core modules — every nation gets these. Cannot be disabled.
+  var CORE = Object.freeze([
+    'applications',          // Applications + Worklist
+    'applications_dashboard',// Apps dashboard view
+    'scoring',               // Scoring model (V2, ED-adjustable)
+    'inventory',             // Housing inventory
+    'tenants',               // Tenants
+    'audit_log',             // Audit log viewer (compliance requirement)
+    'exports',               // CSV/Excel/PDF exports
+    'reports',               // Reports
+    'settings',              // Settings, users, auth
+  ]);
+
+  // Optional modules — nation-level toggle. Listed with their dependencies.
+  var OPTIONAL = Object.freeze({
+    renovations: { depends_on: [], auto_enables: ['contractors'] },
+    finance:     { depends_on: [],  auto_enables: [] },
+    contractors: { depends_on: [],  auto_enables: [] },
+    match:       { depends_on: ['applications', 'inventory'],  auto_enables: [] }
+  });
+
+  var VALID = CORE.concat(Object.keys(OPTIONAL));
+
+  function assertModule(name){
+    if(VALID.indexOf(name) === -1){
+      throw new Error('[modules] unknown module "'+name+'". Valid: '+VALID.join(', '));
+    }
+    return name;
+  }
+
+  function isCore(name){
+    assertModule(name);
+    return CORE.indexOf(name) !== -1;
+  }
+
+  function isEnabled(name){
+    assertModule(name);
+    if(isCore(name)) return true;
+    var cfg = (window.NATION_CONFIG && window.NATION_CONFIG.modules_enabled) || {};
+    if(cfg[name] === true) return true;
+    // Auto-enable via dependency: if any OTHER optional module that's enabled auto-enables this one.
+    for(var k in OPTIONAL){
+      if(cfg[k] === true && OPTIONAL[k].auto_enables.indexOf(name) !== -1) return true;
+    }
+    return false;
+  }
+
+  function listEnabled(){
+    return VALID.filter(isEnabled);
+  }
+
+  function listOptional(){
+    return Object.keys(OPTIONAL);
+  }
+
+  window.CLFN_MODULES = Object.freeze({
+    CORE: CORE,
+    OPTIONAL: OPTIONAL,
+    assertModule: assertModule,
+    isCore: isCore,
+    isEnabled: isEnabled,
+    listEnabled: listEnabled,
+    listOptional: listOptional
+  });
+})();
+
 // ── Supabase client ─────────────────────────────────────────────────────────
-var SUPABASE_URL  = 'https://fkhzrbalumzeripzolph.supabase.co';
-var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo';
-var STORAGE_BUCKET = 'housing-files';
+// Pulled from nation config. Each nation has its own Supabase project →
+// physical data isolation between nations. No nation_id filtering needed.
+var SUPABASE_URL   = window.NATION_CONFIG.supabase_url;
+var SUPABASE_ANON  = window.NATION_CONFIG.supabase_anon;
+var STORAGE_BUCKET = window.NATION_CONFIG.storage_bucket || 'housing-files';
 
 // ── Supabase Storage helpers ──────────────────────────────────────────────────
 // All file uploads go through these functions.
@@ -3875,6 +4037,74 @@ function resetScoringModel() {
   auditEntry('SETTINGS','settings_scoring_reset','Housing application scoring model reset to defaults',window.currentRole||'staff');
 }
 
+// ── Nation & Modules panel (read-only, Phase A0) ─────────────────────────
+// Renders the NATION_CONFIG identity + the CLFN_MODULES enablement list so
+// the ED can see what their nation is licensed for. Module toggles are
+// controlled by the platform admin tool (separate codebase), not here.
+function renderNationPanel(){
+  var identEl = document.getElementById('nation_panel_identity');
+  var modsEl  = document.getElementById('nation_panel_modules');
+  if(!identEl || !modsEl) return;
+  var cfg = window.NATION_CONFIG || {};
+  var modApi = window.CLFN_MODULES;
+
+  // Identity card — nation display name + the subdomain it's serving.
+  var host = (window.location.hostname || '').toLowerCase();
+  identEl.innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;">'
+    +   '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'
+    +     '<div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Nation</div>'
+    +     '<div style="font-size:16px;font-weight:700;color:var(--text);">'+(cfg.display_name||'—')+'</div>'
+    +     '<div style="font-size:11px;color:var(--muted);margin-top:2px;">ID: <code style="font-family:Consolas,Monaco,monospace;">'+(cfg.id||'—')+'</code></div>'
+    +   '</div>'
+    +   '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'
+    +     '<div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Hosting</div>'
+    +     '<div style="font-size:13px;font-weight:700;color:var(--text);font-family:Consolas,Monaco,monospace;word-break:break-all;">'+host+'</div>'
+    +     '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Subdomain-routed</div>'
+    +   '</div>'
+    + '</div>';
+
+  // Modules list — core vs optional, each with status pill.
+  if(!modApi){
+    modsEl.innerHTML = '<div style="color:var(--muted);font-size:12px;">Module registry not available.</div>';
+    return;
+  }
+  var pill = function(label, c, bg){
+    return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+';">'+label+'</span>';
+  };
+  var row = function(name, status, kind){
+    var humanName = name.replace(/_/g,' ').replace(/\b\w/g, function(m){return m.toUpperCase();});
+    var statusPill = status==='enabled'
+      ? pill('Enabled','#15803d','#f0fdf4')
+      : pill('Disabled','#888','#f4f4f0');
+    var kindPill = kind==='core'
+      ? pill('Core','#1d4ed8','#eff6ff')
+      : pill('Optional','#7a6000','#fef9ec');
+    return '<tr style="border-bottom:1px solid var(--border);">'
+         +   '<td style="padding:10px 12px;font-size:13px;font-weight:600;color:var(--text);">'+humanName+'</td>'
+         +   '<td style="padding:10px 12px;">'+kindPill+'</td>'
+         +   '<td style="padding:10px 12px;">'+statusPill+'</td>'
+         + '</tr>';
+  };
+  var coreRows = modApi.CORE.map(function(n){ return row(n, 'enabled', 'core'); }).join('');
+  var optRows  = modApi.listOptional().map(function(n){
+    return row(n, modApi.isEnabled(n) ? 'enabled' : 'disabled', 'optional');
+  }).join('');
+  modsEl.innerHTML =
+      '<div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Modules</div>'
+    + '<div style="overflow-x:auto;">'
+    + '<table style="width:100%;border-collapse:collapse;">'
+    +   '<thead><tr style="background:var(--bg);border-bottom:2px solid var(--border);">'
+    +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Module</th>'
+    +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:100px;">Type</th>'
+    +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:110px;">Status</th>'
+    +   '</tr></thead>'
+    +   '<tbody>'+coreRows+optRows+'</tbody>'
+    + '</table>'
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--muted);margin-top:12px;font-style:italic;">To enable or disable optional modules for your nation, contact your platform administrator.</div>';
+}
+
 function renderScoringModelTable() {
   var wrap = document.getElementById('scoring_model_table_wrap');
   if(!wrap) return;
@@ -5390,6 +5620,17 @@ function showSettings(){
   setTimeout(applySettingsRoleLocks, 80);
 }
 
+// ── Finance Module (placeholder) ─────────────────────────────────────────
+// Gated by CLFN_MODULES.isEnabled('finance'). Real UI arrives in a later phase.
+// Exists now so the tile's onclick has something to call if the module is on.
+function showFinance(){
+  if(!(window.CLFN_MODULES && window.CLFN_MODULES.isEnabled('finance'))){
+    showToast('Finance module is not enabled for this nation.');
+    return;
+  }
+  showToast('Finance Module — coming soon. (UI will be built in the next phase.)');
+}
+
 // ── Generic view helper ──
 function hideAllViews(){
   var ids=['appLayout','settingsView','scorecardView',
@@ -5438,6 +5679,10 @@ function showInventory(){
 
 // ── Match view ──
 function showMatch(){
+  if(window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('match')){
+    showToast('Match module is not enabled for this nation.');
+    return;
+  }
   if(!window._navSkipPush) pushNav('match');
   setExportView('match');
   setNavActive('tab_match');
@@ -5455,6 +5700,10 @@ function showTenants(){
 
 // ── Renovations view ──
 function showRenos(){
+  if(window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('renovations')){
+    showToast('Renovations module is not enabled for this nation.');
+    return;
+  }
   // The renoApprovalsView/renosView markup lives in renos.html, not housing.html —
   // always navigate cross-page so the correct page loads with its own init.
   var role = window.currentRole || 'employee';
@@ -5465,11 +5714,19 @@ function showRenos(){
   }
 }
 function showRenosSimple(){
+  if(window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('renovations')){
+    showToast('Renovations module is not enabled for this nation.');
+    return;
+  }
   window.location.href = 'renos.html?view=renovations';
 }
 
 // ── Contractors view ──
 function showContractors(){
+  if(window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('contractors')){
+    showToast('Contractors module is not enabled for this nation.');
+    return;
+  }
   // contractorsView markup lives in renos.html — navigate cross-page
   window.location.href = 'renos.html?view=contractors';
 }
@@ -13460,18 +13717,41 @@ function showEmployeeHome(){
       +'</div>';
 
     tilesEl.style.gridTemplateColumns = 'repeat(auto-fill,minmax(240px,1fr))';
-    tilesEl.innerHTML = newAppTile + worklistTile + appTile + invTile + matchTile + tenantTile + renoTile + ctTile + settingsTile;
+
+    // ── Module gating (Phase A0) ─────────────────────────────────────
+    // Optional-module tiles only render if CLFN_MODULES.isEnabled() returns true.
+    // Core-module tiles (Applications, Worklist, Inventory, Tenants, Settings) always render.
+    var mods = window.CLFN_MODULES;
+    var matchTileOut = (mods && mods.isEnabled('match'))        ? matchTile : '';
+    var renoTileOut  = (mods && mods.isEnabled('renovations'))  ? renoTile  : '';
+    var ctTileOut    = (mods && mods.isEnabled('contractors')) ? ctTile    : '';
+
+    // Finance module placeholder — real UI comes in a later phase.
+    // Shown when the nation has the Finance module licensed AND the user has
+    // finance access (ED, HM, HE-L2, CFO, Finance L1 — actual check comes in Phase A).
+    var financeTile = '';
+    if(mods && mods.isEnabled('finance')){
+      financeTile = '<div onclick="showFinance()" style="background:var(--surface);border:1px solid var(--border);border-top:3px solid #1d4ed8;border-radius:12px;padding:18px 20px;cursor:pointer;transition:box-shadow .15s;"'
+        +' onmouseover="this.style.boxShadow=&quot;0 4px 20px rgba(0,0,0,0.1)&quot;" onmouseout="this.style.boxShadow=&quot;&quot;">'
+        +'<div style="display:flex;align-items:center;gap:12px;"><span style="font-size:22px;">💰</span>'
+        +'<div><div style="font-weight:700;font-size:14px;">Finance Module</div>'
+        +'<div style="font-size:12px;color:var(--muted);">Budgets, payments &amp; financial reporting</div></div></div>'
+        +'</div>';
+    }
+
+    tilesEl.innerHTML = newAppTile + worklistTile + appTile + invTile + matchTileOut + tenantTile + renoTileOut + ctTileOut + financeTile + settingsTile;
 
   } else {
     // ── Employee: simple tiles ──
     tilesEl.style.gridTemplateColumns = 'repeat(auto-fill,minmax(200px,1fr))';
+    var mods2 = window.CLFN_MODULES;
     var empTiles = [
-      {icon:'📝', label:'New Application', desc:'Start a new housing application', fn:'newApp()', accent:true},
-      {icon:'📋', label:'My Worklist',     desc:'Track applications you have submitted', fn:'showWorklist()'},
-      {icon:'👥', label:'Tenants',         desc:'Search and update tenant records',   fn:'showTenantsForRole()'},
-      {icon:'🔨', label:'Renovations',     desc:'Renovation progress and requests',   fn:'showRenosForRole()'},
-      {icon:'🧰', label:'Contractors',     desc:'Browse contractor directory',         fn:'showContractorsForRole()'}
-    ];
+      {icon:'📝', label:'New Application', desc:'Start a new housing application', fn:'newApp()', accent:true, module:'applications'},
+      {icon:'📋', label:'My Worklist',     desc:'Track applications you have submitted', fn:'showWorklist()', module:'applications'},
+      {icon:'👥', label:'Tenants',         desc:'Search and update tenant records',   fn:'showTenantsForRole()', module:'tenants'},
+      {icon:'🔨', label:'Renovations',     desc:'Renovation progress and requests',   fn:'showRenosForRole()', module:'renovations'},
+      {icon:'🧰', label:'Contractors',     desc:'Browse contractor directory',         fn:'showContractorsForRole()', module:'contractors'}
+    ].filter(function(t){ return !t.module || !mods2 || mods2.isEnabled(t.module); });
     tilesEl.innerHTML = empTiles.map(function(t) {
       var ab = t.accent ? 'background:var(--dark);border:2px solid var(--yellow);' : 'background:var(--surface);border:1px solid var(--border);';
       var lc = t.accent ? 'color:var(--yellow);' : '';
