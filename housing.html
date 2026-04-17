@@ -17065,6 +17065,17 @@ function initHousingPage() {
   window.CLFN_AUTH = window.CLFN_AUTH||{};
   window.CLFN_AUTH.isAuthenticated=true; window.CLFN_AUTH.currentRole=savedRole;
   try {
+    // Resolve the CURRENT role from the staff table before rendering anything.
+    // The sessionStorage cache above is stale on every housing.html page load
+    // because nothing writes to clfn_housing_role — it will always default to
+    // 'employee', which renders the wrong tile grid and causes the Finance
+    // tile to be hidden from ED/HM users on first load. This call queries
+    // Supabase for the real role based on email, then updates
+    // HOUSING_SESSION.role, window.currentRole, and window._realRole to match.
+    if(HOUSING_SESSION.email && typeof resolveHousingRole === 'function') {
+      await resolveHousingRole();
+      console.log('[housing] initHousing: resolved role =', HOUSING_SESSION.role);
+    }
     await loadHousingData();
     initHousingPage();
   } catch(e) {
