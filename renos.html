@@ -1697,9 +1697,10 @@ function updateHeaderUser(role) {
     settingsBtn.style.display = show ? 'flex' : 'none';
   }
 
-  // Show role switcher dropdown — ED only
+  // Show role switcher dropdown — visible for real EDs even when previewing as HM/Employee
+  var realRole = window._realRole || role;
   var rs = document.getElementById('roleSwitcher');
-  if(rs) rs.style.display = (role === 'ed') ? 'flex' : 'none';
+  if(rs) rs.style.display = (realRole === 'ed') ? 'flex' : 'none';
   var rbSel = document.getElementById('rb_select');
   if(rbSel) rbSel.value = role;
 }
@@ -2739,6 +2740,9 @@ function closeRenoBudget() {
   HOUSING_SESSION.name  = savedName;
   HOUSING_SESSION.email = savedEmail;
   window.currentRole    = savedRole;
+  // _realRole tracks the authenticated role; _viewAsRole is the ED's preview-as selection.
+  // When a real ED previews as HM/Employee, _realRole stays 'ed' so the role dropdown stays visible.
+  if(!window._realRole) window._realRole = savedRole;
   
   try {
     await loadRenosData();
