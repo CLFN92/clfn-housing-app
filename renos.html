@@ -3263,16 +3263,7 @@ function deleteContractor(idx){
 }
 
 
-// ── Application Scores view ──────────────────────────────
-function showScores() {
-  hideAllViews();
-  setNavActive();
-  var sc=document.getElementById();
-  if(sc) sc.style.display='flex';
-  document.getElementById('dashNav').style.display='block';
-    var tsc=document.getElementById('tab_scores'); if(tsc) tsc.classList.add('active');
-  renderScoresTable();
-}
+// (showScores removed — was calling getElementById with a missing argument and had zero callers. Dead code from an earlier scoring view design.)
 
 var _scoresSortKey='score', _scoresSortDir=-1;
 function sortScores(key) {
@@ -3641,10 +3632,17 @@ function showScorecard(app){
   setText('sc_back_name',((app.fn||'')+' '+(app.ln||'')).trim());
   setText('sc_back_id',app.id+' · '+(app.appDate||''));
   var s=app.score||0;
-  var tc=s<=5?{bg:'#fef2f2',c:'#b91c1c',bar:'#b91c1c'}:s<=10?{bg:'#fef9ec',c:'#7a6000',bar:'#d97706'}:s<=15?{bg:'#e8eef5',c:'#1e3a5f',bar:'#3b82f6'}:{bg:'#f0fdf4',c:'#15803d',bar:'#15803d'};
+  // Use V2 tier thresholds (ED-adjustable, stored in liveV2Tiers) for both color and bar scale.
+  var _t = (typeof liveV2Tiers === 'object' && liveV2Tiers) ? liveV2Tiers : {critical:80, high:60, medium:40};
+  var tc = s >= _t.critical ? {bg:'#f0fdf4',c:'#15803d',bar:'#15803d'}
+         : s >= _t.high     ? {bg:'#e8eef5',c:'#1e3a5f',bar:'#3b82f6'}
+         : s >= _t.medium   ? {bg:'#fef9ec',c:'#7a6000',bar:'#d97706'}
+         :                    {bg:'#fef2f2',c:'#b91c1c',bar:'#b91c1c'};
   setText('sc_score_total',s);
   var tierEl=document.getElementById('sc_score_tier');if(tierEl){tierEl.textContent=app.tier||'—';tierEl.style.background=tc.bg;tierEl.style.color=tc.c;}
-  var barEl=document.getElementById('sc_score_bar');if(barEl){barEl.style.width=Math.min(100,Math.round((s/30)*100))+'%';barEl.style.background=tc.bar;}
+  // Scale the bar against the V2 max (~100); peg to critical threshold so labels align with tier boundaries.
+  var barMax = Math.max(100, (_t.critical||80) * 1.25);
+  var barEl=document.getElementById('sc_score_bar');if(barEl){barEl.style.width=Math.min(100,Math.max(0,Math.round((s/barMax)*100)))+'%';barEl.style.background=tc.bar;}
   var infoEl=document.getElementById('sc_info_strip');
   if(infoEl){
     var _wfStatus={'draft':'Draft','submitted':'Awaiting HM Review','file_update':'File Update — Awaiting HM','mgr_approved':'Awaiting ED Approval','hm_approved':'File Update Approved','ed_approved':'ED Approved','declined':'Declined','returned':'Returned for Info','housed':'Housed'};
@@ -3937,13 +3935,45 @@ function printScorecard(){
   var today=new Date().toLocaleDateString('en-CA');
   var bd=app.scoreBreakdown||{};var s=app.score||0;
   var logoSrc=(document.querySelector('.app-logo img')||{}).src||'';
-  var tierColor2=s<=5?'#b91c1c':s<=10?'#92400e':s<=15?'#1e3a5f':'#14532d';
-  var tierBg2=s<=5?'#fef2f2':s<=10?'#fffbeb':s<=15?'#e8eef5':'#f0fdf4';
-  var CATS=[['waitlist','Waitlist Years'],['reserve','Reserve Status'],['band','Band Members'],['income','Income Source'],['relation','Relationship'],['ages','Household Ages'],['access','Accessibility'],['moveIn','Move-In'],['homeCond','Home Condition'],['renos','Renovation Est.'],['arrears','Rent Arrears'],['payment','Payment Arrange.']];
-  var tableRows=CATS.map(function(pair){
-    var v=bd[pair[0]]||0;
-    var col=v>0?'#15803d':v<0?'#b91c1c':'#666';
-    return'<tr style="border-bottom:1px solid #f0f0ec;"><td style="padding:8px 12px;font-weight:600;font-size:11px;">'+pair[1]+'</td><td style="padding:8px 12px;text-align:right;font-size:14px;font-weight:700;color:'+col+';">'+(v>0?'+':'')+v+'</td></tr>';
+  // Use V2 tier thresholds (ED-adjustable); fall back to defaults if not loaded yet.
+  var _t = (typeof liveV2Tiers === 'object' && liveV2Tiers) ? liveV2Tiers : {critical:80, high:60, medium:40};
+  var tierColor2 = s >= _t.critical ? '#14532d'
+                 : s >= _t.high     ? '#1e3a5f'
+                 : s >= _t.medium   ? '#92400e'
+                 :                    '#b91c1c';
+  var tierBg2    = s >= _t.critical ? '#f0fdf4'
+                 : s >= _t.high     ? '#e8eef5'
+                 : s >= _t.medium   ? '#fffbeb'
+                 :                    '#fef2f2';
+  // V2 breakdown has a nested structure: sectionA.{urgent,health,...}, sectionB.{rent,condition,...}, arrears, edAdjustment.
+  var sA = bd.sectionA || {};
+  var sB = bd.sectionB || {};
+  var V2ROWS = [
+    {section:'A', label:'Urgent Need / Displacement',    val:sA.urgent},
+    {section:'A', label:'Health & Safety Risk',          val:sA.health},
+    {section:'A', label:'Overcrowding',                  val:sA.overcrowding},
+    {section:'A', label:'Household Composition',         val:sA.household},
+    {section:'A', label:'Accessibility Need',            val:sA.accessibility},
+    {section:'A', label:'Waitlist Duration',             val:sA.waitlist},
+    {section:'B', label:'Rent Payment History',          val:sB.rent},
+    {section:'B', label:'Unit Condition History',        val:sB.condition},
+    {section:'B', label:'Tenancy Conduct',               val:sB.conduct},
+    {section:'B', label:'Income Stability',              val:sB.income},
+    {section:'C', label:'Arrears Deduction',             val:bd.arrears}
+  ];
+  var currentSection = '';
+  var tableRows = V2ROWS.map(function(row){
+    var v = (row.val === undefined || row.val === null) ? 0 : row.val;
+    var col = v>0?'#15803d':v<0?'#b91c1c':'#666';
+    var sectionHdr = '';
+    if(row.section !== currentSection) {
+      currentSection = row.section;
+      var sectLabel = row.section === 'A' ? 'Section A — Housing Need'
+                   : row.section === 'B' ? 'Section B — Tenant Responsibility'
+                   :                       'Section C — Arrears';
+      sectionHdr = '<tr><td colspan="2" style="padding:10px 12px 4px;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#888;background:#fafafa;border-top:1px solid #e8e6df;">'+sectLabel+'</td></tr>';
+    }
+    return sectionHdr + '<tr style="border-bottom:1px solid #f0f0ec;"><td style="padding:8px 12px;font-weight:600;font-size:11px;">'+row.label+'</td><td style="padding:8px 12px;text-align:right;font-size:14px;font-weight:700;color:'+col+';">'+(v>0?'+':'')+v+'</td></tr>';
   }).join('');
   var edAdj=bd.edAdjustment||0;
   if(edAdj)tableRows+='<tr style="border-top:2px solid #F8E41A;"><td style="padding:8px 12px;font-weight:700;">ED Adjustment</td><td style="padding:8px 12px;text-align:right;font-size:14px;font-weight:700;color:'+(edAdj>0?'#15803d':'#b91c1c')+'">'+(edAdj>0?'+':'')+edAdj+'</td></tr>';
@@ -3957,7 +3987,7 @@ function printScorecard(){
     +'<div><div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:4px;">Total Score</div><div style="font-size:40px;font-weight:700;color:#F8E41A;line-height:1;">'+s+'</div></div>'
     +'<div style="width:1px;height:40px;background:#333;"></div>'
     +'<div><div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:6px;">Priority Tier</div><div style="font-size:13px;font-weight:700;padding:6px 14px;border-radius:6px;background:'+tierBg2+';color:'+tierColor2+';">'+(app.tier||'—')+'</div></div>'
-    +'<div style="flex:1;"><div style="font-size:9px;color:#888;margin-bottom:4px;">Score Bar</div><div style="height:6px;background:#333;border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+Math.min(100,Math.round((s/30)*100))+'%;background:'+tierColor2+';border-radius:3px;"></div></div></div></div>'
+    +'<div style="flex:1;"><div style="font-size:9px;color:#888;margin-bottom:4px;">Score Bar</div><div style="height:6px;background:#333;border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+Math.min(100,Math.max(0,Math.round((s/Math.max(100,(_t.critical||80)*1.25))*100)))+'%;background:'+tierColor2+';border-radius:3px;"></div></div></div></div>'
     +'<table style="width:100%;border-collapse:collapse;border:1px solid #eee;margin-bottom:16px;">'
     +'<thead><tr style="background:#111;border-bottom:2px solid #F8E41A;"><th style="padding:8px 12px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:#888;font-weight:700;">Category</th><th style="padding:8px 12px;text-align:right;font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:#888;font-weight:700;width:60px;">Score</th></tr></thead>'
     +'<tbody>'+tableRows+'</tbody>'
