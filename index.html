@@ -45,11 +45,6 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 #appLayout{flex:1;display:flex;flex-direction:column;min-width:0;align-items:center;}
 
 /* ── PAGE HEADER (Back button + sub-header band) ── */
-[id$="View"]:has(> .page-back-row:first-child),
-.dash-view:has(> .page-back-row:first-child),
-.settings-view:has(> .page-back-row:first-child){
-  padding-top:12px !important;
-}
 #worklistView,
 #dashView,
 #settingsView,
@@ -60,11 +55,11 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 #renoApprovalsView,
 #renosView,
 #contractorsView{
-  padding-top:12px !important;
+  padding-top:0 !important;
 }
 #role_queue_banner:empty{display:none;}
 #role_queue_banner{padding:0 !important;}
-.page-back-row{margin:0 0 10px 0;}
+.page-back-row{margin:12px 0 10px 0;}
 .back-btn-yellow{
   background:var(--yellow);border:1.5px solid var(--yellow);color:#111;
   padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;
