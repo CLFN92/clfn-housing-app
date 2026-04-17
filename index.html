@@ -58,6 +58,19 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 #contractorsView{
   padding-top:12px !important;
 }
+/* Mobile @media rule at line ~779 applies padding shorthand with !important on ID selectors. */
+/* Chained ID bumps specificity to beat that. */
+#worklistView#worklistView,
+#dashView#dashView,
+#settingsView#settingsView,
+#inventoryView#inventoryView,
+#matchView#matchView,
+#tenantsView#tenantsView,
+#renoApprovalsView#renoApprovalsView,
+#renosView#renosView,
+#contractorsView#contractorsView{
+  padding-top:12px !important;
+}
 .settings-view.settings-view{padding-top:12px !important;}
 #role_queue_banner:empty{display:none !important;}
 #role_queue_banner{padding:0 !important;margin:0 !important;}
