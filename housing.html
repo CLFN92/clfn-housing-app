@@ -5850,12 +5850,28 @@ function showSettings(){
 // into sessionStorage so finance.html (a separate single-file app) can read
 // it, then navigates over.
 function showFinance(){
+  console.log('[housing] showFinance called');
+  console.log('  window._realRole:', window._realRole);
+  console.log('  window._viewAsRole:', window._viewAsRole);
+  console.log('  HOUSING_SESSION.role:', typeof HOUSING_SESSION !== 'undefined' ? HOUSING_SESSION.role : 'undefined');
+  console.log('  CLFN_MODULES exists:', !!window.CLFN_MODULES);
+  console.log('  CLFN_PERMS exists:', !!window.CLFN_PERMS);
+
   if(!(window.CLFN_MODULES && window.CLFN_MODULES.isEnabled('finance'))){
+    console.warn('[housing] showFinance: finance module not enabled');
     showToast('Finance module is not enabled for this nation.');
     return;
   }
-  // Gate on finance-role access (HE-L1 cannot enter finance).
-  if(!window.CLFN_PERMS.hasFinanceAccess(window._realRole || 'housing_employee_l1')){
+  // Gate on finance-role access. Uses _realRole, NOT _viewAsRole — the
+  // "view as" dropdown is a UI preview only and shouldn't grant actual
+  // access to modules the real user isn't authorized for.
+  var gateRole = window._realRole || 'housing_employee_l1';
+  console.log('[housing] showFinance: checking hasFinanceAccess("'+gateRole+'")');
+  var canAccess = window.CLFN_PERMS.hasFinanceAccess(gateRole);
+  console.log('[housing] showFinance: result =', canAccess);
+
+  if(!canAccess){
+    console.warn('[housing] showFinance: role "'+gateRole+'" blocked from finance module');
     showToast('Your role does not have access to the Finance module.');
     return;
   }
@@ -5865,6 +5881,7 @@ function showFinance(){
     // stashHousingSession already alerted the user; don't navigate.
     return;
   }
+  console.log('[housing] showFinance: navigating to finance.html');
   window.location.href = 'finance.html';
 }
 
