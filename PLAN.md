@@ -121,6 +121,90 @@ For now: **embed in each deployment build** as `window.NATION_CONFIG`. Simplest 
 
 ---
 
+## Phase F1 — Finance Module Infrastructure Shell  ✅
+
+**Goal:** Retrofit the existing CLFN finance module (`finance-module_76.html`) into the
+multi-nation architecture. No data layer changes yet — localStorage stays put.
+Just wrap it properly.
+
+### Decisions (locked this session)
+- Full retrofit path chosen (F1 + F2 + F3 across multiple sessions) — required before Nation 2
+- Finance lives in `finance.html` (separate file, like `renos.html`)
+- No existing localStorage data to migrate (CLFN hasn't used it for real)
+- Kevin trusts schema judgment in F2 but will review SQL before running
+
+### Deliverables (done)
+- ✅ `NATION_CONFIG` + `CLFN_MODULES` + `CLFN_PERMS` boot blocks injected in finance.html
+- ✅ Auth handoff: finance.html reads `HOUSING_SESSION` from sessionStorage; bounces on missing session or insufficient role
+- ✅ Role alignment: `housing_staff` → `housing_employee_l1`, `housing_staff_l2` → `housing_employee_l2`, `finance_clerk` → `finance_l1`; `readonly` removed
+- ✅ `PERMISSIONS` matrix rewritten with canonical role names (16 fine-grained permissions)
+- ✅ `_currentRole` / `CURRENT_USER` now session-driven, not hardcoded defaults
+- ✅ Client-side "Switch Role (Testing)" menu removed; `setRole`/`toggleRoleMenu` rewritten as no-op stubs
+- ✅ Inline CLFN base64 logo moved from HTML markup → `NATION_LOGOS` registry in JS
+- ✅ Hardcoded "Constance Lake First Nation" / "CLFN Housing" strings replaced with `NATION_CONFIG.display_name` / `short_name` throughout print templates, voucher, cash receipt, tenant profile, reports
+- ✅ Hardcoded fiscal-year notice → dynamic from `NATION_CONFIG.fiscal_year_start_month` with end-month calculated
+- ✅ `<title>` tag generic; updated dynamically at runtime via `applyBrandingToHeader()`
+- ✅ `housing.html` has `stashHousingSession()` helper + wired into `showFinance()`
+- ✅ `showFinance()` gates on `CLFN_MODULES.isEnabled('finance')` AND `CLFN_PERMS.hasFinanceAccess(role)` before navigating
+- ✅ `modules_enabled.finance = true` flipped for CLFN
+- ✅ Verification: 10/10 permission matrix tests pass; JS syntax clean on both files
+
+### Known limitations shipped in F1
+- Finance data still lives in `localStorage` under key `clfn_finance_v6` — per-browser, not shared across users
+- Same-browser testing with multiple roles requires logging in/out (no more self-promotion menu — this is correct)
+- Finance module data is NOT reconciled with housing.html tenants/applications (different data stores)
+
+### F1 → F2 transition notes
+- Boot blocks in finance.html mirror housing.html/renos.html structure exactly — add new nations in only one place (`NATION_REGISTRY` in all three files, which should collapse into `shared.js` in Phase C)
+- `FINANCE_HEADERS` already built from `SUPABASE_ANON` + session `accessToken` — ready for F3 to use
+- `SUPABASE_URL` already pulled from `NATION_CONFIG` — ready for F2's new tables
+
+---
+
+## Phase F2 — Finance Supabase Schema  ⬜
+
+**Goal:** Design and deploy ~12 finance tables with `nation_id` columns
++ indexes. No code changes — just SQL migration.
+
+### Tables to design
+- `finance_tenants` — tenant ledger (separate from housing `tenants` table? Or FK? Decision needed in F2)
+- `finance_rent_ledger` — rent owing / paid entries
+- `finance_loans` — loan headers (principal, term, status, approvals)
+- `finance_loan_payments` — loan payment line items
+- `finance_invoices` — invoice headers
+- `finance_arrangements` — payment arrangements
+- `finance_arr_payments` — arrangement payment line items
+- `finance_collections` — collections flags/notes
+- `finance_journal` — generic journal entries
+- `finance_utility_hydro` — hydro meter readings / charges
+- `finance_utility_gas` — gas meter readings / charges
+- `finance_audit_log` — append-only audit trail
+
+### Design decisions needed in F2 (walk through before SQL)
+- `finance_tenants` as separate table vs FK to `tenants` in housing schema
+- How to model opening balances
+- Audit log: append-only or immutable via trigger
+- RLS posture (deferred per F1 decisions, but nation_id indexes MUST exist)
+- Soft-delete vs hard-delete for voided entries
+- Foreign-key cascades for tenant deletion
+
+---
+
+## Phase F3 — Finance Data Layer Port  ⬜
+
+**Goal:** Replace every `localStorage.getItem('clfn_finance_v6')` / `saveData()`
+call with `fetch()` against Supabase. ~40+ locations. Likely 2-3 sessions.
+
+### Scope
+- `saveData(d)` → per-table upsert calls
+- `loadData()` → login-time fetch with in-memory cache (mirror housing's `window._contractors`)
+- Every add/edit/delete form submission → async Supabase POST/PATCH
+- Every render function → read from cache, not localStorage
+- Audit log writes → direct insert to `finance_audit_log`
+- Reconcile tenant references with housing `tenants` table (decision from F2)
+
+---
+
 ## Phase C — Refactor to shared.js  ⬜
 
 ### Pre-flight

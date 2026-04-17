@@ -2274,7 +2274,7 @@
       // Optional modules only — core modules are never gated.
       modules_enabled: {
         renovations: true,
-        finance:     false,    // launches later
+        finance:     true,     // F1 retrofit: tile now navigates to finance.html
         contractors: true,
         match:       true
       }
@@ -5839,15 +5839,59 @@ function showSettings(){
   setTimeout(applySettingsRoleLocks, 80);
 }
 
-// ── Finance Module (placeholder) ─────────────────────────────────────────
-// Gated by CLFN_MODULES.isEnabled('finance'). Real UI arrives in a later phase.
-// Exists now so the tile's onclick has something to call if the module is on.
+// ── Finance Module ────────────────────────────────────────────────────────
+// Gated by CLFN_MODULES.isEnabled('finance'). Stashes the current session
+// into sessionStorage so finance.html (a separate single-file app) can read
+// it, then navigates over.
 function showFinance(){
   if(!(window.CLFN_MODULES && window.CLFN_MODULES.isEnabled('finance'))){
     showToast('Finance module is not enabled for this nation.');
     return;
   }
-  showToast('Finance Module — coming soon. (UI will be built in the next phase.)');
+  // Gate on finance-role access (HE-L1 cannot enter finance).
+  if(!window.CLFN_PERMS.hasFinanceAccess(window._realRole || 'housing_employee_l1')){
+    showToast('Your role does not have access to the Finance module.');
+    return;
+  }
+  stashHousingSession();
+  window.location.href = 'finance.html';
+}
+
+// Writes the current user's session details into sessionStorage so that
+// other same-origin HTML pages (finance.html today, renos.html in the
+// future) can recover who is signed in without running the whole login
+// flow again. Called on a successful login and whenever we hand off to a
+// module in a separate HTML file.
+//
+// Reads from the globals the login flow actually populates:
+//   - HOUSING_SESSION.accessToken  — set at login (line ~16384)
+//   - HOUSING_SESSION.name          — set at login (line ~16383)
+//   - HOUSING_SESSION.email         — set at login (line ~16382)
+//   - window._realRole              — set by resolveHousingRole() after login
+//
+// NOTE: `HOUSING_SESSION` here is housing.html's internal object. finance.html
+// has its own variable with the same name that reads from sessionStorage.
+// They're intentionally coupled via the sessionStorage key below.
+function stashHousingSession(){
+  try {
+    var token = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.accessToken) || '';
+    var name  = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.name) || '';
+    var email = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.email) || '';
+    var role  = window._realRole || (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.role) || '';
+
+    if (!token) { console.warn('[housing] stashHousingSession: no access token in HOUSING_SESSION'); }
+    if (!role)  { console.warn('[housing] stashHousingSession: no role on window._realRole or HOUSING_SESSION.role'); }
+
+    var sess = {
+      accessToken: token,
+      role:        role,
+      name:        name || email || 'Unknown User',
+      email:       email
+    };
+    sessionStorage.setItem('HOUSING_SESSION', JSON.stringify(sess));
+  } catch(e) {
+    console.warn('[housing] stashHousingSession failed:', e);
+  }
 }
 
 // ── Generic view helper ──
