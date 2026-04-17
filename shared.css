@@ -39,7 +39,9 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 /* ── PAGE HEADER (Back button + sub-header band) ── */
 /* Used by every top-level view (Dashboard, Worklist, Inventory, Match, Tenants, Settings, Renos, Contractors, Reno Approvals). */
 /* Structure: <div class="page-back-row"><button class="back-btn-yellow"/></div> <div class="page-header-bar"><h1/><p/>…</div> */
-.page-back-row{margin-bottom:10px;}
+/* The negative top margin pulls the Back button up tight against the app header, */
+/* neutralizing the generous clamp() top padding on each view container. */
+.page-back-row{margin:-12px 0 10px 0;}
 .back-btn-yellow{
   background:var(--yellow);border:1.5px solid var(--yellow);color:#111;
   padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;
