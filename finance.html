@@ -2022,32 +2022,627 @@ var FINANCE_HEADERS = HOUSING_SESSION ? {
 // ═══════════════════════════════════════════════════════════════════════════
 
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PERSISTENCE LAYER — Supabase-backed (Phase F3)
+// ═══════════════════════════════════════════════════════════════════════════
+// This layer replaced a localStorage-only implementation in Phase F3. The
+// design goals (from F3 decision log):
+//
+//   • Zero changes to the ~125 existing saveData()/getData() call sites.
+//     They remain synchronous and continue to mutate an in-memory object.
+//   • Boot loads everything from Supabase into _memStore (one fetch per
+//     table, in parallel). getData() continues to return _memStore by
+//     reference — fully synchronous, zero latency after boot.
+//   • saveData(d) diffs against the previous _memStore, identifies
+//     changed/new rows per table, and fires parallel upserts to Supabase
+//     as fire-and-forget. UI responds instantly; persistence is async.
+//   • On write failure: red toast + console error. No retry queue for now
+//     (Phase F3B will add that if operational experience demands it).
+//   • Every saveData() also writes one row to finance_audit_log with actor,
+//     action summary, entity type/ids. Audit is also fire-and-forget but
+//     failures here are especially loud (red toast).
+//   • Void pattern is NOT surfaced in the UI in this phase; deferred to
+//     Phase F3B. Ledger rows the UI "deletes" today still get removed from
+//     _memStore (and therefore get DELETEd at Supabase). That's a temporary
+//     compromise — UI surfacing of void will arrive next session.
+//
+// Shape translation: the in-memory shape uses camelCase and positive-number
+// charge/payment columns (legacy). The Supabase shape uses snake_case and
+// a signed `amount` column. Mapper functions toRow()/fromRow() live at the
+// bottom of this block.
+
 var currentUtilityType='hydro';
 var currentReversalId=null;
 var currentArrId=null;
 
+var _memStore = null;               // authoritative in-memory copy, hydrated at boot
+var _bootLoadPromise = null;        // resolves when initial load completes
+var _writeInFlight = 0;             // counter for pending Supabase writes (for debug)
 
-var _memStore = null;
-var _entryCache = {}; // in-memory fallback when localStorage unavailable
-
-function saveData(d){
-  _memStore = d;
-  try { localStorage.setItem('clfn_finance_v6', JSON.stringify(d)); } catch(e) {}
+// Replace the old random-id generator with proper UUIDs so ids match
+// Supabase's uuid columns with no translation required.
+function uid(){
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  // Fallback for very old browsers — RFC4122 v4-ish
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
+    var r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
+    return v.toString(16);
+  });
 }
 
-function loadData(){
-  var def={tenants:[],rentLedger:[],loanList:[],loanPayments:[],hydroLedger:[],gasLedger:[],journalEntries:[],arrangements:[],arrPayments:[],collections:[],auditLog:[]};
-  if (_memStore) return Object.assign({}, def, _memStore);
+// Empty-store default shape. Every table exported by the app lives here.
+function _emptyStore(){
+  return {
+    tenants:[], rentLedger:[], loanList:[], loanPayments:[],
+    hydroLedger:[], gasLedger:[], journalEntries:[],
+    arrangements:[], arrPayments:[], collections:[], auditLog:[]
+  };
+}
+
+// ── Toasts ─────────────────────────────────────────────────────────────────
+// Persistent red toast for failures so the user can't miss them, auto-
+// dismissing green toast for successes. Mirrors housing.html's pattern.
+function _toastSuccess(msg){
+  if (typeof toast === 'function') { toast(msg, 1500); return; }
+  console.log('[finance] ' + msg);
+}
+function _toastError(msg){
+  var el = document.getElementById('app-toast');
+  if (!el) { console.error('[finance] ' + msg); return; }
+  el.textContent = '⚠ ' + msg;
+  el.style.background = '#b91c1c';
+  el.style.color = '#fff';
+  el.style.opacity = '1';
+  el.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(el._t);
+  // No auto-dismiss — user must see this. Click dismisses.
+  el.onclick = function(){
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(-50%) translateY(20px)';
+    el.style.background = ''; el.style.color = '';
+    el.onclick = null;
+  };
+}
+
+// ── Shape mappers ──────────────────────────────────────────────────────────
+// Convert between in-memory camelCase shape and Supabase snake_case/signed-
+// amount shape. Any field omitted from fromRow/toRow pairs is considered
+// transient and not persisted.
+
+var _ACTOR = function(){
+  // Best-effort actor identity for audit trails + created_by columns. Reads
+  // from HOUSING_SESSION populated at boot by index.html → finance.html.
   try {
-    var d = localStorage.getItem('clfn_finance_v6');
-    if (d) {
-      _memStore = JSON.parse(d);
-      return Object.assign({}, def, _memStore);
+    if (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) {
+      return HOUSING_SESSION.email || HOUSING_SESSION.name || 'unknown';
     }
   } catch(e) {}
-  return def;
+  return 'unknown';
+};
+
+var _NATION = function(){
+  try {
+    if (window.NATION_CONFIG && window.NATION_CONFIG.id) return window.NATION_CONFIG.id;
+  } catch(e) {}
+  return 'clfn';
+};
+
+// Rent ledger row ↔ Supabase row.
+// Legacy shape uses { charge, payment } (both >= 0). Supabase stores a
+// single signed amount where charges are positive and payments negative.
+// entry_type values align with schema CHECK: opening_balance, rent_charge,
+// payment, adjustment_credit, adjustment_debit, void.
+function _rentLedgerToRow(e){
+  // Determine signed amount and entry_type from legacy fields.
+  var amt = 0, etype = 'rent_charge';
+  if (e.type === 'opening') { amt = Number(e.charge||0); etype = 'opening_balance'; }
+  else if (e.type === 'invoice') { amt = Number(e.charge||0); etype = 'rent_charge'; }
+  else if (e.type === 'payment') { amt = -Number(e.payment||0); etype = 'payment'; }
+  else if (Number(e.charge||0) > 0) { amt = Number(e.charge); etype = 'adjustment_debit'; }
+  else if (Number(e.payment||0) > 0) { amt = -Number(e.payment); etype = 'adjustment_credit'; }
+  return {
+    id: e.id, nation_id: _NATION(),
+    tenant_id: e.tenantId, unit_id: e.unitId || null,
+    entry_type: etype, amount: amt,
+    entry_date: e.date, description: e.desc || '',
+    voids_id: e.voidsId || null, void_reason: e.voidReason || null,
+    created_by: e.createdBy || _ACTOR()
+  };
+}
+function _rentLedgerFromRow(r){
+  var charge = 0, payment = 0, type = 'invoice';
+  if (r.entry_type === 'opening_balance') { charge = Number(r.amount); type = 'opening'; }
+  else if (r.entry_type === 'rent_charge') { charge = Number(r.amount); type = 'invoice'; }
+  else if (r.entry_type === 'payment') { payment = -Number(r.amount); type = 'payment'; }
+  else if (r.entry_type === 'adjustment_debit') { charge = Number(r.amount); type = 'invoice'; }
+  else if (r.entry_type === 'adjustment_credit') { payment = -Number(r.amount); type = 'payment'; }
+  else if (r.entry_type === 'void') { type = 'void'; }
+  return {
+    id: r.id, tenantId: r.tenant_id, unitId: r.unit_id,
+    date: r.entry_date, desc: r.description || '',
+    charge: charge, payment: payment, type: type,
+    method: '', status: 'posted', ref: '',
+    voidsId: r.voids_id, voidReason: r.void_reason, createdBy: r.created_by
+  };
 }
 
+function _tenantToRow(t){
+  return {
+    id: t.id, nation_id: _NATION(),
+    full_name: ((t.first||'') + ' ' + (t.last||'')).trim() || '(unnamed)',
+    email: t.email || null, phone: t.phone || null,
+    current_unit_id: t.currentUnitId || null,  // Phase C work links to housing_units.id
+    status: t.status || 'active', archived: !!t.archived,
+    notes: t.notes || null, created_by: t.createdBy || _ACTOR(),
+    updated_by: _ACTOR()
+  };
+}
+function _tenantFromRow(r){
+  var parts = (r.full_name||'').split(/\s+/);
+  var first = parts.shift() || '';
+  var last  = parts.join(' ');
+  return {
+    id: r.id, first: first, last: last,
+    unit: '', type: 'community',         // denormalized fields not yet stored in DB; UI may populate later
+    rent: 0, invPref: 'email',
+    email: r.email || '', phone: r.phone || '',
+    hydroAcct: '', gasAcct: '', autoPay: false,
+    notes: r.notes || '',
+    status: r.status, archived: !!r.archived,
+    currentUnitId: r.current_unit_id || '',
+    createdBy: r.created_by, updatedBy: r.updated_by
+  };
+}
+
+function _loanToRow(l){
+  return {
+    id: l.id, nation_id: _NATION(),
+    tenant_id: l.tenantId,
+    loan_number: l.ref || null,
+    principal: Number(l.principal||0),
+    interest_rate: Number(l.rate||0),
+    term_months: Number(l.term||0),
+    start_date: l.start || null,
+    purpose: l.notes || null,
+    status: l.status || 'draft',
+    approved_by: l.approvedBy || null,
+    approved_at: l.approvedAt || null,
+    archived: !!l.archived,
+    notes: l.notes || null,
+    created_by: l.createdBy || _ACTOR(),
+    updated_by: _ACTOR()
+  };
+}
+function _loanFromRow(r){
+  return {
+    id: r.id, tenantId: r.tenant_id,
+    type: 'renovation', rateType: Number(r.interest_rate) > 0 ? 'fixed' : 'none',
+    rate: Number(r.interest_rate||0),
+    principal: Number(r.principal||0),
+    term: Number(r.term_months||0),
+    freq: 'monthly',
+    start: r.start_date || '',
+    notes: r.notes || r.purpose || '',
+    status: r.status,
+    payment: 0, totalInterest: 0, totalRepay: 0,  // client-computed
+    ref: r.loan_number || '',
+    archived: !!r.archived,
+    approvedBy: r.approved_by, approvedAt: r.approved_at,
+    createdBy: r.created_by
+  };
+}
+
+function _loanPaymentToRow(p){
+  return {
+    id: p.id, nation_id: _NATION(),
+    loan_id: p.loanId,
+    payment_date: p.date,
+    principal_paid: Number(p.amount||0),  // simplified: all principal; later we'll split
+    interest_paid: 0,
+    method: p.method || null,
+    reference: p.ref || null,
+    voids_id: p.voidsId || null,
+    void_reason: p.voidReason || null,
+    created_by: p.createdBy || _ACTOR()
+  };
+}
+function _loanPaymentFromRow(r){
+  return {
+    id: r.id, loanId: r.loan_id, tenantId: '',  // tenantId derived via loan lookup at render
+    date: r.payment_date,
+    amount: Number(r.principal_paid||0) + Number(r.interest_paid||0),
+    method: r.method || '', notes: '',
+    voidsId: r.voids_id, voidReason: r.void_reason, createdBy: r.created_by
+  };
+}
+
+function _arrangementToRow(a){
+  return {
+    id: a.id, nation_id: _NATION(),
+    tenant_id: a.tenantId,
+    total_owing: Number(a.totalOwing||0),
+    payment_amount: Number(a.monthlyPayment||0),
+    frequency: 'monthly',
+    start_date: a.startDate || null,
+    end_date: a.endDate || null,
+    status: a.status || 'active',
+    reason: a.notes || null,
+    approved_by: a.approvedBy || null,
+    approved_at: a.approvedAt || null,
+    archived: !!a.archived,
+    created_by: a.createdBy || _ACTOR(),
+    updated_by: _ACTOR()
+  };
+}
+function _arrangementFromRow(r){
+  return {
+    id: r.id, tenantId: r.tenant_id,
+    ledger: 'all',
+    totalOwing: Number(r.total_owing||0),
+    monthlyPayment: Number(r.payment_amount||0),
+    startDate: r.start_date || '', endDate: r.end_date || '',
+    ref: '', notes: r.reason || '',
+    status: r.status, archived: !!r.archived,
+    approvedBy: r.approved_by, approvedAt: r.approved_at,
+    createdBy: r.created_by
+  };
+}
+
+function _arrPaymentToRow(p){
+  return {
+    id: p.id, nation_id: _NATION(),
+    arrangement_id: p.arrId,
+    invoice_id: p.invoiceId || null,
+    payment_date: p.date,
+    amount: Number(p.amount||0),
+    method: p.method || null,
+    reference: p.ref || null,
+    voids_id: p.voidsId || null,
+    void_reason: p.voidReason || null,
+    created_by: p.createdBy || _ACTOR()
+  };
+}
+function _arrPaymentFromRow(r){
+  return {
+    id: r.id, arrId: r.arrangement_id,
+    invoiceId: r.invoice_id || '',
+    tenantId: '',    // derived via arrangement lookup at render
+    date: r.payment_date, amount: Number(r.amount||0),
+    method: r.method || '', type: 'regular',
+    ref: r.reference || '', notes: '',
+    voidsId: r.voids_id, voidReason: r.void_reason, createdBy: r.created_by
+  };
+}
+
+function _collectionToRow(c){
+  return {
+    id: c.id, nation_id: _NATION(),
+    tenant_id: c.tenantId,
+    opened_date: c.openedDate || c.date || today(),
+    closed_date: c.closedDate || null,
+    stage: c.stage || 'flagged',
+    amount_at_open: Number(c.amountAtOpen || c.amount || 0),
+    amount_current: c.amountCurrent != null ? Number(c.amountCurrent) : null,
+    notes: c.notes || null,
+    archived: !!c.archived,
+    created_by: c.createdBy || _ACTOR(),
+    updated_by: _ACTOR()
+  };
+}
+function _collectionFromRow(r){
+  return {
+    id: r.id, tenantId: r.tenant_id,
+    openedDate: r.opened_date, closedDate: r.closed_date,
+    stage: r.stage,
+    amountAtOpen: Number(r.amount_at_open||0),
+    amountCurrent: r.amount_current != null ? Number(r.amount_current) : null,
+    status: r.stage, notes: r.notes || '',
+    archived: !!r.archived,
+    createdBy: r.created_by
+  };
+}
+
+function _journalToRow(j){
+  var debit = Number(j.debit||0), credit = Number(j.credit||0);
+  return {
+    id: j.id, nation_id: _NATION(),
+    tenant_id: j.tenantId || null,
+    entry_date: j.date,
+    account_code: j.ledger || null,
+    debit: debit, credit: credit,
+    description: j.memo || '(no memo)',
+    reference: j.ref || null,
+    voids_id: j.voidsId || null,
+    void_reason: j.voidReason || null,
+    created_by: j.postedBy || j.createdBy || _ACTOR()
+  };
+}
+function _journalFromRow(r){
+  return {
+    id: r.id, tenantId: r.tenant_id || '',
+    date: r.entry_date,
+    ledger: r.account_code || 'rent',
+    debit: Number(r.debit||0), credit: Number(r.credit||0),
+    memo: r.description || '', ref: r.reference || '',
+    postedBy: r.created_by, status: 'posted',
+    voidsId: r.voids_id, voidReason: r.void_reason
+  };
+}
+
+function _hydroToRow(h){
+  return {
+    id: h.id, nation_id: _NATION(),
+    unit_id: h.unitId || h.tenantId || '',   // temporary fallback; utility is unit-keyed in schema
+    tenant_id: h.tenantId || null,
+    period_start: h.periodStart || h.date,
+    period_end: h.periodEnd || h.date,
+    meter_start: h.meterStart != null ? Number(h.meterStart) : null,
+    meter_end:   h.meterEnd   != null ? Number(h.meterEnd)   : null,
+    amount_billed: Number(h.amount||h.amountBilled||0),
+    amount_paid: Number(h.amountPaid||0),
+    notes: h.notes || null,
+    voids_id: h.voidsId || null, void_reason: h.voidReason || null,
+    created_by: h.createdBy || _ACTOR()
+  };
+}
+function _hydroFromRow(r){
+  return {
+    id: r.id, unitId: r.unit_id, tenantId: r.tenant_id || '',
+    periodStart: r.period_start, periodEnd: r.period_end,
+    date: r.period_end,
+    meterStart: r.meter_start, meterEnd: r.meter_end,
+    amount: Number(r.amount_billed||0),
+    amountBilled: Number(r.amount_billed||0),
+    amountPaid: Number(r.amount_paid||0),
+    notes: r.notes || '',
+    voidsId: r.voids_id, voidReason: r.void_reason, createdBy: r.created_by
+  };
+}
+
+function _gasToRow(g){
+  return {
+    id: g.id, nation_id: _NATION(),
+    unit_id: g.unitId || g.tenantId || '',
+    tenant_id: g.tenantId || null,
+    period_start: g.periodStart || g.date,
+    period_end: g.periodEnd || g.date,
+    meter_start: g.meterStart != null ? Number(g.meterStart) : null,
+    meter_end:   g.meterEnd   != null ? Number(g.meterEnd)   : null,
+    amount_billed: Number(g.amount||g.amountBilled||0),
+    amount_paid: Number(g.amountPaid||0),
+    notes: g.notes || null,
+    voids_id: g.voidsId || null, void_reason: g.voidReason || null,
+    created_by: g.createdBy || _ACTOR()
+  };
+}
+function _gasFromRow(r){
+  return {
+    id: r.id, unitId: r.unit_id, tenantId: r.tenant_id || '',
+    periodStart: r.period_start, periodEnd: r.period_end,
+    date: r.period_end,
+    meterStart: r.meter_start, meterEnd: r.meter_end,
+    amount: Number(r.amount_billed||0),
+    amountBilled: Number(r.amount_billed||0),
+    amountPaid: Number(r.amount_paid||0),
+    notes: r.notes || '',
+    voidsId: r.voids_id, voidReason: r.void_reason, createdBy: r.created_by
+  };
+}
+
+// ── Table registry ─────────────────────────────────────────────────────────
+// Binds each in-memory collection name to its Supabase table + mappers.
+// Adding a new table = one line here plus the two mapper functions above.
+var _FIN_TABLES = [
+  { key:'tenants',        table:'tenants',                toRow:_tenantToRow,       fromRow:_tenantFromRow       },
+  { key:'rentLedger',     table:'finance_rent_ledger',    toRow:_rentLedgerToRow,   fromRow:_rentLedgerFromRow   },
+  { key:'loanList',       table:'finance_loans',          toRow:_loanToRow,         fromRow:_loanFromRow         },
+  { key:'loanPayments',   table:'finance_loan_payments',  toRow:_loanPaymentToRow,  fromRow:_loanPaymentFromRow  },
+  { key:'arrangements',   table:'finance_arrangements',   toRow:_arrangementToRow,  fromRow:_arrangementFromRow  },
+  { key:'arrPayments',    table:'finance_arr_payments',   toRow:_arrPaymentToRow,   fromRow:_arrPaymentFromRow   },
+  { key:'collections',    table:'finance_collections',    toRow:_collectionToRow,   fromRow:_collectionFromRow   },
+  { key:'journalEntries', table:'finance_journal',        toRow:_journalToRow,      fromRow:_journalFromRow      },
+  { key:'hydroLedger',    table:'finance_utility_hydro',  toRow:_hydroToRow,        fromRow:_hydroFromRow        },
+  { key:'gasLedger',      table:'finance_utility_gas',    toRow:_gasToRow,          fromRow:_gasFromRow          }
+];
+
+// ── Fetch helpers ──────────────────────────────────────────────────────────
+// Build the right headers once so every call uses the bearer from the
+// housing login handoff (FINANCE_HEADERS set at boot by F1 infrastructure).
+function _fetchFromSupabase(path, opts){
+  var headers = (typeof FINANCE_HEADERS !== 'undefined' && FINANCE_HEADERS)
+              ? FINANCE_HEADERS
+              : { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' };
+  return fetch(SUPABASE_URL + '/rest/v1/' + path, Object.assign({ headers: headers }, opts||{}));
+}
+
+// ── Boot load ──────────────────────────────────────────────────────────────
+// Fetches every finance table in parallel, maps to in-memory shape, and
+// populates _memStore. Called once at page load. Returns a promise so the
+// DOMContentLoaded handler can await it before the first render.
+async function _bootLoadFinanceData(){
+  var nation = _NATION();
+  var results = {};
+  try {
+    var fetches = _FIN_TABLES.map(function(spec){
+      var path = spec.table
+        + '?select=*&nation_id=eq.' + encodeURIComponent(nation)
+        + '&order=' + (spec.table.indexOf('payment') !== -1 || spec.table === 'finance_rent_ledger'
+                        ? 'entry_date.desc' : 'created_at.desc')
+        + '&limit=10000';
+      return _fetchFromSupabase(path).then(function(r){
+        if (!r.ok) throw new Error('[finance boot] ' + spec.table + ' HTTP ' + r.status);
+        return r.json().then(function(rows){
+          results[spec.key] = (rows||[]).map(spec.fromRow);
+        });
+      }).catch(function(err){
+        console.warn('[finance boot] ' + spec.table + ' failed:', err);
+        results[spec.key] = [];
+      });
+    });
+    await Promise.all(fetches);
+    _memStore = Object.assign(_emptyStore(), results);
+    console.log('[finance] hydrated:',
+      _FIN_TABLES.map(function(s){ return s.key + '=' + (results[s.key]||[]).length; }).join(', '));
+  } catch(e) {
+    console.error('[finance boot] fatal:', e);
+    _memStore = _emptyStore();
+    _toastError('Failed to load finance data. Some views may be empty.');
+  }
+  return _memStore;
+}
+
+// ── Diff + write ───────────────────────────────────────────────────────────
+// Given a new _memStore candidate d, find rows added/changed/removed per
+// table vs the prior _memStore, then upsert/delete against Supabase. Done
+// fire-and-forget. Best-effort; failures toast red.
+function _diffCollection(prev, next){
+  var prevMap = {}; (prev||[]).forEach(function(x){ if (x && x.id) prevMap[x.id] = x; });
+  var nextMap = {}; (next||[]).forEach(function(x){ if (x && x.id) nextMap[x.id] = x; });
+  var toUpsert = [], toDelete = [];
+  Object.keys(nextMap).forEach(function(id){
+    var prev = prevMap[id];
+    if (!prev || JSON.stringify(prev) !== JSON.stringify(nextMap[id])) {
+      toUpsert.push(nextMap[id]);
+    }
+  });
+  Object.keys(prevMap).forEach(function(id){
+    if (!(id in nextMap)) toDelete.push(id);
+  });
+  return { toUpsert: toUpsert, toDelete: toDelete };
+}
+
+function _upsertRows(table, rows){
+  if (!rows.length) return Promise.resolve();
+  var headers = Object.assign({}, FINANCE_HEADERS || {}, {
+    'Prefer': 'resolution=merge-duplicates,return=minimal',
+    'Content-Type': 'application/json'
+  });
+  return fetch(SUPABASE_URL + '/rest/v1/' + table, {
+    method: 'POST', headers: headers, body: JSON.stringify(rows)
+  }).then(function(r){
+    if (!r.ok) return r.text().then(function(t){ throw new Error(table + ' upsert ' + r.status + ': ' + t); });
+  });
+}
+
+function _deleteRows(table, ids){
+  if (!ids.length) return Promise.resolve();
+  // Use the in.() list operator; one request per table.
+  var inList = ids.map(function(x){ return '"'+x+'"'; }).join(',');
+  var path = table + '?id=in.(' + encodeURIComponent(inList) + ')';
+  return _fetchFromSupabase(path, { method:'DELETE' }).then(function(r){
+    if (!r.ok) return r.text().then(function(t){ throw new Error(table + ' delete ' + r.status + ': ' + t); });
+  });
+}
+
+// ── saveData — diff and fire-and-forget persist ────────────────────────────
+// Synchronous from caller's perspective. Updates _memStore immediately so
+// subsequent getData() reflects the change. Supabase writes happen async.
+function saveData(d){
+  var prev = _memStore || _emptyStore();
+  var next = Object.assign(_emptyStore(), d || {});
+
+  // 1) Update in-memory authoritative store immediately.
+  _memStore = next;
+
+  // 2) Legacy fallback to localStorage so a stale tab doesn't lose a draft
+  //    if the Supabase write fails. Harmless overhead on success path.
+  try { localStorage.setItem('clfn_finance_v6', JSON.stringify(next)); } catch(e) {}
+
+  // 3) Persist diffs to Supabase in parallel. Collect promises so we can
+  //    toast once globally on outcome rather than per-table.
+  var writePromises = [];
+  var totalUpserts = 0, totalDeletes = 0;
+
+  _FIN_TABLES.forEach(function(spec){
+    var diff = _diffCollection(prev[spec.key], next[spec.key]);
+    totalUpserts += diff.toUpsert.length;
+    totalDeletes += diff.toDelete.length;
+
+    if (diff.toUpsert.length) {
+      var rows = diff.toUpsert.map(function(x){
+        try { return spec.toRow(x); } catch(e) { console.error('[finance] toRow failed on '+spec.key, x, e); return null; }
+      }).filter(Boolean);
+      if (rows.length) {
+        _writeInFlight++;
+        writePromises.push(_upsertRows(spec.table, rows).finally(function(){ _writeInFlight--; }));
+      }
+    }
+    if (diff.toDelete.length) {
+      _writeInFlight++;
+      writePromises.push(_deleteRows(spec.table, diff.toDelete).finally(function(){ _writeInFlight--; }));
+    }
+  });
+
+  if (writePromises.length === 0) return;
+
+  // 4) Audit log write. Summary is coarse at this level; finer-grained
+  //    audit events should be added at specific action handlers (e.g.
+  //    approveLoan, postPayment) in a later phase.
+  var auditPromise = _writeAuditEntry({
+    action: 'saveData',
+    summary: 'Saved finance state (' + totalUpserts + ' upserts, ' + totalDeletes + ' deletes)',
+    entity_type: 'batch',
+    detail: { upserts: totalUpserts, deletes: totalDeletes }
+  });
+  writePromises.push(auditPromise);
+
+  // 5) Handle outcome. Keep silent on single-write success to avoid toast
+  //    fatigue; only toast on failure.
+  Promise.all(writePromises).catch(function(err){
+    console.error('[finance] save failed:', err);
+    _toastError('Some changes could not be saved. Refresh to verify.');
+  });
+}
+
+// ── Audit writer ───────────────────────────────────────────────────────────
+// Inserts one row into finance_audit_log. Fire-and-forget. Failures are
+// loud because an audit miss is a compliance gap.
+function _writeAuditEntry(entry){
+  var row = {
+    nation_id: _NATION(),
+    actor_email: _ACTOR(),
+    actor_role:  (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION.role : null,
+    action: entry.action,
+    entity_type: entry.entity_type || 'unknown',
+    entity_id: entry.entity_id || null,
+    tenant_id: entry.tenant_id || null,
+    summary: entry.summary || '(no summary)',
+    detail: entry.detail || null
+  };
+  var headers = Object.assign({}, FINANCE_HEADERS || {}, {
+    'Prefer': 'return=minimal', 'Content-Type': 'application/json'
+  });
+  return fetch(SUPABASE_URL + '/rest/v1/finance_audit_log', {
+    method: 'POST', headers: headers, body: JSON.stringify([row])
+  }).then(function(r){
+    if (!r.ok) return r.text().then(function(t){ throw new Error('audit ' + r.status + ': ' + t); });
+  }).catch(function(err){
+    console.error('[finance audit] failed:', err);
+    _toastError('Audit log write failed. Please report this.');
+  });
+}
+
+// Public wrapper so action-specific callers (approveLoan, postPayment, etc.)
+// can add richer audit entries. Usage:
+//   writeAuditEntry({action:'approve_loan', entity_type:'loan', entity_id:ln.id,
+//                    tenant_id:ln.tenantId, summary:'Approved $8000 loan for Mary Atlookan'});
+function writeAuditEntry(entry){ return _writeAuditEntry(entry||{}); }
+
+// ── loadData / getData — unchanged contract ────────────────────────────────
+// These must remain synchronous because 125 call sites depend on that. We
+// return _memStore directly (shallow-merged with the empty shape to guarantee
+// every collection key exists). If _memStore is null (boot didn't finish),
+// return an empty shell — callers get empty arrays and the UI shows "no data"
+// rather than undefined errors.
+function loadData(){
+  if (_memStore) return Object.assign(_emptyStore(), _memStore);
+  // localStorage fallback preserves UX if we ever lose connectivity on reload.
+  try {
+    var d = localStorage.getItem('clfn_finance_v6');
+    if (d) { _memStore = JSON.parse(d); return Object.assign(_emptyStore(), _memStore); }
+  } catch(e) {}
+  return _emptyStore();
+}
 function getData(){ return loadData(); }
 
 
@@ -2066,78 +2661,14 @@ function toast(msg, duration) {
 }
 
 function seedIfEmpty(){
-  var d=getData();
-  if(d.tenants.length>0)return;
-  d.tenants=[
-    {id:'t1',first:'Mary',last:'Atlookan',unit:'Unit 4',type:'band-on',rent:450,invPref:'email',email:'mary.atlookan@example.com',phone:'(807)555-0101',hydroAcct:'HYD-1041',gasAcct:'GAS-1041',autoPay:false,notes:''},
-    {id:'t2',first:'George',last:'Sutherland',unit:'Unit 7',type:'band-staff',rent:320,invPref:'print',email:'',phone:'(807)555-0202',hydroAcct:'HYD-1072',gasAcct:'',autoPay:true,notes:'Band office employee'},
-    {id:'t3',first:'Sandra',last:'Kapashesit',unit:'Unit 11',type:'clea',rent:500,invPref:'email',email:'s.kapashesit@example.com',phone:'(807)555-0303',hydroAcct:'HYD-1113',gasAcct:'GAS-1113',autoPay:false,notes:'CLEA staff housing - Rent-to-Own'},
-    {id:'t4',first:'David',last:'Moonias',unit:'Unit 3',type:'community',rent:600,invPref:'print',email:'',phone:'(807)555-0404',hydroAcct:'HYD-1031',gasAcct:'GAS-1031',autoPay:false,notes:'Community member - payment arrangement active'}
-  ];
-  d.rentLedger=[
-    {id:'rl1',tenantId:'t1',date:'2026-01-01',desc:'Opening Balance (Arrears)',charge:900,payment:0,type:'opening',method:'',status:'approved',ref:''},
-    {id:'rl2',tenantId:'t1',date:'2026-02-01',desc:'February 2026 Rent Invoice',charge:450,payment:0,type:'invoice',method:'',status:'approved',ref:'INV-001'},
-    {id:'rl3',tenantId:'t1',date:'2026-02-15',desc:'Rent Payment',charge:0,payment:450,type:'payment',method:'cash',status:'posted',ref:''},
-    {id:'rl4',tenantId:'t2',date:'2026-02-01',desc:'February 2026 Rent Invoice',charge:320,payment:0,type:'invoice',method:'',status:'approved',ref:'INV-002'},
-    {id:'rl5',tenantId:'t3',date:'2026-03-01',desc:'March 2026 Rent Invoice',charge:500,payment:0,type:'invoice',method:'',status:'approved',ref:'INV-003'},
-    {id:'rl6',tenantId:'t3',date:'2026-03-20',desc:'Rent Payment',charge:0,payment:500,type:'payment',method:'auto',status:'posted',ref:'AUTO-2603'},
-    {id:'rl7',tenantId:'t4',date:'2024-01-01',desc:'Opening Balance (Arrears)',charge:18500,payment:0,type:'opening',method:'',status:'approved',ref:''},
-    {id:'rl8',tenantId:'t4',date:'2026-04-01',desc:'April 2026 Rent Invoice',charge:600,payment:0,type:'invoice',method:'',status:'approved',ref:'INV-004'}
-  ];
-  d.loanList=[
-    {id:'ln1',tenantId:'t1',type:'renovation',rateType:'fixed',rate:3.5,principal:8000,term:48,freq:'monthly',start:'2025-06-01',notes:'Kitchen and bathroom renovation',status:'approved',payment:179.69,totalInterest:628.12,totalRepay:8628.12},
-    {id:'ln2',tenantId:'t3',type:'rent-to-own',rateType:'none',rate:0,principal:45000,term:120,freq:'monthly',start:'2024-01-01',notes:'Rent-to-own program - Unit 11',status:'approved',payment:375,totalInterest:0,totalRepay:45000}
-  ];
-  d.loanPayments=[
-    {id:'lp1',loanId:'ln1',tenantId:'t1',date:'2025-07-01',amount:179.69,method:'auto',notes:''},
-    {id:'lp2',loanId:'ln1',tenantId:'t1',date:'2025-08-01',amount:179.69,method:'auto',notes:''},
-    {id:'lp3',loanId:'ln1',tenantId:'t1',date:'2025-09-01',amount:179.69,method:'cash',notes:''},
-    {id:'lp4',loanId:'ln2',tenantId:'t3',date:'2024-02-01',amount:375,method:'auto',notes:''},
-    {id:'lp5',loanId:'ln2',tenantId:'t3',date:'2024-03-01',amount:375,method:'auto',notes:''},
-    {id:'lp6',loanId:'ln2',tenantId:'t3',date:'2024-04-01',amount:375,method:'etransfer',notes:''}
-  ];
-  d.hydroLedger=[];
-  d.gasLedger=[];
-  d.journalEntries=[
-    {id:'je1',tenantId:'t3',date:'2026-02-28',ledger:'rent',debit:0,credit:50,memo:'Rent adjustment - leaking roof repair credit',postedBy:'Housing Manager',status:'pending-ed'}
-  ];
-  d.arrangements=[
-    {id:'arr1',tenantId:'t4',ledger:'all',totalOwing:20000,monthlyPayment:200,startDate:'2026-01-01',ref:'ARR-2026-001',notes:'Community member payment arrangement - approved by ED Jan 2026',status:'approved'}
-  ];
-  d.arrPayments=[
-    {id:'ap1',arrId:'arr1',tenantId:'t4',date:'2026-01-15',amount:200,method:'cash',type:'regular',ref:'',notes:''},
-    {id:'ap2',arrId:'arr1',tenantId:'t4',date:'2026-02-15',amount:200,method:'etransfer',type:'regular',ref:'CONF-2026021501',notes:''},
-    {id:'ap3',arrId:'arr1',tenantId:'t4',date:'2026-03-01',amount:500,method:'cash',type:'extra',ref:'',notes:'Extra payment - income tax return'}
-  ];
-  d.collections=[];
-
-  // Seed 6 months of historical invoices for demo tenants
-  var histMonths=[
-    {m:'2025-10',lbl:'October 2025'},{m:'2025-11',lbl:'November 2025'},
-    {m:'2025-12',lbl:'December 2025'},{m:'2026-01',lbl:'January 2026'},
-    {m:'2026-02',lbl:'February 2026'},{m:'2026-03',lbl:'March 2026'}
-  ];
-  histMonths.forEach(function(mo,i){
-    // t1 Mary - paid Oct/Nov/Dec, then fell behind
-    d.rentLedger.push({id:uid(),tenantId:'t1',date:mo.m+'-01',desc:mo.lbl+' Rent Invoice',charge:450,payment:0,type:'invoice',method:'',status:'approved',ref:'INV-T1-'+mo.m});
-    if(i<3){d.rentLedger.push({id:uid(),tenantId:'t1',date:mo.m+'-18',desc:'Rent Payment',charge:0,payment:450,type:'payment',method:'cash',status:'posted',ref:''});}
-    // t2 George - auto-pay, always paid
-    d.rentLedger.push({id:uid(),tenantId:'t2',date:mo.m+'-01',desc:mo.lbl+' Rent Invoice',charge:320,payment:0,type:'invoice',method:'',status:'approved',ref:'INV-T2-'+mo.m});
-    d.rentLedger.push({id:uid(),tenantId:'t2',date:mo.m+'-01',desc:'Auto Payment',charge:0,payment:320,type:'payment',method:'auto',status:'posted',ref:'AUTO-T2-'+mo.m});
-    // t3 Sandra - e-transfer, all paid
-    d.rentLedger.push({id:uid(),tenantId:'t3',date:mo.m+'-01',desc:mo.lbl+' Rent Invoice',charge:500,payment:0,type:'invoice',method:'',status:'approved',ref:'INV-T3-'+mo.m});
-    d.rentLedger.push({id:uid(),tenantId:'t3',date:mo.m+'-03',desc:'Rent Payment',charge:0,payment:500,type:'payment',method:'etransfer',status:'posted',ref:'ET-T3-'+mo.m});
-    // t4 David - invoiced, unpaid (paying via arrangement)
-    d.rentLedger.push({id:uid(),tenantId:'t4',date:mo.m+'-01',desc:mo.lbl+' Rent Invoice',charge:600,payment:0,type:'invoice',method:'',status:'approved',ref:'INV-T4-'+mo.m});
-  });
-  saveData(d);
+  // Phase F3: no-op. Real tenant data comes from the housing → tenants
+  // trigger-sync installed by the F2 migration. Demo/dev data should be
+  // inserted directly in Supabase via the SQL editor if needed.
 }
-
 function fmt(n){return '$'+Number(n||0).toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function today(){return new Date().toISOString().slice(0,10);}
 function tenantName(t){return t.first+' '+t.last;}
 function getTenant(id){return getData().tenants.find(function(t){return t.id===id;})||null;}
-function uid(){return 'id'+Date.now()+Math.random().toString(36).slice(2,6);}
 function methodLabel(m){
   var map={cash:'Cash',debit:'Debit',credit:'Credit Card',etransfer:'E-Transfer','online-banking':'Online Banking',cheque:'Cheque',auto:'Auto Payment',eft:'EFT (Auto)',payroll:'Payroll Deduction'};
   return map[m]||m||'';
@@ -7257,7 +7788,7 @@ function toggleRoleMenu() { /* disabled in Phase F1 */ }
 
 // \u2500\u2500 App Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   // Global error trap - surfaces crashes visibly on iPhone
   window.onerror = function(msg, src, line, col, err) {
     var div = document.createElement('div');
@@ -7272,7 +7803,13 @@ document.addEventListener('DOMContentLoaded', function() {
     applyBrandingToHeader();
     applyRoleToHeader();
     applyPermissions();
-    seedIfEmpty();
+
+    // Phase F3: hydrate _memStore from Supabase before the first render.
+    // Every getData() call after this returns real data instead of an empty shell.
+    // seedIfEmpty() is a no-op in F3 — real tenants come from the housing→tenants
+    // trigger-sync installed by the F2 migration.
+    await _bootLoadFinanceData();
+
     showPage('dashboard');
     initTenantSelects();
   document.addEventListener('click', function(e) {

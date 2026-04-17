@@ -2051,6 +2051,11 @@ function showRenos()              { navigateTo('renos.html'); }
 function showRenosForRole()       { navigateTo('renos.html'); }
 function showContractorsForRole() { navigateTo('renos.html',{view:'contractors'}); }
 function showFinance() {
+  console.log('[index] showFinance called');
+  console.log('  HOUSING_SESSION:', typeof HOUSING_SESSION !== 'undefined' ? HOUSING_SESSION : 'undefined');
+  console.log('  window._realRole:', window._realRole);
+  console.log('  window.currentRole:', window.currentRole);
+
   // Gate on module enablement + role access, then stash session and navigate.
   // Mirrors showFinance() in housing.html so the finance tile works from either page.
   if(!(window.CLFN_MODULES && window.CLFN_MODULES.isEnabled('finance'))){
@@ -2061,6 +2066,7 @@ function showFinance() {
               || window._realRole
               || window.currentRole
               || 'housing_employee_l1';
+  console.log('[index] showFinance: gateRole =', gateRole);
   if(!window.CLFN_PERMS.hasFinanceAccess(gateRole)){
     alert('Your role does not have access to the Finance module.');
     return;
@@ -2070,9 +2076,11 @@ function showFinance() {
     var token = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.accessToken) || '';
     var name  = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.name) || '';
     var email = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.email) || '';
+    console.log('[index] showFinance: token length =', token.length, 'name =', name, 'email =', email);
     if(!token){ alert('Session handoff failed: no access token. Please sign out and sign back in.'); return; }
     var sess = { accessToken: token, role: gateRole, name: name || email || 'Unknown User', email: email };
     sessionStorage.setItem('HOUSING_SESSION', JSON.stringify(sess));
+    console.log('[index] showFinance: wrote HOUSING_SESSION to sessionStorage, navigating...');
   } catch(e) { console.warn('[index] showFinance stash failed:', e); return; }
   navigateTo('finance.html');
 }

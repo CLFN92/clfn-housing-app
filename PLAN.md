@@ -161,47 +161,108 @@ Just wrap it properly.
 
 ---
 
-## Phase F2 — Finance Supabase Schema  ⬜
+## Phase F2 — Finance Supabase Schema  ✅
 
-**Goal:** Design and deploy ~12 finance tables with `nation_id` columns
+**Goal:** Design and deploy finance tables with `nation_id` columns
 + indexes. No code changes — just SQL migration.
 
-### Tables to design
-- `finance_tenants` — tenant ledger (separate from housing `tenants` table? Or FK? Decision needed in F2)
-- `finance_rent_ledger` — rent owing / paid entries
-- `finance_loans` — loan headers (principal, term, status, approvals)
-- `finance_loan_payments` — loan payment line items
-- `finance_invoices` — invoice headers
-- `finance_arrangements` — payment arrangements
-- `finance_arr_payments` — arrangement payment line items
-- `finance_collections` — collections flags/notes
-- `finance_journal` — generic journal entries
-- `finance_utility_hydro` — hydro meter readings / charges
-- `finance_utility_gas` — gas meter readings / charges
-- `finance_audit_log` — append-only audit trail
+### Decisions (locked and shipped)
+- ✅ Tenant reference: new `tenants` platform table, FK from finance tables, sync trigger from `housing_units`
+- ✅ Opening balances: ledger rows with `entry_type='opening_balance'`
+- ✅ Audit immutability: trigger + RLS on BOTH `finance_audit_log` AND `housing_audit_log` (housing gap closed)
+- ✅ Deletion pattern: void pattern for ledger tables, soft-delete (archived flag) for entity tables
+- ✅ FK cascades: RESTRICT on tenant/loan/invoice, SET NULL for housing_units → ledger
+- ✅ Money: `numeric(12,2)`, CAD assumed, no currency column
 
-### Design decisions needed in F2 (walk through before SQL)
-- `finance_tenants` as separate table vs FK to `tenants` in housing schema
-- How to model opening balances
-- Audit log: append-only or immutable via trigger
-- RLS posture (deferred per F1 decisions, but nation_id indexes MUST exist)
-- Soft-delete vs hard-delete for voided entries
-- Foreign-key cascades for tenant deletion
+### Tables delivered (13 total)
+**Platform table:**
+- `tenants` — shared by housing + finance, trigger-synced from housing_units.assigned_name
+
+**Finance tables (12):**
+- `finance_rent_ledger` — all rent events, void pattern
+- `finance_loans` + `finance_loan_payments` — entity + ledger
+- `finance_invoices` — entity with lifecycle
+- `finance_arrangements` + `finance_arr_payments` — entity + ledger
+- `finance_collections` — case tracking
+- `finance_journal` — generic manual entries
+- `finance_utility_hydro` + `finance_utility_gas` — metered billing
+- `finance_audit_log` — append-only
+
+### Automation baked in
+- Append-only triggers block UPDATE/DELETE on audit tables at DB level
+- RLS policies + GRANT revocations prevent audit tampering
+- Auto-maintained `updated_at` timestamps on entity tables
+- `housing_units.assigned_name` changes trigger `tenants` sync automatically
+- One-time backfill run at migration: every assigned unit now has a tenant row
+
+### Post-deploy status
+- 13 tables created in Supabase project `fkhzrbalumzeripzolph`
+- Tenant backfill verified against `housing_units.assigned_name IS NOT NULL`
+- User deployed via Supabase SQL Editor, single transaction, succeeded
+
+### Schema gotcha (fixed during deploy)
+First run failed with `incompatible types: uuid and text` because `housing_units.id` is `text`. Updated all 5 FK columns (`tenants.current_unit_id`, `finance_rent_ledger.unit_id`, `finance_invoices.unit_id`, `finance_utility_hydro.unit_id`, `finance_utility_gas.unit_id`) from `uuid` to `text`. Internal finance PKs remain `uuid`.
 
 ---
 
-## Phase F3 — Finance Data Layer Port  ⬜
+## Phase F3 — Finance Data Layer Port (session 1 of 2)  ✅
 
-**Goal:** Replace every `localStorage.getItem('clfn_finance_v6')` / `saveData()`
-call with `fetch()` against Supabase. ~40+ locations. Likely 2-3 sessions.
+**Goal:** Replace localStorage-only persistence with Supabase-backed reads and
+writes. Keep the existing synchronous call pattern so the ~125 call sites in
+finance.html don't need to change.
 
-### Scope
-- `saveData(d)` → per-table upsert calls
-- `loadData()` → login-time fetch with in-memory cache (mirror housing's `window._contractors`)
-- Every add/edit/delete form submission → async Supabase POST/PATCH
-- Every render function → read from cache, not localStorage
-- Audit log writes → direct insert to `finance_audit_log`
-- Reconcile tenant references with housing `tenants` table (decision from F2)
+### Design (locked this session)
+- Load-everything-at-boot: one fetch per table at DOMContentLoaded; hydrate `_memStore`
+- `getData()` / `loadData()` stay synchronous, return `_memStore` by reference
+- `saveData(d)` stays synchronous from caller's view; internally diffs against
+  the previous `_memStore` and fires async upserts/deletes to Supabase
+- Fire-and-forget writes; success is silent, failures show persistent red toast
+- UUIDs everywhere via `crypto.randomUUID()` — matches Supabase uuid columns
+- Every saveData writes one audit row; richer per-action audit calls to be
+  added in later phases using the public `writeAuditEntry()` helper
+
+### Deliverables (done)
+- ✅ `_FIN_TABLES` registry binding each in-memory collection to Supabase table + mappers
+- ✅ Shape mappers for all 10 entities (camelCase ↔ snake_case, charge/payment ↔ signed amount):
+  tenants, rentLedger, loanList, loanPayments, arrangements, arrPayments,
+  collections, journalEntries, hydroLedger, gasLedger
+- ✅ `_bootLoadFinanceData()` — parallel fetch of all tables at DOMContentLoaded
+- ✅ `saveData()` — diff-based upsert/delete, synchronous to caller, async to Supabase
+- ✅ `loadData()` / `getData()` — return `_memStore` synchronously, localStorage fallback preserved
+- ✅ `uid()` returns `crypto.randomUUID()` — 51 call sites auto-upgrade
+- ✅ `_writeAuditEntry()` — writes to `finance_audit_log` on every save
+- ✅ `writeAuditEntry()` — public wrapper for per-action audit
+- ✅ `_toastSuccess()` / `_toastError()` — UI feedback
+- ✅ `seedIfEmpty()` neutralized (demo tenants no longer created; real tenants come from F2 trigger)
+- ✅ DOMContentLoaded awaits `_bootLoadFinanceData()` before first render
+- ✅ Syntax verified, ships via present_files
+
+### Known caveats (acceptable for F3 session 1)
+- Demo tenants (Mary/George/Sandra/David) no longer auto-seed. Either rely on
+  F2 trigger-sync from housing_units, or insert rows directly via Supabase SQL
+  editor for dev testing.
+- `tenants` table schema has slim mapping — housing-specific fields (unit type,
+  rent amount, hydro account #, gas account #, autoPay, etc.) aren't in the new
+  tenants table. They default to empty/false on load. Phase C housing→finance
+  alignment or new tenant columns will reconcile.
+- Diff-based write uses JSON.stringify for equality — fine for this scale but
+  not optimal. Per-entity save functions (saveTenant, savePayment) can replace
+  the blob save later if needed.
+
+---
+
+## Phase F3B — Finance Data Layer Port (session 2 of 2)  ⬜
+
+**Goal:** Surface the void pattern in the UI, replace "Delete" buttons with
+"Void" buttons with reason prompt, add an Audit tab showing voided entries.
+
+### Planned work
+- Replace "Delete" buttons on rent_ledger/loan_payments/arr_payments/journal/hydro/gas with "Void"
+- Void modal: prompts for reason, inserts reversing entry with `voids_id` FK
+- Views filter out voided + void rows by default (both hidden)
+- New "Audit" tab shows ALL rows including voids, for compliance viewing
+- Per-action audit entries (approveLoan, postPayment, etc.) using `writeAuditEntry()`
+- Optional: retry queue in localStorage for failed writes if operational need emerges
 
 ---
 
