@@ -2431,18 +2431,20 @@ function _gasFromRow(r){
 
 // ── Table registry ─────────────────────────────────────────────────────────
 // Binds each in-memory collection name to its Supabase table + mappers.
-// Adding a new table = one line here plus the two mapper functions above.
+// orderBy is the column used for initial-load sorting; must exist in the
+// actual schema (see f2_finance_schema.sql). Adding a new table = one line
+// here plus the two mapper functions above.
 var _FIN_TABLES = [
-  { key:'tenants',        table:'tenants',                toRow:_tenantToRow,       fromRow:_tenantFromRow       },
-  { key:'rentLedger',     table:'finance_rent_ledger',    toRow:_rentLedgerToRow,   fromRow:_rentLedgerFromRow   },
-  { key:'loanList',       table:'finance_loans',          toRow:_loanToRow,         fromRow:_loanFromRow         },
-  { key:'loanPayments',   table:'finance_loan_payments',  toRow:_loanPaymentToRow,  fromRow:_loanPaymentFromRow  },
-  { key:'arrangements',   table:'finance_arrangements',   toRow:_arrangementToRow,  fromRow:_arrangementFromRow  },
-  { key:'arrPayments',    table:'finance_arr_payments',   toRow:_arrPaymentToRow,   fromRow:_arrPaymentFromRow   },
-  { key:'collections',    table:'finance_collections',    toRow:_collectionToRow,   fromRow:_collectionFromRow   },
-  { key:'journalEntries', table:'finance_journal',        toRow:_journalToRow,      fromRow:_journalFromRow      },
-  { key:'hydroLedger',    table:'finance_utility_hydro',  toRow:_hydroToRow,        fromRow:_hydroFromRow        },
-  { key:'gasLedger',      table:'finance_utility_gas',    toRow:_gasToRow,          fromRow:_gasFromRow          }
+  { key:'tenants',        table:'tenants',                orderBy:'created_at.desc', toRow:_tenantToRow,       fromRow:_tenantFromRow       },
+  { key:'rentLedger',     table:'finance_rent_ledger',    orderBy:'entry_date.desc', toRow:_rentLedgerToRow,   fromRow:_rentLedgerFromRow   },
+  { key:'loanList',       table:'finance_loans',          orderBy:'created_at.desc', toRow:_loanToRow,         fromRow:_loanFromRow         },
+  { key:'loanPayments',   table:'finance_loan_payments',  orderBy:'payment_date.desc', toRow:_loanPaymentToRow,  fromRow:_loanPaymentFromRow  },
+  { key:'arrangements',   table:'finance_arrangements',   orderBy:'created_at.desc', toRow:_arrangementToRow,  fromRow:_arrangementFromRow  },
+  { key:'arrPayments',    table:'finance_arr_payments',   orderBy:'payment_date.desc', toRow:_arrPaymentToRow,   fromRow:_arrPaymentFromRow   },
+  { key:'collections',    table:'finance_collections',    orderBy:'opened_date.desc', toRow:_collectionToRow,   fromRow:_collectionFromRow   },
+  { key:'journalEntries', table:'finance_journal',        orderBy:'entry_date.desc', toRow:_journalToRow,      fromRow:_journalFromRow      },
+  { key:'hydroLedger',    table:'finance_utility_hydro',  orderBy:'period_start.desc', toRow:_hydroToRow,        fromRow:_hydroFromRow        },
+  { key:'gasLedger',      table:'finance_utility_gas',    orderBy:'period_start.desc', toRow:_gasToRow,          fromRow:_gasFromRow          }
 ];
 
 // ── Fetch helpers ──────────────────────────────────────────────────────────
@@ -2466,8 +2468,7 @@ async function _bootLoadFinanceData(){
     var fetches = _FIN_TABLES.map(function(spec){
       var path = spec.table
         + '?select=*&nation_id=eq.' + encodeURIComponent(nation)
-        + '&order=' + (spec.table.indexOf('payment') !== -1 || spec.table === 'finance_rent_ledger'
-                        ? 'entry_date.desc' : 'created_at.desc')
+        + '&order=' + spec.orderBy
         + '&limit=10000';
       return _fetchFromSupabase(path).then(function(r){
         if (!r.ok) throw new Error('[finance boot] ' + spec.table + ' HTTP ' + r.status);
