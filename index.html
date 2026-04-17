@@ -1369,6 +1369,62 @@ body{font-family:'DM Sans',sans-serif;background:#fafaf8;color:#111;font-size:14
   });
 })();
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PERMISSIONS MODULE — mirrored from housing.html
+// ═══════════════════════════════════════════════════════════════════════════
+// The login page needs normalizeRole + hasHousingAccess for post-login routing.
+// Full API is mirrored for consistency even though most helpers aren't used here.
+(function initPerms(){
+  var ROLES = Object.freeze({
+    ED: 'ed', HM: 'housing_manager',
+    HE_L2: 'housing_employee_l2', HE_L1: 'housing_employee_l1',
+    CFO: 'cfo', FINANCE_L1: 'finance_l1'
+  });
+  var LEGACY_ALIASES = Object.freeze({
+    'employee': ROLES.HE_L1, 'staff': ROLES.HE_L1,
+    'hm': ROLES.HM, 'manager': ROLES.HM, 'finance': ROLES.FINANCE_L1
+  });
+  var ROLE_LABELS = Object.freeze({
+    'ed':'Executive Director', 'housing_manager':'Housing Manager',
+    'housing_employee_l2':'Housing Employee L2', 'housing_employee_l1':'Housing Employee L1',
+    'cfo':'CFO', 'finance_l1':'Finance Clerk L1'
+  });
+  var VALID_KEYS = Object.freeze(Object.keys(ROLE_LABELS));
+
+  function normalizeRole(role){
+    if(role == null) return null;
+    var r = String(role).toLowerCase().trim();
+    if(r in LEGACY_ALIASES) return LEGACY_ALIASES[r];
+    return r;
+  }
+  function isValidRole(role){ return VALID_KEYS.indexOf(normalizeRole(role)) !== -1; }
+  function assertRole(role, caller){
+    var r = normalizeRole(role);
+    if(r == null) throw new Error('[permissions] '+(caller||'check')+': role is required');
+    if(VALID_KEYS.indexOf(r) === -1){
+      throw new Error('[permissions] '+(caller||'check')+': unknown role "'+role+'" (normalized to "'+r+'"). Valid: '+VALID_KEYS.join(', '));
+    }
+    return r;
+  }
+  function roleLabel(role){ return ROLE_LABELS[normalizeRole(role)] || String(role||''); }
+  function hasHousingAccess(role){
+    var r = assertRole(role, 'hasHousingAccess');
+    return r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2 || r === ROLES.HE_L1;
+  }
+  function hasFinanceAccess(role){
+    var r = assertRole(role, 'hasFinanceAccess');
+    return r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2
+        || r === ROLES.CFO || r === ROLES.FINANCE_L1;
+  }
+
+  window.CLFN_PERMS = Object.freeze({
+    ROLES: ROLES, ROLE_LABELS: ROLE_LABELS,
+    normalizeRole: normalizeRole, isValidRole: isValidRole, assertRole: assertRole,
+    roleLabel: roleLabel,
+    hasHousingAccess: hasHousingAccess, hasFinanceAccess: hasFinanceAccess
+  });
+})();
+
 // ── Supabase client ─────────────────────────────────────────────────────────
 var SUPABASE_URL   = window.NATION_CONFIG.supabase_url;
 var SUPABASE_ANON  = window.NATION_CONFIG.supabase_anon;

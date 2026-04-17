@@ -54,10 +54,15 @@
   <!-- User info bar -->
   <div id="header_user_bar" style="display:flex;align-items:center;gap:10px;margin-left:auto;">
     <div id="roleSwitcher" style="display:none;align-items:center;gap:6px;">
+      <!-- Options populated dynamically from CLFN_PERMS.ROLE_LABELS at login time -->
+      <!-- (see populateRoleSwitcher). Fallback options below if JS fails. -->
       <select id="rb_select" onchange="switchRole(this.value)" style="padding:5px 10px;border:1px solid #444;border-radius:8px;font-size:12px;font-weight:600;font-family:DM Sans,sans-serif;background:#1a1a18;color:#ccc;cursor:pointer;outline:none;">
         <option value="ed">Executive Director</option>
         <option value="housing_manager">Housing Manager</option>
-        <option value="employee">Employee</option>
+        <option value="housing_employee_l2">Housing Employee L2</option>
+        <option value="housing_employee_l1">Housing Employee L1</option>
+        <option value="cfo">CFO</option>
+        <option value="finance_l1">Finance Clerk L1</option>
       </select>
     </div>
     <div id="header_user_pill" style="display:flex;align-items:center;gap:8px;background:#1a1a18;border:1px solid #333;border-radius:20px;padding:5px 12px 5px 6px;">
@@ -2374,6 +2379,204 @@
     isEnabled: isEnabled,
     listEnabled: listEnabled,
     listOptional: listOptional
+  });
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PERMISSIONS MODULE (single source of truth for role gating)
+// ═══════════════════════════════════════════════════════════════════════════
+// Strict enum: any call to a permission helper with an unknown role throws
+// immediately. This catches typos ('ED' vs 'ed', 'HM' vs 'housing_manager')
+// at the offending line rather than silently returning false and hiding a
+// button without explanation.
+//
+// All UI show/hide logic, all Save-path guards, and all view-as logic MUST
+// route through these helpers. Raw string comparisons like `role === 'ed'`
+// are legacy — Phase B will migrate them out.
+
+(function initPerms(){
+
+  // ── Authoritative role keys ───────────────────────────────────────────
+  // Canonical values stored in staff.role. The DB was normalized to these
+  // via the Phase A0 migration.
+  var ROLES = Object.freeze({
+    ED:         'ed',
+    HM:         'housing_manager',
+    HE_L2:      'housing_employee_l2',
+    HE_L1:      'housing_employee_l1',
+    CFO:        'cfo',
+    FINANCE_L1: 'finance_l1'
+  });
+
+  // ── Legacy-name aliases ───────────────────────────────────────────────
+  // Normalized at read-time so any pre-existing session tokens or cached
+  // strings keep working. The DB migration cleaned up stored values, but
+  // in-flight sessions may still carry the old strings.
+  var LEGACY_ALIASES = Object.freeze({
+    'employee':  ROLES.HE_L1,
+    'staff':     ROLES.HE_L1,
+    'hm':        ROLES.HM,
+    'manager':   ROLES.HM,
+    'finance':   ROLES.FINANCE_L1
+  });
+
+  // ── Human-readable labels (role switcher, badges, audit log) ──────────
+  var ROLE_LABELS = Object.freeze({
+    'ed':                   'Executive Director',
+    'housing_manager':      'Housing Manager',
+    'housing_employee_l2':  'Housing Employee L2',
+    'housing_employee_l1':  'Housing Employee L1',
+    'cfo':                  'CFO',
+    'finance_l1':           'Finance Clerk L1'
+  });
+
+  var VALID_KEYS = Object.freeze(Object.keys(ROLE_LABELS));
+
+  // ── Core helpers ──────────────────────────────────────────────────────
+
+  function normalizeRole(role){
+    if(role == null) return null;
+    var r = String(role).toLowerCase().trim();
+    if(r in LEGACY_ALIASES) return LEGACY_ALIASES[r];
+    return r;
+  }
+
+  function isValidRole(role){
+    var r = normalizeRole(role);
+    return VALID_KEYS.indexOf(r) !== -1;
+  }
+
+  function assertRole(role, caller){
+    var r = normalizeRole(role);
+    if(r == null) throw new Error('[permissions] '+(caller||'check')+': role is required');
+    if(VALID_KEYS.indexOf(r) === -1){
+      throw new Error('[permissions] '+(caller||'check')+': unknown role "'+role+'" (normalized to "'+r+'"). Valid: '+VALID_KEYS.join(', '));
+    }
+    return r;
+  }
+
+  function roleLabel(role){
+    var r = normalizeRole(role);
+    return ROLE_LABELS[r] || String(role||'');
+  }
+
+  // ── Effective vs. real role ───────────────────────────────────────────
+  // effectiveRole: the role the app is currently acting as (honors view-as).
+  // realRole:      the actual authenticated user's role — used for override
+  //                authority (only the real ED can unlock a completed SOW,
+  //                regardless of which role they're previewing as).
+  function effectiveRole(){
+    return normalizeRole(window._viewAsRole || window.currentRole || null);
+  }
+  function realRole(){
+    return normalizeRole(window._realRole || window.currentRole || null);
+  }
+
+  // ── Module-level access gates ─────────────────────────────────────────
+  // "Does this role have access to the Housing app / Finance module?"
+  // Module enablement (CLFN_MODULES) is a separate check — both must pass.
+  function hasHousingAccess(role){
+    var r = assertRole(role, 'hasHousingAccess');
+    return r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2 || r === ROLES.HE_L1;
+  }
+
+  function hasFinanceAccess(role){
+    var r = assertRole(role, 'hasFinanceAccess');
+    return r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2
+        || r === ROLES.CFO || r === ROLES.FINANCE_L1;
+  }
+
+  // ── Housing-app capabilities ──────────────────────────────────────────
+
+  // Anyone with housing access can START a new application. HE-L1 is
+  // restricted to creating NEW apps but not editing others'.
+  function canCreateApp(role){
+    var r = assertRole(role, 'canCreateApp');
+    return hasHousingAccess(r);
+  }
+
+  // Editing an EXISTING application.
+  // Args: (role, {ownerRole, ownerName, currentUserName, status})
+  // HE-L1: only own drafts. Everyone else with housing access: anything.
+  function canEditApp(role, opts){
+    var r = assertRole(role, 'canEditApp');
+    if(r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2) return true;
+    if(r === ROLES.HE_L1){
+      if(!opts) return false;
+      var isOwner = (opts.ownerRole === r) || (opts.ownerName && opts.ownerName === opts.currentUserName);
+      var isDraft = !opts.status || opts.status === 'draft';
+      return !!(isOwner && isDraft);
+    }
+    return false;
+  }
+
+  // Editing a SOW. Completed SOWs lock down unless real-role is ED.
+  function canEditSow(role, sowStatus){
+    var r = assertRole(role, 'canEditSow');
+    if(!hasHousingAccess(r)) return false;
+    if(sowStatus === 'completed') return realRole() === ROLES.ED;
+    if(r === ROLES.HE_L1) return false;  // L1 can create apps only, not SOWs
+    return true;
+  }
+
+  // Editing progress reports for a unit. Locked if any SOW on the unit
+  // is completed — only real-ED can write in that state.
+  function canEditProgressForUnit(role, unitHasCompletedSow){
+    var r = assertRole(role, 'canEditProgressForUnit');
+    if(!hasHousingAccess(r)) return false;
+    if(r === ROLES.HE_L1) return false;
+    if(unitHasCompletedSow) return realRole() === ROLES.ED;
+    return true;
+  }
+
+  // ── Approval authority ────────────────────────────────────────────────
+  function canApproveSowHm(role){
+    var r = assertRole(role, 'canApproveSowHm');
+    return r === ROLES.HM || r === ROLES.ED;
+  }
+  function canApproveSowEd(role){
+    var r = assertRole(role, 'canApproveSowEd');
+    return r === ROLES.ED;
+  }
+  function canMarkSowComplete(role){
+    var r = assertRole(role, 'canMarkSowComplete');
+    return r === ROLES.ED || r === ROLES.HM;
+  }
+  function canReopenSow(role){
+    var r = assertRole(role, 'canReopenSow');
+    return r === ROLES.ED;
+  }
+
+  // ── Role switcher (ED's "view as") ────────────────────────────────────
+  // Only the ED may preview as other roles. Returns the list of roles they
+  // can preview as (all roles except their own).
+  function getViewAsOptions(role){
+    var r = assertRole(role, 'getViewAsOptions');
+    if(r !== ROLES.ED) return [];
+    return VALID_KEYS.filter(function(k){ return k !== ROLES.ED; });
+  }
+
+  // Expose immutable API.
+  window.CLFN_PERMS = Object.freeze({
+    ROLES:                  ROLES,
+    ROLE_LABELS:            ROLE_LABELS,
+    normalizeRole:          normalizeRole,
+    isValidRole:            isValidRole,
+    assertRole:             assertRole,
+    roleLabel:              roleLabel,
+    effectiveRole:          effectiveRole,
+    realRole:               realRole,
+    hasHousingAccess:       hasHousingAccess,
+    hasFinanceAccess:       hasFinanceAccess,
+    canCreateApp:           canCreateApp,
+    canEditApp:             canEditApp,
+    canEditSow:             canEditSow,
+    canEditProgressForUnit: canEditProgressForUnit,
+    canApproveSowHm:        canApproveSowHm,
+    canApproveSowEd:        canApproveSowEd,
+    canMarkSowComplete:     canMarkSowComplete,
+    canReopenSow:           canReopenSow,
+    getViewAsOptions:       getViewAsOptions
   });
 })();
 
@@ -9459,9 +9662,13 @@ async function editStaff(id) {
     +'<div class="f"><label>Email</label><input type="text" value="'+u.email+'" disabled style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--bg);color:var(--muted);width:100%;box-sizing:border-box;" title="Email cannot be changed"/></div>'
     +'<div class="f"><label>Housing Role</label>'
     +'<select id="edit_staff_role" style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);width:100%;">'
-    +'<option value="employee"'+(currentHrole==='employee'?' selected':'')+'>Employee</option>'
-    +'<option value="housing_manager"'+(currentHrole==='housing_manager'?' selected':'')+'>Housing Manager</option>'
-    +'<option value="ed"'+(currentHrole==='ed'?' selected':'')+'>Executive Director</option>'
+    + (function(){
+        var perms = window.CLFN_PERMS;
+        if(!perms) return '<option value="housing_employee_l1">Housing Employee L1</option>';
+        return Object.keys(perms.ROLE_LABELS).map(function(k){
+          return '<option value="'+k+'"'+(currentHrole===k?' selected':'')+'>'+perms.roleLabel(k)+'</option>';
+        }).join('');
+      })()
     +'</select></div>'
     +'<div style="font-size:11px;color:var(--muted);background:var(--bg);border-radius:6px;padding:8px 10px;">Changing the role takes effect the next time this staff member signs in.</div>'
     +'</div>'
@@ -11103,19 +11310,39 @@ function renderWlTable(apps, showScore, showReview) {
 
 
 // ── Header role view-as toggle ─────────────────────────────────────────────
+// Phase A rewrite: driven by CLFN_PERMS.getViewAsOptions() instead of
+// hardcoded role strings. Previously this function silently did nothing
+// because toggleEl and selectEl were never initialized.
 function setupHeaderRoleToggle(realRole) {
+  var toggleEl = document.getElementById('roleSwitcher');
+  var selectEl = document.getElementById('rb_select');
   if(!toggleEl || !selectEl) return;
-  if(realRole === 'ed' || realRole === 'housing_manager') {
-    toggleEl.style.display = 'flex';
-    selectEl.innerHTML = '<option value="">My Role</option>';
-    if(realRole === 'ed') {
-      selectEl.innerHTML += '<option value="housing_manager">Housing Manager</option>';
-    }
-    selectEl.innerHTML += '<option value="employee">Employee</option>';
-    selectEl.value = window._viewAsRole || '';
-  } else {
+
+  var perms = window.CLFN_PERMS;
+  if(!perms){
+    // Permissions module not loaded — hide the switcher for safety.
     toggleEl.style.display = 'none';
+    return;
   }
+
+  // Normalize in case a legacy role string slips through.
+  var normalized = perms.normalizeRole(realRole);
+  var options    = perms.getViewAsOptions(normalized);  // ED gets all others; anyone else gets []
+
+  if(options.length === 0){
+    toggleEl.style.display = 'none';
+    return;
+  }
+
+  toggleEl.style.display = 'flex';
+
+  // "My Role" default + one entry per role the user can preview as.
+  var optionsHtml = '<option value="">My Role</option>';
+  options.forEach(function(roleKey){
+    optionsHtml += '<option value="'+roleKey+'">'+perms.roleLabel(roleKey)+'</option>';
+  });
+  selectEl.innerHTML = optionsHtml;
+  selectEl.value = window._viewAsRole || '';
 }
 
 
@@ -16365,8 +16592,23 @@ function showAddHousingStaff() {
 
   var depts = ['Housing','Administration','Capital Projects & Infrastructure','Human Resources','Finance','Wellness','Medical Services','Choose Life','Ontario Works','Eagles Earth','Water Treatment Plant','Lands & Resources','Chief & Council','Band Reps'];
   var deptOptions = depts.map(function(d){ return '<option value="'+d+'">'+d+'</option>'; }).join('');
-  var roleOptions = '<option value="employee">Employee</option>'
-    + (isED ? '<option value="manager">Manager</option><option value="ed">Executive Director</option>' : '');
+  // Role options — gated by the current user's role.
+  // ED can assign any role. HM can assign only HE-L1 / HE-L2. Others shouldn't
+  // reach this modal (the Add Staff button is gated earlier).
+  var roleOptions = (function(){
+    var perms = window.CLFN_PERMS;
+    if(!perms){
+      // Fallback if permissions module somehow didn't load — safe minimum.
+      return '<option value="housing_employee_l1">Housing Employee L1</option>';
+    }
+    var all = Object.keys(perms.ROLE_LABELS);
+    var allowed = isED
+      ? all                                   // ED: any role
+      : ['housing_employee_l1','housing_employee_l2'];  // HM: employee levels only
+    return allowed.map(function(k){
+      return '<option value="'+k+'">'+perms.roleLabel(k)+'</option>';
+    }).join('');
+  })();
 
   overlay.innerHTML = '<div style="background:var(--surface);border-radius:14px;width:100%;max-width:520px;box-shadow:0 24px 60px rgba(0,0,0,.5);overflow:hidden;">'
     + '<div style="background:var(--dark);border-bottom:3px solid var(--yellow);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">'
