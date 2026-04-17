@@ -181,7 +181,7 @@
         <div class="stat-num" id="ds_avg_score" style="color:var(--yellow);">—</div>
         <div style="font-size:14px;color:var(--muted);">avg</div>
       </div>
-      <div class="stat-lbl">Avg Score · <span id="ds_urgent" style="color:#15803d;font-weight:700;">0</span> Urgent · <span id="ds_archived" style="color:#d97706;font-weight:700;cursor:pointer;" onclick="document.getElementById('dashFilterStatus').value='archived';renderDashTable();" title="Click to view archived">0</span> Archived</div>
+      <div class="stat-lbl">Avg Score · <span id="ds_urgent" style="color:#15803d;font-weight:700;">0</span> Critical · <span id="ds_archived" style="color:#d97706;font-weight:700;cursor:pointer;" onclick="document.getElementById('dashFilterStatus').value='archived';renderDashTable();" title="Click to view archived">0</span> Archived</div>
       <div class="stat-bar"><div class="stat-fill" id="ds_score_bar" style="width:0%;background:var(--yellow);"></div></div>
     </div>
   </div>
@@ -242,10 +242,10 @@
     </select>
     <select id="dashFilterTier" onchange="renderDashTable()">
       <option value="">All Priority Tiers</option>
-      <option value="Urgent Priority">Urgent (16+)</option>
-      <option value="High Priority">High (11–15)</option>
-      <option value="Medium Priority">Medium (6–10)</option>
-      <option value="Low Priority">Low (≤5)</option>
+      <option value="Critical Priority">Critical (80+)</option>
+      <option value="High Priority">High (60–79)</option>
+      <option value="Medium Priority">Medium (40–59)</option>
+      <option value="Low Priority">Low (&lt;40)</option>
     </select>
     <select id="dashSortBy" onchange="renderDashTable()">
       <option value="date">Sort: Date</option>
@@ -866,7 +866,7 @@
           <div id="sc_score_bar" style="height:100%;background:var(--yellow);border-radius:4px;width:0%;transition:width .4s ease;"></div>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:10px;color:#555;margin-top:4px;">
-          <span>Low</span><span>Medium</span><span>High</span><span>Urgent</span>
+          <span>Low</span><span>Medium</span><span>High</span><span>Critical</span>
         </div>
       </div>
     </div>
@@ -1285,7 +1285,7 @@
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
     <input id="match_search" type="text" placeholder="🔍 Search applicant..." oninput="renderMatchView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);min-width:200px;"/>
     <select id="match_filter_tier" onchange="renderMatchView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
-      <option value="">All Priority Tiers</option><option value="Urgent Priority">Urgent Priority</option><option value="High Priority">High Priority</option><option value="Medium Priority">Medium Priority</option><option value="Low Priority">Low Priority</option>
+      <option value="">All Priority Tiers</option><option value="Critical Priority">Critical Priority</option><option value="High Priority">High Priority</option><option value="Medium Priority">Medium Priority</option><option value="Low Priority">Low Priority</option>
     </select>
     <select id="match_filter_status" onchange="renderMatchView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
       <option value="">All Statuses</option><option value="submitted">Submitted</option><option value="ed_approved">ED Approved</option><option value="mgr_approved">Manager Approved</option>
@@ -4910,7 +4910,7 @@ window.closeScorePopup=function(){
 
 // ── Tier/score helpers ──
 function tierColor(tier){
-  if(tier==='Urgent Priority')return{bg:'#f0fdf4',c:'#15803d'};
+  if(tier==='Critical Priority')return{bg:'#f0fdf4',c:'#15803d'};
   if(tier==='High Priority')return{bg:'#e8eef5',c:'#1e3a5f'};
   if(tier==='Medium Priority')return{bg:'#fef9ec',c:'#7a6000'};
   return{bg:'#fef2f2',c:'#b91c1c'};
@@ -4930,7 +4930,7 @@ function updateDashStats(){
   var declined=applications.filter(function(a){return a.status==='declined';}).length;
   var scored=applications.filter(function(a){return typeof a.score==='number';});
   var avgScore=scored.length?Math.round(scored.reduce(function(s,a){return s+(a.score||0);},0)/scored.length):0;
-  var urgent=applications.filter(function(a){return a.tier==='Urgent Priority';}).length;
+  var urgent=applications.filter(function(a){return a.tier==='Critical Priority';}).length;
   var archived=applications.filter(function(a){return a.archived;}).length;
   setText('ds_total',total);setText('ds_pending',pending);setText('ds_approved',approved);
   setText('ds_declined',declined);setText('ds_avg_score',avgScore);setText('ds_urgent',urgent);setText('ds_archived',archived);
@@ -6175,7 +6175,7 @@ function renderMatchView(){
   }
 
   var tierColor = {
-    'Urgent Priority': '#15803d',
+    'Critical Priority': '#15803d',
     'High Priority':   '#1d4ed8',
     'Medium Priority': '#d97706',
     'Low Priority':    '#6b7280'
@@ -6795,7 +6795,7 @@ function renderScoresTable() {
   function tierBadge(tier) {
     if(!tier) return '—';
     var map = {
-      'Urgent Priority': {bg:'#f0fdf4',c:'#15803d'},
+      'Critical Priority': {bg:'#f0fdf4',c:'#15803d'},
       'High Priority':   {bg:'#e8eef5',c:'#1e3a5f'},
       'Medium Priority': {bg:'#fef9ec',c:'#7a6000'},
       'Low Priority':    {bg:'#fef2f2',c:'#b91c1c'}
@@ -7131,10 +7131,18 @@ function showScorecard(app){
   setText('sc_back_name',((app.fn||'')+' '+(app.ln||'')).trim());
   setText('sc_back_id',app.id+' · '+(app.appDate||''));
   var s=app.score||0;
-  var tc=s<=5?{bg:'#fef2f2',c:'#b91c1c',bar:'#b91c1c'}:s<=10?{bg:'#fef9ec',c:'#7a6000',bar:'#d97706'}:s<=15?{bg:'#e8eef5',c:'#1e3a5f',bar:'#3b82f6'}:{bg:'#f0fdf4',c:'#15803d',bar:'#15803d'};
+  // Use V2 tier thresholds (ED-adjustable, stored in liveV2Tiers) for both color and tier label
+  var _t = (typeof liveV2Tiers === 'object' && liveV2Tiers) ? liveV2Tiers : {critical:80, high:60, medium:40};
+  var tc = s >= _t.critical ? {bg:'#f0fdf4',c:'#15803d',bar:'#15803d'}
+         : s >= _t.high     ? {bg:'#e8eef5',c:'#1e3a5f',bar:'#3b82f6'}
+         : s >= _t.medium   ? {bg:'#fef9ec',c:'#7a6000',bar:'#d97706'}
+         :                    {bg:'#fef2f2',c:'#b91c1c',bar:'#b91c1c'};
   setText('sc_score_total',s);
   var tierEl=document.getElementById('sc_score_tier');if(tierEl){tierEl.textContent=app.tier||'—';tierEl.style.background=tc.bg;tierEl.style.color=tc.c;}
-  var barEl=document.getElementById('sc_score_bar');if(barEl){barEl.style.width=Math.min(100,Math.round((s/30)*100))+'%';barEl.style.background=tc.bar;}
+  // Bar: scale against the critical threshold so Low/Med/High/Critical labels align visually with tier boundaries
+  // Max is 100 (sum of all positive V2 criteria); but pegging at critical keeps the bar meaningful
+  var barMax = Math.max(100, (_t.critical||80) * 1.25);
+  var barEl=document.getElementById('sc_score_bar');if(barEl){barEl.style.width=Math.min(100,Math.max(0,Math.round((s/barMax)*100)))+'%';barEl.style.background=tc.bar;}
   var infoEl=document.getElementById('sc_info_strip');
   if(infoEl){
     var _wfStatus={'draft':'Draft','submitted':'Awaiting HM Review','file_update':'File Update — Awaiting HM','mgr_approved':'Awaiting ED Approval','hm_approved':'File Update Approved','ed_approved':'ED Approved','declined':'Declined','returned':'Returned for Info','housed':'Housed'};
@@ -10202,7 +10210,7 @@ function renderWorklist() {
     var sm = SM[a.status] || {label:a.status, c:'#888', bg:'#f4f4f0'};
     var name = ((a.fn||'')+' '+(a.ln||'')).trim()||'—';
     var tier = a.tier||'';
-    var tc = tier==='Urgent Priority'?'#b91c1c':tier==='High Priority'?'#1d4ed8':tier==='Medium Priority'?'#7a6000':'#888';
+    var tc = tier==='Critical Priority'?'#b91c1c':tier==='High Priority'?'#1d4ed8':tier==='Medium Priority'?'#7a6000':'#888';
     // Branch: what action button to show per status per role
     var actionBtn = '';
     if(a.status==='returned') {
@@ -10272,7 +10280,7 @@ function renderWlTable(apps, showScore, showReview) {
   var rows = sorted.map(function(a){
     var name = ((a.fn||'')+' '+(a.ln||'')).trim()||'—';
     var tier = a.tier||'';
-    var tc = tier==='Urgent Priority'?'#b91c1c':tier==='High Priority'?'#1d4ed8':tier==='Medium Priority'?'#7a6000':'#888';
+    var tc = tier==='Critical Priority'?'#b91c1c':tier==='High Priority'?'#1d4ed8':tier==='Medium Priority'?'#7a6000':'#888';
     return '<tr style="border-bottom:1px solid var(--border);">'
       + '<td style="padding:10px 14px;font-weight:600;font-size:13px;">'+name+'</td>'
       + '<td style="padding:10px 14px;font-size:12px;color:var(--muted);">'+a.id+'</td>'
@@ -12791,7 +12799,7 @@ function showEmployeeHome(){
     var pending     = apps.filter(function(a){return a.status==='submitted'||a.status==='file_update';}).length;
     var awaitingED  = apps.filter(function(a){return a.status==='mgr_approved';}).length;
     var totalApps   = apps.filter(function(a){return !a.archived;}).length;
-    var urgent      = apps.filter(function(a){return a.tier==='Urgent Priority'&&!a.archived;}).length;
+    var critical   = apps.filter(function(a){return a.tier==='Critical Priority'&&!a.archived;}).length;
 
     var vacant      = units.filter(function(u){return u.status==='vacant';}).length;
     var occupied    = units.filter(function(u){return u.status==='occupied';}).length;
@@ -12841,7 +12849,7 @@ function showEmployeeHome(){
     var appTile = tile('📋','Applications','showDashboard()','#3b82f6',
       makeStat('Awaiting HM Review', pending,   pending>0?'alert':'info') +
       makeStat('Awaiting ED Approval', awaitingED, (awaitingED>0&&role==='ed')?'alert':'info') +
-      makeStat('Urgent Priority',    urgent,    urgent>0?'alert':'info') +
+      makeStat('Critical Priority',    critical,    critical>0?'alert':'info') +
       makeStat('Total Active',       totalApps, 'neutral'));
 
     var invTile = tile('🏠','Inventory','showInventory()','#7c3aed',

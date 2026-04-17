@@ -2319,7 +2319,7 @@ function showEmployeeHome(){
     var pending     = apps.filter(function(a){return a.status==='submitted'||a.status==='file_update';}).length;
     var awaitingED  = apps.filter(function(a){return a.status==='mgr_approved';}).length;
     var totalApps   = apps.filter(function(a){return !a.archived;}).length;
-    var urgent      = apps.filter(function(a){return a.tier==='Urgent Priority'&&!a.archived;}).length;
+    var critical   = apps.filter(function(a){return a.tier==='Critical Priority'&&!a.archived;}).length;
 
     var vacant      = units.filter(function(u){return u.status==='vacant';}).length;
     var occupied    = units.filter(function(u){return u.status==='occupied';}).length;
@@ -2369,7 +2369,7 @@ function showEmployeeHome(){
     var appTile = tile('📋','Applications','showDashboard()','#3b82f6',
       makeStat('Awaiting HM Review', pending,   pending>0?'alert':'info') +
       makeStat('Awaiting ED Approval', awaitingED, (awaitingED>0&&role==='ed')?'alert':'info') +
-      makeStat('Urgent Priority',    urgent,    urgent>0?'alert':'info') +
+      makeStat('Critical Priority',    critical,    critical>0?'alert':'info') +
       makeStat('Total Active',       totalApps, 'neutral'));
 
     var invTile = tile('🏠','Inventory','showInventory()','#7c3aed',
