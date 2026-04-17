@@ -2474,12 +2474,22 @@ function showEmployeeHome(){
   renderRecentActivity(role);
 }
 
-function renderRecentActivity(role) {
+async function renderRecentActivity(role) {
   var el = document.getElementById('emp_recent_activity');
   if(!el) return;
 
-  var log = [];
-  // audit log loaded from Supabase
+  var log = (typeof auditLog !== 'undefined' && auditLog && auditLog.length) ? auditLog.slice() : [];
+  if(!log.length && typeof sbLoadAuditLog === 'function') {
+    el.innerHTML = '<div style="color:var(--muted);font-style:italic;font-size:13px;">Loading activity…</div>';
+    try {
+      var loaded = await sbLoadAuditLog(200);
+      if(Array.isArray(loaded)) {
+        log = loaded;
+        if(typeof auditLog !== 'undefined') { try { auditLog = loaded.slice(); } catch(e){} }
+      }
+    } catch(e) { console.warn('[RECENT ACTIVITY] load failed:', e); }
+  }
+
   var apps  = (typeof applications !== 'undefined') ? applications : [];
   var units = (typeof housingUnits  !== 'undefined') ? housingUnits  : [];
 

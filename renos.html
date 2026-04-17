@@ -2781,6 +2781,8 @@ function initRenosPage() {
   var params = new URLSearchParams(window.location.search);
   var view = params.get('view') || 'renovations';
   updateRenosHeader();
+  // Also apply the shared header updates (role switcher visibility, settings button, etc.)
+  if(typeof updateHeaderUser === 'function') updateHeaderUser(window.currentRole || 'employee');
   var ldg = document.getElementById('renosLoadingView'); if(ldg) ldg.style.display='none';
   if(view==='contractors') showContractors();
   else if(view==='approvals') showRenoApprovals();
