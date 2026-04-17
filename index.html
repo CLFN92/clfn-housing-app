@@ -2046,7 +2046,32 @@ function newApp()                 { navigateTo('housing.html',{view:'newapp'}); 
 function showRenos()              { navigateTo('renos.html'); }
 function showRenosForRole()       { navigateTo('renos.html'); }
 function showContractorsForRole() { navigateTo('renos.html',{view:'contractors'}); }
-function showFinance()            { navigateTo('finance.html'); }
+function showFinance() {
+  // Gate on module enablement + role access, then stash session and navigate.
+  // Mirrors showFinance() in housing.html so the finance tile works from either page.
+  if(!(window.CLFN_MODULES && window.CLFN_MODULES.isEnabled('finance'))){
+    alert('Finance module is not enabled for this nation.');
+    return;
+  }
+  var gateRole = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.role)
+              || window._realRole
+              || window.currentRole
+              || 'housing_employee_l1';
+  if(!window.CLFN_PERMS.hasFinanceAccess(gateRole)){
+    alert('Your role does not have access to the Finance module.');
+    return;
+  }
+  // Stash session so finance.html can read it on load.
+  try {
+    var token = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.accessToken) || '';
+    var name  = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.name) || '';
+    var email = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.email) || '';
+    if(!token){ alert('Session handoff failed: no access token. Please sign out and sign back in.'); return; }
+    var sess = { accessToken: token, role: gateRole, name: name || email || 'Unknown User', email: email };
+    sessionStorage.setItem('HOUSING_SESSION', JSON.stringify(sess));
+  } catch(e) { console.warn('[index] showFinance stash failed:', e); return; }
+  navigateTo('finance.html');
+}
 // Stubs for functions called by shared code but only needed in housing.html
 function applyTenancyFieldRoles() {}
 function wireDashTable()          {}
@@ -2615,15 +2640,30 @@ function showEmployeeHome(){
       makeStat('Approved',           ctApproved,   ctApproved>0?'good':'neutral') +
       (ctDeclined>0?makeStat('Declined', ctDeclined, 'alert'):''));
 
-        var settingsTile = '<div onclick="showSettings()" style="background:var(--surface);border:1px solid var(--border);border-top:3px solid #6b7280;border-radius:12px;padding:18px 20px;cursor:pointer;transition:box-shadow .15s;"'
-      +' onmouseover="this.style.boxShadow=&quot;0 4px 20px rgba(0,0,0,0.1)&quot;" onmouseout="this.style.boxShadow=&quot;&quot;">'
-      +'<div style="display:flex;align-items:center;gap:12px;"><span style="font-size:22px;">⚙️</span>'
-      +'<div><div style="font-weight:700;font-size:14px;">Settings</div>'
-      +'<div style="font-size:12px;color:var(--muted);">Scoring models, users &amp; contacts</div></div></div>'
-      +'</div>';
+        // Settings tile removed — Settings is accessible via the gear icon in the header.
 
     tilesEl.style.gridTemplateColumns = 'repeat(auto-fill,minmax(240px,1fr))';
-    tilesEl.innerHTML = newAppTile + worklistTile + appTile + invTile + matchTile + tenantTile + renoTile + ctTile + settingsTile;
+
+    // ── Module gating (matches housing.html) ─────────────────────────────
+    // Optional-module tiles only render if CLFN_MODULES.isEnabled() returns true.
+    var mods = window.CLFN_MODULES;
+    var matchTileOut = (mods && mods.isEnabled('match'))        ? matchTile : '';
+    var renoTileOut  = (mods && mods.isEnabled('renovations'))  ? renoTile  : '';
+    var ctTileOut    = (mods && mods.isEnabled('contractors')) ? ctTile    : '';
+
+    // Finance module tile — navigates to finance.html when clicked. Session
+    // handoff happens via showFinance() (see below).
+    var financeTile = '';
+    if(mods && mods.isEnabled('finance')){
+      financeTile = '<div onclick="showFinance()" style="background:var(--surface);border:1px solid var(--border);border-top:3px solid #1d4ed8;border-radius:12px;padding:18px 20px;cursor:pointer;transition:box-shadow .15s;"'
+        +' onmouseover="this.style.boxShadow=&quot;0 4px 20px rgba(0,0,0,0.1)&quot;" onmouseout="this.style.boxShadow=&quot;&quot;">'
+        +'<div style="display:flex;align-items:center;gap:12px;"><span style="font-size:22px;">💰</span>'
+        +'<div><div style="font-weight:700;font-size:14px;">Finance Module</div>'
+        +'<div style="font-size:12px;color:var(--muted);">Budgets, payments &amp; financial reporting</div></div></div>'
+        +'</div>';
+    }
+
+    tilesEl.innerHTML = newAppTile + worklistTile + appTile + invTile + matchTileOut + tenantTile + renoTileOut + ctTileOut + financeTile;
 
   } else {
     // ── Employee: simple tiles ──
