@@ -7898,7 +7898,23 @@ var SOW_CATEGORIES = [
 function openSowModal(unitId, projectNumber) {
   _sowUnitId  = unitId || null;
   _sowItemIdx = 0;
-  // projectNumber: if provided → edit that specific SOW; if omitted → create a new SOW for this unit.
+
+  // Resolve which SOW to open:
+  //   - If projectNumber was passed, edit that specific SOW.
+  //   - If no projectNumber but the unit has existing SOWs, open the most recent one.
+  //     This preserves legacy behavior where call sites like the inventory 🔨 button
+  //     expect "open the SOW for this unit" and fall back gracefully for multi-SOW.
+  //   - If no projectNumber AND the unit has zero SOWs, create a new one with a
+  //     freshly-auto-incremented project number.
+  var existingList = unitId ? (typeof getUnitSowList === 'function' ? getUnitSowList(unitId) : []) : [];
+  if(!projectNumber && existingList.length > 0){
+    // Pick the most recent SOW for this unit so unit-detail click opens it.
+    var sortedByDate = existingList.slice().sort(function(a, b){
+      return (b.created_at || '').localeCompare(a.created_at || '');
+    });
+    projectNumber = sortedByDate[0].project_number || null;
+  }
+
   var isEdit = !!projectNumber;
   var saved = (unitId && projectNumber) ? getSowByProjectNumber(unitId, projectNumber) : null;
   window._sowEditingProjectNumber = isEdit ? projectNumber : null;  // remember for save
