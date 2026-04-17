@@ -830,25 +830,32 @@
 </div><!-- end appLayout -->
 
 <!-- ═══ INDIVIDUAL SCORECARD VIEW ═══ -->
-<div id="scorecardView" style="display:none;width:100%;">
-  <div style="background:var(--dark);border-bottom:1px solid var(--dark3);padding:10px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10;min-width:0;">
-    <button onclick="showDash()" style="background:none;border:1px solid #444;color:#aaa;padding:5px 10px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;flex-shrink:0;transition:all .15s;">
-      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>Back
+<div id="scorecardView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
+  <div class="page-back-row">
+    <button onclick="showDash()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
     </button>
-    <div style="flex:1;min-width:0;text-align:center;">
-      <div id="sc_back_name" style="font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-      <div id="sc_back_id" style="font-size:10px;color:#999;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+  </div>
+  <div class="page-header-bar">
+    <div class="phb-title">
+      <h1 id="sc_back_name">—</h1>
+      <p id="sc_back_id">—</p>
     </div>
-    <div style="display:flex;gap:6px;flex-shrink:0;">
-      <button onclick="if(window._currentScorecardApp&&typeof window.openEditModal==='function')window.openEditModal(window._currentScorecardApp.id);" style="background:none;border:1px solid #444;color:#aaa;padding:5px 10px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px;transition:all .15s;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='#444';this.style.color='#aaa'">
-        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Open
+    <div class="phb-actions">
+      <button onclick="if(window._currentScorecardApp&&typeof window.openEditModal==='function')window.openEditModal(window._currentScorecardApp.id);"
+              style="background:#fff;border:1.5px solid var(--border);color:#111;padding:7px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;transition:border-color .15s;"
+              onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="this.style.borderColor='var(--border)'">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Open
       </button>
-      <button onclick="printScorecard()" style="background:var(--yellow);border:none;color:#111;padding:5px 10px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print / Save PDF
+      <button onclick="printScorecard()" style="background:var(--yellow);border:none;color:#111;padding:7px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print / Save PDF
       </button>
     </div>
   </div>
-  <div style="padding:clamp(12px,3vw,28px) clamp(12px,3vw,32px) 40px;max-width:900px;width:100%;margin:0 auto;">
+  <div style="padding:0 clamp(4px,1vw,8px) 40px;max-width:900px;width:100%;margin:0 auto;">
     <div style="background:var(--dark);border:1px solid var(--dark3);border-top:3px solid var(--yellow);border-radius:10px;padding:20px 28px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
       <div>
         <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:4px;">Total Application Score</div>
@@ -4936,8 +4943,17 @@ function tierColor(tier){
   return{bg:'#fef2f2',c:'#b91c1c'};
 }
 function scoreMiniBar(score){
-  var w=Math.min(100,Math.round(((score||0)/25)*100));
-  var col=!score?'#ccc':score<=5?'#b91c1c':score<=10?'#d97706':score<=15?'#3b82f6':'#15803d';
+  var s = score || 0;
+  var _t = (typeof liveV2Tiers === 'object' && liveV2Tiers) ? liveV2Tiers : {critical:80, high:60, medium:40};
+  // Scale the bar against a V2 ceiling that peaks slightly above the Critical threshold (same math as the full scorecard bar).
+  var barMax = Math.max(100, (_t.critical || 80) * 1.25);
+  var w = Math.min(100, Math.max(0, Math.round((s / barMax) * 100)));
+  // Color by V2 tier thresholds.
+  var col = !score           ? '#ccc'
+          : s >= _t.critical ? '#15803d'   // Critical — green
+          : s >= _t.high     ? '#3b82f6'   // High — blue
+          : s >= _t.medium   ? '#d97706'   // Medium — orange
+          :                    '#b91c1c';  // Low — red
   return '<div style="height:3px;width:64px;background:var(--border);border-radius:2px;margin-top:3px;"><div style="height:100%;width:'+w+'%;background:'+col+';border-radius:2px;"></div></div>';
 }
 

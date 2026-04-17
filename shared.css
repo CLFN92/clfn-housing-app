@@ -53,24 +53,30 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 #tenantsView,
 #renoApprovalsView,
 #renosView,
-#contractorsView{
+#contractorsView,
+#scorecardView{
   padding-top:12px !important;
 }
 /* At mobile widths (≤680px), shared.css line ~766 applies `#dashView, #settingsView, ... { padding: 16px 14px !important }` */
 /* which is higher specificity than plain ID. Re-bump with chained ID to lock our padding-top on mobile too. */
 #worklistView#worklistView,
 #dashView#dashView,
-#settingsView#settingsView,
 #inventoryView#inventoryView,
 #matchView#matchView,
 #tenantsView#tenantsView,
 #renoApprovalsView#renoApprovalsView,
 #renosView#renosView,
-#contractorsView#contractorsView{
+#contractorsView#contractorsView,
+#scorecardView#scorecardView{
   padding-top:12px !important;
 }
-/* .settings-view inner div has its own `padding: 16px 12px !important` rules at lines ~558 and ~622. */
-/* Bump specificity with chained class so our padding-top wins on the inner div too. */
+/* Settings uses NESTED wrappers: <#settingsView><.settings-view>...</.settings-view></#settingsView>. */
+/* If both wrappers get their own padding, the Back button ends up double-indented vs every other view */
+/* (which has just ONE wrapper). Kill all padding on the outer #settingsView and let the inner */
+/* .settings-view own it — that way the Back button is positioned consistently with other views. */
+#settingsView#settingsView{padding:0 !important;}
+/* Inner .settings-view: bump specificity with doubled class chain to beat lines ~573 and ~638 that */
+/* apply `padding: 16px 12px !important` (they use padding shorthand which would reset padding-top). */
 .settings-view.settings-view{padding-top:12px !important;}
 /* The role_queue_banner div on the dashboard adds its own spacing before the back row; */
 /* hide it entirely when empty AND kill its padding. */
@@ -580,7 +586,8 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 #stepProgressBar button span:last-child { }
 
 /* ── Scorecard ── */
-#scorecardView > div:first-child { padding: 10px 12px; }
+/* (Legacy `#scorecardView > div:first-child { padding: 10px 12px }` removed — the first child */
+/*  is now .page-back-row which has its own margin rule. Leaving this here would add unwanted padding.) */
 
 /* ── Inventory table ── */
 #inv_table th:nth-child(7),
@@ -997,7 +1004,8 @@ body.modal-open { overflow: hidden; position: fixed; width: 100%; }
 
 /* Scorecard view: full-bleed on mobile */
 @media (max-width: 700px) {
-  #scorecardView > div:nth-child(2) { padding: 14px 14px 40px !important; }
+  /* New structure: child 1 = .page-back-row, child 2 = .page-header-bar, child 3 = content wrapper */
+  #scorecardView > div:nth-child(3) { padding: 0 4px 40px !important; }
 }
 
 /* Role switcher: smaller on mobile */
