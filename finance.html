@@ -1964,11 +1964,35 @@ function applyBrandingToHeader() {
 var HOUSING_SESSION = (function loadSession(){
   try {
     var raw = sessionStorage.getItem('HOUSING_SESSION');
-    if(!raw) return null;
+    console.log('[finance] sessionStorage HOUSING_SESSION raw:', raw);
+    if(!raw) {
+      console.warn('[finance] session load: no HOUSING_SESSION key in sessionStorage');
+      return null;
+    }
     var s = JSON.parse(raw);
-    if(!s || !s.accessToken || !s.role || !s.name) return null;
+    console.log('[finance] parsed session:', s);
+    if(!s) {
+      console.warn('[finance] session load: parsed object is falsy');
+      return null;
+    }
+    if(!s.accessToken) {
+      console.warn('[finance] session load: missing accessToken');
+      return null;
+    }
+    if(!s.role) {
+      console.warn('[finance] session load: missing role');
+      return null;
+    }
+    if(!s.name) {
+      console.warn('[finance] session load: missing name');
+      return null;
+    }
+    console.log('[finance] session load OK:', { role: s.role, name: s.name, tokenLen: s.accessToken.length });
     return s;
-  } catch(e){ return null; }
+  } catch(e){
+    console.warn('[finance] session load exception:', e);
+    return null;
+  }
 })();
 
 if(!HOUSING_SESSION){
