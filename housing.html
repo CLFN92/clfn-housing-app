@@ -13956,7 +13956,15 @@ function showEmployeeHome(){
   }
 
   var nameEl = document.getElementById('emp_home_name');
-  if(nameEl) nameEl.textContent = roleLabels[role] || 'Staff';
+  if(nameEl) {
+    var userName = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.name) ? HOUSING_SESSION.name : '';
+    var roleLbl  = roleLabels[role] || 'Staff';
+    if(userName) {
+      nameEl.innerHTML = userName + '<span style="color:var(--muted);font-weight:400;font-size:0.7em;font-style:italic;margin-left:10px;">' + roleLbl + '</span>';
+    } else {
+      nameEl.textContent = roleLbl;
+    }
+  }
   var subEl = document.getElementById('emp_home_subtitle');
   if(subEl) subEl.textContent = subtitles[role] || '';
 

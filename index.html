@@ -1198,9 +1198,13 @@ body{font-family:'DM Sans',sans-serif;background:#fafaf8;color:#111;font-size:14
 <div class="content-area">
 <!-- ═══ EMPLOYEE HOME VIEW ═══ -->
 <div id="employeeHomeView" style="display:none;width:100%;flex-direction:column;padding:clamp(16px,4vw,40px) clamp(14px,3vw,40px);box-sizing:border-box;max-width:1100px;margin:0 auto;">
-  <div style="margin-bottom:28px;">
-    <h1 style="font-family:'DM Serif Display',serif;font-size:26px;font-weight:400;margin-bottom:6px;">Welcome, <span id="emp_home_name" style="color:var(--yellow);"></span></h1>
-    <p id="emp_home_subtitle" style="color:var(--muted);font-size:13px;"></p>
+  <!-- Greeting block — brand: CLFN serif heading, yellow accent, muted meta line -->
+  <div style="margin-bottom:28px;position:relative;padding-left:16px;">
+    <!-- Yellow accent bar anchored to the left of the heading -->
+    <div style="position:absolute;left:0;top:6px;bottom:6px;width:4px;background:var(--yellow);border-radius:2px;"></div>
+    <div id="emp_home_date" style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;"></div>
+    <h1 style="font-family:'DM Serif Display',serif;font-size:30px;font-weight:400;line-height:1.15;margin:0 0 6px 0;">Welcome back, <span id="emp_home_name" style="color:var(--yellow);"></span></h1>
+    <p id="emp_home_subtitle" style="color:var(--muted);font-size:14px;margin:0;"></p>
   </div>
 
   <!-- Dynamic role-aware tile grid -->
@@ -2501,15 +2505,39 @@ function showEmployeeHome(){
   hideAllViews();
   setNavActive('tab_dash');
   var role = window.currentRole || 'employee';
-  var roleLabels = {employee:'Staff', housing_manager:'Housing Manager', ed:'Executive Director'};
+  var roleLabels = {employee:'Staff', housing_manager:'Housing Manager', ed:'Executive Director', cfo:'CFO', finance_l1:'Finance', housing_employee_l1:'Staff', housing_employee_l2:'Staff'};
   var subtitles = {
     employee: 'Select a tile below to get started.',
-    housing_manager: 'Good to have you back. Here\'s your overview.',
-    ed: 'Good to have you back. Here\'s your overview.'
+    housing_employee_l1: 'Select a tile below to get started.',
+    housing_employee_l2: 'Select a tile below to get started.',
+    housing_manager: "Here's what's happening across housing today.",
+    ed: "Here's what's happening across housing today.",
+    cfo: "Here's an overview of finance activity.",
+    finance_l1: 'Select a tile below to get started.'
   };
 
+  // Today's date — formatted "FRIDAY · APRIL 17, 2026" for the uppercase meta line.
+  var dateEl = document.getElementById('emp_home_date');
+  if(dateEl){
+    var d = new Date();
+    var dayStr  = d.toLocaleDateString('en-US', { weekday: 'long' });
+    var dateStr = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    dateEl.textContent = dayStr + ' · ' + dateStr;
+  }
+
+  // Greeting: "Welcome back, <Name>, <Role>". Name comes from the staff table
+  // lookup in resolveHousingRole (HOUSING_SESSION.name). Role label is appended
+  // in muted text after the name. Falls back gracefully when name isn't set.
   var nameEl = document.getElementById('emp_home_name');
-  if(nameEl) nameEl.textContent = roleLabels[role] || 'Staff';
+  if(nameEl) {
+    var userName = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.name) ? HOUSING_SESSION.name : '';
+    var roleLbl  = roleLabels[role] || 'Staff';
+    if(userName) {
+      nameEl.innerHTML = userName + '<span style="color:var(--muted);font-weight:400;font-size:0.7em;font-style:italic;margin-left:10px;">' + roleLbl + '</span>';
+    } else {
+      nameEl.textContent = roleLbl;
+    }
+  }
   var subEl = document.getElementById('emp_home_subtitle');
   if(subEl) subEl.textContent = subtitles[role] || '';
 
