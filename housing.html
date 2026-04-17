@@ -3541,16 +3541,17 @@ function renderV2ScoringEditor() {
 
   // ── Tier Thresholds ──
   html += sectionHdr('Priority Tier Thresholds', 0);
-  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Scores are compared from highest to lowest. A score meeting the Critical threshold is Critical Priority, even if it also meets the High threshold.</div>';
+  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Set the minimum score required for each tier. Scores are evaluated from highest to lowest — an application meeting the Critical threshold is Critical Priority, even if it also meets the High threshold. The Low tier is anything below the Medium threshold.</div>';
 
-  function tierRow(label, key, col) {
+  function tierRow(label, key, col, rangeLabel) {
     var val = t[key];
     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:8px;margin-bottom:6px;background:var(--bg);border-left:3px solid ' + col + ';">'
       + '<div>'
       +   '<div style="font-size:13px;font-weight:700;color:var(--text);">' + label + '</div>'
-      +   '<div style="font-size:11px;color:var(--muted);">Score &ge; this value</div>'
+      +   '<div style="font-size:11px;color:var(--muted);" id="tier_range_' + key + '">' + rangeLabel + '</div>'
       + '</div>'
       + '<div style="display:flex;align-items:center;gap:6px;">'
+      +   '<span style="font-size:11px;color:var(--muted);">Score &ge;</span>'
       +   '<input type="number" value="' + val + '" min="0" max="100" step="1" data-tier="' + key + '" '
       +   'style="width:64px;padding:4px 8px;border:1.5px solid ' + col + ';border-radius:6px;font-size:15px;font-weight:700;color:' + col + ';text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);" '
       +   'onchange="updateV2Tier(this)"/>'
@@ -3559,16 +3560,26 @@ function renderV2ScoringEditor() {
       + '</div>';
   }
 
-  html += tierRow('Critical Priority', 'critical', '#4ade80');
-  html += tierRow('High Priority',     'high',     '#93c5fd');
-  html += tierRow('Medium Priority',   'medium',   '#fcd34d');
-  html += '<div style="padding:8px 12px;background:var(--bg);border-radius:8px;border-left:3px solid #f87171;">'
-    + '<div style="font-size:13px;font-weight:700;color:var(--text);">Low Priority</div>'
-    + '<div style="font-size:11px;color:var(--muted);">Any score below the Medium threshold</div>'
+  // Compute display ranges
+  var critR = t.critical + '+ pts';
+  var highR = t.high + '–' + Math.max(t.high, t.critical - 1) + ' pts';
+  var medR  = t.medium + '–' + Math.max(t.medium, t.high - 1) + ' pts';
+  var lowR  = '0–' + Math.max(0, t.medium - 1) + ' pts';
+
+  html += tierRow('Critical Priority', 'critical', '#4ade80', critR);
+  html += tierRow('High Priority',     'high',     '#93c5fd', highR);
+  html += tierRow('Medium Priority',   'medium',   '#fcd34d', medR);
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:8px;margin-bottom:6px;background:var(--bg);border-left:3px solid #f87171;">'
+    + '<div>'
+    +   '<div style="font-size:13px;font-weight:700;color:var(--text);">Low Priority</div>'
+    +   '<div style="font-size:11px;color:var(--muted);" id="tier_range_low">' + lowR + '</div>'
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--muted);font-style:italic;">Anything below Medium</div>'
     + '</div>';
 
-  html += '<div style="margin-top:12px;display:flex;gap:8px;">'
+  html += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">'
     + '<button onclick="saveV2TiersED()" style="background:var(--yellow);border:none;color:#111;padding:7px 18px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save Tier Thresholds</button>'
+    + '<button onclick="saveV2TiersAndRescoreED()" style="background:none;border:1.5px solid var(--yellow);color:var(--yellow);padding:7px 14px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save &amp; Rescore All</button>'
     + '<button onclick="resetV2TiersED()" style="background:none;border:1px solid #444;color:#888;padding:7px 14px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;">Reset Defaults</button>'
     + '</div>';
 
@@ -3591,19 +3602,46 @@ function updateV2Tier(el) {
   var key = el.getAttribute('data-tier');
   var val = parseInt(el.value) || 0;
   liveV2Tiers[key] = val;
-  // Validate ordering
-  if (liveV2Tiers.critical < liveV2Tiers.high) {
+  // Validate ordering — warn but don't block
+  if (liveV2Tiers.critical <= liveV2Tiers.high) {
     showToast('Warning: Critical threshold should be higher than High');
   }
-  if (liveV2Tiers.high < liveV2Tiers.medium) {
+  if (liveV2Tiers.high <= liveV2Tiers.medium) {
     showToast('Warning: High threshold should be higher than Medium');
   }
+  // Live-update the range labels so the ED can see the effect immediately
+  var t = liveV2Tiers;
+  var critR = t.critical + '+ pts';
+  var highR = t.high + '–' + Math.max(t.high, t.critical - 1) + ' pts';
+  var medR  = t.medium + '–' + Math.max(t.medium, t.high - 1) + ' pts';
+  var lowR  = '0–' + Math.max(0, t.medium - 1) + ' pts';
+  var labels = {critical:critR, high:highR, medium:medR, low:lowR};
+  Object.keys(labels).forEach(function(k){
+    var lblEl = document.getElementById('tier_range_' + k);
+    if(lblEl) lblEl.textContent = labels[k];
+  });
 }
 
 function saveV2TiersED() {
   edGuard('V2 tier thresholds updated', function() {
     saveV2Tiers();
     auditEntry('SETTINGS', 'scoring_v2_tiers', 'Priority tier thresholds updated: Critical=' + liveV2Tiers.critical + ' High=' + liveV2Tiers.high + ' Medium=' + liveV2Tiers.medium, 'ed');
+  });
+}
+
+// Save tier thresholds AND immediately rescore all applications so existing records
+// reflect the new tier boundaries in their `tier` field. Without this, the editor
+// saves the thresholds but the dashboard keeps showing the old tier labels until
+// the ED separately clicks "Rescore All".
+function saveV2TiersAndRescoreED() {
+  edGuard('V2 tier thresholds updated and applications rescored', function() {
+    saveV2Tiers();
+    auditEntry('SETTINGS', 'scoring_v2_tiers', 'Priority tier thresholds updated: Critical=' + liveV2Tiers.critical + ' High=' + liveV2Tiers.high + ' Medium=' + liveV2Tiers.medium + ' — auto-rescored', 'ed');
+    if(typeof rescoreAndSave === 'function') {
+      rescoreAndSave();
+    } else if(typeof rescoreAllApplications === 'function') {
+      rescoreAllApplications();
+    }
   });
 }
 
@@ -9973,7 +10011,16 @@ function showSettingsSection(section) {
     t.style.color=active?'var(--text)':'var(--muted)';
   });
   if(section==='sec_users'       && typeof renderHousingUserTable==='function') renderHousingUserTable();
-  if(section==='sec_app_scoring' && typeof renderScoringModelTable==='function') renderScoringModelTable();
+  if(section==='sec_app_scoring') {
+    // ED sees the V2 editor (object-based model with tier threshold controls).
+    // Other roles see a read-only message (populateSettings handles that on initial load).
+    if(window.currentRole === 'ed' && typeof renderV2ScoringEditor === 'function') {
+      renderV2ScoringEditor();
+    } else {
+      var wrap = document.getElementById('scoring_model_table_wrap');
+      if(wrap) wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-style:italic;">Scoring model configuration is only available to the Executive Director.</div>';
+    }
+  }
   if(section==='sec_unit_match'  && typeof renderUnitScoreTable==='function') renderUnitScoreTable();
   if(section==='sec_reno_score'  && typeof renderRenoScoreTable==='function') renderRenoScoreTable();
   if(section==='sec_budget'      && typeof renderBudgetPools==='function') renderBudgetPools();
