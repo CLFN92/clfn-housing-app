@@ -145,12 +145,15 @@
 <div class="dash-view" id="dashView" style="display:none;flex-direction:column;gap:16px;">
 <div id="role_queue_banner" style="padding:0 0 8px 0;"></div>
   <div class="dash-header">
-    <div>
-      <button onclick="showDash()" style="background:none;border:none;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;padding:0;margin-bottom:6px;display:flex;align-items:center;gap:4px;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>Home
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;flex-shrink:0;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
       </button>
-      <h1>Applications Dashboard</h1>
-      <p>All housing applications and their current approval status</p>
+      <div>
+        <h1 style="margin:0;">Applications Dashboard</h1>
+        <p style="margin:2px 0 0 0;">All housing applications and their current approval status</p>
+      </div>
     </div>
   </div>
 
@@ -934,12 +937,13 @@
 <!-- ═══ SETTINGS VIEW ═══ -->
 <div id="settingsView" style="display:none;width:100%;flex-direction:column;max-width:1200px;margin:0 auto;box-sizing:border-box;">
 <div class="settings-view" style="display:flex;flex-direction:column;gap:0;padding:clamp(14px,3vw,28px);">
-  <div style="border-bottom:1px solid var(--border);padding:10px 0;margin-bottom:20px;">
-    <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:inline-flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> Back
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+    <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;flex-shrink:0;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
     </button>
+    <div class="settings-header"><h1 style="margin:0;">Settings</h1><p style="margin:2px 0 0 0;">Manage CLFN Housing Application configuration and scoring models.</p></div>
   </div>
-  <div class="settings-header"><h1>Settings</h1><p>Manage CLFN Housing Application configuration and scoring models.</p></div>
 
   <!-- Section nav tabs -->
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0;">
@@ -1221,15 +1225,16 @@
 </div>
 
 <div id="inventoryView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
-  <div style="border-bottom:1px solid var(--border);padding:10px 0;margin-bottom:20px;">
-    <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:inline-flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> Back
-    </button>
-  </div>
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px;">
-    <div>
-      <h1 style="font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;margin-bottom:4px;">Housing Inventory</h1>
-      <p style="color:var(--muted);font-size:13px;">All <span id="inv_count">—</span> CLFN housing units — <span id="inv_vacant_count" style="color:#15803d;font-weight:600;">—</span> vacant</p>
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px;">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;flex-shrink:0;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <div>
+        <h1 style="font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;margin:0 0 4px 0;">Housing Inventory</h1>
+        <p style="color:var(--muted);font-size:13px;margin:0;">All <span id="inv_count">—</span> CLFN housing units — <span id="inv_vacant_count" style="color:#15803d;font-weight:600;">—</span> vacant</p>
+      </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       <input id="inv_search" type="text" placeholder="🔍 Search address..." oninput="renderInventoryView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);min-width:180px;"/>
@@ -1273,14 +1278,15 @@
 
 <!-- ═══ MATCH VIEW ═══ -->
 <div id="matchView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
-  <div style="border-bottom:1px solid var(--border);padding:10px 0;margin-bottom:20px;">
-    <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:inline-flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> Back
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+    <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;flex-shrink:0;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
     </button>
-  </div>
-  <div style="margin-bottom:16px;">
-    <h1 style="font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;margin-bottom:4px;">Housing Match</h1>
-    <p style="color:var(--muted);font-size:13px;">Applicants ranked by score matched against vacant units</p>
+    <div>
+      <h1 style="font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;margin:0 0 4px 0;">Housing Match</h1>
+      <p style="color:var(--muted);font-size:13px;margin:0;">Applicants ranked by score matched against vacant units</p>
+    </div>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
     <input id="match_search" type="text" placeholder="🔍 Search applicant..." oninput="renderMatchView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);min-width:200px;"/>
@@ -1300,19 +1306,20 @@
 
 <!-- ═══ TENANTS VIEW ═══ -->
 <div id="tenantsView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
-  <div style="border-bottom:1px solid var(--border);padding:10px 0;margin-bottom:20px;">
-    <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:inline-flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> Back
-    </button>
-  </div>
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-    <div>
-      <h1 style="font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;margin-bottom:4px;">Tenants</h1>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <p style="color:var(--muted);font-size:13px;margin:0;">Occupied and reserved units — <span id="tenant_count" style="font-weight:600;color:var(--text);">—</span> tenants</p>
-        <button type="button" onclick="openAddTenantModal()" style="background:var(--yellow);border:none;color:#111;padding:5px 12px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Tenant
-        </button>
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;flex-shrink:0;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <div>
+        <h1 style="font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;margin:0 0 4px 0;">Tenants</h1>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <p style="color:var(--muted);font-size:13px;margin:0;">Occupied and reserved units — <span id="tenant_count" style="font-weight:600;color:var(--text);">—</span> tenants</p>
+          <button type="button" onclick="openAddTenantModal()" style="background:var(--yellow);border:none;color:#111;padding:5px 12px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Tenant
+          </button>
+        </div>
       </div>
     </div>
     <input id="tenant_search" type="text" placeholder="🔍 Search name or address..." oninput="renderTenantsView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);min-width:200px;"/>
@@ -5438,30 +5445,23 @@ function showTenants(){
 
 // ── Renovations view ──
 function showRenos(){
-  if(!window._navSkipPush) pushNav('renos');
-  setNavActive('tab_renos');
+  // The renoApprovalsView/renosView markup lives in renos.html, not housing.html —
+  // always navigate cross-page so the correct page loads with its own init.
   var role = window.currentRole || 'employee';
   if(role === 'housing_manager' || role === 'ed') {
-    setExportView('reno_approvals');
-    _showView('renoApprovalsView', renderRenoApprovalsView);
+    window.location.href = 'renos.html?view=approvals';
   } else {
-    setExportView('renos');
-    _showView('renosView', renderRenosView);
+    window.location.href = 'renos.html?view=renovations';
   }
 }
 function showRenosSimple(){
-  if(!window._navSkipPush) pushNav('renos');
-  setExportView('reno_approvals');
-  setNavActive('tab_renos');
-  _showView('renosView', renderRenosView);
+  window.location.href = 'renos.html?view=renovations';
 }
 
 // ── Contractors view ──
 function showContractors(){
-  if(!window._navSkipPush) pushNav('contractors');
-  setExportView('contractors');
-  setNavActive('tab_contractors');
-  _showView('contractorsView', renderContractorsView);
+  // contractorsView markup lives in renos.html — navigate cross-page
+  window.location.href = 'renos.html?view=contractors';
 }
 
 function showContractorsForRole() {
