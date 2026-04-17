@@ -44,6 +44,40 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 .dash-view{display:flex;padding:20px 16px;flex-direction:column;gap:16px;width:100%;box-sizing:border-box;max-width:1200px;margin:0 auto;}
 #appLayout{flex:1;display:flex;flex-direction:column;min-width:0;align-items:center;}
 
+/* ── PAGE HEADER (Back button + sub-header band) ── */
+.page-back-row{margin-bottom:10px;}
+.back-btn-yellow{
+  background:var(--yellow);border:1.5px solid var(--yellow);color:#111;
+  padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;
+  cursor:pointer;font-family:DM Sans,sans-serif;
+  display:inline-flex;align-items:center;gap:5px;
+  transition:background 0.15s ease, box-shadow 0.15s ease;
+}
+.back-btn-yellow:hover{background:#fff0a6;box-shadow:0 2px 6px rgba(248,228,26,0.35);}
+.back-btn-yellow svg{flex-shrink:0;}
+.page-header-bar{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:14px 20px;
+  margin-bottom:20px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:12px;
+}
+.page-header-bar > .phb-title h1{
+  font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;
+  margin:0 0 4px 0;line-height:1.15;color:var(--text);
+}
+.page-header-bar > .phb-title p{
+  color:var(--muted);font-size:13px;margin:0;
+}
+.page-header-bar > .phb-actions{
+  display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+}
+
 /* ── SIDEBAR ── */
 
 .snum{width:21px;height:21px;border-radius:50%;background:#e5e5e5;color:#666;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:var(--tr);}

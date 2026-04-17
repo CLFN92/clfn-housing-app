@@ -76,19 +76,18 @@
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 <div id="renoApprovalsView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
 
-  <!-- Page header with inline back button -->
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;flex-shrink:0;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-        Back
-      </button>
-      <div>
-        <h1 style="font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;margin:0 0 4px 0;">Renovation Approvals</h1>
-        <p style="color:var(--muted);font-size:13px;margin:0;">SOW approval queue — all units with scope of work filed, by approval status</p>
-      </div>
+  <div class="page-back-row">
+    <button onclick="goBack()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </button>
+  </div>
+  <div class="page-header-bar">
+    <div class="phb-title">
+      <h1>Renovation Approvals</h1>
+      <p>SOW approval queue — all units with scope of work filed, by approval status</p>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <div class="phb-actions">
       <button onclick="exportRenoApprovalsCSV()" style="background:none;border:1.5px solid var(--border);color:var(--text);padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="this.style.borderColor='var(--border)'">⬇ CSV</button>
       <button onclick="exportRenoApprovalsPDF()" style="background:none;border:1.5px solid var(--border);color:var(--text);padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="this.style.borderColor='var(--border)'">🖨 PDF</button>
       <button onclick="showRenos()" style="background:none;border:1.5px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:600;">Progress View</button>
@@ -132,14 +131,16 @@
 </div><!-- end renoApprovalsView -->
 
 <div id="renosView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
-    <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;flex-shrink:0;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+  <div class="page-back-row">
+    <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
     </button>
-    <div>
-      <h1 style="font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;margin:0 0 4px 0;">Renovations</h1>
-      <p style="color:var(--muted);font-size:13px;margin:0;">Units under repair or condemned — click a unit to view progress</p>
+  </div>
+  <div class="page-header-bar">
+    <div class="phb-title">
+      <h1>Renovations</h1>
+      <p>Units under repair or condemned — click a unit to view progress</p>
     </div>
   </div>
   <div class="card" style="padding:0;overflow:hidden;margin-bottom:20px;">
@@ -183,20 +184,22 @@
 
 <!-- ═══ CONTRACTORS VIEW ═══ -->
 <div id="contractorsView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;">
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;flex-shrink:0;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-        Back
-      </button>
-      <div>
-        <h1 style="font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;margin:0 0 4px 0;">Contractors</h1>
-        <p style="color:var(--muted);font-size:13px;margin:0;">Manage contractor directory and approval workflow</p>
-      </div>
-    </div>
-    <button onclick="openAddContractorModal()" style="background:var(--yellow);border:none;color:#111;padding:8px 18px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Contractor
+  <div class="page-back-row">
+    <button onclick="goBack()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
     </button>
+  </div>
+  <div class="page-header-bar">
+    <div class="phb-title">
+      <h1>Contractors</h1>
+      <p>Manage contractor directory and approval workflow</p>
+    </div>
+    <div class="phb-actions">
+      <button onclick="openAddContractorModal()" style="background:var(--yellow);border:none;color:#111;padding:8px 18px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Contractor
+      </button>
+    </div>
   </div>
 
   <!-- Status filter tabs -->

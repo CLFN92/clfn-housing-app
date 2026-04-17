@@ -119,20 +119,18 @@
 
 <!-- ═══ WORKLIST VIEW ═══ -->
 <div id="worklistView" style="display:none;width:100%;flex-direction:column;padding:clamp(16px,4vw,40px) clamp(14px,3vw,40px);box-sizing:border-box;max-width:1100px;margin:0 auto;">
-  <!-- Header row -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
-    <div style="display:flex;align-items:center;gap:12px;">
-      <button onclick="showEmployeeHome()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-        Back
-      </button>
-      <div>
-        <h1 style="font-family:'DM Serif Display',serif;font-size:24px;font-weight:400;margin-bottom:2px;">My Worklist</h1>
-        <p id="worklist_subtitle" style="color:var(--muted);font-size:12px;"></p>
-      </div>
+  <div class="page-back-row">
+    <button onclick="showEmployeeHome()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </button>
+  </div>
+  <div class="page-header-bar">
+    <div class="phb-title">
+      <h1>My Worklist</h1>
+      <p id="worklist_subtitle"></p>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-
+    <div class="phb-actions">
       <button onclick="newApp()" style="background:var(--yellow);border:none;color:#111;padding:7px 16px;border-radius:8px;font-size:13px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px;">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         New Application
@@ -144,16 +142,16 @@
 
 <div class="dash-view" id="dashView" style="display:none;flex-direction:column;gap:16px;">
 <div id="role_queue_banner" style="padding:0 0 8px 0;"></div>
-  <div class="dash-header">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;flex-shrink:0;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-        Back
-      </button>
-      <div>
-        <h1 style="margin:0;">Applications Dashboard</h1>
-        <p style="margin:2px 0 0 0;">All housing applications and their current approval status</p>
-      </div>
+  <div class="page-back-row">
+    <button onclick="goBack()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </button>
+  </div>
+  <div class="page-header-bar">
+    <div class="phb-title">
+      <h1>Applications Dashboard</h1>
+      <p>All housing applications and their current approval status</p>
     </div>
   </div>
 
@@ -937,12 +935,17 @@
 <!-- ═══ SETTINGS VIEW ═══ -->
 <div id="settingsView" style="display:none;width:100%;flex-direction:column;max-width:1200px;margin:0 auto;box-sizing:border-box;">
 <div class="settings-view" style="display:flex;flex-direction:column;gap:0;padding:clamp(14px,3vw,28px);">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
-    <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;flex-shrink:0;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+  <div class="page-back-row">
+    <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
     </button>
-    <div class="settings-header"><h1 style="margin:0;">Settings</h1><p style="margin:2px 0 0 0;">Manage CLFN Housing Application configuration and scoring models.</p></div>
+  </div>
+  <div class="page-header-bar">
+    <div class="phb-title">
+      <h1>Settings</h1>
+      <p>Manage CLFN Housing Application configuration and scoring models.</p>
+    </div>
   </div>
 
   <!-- Section nav tabs -->
@@ -1225,18 +1228,18 @@
 </div>
 
 <div id="inventoryView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px;">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;flex-shrink:0;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-        Back
-      </button>
-      <div>
-        <h1 style="font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;margin:0 0 4px 0;">Housing Inventory</h1>
-        <p style="color:var(--muted);font-size:13px;margin:0;">All <span id="inv_count">—</span> CLFN housing units — <span id="inv_vacant_count" style="color:#15803d;font-weight:600;">—</span> vacant</p>
-      </div>
+  <div class="page-back-row">
+    <button onclick="goBack()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </button>
+  </div>
+  <div class="page-header-bar">
+    <div class="phb-title">
+      <h1>Housing Inventory</h1>
+      <p>All <span id="inv_count">—</span> CLFN housing units — <span id="inv_vacant_count" style="color:#15803d;font-weight:600;">—</span> vacant</p>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <div class="phb-actions">
       <input id="inv_search" type="text" placeholder="🔍 Search address..." oninput="renderInventoryView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);min-width:180px;"/>
       <select id="inv_filter_status" onchange="renderInventoryView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
         <option value="">All Statuses</option><option value="vacant">Vacant</option><option value="occupied">Occupied</option><option value="under_repair">Under Repair</option><option value="reserved">Reserved</option><option value="condemned">Condemned</option><option value="archived">Archived</option>
@@ -1278,14 +1281,16 @@
 
 <!-- ═══ MATCH VIEW ═══ -->
 <div id="matchView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
-    <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;flex-shrink:0;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+  <div class="page-back-row">
+    <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
     </button>
-    <div>
-      <h1 style="font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;margin:0 0 4px 0;">Housing Match</h1>
-      <p style="color:var(--muted);font-size:13px;margin:0;">Applicants ranked by score matched against vacant units</p>
+  </div>
+  <div class="page-header-bar">
+    <div class="phb-title">
+      <h1>Housing Match</h1>
+      <p>Applicants ranked by score matched against vacant units</p>
     </div>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
@@ -1306,23 +1311,23 @@
 
 <!-- ═══ TENANTS VIEW ═══ -->
 <div id="tenantsView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <button onclick="goBack()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;flex-shrink:0;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-        Back
-      </button>
-      <div>
-        <h1 style="font-family:'DM Serif Display',serif;font-size:25px;font-weight:400;margin:0 0 4px 0;">Tenants</h1>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <p style="color:var(--muted);font-size:13px;margin:0;">Occupied and reserved units — <span id="tenant_count" style="font-weight:600;color:var(--text);">—</span> tenants</p>
-          <button type="button" onclick="openAddTenantModal()" style="background:var(--yellow);border:none;color:#111;padding:5px 12px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Tenant
-          </button>
-        </div>
-      </div>
+  <div class="page-back-row">
+    <button onclick="goBack()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </button>
+  </div>
+  <div class="page-header-bar">
+    <div class="phb-title">
+      <h1>Tenants</h1>
+      <p>Occupied and reserved units — <span id="tenant_count" style="font-weight:600;color:var(--text);">—</span> tenants</p>
     </div>
-    <input id="tenant_search" type="text" placeholder="🔍 Search name or address..." oninput="renderTenantsView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);min-width:200px;"/>
+    <div class="phb-actions">
+      <input id="tenant_search" type="text" placeholder="🔍 Search name or address..." oninput="renderTenantsView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);min-width:200px;"/>
+      <button type="button" onclick="openAddTenantModal()" style="background:var(--yellow);border:none;color:#111;padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Tenant
+      </button>
+    </div>
   </div>
   <div class="card" style="padding:0;overflow:hidden;">
     <div style="overflow-x:auto;">
