@@ -1521,7 +1521,18 @@
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:6px;">Notes</div>
         <div id="udp_notes" style="font-size:13px;color:var(--text);"></div>
       </div>
-      <div>
+      <!-- Scopes of Work -->
+      <div id="udp_sow_section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Scopes of Work</div>
+          <button onclick="udpNewSow()" style="background:var(--yellow);border:none;color:#111;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:4px;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New SOW
+          </button>
+        </div>
+        <div id="udp_sow_table_wrap" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;"></div>
+      </div>
+      <div><!-- Photos -->
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;">Photos</div>
         <div id="udp_photos" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
       </div>
@@ -1563,13 +1574,18 @@
         <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:3px;">Constance Lake First Nation — Housing</div>
         <div style="font-size:16px;font-weight:700;color:#fff;">Renovation Scope of Work</div>
         <div id="sow_unit_label" style="font-size:11px;color:#888;margin-top:2px;"></div>
+        <div style="margin-top:4px;display:flex;align-items:center;gap:6px;"><span style="font-size:9px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#888;">Project #</span><span id="sow_project_number_label" style="font-size:11px;font-weight:700;color:var(--yellow);font-family:ui-monospace,Menlo,Monaco,'Courier New',monospace;"></span></div>
       </div>
-      <div style="display:flex;gap:8px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+        <button id="sow_mark_complete_btn" type="button" onclick="markSowComplete()" style="display:none;background:#15803d;border:none;color:#fff;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;align-items:center;gap:5px;">✓ Mark Complete</button>
+        <button id="sow_reopen_btn" type="button" onclick="reopenSow()" style="display:none;background:none;border:1px solid #fbbf24;color:#fbbf24;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;align-items:center;gap:5px;">↺ Reopen</button>
         <button type="button" onclick="printWorkOrder()" style="background:var(--yellow);border:none;color:#111;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;display:flex;align-items:center;gap:5px;">🏗 Work Order</button>
         <button type="button" onclick="printSOW()" style="background:none;border:1px solid #555;color:#ccc;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;">🖨 Full SOW</button>
         <button type="button" onclick="closeSowModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
       </div>
     </div>
+    <!-- Read-only banner shown when SOW is completed and viewer cannot edit -->
+    <div id="sow_readonly_banner" style="display:none;background:#f0fdf4;border-bottom:2px solid #15803d;padding:10px 24px;font-size:12px;color:#15803d;font-weight:600;"><span style="font-size:14px;margin-right:6px;">🔒</span>This Scope of Work is marked Completed and is read-only. Only the Executive Director can reopen or modify a completed SOW.</div>
 
     <!-- Body -->
     <div style="padding:24px;display:flex;flex-direction:column;gap:0;">
@@ -1824,7 +1840,7 @@
       <div id="sow_saved_indicator" style="font-size:12px;color:var(--muted);"></div>
       <div style="display:flex;gap:10px;">
         <button type="button" onclick="closeSowModal()" class="btn btn-ghost">Cancel</button>
-        <button type="button" onclick="saveSOW()" class="btn btn-primary">💾 Save Scope of Work</button>
+        <button id="sow_save_btn" type="button" onclick="saveSOW()" class="btn btn-primary">💾 Save Scope of Work</button>
       </div>
     </div>
   </div>
@@ -5616,7 +5632,7 @@ function renderInventoryView(){
       +'<td style="padding:9px 14px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
       +(u.assignedName?' <span style="font-size:11px;color:var(--muted);">→ '+u.assignedName+'</span>':'')+'</td>'
       +(window.currentRole==='housing_manager'||window.currentRole==='ed' ? (function(){
-        var _hasSow = !!(window._sowCache && window._sowCache[u.id]);
+        var _hasSow = !!getSowData(u.id);
         var _hasProg = !!(window._renoProgress && window._renoProgress[u.id]);
         if(_hasSow||_hasProg){
           var _rs=calcRenoScore(u.id); var _sc=_rs.score;
@@ -5800,7 +5816,7 @@ function ueUpdateBudgetRouting() {
 
   var limit = getHmBudgetLimit();
   var sowData = null;
-  sowData = (window._sowCache && window._sowCache[uid]) || null;
+  sowData = getSowData(uid);
   var totalCost = sowData ? (parseFloat((sowData.totalCost||'').toString().replace(/[^0-9.]/g,''))||0) : 0;
 
   var indicator = document.getElementById('ue_budget_indicator');
@@ -6303,7 +6319,7 @@ function renderTenantsView(){
   // File counts loaded asynchronously — see getTenantFiles (Supabase Storage)
   function hasSowOrReno(uid){
     try{
-      var sow = (window._sowCache && window._sowCache[uid]) || null;
+      var sow = getSowData(uid);
       var prog = (window._renoProgress && window._renoProgress[uid]) || null;
       return !!(sow&&sow!=='null') || !!(prog&&prog!=='null');
     }catch(e){return false;}
@@ -7876,11 +7892,14 @@ var SOW_CATEGORIES = [
   'Flooring','Kitchen','Bathroom','Painting','Accessibility Modifications','Other'
 ];
 
-function openSowModal(unitId) {
+function openSowModal(unitId, projectNumber) {
   _sowUnitId  = unitId || null;
   _sowItemIdx = 0;
-  // Reset "previously saved" flag so first save of a session logs as new/update correctly
-  window._sowWasPreviouslySaved = !!(unitId && getSowData(unitId));
+  // projectNumber: if provided → edit that specific SOW; if omitted → create a new SOW for this unit.
+  var isEdit = !!projectNumber;
+  var saved = (unitId && projectNumber) ? getSowByProjectNumber(unitId, projectNumber) : null;
+  window._sowEditingProjectNumber = isEdit ? projectNumber : null;  // remember for save
+  window._sowWasPreviouslySaved = isEdit && !!saved;
   var label = '';
   if(unitId) {
     var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
@@ -7891,12 +7910,13 @@ function openSowModal(unitId) {
   if(lbl) lbl.textContent = label || 'No unit selected';
   var today = new Date().toISOString().slice(0,10);
   var dateEl = document.getElementById('sow_date'); if(dateEl) dateEl.value = today;
-  var saved = unitId ? getSowData(unitId) : null;
-  if(saved) { populateSow(saved); } else {
+  if(saved) {
+    populateSow(saved);
+  } else {
     resetSow();
     if(label) { var addr=document.getElementById('sow_address'); if(addr) addr.value=label; }
   }
-  // Auto-populate tenant name from unit's assigned tenant
+  // Auto-populate tenant name from unit's assigned tenant (for new SOWs only).
   if(unitId && !saved) {
     var allUnits2 = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
     var u2 = allUnits2.find(function(x){ return x.id===unitId; });
@@ -7904,6 +7924,14 @@ function openSowModal(unitId) {
       var tnEl = document.getElementById('sow_tenant_name');
       if(tnEl) tnEl.value = u2.assignedName;
     }
+  }
+
+  // Show project number header (new visual identifier for the SOW).
+  var pnLabel = document.getElementById('sow_project_number_label');
+  if(pnLabel){
+    var pn = isEdit ? projectNumber : (unitId ? nextProjectNumber(unitId) : '(no unit)');
+    pnLabel.textContent = pn;
+    window._sowEditingProjectNumber = pn;  // lock in the project number for save (handles new too)
   }
 
   var modal = document.getElementById('sowModal');
@@ -7922,6 +7950,116 @@ function openSowModal(unitId) {
     var badge = document.getElementById('sow_budget_badge');
     if(badge) badge.style.display = 'none';
   }, 50);
+
+  // Apply the locked/unlocked state based on the SOW's status and the current user's role.
+  _applySowModalLock(saved);
+}
+
+// ── SOW completion state control ──────────────────────────────────────────
+// Applies read-only lock when a SOW is completed AND the viewer isn't the ED.
+// Also toggles the Mark Complete / Reopen buttons based on status + permissions.
+function _applySowModalLock(sow){
+  var modal = document.getElementById('sowModal');
+  if(!modal) return;
+  var completed = isSowCompleted(sow);
+  var canEdit   = canEditSow(sow);
+  var readOnly  = completed && !canEdit;
+
+  // Banner
+  var banner = document.getElementById('sow_readonly_banner');
+  if(banner) banner.style.display = readOnly ? 'block' : 'none';
+
+  // Mark Complete button: only show when SOW is NOT completed AND viewer is HM or ED AND there's a unit/saved SOW.
+  var mcBtn = document.getElementById('sow_mark_complete_btn');
+  if(mcBtn){
+    var showMC = !completed && canMarkSowComplete() && !!_sowUnitId && !!window._sowEditingProjectNumber;
+    mcBtn.style.display = showMC ? 'flex' : 'none';
+  }
+
+  // Reopen button: only show when completed AND viewer is ED.
+  var roBtn = document.getElementById('sow_reopen_btn');
+  if(roBtn){
+    roBtn.style.display = (completed && canReopenSow()) ? 'flex' : 'none';
+  }
+
+  // Save button: hidden in read-only mode.
+  var saveBtn = document.getElementById('sow_save_btn');
+  if(saveBtn) saveBtn.style.display = readOnly ? 'none' : '';
+
+  // Disable every form control inside the modal body when read-only.
+  // Inputs in the header (like close button) are outside this query.
+  var body = modal.querySelector('div[style*="padding:24px"]');
+  if(body){
+    var controls = body.querySelectorAll('input, select, textarea, button');
+    controls.forEach(function(el){
+      // Never disable the "close the modal" or "add SOW line" structural controls? Actually,
+      // when read-only we disable them all so the SOW is effectively frozen in view.
+      // The only escape is the X in the modal header (not inside body), which stays enabled.
+      if(readOnly){
+        el.setAttribute('data-sow-locked', '1');
+        el.disabled = true;
+        el.style.opacity = '0.6';
+        el.style.cursor = 'not-allowed';
+      } else if(el.getAttribute('data-sow-locked') === '1'){
+        // Un-lock if we previously locked this element.
+        el.removeAttribute('data-sow-locked');
+        el.disabled = false;
+        el.style.opacity = '';
+        el.style.cursor = '';
+      }
+    });
+    // Disable signature canvases too (they're <canvas> not form controls; swap pointer-events).
+    body.querySelectorAll('canvas').forEach(function(c){
+      c.style.pointerEvents = readOnly ? 'none' : '';
+      c.style.opacity = readOnly ? '0.55' : '';
+    });
+  }
+}
+
+function markSowComplete(){
+  if(!_sowUnitId || !window._sowEditingProjectNumber){
+    showToast('Save the SOW before marking complete.');
+    return;
+  }
+  if(!canMarkSowComplete()){
+    showToast('Only Housing Manager or Executive Director can mark a SOW complete.');
+    return;
+  }
+  var pn = window._sowEditingProjectNumber;
+  if(!confirm('Mark SOW ' + pn + ' as Completed?\n\nThis locks the SOW, work order, and progress reports from further edits. Only the Executive Director can reopen it.')) return;
+  var sow = getSowByProjectNumber(_sowUnitId, pn);
+  if(!sow){ showToast('SOW not found'); return; }
+  sow.approval_status = 'completed';
+  sow.completed_at = new Date().toISOString();
+  sow.completed_by = window.currentUserName || _realRoleForPermissions();
+  upsertSowInList(_sowUnitId, sow);
+  auditEntry('SOW:'+_sowUnitId, 'sow_completed', 'SOW '+pn+' marked Completed', _realRoleForPermissions());
+  showToast('✓ SOW marked Completed');
+  // Re-apply lock immediately so the modal flips to read-only for non-ED users.
+  _applySowModalLock(sow);
+}
+
+function reopenSow(){
+  if(!_sowUnitId || !window._sowEditingProjectNumber) return;
+  if(!canReopenSow()){
+    showToast('Only the Executive Director can reopen a completed SOW.');
+    return;
+  }
+  var pn = window._sowEditingProjectNumber;
+  if(!confirm('Reopen SOW ' + pn + ' for editing?\n\nThis returns the SOW to its prior approval state so it can be modified.')) return;
+  var sow = getSowByProjectNumber(_sowUnitId, pn);
+  if(!sow){ showToast('SOW not found'); return; }
+  // Restore to the prior status based on available signatures, falling back to draft.
+  if(sow.edName && sow.edDate) sow.approval_status = 'ed_approved';
+  else if(sow.hmName && sow.hmDate) sow.approval_status = 'hm_approved';
+  else if((sow.tenantSig && sow.tenantSig.image) || (sow.staffSig && sow.staffSig.image)) sow.approval_status = 'signed';
+  else sow.approval_status = 'draft';
+  sow.reopened_at = new Date().toISOString();
+  sow.reopened_by = window.currentUserName || _realRoleForPermissions();
+  upsertSowInList(_sowUnitId, sow);
+  auditEntry('SOW:'+_sowUnitId, 'sow_reopened', 'SOW '+pn+' reopened for editing', _realRoleForPermissions());
+  showToast('SOW reopened');
+  _applySowModalLock(sow);
 }
 
 function closeSowModal() {
@@ -7939,6 +8077,17 @@ function closeRenoProgress() {
 function saveRenoProgress() {
   var unitId = window._rpUnitId;
   if(!unitId) return;
+
+  // If the unit has completed SOWs and the viewer isn't the ED, block the save.
+  // Rationale: a completed SOW shouldn't have its progress rewritten by non-ED users.
+  // If NO completed SOWs exist (or the viewer is ED), allow normally.
+  var unitSows = getUnitSowList(unitId);
+  var hasCompletedSow = unitSows.some(isSowCompleted);
+  if(hasCompletedSow && _realRoleForPermissions() !== 'ed'){
+    showToast('This unit has a completed SOW. Only the Executive Director can update progress on completed work.');
+    return;
+  }
+
   var get = function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
   var status   = get('rp_status_select') || 'Not Started';
   var pct      = parseInt(get('rp_pct_input'))||0;
@@ -7976,6 +8125,38 @@ function saveRenoProgress() {
     headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
     body: JSON.stringify({ unit_id: unitId, data: prog, updated_at: new Date().toISOString() })
   }).catch(function(e){ console.warn('Reno progress save failed:',e); });
+
+  // Mirror the progress percent onto every open SOW for this unit so the SOW table shows it.
+  // Skip SOWs that are already completed (don't overwrite their final state).
+  // Also: auto-mark the most recent active SOW as 'completed' when progress hits 100%.
+  (function mirrorProgress(){
+    var list = getUnitSowList(unitId);
+    if(!list.length) return;
+    var touched = false;
+    list.forEach(function(sow){
+      if(sow.approval_status === 'completed') return;
+      sow.progress = sow.progress || {};
+      sow.progress.percent = pct;
+      sow.progress.status  = status;
+      sow.progress.updated_at = new Date().toISOString();
+      touched = true;
+    });
+    // Auto-complete: if progress is 100 and there's at least one non-completed SOW,
+    // mark the MOST RECENT non-completed SOW as completed.
+    if(pct >= 100){
+      var candidates = list.filter(function(s){ return s.approval_status !== 'completed'; });
+      if(candidates.length){
+        candidates.sort(function(a, b){ return (b.created_at||'').localeCompare(a.created_at||''); });
+        var target = candidates[0];
+        target.approval_status = 'completed';
+        target.completed_at = new Date().toISOString();
+        target.completed_by = window.currentUserName || _realRoleForPermissions();
+        auditEntry('SOW:'+unitId, 'sow_auto_completed', 'SOW '+(target.project_number||'?')+' auto-completed — progress reached 100%', _realRoleForPermissions());
+        touched = true;
+      }
+    }
+    if(touched) saveSowList(unitId, list);
+  })();
 
   closeRenoProgress();
   renderRenosView();
@@ -8158,11 +8339,30 @@ function _renderRpPendingPhotos() {
 }
 
 function getSowData(unitId){
-  return (window._sowCache && window._sowCache[unitId]) || null;
+  // Backwards compat: callers that predate multi-SOW expect a flat SOW object.
+  // We return the most recent SOW from the list so "does this unit have a SOW?" and
+  // "show summary of its SOW" both keep working.
+  // For multi-SOW-aware code, use getUnitSowList() / getSowByProjectNumber() directly.
+  var raw = getSowData(unitId);
+  if(!raw) return null;
+  if(Array.isArray(raw.sows)){
+    if(!raw.sows.length) return null;
+    // Most recent first (same sort as the table).
+    var sorted = raw.sows.slice().sort(function(a, b){
+      return (b.created_at || '').localeCompare(a.created_at || '');
+    });
+    return sorted[0];
+  }
+  return raw;  // legacy flat shape
+}
+
+function _getRawSowRecord(unitId){
+  // Escape hatch for code that needs the wrapper ({sows:[...]}).
+  return getSowData(unitId);
 }
 
 function saveSowData(unitId, data){
-  // Update in-memory cache
+  // Update in-memory cache (writes the RAW wrapper — callers should pass {sows:[...]}).
   if(!window._sowCache) window._sowCache = {};
   window._sowCache[unitId] = data;
   // Save to Supabase
@@ -8172,6 +8372,231 @@ function saveSowData(unitId, data){
     body: JSON.stringify({ unit_id: unitId, data: data, updated_at: new Date().toISOString() })
   }).catch(function(e){ console.warn('SOW save failed:',e); });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MULTI-SOW MODEL (one unit → many scopes of work)
+// ═══════════════════════════════════════════════════════════════════════════
+// Storage shape in housing_sow.data:
+//   NEW:    { sows: [{project_number, created_at, approval_status, amount, progress, ...sowFields}, ...] }
+//   LEGACY: { ...sowFields }  (a single SOW stored flat — migrated on read)
+//
+// Migration: _migrateLegacySow wraps legacy records as { sows: [legacy] } transparently.
+// Writes always use the NEW shape.
+
+function _migrateLegacySow(rawData){
+  // Returns { sows: [...] } regardless of input shape.
+  if(!rawData) return { sows: [] };
+  if(Array.isArray(rawData.sows)) return rawData;  // already new format
+  // Legacy flat SOW — wrap as single-item list.
+  // Synthesize project_number from address if missing; preserve all fields.
+  var legacy = Object.assign({}, rawData);
+  if(!legacy.project_number) legacy.project_number = (legacy.address || 'UNIT') + '-SOW-001';
+  if(!legacy.created_at) legacy.created_at = legacy.date || new Date().toISOString().slice(0,10);
+  if(!legacy.approval_status){
+    // Derive from existing approval fields if present.
+    if(legacy.ed_approved) legacy.approval_status = 'ed_approved';
+    else if(legacy.hm_approved) legacy.approval_status = 'hm_approved';
+    else if(legacy.tenant_signed_at || legacy.staff_signed_at) legacy.approval_status = 'signed';
+    else legacy.approval_status = 'draft';
+  }
+  if(legacy.amount == null){
+    // Try common fields where the amount might live.
+    var amt = legacy.estimated_total || legacy.total_cost || legacy.budget || 0;
+    legacy.amount = typeof amt === 'number' ? amt : (parseFloat(String(amt).replace(/[^0-9.\-]/g,''))||0);
+  }
+  return { sows: [legacy] };
+}
+
+function getUnitSowList(unitId){
+  // Returns an array of SOW objects for this unit (migrated if needed).
+  var raw = getSowData(unitId);
+  var migrated = _migrateLegacySow(raw);
+  return migrated.sows || [];
+}
+
+function getSowByProjectNumber(unitId, projectNumber){
+  var list = getUnitSowList(unitId);
+  for(var i=0; i<list.length; i++){
+    if(list[i].project_number === projectNumber) return list[i];
+  }
+  return null;
+}
+
+// ── SOW lock / permission helpers ─────────────────────────────────────────
+// A SOW becomes immutable once its approval_status is 'completed'. Only the ED
+// (using their real role, not view-as) can edit a completed SOW or reopen it.
+function _effectiveRole(){
+  return window._viewAsRole || window.currentRole || '';
+}
+function _realRoleForPermissions(){
+  // For override authority we check the REAL role, not view-as.
+  // This way an ED previewing "as HM" still has edit power on completed SOWs.
+  return window._realRole || window.currentRole || '';
+}
+function isSowCompleted(sow){
+  if(!sow) return false;
+  return sow.approval_status === 'completed';
+}
+function canEditSow(sow){
+  // Anyone authenticated can edit a non-completed SOW (existing behavior).
+  // Only the ED (real role) can edit a completed one.
+  if(!isSowCompleted(sow)) return true;
+  return _realRoleForPermissions() === 'ed';
+}
+function canMarkSowComplete(){
+  // HM or ED can mark a SOW complete; staff/employee cannot.
+  var r = _realRoleForPermissions();
+  return r === 'ed' || r === 'housing_manager' || r === 'hm';
+}
+function canReopenSow(){
+  // Only ED can reopen a completed SOW.
+  return _realRoleForPermissions() === 'ed';
+}
+
+function saveSowList(unitId, sowList){
+  // Persist the whole list to the housing_sow.data column.
+  saveSowData(unitId, { sows: sowList });
+}
+
+function upsertSowInList(unitId, sow){
+  // Add or update a SOW in the unit's list (matched by project_number) and persist.
+  var list = getUnitSowList(unitId);
+  var found = false;
+  for(var i=0; i<list.length; i++){
+    if(list[i].project_number === sow.project_number){
+      list[i] = sow;
+      found = true;
+      break;
+    }
+  }
+  if(!found) list.push(sow);
+  saveSowList(unitId, list);
+  return list;
+}
+
+function deleteSowFromList(unitId, projectNumber){
+  var list = getUnitSowList(unitId).filter(function(s){ return s.project_number !== projectNumber; });
+  saveSowList(unitId, list);
+  return list;
+}
+
+function nextProjectNumber(unitId){
+  // Produces "<address>-SOW-NNN" where NNN is one more than the current max on this unit.
+  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
+  var u = allUnits.find(function(x){ return x.id === unitId; });
+  var addr = u ? (u.num + ' ' + u.street).trim() : 'UNIT';
+  var list = getUnitSowList(unitId);
+  var maxN = 0;
+  var re = new RegExp('^' + addr.replace(/[-\/\\^$*+?.()|[\]{}]/g,'\\$&') + '-SOW-(\\d+)$');
+  list.forEach(function(s){
+    var m = re.exec(String(s.project_number || ''));
+    if(m){ var n = parseInt(m[1], 10); if(n > maxN) maxN = n; }
+  });
+  var next = ('000' + (maxN + 1)).slice(-3);
+  return addr + '-SOW-' + next;
+}
+
+// ── SOW table on Unit Detail card ─────────────────────────────────────────
+// Renders every SOW for a given unit as a row in a table inside the Unit Detail modal.
+function udpRenderSowTable(unitId){
+  var wrap = document.getElementById('udp_sow_table_wrap');
+  if(!wrap) return;
+  var list = getUnitSowList(unitId);
+  if(!list.length){
+    wrap.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:12px;font-style:italic;background:var(--bg);">No scopes of work yet. Click <strong style="color:var(--text);">New SOW</strong> to create one.</div>';
+    return;
+  }
+  // Sort newest first by created_at.
+  list = list.slice().sort(function(a, b){
+    return (b.created_at || '').localeCompare(a.created_at || '');
+  });
+
+  var statusStyles = {
+    draft:        {bg:'#f4f4f0', c:'#666',    label:'Draft'},
+    signed:       {bg:'#eff6ff', c:'#1d4ed8', label:'Signed'},
+    hm_approved:  {bg:'#fffbeb', c:'#92400e', label:'HM Approved'},
+    ed_approved:  {bg:'#f0fdf4', c:'#15803d', label:'ED Approved'},
+    completed:    {bg:'#f0fdf4', c:'#15803d', label:'Completed'}
+  };
+
+  function fmtCurrency(n){
+    var v = Number(n) || 0;
+    return '$' + v.toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:0});
+  }
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  var rows = list.map(function(sow){
+    var ss = statusStyles[sow.approval_status] || {bg:'#f4f4f0', c:'#666', label:sow.approval_status || '—'};
+    var pn = esc(sow.project_number || '—');
+    var date = esc(sow.created_at || sow.date || '—');
+    var amount = (sow.amount == null) ? '—' : fmtCurrency(sow.amount);
+    var progressPct = (sow.progress && typeof sow.progress.percent === 'number') ? sow.progress.percent : null;
+    var progressCell = progressPct == null
+      ? '<span style="color:var(--muted);font-size:11px;">—</span>'
+      : '<div style="display:flex;align-items:center;gap:6px;min-width:80px;"><div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="height:100%;width:'+Math.min(100,Math.max(0,progressPct))+'%;background:'+(progressPct>=100?'#15803d':'#1d4ed8')+';"></div></div><span style="font-size:10px;font-weight:700;color:var(--muted);min-width:26px;text-align:right;">'+progressPct+'%</span></div>';
+    // Project # cell is clickable — opens the full SOW document in print-ready view.
+    // Build row actions based on completion state + viewer role.
+    // Completed SOW + non-ED → View (opens read-only) instead of Edit.
+    // Work Order stays available to everyone regardless of status.
+    var locked = isSowCompleted(sow) && !canEditSow(sow);
+    var editBtn = locked
+      ? '<button onclick="udpEditSow(\''+esc(unitId)+'\',\''+pn+'\')" title="View SOW (read-only)" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:600;font-family:DM Sans,sans-serif;margin-right:4px;">View</button>'
+      : '<button onclick="udpEditSow(\''+esc(unitId)+'\',\''+pn+'\')" title="Edit SOW" style="background:none;border:1px solid var(--border);color:var(--text);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:600;font-family:DM Sans,sans-serif;margin-right:4px;">Edit</button>';
+    return '<tr style="border-top:1px solid var(--border);">'
+      +'<td style="padding:8px 10px;font-size:11px;color:var(--muted);white-space:nowrap;">'+date+'</td>'
+      +'<td style="padding:8px 10px;"><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:'+ss.bg+';color:'+ss.c+';white-space:nowrap;">'+ss.label+(locked?' 🔒':'')+'</span></td>'
+      +'<td style="padding:8px 10px;font-size:12px;font-weight:700;white-space:nowrap;">'+amount+'</td>'
+      +'<td style="padding:8px 10px;font-size:11px;"><button onclick="udpOpenSowDocument(\''+esc(unitId)+'\',\''+pn+'\')" style="background:none;border:none;color:var(--text);padding:0;font-family:ui-monospace,Menlo,Monaco,\'Courier New\',monospace;font-size:11px;font-weight:600;cursor:pointer;text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;" title="Open full SOW document">'+pn+'</button></td>'
+      +'<td style="padding:8px 10px;font-size:10px;">'+progressCell+'</td>'
+      +'<td style="padding:6px 8px;white-space:nowrap;text-align:right;">'
+        +editBtn
+        +'<button onclick="udpPrintWorkOrder(\''+esc(unitId)+'\',\''+pn+'\')" title="Print work order" style="background:var(--yellow);border:none;color:#111;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700;font-family:DM Sans,sans-serif;">Work Order</button>'
+      +'</td>'
+      +'</tr>';
+  }).join('');
+
+  wrap.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-family:DM Sans,sans-serif;">'
+    +'<thead><tr style="background:var(--bg);"><th style="padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;">Date</th>'
+    +'<th style="padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;">Status</th>'
+    +'<th style="padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;">Amount</th>'
+    +'<th style="padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;">Project #</th>'
+    +'<th style="padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;">Progress</th>'
+    +'<th style="padding:7px 10px;"></th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table></div>';
+}
+
+function udpNewSow(){
+  if(!_currentDetailUnitId) return;
+  closeUnitDetail();
+  openSowModal(_currentDetailUnitId);  // no projectNumber → new SOW
+}
+
+function udpEditSow(unitId, projectNumber){
+  closeUnitDetail();
+  openSowModal(unitId, projectNumber);
+}
+
+function udpOpenSowDocument(unitId, projectNumber){
+  // Opens the full SOW as a print-ready document (same as "Full SOW" button inside the modal).
+  // Loads the SOW into the modal first so printSOW() has the right data, then triggers print.
+  var sow = getSowByProjectNumber(unitId, projectNumber);
+  if(!sow){ showToast('SOW not found'); return; }
+  closeUnitDetail();
+  openSowModal(unitId, projectNumber);
+  // Give the modal a tick to populate before printing.
+  setTimeout(function(){ if(typeof printSOW === 'function') printSOW(); }, 250);
+}
+
+function udpPrintWorkOrder(unitId, projectNumber){
+  // Prints a work order for the specific SOW. Loads the SOW into the modal briefly so
+  // the existing printWorkOrder() (which reads from modal state) produces the right output.
+  var sow = getSowByProjectNumber(unitId, projectNumber);
+  if(!sow){ showToast('SOW not found'); return; }
+  closeUnitDetail();
+  openSowModal(unitId, projectNumber);
+  setTimeout(function(){ if(typeof printWorkOrder === 'function') printWorkOrder(); }, 250);
+}
+
 
 function renderSowAuditLog(unitId) {
   var tbody = document.getElementById('sow_audit_tbody');
@@ -8344,7 +8769,36 @@ function saveSOW(){
     policeReport:chk('sow_police_report'), accountabilityNotes:get('sow_accountability_notes'),
     items:collectSowItems(), savedAt:new Date().toISOString()
   };
-  if(_sowUnitId) saveSowData(_sowUnitId, data);
+  // ── Multi-SOW fields ───────────────────────────────────────────────────
+  // Stamp the project number (either the one being edited or a fresh one for new SOWs).
+  data.project_number = window._sowEditingProjectNumber || (_sowUnitId ? nextProjectNumber(_sowUnitId) : 'NO-UNIT-SOW-001');
+  // Preserve created_at if editing an existing SOW; otherwise stamp today.
+  if(_sowUnitId){
+    var existing = getSowByProjectNumber(_sowUnitId, data.project_number);
+    data.created_at = (existing && existing.created_at) || data.date || new Date().toISOString().slice(0,10);
+    // Preserve progress block so editing SOW doesn't wipe progress.
+    if(existing && existing.progress) data.progress = existing.progress;
+  } else {
+    data.created_at = data.date || new Date().toISOString().slice(0,10);
+  }
+  // Normalize the amount to a number for table display / sorting.
+  var totalNum = parseFloat(String(data.totalCost||'').replace(/[^0-9.\-]/g,'')) || 0;
+  data.amount = totalNum;
+  // Compute a simple approval_status from the signature / approval fields on the form.
+  // EXCEPTION: if the SOW was already marked 'completed', preserve that — only markSowComplete/reopenSow
+  // should transition into or out of the completed state. This keeps Save from accidentally
+  // downgrading a completed SOW when an ED edits its fields.
+  var existingForStatus = _sowUnitId && data.project_number ? getSowByProjectNumber(_sowUnitId, data.project_number) : null;
+  if(existingForStatus && existingForStatus.approval_status === 'completed'){
+    data.approval_status = 'completed';
+    if(existingForStatus.completed_at) data.completed_at = existingForStatus.completed_at;
+    if(existingForStatus.completed_by) data.completed_by = existingForStatus.completed_by;
+  } else if(data.edName && data.edDate) data.approval_status = 'ed_approved';
+  else if(data.hmName && data.hmDate) data.approval_status = 'hm_approved';
+  else if((data.tenantSig && data.tenantSig.image) || (data.staffSig && data.staffSig.image)) data.approval_status = 'signed';
+  else data.approval_status = 'draft';
+
+  if(_sowUnitId) upsertSowInList(_sowUnitId, data);
 
   // ── Audit trail ──────────────────────────────────────────────────────────
   var role = window.currentRole || 'staff';
@@ -9047,6 +9501,9 @@ function openUnitDetail(unitId) {
   // Photos
   renderUnitPhotos(unitId);
 
+  // Scopes of Work table
+  udpRenderSowTable(unitId);
+
   // Tenant files preview in detail panel
   udpRenderFilePreviews(unitId);
 
@@ -9227,7 +9684,7 @@ function getSpentByPool(){
   BUDGET_POOLS.forEach(function(p){spent[p.id]=0;});
   allUnits.forEach(function(u){
     var sow=null;
-    sow = (window._sowCache && window._sowCache[u.id]) || null;
+    sow = getSowData(u.id);
     if(!sow||!sow.totalCost)return;
     var cost=parseFloat(sow.totalCost.replace(/[^0-9.]/g,''))||0;
     if(!cost)return;
@@ -9545,7 +10002,7 @@ function calcRenoScore(unitId) {
   if(!u) return {score:0, breakdown:[]};
 
   var sow = null;
-  sow = (window._sowCache && window._sowCache[unitId]) || null;
+  sow = getSowData(unitId);
 
   function addPts(id, label, pts) {
     if(pts) { score += pts; breakdown.push({label:label, pts:pts}); }
@@ -9728,7 +10185,7 @@ function openRenoBudget(unitId) {
   if(!u) return;
 
   var sow = null;
-  sow = (window._sowCache && window._sowCache[unitId]) || null;
+  sow = getSowData(unitId);
 
   var approval = null;
   approval = (window._renoBudget && window._renoBudget[unitId]) || null;
@@ -11256,7 +11713,7 @@ function exportRenos(format) {
   var headers=['Address','Beds','Type','Foundation','Status','Priority Score','Contractor','SOW Filed','Progress %'];
   var data=rows.map(function(u){
     var rs=calcRenoScore(u.id);
-    var sow=null;sow = (window._sowCache && window._sowCache[u.id]) || null;
+    var sow=null;sow = getSowData(u.id);
     var prog=null;prog = (window._renoProgress && window._renoProgress[u.id]) || {};
     return[u.num+' '+u.street,u.bedrooms,(u.type&&u.type!=='0'&&u.type!=='nan')?u.type:'',(u.foundation&&u.foundation!=='0'&&u.foundation!=='nan')?u.foundation:'',u.status,rs.score||0,(prog.contractor||sow&&sow.contractor||''),(sow?'Yes':'No'),(prog.progress||0)+'%'];
   });
@@ -11331,7 +11788,7 @@ function openRenoProgress(unitId) {
 
   // SOW summary
   var sow = null;
-  sow = (window._sowCache && window._sowCache[unitId]) || null;
+  sow = getSowData(unitId);
   var sumEl = document.getElementById('rp_sow_summary');
   if(sumEl) {
     if(sow && sow.items && sow.items.length) {
@@ -12936,7 +13393,7 @@ function showEmployeeHome(){
       var renoUnits=allU.filter(function(u){return (u.status==='under_repair'||u.status==='condemned')&&!u.archived;});
       var hmLimit2=parseFloat(((window._appSettings||{}).hmBudgetLimit)||25000);
       renoUnits.forEach(function(u){
-        var sow=null; sow = (window._sowCache && window._sowCache[u.id]) || null;
+        var sow=null; sow = getSowData(u.id);
         var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
         if(!sow){sowNoSow++;return;}
         var cost=parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))||0;
@@ -14991,7 +15448,7 @@ function _getAllRenoUnits() {
   if(!units.length) units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
   return units.filter(function(u) {
     if(u.archived) return false;
-    var hasSow = !!(window._sowCache && window._sowCache[u.id]);
+    var hasSow = !!getSowData(u.id);
     return hasSow || u.status==='under_repair' || u.status==='condemned';
   });
 }
@@ -15001,7 +15458,7 @@ function renderRenoApprovalsView() {
   var relevant = _getAllRenoUnits();
 
   var rows = relevant.map(function(u) {
-    var sow=null; sow = (window._sowCache && window._sowCache[u.id]) || null;
+    var sow=null; sow = getSowData(u.id);
     var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
     var rs = calcRenoScore(u.id);
     var appr = _getRaApprovalStatus(u, sow);
@@ -15130,7 +15587,7 @@ function exportRenoApprovalsCSV() {
   var hmLimit = _getHmLimit();
   var headers = ['Address','Unit Status','Beds','Type','Priority Score','Priority Tier','SOW Cost','ED Auth Required','Approval Status','HM Decision','HM Date','ED Decision','ED Date','Contractor','Progress %'];
   var csvRows = units.map(function(u) {
-    var sow=null;sow = (window._sowCache && window._sowCache[u.id]) || null;
+    var sow=null;sow = getSowData(u.id);
     var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
     var rs=calcRenoScore(u.id);
     var tier=rs.score>=40?'Critical':rs.score>=25?'High':rs.score>=12?'Medium':'Low';
@@ -15158,13 +15615,13 @@ function exportRenoApprovalsPDF() {
   var logoSrc=(document.querySelector('.app-logo img')||{}).src||'';
   var today=new Date().toLocaleDateString('en-CA');
   var relevant = _raFilter ? units.filter(function(u){
-    var sow=null;sow = (window._sowCache && window._sowCache[u.id]) || null;
+    var sow=null;sow = getSowData(u.id);
     return _getRaApprovalStatus(u,sow).key===_raFilter;
   }) : units;
   relevant.sort(function(a,b){return calcRenoScore(b.id).score-calcRenoScore(a.id).score;});
 
   var tableRows = relevant.map(function(u,i){
-    var sow=null;sow = (window._sowCache && window._sowCache[u.id]) || null;
+    var sow=null;sow = getSowData(u.id);
     var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
     var rs=calcRenoScore(u.id);
     var tier=rs.score>=40?{l:'Critical',c:'#b91c1c'}:rs.score>=25?{l:'High',c:'#92400e'}:rs.score>=12?{l:'Medium',c:'#1d4ed8'}:{l:'Low',c:'#15803d'};

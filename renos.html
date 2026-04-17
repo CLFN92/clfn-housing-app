@@ -625,6 +625,8 @@
       </div>
       <button type="button" onclick="closeRenoProgress()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
     </div>
+    <!-- Read-only banner: shown when one of the unit's SOWs is Completed and viewer isn't ED -->
+    <div id="rp_readonly_banner" style="display:none;background:#f0fdf4;border-bottom:2px solid #15803d;padding:10px 24px;font-size:12px;color:#15803d;font-weight:600;"><span style="font-size:14px;margin-right:6px;">🔒</span>This unit has a Completed SOW. Progress reports are read-only. Only the Executive Director can reopen the SOW and update progress.</div>
     <div style="padding:24px;display:flex;flex-direction:column;gap:18px;">
 
       <!-- Renovation Priority Score -->
@@ -716,7 +718,7 @@
     <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:var(--bg);">
       <button type="button" onclick="openRenoBudget(window._rpUnitId)" style="background:none;border:1.5px solid var(--yellow);color:var(--text);padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;">💰 Budget &amp; Approval</button>
       <button type="button" onclick="closeRenoProgress()" class="btn btn-ghost">Close</button>
-      <button type="button" onclick="saveRenoProgress()" class="btn btn-primary">Save Update</button>
+      <button id="rp_save_btn" type="button" onclick="saveRenoProgress()" class="btn btn-primary">Save Update</button>
     </div>
   </div>
 </div>
@@ -2413,7 +2415,7 @@ function openRenoProgress(unitId) {
 
   // SOW summary
   var sow = null;
-  sow = (window._sowCache && window._sowCache[unitId]) || null;
+  sow = getSowData(unitId);
   var sumEl = document.getElementById('rp_sow_summary');
   if(sumEl) {
     if(sow && sow.items && sow.items.length) {
@@ -2496,6 +2498,55 @@ function openRenoProgress(unitId) {
   var modal = document.getElementById('renoProgressModal');
   if(modal){ modal.style.removeProperty('display'); modal.style.setProperty('display','flex','important'); }
   renderRenoScoreBadge(unitId);
+
+  // Apply read-only lock if a SOW for this unit is Completed and the viewer isn't ED.
+  _applyProgressModalLock(unitId);
+}
+
+// ── Progress modal lock ──────────────────────────────────────────────────
+// Matches the SOW modal lock: disable inputs, show banner, hide Save button.
+function _applyProgressModalLock(unitId){
+  var modal = document.getElementById('renoProgressModal');
+  if(!modal) return;
+  var locked = unitHasCompletedSow(unitId) && _realRoleForPermissions() !== 'ed';
+
+  var banner = document.getElementById('rp_readonly_banner');
+  if(banner) banner.style.display = locked ? 'block' : 'none';
+
+  var saveBtn = document.getElementById('rp_save_btn');
+  if(saveBtn) saveBtn.style.display = locked ? 'none' : '';
+
+  // Disable all form controls in the modal body when locked.
+  var body = modal.querySelector('div[style*="padding:24px"]');
+  if(body){
+    body.querySelectorAll('input, select, textarea').forEach(function(el){
+      if(locked){
+        el.setAttribute('data-rp-locked', '1');
+        el.disabled = true;
+        el.style.opacity = '0.6';
+        el.style.cursor = 'not-allowed';
+      } else if(el.getAttribute('data-rp-locked') === '1'){
+        el.removeAttribute('data-rp-locked');
+        el.disabled = false;
+        el.style.opacity = '';
+        el.style.cursor = '';
+      }
+    });
+    // Dim inner buttons (e.g. "Choose photos") but leave the X close button in the header alone.
+    body.querySelectorAll('button').forEach(function(b){
+      if(locked){
+        b.setAttribute('data-rp-locked', '1');
+        b.disabled = true;
+        b.style.opacity = '0.6';
+        b.style.cursor = 'not-allowed';
+      } else if(b.getAttribute('data-rp-locked') === '1'){
+        b.removeAttribute('data-rp-locked');
+        b.disabled = false;
+        b.style.opacity = '';
+        b.style.cursor = '';
+      }
+    });
+  }
 }
 
 
@@ -4550,6 +4601,13 @@ function closeRenoProgress() {
 function saveRenoProgress() {
   var unitId = window._rpUnitId;
   if(!unitId) return;
+
+  // Block non-ED writes when any SOW for this unit is completed.
+  if(!canEditProgressFor(unitId)){
+    showToast('This unit has a completed SOW. Only the Executive Director can update progress on completed work.');
+    return;
+  }
+
   var get = function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
   var status   = get('rp_status_select') || 'Not Started';
   var pct      = parseInt(get('rp_pct_input'))||0;
@@ -4587,6 +4645,36 @@ function saveRenoProgress() {
     headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
     body: JSON.stringify({ unit_id: unitId, data: prog, updated_at: new Date().toISOString() })
   }).catch(function(e){ console.warn('Reno progress save failed:',e); });
+
+  // Mirror progress percent onto every non-completed SOW for this unit and auto-complete at 100%.
+  (function mirrorProgress(){
+    var list = getUnitSowList(unitId);
+    if(!list.length) return;
+    var touched = false;
+    list.forEach(function(sow){
+      if(sow.approval_status === 'completed') return;
+      sow.progress = sow.progress || {};
+      sow.progress.percent = pct;
+      sow.progress.status  = status;
+      sow.progress.updated_at = new Date().toISOString();
+      touched = true;
+    });
+    if(pct >= 100){
+      var candidates = list.filter(function(s){ return s.approval_status !== 'completed'; });
+      if(candidates.length){
+        candidates.sort(function(a, b){ return (b.created_at||'').localeCompare(a.created_at||''); });
+        var target = candidates[0];
+        target.approval_status = 'completed';
+        target.completed_at = new Date().toISOString();
+        target.completed_by = window.currentUserName || _realRoleForPermissions();
+        if(typeof auditEntry === 'function'){
+          auditEntry('SOW:'+unitId, 'sow_auto_completed', 'SOW '+(target.project_number||'?')+' auto-completed — progress reached 100%', _realRoleForPermissions());
+        }
+        touched = true;
+      }
+    }
+    if(touched) saveSowList(unitId, list);
+  })();
 
   closeRenoProgress();
   renderRenosView();
@@ -4769,20 +4857,78 @@ function _renderRpPendingPhotos() {
 }
 
 function getSowData(unitId){
-  return (window._sowCache && window._sowCache[unitId]) || null;
+  // Backwards compat: returns most recent SOW as flat object (unwraps {sows:[...]}).
+  var raw = (window._sowCache && window._sowCache[unitId]) || null;
+  if(!raw) return null;
+  if(Array.isArray(raw.sows)){
+    if(!raw.sows.length) return null;
+    var sorted = raw.sows.slice().sort(function(a, b){
+      return (b.created_at || '').localeCompare(a.created_at || '');
+    });
+    return sorted[0];
+  }
+  return raw;
 }
 
 function saveSowData(unitId, data){
-  // Update in-memory cache
   if(!window._sowCache) window._sowCache = {};
   window._sowCache[unitId] = data;
-  // Save to Supabase
   fetch(SUPABASE_URL+'/rest/v1/housing_sow', {
     method: 'POST',
     headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
     body: JSON.stringify({ unit_id: unitId, data: data, updated_at: new Date().toISOString() })
   }).catch(function(e){ console.warn('SOW save failed:',e); });
 }
+
+// ── Multi-SOW helpers (mirror of housing.html) ─────────────────────────────
+function _migrateLegacySow(rawData){
+  if(!rawData) return { sows: [] };
+  if(Array.isArray(rawData.sows)) return rawData;
+  var legacy = Object.assign({}, rawData);
+  if(!legacy.project_number) legacy.project_number = (legacy.address || 'UNIT') + '-SOW-001';
+  if(!legacy.created_at) legacy.created_at = legacy.date || new Date().toISOString().slice(0,10);
+  if(!legacy.approval_status){
+    if(legacy.ed_approved) legacy.approval_status = 'ed_approved';
+    else if(legacy.hm_approved) legacy.approval_status = 'hm_approved';
+    else if(legacy.tenant_signed_at || legacy.staff_signed_at) legacy.approval_status = 'signed';
+    else legacy.approval_status = 'draft';
+  }
+  if(legacy.amount == null){
+    var amt = legacy.estimated_total || legacy.total_cost || legacy.budget || 0;
+    legacy.amount = typeof amt === 'number' ? amt : (parseFloat(String(amt).replace(/[^0-9.\-]/g,''))||0);
+  }
+  return { sows: [legacy] };
+}
+
+function getUnitSowList(unitId){
+  var raw = (window._sowCache && window._sowCache[unitId]) || null;
+  var migrated = _migrateLegacySow(raw);
+  return migrated.sows || [];
+}
+
+function saveSowList(unitId, sowList){
+  saveSowData(unitId, { sows: sowList });
+}
+
+// ── SOW lock / permission helpers ─────────────────────────────────────────
+function _effectiveRole(){
+  return window._viewAsRole || window.currentRole || '';
+}
+function _realRoleForPermissions(){
+  return window._realRole || window.currentRole || '';
+}
+function isSowCompleted(sow){
+  return !!(sow && sow.approval_status === 'completed');
+}
+function unitHasCompletedSow(unitId){
+  return getUnitSowList(unitId).some(isSowCompleted);
+}
+function canEditProgressFor(unitId){
+  // Only ED can edit progress when a completed SOW exists for this unit.
+  if(!unitHasCompletedSow(unitId)) return true;
+  return _realRoleForPermissions() === 'ed';
+}
+
 
 function renderSowAuditLog(unitId) {
   var tbody = document.getElementById('sow_audit_tbody');
