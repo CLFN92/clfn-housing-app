@@ -2206,9 +2206,31 @@ function _tenantToRow(t){
     id: t.id, nation_id: _NATION(),
     full_name: ((t.first||'') + ' ' + (t.last||'')).trim() || '(unnamed)',
     email: t.email || null, phone: t.phone || null,
-    current_unit_id: t.currentUnitId || null,  // Phase C work links to housing_units.id
+    current_unit_id: t.currentUnitId || null,  // FK to housing_units.id (text)
     status: t.status || 'active', archived: !!t.archived,
-    notes: t.notes || null, created_by: t.createdBy || _ACTOR(),
+    notes: t.notes || null,
+
+    // Personal (added F3A)
+    dob:             t.dob || null,
+    band_number:     t.bandNumber || null,
+
+    // Address (added F3A)
+    street_address:  t.street || null,
+    community:       t.community || null,
+    province:        t.province || null,
+    postal_code:     t.postalCode || null,
+    mailing_address: t.mailingAddress || null,
+
+    // Finance settings (added F3A)
+    tenant_type:         t.type || null,
+    monthly_rent:        Number(t.rent || 0),
+    invoice_preference:  t.invPref || null,
+    auto_pay:            !!t.autoPay,
+    auto_pay_type:       t.autoPayType || null,
+    hydro_account:       t.hydroAcct || null,
+    gas_account:         t.gasAcct || null,
+
+    created_by: t.createdBy || _ACTOR(),
     updated_by: _ACTOR()
   };
 }
@@ -2216,15 +2238,45 @@ function _tenantFromRow(r){
   var parts = (r.full_name||'').split(/\s+/);
   var first = parts.shift() || '';
   var last  = parts.join(' ');
+
+  // Build the denormalized `unit` display string the UI expects. When we
+  // have a current_unit_id we could join against housing_units, but keeping
+  // the render cheap here: fall back to street_address if populated.
+  var unitDisplay = r.street_address || '';
+
   return {
     id: r.id, first: first, last: last,
-    unit: '', type: 'community',         // denormalized fields not yet stored in DB; UI may populate later
-    rent: 0, invPref: 'email',
+
+    // Personal
+    dob:         r.dob || '',
+    bandNumber:  r.band_number || '',
+
+    // Address
+    street:          r.street_address || '',
+    community:       r.community || '',
+    province:        r.province || '',
+    postalCode:      r.postal_code || '',
+    mailingAddress:  r.mailing_address || '',
+
+    // Finance settings
+    unit:         unitDisplay,
+    type:         r.tenant_type || 'community',
+    rent:         Number(r.monthly_rent || 0),
+    invPref:      r.invoice_preference || 'email',
+    autoPay:      !!r.auto_pay,
+    autoPayType:  r.auto_pay_type || null,
+    hydroAcct:    r.hydro_account || '',
+    gasAcct:      r.gas_account || '',
+
+    // Contact
     email: r.email || '', phone: r.phone || '',
-    hydroAcct: '', gasAcct: '', autoPay: false,
+
+    // State
     notes: r.notes || '',
     status: r.status, archived: !!r.archived,
     currentUnitId: r.current_unit_id || '',
+    active: (r.status || 'active') === 'active',
+
     createdBy: r.created_by, updatedBy: r.updated_by
   };
 }
@@ -2618,6 +2670,14 @@ function _deleteRows(table, ids){
 // ── saveData — diff and fire-and-forget persist ────────────────────────────
 // Synchronous from caller's perspective. Updates _memStore immediately so
 // subsequent getData() reflects the change. Supabase writes happen async.
+//
+// Important: there is NO localStorage fallback here. Previously we mirrored
+// to localStorage as a "safety net," but that created a dangerous failure
+// mode — if Supabase writes failed silently, localStorage still held the
+// data and subsequent page loads would "restore" data that doesn't actually
+// exist in Supabase. That masked real persistence failures. Now: if a
+// Supabase write fails, the user sees a red toast AND the data won't be
+// there on refresh. Painful, but honest.
 function saveData(d){
   var prev = _memStore || _emptyStore();
   var next = Object.assign(_emptyStore(), d || {});
@@ -2625,14 +2685,11 @@ function saveData(d){
   // 1) Update in-memory authoritative store immediately.
   _memStore = next;
 
-  // 2) Legacy fallback to localStorage so a stale tab doesn't lose a draft
-  //    if the Supabase write fails. Harmless overhead on success path.
-  try { localStorage.setItem('clfn_finance_v6', JSON.stringify(next)); } catch(e) {}
-
-  // 3) Persist diffs to Supabase in parallel. Collect promises so we can
+  // 2) Persist diffs to Supabase in parallel. Collect promises so we can
   //    toast once globally on outcome rather than per-table.
   var writePromises = [];
   var totalUpserts = 0, totalDeletes = 0;
+  var perTableReport = [];
 
   _FIN_TABLES.forEach(function(spec){
     var diff = _diffCollection(prev[spec.key], next[spec.key]);
@@ -2645,20 +2702,35 @@ function saveData(d){
       }).filter(Boolean);
       if (rows.length) {
         _writeInFlight++;
-        writePromises.push(_upsertRows(spec.table, rows).finally(function(){ _writeInFlight--; }));
+        var p = _upsertRows(spec.table, rows)
+          .then(function(){ perTableReport.push(spec.key+':upserted '+rows.length); })
+          .catch(function(err){
+            perTableReport.push(spec.key+':FAILED');
+            console.error('[finance] upsert ' + spec.table + ' failed:', err);
+            console.error('[finance] payload that failed:', JSON.stringify(rows, null, 2));
+            throw err;  // re-throw so Promise.all rejects
+          })
+          .finally(function(){ _writeInFlight--; });
+        writePromises.push(p);
       }
     }
     if (diff.toDelete.length) {
       _writeInFlight++;
-      writePromises.push(_deleteRows(spec.table, diff.toDelete).finally(function(){ _writeInFlight--; }));
+      var dp = _deleteRows(spec.table, diff.toDelete)
+        .then(function(){ perTableReport.push(spec.key+':deleted '+diff.toDelete.length); })
+        .catch(function(err){
+          perTableReport.push(spec.key+':DELETE-FAILED');
+          console.error('[finance] delete ' + spec.table + ' failed:', err);
+          throw err;
+        })
+        .finally(function(){ _writeInFlight--; });
+      writePromises.push(dp);
     }
   });
 
   if (writePromises.length === 0) return;
 
-  // 4) Audit log write. Summary is coarse at this level; finer-grained
-  //    audit events should be added at specific action handlers (e.g.
-  //    approveLoan, postPayment) in a later phase.
+  // 3) Audit log write (also fire-and-forget).
   var auditPromise = _writeAuditEntry({
     action: 'saveData',
     summary: 'Saved finance state (' + totalUpserts + ' upserts, ' + totalDeletes + ' deletes)',
@@ -2667,11 +2739,12 @@ function saveData(d){
   });
   writePromises.push(auditPromise);
 
-  // 5) Handle outcome. Keep silent on single-write success to avoid toast
-  //    fatigue; only toast on failure.
-  Promise.all(writePromises).catch(function(err){
-    console.error('[finance] save failed:', err);
-    _toastError('Some changes could not be saved. Refresh to verify.');
+  // 4) Handle outcome. Log per-table report on success; toast red on failure.
+  Promise.all(writePromises).then(function(){
+    console.log('[finance] save OK —', perTableReport.join(', '));
+  }).catch(function(err){
+    console.error('[finance] save FAILED —', perTableReport.join(', '), err);
+    _toastError('Some changes could not be saved. Check console for details.');
   });
 }
 
@@ -2727,16 +2800,20 @@ function writeAuditEntry(entry){ return _writeAuditEntry(entry||{}); }
 // every collection key exists). If _memStore is null (boot didn't finish),
 // return an empty shell — callers get empty arrays and the UI shows "no data"
 // rather than undefined errors.
+//
+// NO localStorage fallback. Previously we would restore from localStorage
+// if _memStore was null, which masked failed Supabase writes. Now the only
+// source of truth is what _bootLoadFinanceData() hydrates from Supabase.
 function loadData(){
   if (_memStore) return Object.assign(_emptyStore(), _memStore);
-  // localStorage fallback preserves UX if we ever lose connectivity on reload.
-  try {
-    var d = localStorage.getItem('clfn_finance_v6');
-    if (d) { _memStore = JSON.parse(d); return Object.assign(_emptyStore(), _memStore); }
-  } catch(e) {}
   return _emptyStore();
 }
 function getData(){ return loadData(); }
+
+// Purge the legacy localStorage store on page load. This prevents lingering
+// data from older versions of the app from confusing users about what is
+// actually persisted in Supabase.
+try { localStorage.removeItem('clfn_finance_v6'); } catch(e) {}
 
 
 // Toast notification (replaces alert() - works on all platforms)
@@ -3227,7 +3304,7 @@ function renderTenantProfile(tid) {
   // Housing App sync notice
   var syncNote = s1.appendChild(document.createElement('div'));
   syncNote.style.cssText = 'display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 12px;margin-bottom:14px;font-size:11px;color:var(--muted);';
-  syncNote.innerHTML = '<span>&#128279;</span> Contact and address details sync from the <strong style="color:var(--text);margin:0 3px;">Housing App</strong>. Edit tenant information there.';
+  syncNote.innerHTML = '<span>&#9998;</span> To edit any field below, click <strong style="color:var(--text);margin:0 3px;">Edit</strong> in the Finance Settings section.';
 
   function makeGrid(parent, fields) {
     var g = parent.appendChild(document.createElement('div'));
@@ -3255,12 +3332,12 @@ function renderTenantProfile(tid) {
   contactHdr.style.cssText = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px;';
   contactHdr.textContent = 'Contact Information';
   makeGrid(s1, [
-    {lbl:'First Name',    val:t.first,                ha:false},
-    {lbl:'Last Name',     val:t.last,                 ha:false},
-    {lbl:'Phone',         val:t.phone||'Not on file',  ha:true},
-    {lbl:'Email',         val:t.email||'Not on file',  ha:true},
-    {lbl:'Date of Birth', val:t.dob||'Not on file',    ha:true},
-    {lbl:'Band #',        val:t.bandNumber||'Not on file', ha:true},
+    {lbl:'First Name',    val:t.first||'Not on file',    ha:false},
+    {lbl:'Last Name',     val:t.last||'Not on file',     ha:false},
+    {lbl:'Phone',         val:t.phone||'Not on file',    ha:false},
+    {lbl:'Email',         val:t.email||'Not on file',    ha:false},
+    {lbl:'Date of Birth', val:t.dob||'Not on file',      ha:false},
+    {lbl:'Band #',        val:t.bandNumber||'Not on file', ha:false},
   ]);
 
   // Address
@@ -3268,12 +3345,12 @@ function renderTenantProfile(tid) {
   addrHdr.style.cssText = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px;';
   addrHdr.textContent = 'Property & Mailing Address';
   makeGrid(s1, [
-    {lbl:'Unit / House #',    val:t.unit,                              ha:false},
-    {lbl:'Street Address',    val:t.street||'Not on file',             ha:true},
-    {lbl:'Community',         val:t.community||(window.NATION_CONFIG && window.NATION_CONFIG.display_name || ""),       ha:true},
-    {lbl:'Province / Territory', val:t.province||'Ontario',            ha:true},
-    {lbl:'Postal Code',       val:t.postalCode||'Not on file',         ha:true},
-    {lbl:'Mailing Address',   val:t.mailingAddress||'Same as above',   ha:true},
+    {lbl:'Unit / House #',    val:t.unit||'Not on file',              ha:false},
+    {lbl:'Street Address',    val:t.street||'Not on file',            ha:false},
+    {lbl:'Community',         val:t.community||(window.NATION_CONFIG && window.NATION_CONFIG.display_name || ""),       ha:false},
+    {lbl:'Province / Territory', val:t.province||'Ontario',           ha:false},
+    {lbl:'Postal Code',       val:t.postalCode||'Not on file',        ha:false},
+    {lbl:'Mailing Address',   val:t.mailingAddress||'Same as above',  ha:false},
   ]);
 
   // Finance settings (Finance Module owns these)
@@ -7279,17 +7356,38 @@ function openLoanPaymentForTenant(loanId) {
 function openEditTenant(tid) {
   var t = getTenant(tid);
   if (!t) return;
-  document.getElementById('et-name').value = tenantName(t) + ' \u2014 ' + t.unit;
-  document.getElementById('et-type').value = t.type;
-  document.getElementById('et-rent').value = t.rent;
-  document.getElementById('et-invpref').value = t.invPref;
-  document.getElementById('et-autopay').checked = t.autoPay;
+  // Pretty display-only header line
+  document.getElementById('et-name').value = tenantName(t) + (t.unit ? ' \u2014 ' + t.unit : '');
+
+  // Personal
+  document.getElementById('et-first').value    = t.first || '';
+  document.getElementById('et-last').value     = t.last  || '';
+  document.getElementById('et-dob').value      = t.dob   || '';
+  document.getElementById('et-band').value     = t.bandNumber || '';
+  document.getElementById('et-phone').value    = t.phone || '';
+  document.getElementById('et-email').value    = t.email || '';
+
+  // Address
+  document.getElementById('et-street').value    = t.street   || '';
+  document.getElementById('et-community').value = t.community || (window.NATION_CONFIG && window.NATION_CONFIG.display_name || '');
+  document.getElementById('et-province').value  = t.province  || 'Ontario';
+  document.getElementById('et-postal').value    = t.postalCode || '';
+  document.getElementById('et-mailing').value   = t.mailingAddress || '';
+
+  // Finance settings
+  document.getElementById('et-type').value     = t.type || 'community';
+  document.getElementById('et-rent').value     = (t.rent != null ? t.rent : '');
+  document.getElementById('et-invpref').value  = t.invPref || 'email';
+  document.getElementById('et-hydro').value    = t.hydroAcct || '';
+  document.getElementById('et-gas').value      = t.gasAcct || '';
+  document.getElementById('et-autopay').checked = !!t.autoPay;
   document.getElementById('et-autopay-type').value = t.autoPayType || 'eft';
   document.getElementById('et-autopay-type-row').style.display = t.autoPay ? 'block' : 'none';
-  document.getElementById('et-notes').value = t.notes || '';
+  document.getElementById('et-notes').value    = t.notes || '';
   document.getElementById('et-autopay').onchange = function() {
     document.getElementById('et-autopay-type-row').style.display = this.checked ? 'block' : 'none';
   };
+
   document.getElementById('modalEditTenant').dataset.tid = tid;
   openModal('modalEditTenant');
 }
@@ -7300,19 +7398,49 @@ function saveEditTenant() {
   var d = getData();
   var t = d.tenants.find(function(x){ return x.id === tid; });
   if (!t) return;
-  var before = {type:t.type, rent:t.rent, invPref:t.invPref, autoPay:t.autoPay, autoPayType:t.autoPayType, notes:t.notes};
-  t.type = document.getElementById('et-type').value;
-  t.rent = parseFloat(document.getElementById('et-rent').value) || t.rent;
-  t.invPref = document.getElementById('et-invpref').value;
-  t.autoPay = document.getElementById('et-autopay').checked;
+
+  // Snapshot before for audit diff
+  var before = JSON.parse(JSON.stringify(t));
+
+  // Personal
+  t.first      = (document.getElementById('et-first').value || '').trim();
+  t.last       = (document.getElementById('et-last').value  || '').trim();
+  t.dob        = document.getElementById('et-dob').value || '';
+  t.bandNumber = (document.getElementById('et-band').value  || '').trim();
+  t.phone      = (document.getElementById('et-phone').value || '').trim();
+  t.email      = (document.getElementById('et-email').value || '').trim();
+
+  // Address
+  t.street         = (document.getElementById('et-street').value    || '').trim();
+  t.community      = (document.getElementById('et-community').value || '').trim();
+  t.province       = (document.getElementById('et-province').value  || '').trim();
+  t.postalCode     = (document.getElementById('et-postal').value    || '').trim();
+  t.mailingAddress = (document.getElementById('et-mailing').value   || '').trim();
+
+  // Finance settings
+  t.type        = document.getElementById('et-type').value;
+  t.rent        = parseFloat(document.getElementById('et-rent').value) || 0;
+  t.invPref     = document.getElementById('et-invpref').value;
+  t.hydroAcct   = (document.getElementById('et-hydro').value || '').trim();
+  t.gasAcct     = (document.getElementById('et-gas').value   || '').trim();
+  t.autoPay     = document.getElementById('et-autopay').checked;
   t.autoPayType = t.autoPay ? document.getElementById('et-autopay-type').value : null;
-  t.notes = document.getElementById('et-notes').value.trim();
-  var after = {type:t.type, rent:t.rent, invPref:t.invPref, autoPay:t.autoPay, autoPayType:t.autoPayType, notes:t.notes};
-  auditLog('update', 'tenant', tid, 'Tenant settings updated: ' + tenantName(t), before, after);
+  t.notes       = (document.getElementById('et-notes').value || '').trim();
+
   saveData(d);
+
+  writeAuditEntry({
+    action: 'update_tenant',
+    entity_type: 'tenant',
+    entity_id: tid,
+    tenant_id: tid,
+    summary: 'Updated tenant record: ' + tenantName(t),
+    detail: { before: before, after: t }
+  });
+
   closeModal('modalEditTenant');
-  // Reload the profile
   selectTenantProfile(tid);
+  toast('Tenant record saved.');
 }
 
 var GL_ACCOUNTS = {
@@ -8232,19 +8360,38 @@ function clearAndReseed() {
 
 <!-- EDIT TENANT MODAL -->
 <div class="modal-ov" id="modalEditTenant">
-  <div class="modal">
+  <div class="modal modal-lg">
     <div class="modal-hdr">
-      <div><h2>Edit Tenant Settings</h2><p>Finance-managed fields only</p></div>
+      <div><h2>Edit Tenant Record</h2><p>All tenant fields are editable here. Phone and email are synced to the Housing App.</p></div>
       <button class="modal-close" onclick="closeModal('modalEditTenant')">&#x2715;</button>
     </div>
     <div class="modal-body">
-      <div class="ibox dark" style="margin-bottom:16px;">&#128279; Phone and email sync from the Housing App and cannot be edited here.</div>
-      <div class="fg" style="gap:14px;">
-        <div class="f"><label>Tenant</label><input id="et-name" readonly style="background:var(--bg);color:var(--muted);"/></div>
+      <div class="fg c2" style="gap:14px;">
+        <div class="f s2"><label>Tenant</label><input id="et-name" readonly style="background:var(--bg);color:var(--muted);"/></div>
+
+        <!-- Personal -->
+        <div class="f s2" style="margin-top:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Personal</div>
+        <div class="f"><label>First Name</label><input id="et-first"/></div>
+        <div class="f"><label>Last Name</label><input id="et-last"/></div>
+        <div class="f"><label>Date of Birth</label><input id="et-dob" type="date"/></div>
+        <div class="f"><label>Band #</label><input id="et-band" placeholder="Treaty / band number"/></div>
+        <div class="f"><label>Phone</label><input id="et-phone" placeholder="(807) 555-0000"/></div>
+        <div class="f"><label>Email</label><input id="et-email" type="email" placeholder="email@example.com"/></div>
+
+        <!-- Address -->
+        <div class="f s2" style="margin-top:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Property &amp; Mailing Address</div>
+        <div class="f s2"><label>Street Address</label><input id="et-street" placeholder="e.g. 42 Main Street"/></div>
+        <div class="f"><label>Community</label><input id="et-community"/></div>
+        <div class="f"><label>Province / Territory</label><input id="et-province" placeholder="Ontario"/></div>
+        <div class="f"><label>Postal Code</label><input id="et-postal" placeholder="P0L 1B0"/></div>
+        <div class="f"><label>Mailing Address (if different)</label><input id="et-mailing" placeholder="Same as above"/></div>
+
+        <!-- Finance settings -->
+        <div class="f s2" style="margin-top:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Finance Settings</div>
         <div class="f"><label>Tenant Type</label>
           <select id="et-type">
-            <option value="band-on">Band Member — On-Reserve</option>
-            <option value="band-off">Band Member — Off-Reserve</option>
+            <option value="band-on">Band Member &mdash; On-Reserve</option>
+            <option value="band-off">Band Member &mdash; Off-Reserve</option>
             <option value="band-staff">Band Office Staff</option>
             <option value="clea">CLEA (Staff Housing)</option>
             <option value="community">Community Member (Non-Band)</option>
@@ -8257,20 +8404,22 @@ function clearAndReseed() {
             <option value="print">&#128424; Print / Mail</option>
           </select>
         </div>
+        <div class="f"><label>Hydro Account #</label><input id="et-hydro"/></div>
+        <div class="f"><label>Gas Account #</label><input id="et-gas"/></div>
         <div class="f">
           <div class="toggle-row">
-            <label for="et-autopay">Auto-Payment Enabled (pre-authorized)</label>
+            <label for="et-autopay">Auto-Payment Enabled</label>
             <span class="tsw"><input type="checkbox" id="et-autopay"/><span class="tsl"></span></span>
           </div>
         </div>
         <div class="f" id="et-autopay-type-row" style="display:none;">
           <label>Auto-Payment Type</label>
           <select id="et-autopay-type">
-            <option value="eft">EFT — Electronic Funds Transfer</option>
+            <option value="eft">EFT &mdash; Electronic Funds Transfer</option>
             <option value="payroll">Payroll Deduction</option>
           </select>
         </div>
-        <div class="f"><label>Notes</label><textarea id="et-notes" placeholder="Internal notes..."></textarea></div>
+        <div class="f s2"><label>Notes</label><textarea id="et-notes" placeholder="Internal notes..."></textarea></div>
       </div>
     </div>
     <div class="modal-footer">
