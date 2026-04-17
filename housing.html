@@ -280,9 +280,12 @@
 
 <!-- ── STEP PROGRESS BAR ── -->
 <div id="stepProgressBar" style="background:#fff;border-bottom:1px solid #e5e5e5;padding:0;display:none;">
-  <!-- Back button row -->
-  <div style="padding:6px 16px;display:flex;align-items:center;border-bottom:1px solid #f0f0f0;">
-    <button type="button" onclick="closeApplicationForm()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;display:inline-flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg> Back</button>
+  <!-- Back button row — matches the pattern used on every other view (yellow pill, flush-left, under the app header). -->
+  <div class="page-back-row" style="margin:12px 16px 10px 16px;">
+    <button type="button" onclick="closeApplicationForm()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </button>
   </div>
   <!-- Steps row - transparent bg, black active border-top, yellow active circle -->
   <div style="display:flex;align-items:stretch;overflow-x:auto;background:transparent;">
