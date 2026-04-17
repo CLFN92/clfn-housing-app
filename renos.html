@@ -1359,10 +1359,16 @@ function sbClient() {
 
 // ── Map staff table role to housing app role ────────────────────────────────
 function sbMapRole(staffRow) {
-  if(!staffRow) return 'employee';
-  if(staffRow.role === 'ed') return 'ed';
-  if(staffRow.role === 'manager' && (staffRow.department||'').toLowerCase().includes('housing')) return 'housing_manager';
-  return 'employee';
+  // Mirror of housing.html sbMapRole — returns canonical normalized role.
+  if(!staffRow) return 'housing_employee_l1';
+  var raw = staffRow.role;
+  if(raw === 'manager' && !(staffRow.department||'').toLowerCase().includes('housing')) {
+    return 'housing_employee_l1';
+  }
+  if(window.CLFN_PERMS && window.CLFN_PERMS.isValidRole(raw)){
+    return window.CLFN_PERMS.normalizeRole(raw);
+  }
+  return 'housing_employee_l1';
 }
 
 // ── AUTH: Look up staff by email ─────────────────────────────────────────────
@@ -5716,22 +5722,15 @@ async function editStaff(id) {
 
 async function saveStaffEdit(id, original, modal) {
   var name = (document.getElementById('edit_staff_name')||{}).value || '';
-  var hrole = (document.getElementById('edit_staff_role')||{}).value || 'employee';
+  var hrole = (document.getElementById('edit_staff_role')||{}).value || 'housing_employee_l1';
   var saveBtn = document.getElementById('editStaffSave');
   if(saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
 
-  // Map housing role back to staff table fields
-  var patch = { name: name.trim() };
-  if(hrole === 'ed') {
-    patch.role = 'ed';
-    patch.department = original.department || 'Housing';
-  } else if(hrole === 'housing_manager') {
-    patch.role = 'manager';
-    patch.department = 'Housing';
-  } else {
-    patch.role = 'employee';
-    patch.department = original.department || 'Housing';
-  }
+  // Store the canonical CLFN_PERMS role value directly. Phase A0 migrated the DB
+  // to canonical values, so we no longer convert back to legacy 'manager'/'employee'.
+  var patch = { name: name.trim(), role: hrole };
+  // Housing Manager is always in Housing department (keeps sbMapRole consistent).
+  patch.department = (hrole === 'housing_manager') ? 'Housing' : (original.department || 'Housing');
 
   try {
     var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id, {

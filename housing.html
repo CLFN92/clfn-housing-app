@@ -2747,10 +2747,22 @@ function sbClient() {
 
 // ── Map staff table role to housing app role ────────────────────────────────
 function sbMapRole(staffRow) {
-  if(!staffRow) return 'employee';
-  if(staffRow.role === 'ed') return 'ed';
-  if(staffRow.role === 'manager' && (staffRow.department||'').toLowerCase().includes('housing')) return 'housing_manager';
-  return 'employee';
+  // Returns the canonical normalized role for a staff row.
+  // Post-Phase-A0 migration, staff.role stores canonical values already
+  // ('ed', 'housing_manager', 'housing_employee_l1/l2', 'cfo', 'finance_l1'),
+  // but some sessions / legacy data may still use ('employee', 'manager', etc.)
+  // CLFN_PERMS.normalizeRole handles both.
+  if(!staffRow) return 'housing_employee_l1';
+  var raw = staffRow.role;
+  // Legacy mapping: a staff row with role='manager' AND department='Housing' means Housing Manager.
+  // Post-migration this shouldn't happen, but keep the guard for safety.
+  if(raw === 'manager' && !(staffRow.department||'').toLowerCase().includes('housing')) {
+    return 'housing_employee_l1';  // non-Housing managers get base access only
+  }
+  if(window.CLFN_PERMS && window.CLFN_PERMS.isValidRole(raw)){
+    return window.CLFN_PERMS.normalizeRole(raw);
+  }
+  return 'housing_employee_l1';
 }
 
 // ── AUTH: Look up staff by email ─────────────────────────────────────────────
@@ -9686,22 +9698,13 @@ async function editStaff(id) {
 
 async function saveStaffEdit(id, original, modal) {
   var name = (document.getElementById('edit_staff_name')||{}).value || '';
-  var hrole = (document.getElementById('edit_staff_role')||{}).value || 'employee';
+  var hrole = (document.getElementById('edit_staff_role')||{}).value || 'housing_employee_l1';
   var saveBtn = document.getElementById('editStaffSave');
   if(saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
 
-  // Map housing role back to staff table fields
-  var patch = { name: name.trim() };
-  if(hrole === 'ed') {
-    patch.role = 'ed';
-    patch.department = original.department || 'Housing';
-  } else if(hrole === 'housing_manager') {
-    patch.role = 'manager';
-    patch.department = 'Housing';
-  } else {
-    patch.role = 'employee';
-    patch.department = original.department || 'Housing';
-  }
+  // Store canonical CLFN_PERMS role value directly (Phase A0 migrated DB to canonical).
+  var patch = { name: name.trim(), role: hrole };
+  patch.department = (hrole === 'housing_manager') ? 'Housing' : (original.department || 'Housing');
 
   try {
     var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id, {
@@ -10955,7 +10958,7 @@ function closeRenoBudget() {
 
 // ── Settings section tabs ──
 function showSettingsSection(section) {
-  var sections = ['sec_users','sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget','sec_contacts','sec_audit','sec_occupancy'];
+  var sections = ['sec_users','sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget','sec_contacts','sec_nation','sec_audit','sec_occupancy'];
   sections.forEach(function(id){
     var el=document.getElementById(id);
     if(el) el.style.display=(id===section)?'block':'none';
@@ -10968,6 +10971,7 @@ function showSettingsSection(section) {
     t.style.color=active?'var(--text)':'var(--muted)';
   });
   if(section==='sec_users'       && typeof renderHousingUserTable==='function') renderHousingUserTable();
+  if(section==='sec_nation'      && typeof renderNationPanel==='function') renderNationPanel();
   if(section==='sec_app_scoring') {
     // ED sees the V2 editor (object-based model with tier threshold controls).
     // Other roles see a read-only message (populateSettings handles that on initial load).
@@ -16658,11 +16662,16 @@ function editStaff(idOrObj) {
   var depts = ['Housing','Administration','Capital Projects & Infrastructure','Human Resources','Finance','Wellness','Medical Services','Choose Life','Ontario Works','Eagles Earth','Water Treatment Plant','Lands & Resources','Chief & Council','Band Reps'];
   var currentRole = sbMapRole(u);
   var deptOptions = depts.map(function(d){ return '<option value="'+d+'"'+(u.department===d?' selected':'')+'>'+d+'</option>'; }).join('');
-  var roleOptions = [
-    ['employee','Employee'],
-    ['manager','Housing Manager'],
-    ['ed','Executive Director']
-  ].map(function(r){ return '<option value="'+r[0]+'"'+(currentRole===r[0]||u.role===r[0]?' selected':'')+'>'+r[1]+'</option>'; }).join('');
+  var roleOptions = (function(){
+    var perms = window.CLFN_PERMS;
+    if(!perms){
+      return '<option value="housing_employee_l1">Housing Employee L1</option>';
+    }
+    return Object.keys(perms.ROLE_LABELS).map(function(k){
+      var selected = (currentRole === k) ? ' selected' : '';
+      return '<option value="'+k+'"'+selected+'>'+perms.roleLabel(k)+'</option>';
+    }).join('');
+  })();
 
   var overlay = document.createElement('div');
   overlay.id = 'staffModal';
@@ -16698,16 +16707,18 @@ function editStaff(idOrObj) {
 async function submitEditStaff(id) {
   var name = ((document.getElementById('es-name')||{}).value||'').trim();
   var dept = (document.getElementById('es-dept')||{}).value||'';
-  var role = (document.getElementById('es-role')||{}).value||'employee';
+  var role = (document.getElementById('es-role')||{}).value||'housing_employee_l1';
   var btn  = document.getElementById('es-submit-btn');
   var res  = document.getElementById('es-result');
 
   if(!name) { showToast('Please enter a name'); return; }
   if(btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
 
-  // Map role back to staff table format
-  var staffRole = role; // 'employee', 'manager', or 'ed'
-  var staffDept = (role === 'manager') ? 'Housing' : dept;
+  // Role now stores canonical CLFN_PERMS value directly (no legacy re-mapping).
+  var staffRole = role;
+  // Housing Manager is always in Housing department — enforce it so it lines up
+  // with what sbMapRole expects on read. Other roles keep the user's chosen dept.
+  var staffDept = (role === 'housing_manager') ? 'Housing' : dept;
 
   try {
     var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id, {
@@ -16749,8 +16760,13 @@ async function submitAddHousingStaff() {
   if(!email||!email.includes('@')) { showToast('Please enter a valid email address'); return; }
   if(!email.endsWith('@clfn.on.ca')) { showToast('Only @clfn.on.ca email addresses can be registered'); return; }
 
-  if(window.currentRole === 'housing_manager' && (role === 'manager' || role === 'ed')) {
-    showToast('Housing managers can only add employees. Only the ED can add managers.'); return;
+  // Role-based add-staff gate. HM can only add HE-L1 or HE-L2. ED can add any role.
+  if(window.currentRole === 'housing_manager'){
+    var allowedForHm = ['housing_employee_l1','housing_employee_l2'];
+    if(allowedForHm.indexOf(role) === -1){
+      showToast('Housing managers can only add Housing Employees. Only the ED can add other roles.');
+      return;
+    }
   }
 
   if(btn){ btn.disabled=true; btn.textContent='Adding…'; }
