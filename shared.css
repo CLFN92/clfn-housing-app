@@ -46,6 +46,7 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 /* Using padding shorthand here to override `.dash-view` class rules (which also use padding shorthand). */
 #worklistView,
 #dashView,
+.dash-view,
 #settingsView,
 .settings-view,
 #inventoryView,
@@ -57,9 +58,13 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
   padding-top:0 !important;
 }
 /* The role_queue_banner div on the dashboard adds its own spacing before the back row; */
-/* collapse it when empty so the back button still sits tight. */
-#role_queue_banner:empty{display:none;}
-#role_queue_banner{padding:0 !important;}
+/* hide it entirely when empty AND kill its padding. */
+#role_queue_banner:empty{display:none !important;}
+#role_queue_banner{padding:0 !important;margin:0 !important;}
+/* The dashboard uses inline `gap:16px` on its flex column, which adds 16px between */
+/* .page-back-row and the next sibling (.page-header-bar). That makes the title card */
+/* sit lower on the dashboard than on other views. Pull it back up. */
+#dashView > .page-back-row{margin-bottom:-6px;}
 
 /* Fixed gap between the app header and the Back button, same on every view. */
 .page-back-row{margin:12px 0 10px 0;}
