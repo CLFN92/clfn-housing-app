@@ -5854,6 +5854,7 @@ function showFinance(){
   console.log('  window._realRole:', window._realRole);
   console.log('  window._viewAsRole:', window._viewAsRole);
   console.log('  HOUSING_SESSION.role:', typeof HOUSING_SESSION !== 'undefined' ? HOUSING_SESSION.role : 'undefined');
+  console.log('  window.currentRole:', window.currentRole);
   console.log('  CLFN_MODULES exists:', !!window.CLFN_MODULES);
   console.log('  CLFN_PERMS exists:', !!window.CLFN_PERMS);
 
@@ -5862,10 +5863,14 @@ function showFinance(){
     showToast('Finance module is not enabled for this nation.');
     return;
   }
-  // Gate on finance-role access. Uses _realRole, NOT _viewAsRole — the
-  // "view as" dropdown is a UI preview only and shouldn't grant actual
-  // access to modules the real user isn't authorized for.
-  var gateRole = window._realRole || 'housing_employee_l1';
+  // Gate on finance-role access. Use the same authoritative source as
+  // showEmployeeHome(): HOUSING_SESSION.role takes priority, then _realRole,
+  // then currentRole. This avoids races where the gate sees stale
+  // window.currentRole while HOUSING_SESSION.role is already set.
+  var gateRole = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.role)
+              || window._realRole
+              || window.currentRole
+              || 'housing_employee_l1';
   console.log('[housing] showFinance: checking hasFinanceAccess("'+gateRole+'")');
   var canAccess = window.CLFN_PERMS.hasFinanceAccess(gateRole);
   console.log('[housing] showFinance: result =', canAccess);
@@ -13909,7 +13914,19 @@ function showEmployeeHome(){
   setExportView(null);
   hideAllViews();
   setNavActive('tab_dash');
-  var role = window.currentRole || 'employee';
+  // Authoritative role resolution. HOUSING_SESSION.role is set by
+  // resolveHousingRole() at login and is the canonical source. Fall back to
+  // window.currentRole (legacy writers still touch this) and finally to
+  // 'employee' if neither is populated (very first render before login
+  // completes — should never actually render visible tiles in that case).
+  var role = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.role)
+          || window._realRole
+          || window.currentRole
+          || 'employee';
+  console.log('[housing] showEmployeeHome: role=' + role
+    + ' (HOUSING_SESSION.role=' + (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.role : 'n/a')
+    + ', _realRole=' + window._realRole
+    + ', currentRole=' + window.currentRole + ')');
   var roleLabels = {
     employee: 'Staff',
     housing_employee_l1: 'Staff',
