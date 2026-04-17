@@ -8343,7 +8343,7 @@ function getSowData(unitId){
   // We return the most recent SOW from the list so "does this unit have a SOW?" and
   // "show summary of its SOW" both keep working.
   // For multi-SOW-aware code, use getUnitSowList() / getSowByProjectNumber() directly.
-  var raw = getSowData(unitId);
+  var raw = (window._sowCache && window._sowCache[unitId]) || null;
   if(!raw) return null;
   if(Array.isArray(raw.sows)){
     if(!raw.sows.length) return null;
@@ -8358,7 +8358,7 @@ function getSowData(unitId){
 
 function _getRawSowRecord(unitId){
   // Escape hatch for code that needs the wrapper ({sows:[...]}).
-  return getSowData(unitId);
+  return (window._sowCache && window._sowCache[unitId]) || null;
 }
 
 function saveSowData(unitId, data){
@@ -8409,7 +8409,9 @@ function _migrateLegacySow(rawData){
 
 function getUnitSowList(unitId){
   // Returns an array of SOW objects for this unit (migrated if needed).
-  var raw = getSowData(unitId);
+  // Must read the RAW cache entry (the wrapper {sows:[...]} or legacy flat shape) —
+  // NOT getSowData() which already unwraps to the single most-recent SOW.
+  var raw = (window._sowCache && window._sowCache[unitId]) || null;
   var migrated = _migrateLegacySow(raw);
   return migrated.sows || [];
 }
