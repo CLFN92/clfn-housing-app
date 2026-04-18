@@ -859,122 +859,109 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
       Back to Home
     </button>
   </div>
-  <div class="page-hdr">
-    <div><h1>Finance Reports</h1><p>Period summaries for entry into accounting software</p></div>
+
+  <!-- Page title + actions -->
+  <div class="std-page-header">
+    <div class="std-page-header-main">
+      <h1 class="std-page-title">Finance Reports</h1>
+      <p class="std-page-subtitle">Period summaries, aging, reconciliation, loan schedules, and fiscal-year rollups — designed for hand-off to accounting.</p>
+      <div class="std-page-meta" id="reports_page_meta">—</div>
+    </div>
+    <div class="std-page-actions">
+      <button class="btn btn-ghost btn-sm" onclick="exportActiveReport()">&#128196; Export CSV</button>
+      <button class="btn btn-ghost btn-sm" onclick="printActiveReport()">&#128424; Print</button>
+    </div>
   </div>
 
-  <div class="ibox dark" style="margin-bottom:16px;">
-    &#128203; These reports are designed to be printed or exported and handed to Finance for entry into the accounting system. <span id="hdr-fy-notice">fiscal year</span>.
-  </div>
-
-  <div class="tabs" style="margin-bottom:0;">
-    <button class="tab-btn active" onclick="showTab(event,'rpt-period')">&#128197; Period Summary</button>
-    <button class="tab-btn" onclick="showTab(event,'rpt-aging');renderAging();">&#9201; Arrears Aging</button>
-    <button class="tab-btn" onclick="showTab(event,'rpt-reconcile');renderReconciliation();">&#9776; Reconciliation</button>
-    <button class="tab-btn" onclick="showTab(event,'rpt-loan');renderLoanSchedule();">&#128188; Loan Schedule</button>
-    <button class="tab-btn" onclick="showTab(event,'rpt-annual');renderAnnual();">&#128202; Annual Summary</button>
-    <button class="tab-btn" onclick="showTab(event,'rpt-journal');renderJournal();">&#128221; Journal Entries</button>
+  <!-- Tab bar -->
+  <div class="tabs" style="margin-bottom:14px;">
+    <button class="tab-btn active" onclick="showReportTab(event,'rpt-period')">&#128197; Period Summary</button>
+    <button class="tab-btn" onclick="showReportTab(event,'rpt-aging')">&#9201; Arrears Aging</button>
+    <button class="tab-btn" onclick="showReportTab(event,'rpt-reconcile')">&#9776; Reconciliation</button>
+    <button class="tab-btn" onclick="showReportTab(event,'rpt-loan')">&#128188; Loan Schedule</button>
+    <button class="tab-btn" onclick="showReportTab(event,'rpt-annual')">&#128202; Annual Summary</button>
   </div>
 
   <!-- PERIOD SUMMARY -->
-  <div class="tab-panel on card" id="rpt-period" style="border-radius:0 10px 10px 10px;">
-    <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
-      <div class="f" style="margin:0;min-width:140px;"><label>Period</label>
-        <select id="rpt-period-type" onchange="renderPeriodSummary()">
-          <option value="month">Monthly</option>
-          <option value="quarter">Quarterly</option>
-          <option value="fiscal">Full Fiscal Year</option>
-        </select>
-      </div>
-      <div class="f" style="margin:0;min-width:130px;" id="rpt-month-wrap"><label>Month</label>
-        <select id="rpt-period-month" onchange="renderPeriodSummary()">
-          <option value="01">January</option><option value="02">February</option><option value="03">March</option>
-          <option value="04">April</option><option value="05">May</option><option value="06">June</option>
-          <option value="07">July</option><option value="08">August</option><option value="09">September</option>
-          <option value="10">October</option><option value="11">November</option><option value="12">December</option>
-        </select>
-      </div>
-      <div class="f" style="margin:0;min-width:90px;"><label>Year</label>
-        <select id="rpt-period-year" onchange="renderPeriodSummary()">
-          <option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option>
-        </select>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="printReport('period')">&#128424; Print</button>
-      <button class="btn btn-ghost btn-sm" onclick="exportPeriodCSV()">&#128196; Export CSV</button>
+  <div class="tab-panel on" id="rpt-period">
+    <div class="std-filter-row">
+      <span class="std-filter-label">Period</span>
+      <select class="std-filter-control" id="rpt-period-type" onchange="renderPeriodSummary()">
+        <option value="month">Monthly</option>
+        <option value="quarter">Quarterly</option>
+        <option value="fiscal">Full Fiscal Year</option>
+      </select>
+      <div class="std-filter-divider"></div>
+      <span class="std-filter-label">Month</span>
+      <select class="std-filter-control" id="rpt-period-month" onchange="renderPeriodSummary()">
+        <option value="01">January</option><option value="02">February</option><option value="03">March</option>
+        <option value="04">April</option><option value="05">May</option><option value="06">June</option>
+        <option value="07">July</option><option value="08">August</option><option value="09">September</option>
+        <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+      </select>
+      <div class="std-filter-divider"></div>
+      <span class="std-filter-label">Year</span>
+      <select class="std-filter-control narrow" id="rpt-period-year" onchange="renderPeriodSummary()">
+        <option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option>
+      </select>
     </div>
     <div id="rpt-period-content"></div>
   </div>
 
   <!-- ARREARS AGING -->
-  <div class="tab-panel card" id="rpt-aging" style="border-radius:0 10px 10px 10px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <div style="font-size:13px;color:var(--muted);">Outstanding balances by age &mdash; as of today</div>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-ghost btn-sm" onclick="printReport('aging')">&#128424; Print</button>
-        <button class="btn btn-ghost btn-sm" onclick="exportAgingCSV()">&#128196; Export CSV</button>
-      </div>
+  <div class="tab-panel" id="rpt-aging">
+    <div class="std-filter-row">
+      <span class="std-filter-label">As of</span>
+      <span style="font-size:13px;color:var(--text);font-weight:600;" id="aging-as-of-label">—</span>
+      <div class="std-filter-spacer"></div>
+      <span style="font-size:12px;color:var(--muted);">Outstanding balances bucketed by age of oldest unpaid charge</span>
     </div>
     <div id="aging-content"></div>
   </div>
 
   <!-- RECONCILIATION -->
-  <div class="tab-panel card" id="rpt-reconcile" style="border-radius:0 10px 10px 10px;">
-    <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
-      <div class="f" style="margin:0;min-width:130px;"><label>Month</label>
-        <select id="rec-month" onchange="renderReconciliation()">
-          <option value="01">January</option><option value="02">February</option><option value="03">March</option>
-          <option value="04">April</option><option value="05">May</option><option value="06">June</option>
-          <option value="07">July</option><option value="08">August</option><option value="09">September</option>
-          <option value="10">October</option><option value="11">November</option><option value="12">December</option>
-        </select>
-      </div>
-      <div class="f" style="margin:0;min-width:90px;"><label>Year</label>
-        <select id="rec-year" onchange="renderReconciliation()">
-          <option value="2025">2025</option><option value="2026" selected>2026</option>
-        </select>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="printReport('reconcile')">&#128424; Print</button>
+  <div class="tab-panel" id="rpt-reconcile">
+    <div class="std-filter-row">
+      <span class="std-filter-label">Month</span>
+      <select class="std-filter-control" id="rec-month" onchange="renderReconciliation()">
+        <option value="01">January</option><option value="02">February</option><option value="03">March</option>
+        <option value="04">April</option><option value="05">May</option><option value="06">June</option>
+        <option value="07">July</option><option value="08">August</option><option value="09">September</option>
+        <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+      </select>
+      <div class="std-filter-divider"></div>
+      <span class="std-filter-label">Year</span>
+      <select class="std-filter-control narrow" id="rec-year" onchange="renderReconciliation()">
+        <option value="2025">2025</option><option value="2026" selected>2026</option>
+      </select>
     </div>
     <div id="rec-content"></div>
   </div>
 
   <!-- LOAN SCHEDULE -->
-  <div class="tab-panel card" id="rpt-loan" style="border-radius:0 10px 10px 10px;">
-    <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
-      <div class="f" style="margin:0;min-width:200px;"><label>Tenant (optional — blank = all)</label>
-        <select id="loanSchedTenantSelect" onchange="renderLoanSchedule()"><option value="">All Tenants</option></select>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="printReport('loan')">&#128424; Print</button>
-      <button class="btn btn-ghost btn-sm" onclick="exportLoanCSV()">&#128196; Export CSV</button>
+  <div class="tab-panel" id="rpt-loan">
+    <div class="std-filter-row">
+      <span class="std-filter-label">Tenant</span>
+      <select class="std-filter-control" id="loanSchedTenantSelect" onchange="renderLoanSchedule()" style="min-width:220px;">
+        <option value="">All Tenants</option>
+      </select>
+      <div class="std-filter-spacer"></div>
+      <span style="font-size:12px;color:var(--muted);">Leave blank to show every active loan's remaining schedule</span>
     </div>
     <div id="loan-sched-content"></div>
   </div>
 
   <!-- ANNUAL SUMMARY -->
-  <div class="tab-panel card" id="rpt-annual" style="border-radius:0 10px 10px 10px;">
-    <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:16px;">
-      <div class="f" style="margin:0;"><label>Fiscal Year</label>
-        <select id="annualYear" onchange="renderAnnual()">
-          <option value="2024">FY 2024&ndash;25 (Apr 2024 &ndash; Mar 2025)</option>
-          <option value="2025" selected>FY 2025&ndash;26 (Apr 2025 &ndash; Mar 2026)</option>
-          <option value="2026">FY 2026&ndash;27 (Apr 2026 &ndash; Mar 2027)</option>
-        </select>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="printReport('annual')">&#128424; Print</button>
-      <button class="btn btn-ghost btn-sm" onclick="exportAnnualCSV()">&#128196; Export CSV</button>
+  <div class="tab-panel" id="rpt-annual">
+    <div class="std-filter-row">
+      <span class="std-filter-label">Fiscal Year</span>
+      <select class="std-filter-control" id="annualYear" onchange="renderAnnual()" style="min-width:280px;">
+        <option value="2024">FY 2024&ndash;25 (Apr 2024 &ndash; Mar 2025)</option>
+        <option value="2025" selected>FY 2025&ndash;26 (Apr 2025 &ndash; Mar 2026)</option>
+        <option value="2026">FY 2026&ndash;27 (Apr 2026 &ndash; Mar 2027)</option>
+      </select>
     </div>
     <div id="annual-content"></div>
-  </div>
-
-  <!-- JOURNAL ENTRIES -->
-  <div class="tab-panel card" id="rpt-journal" style="border-radius:0 10px 10px 10px;">
-    <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
-      <div class="f" style="margin:0;min-width:200px;"><label>Tenant</label>
-        <select id="journalTenantSelect" onchange="renderJournal()"><option value="all">All Tenants</option></select>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="printReport('journal')">&#128424; Print</button>
-    </div>
-    <div id="journal-content"></div>
   </div>
 
 </div>
@@ -3431,7 +3418,9 @@ function showPage(id) {
     var _yr=document.getElementById('rpt-period-year'); if(_yr)_yr.value=String(_now.getFullYear());
     var _rm=document.getElementById('rec-month'); if(_rm)_rm.value=String(_now.getMonth()+1).padStart(2,'0');
     var _ry=document.getElementById('rec-year'); if(_ry)_ry.value=String(_now.getFullYear());
-    renderPeriodSummary(); renderAging();
+    _activeReportTab = 'rpt-period';
+    renderPeriodSummary();
+    updateReportsPageMeta();
   }
   if(id==='collections') renderCollections();
   if(id==='transactions'){initTxnFilters();renderTransactions();}
@@ -6310,13 +6299,13 @@ function renderPeriodSummary() {
   var tRows = tenantRows.map(function(row){
     var variance = row.rentPaid - row.charged;
     return '<tr>'+
-      '<td><strong>'+tenantName(row.t)+'</strong><br><span style="font-size:11px;color:var(--muted);">'+row.t.unit+'</span></td>'+
-      '<td class="amt-debit">'+fmt(row.charged)+'</td>'+
-      '<td class="amt-credit">'+fmt(row.rentPaid)+'</td>'+
-      '<td>'+(row.arrPaid>0?'<span class="amt-credit">'+fmt(row.arrPaid)+'</span>':'\u2014')+'</td>'+
-      '<td>'+(row.loanPaid>0?'<span class="amt-credit">'+fmt(row.loanPaid)+'</span>':'\u2014')+'</td>'+
-      '<td><strong class="amt-credit">'+fmt(row.total)+'</strong></td>'+
-      '<td style="color:'+(variance>=0?'var(--success)':'var(--danger)')+';">'+fmt(variance)+'</td>'+
+      '<td class="std-cell-primary">'+tenantName(row.t)+'<br><span style="font-size:11px;color:var(--muted);font-weight:normal;">'+row.t.unit+'</span></td>'+
+      '<td class="std-cell-right amt-debit">'+fmt(row.charged)+'</td>'+
+      '<td class="std-cell-right amt-credit">'+fmt(row.rentPaid)+'</td>'+
+      '<td class="std-cell-right">'+(row.arrPaid>0?'<span class="amt-credit">'+fmt(row.arrPaid)+'</span>':'<span class="std-cell-dash">\u2014</span>')+'</td>'+
+      '<td class="std-cell-right">'+(row.loanPaid>0?'<span class="amt-credit">'+fmt(row.loanPaid)+'</span>':'<span class="std-cell-dash">\u2014</span>')+'</td>'+
+      '<td class="std-cell-right"><strong class="amt-credit">'+fmt(row.total)+'</strong></td>'+
+      '<td class="std-cell-right" style="color:'+(variance>=0?'var(--success)':'var(--danger)')+';">'+fmt(variance)+'</td>'+
     '</tr>';
   }).join('');
 
@@ -6324,20 +6313,34 @@ function renderPeriodSummary() {
     '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">'+
     ''+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' Housing Finance &mdash; '+periodLabel+'</div>'+
     summaryHtml+
-    '<div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Tenant Detail</div>'+
-    '<div class="tbl-wrap"><table class="tbl">'+
-    '<thead><tr><th>Tenant</th><th>Rent Charged</th><th>Rent Paid</th><th>Arrangement</th><th>Loan</th><th>Total Received</th><th>Variance</th></tr></thead>'+
-    '<tbody>'+tRows+
-    '<tr style="background:var(--dark2);font-weight:700;">'+
-      '<td>TOTAL</td>'+
-      '<td class="amt-debit">'+fmt(rentCharged)+'</td>'+
-      '<td class="amt-credit">'+fmt(rentCollected)+'</td>'+
-      '<td class="amt-credit">'+fmt(arrCollected)+'</td>'+
-      '<td class="amt-credit">'+fmt(loanCollected)+'</td>'+
-      '<td class="amt-credit">'+fmt(totalCollected)+'</td>'+
-      '<td style="color:'+(rentArrears<=0?'var(--success)':'var(--danger)')+';">'+fmt(rentCollected-rentCharged)+'</td>'+
-    '</tr>'+
-    '</tbody></table></div>'+
+    '<div class="std-table-card">'+
+      '<div class="std-table-hdr">'+
+        '<span>Tenant Detail</span>'+
+        '<span class="std-table-count">'+tenantRows.length+' tenants · '+periodLabel+'</span>'+
+      '</div>'+
+      '<table class="std-table">'+
+      '<thead><tr>'+
+        '<th>Tenant</th>'+
+        '<th class="std-cell-right">Rent Charged</th>'+
+        '<th class="std-cell-right">Rent Paid</th>'+
+        '<th class="std-cell-right">Arrangement</th>'+
+        '<th class="std-cell-right">Loan</th>'+
+        '<th class="std-cell-right">Total Received</th>'+
+        '<th class="std-cell-right">Variance</th>'+
+      '</tr></thead>'+
+      '<tbody>'+
+      (tRows || '<tr class="empty-row"><td colspan="7">No activity in this period.</td></tr>')+
+      (tenantRows.length ? '<tr style="background:var(--bg);font-weight:700;border-top:2px solid var(--border);">'+
+        '<td>TOTAL</td>'+
+        '<td class="std-cell-right amt-debit">'+fmt(rentCharged)+'</td>'+
+        '<td class="std-cell-right amt-credit">'+fmt(rentCollected)+'</td>'+
+        '<td class="std-cell-right amt-credit">'+fmt(arrCollected)+'</td>'+
+        '<td class="std-cell-right amt-credit">'+fmt(loanCollected)+'</td>'+
+        '<td class="std-cell-right amt-credit">'+fmt(totalCollected)+'</td>'+
+        '<td class="std-cell-right" style="color:'+(rentArrears<=0?'var(--success)':'var(--danger)')+';">'+fmt(rentCollected-rentCharged)+'</td>'+
+      '</tr>' : '')+
+      '</tbody></table>'+
+    '</div>'+
     '<div style="margin-top:12px;font-size:11px;color:var(--muted);">'+
     'Generated: '+new Date().toLocaleString('en-CA')+' &nbsp;|&nbsp; Period: '+periodLabel+' &nbsp;|&nbsp; '+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' Housing Finance Module</div>';
 }
@@ -6390,45 +6393,193 @@ function renderReconciliation() {
   el.innerHTML =
     '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:16px;">'+
     ''+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' Housing Finance &mdash; Monthly Reconciliation &mdash; '+periodLabel+'</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">'+
-      '<div>'+
-        '<div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--text);">Rent Account Reconciliation</div>'+
-        '<div class="tbl-wrap"><table class="tbl">'+
-          '<tbody>'+
-          '<tr><td>Opening Balance (prior month arrears)</td><td style="text-align:right;color:'+(priorRentBal>0?'var(--danger)':'var(--success)')+';">'+fmt(priorRentBal)+'</td></tr>'+
-          '<tr><td>+ Rent Charged This Month</td><td style="text-align:right;" class="amt-debit">'+fmt(thisCharged)+'</td></tr>'+
-          '<tr><td>&minus; Rent Payments Received</td><td style="text-align:right;" class="amt-credit">('+fmt(thisRentPaid)+')</td></tr>'+
-          '<tr style="font-weight:700;background:var(--dark2);"><td>Closing Balance (Rent Arrears)</td><td style="text-align:right;color:'+(closingRentBal>0?'var(--danger)':'var(--success)')+';">'+fmt(closingRentBal)+'</td></tr>'+
-          '</tbody></table></div>'+
 
-        '<div style="font-size:12px;font-weight:700;margin:14px 0 8px;color:var(--text);">Collections by Payment Method</div>'+
-        '<div class="tbl-wrap"><table class="tbl">'+
-          '<thead><tr><th>Method</th><th>Amount</th></tr></thead>'+
-          '<tbody>'+methodRows+
-          '<tr style="font-weight:700;background:var(--dark2);"><td>Total Collected</td><td class="amt-credit">'+fmt(totalCollected)+'</td></tr>'+
-          '</tbody></table></div>'+
-      '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">'+
+
+      // LEFT COLUMN — reconciliation + methods
       '<div>'+
-        '<div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--text);">Summary for Finance</div>'+
-        '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">'+
-          '<div style="background:var(--dark2);padding:10px 14px;font-size:11px;font-weight:700;color:#888;text-transform:uppercase;">To be posted in accounting software</div>'+
-          [
-            {acct:'Rent Revenue (4100)',amount:thisCharged,type:'CR'},
-            {acct:'Rent Receivable (1200)',amount:thisRentPaid,type:'DR'},
-            {acct:'Arrangement Receivable (1210)',amount:thisArrPaid,type:'DR'},
-            {acct:'Loan Receivable (1220)',amount:thisLoanPaid,type:'DR'},
-          ].map(function(row){
-            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);">'+
-              '<div><div style="font-size:12px;font-weight:600;">'+row.acct+'</div>'+
-              '<div style="font-size:10px;color:var(--muted);">'+row.type+'</div></div>'+
-              '<div style="font-size:15px;font-weight:700;color:'+(row.type==='CR'?'var(--danger)':'var(--success)')+';">'+fmt(row.amount)+'</div>'+
-            '</div>';
-          }).join('')+
-          '<div style="padding:10px 14px;background:var(--bg);font-size:11px;color:var(--muted);">&#9432; Account codes are indicative. Confirm with your chart of accounts.</div>'+
+
+        // Rent Account Reconciliation
+        '<div class="std-table-card" style="margin-bottom:14px;">'+
+          '<div class="std-table-hdr"><span>Rent Account Reconciliation</span><span class="std-table-count">'+periodLabel+'</span></div>'+
+          '<table class="std-table">'+
+            '<tbody>'+
+              '<tr><td>Opening Balance <span style="color:var(--muted);font-size:11px;">(prior month arrears)</span></td>'+
+                '<td class="std-cell-right" style="color:'+(priorRentBal>0?'var(--danger)':'var(--success)')+';"><strong>'+fmt(priorRentBal)+'</strong></td></tr>'+
+              '<tr><td>+ Rent Charged This Month</td>'+
+                '<td class="std-cell-right amt-debit">'+fmt(thisCharged)+'</td></tr>'+
+              '<tr><td>&minus; Rent Payments Received</td>'+
+                '<td class="std-cell-right amt-credit">('+fmt(thisRentPaid)+')</td></tr>'+
+              '<tr style="background:var(--bg);font-weight:700;border-top:2px solid var(--border);">'+
+                '<td>Closing Balance <span style="color:var(--muted);font-size:11px;font-weight:normal;">(rent arrears)</span></td>'+
+                '<td class="std-cell-right" style="color:'+(closingRentBal>0?'var(--danger)':'var(--success)')+';"><strong>'+fmt(closingRentBal)+'</strong></td>'+
+              '</tr>'+
+            '</tbody>'+
+          '</table>'+
+        '</div>'+
+
+        // Collections by Method
+        '<div class="std-table-card">'+
+          '<div class="std-table-hdr"><span>Collections by Payment Method</span><span class="std-table-count">'+Object.keys(byMethod).length+' method'+(Object.keys(byMethod).length===1?'':'s')+'</span></div>'+
+          '<table class="std-table">'+
+            '<thead><tr><th>Method</th><th class="std-cell-right">Amount</th></tr></thead>'+
+            '<tbody>'+
+              (methodRows || '<tr class="empty-row"><td colspan="2">No payments recorded this period.</td></tr>')+
+              (methodRows ? '<tr style="background:var(--bg);font-weight:700;border-top:2px solid var(--border);">'+
+                '<td>Total Collected</td>'+
+                '<td class="std-cell-right amt-credit">'+fmt(totalCollected)+'</td></tr>' : '')+
+            '</tbody>'+
+          '</table>'+
+        '</div>'+
+
+      '</div>'+
+
+      // RIGHT COLUMN — GL posting summary
+      '<div>'+
+        '<div class="std-table-card">'+
+          '<div class="std-table-hdr"><span>Summary for Finance</span><span class="std-table-count">To post in accounting software</span></div>'+
+          '<table class="std-table">'+
+            '<thead><tr><th>Account</th><th>Type</th><th class="std-cell-right">Amount</th></tr></thead>'+
+            '<tbody>'+
+              [
+                {acct:'Rent Revenue (4100)',          amount:thisCharged,    type:'CR'},
+                {acct:'Rent Receivable (1200)',       amount:thisRentPaid,   type:'DR'},
+                {acct:'Arrangement Receivable (1210)',amount:thisArrPaid,    type:'DR'},
+                {acct:'Loan Receivable (1220)',       amount:thisLoanPaid,   type:'DR'}
+              ].map(function(row){
+                return '<tr>'+
+                  '<td class="std-cell-primary">'+row.acct+'</td>'+
+                  '<td>'+(row.type==='CR'?'<span class="std-pill std-pill-overdue">CR</span>':'<span class="std-pill std-pill-paid">DR</span>')+'</td>'+
+                  '<td class="std-cell-right"><strong style="color:'+(row.type==='CR'?'var(--danger)':'var(--success)')+';">'+fmt(row.amount)+'</strong></td>'+
+                '</tr>';
+              }).join('')+
+            '</tbody>'+
+          '</table>'+
+          '<div style="padding:10px 14px;background:var(--bg);font-size:11px;color:var(--muted);border-top:1px solid var(--border);">&#9432; Account codes are indicative. Confirm with your chart of accounts.</div>'+
         '</div>'+
       '</div>'+
     '</div>'+
+
     '<div style="margin-top:12px;font-size:11px;color:var(--muted);">Generated: '+new Date().toLocaleString('en-CA')+' | '+(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+' Housing Finance Module</div>';
+}
+
+// ── Reports tab helpers ────────────────────────────────────────────────────
+// showReportTab: swap which tab panel is visible AND trigger its render
+// exportActiveReport / printActiveReport: dispatch to the right export/print
+// fn based on which tab is currently active. These are bound to the
+// page-level "Export CSV" and "Print" buttons.
+var _activeReportTab = 'rpt-period';
+
+function showReportTab(ev, id){
+  document.querySelectorAll('#page-reports .tab-panel').forEach(function(p){p.classList.remove('on');});
+  document.querySelectorAll('#page-reports .tab-btn').forEach(function(b){b.classList.remove('active');});
+  var tp = document.getElementById(id); if (tp) tp.classList.add('on');
+  if (ev && ev.target) ev.target.classList.add('active');
+  _activeReportTab = id;
+  // Trigger per-tab render
+  if (id === 'rpt-period')     renderPeriodSummary();
+  if (id === 'rpt-aging')      renderAging();
+  if (id === 'rpt-reconcile')  renderReconciliation();
+  if (id === 'rpt-loan')       renderLoanSchedule();
+  if (id === 'rpt-annual')     renderAnnual();
+  updateReportsPageMeta();
+}
+
+function updateReportsPageMeta(){
+  var metaEl = document.getElementById('reports_page_meta');
+  if (!metaEl) return;
+  var labels = {
+    'rpt-period':    'Period Summary',
+    'rpt-aging':     'Arrears Aging',
+    'rpt-reconcile': 'Reconciliation',
+    'rpt-loan':      'Loan Schedule',
+    'rpt-annual':    'Annual Summary'
+  };
+  var today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  metaEl.textContent = (labels[_activeReportTab] || 'Report') + ' · Generated ' + today;
+
+  // Also update the aging "as of" label if we're on that tab
+  var asOf = document.getElementById('aging-as-of-label');
+  if (asOf) asOf.textContent = today;
+}
+
+function exportActiveReport(){
+  var tab = _activeReportTab;
+  if (tab === 'rpt-period')     return exportPeriodCSV();
+  if (tab === 'rpt-aging')      return exportAgingCSV();
+  if (tab === 'rpt-reconcile')  return exportReconciliationCSV();
+  if (tab === 'rpt-loan')       return exportLoanCSV();
+  if (tab === 'rpt-annual')     return exportAnnualCSV();
+  toast('Export is not available for this tab.');
+}
+
+function printActiveReport(){
+  var map = {
+    'rpt-period':    'period',
+    'rpt-aging':     'aging',
+    'rpt-reconcile': 'reconcile',
+    'rpt-loan':      'loan',
+    'rpt-annual':    'annual'
+  };
+  var type = map[_activeReportTab];
+  if (!type) { toast('Print is not available for this tab.'); return; }
+  printReport(type);
+}
+
+// Reconciliation CSV export (previously missing — completes the pattern)
+function exportReconciliationCSV(){
+  var d = getData();
+  var mm = (document.getElementById('rec-month')||{}).value || '01';
+  var yy = (document.getElementById('rec-year') ||{}).value || String(new Date().getFullYear());
+  var periodStart = yy + '-' + mm + '-01';
+  // Last day of the month
+  var lastDay = new Date(parseInt(yy,10), parseInt(mm,10), 0).getDate();
+  var periodEnd = yy + '-' + mm + '-' + String(lastDay).padStart(2,'0');
+
+  // Collect every ledger entry in the period across rent, arrangement, loan
+  var rows = [];
+  (d.rentLedger||[]).forEach(function(r){
+    if (r.date >= periodStart && r.date <= periodEnd) {
+      var t = getTenant(r.tenantId);
+      rows.push([
+        r.date, t?tenantName(t):'', r.tenantId,
+        'Rent', r.type || '', r.desc || '',
+        r.charge || 0, r.payment || 0,
+        methodLabel(r.method), r.status || '', r.ref || ''
+      ]);
+    }
+  });
+  (d.arrPayments||[]).forEach(function(p){
+    if (p.date >= periodStart && p.date <= periodEnd) {
+      var t = getTenant(p.tenantId);
+      var a = (d.arrangements||[]).find(function(x){ return x.id === p.arrId; });
+      rows.push([
+        p.date, t?tenantName(t):'', p.tenantId,
+        'Arrangement', p.type || 'payment', a ? ('Arrangement '+a.ref) : '',
+        0, p.amount || 0,
+        methodLabel(p.method), p.status || '', p.ref || ''
+      ]);
+    }
+  });
+  (d.loanPayments||[]).forEach(function(p){
+    if (p.date >= periodStart && p.date <= periodEnd) {
+      var t = getTenant(p.tenantId);
+      var l = (d.loanList||[]).find(function(x){ return x.id === p.loanId; });
+      rows.push([
+        p.date, t?tenantName(t):'', p.tenantId,
+        'Loan', p.type || 'payment', l ? ('Loan '+l.type) : '',
+        0, p.amount || 0,
+        methodLabel(p.method), p.status || '', p.ref || ''
+      ]);
+    }
+  });
+
+  rows.sort(function(a,b){ return (b[0]||'').localeCompare(a[0]||''); });
+
+  exportStdCSV('Reconciliation-'+yy+'-'+mm,
+    ['Date','Tenant','Tenant ID','Ledger','Type','Description','Charge','Payment','Method','Status','Reference'],
+    rows
+  );
 }
 
 function printReport(type) {
@@ -6561,68 +6712,250 @@ function renderAging() {
     var oldest = invoices[0];
     var days = oldest ? Math.floor((new Date() - new Date(oldest.date))/86400000) : 0;
     var bucket = days<=30?'Current':days<=60?'31-60':days<=90?'61-90':'90+';
-    buckets[bucket].push({name:tenantName(t),unit:t.unit,balance:balance,days:days});
+    buckets[bucket].push({tid:t.id,name:tenantName(t),unit:t.unit||'',balance:balance,days:days,oldest:oldest?oldest.date:''});
   });
   var el = document.getElementById('aging-content');
   if (!el) return;
-  var colors = {'Current':'var(--success)','31-60':'#f59e0b','61-90':'#f97316','90+':'var(--danger)'};
-  el.innerHTML = Object.keys(buckets).map(function(bucket){
-    var items = buckets[bucket];
-    var total = items.reduce(function(s,x){return s+x.balance;},0);
-    return '<div style="margin-bottom:16px;">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'+
-        '<span style="font-size:13px;font-weight:700;color:'+colors[bucket]+';">'+bucket+' Days</span>'+
-        '<span style="font-weight:700;">'+fmt(total)+'</span></div>'+
-      (items.length?'<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">'+
-        items.map(function(x){return '<div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;">'+
-          '<span>'+x.name+' \u2014 '+x.unit+'</span><span class="amt-debit">'+fmt(x.balance)+'</span></div>';
-        }).join('')+'</div>':'<div style="font-size:12px;color:var(--muted);padding:6px 0;">None</div>')+
+
+  // Summary tiles
+  var bucketMeta = {
+    'Current': { color:'var(--success)',    label:'Current (0–30 days)',       pillClass:'std-pill-paid' },
+    '31-60':   { color:'#f59e0b',           label:'31–60 Days',                pillClass:'std-pill-pending' },
+    '61-90':   { color:'#f97316',           label:'61–90 Days',                pillClass:'std-pill-pending' },
+    '90+':     { color:'var(--danger)',     label:'90+ Days (Critical)',       pillClass:'std-pill-overdue' }
+  };
+
+  var grandTotal = 0;
+  Object.keys(buckets).forEach(function(k){
+    buckets[k].forEach(function(x){ grandTotal += x.balance; });
+  });
+
+  var summaryHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">' +
+    Object.keys(buckets).map(function(k){
+      var items = buckets[k];
+      var total = items.reduce(function(s,x){return s+x.balance;},0);
+      var meta  = bucketMeta[k];
+      return '<div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid '+meta.color+';border-radius:10px;padding:14px;">'+
+        '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px;">'+meta.label+'</div>'+
+        '<div style="font-size:22px;font-weight:700;color:'+meta.color+';">'+fmt(total)+'</div>'+
+        '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+items.length+' tenant'+(items.length===1?'':'s')+'</div>'+
+      '</div>';
+    }).join('') +
     '</div>';
-  }).join('');
+
+  // Flatten into one big table
+  var flatRows = [];
+  Object.keys(buckets).forEach(function(k){
+    buckets[k].forEach(function(x){
+      flatRows.push({ bucket:k, meta:bucketMeta[k], row:x });
+    });
+  });
+  // Sort by days descending (oldest first)
+  flatRows.sort(function(a,b){ return b.row.days - a.row.days; });
+
+  var rows;
+  if (!flatRows.length) {
+    rows = '<tr class="empty-row"><td colspan="5">No outstanding rent balances. Every tenant is current.</td></tr>';
+  } else {
+    rows = flatRows.map(function(fr){
+      var x = fr.row;
+      var safeId = (x.tid||'').replace(/'/g, "\\'");
+      return '<tr class="clickable" onclick="goToTenant(\''+safeId+'\')">'+
+        '<td class="std-cell-primary">'+x.name+
+          (x.unit?'<div style="font-size:11px;color:var(--muted);font-weight:normal;">'+x.unit+'</div>':'')+'</td>'+
+        '<td>'+(x.oldest||'<span class="std-cell-dash">—</span>')+'</td>'+
+        '<td class="std-cell-right">'+x.days+' days</td>'+
+        '<td class="std-cell-right amt-debit"><strong>'+fmt(x.balance)+'</strong></td>'+
+        '<td><span class="std-pill '+fr.meta.pillClass+'">'+fr.bucket+'</span></td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  el.innerHTML = summaryHtml +
+    '<div class="std-table-card">' +
+      '<div class="std-table-hdr">' +
+        '<span>Aging Detail</span>' +
+        '<span class="std-table-count">'+flatRows.length+' tenants with arrears · '+fmt(grandTotal)+' total</span>' +
+      '</div>' +
+      '<table class="std-table">' +
+        '<thead><tr>' +
+          '<th>Tenant</th>' +
+          '<th>Oldest Unpaid</th>' +
+          '<th class="std-cell-right">Days Outstanding</th>' +
+          '<th class="std-cell-right">Balance</th>' +
+          '<th>Bucket</th>' +
+        '</tr></thead>' +
+        '<tbody>'+rows+'</tbody>' +
+      '</table>' +
+    '</div>';
 }
 
 function renderAnnual() {
   var year = parseInt((document.getElementById('annualYear')||{}).value||new Date().getFullYear());
   var d = getData();
-  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var rows = months.map(function(m,i){
-    var ym = year+'-'+String(i+1).padStart(2,'0');
-    var charged = d.rentLedger.filter(function(r){return r.date.slice(0,7)===ym&&r.charge>0&&r.status!=='reversed';}).reduce(function(s,r){return s+r.charge;},0);
-    var collected = d.rentLedger.filter(function(r){return r.date.slice(0,7)===ym&&r.payment>0&&r.status!=='reversed';}).reduce(function(s,r){return s+r.payment;},0);
-    var variance = collected - charged;
-    return '<tr><td>'+m+' '+year+'</td><td><span class="amt-debit">'+fmt(charged)+'</span></td>'+
-      '<td><span class="amt-credit">'+fmt(collected)+'</span></td>'+
-      '<td style="color:'+(variance>=0?'var(--success)':'var(--danger)')+';">'+fmt(variance)+'</td></tr>';
-  }).join('');
   var el = document.getElementById('annual-content');
-  if (el) el.innerHTML = '<table class="tbl"><thead><tr><th>Month</th><th>Charged</th><th>Collected</th><th>Variance</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  if (!el) return;
+
+  // Fiscal year runs Apr (year) through Mar (year+1)
+  var fyMonths = [
+    {m:4,  y:year},   {m:5,  y:year},   {m:6,  y:year},
+    {m:7,  y:year},   {m:8,  y:year},   {m:9,  y:year},
+    {m:10, y:year},   {m:11, y:year},   {m:12, y:year},
+    {m:1,  y:year+1}, {m:2,  y:year+1}, {m:3,  y:year+1}
+  ];
+  var mNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  var totalCharged = 0, totalCollected = 0, totalArrCollected = 0, totalLoanCollected = 0;
+
+  var rows = fyMonths.map(function(mo){
+    var ym = String(mo.y) + '-' + String(mo.m).padStart(2,'0');
+    var charged = (d.rentLedger||[]).filter(function(r){ return r.date.slice(0,7)===ym && r.charge>0 && r.status!=='reversed'; })
+                                     .reduce(function(s,r){ return s+r.charge; }, 0);
+    var rentCollected = (d.rentLedger||[]).filter(function(r){ return r.date.slice(0,7)===ym && r.payment>0 && r.status!=='reversed'; })
+                                           .reduce(function(s,r){ return s+r.payment; }, 0);
+    var arrCollected = (d.arrPayments||[]).filter(function(p){ return p.date.slice(0,7)===ym && p.status!=='reversed'; })
+                                           .reduce(function(s,p){ return s+p.amount; }, 0);
+    var loanCollected = (d.loanPayments||[]).filter(function(p){ return p.date.slice(0,7)===ym && p.status!=='reversed'; })
+                                              .reduce(function(s,p){ return s+p.amount; }, 0);
+    var totalMonth = rentCollected + arrCollected + loanCollected;
+    var variance = rentCollected - charged;
+
+    totalCharged       += charged;
+    totalCollected     += rentCollected;
+    totalArrCollected  += arrCollected;
+    totalLoanCollected += loanCollected;
+
+    return '<tr>'+
+      '<td class="std-cell-primary">'+mNames[mo.m]+' '+mo.y+'</td>'+
+      '<td class="std-cell-right amt-debit">'+fmt(charged)+'</td>'+
+      '<td class="std-cell-right amt-credit">'+fmt(rentCollected)+'</td>'+
+      '<td class="std-cell-right">'+(arrCollected>0?'<span class="amt-credit">'+fmt(arrCollected)+'</span>':'<span class="std-cell-dash">—</span>')+'</td>'+
+      '<td class="std-cell-right">'+(loanCollected>0?'<span class="amt-credit">'+fmt(loanCollected)+'</span>':'<span class="std-cell-dash">—</span>')+'</td>'+
+      '<td class="std-cell-right"><strong>'+fmt(totalMonth)+'</strong></td>'+
+      '<td class="std-cell-right" style="color:'+(variance>=0?'var(--success)':'var(--danger)')+';">'+fmt(variance)+'</td>'+
+    '</tr>';
+  }).join('');
+
+  var totalAllCollected = totalCollected + totalArrCollected + totalLoanCollected;
+  var totalVariance = totalCollected - totalCharged;
+  var collectionRate = totalCharged > 0 ? (totalCollected / totalCharged * 100) : 0;
+
+  // Summary tiles on top
+  var summaryHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">'+
+    [
+      {lbl:'Rent Charged',       val:fmt(totalCharged),       color:'var(--text)',    sub:'FY'+year+'–'+String(year+1).slice(2)+' total'},
+      {lbl:'Rent Collected',     val:fmt(totalCollected),     color:'var(--success)', sub:collectionRate.toFixed(1)+'% collection rate'},
+      {lbl:'Rent Variance',      val:fmt(totalVariance),      color:totalVariance>=0?'var(--success)':'var(--danger)', sub:totalVariance>=0?'Above plan':'Arrears outstanding'},
+      {lbl:'Total Collections',  val:fmt(totalAllCollected),  color:'var(--yellow)',  sub:'Rent + Arr + Loan', dark:true}
+    ].map(function(tile){
+      return '<div style="background:'+(tile.dark?'var(--dark)':'var(--surface)')+';border:1px solid var(--border);border-radius:10px;padding:14px;">'+
+        '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:'+(tile.dark?'#888':'var(--muted)')+';margin-bottom:4px;">'+tile.lbl+'</div>'+
+        '<div style="font-size:22px;font-weight:700;color:'+tile.color+';">'+tile.val+'</div>'+
+        '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+tile.sub+'</div>'+
+      '</div>';
+    }).join('')+
+    '</div>';
+
+  el.innerHTML = summaryHtml +
+    '<div class="std-table-card">'+
+      '<div class="std-table-hdr"><span>Monthly Rollup</span>'+
+        '<span class="std-table-count">FY '+year+'–'+String(year+1).slice(2)+' · Apr '+year+' – Mar '+(year+1)+'</span></div>'+
+      '<table class="std-table">'+
+        '<thead><tr>'+
+          '<th>Month</th>'+
+          '<th class="std-cell-right">Charged</th>'+
+          '<th class="std-cell-right">Rent Collected</th>'+
+          '<th class="std-cell-right">Arrangement</th>'+
+          '<th class="std-cell-right">Loan</th>'+
+          '<th class="std-cell-right">Total Collected</th>'+
+          '<th class="std-cell-right">Variance</th>'+
+        '</tr></thead>'+
+        '<tbody>'+rows+
+          '<tr style="background:var(--bg);font-weight:700;border-top:2px solid var(--border);">'+
+            '<td>FY TOTAL</td>'+
+            '<td class="std-cell-right amt-debit">'+fmt(totalCharged)+'</td>'+
+            '<td class="std-cell-right amt-credit">'+fmt(totalCollected)+'</td>'+
+            '<td class="std-cell-right amt-credit">'+fmt(totalArrCollected)+'</td>'+
+            '<td class="std-cell-right amt-credit">'+fmt(totalLoanCollected)+'</td>'+
+            '<td class="std-cell-right amt-credit">'+fmt(totalAllCollected)+'</td>'+
+            '<td class="std-cell-right" style="color:'+(totalVariance>=0?'var(--success)':'var(--danger)')+';">'+fmt(totalVariance)+'</td>'+
+          '</tr>'+
+        '</tbody>'+
+      '</table>'+
+    '</div>';
 }
 
 function renderLoanSchedule() {
-  var tid = (document.getElementById('loanSchedTenantSelect')||{}).value;
-  var el = document.getElementById('loan-sched-content');
+  var tid = (document.getElementById('loanSchedTenantSelect')||{}).value || '';
+  var el  = document.getElementById('loan-sched-content');
   if (!el) return;
-  if (!tid) { el.innerHTML = '<p style="color:var(--muted);">Select a tenant to view loan schedule.</p>'; return; }
   var d = getData();
-  var loans = d.loanList.filter(function(l){return l.tenantId===tid&&l.status==='approved';});
-  if (!loans.length) { el.innerHTML = '<p style="color:var(--muted);">No approved loans for this tenant.</p>'; return; }
-  el.innerHTML = loans.map(function(l){
-    var paid = d.loanPayments.filter(function(p){return p.loanId===l.id&&p.status!=='reversed';}).reduce(function(s,p){return s+p.amount;},0);
-    var rem = Math.max(0,l.principal-paid);
-    var pct = l.principal>0?Math.min(100,(paid/l.principal)*100):0;
-    var typeLabel={renovation:'Renovation Loan','rent-to-own':'Rent-to-Own',utilities:'Utilities',other:'Loan'}[l.type]||'Loan';
-    return '<div class="card" style="margin-bottom:12px;">'+
-      '<div style="font-size:14px;font-weight:700;margin-bottom:4px;">'+typeLabel+'</div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px;">'+
-        '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Principal</div><div style="font-size:16px;font-weight:700;">'+fmt(l.principal)+'</div></div>'+
-        '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Paid</div><div style="font-size:16px;font-weight:700;color:var(--success);">'+fmt(paid)+'</div></div>'+
-        '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Remaining</div><div style="font-size:16px;font-weight:700;color:'+(rem>0?'var(--danger)':'var(--success)')+';">'+fmt(rem)+'</div></div>'+
-        '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Monthly</div><div style="font-size:16px;font-weight:700;">'+fmt(l.payment)+'</div></div>'+
-      '</div>'+
-      '<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="width:'+pct.toFixed(1)+'%;height:100%;background:var(--yellow);border-radius:4px;"></div></div>'+
-      '<div style="font-size:11px;color:var(--muted);margin-top:4px;">'+pct.toFixed(0)+'% repaid</div>'+
-    '</div>';
+  var allLoans = (d.loanList||[]).filter(function(l){ return l.status === 'approved'; });
+  var loans = tid ? allLoans.filter(function(l){ return l.tenantId === tid; }) : allLoans;
+
+  var typeLabels = {renovation:'Renovation', 'rent-to-own':'Rent-to-Own', utilities:'Utilities', emergency:'Emergency', other:'Loan'};
+
+  var totalPrincipal = 0, totalPaid = 0, totalRemaining = 0;
+  var rows = loans.map(function(l){
+    var t = getTenant(l.tenantId);
+    var paid = d.loanPayments.filter(function(p){ return p.loanId === l.id && p.status !== 'reversed'; })
+                              .reduce(function(s,p){ return s+p.amount; }, 0);
+    var rem = Math.max(0, l.principal - paid);
+    var pct = l.principal > 0 ? Math.min(100, (paid/l.principal)*100) : 0;
+    totalPrincipal += l.principal || 0;
+    totalPaid      += paid;
+    totalRemaining += rem;
+    var progress = '<div style="display:flex;align-items:center;gap:8px;min-width:120px;">'+
+      '<div style="flex:1;height:6px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="width:'+pct.toFixed(0)+'%;height:100%;background:var(--yellow);"></div></div>'+
+      '<span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+pct.toFixed(0)+'%</span>'+
+      '</div>';
+    return '<tr>'+
+      '<td class="std-cell-primary">'+(t?tenantName(t):'<span class="std-cell-dash">—</span>')+
+        (t&&t.unit?'<div style="font-size:11px;color:var(--muted);font-weight:normal;">'+t.unit+'</div>':'')+'</td>'+
+      '<td>'+(typeLabels[l.type]||l.type||'<span class="std-cell-dash">—</span>')+'</td>'+
+      '<td class="std-cell-right">'+fmt(l.principal)+'</td>'+
+      '<td class="std-cell-right amt-credit">'+fmt(paid)+'</td>'+
+      '<td class="std-cell-right" style="color:'+(rem>0?'var(--danger)':'var(--success)')+';"><strong>'+fmt(rem)+'</strong></td>'+
+      '<td class="std-cell-right">'+fmt(l.payment)+'</td>'+
+      '<td>'+progress+'</td>'+
+    '</tr>';
   }).join('');
+
+  var scopeLabel = tid
+    ? (function(){ var t = getTenant(tid); return t ? tenantName(t) : 'Selected tenant'; })()
+    : 'All tenants';
+
+  var body;
+  if (!loans.length) {
+    body = '<tr class="empty-row"><td colspan="7">No approved loans'+(tid?' for the selected tenant.':'.')+'</td></tr>';
+  } else {
+    body = rows +
+      '<tr style="background:var(--bg);font-weight:700;border-top:2px solid var(--border);">'+
+        '<td colspan="2">TOTAL</td>'+
+        '<td class="std-cell-right">'+fmt(totalPrincipal)+'</td>'+
+        '<td class="std-cell-right amt-credit">'+fmt(totalPaid)+'</td>'+
+        '<td class="std-cell-right" style="color:'+(totalRemaining>0?'var(--danger)':'var(--success)')+';">'+fmt(totalRemaining)+'</td>'+
+        '<td></td><td></td>'+
+      '</tr>';
+  }
+
+  el.innerHTML =
+    '<div class="std-table-card">'+
+      '<div class="std-table-hdr"><span>Approved Loan Schedule</span>'+
+        '<span class="std-table-count">'+loans.length+' loan'+(loans.length===1?'':'s')+' · '+scopeLabel+'</span></div>'+
+      '<table class="std-table">'+
+        '<thead><tr>'+
+          '<th>Tenant</th>'+
+          '<th>Type</th>'+
+          '<th class="std-cell-right">Principal</th>'+
+          '<th class="std-cell-right">Paid</th>'+
+          '<th class="std-cell-right">Remaining</th>'+
+          '<th class="std-cell-right">Scheduled Payment</th>'+
+          '<th>Progress</th>'+
+        '</tr></thead>'+
+        '<tbody>'+body+'</tbody>'+
+      '</table>'+
+    '</div>';
 }
 
 function clearJournalFilters(){
