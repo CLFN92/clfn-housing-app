@@ -8712,7 +8712,11 @@ function dashSelectTenant(tid) {
 }
 
 function renderDashboard(){
-  document.getElementById('dashSubtitle').textContent='Overview - '+new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
+  // NOTE: #dashSubtitle used to live on the old Dashboard page which was
+  // consolidated into Home. We keep the null-guard in case other callers
+  // (or future markup changes) re-introduce it.
+  var subEl = document.getElementById('dashSubtitle');
+  if (subEl) subEl.textContent = 'Overview - ' + new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
   var d=getData();
 
   // Diagnostic
@@ -8730,7 +8734,8 @@ function renderDashboard(){
   });
   colCount=d.collections.filter(function(c){return c.status==='approved';}).length;
   var grand=tR+tL+tA;
-  document.getElementById('dashStats').innerHTML=
+  var statsEl = document.getElementById('dashStats');
+  if (statsEl) statsEl.innerHTML=
     statCard('Total Owing',fmt(grand),'All ledgers',grand>0?'danger':'')+
     statCard('Rent Arrears',fmt(tR),'',tR>0?'danger':'')+
     statCard('Accounts Clear',clearCount,'of '+d.tenants.length+' tenants','success')+
