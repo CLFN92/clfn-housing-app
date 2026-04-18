@@ -218,9 +218,30 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .voucher-sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;}
 
 /* ── Filter bars ── */
-.filter-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px;}
-.tenant-selector{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
-.tenant-selector label{font-size:13px;font-weight:600;}
+.filter-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;}
+.filter-bar label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;}
+.filter-bar select,.filter-bar input{border:1.5px solid var(--border);border-radius:7px;padding:7px 11px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--surface);outline:none;cursor:pointer;transition:border-color .15s;}
+.filter-bar select{min-width:160px;}
+.filter-bar input{min-width:200px;flex:1;}
+.filter-bar select:focus,.filter-bar input:focus,.filter-bar select:hover{border-color:var(--yellow);}
+/* ── Filter row & tenant selector — polished to match housing.html ── */
+.tenant-selector{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;}
+.tenant-selector label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;}
+.tenant-selector select,.tenant-selector input{border:1.5px solid var(--border);border-radius:7px;padding:7px 11px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--surface);outline:none;min-width:220px;cursor:pointer;transition:border-color .15s;}
+.tenant-selector select:focus,.tenant-selector input:focus,.tenant-selector select:hover{border-color:var(--yellow);}
+
+.dash-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;}
+.dash-filters label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;}
+.dash-filters select,.dash-filters input{border:1.5px solid var(--border);border-radius:7px;padding:7px 11px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--surface);outline:none;transition:border-color .15s;}
+.dash-filters select{min-width:160px;cursor:pointer;}
+.dash-filters input{min-width:200px;flex:1;}
+.dash-filters select:focus,.dash-filters input:focus,.dash-filters select:hover{border-color:var(--yellow);}
+
+/* ── Filter pills — tab-row style for quick status filters ── */
+.filter-pills{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.filter-pill{padding:6px 14px;border:1.5px solid var(--border);border-radius:20px;background:var(--surface);color:var(--muted);font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .15s;}
+.filter-pill:hover{border-color:var(--yellow);color:var(--text);}
+.filter-pill.active{background:var(--yellow);border-color:var(--yellow);color:#111;}
 
 /* ── Responsive ── */
 @media(max-width:1023px) and (min-width:769px){
