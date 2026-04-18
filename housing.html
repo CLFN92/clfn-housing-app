@@ -927,26 +927,19 @@
       <div id="sc_ed_content"></div>
     </div>
 
-    <!-- Application Documents -->
+    <!-- Application Documents — rendered by DocLibrary factory.
+         The "Assign Files" flow stays outside the factory because it
+         operates on a cross-app shared folder (applications/APP-/)
+         and lets users link those migrated files to the current app
+         via the app_documents table \u2014 a different data model. -->
     <div id="sc_docs_section" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;">
       <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
         <div style="font-size:13px;font-weight:700;">📎 Application Documents</div>
         <div style="display:flex;gap:8px;align-items:center;">
           <button id="sc_assign_btn" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Assign Files</button>
-          <label style="background:var(--yellow);border:none;color:#111;padding:5px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">
-            + Upload
-            <input type="file" id="sc_file_input" multiple accept=".pdf,image/*,.doc,.docx,.txt" style="display:none;" onchange="scUploadFiles(this)"/>
-          </label>
         </div>
       </div>
-      <div id="sc_docs_drop_zone"
-        ondragover="event.preventDefault();document.getElementById('sc_docs_drop_zone').style.background='var(--yellow-light)';document.getElementById('sc_docs_drop_zone').style.borderColor='var(--yellow)'"
-        ondragleave="document.getElementById('sc_docs_drop_zone').style.background='';document.getElementById('sc_docs_drop_zone').style.borderColor=''"
-        ondrop="scFileDrop(event)"
-        style="padding:12px 18px;min-height:48px;transition:background .15s;">
-        <div id="sc_docs_list" style="display:flex;flex-direction:column;gap:6px;"></div>
-        <div id="sc_docs_empty" style="padding:16px;text-align:center;color:var(--muted);font-size:12px;font-style:italic;">No documents attached. Drag files here or click Upload.</div>
-      </div>
+      <div id="sc_docs_mount"></div>
     </div>
 
   </div>
@@ -2573,134 +2566,10 @@ var SUPABASE_URL   = window.NATION_CONFIG.supabase_url;
 var SUPABASE_ANON  = window.NATION_CONFIG.supabase_anon;
 var STORAGE_BUCKET = window.NATION_CONFIG.storage_bucket || 'housing-files';
 
-// ── Supabase Storage helpers ──────────────────────────────────────────────────
-// All file uploads go through these functions.
-// Path conventions:
-//   tenants/{unitId}/{timestamp}_{filename}
-//   applications/{appId}/{timestamp}_{filename}
-//   contractors/{contractorId}/{bucket}/{timestamp}_{filename}
-//   units/{unitId}/photos/{timestamp}_{filename}
-//   sow/{unitId}/{timestamp}_{filename}
-
-function sbStorageHeaders() {
-  var h = { 'apikey': SUPABASE_ANON };
-  if(HOUSING_HEADERS && HOUSING_HEADERS['Authorization']) {
-    h['Authorization'] = HOUSING_HEADERS['Authorization'];
-  }
-  return h;
-}
-
-// Upload a File object to Supabase Storage. Returns {path, url} or throws.
-async function sbUploadFile(path, file) {
-  var url = SUPABASE_URL + '/storage/v1/object/' + STORAGE_BUCKET + '/' + path;
-  var res = await fetch(url, {
-    method: 'POST',
-    headers: Object.assign({}, sbStorageHeaders(), { 'x-upsert': 'true' }),
-    body: file
-  });
-  if(!res.ok) {
-    var err = await res.text();
-    throw new Error('Upload failed: ' + err);
-  }
-  return { path: path, url: sbGetFileUrl(path) };
-}
-
-// Get a signed URL for a file (valid 1 hour)
-async function sbGetSignedUrl(path) {
-  // Use Supabase JS client createSignedUrl if available — handles encoding automatically
-  try {
-    if(window._sb) {
-      var r = await window._sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
-      if(r.data && r.data.signedUrl) return r.data.signedUrl;
-    }
-  } catch(e) { console.warn('createSignedUrl error:', e); }
-  // Fallback: authenticated URL — token in Authorization header via fetch, then blob URL
-  return sbGetFileUrl(path);
-}
-
-// Return authenticated URL with properly encoded path and token
-function sbGetFileUrl(path) {
-  var token = (HOUSING_HEADERS && HOUSING_HEADERS['Authorization'] || '').replace('Bearer ','');
-  var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
-  var base = SUPABASE_URL + '/storage/v1/object/authenticated/' + STORAGE_BUCKET + '/' + encodedPath;
-  return token ? (base + '?token=' + encodeURIComponent(token)) : base;
-}
-
-// Delete a file from storage
-async function sbDeleteFile(path) {
-  var url = SUPABASE_URL + '/storage/v1/object/' + STORAGE_BUCKET;
-  var res = await fetch(url, {
-    method: 'DELETE',
-    headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ prefixes: [path] })
-  });
-  return res.ok;
-}
-
-// List files under a path prefix
-async function sbListFiles(prefix) {
-  // Remove trailing slash for the prefix
-  var cleanPrefix = prefix.replace(/\/$/, '');
-  var url = SUPABASE_URL + '/storage/v1/object/list/' + STORAGE_BUCKET;
-  var res = await fetch(url, {
-    method: 'POST',
-    headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ prefix: cleanPrefix, limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } })
-  });
-  if(!res.ok) return [];
-  var data = await res.json();
-  return Array.isArray(data) ? data : [];
-}
-
-// Save file metadata to housing_audit_log (so we can list files without storage list calls)
-async function sbSaveFileMeta(entityType, entityId, filePath, fileName, fileSize, fileType) {
-  try {
-    await fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
-      method: 'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
-      body: JSON.stringify({
-        entity_type: entityType,
-        entity_id: String(entityId),
-        action: 'file_uploaded',
-        details: JSON.stringify({ path: filePath, name: fileName, size: fileSize, type: fileType }),
-        actor: window.currentRole || 'staff',
-        created_at: new Date().toISOString()
-      })
-    });
-  } catch(e) { console.warn('File meta save failed:', e); }
-}
-
-// Load file list for an entity from audit log
-async function sbLoadFileMeta(entityType, entityId) {
-  try {
-    var r = await fetch(
-      SUPABASE_URL + '/rest/v1/housing_audit_log?entity_type=eq.'+entityType+'&entity_id=eq.'+encodeURIComponent(String(entityId))+'&action=eq.file_uploaded&order=created_at.desc',
-      { headers: HOUSING_HEADERS }
-    );
-    if(!r.ok) return [];
-    var rows = await r.json();
-    // Filter out deleted files
-    var deleted = rows.filter(function(r){ return r.action === 'file_deleted'; }).map(function(r){ return JSON.parse(r.details||'{}').path; });
-    return rows
-      .filter(function(row){ var d = JSON.parse(row.details||'{}'); return !deleted.includes(d.path); })
-      .map(function(row){
-        var d = JSON.parse(row.details||'{}');
-        return { path: d.path, name: d.name, size: d.size, type: d.type, addedAt: (row.created_at||'').slice(0,10), addedBy: row.actor, logId: row.id };
-      });
-  } catch(e) { return []; }
-}
-
-// Unified upload handler: uploads to Supabase Storage + saves metadata
-// Returns { path, name, size, type, addedAt, addedBy }
-async function sbUploadAndSave(entityType, entityId, file, pathPrefix) {
-  var ts = Date.now();
-  var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  var path = pathPrefix + '/' + ts + '_' + safeName;
-  var result = await sbUploadFile(path, file);
-  await sbSaveFileMeta(entityType, String(entityId), path, file.name, file.size, file.type);
-  return { path: path, name: file.name, size: file.size, type: file.type,
-           addedAt: new Date().toISOString().slice(0,10), addedBy: window.currentRole || 'staff' };
-}
+// ── Supabase Storage helpers ──────────────────────────────────────────────
+// Moved to /shared.js (Turn 3, Phase C dedup). See window.SbStorage and the
+// bare aliases (sbUploadFile, sbGetSignedUrl, sbUploadAndSave, etc.). Same
+// behavior, same call sites — just loaded from the shared file now.
 
 
 window._sb = null;
@@ -7485,140 +7354,159 @@ function scViewFile(path) {
     });
 }
 
+
+// ── Scorecard docs — DocLibrary instance (Phase C Turn 3) ────────────
+// Uses the factory with customLoader + customDelete because the scorecard
+// merges two data sources:
+//   1. app_documents table — manually-assigned migrated files
+//   2. applications/{appId}/ storage folder — directly-uploaded files
+// The factory's default audit-log loader doesn't know about this dual
+// model, so we hand-roll the loader/delete. Everything else (render,
+// upload, filter, view) is standard factory behavior.
+//
+// Note on upload behavior: the factory's built-in upload writes a
+// file_uploaded audit row keyed by entity_type='application'. The storage
+// listing in our customLoader picks that file up on the next refresh.
+
+// Categories for application documents. Drive the upload picker + chips.
+var _SCORECARD_APP_DOC_CATEGORIES = [
+  { key:'id',          label:'ID',              icon:'\uD83E\uDDFE' },
+  { key:'income',      label:'Income / Pay',    icon:'\uD83D\uDCB0' },
+  { key:'reference',   label:'Reference',       icon:'\uD83D\uDCDD' },
+  { key:'housing_hist',label:'Housing History', icon:'\uD83C\uDFE0' },
+  { key:'medical',     label:'Medical',         icon:'\u2695\uFE0F'  },
+  { key:'migrated',    label:'Migrated',        icon:'\uD83D\uDCC2' },
+  { key:'other',       label:'Other',           icon:'\uD83D\uDCCE' }
+];
+
+// Active factory instance — allows scSaveAssignedDocs to refresh the list
+window._scDocsLib = null;
+
 async function scLoadDocs(app) {
-  var list  = document.getElementById('sc_docs_list');
-  var empty = document.getElementById('sc_docs_empty');
-  if(!list) return;
-  list.innerHTML = '<div style="padding:10px;text-align:center;color:var(--muted);font-size:12px;">Loading\u2026</div>';
-
+  var mount = document.getElementById('sc_docs_mount');
+  if (!mount || !app) return;
   var appId = app.id || '';
-  var allFiles = [];
 
-  // Primary source: app_documents table (accurate, manually assigned)
-  try {
-    var r = await fetch(
-      SUPABASE_URL + '/rest/v1/app_documents?app_id=eq.' + encodeURIComponent(appId) + '&order=added_at.asc',
-      { headers: HOUSING_HEADERS }
-    );
-    if(r.ok) {
-      var rows = await r.json();
-      rows.forEach(function(row){
-        allFiles.push({ name: row.file_name, path: row.file_path,
-          size: row.file_size||0, type: row.file_type||'', docId: row.id });
-      });
-    }
-  } catch(e) { console.warn('app_documents load error:', e); }
-
-  // Secondary source: files uploaded directly via the app (per-app folder)
-  try {
-    var appFiles = await sbListFiles('applications/'+appId+'/');
-    if(appFiles && appFiles.length) {
-      appFiles.forEach(function(f){
-        if(!f.name || f.name === '.emptyFolderPlaceholder') return;
-        var fpath = 'applications/'+appId+'/'+f.name;
-        if(!allFiles.find(function(x){ return x.path === fpath; })) {
-          allFiles.push({ name: f.name, path: fpath,
-            size: f.metadata ? f.metadata.size : 0,
-            type: f.metadata ? f.metadata.mimetype : '' });
-        }
-      });
-    }
-  } catch(e) { /* folder may not exist */ }
-
-  if(!allFiles.length) {
-    list.innerHTML = '';
-    if(empty) empty.style.display = 'block';
+  // Tear down any prior instance so we don't double-mount
+  mount.innerHTML = '';
+  if (!window.DocLibrary) {
+    mount.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">Document library unavailable.</div>';
     return;
   }
-  if(empty) empty.style.display = 'none';
+  var canDelete = (window.currentRole === 'ed' || window.currentRole === 'housing_manager');
 
-  // Build rows using DOM nodes so paths with spaces/special chars don't break onclick
-  list.innerHTML = '';
-  allFiles.forEach(function(f) {
-    var isPdf = (f.type||f.name||'').includes('pdf') || (f.name||'').toLowerCase().endsWith('.pdf');
-    var isImg = (f.type||'').startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(f.name||'');
-    var icon  = isPdf ? '📄' : isImg ? '🖼️' : '📎';
-    var size  = f.size > 1048576 ? (f.size/1048576).toFixed(1)+'MB' : f.size > 1024 ? Math.round(f.size/1024)+'KB' : '';
+  window._scDocsLib = window.DocLibrary.create(mount, {
+    entityType:    'application',
+    entityId:      appId,
+    pathPrefix:    'applications/' + appId,
+    supabaseUrl:   SUPABASE_URL,
+    supabaseAnon:  SUPABASE_ANON,
+    storageBucket: STORAGE_BUCKET,
+    auditTable:    'housing_audit_log',
+    getActor:      function(){ return window.currentRole || 'staff'; },
+    categories:    _SCORECARD_APP_DOC_CATEGORIES,
+    readOnly:      !canDelete,
+    customLoader:  async function() {
+      var allFiles = [];
+      // Primary: app_documents table (manually assigned)
+      try {
+        var r = await fetch(
+          SUPABASE_URL + '/rest/v1/app_documents?app_id=eq.' + encodeURIComponent(appId) + '&order=added_at.asc',
+          { headers: HOUSING_HEADERS }
+        );
+        if (r.ok) {
+          var rows = await r.json();
+          rows.forEach(function(row){
+            allFiles.push({
+              path:     row.file_path,
+              name:     row.file_name,
+              size:     row.file_size || 0,
+              type:     row.file_type || '',
+              category: 'migrated',
+              addedAt:  (row.added_at || '').slice(0,10),
+              addedBy:  row.added_by || '',
+              docId:    row.id
+            });
+          });
+        }
+      } catch(e) { console.warn('app_documents load error:', e); }
 
-    var row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;';
+      // Secondary: direct uploads to this app's folder
+      try {
+        var appFiles = await sbListFiles('applications/' + appId + '/');
+        if (appFiles && appFiles.length) {
+          appFiles.forEach(function(f){
+            if (!f.name || f.name === '.emptyFolderPlaceholder') return;
+            var fpath = 'applications/' + appId + '/' + f.name;
+            if (!allFiles.find(function(x){ return x.path === fpath; })) {
+              allFiles.push({
+                path:     fpath,
+                name:     f.name,
+                size:     f.metadata ? f.metadata.size : 0,
+                type:     f.metadata ? f.metadata.mimetype : '',
+                category: 'other',
+                addedAt:  (f.created_at || '').slice(0,10),
+                addedBy:  ''
+              });
+            }
+          });
+        }
+      } catch(e) { /* folder may not exist yet */ }
 
-    var icEl = document.createElement('span');
-    icEl.style.fontSize = '18px'; icEl.style.flexShrink = '0';
-    icEl.textContent = icon;
-    row.appendChild(icEl);
+      // Category enrichment: read audit-log rows for this app so we can
+      // apply the per-file category stored in details JSON at upload time.
+      try {
+        var audit = await sbLoadFileMeta('application', appId);
+        if (Array.isArray(audit)) {
+          var catByPath = {};
+          audit.forEach(function(row){
+            if (row.path && row.category) catByPath[row.path] = row.category;
+          });
+          allFiles.forEach(function(f){
+            if (!f.docId && catByPath[f.path]) f.category = catByPath[f.path];
+          });
+        }
+      } catch(e) { /* non-fatal */ }
 
-    var meta = document.createElement('div');
-    meta.style.cssText = 'flex:1;min-width:0;';
-    var nm = document.createElement('div');
-    nm.style.cssText = 'font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-    nm.textContent = f.name;
-    meta.appendChild(nm);
-    if(size) {
-      var sz = document.createElement('div');
-      sz.style.cssText = 'font-size:10px;color:var(--muted);';
-      sz.textContent = size;
-      meta.appendChild(sz);
+      return allFiles;
+    },
+    customDelete: async function(file) {
+      if (file.docId) {
+        // app_documents row — remove the assignment only; the underlying
+        // storage file (shared migrated folder) stays put.
+        await fetch(
+          SUPABASE_URL + '/rest/v1/app_documents?id=eq.' + encodeURIComponent(file.docId),
+          { method:'DELETE', headers: HOUSING_HEADERS }
+        );
+      } else {
+        // Direct upload: delete the storage object + write a tombstone
+        // audit row. We intentionally keep the original file_uploaded
+        // audit row so history is preserved.
+        await sbDeleteFile(file.path);
+        await fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
+          method:'POST',
+          headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer':'return=minimal' }),
+          body: JSON.stringify({
+            entity_type: 'application',
+            entity_id:   String(appId),
+            action:      'file_deleted',
+            details:     JSON.stringify({ path: file.path, name: file.name }),
+            actor:       window.currentRole || 'staff',
+            created_at:  new Date().toISOString()
+          })
+        });
+      }
     }
-    row.appendChild(meta);
-
-    var btn = document.createElement('button');
-    btn.textContent = 'View';
-    btn.style.cssText = 'background:none;border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;';
-    (function(fp){ btn.addEventListener('click', function(){ scViewFile(fp); }); })(f.path||'');
-    row.appendChild(btn);
-
-    // Delete button — ED and HM only
-    var canDelete = (window.currentRole === 'ed' || window.currentRole === 'housing_manager');
-    if(canDelete) {
-      var delBtn = document.createElement('button');
-      delBtn.textContent = '✕';
-      delBtn.title = 'Remove file';
-      delBtn.style.cssText = 'background:none;border:1px solid #fecaca;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;color:#b91c1c;cursor:pointer;white-space:nowrap;';
-      (function(fp, docId){ delBtn.addEventListener('click', function(){ scDeleteDoc(fp, docId); }); })(f.path||'', f.docId||null);
-      row.appendChild(delBtn);
-    }
-
-    list.appendChild(row);
   });
-}
-async function scUploadFiles(input) {
-  var app = window._currentScorecardApp;
-  if(!app || !input.files || !input.files.length) return;
-  var files = Array.from(input.files);
-  var appId = app.id || '';
-  var list  = document.getElementById('sc_docs_list');
-  if(list) list.innerHTML = '<div style="padding:10px;text-align:center;color:var(--muted);font-size:12px;">Uploading '+files.length+' file'+(files.length>1?'s':'')+'\u2026</div>';
-  try {
-    for(var i=0; i<files.length; i++) {
-      await sbUploadAndSave('application', appId, files[i], 'applications/'+appId);
-    }
-    showToast('\u2713 '+files.length+' file'+(files.length>1?'s':'')+' uploaded');
-  } catch(e) { showToast('Upload failed: '+e.message); }
-  input.value = '';
-  scLoadDocs(app);
+
+  // Wire the Assign Files button (scorecard-specific flow, stays outside factory)
+  var assignBtn = document.getElementById('sc_assign_btn');
+  if (assignBtn) {
+    assignBtn.onclick = null;
+    assignBtn.addEventListener('click', function(){ scShowAssignDocs(app); });
+  }
 }
 
-// ── Document assignment (links APP- migrated files to a specific application) ──
-
-async function scDeleteDoc(filePath, docId) {
-  if(!confirm('Remove this file from the application? The file will not be deleted from storage.')) return;
-  var app = window._currentScorecardApp;
-  try {
-    if(docId) {
-      // Remove from app_documents table
-      await fetch(SUPABASE_URL+'/rest/v1/app_documents?id=eq.'+docId, { method:'DELETE', headers:HOUSING_HEADERS });
-    } else {
-      // Remove from audit log (app-uploaded files)
-      await fetch(
-        SUPABASE_URL+'/rest/v1/housing_audit_log?entity_type=eq.application&entity_id=eq.'+encodeURIComponent(app.id||'')+'&action=eq.file_uploaded',
-        { method:'DELETE', headers:HOUSING_HEADERS }
-      );
-    }
-    showToast('File removed from application');
-    if(app) scLoadDocs(app);
-  } catch(e) { showToast('Error removing file: '+(e.message||e)); }
-}
 
 
 async function scShowAssignDocs(app) {
@@ -7706,18 +7594,6 @@ async function scSaveAssignedDocs(app, previouslyAssigned) {
   scLoadDocs(app);
 }
 
-
-function scFileDrop(e) {
-  e.preventDefault();
-  var zone = document.getElementById('sc_docs_drop_zone');
-  if(zone){ zone.style.background=''; zone.style.borderColor=''; }
-  var app = window._currentScorecardApp;
-  if(!app) return;
-  var files = Array.from(e.dataTransfer.files||[]);
-  if(!files.length) return;
-  var fakeInput = { files: files, value: '' };
-  scUploadFiles(fakeInput);
-}
 
 function showScorecard(app){
   if(!app)return;
@@ -10128,28 +10004,6 @@ async function udpRenderFilePreviews(unitId){
     categories:    _HOUSING_TENANT_DOC_CATEGORIES,
     readOnly:      true
   });
-}
-
-// ── Legacy compat wrappers ──────────────────────────────────────────
-// Older markup / event bindings may still call these. They now delegate
-// to the tenant-files modal (which is the single source of truth for
-// tenant-file edits after Phase C).
-function udpFileDrop(e) {
-  e.preventDefault();
-  if (!_currentDetailUnitId) return;
-  udpOpenFilesModal();
-}
-
-function udpFileUploadInline(input) {
-  if (!_currentDetailUnitId) return;
-  if (input && input.value !== undefined) input.value = '';
-  udpOpenFilesModal();
-}
-
-async function udpProcessFiles(files) {
-  // Legacy path — forward any stale inline callers to the managed modal
-  if (!_currentDetailUnitId) return;
-  udpOpenFilesModal();
 }
 
 function saveNewUnit(){
@@ -14381,38 +14235,10 @@ function closeTenantFilesPanel(){
 // these. They now delegate to the DocLibrary-backed flow. If you're
 // reading this in Phase D cleanup: these can go away once every caller
 // uses DocLibrary directly.
-async function tenantFilesUpload(input){
-  // Uploading is now handled inside DocLibrary's upload drop zone.
-  // If something still reaches here, forward to the active library.
-  if (!input || !input.files || !input.files.length || !_tenantFilesLib) return;
-  var files = Array.from(input.files);
-  // Simulate a drop to reuse DocLibrary's internal _handleFiles via the
-  // file input it rendered. Easiest path: trigger a refresh and ask the
-  // user to re-drop through the factory UI. But to keep existing
-  // callers working, we do a direct sequential upload using the same
-  // storage helpers, then refresh the library.
-  try {
-    for (var i = 0; i < files.length; i++) {
-      await sbUploadAndSave('tenant', _tenantFilesUnitId, files[i], 'tenants/' + _tenantFilesUnitId);
-    }
-    showToast('\u2713 ' + files.length + ' file' + (files.length>1?'s':'') + ' uploaded');
-  } catch(e) { showToast('Upload failed: ' + e.message); }
-  if (input.value !== undefined) input.value = '';
-  if (_tenantFilesLib) _tenantFilesLib.refresh();
-}
-
-function tenantFilesDrop(event){
-  // Legacy drop handler — DocLibrary has its own drop zone now; this is
-  // only kept in case some stale markup somewhere still dispatches to it.
-  event.preventDefault();
-  var dt = event.dataTransfer;
-  if (dt && dt.files && dt.files.length) tenantFilesUpload({ files: dt.files, value: '' });
-}
-
 async function deleteTenantFile(path){
-  // Legacy delete — DocLibrary handles its own delete button now. Kept
-  // because scLoadDocs / udpRenderFilePreviews / other list renderers
-  // still inline this call from their templated rows.
+  // Still present because Turn 3 Item 2's authorized scope was tenantFiles*
+  // + udp* wrappers only. This one has no external callers in housing.html
+  // today but it's left for a future cleanup pass to delete explicitly.
   if(!confirm('Remove this file?')) return;
   var entityId = _tenantFilesUnitId || (typeof _currentDetailUnitId !== 'undefined' ? _currentDetailUnitId : '');
   try {
@@ -14432,12 +14258,6 @@ async function deleteTenantFile(path){
       udpRenderFilePreviews(_currentDetailUnitId);
     }
   } catch(e){ showToast('Could not remove: '+e.message); }
-}
-
-async function renderTenantFileList(){
-  // Legacy entry point. DocLibrary now owns the render. If an older code
-  // path still calls this, forward to refresh().
-  if (_tenantFilesLib) _tenantFilesLib.refresh();
 }
 
 // ══════════════════════════════════════════════════════

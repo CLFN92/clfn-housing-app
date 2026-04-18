@@ -849,3 +849,334 @@ window.DocLibrary = (function(){
 
   return { create: create };
 })();
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// SUPABASE STORAGE HELPERS (Phase C — extracted from housing/renos)
+// ───────────────────────────────────────────────────────────────────────
+// These helpers were duplicated byte-for-byte across housing.html and
+// renos.html. They now live here and both apps get them from shared.js.
+//
+// Config dependencies — these must exist as window globals BEFORE any
+// helper is called. Both housing.html and renos.html already declare
+// them near the top of their scripts:
+//   window.SUPABASE_URL     — Supabase project URL (from NATION_CONFIG)
+//   window.SUPABASE_ANON    — anon/public key (from NATION_CONFIG)
+//   window.STORAGE_BUCKET   — bucket name (from NATION_CONFIG, or
+//                             'housing-files' default)
+//   window.HOUSING_HEADERS  — {'apikey', 'Authorization'} object used
+//                             by housing_audit_log REST calls
+//   window.currentRole      — optional; used as the audit 'actor'
+//   window._sb              — optional; Supabase JS client for signed URLs
+//
+// Path conventions:
+//   tenants/{unitId}/{timestamp}_{filename}
+//   applications/{appId}/{timestamp}_{filename}
+//   contractors/{contractorId}/{bucket}/{timestamp}_{filename}
+//   units/{unitId}/photos/{timestamp}_{filename}
+//   sow/{unitId}/{timestamp}_{filename}
+//
+// Exposes both window.SbStorage (namespaced) and the legacy top-level
+// names (sbUploadFile, sbGetSignedUrl, etc.) — the latter because 15+
+// existing call sites use them bare.
+// ═══════════════════════════════════════════════════════════════════════
+(function(){
+  'use strict';
+
+  function sbStorageHeaders() {
+    var h = { 'apikey': window.SUPABASE_ANON };
+    if (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization']) {
+      h['Authorization'] = window.HOUSING_HEADERS['Authorization'];
+    }
+    return h;
+  }
+
+  // Return authenticated URL with properly encoded path and token
+  function sbGetFileUrl(path) {
+    var token = (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ','');
+    var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
+    var base = window.SUPABASE_URL + '/storage/v1/object/authenticated/' + window.STORAGE_BUCKET + '/' + encodedPath;
+    return token ? (base + '?token=' + encodeURIComponent(token)) : base;
+  }
+
+  // Upload a File object to Supabase Storage. Returns {path, url} or throws.
+  async function sbUploadFile(path, file) {
+    var url = window.SUPABASE_URL + '/storage/v1/object/' + window.STORAGE_BUCKET + '/' + path;
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: Object.assign({}, sbStorageHeaders(), { 'x-upsert': 'true' }),
+      body: file
+    });
+    if (!res.ok) {
+      var err = await res.text();
+      throw new Error('Upload failed: ' + err);
+    }
+    return { path: path, url: sbGetFileUrl(path) };
+  }
+
+  // Get a signed URL for a file (valid 1 hour)
+  async function sbGetSignedUrl(path) {
+    // Prefer Supabase JS client if available — handles encoding cleanly
+    try {
+      if (window._sb) {
+        var r = await window._sb.storage.from(window.STORAGE_BUCKET).createSignedUrl(path, 3600);
+        if (r.data && r.data.signedUrl) return r.data.signedUrl;
+      }
+    } catch(e) { console.warn('createSignedUrl error:', e); }
+    // Fallback: authenticated URL with token param
+    return sbGetFileUrl(path);
+  }
+
+  // Delete a file from storage
+  async function sbDeleteFile(path) {
+    var url = window.SUPABASE_URL + '/storage/v1/object/' + window.STORAGE_BUCKET;
+    var res = await fetch(url, {
+      method: 'DELETE',
+      headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ prefixes: [path] })
+    });
+    return res.ok;
+  }
+
+  // List files under a path prefix
+  async function sbListFiles(prefix) {
+    var cleanPrefix = prefix.replace(/\/$/, '');
+    var url = window.SUPABASE_URL + '/storage/v1/object/list/' + window.STORAGE_BUCKET;
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ prefix: cleanPrefix, limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } })
+    });
+    if (!res.ok) return [];
+    var data = await res.json();
+    return Array.isArray(data) ? data : [];
+  }
+
+  // Save file metadata to housing_audit_log
+  async function sbSaveFileMeta(entityType, entityId, filePath, fileName, fileSize, fileType) {
+    try {
+      await fetch(window.SUPABASE_URL + '/rest/v1/housing_audit_log', {
+        method: 'POST',
+        headers: Object.assign({}, window.HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({
+          entity_type: entityType,
+          entity_id: String(entityId),
+          action: 'file_uploaded',
+          details: JSON.stringify({ path: filePath, name: fileName, size: fileSize, type: fileType }),
+          actor: window.currentRole || 'staff',
+          created_at: new Date().toISOString()
+        })
+      });
+    } catch(e) { console.warn('File meta save failed:', e); }
+  }
+
+  // Load file list for an entity from audit log (filters out deleted)
+  async function sbLoadFileMeta(entityType, entityId) {
+    try {
+      var r = await fetch(
+        window.SUPABASE_URL + '/rest/v1/housing_audit_log?entity_type=eq.'+entityType+'&entity_id=eq.'+encodeURIComponent(String(entityId))+'&action=eq.file_uploaded&order=created_at.desc',
+        { headers: window.HOUSING_HEADERS }
+      );
+      if (!r.ok) return [];
+      var rows = await r.json();
+      var deleted = rows.filter(function(r){ return r.action === 'file_deleted'; }).map(function(r){ return JSON.parse(r.details||'{}').path; });
+      return rows
+        .filter(function(row){ var d = JSON.parse(row.details||'{}'); return !deleted.includes(d.path); })
+        .map(function(row){
+          var d = JSON.parse(row.details||'{}');
+          return { path: d.path, name: d.name, size: d.size, type: d.type, addedAt: (row.created_at||'').slice(0,10), addedBy: row.actor, logId: row.id };
+        });
+    } catch(e) { return []; }
+  }
+
+  // Unified upload handler: uploads to Supabase Storage + saves metadata
+  async function sbUploadAndSave(entityType, entityId, file, pathPrefix) {
+    var ts = Date.now();
+    var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    var path = pathPrefix + '/' + ts + '_' + safeName;
+    var result = await sbUploadFile(path, file);
+    await sbSaveFileMeta(entityType, String(entityId), path, file.name, file.size, file.type);
+    return { path: path, name: file.name, size: file.size, type: file.type,
+             addedAt: new Date().toISOString().slice(0,10), addedBy: window.currentRole || 'staff' };
+  }
+
+  // Expose namespaced API
+  window.SbStorage = {
+    storageHeaders: sbStorageHeaders,
+    getFileUrl: sbGetFileUrl,
+    uploadFile: sbUploadFile,
+    getSignedUrl: sbGetSignedUrl,
+    deleteFile: sbDeleteFile,
+    listFiles: sbListFiles,
+    saveFileMeta: sbSaveFileMeta,
+    loadFileMeta: sbLoadFileMeta,
+    uploadAndSave: sbUploadAndSave
+  };
+  // Expose legacy top-level aliases — 15+ call sites across housing.html
+  // and renos.html use these bare names. Keep them until every caller
+  // migrates to window.SbStorage.
+  window.sbStorageHeaders = sbStorageHeaders;
+  window.sbGetFileUrl     = sbGetFileUrl;
+  window.sbUploadFile     = sbUploadFile;
+  window.sbGetSignedUrl   = sbGetSignedUrl;
+  window.sbDeleteFile     = sbDeleteFile;
+  window.sbListFiles      = sbListFiles;
+  window.sbSaveFileMeta   = sbSaveFileMeta;
+  window.sbLoadFileMeta   = sbLoadFileMeta;
+  window.sbUploadAndSave  = sbUploadAndSave;
+})();
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Supabase Storage Helpers (Turn 3 — Phase C dedup)
+
+   Extracted from housing.html + renos.html (byte-identical duplicates).
+   Exposes window.SbStorage (namespaced) AND bare aliases on window
+   (sbUploadFile, sbGetSignedUrl, etc.) because 15+ existing call sites
+   across housing.html and renos.html use the bare names.
+
+   Dependencies read from window at call-time:
+     window.SUPABASE_URL
+     window.SUPABASE_ANON
+     window.STORAGE_BUCKET
+     window.HOUSING_HEADERS      (REST + auth for Supabase audit-log)
+     window.currentRole          (used as audit 'actor')
+     window._sb                  (Supabase JS client; optional for signed URLs)
+
+   These globals are set by housing.html/renos.html near the top of their
+   scripts. Finance uses different auth headers and does not consume these
+   bare aliases — it goes through window.DocLibrary which takes its own opts.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function(){
+  'use strict';
+
+  function sbStorageHeaders() {
+    var h = { 'apikey': window.SUPABASE_ANON };
+    if (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization']) {
+      h['Authorization'] = window.HOUSING_HEADERS['Authorization'];
+    }
+    return h;
+  }
+
+  function sbGetFileUrl(path) {
+    var token = (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ','');
+    var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
+    var base = window.SUPABASE_URL + '/storage/v1/object/authenticated/' + window.STORAGE_BUCKET + '/' + encodedPath;
+    return token ? (base + '?token=' + encodeURIComponent(token)) : base;
+  }
+
+  async function sbUploadFile(path, file) {
+    var url = window.SUPABASE_URL + '/storage/v1/object/' + window.STORAGE_BUCKET + '/' + path;
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: Object.assign({}, sbStorageHeaders(), { 'x-upsert': 'true' }),
+      body: file
+    });
+    if (!res.ok) {
+      var err = await res.text();
+      throw new Error('Upload failed: ' + err);
+    }
+    return { path: path, url: sbGetFileUrl(path) };
+  }
+
+  async function sbGetSignedUrl(path) {
+    try {
+      if (window._sb) {
+        var r = await window._sb.storage.from(window.STORAGE_BUCKET).createSignedUrl(path, 3600);
+        if (r.data && r.data.signedUrl) return r.data.signedUrl;
+      }
+    } catch(e) { console.warn('createSignedUrl error:', e); }
+    return sbGetFileUrl(path);
+  }
+
+  async function sbDeleteFile(path) {
+    var url = window.SUPABASE_URL + '/storage/v1/object/' + window.STORAGE_BUCKET;
+    var res = await fetch(url, {
+      method: 'DELETE',
+      headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ prefixes: [path] })
+    });
+    return res.ok;
+  }
+
+  async function sbListFiles(prefix) {
+    var cleanPrefix = prefix.replace(/\/$/, '');
+    var url = window.SUPABASE_URL + '/storage/v1/object/list/' + window.STORAGE_BUCKET;
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ prefix: cleanPrefix, limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } })
+    });
+    if (!res.ok) return [];
+    var data = await res.json();
+    return Array.isArray(data) ? data : [];
+  }
+
+  async function sbSaveFileMeta(entityType, entityId, filePath, fileName, fileSize, fileType) {
+    try {
+      await fetch(window.SUPABASE_URL + '/rest/v1/housing_audit_log', {
+        method: 'POST',
+        headers: Object.assign({}, window.HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({
+          entity_type: entityType,
+          entity_id: String(entityId),
+          action: 'file_uploaded',
+          details: JSON.stringify({ path: filePath, name: fileName, size: fileSize, type: fileType }),
+          actor: window.currentRole || 'staff',
+          created_at: new Date().toISOString()
+        })
+      });
+    } catch(e) { console.warn('File meta save failed:', e); }
+  }
+
+  async function sbLoadFileMeta(entityType, entityId) {
+    try {
+      var r = await fetch(
+        window.SUPABASE_URL + '/rest/v1/housing_audit_log?entity_type=eq.'+entityType+'&entity_id=eq.'+encodeURIComponent(String(entityId))+'&action=eq.file_uploaded&order=created_at.desc',
+        { headers: window.HOUSING_HEADERS }
+      );
+      if (!r.ok) return [];
+      var rows = await r.json();
+      var deleted = rows.filter(function(row){ return row.action === 'file_deleted'; }).map(function(row){ return JSON.parse(row.details||'{}').path; });
+      return rows
+        .filter(function(row){ var d = JSON.parse(row.details||'{}'); return !deleted.includes(d.path); })
+        .map(function(row){
+          var d = JSON.parse(row.details||'{}');
+          return { path: d.path, name: d.name, size: d.size, type: d.type, addedAt: (row.created_at||'').slice(0,10), addedBy: row.actor, logId: row.id };
+        });
+    } catch(e) { return []; }
+  }
+
+  async function sbUploadAndSave(entityType, entityId, file, pathPrefix) {
+    var ts = Date.now();
+    var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    var path = pathPrefix + '/' + ts + '_' + safeName;
+    var result = await sbUploadFile(path, file);
+    await sbSaveFileMeta(entityType, String(entityId), path, file.name, file.size, file.type);
+    return { path: path, name: file.name, size: file.size, type: file.type,
+             addedAt: new Date().toISOString().slice(0,10), addedBy: window.currentRole || 'staff' };
+  }
+
+  // Namespaced API
+  window.SbStorage = {
+    storageHeaders: sbStorageHeaders,
+    getFileUrl:     sbGetFileUrl,
+    uploadFile:     sbUploadFile,
+    getSignedUrl:   sbGetSignedUrl,
+    deleteFile:     sbDeleteFile,
+    listFiles:      sbListFiles,
+    saveFileMeta:   sbSaveFileMeta,
+    loadFileMeta:   sbLoadFileMeta,
+    uploadAndSave:  sbUploadAndSave
+  };
+  // Bare aliases — required until every call site migrates to SbStorage.
+  window.sbStorageHeaders = sbStorageHeaders;
+  window.sbGetFileUrl     = sbGetFileUrl;
+  window.sbUploadFile     = sbUploadFile;
+  window.sbGetSignedUrl   = sbGetSignedUrl;
+  window.sbDeleteFile     = sbDeleteFile;
+  window.sbListFiles      = sbListFiles;
+  window.sbSaveFileMeta   = sbSaveFileMeta;
+  window.sbLoadFileMeta   = sbLoadFileMeta;
+  window.sbUploadAndSave  = sbUploadAndSave;
+})();
