@@ -312,14 +312,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
       <button class="btn btn-primary btn-sm" onclick="openModal('modalRentPayment')">&#127968; Record Payment</button>
       <button class="btn btn-ghost btn-sm" onclick="openModal('modalAddTenant')">+ Add Tenant</button>
-      <button class="btn btn-ghost btn-sm" onclick="diagCheck()" style="color:var(--muted);">&#128269; Diagnose</button>
-      <button class="btn btn-ghost btn-sm" onclick="clearAndReseed()" style="color:var(--muted);">&#8634; Reset Demo Data</button>
     </div>
   </div>
 
   <!-- Summary stats (previously on Dashboard) -->
   <div class="stats-grid" id="dashStats" style="margin-bottom:18px;"></div>
-  <div id="dash-diag" style="font-size:11px;color:var(--muted);margin-bottom:14px;"></div>
 
   <!-- Find-a-Tenant (compact) -->
   <div style="margin-bottom:18px;">
@@ -8807,13 +8804,6 @@ function renderDashboard(){
   if (subEl) subEl.textContent = 'Overview - ' + new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
   var d=getData();
 
-  // Diagnostic
-  var diag = document.getElementById('dash-diag');
-  if (diag) {
-    var lsStatus = (function(){try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return 'working';}catch(e){return 'BLOCKED \u2014 open via http://localhost not file://';}}());
-    diag.textContent = d.tenants.length + ' tenants | localStorage: ' + lsStatus;
-    diag.style.color = lsStatus==='working' ? 'var(--success)' : 'var(--danger)';
-  }
   var totals=calcAllTotals(d);
   var tR=0,tL=0,tA=0,colCount=0,clearCount=0;
   d.tenants.forEach(function(t){
@@ -10246,58 +10236,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     window.onerror(e.message, '', 0, 0, e);
   }
 });
-
-// \u2500\u2500 Dev utility: clear and reseed \u2500\u2500
-function diagCheck() {
-  var lines = [];
-  // 1. _memStore
-  lines.push('=== _memStore ===');
-  if (typeof _memStore === 'undefined' || _memStore === null) {
-    lines.push('_memStore: NULL / undefined');
-  } else {
-    lines.push('_memStore.tenants: ' + (_memStore.tenants ? _memStore.tenants.length : 'missing'));
-  }
-  // 2. localStorage
-  lines.push('\n=== localStorage ===');
-  try {
-    var ls = localStorage.getItem('clfn_finance_v6');
-    if (!ls) {
-      lines.push('clfn_finance: EMPTY / null');
-    } else {
-      var parsed = JSON.parse(ls);
-      lines.push('clfn_finance.tenants: ' + (parsed.tenants ? parsed.tenants.length : 'missing'));
-    }
-  } catch(e) {
-    lines.push('localStorage ERROR: ' + e.message);
-  }
-  // 3. getData() result
-  lines.push('\n=== getData() ===');
-  try {
-    var d = getData();
-    lines.push('tenants: ' + d.tenants.length);
-    if (d.tenants.length > 0) {
-      lines.push('first: ' + d.tenants[0].first + ' ' + d.tenants[0].last);
-    }
-  } catch(e) {
-    lines.push('getData ERROR: ' + e.message);
-  }
-  // 4. seedIfEmpty check
-  lines.push('\n=== seedIfEmpty would run? ===');
-  try {
-    var d2 = getData();
-    lines.push(d2.tenants.length === 0 ? 'YES - tenants empty' : 'NO - already has ' + d2.tenants.length + ' tenants');
-  } catch(e) { lines.push('ERROR: ' + e.message); }
-
-  toast(lines.join('\n'));
-}
-
-function clearAndReseed() {
-  if (!confirm('Clear all data and reload demo data? This cannot be undone.')) return;
-  localStorage.removeItem('clfn_finance_v6');
-  seedIfEmpty();
-  showPage('home');
-  toast('Demo data reloaded.');
-}
 
 </script>
 
