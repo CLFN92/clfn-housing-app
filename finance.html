@@ -380,11 +380,14 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
     <button class="btn btn-primary btn-sm" onclick="openModal('modalAddTenant')">+ Add Tenant</button>
   </div>
 
+  <!-- Browseable tenant list — shown when no profile is selected. Phase F3A. -->
+  <div id="tenantListPanel" style="margin-bottom:16px;"></div>
+
   <!-- TIC — hidden until tenant selected -->
   <div id="tenantProfilePanel">
     <div style="text-align:center;padding:60px 0;color:var(--muted);">
       <div style="font-size:32px;margin-bottom:12px;">&#128101;</div>
-      <div style="font-size:14px;">Search for a tenant above to view their information card</div>
+      <div style="font-size:14px;">Search for a tenant above or pick one from the list below to view their information card</div>
     </div>
   </div>
 
@@ -2884,7 +2887,8 @@ function showPage(id) {
       var inp = document.getElementById('tenantSearchInput');
       if(inp){ inp.value=''; searchTenants(''); inp.focus(); }
       var pp = document.getElementById('tenantProfilePanel');
-      if(pp) pp.innerHTML='<div style="text-align:center;padding:20px 0 40px;color:var(--muted);font-size:13px;">Enter a name above to view a tenant record</div>';
+      if(pp) pp.innerHTML='<div style="text-align:center;padding:20px 0 40px;color:var(--muted);font-size:13px;">Select a tenant from the list below to view their record.</div>';
+      renderTenantList();
     }, 80);
   }
   if(id==='rent'){initTenantSelects();renderRentLedger();}
@@ -3124,11 +3128,78 @@ function searchTenants(q) {
 function selectTenantProfile(tid) {
   var resultsEl = document.getElementById('tenantSearchResults');
   if (resultsEl) resultsEl.style.display = 'none';
+  var listEl = document.getElementById('tenantListPanel');
+  if (listEl) listEl.style.display = 'none';   // hide browse list when a profile is up
   var inp = document.getElementById('tenantSearchInput');
   var t = getTenant(tid);
   if (!t) return;
   if (inp) inp.value = tenantName(t);
   renderTenantProfile(tid);
+}
+
+// Phase F3A — browseable tenant list on the Tenants tab. Shown when no
+// profile is selected; clicking a row opens that tenant's profile.
+function renderTenantList() {
+  var panel = document.getElementById('tenantListPanel');
+  if (!panel) return;
+  panel.style.display = 'block';
+  var d = getData();
+  var list = (d.tenants||[]).slice().sort(function(a,b){
+    return tenantName(a).localeCompare(tenantName(b));
+  });
+  if (!list.length) {
+    panel.innerHTML = '<div class="card" style="text-align:center;padding:30px;color:var(--muted);">' +
+      '<div style="font-size:24px;margin-bottom:8px;">&#128101;</div>' +
+      '<div style="font-size:13px;">No tenants yet. Click <strong>+ Add Tenant</strong> to create the first one.</div>' +
+      '</div>';
+    return;
+  }
+  // Compact table. Clickable rows open the profile.
+  var rows = list.map(function(t){
+    var initials = ((t.first||'')[0]||'') + ((t.last||'')[0]||'');
+    if (!initials) initials = '?';
+    var safeId = (t.id||'').replace(/'/g, "\\'");
+    var statusPill = t.status === 'former'
+      ? '<span class="pill" style="background:#fee2e2;color:#991b1b;font-size:10px;">Former</span>'
+      : t.status === 'deceased'
+        ? '<span class="pill" style="background:#e5e7eb;color:#4b5563;font-size:10px;">Deceased</span>'
+        : '<span class="pill" style="background:#dcfce7;color:#166534;font-size:10px;">Active</span>';
+    var unitLabel = t.unit || '<span style="color:var(--muted);">—</span>';
+    var typeLabel = (t.type||'').replace(/-/g,' ') || '<span style="color:var(--muted);">—</span>';
+    return '<tr onclick="selectTenantProfile(\''+safeId+'\')" style="cursor:pointer;">'+
+      '<td style="width:40px;"><div class="tsr-avatar" style="width:32px;height:32px;font-size:12px;">'+initials+'</div></td>'+
+      '<td><strong>'+tenantName(t)+'</strong></td>'+
+      '<td>'+unitLabel+'</td>'+
+      '<td style="text-transform:capitalize;">'+typeLabel+'</td>'+
+      '<td>'+statusPill+'</td>'+
+      '<td style="text-align:right;color:var(--muted);font-size:12px;">Click to open &rsaquo;</td>'+
+    '</tr>';
+  }).join('');
+  panel.innerHTML =
+    '<div class="card" style="padding:0;overflow:hidden;">'+
+      '<div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">'+
+        '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">All Tenants</div>'+
+        '<div style="font-size:12px;color:var(--muted);">'+list.length+' total</div>'+
+      '</div>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:13px;">'+
+        '<thead><tr style="background:var(--bg);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;">'+
+          '<th style="text-align:left;padding:8px 14px;"></th>'+
+          '<th style="text-align:left;padding:8px 14px;">Name</th>'+
+          '<th style="text-align:left;padding:8px 14px;">Unit</th>'+
+          '<th style="text-align:left;padding:8px 14px;">Type</th>'+
+          '<th style="text-align:left;padding:8px 14px;">Status</th>'+
+          '<th></th>'+
+        '</tr></thead>'+
+        '<tbody>'+rows+'</tbody>'+
+      '</table>'+
+    '</div>';
+  // Add a subtle hover state via CSS (injected once)
+  if (!document.getElementById('tenant-list-style')){
+    var st = document.createElement('style');
+    st.id = 'tenant-list-style';
+    st.textContent = '#tenantListPanel tbody tr:hover { background:var(--bg); }';
+    document.head.appendChild(st);
+  }
 }
 
 function renderTenantProfile(tid) {
