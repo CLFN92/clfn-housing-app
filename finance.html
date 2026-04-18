@@ -603,14 +603,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
       Back to Home
     </button>
   </div>
-  <div class="page-hdr">
-    <div><h1>Payment Arrangements</h1><p>Formal repayment plans for arrears across any ledger</p></div>
-    <div class="page-hdr-actions">
+
+  <!-- Page title + actions -->
+  <div class="std-page-header">
+    <div class="std-page-header-main">
+      <h1 class="std-page-title">Payment Arrangements</h1>
+      <p class="std-page-subtitle">Formal repayment plans for arrears across any ledger.</p>
+      <div class="std-page-meta" id="arr_page_meta">—</div>
+    </div>
+    <div class="std-page-actions">
       <button class="btn btn-ghost btn-sm" onclick="openModal('modalNewArrangement')">&#128203; New Arrangement</button>
       <button class="btn btn-primary btn-sm" onclick="openModal('modalArrPayment');currentArrId=null;">+ Record Payment</button>
     </div>
   </div>
-  <div class="tenant-picker" style="margin-bottom:16px;position:relative;">
+
+  <!-- Tenant picker -->
+  <div class="tenant-picker" style="margin-bottom:14px;position:relative;">
     <div class="search-wrap" style="margin:0;">
       <span class="search-icon">&#128269;</span>
       <input type="text" id="arrTenantSearch"
@@ -622,6 +630,48 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     </div>
     <select id="arrTenantSelect" onchange="renderArrangementsPage()" style="display:none;"><option value="all">All Tenants</option></select>
   </div>
+
+  <!-- Filter row -->
+  <div class="std-filter-row">
+    <span class="std-filter-label">Status</span>
+    <select class="std-filter-control narrow" id="afilt_status" onchange="renderArrangementsPage()">
+      <option value="">All</option>
+      <option value="active">Active</option>
+      <option value="approved">Approved</option>
+      <option value="pending-ed">Pending ED</option>
+      <option value="completed">Completed</option>
+      <option value="defaulted">Defaulted</option>
+      <option value="cancelled">Cancelled</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Ledger</span>
+    <select class="std-filter-control" id="afilt_ledger" onchange="renderArrangementsPage()">
+      <option value="">All ledgers</option>
+      <option value="rent">Rent</option>
+      <option value="loan">Loan</option>
+      <option value="utility">Utility</option>
+      <option value="other">Other</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Frequency</span>
+    <select class="std-filter-control narrow" id="afilt_freq" onchange="renderArrangementsPage()">
+      <option value="">All</option>
+      <option value="weekly">Weekly</option>
+      <option value="biweekly">Bi-Weekly</option>
+      <option value="semimonthly">Semi-Monthly</option>
+      <option value="monthly">Monthly</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Amount</span>
+    <span class="std-amount-range">
+      <input type="number" id="afilt_amt_min" placeholder="Min" step="0.01" oninput="renderArrangementsPage()"/>
+      <span class="sep">—</span>
+      <input type="number" id="afilt_amt_max" placeholder="Max" step="0.01" oninput="renderArrangementsPage()"/>
+    </span>
+    <div class="std-filter-spacer"></div>
+    <button class="std-filter-clear" onclick="clearArrangementsFilters()">Clear</button>
+  </div>
+
   <div id="arrangementsContent"></div>
 </div>
 
@@ -634,24 +684,66 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
       Back to Home
     </button>
   </div>
-  <div class="page-hdr">
-    <div><h1>Loans</h1><p>Renovation loans, rent-to-own, and repayment tracking</p></div>
-    <div class="page-hdr-actions"><button class="btn btn-primary btn-sm" onclick="openModal('modalNewLoan')">+ New Loan</button></div>
+
+  <!-- Page title + actions -->
+  <div class="std-page-header">
+    <div class="std-page-header-main">
+      <h1 class="std-page-title">Loans</h1>
+      <p class="std-page-subtitle">Renovation loans, rent-to-own, and repayment tracking across all tenants.</p>
+      <div class="std-page-meta" id="loan_page_meta">—</div>
+    </div>
+    <div class="std-page-actions">
+      <button class="btn btn-primary btn-sm" onclick="openModal('modalNewLoan')">+ New Loan</button>
+    </div>
   </div>
-  <div class="tenant-picker" style="margin-bottom:16px;position:relative;">
+
+  <!-- Tenant picker -->
+  <div class="tenant-picker" style="margin-bottom:14px;position:relative;">
     <div class="search-wrap" style="margin:0;">
       <span class="search-icon">&#128269;</span>
       <input type="text" id="loanTenantSearch"
-        placeholder="Search by name, unit, phone or email..."
+        placeholder="All Tenants — click to filter by name, unit, phone or email..."
         oninput="tenantPickerSearch('loan', this.value)"
         onfocus="tenantPickerFocus('loan')"
         autocomplete="off"/>
       <div id="loanTenantResults" class="tenant-search-results"></div>
     </div>
-    <select id="loanTenantSelect" onchange="renderLoansPage()" style="display:none;"></select>
+    <select id="loanTenantSelect" onchange="renderLoansPage()" style="display:none;"><option value="all">All Tenants</option></select>
     <div class="tenant-info-badge" id="loanTenantBadge"></div>
   </div>
-  <!-- Loan switcher tabs (shown when tenant has >1 loan) -->
+
+  <!-- Filter row -->
+  <div class="std-filter-row">
+    <span class="std-filter-label">Status</span>
+    <select class="std-filter-control narrow" id="lfilt_status" onchange="renderLoansPage()">
+      <option value="">All</option>
+      <option value="approved">Approved</option>
+      <option value="pending-ed">Pending ED</option>
+      <option value="pending">Pending</option>
+      <option value="declined">Declined</option>
+      <option value="completed">Paid Off</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Purpose</span>
+    <select class="std-filter-control" id="lfilt_purpose" onchange="renderLoansPage()">
+      <option value="">All purposes</option>
+      <option value="renovation">Renovation</option>
+      <option value="rent-to-own">Rent-to-Own</option>
+      <option value="emergency">Emergency</option>
+      <option value="other">Other</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Principal</span>
+    <span class="std-amount-range">
+      <input type="number" id="lfilt_amt_min" placeholder="Min" step="0.01" oninput="renderLoansPage()"/>
+      <span class="sep">—</span>
+      <input type="number" id="lfilt_amt_max" placeholder="Max" step="0.01" oninput="renderLoansPage()"/>
+    </span>
+    <div class="std-filter-spacer"></div>
+    <button class="std-filter-clear" onclick="clearLoansFilters()">Clear</button>
+  </div>
+
+  <!-- Loan switcher tabs (shown when single-tenant filter has >1 loan) -->
   <div id="loanSwitcher" style="display:none;margin-bottom:16px;"></div>
   <div id="loansContent"></div>
 </div>
@@ -665,11 +757,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
       Back to Home
     </button>
   </div>
-  <div class="page-hdr">
-    <div><h1>Journal Entries</h1><p>Manual debits and credits - reviewed by ED</p></div>
-    <div class="page-hdr-actions"><button class="btn btn-primary btn-sm" onclick="openModal('modalJournalEntry')">+ New Entry</button></div>
+  <!-- Page title + actions -->
+  <div class="std-page-header">
+    <div class="std-page-header-main">
+      <h1 class="std-page-title">Journal Entries</h1>
+      <p class="std-page-subtitle">Manual debits and credits across any ledger. Each entry is reviewed by the ED before posting.</p>
+      <div class="std-page-meta" id="journal_page_meta">—</div>
+    </div>
+    <div class="std-page-actions">
+      <button class="btn btn-primary btn-sm" onclick="openModal('modalJournalEntry')">+ New Entry</button>
+    </div>
   </div>
-  <div class="tenant-picker" style="margin-bottom:16px;position:relative;">
+
+  <!-- Tenant picker -->
+  <div class="tenant-picker" style="margin-bottom:14px;position:relative;">
     <div class="search-wrap" style="margin:0;">
       <span class="search-icon">&#128269;</span>
       <input type="text" id="journalTenantSearch"
@@ -681,11 +782,66 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     </div>
     <select id="journalTenantSelect" onchange="renderJournal()" style="display:none;"><option value="all">All Tenants</option></select>
   </div>
-  <div class="card"><div class="ctitle">Journal</div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Date</th><th>Tenant</th><th>Memo</th><th>Ledger</th><th>Debit</th><th>Credit</th><th>Posted By</th><th>Status</th></tr></thead>
+
+  <!-- Filter row -->
+  <div class="std-filter-row">
+    <span class="std-filter-label">Status</span>
+    <select class="std-filter-control narrow" id="jfilt_status" onchange="renderJournal()">
+      <option value="">All</option>
+      <option value="approved">Approved</option>
+      <option value="pending-ed">Pending ED</option>
+      <option value="pending">Pending</option>
+      <option value="reversed">Reversed</option>
+      <option value="declined">Declined</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Ledger</span>
+    <select class="std-filter-control" id="jfilt_ledger" onchange="renderJournal()">
+      <option value="">All ledgers</option>
+      <option value="rent">Rent</option>
+      <option value="loan">Loan</option>
+      <option value="arrangement">Arrangement</option>
+      <option value="utility">Utility</option>
+      <option value="other">Other</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Date</span>
+    <select class="std-filter-control" id="jfilt_date" onchange="renderJournal()">
+      <option value="all">All time</option>
+      <option value="this_month">This month</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">Last 90 days</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Amount</span>
+    <span class="std-amount-range">
+      <input type="number" id="jfilt_amt_min" placeholder="Min" step="0.01" oninput="renderJournal()"/>
+      <span class="sep">—</span>
+      <input type="number" id="jfilt_amt_max" placeholder="Max" step="0.01" oninput="renderJournal()"/>
+    </span>
+    <div class="std-filter-spacer"></div>
+    <button class="std-filter-clear" onclick="clearJournalFilters()">Clear</button>
+  </div>
+
+  <!-- Journal table -->
+  <div class="std-table-card">
+    <div class="std-table-hdr">
+      <span>Journal Entries</span>
+      <span class="std-table-count" id="journalCount">—</span>
+    </div>
+    <table class="std-table">
+      <thead><tr>
+        <th>Date</th>
+        <th>Tenant</th>
+        <th>Memo</th>
+        <th>Ledger</th>
+        <th class="std-cell-right">Debit</th>
+        <th class="std-cell-right">Credit</th>
+        <th>Posted By</th>
+        <th>Status</th>
+      </tr></thead>
       <tbody id="journalBody"></tbody>
-    </table></div>
+    </table>
   </div>
 </div>
 
@@ -826,18 +982,71 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
       Back to Home
     </button>
   </div>
-  <div class="page-hdr">
-    <div><h1>Collections</h1><p>Accounts referred to collections - requires ED approval</p></div>
-    <div class="page-hdr-actions">
+
+  <!-- Page title + actions -->
+  <div class="std-page-header">
+    <div class="std-page-header-main">
+      <h1 class="std-page-title">Collections</h1>
+      <p class="std-page-subtitle">Accounts referred to collections. Each referral requires ED approval and carries a full audit trail.</p>
+      <div class="std-page-meta" id="col_page_meta">—</div>
+    </div>
+    <div class="std-page-actions">
       <button class="btn btn-danger btn-sm" onclick="openModal('modalFlagCollections')">&#128680; Flag Account</button>
     </div>
   </div>
-  <div class="card">
-    <div class="ctitle">Active Collections Files</div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Tenant</th><th>Date Flagged</th><th>Amount at Referral</th><th>Agency / Ref</th><th>Current Balance</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+
+  <!-- Filter row -->
+  <div class="std-filter-row">
+    <span class="std-filter-label">Status</span>
+    <select class="std-filter-control narrow" id="cfilt_status" onchange="renderCollections()">
+      <option value="">All</option>
+      <option value="active">Active</option>
+      <option value="approved">Approved</option>
+      <option value="pending-ed">Pending ED</option>
+      <option value="resolved">Resolved</option>
+      <option value="cancelled">Cancelled</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Date</span>
+    <select class="std-filter-control" id="cfilt_date" onchange="renderCollections()">
+      <option value="all">All time</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="365">Last year</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Amount</span>
+    <span class="std-amount-range">
+      <input type="number" id="cfilt_amt_min" placeholder="Min" step="0.01" oninput="renderCollections()"/>
+      <span class="sep">—</span>
+      <input type="number" id="cfilt_amt_max" placeholder="Max" step="0.01" oninput="renderCollections()"/>
+    </span>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Search</span>
+    <input type="text" class="std-filter-control" id="cfilt_search" placeholder="Tenant name or reference..." oninput="renderCollections()" style="min-width:220px;flex:1;"/>
+    <div class="std-filter-spacer"></div>
+    <button class="std-filter-clear" onclick="clearCollectionsFilters()">Clear</button>
+  </div>
+
+  <!-- Collections table -->
+  <div class="std-table-card">
+    <div class="std-table-hdr">
+      <span>Collections Files</span>
+      <span class="std-table-count" id="collectionsCount">—</span>
+    </div>
+    <table class="std-table">
+      <thead><tr>
+        <th>Tenant</th>
+        <th>Date Flagged</th>
+        <th class="std-cell-right">Amount at Referral</th>
+        <th>Agency / Ref</th>
+        <th class="std-cell-right">Current Balance</th>
+        <th>Status</th>
+        <th>Notes</th>
+        <th></th>
+      </tr></thead>
       <tbody id="collectionsBody"></tbody>
-    </table></div>
+    </table>
   </div>
 </div>
 
@@ -6367,27 +6576,94 @@ function renderLoanSchedule() {
   }).join('');
 }
 
+function clearJournalFilters(){
+  ['jfilt_status','jfilt_ledger','jfilt_amt_min','jfilt_amt_max'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value = '';
+  });
+  var dEl = document.getElementById('jfilt_date'); if (dEl) dEl.value = 'all';
+  renderJournal();
+}
+
 function renderJournal() {
   var tid = (document.getElementById('journalTenantSelect')||{}).value||'all';
   var d = getData();
-  var entries = d.rentLedger.filter(function(r){return r.type==='journal'||(r.type==='opening');});
-  if (tid !== 'all') entries = entries.filter(function(r){return r.tenantId===tid;});
-  entries.sort(function(a,b){return b.date.localeCompare(a.date);});
-  var el = document.getElementById('journal-content');
-  if (!el) return;
-  if (!entries.length) { el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">No journal entries.</div>'; return; }
-  var rows = entries.map(function(r){
+  // Source: rentLedger entries flagged as journal or opening balance
+  var all = (d.rentLedger||[]).filter(function(r){ return r.type==='journal' || r.type==='opening' || r.type==='opening_balance'; });
+
+  // Tenant filter
+  var list = tid === 'all' ? all : all.filter(function(r){ return r.tenantId === tid; });
+
+  // Additional filters
+  var fStatus = (document.getElementById('jfilt_status')||{}).value || '';
+  var fLedger = (document.getElementById('jfilt_ledger')||{}).value || '';
+  var fDate   = (document.getElementById('jfilt_date')  ||{}).value || 'all';
+  var fMin    = parseFloat((document.getElementById('jfilt_amt_min')||{}).value);
+  var fMax    = parseFloat((document.getElementById('jfilt_amt_max')||{}).value);
+
+  var cutoff = null;
+  var todayD = new Date();
+  if (fDate === 'this_month') cutoff = new Date(todayD.getFullYear(), todayD.getMonth(), 1);
+  else if (fDate === '30')    cutoff = new Date(todayD.getTime() - 30*24*60*60*1000);
+  else if (fDate === '90')    cutoff = new Date(todayD.getTime() - 90*24*60*60*1000);
+
+  list = list.filter(function(r){
+    if (cutoff && new Date(r.date) < cutoff) return false;
+    if (fStatus && (r.status||'') !== fStatus) return false;
+    // Journal entries don't have their own ledger field; for now we treat them all as 'rent'
+    // (they live in rentLedger). If the ledger field gets added later, this filter will work.
+    if (fLedger && (r.ledger || 'rent') !== fLedger) return false;
+    var amt = (r.charge||0) + (r.payment||0);
+    if (!isNaN(fMin) && amt < fMin) return false;
+    if (!isNaN(fMax) && amt > fMax) return false;
+    return true;
+  });
+
+  list.sort(function(a,b){ return b.date.localeCompare(a.date); });
+
+  // Update meta + count
+  var metaEl = document.getElementById('journal_page_meta');
+  if (metaEl) {
+    var today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+    metaEl.textContent = list.length + ' shown · ' + all.length + ' total · Last updated ' + today;
+  }
+  var countEl = document.getElementById('journalCount');
+  if (countEl) countEl.textContent = list.length + ' shown · ' + all.length + ' total';
+
+  var bodyEl = document.getElementById('journalBody');
+  if (!bodyEl) return;
+
+  if (!all.length) {
+    bodyEl.innerHTML = '<tr class="empty-row"><td colspan="8">No journal entries yet. Use <strong>+ New Entry</strong> to create the first one.</td></tr>';
+    return;
+  }
+  if (!list.length) {
+    bodyEl.innerHTML = '<tr class="empty-row"><td colspan="8">No entries match the current filters. <a href="#" onclick="clearJournalFilters();return false;" style="color:var(--text);text-decoration:underline;">Clear filters</a> to show all.</td></tr>';
+    return;
+  }
+
+  function stdPillForStatus(st){
+    if (st === 'approved') return '<span class="std-pill std-pill-approved">Approved</span>';
+    if (st === 'pending-ed') return '<span class="std-pill std-pill-pending">Pending ED</span>';
+    if (st === 'pending') return '<span class="std-pill std-pill-pending">Pending</span>';
+    if (st === 'reversed') return '<span class="std-pill std-pill-voided">Reversed</span>';
+    if (st === 'declined') return '<span class="std-pill std-pill-overdue">Declined</span>';
+    return '<span class="std-pill std-pill-info">'+(st||'—')+'</span>';
+  }
+
+  bodyEl.innerHTML = list.map(function(r){
     var t = getTenant(r.tenantId);
+    var postedBy = r.postedBy || r.enteredBy || '<span class="std-cell-dash">—</span>';
     return '<tr>'+
       '<td>'+r.date+'</td>'+
-      '<td>'+(t?tenantName(t):'\u2014')+'</td>'+
-      '<td>'+r.desc+'</td>'+
-      '<td>'+(r.charge>0?'<span class="amt-debit">'+fmt(r.charge)+'</span>':'\u2014')+'</td>'+
-      '<td>'+(r.payment>0?'<span class="amt-credit">'+fmt(r.payment)+'</span>':'\u2014')+'</td>'+
-      '<td>'+statusPill(r.status)+'</td>'+
+      '<td class="std-cell-primary">'+(t?tenantName(t):'<span class="std-cell-dash">—</span>')+'</td>'+
+      '<td>'+(r.desc||'<span class="std-cell-dash">—</span>')+'</td>'+
+      '<td style="text-transform:capitalize;">'+(r.ledger||'rent')+'</td>'+
+      '<td class="std-cell-right">'+(r.charge>0?'<span class="amt-debit">'+fmt(r.charge)+'</span>':'<span class="std-cell-dash">—</span>')+'</td>'+
+      '<td class="std-cell-right">'+(r.payment>0?'<span class="amt-credit">'+fmt(r.payment)+'</span>':'<span class="std-cell-dash">—</span>')+'</td>'+
+      '<td style="font-size:12px;color:var(--muted);">'+postedBy+'</td>'+
+      '<td>'+stdPillForStatus(r.status)+'</td>'+
     '</tr>';
   }).join('');
-  el.innerHTML = '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Tenant</th><th>Description</th><th>Debit</th><th>Credit</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 
 function renderBatchList() {
@@ -6733,28 +7009,111 @@ function renderAuditLog() {
   document.getElementById('auditLogContent').innerHTML='<div class="card"><div class="ctitle">'+filtered.length+' entries</div>'+html+'</div>';
 }
 
+function clearCollectionsFilters(){
+  ['cfilt_status','cfilt_amt_min','cfilt_amt_max','cfilt_search'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value = '';
+  });
+  var dEl = document.getElementById('cfilt_date'); if (dEl) dEl.value = 'all';
+  renderCollections();
+}
+
 function renderCollections() {
-  var d=getData();
-  var el=document.getElementById('collectionsContent');
-  if(!el)return;
-  var cols=d.collections||[];
-  if(!cols.length){el.innerHTML='<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No collection flags on file.</p></div>';return;}
-  el.innerHTML=cols.map(function(c){
-    var t=getTenant(c.tenantId);
-    return '<div class="card" style="margin-bottom:12px;border-left:4px solid '+(c.status==='approved'?'var(--danger)':c.status==='resolved'?'var(--success)':'#eab308')+';">'+
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">'+
-        '<div>'+
-          '<div style="font-size:15px;font-weight:600;">'+(t?tenantName(t):c.tenantId)+'</div>'+
-          '<div style="font-size:12px;color:var(--muted);">'+(t?t.unit:'')+' &middot; Flagged '+c.dateFlagged+'</div>'+
-          '<div style="font-size:13px;margin-top:4px;">Amount at referral: <strong>'+fmt(c.amountAtReferral)+'</strong></div>'+
-          (c.agency?'<div style="font-size:12px;color:var(--muted);">Agency: '+c.agency+'</div>':'')+
-          (c.notes?'<div style="font-size:12px;color:var(--muted);margin-top:4px;">'+c.notes+'</div>':'')+
-        '</div>'+
-        '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">'+
-          statusPill(c.status)+
-          (c.status==='resolved'?'':'<button class="btn btn-ghost btn-sm" onclick="resolveCollection(this.dataset.cid)" data-cid="'+c.id+'">Mark Resolved</button>')+
-        '</div>'+
-      '</div></div>';
+  var d = getData();
+  var all = d.collections || [];
+
+  // Pull filters
+  var fStatus = (document.getElementById('cfilt_status') ||{}).value || '';
+  var fDate   = (document.getElementById('cfilt_date')   ||{}).value || 'all';
+  var fMin    = parseFloat((document.getElementById('cfilt_amt_min')||{}).value);
+  var fMax    = parseFloat((document.getElementById('cfilt_amt_max')||{}).value);
+  var fSearch = ((document.getElementById('cfilt_search')||{}).value || '').trim().toLowerCase();
+
+  // Date cutoff
+  var cutoff = null;
+  var todayD = new Date();
+  if (fDate === '30')       cutoff = new Date(todayD.getTime() - 30*24*60*60*1000);
+  else if (fDate === '90')  cutoff = new Date(todayD.getTime() - 90*24*60*60*1000);
+  else if (fDate === '365') cutoff = new Date(todayD.getTime() - 365*24*60*60*1000);
+
+  var list = all.filter(function(c){
+    if (cutoff && c.dateFlagged && new Date(c.dateFlagged) < cutoff) return false;
+    if (fStatus) {
+      if (fStatus === 'active') {
+        if (c.status === 'resolved' || c.status === 'cancelled') return false;
+      } else if ((c.status||'') !== fStatus) {
+        return false;
+      }
+    }
+    var amt = parseFloat(c.amountAtReferral) || 0;
+    if (!isNaN(fMin) && amt < fMin) return false;
+    if (!isNaN(fMax) && amt > fMax) return false;
+    if (fSearch) {
+      var t = getTenant(c.tenantId);
+      var hay = ((t?tenantName(t):'') + ' ' + (c.agency||'') + ' ' + (c.ref||'') + ' ' + (c.notes||'')).toLowerCase();
+      if (hay.indexOf(fSearch) === -1) return false;
+    }
+    return true;
+  });
+
+  // Sort newest flag first
+  list.sort(function(a,b){ return (b.dateFlagged||'').localeCompare(a.dateFlagged||''); });
+
+  // Meta + count
+  var metaEl = document.getElementById('col_page_meta');
+  if (metaEl) {
+    var today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+    var openCount = all.filter(function(c){ return c.status !== 'resolved' && c.status !== 'cancelled'; }).length;
+    metaEl.textContent = openCount + ' open · ' + all.length + ' total · Last updated ' + today;
+  }
+  var countEl = document.getElementById('collectionsCount');
+  if (countEl) countEl.textContent = list.length + ' shown · ' + all.length + ' total';
+
+  var bodyEl = document.getElementById('collectionsBody');
+  if (!bodyEl) return;
+
+  if (!all.length) {
+    bodyEl.innerHTML = '<tr class="empty-row"><td colspan="8">No collection flags on file. Use <strong>🚨 Flag Account</strong> to refer an account.</td></tr>';
+    return;
+  }
+  if (!list.length) {
+    bodyEl.innerHTML = '<tr class="empty-row"><td colspan="8">No collections match the current filters. <a href="#" onclick="clearCollectionsFilters();return false;" style="color:var(--text);text-decoration:underline;">Clear filters</a> to show all.</td></tr>';
+    return;
+  }
+
+  function pillFor(status){
+    if (status === 'approved') return '<span class="std-pill std-pill-overdue">Active</span>';
+    if (status === 'pending-ed') return '<span class="std-pill std-pill-pending">Pending ED</span>';
+    if (status === 'resolved') return '<span class="std-pill std-pill-paid">Resolved</span>';
+    if (status === 'cancelled' || status === 'voided') return '<span class="std-pill std-pill-voided">Cancelled</span>';
+    return '<span class="std-pill std-pill-info">'+(status||'—')+'</span>';
+  }
+
+  // Compute current balance for each tenant using calcAllTotals
+  var totals = calcAllTotals(d);
+
+  bodyEl.innerHTML = list.map(function(c){
+    var t = getTenant(c.tenantId);
+    var bal = totals[c.tenantId] || {};
+    var curBalance = (bal.rent||0) + (bal.loan||0) + (bal.arrangement||0);
+    var safeCid = (c.id||'').replace(/'/g, "\\'");
+    var actionBtn = (c.status==='resolved' || c.status==='cancelled')
+      ? ''
+      : '<button class="btn btn-ghost btn-sm" onclick="resolveCollection(\''+safeCid+'\')">Mark Resolved</button>';
+    return '<tr>'+
+      '<td class="std-cell-primary">'+(t?tenantName(t):'<span class="std-cell-dash">—</span>')+
+        (t&&t.unit?'<div style="font-size:11px;color:var(--muted);font-weight:normal;">'+t.unit+'</div>':'')+'</td>'+
+      '<td>'+(c.dateFlagged||'<span class="std-cell-dash">—</span>')+'</td>'+
+      '<td class="std-cell-right"><span class="amt-debit">'+fmt(c.amountAtReferral||0)+'</span></td>'+
+      '<td style="font-size:12px;">'+
+        (c.agency ? '<div>'+c.agency+'</div>' : '<span class="std-cell-dash">—</span>')+
+        (c.ref ? '<div style="color:var(--muted);font-size:11px;">Ref: '+c.ref+'</div>' : '')+'</td>'+
+      '<td class="std-cell-right '+(curBalance>0?'balance-owed':'balance-clear')+'">'+fmt(curBalance)+'</td>'+
+      '<td>'+pillFor(c.status)+'</td>'+
+      '<td style="font-size:12px;color:var(--muted);max-width:240px;">'+
+        (c.notes ? (c.notes.length>80 ? c.notes.slice(0,80)+'…' : c.notes) : '<span class="std-cell-dash">—</span>')+
+        '</td>'+
+      '<td class="std-cell-tail">'+actionBtn+'</td>'+
+    '</tr>';
   }).join('');
 }
 
@@ -7446,25 +7805,22 @@ function populateModalSelects(id){
 function initTenantSelects(){
   var d=getData();
   var opts=d.tenants.map(function(t){return '<option value="'+t.id+'">'+tenantName(t)+' - '+t.unit+'</option>';}).join('');
-  ['rentTenantSelect','loanTenantSelect','stmtTenantSelect','loanSchedTenantSelect',
-   'journalTenantSelect'].forEach(function(sid){
+  ['rentTenantSelect','stmtTenantSelect','loanSchedTenantSelect'].forEach(function(sid){
     var el=document.getElementById(sid);
     if(!el)return;
     var cur=el.value;
-    var prefix=sid==='journalTenantSelect'?'<option value="all">All Tenants</option>':'<option value="">\u2014 Select Tenant \u2014</option>';
-    el.innerHTML=prefix+opts;
+    el.innerHTML='<option value="">\u2014 Select Tenant \u2014</option>'+opts;
     if(cur)el.value=cur;
   });
-  // Also (re)populate the arrangements select which isn't in the loop above
-  // because it uses a different onchange wiring.
-  var arrSel = document.getElementById('arrTenantSelect');
-  if (arrSel) {
-    var cur = arrSel.value;
-    arrSel.innerHTML = '<option value="all">All Tenants</option>' + opts;
-    if (cur) arrSel.value = cur;
-  }
-  // Sync the visible search labels for each tenant picker so they show the
-  // currently-selected tenant on page re-entry. Idempotent.
+  // Selects that support an "All Tenants" option
+  ['journalTenantSelect','arrTenantSelect','loanTenantSelect'].forEach(function(sid){
+    var el=document.getElementById(sid);
+    if(!el)return;
+    var cur=el.value;
+    el.innerHTML='<option value="all">All Tenants</option>'+opts;
+    if(cur)el.value=cur; else el.value='all';
+  });
+  // Sync visible search labels
   ['rent','loan','journal','arr'].forEach(function(key){
     syncTenantPickerLabel(key);
   });
@@ -7481,7 +7837,7 @@ function initTenantSelects(){
 var _TENANT_PICKERS = {
   rent:    { input:'rentTenantSearch',    results:'rentTenantResults',    select:'rentTenantSelect',    allowAll:false, trigger:'renderRentLedger' },
   arr:     { input:'arrTenantSearch',     results:'arrTenantResults',     select:'arrTenantSelect',     allowAll:true,  trigger:'renderArrangementsPage' },
-  loan:    { input:'loanTenantSearch',    results:'loanTenantResults',    select:'loanTenantSelect',    allowAll:false, trigger:'renderLoansPage' },
+  loan:    { input:'loanTenantSearch',    results:'loanTenantResults',    select:'loanTenantSelect',    allowAll:true,  trigger:'renderLoansPage' },
   journal: { input:'journalTenantSearch', results:'journalTenantResults', select:'journalTenantSelect', allowAll:true,  trigger:'renderJournal' }
 };
 
@@ -8448,51 +8804,168 @@ function calcArrangement(){
   document.getElementById('arr-payoff').textContent = payoffStr;
 }
 
+function clearArrangementsFilters(){
+  ['afilt_status','afilt_ledger','afilt_freq','afilt_amt_min','afilt_amt_max'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value = '';
+  });
+  renderArrangementsPage();
+}
+
 function renderArrangementsPage(){
-  var d=getData();
-  var filterTid=document.getElementById('arrTenantSelect').value;
-  var arrs=filterTid==='all'?d.arrangements:d.arrangements.filter(function(a){return a.tenantId===filterTid;});
-  if(arrs.length===0){
-    document.getElementById('arrangementsContent').innerHTML='<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);margin-bottom:16px;">No payment arrangements found.</p><button class="btn btn-primary" onclick="openModal(\'modalNewArrangement\')">+ New Arrangement</button></div>';
+  var d = getData();
+  var filterTid = (document.getElementById('arrTenantSelect')||{}).value || 'all';
+  var all = d.arrangements || [];
+
+  // Apply tenant filter (via picker)
+  var list = filterTid === 'all' ? all : all.filter(function(a){ return a.tenantId === filterTid; });
+
+  // Apply other filters
+  var fStatus = (document.getElementById('afilt_status')||{}).value || '';
+  var fLedger = (document.getElementById('afilt_ledger')||{}).value || '';
+  var fFreq   = (document.getElementById('afilt_freq')  ||{}).value || '';
+  var fMin    = parseFloat((document.getElementById('afilt_amt_min')||{}).value);
+  var fMax    = parseFloat((document.getElementById('afilt_amt_max')||{}).value);
+  list = list.filter(function(a){
+    if (fStatus) {
+      if (fStatus === 'active' && !(a.status === 'approved' || a.status === 'active')) return false;
+      if (fStatus !== 'active' && a.status !== fStatus) return false;
+    }
+    if (fLedger && (a.ledger||'').toLowerCase() !== fLedger) return false;
+    if (fFreq   && (a.frequency || 'monthly') !== fFreq) return false;
+    var amt = parseFloat(a.totalOwing) || 0;
+    if (!isNaN(fMin) && amt < fMin) return false;
+    if (!isNaN(fMax) && amt > fMax) return false;
+    return true;
+  });
+
+  // Page meta
+  var metaEl = document.getElementById('arr_page_meta');
+  if (metaEl) {
+    var today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+    metaEl.textContent = list.length + ' shown · ' + all.length + ' total · Last updated ' + today;
+  }
+
+  var content = document.getElementById('arrangementsContent');
+  if (!content) return;
+
+  // Empty states — no "+ New Arrangement" button here (user wants it in page-actions only)
+  if (all.length === 0) {
+    content.innerHTML = '<div class="std-table-card" style="text-align:center;padding:40px 30px;color:var(--muted);">' +
+      '<div style="font-size:28px;margin-bottom:10px;">&#128203;</div>' +
+      '<div style="font-size:13px;">No payment arrangements yet. Use the <strong>📋 New Arrangement</strong> button above to create the first one.</div>' +
+      '</div>';
     return;
   }
-  document.getElementById('arrangementsContent').innerHTML=arrs.map(function(arr){
-    var t=getTenant(arr.tenantId);
-    var payments=d.arrPayments.filter(function(p){return p.arrId===arr.id;});
-    var totalPaid=payments.reduce(function(s,p){return s+p.amount;},0);
-    var remaining=Math.max(0,arr.totalOwing-totalPaid);
-    var pct=arr.totalOwing>0?Math.min(100,(totalPaid/arr.totalOwing)*100):0;
-    var monthsLeft=arr.monthlyPayment>0?Math.ceil(remaining/arr.monthlyPayment):0;
-    var payoff=new Date();payoff.setMonth(payoff.getMonth()+monthsLeft);
-    var payoffStr=remaining<=0?'Paid Off':payoff.toLocaleDateString('en-CA',{year:'numeric',month:'long'});
-    var payRows=payments.map(function(p){
-      return '<tr><td>'+p.date+'</td><td><span class="amt-credit">'+fmt(p.amount)+'</span></td>'+
-        '<td>'+methodLabel(p.method)+'</td>'+
-        '<td><span class="pill '+(p.type==='extra'?'pill-purple':'pill-blue')+'">'+p.type+'</span></td>'+
-        '<td style="font-size:12px;color:var(--muted);">'+p.ref+'</td>'+
-        '<td style="font-size:12px;">'+p.notes+'</td></tr>';
+
+  // Build summary table
+  function pillFor(status){
+    if (status === 'approved' || status === 'active') return '<span class="std-pill std-pill-active">'+(status==='approved'?'Approved':'Active')+'</span>';
+    if (status === 'pending-ed') return '<span class="std-pill std-pill-pending">Pending ED</span>';
+    if (status === 'completed')  return '<span class="std-pill std-pill-paid">Completed</span>';
+    if (status === 'defaulted')  return '<span class="std-pill std-pill-overdue">Defaulted</span>';
+    if (status === 'cancelled' || status === 'voided') return '<span class="std-pill std-pill-voided">'+status.charAt(0).toUpperCase()+status.slice(1)+'</span>';
+    return '<span class="std-pill std-pill-info">'+(status||'—')+'</span>';
+  }
+
+  var rows;
+  if (!list.length) {
+    rows = '<tr class="empty-row"><td colspan="7">No arrangements match the current filters. <a href="#" onclick="clearArrangementsFilters();return false;" style="color:var(--text);text-decoration:underline;">Clear filters</a> to show all.</td></tr>';
+  } else {
+    rows = list.map(function(arr){
+      var t = getTenant(arr.tenantId);
+      var payments = d.arrPayments.filter(function(p){ return p.arrId === arr.id; });
+      var totalPaid = payments.reduce(function(s,p){ return s + p.amount; }, 0);
+      var remaining = Math.max(0, arr.totalOwing - totalPaid);
+      var pct = arr.totalOwing > 0 ? Math.min(100, (totalPaid/arr.totalOwing)*100) : 0;
+      var safeId = (arr.id||'').replace(/'/g, "\\'");
+      var progress = '<div style="display:flex;align-items:center;gap:8px;min-width:120px;">'+
+        '<div style="flex:1;height:6px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="width:'+pct.toFixed(0)+'%;height:100%;background:var(--yellow);"></div></div>'+
+        '<span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+pct.toFixed(0)+'%</span>'+
+        '</div>';
+      return '<tr class="clickable" onclick="showArrangementDetail(\''+safeId+'\')">'+
+        '<td class="std-cell-primary">'+(t?tenantName(t):'<span class="std-cell-dash">—</span>')+'</td>'+
+        '<td style="text-transform:capitalize;">'+(arr.ledger||'<span class="std-cell-dash">—</span>')+'</td>'+
+        '<td class="std-cell-right">'+fmt(arr.totalOwing)+'</td>'+
+        '<td class="std-cell-right">'+fmt(remaining)+'</td>'+
+        '<td>'+progress+'</td>'+
+        '<td>'+pillFor(arr.status)+'</td>'+
+        '<td class="std-cell-tail">Click to open &rsaquo;</td>'+
+      '</tr>';
     }).join('');
-    return '<div class="card" style="margin-bottom:16px;">'+
-      '<div class="ctitle" style="justify-content:space-between;">'+
-        'Payment Arrangement &mdash; '+(t?tenantName(t):'')+'&nbsp;'+statusPill(arr.status)+
-        (arr.status==='approved'?'<button class="btn btn-primary btn-sm" onclick="openArrPayment(\''+arr.id+'\')">+ Record Payment</button>':'')+'</div>'+
-      '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">'+
-        statCard('Total Owing',fmt(arr.totalOwing),'At arrangement date','')+
-        statCard('Paid to Date',fmt(totalPaid),'','success')+
-        statCard('Remaining',fmt(remaining),'',remaining>0?'danger':'success')+
-        statCard('Projected Payoff',payoffStr,monthsLeft>0?monthsLeft+' months left':'','')+'</div>'+
-      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:12px;margin-bottom:14px;padding:12px;background:var(--bg);border-radius:8px;">'+
-        '<div><span style="color:var(--muted);display:block;font-size:11px;">Ledger</span><strong style="text-transform:capitalize;">'+arr.ledger+'</strong></div>'+
-        '<div><span style="color:var(--muted);display:block;font-size:11px;">Monthly Payment</span><strong>'+fmt(arr.monthlyPayment)+'</strong></div>'+
-        '<div><span style="color:var(--muted);display:block;font-size:11px;">Start Date</span><strong>'+arr.startDate+'</strong></div>'+
-        '<div><span style="color:var(--muted);display:block;font-size:11px;">Reference #</span><strong>'+arr.ref+'</strong></div>'+
+  }
+
+  var summary =
+    '<div class="std-table-card">'+
+      '<div class="std-table-hdr">'+
+        '<span>Payment Arrangements</span>'+
+        '<span class="std-table-count">'+list.length+' shown · '+all.length+' total</span>'+
       '</div>'+
-      '<div style="height:8px;background:var(--border);border-radius:6px;margin-bottom:6px;overflow:hidden;"><div style="width:'+pct.toFixed(1)+'%;height:100%;background:var(--yellow);border-radius:6px;transition:width .5s;"></div></div>'+
-      '<div style="font-size:11px;color:var(--muted);margin-bottom:16px;">'+pct.toFixed(1)+'% repaid &mdash; '+fmt(totalPaid)+' of '+fmt(arr.totalOwing)+'</div>'+
-      (arr.notes?'<div class="ibox yellow" style="margin-bottom:14px;">'+arr.notes+'</div>':'')+
-      (payRows?'<div class="ctitle">Payment History</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Type</th><th>Ref #</th><th>Notes</th></tr></thead><tbody>'+payRows+'</tbody></table></div>':'<p style="color:var(--muted);font-size:13px;">No payments recorded yet.</p>')+
+      '<table class="std-table">'+
+        '<thead><tr>'+
+          '<th>Tenant</th>'+
+          '<th>Ledger</th>'+
+          '<th class="std-cell-right">Total Owing</th>'+
+          '<th class="std-cell-right">Remaining</th>'+
+          '<th>Progress</th>'+
+          '<th>Status</th>'+
+          '<th></th>'+
+        '</tr></thead>'+
+        '<tbody>'+rows+'</tbody>'+
+      '</table>'+
     '</div>';
-  }).join('');
+
+  // Expanded detail (only if a single-tenant filter is picked) — keep the rich old view below
+  var detail = '';
+  if (filterTid !== 'all' && list.length) {
+    detail = list.map(function(arr){
+      var t = getTenant(arr.tenantId);
+      var payments = d.arrPayments.filter(function(p){ return p.arrId === arr.id; });
+      var totalPaid = payments.reduce(function(s,p){ return s + p.amount; }, 0);
+      var remaining = Math.max(0, arr.totalOwing - totalPaid);
+      var pct = arr.totalOwing > 0 ? Math.min(100, (totalPaid/arr.totalOwing)*100) : 0;
+      var monthsLeft = arr.monthlyPayment > 0 ? Math.ceil(remaining/arr.monthlyPayment) : 0;
+      var payoff = new Date(); payoff.setMonth(payoff.getMonth()+monthsLeft);
+      var payoffStr = remaining <= 0 ? 'Paid Off' : payoff.toLocaleDateString('en-CA',{year:'numeric',month:'long'});
+      var payRows = payments.map(function(p){
+        return '<tr><td>'+p.date+'</td><td><span class="amt-credit">'+fmt(p.amount)+'</span></td>'+
+          '<td>'+methodLabel(p.method)+'</td>'+
+          '<td><span class="pill '+(p.type==='extra'?'pill-purple':'pill-blue')+'">'+p.type+'</span></td>'+
+          '<td style="font-size:12px;color:var(--muted);">'+p.ref+'</td>'+
+          '<td style="font-size:12px;">'+p.notes+'</td></tr>';
+      }).join('');
+      return '<div class="card" style="margin-bottom:16px;margin-top:16px;">'+
+        '<div class="ctitle" style="justify-content:space-between;">'+
+          'Payment Arrangement &mdash; '+(t?tenantName(t):'')+'&nbsp;'+statusPill(arr.status)+
+          (arr.status==='approved'?'<button class="btn btn-primary btn-sm" onclick="openArrPayment(\''+arr.id+'\')">+ Record Payment</button>':'')+'</div>'+
+        '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">'+
+          statCard('Total Owing',fmt(arr.totalOwing),'At arrangement date','')+
+          statCard('Paid to Date',fmt(totalPaid),'','success')+
+          statCard('Remaining',fmt(remaining),'',remaining>0?'danger':'success')+
+          statCard('Projected Payoff',payoffStr,monthsLeft>0?monthsLeft+' months left':'','')+'</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:12px;margin-bottom:14px;padding:12px;background:var(--bg);border-radius:8px;">'+
+          '<div><span style="color:var(--muted);display:block;font-size:11px;">Ledger</span><strong style="text-transform:capitalize;">'+arr.ledger+'</strong></div>'+
+          '<div><span style="color:var(--muted);display:block;font-size:11px;">Monthly Payment</span><strong>'+fmt(arr.monthlyPayment)+'</strong></div>'+
+          '<div><span style="color:var(--muted);display:block;font-size:11px;">Start Date</span><strong>'+arr.startDate+'</strong></div>'+
+          '<div><span style="color:var(--muted);display:block;font-size:11px;">Reference #</span><strong>'+arr.ref+'</strong></div>'+
+        '</div>'+
+        '<div style="height:8px;background:var(--border);border-radius:6px;margin-bottom:6px;overflow:hidden;"><div style="width:'+pct.toFixed(1)+'%;height:100%;background:var(--yellow);border-radius:6px;transition:width .5s;"></div></div>'+
+        '<div style="font-size:11px;color:var(--muted);margin-bottom:16px;">'+pct.toFixed(1)+'% repaid &mdash; '+fmt(totalPaid)+' of '+fmt(arr.totalOwing)+'</div>'+
+        (arr.notes?'<div class="ibox yellow" style="margin-bottom:14px;">'+arr.notes+'</div>':'')+
+        (payRows?'<div class="ctitle">Payment History</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Type</th><th>Ref #</th><th>Notes</th></tr></thead><tbody>'+payRows+'</tbody></table></div>':'<p style="color:var(--muted);font-size:13px;">No payments recorded yet.</p>')+
+      '</div>';
+    }).join('');
+  }
+
+  content.innerHTML = summary + detail;
+}
+
+// Helper: from the arrangements summary table, clicking a row sets the tenant
+// picker to just that tenant so the detail card renders below.
+function showArrangementDetail(arrId){
+  var d = getData();
+  var arr = d.arrangements.find(function(a){ return a.id === arrId; });
+  if (!arr) return;
+  tenantPickerSelect('arr', arr.tenantId);
 }
 
 function openArrPayment(arrId){
@@ -8514,39 +8987,153 @@ function openArrPayment(arrId){
 // LOANS
 var _currentLoanId = null;
 
+function clearLoansFilters(){
+  ['lfilt_status','lfilt_purpose','lfilt_amt_min','lfilt_amt_max'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value = '';
+  });
+  renderLoansPage();
+}
+
 function renderLoansPage(){
   var d = getData();
-  var tid = document.getElementById('loanTenantSelect').value;
-  var t = getTenant(tid);
+  var tid = (document.getElementById('loanTenantSelect')||{}).value || 'all';
   var content = document.getElementById('loansContent');
   var switcher = document.getElementById('loanSwitcher');
+  if (!content) return;
 
-  if(!t){
-    content.innerHTML = '<div class="card"><p style="color:var(--muted);text-align:center;padding:30px;">Select a tenant above</p></div>';
+  var all = d.loanList || [];
+
+  // Apply filters
+  var fStatus  = (document.getElementById('lfilt_status') ||{}).value || '';
+  var fPurpose = (document.getElementById('lfilt_purpose')||{}).value || '';
+  var fMin     = parseFloat((document.getElementById('lfilt_amt_min')||{}).value);
+  var fMax     = parseFloat((document.getElementById('lfilt_amt_max')||{}).value);
+
+  function passFilter(l){
+    if (fStatus && l.status !== fStatus) return false;
+    if (fPurpose && (l.type||'') !== fPurpose) return false;
+    var p = parseFloat(l.principal) || 0;
+    if (!isNaN(fMin) && p < fMin) return false;
+    if (!isNaN(fMax) && p > fMax) return false;
+    return true;
+  }
+
+  // Meta
+  var metaEl = document.getElementById('loan_page_meta');
+  if (metaEl) {
+    var today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+    var scope = tid === 'all' ? 'All tenants' : (function(){ var tt=getTenant(tid); return tt?tenantName(tt):'—'; })();
+    metaEl.textContent = scope + ' · ' + all.length + ' loans total · Last updated ' + today;
+  }
+
+  // ALL-TENANTS MODE — summary table
+  if (tid === 'all' || !tid) {
+    switcher.style.display = 'none';
+
+    var list = all.filter(passFilter);
+    var typeLabels = {'renovation':'Renovation','rent-to-own':'Rent-to-Own','utilities':'Utilities','emergency':'Emergency','other':'Other'};
+
+    function pillFor(status){
+      if (status === 'approved') return '<span class="std-pill std-pill-approved">Approved</span>';
+      if (status === 'pending-ed') return '<span class="std-pill std-pill-pending">Pending ED</span>';
+      if (status === 'pending') return '<span class="std-pill std-pill-pending">Pending</span>';
+      if (status === 'declined') return '<span class="std-pill std-pill-overdue">Declined</span>';
+      if (status === 'completed' || status === 'paid_off') return '<span class="std-pill std-pill-paid">Paid Off</span>';
+      return '<span class="std-pill std-pill-info">'+(status||'—')+'</span>';
+    }
+
+    if (all.length === 0) {
+      content.innerHTML = '<div class="std-table-card" style="text-align:center;padding:40px 30px;color:var(--muted);">' +
+        '<div style="font-size:28px;margin-bottom:10px;">&#128188;</div>' +
+        '<div style="font-size:13px;">No loans yet. Use the <strong>+ New Loan</strong> button above to create the first one.</div>' +
+        '</div>';
+      return;
+    }
+
+    var rows;
+    if (!list.length) {
+      rows = '<tr class="empty-row"><td colspan="7">No loans match the current filters. <a href="#" onclick="clearLoansFilters();return false;" style="color:var(--text);text-decoration:underline;">Clear filters</a> to show all.</td></tr>';
+    } else {
+      rows = list.map(function(l){
+        var t = getTenant(l.tenantId);
+        var paid = d.loanPayments.filter(function(p){ return p.loanId === l.id && p.status !== 'reversed'; }).reduce(function(s,p){ return s+p.amount; }, 0);
+        var remaining = Math.max(0, l.principal - paid);
+        var pct = l.principal > 0 ? Math.min(100, (paid/l.principal)*100) : 0;
+        var safeId = (l.tenantId||'').replace(/'/g, "\\'");
+        var progress = '<div style="display:flex;align-items:center;gap:8px;min-width:120px;">'+
+          '<div style="flex:1;height:6px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="width:'+pct.toFixed(0)+'%;height:100%;background:var(--yellow);"></div></div>'+
+          '<span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+pct.toFixed(0)+'%</span>'+
+          '</div>';
+        return '<tr class="clickable" onclick="tenantPickerSelect(\'loan\',\''+safeId+'\')">'+
+          '<td class="std-cell-primary">'+(t?tenantName(t):'<span class="std-cell-dash">—</span>')+'</td>'+
+          '<td>'+(typeLabels[l.type]||l.type||'<span class="std-cell-dash">—</span>')+'</td>'+
+          '<td class="std-cell-right">'+fmt(l.principal)+'</td>'+
+          '<td class="std-cell-right">'+fmt(remaining)+'</td>'+
+          '<td>'+progress+'</td>'+
+          '<td>'+pillFor(l.status)+'</td>'+
+          '<td class="std-cell-tail">Click to open &rsaquo;</td>'+
+        '</tr>';
+      }).join('');
+    }
+
+    content.innerHTML =
+      '<div class="std-table-card">'+
+        '<div class="std-table-hdr">'+
+          '<span>All Loans</span>'+
+          '<span class="std-table-count">'+list.length+' shown · '+all.length+' total</span>'+
+        '</div>'+
+        '<table class="std-table">'+
+          '<thead><tr>'+
+            '<th>Tenant</th>'+
+            '<th>Purpose</th>'+
+            '<th class="std-cell-right">Principal</th>'+
+            '<th class="std-cell-right">Remaining</th>'+
+            '<th>Progress</th>'+
+            '<th>Status</th>'+
+            '<th></th>'+
+          '</tr></thead>'+
+          '<tbody>'+rows+'</tbody>'+
+        '</table>'+
+      '</div>';
+    return;
+  }
+
+  // SINGLE-TENANT MODE — detail view
+  var t = getTenant(tid);
+  if (!t) {
+    content.innerHTML = '<div class="std-table-card" style="text-align:center;padding:30px;color:var(--muted);">Select a tenant above.</div>';
     switcher.style.display = 'none';
     return;
   }
   document.getElementById('loanTenantBadge').innerHTML = typePill(t.type)+(t.autoPay?' <span class="pill pill-green">Auto-Pay</span>':'');
 
-  var loans = d.loanList.filter(function(l){return l.tenantId===tid;});
-  if(loans.length===0){
+  var loans = all.filter(function(l){ return l.tenantId === tid && passFilter(l); });
+  if (loans.length === 0){
     switcher.style.display='none';
-    content.innerHTML='<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);margin-bottom:16px;">No loans on file for this tenant.</p><button class="btn btn-primary" onclick="openModal(\'modalNewLoan\')">+ New Loan</button></div>';
+    var countAll = all.filter(function(l){return l.tenantId === tid;}).length;
+    if (countAll === 0) {
+      content.innerHTML = '<div class="std-table-card" style="text-align:center;padding:40px 30px;color:var(--muted);">' +
+        '<div style="font-size:28px;margin-bottom:10px;">&#128188;</div>' +
+        '<div style="font-size:13px;">No loans on file for '+tenantName(t)+'. Use the <strong>+ New Loan</strong> button above to create one.</div>' +
+        '</div>';
+    } else {
+      content.innerHTML = '<div class="std-table-card" style="text-align:center;padding:30px;color:var(--muted);">No loans match the current filters. <a href="#" onclick="clearLoansFilters();return false;" style="color:var(--text);text-decoration:underline;">Clear filters</a> to show all.</div>';
+    }
     return;
   }
 
-  // Loan switcher \u2014 show tabs if more than 1 loan
-  if(loans.length > 1){
+  // Loan switcher — show tabs if more than 1 loan
+  if (loans.length > 1){
     switcher.style.display = 'block';
-    if(!_currentLoanId || !loans.find(function(l){return l.id===_currentLoanId;})) {
+    if (!_currentLoanId || !loans.find(function(l){ return l.id === _currentLoanId; })) {
       _currentLoanId = loans[0].id;
     }
-    var typeLabels={'renovation':'Renovation','rent-to-own':'Rent-to-Own','utilities':'Utilities','other':'Loan'};
+    var typeLabels2 = {'renovation':'Renovation','rent-to-own':'Rent-to-Own','utilities':'Utilities','other':'Loan'};
     switcher.innerHTML = '<div class="tabs">'+
       loans.map(function(l){
-        var active = l.id===_currentLoanId ? ' active' : '';
+        var active = l.id === _currentLoanId ? ' active' : '';
         return '<button class="tab-btn'+active+'" onclick="switchLoan(\''+l.id+'\')">'+
-          (typeLabels[l.type]||'Loan')+' &mdash; '+fmt(l.principal)+' '+statusPill(l.status)+
+          (typeLabels2[l.type]||'Loan')+' &mdash; '+fmt(l.principal)+' '+statusPill(l.status)+
         '</button>';
       }).join('')+
     '</div>';
@@ -8555,7 +9142,7 @@ function renderLoansPage(){
     _currentLoanId = loans[0].id;
   }
 
-  var ln = loans.find(function(l){return l.id===_currentLoanId;}) || loans[0];
+  var ln = loans.find(function(l){ return l.id === _currentLoanId; }) || loans[0];
   renderLoanDetail(ln, d, t);
 }
 
