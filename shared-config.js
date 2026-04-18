@@ -154,3 +154,87 @@
 var SUPABASE_URL   = window.NATION_CONFIG.supabase_url;
 var SUPABASE_ANON  = window.NATION_CONFIG.supabase_anon;
 var STORAGE_BUCKET = window.NATION_CONFIG.storage_bucket || 'housing-files';
+
+// ── APP_STATUS ────────────────────────────────────────────────────────────────
+// Single source of truth for all application status strings.
+// Usage: APP_STATUS.DRAFT instead of 'draft' anywhere in the codebase.
+// Typos in status strings cause silent failures — use these constants.
+var APP_STATUS = Object.freeze({
+  DRAFT:        'draft',
+  SUBMITTED:    'submitted',
+  MGR_APPROVED: 'mgr_approved',
+  ED_APPROVED:  'ed_approved',
+  FILE_UPDATE:  'file_update',
+  ARCHIVED:     'archived',
+
+  // Human-readable labels for display
+  label: function(status) {
+    var labels = {
+      draft:        'Draft',
+      submitted:    'Submitted',
+      mgr_approved: 'HM Approved',
+      ed_approved:  'ED Approved',
+      file_update:  'File Update',
+      archived:     'Archived'
+    };
+    return labels[status] || status;
+  },
+
+  // Ordered list for filter chips / dropdowns
+  all: function() {
+    return ['draft','submitted','mgr_approved','ed_approved','file_update','archived'];
+  },
+
+  // Which statuses count as "active" (not archived)
+  active: function() {
+    return ['draft','submitted','mgr_approved','ed_approved','file_update'];
+  },
+
+  // Which statuses an HM can approve → ED_APPROVED
+  hmCanApprove: function(status) {
+    return status === 'submitted';
+  },
+
+  // Which statuses an ED can approve → ED_APPROVED
+  edCanApprove: function(status) {
+    return status === 'submitted' || status === 'mgr_approved';
+  }
+});
+
+// ── APP_TYPE ──────────────────────────────────────────────────────────────────
+// Application type constants.
+var APP_TYPE = Object.freeze({
+  NEW_HOUSING: 'new_housing',
+  TRANSFER:    'transfer',
+  EMERGENCY:   'emergency',
+
+  label: function(type) {
+    var labels = { new_housing: 'New Housing', transfer: 'Transfer', emergency: 'Emergency' };
+    return labels[type] || type;
+  },
+
+  all: function() { return ['new_housing','transfer','emergency']; }
+});
+
+// ── ROLE ──────────────────────────────────────────────────────────────────────
+// Canonical role strings. Use these instead of raw strings in comparisons.
+// Role checks should use CLFN_PERMS helpers, but these constants prevent typos
+// when constructing queries, audit entries, or permission tables.
+var ROLE = Object.freeze({
+  ED:              'ed',
+  HOUSING_MANAGER: 'housing_manager',
+  HE_L1:           'housing_employee_l1',
+  HE_L2:           'housing_employee_l2',
+  CFO:             'cfo',
+  FINANCE_L1:      'finance_l1',
+
+  // Convenience: is this a housing management role?
+  isManagement: function(role) {
+    return role === 'ed' || role === 'housing_manager';
+  },
+
+  // All roles in display order
+  all: function() {
+    return ['ed','housing_manager','housing_employee_l1','housing_employee_l2','cfo','finance_l1'];
+  }
+});

@@ -223,48 +223,6 @@
   </div>
 </div>
 
-
-
-
-<script src="shared.js"></script>
-<script>
-
-// ═══════════════════════════════════════════════════════════════════════════
-// NATION CONFIG (multi-tenant foundation) — mirrored from housing.html// ═══════════════════════════════════════════════════════════════════════════
-// MODULES REGISTRY — mirrored from housing.html
-// ═══════════════════════════════════════════════════════════════════════════
-(function initModules(){
-  var CORE = Object.freeze(['applications','applications_dashboard','scoring','inventory','tenants','audit_log','exports','reports','settings']);
-  var OPTIONAL = Object.freeze({
-    renovations: { depends_on: [], auto_enables: ['contractors'] },
-    finance:     { depends_on: [], auto_enables: [] },
-    contractors: { depends_on: [], auto_enables: [] },
-    match:       { depends_on: ['applications','inventory'], auto_enables: [] }
-  });
-  var VALID = CORE.concat(Object.keys(OPTIONAL));
-  function assertModule(name){
-    if(VALID.indexOf(name) === -1) throw new Error('[modules] unknown module "'+name+'". Valid: '+VALID.join(', '));
-    return name;
-  }
-  function isCore(name){ assertModule(name); return CORE.indexOf(name) !== -1; }
-  function isEnabled(name){
-    assertModule(name);
-    if(isCore(name)) return true;
-    var cfg = (window.NATION_CONFIG && window.NATION_CONFIG.modules_enabled) || {};
-    if(cfg[name] === true) return true;
-    for(var k in OPTIONAL){
-      if(cfg[k] === true && OPTIONAL[k].auto_enables.indexOf(name) !== -1) return true;
-    }
-    return false;
-  }
-  window.CLFN_MODULES = Object.freeze({
-    CORE: CORE, OPTIONAL: OPTIONAL,
-    assertModule: assertModule, isCore: isCore, isEnabled: isEnabled,
-    listEnabled: function(){ return VALID.filter(isEnabled); },
-    listOptional: function(){ return Object.keys(OPTIONAL); }
-  });
-})();
-
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── Supabase client ─────────────────────────────────────────────────────────
@@ -318,11 +276,7 @@ var approvalRole='employee';
 
 // Navigation stack
 window._navStack = window._navStack || [];
-function goBack() {
-  var stack = window._navStack || [];
-  if(stack.length) stack.pop();
-  showEmployeeHome();
-}
+
 
 // Utility helpers needed by showEmployeeHome
 function setExportView(v) {}
@@ -432,7 +386,7 @@ function headerExport(format) {
 }
 function showAddHousingStaff() {
   var role = window.currentRole || 'employee';
-  if(role !== 'housing_manager' && role !== 'ed') {
+  if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) {
     if(typeof showToast==='function') showToast('Staff management is only accessible to the Housing Manager and Executive Director.');
     return;
   }
@@ -807,13 +761,13 @@ function showEmployeeHome(){
   var tilesEl = document.getElementById('emp_tiles_grid');
   if(!tilesEl) { var view2=document.getElementById('employeeHomeView'); if(view2){view2.style.display='flex';view2.style.flexDirection='column';} return; }
 
-  if(role === 'housing_manager' || role === 'ed') {
+  if(ROLE.isManagement(role)) {
     // ── Rich stat tiles for HM / ED ──
     var apps  = (typeof applications !== 'undefined') ? applications : [];
     var units = (typeof housingUnits  !== 'undefined') ? housingUnits  : [];
 
-    var pending     = apps.filter(function(a){return a.status==='submitted'||a.status==='file_update';}).length;
-    var awaitingED  = apps.filter(function(a){return a.status==='mgr_approved';}).length;
+    var pending     = apps.filter(function(a){return a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE;}).length;
+    var awaitingED  = apps.filter(function(a){return a.status===APP_STATUS.MGR_APPROVED;}).length;
     var totalApps   = apps.filter(function(a){return !a.archived;}).length;
     var critical   = apps.filter(function(a){return a.tier==='Critical Priority'&&!a.archived;}).length;
 
@@ -821,7 +775,7 @@ function showEmployeeHome(){
     var occupied    = units.filter(function(u){return u.status==='occupied';}).length;
     var totalUnits  = units.length;
 
-    var readyMatch  = apps.filter(function(a){return (a.status==='ed_approved'||a.status==='mgr_approved')&&!a.assignedUnit&&!a.archived;}).length;
+    var readyMatch  = apps.filter(function(a){return (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit&&!a.archived;}).length;
     var matched     = apps.filter(function(a){return !!a.assignedUnit;}).length;
 
     var tenanted    = units.filter(function(u){return u.status==='occupied'||u.status==='reserved';}).length;
@@ -854,17 +808,17 @@ function showEmployeeHome(){
       +'<span style="font-size:12px;color:#888;">Enter a housing application for a community member</span>'
       +'</div>';
 
-    var _wlActionCount = role==='housing_manager'
-      ? apps.filter(function(a){return (a.status==='submitted'||a.status==='file_update')&&!a.archived;}).length
-      : apps.filter(function(a){return a.status==='mgr_approved'&&!a.archived;}).length;
+    var _wlActionCount = role=== ROLE.HOUSING_MANAGER
+      ? apps.filter(function(a){return (a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)&&!a.archived;}).length
+      : apps.filter(function(a){return a.status===APP_STATUS.MGR_APPROVED&&!a.archived;}).length;
     var _wlReturnCount = apps.filter(function(a){return a.status==='returned'&&!a.archived;}).length;
     var worklistTile = tile('📋','My Worklist','showWorklist()','#F8E41A',
-      makeStat(role==='ed'?'Awaiting Final Approval':'Awaiting Your Review', _wlActionCount, _wlActionCount>0?'alert':'neutral') +
+      makeStat(role=== ROLE.ED?'Awaiting Final Approval':'Awaiting Your Review', _wlActionCount, _wlActionCount>0?'alert':'neutral') +
       makeStat('Returned for Info', _wlReturnCount, _wlReturnCount>0?'alert':'neutral') +
       makeStat('Total Active', totalApps, 'neutral'));
     var appTile = tile('📋','Applications','showDashboard()','#3b82f6',
       makeStat('Awaiting HM Review', pending,   pending>0?'alert':'info') +
-      makeStat('Awaiting ED Approval', awaitingED, (awaitingED>0&&role==='ed')?'alert':'info') +
+      makeStat('Awaiting ED Approval', awaitingED, (awaitingED>0&&role=== ROLE.ED)?'alert':'info') +
       makeStat('Critical Priority',    critical,    critical>0?'alert':'info') +
       makeStat('Total Active',       totalApps, 'neutral'));
 
@@ -909,8 +863,8 @@ function showEmployeeHome(){
     var renoTile = tile('🔨','Renovations','showRenos()','#d97706',
       makeStat('Under Repair', underRepair, underRepair>0?'alert':'good') +
       makeStat('Condemned',    condemned,   condemned>0?'alert':'good') +
-      makeStat('Pending HM Approval',  sowPendingHM,  sowPendingHM>0?(role==='housing_manager'?'alert':'info'):'neutral') +
-      makeStat('Pending ED Approval',  sowPendingED,  sowPendingED>0?(role==='ed'?'alert':'info'):'neutral') +
+      makeStat('Pending HM Approval',  sowPendingHM,  sowPendingHM>0?(role=== ROLE.HOUSING_MANAGER?'alert':'info'):'neutral') +
+      makeStat('Pending ED Approval',  sowPendingED,  sowPendingED>0?(role=== ROLE.ED?'alert':'info'):'neutral') +
       makeStat('SOW Approved',         sowApproved,   sowApproved>0?'good':'neutral') +
       makeStat('In Progress',          sowInProgress, sowInProgress>0?'good':'neutral'));
 
@@ -925,8 +879,8 @@ function showEmployeeHome(){
     } catch(e){}
 
     var ctTile = tile('🧰','Contractors','showContractorsForRole()','#6b7280',
-      makeStat('Pending HM Review',  ctPending,    ctPending>0?(role==='housing_manager'?'alert':'info'):'neutral') +
-      makeStat('Awaiting ED Approval', ctAwaitingED, ctAwaitingED>0?(role==='ed'?'alert':'info'):'neutral') +
+      makeStat('Pending HM Review',  ctPending,    ctPending>0?(role=== ROLE.HOUSING_MANAGER?'alert':'info'):'neutral') +
+      makeStat('Awaiting ED Approval', ctAwaitingED, ctAwaitingED>0?(role=== ROLE.ED?'alert':'info'):'neutral') +
       makeStat('Approved',           ctApproved,   ctApproved>0?'good':'neutral') +
       (ctDeclined>0?makeStat('Declined', ctDeclined, 'alert'):''));
 

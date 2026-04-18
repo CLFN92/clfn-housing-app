@@ -4337,7 +4337,7 @@ function submitReversal() {
                ledgerType==='loan'        ? d.loanPayments : d.rentLedger;
   var entry = ledger.find(function(e){ return e.id===entryId; });
   if (!entry) { toast('Entry not found.'); return; }
-  var approverLabel = approver==='ed' ? 'Executive Director' : 'CFO / Finance Director';
+  var approverLabel = approver=== ROLE.ED ? 'Executive Director' : 'CFO / Finance Director';
   entry.status = 'pending-reversal';
   ledger.push(Object.assign({}, entry, {
     id:uid(), date:revDate,
@@ -9681,7 +9681,7 @@ function renderLoanDetail(ln, d, t){
   var pct = ln.principal>0 ? Math.min(100,(totalPaid/ln.principal)*100) : 0;
   var typeLabels = {'renovation':'Renovation Loan','rent-to-own':'Rent-to-Own Loan','utilities':'Utilities Loan','other':'Loan'};
   var typeLabel = typeLabels[ln.type]||'Loan';
-  var isDraft    = ln.status === 'draft';
+  var isDraft    = ln.status === APP_STATUS.DRAFT;
   var isPendingED= ln.status === 'pending-ed';
   var isDeclined = ln.status === 'declined';
   var isPending  = isDraft || isPendingED || isDeclined;

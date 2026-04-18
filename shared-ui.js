@@ -59,8 +59,6 @@ function showToast(msg, opts) {
   setTimeout(function() { if(t.parentNode) t.remove(); }, duration);
 }
 
-// Convenience alias used in some places
-function _toastError(msg) { showToast(msg, { type: 'error' }); }
 
 // ── pushNav ───────────────────────────────────────────────────────────────────
 function pushNav(viewName) {
@@ -177,12 +175,12 @@ function updateHeaderUser(role) {
   // Show Settings only for HM / ED
   var settingsBtn = document.getElementById('header_settings_btn');
   if (settingsBtn) settingsBtn.style.display =
-    (role === 'housing_manager' || role === 'ed') ? 'flex' : 'none';
+    (ROLE.isManagement(role)) ? 'flex' : 'none';
 
   // Show Add Staff only for HM / ED
   var addStaffBtn = document.getElementById('header_addstaff_btn');
   if (addStaffBtn) addStaffBtn.style.display =
-    (role === 'housing_manager' || role === 'ed') ? 'flex' : 'none';
+    (ROLE.isManagement(role)) ? 'flex' : 'none';
 }
 
 // ── headerSignOut ─────────────────────────────────────────────────────────────
@@ -206,12 +204,12 @@ function switchRole(role) {
   // Update nav dashboard label
   var dashLabel = document.getElementById('tab_dash_label');
   if (dashLabel) dashLabel.textContent =
-    (role === 'housing_manager' || role === 'ed') ? 'Dashboard' : 'Home';
+    (ROLE.isManagement(role)) ? 'Dashboard' : 'Home';
 
   // Hide Settings nav for HE-L1/L2
   var settingsBtn = document.getElementById('tab_settings');
   if (settingsBtn) settingsBtn.style.display =
-    (role === 'housing_manager' || role === 'ed') ? '' : 'none';
+    (ROLE.isManagement(role)) ? '' : 'none';
 
   // Notify page — e.g. housing.html refreshes scorecard actions, applies field locks
   if (typeof window._onSwitchRole === 'function') {
@@ -253,7 +251,7 @@ function setupHeaderRoleToggle(realRole) {
 // Returns true if the user is ED. Shows a toast and returns false otherwise.
 // Usage: if (!edGuard(role, 'scoring model changes')) return;
 function edGuard(role, featureName) {
-  if (role === 'ed') return true;
+  if (role === ROLE.ED) return true;
   showToast((featureName || 'This action') + ' requires Executive Director access.');
   return false;
 }
