@@ -7,6 +7,10 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="shared.css"/>
 <script src="shared.js"></script>
+<script src="shared-config.js"></script>
+<script src="shared-auth.js"></script>
+<script src="shared-ui.js"></script>
+<script src="shared-data.js"></script>
 
 </head><body>
 <!-- ─── APPROVAL ACTION MODAL ─── -->
@@ -2211,172 +2215,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 console.log('%c[CLFN HOUSING] Build: F1-2026-04-17 — Finance module retrofit', 'background:#F8E41A;color:#111;font-weight:700;padding:4px 8px;');
 
-// ═══════════════════════════════════════════════════════════════════════════
-// NATION CONFIG (multi-tenant foundation)
-// ═══════════════════════════════════════════════════════════════════════════
-// This app is a multi-tenant SaaS platform. Each First Nation customer gets
-// its own Supabase project, its own branding, and its own enabled modules.
-// Detection is driven by the hostname the user visits:
-//   clfn.housingapp.com    → CLFN config
-//   nation2.housingapp.com → Nation 2 config
-//   localhost / preview    → defaults to CLFN (first customer)
-//
-// For now, all nation configs are embedded in this build. A later phase will
-// fetch configs from a platform CDN or shared registry.
-
-(function initNationConfig(){
-  // ── Registry of known nations ──────────────────────────────────────
-  // Add new nations here. Each entry is an independent Supabase project.
-  var REGISTRY = {
-    'clfn': {
-      id: 'clfn',
-      display_name: 'Constance Lake First Nation',
-      display_short: 'CLFN',
-      supabase_url:  'https://fkhzrbalumzeripzolph.supabase.co',
-      supabase_anon: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo',
-      storage_bucket: 'housing-files',
-      branding: {
-        primary_color: '#F8E41A',   // CLFN yellow
-        dark_color:    '#000000',
-        font_serif:    'DM Serif Display',
-        font_sans:     'DM Sans'
-        // logo_url handled by existing .app-logo markup; future phase lifts into config
-      },
-      // Optional modules only — core modules are never gated.
-      modules_enabled: {
-        renovations: true,
-        finance:     true,     // F1 retrofit: tile now navigates to finance.html
-        contractors: true,
-        match:       true
-      }
-    }
-    // Future nations go here. Example:
-    // ,'nation2': { id:'nation2', display_name:'...', supabase_url:'...', ... }
-  };
-
-  // ── Subdomain → nation resolution ──────────────────────────────────
-  // Strips the first DNS label from the hostname and looks it up. Falls back
-  // to CLFN for localhost / 127.0.0.1 / preview builds / Azure Static Web Apps
-  // preview URLs (which use random subdomains like white-ground-0635e2610...).
-  function resolveNationId(){
-    var host = (window.location.hostname || '').toLowerCase();
-    if(!host || host === 'localhost' || host.startsWith('127.') || host.startsWith('192.168.')){
-      return 'clfn';  // dev default
-    }
-    // Azure Static Web Apps preview subdomain (e.g. white-ground-abc.2.azurestaticapps.net)
-    if(host.indexOf('azurestaticapps.net') !== -1) return 'clfn';
-    // Extract first label: "clfn.housingapp.com" → "clfn"
-    var first = host.split('.')[0];
-    if(first && REGISTRY[first]) return first;
-    // Fallback if unknown subdomain: log loudly so misconfig is caught, but don't break.
-    console.warn('[nation] unknown subdomain "'+first+'" — falling back to clfn');
-    return 'clfn';
-  }
-
-  var nationId = resolveNationId();
-  var config = REGISTRY[nationId];
-  if(!config){
-    throw new Error('[nation] no config registered for nation "'+nationId+'"');
-  }
-
-  // Expose immutable config object.
-  window.NATION_CONFIG = Object.freeze(JSON.parse(JSON.stringify(config)));
-})();
-
-// ═══════════════════════════════════════════════════════════════════════════
-// MODULES REGISTRY
-// ═══════════════════════════════════════════════════════════════════════════
-// Separates "what this app can do" from "what this nation has licensed."
-// Core modules are always on. Optional modules are gated per-nation.
-// Any UI element that's module-specific MUST check CLFN_MODULES.isEnabled().
-
-(function initModules(){
-  // Core modules — every nation gets these. Cannot be disabled.
-  var CORE = Object.freeze([
-    'applications',          // Applications + Worklist
-    'applications_dashboard',// Apps dashboard view
-    'scoring',               // Scoring model (V2, ED-adjustable)
-    'inventory',             // Housing inventory
-    'tenants',               // Tenants
-    'audit_log',             // Audit log viewer (compliance requirement)
-    'exports',               // CSV/Excel/PDF exports
-    'reports',               // Reports
-    'settings',              // Settings, users, auth
-  ]);
-
-  // Optional modules — nation-level toggle. Listed with their dependencies.
-  var OPTIONAL = Object.freeze({
-    renovations: { depends_on: [], auto_enables: ['contractors'] },
-    finance:     { depends_on: [],  auto_enables: [] },
-    contractors: { depends_on: [],  auto_enables: [] },
-    match:       { depends_on: ['applications', 'inventory'],  auto_enables: [] }
-  });
-
-  var VALID = CORE.concat(Object.keys(OPTIONAL));
-
-  function assertModule(name){
-    if(VALID.indexOf(name) === -1){
-      throw new Error('[modules] unknown module "'+name+'". Valid: '+VALID.join(', '));
-    }
-    return name;
-  }
-
-  function isCore(name){
-    assertModule(name);
-    return CORE.indexOf(name) !== -1;
-  }
-
-  function isEnabled(name){
-    assertModule(name);
-    if(isCore(name)) return true;
-    var cfg = (window.NATION_CONFIG && window.NATION_CONFIG.modules_enabled) || {};
-    if(cfg[name] === true) return true;
-    // Auto-enable via dependency: if any OTHER optional module that's enabled auto-enables this one.
-    for(var k in OPTIONAL){
-      if(cfg[k] === true && OPTIONAL[k].auto_enables.indexOf(name) !== -1) return true;
-    }
-    return false;
-  }
-
-  function listEnabled(){
-    return VALID.filter(isEnabled);
-  }
-
-  function listOptional(){
-    return Object.keys(OPTIONAL);
-  }
-
-  window.CLFN_MODULES = Object.freeze({
-    CORE: CORE,
-    OPTIONAL: OPTIONAL,
-    assertModule: assertModule,
-    isCore: isCore,
-    isEnabled: isEnabled,
-    listEnabled: listEnabled,
-    listOptional: listOptional
-  });
-})();
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PERMISSIONS MODULE (single source of truth for role gating)
-// ═══════════════════════════════════════════════════════════════════════════
-// Strict enum: any call to a permission helper with an unknown role throws
-// immediately. This catches typos ('ED' vs 'ed', 'HM' vs 'housing_manager')
-// at the offending line rather than silently returning false and hiding a
-// button without explanation.
-//
-// All UI show/hide logic, all Save-path guards, and all view-as logic MUST
-// route through these helpers. Raw string comparisons like `role === 'ed'`
-// are legacy — Phase B will migrate them out.
-
-
-// ── Supabase client ─────────────────────────────────────────────────────────
-// Pulled from nation config. Each nation has its own Supabase project →
-// physical data isolation between nations. No nation_id filtering needed.
-var SUPABASE_URL   = window.NATION_CONFIG.supabase_url;
-var SUPABASE_ANON  = window.NATION_CONFIG.supabase_anon;
-var STORAGE_BUCKET = window.NATION_CONFIG.storage_bucket || 'housing-files';
-
 // ── Supabase Storage helpers ──────────────────────────────────────────────
 // Moved to /shared.js (Turn 3, Phase C dedup). See window.SbStorage and the
 // bare aliases (sbUploadFile, sbGetSignedUrl, sbUploadAndSave, etc.). Same
@@ -2657,8 +2495,6 @@ async function sbSaveContractor(ct) {
 }
 
 
-window._realRole=null; window._viewAsRole=null;
-window._realRole=null; window._viewAsRole=null;
 function initRoleSwitcher(){ /* no-op - dropdown handles role switching */ }
 
 // ── Preview from Dash ──
@@ -2676,13 +2512,6 @@ let approvalRole   = 'housing_employee_l1';
 function g(id)  { const e=document.getElementById(id); return e?e.value:''; }
 function fv(id) { const e=document.getElementById(id); return e?e.value:''; }
 function fb(id) { const e=document.getElementById(id); return e?e.checked:false; }
-function showToast(msg) {
-  const t=document.createElement('div');
-  t.textContent=msg;
-  t.style.cssText='position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#111;color:#F8E41A;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 4px 24px rgba(0,0,0,0.5);white-space:nowrap;';
-  document.body.appendChild(t);
-  setTimeout(function(){t.remove();},2800);
-}
 function setText(id,val){var e=document.getElementById(id);if(e)e.textContent=val;}
 
 // ── Phone formatter ──
@@ -5400,43 +5229,6 @@ function stashHousingSession(){
   } catch(e) {
     console.warn('[housing] stashHousingSession failed:', e);
     throw e;  // re-throw so showFinance() can abort navigation
-  }
-}
-
-// ── Generic view helper ──
-function hideAllViews(){
-  var ids=['appLayout','settingsView','scorecardView',
-           'dashView','employeeHomeView','worklistView','inventoryView','matchView','tenantsView','renoApprovalsView','renosView','contractorsView'];
-  ids.forEach(function(id){
-    var el=document.getElementById(id);
-    if(el){el.style.display='none';el.style.flex='';}
-  });
-  var _spb=document.getElementById('stepProgressBar');if(_spb)_spb.style.display='none';
-  var _sn=document.getElementById('stepNav');if(_sn)_sn.style.display='none';
-  var apf=document.getElementById('appProgressFoot');if(apf)apf.style.display='none';
-}
-function _showView(id, renderFn){
-  hideAllViews();
-  var v=document.getElementById(id);
-  if(v){v.style.display='flex';v.style.flexDirection='column';}
-  if(renderFn) renderFn();
-}
-function setNavActive(id){
-  ['tab_app','tab_dash','tab_scores','tab_settings','tab_match','tab_inventory','tab_contractors','tab_tenants','tab_renos','tab_budget'].forEach(function(tid){
-    var b=document.getElementById(tid);
-    if(b){b.classList.remove('nav-active');b.style.background='';b.style.color='';b.style.borderColor='';}
-  });
-  var el=document.getElementById(id);
-  if(el){
-    if(id==='tab_settings'){
-      el.style.background='rgba(248,228,26,0.12)';
-      el.style.color='var(--yellow)';
-      el.style.borderColor='var(--yellow)';
-    } else {
-      el.style.background='var(--yellow)';
-      el.style.color='#111';
-      el.style.borderColor='var(--yellow)';
-    }
   }
 }
 
@@ -10080,43 +9872,6 @@ function ctGetPeople() {
   return people.filter(function(p){ return p && (p.name||p.phone||p.email); });
 }
 
-function updateRoleSwitcherVisibility() { /* no-op — dropdown handled by updateHeaderUser */ }
-
-function updateHeaderUser(role) {
-  var roleLabels = {employee:'Employee', housing_manager:'Housing Manager', ed:'Executive Director'};
-  var roleBadges = {employee:'', housing_manager:'HM', ed:'ED'};
-  var label = roleLabels[role] || 'Staff';
-  var badge = roleBadges[role] || '';
-
-  // Avatar initials from role
-  var initials = {employee:'ST', housing_manager:'HM', ed:'ED'};
-  var av = document.getElementById('header_avatar');
-  if(av) av.textContent = initials[role] || '?';
-
-  var nameEl = document.getElementById('header_user_name');
-  if(nameEl) nameEl.textContent = label;
-
-  var badgeEl = document.getElementById('header_role_badge');
-  if(badgeEl) {
-    badgeEl.textContent = badge;
-    badgeEl.style.display = badge ? '' : 'none';
-  }
-
-  // Show Settings button only for HM/ED
-  var settingsBtn = document.getElementById('header_settings_btn');
-  if(settingsBtn) {
-    var show = (role === 'housing_manager' || role === 'ed');
-    settingsBtn.style.display = show ? 'flex' : 'none';
-  }
-
-  // Show role switcher dropdown — visible for real EDs even when previewing as HM/Employee
-  var realRole = window._realRole || role;
-  var rs = document.getElementById('roleSwitcher');
-  if(rs) rs.style.display = (realRole === 'ed') ? 'flex' : 'none';
-  var rbSel = document.getElementById('rb_select');
-  if(rbSel) rbSel.value = role;
-}
-
 
 // ══════════════════════════════════════════════════════════════
 // WORKLIST VIEW
@@ -10362,52 +10117,7 @@ function renderWlTable(apps, showScore, showReview) {
 }
 
 
-// ── Header role view-as toggle ─────────────────────────────────────────────
-// Phase A rewrite: driven by CLFN_PERMS.getViewAsOptions() instead of
-// hardcoded role strings. Previously this function silently did nothing
-// because toggleEl and selectEl were never initialized.
-function setupHeaderRoleToggle(realRole) {
-  var toggleEl = document.getElementById('roleSwitcher');
-  var selectEl = document.getElementById('rb_select');
-  if(!toggleEl || !selectEl) return;
 
-  var perms = window.CLFN_PERMS;
-  if(!perms){
-    // Permissions module not loaded — hide the switcher for safety.
-    toggleEl.style.display = 'none';
-    return;
-  }
-
-  // Normalize in case a legacy role string slips through.
-  var normalized = perms.normalizeRole(realRole);
-  var options    = perms.getViewAsOptions(normalized);  // ED gets all others; anyone else gets []
-
-  if(options.length === 0){
-    toggleEl.style.display = 'none';
-    return;
-  }
-
-  toggleEl.style.display = 'flex';
-
-  // "My Role" default + one entry per role the user can preview as.
-  var optionsHtml = '<option value="">My Role</option>';
-  options.forEach(function(roleKey){
-    optionsHtml += '<option value="'+roleKey+'">'+perms.roleLabel(roleKey)+'</option>';
-  });
-  selectEl.innerHTML = optionsHtml;
-  selectEl.value = window._viewAsRole || '';
-}
-
-
-
-function headerSignOut() {
-  if(HOUSING_SESSION && HOUSING_SESSION.accessToken) {
-    if(confirm('Sign out of CLFN Housing?')) doLogout();
-  } else {
-    switchRole('housing_employee_l1');
-    showToast('Signed out — reset to Employee role.');
-  }
-}
 
 
 function prefillTransferFromTenant() {
@@ -10689,16 +10399,6 @@ function applySettingsRoleLocks() {
     if(existingOcc) existingOcc.remove();
     if(locked) occSec.insertAdjacentHTML('afterbegin', lockMsg);
   }
-}
-
-// ── ED-gated save wrappers with audit logging ──
-function edGuard(actionName, fn) {
-  if(window.currentRole !== 'ed') {
-    showToast('Only the Executive Director can change scoring values.');
-    return;
-  }
-  fn();
-  auditEntry('SETTINGS', actionName, actionName + ' updated by ED', 'Executive Director');
 }
 
 function saveScoringModelED() {
@@ -12807,15 +12507,6 @@ function printApplicationPreview() {
 // ── Navigation history stack ──
 window._navStack = [];
 
-function pushNav(viewName) {
-  // Don't push the same view twice in a row
-  var stack = window._navStack;
-  if(stack.length && stack[stack.length-1] === viewName) return;
-  stack.push(viewName);
-  // Cap at 20 entries
-  if(stack.length > 20) stack.shift();
-}
-
 function goBack(){
   var stack = window._navStack;
   // Pop current view
@@ -13394,85 +13085,36 @@ async function deleteTenantFile(path){
  *   { id, name, email, role }
  *   role values: 'employee' | 'housing_manager' | 'ed'
  */
-window.CLFN_AUTH = {
-  currentUser:  null,   // { id, name, email } from Supabase/staff table
-  currentRole:  'employee',  // 'employee' | 'housing_manager' | 'ed'
-  employeeId:   null,   // staff table row id
-  isAuthenticated: false,
 
-  // Call this after a successful Supabase login + staff table lookup
-  setSession: function(supabaseUser, staffRow) {
-    this.currentUser     = { id: supabaseUser.id, name: staffRow.name, email: supabaseUser.email };
-    this.currentRole     = staffRow.role || 'housing_employee_l1';
-    this.employeeId      = staffRow.id;
-    this.isAuthenticated = true;
 
-    // Keep window.currentRole in sync (all existing checks read from here)
-    window.currentRole = this.currentRole;
 
-    // Update the UI
-    if(typeof switchRole === 'function') switchRole(this.currentRole);
-    if(typeof updateHeaderUser === 'function') updateHeaderUser(this.currentRole);
 
-    // Hide the demo role switcher — not needed when auth is live
-    var switcher = document.getElementById('roleSwitcher');
-    if(switcher) switcher.style.display = 'none';
-
-    console.log('[CLFN] Session set — '+this.currentUser.name+' ('+this.currentRole+')');
-  },
-
-  // Call this on logout
-  clearSession: function() {
-    this.currentUser     = null;
-    this.currentRole     = 'housing_employee_l1';
-    this.employeeId      = null;
-    this.isAuthenticated = false;
-    window.currentRole   = 'housing_employee_l1';
-    console.log('[CLFN] Session cleared');
-  },
-
-  // Helper used throughout the app — returns the active role
-  getRole: function() {
-    return window.currentRole || this.currentRole || 'housing_employee_l1';
-  },
-
-  // Helper — true if HM or ED
-  isManager: function() {
-    var r = this.getRole();
-    return r === 'housing_manager' || r === 'ed';
-  },
-
-  // Helper — true if ED only
-  isED: function() {
-    return this.getRole() === 'ed';
-  }
+// ── Page-specific role switch hook ────────────────────────────────────────────
+// shared-ui.js switchRole() calls this after updating window.currentRole,
+// the header, and nav visibility. Housing-page-specific logic goes here.
+window._onSwitchRole = function(role) {
+  approvalRole = role;
+  var rbSel = document.getElementById('rb_select');
+  if (rbSel) rbSel.value = role;
+  var hud = document.getElementById('header_user_display');
+  if (hud) hud.textContent = (window.CLFN_PERMS && window.CLFN_PERMS.roleLabel)
+    ? window.CLFN_PERMS.roleLabel(role) : role;
+  if (window._currentScorecardApp && typeof renderScorecardActions === 'function')
+    renderScorecardActions(window._currentScorecardApp);
+  if (typeof applyTenancyFieldRoles === 'function') applyTenancyFieldRoles();
+  if (typeof showEmployeeHome === 'function') showEmployeeHome();
 };
 
-// Convenience global alias — existing code can use getRole() anywhere
-function getRole(){ return window.CLFN_AUTH.getRole(); }
+// ── Page-specific logout hook ─────────────────────────────────────────────────
+// shared-auth.js doLogout() calls this after clearing all state.
+window._onLogout = function() {
+  applications = []; housingUnits = [];
+  if (typeof showLoginScreen === 'function') showLoginScreen();
+};
 
+// ── Page-specific nav map (used by shared-ui.js goBack()) ─────────────────────
+// Registered after page functions are defined (see bottom of script block).
 
-function switchRole(role){
-  approvalRole=role;
-  window.currentRole=role;
-  var rbSel=document.getElementById('rb_select');
-  if(rbSel) rbSel.value=role;
-  var roleLabels={employee:'Employee',housing_manager:'Housing Manager',ed:'Executive Director'};
-  var hud=document.getElementById('header_user_display');
-  if(hud) hud.textContent=roleLabels[role]||role;
-  updateHeaderUser(role);
-  if(window._currentScorecardApp && typeof renderScorecardActions === 'function') renderScorecardActions(window._currentScorecardApp);
-  updateRoleSwitcherVisibility();
-  // Update nav label and visibility based on role
-  var dashLabel = document.getElementById('tab_dash_label');
-  if(dashLabel) dashLabel.textContent = (role === 'housing_manager' || role === 'ed') ? 'Dashboard' : 'Home';
-  var settingsBtn = document.getElementById('tab_settings');
-  if(settingsBtn) settingsBtn.style.display = (role === 'housing_manager' || role === 'ed') ? '' : 'none';
-    // Apply tenancy field role locks whenever role changes
-  applyTenancyFieldRoles();
-  // All roles land on the home tile page
-  showEmployeeHome();
-}
 
 function _saveToggleStates(){
   try{
@@ -15331,8 +14973,6 @@ function exportRenoApprovalsPDF() {
 // Uses fetch() to Supabase Auth REST API
 // ══════════════════════════════════════════════════════════════
 
-var HOUSING_SESSION = { email:'', name:'', role:'', accessToken:'' };
-var HOUSING_HEADERS = { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON, 'Content-Type': 'application/json' };
 
 // ── Panel helpers ──────────────────────────────────────────────────────────
 function showSignInPanel() {
@@ -15468,79 +15108,6 @@ async function startSignIn() {
   } finally {
     if(btn){btn.disabled=false;btn.textContent='Sign in';}
   }
-}
-
-// ── Resolve housing role from staff table ──────────────────────────────────
-async function resolveHousingRole() {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?select=role,department,name&email=eq.'+encodeURIComponent(HOUSING_SESSION.email)+'&is_active=eq.true',
-      {headers:HOUSING_HEADERS});
-    var rows = await r.json();
-    if(rows&&rows.length) {
-      var staffRow = rows[0];
-      HOUSING_SESSION.name = staffRow.name||HOUSING_SESSION.name;
-      var housingRole = sbMapRole(staffRow);
-      HOUSING_SESSION.role = housingRole;
-      window.currentRole = housingRole;
-      window.CLFN_AUTH.isAuthenticated = true;
-      window.CLFN_AUTH.currentRole = housingRole;
-      if(typeof switchRole==='function') switchRole(housingRole);
-      /* roleSwitcher managed by updateHeaderUser */
-      var sb=document.getElementById('header_addstaff_btn');
-      if(sb) sb.style.display=(housingRole==='ed'||housingRole==='housing_manager')?'flex':'none';
-      // Store real role and setup view-as toggle
-      window._realRole = housingRole;
-      window._viewAsRole = '';
-      if(typeof setupHeaderRoleToggle === 'function') setupHeaderRoleToggle(housingRole);
-    } else {
-      HOUSING_SESSION.role='housing_employee_l1';
-      window.currentRole='housing_employee_l1';
-    }
-  } catch(e) { console.warn('[HOUSING] role lookup failed:', e); HOUSING_SESSION.role='housing_employee_l1'; window.currentRole='housing_employee_l1'; }
-}
-
-// ── Sign out ───────────────────────────────────────────────────────────────
-// Clear ALL client-side state on sign-out so the next user doesn't see stale data
-function _clearLocalClientState(){
-  // localStorage keys owned by this app
-  var lsKeys = [
-    'clfn_applications','clfn_housing_units',
-    'clfn_scoring_model','clfn_scoring_model_v2','clfn_scoring_tiers_v2',
-    'clfn_budget_pools','clfn_reno_score_model_v3','clfn_unit_score_model',
-    'HOUSING_REMEMBER_KEY'
-  ];
-  try {
-    lsKeys.forEach(function(k){ try { localStorage.removeItem(k); } catch(e){} });
-  } catch(e){}
-  // sessionStorage
-  try {
-    ['clfn_housing_token','clfn_housing_role','clfn_housing_name','clfn_housing_email_session']
-      .forEach(function(k){ try { sessionStorage.removeItem(k); } catch(e){} });
-  } catch(e){}
-  // In-memory window caches — wipe so next user starts fresh
-  var winKeys = [
-    '_contractors','_sowCache','_renoProgress','_appSettings','_renoBudget',
-    '_unitPhotos','_staffCache','_editingUnitId','_rbaUnitId','_sowUnitId',
-    '_currentDetailUnitId','_ctLastSaved','_pendingLookupUser','_currentScorecardApp',
-    '_auStagedPhotos','_ueStagedPhotos','_rpPendingPhotos','_rpStoredPhotos',
-    '_rpUnitId','_tenantFilesUnitId','_appFormReturnTo','_appMenuId',
-    '_userLookupTimer','_ctEditIdx','_ctFilter','_sowWasPreviouslySaved',
-    '_sowAfterContractorSave','_rpAfterContractorSave','_printPanelDoc'
-  ];
-  winKeys.forEach(function(k){ try { window[k] = undefined; delete window[k]; } catch(e){} });
-}
-
-async function doLogout() {
-  try {
-    await fetch(SUPABASE_URL+'/auth/v1/logout',{method:'POST',headers:HOUSING_HEADERS});
-  } catch(e){}
-  _clearLocalClientState();
-  HOUSING_SESSION={email:'',name:'',role:'',accessToken:''};
-  HOUSING_HEADERS['Authorization']='Bearer '+SUPABASE_ANON;
-  window.CLFN_AUTH.isAuthenticated=false;
-  window.currentRole='housing_employee_l1';
-  applications=[]; housingUnits=[];
-  showLoginScreen();
 }
 
 function showLoginScreen() {

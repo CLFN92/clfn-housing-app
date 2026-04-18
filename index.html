@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <title>Sign In</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="shared.css"/>
+<script src="shared.js"></script>
+<script src="shared-config.js"></script>
+<script src="shared-auth.js"></script>
+<script src="shared-ui.js"></script>
+<script src="shared-data.js"></script>
 <style>
 /* ── index.html page-specific overrides ──────────────────────────────────────
    shared.css handles all layout, tokens, and components.
@@ -224,40 +230,7 @@
 <script>
 
 // ═══════════════════════════════════════════════════════════════════════════
-// NATION CONFIG (multi-tenant foundation) — mirrored from housing.html
-// ═══════════════════════════════════════════════════════════════════════════
-(function initNationConfig(){
-  var REGISTRY = {
-    'clfn': {
-      id: 'clfn',
-      display_name: 'Constance Lake First Nation',
-      display_short: 'CLFN',
-      supabase_url:  'https://fkhzrbalumzeripzolph.supabase.co',
-      supabase_anon: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo',
-      storage_bucket: 'housing-files',
-      branding: {
-        primary_color: '#F8E41A', dark_color: '#000000',
-        font_serif: 'DM Serif Display', font_sans: 'DM Sans'
-      },
-      modules_enabled: { renovations: true, finance: true, contractors: true, match: true }
-    }
-  };
-  function resolveNationId(){
-    var host = (window.location.hostname || '').toLowerCase();
-    if(!host || host === 'localhost' || host.startsWith('127.') || host.startsWith('192.168.')) return 'clfn';
-    if(host.indexOf('azurestaticapps.net') !== -1) return 'clfn';
-    var first = host.split('.')[0];
-    if(first && REGISTRY[first]) return first;
-    console.warn('[nation] unknown subdomain "'+first+'" — falling back to clfn');
-    return 'clfn';
-  }
-  var nationId = resolveNationId();
-  var config = REGISTRY[nationId];
-  if(!config) throw new Error('[nation] no config registered for nation "'+nationId+'"');
-  window.NATION_CONFIG = Object.freeze(JSON.parse(JSON.stringify(config)));
-})();
-
-// ═══════════════════════════════════════════════════════════════════════════
+// NATION CONFIG (multi-tenant foundation) — mirrored from housing.html// ═══════════════════════════════════════════════════════════════════════════
 // MODULES REGISTRY — mirrored from housing.html
 // ═══════════════════════════════════════════════════════════════════════════
 (function initModules(){
@@ -295,9 +268,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── Supabase client ─────────────────────────────────────────────────────────
-var SUPABASE_URL   = window.NATION_CONFIG.supabase_url;
-var SUPABASE_ANON  = window.NATION_CONFIG.supabase_anon;
-var STORAGE_BUCKET = window.NATION_CONFIG.storage_bucket || 'housing-files';
 // ── Map staff table role to housing app role ────────────────────────────────
 // Uses CLFN_PERMS.normalizeRole so all six canonical roles (and legacy
 // aliases) are recognized, not just 'ed' and 'manager+Housing'.
@@ -340,9 +310,6 @@ async function sbLoadAuditLog(limit) {
 
 
 
-var HOUSING_SESSION = { email:'', name:'', role:'', accessToken:'' };
-var HOUSING_HEADERS = { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON, 'Content-Type': 'application/json' };
-window.currentRole = 'employee';
 window._navStack = [];
 window._contractors=[]; window._sowCache={}; window._renoProgress={};
 window._renoBudget={}; window._unitPhotos={}; window._appSettings={};
@@ -351,13 +318,6 @@ var approvalRole='employee';
 
 // Navigation stack
 window._navStack = window._navStack || [];
-function pushNav(viewName) {
-  if(!window._navStack) window._navStack = [];
-  var stack = window._navStack;
-  if(stack.length && stack[stack.length-1] === viewName) return;
-  stack.push(viewName);
-  if(stack.length > 20) stack.shift();
-}
 function goBack() {
   var stack = window._navStack || [];
   if(stack.length) stack.pop();
@@ -366,69 +326,25 @@ function goBack() {
 
 // Utility helpers needed by showEmployeeHome
 function setExportView(v) {}
-function hideAllViews() {
-  ['appLayout','dashView','employeeHomeView','worklistView','inventoryView',
-   'matchView','tenantsView','scorecardView','settingsView'].forEach(function(id){
-    var el = document.getElementById(id);
-    if(el){ el.style.display='none'; el.style.flex=''; }
-  });
-}
-function setNavActive(id) {
-  var el = document.getElementById(id);
-  if(el) el.classList.add('nav-active');
-}
-function updateHeaderUser(role) {
-  var el = document.getElementById('header_user_name');
-  if(el) el.textContent = HOUSING_SESSION.name || '';
-  var av = document.getElementById('header_avatar');
-  if(av) av.textContent = (HOUSING_SESSION.name||'S').charAt(0).toUpperCase();
-  var rb = document.getElementById('header_role_badge');
-  if(rb) rb.textContent = {employee:'Employee',housing_manager:'HM',ed:'ED'}[role]||role;
 
-  // Show Settings button for HM/ED
-  var sbtn = document.getElementById('header_settings_btn');
-  if(sbtn) sbtn.style.display = (role==='housing_manager'||role==='ed') ? 'inline-flex' : 'none';
-
-  // Show Add Staff button for ED
-  var abtn = document.getElementById('header_addstaff_btn');
-  if(abtn) abtn.style.display = (role==='ed') ? 'inline-flex' : 'none';
-
-
-  // Show role switcher dropdown — visible for real EDs even when previewing as HM/Employee
-  var realRole = window._realRole || role;
-  var rs = document.getElementById('roleSwitcher');
-  if(rs) rs.style.display = (realRole === 'ed') ? 'flex' : 'none';
-  var rbSel = document.getElementById('rb_select');
-  if(rbSel) rbSel.value = role;
-}
-function updateRoleSwitcherVisibility() {}
-function switchRole(role) {
-  window.currentRole = role;
-  if(window.CLFN_AUTH) window.CLFN_AUTH.currentRole = role;
-  sessionStorage.setItem('clfn_housing_role', role);
-  updateHeaderUser(role);
-  if(typeof showEmployeeHome === 'function') showEmployeeHome();
-}
+// ── Page hooks for shared modules ──────────────────────────────
+window._onSwitchRole = function(role) {
+  // index.html: update nav tiles visibility based on role
+  if (typeof renderHomeTiles === 'function') renderHomeTiles();
+};
+window._onLogout = function() {
+  // index.html: show login screen, clear data
+  applications = []; housingUnits = [];
+  if (typeof showLoginScreen === 'function') showLoginScreen();
+};
+window._navMap = {
+  'home': function() { if (typeof showEmployeeHome === 'function') showEmployeeHome(); }
+};
 function auditEntry() {}
 function getRole() { return window.currentRole || 'employee'; }
 
 // CLFN_AUTH object required by resolveHousingRole
-window.CLFN_AUTH = { isAuthenticated: false, currentRole: 'employee', currentUser: null,
-  getRole: function(){ return window.currentRole || 'employee'; },
-  isED: function(){ return window.currentRole === 'ed'; },
-  isHM: function(){ return window.currentRole === 'housing_manager'; }
-};
 
-// showToast — slide-up notification
-function showToast(msg, duration) {
-  duration = duration || 3000;
-  var t = document.createElement('div');
-  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(40px);background:#1a1a18;color:#F8E41A;border:1.5px solid #F8E41A;padding:10px 22px;border-radius:20px;font-size:13px;font-weight:600;z-index:99999;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;font-family:DM Sans,sans-serif;';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(function(){ t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)'; }, 10);
-  setTimeout(function(){ t.style.opacity='0'; setTimeout(function(){ t.remove(); }, 300); }, duration);
-}
 
 
 
@@ -491,19 +407,6 @@ function showScorecard()          {}
 function renderDashTable()        {}
 function updateDashStats()        {}
 
-// ── Header handlers (used on the app shell after login) ────────────────────
-function headerSignOut() {
-  if(!confirm('Sign out of CLFN Housing?')) return;
-  // doLogout is defined later in this file — call it if present, otherwise clear manually
-  if(typeof doLogout === 'function') { doLogout(); return; }
-  try {
-    sessionStorage.removeItem('clfn_housing_token');
-    sessionStorage.removeItem('clfn_housing_role');
-    sessionStorage.removeItem('clfn_housing_name');
-    sessionStorage.removeItem('clfn_housing_email_session');
-  } catch(e){}
-  window.location.reload();
-}
 function toggleHeaderExportMenu() {
   var m = document.getElementById('header_export_menu');
   if(!m) return;
@@ -844,33 +747,6 @@ async function startSignIn() {
   }
 }
 
-async function resolveHousingRole() {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?select=role,department,name&email=eq.'+encodeURIComponent(HOUSING_SESSION.email)+'&is_active=eq.true',
-      {headers:HOUSING_HEADERS});
-    var rows = await r.json();
-    if(rows&&rows.length) {
-      var staffRow = rows[0];
-      HOUSING_SESSION.name = staffRow.name||HOUSING_SESSION.name;
-      var housingRole = sbMapRole(staffRow);
-      HOUSING_SESSION.role = housingRole;
-      window.currentRole = housingRole;
-      window.CLFN_AUTH.isAuthenticated = true;
-      window.CLFN_AUTH.currentRole = housingRole;
-      if(typeof switchRole==='function') switchRole(housingRole);
-      var sb=document.getElementById('header_addstaff_btn');
-      if(sb) sb.style.display=(housingRole==='ed'||housingRole==='housing_manager')?'flex':'none';
-      // Store real role and setup view-as toggle
-      window._realRole = housingRole;
-      window._viewAsRole = '';
-      if(typeof setupHeaderRoleToggle === 'function') setupHeaderRoleToggle(housingRole);
-    } else {
-      HOUSING_SESSION.role='employee';
-      window.currentRole='employee';
-    }
-  } catch(e) { console.warn('[HOUSING] role lookup failed:', e); HOUSING_SESSION.role='employee'; window.currentRole='employee'; }
-}
-
 function hidLoginScreen() {
   var ls=document.getElementById('loginScreen');
   if(ls) ls.style.display='none';
@@ -882,40 +758,6 @@ function showLoginScreen() {
   showSignInPanel();
   var p=document.getElementById('signin-password'); if(p) p.value='';
   var e=document.getElementById('signin-error'); if(e) e.style.display='none';
-}
-
-// Clear ALL client-side state on sign-out so the next user doesn't see stale data
-function _clearLocalClientState(){
-  var lsKeys = [
-    'clfn_applications','clfn_housing_units',
-    'clfn_scoring_model','clfn_scoring_model_v2','clfn_scoring_tiers_v2',
-    'clfn_budget_pools','clfn_reno_score_model_v3','clfn_unit_score_model',
-    'HOUSING_REMEMBER_KEY'
-  ];
-  try { lsKeys.forEach(function(k){ try { localStorage.removeItem(k); } catch(e){} }); } catch(e){}
-  try {
-    ['clfn_housing_token','clfn_housing_role','clfn_housing_name','clfn_housing_email_session']
-      .forEach(function(k){ try { sessionStorage.removeItem(k); } catch(e){} });
-  } catch(e){}
-  var winKeys = [
-    '_contractors','_sowCache','_renoProgress','_appSettings','_renoBudget',
-    '_unitPhotos','_staffCache','_editingUnitId','_rbaUnitId','_sowUnitId',
-    '_currentDetailUnitId','_ctLastSaved','_pendingLookupUser','_currentScorecardApp'
-  ];
-  winKeys.forEach(function(k){ try { window[k] = undefined; delete window[k]; } catch(e){} });
-}
-
-async function doLogout() {
-  try {
-    await fetch(SUPABASE_URL+'/auth/v1/logout',{method:'POST',headers:HOUSING_HEADERS});
-  } catch(e){}
-  _clearLocalClientState();
-  HOUSING_SESSION={email:'',name:'',role:'',accessToken:''};
-  HOUSING_HEADERS['Authorization']='Bearer '+SUPABASE_ANON;
-  window.CLFN_AUTH.isAuthenticated=false;
-  window.currentRole='employee';
-  applications=[]; housingUnits=[];
-  showLoginScreen();
 }
 
 function showEmployeeHome(){
