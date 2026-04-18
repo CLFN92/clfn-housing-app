@@ -4046,6 +4046,10 @@ function renderTenantProfile(tid) {
   if (!pp) return;
   pp.innerHTML = '';
 
+  // Reset any prior DocLibrary instance for this tenant \u2014 the old DOM
+  // nodes are about to be garbage-collected via innerHTML='' above.
+  if (window._ticDocLibs) delete window._ticDocLibs[tid];
+
   
   // \u2500\u2500 SECTION 1: Account Overview (TOP) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   var s2 = pp.appendChild(document.createElement('div'));
@@ -4265,16 +4269,25 @@ function renderTenantProfile(tid) {
     notesEl.textContent = '\uD83D\uDCDD ' + t.notes;
   }
 
-  // \u2500\u2500 SECTION 3: Transaction History (full ledger for this tenant) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-  // Uses the shared getAllTransactions() data source and .std-* design system.
-  // Filters: ledger-category chips, date range, amount range, transaction type,
-  // and status. Each row has an action button to void (reverse) the transaction
-  // \u2014 the void path is wired through voidTicTransaction(), which is approval-
-  // ready (immediate for now; later will branch on role to queue for approval).
-  var s3 = pp.appendChild(document.createElement('div'));
-  s3.className = 'std-table-card';
-  s3.id = 'tic-history-' + tid;
-  s3.style.marginBottom = '12px';
+  // \u2500\u2500 SECTION 3: Detail tabs (Transaction History + Documents) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // History uses shared getAllTransactions() + std-* design system.
+  // Documents uses the DocLibrary factory. Both live inside a single tab
+  // strip to keep the TIC from pancake-stacking as more per-tenant data
+  // surfaces over time.
+  var detailWrap = pp.appendChild(document.createElement('div'));
+  detailWrap.style.marginBottom = '12px';
+  detailWrap.innerHTML =
+    '<div class="tabs" style="margin-bottom:0;">' +
+      '<button class="tab-btn active" data-tic-tab="history" onclick="showTicDetailTab(\''+tid+'\',\'history\')">Transaction History</button>' +
+      '<button class="tab-btn" data-tic-tab="docs" onclick="showTicDetailTab(\''+tid+'\',\'docs\')">Documents</button>' +
+    '</div>' +
+    '<div class="tab-panel on" id="tic-tab-history-'+tid+'"></div>' +
+    '<div class="tab-panel" id="tic-tab-docs-'+tid+'"></div>';
+
+  // ── History panel content ──
+  var s3 = document.getElementById('tic-tab-history-'+tid);
+  s3.className = 'tab-panel on std-table-card';
+  s3.id = 'tic-history-' + tid;   // preserve existing id for renderTicHistory
 
   s3.innerHTML =
     '<div class="std-table-hdr">'+
@@ -4348,8 +4361,59 @@ function renderTenantProfile(tid) {
       '</table>'+
     '</div>';
 
-  // Initial render (newest-first by default \u2014 getAllTransactions() already sorts desc)
+  // Initial history render (newest-first)
   renderTicHistory(tid);
+
+  // ── Documents panel (lazy-mounted on first tab open; see showTicDetailTab) ──
+  // Note: we don't mount DocLibrary up-front because it triggers a Supabase
+  // fetch; mount on first switch to the Documents tab to keep the initial
+  // TIC open snappy.
+}
+
+// Switch between the TIC detail tabs. Lazy-mounts DocLibrary on first
+// Documents click so the initial TIC render doesn't pay that network cost.
+window._ticDocLibs = window._ticDocLibs || {};
+function showTicDetailTab(tid, tab) {
+  var histPanel = document.getElementById('tic-tab-history-' + tid);
+  var docsPanel = document.getElementById('tic-tab-docs-' + tid);
+  if (!histPanel || !docsPanel) return;
+
+  // Find the sibling tab buttons (scoped to this tenant's tabs strip)
+  var tabsWrap = histPanel.parentElement;
+  if (tabsWrap) {
+    tabsWrap.querySelectorAll('[data-tic-tab]').forEach(function(btn){
+      btn.classList.toggle('active', btn.getAttribute('data-tic-tab') === tab);
+    });
+  }
+  histPanel.classList.toggle('on', tab === 'history');
+  docsPanel.classList.toggle('on', tab === 'docs');
+
+  if (tab === 'docs' && !window._ticDocLibs[tid]) {
+    docsPanel.innerHTML = '';
+    if (window.DocLibrary && typeof SUPABASE_URL === 'string' && SUPABASE_URL) {
+      window._ticDocLibs[tid] = window.DocLibrary.create(docsPanel, {
+        entityType:    'tenant',
+        entityId:      tid,
+        pathPrefix:    'tenants/' + tid,
+        supabaseUrl:   SUPABASE_URL,
+        supabaseAnon:  SUPABASE_ANON,
+        storageBucket: (window.NATION_CONFIG && window.NATION_CONFIG.storage_bucket) || 'housing-files',
+        auditTable:    'finance_audit_log',
+        getActor:      function(){ return (typeof CURRENT_USER !== 'undefined' ? CURRENT_USER : 'staff'); },
+        categories: [
+          { key:'id',      label:'ID',            icon:'\uD83E\uDDFE' },
+          { key:'lease',   label:'Lease',         icon:'\uD83D\uDCC4' },
+          { key:'hydro',   label:'Hydro Bill',    icon:'\u26A1'      },
+          { key:'gas',     label:'Gas Bill',      icon:'\uD83D\uDD25' },
+          { key:'cheque',  label:'Void Cheque',   icon:'\uD83C\uDFE6' },
+          { key:'notice',  label:'Notice / Letter', icon:'\uD83D\uDCEC' },
+          { key:'other',   label:'Other',         icon:'\uD83D\uDCCE' }
+        ]
+      });
+    } else {
+      docsPanel.innerHTML = '<div class="ibox" style="margin:14px;">Document library is unavailable (storage not configured).</div>';
+    }
+  }
 }
 
 function showTicDetail(tid, key, balGrid, clickedCell) {
@@ -6207,6 +6271,426 @@ window.SigWidget = (function(){
   }
 
   return { create: create, createPair: createPair };
+})();
+
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// SHARED DOCUMENT LIBRARY FACTORY (Phase F3B \u2014 shared JS, v1)
+//
+// Single entry point: window.DocLibrary.create(mountEl, opts)
+// Produces an upload + list + delete UI for per-entity document storage.
+// Storage backend: Supabase Storage bucket (path-scoped per entity).
+// Metadata backend: audit-log row with details JSON (category lives here
+// in v1; will move to its own column in Phase F3C).
+//
+// Designed zero-dependency: no jQuery, no getData(), no toast(), no
+// window.NATION_CONFIG reads inside the factory. Everything is passed via
+// opts so the factory can be lifted verbatim into /shared.js in Phase C.
+//
+// Uses existing shared styles: std-table-card, std-table, tic-hist-chip,
+// plus a few doclib-* classes added to shared.css for upload area.
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+window.DocLibrary = (function(){
+  'use strict';
+
+  // ── Helpers ──────────────────────────────────────────────────────────
+  function _fmtBytes(b) {
+    if (b == null || isNaN(b)) return '\u2014';
+    if (b < 1024) return b + ' B';
+    if (b < 1024*1024) return (b/1024).toFixed(0) + ' KB';
+    return (b/1024/1024).toFixed(1) + ' MB';
+  }
+  function _safeName(n) { return String(n || 'file').replace(/[^a-zA-Z0-9._-]/g, '_'); }
+  function _iconForType(mime) {
+    mime = (mime||'').toLowerCase();
+    if (mime.indexOf('pdf') >= 0) return '\uD83D\uDCC4';
+    if (mime.indexOf('image') >= 0) return '\uD83D\uDDBC\uFE0F';
+    if (mime.indexOf('word') >= 0 || mime.indexOf('officedocument') >= 0) return '\uD83D\uDCDD';
+    if (mime.indexOf('sheet') >= 0 || mime.indexOf('excel') >= 0) return '\uD83D\uDCCA';
+    return '\uD83D\uDCCE';
+  }
+  function _escAttr(s) { return String(s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+  function _escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Network layer ────────────────────────────────────────────────────
+  // All calls use raw fetch() + REST/Storage endpoints. No supabase-js.
+  function _storageHeaders(opts) {
+    var tok = (typeof opts.getAuthToken === 'function' && opts.getAuthToken()) || opts.supabaseAnon;
+    return { 'apikey': opts.supabaseAnon, 'Authorization': 'Bearer ' + tok };
+  }
+  function _restHeaders(opts) {
+    var tok = (typeof opts.getAuthToken === 'function' && opts.getAuthToken()) || opts.supabaseAnon;
+    return {
+      'apikey': opts.supabaseAnon,
+      'Authorization': 'Bearer ' + tok,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal'
+    };
+  }
+
+  function _uploadBytes(opts, path, file) {
+    var url = opts.supabaseUrl + '/storage/v1/object/' + opts.storageBucket + '/' + path;
+    return fetch(url, {
+      method: 'POST',
+      headers: Object.assign({}, _storageHeaders(opts), {
+        'Content-Type': file.type || 'application/octet-stream',
+        'x-upsert': 'true'
+      }),
+      body: file
+    });
+  }
+
+  function _signUrl(opts, path) {
+    var url = opts.supabaseUrl + '/storage/v1/object/sign/' + opts.storageBucket + '/' + path;
+    return fetch(url, {
+      method: 'POST',
+      headers: Object.assign({}, _storageHeaders(opts), { 'Content-Type':'application/json' }),
+      body: JSON.stringify({ expiresIn: 3600 })
+    }).then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if (!d || !d.signedURL && !d.signedUrl) return null;
+        var rel = d.signedURL || d.signedUrl;
+        // Supabase returns a relative path; prepend storage host
+        return opts.supabaseUrl + '/storage/v1' + rel;
+      });
+  }
+
+  function _deleteObject(opts, path) {
+    var url = opts.supabaseUrl + '/storage/v1/object/' + opts.storageBucket + '/' + path;
+    return fetch(url, { method:'DELETE', headers: _storageHeaders(opts) });
+  }
+
+  function _saveMeta(opts, path, name, size, type, category) {
+    var url = opts.supabaseUrl + '/rest/v1/' + opts.auditTable;
+    var actor = (typeof opts.getActor === 'function' && opts.getActor()) || 'staff';
+    return fetch(url, {
+      method: 'POST',
+      headers: _restHeaders(opts),
+      body: JSON.stringify({
+        entity_type: opts.entityType,
+        entity_id:   String(opts.entityId),
+        action:      'file_uploaded',
+        details:     JSON.stringify({ path:path, name:name, size:size, type:type, category:category||'other' }),
+        actor:       actor,
+        created_at:  new Date().toISOString()
+      })
+    });
+  }
+
+  function _loadMeta(opts) {
+    // We list by entity + action=file_uploaded AND exclude any rows that
+    // have been marked 'file_deleted' for the same path. A small query
+    // gets us both in one round-trip.
+    var base = opts.supabaseUrl + '/rest/v1/' + opts.auditTable +
+      '?entity_type=eq.' + encodeURIComponent(opts.entityType) +
+      '&entity_id=eq.' + encodeURIComponent(String(opts.entityId)) +
+      '&action=in.(file_uploaded,file_deleted)' +
+      '&order=created_at.desc&limit=500';
+    var tok = (typeof opts.getAuthToken === 'function' && opts.getAuthToken()) || opts.supabaseAnon;
+    return fetch(base, {
+      headers: { 'apikey': opts.supabaseAnon, 'Authorization': 'Bearer ' + tok, 'Accept':'application/json' }
+    }).then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(rows){
+        if (!Array.isArray(rows)) return [];
+        var deletedPaths = {};
+        rows.forEach(function(r){
+          if (r.action === 'file_deleted') {
+            try { var d = JSON.parse(r.details||'{}'); if (d.path) deletedPaths[d.path] = true; } catch(e){}
+          }
+        });
+        var files = [];
+        var seenPath = {};
+        rows.forEach(function(r){
+          if (r.action !== 'file_uploaded') return;
+          try {
+            var d = JSON.parse(r.details || '{}');
+            if (!d.path || deletedPaths[d.path]) return;
+            if (seenPath[d.path]) return;
+            seenPath[d.path] = true;
+            files.push({
+              path: d.path,
+              name: d.name || d.path.split('/').pop(),
+              size: d.size || 0,
+              type: d.type || '',
+              category: d.category || 'other',
+              addedAt: (r.created_at || '').slice(0,10),
+              addedBy: r.actor || ''
+            });
+          } catch(e) {}
+        });
+        return files;
+      });
+  }
+
+  function _markDeleted(opts, path, name) {
+    var url = opts.supabaseUrl + '/rest/v1/' + opts.auditTable;
+    var actor = (typeof opts.getActor === 'function' && opts.getActor()) || 'staff';
+    return fetch(url, {
+      method:'POST',
+      headers: _restHeaders(opts),
+      body: JSON.stringify({
+        entity_type: opts.entityType,
+        entity_id:   String(opts.entityId),
+        action:      'file_deleted',
+        details:     JSON.stringify({ path:path, name:name }),
+        actor:       actor,
+        created_at:  new Date().toISOString()
+      })
+    });
+  }
+
+  // ── Factory ──────────────────────────────────────────────────────────
+  function create(mountEl, opts) {
+    opts = opts || {};
+    // Required opts
+    ['entityType','entityId','pathPrefix','supabaseUrl','supabaseAnon','storageBucket']
+      .forEach(function(k){ if (!opts[k]) throw new Error('DocLibrary: opts.'+k+' required'); });
+    // Defaults
+    opts.categories = opts.categories && opts.categories.length ? opts.categories : [
+      { key:'other', label:'Other', icon:'\uD83D\uDCCE' }
+    ];
+    opts.auditTable = opts.auditTable || 'housing_audit_log';
+    opts.maxSizeMB  = opts.maxSizeMB || 25;
+
+    var state = {
+      files: [],
+      loading: true,
+      filter: 'all',      // category key or 'all'
+      uploadCategory: opts.categories[0].key,
+      uploading: false,
+      error: null
+    };
+
+    // Build DOM once
+    var root = document.createElement('div');
+    root.className = 'std-table-card doclib';
+    mountEl.appendChild(root);
+
+    function render() {
+      var hasFiles = state.files.length > 0;
+      var filtered = state.filter === 'all'
+        ? state.files
+        : state.files.filter(function(f){ return f.category === state.filter; });
+      var totalCount = state.files.length;
+      var shownCount = filtered.length;
+
+      var catByKey = {};
+      opts.categories.forEach(function(c){ catByKey[c.key] = c; });
+
+      // Header
+      var headerHTML =
+        '<div class="std-table-hdr">' +
+          '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+            '<h3 style="margin:0;font-size:15px;font-weight:700;">Documents</h3>' +
+            '<span class="std-table-count">' +
+              (shownCount === totalCount ? totalCount + ' total' : shownCount + ' shown \u00B7 ' + totalCount + ' total') +
+            '</span>' +
+          '</div>' +
+        '</div>';
+
+      // Upload area (skipped when readOnly)
+      var uploadHTML = '';
+      if (!opts.readOnly) {
+        var catOptions = opts.categories.map(function(c){
+          var sel = c.key === state.uploadCategory ? ' selected' : '';
+          return '<option value="'+_escAttr(c.key)+'"'+sel+'>'+(c.icon?c.icon+' ':'')+_escHtml(c.label)+'</option>';
+        }).join('');
+        uploadHTML =
+          '<div class="doclib-upload-row">' +
+            '<div class="doclib-upload-drop" data-dl-drop>' +
+              '<input type="file" multiple data-dl-file-input style="display:none;">' +
+              '<span class="doclib-upload-icon">\uD83D\uDCC1</span>' +
+              '<div class="doclib-upload-text">' +
+                '<div style="font-size:13px;font-weight:600;">Drop files here or click to upload</div>' +
+                '<div style="font-size:11px;color:var(--muted);">Max ' + opts.maxSizeMB + ' MB per file</div>' +
+              '</div>' +
+            '</div>' +
+            '<label class="doclib-upload-cat">' +
+              '<span>Category</span>' +
+              '<select data-dl-cat class="std-filter-control narrow">'+catOptions+'</select>' +
+            '</label>' +
+          '</div>' +
+          (state.uploading ? '<div class="doclib-status doclib-status-info">Uploading\u2026</div>' : '') +
+          (state.error ? '<div class="doclib-status doclib-status-error">'+_escHtml(state.error)+'</div>' : '');
+      }
+
+      // Filter chips
+      var chipAll = '<button type="button" class="btn btn-sm tic-hist-chip' +
+        (state.filter==='all'?' is-active':'') + '" data-dl-chip="all">All</button>';
+      var chips = opts.categories.map(function(c){
+        var active = state.filter === c.key ? ' is-active' : '';
+        return '<button type="button" class="btn btn-sm tic-hist-chip'+active+'" data-dl-chip="'+_escAttr(c.key)+'">' +
+          (c.icon ? c.icon + ' ' : '') + _escHtml(c.label) + '</button>';
+      }).join('');
+      var filterHTML =
+        '<div class="std-filter-row" style="flex-wrap:wrap;">' +
+          '<span class="std-filter-label">Category</span>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + chipAll + chips + '</div>' +
+        '</div>';
+
+      // Table body
+      var bodyRows;
+      if (state.loading) {
+        bodyRows = '<tr class="empty-row"><td colspan="5">Loading\u2026</td></tr>';
+      } else if (!hasFiles) {
+        bodyRows = '<tr class="empty-row"><td colspan="5">No documents yet.' +
+          (opts.readOnly ? '' : ' Upload your first file above.') + '</td></tr>';
+      } else if (!filtered.length) {
+        bodyRows = '<tr class="empty-row"><td colspan="5">No documents match this filter.</td></tr>';
+      } else {
+        bodyRows = filtered.map(function(f){
+          var cat = catByKey[f.category] || { label: f.category || 'Other', icon:'\uD83D\uDCCE' };
+          var icon = _iconForType(f.type);
+          return '<tr>' +
+            '<td style="font-size:16px;width:28px;">'+icon+'</td>' +
+            '<td class="std-cell-primary" style="max-width:320px;white-space:normal;word-break:break-word;">' +
+              _escHtml(f.name) +
+              '<div style="font-size:11px;color:var(--muted);font-weight:normal;">' +
+                _escHtml(f.addedAt||'') + (f.addedBy?' \u00B7 '+_escHtml(f.addedBy):'') + '</div>' +
+            '</td>' +
+            '<td>' +
+              '<span class="std-pill std-pill-info">' + (cat.icon?cat.icon+' ':'') + _escHtml(cat.label) + '</span>' +
+            '</td>' +
+            '<td class="std-cell-right std-cell-mono">'+_fmtBytes(f.size)+'</td>' +
+            '<td class="std-cell-tail" style="white-space:nowrap;">' +
+              '<button class="btn btn-ghost btn-sm" data-dl-view="'+_escAttr(f.path)+'">View</button>' +
+              (opts.readOnly ? '' : ' <button class="btn btn-ghost btn-sm" style="color:var(--danger);" data-dl-del="'+_escAttr(f.path)+'" data-dl-del-name="'+_escAttr(f.name)+'">Delete</button>') +
+            '</td>' +
+          '</tr>';
+        }).join('');
+      }
+
+      var tableHTML =
+        '<div style="overflow-x:auto;">' +
+          '<table class="std-table">' +
+            '<thead><tr>' +
+              '<th></th><th>File</th><th>Category</th>' +
+              '<th class="std-cell-right">Size</th>' +
+              '<th class="std-cell-tail">Actions</th>' +
+            '</tr></thead>' +
+            '<tbody>'+bodyRows+'</tbody>' +
+          '</table>' +
+        '</div>';
+
+      root.innerHTML = headerHTML + uploadHTML + filterHTML + tableHTML;
+
+      _wireEvents();
+    }
+
+    function _wireEvents() {
+      // Chip click
+      root.querySelectorAll('[data-dl-chip]').forEach(function(btn){
+        btn.onclick = function(){ state.filter = btn.getAttribute('data-dl-chip'); render(); };
+      });
+      // Category dropdown (upload)
+      var cat = root.querySelector('[data-dl-cat]');
+      if (cat) cat.onchange = function(){ state.uploadCategory = cat.value; };
+      // Drop zone click opens file picker
+      var drop = root.querySelector('[data-dl-drop]');
+      var fi   = root.querySelector('[data-dl-file-input]');
+      if (drop && fi) {
+        drop.onclick = function(){ fi.click(); };
+        drop.ondragover = function(e){ e.preventDefault(); drop.classList.add('is-drag'); };
+        drop.ondragleave = function(){ drop.classList.remove('is-drag'); };
+        drop.ondrop = function(e){
+          e.preventDefault(); drop.classList.remove('is-drag');
+          if (e.dataTransfer && e.dataTransfer.files) _handleFiles(e.dataTransfer.files);
+        };
+        fi.onchange = function(){ _handleFiles(fi.files); fi.value = ''; };
+      }
+      // View + delete
+      root.querySelectorAll('[data-dl-view]').forEach(function(btn){
+        btn.onclick = function(){
+          var p = btn.getAttribute('data-dl-view');
+          _signUrl(opts, p).then(function(u){
+            if (u) window.open(u, '_blank');
+            else _setError('Could not generate link for that file.');
+          }).catch(function(){ _setError('Could not generate link for that file.'); });
+        };
+      });
+      root.querySelectorAll('[data-dl-del]').forEach(function(btn){
+        btn.onclick = function(){
+          var p = btn.getAttribute('data-dl-del');
+          var n = btn.getAttribute('data-dl-del-name');
+          if (!confirm('Delete "'+n+'"? This cannot be undone.')) return;
+          btn.disabled = true;
+          _deleteObject(opts, p).then(function(){ return _markDeleted(opts, p, n); })
+            .then(function(){
+              state.files = state.files.filter(function(f){ return f.path !== p; });
+              if (typeof opts.onChange === 'function') opts.onChange('delete', { path:p, name:n });
+              render();
+            })
+            .catch(function(){ _setError('Delete failed.'); btn.disabled = false; });
+        };
+      });
+    }
+
+    function _setError(msg) {
+      state.error = msg; render();
+      setTimeout(function(){ state.error = null; render(); }, 4000);
+    }
+
+    function _handleFiles(fileList) {
+      if (!fileList || !fileList.length) return;
+      var files = Array.prototype.slice.call(fileList);
+      // Size guard
+      var tooBig = files.filter(function(f){ return f.size > opts.maxSizeMB * 1024 * 1024; });
+      if (tooBig.length) { _setError('Some files exceed the '+opts.maxSizeMB+' MB limit.'); return; }
+
+      state.uploading = true; state.error = null; render();
+
+      // Sequential uploads \u2014 keeps order predictable + avoids rate limits
+      function next(i) {
+        if (i >= files.length) {
+          state.uploading = false;
+          return refresh();
+        }
+        var f = files[i];
+        var ts = Date.now();
+        var path = opts.pathPrefix.replace(/\/$/,'') + '/' + ts + '_' + _safeName(f.name);
+        _uploadBytes(opts, path, f).then(function(r){
+          if (!r.ok) throw new Error('upload failed');
+          return _saveMeta(opts, path, f.name, f.size, f.type, state.uploadCategory);
+        }).then(function(){
+          if (typeof opts.onChange === 'function') {
+            opts.onChange('upload', { path:path, name:f.name, category:state.uploadCategory });
+          }
+          next(i+1);
+        }).catch(function(){
+          state.uploading = false;
+          _setError('Upload failed: ' + f.name);
+        });
+      }
+      next(0);
+    }
+
+    function refresh() {
+      state.loading = true; render();
+      return _loadMeta(opts).then(function(files){
+        state.files = files;
+        state.loading = false;
+        render();
+      }).catch(function(){
+        state.loading = false;
+        _setError('Could not load documents.');
+      });
+    }
+
+    // Initial render + load
+    render();
+    refresh();
+
+    return {
+      root: root,
+      refresh: refresh,
+      setCategoryFilter: function(k){ state.filter = k; render(); },
+      getFiles: function(){ return state.files.slice(); }
+    };
+  }
+
+  return { create: create };
 })();
 
 

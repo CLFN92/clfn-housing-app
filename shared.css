@@ -1360,3 +1360,54 @@ body.modal-open { overflow: hidden; position: fixed; width: 100%; }
 .sigw-presence-btn.is-active{background:var(--yellow);color:#111;}
 .sigw-presence-btn:disabled{cursor:not-allowed;opacity:.6;}
 .sigw-presence-desc{font-size:11px;color:var(--muted);}
+
+/* ─────────────────────────────────────────────────────────────── */
+/* Document Library factory (Phase F3B) — upload area + drop zone  */
+/* Table rendering uses existing .std-table-card / .std-table.     */
+/* ─────────────────────────────────────────────────────────────── */
+.doclib{}
+.doclib-upload-row{
+  display:flex;
+  gap:12px;
+  padding:14px;
+  align-items:stretch;
+  border-bottom:1px solid var(--border);
+  flex-wrap:wrap;
+}
+.doclib-upload-drop{
+  flex:1;
+  min-width:240px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px 14px;
+  border:1.5px dashed var(--border);
+  border-radius:8px;
+  background:#fafaf8;
+  cursor:pointer;
+  transition:var(--tr);
+}
+.doclib-upload-drop:hover{border-color:var(--yellow);background:#fffce8;}
+.doclib-upload-drop.is-drag{border-color:var(--yellow);background:#fffce8;box-shadow:0 0 0 3px rgba(248,228,26,.15);}
+.doclib-upload-icon{font-size:22px;flex-shrink:0;}
+.doclib-upload-text{flex:1;min-width:0;}
+.doclib-upload-cat{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:0 4px;
+  font-size:11px;
+  font-weight:600;
+  color:var(--muted);
+  text-transform:uppercase;
+  letter-spacing:.4px;
+}
+.doclib-upload-cat select{min-width:140px;}
+.doclib-status{
+  padding:8px 14px;
+  font-size:12px;
+  font-weight:500;
+  border-bottom:1px solid var(--border);
+}
+.doclib-status-info{background:#f0fdf4;color:#15803d;}
+.doclib-status-error{background:#fef2f2;color:var(--danger);}
