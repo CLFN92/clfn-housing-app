@@ -301,7 +301,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     <p class="home-subtitle">Finance activity at a glance.</p>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
       <button class="btn btn-primary btn-sm" onclick="openModal('modalRentPayment')">&#127968; Record Payment</button>
-      <button class="btn btn-ghost btn-sm" onclick="openModal('modalAddTenant')">+ Add Tenant</button>
+      <button class="btn btn-ghost btn-sm" onclick="openAddTenant()">+ Add Tenant</button>
     </div>
   </div>
 
@@ -388,7 +388,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
       <span class="action-label">Auto Engine</span>
       <span class="action-sub">Bulk invoice &amp; payment run</span>
     </button>
-    <button class="action-btn-card" onclick="openModal('modalAddTenant')">
+    <button class="action-btn-card" onclick="openAddTenant()">
       <span class="action-icon">&#128100;</span>
       <span class="action-label">Add Tenant</span>
       <span class="action-sub">Create a new tenant record</span>
@@ -418,7 +418,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     </div>
     <div class="std-page-actions" id="tenantsListChromeActions">
       <button class="btn btn-ghost btn-sm" onclick="exportTenants()">&#128196; Export CSV</button>
-      <button class="btn btn-primary btn-sm" onclick="openModal('modalAddTenant')">+ Add Tenant</button>
+      <button class="btn btn-primary btn-sm" onclick="openAddTenant()">+ Add Tenant</button>
     </div>
   </div>
 
@@ -1371,50 +1371,128 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 </main>
 
 <!-- ADD TENANT -->
-<div class="modal-ov" id="modalAddTenant">
+<!-- ═════════════════════════════════════════════════════════════════════ -->
+<!-- UNIFIED TENANT FORM — one modal, two modes (new | edit).              -->
+<!-- Opened via openAddTenant() for new, openEditTenant(tid) for edit.     -->
+<!-- Mode + tid stored on modal.dataset. Uses tf-* id prefix.              -->
+<!-- ═════════════════════════════════════════════════════════════════════ -->
+<div class="modal-ov" id="modalTenantForm">
   <div class="modal modal-lg">
-    <div class="modal-hdr"><div><h2>Add Tenant Account</h2></div><button class="modal-close" onclick="closeModal('modalAddTenant')">&#x2715;</button></div>
+    <div class="modal-hdr">
+      <div>
+        <h2 id="tf-title">Add Tenant Account</h2>
+        <p id="tf-subtitle">Create a new tenant record. Phone and email sync to the Housing App.</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modalTenantForm')">&#x2715;</button>
+    </div>
     <div class="modal-body">
-      <div class="fg c2" style="gap:14px;">
-        <div class="f"><label>First Name <span class="r">*</span></label><input id="tn-first" placeholder="First name"/></div>
-        <div class="f"><label>Last Name <span class="r">*</span></label><input id="tn-last" placeholder="Last name"/></div>
-        <div class="f"><label>Status <span class="r">*</span></label>
-          <select id="tn-status">
-            <option value="active">Active (currently in a unit)</option>
-            <option value="former">Former (moved out &mdash; balance only)</option>
+
+      <!-- Read-only header shown only in edit mode -->
+      <div id="tf-edit-header" class="f s2" style="display:none;margin-bottom:14px;">
+        <label>Editing tenant</label>
+        <input id="tf-edit-name" readonly style="background:var(--bg);color:var(--muted);"/>
+      </div>
+
+      <!-- ── Identity ────────────────────────────────────────────────── -->
+      <div class="tf-section-label">Identity</div>
+      <div class="fg c2" style="gap:14px;margin-bottom:18px;">
+        <div class="f"><label>First Name <span class="r">*</span></label><input id="tf-first" placeholder="First name"/></div>
+        <div class="f"><label>Last Name <span class="r">*</span></label><input id="tf-last" placeholder="Last name"/></div>
+        <div class="f"><label>Date of Birth</label><input id="tf-dob" type="date"/></div>
+        <div class="f"><label>Band #</label><input id="tf-band" placeholder="Treaty / band number"/></div>
+        <div class="f"><label>Marital Status</label>
+          <select id="tf-marital">
+            <option value="">—</option>
+            <option value="single">Single</option>
+            <option value="married">Married</option>
+            <option value="common-law">Common-law</option>
+            <option value="separated">Separated</option>
+            <option value="divorced">Divorced</option>
+            <option value="widowed">Widowed</option>
           </select>
         </div>
-        <div class="f"><label>Unit / Address <span style="color:var(--muted);font-weight:400;">(required if Active)</span></label><input id="tn-unit" list="housingUnitsList" placeholder="Start typing address or unit number..." autocomplete="off"/><datalist id="housingUnitsList"></datalist></div>
+        <div class="f"><label>Status <span class="r">*</span></label>
+          <select id="tf-status">
+            <option value="active">Active (currently in a unit)</option>
+            <option value="former">Former (moved out — balance only)</option>
+            <option value="deceased">Deceased</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- ── Contact ─────────────────────────────────────────────────── -->
+      <div class="tf-section-label">Contact</div>
+      <div class="fg c2" style="gap:14px;margin-bottom:18px;">
+        <div class="f"><label>Phone</label><input id="tf-phone" placeholder="(807) 555-0000"/></div>
+        <div class="f"><label>Email</label><input id="tf-email" type="email" placeholder="email@example.com"/></div>
+      </div>
+
+      <!-- ── Address ─────────────────────────────────────────────────── -->
+      <div class="tf-section-label">Property &amp; Mailing Address</div>
+      <div class="fg c2" style="gap:14px;margin-bottom:18px;">
+        <div class="f s2">
+          <label>Unit / Address <span id="tf-unit-hint" style="color:var(--muted);font-weight:400;">(required if Active)</span></label>
+          <input id="tf-unit" list="housingUnitsList" placeholder="Start typing address or unit number..." autocomplete="off"/>
+          <datalist id="housingUnitsList"></datalist>
+        </div>
+        <div class="f s2"><label>Street Address</label><input id="tf-street" placeholder="e.g. 42 Main Street"/></div>
+        <div class="f"><label>Community</label><input id="tf-community"/></div>
+        <div class="f"><label>Province / Territory</label><input id="tf-province" placeholder="Ontario"/></div>
+        <div class="f"><label>Postal Code</label><input id="tf-postal" placeholder="P0L 1B0"/></div>
+        <div class="f"><label>Mailing Address (if different)</label><input id="tf-mailing" placeholder="Same as above"/></div>
+      </div>
+
+      <!-- ── Finance ─────────────────────────────────────────────────── -->
+      <div class="tf-section-label">Finance Settings</div>
+      <div class="fg c2" style="gap:14px;margin-bottom:18px;">
         <div class="f"><label>Tenant Type</label>
-          <select id="tn-type">
-            <option value="band-on">Band Member - On-Reserve</option>
-            <option value="band-off">Band Member - Off-Reserve</option>
+          <select id="tf-type">
+            <option value="band-on">Band Member — On-Reserve</option>
+            <option value="band-off">Band Member — Off-Reserve</option>
             <option value="band-staff">Band Office Staff</option>
             <option value="clea">CLEA (Staff Housing)</option>
             <option value="community">Community Member (Non-Band)</option>
           </select>
         </div>
-        <div class="f"><label>Monthly Rent ($)</label><input id="tn-rent" type="number" placeholder="0.00" step="0.01"/></div>
-        <div class="f"><label>Opening Balance Owed ($) <span style="color:var(--muted);font-weight:400;">(optional)</span></label><input id="tn-open-bal" type="number" placeholder="0.00" step="0.01"/></div>
+        <div class="f"><label>Monthly Rent ($)</label><input id="tf-rent" type="number" placeholder="0.00" step="0.01" min="0"/></div>
         <div class="f"><label>Invoice Preference</label>
-          <select id="tn-inv-pref"><option value="email">Email Invoice</option><option value="print">Print / Mail</option></select>
+          <select id="tf-invpref">
+            <option value="email">&#128231; Email Invoice</option>
+            <option value="print">&#128424; Print / Mail</option>
+          </select>
         </div>
-        <div class="f s2"><label>Email Address</label><input id="tn-email" type="email" placeholder="email@example.com"/></div>
-        <div class="f"><label>Phone</label><input id="tn-phone" placeholder="(807) 555-0000"/></div>
-        <div class="f"><label>Hydro Account #</label><input id="tn-hydro-acct" placeholder="Account number"/></div>
-        <div class="f"><label>Gas Account #</label><input id="tn-gas-acct" placeholder="Account number"/></div>
+        <div class="f" id="tf-open-bal-row"><label>Opening Balance Owed ($) <span style="color:var(--muted);font-weight:400;">(optional)</span></label><input id="tf-open-bal" type="number" placeholder="0.00" step="0.01" min="0"/></div>
+        <div class="f"><label>Hydro Account #</label><input id="tf-hydro" placeholder="Account number"/></div>
+        <div class="f"><label>Gas Account #</label><input id="tf-gas" placeholder="Account number"/></div>
         <div class="f s2">
           <div class="toggle-row">
-            <label for="tn-autopay">Auto-Payment Enabled (tenant is on pre-authorized payment)</label>
-            <label class="tsw"><input type="checkbox" id="tn-autopay"/><span class="tsl"></span></label>
+            <label for="tf-autopay">Auto-Payment Enabled (tenant is on pre-authorized payment)</label>
+            <label class="tsw"><input type="checkbox" id="tf-autopay" onchange="_tfToggleAutopayType()"/><span class="tsl"></span></label>
           </div>
         </div>
-        <div class="f s2"><label>Notes</label><textarea id="tn-notes" placeholder="Any additional notes..."></textarea></div>
+        <div class="f s2" id="tf-autopay-type-row" style="display:none;">
+          <label>Auto-Payment Type</label>
+          <select id="tf-autopay-type">
+            <option value="eft">EFT — Electronic Funds Transfer</option>
+            <option value="payroll">Payroll Deduction</option>
+          </select>
+        </div>
       </div>
+
+      <!-- ── Notes ───────────────────────────────────────────────────── -->
+      <div class="tf-section-label">Notes</div>
+      <div class="fg" style="gap:14px;">
+        <div class="f"><textarea id="tf-notes" placeholder="Internal notes..."></textarea></div>
+      </div>
+
     </div>
-    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modalAddTenant')">Cancel</button><button class="btn btn-primary" onclick="saveTenant()">Add Tenant</button></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalTenantForm')">Cancel</button>
+      <button class="btn btn-primary" id="tf-submit" onclick="saveTenant()">Add Tenant</button>
+    </div>
   </div>
 </div>
+
 
 <!-- OPENING BALANCE -->
 <div class="modal-ov" id="modalOpeningBalance">
@@ -5716,176 +5794,590 @@ function openVoucher(txn) {
 }
 
 
-// \u2500\u2500 Signature Pad \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-var _sigPads = {};
-var _sigLocked = false;
-var _sigSigned = { auth: false, verif: false };
-var _sigMode = 'customer'; // 'customer' | 'internal'
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// SHARED SIGNATURE WIDGET FACTORY (Phase F3B — shared JS, v1)
+// Single entry point: window.SigWidget.create(mountEl, opts)
+// Produces a 3-tab signature widget (Draw / Type / Wet-or-E-Sign) and
+// returns a controller with methods: getDataURL(), clear(), getMeta(),
+// lock(), unlock(), isSigned().
+//
+// This factory is intentionally self-contained with ZERO external
+// dependencies (no jQuery, no getData, no toast) so that when Phase C
+// refactor introduces /shared.js, this block can be moved verbatim.
+// CSS lives in shared.css under the .sigw-* namespace.
+//
+// Consumers in this file: initVoucherSigs() (voucher modal).
+// Consumers elsewhere (housing.html, etc.) can adopt this factory too.
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+window.SigWidget = (function(){
+  'use strict';
+
+  // Render a single typed name into an offscreen canvas so we can produce
+  // a consistent data URL regardless of which tab the user signed on.
+  function _renderTypedToDataURL(name, width, height) {
+    var c = document.createElement('canvas');
+    c.width = width || 600; c.height = height || 90;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#111';
+    ctx.font = 'italic 34px Georgia, serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(name || '', 12, c.height/2);
+    return c.toDataURL('image/png');
+  }
+
+  function create(mountEl, opts) {
+    opts = opts || {};
+    var id = opts.id || ('sigw_' + Math.random().toString(36).slice(2,9));
+    var height = opts.height || 90;
+    var allowTabs = opts.tabs || ['draw','type','wet'];
+    var labelDraw = opts.labelDraw || '\u270F\uFE0F Draw';
+    var labelType = opts.labelType || '\u2328\uFE0F Type';
+    var labelWet  = opts.labelWet  || '\uD83D\uDD8A Wet / E-Sign';
+
+    // Build DOM
+    var root = document.createElement('div');
+    root.className = 'sigw';
+    root.dataset.sigwId = id;
+
+    var tabs = document.createElement('div');
+    tabs.className = 'sigw-tabs';
+
+    var panels = {};
+    var tabBtns = {};
+
+    function makeTab(key, label) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sigw-tab';
+      b.dataset.tab = key;
+      b.textContent = label;
+      b.onclick = function(){ setMethod(key); };
+      tabs.appendChild(b);
+      tabBtns[key] = b;
+    }
+
+    if (allowTabs.indexOf('draw') >= 0) makeTab('draw', labelDraw);
+    if (allowTabs.indexOf('type') >= 0) makeTab('type', labelType);
+    if (allowTabs.indexOf('wet')  >= 0) makeTab('wet',  labelWet);
+
+    root.appendChild(tabs);
+
+    // ── Draw panel ──
+    var drawPanel, canvas, drawCtx;
+    if (allowTabs.indexOf('draw') >= 0) {
+      drawPanel = document.createElement('div');
+      drawPanel.className = 'sigw-panel';
+      drawPanel.dataset.panel = 'draw';
+      canvas = document.createElement('canvas');
+      canvas.className = 'sigw-canvas';
+      canvas.width = 700; canvas.height = height;
+      canvas.style.height = height + 'px';
+      drawPanel.appendChild(canvas);
+      var footer = document.createElement('div');
+      footer.className = 'sigw-canvas-footer';
+      var hint = document.createElement('span');
+      hint.className = 'sigw-hint';
+      hint.textContent = 'Sign with finger or mouse';
+      var clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'sigw-clear';
+      clearBtn.textContent = 'Clear';
+      clearBtn.onclick = function(){ clear(); };
+      footer.appendChild(hint);
+      footer.appendChild(clearBtn);
+      drawPanel.appendChild(footer);
+      root.appendChild(drawPanel);
+      panels.draw = drawPanel;
+
+      drawCtx = canvas.getContext('2d');
+      drawCtx.strokeStyle = '#111';
+      drawCtx.lineWidth = 2;
+      drawCtx.lineCap = 'round';
+      drawCtx.lineJoin = 'round';
+
+      // Pointer handling (covers mouse + touch via pointer events where available)
+      var drawing = false, lastX = 0, lastY = 0, _locked = false;
+      function pos(ev){
+        var rect = canvas.getBoundingClientRect();
+        var sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+        var src = ev.touches ? ev.touches[0] : ev;
+        return { x:(src.clientX - rect.left) * sx, y:(src.clientY - rect.top) * sy };
+      }
+      function start(ev){ if(_locked)return; ev.preventDefault(); drawing = true; var p = pos(ev); lastX = p.x; lastY = p.y; }
+      function move(ev){ if(!drawing||_locked)return; ev.preventDefault(); var p = pos(ev); drawCtx.beginPath(); drawCtx.moveTo(lastX,lastY); drawCtx.lineTo(p.x,p.y); drawCtx.stroke(); lastX=p.x; lastY=p.y; _updateSignedState(); }
+      function end(){ drawing = false; }
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      canvas.addEventListener('mouseup', end);
+      canvas.addEventListener('mouseleave', end);
+      canvas.addEventListener('touchstart', start, {passive:false});
+      canvas.addEventListener('touchmove', move, {passive:false});
+      canvas.addEventListener('touchend', end);
+      root._setDrawLocked = function(v){ _locked = !!v; };
+    }
+
+    // ── Type panel ──
+    var typeInput;
+    if (allowTabs.indexOf('type') >= 0) {
+      var typePanel = document.createElement('div');
+      typePanel.className = 'sigw-panel';
+      typePanel.dataset.panel = 'type';
+      typePanel.hidden = true;
+      var pad = document.createElement('div');
+      pad.className = 'sigw-type-pad';
+      typeInput = document.createElement('input');
+      typeInput.type = 'text';
+      typeInput.className = 'sigw-type-input';
+      typeInput.placeholder = 'Type full legal name';
+      typeInput.addEventListener('input', _updateSignedState);
+      var note = document.createElement('div');
+      note.className = 'sigw-type-note';
+      note.textContent = 'Typing your name constitutes a legal electronic signature';
+      pad.appendChild(typeInput);
+      pad.appendChild(note);
+      typePanel.appendChild(pad);
+      root.appendChild(typePanel);
+      panels.type = typePanel;
+    }
+
+    // ── Wet panel ──
+    var wetInput;
+    if (allowTabs.indexOf('wet') >= 0) {
+      var wetPanel = document.createElement('div');
+      wetPanel.className = 'sigw-panel';
+      wetPanel.dataset.panel = 'wet';
+      wetPanel.hidden = true;
+      var wpad = document.createElement('div');
+      wpad.className = 'sigw-wet-pad';
+      var wnote = document.createElement('div');
+      wnote.className = 'sigw-wet-note';
+      wnote.textContent = 'Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.';
+      wetInput = document.createElement('input');
+      wetInput.type = 'text';
+      wetInput.className = 'sigw-wet-input';
+      wetInput.placeholder = 'Reference # or e-sign envelope ID (optional)';
+      wetInput.addEventListener('input', _updateSignedState);
+      wpad.appendChild(wnote);
+      wpad.appendChild(wetInput);
+      wetPanel.appendChild(wpad);
+      root.appendChild(wetPanel);
+      panels.wet = wetPanel;
+    }
+
+    // Mount
+    if (mountEl && mountEl.appendChild) mountEl.appendChild(root);
+
+    // ── Controller state ──
+    var currentMethod = allowTabs[0] || 'draw';
+    var locked = false;
+
+    function setMethod(method) {
+      if (locked) return;
+      if (!panels[method]) return;
+      currentMethod = method;
+      Object.keys(panels).forEach(function(k){
+        panels[k].hidden = (k !== method);
+        tabBtns[k].classList.toggle('is-active', k === method);
+      });
+      _updateSignedState();
+    }
+
+    function isSigned() {
+      if (currentMethod === 'draw' && canvas) {
+        try {
+          var data = drawCtx.getImageData(0,0,canvas.width,canvas.height).data;
+          for (var i = 3; i < data.length; i += 4) if (data[i] > 0) return true;
+          return false;
+        } catch(e) { return false; }
+      }
+      if (currentMethod === 'type' && typeInput) return typeInput.value.trim().length > 0;
+      if (currentMethod === 'wet'  && wetInput)  return wetInput.value.trim().length > 0;
+      return false;
+    }
+
+    function _updateSignedState() {
+      root.classList.toggle('is-signed', isSigned());
+    }
+
+    function getDataURL() {
+      // Returns a PNG data URL regardless of method, so downstream print /
+      // email code can just slot an <img src=...>.
+      if (currentMethod === 'draw' && canvas) {
+        return isSigned() ? canvas.toDataURL('image/png') : '';
+      }
+      if (currentMethod === 'type' && typeInput) {
+        var v = typeInput.value.trim();
+        return v ? _renderTypedToDataURL(v, canvas ? canvas.width : 700, height) : '';
+      }
+      // Wet / external e-sign doesn't produce a pixel signature in-app;
+      // return empty data URL and caller should use getMeta() for the ref.
+      return '';
+    }
+
+    function getMeta() {
+      return {
+        method: currentMethod,
+        typedName: typeInput ? typeInput.value.trim() : '',
+        wetRef:    wetInput  ? wetInput.value.trim()  : '',
+        signed:    isSigned()
+      };
+    }
+
+    function clear() {
+      if (locked) return;
+      if (canvas && drawCtx) drawCtx.clearRect(0, 0, canvas.width, canvas.height);
+      if (typeInput) typeInput.value = '';
+      if (wetInput)  wetInput.value  = '';
+      _updateSignedState();
+    }
+
+    function lock() {
+      locked = true;
+      if (root._setDrawLocked) root._setDrawLocked(true);
+      if (typeInput) typeInput.disabled = true;
+      if (wetInput)  wetInput.disabled  = true;
+      Object.keys(tabBtns).forEach(function(k){ tabBtns[k].disabled = true; });
+    }
+
+    function unlock() {
+      locked = false;
+      if (root._setDrawLocked) root._setDrawLocked(false);
+      if (typeInput) typeInput.disabled = false;
+      if (wetInput)  wetInput.disabled  = false;
+      Object.keys(tabBtns).forEach(function(k){ tabBtns[k].disabled = false; });
+    }
+
+    // Initialize default tab
+    setMethod(currentMethod);
+
+    return {
+      id: id,
+      root: root,
+      setMethod: setMethod,
+      getDataURL: getDataURL,
+      getMeta: getMeta,
+      clear: clear,
+      lock: lock,
+      unlock: unlock,
+      isSigned: isSigned
+    };
+  }
+
+  // ── createPair ──────────────────────────────────────────────────────
+  // Bundles two SigWidgets with a shared Yes/No presence toggle.
+  // Everything consumer-specific (CURRENT_USER, role-validation copy,
+  // label strings) is passed through opts — the factory just applies.
+  //
+  // opts shape:
+  //   toggleMount: HTMLElement          (required) where to render toggle
+  //   toggleLabel: '...'                label next to toggle (default 'Customer Present?')
+  //   initialMode: 'yes' | 'no'         default 'yes'
+  //   modes: { yes: {...}, no: {...} }  (required) see below
+  //   leftNameInput, leftNameNote,      (optional) DOM refs for auto-fill + notes
+  //   rightNameInput, rightNameNote,
+  //   widgetOpts: {...}                 passed to each create()
+  //   onChange: function(mode)          fired after a mode change
+  //
+  // modes[k] shape:
+  //   yesButtonText, noButtonText       button labels (only consulted on 'yes')
+  //   description                       subtitle shown next to toggle
+  //   left:  { title, sub, nameAuto, nameNote, nameNoteKind }
+  //   right: { title, sub, nameAuto, nameNote, nameNoteKind }
+  //     nameNoteKind: 'success' | 'warning' | 'danger' | '' (default)
+  //
+  // Returns:
+  //   left, right                       the two controllers
+  //   setMode(m), getMode()
+  //   lock(), unlock(), isLocked()
+  //   isBothSigned()
+  //   getDataURLs()  -> {left, right}
+  //   root                              the toggle element (for styling)
+  function createPair(mountLeft, mountRight, opts) {
+    opts = opts || {};
+    if (!opts.modes || !opts.modes.yes || !opts.modes.no) {
+      throw new Error('SigWidget.createPair: opts.modes.{yes,no} required');
+    }
+    var widgetOpts = opts.widgetOpts || {};
+
+    // Build the two widgets first so we can reach them from the toggle
+    var leftW  = create(mountLeft,  widgetOpts);
+    var rightW = create(mountRight, widgetOpts);
+
+    // Build the toggle strip
+    var tmount = opts.toggleMount;
+    var toggleEl = document.createElement('div');
+    toggleEl.className = 'sigw-presence';
+    var label = document.createElement('span');
+    label.className = 'sigw-presence-label';
+    label.textContent = opts.toggleLabel || 'Customer Present?';
+    var btnGroup = document.createElement('div');
+    btnGroup.className = 'sigw-presence-btns';
+    var yesBtn = document.createElement('button');
+    yesBtn.type = 'button';
+    yesBtn.className = 'sigw-presence-btn';
+    yesBtn.textContent = (opts.modes.yes.yesButtonText) || '\u2713 Yes';
+    var noBtn = document.createElement('button');
+    noBtn.type = 'button';
+    noBtn.className = 'sigw-presence-btn';
+    noBtn.textContent = (opts.modes.yes.noButtonText) || 'No';
+    btnGroup.appendChild(yesBtn);
+    btnGroup.appendChild(noBtn);
+    var desc = document.createElement('span');
+    desc.className = 'sigw-presence-desc';
+    toggleEl.appendChild(label);
+    toggleEl.appendChild(btnGroup);
+    toggleEl.appendChild(desc);
+    if (tmount && tmount.appendChild) tmount.appendChild(toggleEl);
+
+    var currentMode = opts.initialMode || 'yes';
+    var locked = false;
+
+    function _applyNote(el, text, kind) {
+      if (!el) return;
+      el.textContent = text || '';
+      var c = 'var(--muted)';
+      if (kind === 'success') c = 'var(--success)';
+      else if (kind === 'warning' || kind === 'danger') c = 'var(--danger)';
+      el.style.color = c;
+    }
+
+    function _applyPadLabels(side, cfg) {
+      // side: 'left' | 'right'; cfg: {title, sub, nameAuto, nameNote, nameNoteKind}
+      if (!cfg) return;
+      var titleEl = opts[side + 'TitleEl'];
+      var subEl   = opts[side + 'SubEl'];
+      var nameEl  = opts[side + 'NameInput'];
+      var noteEl  = opts[side + 'NameNote'];
+      if (titleEl && cfg.title != null) titleEl.innerHTML  = cfg.title;
+      if (subEl   && cfg.sub   != null) subEl.textContent  = cfg.sub;
+      if (nameEl  && cfg.nameAuto != null && !locked) nameEl.value = cfg.nameAuto;
+      if (noteEl) _applyNote(noteEl, cfg.nameNote || '', cfg.nameNoteKind || '');
+    }
+
+    function setMode(m) {
+      if (locked) return;
+      if (m !== 'yes' && m !== 'no') return;
+      currentMode = m;
+      var modeCfg = opts.modes[m];
+      // Update button visuals
+      yesBtn.classList.toggle('is-active', m === 'yes');
+      noBtn.classList.toggle('is-active',  m === 'no');
+      // Update description
+      desc.textContent = modeCfg.description || '';
+      // Apply labels + name inputs + notes
+      _applyPadLabels('left',  modeCfg.left);
+      _applyPadLabels('right', modeCfg.right);
+      // Clear pads on switch
+      leftW.clear();
+      rightW.clear();
+      if (typeof opts.onChange === 'function') opts.onChange(m);
+    }
+
+    yesBtn.onclick = function(){ setMode('yes'); };
+    noBtn.onclick  = function(){ setMode('no');  };
+
+    // Initial application
+    setMode(currentMode);
+
+    function lock() {
+      locked = true;
+      leftW.lock(); rightW.lock();
+      yesBtn.disabled = true; noBtn.disabled = true;
+    }
+    function unlock() {
+      locked = false;
+      leftW.unlock(); rightW.unlock();
+      yesBtn.disabled = false; noBtn.disabled = false;
+    }
+    function isBothSigned() { return leftW.isSigned() && rightW.isSigned(); }
+    function getDataURLs() { return { left: leftW.getDataURL(), right: rightW.getDataURL() }; }
+
+    return {
+      left: leftW,
+      right: rightW,
+      root: toggleEl,
+      setMode: setMode,
+      getMode: function(){ return currentMode; },
+      lock: lock,
+      unlock: unlock,
+      isLocked: function(){ return locked; },
+      isBothSigned: isBothSigned,
+      getDataURLs: getDataURLs
+    };
+  }
+
+  return { create: create, createPair: createPair };
+})();
+
+
+// \u2500\u2500 Voucher Signature Pads (using SigWidget.createPair) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// One createPair call handles both pads + the Customer Present toggle.
+// Voucher-specific config (CURRENT_USER auto-fill, role-validation copy)
+// is passed through opts \u2014 the factory is domain-agnostic.
+//
+// External API preserved:
+//   initVoucherSigs()            called when modalVoucher opens
+//   setSigMode('customer'|'internal')  still accepted (legacy terminology)
+//   getSigDataURL('auth'|'verif')
+//   clearVoucherSig / clearSig
+//   lockVoucherSignatures
+//   _sigMode     legacy global read by printVoucherWithSigs \u2014 derived getter
 var _AUTHORIZING_ROLES = ['housing_manager', 'executive_director'];
+window._voucherSig = null;  // the pair controller
 
 function _canAuthorize() {
   return _AUTHORIZING_ROLES.indexOf(_currentRole) >= 0;
 }
 
-function setSigMode(mode) {
-  if (_sigLocked) return;
-  _sigMode = mode;
+// Legacy terminology map. The pair controller uses 'yes'|'no'; older code
+// in this file (notably printVoucherWithSigs) reads _sigMode as
+// 'customer'|'internal'. A getter+setter on window keeps both in sync
+// without touching the older code.
+Object.defineProperty(window, '_sigMode', {
+  get: function(){
+    if (!window._voucherSig) return 'customer';
+    return window._voucherSig.getMode() === 'yes' ? 'customer' : 'internal';
+  },
+  configurable: true
+});
 
-  // Toggle button styles
-  var yesBtn = document.getElementById('sig-mode-yes');
-  var noBtn  = document.getElementById('sig-mode-no');
-  if (yesBtn) { yesBtn.style.background = mode==='customer'?'var(--yellow)':'var(--surface)'; yesBtn.style.color = mode==='customer'?'#111':'var(--muted)'; }
-  if (noBtn)  { noBtn.style.background  = mode==='internal'?'var(--yellow)':'var(--surface)'; noBtn.style.color  = mode==='internal'?'#111':'var(--muted)'; }
-
-  var authNameEl  = document.getElementById('sig-auth-name');
-  var verifNameEl = document.getElementById('sig-verif-name');
-  var authNote    = document.getElementById('sig-auth-role-note');
-  var verifNote   = document.getElementById('sig-verif-role-note');
-  var desc        = document.getElementById('sig-mode-desc');
-  var lt = document.getElementById('sig-left-title');
-  var ls = document.getElementById('sig-left-sub');
-  var rt = document.getElementById('sig-right-title');
-  var rs = document.getElementById('sig-right-sub');
-
-  if (mode === 'customer') {
-    if (lt) lt.innerHTML  = '&#128101; Customer / Tenant';
-    if (ls) ls.textContent = 'Community member receiving the transaction';
-    if (rt) rt.innerHTML  = '&#128188; Employee / Staff';
-    if (rs) rs.textContent = 'Staff member processing the transaction';
-    if (desc) desc.textContent = 'Customer signs in person alongside employee';
-    if (authNameEl)  { authNameEl.value = ''; authNameEl.placeholder = 'Customer name...'; }
-    if (verifNameEl) { verifNameEl.value = CURRENT_USER; }
-    if (authNote)  { authNote.textContent = ''; }
-    if (verifNote) { verifNote.textContent = '✓ Auto-filled from current user'; verifNote.style.color = 'var(--success)'; }
-  } else {
-    if (lt) lt.innerHTML  = '&#128188; Employee / Recorder';
-    if (ls) ls.textContent = 'Staff member entering the transaction';
-    if (rt) rt.innerHTML  = '&#9997; Authorizing Officer';
-    if (rs) rs.textContent = 'Housing Manager or ED — internal countersign';
-    if (desc) desc.textContent = 'Internal record only — no customer present';
-    if (authNameEl)  { authNameEl.value = CURRENT_USER; authNameEl.placeholder = 'Print name...'; }
-    if (authNote)  { authNote.textContent = '✓ Auto-filled from current user'; authNote.style.color = 'var(--success)'; }
-    if (_canAuthorize()) {
-      if (verifNameEl) verifNameEl.value = CURRENT_USER;
-      if (verifNote) { verifNote.textContent = '✓ Your role qualifies as Authorizing Officer'; verifNote.style.color = 'var(--success)'; }
-    } else {
-      if (verifNameEl) { verifNameEl.value = ''; verifNameEl.placeholder = 'Manager/ED name...'; }
-      if (verifNote) { verifNote.textContent = '⚠ Manager or ED required to countersign'; verifNote.style.color = 'var(--danger)'; }
+function _buildVoucherModes() {
+  // Build the modes object fresh each time initVoucherSigs runs, so the
+  // role check reflects the current user/role at voucher-open time.
+  var canAuth = _canAuthorize();
+  return {
+    yes: {
+      yesButtonText: '\u2713 Yes',
+      noButtonText:  'No',
+      description:   'Customer signs in person alongside employee',
+      left: {
+        title: '\uD83D\uDC65 Customer / Tenant',
+        sub:   'Community member receiving the transaction',
+        nameAuto: '',
+        nameNote: '',
+        nameNoteKind: ''
+      },
+      right: {
+        title: '\uD83D\uDCBC Employee / Staff',
+        sub:   'Staff member processing the transaction',
+        nameAuto: CURRENT_USER,
+        nameNote: '\u2713 Auto-filled from current user',
+        nameNoteKind: 'success'
+      }
+    },
+    no: {
+      description:   'Internal record only \u2014 no customer present',
+      left: {
+        title: '\uD83D\uDCBC Employee / Recorder',
+        sub:   'Staff member entering the transaction',
+        nameAuto: CURRENT_USER,
+        nameNote: '\u2713 Auto-filled from current user',
+        nameNoteKind: 'success'
+      },
+      right: {
+        title: '\u270D Authorizing Officer',
+        sub:   'Housing Manager or ED \u2014 internal countersign',
+        nameAuto: canAuth ? CURRENT_USER : '',
+        nameNote: canAuth ? '\u2713 Your role qualifies as Authorizing Officer'
+                          : '\u26A0 Manager or ED required to countersign',
+        nameNoteKind: canAuth ? 'success' : 'warning'
+      }
     }
-  }
-
-  // Reset pads when mode switches
-  _sigSigned = { auth: false, verif: false };
-  ['auth','verif'].forEach(function(id) {
-    var c = document.getElementById('sig-'+id);
-    if (c) { c.getContext('2d').clearRect(0,0,c.width,c.height); c.style.pointerEvents='auto'; }
-    var cl = document.getElementById('sig-'+id+'-clear'); if (cl) cl.style.display='block';
-    var ov = document.getElementById('sig-'+id+'-locked-overlay'); if (ov) ov.style.display='none';
-    var wrap = document.getElementById('sig-'+id+'-wrap'); if (wrap) wrap.style.borderColor='var(--border)';
-    var nameEl = document.getElementById('sig-'+id+'-name'); if (nameEl) nameEl.removeAttribute('readonly');
-  });
-  var lockBtn = document.getElementById('sig-lock-btn'); if (lockBtn) lockBtn.style.display='none';
+  };
 }
 
 function initVoucherSigs() {
-  _sigLocked = false;
-  _sigSigned = { auth: false, verif: false };
-  _sigMode = 'customer';
-  _sigPads = {};
-  ['auth','verif'].forEach(function(id) {
-    var c = document.getElementById('sig-'+id);
-    if (c) { c.getContext('2d').clearRect(0,0,c.width,c.height); c.style.pointerEvents='auto'; }
-    var cl = document.getElementById('sig-'+id+'-clear'); if (cl) cl.style.display='block';
-    var ov = document.getElementById('sig-'+id+'-locked-overlay'); if (ov) ov.style.display='none';
-    var wrap = document.getElementById('sig-'+id+'-wrap'); if (wrap) wrap.style.borderColor='var(--border)';
-    var nameEl = document.getElementById('sig-'+id+'-name'); if (nameEl) nameEl.removeAttribute('readonly');
+  // Clear mount points so stale widgets don't linger between vouchers
+  var leftMount     = document.getElementById('sig-auth-mount');
+  var rightMount    = document.getElementById('sig-verif-mount');
+  var toggleMount   = document.getElementById('sig-presence-mount');
+  if (leftMount)   leftMount.innerHTML   = '';
+  if (rightMount)  rightMount.innerHTML  = '';
+  if (toggleMount) toggleMount.innerHTML = '';
+  if (!leftMount || !rightMount || !toggleMount || !window.SigWidget) return;
+
+  window._voucherSig = window.SigWidget.createPair(leftMount, rightMount, {
+    toggleMount:    toggleMount,
+    toggleLabel:    '\uD83D\uDC64 Customer Present?',
+    initialMode:    'yes',
+    modes:          _buildVoucherModes(),
+    leftTitleEl:    document.getElementById('sig-left-title'),
+    leftSubEl:      document.getElementById('sig-left-sub'),
+    leftNameInput:  document.getElementById('sig-auth-name'),
+    leftNameNote:   document.getElementById('sig-auth-role-note'),
+    rightTitleEl:   document.getElementById('sig-right-title'),
+    rightSubEl:     document.getElementById('sig-right-sub'),
+    rightNameInput: document.getElementById('sig-verif-name'),
+    rightNameNote:  document.getElementById('sig-verif-role-note'),
+    widgetOpts:     { height: 80 }
   });
+
+  // Poll to reveal the Lock button once both pads are signed
+  clearInterval(window._sigPollInterval);
+  window._sigPollInterval = setInterval(function(){
+    var modal = document.getElementById('modalVoucher');
+    if (!modal || !modal.classList.contains('on')) {
+      clearInterval(window._sigPollInterval);
+      return;
+    }
+    var lockBtn = document.getElementById('sig-lock-btn');
+    if (lockBtn && window._voucherSig) {
+      lockBtn.style.display = window._voucherSig.isBothSigned() ? 'block' : 'none';
+    }
+  }, 400);
+
   var lockBtn = document.getElementById('sig-lock-btn'); if (lockBtn) lockBtn.style.display='none';
   var lockBadge = document.getElementById('sig-lock-badge'); if (lockBadge) lockBadge.style.display='none';
-  setSigMode('customer');
-  _initSigCanvas('auth');
-  _initSigCanvas('verif');
 }
 
-function _initSigCanvas(id) {
-  var canvas = document.getElementById('sig-'+id); if (!canvas) return;
-  var ctx = canvas.getContext('2d');
-  ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  var drawing = false, lastX = 0, lastY = 0;
-  function getPos(e) {
-    var rect = canvas.getBoundingClientRect();
-    var scaleX = canvas.width/rect.width, scaleY = canvas.height/rect.height;
-    var src = e.touches ? e.touches[0] : e;
-    return {x:(src.clientX-rect.left)*scaleX, y:(src.clientY-rect.top)*scaleY};
-  }
-  function start(e){ if(_sigLocked||_sigSigned[id])return; e.preventDefault(); drawing=true; var p=getPos(e); lastX=p.x; lastY=p.y; }
-  function move(e){
-    if(!drawing||_sigLocked||_sigSigned[id])return; e.preventDefault();
-    var p=getPos(e); ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(p.x,p.y); ctx.stroke(); lastX=p.x; lastY=p.y;
-  }
-  function stop(){
-    if(!drawing)return; drawing=false;
-    var data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-    var hasInk=false; for(var i=3;i<data.length;i+=4){if(data[i]>0){hasInk=true;break;}}
-    if(hasInk && !_sigSigned[id]) {
-      _sigSigned[id]=true;
-      var ov=document.getElementById('sig-'+id+'-locked-overlay'); if(ov) ov.style.display='flex';
-      var wrap=document.getElementById('sig-'+id+'-wrap'); if(wrap) wrap.style.borderColor='#bbf7d0';
-      var cl=document.getElementById('sig-'+id+'-clear'); if(cl) cl.style.display='none';
-      var nameEl=document.getElementById('sig-'+id+'-name'); if(nameEl) nameEl.setAttribute('readonly','readonly');
-      _checkBothSigned();
-    }
-  }
-  canvas.addEventListener('mousedown',start); canvas.addEventListener('mousemove',move);
-  canvas.addEventListener('mouseup',stop);    canvas.addEventListener('mouseleave',stop);
-  canvas.addEventListener('touchstart',start,{passive:false}); canvas.addEventListener('touchmove',move,{passive:false});
-  canvas.addEventListener('touchend',stop);
-  _sigPads[id]=ctx;
-}
-
-function _checkBothSigned() {
-  if (_sigSigned.auth && _sigSigned.verif) {
-    var lockBtn = document.getElementById('sig-lock-btn'); if (lockBtn) lockBtn.style.display = 'block';
-  }
+// Legacy setSigMode kept for compatibility \u2014 maps legacy names to pair modes
+function setSigMode(mode) {
+  if (!window._voucherSig) return;
+  window._voucherSig.setMode(mode === 'internal' ? 'no' : 'yes');
 }
 
 function lockVoucherSignatures() {
-  if (!_sigSigned.auth || !_sigSigned.verif) { toast('Both signatures required before locking.'); return; }
-  // In internal mode, right pad must be manager+
-  if (_sigMode === 'internal' && !_canAuthorize()) {
-    toast('⚠ Internal mode requires a Manager or ED as Authorizing Officer.'); return;
+  var pair = window._voucherSig;
+  if (!pair || !pair.isBothSigned()) { toast('Both signatures required before locking.'); return; }
+  var isInternal = (pair.getMode() === 'no');
+  if (isInternal && !_canAuthorize()) {
+    toast('\u26A0 Internal mode requires a Manager or ED as Authorizing Officer.'); return;
   }
   var authName  = (document.getElementById('sig-auth-name')||{}).value||'';
   var verifName = (document.getElementById('sig-verif-name')||{}).value||'';
-  // In internal mode, prevent same person signing both
-  if (_sigMode === 'internal' && authName && verifName && authName.trim().toLowerCase() === verifName.trim().toLowerCase()) {
-    toast('⚠ Recorder and Authorizing Officer cannot be the same person.'); return;
+  if (isInternal && authName && verifName && authName.trim().toLowerCase() === verifName.trim().toLowerCase()) {
+    toast('\u26A0 Recorder and Authorizing Officer cannot be the same person.'); return;
   }
-  _sigLocked = true;
-  ['auth','verif'].forEach(function(id) {
-    var c=document.getElementById('sig-'+id); if(c) c.style.pointerEvents='none';
-    var nameEl=document.getElementById('sig-'+id+'-name'); if(nameEl) nameEl.setAttribute('readonly','readonly');
+  pair.lock();
+  ['auth','verif'].forEach(function(k){
+    var nameEl = document.getElementById('sig-'+k+'-name');
+    if (nameEl) nameEl.setAttribute('readonly','readonly');
   });
-  // Lock the mode toggle too
-  var yesBtn = document.getElementById('sig-mode-yes'); if(yesBtn) yesBtn.disabled=true;
-  var noBtn  = document.getElementById('sig-mode-no');  if(noBtn)  noBtn.disabled=true;
   var lockBtn=document.getElementById('sig-lock-btn'); if(lockBtn) lockBtn.style.display='none';
   var lockBadge=document.getElementById('sig-lock-badge'); if(lockBadge) lockBadge.style.display='inline-block';
-  toast('✔ Voucher signatures locked.');
+  toast('\u2713 Voucher signatures locked.');
 }
 
-function clearVoucherSig(id) {
-  if (_sigLocked || _sigSigned[id]) return;
-  var c=document.getElementById('sig-'+id); if(c) c.getContext('2d').clearRect(0,0,c.width,c.height);
+function clearVoucherSig(k) {
+  var pair = window._voucherSig;
+  if (!pair || pair.isLocked()) return;
+  if (k === 'auth')  pair.left.clear();
+  if (k === 'verif') pair.right.clear();
 }
 
-function clearSig(id){ clearVoucherSig(id); }
+// Kept for backward compat with external call sites
+function clearSig(k){ clearVoucherSig(k); }
 
-function getSigDataURL(id) {
-  var c=document.getElementById('sig-'+id); if(!c) return null;
-  var data=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
-  for(var i=3;i<data.length;i+=4){if(data[i]>0)return c.toDataURL('image/png');}
-  return null;
+// Returns a PNG data URL for pad 'auth' or 'verif', regardless of method.
+// Draw \u2192 the canvas; Type \u2192 italic-rendered name; Wet \u2192 null.
+// Preserves legacy signature expected by printVoucherWithSigs/emailVoucher.
+function getSigDataURL(k) {
+  var pair = window._voucherSig;
+  if (!pair) return null;
+  var w = (k === 'auth') ? pair.left : (k === 'verif') ? pair.right : null;
+  if (!w) return null;
+  var url = w.getDataURL();
+  return url || null;
 }
 
 function printVoucherWithSigs(){
@@ -6047,69 +6539,208 @@ function resolveCollection(id) {
 // Unit is optional. If an opening balance is entered, a seed rent_ledger
 // row is created with entry_type='opening_balance' so subsequent ledger
 // math Just Works.
+// ── Unified Tenant form handlers ─────────────────────────────────────────
+// saveTenant() handles BOTH new and edit modes. Mode is read from the
+// modalTenantForm dataset. Single id prefix: tf-*. Legacy openEditTenant /
+// saveEditTenant remain as thin wrappers that delegate here.
+
+function _tfVal(id) {
+  var el = document.getElementById(id);
+  return el ? (el.value || '').trim() : '';
+}
+function _tfChecked(id) {
+  var el = document.getElementById(id);
+  return !!(el && el.checked);
+}
+
+function _tfToggleAutopayType() {
+  var row = document.getElementById('tf-autopay-type-row');
+  var cb  = document.getElementById('tf-autopay');
+  if (row) row.style.display = (cb && cb.checked) ? 'block' : 'none';
+}
+
+function _tfResetFields() {
+  // Clear every field in the form. Called at the top of openAddTenant.
+  ['tf-first','tf-last','tf-dob','tf-band','tf-phone','tf-email',
+   'tf-unit','tf-street','tf-community','tf-province','tf-postal','tf-mailing',
+   'tf-rent','tf-open-bal','tf-hydro','tf-gas','tf-notes','tf-edit-name'
+  ].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  ['tf-marital','tf-status','tf-type','tf-invpref','tf-autopay-type'
+  ].forEach(function(id){ var el=document.getElementById(id); if(el) el.selectedIndex=0; });
+  var ap = document.getElementById('tf-autopay'); if (ap) ap.checked = false;
+  _tfToggleAutopayType();
+  // Defaults that differ from empty string:
+  var comm = document.getElementById('tf-community');
+  if (comm) comm.value = (window.NATION_CONFIG && window.NATION_CONFIG.display_name) || '';
+  var prov = document.getElementById('tf-province');
+  if (prov) prov.value = 'Ontario';
+}
+
+function openAddTenant() {
+  var modal = document.getElementById('modalTenantForm');
+  if (!modal) return;
+  modal.dataset.mode = 'new';
+  modal.dataset.tid  = '';
+  var title    = document.getElementById('tf-title');
+  var subtitle = document.getElementById('tf-subtitle');
+  var submit   = document.getElementById('tf-submit');
+  var hdr      = document.getElementById('tf-edit-header');
+  var openBal  = document.getElementById('tf-open-bal-row');
+  if (title)    title.textContent = 'Add Tenant Account';
+  if (subtitle) subtitle.textContent = 'Create a new tenant record. Phone and email sync to the Housing App.';
+  if (submit)   submit.textContent = 'Add Tenant';
+  if (hdr)      hdr.style.display = 'none';
+  if (openBal)  openBal.style.display = '';
+  _tfResetFields();
+  openModal('modalTenantForm');
+}
+
+function openEditTenant(tid) {
+  var t = getTenant(tid);
+  if (!t) { toast('Tenant not found.'); return; }
+  var modal = document.getElementById('modalTenantForm');
+  if (!modal) return;
+  modal.dataset.mode = 'edit';
+  modal.dataset.tid  = tid;
+  var title    = document.getElementById('tf-title');
+  var subtitle = document.getElementById('tf-subtitle');
+  var submit   = document.getElementById('tf-submit');
+  var hdr      = document.getElementById('tf-edit-header');
+  var openBal  = document.getElementById('tf-open-bal-row');
+  if (title)    title.textContent = 'Edit Tenant Record';
+  if (subtitle) subtitle.textContent = 'All tenant fields are editable here. Phone and email are synced to the Housing App.';
+  if (submit)   submit.textContent = 'Save Changes';
+  if (hdr)      hdr.style.display = '';
+  if (openBal)  openBal.style.display = 'none';  // opening balance is new-only
+
+  // Prefill all fields
+  var set = function(id, val){ var el=document.getElementById(id); if(el) el.value = (val==null?'':val); };
+  set('tf-edit-name', tenantName(t) + (t.unit ? ' — ' + t.unit : ''));
+  set('tf-first',     t.first);
+  set('tf-last',      t.last);
+  set('tf-dob',       t.dob);
+  set('tf-band',      t.bandNumber);
+  set('tf-marital',   t.marital);
+  set('tf-status',    t.status || (t.active===false ? 'former' : 'active'));
+  set('tf-phone',     t.phone);
+  set('tf-email',     t.email);
+  set('tf-unit',      t.unit);
+  set('tf-street',    t.street);
+  set('tf-community', t.community || (window.NATION_CONFIG && window.NATION_CONFIG.display_name) || '');
+  set('tf-province',  t.province  || 'Ontario');
+  set('tf-postal',    t.postalCode);
+  set('tf-mailing',   t.mailingAddress);
+  set('tf-type',      t.type || 'community');
+  set('tf-rent',      (t.rent != null ? t.rent : ''));
+  set('tf-invpref',   t.invPref || 'email');
+  set('tf-hydro',     t.hydroAcct);
+  set('tf-gas',       t.gasAcct);
+  set('tf-notes',     t.notes);
+
+  var ap = document.getElementById('tf-autopay');
+  if (ap) ap.checked = !!t.autoPay;
+  set('tf-autopay-type', t.autoPayType || 'eft');
+  _tfToggleAutopayType();
+
+  openModal('modalTenantForm');
+}
+
 function saveTenant() {
-  // The modal markup uses tn-* IDs; the original handler read nt-* and
-  // therefore never captured any input. Both prefixes are checked here so
-  // we're resilient if the markup is touched later.
-  function v(id1, id2){
-    var el = document.getElementById(id1) || (id2 ? document.getElementById(id2) : null);
-    return el ? (el.value||'').trim() : '';
-  }
-  var first   = v('tn-first', 'nt-first');
-  var last    = v('tn-last',  'nt-last');
-  var unit    = v('tn-unit',  'nt-unit');              // now optional
-  var type    = v('tn-type',  'nt-type') || 'community';
-  var rent    = parseFloat(v('tn-rent', 'nt-rent')) || 0;
-  var invPref = v('tn-inv-pref', 'nt-invpref') || 'email';
-  var phone   = v('tn-phone', 'nt-phone');
-  var email   = v('tn-email', 'nt-email');
-  var hydroA  = v('tn-hydro-acct', '');
-  var gasA    = v('tn-gas-acct',   '');
-  var notes   = v('tn-notes', 'nt-notes');
-  var status  = v('tn-status', '') || 'active';         // NEW — active | former
-  var openBal = parseFloat(v('tn-open-bal', '')) || 0;  // NEW — opening arrears
+  var modal = document.getElementById('modalTenantForm');
+  if (!modal) return;
+  var mode  = modal.dataset.mode || 'new';
 
-  if (!first || !last) { toast('First and last name required.'); return; }
+  // Harvest fields (both modes read from tf-*)
+  var first   = _tfVal('tf-first');
+  var last    = _tfVal('tf-last');
+  var dob     = _tfVal('tf-dob');
+  var band    = _tfVal('tf-band');
+  var marital = _tfVal('tf-marital');
+  var status  = _tfVal('tf-status') || 'active';
+  var phone   = _tfVal('tf-phone');
+  var email   = _tfVal('tf-email');
+  var unit    = _tfVal('tf-unit');
+  var street  = _tfVal('tf-street');
+  var community = _tfVal('tf-community');
+  var province  = _tfVal('tf-province');
+  var postal    = _tfVal('tf-postal');
+  var mailing   = _tfVal('tf-mailing');
+  var type    = _tfVal('tf-type') || 'community';
+  var rent    = parseFloat(_tfVal('tf-rent')) || 0;
+  var invPref = _tfVal('tf-invpref') || 'email';
+  var hydroA  = _tfVal('tf-hydro');
+  var gasA    = _tfVal('tf-gas');
+  var autoPay = _tfChecked('tf-autopay');
+  var autoPayType = autoPay ? (_tfVal('tf-autopay-type') || 'eft') : null;
+  var notes   = _tfVal('tf-notes');
 
-  // If marked Former but no unit, that's fine. If marked Active, require unit.
+  if (!first || !last) { toast('First and last name are required.'); return; }
   if (status === 'active' && !unit) {
     toast('Unit required for an active tenant. Pick Former if they no longer have a unit.');
     return;
   }
 
-  var autoPayEl = document.getElementById('tn-autopay');
-  var autoPay   = !!(autoPayEl && autoPayEl.checked);
-
-  // Resolve the typed unit text back to a housing_units.id if it matches
-  // a known unit. Free-typed text without a match is still kept as the
-  // display string but stores null for the FK (acceptable per schema).
-  var unitId = unit ? _resolveUnitId(unit) : null;
-
   var d = getData();
-  var t = {
+  var unitId = unit ? (typeof _resolveUnitId === 'function' ? _resolveUnitId(unit) : null) : null;
+
+  if (mode === 'edit') {
+    var tid = modal.dataset.tid;
+    if (!tid) { toast('Missing tenant id.'); return; }
+    var t = d.tenants.find(function(x){ return x.id === tid; });
+    if (!t) { toast('Tenant not found.'); return; }
+    var before = JSON.parse(JSON.stringify(t));
+
+    t.first = first; t.last = last;
+    t.dob = dob; t.bandNumber = band; t.marital = marital;
+    t.phone = phone; t.email = email;
+    t.unit = unit; t.street = street; t.community = community;
+    t.province = province; t.postalCode = postal; t.mailingAddress = mailing;
+    t.type = type; t.rent = rent; t.invPref = invPref;
+    t.hydroAcct = hydroA; t.gasAcct = gasA;
+    t.autoPay = autoPay; t.autoPayType = autoPayType;
+    t.notes = notes;
+    t.status = status;
+    t.currentUnitId = unitId;
+    t.active = (status === 'active');
+
+    saveData(d);
+    writeAuditEntry({
+      action: 'update_tenant', entity_type: 'tenant',
+      entity_id: tid, tenant_id: tid,
+      summary: 'Updated tenant record: ' + tenantName(t),
+      detail: { before: before, after: t }
+    });
+    closeModal('modalTenantForm');
+    selectTenantProfile(tid);
+    toast('Tenant record saved.');
+    return;
+  }
+
+  // ── New-tenant path ──
+  var openBal = parseFloat(_tfVal('tf-open-bal')) || 0;
+  var newTenant = {
     id: uid(),
     first: first, last: last,
-    unit: unit, type: type, rent: rent,
-    invPref: invPref,
+    dob: dob, bandNumber: band, marital: marital,
     phone: phone, email: email,
+    unit: unit, street: street, community: community,
+    province: province, postalCode: postal, mailingAddress: mailing,
+    type: type, rent: rent, invPref: invPref,
     hydroAcct: hydroA, gasAcct: gasA,
-    autoPay: autoPay, autoPayType: null,
+    autoPay: autoPay, autoPayType: autoPayType,
     notes: notes,
-    status: status,               // persists to tenants.status
-    currentUnitId: unitId,        // FK to housing_units.id (resolved above)
-    active: status === 'active'   // legacy UI field for older views
+    status: status,
+    currentUnitId: unitId,
+    active: (status === 'active')
   };
-  d.tenants.push(t);
+  d.tenants.push(newTenant);
 
-  // If an opening balance was entered, create a seed ledger row. Charge is
-  // positive (tenant owes), which translates to entry_type='opening_balance'
-  // in the mapper. Auto-signed: the user enters a positive number and it's
-  // recorded as a debit (money owed).
+  // Seed ledger row for opening balance (only on new)
   if (openBal > 0) {
     d.rentLedger = d.rentLedger || [];
     d.rentLedger.push({
       id: uid(),
-      tenantId: t.id,
+      tenantId: newTenant.id,
       unitId: null,
       date: today(),
       desc: 'Opening balance at account creation',
@@ -6120,23 +6751,19 @@ function saveTenant() {
   }
 
   saveData(d);
-
-  // Rich per-action audit entry (complements the blanket saveData audit).
   writeAuditEntry({
-    action: 'create_tenant',
-    entity_type: 'tenant',
-    entity_id:   t.id,
-    tenant_id:   t.id,
-    summary:     'Added ' + (status === 'former' ? 'former' : 'active') +
-                 ' tenant ' + tenantName(t) +
-                 (unit ? ' (' + unit + ')' : '') +
-                 (openBal > 0 ? ' with opening balance $' + openBal.toFixed(2) : ''),
+    action: 'create_tenant', entity_type: 'tenant',
+    entity_id: newTenant.id, tenant_id: newTenant.id,
+    summary: 'Added ' + (status === 'former' ? 'former' : status === 'deceased' ? 'deceased' : 'active') +
+             ' tenant ' + tenantName(newTenant) +
+             (unit ? ' (' + unit + ')' : '') +
+             (openBal > 0 ? ' with opening balance $' + openBal.toFixed(2) : ''),
     detail: { unit: unit, status: status, openingBalance: openBal }
   });
 
-  closeModal('modalAddTenant');
+  closeModal('modalTenantForm');
   renderDashboard();
-  selectTenantProfile(t.id);
+  selectTenantProfile(newTenant.id);
   showPage('tenants');
   toast('Tenant added.');
 }
@@ -8981,8 +9608,8 @@ function openModal(id,extra){
   if(id==='modalUtilityCharge')document.getElementById('utilChargeTitle').textContent='Post '+(currentUtilityType==='gas'?'Gas':'Hydro')+' Charge';
   if(id==='modalUtilityPayment')document.getElementById('utilPayTitle').textContent='Record '+(currentUtilityType==='gas'?'Gas':'Hydro')+' Payment';
   populateModalSelects(id);
-  // Ensure unit picker datalist is current if Add Tenant is opening
-  if(id==='modalAddTenant' && typeof _populateUnitDatalist === 'function') _populateUnitDatalist();
+  // Ensure unit picker datalist is current when the tenant form is opening
+  if(id==='modalTenantForm' && typeof _populateUnitDatalist === 'function') _populateUnitDatalist();
   document.getElementById(id).classList.add('on');
   // Auto-init payment modal
   if(id==='modalRentPayment'){
@@ -9564,95 +10191,10 @@ function openLoanPaymentForTenant(loanId) {
   openModal('modalLoanPayment');
 }
 
-function openEditTenant(tid) {
-  var t = getTenant(tid);
-  if (!t) return;
-  // Pretty display-only header line
-  document.getElementById('et-name').value = tenantName(t) + (t.unit ? ' \u2014 ' + t.unit : '');
-
-  // Personal
-  document.getElementById('et-first').value    = t.first || '';
-  document.getElementById('et-last').value     = t.last  || '';
-  document.getElementById('et-dob').value      = t.dob   || '';
-  document.getElementById('et-band').value     = t.bandNumber || '';
-  document.getElementById('et-phone').value    = t.phone || '';
-  document.getElementById('et-email').value    = t.email || '';
-
-  // Address
-  document.getElementById('et-street').value    = t.street   || '';
-  document.getElementById('et-community').value = t.community || (window.NATION_CONFIG && window.NATION_CONFIG.display_name || '');
-  document.getElementById('et-province').value  = t.province  || 'Ontario';
-  document.getElementById('et-postal').value    = t.postalCode || '';
-  document.getElementById('et-mailing').value   = t.mailingAddress || '';
-
-  // Finance settings
-  document.getElementById('et-type').value     = t.type || 'community';
-  document.getElementById('et-rent').value     = (t.rent != null ? t.rent : '');
-  document.getElementById('et-invpref').value  = t.invPref || 'email';
-  document.getElementById('et-hydro').value    = t.hydroAcct || '';
-  document.getElementById('et-gas').value      = t.gasAcct || '';
-  document.getElementById('et-autopay').checked = !!t.autoPay;
-  document.getElementById('et-autopay-type').value = t.autoPayType || 'eft';
-  document.getElementById('et-autopay-type-row').style.display = t.autoPay ? 'block' : 'none';
-  document.getElementById('et-notes').value    = t.notes || '';
-  document.getElementById('et-autopay').onchange = function() {
-    document.getElementById('et-autopay-type-row').style.display = this.checked ? 'block' : 'none';
-  };
-
-  document.getElementById('modalEditTenant').dataset.tid = tid;
-  openModal('modalEditTenant');
-}
-
-function saveEditTenant() {
-  var tid = document.getElementById('modalEditTenant').dataset.tid;
-  if (!tid) return;
-  var d = getData();
-  var t = d.tenants.find(function(x){ return x.id === tid; });
-  if (!t) return;
-
-  // Snapshot before for audit diff
-  var before = JSON.parse(JSON.stringify(t));
-
-  // Personal
-  t.first      = (document.getElementById('et-first').value || '').trim();
-  t.last       = (document.getElementById('et-last').value  || '').trim();
-  t.dob        = document.getElementById('et-dob').value || '';
-  t.bandNumber = (document.getElementById('et-band').value  || '').trim();
-  t.phone      = (document.getElementById('et-phone').value || '').trim();
-  t.email      = (document.getElementById('et-email').value || '').trim();
-
-  // Address
-  t.street         = (document.getElementById('et-street').value    || '').trim();
-  t.community      = (document.getElementById('et-community').value || '').trim();
-  t.province       = (document.getElementById('et-province').value  || '').trim();
-  t.postalCode     = (document.getElementById('et-postal').value    || '').trim();
-  t.mailingAddress = (document.getElementById('et-mailing').value   || '').trim();
-
-  // Finance settings
-  t.type        = document.getElementById('et-type').value;
-  t.rent        = parseFloat(document.getElementById('et-rent').value) || 0;
-  t.invPref     = document.getElementById('et-invpref').value;
-  t.hydroAcct   = (document.getElementById('et-hydro').value || '').trim();
-  t.gasAcct     = (document.getElementById('et-gas').value   || '').trim();
-  t.autoPay     = document.getElementById('et-autopay').checked;
-  t.autoPayType = t.autoPay ? document.getElementById('et-autopay-type').value : null;
-  t.notes       = (document.getElementById('et-notes').value || '').trim();
-
-  saveData(d);
-
-  writeAuditEntry({
-    action: 'update_tenant',
-    entity_type: 'tenant',
-    entity_id: tid,
-    tenant_id: tid,
-    summary: 'Updated tenant record: ' + tenantName(t),
-    detail: { before: before, after: t }
-  });
-
-  closeModal('modalEditTenant');
-  selectTenantProfile(tid);
-  toast('Tenant record saved.');
-}
+// Legacy openEditTenant / saveEditTenant removed in Phase F3 — both now
+// live in the unified Tenant form block earlier in this file. openEditTenant
+// is re-declared there; saveEditTenant no longer exists because saveTenant()
+// handles both new and edit modes.
 
 var GL_ACCOUNTS = {
   'rent':           {code:'4100', name:'Rent Revenue',              ledger:'rent',        type:'invoice'},
@@ -10765,48 +11307,33 @@ document.addEventListener('DOMContentLoaded', async function() {
           <span id="sig-lock-badge" style="display:none;background:#15803d;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;letter-spacing:.4px;">&#128274; Locked</span>
         </div>
 
-        <!-- Customer Present toggle -->
-        <div style="padding:10px 14px;background:#f8f8f6;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <span style="font-size:12px;font-weight:600;color:var(--text);">&#128100; Customer Present?</span>
-          <div style="display:flex;gap:0;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;">
-            <button id="sig-mode-yes" onclick="setSigMode('customer')" style="padding:5px 14px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:var(--yellow);color:#111;">&#10003; Yes</button>
-            <button id="sig-mode-no"  onclick="setSigMode('internal')" style="padding:5px 14px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:var(--surface);color:var(--muted);border-left:1px solid var(--border);">No</button>
-          </div>
-          <span id="sig-mode-desc" style="font-size:11px;color:var(--muted);">Customer signs in person alongside employee</span>
-        </div>
+        <!-- Customer Present toggle — rendered by SigWidget.createPair -->
+        <div id="sig-presence-mount"></div>
 
-        <!-- Sig pads grid -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;" class="voucher-sig-grid">
+        <!-- Sig pads grid — each mount hosts a SigWidget (Draw / Type / Wet) -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;" class="voucher-sig-grid">
 
           <!-- Left pad -->
-          <div style="padding:14px;border-right:1px solid var(--border);">
+          <div>
             <div style="font-size:12px;font-weight:600;margin-bottom:2px;color:var(--text);" id="sig-left-title">&#128101; Customer / Tenant</div>
-            <div style="font-size:10px;color:var(--muted);margin-bottom:8px;" id="sig-left-sub">Community member receiving the transaction</div>
-            <div id="sig-auth-wrap" style="position:relative;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:#fafaf9;cursor:crosshair;">
-              <canvas id="sig-auth" width="260" height="100" style="display:block;width:100%;touch-action:none;"></canvas>
-              <button id="sig-auth-clear" onclick="clearVoucherSig('auth')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;color:#666;">Clear</button>
-              <div id="sig-auth-locked-overlay" style="display:none;position:absolute;inset:0;background:rgba(240,253,244,.8);align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#15803d;letter-spacing:.5px;">&#10003; SIGNED</div>
-            </div>
-            <div style="margin-top:8px;"><input id="sig-auth-name" placeholder="Print name..." style="width:100%;font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box;"/></div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:6px;" id="sig-left-sub">Community member receiving the transaction</div>
+            <div id="sig-auth-mount"></div>
+            <div style="margin-top:6px;"><input id="sig-auth-name" placeholder="Print name..." style="width:100%;font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box;"/></div>
             <div id="sig-auth-role-note" style="margin-top:5px;font-size:10px;"></div>
           </div>
 
           <!-- Right pad -->
-          <div style="padding:14px;">
+          <div>
             <div style="font-size:12px;font-weight:600;margin-bottom:2px;color:var(--text);" id="sig-right-title">&#128188; Employee / Staff</div>
-            <div style="font-size:10px;color:var(--muted);margin-bottom:8px;" id="sig-right-sub">Staff member processing the transaction</div>
-            <div id="sig-verif-wrap" style="position:relative;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:#fafaf9;cursor:crosshair;">
-              <canvas id="sig-verif" width="260" height="100" style="display:block;width:100%;touch-action:none;"></canvas>
-              <button id="sig-verif-clear" onclick="clearVoucherSig('verif')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;color:#666;">Clear</button>
-              <div id="sig-verif-locked-overlay" style="display:none;position:absolute;inset:0;background:rgba(240,253,244,.8);align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#15803d;letter-spacing:.5px;">&#10003; SIGNED</div>
-            </div>
-            <div style="margin-top:8px;"><input id="sig-verif-name" placeholder="Print name..." style="width:100%;font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box;"/></div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:6px;" id="sig-right-sub">Staff member processing the transaction</div>
+            <div id="sig-verif-mount"></div>
+            <div style="margin-top:6px;"><input id="sig-verif-name" placeholder="Print name..." style="width:100%;font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);box-sizing:border-box;"/></div>
             <div id="sig-verif-role-note" style="margin-top:5px;font-size:10px;"></div>
           </div>
 
         </div>
         <div style="padding:10px 14px;background:var(--bg);border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-          <span style="font-size:11px;color:var(--muted);">&#9998; Sign with mouse or touch. Each signature locks on lift-off.</span>
+          <span style="font-size:11px;color:var(--muted);">&#9998; Choose a method per signer: Draw, Type, or reference an external e-sign / wet signature.</span>
           <button id="sig-lock-btn" onclick="lockVoucherSignatures()" style="display:none;background:var(--dark);color:var(--yellow);border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">&#128274; Lock Signatures</button>
         </div>
       </div>
@@ -10825,76 +11352,8 @@ document.addEventListener('DOMContentLoaded', async function() {
   </div>
 </div>
 
-<!-- EDIT TENANT MODAL -->
-<div class="modal-ov" id="modalEditTenant">
-  <div class="modal modal-lg">
-    <div class="modal-hdr">
-      <div><h2>Edit Tenant Record</h2><p>All tenant fields are editable here. Phone and email are synced to the Housing App.</p></div>
-      <button class="modal-close" onclick="closeModal('modalEditTenant')">&#x2715;</button>
-    </div>
-    <div class="modal-body">
-      <div class="fg c2" style="gap:14px;">
-        <div class="f s2"><label>Tenant</label><input id="et-name" readonly style="background:var(--bg);color:var(--muted);"/></div>
-
-        <!-- Personal -->
-        <div class="f s2" style="margin-top:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Personal</div>
-        <div class="f"><label>First Name</label><input id="et-first"/></div>
-        <div class="f"><label>Last Name</label><input id="et-last"/></div>
-        <div class="f"><label>Date of Birth</label><input id="et-dob" type="date"/></div>
-        <div class="f"><label>Band #</label><input id="et-band" placeholder="Treaty / band number"/></div>
-        <div class="f"><label>Phone</label><input id="et-phone" placeholder="(807) 555-0000"/></div>
-        <div class="f"><label>Email</label><input id="et-email" type="email" placeholder="email@example.com"/></div>
-
-        <!-- Address -->
-        <div class="f s2" style="margin-top:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Property &amp; Mailing Address</div>
-        <div class="f s2"><label>Street Address</label><input id="et-street" placeholder="e.g. 42 Main Street"/></div>
-        <div class="f"><label>Community</label><input id="et-community"/></div>
-        <div class="f"><label>Province / Territory</label><input id="et-province" placeholder="Ontario"/></div>
-        <div class="f"><label>Postal Code</label><input id="et-postal" placeholder="P0L 1B0"/></div>
-        <div class="f"><label>Mailing Address (if different)</label><input id="et-mailing" placeholder="Same as above"/></div>
-
-        <!-- Finance settings -->
-        <div class="f s2" style="margin-top:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Finance Settings</div>
-        <div class="f"><label>Tenant Type</label>
-          <select id="et-type">
-            <option value="band-on">Band Member &mdash; On-Reserve</option>
-            <option value="band-off">Band Member &mdash; Off-Reserve</option>
-            <option value="band-staff">Band Office Staff</option>
-            <option value="clea">CLEA (Staff Housing)</option>
-            <option value="community">Community Member (Non-Band)</option>
-          </select>
-        </div>
-        <div class="f"><label>Monthly Rent ($)</label><input id="et-rent" type="number" step="0.01" min="0"/></div>
-        <div class="f"><label>Invoice Preference</label>
-          <select id="et-invpref">
-            <option value="email">&#128231; Email Invoice</option>
-            <option value="print">&#128424; Print / Mail</option>
-          </select>
-        </div>
-        <div class="f"><label>Hydro Account #</label><input id="et-hydro"/></div>
-        <div class="f"><label>Gas Account #</label><input id="et-gas"/></div>
-        <div class="f">
-          <div class="toggle-row">
-            <label for="et-autopay">Auto-Payment Enabled</label>
-            <label class="tsw"><input type="checkbox" id="et-autopay"/><span class="tsl"></span></label>
-          </div>
-        </div>
-        <div class="f" id="et-autopay-type-row" style="display:none;">
-          <label>Auto-Payment Type</label>
-          <select id="et-autopay-type">
-            <option value="eft">EFT &mdash; Electronic Funds Transfer</option>
-            <option value="payroll">Payroll Deduction</option>
-          </select>
-        </div>
-        <div class="f s2"><label>Notes</label><textarea id="et-notes" placeholder="Internal notes..."></textarea></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modalEditTenant')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveEditTenant()">Save Changes</button>
-    </div>
-  </div>
-</div>
+<!-- modalEditTenant removed in Phase F3 — replaced by the unified
+     modalTenantForm which handles both new and edit modes. -->
 <div id="app-toast" style="position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-20px);background:#111;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:500;z-index:99999;opacity:0;transition:all .25s ease;pointer-events:none;max-width:calc(100vw - 40px);text-align:center;box-shadow:0 4px 16px rgba(0,0,0,0.15);"></div>
 </body>
 </html>

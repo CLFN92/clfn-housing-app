@@ -594,7 +594,12 @@ body{font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);font-
 #inv_table td:nth-child(7) { display: none; }  /* hide Top Match column */
 
 /* ── Modals ── */
-.modal, .edit-modal { width: calc(100vw - 24px) !important; max-width: 100% !important; }
+/* Mobile: full-width modal. Desktop/widescreen: respect modal max-width
+   (previously this was unconditional, causing Edit Tenant and other
+   modal-lg forms to stretch edge-to-edge on large monitors.) */
+@media (max-width: 640px) {
+  .modal, .edit-modal { width: calc(100vw - 24px) !important; max-width: 100% !important; }
+}
 
 /* ── Tables on mobile — allow scroll ── */
 .dash-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -1191,3 +1196,167 @@ body.modal-open { overflow: hidden; position: fixed; width: 100%; }
 .voucher-row{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;border-bottom:1px solid var(--border);font-size:13px;}
 .voucher-row .lbl{font-size:12px;color:var(--muted);font-weight:500;}
 .voucher-total{background:var(--dark);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;}
+
+/* ─────────────────────────────────────────────────────────────── */
+/* Form section label — small uppercase muted heading inside a     */
+/* sectioned form. Used by the unified Tenant form and any future  */
+/* multi-section modals.                                           */
+/* ─────────────────────────────────────────────────────────────── */
+.tf-section-label{
+  font-size:10px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.6px;
+  color:var(--muted);
+  margin-top:4px;
+  margin-bottom:10px;
+  padding-bottom:6px;
+  border-bottom:1px solid var(--border);
+}
+.tf-section-label:not(:first-child){margin-top:18px;}
+
+/* ─────────────────────────────────────────────────────────────── */
+/* Signature widget (Phase F3B — shared 3-tab signature factory)    */
+/* Used by: finance voucher modal, housing application form, and    */
+/* any other place that renders a signature pad via makeSigWidget.  */
+/* These classes style the output of makeSigWidget(canvasId, opts). */
+/* ─────────────────────────────────────────────────────────────── */
+
+.sigw{
+  border:1.5px solid var(--border);
+  border-radius:8px;
+  overflow:hidden;
+  background:#fff;
+}
+
+/* Tab strip (Draw / Type / Wet) */
+.sigw-tabs{
+  display:flex;
+  border-bottom:1px solid var(--border);
+  background:var(--bg);
+}
+.sigw-tab{
+  flex:1;
+  padding:7px 4px;
+  border:none;
+  border-bottom:2px solid transparent;
+  background:none;
+  font-size:11px;
+  font-weight:600;
+  color:var(--muted);
+  cursor:pointer;
+  font-family:inherit;
+  transition:var(--tr);
+}
+.sigw-tab:hover{color:var(--text);}
+.sigw-tab.is-active{
+  color:var(--text);
+  font-weight:700;
+  border-bottom-color:var(--yellow);
+}
+
+/* Panel container (one panel per tab; factory toggles display) */
+.sigw-panel{background:#fafaf8;}
+.sigw-panel[hidden]{display:none !important;}
+
+/* Draw canvas panel */
+.sigw-canvas{
+  width:100%;
+  height:90px;
+  display:block;
+  touch-action:none;
+  cursor:crosshair;
+  background:transparent;
+}
+.sigw-canvas-footer{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:4px 10px;
+  border-top:1px solid var(--border);
+}
+.sigw-hint{font-size:10px;color:var(--muted);}
+.sigw-clear{
+  background:none;
+  border:1px solid var(--border);
+  border-radius:4px;
+  padding:2px 8px;
+  font-size:10px;
+  color:var(--muted);
+  cursor:pointer;
+  font-family:inherit;
+  transition:var(--tr);
+}
+.sigw-clear:hover{color:var(--danger);border-color:var(--danger);}
+
+/* Type panel (e-signature via typed name) */
+.sigw-type-pad{padding:14px 12px;}
+.sigw-type-input{
+  width:100%;
+  border:none;
+  border-bottom:2px solid var(--dark);
+  background:transparent;
+  font-size:16px;
+  font-family:Georgia,serif;
+  font-style:italic;
+  color:var(--text);
+  outline:none;
+  padding:4px 0;
+  box-sizing:border-box;
+}
+.sigw-type-note{font-size:10px;color:var(--muted);margin-top:6px;}
+
+/* Wet-sign / external e-sign panel */
+.sigw-wet-pad{padding:14px 12px;}
+.sigw-wet-note{font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;}
+.sigw-wet-input{
+  width:100%;
+  padding:6px 10px;
+  border:1px solid var(--border);
+  border-radius:6px;
+  font-size:11px;
+  font-family:inherit;
+  background:var(--surface);
+  color:var(--text);
+  box-sizing:border-box;
+}
+
+/* Signed indicator — applied by factory when a signature is captured */
+.sigw.is-signed{border-color:var(--yellow);box-shadow:0 0 0 2px rgba(248,228,26,.15);}
+
+/* ─────────────────────────────────────────────────────────────── */
+/* Signature widget — presence toggle (rendered by                  */
+/* SigWidget.createPair). Sits above or beside the two sig pads.    */
+/* ─────────────────────────────────────────────────────────────── */
+.sigw-presence{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  padding:10px 14px;
+  background:#f8f8f6;
+  border-bottom:1px solid var(--border);
+}
+.sigw-presence-label{font-size:12px;font-weight:600;color:var(--text);}
+.sigw-presence-btns{
+  display:flex;
+  gap:0;
+  border:1.5px solid var(--border);
+  border-radius:8px;
+  overflow:hidden;
+}
+.sigw-presence-btn{
+  padding:5px 14px;
+  font-size:12px;
+  font-weight:600;
+  border:none;
+  cursor:pointer;
+  background:var(--surface);
+  color:var(--muted);
+  font-family:inherit;
+  transition:var(--tr);
+}
+.sigw-presence-btn + .sigw-presence-btn{border-left:1px solid var(--border);}
+.sigw-presence-btn.is-active{background:var(--yellow);color:#111;}
+.sigw-presence-btn:disabled{cursor:not-allowed;opacity:.6;}
+.sigw-presence-desc{font-size:11px;color:var(--muted);}
