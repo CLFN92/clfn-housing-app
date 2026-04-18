@@ -1059,40 +1059,72 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
       Back to Home
     </button>
   </div>
-  <div class="page-hdr">
-    <div><h1>Transactions</h1><p>All financial entries across every ledger</p></div>
-    <div class="page-hdr-actions">
+
+  <!-- Page title + actions -->
+  <div class="std-page-header">
+    <div class="std-page-header-main">
+      <h1 class="std-page-title">Transactions</h1>
+      <p class="std-page-subtitle">Every financial entry across the Rent, Arrangements, Loans, Journal, and Utility ledgers — in one place.</p>
+      <div class="std-page-meta" id="txn_page_meta">—</div>
+    </div>
+    <div class="std-page-actions">
       <button class="btn btn-ghost btn-sm" onclick="exportTransactions()">&#128196; Export CSV</button>
     </div>
   </div>
-  <div class="filter-bar">
-    <label style="font-size:11px;font-weight:700;color:var(--muted);">Tenant</label>
-    <select id="txn-filter-tenant" onchange="renderTransactions()"><option value="all">All Tenants</option></select>
-    <label style="font-size:11px;font-weight:700;color:var(--muted);">Ledger</label>
-    <select id="txn-filter-ledger" onchange="renderTransactions()">
-      <option value="all">All Ledgers</option>
+
+  <!-- Filter row -->
+  <div class="std-filter-row">
+    <span class="std-filter-label">Tenant</span>
+    <select class="std-filter-control" id="txn-filter-tenant" onchange="renderTransactions()"><option value="all">All Tenants</option></select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Ledger</span>
+    <select class="std-filter-control narrow" id="txn-filter-ledger" onchange="renderTransactions()">
+      <option value="all">All</option>
       <option value="rent">Rent</option>
       <option value="arrangement">Arrangement</option>
       <option value="loans">Loans</option>
       <option value="journal">Journal</option>
+      <option value="utility">Utility</option>
     </select>
-    <label style="font-size:11px;font-weight:700;color:var(--muted);">Type</label>
-    <select id="txn-filter-type" onchange="renderTransactions()">
-      <option value="all">All Types</option>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Type</span>
+    <select class="std-filter-control narrow" id="txn-filter-type" onchange="renderTransactions()">
+      <option value="all">All</option>
       <option value="charge">Charges</option>
       <option value="payment">Payments</option>
     </select>
-    <label style="font-size:11px;font-weight:700;color:var(--muted);">From</label>
-    <input type="date" id="txn-filter-from" onchange="renderTransactions()"/>
-    <label style="font-size:11px;font-weight:700;color:var(--muted);">To</label>
-    <input type="date" id="txn-filter-to" onchange="renderTransactions()"/>
-    <button class="btn btn-ghost btn-sm" onclick="clearTxnFilters()">Clear</button>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">From</span>
+    <input type="date" class="std-filter-control narrow" id="txn-filter-from" onchange="renderTransactions()"/>
+    <span class="std-filter-label">To</span>
+    <input type="date" class="std-filter-control narrow" id="txn-filter-to" onchange="renderTransactions()"/>
+    <div class="std-filter-spacer"></div>
+    <button class="std-filter-clear" onclick="clearTxnFilters()">Clear</button>
   </div>
+
   <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);" id="txnStats"></div>
-  <div class="tbl-wrap"><table class="tbl">
-    <thead><tr><th>Date</th><th>Tenant</th><th>Ledger</th><th>Description</th><th>Charge</th><th>Payment</th><th>Method</th><th>Status</th><th>Voucher</th></tr></thead>
-    <tbody id="transactionsBody"></tbody>
-  </table></div>
+
+  <!-- Transactions table -->
+  <div class="std-table-card">
+    <div class="std-table-hdr">
+      <span>Transactions</span>
+      <span class="std-table-count" id="txnCount">—</span>
+    </div>
+    <table class="std-table">
+      <thead><tr>
+        <th>Date</th>
+        <th>Tenant</th>
+        <th>Ledger</th>
+        <th>Description</th>
+        <th class="std-cell-right">Charge</th>
+        <th class="std-cell-right">Payment</th>
+        <th>Method</th>
+        <th>Status</th>
+        <th>Voucher</th>
+      </tr></thead>
+      <tbody id="transactionsBody"></tbody>
+    </table>
+  </div>
 </div>
 
 <!-- AUDIT LOG -->
@@ -3406,6 +3438,17 @@ function showPage(id) {
 // tile to drill into a specific area. Mirrors housing.html's home.
 function showHome(){ showPage('home'); }
 
+// Utilities tile → Transactions page pre-filtered to utility ledgers
+function openUtilitiesView(){
+  showPage('transactions');
+  // Apply the filter after the page's init runs (showPage kicks off initTxnFilters).
+  setTimeout(function(){
+    var lf = document.getElementById('txn-filter-ledger');
+    if (lf) { lf.value = 'utility'; }
+    if (typeof renderTransactions === 'function') renderTransactions();
+  }, 120);
+}
+
 function renderHome(){
   // Greeting block: date line, "Welcome back, <n>"
   var dateEl = document.getElementById('home_date');
@@ -3502,8 +3545,8 @@ function renderHome(){
     + stat('Total Entries', journal.length, 'neutral')
   ));
 
-  // Utilities — combined hydro + gas view (opens rent page for now)
-  tiles.push(tile('⚡','Utilities',"showPage('rent')",'#f59e0b',
+  // Utilities — open Transactions page pre-filtered to utility-type entries
+  tiles.push(tile('⚡','Utilities',"openUtilitiesView()",'#f59e0b',
     stat('Hydro Records', hydro, 'neutral')
     + stat('Gas Records', gas, 'neutral')
   ));
@@ -6938,40 +6981,85 @@ function renderTransactions() {
   var filterType = (document.getElementById('txn-filter-type')||{}).value||'all';
   var filterFrom = (document.getElementById('txn-filter-from')||{}).value||'';
   var filterTo = (document.getElementById('txn-filter-to')||{}).value||'';
-  var txns = getAllTransactions();
+  var all = getAllTransactions();
+  var txns = all.slice();
   if(filterTenant!=='all') txns=txns.filter(function(t){return t.tenantId===filterTenant;});
   if(filterLedger!=='all') txns=txns.filter(function(t){return t.ledger===filterLedger;});
   if(filterType==='charge') txns=txns.filter(function(t){return t.charge>0;});
   if(filterType==='payment') txns=txns.filter(function(t){return t.payment>0;});
   if(filterFrom) txns=txns.filter(function(t){return t.date>=filterFrom;});
   if(filterTo) txns=txns.filter(function(t){return t.date<=filterTo;});
-  var totalCharge=txns.reduce(function(s,t){return s+t.charge;},0);
-  var totalPayment=txns.reduce(function(s,t){return s+t.payment;},0);
-  document.getElementById('txnStats').innerHTML=
-    statCard('Transactions',txns.length,'','')+
-    statCard('Total Charges',fmt(totalCharge),'',totalCharge>0?'danger':'')+
-    statCard('Total Payments',fmt(totalPayment),'','success')+
-    statCard('Net Balance',fmt(totalCharge-totalPayment),'',totalCharge-totalPayment>0?'danger':'success');
-  var ledgerPill={'rent':'<span class="pill pill-blue">Rent</span>','arrangement':'<span class="pill pill-yellow">Arrangement</span>','loans':'<span class="pill pill-purple">Loans</span>','journal':'<span class="pill pill-gray">Journal</span>'};
+
+  var totalCharge = txns.reduce(function(s,t){ return s+t.charge; }, 0);
+  var totalPayment = txns.reduce(function(s,t){ return s+t.payment; }, 0);
+
+  // Stats row
+  var statsEl = document.getElementById('txnStats');
+  if (statsEl) {
+    statsEl.innerHTML =
+      statCard('Transactions', txns.length, '', '') +
+      statCard('Total Charges', fmt(totalCharge), '', totalCharge>0?'danger':'') +
+      statCard('Total Payments', fmt(totalPayment), '', 'success') +
+      statCard('Net Balance', fmt(totalCharge-totalPayment), '', totalCharge-totalPayment>0?'danger':'success');
+  }
+
+  // Meta + count
+  var metaEl = document.getElementById('txn_page_meta');
+  if (metaEl) {
+    var today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+    metaEl.textContent = txns.length + ' shown · ' + all.length + ' total · Last updated ' + today;
+  }
+  var countEl = document.getElementById('txnCount');
+  if (countEl) countEl.textContent = txns.length + ' shown · ' + all.length + ' total';
+
+  var ledgerPill = {
+    'rent':        '<span class="std-pill std-pill-info">Rent</span>',
+    'arrangement': '<span class="std-pill std-pill-pending">Arrangement</span>',
+    'loans':       '<span class="std-pill std-pill-info">Loans</span>',
+    'loan':        '<span class="std-pill std-pill-info">Loans</span>',
+    'journal':     '<span class="std-pill std-pill-voided">Journal</span>',
+    'utility':     '<span class="std-pill std-pill-pending">Utility</span>'
+  };
+
+  function stdStatusPill(st){
+    if (st === 'posted' || st === 'approved') return '<span class="std-pill std-pill-paid">'+(st.charAt(0).toUpperCase()+st.slice(1))+'</span>';
+    if (st === 'pending' || st === 'pending-ed') return '<span class="std-pill std-pill-pending">'+(st==='pending-ed'?'Pending ED':'Pending')+'</span>';
+    if (st === 'reversed' || st === 'voided') return '<span class="std-pill std-pill-voided">'+(st.charAt(0).toUpperCase()+st.slice(1))+'</span>';
+    if (st === 'overdue') return '<span class="std-pill std-pill-overdue">Overdue</span>';
+    if (st === 'active') return '<span class="std-pill std-pill-active">Active</span>';
+    return '<span class="std-pill std-pill-info">'+(st||'—')+'</span>';
+  }
+
   var _txnCache = {};
-  var rows=txns.map(function(t){
-    var tn=getTenant(t.tenantId);
+  var rows = txns.map(function(t){
+    var tn = getTenant(t.tenantId);
     var cacheKey = 'txn_' + t.id;
     _txnCache[cacheKey] = t;
     window._txnVoucherCache = _txnCache;
     return '<tr>'+
       '<td>'+t.date+'</td>'+
-      '<td><div class="tbl-name">'+(tn?tenantName(tn):t.tenantId)+'</div><div class="tbl-sub">'+(tn?tn.unit:'')+'</div></td>'+
-      '<td>'+(ledgerPill[t.ledger]||t.ledger)+'</td>'+
-      '<td style="max-width:220px;white-space:normal;">'+t.desc+'</td>'+
-      '<td>'+(t.charge>0?'<span class="txn-type-charge">'+fmt(t.charge)+'</span>':'&mdash;')+'</td>'+
-      '<td>'+(t.payment>0?'<span class="txn-type-payment">'+fmt(t.payment)+'</span>':'&mdash;')+'</td>'+
+      '<td class="std-cell-primary">'+(tn?tenantName(tn):'<span class="std-cell-dash">—</span>')+
+        (tn&&tn.unit?'<div style="font-size:11px;color:var(--muted);font-weight:normal;">'+tn.unit+'</div>':'')+'</td>'+
+      '<td>'+(ledgerPill[t.ledger]||'<span class="std-pill std-pill-info">'+(t.ledger||'—')+'</span>')+'</td>'+
+      '<td style="max-width:260px;white-space:normal;">'+(t.desc||'<span class="std-cell-dash">—</span>')+'</td>'+
+      '<td class="std-cell-right">'+(t.charge>0?'<span class="amt-debit">'+fmt(t.charge)+'</span>':'<span class="std-cell-dash">—</span>')+'</td>'+
+      '<td class="std-cell-right">'+(t.payment>0?'<span class="amt-credit">'+fmt(t.payment)+'</span>':'<span class="std-cell-dash">—</span>')+'</td>'+
       '<td style="font-size:12px;">'+methodLabel(t.method)+'</td>'+
-      '<td>'+statusPill(t.status)+'</td>'+
-      "<td><button class=\"btn btn-ghost btn-sm\" onclick=\"openVoucher(window._txnVoucherCache['txn_"+t.id+"'])\">&#128203;</button></td>"+
+      '<td>'+stdStatusPill(t.status)+'</td>'+
+      '<td class="std-cell-tail"><button class="btn btn-ghost btn-sm" onclick="openVoucher(window._txnVoucherCache[\'txn_'+t.id+'\'])">&#128203;</button></td>'+
     '</tr>';
   }).join('');
-  document.getElementById('transactionsBody').innerHTML=rows||'<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted);">No transactions match filters.</td></tr>';
+
+  var bodyEl = document.getElementById('transactionsBody');
+  if (bodyEl) {
+    if (!all.length) {
+      bodyEl.innerHTML = '<tr class="empty-row"><td colspan="9">No transactions yet. Record a payment or create an invoice to get started.</td></tr>';
+    } else if (!rows) {
+      bodyEl.innerHTML = '<tr class="empty-row"><td colspan="9">No transactions match the current filters. <a href="#" onclick="clearTxnFilters();return false;" style="color:var(--text);text-decoration:underline;">Clear filters</a> to show all.</td></tr>';
+    } else {
+      bodyEl.innerHTML = rows;
+    }
+  }
 }
 
 function renderAuditLog() {
@@ -8848,15 +8936,6 @@ function renderArrangementsPage(){
   var content = document.getElementById('arrangementsContent');
   if (!content) return;
 
-  // Empty states — no "+ New Arrangement" button here (user wants it in page-actions only)
-  if (all.length === 0) {
-    content.innerHTML = '<div class="std-table-card" style="text-align:center;padding:40px 30px;color:var(--muted);">' +
-      '<div style="font-size:28px;margin-bottom:10px;">&#128203;</div>' +
-      '<div style="font-size:13px;">No payment arrangements yet. Use the <strong>📋 New Arrangement</strong> button above to create the first one.</div>' +
-      '</div>';
-    return;
-  }
-
   // Build summary table
   function pillFor(status){
     if (status === 'approved' || status === 'active') return '<span class="std-pill std-pill-active">'+(status==='approved'?'Approved':'Active')+'</span>';
@@ -8868,7 +8947,12 @@ function renderArrangementsPage(){
   }
 
   var rows;
-  if (!list.length) {
+  if (all.length === 0) {
+    rows = '<tr class="empty-row"><td colspan="7">' +
+      '<div style="font-size:24px;margin-bottom:8px;">&#128203;</div>' +
+      '<div>No payment arrangements yet. Use the <strong>📋 New Arrangement</strong> button above to create the first one.</div>' +
+      '</td></tr>';
+  } else if (!list.length) {
     rows = '<tr class="empty-row"><td colspan="7">No arrangements match the current filters. <a href="#" onclick="clearArrangementsFilters();return false;" style="color:var(--text);text-decoration:underline;">Clear filters</a> to show all.</td></tr>';
   } else {
     rows = list.map(function(arr){
@@ -9042,16 +9126,13 @@ function renderLoansPage(){
       return '<span class="std-pill std-pill-info">'+(status||'—')+'</span>';
     }
 
-    if (all.length === 0) {
-      content.innerHTML = '<div class="std-table-card" style="text-align:center;padding:40px 30px;color:var(--muted);">' +
-        '<div style="font-size:28px;margin-bottom:10px;">&#128188;</div>' +
-        '<div style="font-size:13px;">No loans yet. Use the <strong>+ New Loan</strong> button above to create the first one.</div>' +
-        '</div>';
-      return;
-    }
-
     var rows;
-    if (!list.length) {
+    if (all.length === 0) {
+      rows = '<tr class="empty-row"><td colspan="7">' +
+        '<div style="font-size:24px;margin-bottom:8px;">&#128188;</div>' +
+        '<div>No loans yet. Use the <strong>+ New Loan</strong> button above to create the first one.</div>' +
+        '</td></tr>';
+    } else if (!list.length) {
       rows = '<tr class="empty-row"><td colspan="7">No loans match the current filters. <a href="#" onclick="clearLoansFilters();return false;" style="color:var(--text);text-decoration:underline;">Clear filters</a> to show all.</td></tr>';
     } else {
       rows = list.map(function(l){
