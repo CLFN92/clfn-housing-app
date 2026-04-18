@@ -78,9 +78,9 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
 .f input:focus,.f select:focus,.f textarea:focus{border-color:var(--yellow);box-shadow:0 0 0 3px rgba(248,228,26,.15);}
 .f textarea{resize:vertical;min-height:80px;}
 .toggle-row{display:flex;align-items:center;justify-content:space-between;}
-.tsw{position:relative;width:44px;height:24px;flex-shrink:0;}
+.tsw{position:relative;width:44px;height:24px;flex-shrink:0;display:inline-block;cursor:pointer;}
 .tsw input{opacity:0;width:0;height:0;}
-.tsl{position:absolute;inset:0;background:var(--border);border-radius:12px;transition:var(--tr);cursor:pointer;}
+.tsl{position:absolute;inset:0;background:var(--border);border-radius:12px;transition:var(--tr);cursor:pointer;pointer-events:none;}
 .tsw input:checked+.tsl{background:var(--yellow);}
 .tsl:before{content:'';position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:3px;left:3px;transition:var(--tr);}
 .tsw input:checked+.tsl:before{transform:translateX(20px);}
@@ -923,7 +923,7 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
         <div class="f s2">
           <div class="toggle-row">
             <label for="tn-autopay">Auto-Payment Enabled (tenant is on pre-authorized payment)</label>
-            <span class="tsw"><input type="checkbox" id="tn-autopay"/><span class="tsl"></span></span>
+            <label class="tsw" for="tn-autopay"><input type="checkbox" id="tn-autopay"/><span class="tsl"></span></label>
           </div>
         </div>
         <div class="f s2"><label>Notes</label><textarea id="tn-notes" placeholder="Any additional notes..."></textarea></div>
@@ -3379,13 +3379,12 @@ function renderTenantProfile(tid) {
   var nameEl = nameRow.appendChild(document.createElement('span'));
   nameEl.style.cssText = 'font-size:20px;font-weight:700;';
   nameEl.textContent = tenantName(t);
-  // Active/Inactive \u2014 read-only, Housing App owns this
+  // Active/Inactive pill
   var activeBadge = nameRow.appendChild(document.createElement('span'));
   activeBadge.className = isActive ? 'pill pill-green' : 'pill pill-gray';
   activeBadge.style.cssText = 'font-size:10px;cursor:default;';
-  activeBadge.title = 'Tenancy status is managed in the Housing App';
   activeBadge.textContent = isActive ? '\u25CF Active' : '\u25CB Inactive';
-  // Collections flag \u2014 Finance owned
+  // Collections flag
   var colBadge = nameRow.appendChild(document.createElement('span'));
   if (inCol) {
     colBadge.className = 'collections-badge';
@@ -3400,12 +3399,14 @@ function renderTenantProfile(tid) {
   }
   var subEl = nameBlock.appendChild(document.createElement('div'));
   subEl.style.cssText = 'font-size:12px;color:var(--muted);';
-  subEl.textContent = t.unit + '  \u00B7  ' + (typeLabels[t.type]||t.type);
+  subEl.textContent = (t.unit || 'No unit assigned') + '  \u00B7  ' + (typeLabels[t.type]||t.type||'Unspecified');
 
-  // Housing App sync notice
-  var syncNote = s1.appendChild(document.createElement('div'));
-  syncNote.style.cssText = 'display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 12px;margin-bottom:14px;font-size:11px;color:var(--muted);';
-  syncNote.innerHTML = '<span>&#9998;</span> To edit any field below, click <strong style="color:var(--text);margin:0 3px;">Edit</strong> in the Finance Settings section.';
+  // Edit Tenant button — anchored to the right of the header. Phase F3A.
+  var editBtn = hdr.appendChild(document.createElement('button'));
+  editBtn.className = 'btn btn-primary btn-sm';
+  editBtn.style.cssText = 'flex-shrink:0;';
+  editBtn.innerHTML = '&#9998; Edit Tenant';
+  editBtn.onclick = function(){ openEditTenant(tid); };
 
   function makeGrid(parent, fields) {
     var g = parent.appendChild(document.createElement('div'));
@@ -3456,8 +3457,8 @@ function renderTenantProfile(tid) {
 
   // Finance settings (Finance Module owns these)
   var finHdr = s1.appendChild(document.createElement('div'));
-  finHdr.style.cssText = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;';
-  var finEditBtn = document.createElement('button'); finEditBtn.className='btn btn-ghost btn-sm'; finEditBtn.style.cssText='font-size:10px;padding:2px 8px;'; finEditBtn.innerHTML='&#9998; Edit'; finEditBtn.onclick=function(){openEditTenant(tid);}; finHdr.textContent='Finance Settings '; finHdr.appendChild(finEditBtn);
+  finHdr.style.cssText = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px;';
+  finHdr.textContent = 'Finance Settings';
   makeGrid(s1, [
     {lbl:'Monthly Rent',       val:fmt(t.rent)+' / month'},
     {lbl:'Invoice Preference', val:t.invPref==='email'?'\uD83D\uDCE7 Email':'\uD83D\uDDA8\uFE0F Print / Mail'},
@@ -8510,7 +8511,7 @@ function clearAndReseed() {
         <div class="f">
           <div class="toggle-row">
             <label for="et-autopay">Auto-Payment Enabled</label>
-            <span class="tsw"><input type="checkbox" id="et-autopay"/><span class="tsl"></span></span>
+            <label class="tsw" for="et-autopay"><input type="checkbox" id="et-autopay"/><span class="tsl"></span></label>
           </div>
         </div>
         <div class="f" id="et-autopay-type-row" style="display:none;">
