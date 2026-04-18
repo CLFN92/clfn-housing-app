@@ -2430,59 +2430,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 })();
 
 // ── Permissions ────────────────────────────────────────────────────────────
-(function initPerms(){
-  var ROLES = Object.freeze({
-    ED: 'ed', HM: 'housing_manager',
-    HE_L2: 'housing_employee_l2', HE_L1: 'housing_employee_l1',
-    CFO: 'cfo', FINANCE_L1: 'finance_l1'
-  });
-  var LEGACY_ALIASES = Object.freeze({
-    'employee': ROLES.HE_L1, 'staff': ROLES.HE_L1,
-    'housing_staff': ROLES.HE_L1, 'housing_staff_l2': ROLES.HE_L2,
-    'hm': ROLES.HM, 'manager': ROLES.HM,
-    'finance': ROLES.FINANCE_L1, 'finance_clerk': ROLES.FINANCE_L1
-  });
-  var ROLE_LABELS = Object.freeze({
-    'ed':'Executive Director', 'housing_manager':'Housing Manager',
-    'housing_employee_l2':'Housing Employee L2', 'housing_employee_l1':'Housing Employee L1',
-    'cfo':'CFO', 'finance_l1':'Finance Clerk L1'
-  });
-  var VALID_KEYS = Object.freeze(Object.keys(ROLE_LABELS));
-
-  function normalizeRole(role){
-    if(role == null) return null;
-    var r = String(role).toLowerCase().trim();
-    if(r in LEGACY_ALIASES) return LEGACY_ALIASES[r];
-    return r;
-  }
-  function isValidRole(role){ return VALID_KEYS.indexOf(normalizeRole(role)) !== -1; }
-  function assertRole(role, caller){
-    var r = normalizeRole(role);
-    if(r == null) throw new Error('[permissions] '+(caller||'check')+': role is required');
-    if(VALID_KEYS.indexOf(r) === -1){
-      throw new Error('[permissions] '+(caller||'check')+': unknown role "'+role+'" (normalized to "'+r+'"). Valid: '+VALID_KEYS.join(', '));
-    }
-    return r;
-  }
-  function roleLabel(role){ return ROLE_LABELS[normalizeRole(role)] || String(role||''); }
-
-  function hasHousingAccess(role){
-    var r = assertRole(role, 'hasHousingAccess');
-    return r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2 || r === ROLES.HE_L1;
-  }
-  function hasFinanceAccess(role){
-    var r = assertRole(role, 'hasFinanceAccess');
-    return r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2
-        || r === ROLES.CFO || r === ROLES.FINANCE_L1;
-  }
-
-  window.CLFN_PERMS = Object.freeze({
-    ROLES: ROLES, ROLE_LABELS: ROLE_LABELS,
-    normalizeRole: normalizeRole, isValidRole: isValidRole, assertRole: assertRole,
-    roleLabel: roleLabel,
-    hasHousingAccess: hasHousingAccess, hasFinanceAccess: hasFinanceAccess
-  });
-})();
 
 // ── Per-nation logos ──────────────────────────────────────────────────────
 // Logos live as data URIs keyed by nation id. When a new nation is onboarded,
@@ -3687,85 +3634,6 @@ function matchInvoicesToPayments(tenantId, d) {
   return invoiceBalances;
 }
 
-function buildInvoiceHistory(tenantId, d) {
-  var matched = matchInvoicesToPayments(tenantId, d);
-  if (!matched.length) return '<p style="color:var(--muted);font-size:13px;padding:8px 0;">No invoices on file.</p>';
-  var rows = matched.slice().reverse().map(function(ib){
-    var isPaid = ib.remaining <= 0.005;
-    var isPartial = !isPaid && ib.payments.length > 0;
-    var statusBadge = isPaid ? '<span class="pill pill-green">&#10003; Paid</span>'
-      : isPartial ? '<span class="pill pill-yellow">Partial</span>'
-      : '<span class="pill pill-red">Unpaid</span>';
-    var paymentLines = ib.payments.map(function(pay){
-      return '<div style="font-size:11px;color:var(--muted);margin-top:3px;">&#10144; '+fmt(pay.amount)+' &middot; '+pay.date+(pay.method?' &middot; '+methodLabel(pay.method):'')+' </div>';
-    }).join('');
-    var rowBg = isPaid ? 'background:var(--surface);' : isPartial ? 'background:#fff7ed;' : 'background:#fef2f2;';
-    var cacheKey = 'inv_'+ib.inv.id;
-    _invoiceCache[cacheKey] = {date:ib.inv.date,tenantId:tenantId,ledger:'rent',desc:ib.inv.desc,
-      charge:ib.inv.charge,payment:0,method:'',status:isPaid?'paid':isPartial?'partial':'unpaid',
-      id:ib.inv.id,ref:ib.inv.ref,invoiceBalance:ib.remaining,payments:ib.payments};
-    return '<div style="'+rowBg+'border-bottom:1px solid var(--border);padding:12px 14px;cursor:pointer;" data-inv-key="'+cacheKey+'" onclick="openInvoiceById(this.dataset.invKey)">'+
-      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">'+
-        '<div style="flex:1;">'+
-          '<div style="font-size:13px;font-weight:600;">'+ib.inv.desc+'</div>'+
-          '<div style="font-size:12px;color:var(--muted);margin-top:1px;">'+ib.inv.date+(ib.inv.ref?' &middot; '+ib.inv.ref:'')+' </div>'+
-          paymentLines+
-        '</div>'+
-        '<div style="text-align:right;flex-shrink:0;">'+
-          '<div style="font-family:var(--serif);font-size:16px;">'+fmt(ib.inv.charge)+'</div>'+
-          (!isPaid?'<div style="font-size:11px;color:var(--danger);margin-top:1px;">'+fmt(ib.remaining)+' owing</div>':'')+
-          '<div style="margin-top:4px;">'+statusBadge+'</div>'+
-        '</div>'+
-      '</div>'+
-    '</div>';
-  }).join('');
-  var totalCharged = matched.reduce(function(s,ib){return s+ib.inv.charge;},0);
-  var totalOwing = matched.reduce(function(s,ib){return s+ib.remaining;},0);
-  var totalPaid = totalCharged - totalOwing;
-  return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">'+
-    '<div style="background:var(--bg);border-radius:8px;padding:10px 12px;text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:3px;">Total Invoiced</div><div style="font-size:16px;">'+fmt(totalCharged)+'</div></div>'+
-    '<div style="background:#f0fdf4;border-radius:8px;padding:10px 12px;text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:3px;">Paid</div><div style="font-size:16px;color:var(--success);">'+fmt(totalPaid)+'</div></div>'+
-    '<div style="background:'+(totalOwing>0?'#fef2f2':'var(--bg)')+';border-radius:8px;padding:10px 12px;text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:3px;">Owing</div><div style="font-size:16px;color:'+(totalOwing>0?'var(--danger)':'var(--success)')+';">'+fmt(totalOwing)+'</div></div>'+
-  '</div>'+
-  '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">'+rows+'</div>';
-}
-
-function buildTenantStatement(tenantId, d) {
-  var allEntries = d.rentLedger.filter(function(r){return r.tenantId===tenantId&&r.status!=='reversed';})
-    .sort(function(a,b){return b.date.localeCompare(a.date);});
-  if (!allEntries.length) return '<p style="color:var(--muted);font-size:13px;padding:8px 0;">No statement data available.</p>';
-  var groups = {};
-  allEntries.forEach(function(r){ var ym=r.date.slice(0,7); if(!groups[ym])groups[ym]=[]; groups[ym].push(r); });
-  var t = d.tenants.find(function(x){return x.id===tenantId;});
-  var stmtHtml = Object.keys(groups).sort().reverse().map(function(ym){
-    var me = groups[ym];
-    var mc = me.reduce(function(s,r){return s+r.charge;},0);
-    var mp = me.reduce(function(s,r){return s+r.payment;},0);
-    var label = new Date(ym+'-15').toLocaleDateString('en-CA',{year:'numeric',month:'long'});
-    var rows = me.map(function(r){
-      return '<div style="display:flex;justify-content:space-between;padding:7px 14px;border-bottom:1px solid var(--border);font-size:12px;">'+
-        '<div style="color:var(--muted);">'+r.date.slice(8)+' \u2014 '+r.desc+'</div>'+
-        '<div>'+(r.charge>0?'<span class="amt-debit">'+fmt(r.charge)+'</span>':'')+
-             (r.payment>0?'<span class="amt-credit">'+fmt(r.payment)+'</span>':'')+
-        '</div></div>';
-    }).join('');
-    return '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;">'+
-      '<div style="background:var(--dark2);padding:9px 14px;display:flex;justify-content:space-between;align-items:center;">'+
-        '<div style="font-size:13px;font-weight:600;color:#fff;">'+label+'</div>'+
-        '<div style="display:flex;gap:12px;font-size:12px;">'+
-          (mc>0?'<span style="color:#f87171;">'+fmt(mc)+' charged</span>':'')+
-          (mp>0?'<span style="color:#4ade80;">'+fmt(mp)+' paid</span>':'')+
-        '</div></div>'+rows+'</div>';
-  }).join('');
-  var totals=calcAllTotals(d); var v=totals[tenantId]||{}; var grand=(v.rent||0)+(v.loan||0)+(v.arrangement||0);
-  return '<div style="background:var(--dark);border-radius:10px;padding:14px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">'+
-    '<div><div style="font-size:10px;color:#888;text-transform:uppercase;margin-bottom:2px;">Current Balance Owing</div>'+
-    '<div style="font-size:24px;color:var(--yellow);">'+fmt(grand)+'</div></div>'+
-    '<div style="text-align:right;font-size:12px;color:#888;">'+(t?tenantName(t):'')+
-    '<br>'+new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'})+'</div>'+
-  '</div>'+stmtHtml;
-}
-
 function openInvoiceVoucher(txn) {
   currentVoucherData = txn;
   var tn = getTenant(txn.tenantId);
@@ -3893,18 +3761,6 @@ function selectTenantProfile(tid) {
   if (inp) inp.value = tenantName(t);
   setTenantsChromeMode('profile');
   renderTenantProfile(tid);
-}
-
-function backToTenantList() {
-  setTenantsChromeMode('list');
-  var inp = document.getElementById('tenantSearchInput');
-  if (inp) { inp.value = ''; searchTenants(''); }
-  var pp = document.getElementById('tenantProfilePanel');
-  if (pp) pp.innerHTML = '<div style="text-align:center;padding:60px 0;color:var(--muted);">'+
-    '<div style="font-size:32px;margin-bottom:12px;">&#128101;</div>'+
-    '<div style="font-size:14px;">Search for a tenant above or pick one from the list below to view their information card</div></div>';
-  renderTenantList();
-  window.scrollTo({top:0, behavior:'instant'});
 }
 
 // Phase F3A — browseable tenant list on the Tenants tab. Shown when no
@@ -4392,6 +4248,14 @@ function showTicDetailTab(tid, tab) {
   if (tab === 'docs' && !window._ticDocLibs[tid]) {
     docsPanel.innerHTML = '';
     if (window.DocLibrary && typeof SUPABASE_URL === 'string' && SUPABASE_URL) {
+      // NOTE: finance_audit_log has a materially different schema than
+      // housing_audit_log — occurred_at (not created_at), actor_email +
+      // actor_role (not actor), detail jsonb (not text), plus summary and
+      // tenant_id columns. The factory is currently hardcoded to the
+      // housing shape. Uploads to finance storage should succeed, but
+      // the audit-log write will 400 and the list will not persist.
+      // This is a known limitation pending Path A schema-normalization
+      // work. TODO(Path-A): wire a customSaveMeta opt for finance.
       window._ticDocLibs[tid] = window.DocLibrary.create(docsPanel, {
         entityType:    'tenant',
         entityId:      tid,
@@ -5024,234 +4888,6 @@ function buildLedgerTable(entries, type) {
 }
 
 
-function buildRentPanel(tid, d, v) {
-  var inCol = isInCollections(tid);
-  var colBlock = inCol ?
-    '<div style="background:#fef2f2;border:1px solid var(--danger);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#7f1d1d;">'+
-    '&#128680; <strong>Collections flag active.</strong> Auto-payments suspended. Record manual payments only. All payments require staff authorisation.</div>' : '';
-
-  // Quick payment form \u2014 disable auto method when in collections
-  var methodOptions = '<option value="cash">Cash</option><option value="debit">Debit (In-Person)</option>'+
-    '<option value="etransfer">E-Transfer</option><option value="online">Online Banking</option>'+
-    '<option value="cheque">Cheque</option>'+
-    (!inCol ? '<option value="auto">Auto Payment</option>' : '');
-  var matched = matchInvoicesToPayments(tid, d);
-
-  // Quick payment form
-  var payForm = colBlock +
-    '<div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:16px;">' +
-    '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px;">Record Rent Payment</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:flex-end;">' +
-      '<div class="f" style="margin:0;"><label>Date</label><input id="tic-rent-date" type="date" value="'+today()+'"/></div>' +
-      '<div class="f" style="margin:0;"><label>Amount ($)</label><input id="tic-rent-amount" type="number" step="0.01" placeholder="'+(v.rent||0).toFixed(2)+'" value="'+(v.rent>0?(v.rent).toFixed(2):'')+'"/></div>' +
-      '<button class="btn btn-primary" style="height:40px;white-space:nowrap;" onclick="saveRentQuickPayment('+JSON.stringify(tid)+')">Record</button>' +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">' +
-      '<div class="f" style="margin:0;"><label>Method</label>' +
-        '<select id="tic-rent-method">'+methodOptions+'</select>' +
-      '</div>' +
-      '<div class="f" style="margin:0;"><label>Notes</label><input id="tic-rent-notes" placeholder="Optional..."/></div>' +
-    '</div>' +
-  '</div>';
-
-
-  // Invoice history
-  var invRows = matched.slice().reverse().map(function(ib){
-    var isPaid2 = ib.remaining <= 0.005;
-    var isPartial = !isPaid2 && ib.payments.length > 0;
-    var badge = isPaid2 ? '<span class="pill pill-green">Paid</span>'
-      : isPartial ? '<span class="pill pill-yellow">Partial</span>'
-      : '<span class="pill pill-red">Unpaid</span>';
-    var cacheKey = 'inv_'+ib.inv.id;
-    _invoiceCache[cacheKey] = {date:ib.inv.date,tenantId:tid,ledger:'rent',desc:ib.inv.desc,
-      charge:ib.inv.charge,payment:0,method:'',status:isPaid2?'paid':isPartial?'partial':'unpaid',
-      id:ib.inv.id,ref:ib.inv.ref,invoiceBalance:ib.remaining,payments:ib.payments};
-    var pmtLines = ib.payments.map(function(p){
-      return '<div style="font-size:11px;color:var(--muted);padding-left:12px;">\u21B3 '+fmt(p.amount)+' \u00B7 '+p.date+(p.method?' \u00B7 '+methodLabel(p.method):'')+' </div>';
-    }).join('');
-    return '<div style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;" data-inv-key="'+cacheKey+'" onclick="openInvoiceById(this.dataset.invKey)">'+
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'+
-        '<div style="flex:1;">'+
-          '<div style="font-size:13px;font-weight:500;">'+ib.inv.desc+'</div>'+
-          '<div style="font-size:11px;color:var(--muted);">'+ib.inv.date+(ib.inv.ref?' \u00B7 '+ib.inv.ref:'')+' </div>'+
-          pmtLines+
-        '</div>'+
-        '<div style="text-align:right;flex-shrink:0;padding-left:12px;">'+
-          '<div style="font-size:15px;font-weight:700;">'+fmt(ib.inv.charge)+'</div>'+
-          (!isPaid2?'<div style="font-size:11px;color:var(--danger);">'+fmt(ib.remaining)+' owing</div>':'')+
-          badge+
-        '</div>'+
-      '</div>'+
-    '</div>';
-  }).join('');
-
-  // Journal entries for rent ledger
-  var rentEntries = d.rentLedger.filter(function(r){return r.tenantId===tid;})
-    .sort(function(a,b){return b.date.localeCompare(a.date);});
-  var journalRows = rentEntries.map(function(r){
-    var isReversed = r.status==='reversed';
-    return '<tr style="'+(isReversed?'opacity:.45;text-decoration:line-through;':'')+'">'+
-      '<td>'+r.date+'</td>'+
-      '<td style="max-width:200px;white-space:normal;font-size:12px;">'+r.desc+'</td>'+
-      '<td>'+(r.charge>0?'<span class="amt-debit">'+fmt(r.charge)+'</span>':'\u2014')+'</td>'+
-      '<td>'+(r.payment>0?'<span class="amt-credit">'+fmt(r.payment)+'</span>':'\u2014')+'</td>'+
-      '<td>'+statusPill(r.status)+'</td>'+
-      '<td>'+(isReversed?'<span class="pill pill-gray" style="font-size:10px;">Reversed</span>':
-        (r.type==='payment'?'<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger);" onclick="reverseRentEntry('+JSON.stringify(r.id)+','+JSON.stringify(tid)+')">\u21BA Reverse</button>':''))+
-      '</td>'+
-    '</tr>';
-  }).join('');
-
-  return payForm +
-    '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px;">Invoice History</div>'+
-    '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">'+
-      (invRows||'<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">No invoices on file</div>')+
-    '</div>'+
-    '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px;">Ledger Journal</div>'+
-    '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Description</th><th>Charge</th><th>Payment</th><th>Status</th><th></th></tr></thead>'+
-    '<tbody>'+(journalRows||'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">No entries</td></tr>')+'</tbody></table></div>';
-}
-
-function buildArrPanel(tid, d) {
-  var arrs = d.arrangements.filter(function(a){return a.tenantId===tid;});
-  if (!arrs.length) return '<div style="text-align:center;padding:30px;"><p style="color:var(--muted);margin-bottom:12px;">No arrangements on file.</p><button class="btn btn-primary btn-sm" onclick="openNewArrForTenant('+JSON.stringify(tid)+')">+ New Arrangement</button></div>';
-
-  return 
-  arrs.map(function(a){
-    var paid = d.arrPayments.filter(function(p){return p.arrId===a.id&&p.status!=='reversed';}).reduce(function(s,p){return s+p.amount;},0);
-    var rem = Math.max(0,a.totalOwing-paid);
-    var pct = a.totalOwing>0?Math.min(100,(paid/a.totalOwing)*100):0;
-    var isPending = a.status==='pending-ed';
-    var monthsLeft = a.monthlyPayment>0?Math.ceil(rem/a.monthlyPayment):0;
-    var payoff = new Date(); payoff.setMonth(payoff.getMonth()+monthsLeft);
-    var payoffStr = rem<=0?'Paid Off':payoff.toLocaleDateString('en-CA',{year:'numeric',month:'short'});
-
-    var payForm = isPending ? '' :
-      '<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:12px;">'+
-        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Record Payment</div>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:flex-end;">'+
-          '<div class="f" style="margin:0;"><label>Date</label><input class="arr-pay-date" data-arr="'+a.id+'" type="date" value="'+today()+'"/></div>'+
-          '<div class="f" style="margin:0;"><label>Amount</label><input class="arr-pay-amt" data-arr="'+a.id+'" type="number" step="0.01" placeholder="'+a.monthlyPayment.toFixed(2)+'" value="'+a.monthlyPayment.toFixed(2)+'"/></div>'+
-          '<button class="btn btn-primary" style="height:40px;" onclick="saveArrQuickPayment('+JSON.stringify(a.id)+','+JSON.stringify(tid)+')">Record</button>'+
-        '</div>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;">'+
-          '<div class="f" style="margin:0;"><label>Method</label>'+
-            '<select class="arr-pay-method" data-arr="'+a.id+'"><option value="cash">Cash</option><option value="etransfer">E-Transfer</option><option value="debit">Debit</option><option value="cheque">Cheque</option><option value="auto">Auto</option></select>'+
-          '</div>'+
-          '<div class="f" style="margin:0;"><label>Type</label>'+
-            '<select class="arr-pay-type" data-arr="'+a.id+'"><option value="regular">Regular</option><option value="extra">Extra/Lump-Sum</option></select>'+
-          '</div>'+
-          '<div class="f" style="margin:0;"><label>Notes</label><input class="arr-pay-notes" data-arr="'+a.id+'" placeholder="Optional..."/></div>'+
-        '</div>'+
-      '</div>';
-
-    var pmtHistory = d.arrPayments.filter(function(p){return p.arrId===a.id;})
-      .sort(function(a,b){return b.date.localeCompare(a.date);});
-    var pmtRows = pmtHistory.map(function(p){
-      var isRev = p.status==='reversed';
-      return '<tr style="'+(isRev?'opacity:.45;text-decoration:line-through;':'')+'">'+
-        '<td>'+p.date+'</td>'+
-        '<td><span class="'+(isRev?'':'amt-credit')+'">'+fmt(p.amount)+'</span></td>'+
-        '<td>'+methodLabel(p.method)+'</td>'+
-        '<td style="font-size:11px;color:var(--muted);">'+(p.type==='extra'?'Extra':p.type==='lump'?'Lump-Sum':'Regular')+'</td>'+
-        '<td>'+(isRev?'<span class="pill pill-gray" style="font-size:10px;">Reversed</span>':
-          '<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger);" onclick="reverseArrPayment('+JSON.stringify(p.id)+','+JSON.stringify(tid)+')">\u21BA Reverse</button>')+
-        '</td>'+
-      '</tr>';
-    }).join('');
-
-    return '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">' +
-      '<div style="background:'+(isPending?'#fffbea':'var(--dark2)')+';padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">'+
-        '<div><div style="font-size:14px;font-weight:700;color:'+(isPending?'#7a6000':'#fff')+';">'+a.ref+'</div>'+
-        '<div style="font-size:11px;color:'+(isPending?'#a16207':'#888')+';">'+a.ledger+' ledger \u00B7 '+a.monthlyPayment.toFixed(2)+'/mo</div></div>'+
-        statusPill(a.status)+
-      '</div>'+
-      '<div style="padding:14px;">'+
-        (isPending?'<div class="ibox yellow" style="margin-bottom:12px;">\u26A0 Pending ED approval before payments can be recorded.</div>':'')+
-        '<div class="tic-4col" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;">'+
-          '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Total Owing</div><div style="font-size:16px;font-weight:700;">'+fmt(a.totalOwing)+'</div></div>'+
-          '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Paid</div><div style="font-size:16px;font-weight:700;color:var(--success);">'+fmt(paid)+'</div></div>'+
-          '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Remaining</div><div style="font-size:16px;font-weight:700;color:'+(rem>0?'var(--danger)':'var(--success)')+';">'+fmt(rem)+'</div></div>'+
-          '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Payoff</div><div style="font-size:13px;font-weight:600;margin-top:4px;">'+payoffStr+'</div></div>'+
-        '</div>'+
-        '<div style="height:6px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:12px;"><div style="width:'+pct.toFixed(1)+'%;height:100%;background:var(--yellow);border-radius:4px;"></div></div>'+
-        payForm+
-        (pmtRows?'<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Payment History</div>'+
-          '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Type</th><th></th></tr></thead><tbody>'+pmtRows+'</tbody></table></div>':
-          '<div style="color:var(--muted);font-size:13px;text-align:center;padding:12px;">No payments recorded yet.</div>')+
-      '</div>'+
-    '</div>';
-  }).join('');
-}
-
-function buildLoanPanel(tid, d) {
-  var loans = d.loanList.filter(function(l){return l.tenantId===tid;});
-  if (!loans.length) return '<div style="text-align:center;padding:30px;color:var(--muted);">No loans on file.<br><br>'+
-    '<button class="btn btn-primary btn-sm" onclick="openNewLoanForTenant('+JSON.stringify(tid)+')">+ New Loan</button></div>';
-
-  return 
-  loans.map(function(l){
-    var paid = d.loanPayments.filter(function(p){return p.loanId===l.id&&p.status!=='reversed';}).reduce(function(s,p){return s+p.amount;},0);
-    var rem = Math.max(0,l.principal-paid);
-    var pct = l.principal>0?Math.min(100,(paid/l.principal)*100):0;
-    var isPending = l.status==='pending-ed';
-    var typeLabel = {renovation:'Renovation Loan','rent-to-own':'Rent-to-Own Loan',utilities:'Utilities Loan',other:'Loan'}[l.type]||'Loan';
-
-    var payForm = isPending ? '' :
-      '<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:12px;">'+
-        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Record Payment</div>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:flex-end;">'+
-          '<div class="f" style="margin:0;"><label>Date</label><input class="loan-pay-date" data-loan="'+l.id+'" type="date" value="'+today()+'"/></div>'+
-          '<div class="f" style="margin:0;"><label>Amount</label><input class="loan-pay-amt" data-loan="'+l.id+'" type="number" step="0.01" placeholder="'+l.payment.toFixed(2)+'" value="'+l.payment.toFixed(2)+'"/></div>'+
-          '<button class="btn btn-primary" style="height:40px;" onclick="saveLoanQuickPayment('+JSON.stringify(l.id)+','+JSON.stringify(tid)+','+JSON.stringify(l.type)+')">Record</button>'+
-        '</div>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">'+
-          '<div class="f" style="margin:0;"><label>Method</label>'+
-            '<select class="loan-pay-method" data-loan="'+l.id+'"><option value="cash">Cash</option><option value="etransfer">E-Transfer</option><option value="debit">Debit</option><option value="cheque">Cheque</option><option value="auto">Auto</option></select>'+
-          '</div>'+
-          '<div class="f" style="margin:0;"><label>Notes</label><input class="loan-pay-notes" data-loan="'+l.id+'" placeholder="Optional..."/></div>'+
-        '</div>'+
-      '</div>';
-
-    var pmtHistory = d.loanPayments.filter(function(p){return p.loanId===l.id;})
-      .sort(function(a,b){return b.date.localeCompare(a.date);});
-    var pmtRows = pmtHistory.map(function(p){
-      var isRev = p.status==='reversed';
-      return '<tr style="'+(isRev?'opacity:.45;text-decoration:line-through;':'')+'">'+
-        '<td>'+p.date+'</td>'+
-        '<td><span class="'+(isRev?'':'amt-credit')+'">'+fmt(p.amount)+'</span></td>'+
-        '<td>'+methodLabel(p.method)+'</td>'+
-        '<td style="font-size:11px;color:var(--muted);">'+(p.notes||'\u2014')+'</td>'+
-        '<td>'+(isRev?'<span class="pill pill-gray" style="font-size:10px;">Reversed</span>':
-          '<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger);" onclick="reverseLoanPmt('+JSON.stringify(p.id)+','+JSON.stringify(tid)+')">\u21BA Reverse</button>')+
-        '</td>'+
-      '</tr>';
-    }).join('');
-
-    return '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">' +
-      '<div style="background:var(--dark2);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">'+
-        '<div><div style="font-size:14px;font-weight:700;color:#fff;">'+typeLabel+'</div>'+
-        '<div style="font-size:11px;color:#888;">'+(l.rateType==='none'?'Interest-Free':l.rate+'% '+l.rateType)+' \u00B7 '+l.term+' months</div></div>'+
-        statusPill(l.status)+
-      '</div>'+
-      '<div style="padding:14px;">'+
-        (isPending?'<div class="ibox yellow" style="margin-bottom:12px;">\u26A0 Pending ED approval before payments can be recorded.</div>':'')+
-        '<div class="tic-4col" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;">'+
-          '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Principal</div><div style="font-size:16px;font-weight:700;">'+fmt(l.principal)+'</div></div>'+
-          '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Paid</div><div style="font-size:16px;font-weight:700;color:var(--success);">'+fmt(paid)+'</div></div>'+
-          '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Remaining</div><div style="font-size:16px;font-weight:700;color:'+(rem>0?'var(--danger)':'var(--success)')+';">'+fmt(rem)+'</div></div>'+
-          '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Monthly</div><div style="font-size:14px;font-weight:700;margin-top:2px;">'+fmt(l.payment)+'</div></div>'+
-        '</div>'+
-        '<div style="height:6px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:12px;"><div style="width:'+pct.toFixed(1)+'%;height:100%;background:var(--yellow);border-radius:4px;"></div></div>'+
-        payForm+
-        (pmtRows?'<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Payment History</div>'+
-          '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Notes</th><th></th></tr></thead><tbody>'+pmtRows+'</tbody></table></div>':
-          '<div style="color:var(--muted);font-size:13px;text-align:center;padding:12px;">No payments recorded yet.</div>')+
-      '</div>'+
-    '</div>';
-  }).join('');
-}
-
 function updateModalTenantContext(tenantSelId, contextDivId) {
   var tid = (document.getElementById(tenantSelId)||{}).value;
   var el = document.getElementById(contextDivId);
@@ -5364,8 +5000,6 @@ var CURRENT_USER = (HOUSING_SESSION && HOUSING_SESSION.name) || 'Unknown User';
 
 // Sidebar has been removed in the home-tiles refactor. These are kept as
 // no-ops because several legacy onclick handlers still call closeSidebarOnNav().
-// Safe to delete once no inline handlers reference them.
-function toggleSidebar(){}
 function closeSidebarOnNav(){}
 
 
@@ -6802,20 +6436,6 @@ function approveLoan(loanId) {
     (firstPaymentOverdue ? '\n\nNote: First payment date has passed \u2014 please follow up with tenant.' : ''));
 }
 
-function approveArr(arrId) {
-  if (!confirm('Approve this arrangement? This will allow payments to be recorded.')) return;
-  var d = getData();
-  var a = d.arrangements.find(function(x){return x.id===arrId;});
-  if (!a) return;
-  a.status = 'approved';
-  d.auditLog.push({id:uid(),ts:new Date().toISOString(),user:CURRENT_USER,action:'update',
-    entity:'arrangement',entityId:arrId,description:'Arrangement approved by ED: '+fmt(a.totalOwing),
-    before:{status:'pending-ed'},after:{status:'approved'}});
-  saveData(d);
-  renderArrangements();
-  renderDashboard();
-}
-
 // \u2500\u2500 REVERSALS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function openReversal(entryId, ledger) {
   var d = getData();
@@ -7400,16 +7020,6 @@ function exportAnnualCSV() {
   var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   var blob=new Blob([csv],{type:'text/csv'}); var a=document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download=(window.NATION_CONFIG && window.NATION_CONFIG.short_name || "")+'-Annual-FY'+year+'.csv'; a.click();
-}
-
-function renderStatement() {
-  var tid   = (document.getElementById('stmtTenantSelect')||{}).value;
-  var month = (document.getElementById('stmtMonth')||{}).value;
-  var year  = (document.getElementById('stmtYear')||{}).value;
-  var el    = document.getElementById('statementContent');
-  if (!el||!tid) return;
-  // Redirect to statement page
-  goToTenant(tid);
 }
 
 
@@ -8283,66 +7893,6 @@ function reverseLoanPmt(pmtId, tid) {
 }
 
 
-function buildArrTabHtml(tid, d, activeArrs) {
-  var btn = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-size:13px;font-weight:600;">Payment Arrangements</div></div>';
-  if (!activeArrs.length) return btn + '<div style="text-align:center;padding:30px 0;"><p style="color:var(--muted);font-size:13px;margin-bottom:12px;">No arrangements on file.</p><button class="btn btn-primary btn-sm" onclick="openNewArrForTenant('+JSON.stringify(tid)+')">+ New Arrangement</button></div>';
-  return btn + activeArrs.map(function(a){
-    var paid = d.arrPayments.filter(function(p){return p.arrId===a.id;}).reduce(function(s,p){return s+p.amount;},0);
-    var rem = Math.max(0,a.totalOwing-paid);
-    var pct = a.totalOwing>0?Math.min(100,(paid/a.totalOwing)*100):0;
-    var monthsLeft = a.monthlyPayment>0?Math.ceil(rem/a.monthlyPayment):0;
-    var payoff = new Date(); payoff.setMonth(payoff.getMonth()+monthsLeft);
-    var payoffStr = rem<=0?'Paid Off':payoff.toLocaleDateString('en-CA',{year:'numeric',month:'short'});
-    var actionBtn = a.status==='pending-ed'
-      ? '<span class="pill pill-yellow">\u23F1 Pending ED</span>'
-      : '<button class="btn btn-primary btn-sm" onclick="openArrPaymentForTenant(' + JSON.stringify(a.id) + ')">+ Payment</button>';
-    var pending = a.status==='pending-ed' ? '<div style="background:#fffbea;border-left:3px solid #eab308;padding:10px 14px;font-size:12px;color:#7a6000;">\u26A0 Awaiting ED approval.</div>' : '';
-    return '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;">' +
-      '<div style="background:var(--yellow-light);padding:12px 14px;border-bottom:1px solid var(--yellow-mid);display:flex;justify-content:space-between;align-items:flex-start;">' +
-        '<div><div style="font-size:13px;font-weight:700;color:#7a6000;">' + a.ref + '</div>' +
-        '<div style="font-size:11px;color:#7a6000;">' + a.ledger + ' ledger</div></div>' +
-        actionBtn + '</div>' + pending +
-      '<div style="padding:12px 14px;">' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">' +
-          '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Monthly</div><div style="font-size:16px;">' + fmt(a.monthlyPayment) + '</div></div>' +
-          '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Remaining</div><div style="font-size:16px;color:' + (rem>0?'var(--danger)':'var(--success)') + ';">' + fmt(rem) + '</div></div>' +
-          '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Payoff</div><div style="font-size:13px;font-weight:600;margin-top:2px;">' + payoffStr + '</div></div>' +
-        '</div>' +
-        '<div style="height:6px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:8px;"><div style="width:' + pct.toFixed(1) + '%;height:100%;background:var(--yellow);border-radius:4px;"></div></div>' +
-        '<div style="font-size:11px;color:var(--muted);">' + pct.toFixed(0) + '% repaid</div>' +
-      '</div></div>';
-  }).join('');
-}
-
-function buildLoanTabHtml(tid, d, activeLoans) {
-  var btn = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-size:13px;font-weight:600;">Loans</div></div>';
-  if (!activeLoans.length) return btn + '<div style="text-align:center;padding:30px 0;"><p style="color:var(--muted);font-size:13px;margin-bottom:12px;">No loans on file.</p><button class="btn btn-primary btn-sm" onclick="openNewLoanForTenant(' + JSON.stringify(tid) + ')">+ New Loan</button></div>';
-  return btn + activeLoans.map(function(l){
-    var paid = d.loanPayments.filter(function(p){return p.loanId===l.id;}).reduce(function(s,p){return s+p.amount;},0);
-    var rem = Math.max(0,l.principal-paid);
-    var pct = l.principal>0?Math.min(100,(paid/l.principal)*100):0;
-    var typeLabel2 = {renovation:'Renovation Loan','rent-to-own':'Rent-to-Own Loan',utilities:'Utilities Loan',other:'Loan'}[l.type]||'Loan';
-    var actionBtn = l.status==='pending-ed'
-      ? '<span class="pill pill-yellow">\u23F1 Pending ED</span>'
-      : '<button class="btn btn-primary btn-sm" onclick="openLoanPaymentForTenant(' + JSON.stringify(l.id) + ')">+ Payment</button>';
-    var pending = l.status==='pending-ed' ? '<div style="background:#fffbea;border-left:3px solid #eab308;padding:10px 14px;font-size:12px;color:#7a6000;">\u26A0 Awaiting ED approval.</div>' : '';
-    return '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;">' +
-      '<div style="background:var(--dark2);padding:12px 14px;border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:flex-start;">' +
-        '<div><div style="font-size:13px;font-weight:700;color:#fff;">' + typeLabel2 + '</div>' +
-        '<div style="font-size:11px;color:#888;">' + (l.rateType==='none'?'Interest-Free':l.rate+'% '+l.rateType) + ' \u00B7 ' + l.term + ' months</div></div>' +
-        actionBtn + '</div>' + pending +
-      '<div style="padding:12px 14px;">' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">' +
-          '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Principal</div><div style="font-size:16px;">' + fmt(l.principal) + '</div></div>' +
-          '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Remaining</div><div style="font-size:16px;color:' + (rem>0?'var(--danger)':'var(--success)') + ';">' + fmt(rem) + '</div></div>' +
-          '<div style="text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Payment</div><div style="font-size:13px;font-weight:600;margin-top:2px;">' + fmt(l.payment) + '/mo</div></div>' +
-        '</div>' +
-        '<div style="height:6px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:8px;"><div style="width:' + pct.toFixed(1) + '%;height:100%;background:var(--yellow);border-radius:4px;"></div></div>' +
-        '<div style="font-size:11px;color:var(--muted);">' + pct.toFixed(0) + '% repaid</div>' +
-      '</div></div>';
-  }).join('');
-}
-
 function initTxnFilters() {
   var d = getData();
   var opts = d.tenants.map(function(t){return '<option value="'+t.id+'">'+tenantName(t)+' - '+t.unit+'</option>';}).join('');
@@ -8941,12 +8491,6 @@ function previewArrangementAgreement(arr) {
   }
 }
 
-function previewArrangementById(arrId) {
-  var d   = getData();
-  var arr = (d.arrangements||[]).find(function(a){ return a.id === arrId; });
-  previewArrangementAgreement(arr || null);
-}
-
 
 function printAgreement(contentId) {
   var content = document.getElementById(contentId);
@@ -9254,13 +8798,6 @@ function sigBlock(name, role) {
 }
 
 
-function showTab(ev,id){
-  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('on');});
-  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
-  var tp=document.getElementById(id);if(tp)tp.classList.add('on');
-  ev.target.classList.add('active');
-}
-
 // MODAL
 function openModal(id,extra){
   if(extra)currentUtilityType=extra;
@@ -9424,12 +8961,6 @@ function syncTenantPickerLabel(key){
 // so the user doesn't have to type to see options.
 function tenantPickerFocus(key){
   tenantPickerSearch(key, '');
-}
-
-// Clear the search and pick nothing (or 'all' if supported)
-function tenantPickerClear(key){
-  var cfg = _TENANT_PICKERS[key]; if(!cfg) return;
-  tenantPickerSelect(key, cfg.allowAll ? 'all' : '');
 }
 
 
@@ -10037,18 +9568,6 @@ function openPaymentForTenant(id){
     var s=document.getElementById('rp-tenant');
     if(s){ s.value=id; loadUnifiedPaymentContext(); }
   },80);
-}
-
-// TENANTS - table view removed, CRM search used instead
-function renderTenants(){ return; /* no-op - CRM search replaces table */ var _unused=getData();var d=getData();document.getElementById('tenantTableBody') && document.getElementById('tenantTableBody').innerHTML; if(false) d.tenants.map(function(t){
-    var inCol=isInCollections(t.id);
-    return '<tr><td><div class="tbl-name">'+tenantName(t)+(inCol?' <span class="collections-badge" style="font-size:10px;">&#128680;</span>':'')+'</div><div class="tbl-sub">'+t.unit+'</div></td>'+
-      '<td>'+t.unit+'</td><td>'+typePill(t.type)+'</td><td>'+fmt(t.rent)+'/mo</td>'+
-      '<td>'+(t.autoPay?'<span class="pill pill-green">Auto-Pay On</span>':'<span class="pill pill-gray">Manual</span>')+'</td>'+
-      '<td>'+(t.invPref==='email'?'&#128231; Email':'&#128424; Print')+'</td>'+
-      '<td><span class="pill pill-green">Active</span></td>'+
-      '<td><button class="btn btn-ghost btn-sm" onclick="goToTenant(\''+t.id+'\')">Finance</button></td></tr>';
-  }).join('')||'<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted);">No tenants yet</td></tr>';
 }
 
 // RENT LEDGER

@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════
    shared.js — CLFN Housing Suite shared factories
    ───────────────────────────────────────────────────────────────────────
-   Loaded by: finance.html, housing.html, renos.html
-   Exposes:  window.SigWidget, window.DocLibrary
+   Loaded by: finance.html, housing.html, renos.html, index.html
+   Exposes:  window.CLFN_PERMS, window.SigWidget, window.DocLibrary,
+             window.SbStorage (and bare sb* aliases)
 
    IMPORTANT: Pure browser script. No ES modules, no imports, no build
    step — matches the suite's "vanilla JS with direct fetch calls"
@@ -11,9 +12,186 @@
 
    CSS classes live in shared.css under the .sigw-* and .doclib-*
    namespaces; see the shared.css file for the full list.
-
-   See PLAN.md for the Phase C refactor context.
    ═══════════════════════════════════════════════════════════════════════ */
+
+// ═══════════════════════════════════════════════════════════════════════
+// CLFN_PERMS — Authoritative role definitions and capability checks
+// Single source of truth for all four app pages.
+// Previously duplicated in housing.html, renos.html, finance.html,
+// index.html — now lives here only.
+// ═══════════════════════════════════════════════════════════════════════
+(function initPerms(){
+
+  // ── Authoritative role keys ───────────────────────────────────────────
+  // Canonical values stored in staff.role. The DB was normalized to these
+  // via the Phase A0 migration.
+  var ROLES = Object.freeze({
+    ED:         'ed',
+    HM:         'housing_manager',
+    HE_L2:      'housing_employee_l2',
+    HE_L1:      'housing_employee_l1',
+    CFO:        'cfo',
+    FINANCE_L1: 'finance_l1'
+  });
+
+  // ── Legacy-name aliases ───────────────────────────────────────────────
+  // Normalized at read-time so any pre-existing session tokens or cached
+  // strings keep working.
+  var LEGACY_ALIASES = Object.freeze({
+    'employee':  ROLES.HE_L1,
+    'staff':     ROLES.HE_L1,
+    'hm':        ROLES.HM,
+    'manager':   ROLES.HM,
+    'finance':   ROLES.FINANCE_L1
+  });
+
+  // ── Human-readable labels (role switcher, badges, audit log) ──────────
+  var ROLE_LABELS = Object.freeze({
+    'ed':                   'Executive Director',
+    'housing_manager':      'Housing Manager',
+    'housing_employee_l2':  'Housing Employee L2',
+    'housing_employee_l1':  'Housing Employee L1',
+    'cfo':                  'CFO',
+    'finance_l1':           'Finance Clerk L1'
+  });
+
+  var VALID_KEYS = Object.freeze(Object.keys(ROLE_LABELS));
+
+  // ── Core helpers ──────────────────────────────────────────────────────
+
+  function normalizeRole(role){
+    if(role == null) return null;
+    var r = String(role).toLowerCase().trim();
+    if(r in LEGACY_ALIASES) return LEGACY_ALIASES[r];
+    return r;
+  }
+
+  function isValidRole(role){
+    var r = normalizeRole(role);
+    return VALID_KEYS.indexOf(r) !== -1;
+  }
+
+  function assertRole(role, caller){
+    var r = normalizeRole(role);
+    if(r == null) throw new Error('[permissions] '+(caller||'check')+': role is required');
+    if(VALID_KEYS.indexOf(r) === -1){
+      throw new Error('[permissions] '+(caller||'check')+': unknown role "'+role+'" (normalized to "'+r+'"). Valid: '+VALID_KEYS.join(', '));
+    }
+    return r;
+  }
+
+  function roleLabel(role){
+    var r = normalizeRole(role);
+    return ROLE_LABELS[r] || String(role||'');
+  }
+
+  // ── Effective vs. real role ───────────────────────────────────────────
+  // effectiveRole: the role the app is currently acting as (honors view-as).
+  // realRole:      the actual authenticated user's role — used for override
+  //                authority (only the real ED can unlock a completed SOW,
+  //                regardless of which role they're previewing as).
+  function effectiveRole(){
+    return normalizeRole(window._viewAsRole || window.currentRole || null);
+  }
+  function realRole(){
+    return normalizeRole(window._realRole || window.currentRole || null);
+  }
+
+  // ── Module-level access gates ─────────────────────────────────────────
+  function hasHousingAccess(role){
+    var r = assertRole(role, 'hasHousingAccess');
+    return r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2 || r === ROLES.HE_L1;
+  }
+
+  function hasFinanceAccess(role){
+    var r = assertRole(role, 'hasFinanceAccess');
+    return r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2
+        || r === ROLES.CFO || r === ROLES.FINANCE_L1;
+  }
+
+  // ── Housing-app capabilities ──────────────────────────────────────────
+
+  function canCreateApp(role){
+    var r = assertRole(role, 'canCreateApp');
+    return hasHousingAccess(r);
+  }
+
+  function canEditApp(role, opts){
+    var r = assertRole(role, 'canEditApp');
+    if(r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2) return true;
+    if(r === ROLES.HE_L1){
+      if(!opts) return false;
+      var isOwner = (opts.ownerRole === r) || (opts.ownerName && opts.ownerName === opts.currentUserName);
+      var isDraft = !opts.status || opts.status === 'draft';
+      return !!(isOwner && isDraft);
+    }
+    return false;
+  }
+
+  function canEditSow(role, sowStatus){
+    var r = assertRole(role, 'canEditSow');
+    if(!hasHousingAccess(r)) return false;
+    if(sowStatus === 'completed') return realRole() === ROLES.ED;
+    if(r === ROLES.HE_L1) return false;
+    return true;
+  }
+
+  function canEditProgressForUnit(role, unitHasCompletedSow){
+    var r = assertRole(role, 'canEditProgressForUnit');
+    if(!hasHousingAccess(r)) return false;
+    if(r === ROLES.HE_L1) return false;
+    if(unitHasCompletedSow) return realRole() === ROLES.ED;
+    return true;
+  }
+
+  // ── Approval authority ────────────────────────────────────────────────
+  function canApproveSowHm(role){
+    var r = assertRole(role, 'canApproveSowHm');
+    return r === ROLES.HM || r === ROLES.ED;
+  }
+  function canApproveSowEd(role){
+    var r = assertRole(role, 'canApproveSowEd');
+    return r === ROLES.ED;
+  }
+  function canMarkSowComplete(role){
+    var r = assertRole(role, 'canMarkSowComplete');
+    return r === ROLES.ED || r === ROLES.HM;
+  }
+  function canReopenSow(role){
+    var r = assertRole(role, 'canReopenSow');
+    return r === ROLES.ED;
+  }
+
+  // ── Role switcher (ED's "view as") ────────────────────────────────────
+  function getViewAsOptions(role){
+    var r = assertRole(role, 'getViewAsOptions');
+    if(r !== ROLES.ED) return [];
+    return VALID_KEYS.filter(function(k){ return k !== ROLES.ED; });
+  }
+
+  // Expose immutable API.
+  window.CLFN_PERMS = Object.freeze({
+    ROLES:                  ROLES,
+    ROLE_LABELS:            ROLE_LABELS,
+    normalizeRole:          normalizeRole,
+    isValidRole:            isValidRole,
+    assertRole:             assertRole,
+    roleLabel:              roleLabel,
+    effectiveRole:          effectiveRole,
+    realRole:               realRole,
+    hasHousingAccess:       hasHousingAccess,
+    hasFinanceAccess:       hasFinanceAccess,
+    canCreateApp:           canCreateApp,
+    canEditApp:             canEditApp,
+    canEditSow:             canEditSow,
+    canEditProgressForUnit: canEditProgressForUnit,
+    canApproveSowHm:        canApproveSowHm,
+    canApproveSowEd:        canApproveSowEd,
+    canMarkSowComplete:     canMarkSowComplete,
+    canReopenSow:           canReopenSow,
+    getViewAsOptions:       getViewAsOptions
+  });
+})();
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 // SHARED SIGNATURE WIDGET FACTORY (Phase F3B — shared JS, v1)
@@ -432,17 +610,40 @@ window.SigWidget = (function(){
 
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-// SHARED DOCUMENT LIBRARY FACTORY (Phase F3B \u2014 shared JS, v1)
+// SHARED DOCUMENT LIBRARY FACTORY (Phase F3B — shared JS, v2)
 //
 // Single entry point: window.DocLibrary.create(mountEl, opts)
 // Produces an upload + list + delete UI for per-entity document storage.
 // Storage backend: Supabase Storage bucket (path-scoped per entity).
-// Metadata backend: audit-log row with details JSON (category lives here
+// Metadata backend: audit-log row with `detail` JSON (category lives here
 // in v1; will move to its own column in Phase F3C).
 //
 // Designed zero-dependency: no jQuery, no getData(), no toast(), no
 // window.NATION_CONFIG reads inside the factory. Everything is passed via
 // opts so the factory can be lifted verbatim into /shared.js in Phase C.
+//
+// Opts (all in window.DocLibrary.create(mountEl, opts)):
+//   REQUIRED:
+//     entityType, entityId, pathPrefix, supabaseUrl, supabaseAnon,
+//     storageBucket
+//   OPTIONAL:
+//     auditTable       default 'housing_audit_log'
+//     categories       array of {key,label,icon?}; default [{Other}]
+//     getActor         function returning the actor string for audit rows
+//     getAuthToken     function returning a bearer token override
+//     readOnly         hides upload + delete controls
+//     maxSizeMB        per-file upload cap, default 25
+//     onChange         (action, file) => void — hook for external refresh
+//     customLoader     async () => files[] — replaces default audit-log
+//                      fetch. Files must have {path,name,size?,type?,
+//                      category?,addedAt?,addedBy?}; extra fields are
+//                      preserved on the file object and reach customDelete.
+//                      Use when files come from a non-audit-log source
+//                      (e.g. app_documents table + storage listing).
+//     customDelete     async (file) => void — replaces default storage +
+//                      tombstone delete flow. Receives the full file
+//                      object from customLoader; should return a Promise
+//                      that resolves after the delete is committed.
 //
 // Uses existing shared styles: std-table-card, std-table, tic-hist-chip,
 // plus a few doclib-* classes added to shared.css for upload area.
@@ -522,6 +723,11 @@ window.DocLibrary = (function(){
   function _saveMeta(opts, path, name, size, type, category) {
     var url = opts.supabaseUrl + '/rest/v1/' + opts.auditTable;
     var actor = (typeof opts.getActor === 'function' && opts.getActor()) || 'staff';
+    // Column name is `detail` (singular) in both housing_audit_log and
+    // finance_audit_log. Type differs: housing is text, finance is jsonb.
+    // opts.detailAsJson:true sends the object directly (jsonb-friendly);
+    // default stringifies (text-friendly). See PLAN.md schema notes.
+    var detailPayload = { path:path, name:name, size:size, type:type, category:category||'other' };
     return fetch(url, {
       method: 'POST',
       headers: _restHeaders(opts),
@@ -529,7 +735,7 @@ window.DocLibrary = (function(){
         entity_type: opts.entityType,
         entity_id:   String(opts.entityId),
         action:      'file_uploaded',
-        details:     JSON.stringify({ path:path, name:name, size:size, type:type, category:category||'other' }),
+        detail:      opts.detailAsJson ? detailPayload : JSON.stringify(detailPayload),
         actor:       actor,
         created_at:  new Date().toISOString()
       })
@@ -540,6 +746,9 @@ window.DocLibrary = (function(){
     // We list by entity + action=file_uploaded AND exclude any rows that
     // have been marked 'file_deleted' for the same path. A small query
     // gets us both in one round-trip.
+    // Column is `detail` (singular). housing_audit_log stores it as text
+    // (stringified JSON); finance_audit_log stores it as jsonb (object).
+    // _parseDetail handles both cases tolerantly.
     var base = opts.supabaseUrl + '/rest/v1/' + opts.auditTable +
       '?entity_type=eq.' + encodeURIComponent(opts.entityType) +
       '&entity_id=eq.' + encodeURIComponent(String(opts.entityId)) +
@@ -554,36 +763,47 @@ window.DocLibrary = (function(){
         var deletedPaths = {};
         rows.forEach(function(r){
           if (r.action === 'file_deleted') {
-            try { var d = JSON.parse(r.details||'{}'); if (d.path) deletedPaths[d.path] = true; } catch(e){}
+            var d = _parseDetail(r.detail);
+            if (d.path) deletedPaths[d.path] = true;
           }
         });
         var files = [];
         var seenPath = {};
         rows.forEach(function(r){
           if (r.action !== 'file_uploaded') return;
-          try {
-            var d = JSON.parse(r.details || '{}');
-            if (!d.path || deletedPaths[d.path]) return;
-            if (seenPath[d.path]) return;
-            seenPath[d.path] = true;
-            files.push({
-              path: d.path,
-              name: d.name || d.path.split('/').pop(),
-              size: d.size || 0,
-              type: d.type || '',
-              category: d.category || 'other',
-              addedAt: (r.created_at || '').slice(0,10),
-              addedBy: r.actor || ''
-            });
-          } catch(e) {}
+          var d = _parseDetail(r.detail);
+          if (!d.path || deletedPaths[d.path]) return;
+          if (seenPath[d.path]) return;
+          seenPath[d.path] = true;
+          files.push({
+            path: d.path,
+            name: d.name || d.path.split('/').pop(),
+            size: d.size || 0,
+            type: d.type || '',
+            category: d.category || 'other',
+            addedAt: (r.created_at || '').slice(0,10),
+            addedBy: r.actor || ''
+          });
         });
         return files;
       });
   }
 
+  // Tolerant: handles text columns (stringified JSON) and jsonb columns
+  // (already-parsed objects). Returns {} on anything unparseable.
+  function _parseDetail(v) {
+    if (v == null) return {};
+    if (typeof v === 'object') return v;
+    if (typeof v === 'string') {
+      try { return JSON.parse(v); } catch(e) { return {}; }
+    }
+    return {};
+  }
+
   function _markDeleted(opts, path, name) {
     var url = opts.supabaseUrl + '/rest/v1/' + opts.auditTable;
     var actor = (typeof opts.getActor === 'function' && opts.getActor()) || 'staff';
+    var detailPayload = { path:path, name:name };
     return fetch(url, {
       method:'POST',
       headers: _restHeaders(opts),
@@ -591,7 +811,7 @@ window.DocLibrary = (function(){
         entity_type: opts.entityType,
         entity_id:   String(opts.entityId),
         action:      'file_deleted',
-        details:     JSON.stringify({ path:path, name:name }),
+        detail:      opts.detailAsJson ? detailPayload : JSON.stringify(detailPayload),
         actor:       actor,
         created_at:  new Date().toISOString()
       })
@@ -773,10 +993,21 @@ window.DocLibrary = (function(){
           var n = btn.getAttribute('data-dl-del-name');
           if (!confirm('Delete "'+n+'"? This cannot be undone.')) return;
           btn.disabled = true;
-          _deleteObject(opts, p).then(function(){ return _markDeleted(opts, p, n); })
+          // customDelete opt overrides the default storage+tombstone flow.
+          // Receives the full file object (including any extra fields
+          // passed through from customLoader, like docId). Should return
+          // a Promise that resolves when the delete has been committed.
+          var file = state.files.find(function(f){ return f.path === p; }) || { path:p, name:n };
+          var deleteFlow;
+          if (typeof opts.customDelete === 'function') {
+            deleteFlow = Promise.resolve(opts.customDelete(file));
+          } else {
+            deleteFlow = _deleteObject(opts, p).then(function(){ return _markDeleted(opts, p, n); });
+          }
+          deleteFlow
             .then(function(){
               state.files = state.files.filter(function(f){ return f.path !== p; });
-              if (typeof opts.onChange === 'function') opts.onChange('delete', { path:p, name:n });
+              if (typeof opts.onChange === 'function') opts.onChange('delete', file);
               render();
             })
             .catch(function(){ _setError('Delete failed.'); btn.disabled = false; });
@@ -825,8 +1056,16 @@ window.DocLibrary = (function(){
 
     function refresh() {
       state.loading = true; render();
-      return _loadMeta(opts).then(function(files){
-        state.files = files;
+      // customLoader opt overrides the default audit-log load. Expected
+      // return: Promise resolving to an array of {path, name, size, type,
+      // category?, addedAt?, addedBy?} objects. Any extra fields (like
+      // scorecard's docId) are preserved on the file object and reach
+      // customDelete if set.
+      var loader = (typeof opts.customLoader === 'function')
+        ? opts.customLoader()
+        : _loadMeta(opts);
+      return Promise.resolve(loader).then(function(files){
+        state.files = Array.isArray(files) ? files : [];
         state.loading = false;
         render();
       }).catch(function(){
@@ -952,7 +1191,7 @@ window.DocLibrary = (function(){
     return Array.isArray(data) ? data : [];
   }
 
-  // Save file metadata to housing_audit_log
+  // Save file metadata to housing_audit_log (text detail column)
   async function sbSaveFileMeta(entityType, entityId, filePath, fileName, fileSize, fileType) {
     try {
       await fetch(window.SUPABASE_URL + '/rest/v1/housing_audit_log', {
@@ -962,7 +1201,7 @@ window.DocLibrary = (function(){
           entity_type: entityType,
           entity_id: String(entityId),
           action: 'file_uploaded',
-          details: JSON.stringify({ path: filePath, name: fileName, size: fileSize, type: fileType }),
+          detail: JSON.stringify({ path: filePath, name: fileName, size: fileSize, type: fileType }),
           actor: window.currentRole || 'staff',
           created_at: new Date().toISOString()
         })
@@ -970,21 +1209,32 @@ window.DocLibrary = (function(){
     } catch(e) { console.warn('File meta save failed:', e); }
   }
 
-  // Load file list for an entity from audit log (filters out deleted)
+  // Load file list for an entity from audit log (filters out deleted).
+  // Column is `detail` (singular, text). Uses a tolerant parser in case
+  // of jsonb drift later.
+  function _sbParseDetail(v) {
+    if (v == null) return {};
+    if (typeof v === 'object') return v;
+    if (typeof v === 'string') {
+      try { return JSON.parse(v); } catch(e) { return {}; }
+    }
+    return {};
+  }
   async function sbLoadFileMeta(entityType, entityId) {
     try {
       var r = await fetch(
-        window.SUPABASE_URL + '/rest/v1/housing_audit_log?entity_type=eq.'+entityType+'&entity_id=eq.'+encodeURIComponent(String(entityId))+'&action=eq.file_uploaded&order=created_at.desc',
+        window.SUPABASE_URL + '/rest/v1/housing_audit_log?entity_type=eq.'+entityType+'&entity_id=eq.'+encodeURIComponent(String(entityId))+'&action=in.(file_uploaded,file_deleted)&order=created_at.desc',
         { headers: window.HOUSING_HEADERS }
       );
       if (!r.ok) return [];
       var rows = await r.json();
-      var deleted = rows.filter(function(r){ return r.action === 'file_deleted'; }).map(function(r){ return JSON.parse(r.details||'{}').path; });
+      var deleted = rows.filter(function(row){ return row.action === 'file_deleted'; }).map(function(row){ return _sbParseDetail(row.detail).path; });
       return rows
-        .filter(function(row){ var d = JSON.parse(row.details||'{}'); return !deleted.includes(d.path); })
+        .filter(function(row){ return row.action === 'file_uploaded'; })
+        .filter(function(row){ var d = _sbParseDetail(row.detail); return d.path && !deleted.includes(d.path); })
         .map(function(row){
-          var d = JSON.parse(row.details||'{}');
-          return { path: d.path, name: d.name, size: d.size, type: d.type, addedAt: (row.created_at||'').slice(0,10), addedBy: row.actor, logId: row.id };
+          var d = _sbParseDetail(row.detail);
+          return { path: d.path, name: d.name, size: d.size, type: d.type, category: d.category, addedAt: (row.created_at||'').slice(0,10), addedBy: row.actor, logId: row.id };
         });
     } catch(e) { return []; }
   }
@@ -1015,161 +1265,6 @@ window.DocLibrary = (function(){
   // Expose legacy top-level aliases — 15+ call sites across housing.html
   // and renos.html use these bare names. Keep them until every caller
   // migrates to window.SbStorage.
-  window.sbStorageHeaders = sbStorageHeaders;
-  window.sbGetFileUrl     = sbGetFileUrl;
-  window.sbUploadFile     = sbUploadFile;
-  window.sbGetSignedUrl   = sbGetSignedUrl;
-  window.sbDeleteFile     = sbDeleteFile;
-  window.sbListFiles      = sbListFiles;
-  window.sbSaveFileMeta   = sbSaveFileMeta;
-  window.sbLoadFileMeta   = sbLoadFileMeta;
-  window.sbUploadAndSave  = sbUploadAndSave;
-})();
-
-
-/* ═══════════════════════════════════════════════════════════════════════
-   Supabase Storage Helpers (Turn 3 — Phase C dedup)
-
-   Extracted from housing.html + renos.html (byte-identical duplicates).
-   Exposes window.SbStorage (namespaced) AND bare aliases on window
-   (sbUploadFile, sbGetSignedUrl, etc.) because 15+ existing call sites
-   across housing.html and renos.html use the bare names.
-
-   Dependencies read from window at call-time:
-     window.SUPABASE_URL
-     window.SUPABASE_ANON
-     window.STORAGE_BUCKET
-     window.HOUSING_HEADERS      (REST + auth for Supabase audit-log)
-     window.currentRole          (used as audit 'actor')
-     window._sb                  (Supabase JS client; optional for signed URLs)
-
-   These globals are set by housing.html/renos.html near the top of their
-   scripts. Finance uses different auth headers and does not consume these
-   bare aliases — it goes through window.DocLibrary which takes its own opts.
-   ═══════════════════════════════════════════════════════════════════════ */
-(function(){
-  'use strict';
-
-  function sbStorageHeaders() {
-    var h = { 'apikey': window.SUPABASE_ANON };
-    if (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization']) {
-      h['Authorization'] = window.HOUSING_HEADERS['Authorization'];
-    }
-    return h;
-  }
-
-  function sbGetFileUrl(path) {
-    var token = (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ','');
-    var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
-    var base = window.SUPABASE_URL + '/storage/v1/object/authenticated/' + window.STORAGE_BUCKET + '/' + encodedPath;
-    return token ? (base + '?token=' + encodeURIComponent(token)) : base;
-  }
-
-  async function sbUploadFile(path, file) {
-    var url = window.SUPABASE_URL + '/storage/v1/object/' + window.STORAGE_BUCKET + '/' + path;
-    var res = await fetch(url, {
-      method: 'POST',
-      headers: Object.assign({}, sbStorageHeaders(), { 'x-upsert': 'true' }),
-      body: file
-    });
-    if (!res.ok) {
-      var err = await res.text();
-      throw new Error('Upload failed: ' + err);
-    }
-    return { path: path, url: sbGetFileUrl(path) };
-  }
-
-  async function sbGetSignedUrl(path) {
-    try {
-      if (window._sb) {
-        var r = await window._sb.storage.from(window.STORAGE_BUCKET).createSignedUrl(path, 3600);
-        if (r.data && r.data.signedUrl) return r.data.signedUrl;
-      }
-    } catch(e) { console.warn('createSignedUrl error:', e); }
-    return sbGetFileUrl(path);
-  }
-
-  async function sbDeleteFile(path) {
-    var url = window.SUPABASE_URL + '/storage/v1/object/' + window.STORAGE_BUCKET;
-    var res = await fetch(url, {
-      method: 'DELETE',
-      headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ prefixes: [path] })
-    });
-    return res.ok;
-  }
-
-  async function sbListFiles(prefix) {
-    var cleanPrefix = prefix.replace(/\/$/, '');
-    var url = window.SUPABASE_URL + '/storage/v1/object/list/' + window.STORAGE_BUCKET;
-    var res = await fetch(url, {
-      method: 'POST',
-      headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ prefix: cleanPrefix, limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } })
-    });
-    if (!res.ok) return [];
-    var data = await res.json();
-    return Array.isArray(data) ? data : [];
-  }
-
-  async function sbSaveFileMeta(entityType, entityId, filePath, fileName, fileSize, fileType) {
-    try {
-      await fetch(window.SUPABASE_URL + '/rest/v1/housing_audit_log', {
-        method: 'POST',
-        headers: Object.assign({}, window.HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({
-          entity_type: entityType,
-          entity_id: String(entityId),
-          action: 'file_uploaded',
-          details: JSON.stringify({ path: filePath, name: fileName, size: fileSize, type: fileType }),
-          actor: window.currentRole || 'staff',
-          created_at: new Date().toISOString()
-        })
-      });
-    } catch(e) { console.warn('File meta save failed:', e); }
-  }
-
-  async function sbLoadFileMeta(entityType, entityId) {
-    try {
-      var r = await fetch(
-        window.SUPABASE_URL + '/rest/v1/housing_audit_log?entity_type=eq.'+entityType+'&entity_id=eq.'+encodeURIComponent(String(entityId))+'&action=eq.file_uploaded&order=created_at.desc',
-        { headers: window.HOUSING_HEADERS }
-      );
-      if (!r.ok) return [];
-      var rows = await r.json();
-      var deleted = rows.filter(function(row){ return row.action === 'file_deleted'; }).map(function(row){ return JSON.parse(row.details||'{}').path; });
-      return rows
-        .filter(function(row){ var d = JSON.parse(row.details||'{}'); return !deleted.includes(d.path); })
-        .map(function(row){
-          var d = JSON.parse(row.details||'{}');
-          return { path: d.path, name: d.name, size: d.size, type: d.type, addedAt: (row.created_at||'').slice(0,10), addedBy: row.actor, logId: row.id };
-        });
-    } catch(e) { return []; }
-  }
-
-  async function sbUploadAndSave(entityType, entityId, file, pathPrefix) {
-    var ts = Date.now();
-    var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    var path = pathPrefix + '/' + ts + '_' + safeName;
-    var result = await sbUploadFile(path, file);
-    await sbSaveFileMeta(entityType, String(entityId), path, file.name, file.size, file.type);
-    return { path: path, name: file.name, size: file.size, type: file.type,
-             addedAt: new Date().toISOString().slice(0,10), addedBy: window.currentRole || 'staff' };
-  }
-
-  // Namespaced API
-  window.SbStorage = {
-    storageHeaders: sbStorageHeaders,
-    getFileUrl:     sbGetFileUrl,
-    uploadFile:     sbUploadFile,
-    getSignedUrl:   sbGetSignedUrl,
-    deleteFile:     sbDeleteFile,
-    listFiles:      sbListFiles,
-    saveFileMeta:   sbSaveFileMeta,
-    loadFileMeta:   sbLoadFileMeta,
-    uploadAndSave:  sbUploadAndSave
-  };
-  // Bare aliases — required until every call site migrates to SbStorage.
   window.sbStorageHeaders = sbStorageHeaders;
   window.sbGetFileUrl     = sbGetFileUrl;
   window.sbUploadFile     = sbUploadFile;
