@@ -1220,18 +1220,6 @@ document.addEventListener('DOMContentLoaded', function() {
 // The app falls back to localStorage if Supabase is unavailable.
 // ══════════════════════════════════════════════════════════════
 
-var _sbReady = false;
-
-function sbClient() {
-  if(!window._sb) {
-    if(window.supabase && window.supabase.createClient) {
-      window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-      _sbReady = true;
-    }
-  }
-  return window._sb;
-}
-
 // ── Map staff table role to housing app role ────────────────────────────────
 function sbMapRole(staffRow) {
   // Mirror of housing.html sbMapRole — returns canonical normalized role.
@@ -1246,32 +1234,7 @@ function sbMapRole(staffRow) {
   return 'housing_employee_l1';
 }
 
-// ── AUTH: Look up staff by email ─────────────────────────────────────────────
-async function sbGetStaffByEmail(email) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?select=*&email=eq.'+encodeURIComponent(email)+'&is_active=eq.true&limit=1', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] || null;
-  } catch(e) { console.warn('[SB] staff lookup failed:', e); return null; }
-}
-
 // ── APPLICATIONS ─────────────────────────────────────────────────────────────
-async function sbLoadApplications() {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_applications?select=*&order=submitted_at.desc&limit=9999', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row) {
-      return Object.assign({}, row.data||{}, {
-        id:row.id, status:row.status, score:row.score, tier:row.tier,
-        classification:row.classification, reserve:row.reserve, archived:row.archived,
-        assignedUnit:row.assigned_unit_id, assignedAddress:row.assigned_address, submittedAt:row.submitted_at
-      });
-    });
-  } catch(e) { console.warn('[SB] load applications failed:', e); return null; }
-}
-
 async function sbSaveApplication(app) {
   var row = {
     id: app.id,
@@ -1346,22 +1309,6 @@ async function sbSaveAllApplications(apps) {
 }
 
 // ── HOUSING UNITS ─────────────────────────────────────────────────────────────
-async function sbLoadUnits() {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_units?select=*&order=street,num&limit=9999', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row) {
-      return Object.assign({}, row.data||{}, {
-        id:row.id, num:row.num, street:row.street, bedrooms:row.bedrooms, bathrooms:row.bathrooms,
-        type:row.type, foundation:row.foundation, funder:row.funder, status:row.status,
-        accessible:row.accessible, isElders:row.is_elders, archived:row.archived,
-        assignedTo:row.assigned_to, assignedName:row.assigned_name, assignedDate:row.assigned_date
-      });
-    });
-  } catch(e) { console.warn('[SB] load units failed:', e); return null; }
-}
-
 async function sbSaveUnit(u) {
   var row = {
     id:u.id, num:u.num||null, street:u.street||null, bedrooms:u.bedrooms||null,
@@ -1415,39 +1362,7 @@ async function sbSaveAllUnits(units) {
   return true;
 }
 
-// ── AUDIT LOG ─────────────────────────────────────────────────────────────────
-async function sbLogAudit(appId, action, detail, userRole) {
-  try {
-    await fetch(SUPABASE_URL+'/rest/v1/housing_audit_log', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
-      body:JSON.stringify({ entity_type:'application', entity_id:String(appId||''), action:action, details:JSON.stringify({detail:detail}), actor:userRole||window.currentRole||'staff', created_at:new Date().toISOString() })
-    });
-  } catch(e){ console.warn('[SB] log audit failed:',e); }
-}
-
-async function sbLoadAuditLog(limit) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_audit_log?select=*&order=created_at.desc&limit='+(limit||500), { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row){
-      var d = JSON.parse(row.details||'{}');
-      return { ts:row.created_at, appId:row.entity_id, action:row.action, detail:d.detail||row.details||'', user:row.actor };
-    });
-  } catch(e){ console.warn('[SB] load audit log failed:',e); return null; }
-}
-
 // ── SETTINGS ─────────────────────────────────────────────────────────────────
-async function sbLoadSetting(key) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=value&key=eq.'+encodeURIComponent(key)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].value : null;
-  } catch(e){ return null; }
-}
-
 async function sbSaveSetting(key, value) {
   try {
     var r = await fetch(SUPABASE_URL+'/rest/v1/housing_settings', {
@@ -1482,111 +1397,9 @@ async function sbSaveContractor(ct) {
   } catch(e) { console.warn('[SB] save contractor error:', e); return false; }
 }
 
-// ── SOW ──────────────────────────────────────────────────────────────────────
-async function sbLoadSow(unitId) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=data&unit_id=eq.'+encodeURIComponent(unitId)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].data : null;
-  } catch(e){ return null; }
-}
-
-async function sbSaveSow(unitId, data) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_sow', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({unit_id:unitId, data:data, updated_at:new Date().toISOString()})
-    });
-    return r.ok;
-  } catch(e){ console.warn('[SB] save sow error:',e); return false; }
-}
-
-// ── RENO PROGRESS ─────────────────────────────────────────────────────────────
-async function sbLoadRenoProgress(unitId) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress?select=data&unit_id=eq.'+encodeURIComponent(unitId)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].data : null;
-  } catch(e){ return null; }
-}
-
-async function sbSaveRenoProgress(unitId, data) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({unit_id:unitId, data:data, updated_at:new Date().toISOString()})
-    });
-    return r.ok;
-  } catch(e){ console.warn('[SB] save reno progress error:',e); return false; }
-}
-
-// ── MIGRATE: Push localStorage → Supabase ────────────────────────────────────
-// Run this once from the browser console to seed Supabase with existing data:
-// await sbMigrateAll()
-window.sbMigrateAll = async function() {
-  console.log('[SB MIGRATE] Starting...');
-  showToast('Migration started — check console for progress');
-
-  // Applications
-  var apps = [];
-  try { apps = JSON.parse(localStorage.getItem('clfn_applications')||'[]'); } catch(e){}
-  if(!apps.length) apps = (typeof SP_APPLICATIONS !== 'undefined') ? SP_APPLICATIONS : [];
-  if(apps.length) {
-    var ok = await sbSaveAllApplications(apps);
-    console.log('[SB MIGRATE] Applications:', ok ? apps.length+' saved' : 'FAILED');
-  }
-
-  // Housing units
-  var units = [];
-  try { units = JSON.parse(localStorage.getItem('clfn_housing_units')||'[]'); } catch(e){}
-  if(!units.length) units = (typeof HOUSING_UNITS_DATA !== 'undefined') ? HOUSING_UNITS_DATA : [];
-  if(units.length) {
-    var ok2 = await sbSaveAllUnits(units);
-    console.log('[SB MIGRATE] Housing units:', ok2 ? units.length+' saved' : 'FAILED');
-  }
-
-  // Contractors
-  var contractors = [];
-  var contractors = window._contractors || [];
-  if(contractors.length) {
-    for(var ct of contractors) { await sbSaveContractor(ct); }
-    console.log('[SB MIGRATE] Contractors:', contractors.length+' saved');
-  }
-
-  // Settings
-  var settings = {};
-  settings = window._appSettings || {};
-  if(Object.keys(settings).length) {
-    await sbSaveSetting('app_settings', settings);
-    console.log('[SB MIGRATE] Settings saved');
-  }
-
-  // Scoring model
-  try {
-    var sm = localStorage.getItem('clfn_scoring_model');
-    if(sm) await sbSaveSetting('scoring_model', JSON.parse(sm));
-    var usm = localStorage.getItem('clfn_unit_score_model');
-    if(usm) await sbSaveSetting('unit_score_model', JSON.parse(usm));
-    var rsm = localStorage.getItem('clfn_reno_score_model_v3');
-    if(rsm) await sbSaveSetting('reno_score_model', JSON.parse(rsm));
-    var bp = localStorage.getItem('clfn_budget_pools');
-    if(bp) await sbSaveSetting('budget_pools', JSON.parse(bp));
-    console.log('[SB MIGRATE] Scoring models and budget saved');
-  } catch(e) { console.warn('[SB MIGRATE] Settings partial:', e); }
-
-  console.log('[SB MIGRATE] Complete!');
-  showToast('✓ Migration complete — check console for details');
-};
-
-
-
 var HOUSING_SESSION={email:'',name:'',role:'',accessToken:''};
 var HOUSING_HEADERS={'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON,'Content-Type':'application/json'};
-window.currentRole='employee';
+window.currentRole='housing_employee_l1';
 window._contractors=[];window._sowCache={};window._renoProgress={};
 window._renoBudget={};window._unitPhotos={};window._appSettings={};
 var housingUnits=[];var applications=[];var auditLog=[];
@@ -1594,7 +1407,6 @@ var housingUnits=[];var applications=[];var auditLog=[];
 function g(id)  { const e=document.getElementById(id); return e?e.value:''; }
 function fv(id) { const e=document.getElementById(id); return e?e.value:''; }
 function fb(id) { const e=document.getElementById(id); return e?e.checked:false; }
-function fmtD(v) { return v||''; }
 function showToast(msg) {
   const t=document.createElement('div');
   t.textContent=msg;
@@ -1611,7 +1423,7 @@ function showDash() {
   window.location.href = 'housing.html';
 }
 function showSettings() {
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   if(role !== 'housing_manager' && role !== 'ed') {
     showToast('Settings are only accessible to the Housing Manager and Executive Director.');
     return;
@@ -1619,7 +1431,7 @@ function showSettings() {
   window.location.href = 'housing.html#settings';
 }
 function showAddHousingStaff() {
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   if(role !== 'housing_manager' && role !== 'ed') {
     showToast('Staff management is only accessible to the Housing Manager and Executive Director.');
     return;
@@ -1824,7 +1636,7 @@ function showWorklist() {
 }
 
 function renderWorklist() {
-  var realRole = window._realRole || window.currentRole || 'employee';
+  var realRole = window._realRole || window.currentRole || 'housing_employee_l1';
   var role = window._viewAsRole || realRole;
   var body = document.getElementById('worklist_body');
   var sub  = document.getElementById('worklist_subtitle');
@@ -1864,7 +1676,7 @@ function renderWorklist() {
 
   // ── Chip filter definitions ───────────────────────────────────────────────
   var chipDefs;
-  if(role === 'employee') {
+  if(role === 'housing_employee_l1') {
     chipDefs = [
       {key:'',          label:'All',            filter: function(a){ return !a.archived; }},
       {key:'action',    label:'Action Needed',  filter: function(a){ return a.status==='returned'; }, alert:true},
@@ -1908,7 +1720,7 @@ function renderWorklist() {
       return name.includes(search) || (a.id||'').toLowerCase().includes(search);
     });
   }
-  var showScore = (role !== 'employee');
+  var showScore = (role !== 'housing_employee_l1');
 
   // ── Chip counts ───────────────────────────────────────────────────────────
   var chipsHtml = chipDefs.map(function(c){
@@ -1997,36 +1809,6 @@ function wlEmpty(msg, sub) {
     +(sub?'<div style="font-size:12px;margin-top:4px;">'+sub+'</div>':'')+'</div>';
 }
 
-function renderWlTable(apps, showScore, showReview) {
-  if(!apps||!apps.length) return wlEmpty('None', '');
-  var sorted = apps.slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
-  var rows = sorted.map(function(a){
-    var name = ((a.fn||'')+' '+(a.ln||'')).trim()||'—';
-    var tier = a.tier||'';
-    var tc = tier==='Critical Priority'?'#b91c1c':tier==='High Priority'?'#1d4ed8':tier==='Medium Priority'?'#7a6000':'#888';
-    return '<tr style="border-bottom:1px solid var(--border);">'
-      + '<td style="padding:10px 14px;font-weight:600;font-size:13px;">'+name+'</td>'
-      + '<td style="padding:10px 14px;font-size:12px;color:var(--muted);">'+a.id+'</td>'
-      + '<td style="padding:10px 14px;font-size:12px;color:var(--muted);">'+(a.appDate||'—')+'</td>'
-      + (showScore ? '<td style="padding:10px 14px;"><span style="font-size:18px;font-weight:800;color:var(--text);">'+(typeof a.score==='number'?a.score:'—')+'</span>'
-          +(tier?'<span style="font-size:10px;font-weight:700;margin-left:6px;color:'+tc+';">'+tier.replace(' Priority','')+'</span>':'')+'</td>' : '')
-      + '<td style="padding:10px 14px;text-align:right;">'
-      + (showReview ? '<button data-wl-id="'+a.id+'" onclick="wlOpenApp(this)" style="background:#1d4ed8;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Review →</button>' : '')
-      + '</td>'
-      + '</tr>';
-  }).join('');
-
-  return '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
-    + '<thead><tr style="background:var(--dark);">'
-    + '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Applicant</th>'
-    + '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">ID</th>'
-    + '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Date</th>'
-    + (showScore ? '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Score</th>' : '')
-    + '<th></th>'
-    + '</tr></thead><tbody>'+rows+'</tbody></table></div>';
-}
-
-
 // ── Header role view-as toggle ─────────────────────────────────────────────
 // Phase A rewrite: driven by CLFN_PERMS.getViewAsOptions() instead of
 // hardcoded role strings. Previously this function silently did nothing
@@ -2062,93 +1844,6 @@ function setupHeaderRoleToggle(realRole) {
 
 
 
-function onAppTypeChange() {
-  var isExisting = document.getElementById('apptype_existing') && document.getElementById('apptype_existing').checked;
-  // Style the labels
-  var newLabel = document.getElementById('apptype_new_label');
-  var exLabel  = document.getElementById('apptype_existing_label');
-  if(newLabel) { newLabel.style.borderColor = isExisting ? 'var(--border)' : 'var(--yellow)'; newLabel.style.background = isExisting ? '' : 'var(--dark)'; }
-  if(exLabel)  { exLabel.style.borderColor  = isExisting ? 'var(--yellow)' : 'var(--border)'; exLabel.style.background  = isExisting ? 'var(--dark)' : ''; }
-  // Show/hide notice
-  var notice = document.getElementById('apptype_existing_notice');
-  if(notice) notice.style.display = isExisting ? 'block' : 'none';
-  // Recalculate score display
-  if(isExisting) {
-    // Clear score panel — not applicable
-    var sc = document.getElementById('sc_score_total');
-    if(sc) sc.textContent = 'N/A';
-    var tier = document.getElementById('sc_score_tier');
-    if(tier){ tier.textContent = 'File Update Only'; tier.style.color = '#888'; }
-    var scoreCard = document.getElementById('scorecardPanel');
-    if(scoreCard) scoreCard.style.opacity = '0.4';
-    var scoreNote = document.getElementById('apptype_score_note');
-    if(scoreNote) scoreNote.style.display = 'block';
-  } else {
-    var scoreCard2 = document.getElementById('scorecardPanel');
-    if(scoreCard2) scoreCard2.style.opacity = '';
-    var scoreNote2 = document.getElementById('apptype_score_note');
-    if(scoreNote2) scoreNote2.style.display = 'none';
-    if(typeof calcScore === 'function') calcScore();
-  }
-}
-
-function getAppType() {
-  var el = document.getElementById('apptype_existing');
-  return (el && el.checked) ? 'existing_tenant' : 'new_housing';
-}
-
-// ── Settings role locks ──
-function applySettingsRoleLocks() {
-  var isED = (window.currentRole === 'ed');
-  var locked = !isED;
-
-  // Selectors for all score/budget editable inputs
-  var editableSelectors = [
-    '#scoring_model_table_wrap input',
-    '#scoring_model_table_wrap select',
-    '[data-usm-id]',
-    '[data-rsm-id]',
-    '#budget_fiscal_year',
-    '#budget_pools_tbody input',
-    '#budget_pools_tbody textarea',
-  ];
-  editableSelectors.forEach(function(sel) {
-    document.querySelectorAll(sel).forEach(function(el) {
-      el.disabled = locked;
-      el.style.opacity = locked ? '0.55' : '1';
-      el.style.cursor = locked ? 'not-allowed' : '';
-    });
-  });
-
-  // Show/hide ED-only action buttons
-  var edOnlyBtns = [
-    'settings_save_scoring_btn','settings_reset_scoring_btn','settings_add_criteria_btn',
-    'settings_save_unit_btn','settings_save_reno_btn','settings_reset_reno_btn',
-    'settings_save_budget_btn',
-  ];
-  edOnlyBtns.forEach(function(id) {
-    var el = document.getElementById(id);
-    if(el) el.style.display = locked ? 'none' : '';
-  });
-
-  // Show lock banner on locked sections
-  var lockMsg = locked ?
-    '<div id="settings_lock_banner" style="display:flex;align-items:center;gap:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:14px;">'+
-    '<span style="font-size:16px;">🔒</span> These values are managed by the <strong>Executive Director</strong> only. You can view but not edit them.</div>' : '';
-
-  ['sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget'].forEach(function(secId) {
-    var sec = document.getElementById(secId);
-    if(!sec) return;
-    var existing = sec.querySelector('#settings_lock_banner');
-    if(existing) existing.remove();
-    if(locked) sec.insertAdjacentHTML('afterbegin', lockMsg);
-  });
-
-  // Show/hide audit log tab (ED only)
-  var auditTab = document.getElementById('stab_audit');
-  if(auditTab) auditTab.style.display = isED ? '' : 'none';
-}
-
 // ── ED-gated save wrappers with audit logging ──
 function edGuard(actionName, fn) {
   if(window.currentRole !== 'ed') {
@@ -2159,49 +1854,6 @@ function edGuard(actionName, fn) {
   auditEntry('SETTINGS', actionName, actionName + ' updated by ED', 'Executive Director');
 }
 
-function saveScoringModelED() {
-  edGuard('Housing Application Scoring Model updated', function() {
-    // Save scoring model to Supabase housing_settings
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings', {
-    method: 'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-    body: JSON.stringify({ key: 'scoring_model', value: liveScoreModel })
-  }).catch(function(e){ console.warn('Scoring model save failed:',e); });
-    rescoreAllApplications();
-    if(document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none') {
-      updateDashStats(); renderDashTable();
-    }
-    showToast('Application scoring model saved.');
-  });
-}
-function rescoreAndSave() {
-  if(typeof rescoreAllApplications !== 'function') return;
-  rescoreAllApplications();
-  // Push to Supabase
-  var count = 0;
-  applications.forEach(function(a) {
-    fetch(SUPABASE_URL+'/rest/v1/housing_applications?id=eq.'+a.id, {
-      method: 'PATCH',
-      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'return=minimal'}),
-      body: JSON.stringify({ score: a.score || 0, tier: a.tier || 'Low Priority' })
-    }).then(function(){ count++; if(count===applications.length) console.log('[SCORE] Rescored '+count+' applications'); })
-      .catch(function(){});
-  });
-  // Refresh UI
-  if(typeof updateDashStats==='function') updateDashStats();
-  if(typeof renderDashTable==='function') renderDashTable();
-  console.log('[SCORE] Rescoring '+applications.length+' applications...');
-}
-
-function confirmResetScoringModelED() {
-  edGuard('Housing Application Scoring Model reset to defaults', function() {
-    confirmResetScoringModel();
-  });
-}
-function openAddCriteriaModalED() {
-  if(window.currentRole !== 'ed') { showToast('Only the Executive Director can add scoring criteria.'); return; }
-  openAddCriteriaModal();
-}
 function saveUnitScoreModelED() {
   edGuard('Unit Matching Scoring updated', function() {
     saveUnitScoreModel();
@@ -2375,23 +2027,8 @@ function exportContractors(format) {
 
 // ── (legacy stubs — kept for compatibility) ──
 function toggleInvExportMenu(){}
-function getInventoryExportData(){ return []; }
-
 // ── MOBILE MENU ──
 
-
-
-function saveRenoScoreModelED() {
-  edGuard('Renovation Priority Scoring updated', function() {
-    saveRenoScoreModel();
-  });
-}
-function resetRenoScoreModelED() {
-  edGuard('Renovation Priority Scoring reset to defaults', function() {
-    resetRenoScoreModel();
-  });
-}
-function getRole(){ return window.CLFN_AUTH.getRole(); }
 
 
 function switchRole(role){
@@ -2866,7 +2503,7 @@ function closeRenoBudget() {
   var savedEmail = null;
   try {
     token      = sessionStorage.getItem('clfn_housing_token');
-    savedRole  = sessionStorage.getItem('clfn_housing_role')  || 'employee';
+    savedRole  = sessionStorage.getItem('clfn_housing_role')  || 'housing_employee_l1';
     savedName  = sessionStorage.getItem('clfn_housing_name')  || '';
     savedEmail = sessionStorage.getItem('clfn_housing_email_session') || '';
   } catch(e) {}
@@ -2930,14 +2567,14 @@ function initRenosPage() {
   var view = params.get('view') || 'renovations';
   updateRenosHeader();
   // Also apply the shared header updates (role switcher visibility, settings button, etc.)
-  if(typeof updateHeaderUser === 'function') updateHeaderUser(window.currentRole || 'employee');
+  if(typeof updateHeaderUser === 'function') updateHeaderUser(window.currentRole || 'housing_employee_l1');
   var ldg = document.getElementById('renosLoadingView'); if(ldg) ldg.style.display='none';
   if(view==='contractors') showContractors();
   else if(view==='approvals') showRenoApprovals();
   else showRenos();
 }
 function updateRenosHeader() {
-  var role=window.currentRole||'employee', el;
+  var role=window.currentRole||'housing_employee_l1', el;
   el=document.getElementById('header_user_name'); if(el) el.textContent=HOUSING_SESSION.name||HOUSING_SESSION.email||'';
   el=document.getElementById('header_avatar'); if(el) el.textContent=(HOUSING_SESSION.name||'S').charAt(0).toUpperCase();
   el=document.getElementById('header_role_badge');
@@ -2963,7 +2600,7 @@ function showRenos(){
   if(!window._navSkipPush) pushNav('renos');
   setNavActive('tab_renos');
   hideAllViews();
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   if(role === 'housing_manager' || role === 'ed') {
     // HM/ED see the approvals/management view
     var rav = document.getElementById('renoApprovalsView');
@@ -2992,7 +2629,7 @@ function showContractors(){
 }
 
 function showContractorsForRole() {
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   if(role === 'housing_manager' || role === 'ed') {
     showContractors();
   } else {
@@ -3105,7 +2742,7 @@ function renderContractorsView(){
     returned:       {bg:'#faf5ff',c:'#7c3aed',label:'↩ Returned for Info'}
   };
 
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
 
   if(!filtered.length) {
     list.innerHTML = '<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--muted);font-size:13px;">No contractors match this filter.</div>';
@@ -3359,7 +2996,7 @@ function saveContractor(){
       contractorSearchFilter(document.getElementById('ct_search_input') ? document.getElementById('ct_search_input').value : '');
     } else {
       // Re-open search modal in employee mode, otherwise re-render management view
-      var role = window.currentRole || 'employee';
+      var role = window.currentRole || 'housing_employee_l1';
       if(role === 'housing_manager' || role === 'ed') {
         renderContractorsView();
       } else {
@@ -3929,50 +3566,6 @@ document.addEventListener('keydown', function(e) {
   if(e.key === 'Escape') closePrintPanel();
 });
 
-// ── Save ED adjustment ──
-function saveEdAdjustment(){
-  if(window.currentRole !== 'ed'){ showToast('Only the Executive Director can apply adjustments.'); return; }
-  var app = window._currentScorecardApp;
-  if(!app){ showToast('No application selected.'); return; }
-  var pts = parseInt((document.getElementById('sc_ed_adj_pts')||{}).value||0)||0;
-  var reason = ((document.getElementById('sc_ed_adj_reason')||{}).value||'').trim();
-  var notes  = ((document.getElementById('sc_ed_adj_notes')||{}).value||'').trim();
-  var idx = applications.findIndex(function(a){ return a.id===app.id; });
-  if(idx===-1){ showToast('Application not found'); return; }
-  applications[idx].edAdjustment   = pts;
-  applications[idx].edAdjustReason = reason;
-  applications[idx].edNotes        = notes;
-  // Recompute score with adjustment
-  if(typeof rescoreApplication === 'function') {
-    rescoreApplication(applications[idx]);
-  } else {
-    // Simple fallback: add pts to existing score
-    var bd = applications[idx].scoreBreakdown || {};
-    bd.edAdjustment = pts;
-    applications[idx].scoreBreakdown = bd;
-    var base = Object.keys(bd).filter(function(k){return k!=='edAdjustment';})
-      .reduce(function(sum,k){return sum+(bd[k]||0);},0);
-    applications[idx].score = base + pts;
-  }
-  sbSaveApplication(applications[idx]).catch(function(e){ console.warn('ED adj save failed:',e); });
-  auditEntry(app.id, 'ed_adjustment', 'ED adjusted score by '+(pts>=0?'+':'')+pts+(reason?' — '+reason:''), 'Executive Director');
-  // Update display
-  window._currentScorecardApp = applications[idx];
-  var scoreEl = document.getElementById('sc_score_total');
-  if(scoreEl) scoreEl.textContent = applications[idx].score;
-  var edSec = document.getElementById('sc_ed_section');
-  var edCon = document.getElementById('sc_ed_content');
-  if(edSec&&edCon&&(pts||notes)){
-    edSec.style.display='block';
-    edCon.innerHTML = (pts?'<div style="font-size:13px;margin-bottom:6px;"><strong>'+(pts>0?'+':'')+pts+' pts</strong>'+(reason?' — '+reason:'')+'</div>':'')+(notes?'<div style="font-size:13px;color:var(--muted);">'+notes+'</div>':'');
-  }
-  var msg=document.getElementById('sc_ed_save_msg');
-  if(msg){msg.style.display='flex';setTimeout(function(){msg.style.display='none';},2000);}
-  if(typeof updateDashStats==='function') updateDashStats();
-  if(typeof renderDashTable==='function') renderDashTable();
-  showToast('ED adjustment saved'+(pts?' ('+( pts>0?'+':'')+pts+' pts)':''));
-}
-
 // ── User management (Settings > Users) ──
 async function lookupUser(){
   var emailEl = document.getElementById('user_lookup_email');
@@ -4013,458 +3606,9 @@ function userLookupDebounce(){
   clearTimeout(window._userLookupTimer);
   window._userLookupTimer = setTimeout(lookupUser, 400);
 }
-function addUserFromResult(name, email, role){
-  // Read from pending lookup if no args passed (called from dynamic onclick)
-  if(!name && window._pendingLookupUser) {
-    name  = window._pendingLookupUser.name;
-    email = window._pendingLookupUser.email;
-    role  = window._pendingLookupUser.role;
-    window._pendingLookupUser = null;
-  }
-  var settings = window._appSettings || {};
-  var users = settings.users || [];
-  if(users.find(function(u){return u.email===email;})){ showToast('User already exists'); return; }
-  var prevUsers = users.slice();
-  users.push({name:name, email:email, role:role});
-  settings.users = users;
-  window._appSettings = settings;
-  sbSaveSetting('app_settings', settings).then(function(ok){
-    if(!ok){
-      settings.users = prevUsers;
-      window._appSettings = settings;
-      populateSettings();
-      showToast('Could not save — ' + name + ' was NOT added. Please retry.');
-    }
-  });
-  var emailEl = document.getElementById('user_lookup_email');
-  if(emailEl) emailEl.value='';
-  var resultEl = document.getElementById('user_lookup_result');
-  if(resultEl) resultEl.style.display='none';
-  auditEntry('SETTINGS','settings_user_add','User added: '+name+' ('+email+') — Role: '+role,window.currentRole||'staff');
-  populateSettings();
-  showToast(name+' added');
-}
-function removeUser(btn){
-  if(!confirm('Remove this user?')) return;
-  var row = btn.closest('tr');
-  var emailCell = row ? row.cells[1] : null;
-  var email = emailCell ? emailCell.textContent.trim() : '';
-  if(!email) return;
-  var settings = window._appSettings || {};
-  var prevUsers = (settings.users||[]).slice();
-  var removedUser=(settings.users||[]).find(function(u){return u.email===email;});
-  settings.users = (settings.users||[]).filter(function(u){ return u.email!==email; });
-  window._appSettings = settings;
-  sbSaveSetting('app_settings', settings).then(function(ok){
-    if(!ok){
-      settings.users = prevUsers;
-      window._appSettings = settings;
-      populateSettings();
-      showToast('Could not save — user NOT removed. Please retry.');
-    }
-  });
-  auditEntry('SETTINGS','settings_user_remove','User removed: '+(removedUser?removedUser.name+' ('+email+')':email),window.currentRole||'staff');
-  populateSettings();
-  showToast('User removed');
-}
-
-// ── Print Scorecard ──
-function printScorecard(){
-  var app=window._currentScorecardApp;if(!app)return;
-  var name=((app.fn||'')+' '+(app.ln||'')).trim();
-  var today=new Date().toLocaleDateString('en-CA');
-  var bd=app.scoreBreakdown||{};var s=app.score||0;
-  var logoSrc=(document.querySelector('.app-logo img')||{}).src||'';
-  // Use V2 tier thresholds (ED-adjustable); fall back to defaults if not loaded yet.
-  var _t = (typeof liveV2Tiers === 'object' && liveV2Tiers) ? liveV2Tiers : {critical:80, high:60, medium:40};
-  var tierColor2 = s >= _t.critical ? '#14532d'
-                 : s >= _t.high     ? '#1e3a5f'
-                 : s >= _t.medium   ? '#92400e'
-                 :                    '#b91c1c';
-  var tierBg2    = s >= _t.critical ? '#f0fdf4'
-                 : s >= _t.high     ? '#e8eef5'
-                 : s >= _t.medium   ? '#fffbeb'
-                 :                    '#fef2f2';
-  // V2 breakdown has a nested structure: sectionA.{urgent,health,...}, sectionB.{rent,condition,...}, arrears, edAdjustment.
-  var sA = bd.sectionA || {};
-  var sB = bd.sectionB || {};
-  var V2ROWS = [
-    {section:'A', label:'Urgent Need / Displacement',    val:sA.urgent},
-    {section:'A', label:'Health & Safety Risk',          val:sA.health},
-    {section:'A', label:'Overcrowding',                  val:sA.overcrowding},
-    {section:'A', label:'Household Composition',         val:sA.household},
-    {section:'A', label:'Accessibility Need',            val:sA.accessibility},
-    {section:'A', label:'Waitlist Duration',             val:sA.waitlist},
-    {section:'B', label:'Rent Payment History',          val:sB.rent},
-    {section:'B', label:'Unit Condition History',        val:sB.condition},
-    {section:'B', label:'Tenancy Conduct',               val:sB.conduct},
-    {section:'B', label:'Income Stability',              val:sB.income},
-    {section:'C', label:'Arrears Deduction',             val:bd.arrears}
-  ];
-  var currentSection = '';
-  var tableRows = V2ROWS.map(function(row){
-    var v = (row.val === undefined || row.val === null) ? 0 : row.val;
-    var col = v>0?'#15803d':v<0?'#b91c1c':'#666';
-    var sectionHdr = '';
-    if(row.section !== currentSection) {
-      currentSection = row.section;
-      var sectLabel = row.section === 'A' ? 'Section A — Housing Need'
-                   : row.section === 'B' ? 'Section B — Tenant Responsibility'
-                   :                       'Section C — Arrears';
-      sectionHdr = '<tr><td colspan="2" style="padding:10px 12px 4px;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#888;background:#fafafa;border-top:1px solid #e8e6df;">'+sectLabel+'</td></tr>';
-    }
-    return sectionHdr + '<tr style="border-bottom:1px solid #f0f0ec;"><td style="padding:8px 12px;font-weight:600;font-size:11px;">'+row.label+'</td><td style="padding:8px 12px;text-align:right;font-size:14px;font-weight:700;color:'+col+';">'+(v>0?'+':'')+v+'</td></tr>';
-  }).join('');
-  var edAdj=bd.edAdjustment||0;
-  if(edAdj)tableRows+='<tr style="border-top:2px solid #F8E41A;"><td style="padding:8px 12px;font-weight:700;">ED Adjustment</td><td style="padding:8px 12px;text-align:right;font-size:14px;font-weight:700;color:'+(edAdj>0?'#15803d':'#b91c1c')+'">'+(edAdj>0?'+':'')+edAdj+'</td></tr>';
-  var doc='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Score Report — '+name+'</title>'
-    +'<style>*{box-sizing:border-box;margin:0;padding:0;}@page{size:letter;margin:16mm 14mm;}body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;}.footer{position:fixed;bottom:8mm;left:0;right:0;padding:0 14mm;display:flex;justify-content:space-between;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:5px;}</style>'
-    +'</head><body>'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #F8E41A;padding-bottom:12px;margin-bottom:16px;">'
-    +'<div style="display:flex;align-items:center;gap:10px;">'+(logoSrc?'<img src="'+logoSrc+'" style="width:40px;height:40px;object-fit:contain;" alt="CLFN"/>':'')+'<div><div style="font-size:15px;font-weight:700;">CLFN Housing — Score Report</div><div style="font-size:10px;color:#888;">Constance Lake First Nation</div></div></div>'
-    +'<div style="text-align:right;font-size:10px;color:#888;line-height:1.7;"><strong style="font-size:12px;color:#111;">'+name+'</strong><br/>'+app.id+'<br/>Generated: '+today+'</div></div>'
-    +'<div style="display:flex;align-items:center;gap:24px;background:#111;border-radius:8px;padding:16px 20px;margin-bottom:16px;">'
-    +'<div><div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:4px;">Total Score</div><div style="font-size:40px;font-weight:700;color:#F8E41A;line-height:1;">'+s+'</div></div>'
-    +'<div style="width:1px;height:40px;background:#333;"></div>'
-    +'<div><div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:6px;">Priority Tier</div><div style="font-size:13px;font-weight:700;padding:6px 14px;border-radius:6px;background:'+tierBg2+';color:'+tierColor2+';">'+(app.tier||'—')+'</div></div>'
-    +'<div style="flex:1;"><div style="font-size:9px;color:#888;margin-bottom:4px;">Score Bar</div><div style="height:6px;background:#333;border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+Math.min(100,Math.max(0,Math.round((s/Math.max(100,(_t.critical||80)*1.25))*100)))+'%;background:'+tierColor2+';border-radius:3px;"></div></div></div></div>'
-    +'<table style="width:100%;border-collapse:collapse;border:1px solid #eee;margin-bottom:16px;">'
-    +'<thead><tr style="background:#111;border-bottom:2px solid #F8E41A;"><th style="padding:8px 12px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:#888;font-weight:700;">Category</th><th style="padding:8px 12px;text-align:right;font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:#888;font-weight:700;width:60px;">Score</th></tr></thead>'
-    +'<tbody>'+tableRows+'</tbody>'
-    +'<tfoot><tr style="background:#f5f5f3;border-top:2px solid #111;"><td style="padding:10px 12px;font-weight:700;">Total</td><td style="padding:10px 12px;text-align:right;font-size:18px;font-weight:700;">'+(s>0?'+':'')+s+'</td></tr></tfoot></table>'
-    +'<div class="footer"><span>CLFN Housing Department — Confidential</span><span>Generated '+today+'</span></div>'
-    +'<scr'+'ipt>window.onload=function(){window.print();};<\/script>';
-
-  showPrintPanel(doc, 'Score Report');
-}
 
 
 
-
-
-function previewFromDash(app){
-  if(!app) return;
-  var name    = ((app.fn||'')+' '+(app.ln||'')).trim() || '—';
-  var today   = new Date().toLocaleDateString('en-CA');
-  var logoSrc = (document.querySelector('.app-logo img')||{}).src || '';
-  var hasCoApp = !!(app.coApp && app.coApp.fn);
-  var hasArr   = !!app.hasArrears;
-
-  // ── helpers ──
-  function row(k, v) {
-    var val = (v !== null && v !== undefined && String(v).trim() !== '') ? v : '—';
-    return '<tr>'
-      +'<td style="padding:4px 10px;color:#555;font-size:10px;font-weight:600;width:34%;'
-      +'border-bottom:1px solid #f2f2f0;vertical-align:top;">'+k+'</td>'
-      +'<td style="padding:4px 10px;font-size:10px;border-bottom:1px solid #f2f2f0;">'+val+'</td>'
-      +'</tr>';
-  }
-  function section(title, body) {
-    return '<div style="margin-bottom:12px;page-break-inside:avoid;">'
-      +'<div style="font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;'
-      +'color:#555;border-bottom:2.5px solid #F8E41A;padding-bottom:3px;margin-bottom:0;">'
-      +title+'</div>'
-      +'<table style="width:100%;border-collapse:collapse;">'+body+'</table>'
-      +'</div>';
-  }
-  function yn(v) { return v ? 'Yes' : 'No'; }
-  function dollar(v) { var f=parseFloat(v)||0; return f>0 ? '$'+f.toLocaleString() : '—'; }
-
-  // ── sig block (pen-on-paper for dash print — no canvas available) ──
-  function sigBlock(label, pName, dt) {
-    return '<div style="break-inside:avoid;">'
-      +'<div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;'
-      +'color:#555;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #ddd;">'+label+'</div>'
-      +'<div style="display:grid;grid-template-columns:1fr 90px;gap:8px;margin-bottom:6px;">'
-      +'<div><div style="font-size:8px;color:#999;margin-bottom:1px;">Full Name</div>'
-      +'<div style="font-size:10.5px;font-weight:600;border-bottom:1px solid #bbb;padding-bottom:2px;min-height:15px;">'+(pName||'')+'</div></div>'
-      +'<div><div style="font-size:8px;color:#999;margin-bottom:1px;">Date</div>'
-      +'<div style="font-size:10px;border-bottom:1px solid #bbb;padding-bottom:2px;min-height:15px;">'+(dt||'')+'</div></div>'
-      +'</div>'
-      +'<div style="width:100%;height:65px;border:1px solid #ddd;border-radius:3px;background:#fafaf8;'
-      +'display:flex;align-items:center;justify-content:center;">'
-      +'<span style="font-size:9px;color:#ccc;">Sign here</span></div>'
-      +'</div>';
-  }
-  function internalSig(label) {
-    return '<div style="break-inside:avoid;">'
-      +'<div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;'
-      +'color:#7a5c00;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #e8d87a;">'+label+'</div>'
-      +'<div style="font-size:9px;color:#888;margin-bottom:2px;">Name &amp; Title</div>'
-      +'<div style="border-bottom:1px solid #444;height:16px;margin-bottom:8px;"></div>'
-      +'<div style="font-size:9px;color:#888;margin-bottom:2px;">Signature</div>'
-      +'<div style="border-bottom:1px solid #444;height:52px;margin-bottom:8px;"></div>'
-      +'<div style="display:grid;grid-template-columns:1fr 90px;gap:10px;">'
-      +'<div><div style="font-size:9px;color:#888;margin-bottom:1px;">Date</div>'
-      +'<div style="border-bottom:1px solid #444;height:16px;"></div></div>'
-      +'<div><div style="font-size:9px;color:#888;margin-bottom:1px;">Decision</div>'
-      +'<div style="border-bottom:1px solid #444;height:16px;"></div></div>'
-      +'</div></div>';
-  }
-
-  // ── income body ──
-  var incBody = '';
-  if(app.incomes && app.incomes.length) {
-    app.incomes.forEach(function(inc, i) {
-      var amt = inc.primaryAmt ? dollar(inc.primaryAmt) : '—';
-      incBody += row(inc.person || ('Income '+(i+1)),
-        (inc.incomeType||'—') + (inc.primaryAmt ? ' — '+dollar(inc.primaryAmt) : '')
-        + (inc.employer ? ' · '+inc.employer : ''));
-    });
-  }
-  if(!incBody) incBody = row('Income / Employment', '—');
-
-  // ── household body ──
-  var habBody = '';
-  if(app.habitants && app.habitants.length) {
-    app.habitants.forEach(function(h, i) {
-      var nm = [(h.fn||''),(h.ln||'')].filter(Boolean).join(' ') || ('Member '+(i+1));
-      habBody += row(nm, (h.relationship||'') + (h.dob ? ' · DOB: '+h.dob : ''));
-    });
-  }
-  if(!habBody) habBody = row('Household Members', '—');
-
-  // ── references body ──
-  var refBody = '';
-  if(app.references && app.references.length) {
-    app.references.forEach(function(r, i) {
-      var nm = [(r.fn||''),(r.ln||'')].filter(Boolean).join(' ') || ('Reference '+(i+1));
-      if(nm || r.phone) refBody += row(nm, (r.relationship||'') + (r.phone ? ' · '+r.phone : '') + (r.email ? ' · '+r.email : ''));
-    });
-  }
-  if(!refBody) refBody = row('References', '—');
-
-  // ── pets body ──
-  var petBody = '';
-  if(app.pets && app.pets.length) {
-    app.pets.forEach(function(p) {
-      if(p.type || p.name) petBody += row(p.name || p.type, [p.type, p.size, p.desc].filter(Boolean).join(' · '));
-    });
-  }
-
-  var sigCols = hasCoApp ? '1fr 1fr 1fr' : '1fr 1fr';
-
-  var doc = '<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
-    +'<title>CLFN Housing Application — '+name+'</title>'
-    +'<style>'
-    +'*{box-sizing:border-box;margin:0;padding:0;}'
-    +'@page{size:letter;margin:14mm 13mm 20mm 13mm;}'
-    +'body{font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#111;background:#fff;line-height:1.4;}'
-    +'.footer{position:fixed;bottom:7mm;left:0;right:0;padding:0 13mm;display:flex;justify-content:space-between;font-size:8.5px;color:#aaa;border-top:1px solid #eee;padding-top:4px;}'
-    +'</style>'
-    +'</head><body>'
-
-    // Header
-    +'<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #F8E41A;padding-bottom:10px;margin-bottom:14px;">'
-    +'<div style="display:flex;align-items:center;gap:10px;">'
-    +(logoSrc?'<img src="'+logoSrc+'" style="width:40px;height:40px;object-fit:contain;" alt="CLFN"/>':'')
-    +'<div><div style="font-size:15px;font-weight:700;">CLFN Housing Application</div>'
-    +'<div style="font-size:9.5px;color:#888;">Constance Lake First Nation</div></div></div>'
-    +'<div style="text-align:right;font-size:9.5px;color:#888;line-height:1.9;">'
-    +'<strong style="font-size:12px;color:#111;">'+name+'</strong><br/>'
-    +(app.id||'—')+'<br/>Date: '+today+'</div></div>'
-
-    // 1. Applicant Information
-    +section('Applicant Information',
-       row('First Name',           app.fn   ||'—')
-      +row('Last Name',            app.ln   ||'—')
-      +row('Date of Birth',        app.dob  ||'—')
-      +row('Band Number',          app.band ||'—')
-      +row('On Reserve Status',    app.reserve||'—')
-      +row('Marital Status',       app.marital||'—')
-      +row('Cell Phone',           app.phone||'—')
-      +row('Email Address',        app.email||'—')
-      +row('Application Date',     app.appDate||'—')
-      +row('Accessibility Needs',  app.accessibility||'None')
-      +row('Housing Classification', app.classification||'—')
-    )
-
-    // 2. Current Address
-    +section('Current Address',
-       row('Street Address',  app.street  ||'—')
-      +row('City',            app.city    ||'—')
-      +row('Province',        app.province||'—')
-      +row('Postal Code',     app.postal  ||'—')
-      +row('Occupancy Date',  app.occDate ||'—')
-    )
-
-    // 3. Housing & Arrears
-    +section('Current Housing &amp; Arrears',
-       row('Currently Has a House', yn(app.haveHouse))
-      +row('Home Condition',   app.haveHouse ? (app.homeCondition||'—') : 'N/A')
-      +row('Arrears Owed to CLFN', yn(hasArr))
-      +row('Arrears Amount',   hasArr ? dollar(app.arrBalAmt) : 'N/A')
-    )
-
-    // 4. Employment & Income
-    +section('Employment &amp; Income', incBody)
-
-    // 5. Co-Applicant
-    +section('Co-Applicant',
-       row('Co-Applicant', yn(hasCoApp))
-      +(hasCoApp ? row('First Name',    app.coApp.fn  ||'—') : '')
-      +(hasCoApp ? row('Last Name',     app.coApp.ln  ||'—') : '')
-      +(hasCoApp ? row('Date of Birth', app.coApp.dob ||'—') : '')
-      +(hasCoApp ? row('Band Number',   app.coApp.band||'—') : '')
-      +(hasCoApp ? row('Reserve Status',app.coApp.reserve||'—') : '')
-      +(hasCoApp ? row('Cell Phone',    app.coApp.cell||'—') : '')
-      +(hasCoApp ? row('Email',         app.coApp.email||'—') : '')
-    )
-
-    // 6. Household Members
-    +section('Household Members', habBody)
-
-    // 7. References
-    +section('References', refBody)
-
-    // 8. Pets
-    +(petBody ? section('Pets', petBody) : '')
-
-    // Terms & Conditions
-    +'<div style="margin-top:14px;padding:10px 12px;border:1px solid #ddd;border-radius:4px;background:#fafaf8;page-break-inside:avoid;">'
-    +'<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#555;margin-bottom:7px;padding-bottom:4px;border-bottom:1.5px solid #F8E41A;">Terms &amp; Conditions — Applicant Declaration</div>'
-    +'<p style="font-size:9.5px;color:#444;line-height:1.6;margin-bottom:5px;">By signing below, I hereby apply for housing assistance from the Constance Lake First Nation (CLFN) Housing Program and declare the following:</p>'
-    +'<ol style="font-size:9.5px;color:#444;line-height:1.7;padding-left:14px;">'
-    +'<li>All information provided in this application is true, accurate, and complete to the best of my knowledge.</li>'
-    +'<li>I understand that providing false or misleading information may result in immediate disqualification and removal from the housing waitlist.</li>'
-    +'<li>I consent to CLFN collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation.</li>'
-    +'<li>I understand that my application will be scored according to the CLFN Housing Scoring Rubric and that priority is determined by score, not date of application alone.</li>'
-    +'<li>I agree to notify the CLFN Housing Department within 30 days of any change in household composition, income, address, or contact information.</li>'
-    +'<li>I understand that acceptance into CLFN housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by CLFN prior to occupancy.</li>'
-    +'<li>I agree to comply with all CLFN Housing policies, lease agreements, and community by-laws as a condition of tenancy.</li>'
-    +'<li>I authorize CLFN to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.</li>'
-    +'</ol></div>'
-
-    // Signatures
-    +'<div style="margin-top:14px;page-break-inside:avoid;">'
-    +'<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#555;border-bottom:2.5px solid #F8E41A;padding-bottom:3px;margin-bottom:10px;">Signatures</div>'
-    +'<div style="display:grid;grid-template-columns:'+sigCols+';gap:12px;">'
-    +sigBlock('Applicant', name, app.appDate||today)
-    +(hasCoApp ? sigBlock('Co-Applicant', (app.coApp.fn||'')+' '+(app.coApp.ln||''), app.appDate||today) : '')
-    +sigBlock('Received by — Housing Staff', '', today)
-    +'</div></div>'
-
-    // Internal Use
-    +'<div style="margin-top:16px;border:2px solid #F8E41A;border-radius:5px;padding:12px;page-break-inside:avoid;">'
-    +'<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#7a5c00;margin-bottom:10px;padding-bottom:5px;border-bottom:1.5px solid #F8E41A;">For Internal Use Only</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;font-size:9.5px;">'
-    +'<div><div style="color:#888;margin-bottom:2px;">Date Received</div><div style="border-bottom:1px solid #555;height:16px;"></div></div>'
-    +'<div><div style="color:#888;margin-bottom:2px;">File Number</div><div style="border-bottom:1px solid #555;height:16px;"></div></div>'
-    +'<div><div style="color:#888;margin-bottom:2px;">Waitlist Position</div><div style="border-bottom:1px solid #555;height:16px;"></div></div>'
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;font-size:9.5px;">'
-    +'<div><div style="color:#888;margin-bottom:3px;">Application Complete?</div><div>☐ Yes &nbsp;&nbsp; ☐ No</div></div>'
-    +'<div><div style="color:#888;margin-bottom:3px;">Documents Verified?</div><div>☐ Yes &nbsp;&nbsp; ☐ No &nbsp;&nbsp; ☐ Pending</div></div>'
-    +'<div><div style="color:#888;margin-bottom:3px;">Site Visit Required?</div><div>☐ Yes &nbsp;&nbsp; ☐ No</div></div>'
-    +'</div>'
-    +'<div style="margin-bottom:12px;font-size:9.5px;"><div style="color:#888;margin-bottom:3px;">Internal Notes</div>'
-    +'<div style="border:1px solid #ddd;border-radius:3px;height:44px;background:#fff;"></div></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">'
-    +internalSig('Housing Manager Approval')
-    +internalSig('Executive Director Approval')
-    +'</div></div>'
-
-    +'<div class="footer">'
-    +'  <span>CLFN Housing Department — Confidential</span>'
-    +'  <span id="footerRight" style="display:flex;gap:20px;align-items:center;">'
-    +'    <span>Generated '+today+'</span>'
-    +'    <span id="pageNum" style="font-weight:600;color:#666;"></span>'
-    +'  </span>'
-    +'</div>'
-    +'<scr'+'ipt>window.onload=function(){'
-    +'  var body=document.body;'
-    +'  var pageH=1056;'  /* ~letter page height at 96dpi */
-    +'  var totalH=body.scrollHeight;'
-    +'  var pages=Math.max(1,Math.ceil(totalH/pageH));'
-    +'  var el=document.getElementById(\'pageNum\');'
-    +'  if(el){el.textContent="Page 1 of "+pages;}'
-    +'  /* Use CSS counter for proper per-page numbering */'
-    +'  var style=document.createElement(\'style\');'
-    +'  style.textContent="@page{@bottom-right{content: counter(page) \' / \' counter(pages);font-size:8.5px;color:#aaa;font-family:Arial,sans-serif;margin-right:13mm;}} @page{@bottom-left{content:\'CLFN Housing Department — Confidential\';font-size:8.5px;color:#aaa;font-family:Arial,sans-serif;margin-left:13mm;}}";'
-    +'  document.head.appendChild(style);'
-    +'  window.print();'
-    +'};<\/script>'
-    +'</body></html>';
-
-  showPrintPanel(doc, 'Score Report');
-}
-
-function openMatchScorecard(appId, unitId) {
-  var app  = (typeof applications !== 'undefined' ? applications : []).find(function(a){ return a.id===appId; });
-  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
-  var unit = allUnits.find(function(u){ return u.id===unitId; });
-  if(!app || !unit) return;
-
-  var modal = document.getElementById('matchScorecardModal');
-  if(!modal) return;
-
-  var appName  = ((app.fn||'')+' '+(app.ln||'')).trim();
-  var unitAddr = unit.num+' '+unit.street;
-  var age = app.dob ? Math.floor((new Date()-new Date(app.dob))/(365.25*24*3600*1000)) : null;
-  var isElders  = age !== null && age >= 55;
-  var needsBeds = 1;
-  if(app.habitants) needsBeds = Math.max(1, 1+(app.coApp?1:0)+app.habitants.length);
-  var needsAccess = app.accessibility && app.accessibility!=='None' && app.accessibility!=='0' && app.accessibility!==0;
-
-  // Scoring breakdown
-  var breakdown = [];
-  var bedScore = 0;
-  if(unit.bedrooms === needsBeds)     { bedScore=10; breakdown.push({label:'Bedroom fit (exact match)',    pts:10, max:10}); }
-  else if(unit.bedrooms > needsBeds)  { bedScore=5;  breakdown.push({label:'Bedroom fit (larger than needed)', pts:5, max:10}); }
-  else if(unit.bedrooms===needsBeds-1){ bedScore=3;  breakdown.push({label:'Bedroom fit (one short)',     pts:3, max:10}); }
-  else                                { bedScore=0;  breakdown.push({label:'Bedroom fit (insufficient)',  pts:0, max:10}); }
-
-  var accScore = 0;
-  if(needsAccess && unit.accessible)  { accScore=8;  breakdown.push({label:'Accessibility (needs met)',   pts:8,  max:8}); }
-  else if(needsAccess && !unit.accessible){ accScore=-4; breakdown.push({label:'Accessibility (unmet need)', pts:-4, max:8}); }
-  else                                { breakdown.push({label:'Accessibility (not required)',             pts:0,  max:8}); }
-
-  var eldScore = 0;
-  if(isElders && unit.isElders)       { eldScore=6; breakdown.push({label:'Elders eligibility (matched)',  pts:6, max:6}); }
-  else if(!isElders && unit.isElders) { eldScore=-2; breakdown.push({label:'Elders unit (not eligible)',   pts:-2, max:6}); }
-  else if(isElders && !unit.isElders) { breakdown.push({label:'Elders eligible (standard unit)',           pts:0,  max:6}); }
-  else                                { breakdown.push({label:'Elders (not applicable)',                   pts:0,  max:6}); }
-
-  var total = bedScore + accScore + eldScore;
-  var maxScore = 24;
-  var pct = Math.round(Math.max(0,total)/maxScore*100);
-  var tierColor = total>=16?'#15803d':total>=10?'#d97706':'#b91c1c';
-
-  // Build rows
-  var rows = breakdown.map(function(b){
-    var col = b.pts > 0 ? '#15803d' : b.pts < 0 ? '#b91c1c' : '#888';
-    var bar = Math.round(Math.max(0,b.pts)/b.max*100);
-    return '<tr style="border-bottom:1px solid var(--border);">'
-      +'<td style="padding:10px 14px;font-size:13px;color:var(--text);">'+b.label+'</td>'
-      +'<td style="padding:10px 14px;text-align:right;">'
-        +'<div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;">'
-        +'<div style="height:4px;width:60px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+Math.max(0,bar)+'%;background:'+col+';border-radius:3px;"></div></div>'
-        +'<span style="font-size:13px;font-weight:700;color:'+col+';">'+(b.pts>0?'+':'')+b.pts+'</span>'
-        +'</td>'
-      +'</tr>';
-  }).join('');
-
-  document.getElementById('msc_title').textContent   = 'Match Scorecard';
-  document.getElementById('msc_app').textContent     = appName + ' (' + appId + ')';
-  document.getElementById('msc_unit').textContent    = unitAddr;
-  document.getElementById('msc_score').textContent   = total;
-  document.getElementById('msc_pct').textContent     = pct + '% match';
-  document.getElementById('msc_score').style.color   = tierColor;
-  document.getElementById('msc_bar_fill').style.width = pct + '%';
-  document.getElementById('msc_bar_fill').style.background = tierColor;
-  document.getElementById('msc_rows').innerHTML = rows;
-
-  // Summary flags
-  var flags = [];
-  if(needsAccess && !unit.accessible) flags.push('<span style="color:#b91c1c;font-size:12px;">⚠ Unit does not meet accessibility needs</span>');
-  if(!isElders && unit.isElders) flags.push('<span style="color:#b91c1c;font-size:12px;">⚠ Applicant not eligible for Elders unit</span>');
-  if(unit.bedrooms < needsBeds)  flags.push('<span style="color:#d97706;font-size:12px;">⚠ Unit has fewer bedrooms than needed</span>');
-  if(total >= 14)                flags.push('<span style="color:#15803d;font-size:12px;">✓ Strong match — recommended for assignment</span>');
-  document.getElementById('msc_flags').innerHTML = flags.join('<br>') || '<span style="color:var(--muted);font-size:12px;">No issues flagged</span>';
-
-  modal.style.removeProperty('display');
-  modal.style.setProperty('display','flex','important');
-}
 
 
 // ══════════════════════════════════════════════════════════
@@ -4999,10 +4143,6 @@ function saveSowList(unitId, sowList){
   saveSowData(unitId, { sows: sowList });
 }
 
-// ── SOW lock / permission helpers ─────────────────────────────────────────
-function _effectiveRole(){
-  return window._viewAsRole || window.currentRole || '';
-}
 function _realRoleForPermissions(){
   return window._realRole || window.currentRole || '';
 }
@@ -5816,88 +4956,6 @@ function saveSettings(section){
   showToast('Settings saved');
 }
 
-function openUnitDetail(unitId) {
-  var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
-  var u = units.find(function(x){ return x.id === unitId; });
-  if(!u) return;
-  _currentDetailUnitId = unitId;
-
-  var statusStyle = {
-    vacant:      {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
-    occupied:    {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
-    under_repair:{bg:'#fffbeb',c:'#92400e',label:'Under Repair'},
-    reserved:    {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
-    condemned:   {bg:'#fef2f2',c:'#b91c1c',label:'Condemned'}
-  };
-  var ss = statusStyle[u.status] || {bg:'#f0f0ec',c:'#888',label:u.status||'Unknown'};
-
-  // Header
-  var addr = u.num + ' ' + u.street;
-  setText('udp_address', addr);
-  var sub = [u.bedrooms+' bed', u.bathrooms&&u.bathrooms!=='nan'?u.bathrooms+' bath':'', u.type&&u.type!=='nan'?u.type:''].filter(Boolean).join(' · ');
-  setText('udp_subtitle', sub);
-
-  // Status badge
-  var sr = document.getElementById('udp_status_row');
-  if(sr) sr.innerHTML = '<span style="font-size:12px;font-weight:700;padding:5px 14px;border-radius:20px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
-    +(u.isElders?' <span style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;margin-left:6px;">Elders Unit</span>':'')
-    +(u.accessible?' <span style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;background:#eff6ff;color:#1d4ed8;margin-left:6px;">♿ Accessible</span>':'');
-
-  // Details grid
-  var det = document.getElementById('udp_details');
-  if(det){
-    var fields = [
-      ['Foundation', (u.foundation&&u.foundation!=='nan'&&u.foundation!=='0')?u.foundation:'—'],
-      ['Funder', u.funder||'None / Band'],
-      ['Phase', (u.phase&&u.phase!=='nan')?u.phase:'—'],
-      ['Year Built', (u.year&&u.year!=='nan')?u.year:'—'],
-    ];
-    det.innerHTML = fields.map(function(f){
-      return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'
-        +'<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">'+f[0]+'</div>'
-        +'<div style="font-size:14px;font-weight:600;color:var(--text);text-transform:capitalize;">'+f[1]+'</div>'
-        +'</div>';
-    }).join('');
-  }
-
-  // Tenant section
-  var ts = document.getElementById('udp_tenant_section');
-  var ti = document.getElementById('udp_tenant_info');
-  if(ts && ti){
-    if(u.assignedName || u.status==='occupied' || u.status==='reserved'){
-      ts.style.display = 'block';
-      ti.innerHTML = (u.assignedName?'<div style="font-weight:600;margin-bottom:4px;">'+u.assignedName+'</div>':'')
-        +(u.assignedTo?'<div style="color:var(--muted);font-size:12px;">App ID: '+u.assignedTo+'</div>':'')
-        +(u.assignedDate?'<div style="color:var(--muted);font-size:12px;">Move-in: '+u.assignedDate+'</div>':'')
-        +(!u.assignedName&&!u.assignedTo?'<span style="color:var(--muted);">No tenant assigned yet</span>':'');
-    } else {
-      ts.style.display = 'none';
-    }
-  }
-
-  // Notes
-  var ns = document.getElementById('udp_notes_section');
-  var nd = document.getElementById('udp_notes');
-  if(ns && nd){
-    if(u.notes && u.notes.trim()){
-      ns.style.display = 'block';
-      nd.textContent = u.notes;
-    } else {
-      ns.style.display = 'none';
-    }
-  }
-
-  // Photos
-  renderUnitPhotos(unitId);
-
-  // Tenant files preview in detail panel
-  udpRenderFilePreviews(unitId);
-
-  // Show panel
-  var panel = document.getElementById('unitDetailPanel');
-  if(panel){ panel.style.setProperty('display','flex','important'); }
-}
-
 function udpOpenFiles(){
   if(_currentDetailUnitId) {
     closeUnitDetail();
@@ -5962,57 +5020,6 @@ async function udpRenderFilePreviews(unitId){
   }).join('');
 }
 
-function saveNewUnit(){
-  var get = function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
-  var chk = function(id){ var el=document.getElementById(id); return el?el.checked:false; };
-  var num    = get('au_num');
-  var street = get('au_street');
-  if(!num || !street){ showToast('Unit number and street are required'); return; }
-
-  var newId = (street.toUpperCase().replace(/\s+/g,'-') + '-' + num).replace(/[^A-Z0-9\-]/g,'');
-  var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : [];
-  if(units.find(function(u){ return u.id === newId; })){ showToast('A unit at that address already exists'); return; }
-
-  var newUnit = {
-    id: newId, street: street, num: num,
-    bedrooms: parseInt(get('au_bedrooms'))||3,
-    bathrooms: get('au_bathrooms')||'1',
-    type: get('au_type')||'detached unit',
-    foundation: get('au_foundation')||'',
-    funder: get('au_funder')||'',
-    phase: get('au_phase')||'',
-    year: get('au_year')||'',
-    notes: get('au_notes')||'',
-    accessible: chk('au_accessible'),
-    isElders: chk('au_isElders'),
-    status: 'vacant',
-    assignedTo: null, assignedDate: null, assignedName: null
-  };
-
-  units.push(newUnit);
-  housingUnits.push(newUnit);
-  sbSaveUnit(newUnit).catch(function(e){ console.warn('Add unit save failed:',e); });
-  if(_auStagedPhotos.length){ saveUnitPhotos(newId, _auStagedPhotos); _auStagedPhotos=[]; }
-  closeAddUnitModal();
-  renderInventoryView();
-  showToast(num + ' ' + street + ' added to inventory');
-}
-
-function openAddUnitModal(){
-  var fields = ['au_num','au_street','au_bathrooms','au_year','au_phase','au_notes'];
-  fields.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
-  var bedEl = document.getElementById('au_bedrooms'); if(bedEl) bedEl.value='3';
-  var typeEl = document.getElementById('au_type'); if(typeEl) typeEl.value='';
-  var fndEl = document.getElementById('au_foundation'); if(fndEl) fndEl.value='';
-  var funEl = document.getElementById('au_funder'); if(funEl) funEl.value='';
-  var accEl = document.getElementById('au_accessible'); if(accEl) accEl.checked=false;
-  var eldEl = document.getElementById('au_isElders'); if(eldEl) eldEl.checked=false;
-  _auStagedPhotos = [];
-  renderAddUnitPhotoPreview();
-  var modal = document.getElementById('addUnitModal');
-  if(modal){ modal.style.removeProperty('display'); modal.style.setProperty('display','flex','important'); }
-}
-
 // ── addScoringCriteria ──
 function addScoringCriteria(){
   var cat  = (document.getElementById('ac_category')||{}).value||'Custom';
@@ -6063,26 +5070,6 @@ function getDefaultBudget(){
   BUDGET_POOLS.forEach(function(p){ obj.pools[p.id]={allocated:0,notes:''}; });
   return obj;
 }
-function getSpentByPool(){
-  var allUnits=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-  var spent={};
-  BUDGET_POOLS.forEach(function(p){spent[p.id]=0;});
-  allUnits.forEach(function(u){
-    var sow=null;
-    sow = (window._sowCache && window._sowCache[u.id]) || null;
-    if(!sow||!sow.totalCost)return;
-    var cost=parseFloat(sow.totalCost.replace(/[^0-9.]/g,''))||0;
-    if(!cost)return;
-    var funder=(u.funder||'').toLowerCase();
-    var poolId='band';
-    if(funder==='isc')poolId='isc';
-    else if(funder.includes('cmhc'))poolId='cmhc';
-    else if(funder.includes('rrap'))poolId='rrap';
-    else if(funder.includes('emergency'))poolId='emergency';
-    spent[poolId]=(spent[poolId]||0)+cost;
-  });
-  return spent;
-}
 function renderBudgetPools(){
   var tbody = document.getElementById('budget_pools_tbody');
   if(!tbody) return;
@@ -6126,39 +5113,6 @@ function updateBudgetTotal(){
   });
   var gt = document.getElementById('budget_grand_total');
   if(gt) gt.textContent = '$' + Math.round(total).toLocaleString();
-}
-
-function saveBudgetPools(){
-  // Also save HM budget limit
-  var limitEl = document.getElementById('settings_hm_budget_limit');
-  if(limitEl && limitEl.value) {
-    var s = window._appSettings || {};
-    var prevLimit = s.hmBudgetLimit;
-    s.hmBudgetLimit = parseFloat(limitEl.value)||25000;
-    window._appSettings = s;
-    sbSaveSetting('app_settings', s).then(function(ok){
-      if(!ok){
-        s.hmBudgetLimit = prevLimit;
-        window._appSettings = s;
-        showToast('Could not save HM budget limit — retry.');
-      }
-    });
-  }
-  var fyEl = document.getElementById('budget_fiscal_year');
-  var data = {fiscalYear: fyEl ? fyEl.value : '2025-2026', pools:{}};
-  BUDGET_POOLS.forEach(function(p){
-    var allocEl = document.getElementById('budget_alloc_'+p.id);
-    var notesEl = document.getElementById('budget_notes_'+p.id);
-    data.pools[p.id] = {
-      allocated: parseFloat((allocEl?allocEl.value:0))||0,
-      notes: notesEl ? notesEl.value : ''
-    };
-  });
-  saveBudgetData(data);  // has its own error handling
-  var hmLimitEl=document.getElementById('settings_hm_budget_limit');
-  auditEntry('SETTINGS','settings_budget_save','Budget allocations saved for '+data.fiscalYear+(hmLimitEl?' — HM limit: $'+hmLimitEl.value:''),window.currentRole||'staff');
-  showToast('Budget allocations saved');
-  renderBudgetPools();
 }
 
 // ── renderUnitScoreTable ──
@@ -6904,7 +5858,7 @@ function _ctRenderFlow(status, ct) {
 function _ctRenderActions(ct) {
   var el = document.getElementById('ctap_actions');
   if(!el) return;
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   var status = ct.status || 'pending_review';
   var actions = [];
 
@@ -7058,24 +6012,6 @@ function _getHmLimit() {
   try { return parseFloat((window._appSettings||{}).hmBudgetLimit)||25000; } catch(e) { return 25000; }
 }
 
-function _getRaApprovalStatus(u, sow) {
-  var hmLimit = _getHmLimit();
-  if(!sow) return {key:'no_sow', label:'No SOW Filed', bg:'#f4f4f0', c:'#888'};
-  var cost = parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))||0;
-  var needsED = cost > hmLimit;
-  var hmDec = (u.unitHmSig && u.unitHmSig.decision) || '';
-  var edDec = (u.unitEdSig && u.unitEdSig.decision) || '';
-  var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
-  var pct = prog ? (prog.overallPct||0) : 0;
-  if(pct >= 100) return {key:'complete',    label:'Complete',        bg:'#f0fdf4', c:'#15803d'};
-  if(pct > 0)    return {key:'in_progress', label:'In Progress',     bg:'#fffbeb', c:'#92400e'};
-  if(edDec === 'approved')                  return {key:'approved',  label:'ED Approved',     bg:'#f0fdf4', c:'#15803d'};
-  if(hmDec === 'approved' && !needsED)      return {key:'approved',  label:'HM Approved',     bg:'#f0fdf4', c:'#15803d'};
-  if(hmDec === 'approved' && needsED)       return {key:'pending_ed',label:'Pending ED',       bg:'#eff6ff', c:'#1d4ed8'};
-  if(hmDec === 'declined' || edDec === 'declined') return {key:'declined', label:'Declined',  bg:'#fef2f2', c:'#b91c1c'};
-  return {key:'pending_hm', label:'Pending HM', bg:'#fffbeb', c:'#92400e'};
-}
-
 function _getAllRenoUnits() {
   var units = [];
   units = housingUnits.slice();
@@ -7120,7 +6056,7 @@ function _getRaApprovalStatusForSow(u, sow) {
 }
 
 function renderRenoApprovalsView() {
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   var units = _getAllRenoUnits();
 
   // Build one row PER SOW (not per unit). Units with no SOWs but in-repair status still
@@ -7346,7 +6282,7 @@ function exportRenoApprovalsCSV() {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
-function exportRenoApprovalsExcel() { exportRenoApprovalsCSV(); } // alias — CSV opens in Excel
+ // alias — CSV opens in Excel
 
 function exportRenoApprovalsPDF() {
   var units = _getAllRenoUnits();

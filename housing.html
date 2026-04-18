@@ -2588,18 +2588,6 @@ document.addEventListener('DOMContentLoaded', function() {
 // The app falls back to localStorage if Supabase is unavailable.
 // ══════════════════════════════════════════════════════════════
 
-var _sbReady = false;
-
-function sbClient() {
-  if(!window._sb) {
-    if(window.supabase && window.supabase.createClient) {
-      window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-      _sbReady = true;
-    }
-  }
-  return window._sb;
-}
-
 // ── Map staff table role to housing app role ────────────────────────────────
 function sbMapRole(staffRow) {
   // Returns the canonical normalized role for a staff row.
@@ -2618,16 +2606,6 @@ function sbMapRole(staffRow) {
     return window.CLFN_PERMS.normalizeRole(raw);
   }
   return 'housing_employee_l1';
-}
-
-// ── AUTH: Look up staff by email ─────────────────────────────────────────────
-async function sbGetStaffByEmail(email) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?select=*&email=eq.'+encodeURIComponent(email)+'&is_active=eq.true&limit=1', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] || null;
-  } catch(e) { console.warn('[SB] staff lookup failed:', e); return null; }
 }
 
 // ── APPLICATIONS ─────────────────────────────────────────────────────────────
@@ -2819,37 +2797,18 @@ async function sbSaveAllUnits(units) {
   return true;
 }
 
-// ── AUDIT LOG ─────────────────────────────────────────────────────────────────
-async function sbLogAudit(appId, action, detail, userRole) {
-  try {
-    await fetch(SUPABASE_URL+'/rest/v1/housing_audit_log', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
-      body:JSON.stringify({ entity_type:'application', entity_id:String(appId||''), action:action, details:JSON.stringify({detail:detail}), actor:userRole||window.currentRole||'staff', created_at:new Date().toISOString() })
-    });
-  } catch(e){ console.warn('[SB] log audit failed:',e); }
-}
-
+// ── SETTINGS ─────────────────────────────────────────────────────────────────
 async function sbLoadAuditLog(limit) {
   try {
     var r = await fetch(SUPABASE_URL+'/rest/v1/housing_audit_log?select=*&order=created_at.desc&limit='+(limit||500), { headers:HOUSING_HEADERS });
     if(!r.ok) return null;
     var data = await r.json();
     return data.map(function(row){
-      var d = JSON.parse(row.details||'{}');
-      return { ts:row.created_at, appId:row.entity_id, action:row.action, detail:d.detail||row.details||'', user:row.actor };
+      var d = (typeof row.detail === 'object' ? row.detail : null)
+              || (function(){ try { return JSON.parse(row.detail||'{}'); } catch(e){ return {}; } })();
+      return { ts:row.created_at, appId:row.entity_id, action:row.action, detail:(d.detail||d.summary||''), user:row.actor };
     });
   } catch(e){ console.warn('[SB] load audit log failed:',e); return null; }
-}
-
-// ── SETTINGS ─────────────────────────────────────────────────────────────────
-async function sbLoadSetting(key) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=value&key=eq.'+encodeURIComponent(key)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].value : null;
-  } catch(e){ return null; }
 }
 
 async function sbSaveSetting(key, value) {
@@ -2886,115 +2845,10 @@ async function sbSaveContractor(ct) {
   } catch(e) { console.warn('[SB] save contractor error:', e); return false; }
 }
 
-// ── SOW ──────────────────────────────────────────────────────────────────────
-async function sbLoadSow(unitId) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=data&unit_id=eq.'+encodeURIComponent(unitId)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].data : null;
-  } catch(e){ return null; }
-}
-
-async function sbSaveSow(unitId, data) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_sow', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({unit_id:unitId, data:data, updated_at:new Date().toISOString()})
-    });
-    return r.ok;
-  } catch(e){ console.warn('[SB] save sow error:',e); return false; }
-}
-
-// ── RENO PROGRESS ─────────────────────────────────────────────────────────────
-async function sbLoadRenoProgress(unitId) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress?select=data&unit_id=eq.'+encodeURIComponent(unitId)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].data : null;
-  } catch(e){ return null; }
-}
-
-async function sbSaveRenoProgress(unitId, data) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({unit_id:unitId, data:data, updated_at:new Date().toISOString()})
-    });
-    return r.ok;
-  } catch(e){ console.warn('[SB] save reno progress error:',e); return false; }
-}
-
-// ── MIGRATE: Push localStorage → Supabase ────────────────────────────────────
-// Run this once from the browser console to seed Supabase with existing data:
-// await sbMigrateAll()
-window.sbMigrateAll = async function() {
-  console.log('[SB MIGRATE] Starting...');
-  showToast('Migration started — check console for progress');
-
-  // Applications
-  var apps = [];
-  try { apps = JSON.parse(localStorage.getItem('clfn_applications')||'[]'); } catch(e){}
-  if(!apps.length) apps = (typeof SP_APPLICATIONS !== 'undefined') ? SP_APPLICATIONS : [];
-  if(apps.length) {
-    var ok = await sbSaveAllApplications(apps);
-    console.log('[SB MIGRATE] Applications:', ok ? apps.length+' saved' : 'FAILED');
-  }
-
-  // Housing units
-  var units = [];
-  try { units = JSON.parse(localStorage.getItem('clfn_housing_units')||'[]'); } catch(e){}
-  if(!units.length) units = (typeof HOUSING_UNITS_DATA !== 'undefined') ? HOUSING_UNITS_DATA : [];
-  if(units.length) {
-    var ok2 = await sbSaveAllUnits(units);
-    console.log('[SB MIGRATE] Housing units:', ok2 ? units.length+' saved' : 'FAILED');
-  }
-
-  // Contractors
-  var contractors = [];
-  var contractors = window._contractors || [];
-  if(contractors.length) {
-    for(var ct of contractors) { await sbSaveContractor(ct); }
-    console.log('[SB MIGRATE] Contractors:', contractors.length+' saved');
-  }
-
-  // Settings
-  var settings = {};
-  settings = window._appSettings || {};
-  if(Object.keys(settings).length) {
-    await sbSaveSetting('app_settings', settings);
-    console.log('[SB MIGRATE] Settings saved');
-  }
-
-  // Scoring model
-  try {
-    var sm = localStorage.getItem('clfn_scoring_model');
-    if(sm) await sbSaveSetting('scoring_model', JSON.parse(sm));
-    var usm = localStorage.getItem('clfn_unit_score_model');
-    if(usm) await sbSaveSetting('unit_score_model', JSON.parse(usm));
-    var rsm = localStorage.getItem('clfn_reno_score_model_v3');
-    if(rsm) await sbSaveSetting('reno_score_model', JSON.parse(rsm));
-    var bp = localStorage.getItem('clfn_budget_pools');
-    if(bp) await sbSaveSetting('budget_pools', JSON.parse(bp));
-    console.log('[SB MIGRATE] Scoring models and budget saved');
-  } catch(e) { console.warn('[SB MIGRATE] Settings partial:', e); }
-
-  console.log('[SB MIGRATE] Complete!');
-  showToast('✓ Migration complete — check console for details');
-};
-
-
-
-
 
 window._realRole=null; window._viewAsRole=null;
+window._realRole=null; window._viewAsRole=null;
 function initRoleSwitcher(){ /* no-op - dropdown handles role switching */ }
-function renderRoleSwitcher(){ /* no-op - dropdown handles role switching */ }
-function switchViewRole(role){ switchRole(role); }
-
 
 // ── Preview from Dash ──
 
@@ -3005,13 +2859,12 @@ const uploadedFiles = [];
 const DRAFT_KEY = 'clfn_housing_draft';
 let currentAppId = null;
 let approvalState  = 'draft';
-let approvalRole   = 'employee';
+let approvalRole   = 'housing_employee_l1';
 
 // ── Helpers ──
 function g(id)  { const e=document.getElementById(id); return e?e.value:''; }
 function fv(id) { const e=document.getElementById(id); return e?e.value:''; }
 function fb(id) { const e=document.getElementById(id); return e?e.checked:false; }
-function fmtD(v) { return v||''; }
 function showToast(msg) {
   const t=document.createElement('div');
   t.textContent=msg;
@@ -3046,8 +2899,6 @@ function initAppId(){
   if(el)el.textContent=currentAppId;
 }
 
-// ── Stub functions (referenced but defined elsewhere or not needed) ──
-function _restoreToggleStates() { /* no-op */ }
 function showStepErrors(step, errs, bannerId) {
   // Clear previous field highlights in this step
   var stepEl = document.getElementById(step);
@@ -3339,15 +3190,6 @@ function goTo(s){
 
 // ── Toggle helpers ──
 function tog(id){const e=document.getElementById(id);if(e)e.classList.toggle('on');}
-function chkPrev(dateId,blkId){
-  const el=document.getElementById(dateId);
-  const blk=document.getElementById(blkId);
-  if(!el||!blk)return;
-  const d=new Date(el.value);
-  const diff=(new Date()-d)/(365.25*24*3600*1000);
-  blk.style.display=diff<2?'block':'none';
-}
-
 // ── Dynamic rows ──
 function addIncome(){
   var list=document.getElementById('incomeList');
@@ -4227,20 +4069,6 @@ function renderScoringModelTable() {
   wrap.innerHTML = html;
 }
 
-function updateScoringRow(id, val) {
-  var row = liveScoreModel.find(function(r){ return r.id === id; });
-  if(row) { var oldPts=row.pts; row.pts=parseInt(val)||0; saveScoringModel(); auditEntry('SETTINGS','settings_scoring_change','Rubric: "'+row.label+'" changed from '+oldPts+' to '+row.pts+' pts',window.currentRole||'staff'); showToast('Score updated'); }
-}
-
-function deleteScoringRow(id) {
-  var row = liveScoreModel.find(function(r){ return r.id===id; });
-  liveScoreModel = liveScoreModel.filter(function(r){ return r.id !== id; });
-  saveScoringModel();
-  renderScoringModelTable();
-  auditEntry('SETTINGS','settings_scoring_delete','Rubric criteria removed: "'+(row?row.label:id)+'"',window.currentRole||'staff');
-  showToast('Criteria removed');
-}
-
 function confirmResetScoringModel() {
   if(confirm('Reset the scoring model to defaults? This cannot be undone.')) {
     resetScoringModel();
@@ -4270,34 +4098,6 @@ function closeAddCriteriaModal() {
     modal.style.setProperty('display', 'none', 'important');
   }
 }
-function saveNewCriteria() {
-  var catEl       = document.getElementById('acm_cat');
-  var labelEl     = document.getElementById('acm_label');
-  var ptsEl       = document.getElementById('acm_pts');
-
-  var cat     = catEl ? catEl.value : 'reserve_status';
-  var label   = labelEl ? labelEl.value.trim() : '';
-  var ptsRaw  = ptsEl   ? ptsEl.value : '0';
-  var pts     = ptsRaw === '' ? 0 : parseInt(ptsRaw, 10);
-  if(isNaN(pts)) pts = 0;
-  if(!label){ showToast('Condition Label is required'); return; }
-
-  var newId    = 'custom_' + Date.now();
-  var maxOrder = liveScoreModel.reduce(function(m,r){ return Math.max(m, r.order||0); }, 0);
-  liveScoreModel.push({ id:newId, cat:cat, label:label, key:'custom', min:null, max:null, pts:pts, order:maxOrder+10 });
-  saveScoringModel();
-  renderScoringModelTable();
-  closeAddCriteriaModal();
-  // Rescore all applications (custom categories use a flat 0 base — 
-  // ED can apply them manually via the ED Adjustment factor per application)
-  auditEntry('SETTINGS','settings_scoring_add','Rubric criteria added: "'+label+'" ('+pts+' pts) in '+(SCORING_CAT_LABELS[cat]||cat),window.currentRole||'staff');
-  showToast('"' + label + '" added to ' + (SCORING_CAT_LABELS[cat]||cat) + ' — point value editable in Settings');
-}
-
-function scoreRange(ranges,val){
-  for(const r of ranges){if(val<=r.max)return{score:r.score,label:r.label||''};}
-  return{score:0,label:''};
-}
 function setPts(elId,score){
   const el=document.getElementById(elId);if(!el)return;
   const abs=Math.abs(score);
@@ -4317,7 +4117,7 @@ function onPriorTenancyChange() {
 
 // ── Unlock HM-only fields based on role ──
 function applyTenancyFieldRoles() {
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   var isHM = (role === 'housing_manager' || role === 'ed');
   var badge = document.getElementById('tenancy_hm_badge');
   var lockedMsg = document.getElementById('tenancy_locked_msg');
@@ -5332,7 +5132,6 @@ function updateDashStats(){
   }
 }
 
-function _openAppFromDash(id){ window._appFormReturnTo='dash'; if(typeof window.openEditModal==='function') window.openEditModal(id); }
 function renderDashTable(){
   if(!window._userSetDashFilter){var _f=document.getElementById('dashFilterStatus');if(_f)_f.value='';}
   var search=(document.getElementById('dashSearch')?document.getElementById('dashSearch').value:'').toLowerCase();
@@ -5363,7 +5162,7 @@ function renderDashTable(){
     var clsBg=_clsStyle[0]; var clsColor=_clsStyle[1];
     var statusMap={draft:['Draft','pill-draft'],submitted:['Awaiting HM Review','pill-submitted'],file_update:['File Update — Awaiting HM','pill-submitted'],mgr_approved:['Awaiting ED Approval','pill-mgr'],hm_recommended:['HM Recommended','pill-mgr'],hm_approved:['File Update Approved','pill-approved'],ed_approved:['ED Approved','pill-approved'],declined:['Declined','pill-declined'],returned:['Returned for Info','pill-returned'],housed:['Housed','pill-approved'],assigned:['Assigned','pill-assigned']};
     var sp=statusMap[a.status]||['—','pill-draft'];
-    var role=window.currentRole||'employee';
+    var role=window.currentRole||'housing_employee_l1';
     var canAssignFromDash = (role==='housing_manager'||role==='ed')
       && (a.status==='ed_approved'||a.status==='mgr_approved')
       && !a.assignedUnit && !a.archived;
@@ -5476,7 +5275,7 @@ window.openAppMenu = function(e, appId) {
   var app = applications.find(function(a){ return a.id === appId; });
   if (!app) return;
 
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   var isArchived = !!app.archived;
   var isDeclined = app.status === 'declined';
 
@@ -5586,7 +5385,7 @@ function _handleAppMenuAction(action, appId) {
   var idx = applications.findIndex(function(a){ return a.id === appId; });
   if (idx === -1) { showToast('Application not found'); return; }
   var app = applications[idx];
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
 
   if (action === 'archive') {
     if (!confirm('Archive this application? It will be hidden from the main list.\n\nAll supporting documents will be preserved in the archive record.')) return;
@@ -5634,20 +5433,6 @@ function _handleAppMenuAction(action, appId) {
 
 
 
-// ── Dashboard nav helpers ──
-function toggleDashNav() {
-  var items   = document.getElementById('dashNavItems');
-  var chevron = document.getElementById('dashNavChevron');
-  if(!items) return;
-  var open = items.style.display !== 'none';
-  items.style.display   = open ? 'none' : 'block';
-  if(chevron) chevron.style.transform = open ? 'rotate(-90deg)' : 'rotate(0deg)';
-}
-function setDashNavActive(el) {
-  document.querySelectorAll('.snav-sub-item').forEach(function(li){ li.classList.remove('active'); });
-  if(el) el.classList.add('active');
-}
-
 function filterDash(status){
   var el=document.getElementById('dashFilterStatus');
   if(el){el.value=status;renderDashTable();}
@@ -5655,7 +5440,7 @@ function filterDash(status){
 
 // ── View switchers ──
 function showDash(){
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   if(role === 'housing_manager' || role === 'ed') {
     // HM and ED go to the home tile page with live stats
     showEmployeeHome();
@@ -5675,7 +5460,7 @@ function showApp(){
 }
 
 function showSettings(){
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   if(role !== 'housing_manager' && role !== 'ed') {
     showToast('Settings are only accessible to the Housing Manager and Executive Director.');
     return;
@@ -5882,21 +5667,13 @@ function showRenos(){
   }
   // The renoApprovalsView/renosView markup lives in renos.html, not housing.html —
   // always navigate cross-page so the correct page loads with its own init.
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   if(role === 'housing_manager' || role === 'ed') {
     window.location.href = 'renos.html?view=approvals';
   } else {
     window.location.href = 'renos.html?view=renovations';
   }
 }
-function showRenosSimple(){
-  if(window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('renovations')){
-    showToast('Renovations module is not enabled for this nation.');
-    return;
-  }
-  window.location.href = 'renos.html?view=renovations';
-}
-
 // ── Contractors view ──
 function showContractors(){
   if(window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('contractors')){
@@ -5908,7 +5685,7 @@ function showContractors(){
 }
 
 function showContractorsForRole() {
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   if(role === 'housing_manager' || role === 'ed') {
     showContractors();
   } else {
@@ -6201,7 +5978,7 @@ function openUnitEditModal(unitId){
   // Archive / Restore button in footer (ED only)
   var archWrap = document.getElementById('ue_archive_btn_wrap');
   if(archWrap) {
-    var role = window.currentRole || 'employee';
+    var role = window.currentRole || 'housing_employee_l1';
     if(role === 'ed') {
       if(u.archived) {
         archWrap.innerHTML = '<button type="button" onclick="unarchiveUnit(\''+unitId.replace(/'/g,"\\'")+'\')" style="background:none;border:1.5px solid #888;color:#888;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">📤 Restore Unit</button>';
@@ -6352,7 +6129,7 @@ function saveUnitEdit(){
   if(u.assignedTo && (u.status==='occupied'||u.status==='reserved')) {
     var apps2 = typeof applications!=='undefined'?applications:[];
     var linkedApp2 = apps2.find(function(a){return a.id===u.assignedTo;});
-    var role2 = window.currentRole||'employee';
+    var role2 = window.currentRole||'housing_employee_l1';
     if(linkedApp2) {
       var appStatus = linkedApp2.status||'';
       var edApproved = appStatus==='ed_approved';
@@ -6399,7 +6176,7 @@ function ueTenantSearch(q) {
   if (!dd) return;
 
   var apps = typeof applications !== 'undefined' ? applications : [];
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
 
   // Show ed_approved to all roles; also mgr_approved for HM and ED
   var eligible = apps.filter(function(a) {
@@ -6499,7 +6276,7 @@ function ueTenantSelect(appId, name, status) {
   var statusBg    = isED ? '#f0fdf4'  : isHM ? '#eff6ff' : '#fffbeb';
 
   // Role-based warning
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   var warn = '';
   if (!isED && !isHM) {
     warn = '<div style="margin-top:8px;padding:8px 10px;background:#fef2f2;border-radius:6px;font-size:11px;color:#b91c1c;font-weight:600;">⛔ This application has not been approved. Cannot assign tenant.</div>';
@@ -6934,7 +6711,7 @@ function renderContractorsView(){
     returned:       {bg:'#faf5ff',c:'#7c3aed',label:'↩ Returned for Info'}
   };
 
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
 
   if(!filtered.length) {
     list.innerHTML = '<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--muted);font-size:13px;">No contractors match this filter.</div>';
@@ -7075,10 +6852,6 @@ function ctUpdateClassBorders() {
     if(proofRow) proofRow.style.display = anyIndigenous ? '' : 'none';
   });
 }
-function ctUpdateClassBorder(label) {
-  var radio = label.querySelector('input[name="ct_classification"]');
-  if(radio && !radio.checked) label.style.borderColor = 'var(--border)';
-}
 function ctFileUpload(input,bucket){
   if(!input.files||!input.files.length)return;
   if(!window._ctFiles)window._ctFiles={wsib:[],insurance:[],other:[]};
@@ -7105,10 +6878,7 @@ function renderCtFilePreview(bucket){
     btn.onclick=function(){window._ctFiles[btn.getAttribute('data-bucket')].splice(parseInt(btn.getAttribute('data-idx')),1);renderCtFilePreview(btn.getAttribute('data-bucket'));};
   });
 }
-function ctFileDragOver(e,zoneId){e.preventDefault();var z=document.getElementById(zoneId);if(z){z.style.borderColor='var(--yellow)';z.style.background='rgba(248,228,26,0.06)';}}
 function ctFileDragLeave(zoneId){var z=document.getElementById(zoneId);if(z){z.style.borderColor='var(--border)';z.style.background='var(--bg)';}}
-function ctFileDrop(e,bucket){e.preventDefault();ctFileDragLeave('ct_'+bucket+'_drop');ctFileUpload({files:e.dataTransfer.files,value:''},bucket);}
-
 
 function saveContractor(){
   var get=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
@@ -7188,7 +6958,7 @@ function saveContractor(){
       contractorSearchFilter(document.getElementById('ct_search_input') ? document.getElementById('ct_search_input').value : '');
     } else {
       // Re-open search modal in employee mode, otherwise re-render management view
-      var role = window.currentRole || 'employee';
+      var role = window.currentRole || 'housing_employee_l1';
       if(role === 'housing_manager' || role === 'ed') {
         renderContractorsView();
       } else {
@@ -7237,12 +7007,6 @@ function deleteContractor(idx){
 // (showScores removed — was calling getElementById with a missing argument and had zero callers anywhere. Dead code from an earlier scoring view design.)
 
 var _scoresSortKey='score', _scoresSortDir=-1;
-function sortScores(key) {
-  if(key===_scoresSortKey) _scoresSortDir*=-1; else _scoresSortDir=-1;
-  _scoresSortKey=key;
-  renderScoresTable();
-}
-
 function renderScoresTable() {
   var fTier    = document.getElementById('scFilterTier')    ? document.getElementById('scFilterTier').value    : '';
   var fReserve = document.getElementById('scFilterReserve') ? document.getElementById('scFilterReserve').value : '';
@@ -7334,30 +7098,6 @@ function renderScoresTable() {
 // ── Application Scores view ──
 
 // ── Scorecard document functions ──────────────────────────────────────────────
-
-function scViewFile(path) {
-  showToast('Opening file…');
-  var fileName = path.split('/').pop();
-  var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
-  var fetchUrl = SUPABASE_URL + '/storage/v1/object/authenticated/' + STORAGE_BUCKET + '/' + encodedPath;
-  fetch(fetchUrl, { headers: sbStorageHeaders() })
-    .then(function(res){
-      if(!res.ok) throw new Error('HTTP ' + res.status);
-      return res.blob();
-    })
-    .then(function(blob){
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;  // sets correct filename + extension
-      document.body.appendChild(a); a.click();
-      document.body.removeChild(a);
-      setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
-    })
-    .catch(function(e){
-      showToast('Could not open file: ' + (e.message||e));
-    });
-}
 
 
 // ── Scorecard docs — DocLibrary instance (Phase C Turn 3) ────────────
@@ -7861,67 +7601,6 @@ function userLookupDebounce(){
   clearTimeout(window._userLookupTimer);
   window._userLookupTimer = setTimeout(lookupUser, 400);
 }
-function userLookupDebounce(){
-  clearTimeout(window._userLookupTimer);
-  window._userLookupTimer = setTimeout(lookupUser, 400);
-}
-function addUserFromResult(name, email, role){
-  // Read from pending lookup if no args passed (called from dynamic onclick)
-  if(!name && window._pendingLookupUser) {
-    name  = window._pendingLookupUser.name;
-    email = window._pendingLookupUser.email;
-    role  = window._pendingLookupUser.role;
-    window._pendingLookupUser = null;
-  }
-  var settings = window._appSettings || {};
-  var users = settings.users || [];
-  if(users.find(function(u){return u.email===email;})){ showToast('User already exists'); return; }
-  // Snapshot for rollback
-  var prevUsers = users.slice();
-  users.push({name:name, email:email, role:role});
-  settings.users = users;
-  window._appSettings = settings;
-  sbSaveSetting('app_settings', settings).then(function(ok){
-    if(!ok){
-      // Roll back in-memory change so the UI reflects reality
-      settings.users = prevUsers;
-      window._appSettings = settings;
-      populateSettings();
-      showToast('Could not save — ' + name + ' was NOT added. Please retry.');
-    }
-  });
-  var emailEl = document.getElementById('user_lookup_email');
-  if(emailEl) emailEl.value='';
-  var resultEl = document.getElementById('user_lookup_result');
-  if(resultEl) resultEl.style.display='none';
-  auditEntry('SETTINGS','settings_user_add','User added: '+name+' ('+email+') — Role: '+role,window.currentRole||'staff');
-  populateSettings();
-  showToast(name+' added');
-}
-function removeUser(btn){
-  if(!confirm('Remove this user?')) return;
-  var row = btn.closest('tr');
-  var emailCell = row ? row.cells[1] : null;
-  var email = emailCell ? emailCell.textContent.trim() : '';
-  if(!email) return;
-  var settings = window._appSettings || {};
-  var prevUsers = (settings.users||[]).slice();  // snapshot for rollback
-  var removedUser=(settings.users||[]).find(function(u){return u.email===email;});
-  settings.users = (settings.users||[]).filter(function(u){ return u.email!==email; });
-  window._appSettings = settings;
-  sbSaveSetting('app_settings', settings).then(function(ok){
-    if(!ok){
-      settings.users = prevUsers;
-      window._appSettings = settings;
-      populateSettings();
-      showToast('Could not save — user NOT removed. Please retry.');
-    }
-  });
-  auditEntry('SETTINGS','settings_user_remove','User removed: '+(removedUser?removedUser.name+' ('+email+')':email),window.currentRole||'staff');
-  populateSettings();
-  showToast('User removed');
-}
-
 // ── Print Scorecard ──
 function printScorecard(){
   var app=window._currentScorecardApp;if(!app)return;
@@ -8533,95 +8212,6 @@ function closeRenoProgress() {
   window._rpStoredPhotos = [];
 }
 
-function saveRenoProgress() {
-  var unitId = window._rpUnitId;
-  if(!unitId) return;
-
-  // If the unit has completed SOWs and the viewer isn't the ED, block the save.
-  // Rationale: a completed SOW shouldn't have its progress rewritten by non-ED users.
-  // If NO completed SOWs exist (or the viewer is ED), allow normally.
-  var unitSows = getUnitSowList(unitId);
-  var hasCompletedSow = unitSows.some(isSowCompleted);
-  if(hasCompletedSow && _realRoleForPermissions() !== 'ed'){
-    showToast('This unit has a completed SOW. Only the Executive Director can update progress on completed work.');
-    return;
-  }
-
-  var get = function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
-  var status   = get('rp_status_select') || 'Not Started';
-  var pct      = parseInt(get('rp_pct_input'))||0;
-  var notes    = get('rp_notes');
-  var contr    = get('rp_contractor');
-  var contrId  = (document.getElementById('rp_contractor_id')||{}).value||'';
-  var tgtDate  = get('rp_target_date');
-  var pending  = window._rpPendingPhotos || [];
-  var stored   = window._rpStoredPhotos || [];
-
-  // Load existing
-  var prog = null;
-  prog = (window._renoProgress && window._renoProgress[unitId]) || null;
-  if(!prog) prog = { updates:[], photos:[] };
-
-  // Append new update entry
-  var today = new Date().toISOString().slice(0,10);
-  if(notes || pending.length) {
-    prog.updates = prog.updates || [];
-    prog.updates.push({ date:today, status:status, pct:pct, notes:notes, photos:pending.slice() });
-  }
-
-  // Update top-level state
-  prog.status     = status;
-  prog.overallPct = pct;
-  prog.contractor   = contr;
-  prog.contractorId = contrId;
-  prog.targetDate = tgtDate;
-  prog.photos     = stored.concat(pending); // all photos
-
-  if(!window._renoProgress) window._renoProgress = {};
-  window._renoProgress[unitId] = prog;
-  fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress', {
-    method: 'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-    body: JSON.stringify({ unit_id: unitId, data: prog, updated_at: new Date().toISOString() })
-  }).catch(function(e){ console.warn('Reno progress save failed:',e); });
-
-  // Mirror the progress percent onto every open SOW for this unit so the SOW table shows it.
-  // Skip SOWs that are already completed (don't overwrite their final state).
-  // Also: auto-mark the most recent active SOW as 'completed' when progress hits 100%.
-  (function mirrorProgress(){
-    var list = getUnitSowList(unitId);
-    if(!list.length) return;
-    var touched = false;
-    list.forEach(function(sow){
-      if(sow.approval_status === 'completed') return;
-      sow.progress = sow.progress || {};
-      sow.progress.percent = pct;
-      sow.progress.status  = status;
-      sow.progress.updated_at = new Date().toISOString();
-      touched = true;
-    });
-    // Auto-complete: if progress is 100 and there's at least one non-completed SOW,
-    // mark the MOST RECENT non-completed SOW as completed.
-    if(pct >= 100){
-      var candidates = list.filter(function(s){ return s.approval_status !== 'completed'; });
-      if(candidates.length){
-        candidates.sort(function(a, b){ return (b.created_at||'').localeCompare(a.created_at||''); });
-        var target = candidates[0];
-        target.approval_status = 'completed';
-        target.completed_at = new Date().toISOString();
-        target.completed_by = window.currentUserName || _realRoleForPermissions();
-        auditEntry('SOW:'+unitId, 'sow_auto_completed', 'SOW '+(target.project_number||'?')+' auto-completed — progress reached 100%', _realRoleForPermissions());
-        touched = true;
-      }
-    }
-    if(touched) saveSowList(unitId, list);
-  })();
-
-  closeRenoProgress();
-  renderRenosView();
-  showToast('Progress updated');
-}
-
 function sowContractorSearch(q) {
   var dd = document.getElementById('sow_ct_dropdown');
   if(!dd) return;
@@ -8678,36 +8268,6 @@ function sowAddNewContractor() {
   if(m) m.style.display = 'flex';
 }
 
-function rpContractorSearch(q) {
-  var dd = document.getElementById('rp_ct_dropdown');
-  if(!dd) return;
-  var contractors = [];
-  var contractors = window._contractors || [];
-  var term = (q||'').toLowerCase().trim();
-  var matches = term
-    ? contractors.filter(function(c){ return (c.name||'').toLowerCase().includes(term) || (c.trade||'').toLowerCase().includes(term); })
-    : contractors;
-
-  var rows = matches.map(function(c) {
-    return '<div data-ct-name="'+c.name+'" data-ct-id="'+(c.id||'')+'" style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" '
-      +'onmousedown="rpSelectContractor(this)" '
-      +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-      +'<div style="font-weight:600;">'+c.name+'</div>'
-      +(c.trade?'<div style="font-size:11px;color:var(--muted);">'+c.trade+'</div>':'')
-      +'</div>';
-  });
-
-  // Always show "Add new contractor" option
-  rows.push('<div onmousedown="rpAddNewContractor()" style="padding:9px 14px;cursor:pointer;font-size:12px;font-weight:700;color:var(--yellow);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;" '
-    +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-    +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
-    +(term && !matches.length ? 'Add "'+q+'" as new contractor' : 'Add new contractor')
-    +'</div>');
-
-  dd.innerHTML = rows.join('');
-  dd.style.display = 'block';
-}
-
 function rpSelectContractor(el) {
   var name = el.getAttribute('data-ct-name');
   var id   = el.getAttribute('data-ct-id');
@@ -8736,33 +8296,6 @@ function rpAddNewContractor() {
   window._rpAfterContractorSave = true;
 }
 
-
-function handleRenoPhotoUpload(input) {
-  var files = Array.from(input.files);
-  files.forEach(function(file) {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      window._rpPendingPhotos = window._rpPendingPhotos || [];
-      window._rpPendingPhotos.push(e.target.result);
-      _renderRpPendingPhotos();
-    };
-    reader.readAsDataURL(file);
-  });
-  input.value = '';
-}
-
-function handleRenoPhotoDrop(event) {
-  var files = Array.from(event.dataTransfer.files).filter(function(f){ return f.type.startsWith('image/'); });
-  files.forEach(function(file) {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      window._rpPendingPhotos = window._rpPendingPhotos || [];
-      window._rpPendingPhotos.push(e.target.result);
-      _renderRpPendingPhotos();
-    };
-    reader.readAsDataURL(file);
-  });
-}
 
 function removeRenoPhoto(idx) {
   window._rpStoredPhotos = window._rpStoredPhotos || [];
@@ -8813,11 +8346,6 @@ function getSowData(unitId){
     return sorted[0];
   }
   return raw;  // legacy flat shape
-}
-
-function _getRawSowRecord(unitId){
-  // Escape hatch for code that needs the wrapper ({sows:[...]}).
-  return (window._sowCache && window._sowCache[unitId]) || null;
 }
 
 function saveSowData(unitId, data){
@@ -8885,10 +8413,6 @@ function getSowByProjectNumber(unitId, projectNumber){
 
 // ── SOW lock / permission helpers ─────────────────────────────────────────
 // A SOW becomes immutable once its approval_status is 'completed'. Only the ED
-// (using their real role, not view-as) can edit a completed SOW or reopen it.
-function _effectiveRole(){
-  return window._viewAsRole || window.currentRole || '';
-}
 function _realRoleForPermissions(){
   // For override authority we check the REAL role, not view-as.
   // This way an ED previewing "as HM" still has edit power on completed SOWs.
@@ -8931,12 +8455,6 @@ function upsertSowInList(unitId, sow){
     }
   }
   if(!found) list.push(sow);
-  saveSowList(unitId, list);
-  return list;
-}
-
-function deleteSowFromList(unitId, projectNumber){
-  var list = getUnitSowList(unitId).filter(function(s){ return s.project_number !== projectNumber; });
   saveSowList(unitId, list);
   return list;
 }
@@ -9877,12 +9395,6 @@ function populateSettings(){
   }
 }
 
-function saveSettings(section){
-  // HM and ED contacts now managed via the User Management lookup above
-  auditEntry('SETTINGS','settings_saved','Settings saved — section: '+(section||'general'),window.currentRole||'staff');
-  showToast('Settings saved');
-}
-
 function openUnitDetail(unitId) {
   var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
   var u = units.find(function(x){ return x.id === unitId; });
@@ -9966,13 +9478,6 @@ function openUnitDetail(unitId) {
   // Show panel
   var panel = document.getElementById('unitDetailPanel');
   if(panel){ panel.style.setProperty('display','flex','important'); }
-}
-
-function udpOpenFiles(){
-  if(_currentDetailUnitId) {
-    closeUnitDetail();
-    openTenantFilesPanel(_currentDetailUnitId);
-  }
 }
 
 // ── Unit Detail Panel — tenant files (read-only preview) ────────────
@@ -10112,26 +9617,6 @@ function getDefaultBudget(){
   var obj={fiscalYear:'2025-2026',pools:{}};
   BUDGET_POOLS.forEach(function(p){ obj.pools[p.id]={allocated:0,notes:''}; });
   return obj;
-}
-function getSpentByPool(){
-  var allUnits=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-  var spent={};
-  BUDGET_POOLS.forEach(function(p){spent[p.id]=0;});
-  allUnits.forEach(function(u){
-    var sow=null;
-    sow = getSowData(u.id);
-    if(!sow||!sow.totalCost)return;
-    var cost=parseFloat(sow.totalCost.replace(/[^0-9.]/g,''))||0;
-    if(!cost)return;
-    var funder=(u.funder||'').toLowerCase();
-    var poolId='band';
-    if(funder==='isc')poolId='isc';
-    else if(funder.includes('cmhc'))poolId='cmhc';
-    else if(funder.includes('rrap'))poolId='rrap';
-    else if(funder.includes('emergency'))poolId='emergency';
-    spent[poolId]=(spent[poolId]||0)+cost;
-  });
-  return spent;
 }
 function renderBudgetPools(){
   var tbody = document.getElementById('budget_pools_tbody');
@@ -10611,129 +10096,6 @@ var RENO_FUND_RULES = {
 // Critical system SOW categories — must be funded first
 var CRITICAL_SOW_CATS = ['Heating / HVAC','Electrical','Roofing','Windows & Doors','Plumbing'];
 
-function openRenoBudget(unitId) {
-  if(!unitId) return;
-  window._rbaUnitId = unitId;
-
-  var allUnits = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-  var u = allUnits.find(function(x){ return x.id===unitId; });
-  if(!u) return;
-
-  var sow = null;
-  sow = getSowData(unitId);
-
-  var approval = null;
-  approval = (window._renoBudget && window._renoBudget[unitId]) || null;
-
-  var budgetData = loadBudgetData() || getDefaultBudget();
-  var funder = u.funder || '';
-  var rule = RENO_FUND_RULES[funder] || RENO_FUND_RULES[''];
-  var totalCost = sow ? (parseFloat((sow.totalCost||'').replace(/[^0-9.]/g,''))||0) : 0;
-
-  // Header
-  document.getElementById('rba_unit_header').textContent = u.num+' '+u.street;
-
-  // Summary
-  var critItems = sow && sow.items ? sow.items.filter(function(it){ return CRITICAL_SOW_CATS.some(function(c){ return (it.category||'').includes(c); }); }) : [];
-  var critCost = critItems.reduce(function(s,it){ return s+(parseFloat(it.cost)||0); }, 0);
-  var nonCritCost = totalCost - critCost;
-  document.getElementById('rba_summary').innerHTML =
-    _rbaStat('💰 SOW Total', totalCost ? '$'+Math.round(totalCost).toLocaleString() : 'No SOW', '#111')
-   +_rbaStat('🔴 Critical Systems', critCost ? '$'+Math.round(critCost).toLocaleString() : '—', '#b91c1c')
-   +_rbaStat('🏠 Funder', rule.label, '#1d4ed8');
-
-  // Pool rule
-  document.getElementById('rba_pool_rule').textContent = rule.rule;
-
-  // Eligible pools with balances
-  var poolsHtml = '';
-  rule.pools.forEach(function(pid){
-    var pool = BUDGET_POOLS.find(function(p){ return p.id===pid; });
-    if(!pool) return;
-    var poolData = budgetData.pools[pid]||{allocated:0};
-    var allocated = poolData.allocated||0;
-    // Compute spent from approved renovations only
-    var spent = _getPoolSpent(pid);
-    var available = allocated - spent;
-    var pct = allocated>0 ? Math.min(100,Math.round((spent/allocated)*100)) : 0;
-    var barCol = available<=0?'#b91c1c':available<(allocated*0.2)?'#d97706':'#15803d';
-    poolsHtml += '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
-        +'<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:16px;">'+pool.icon+'</span><span style="font-size:13px;font-weight:700;color:var(--text);">'+pool.label+'</span></div>'
-        +'<div style="text-align:right;">'
-          +'<span style="font-size:13px;font-weight:800;color:'+(available>0?'#15803d':'#b91c1c')+';">$'+Math.max(0,Math.round(available)).toLocaleString()+'</span>'
-          +'<span style="font-size:11px;color:var(--muted);"> / $'+Math.round(allocated).toLocaleString()+' allocated</span>'
-        +'</div>'
-      +'</div>'
-      +'<div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">'
-        +'<div style="height:100%;width:'+pct+'%;background:'+barCol+';border-radius:3px;transition:width .3s;"></div>'
-      +'</div>'
-      +'</div>';
-  });
-  document.getElementById('rba_pools').innerHTML = poolsHtml || '<div style="font-size:12px;color:var(--muted);">No budget pools configured for this funder. Set allocations in Settings.</div>';
-
-  // Allocation input rows — critical first, then general
-  var allocHtml = '';
-  if(critItems.length) {
-    allocHtml += '<div style="font-size:11px;font-weight:700;color:#b91c1c;margin-bottom:4px;text-transform:uppercase;letter-spacing:.6px;">🔴 Critical Systems — Fund First</div>';
-    critItems.forEach(function(it,i){
-      var cost = parseFloat(it.cost)||0;
-      allocHtml += _rbaAllocRow('crit_'+i, it.category||'Critical item', cost, rule.pools, budgetData, approval);
-    });
-    allocHtml += '<div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:10px;margin-bottom:4px;text-transform:uppercase;letter-spacing:.6px;">Other Work Items</div>';
-  }
-  // General allocation input
-  allocHtml += _rbaAllocRow('general', 'Remaining / General Renovation', nonCritCost>0?nonCritCost:totalCost, rule.pools, budgetData, approval);
-  document.getElementById('rba_alloc_rows').innerHTML = allocHtml;
-  _updateRbaAllocSummary(totalCost, rule.pools, budgetData);
-
-  // Listen for changes
-  document.getElementById('rba_alloc_rows').querySelectorAll('input[type="number"]').forEach(function(inp){
-    inp.addEventListener('input', function(){ _updateRbaAllocSummary(totalCost, rule.pools, budgetData); });
-  });
-
-  // Rent-to-own repayment
-  var rtoSection = document.getElementById('rba_repayment_section');
-  rtoSection.style.display = rule.repayment ? 'block' : 'none';
-  if(approval && approval.repayment) {
-    var set = function(id,v){ var el=document.getElementById(id); if(el) el.value=v||''; };
-    set('rba_repay_amt', approval.repayment.amount);
-    set('rba_repay_monthly', approval.repayment.monthly);
-    set('rba_repay_start', approval.repayment.start);
-    set('rba_repay_notes', approval.repayment.notes);
-  }
-
-  // HM pre-fill
-  if(approval) {
-    var setF = function(id,v){ var el=document.getElementById(id); if(el) el.value=v||''; };
-    setF('rba_hm_name', approval.hmName);
-    setF('rba_hm_date', approval.hmDate);
-    setF('rba_hm_notes', approval.hmNotes);
-    setF('rba_ed_name', approval.edName);
-    setF('rba_ed_date', approval.edDate);
-    setF('rba_ed_notes', approval.edNotes);
-  } else {
-    ['rba_hm_name','rba_hm_date','rba_hm_notes','rba_ed_name','rba_ed_date','rba_ed_notes'].forEach(function(id){
-      var el=document.getElementById(id); if(el) el.value='';
-    });
-    var today = new Date().toISOString().slice(0,10);
-    var hmDate = document.getElementById('rba_hm_date'); if(hmDate) hmDate.value=today;
-  }
-
-  // Status badge
-  var badge = document.getElementById('rba_status_badge');
-  if(approval && approval.approved) {
-    badge.textContent='✓ Approved'; badge.style.background='#f0fdf4'; badge.style.color='#15803d';
-  } else if(approval && approval.overBudgetApproved) {
-    badge.textContent='✓ ED Over-Budget Approval'; badge.style.background='#fef9ec'; badge.style.color='#7a6000';
-  } else {
-    badge.textContent='Pending Approval'; badge.style.background='var(--bg)'; badge.style.color='var(--muted)';
-  }
-
-  var modal = document.getElementById('renoBudgetModal');
-  if(modal) modal.style.setProperty('display','flex','important');
-}
-
 function _rbaStat(label, value, col) {
   return '<div style="text-align:center;">'
     +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:4px;">'+label+'</div>'
@@ -10823,77 +10185,6 @@ function _getPoolSpent(pid) {
     }catch(e){}
   });
   return total;
-}
-
-function saveRenoBudgetApproval() {
-  var unitId = window._rbaUnitId;
-  if(!unitId) return;
-
-  var allUnits = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-  var u = allUnits.find(function(x){ return x.id===unitId; });
-  var funder = u ? (u.funder||'') : '';
-  var rule = RENO_FUND_RULES[funder] || RENO_FUND_RULES[''];
-
-  // Collect allocations
-  var allocations = {};
-  var totalAlloc = 0;
-  document.querySelectorAll('#rba_alloc_rows [id^="rba_pool_"]').forEach(function(sel){
-    var key = sel.id.replace('rba_pool_','');
-    var amtEl = document.getElementById('rba_amt_'+key);
-    var amt = parseFloat((amtEl&&amtEl.value)||0)||0;
-    allocations[key] = { pool:sel.value, amount:amt };
-    totalAlloc += amt;
-  });
-
-  // Check over-budget
-  var budgetData = loadBudgetData() || getDefaultBudget();
-  var overBudget = false;
-  rule.pools.forEach(function(pid){
-    var poolData = budgetData.pools[pid]||{allocated:0};
-    var available = (poolData.allocated||0) - _getPoolSpent(pid);
-    // subtract current unit's previous allocation to avoid double-counting
-    var using = 0;
-    Object.keys(allocations).forEach(function(k){ if(allocations[k].pool===pid) using+=allocations[k].amount; });
-    if(using > available) overBudget = true;
-  });
-
-  var get = function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
-
-  if(overBudget) {
-    var edName = get('rba_ed_name');
-    var edNotes = get('rba_ed_notes');
-    if(!edName || !edNotes) {
-      showToast('Over-budget requests require ED name and written justification.');
-      return;
-    }
-  }
-
-  var approval = {
-    unitId:unitId, approvedAt:new Date().toISOString(), approved:true,
-    overBudgetApproved:overBudget,
-    allocations:allocations, totalAllocated:totalAlloc,
-    hmName:get('rba_hm_name'), hmDate:get('rba_hm_date'), hmNotes:get('rba_hm_notes'),
-    edName:overBudget?get('rba_ed_name'):'', edDate:overBudget?get('rba_ed_date'):'', edNotes:overBudget?get('rba_ed_notes'):'',
-  };
-
-  // Rent-to-own repayment
-  if(rule.repayment) {
-    approval.repayment = {
-      amount:get('rba_repay_amt'), monthly:get('rba_repay_monthly'),
-      start:get('rba_repay_start'), notes:get('rba_repay_notes')
-    };
-  }
-
-    if(!window._renoBudget) window._renoBudget = {};
-  window._renoBudget[unitId] = approval;
-  fetch(SUPABASE_URL+'/rest/v1/housing_reno_budget', {
-    method: 'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-    body: JSON.stringify({ unit_id: unitId, data: approval, updated_at: new Date().toISOString() })
-  }).catch(function(e){ console.warn('Reno budget save failed:',e); });
-  closeRenoBudget();
-  renderRenosView();
-  showToast(overBudget ? 'Over-budget approval saved — ED sign-off recorded' : 'Budget approval granted');
 }
 
 function closeRenoBudget() {
@@ -11057,7 +10348,7 @@ function showWorklist() {
 }
 
 function renderWorklist() {
-  var realRole = window._realRole || window.currentRole || 'employee';
+  var realRole = window._realRole || window.currentRole || 'housing_employee_l1';
   var role = window._viewAsRole || realRole;
   var body = document.getElementById('worklist_body');
   var sub  = document.getElementById('worklist_subtitle');
@@ -11097,7 +10388,7 @@ function renderWorklist() {
 
   // ── Chip filter definitions ───────────────────────────────────────────────
   var chipDefs;
-  if(role === 'employee') {
+  if(role === 'housing_employee_l1') {
     chipDefs = [
       {key:'',          label:'All',            filter: function(a){ return !a.archived; }},
       {key:'action',    label:'Action Needed',  filter: function(a){ return a.status==='returned'; }, alert:true},
@@ -11141,7 +10432,7 @@ function renderWorklist() {
       return name.includes(search) || (a.id||'').toLowerCase().includes(search);
     });
   }
-  var showScore = (role !== 'employee');
+  var showScore = (role !== 'housing_employee_l1');
 
   // ── Chip counts ───────────────────────────────────────────────────────────
   var chipsHtml = chipDefs.map(function(c){
@@ -11302,7 +10593,7 @@ function headerSignOut() {
   if(HOUSING_SESSION && HOUSING_SESSION.accessToken) {
     if(confirm('Sign out of CLFN Housing?')) doLogout();
   } else {
-    switchRole('employee');
+    switchRole('housing_employee_l1');
     showToast('Signed out — reset to Employee role.');
   }
 }
@@ -11774,7 +11065,7 @@ async function renderAuditLog() {
 }
 
 function showRenosForRole() {
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   if(role === 'housing_manager' || role === 'ed') {
     showRenos();
   } else {
@@ -11868,7 +11159,7 @@ function renoSearchFilter(q) {
 }
 
 function showTenantsForRole() {
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   if(role === 'housing_manager' || role === 'ed') {
     showTenants();
   } else {
@@ -11961,7 +11252,7 @@ function tenantSearchFilter(q) {
 }
 
 function showInventoryForRole() {
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   if(role === 'housing_manager' || role === 'ed') {
     showInventory();
   } else {
@@ -12364,7 +11655,7 @@ function atSearchApps(q){
   if(!dd) return;
   var apps=typeof applications!=='undefined'?applications:(window.SP_APPLICATIONS||[]);
   // ed_approved = fully approved; mgr_approved = HM recommended (HM role can assign)
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   var valid=apps.filter(function(a){
     if(role==='ed') return a.status==='ed_approved'||a.status==='mgr_approved';
     if(role==='housing_manager') return a.status==='ed_approved'||a.status==='mgr_approved';
@@ -13743,7 +13034,7 @@ function goBack(){
 
 function showDashboard(){
   // The actual applications dashboard — HM and ED only
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   if(role !== 'housing_manager' && role !== 'ed') { showToast('Dashboard access requires Housing Manager or Executive Director role.'); return; }
   if(!window._navSkipPush) pushNav('dashboard');
   hideAllViews();
@@ -13768,7 +13059,7 @@ function showEmployeeHome(){
   var role = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.role)
           || window._realRole
           || window.currentRole
-          || 'employee';
+          || 'housing_employee_l1';
   console.log('[housing] showEmployeeHome: role=' + role
     + ' (HOUSING_SESSION.role=' + (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.role : 'n/a')
     + ', _realRole=' + window._realRole
@@ -14301,7 +13592,7 @@ window.CLFN_AUTH = {
   // Call this after a successful Supabase login + staff table lookup
   setSession: function(supabaseUser, staffRow) {
     this.currentUser     = { id: supabaseUser.id, name: staffRow.name, email: supabaseUser.email };
-    this.currentRole     = staffRow.role || 'employee';
+    this.currentRole     = staffRow.role || 'housing_employee_l1';
     this.employeeId      = staffRow.id;
     this.isAuthenticated = true;
 
@@ -14322,16 +13613,16 @@ window.CLFN_AUTH = {
   // Call this on logout
   clearSession: function() {
     this.currentUser     = null;
-    this.currentRole     = 'employee';
+    this.currentRole     = 'housing_employee_l1';
     this.employeeId      = null;
     this.isAuthenticated = false;
-    window.currentRole   = 'employee';
+    window.currentRole   = 'housing_employee_l1';
     console.log('[CLFN] Session cleared');
   },
 
   // Helper used throughout the app — returns the active role
   getRole: function() {
-    return window.currentRole || this.currentRole || 'employee';
+    return window.currentRole || this.currentRole || 'housing_employee_l1';
   },
 
   // Helper — true if HM or ED
@@ -14833,7 +14124,7 @@ function renderScorecardActions(app) {
   var btns = document.getElementById('sc_action_buttons');
   if(!bar || !btns || !app) return;
 
-  var role   = window.currentRole || 'employee';
+  var role   = window.currentRole || 'housing_employee_l1';
   var status = app.status || 'draft';
   var isFileUpdate = (app.appType === 'existing_tenant');
   var actions = [];
@@ -15496,7 +14787,7 @@ function _ctRenderFlow(status, ct) {
 function _ctRenderActions(ct) {
   var el = document.getElementById('ctap_actions');
   if(!el) return;
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   var status = ct.status || 'pending_review';
   var actions = [];
 
@@ -15672,7 +14963,7 @@ function openAssignModal(appId, suggestedUnitId) {
   if(!allUnits.length) allUnits=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
   var app = allApps.find(function(a){ return a.id===appId; });
   if(!app){ showToast('Application not found'); return; }
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
 
   var vacantUnits = allUnits.filter(function(u){ return u.status==='vacant' && !u.archived; });
   var name = ((app.fn||'')+' '+(app.ln||'')).trim();
@@ -15776,7 +15067,7 @@ function amRenderUnitList(role, needsAccess) {
 
 function amSelectUnit(unitId) {
   _amSelectedUnitId = unitId;
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
 
   // Tie detection: units within 1 point of the top score are "tied" / equally recommended
   var topScore = _amAllScored.length > 0 ? _amAllScored[0].score : 0;
@@ -15999,7 +15290,7 @@ function _getAllRenoUnits() {
 }
 
 function renderRenoApprovalsView() {
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   var relevant = _getAllRenoUnits();
 
   var rows = relevant.map(function(u) {
@@ -16391,10 +15682,10 @@ async function resolveHousingRole() {
       window._viewAsRole = '';
       if(typeof setupHeaderRoleToggle === 'function') setupHeaderRoleToggle(housingRole);
     } else {
-      HOUSING_SESSION.role='employee';
-      window.currentRole='employee';
+      HOUSING_SESSION.role='housing_employee_l1';
+      window.currentRole='housing_employee_l1';
     }
-  } catch(e) { console.warn('[HOUSING] role lookup failed:', e); HOUSING_SESSION.role='employee'; window.currentRole='employee'; }
+  } catch(e) { console.warn('[HOUSING] role lookup failed:', e); HOUSING_SESSION.role='housing_employee_l1'; window.currentRole='housing_employee_l1'; }
 }
 
 // ── Sign out ───────────────────────────────────────────────────────────────
@@ -16436,7 +15727,7 @@ async function doLogout() {
   HOUSING_SESSION={email:'',name:'',role:'',accessToken:''};
   HOUSING_HEADERS['Authorization']='Bearer '+SUPABASE_ANON;
   window.CLFN_AUTH.isAuthenticated=false;
-  window.currentRole='employee';
+  window.currentRole='housing_employee_l1';
   applications=[]; housingUnits=[];
   showLoginScreen();
 }
@@ -16786,7 +16077,7 @@ async function submitAddHousingStaff() {
   var name  = ((document.getElementById('hs-name')||{}).value||'').trim();
   var email = ((document.getElementById('hs-email')||{}).value||'').trim().toLowerCase();
   var dept  = (document.getElementById('hs-dept')||{}).value||'';
-  var role  = (document.getElementById('hs-role')||{}).value||'employee';
+  var role  = (document.getElementById('hs-role')||{}).value||'housing_employee_l1';
   var btn   = document.getElementById('hs-submit-btn');
   var res   = document.getElementById('hs-result');
 
@@ -16918,7 +16209,7 @@ function initHousingPage() {
   var settingsBtn = document.getElementById('tab_settings_btn');
 
   // Apply role-based visibility
-  var role = window.currentRole || 'employee';
+  var role = window.currentRole || 'housing_employee_l1';
   if(settingsBtn) settingsBtn.style.display = (role==='housing_manager'||role==='ed') ? '' : 'none';
   document.querySelectorAll('.hm-ed-only').forEach(function(e){
     e.style.display=(role==='housing_manager'||role==='ed')?'':'none';
@@ -16948,7 +16239,7 @@ function initHousingPage() {
   var token=null, savedRole=null, savedName=null, savedEmail=null;
   try {
     token      = sessionStorage.getItem('clfn_housing_token');
-    savedRole  = sessionStorage.getItem('clfn_housing_role') || 'employee';
+    savedRole  = sessionStorage.getItem('clfn_housing_role') || 'housing_employee_l1';
     savedName  = sessionStorage.getItem('clfn_housing_name') || '';
     savedEmail = sessionStorage.getItem('clfn_housing_email_session') || '';
   } catch(e) {}
