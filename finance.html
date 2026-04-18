@@ -462,9 +462,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
       <button class="btn btn-primary btn-sm" onclick="openModal('modalRentPayment')">+ Record Payment</button>
     </div>
   </div>
-  <div class="tenant-selector">
-    <label>Tenant</label>
-    <select id="rentTenantSelect" onchange="renderRentLedger()"></select>
+  <div class="tenant-picker" style="margin-bottom:16px;position:relative;">
+    <div class="search-wrap" style="margin:0;">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" id="rentTenantSearch"
+        placeholder="Search by name, unit, phone or email..."
+        oninput="tenantPickerSearch('rent', this.value)"
+        onfocus="tenantPickerFocus('rent')"
+        autocomplete="off"/>
+      <div id="rentTenantResults" class="tenant-search-results"></div>
+    </div>
+    <select id="rentTenantSelect" onchange="renderRentLedger()" style="display:none;"></select>
     <div class="tenant-info-badge" id="rentTenantBadge"></div>
   </div>
   <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);" id="rentStats"></div>
@@ -493,9 +501,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
       <button class="btn btn-primary btn-sm" onclick="openModal('modalArrPayment');currentArrId=null;">+ Record Payment</button>
     </div>
   </div>
-  <div class="tenant-selector">
-    <label>Tenant</label>
-    <select id="arrTenantSelect" onchange="renderArrangementsPage()"><option value="all">All Tenants</option></select>
+  <div class="tenant-picker" style="margin-bottom:16px;position:relative;">
+    <div class="search-wrap" style="margin:0;">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" id="arrTenantSearch"
+        placeholder="All Tenants — click to filter by name, unit, phone or email..."
+        oninput="tenantPickerSearch('arr', this.value)"
+        onfocus="tenantPickerFocus('arr')"
+        autocomplete="off"/>
+      <div id="arrTenantResults" class="tenant-search-results"></div>
+    </div>
+    <select id="arrTenantSelect" onchange="renderArrangementsPage()" style="display:none;"><option value="all">All Tenants</option></select>
   </div>
   <div id="arrangementsContent"></div>
 </div>
@@ -513,9 +529,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     <div><h1>Loans</h1><p>Renovation loans, rent-to-own, and repayment tracking</p></div>
     <div class="page-hdr-actions"><button class="btn btn-primary btn-sm" onclick="openModal('modalNewLoan')">+ New Loan</button></div>
   </div>
-  <div class="tenant-selector">
-    <label>Tenant</label>
-    <select id="loanTenantSelect" onchange="renderLoansPage()"></select>
+  <div class="tenant-picker" style="margin-bottom:16px;position:relative;">
+    <div class="search-wrap" style="margin:0;">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" id="loanTenantSearch"
+        placeholder="Search by name, unit, phone or email..."
+        oninput="tenantPickerSearch('loan', this.value)"
+        onfocus="tenantPickerFocus('loan')"
+        autocomplete="off"/>
+      <div id="loanTenantResults" class="tenant-search-results"></div>
+    </div>
+    <select id="loanTenantSelect" onchange="renderLoansPage()" style="display:none;"></select>
     <div class="tenant-info-badge" id="loanTenantBadge"></div>
   </div>
   <!-- Loan switcher tabs (shown when tenant has >1 loan) -->
@@ -536,9 +560,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     <div><h1>Journal Entries</h1><p>Manual debits and credits - reviewed by ED</p></div>
     <div class="page-hdr-actions"><button class="btn btn-primary btn-sm" onclick="openModal('modalJournalEntry')">+ New Entry</button></div>
   </div>
-  <div class="tenant-selector">
-    <label>Tenant</label>
-    <select id="journalTenantSelect" onchange="renderJournal()"><option value="all">All Tenants</option></select>
+  <div class="tenant-picker" style="margin-bottom:16px;position:relative;">
+    <div class="search-wrap" style="margin:0;">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" id="journalTenantSearch"
+        placeholder="All Tenants — click to filter by name, unit, phone or email..."
+        oninput="tenantPickerSearch('journal', this.value)"
+        onfocus="tenantPickerFocus('journal')"
+        autocomplete="off"/>
+      <div id="journalTenantResults" class="tenant-search-results"></div>
+    </div>
+    <select id="journalTenantSelect" onchange="renderJournal()" style="display:none;"><option value="all">All Tenants</option></select>
   </div>
   <div class="card"><div class="ctitle">Journal</div>
     <div class="tbl-wrap"><table class="tbl">
@@ -7263,6 +7295,133 @@ function initTenantSelects(){
     el.innerHTML=prefix+opts;
     if(cur)el.value=cur;
   });
+  // Also (re)populate the arrangements select which isn't in the loop above
+  // because it uses a different onchange wiring.
+  var arrSel = document.getElementById('arrTenantSelect');
+  if (arrSel) {
+    var cur = arrSel.value;
+    arrSel.innerHTML = '<option value="all">All Tenants</option>' + opts;
+    if (cur) arrSel.value = cur;
+  }
+  // Sync the visible search labels for each tenant picker so they show the
+  // currently-selected tenant on page re-entry. Idempotent.
+  ['rent','loan','journal','arr'].forEach(function(key){
+    syncTenantPickerLabel(key);
+  });
+}
+
+// ── Tenant search pickers ─────────────────────────────────────────────────
+// Replaces the "Select Tenant" dropdowns with a search-as-you-type input.
+// Each page has a search input + hidden results panel. Selecting a result
+// writes to the hidden <select id="xxxTenantSelect"> and fires its onchange
+// so all the existing render code keeps working unchanged.
+//
+// The hidden select remains the single source of truth for which tenant
+// is "selected" on each page. The search input is just UI sugar on top.
+var _TENANT_PICKERS = {
+  rent:    { input:'rentTenantSearch',    results:'rentTenantResults',    select:'rentTenantSelect',    allowAll:false, trigger:'renderRentLedger' },
+  arr:     { input:'arrTenantSearch',     results:'arrTenantResults',     select:'arrTenantSelect',     allowAll:true,  trigger:'renderArrangementsPage' },
+  loan:    { input:'loanTenantSearch',    results:'loanTenantResults',    select:'loanTenantSelect',    allowAll:false, trigger:'renderLoansPage' },
+  journal: { input:'journalTenantSearch', results:'journalTenantResults', select:'journalTenantSelect', allowAll:true,  trigger:'renderJournal' }
+};
+
+// Show matching tenants as the user types. Empty query → empty results (hidden).
+function tenantPickerSearch(key, q){
+  var cfg = _TENANT_PICKERS[key]; if(!cfg) return;
+  var resultsEl = document.getElementById(cfg.results); if(!resultsEl) return;
+  var d = getData();
+  var ql = (q||'').trim().toLowerCase();
+  resultsEl.style.display = 'block';
+  var rows = '';
+  // Offer "All Tenants" option at the top if this picker supports it
+  if (cfg.allowAll) {
+    rows += '<div class="tenant-search-result" onclick="tenantPickerSelect(\''+key+'\',\'all\')">'
+      + '<div class="tsr-avatar" style="background:var(--yellow);color:#111;">*</div>'
+      + '<div><div class="tsr-name">All Tenants</div><div class="tsr-meta">Show every tenant</div></div>'
+      + '</div>';
+  }
+  var matches = d.tenants.filter(function(t){
+    if (!ql) return true;
+    return tenantName(t).toLowerCase().includes(ql)
+      || (t.unit||'').toLowerCase().includes(ql)
+      || (t.phone||'').includes(ql)
+      || (t.email||'').toLowerCase().includes(ql);
+  }).slice(0, 10);
+  if (!matches.length && ql) {
+    rows += '<div class="tenant-search-result" style="cursor:default;color:var(--muted);">No tenants found</div>';
+  } else {
+    rows += matches.map(function(t){
+      var initials = ((t.first||'')[0]||'') + ((t.last||'')[0]||'');
+      if (!initials) initials = '?';
+      var safeId = (t.id||'').replace(/'/g, "\\'");
+      var unitLabel = (t.unit||'');
+      var typeLabel = (t.type||'').replace(/-/g,' ');
+      return '<div class="tenant-search-result" onclick="tenantPickerSelect(\''+key+'\',\''+safeId+'\')">'
+        + '<div class="tsr-avatar">'+initials+'</div>'
+        + '<div><div class="tsr-name">'+tenantName(t)+'</div>'
+        + '<div class="tsr-meta">'+(unitLabel?unitLabel+' · ':'')+typeLabel+'</div></div>'
+        + '</div>';
+    }).join('');
+  }
+  resultsEl.innerHTML = rows;
+}
+
+// Select a tenant — writes to the hidden <select>, fires onchange to re-render.
+function tenantPickerSelect(key, tid){
+  var cfg = _TENANT_PICKERS[key]; if(!cfg) return;
+  var sel = document.getElementById(cfg.select);
+  var inp = document.getElementById(cfg.input);
+  var resultsEl = document.getElementById(cfg.results);
+  if (sel) {
+    sel.value = tid;
+    // Fire the existing render function
+    if (cfg.trigger && typeof window[cfg.trigger] === 'function') window[cfg.trigger]();
+  }
+  // Update the visible input label
+  if (inp) {
+    if (tid === 'all') {
+      inp.value = '';
+      inp.placeholder = 'All Tenants — click to filter by name, unit, phone or email...';
+    } else {
+      var d = getData();
+      var t = d.tenants.find(function(x){ return x.id === tid; });
+      inp.value = t ? tenantName(t) + (t.unit ? ' — ' + t.unit : '') : '';
+    }
+  }
+  if (resultsEl) resultsEl.style.display = 'none';
+}
+
+// After initTenantSelects runs, sync the visible input with the hidden select's
+// current value so re-entering a page shows the previously-selected tenant.
+function syncTenantPickerLabel(key){
+  var cfg = _TENANT_PICKERS[key]; if(!cfg) return;
+  var sel = document.getElementById(cfg.select);
+  var inp = document.getElementById(cfg.input);
+  if (!sel || !inp) return;
+  var tid = sel.value;
+  if (!tid || tid === '') {
+    inp.value = '';
+    return;
+  }
+  if (tid === 'all') {
+    inp.value = '';
+    return;
+  }
+  var d = getData();
+  var t = d.tenants.find(function(x){ return x.id === tid; });
+  if (t) inp.value = tenantName(t) + (t.unit ? ' — ' + t.unit : '');
+}
+
+// Clicking into the search input should show all tenants (or recent) by default
+// so the user doesn't have to type to see options.
+function tenantPickerFocus(key){
+  tenantPickerSearch(key, '');
+}
+
+// Clear the search and pick nothing (or 'all' if supported)
+function tenantPickerClear(key){
+  var cfg = _TENANT_PICKERS[key]; if(!cfg) return;
+  tenantPickerSelect(key, cfg.allowAll ? 'all' : '');
 }
 
 
