@@ -2031,6 +2031,8 @@ var FINANCE_HEADERS = HOUSING_SESSION ? {
 // END FINANCE MODULE BOOT
 // ═══════════════════════════════════════════════════════════════════════════
 
+console.log('[CLFN FINANCE] Build: F3A-2026-04-17-deepclone — tenant persistence fix');
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PERSISTENCE LAYER — Supabase-backed (Phase F3)
@@ -2682,8 +2684,13 @@ function _deleteRows(table, ids){
 // Supabase write fails, the user sees a red toast AND the data won't be
 // there on refresh. Painful, but honest.
 function saveData(d){
-  var prev = _memStore || _emptyStore();
+  // Snapshot prev BEFORE we touch _memStore. Deep-clone so later mutations
+  // (including _memStore = next on the next line) can't retroactively change
+  // what prev looks like during the diff.
+  var prev = _cloneStore(_memStore);
   var next = Object.assign(_emptyStore(), d || {});
+
+  console.log('[finance trace] saveData called. tenants: prev=' + (prev.tenants||[]).length + ', next=' + (next.tenants||[]).length);
 
   // 1) Update in-memory authoritative store immediately.
   _memStore = next;
@@ -2700,16 +2707,22 @@ function saveData(d){
     totalDeletes += diff.toDelete.length;
 
     if (diff.toUpsert.length) {
+      console.log('[finance trace] ' + spec.key + ' has ' + diff.toUpsert.length + ' rows to upsert to ' + spec.table);
       var rows = diff.toUpsert.map(function(x){
         try { return spec.toRow(x); } catch(e) { console.error('[finance] toRow failed on '+spec.key, x, e); return null; }
       }).filter(Boolean);
+      console.log('[finance trace] ' + spec.key + ' mapped to ' + rows.length + ' rows after toRow()');
       if (rows.length) {
+        console.log('[finance trace] ' + spec.key + ' payload:', JSON.stringify(rows, null, 2));
         _writeInFlight++;
         var p = _upsertRows(spec.table, rows)
-          .then(function(){ perTableReport.push(spec.key+':upserted '+rows.length); })
+          .then(function(resp){
+            console.log('[finance trace] ' + spec.table + ' upsert SUCCESS');
+            perTableReport.push(spec.key+':upserted '+rows.length);
+          })
           .catch(function(err){
             perTableReport.push(spec.key+':FAILED');
-            console.error('[finance] upsert ' + spec.table + ' failed:', err);
+            console.error('[finance] upsert ' + spec.table + ' FAILED:', err.message);
             console.error('[finance] payload that failed:', JSON.stringify(rows, null, 2));
             throw err;  // re-throw so Promise.all rejects
           })
@@ -2731,7 +2744,12 @@ function saveData(d){
     }
   });
 
-  if (writePromises.length === 0) return;
+  console.log('[finance trace] total writePromises: ' + writePromises.length + ', upserts=' + totalUpserts + ', deletes=' + totalDeletes);
+
+  if (writePromises.length === 0) {
+    console.log('[finance trace] no changes detected, nothing to persist');
+    return;
+  }
 
   // 3) Audit log write (also fire-and-forget).
   var auditPromise = _writeAuditEntry({
@@ -2802,18 +2820,25 @@ function _writeAuditEntry(entry){
 //                    tenant_id:ln.tenantId, summary:'Approved $8000 loan for Mary Atlookan'});
 function writeAuditEntry(entry){ return _writeAuditEntry(entry||{}); }
 
-// ── loadData / getData — unchanged contract ────────────────────────────────
-// These must remain synchronous because 125 call sites depend on that. We
-// return _memStore directly (shallow-merged with the empty shape to guarantee
-// every collection key exists). If _memStore is null (boot didn't finish),
-// return an empty shell — callers get empty arrays and the UI shows "no data"
-// rather than undefined errors.
+// ── loadData / getData — synchronous contract, deep copy ───────────────────
+// These must remain synchronous because 125 call sites depend on that, and
+// they must return a DEEP COPY of _memStore so that call sites which do
+// `var d = getData(); d.tenants.push(...); saveData(d);` don't mutate
+// _memStore in place. If they mutated _memStore in place, then by the time
+// saveData runs, `prev` (from _memStore) and `next` (from the passed d)
+// would be identical and the diff would find no changes — silently
+// dropping every write. That was the root-cause of "UI says saved, but
+// Supabase has nothing" bugs prior to this version.
 //
 // NO localStorage fallback. Previously we would restore from localStorage
-// if _memStore was null, which masked failed Supabase writes. Now the only
-// source of truth is what _bootLoadFinanceData() hydrates from Supabase.
+// if _memStore was null, which masked failed Supabase writes.
+function _cloneStore(s){
+  // JSON round-trip is sufficient: finance data is plain JSON-compatible
+  // (no Date, no functions, no circular refs). Fast enough at this scale.
+  return s ? JSON.parse(JSON.stringify(s)) : _emptyStore();
+}
 function loadData(){
-  if (_memStore) return Object.assign(_emptyStore(), _memStore);
+  if (_memStore) return Object.assign(_emptyStore(), _cloneStore(_memStore));
   return _emptyStore();
 }
 function getData(){ return loadData(); }
