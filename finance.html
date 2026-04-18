@@ -302,110 +302,39 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 
 <!-- HOME (tile grid — replaces sidebar nav) -->
 <div class="page on" id="page-home">
+
+  <!-- Greeting header -->
   <div class="home-greeting">
     <div class="home-accent-bar"></div>
     <div id="home_date" class="home-date-line"></div>
     <h1 class="home-welcome">Welcome back, <span id="home_user_name" style="color:var(--yellow);"></span></h1>
-    <p class="home-subtitle">Finance activity at a glance. Pick a tile below to get started.</p>
-  </div>
-  <div id="home_tiles_grid" class="home-tiles-grid"></div>
-</div>
-
-<!-- DASHBOARD -->
-<div class="page" id="page-dashboard">
-  <div class="page-back-row">
-    <button onclick="showHome()" class="back-btn-yellow">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-      Back to Home
-    </button>
-  </div>
-  <div class="page-hdr">
-    <div><h1>Finance Dashboard</h1><p id="dashSubtitle">Overview of all tenant accounts</p></div>
-    <div class="page-hdr-actions">
-      <button class="btn btn-ghost btn-sm" onclick="diagCheck()" style="font-size:11px;color:var(--muted);">🔍 Diagnose</button>
-      <button class="btn btn-ghost btn-sm" onclick="clearAndReseed()" style="font-size:11px;color:var(--muted);">↺ Reset Demo Data</button>
+    <p class="home-subtitle">Finance activity at a glance.</p>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-primary btn-sm" onclick="openModal('modalRentPayment')">&#127968; Record Payment</button>
       <button class="btn btn-ghost btn-sm" onclick="openModal('modalAddTenant')">+ Add Tenant</button>
+      <button class="btn btn-ghost btn-sm" onclick="diagCheck()" style="color:var(--muted);">&#128269; Diagnose</button>
+      <button class="btn btn-ghost btn-sm" onclick="clearAndReseed()" style="color:var(--muted);">&#8634; Reset Demo Data</button>
     </div>
   </div>
 
-  <!-- Tenant search bar -->
-  <div class="card" style="margin-bottom:20px;padding:20px 24px;">
-    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-      <div style="flex:1;min-width:220px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:7px;">Find a Tenant</div>
-        <div class="search-wrap" style="margin-bottom:0;">
-          <span class="search-icon">&#128269;</span>
-          <input type="text" id="dashTenantSearch"
-            placeholder="Name, unit, phone..."
-            oninput="dashSearchTenants(this.value)"
-            autocomplete="off"/>
-          <div id="dashSearchResults" class="tenant-search-results"></div>
-        </div>
-      </div>
+  <!-- Summary stats (previously on Dashboard) -->
+  <div class="stats-grid" id="dashStats" style="margin-bottom:18px;"></div>
+  <div id="dash-diag" style="font-size:11px;color:var(--muted);margin-bottom:14px;"></div>
+
+  <!-- Find-a-Tenant (compact) -->
+  <div style="margin-bottom:18px;">
+    <div class="search-wrap" style="margin:0;position:relative;">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" id="dashTenantSearch"
+        placeholder="Find a tenant by name, unit, phone or email..."
+        oninput="dashSearchTenants(this.value)"
+        autocomplete="off"/>
+      <div id="dashSearchResults" class="tenant-search-results"></div>
     </div>
   </div>
 
-  <div class="stats-grid" id="dashStats"></div>
-
-  <!-- Diagnostic: shows tenant count to confirm data loaded -->
-  <div id="dash-diag" style="font-size:11px;color:var(--muted);margin-bottom:8px;"></div>
-
-  <div class="card" style="margin-bottom:20px;">
-    <div class="ctitle">Record a Transaction</div>
-    <div class="action-panel">
-      <div class="action-section-label">Payments</div>
-      <button class="action-btn-card primary" onclick="openModal('modalRentPayment')">
-        <span class="action-icon">&#127968;</span>
-        <span class="action-label">Record Payment</span>
-        <span class="action-sub">Rent, arrangement &amp; loan</span>
-      </button>
-
-      <div class="action-section-label">Create Records</div>
-      <button class="action-btn-card" onclick="openModal('modalNewInvoice')">
-        <span class="action-icon">&#128196;</span>
-        <span class="action-label">New Invoice</span>
-        <span class="action-sub">Generate monthly rent invoice</span>
-      </button>
-      <button class="action-btn-card" onclick="openModal('modalNewArrangement')">
-        <span class="action-icon">&#9997;</span>
-        <span class="action-label">New Arrangement</span>
-        <span class="action-sub">Propose a repayment plan</span>
-      </button>
-      <button class="action-btn-card" onclick="openModal('modalNewLoan')">
-        <span class="action-icon">&#128176;</span>
-        <span class="action-label">New Loan</span>
-        <span class="action-sub">Renovation or rent-to-own</span>
-      </button>
-      <button class="action-btn-card" onclick="openModal('modalJournalEntry')">
-        <span class="action-icon">&#128211;</span>
-        <span class="action-label">Journal Entry</span>
-        <span class="action-sub">Manual debit or credit</span>
-      </button>
-
-      <div class="action-section-label">Admin</div>
-      <button class="action-btn-card" onclick="showPage('reports');closeSidebarOnNav()">
-        <span class="action-icon">&#128202;</span>
-        <span class="action-label">Reports</span>
-        <span class="action-sub">Aging, statements, summaries</span>
-      </button>
-      <button class="action-btn-card" onclick="showPage('transactions');closeSidebarOnNav()">
-        <span class="action-icon">&#128260;</span>
-        <span class="action-label">Transactions</span>
-        <span class="action-sub">Full ledger history</span>
-      </button>
-      <button class="action-btn-card danger" onclick="openModal('modalFlagCollections')">
-        <span class="action-icon">&#128680;</span>
-        <span class="action-label" style="color:var(--danger);">Flag Collections</span>
-        <span class="action-sub">Refer account for collections</span>
-      </button>
-      <button class="action-btn-card" onclick="showAutoEngineModal()">
-        <span class="action-icon">&#9654;</span>
-        <span class="action-label">Auto Engine</span>
-        <span class="action-sub">Bulk invoice &amp; payment run</span>
-      </button>
-    </div>
-  </div>
-
+  <!-- Tile grid -->
+  <div id="home_tiles_grid" class="home-tiles-grid"></div>
 </div>
 
 <!-- TENANTS -->
@@ -3395,7 +3324,6 @@ function showPage(id) {
   // Return to top whenever a new page is shown so users don't land mid-scroll
   window.scrollTo({top:0, behavior:'instant'});
   if(id==='home') renderHome();
-  if(id==='dashboard') renderDashboard();
   if(id==='tenants') {
     setTimeout(function(){
       var inp = document.getElementById('tenantSearchInput');
@@ -3460,6 +3388,11 @@ function renderHome(){
     nameEl.textContent = who;
   }
 
+  // Render the dashboard stats block (Total Owing, Rent Arrears, Accounts Clear, Collections)
+  // This is what renderDashboard() populates — the function stays because many other
+  // code paths call it after mutations (payments, voids, etc.) to refresh stats.
+  if (typeof renderDashboard === 'function') renderDashboard();
+
   // Compute live counts from _memStore for the tile stat lines.
   var d = getData();
   var tenants = d.tenants || [];
@@ -3500,13 +3433,6 @@ function renderHome(){
   }
 
   var tiles = [];
-
-  // Dashboard — full-width overview of all accounts
-  tiles.push(tile('📊','Dashboard',"showPage('dashboard')",'#3b82f6',
-    stat('Active Tenants', active, 'info')
-    + stat('Former Tenants', former, 'neutral')
-    + stat('Open Invoices', openInvoices, openInvoices>0?'alert':'neutral')
-  ));
 
   // Tenants
   tiles.push(tile('👥','Tenants',"showPage('tenants')",'#0ea5e9',
