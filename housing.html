@@ -16488,9 +16488,21 @@ async function loadAppDataFromSupabase() {
           id:row.id, status:row.status, score:row.score, tier:row.tier,
           classification:row.classification, reserve:row.reserve,
           archived:!!row.archived, assignedUnit:row.assigned_unit_id,
-          assignedAddress:row.assigned_address, submittedAt:row.submitted_at
+          assignedAddress:row.assigned_address, submittedAt:row.submitted_at,
+          created_by_email: row.created_by_email || null
         });
       });
+    } else {
+      // Supabase returned no rows — fall back to localStorage so existing
+      // data isn't lost during the transition period. Once apps are saved
+      // to Supabase this branch won't be hit.
+      try {
+        var lsApps = JSON.parse(localStorage.getItem('clfn_applications')||'[]');
+        if(lsApps.length) {
+          applications = lsApps;
+          console.log('[CLFN] Loaded '+lsApps.length+' applications from localStorage fallback');
+        }
+      } catch(e) { console.warn('[CLFN] localStorage fallback failed:', e); }
     }
 
     // Housing units
@@ -16521,6 +16533,15 @@ async function loadAppDataFromSupabase() {
           assignedTo:row.assigned_to, assignedName:row.assigned_name, assignedDate:row.assigned_date
         });
       });
+    } else {
+      // Fallback to localStorage during transition period
+      try {
+        var lsUnits = JSON.parse(localStorage.getItem('clfn_housing_units')||'[]');
+        if(lsUnits.length) {
+          housingUnits = lsUnits;
+          console.log('[CLFN] Loaded '+lsUnits.length+' units from localStorage fallback');
+        }
+      } catch(e) { console.warn('[CLFN] localStorage units fallback failed:', e); }
     }
 
     // Settings
