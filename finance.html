@@ -337,6 +337,80 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
   <div id="home_tiles_grid" class="home-tiles-grid"></div>
 </div>
 
+<!-- ENTRY FORMS — dedicated data-entry-only page for restricted roles -->
+<div class="page" id="page-entryforms">
+  <div class="page-back-row">
+    <button onclick="showHome()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Home
+    </button>
+  </div>
+
+  <div class="std-page-header">
+    <div class="std-page-header-main">
+      <h1 class="std-page-title">Entry Forms</h1>
+      <p class="std-page-subtitle">Record payments, create invoices, arrangements, loans, and other financial records. Use these forms to enter new data without browsing the full ledger.</p>
+      <div class="std-page-meta">All entries are audit-logged · Submissions may require ED approval</div>
+    </div>
+  </div>
+
+  <div class="action-panel" style="margin-top:4px;">
+
+    <div class="action-section-label">Payments</div>
+    <button class="action-btn-card primary" onclick="openModal('modalRentPayment')">
+      <span class="action-icon">&#127968;</span>
+      <span class="action-label">Record Payment</span>
+      <span class="action-sub">Rent, arrangement &amp; loan</span>
+    </button>
+
+    <div class="action-section-label">Create Records</div>
+    <button class="action-btn-card" onclick="openModal('modalNewInvoice')">
+      <span class="action-icon">&#128196;</span>
+      <span class="action-label">New Invoice</span>
+      <span class="action-sub">Generate monthly rent invoice</span>
+    </button>
+    <button class="action-btn-card" onclick="openModal('modalNewArrangement')">
+      <span class="action-icon">&#9997;</span>
+      <span class="action-label">New Arrangement</span>
+      <span class="action-sub">Propose a repayment plan</span>
+    </button>
+    <button class="action-btn-card" onclick="openModal('modalNewLoan')">
+      <span class="action-icon">&#128176;</span>
+      <span class="action-label">New Loan</span>
+      <span class="action-sub">Renovation or rent-to-own</span>
+    </button>
+    <button class="action-btn-card" onclick="openModal('modalJournalEntry')">
+      <span class="action-icon">&#128211;</span>
+      <span class="action-label">Journal Entry</span>
+      <span class="action-sub">Manual debit or credit</span>
+    </button>
+    <button class="action-btn-card" onclick="openModal('modalOpeningBalance')">
+      <span class="action-icon">&#128200;</span>
+      <span class="action-label">Set Opening Balance</span>
+      <span class="action-sub">Carry-forward balance for a tenant</span>
+    </button>
+
+    <div class="action-section-label">Operations</div>
+    <button class="action-btn-card danger" onclick="openModal('modalFlagCollections')">
+      <span class="action-icon">&#128680;</span>
+      <span class="action-label" style="color:var(--danger);">Flag Collections</span>
+      <span class="action-sub">Refer account for collections</span>
+    </button>
+    <button class="action-btn-card" onclick="showAutoEngineModal()">
+      <span class="action-icon">&#9654;</span>
+      <span class="action-label">Auto Engine</span>
+      <span class="action-sub">Bulk invoice &amp; payment run</span>
+    </button>
+    <button class="action-btn-card" onclick="openModal('modalAddTenant')">
+      <span class="action-icon">&#128100;</span>
+      <span class="action-label">Add Tenant</span>
+      <span class="action-sub">Create a new tenant record</span>
+    </button>
+
+  </div>
+
+</div>
+
 <!-- TENANTS -->
 <div class="page" id="page-tenants">
   <div class="page-back-row">
@@ -3433,6 +3507,20 @@ function renderHome(){
   }
 
   var tiles = [];
+
+  // Entry Forms — dedicated data-entry surface for restricted roles.
+  // Shows all "create" actions (payments, invoices, etc.) without exposing
+  // the underlying ledger listings.
+  tiles.push(tile('📝','Entry Forms',"showPage('entryforms')",'#F8E41A',
+    stat('Create Records', '9 forms', 'neutral')
+    + stat('Audit-Logged', 'Yes', 'good')
+  ));
+
+  // Batch — opens Batch Invoice modal (bulk print/generate)
+  tiles.push(tile('🖨️','Batch',"openModal('modalBatchInvoice');renderBatchList();",'#7c3aed',
+    stat('Active Tenants', active, 'info')
+    + stat('Bulk Invoice', 'Ready', 'good')
+  ));
 
   // Tenants
   tiles.push(tile('👥','Tenants',"showPage('tenants')",'#0ea5e9',
