@@ -1167,3 +1167,27 @@ body.modal-open { overflow: hidden; position: fixed; width: 100%; }
   .std-table{font-size:12px;}
   .std-table th,.std-table td{padding:8px 10px;}
 }
+
+/* ─────────────────────────────────────────────────────────────── */
+/* Voucher + amount styles (Phase F3 — extracted from finance.html)  */
+/* Used by finance voucher modal, transaction lists, and TIC history */
+/* ─────────────────────────────────────────────────────────────── */
+
+/* Amounts — credit (green) / debit (red) text styles */
+.amt-credit{color:var(--success);font-weight:600;}
+.amt-debit{color:var(--danger);font-weight:600;}
+.txn-type-charge{color:var(--danger);font-weight:600;}
+.txn-type-payment{color:var(--success);font-weight:600;}
+
+/* TIC history chips — category toggle inside tenant profile */
+.tic-hist-chip{font-size:11px;padding:4px 10px;border:1px solid var(--line,#e5e7eb);background:#fff;color:var(--muted);border-radius:999px;cursor:pointer;transition:var(--tr);}
+.tic-hist-chip:hover{background:#f9fafb;}
+.tic-hist-chip.is-active{background:var(--dark);color:var(--yellow);border-color:var(--dark);}
+
+/* Voucher card (in-app modal) */
+.voucher{background:var(--surface);border-radius:12px;overflow:hidden;border:1px solid var(--border);}
+.voucher-hdr{background:var(--dark);padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;}
+.voucher-body{padding:0;}
+.voucher-row{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;border-bottom:1px solid var(--border);font-size:13px;}
+.voucher-row .lbl{font-size:12px;color:var(--muted);font-weight:500;}
+.voucher-total{background:var(--dark);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;}
