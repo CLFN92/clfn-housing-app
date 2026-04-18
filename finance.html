@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Housing Finance Module</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="shared.css"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -416,22 +417,68 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     </button>
   </div>
 
-  <!-- Compact search bar -->
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
-    <div style="flex:1;position:relative;">
-      <div class="search-wrap" style="margin:0;">
-        <span class="search-icon">&#128269;</span>
-        <input type="text" id="tenantSearchInput"
-          placeholder="Search by name, unit, phone or email..."
-          oninput="searchTenants(this.value)"
-          autocomplete="off"/>
-          <div id="tenantSearchResults" class="tenant-search-results"></div>
-      </div>
+  <!-- Page title + actions -->
+  <div class="std-page-header">
+    <div class="std-page-header-main">
+      <h1 class="std-page-title">Tenants</h1>
+      <p class="std-page-subtitle">Browse every tenant account. Use the search bar for quick lookup or narrow the list by status, type, arrears, or collections.</p>
+      <div class="std-page-meta" id="tenants_page_meta">—</div>
     </div>
-    <button class="btn btn-primary btn-sm" onclick="openModal('modalAddTenant')">+ Add Tenant</button>
+    <div class="std-page-actions">
+      <button class="btn btn-primary btn-sm" onclick="openModal('modalAddTenant')">+ Add Tenant</button>
+    </div>
   </div>
 
-  <!-- Browseable tenant list — shown when no profile is selected. Phase F3A. -->
+  <!-- Quick search bar -->
+  <div style="margin-bottom:14px;">
+    <div class="search-wrap" style="margin:0;">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" id="tenantSearchInput"
+        placeholder="Search by name, unit, phone or email..."
+        oninput="searchTenants(this.value)"
+        autocomplete="off"/>
+      <div id="tenantSearchResults" class="tenant-search-results"></div>
+    </div>
+  </div>
+
+  <!-- Filter row (between search and table) -->
+  <div class="std-filter-row">
+    <span class="std-filter-label">Status</span>
+    <select class="std-filter-control narrow" id="tfilt_status" onchange="renderTenantList()">
+      <option value="">All</option>
+      <option value="active">Active</option>
+      <option value="former">Former</option>
+      <option value="deceased">Deceased</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Type</span>
+    <select class="std-filter-control" id="tfilt_type" onchange="renderTenantList()">
+      <option value="">All types</option>
+      <option value="band-on">Band On-Reserve</option>
+      <option value="band-off">Band Off-Reserve</option>
+      <option value="band-staff">Band Office Staff</option>
+      <option value="clea">CLEA</option>
+      <option value="community">Community Member</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Arrears</span>
+    <select class="std-filter-control narrow" id="tfilt_arrears" onchange="renderTenantList()">
+      <option value="">All</option>
+      <option value="yes">Has Arrears</option>
+      <option value="no">No Arrears</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Collections</span>
+    <select class="std-filter-control narrow" id="tfilt_col" onchange="renderTenantList()">
+      <option value="">All</option>
+      <option value="yes">In Collections</option>
+      <option value="no">Not in Collections</option>
+    </select>
+    <div class="std-filter-spacer"></div>
+    <button class="std-filter-clear" onclick="clearTenantFilters()">Clear</button>
+  </div>
+
+  <!-- Browseable tenant list — shown when no profile is selected. -->
   <div id="tenantListPanel" style="margin-bottom:16px;"></div>
 
   <!-- TIC — hidden until tenant selected -->
@@ -454,19 +501,28 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
       Back to Home
     </button>
   </div>
-  <div class="page-hdr">
-    <div><h1>Rent Ledger</h1><p>Monthly rent charges, opening balances, and payments</p></div>
-    <div class="page-hdr-actions">
+
+  <!-- Page title + actions -->
+  <div class="std-page-header">
+    <div class="std-page-header-main">
+      <h1 class="std-page-title">Rent Ledger</h1>
+      <p class="std-page-subtitle">Monthly rent charges, opening balances, and payments for a single tenant.</p>
+      <div class="std-page-meta" id="rent_page_meta">—</div>
+    </div>
+    <div class="std-page-actions">
       <button class="btn btn-ghost btn-sm" onclick="openModal('modalBatchInvoice');renderBatchList()">&#128424; Batch Print</button>
+      <button class="btn btn-ghost btn-sm" onclick="openModal('modalOpeningBalance')">&#128176; Set Opening Balance</button>
       <button class="btn btn-ghost btn-sm" onclick="openModal('modalNewInvoice')">+ Invoice</button>
       <button class="btn btn-primary btn-sm" onclick="openModal('modalRentPayment')">+ Record Payment</button>
     </div>
   </div>
-  <div class="tenant-picker" style="margin-bottom:16px;position:relative;">
+
+  <!-- Tenant search picker -->
+  <div class="tenant-picker" style="margin-bottom:14px;position:relative;">
     <div class="search-wrap" style="margin:0;">
       <span class="search-icon">&#128269;</span>
       <input type="text" id="rentTenantSearch"
-        placeholder="Search by name, unit, phone or email..."
+        placeholder="Search for a tenant by name, unit, phone or email..."
         oninput="tenantPickerSearch('rent', this.value)"
         onfocus="tenantPickerFocus('rent')"
         autocomplete="off"/>
@@ -475,13 +531,66 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     <select id="rentTenantSelect" onchange="renderRentLedger()" style="display:none;"></select>
     <div class="tenant-info-badge" id="rentTenantBadge"></div>
   </div>
+
+  <!-- Filter row -->
+  <div class="std-filter-row">
+    <span class="std-filter-label">Date</span>
+    <select class="std-filter-control" id="rfilt_date" onchange="renderRentLedger()">
+      <option value="all">All time</option>
+      <option value="this_month">This month</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">Last 90 days</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Type</span>
+    <select class="std-filter-control" id="rfilt_type" onchange="renderRentLedger()">
+      <option value="">All types</option>
+      <option value="invoice">Invoice</option>
+      <option value="payment">Payment</option>
+      <option value="opening_balance">Opening Balance</option>
+      <option value="reversal">Reversal</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Status</span>
+    <select class="std-filter-control narrow" id="rfilt_status" onchange="renderRentLedger()">
+      <option value="">All</option>
+      <option value="active">Active</option>
+      <option value="paid">Paid</option>
+      <option value="voided">Voided</option>
+      <option value="overdue">Overdue</option>
+    </select>
+    <div class="std-filter-divider"></div>
+    <span class="std-filter-label">Amount</span>
+    <span class="std-amount-range">
+      <input type="number" id="rfilt_amt_min" placeholder="Min" step="0.01" oninput="renderRentLedger()"/>
+      <span class="sep">—</span>
+      <input type="number" id="rfilt_amt_max" placeholder="Max" step="0.01" oninput="renderRentLedger()"/>
+    </span>
+    <div class="std-filter-spacer"></div>
+    <button class="std-filter-clear" onclick="clearRentFilters()">Clear</button>
+  </div>
+
   <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);" id="rentStats"></div>
-  <div class="card">
-    <div class="ctitle" style="justify-content:space-between;">Rent Ledger<button class="btn btn-ghost btn-sm" onclick="openModal('modalOpeningBalance')">Set Opening Balance</button></div>
-    <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Date</th><th>Description</th><th>Charge</th><th>Payment</th><th>Balance</th><th>Method</th><th>Status</th><th></th></tr></thead>
+
+  <!-- Ledger table -->
+  <div class="std-table-card">
+    <div class="std-table-hdr">
+      <span>Ledger Entries</span>
+      <span class="std-table-count" id="rentLedgerCount">—</span>
+    </div>
+    <table class="std-table">
+      <thead><tr>
+        <th>Date</th>
+        <th>Description</th>
+        <th class="std-cell-right">Charge</th>
+        <th class="std-cell-right">Payment</th>
+        <th class="std-cell-right">Balance</th>
+        <th>Method</th>
+        <th>Status</th>
+        <th></th>
+      </tr></thead>
       <tbody id="rentLedgerBody"></tbody>
-    </table></div>
+    </table>
   </div>
 </div>
 
@@ -3445,67 +3554,118 @@ function selectTenantProfile(tid) {
 
 // Phase F3A — browseable tenant list on the Tenants tab. Shown when no
 // profile is selected; clicking a row opens that tenant's profile.
+function clearTenantFilters(){
+  var ids = ['tfilt_status','tfilt_type','tfilt_arrears','tfilt_col'];
+  ids.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  renderTenantList();
+}
+
 function renderTenantList() {
   var panel = document.getElementById('tenantListPanel');
   if (!panel) return;
   panel.style.display = 'block';
   var d = getData();
-  var list = (d.tenants||[]).slice().sort(function(a,b){
+  var all = (d.tenants||[]).slice().sort(function(a,b){
     return tenantName(a).localeCompare(tenantName(b));
   });
-  if (!list.length) {
-    panel.innerHTML = '<div class="card" style="text-align:center;padding:30px;color:var(--muted);">' +
-      '<div style="font-size:24px;margin-bottom:8px;">&#128101;</div>' +
+
+  // Apply filter selections
+  var fStatus = (document.getElementById('tfilt_status')||{}).value || '';
+  var fType   = (document.getElementById('tfilt_type')||{}).value   || '';
+  var fArr    = (document.getElementById('tfilt_arrears')||{}).value|| '';
+  var fCol    = (document.getElementById('tfilt_col')||{}).value    || '';
+
+  // Pre-compute which tenants are in collections and who has arrears
+  var totals = calcAllTotals(d);
+  var colSet = {};
+  (d.collections||[]).forEach(function(c){
+    if (c.status==='approved' || c.status==='pending-ed') colSet[c.tenantId] = true;
+  });
+
+  var list = all.filter(function(t){
+    // Status filter — treat missing status as 'active'
+    var st = t.status || 'active';
+    if (fStatus && st !== fStatus) return false;
+    if (fType && t.type !== fType) return false;
+    if (fArr) {
+      var bal = totals[t.id] || {};
+      var owe = (bal.rent||0) + (bal.loan||0) + (bal.arrangement||0);
+      var hasArr = owe > 0;
+      if (fArr === 'yes' && !hasArr) return false;
+      if (fArr === 'no'  && hasArr) return false;
+    }
+    if (fCol) {
+      var inCol = !!colSet[t.id];
+      if (fCol === 'yes' && !inCol) return false;
+      if (fCol === 'no'  && inCol) return false;
+    }
+    return true;
+  });
+
+  // Page meta line (title card)
+  var meta = document.getElementById('tenants_page_meta');
+  if (meta) {
+    var today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+    meta.textContent = all.length + ' total · ' + list.length + ' shown · Last updated ' + today;
+  }
+
+  if (!all.length) {
+    panel.innerHTML = '<div class="std-table-card" style="text-align:center;padding:40px 30px;color:var(--muted);">' +
+      '<div style="font-size:28px;margin-bottom:10px;">&#128101;</div>' +
       '<div style="font-size:13px;">No tenants yet. Click <strong>+ Add Tenant</strong> to create the first one.</div>' +
       '</div>';
     return;
   }
-  // Compact table. Clickable rows open the profile.
-  var rows = list.map(function(t){
-    var initials = ((t.first||'')[0]||'') + ((t.last||'')[0]||'');
-    if (!initials) initials = '?';
-    var safeId = (t.id||'').replace(/'/g, "\\'");
-    var statusPill = t.status === 'former'
-      ? '<span class="pill" style="background:#fee2e2;color:#991b1b;font-size:10px;">Former</span>'
-      : t.status === 'deceased'
-        ? '<span class="pill" style="background:#e5e7eb;color:#4b5563;font-size:10px;">Deceased</span>'
-        : '<span class="pill" style="background:#dcfce7;color:#166534;font-size:10px;">Active</span>';
-    var unitLabel = t.unit || '<span style="color:var(--muted);">—</span>';
-    var typeLabel = (t.type||'').replace(/-/g,' ') || '<span style="color:var(--muted);">—</span>';
-    return '<tr onclick="selectTenantProfile(\''+safeId+'\')" style="cursor:pointer;border-top:1px solid var(--border);">'+
-      '<td style="padding:10px 14px;width:52px;"><div class="tsr-avatar" style="width:32px;height:32px;font-size:12px;">'+initials+'</div></td>'+
-      '<td style="padding:10px 14px;"><strong>'+tenantName(t)+'</strong></td>'+
-      '<td style="padding:10px 14px;">'+unitLabel+'</td>'+
-      '<td style="padding:10px 14px;text-transform:capitalize;">'+typeLabel+'</td>'+
-      '<td style="padding:10px 14px;">'+statusPill+'</td>'+
-      '<td style="padding:10px 14px;text-align:right;color:var(--muted);font-size:12px;">Click to open &rsaquo;</td>'+
-    '</tr>';
-  }).join('');
+
+  var typeLabels = {
+    'band-on':'Band On-Reserve','band-off':'Band Off-Reserve','band-staff':'Band Office Staff',
+    'clea':'CLEA','community':'Community Member'
+  };
+
+  var rows;
+  if (!list.length) {
+    rows = '<tr class="empty-row"><td colspan="6">No tenants match the current filters. <a href="#" onclick="clearTenantFilters();return false;" style="color:var(--text);text-decoration:underline;">Clear filters</a> to show all.</td></tr>';
+  } else {
+    rows = list.map(function(t){
+      var initials = ((t.first||'')[0]||'') + ((t.last||'')[0]||'');
+      if (!initials) initials = '?';
+      var safeId = (t.id||'').replace(/'/g, "\\'");
+      var st = t.status || 'active';
+      var pillClass = st === 'former' ? 'std-pill-former'
+                    : st === 'deceased' ? 'std-pill-deceased'
+                    : 'std-pill-active';
+      var statusText = st.charAt(0).toUpperCase() + st.slice(1);
+      var unitCell = t.unit ? t.unit : '<span class="std-cell-dash">—</span>';
+      var typeCell = typeLabels[t.type] || (t.type||'').replace(/-/g,' ') || '<span class="std-cell-dash">—</span>';
+      return '<tr class="clickable" onclick="selectTenantProfile(\''+safeId+'\')">'+
+        '<td class="std-row-avatar-cell"><div class="std-row-avatar">'+initials+'</div></td>'+
+        '<td class="std-cell-primary">'+tenantName(t)+'</td>'+
+        '<td>'+unitCell+'</td>'+
+        '<td>'+typeCell+'</td>'+
+        '<td><span class="std-pill '+pillClass+'">'+statusText+'</span></td>'+
+        '<td class="std-cell-tail">Click to open &rsaquo;</td>'+
+      '</tr>';
+    }).join('');
+  }
+
   panel.innerHTML =
-    '<div class="card" style="padding:0;overflow:hidden;">'+
-      '<div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">'+
-        '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">All Tenants</div>'+
-        '<div style="font-size:12px;color:var(--muted);">'+list.length+' total</div>'+
+    '<div class="std-table-card">'+
+      '<div class="std-table-hdr">'+
+        '<span>All Tenants</span>'+
+        '<span class="std-table-count">'+list.length+' shown · '+all.length+' total</span>'+
       '</div>'+
-      '<table style="width:100%;border-collapse:collapse;font-size:13px;">'+
-        '<thead><tr style="background:var(--bg);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;">'+
-          '<th style="text-align:left;padding:8px 14px;"></th>'+
-          '<th style="text-align:left;padding:8px 14px;">Name</th>'+
-          '<th style="text-align:left;padding:8px 14px;">Unit</th>'+
-          '<th style="text-align:left;padding:8px 14px;">Type</th>'+
-          '<th style="text-align:left;padding:8px 14px;">Status</th>'+
+      '<table class="std-table">'+
+        '<thead><tr>'+
+          '<th></th>'+
+          '<th>Name</th>'+
+          '<th>Unit</th>'+
+          '<th>Type</th>'+
+          '<th>Status</th>'+
           '<th></th>'+
         '</tr></thead>'+
         '<tbody>'+rows+'</tbody>'+
       '</table>'+
     '</div>';
-  // Add a subtle hover state via CSS (injected once)
-  if (!document.getElementById('tenant-list-style')){
-    var st = document.createElement('style');
-    st.id = 'tenant-list-style';
-    st.textContent = '#tenantListPanel tbody tr:hover { background:var(--bg); }';
-    document.head.appendChild(st);
-  }
 }
 
 function renderTenantProfile(tid) {
@@ -8130,28 +8290,112 @@ function renderTenants(){ return; /* no-op - CRM search replaces table */ var _u
 }
 
 // RENT LEDGER
+function clearRentFilters(){
+  var ids = ['rfilt_date','rfilt_type','rfilt_status','rfilt_amt_min','rfilt_amt_max'];
+  ids.forEach(function(id){
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (id === 'rfilt_date') el.value = 'all';
+    else el.value = '';
+  });
+  renderRentLedger();
+}
+
 function renderRentLedger(){
   var d=getData();
   var tid=document.getElementById('rentTenantSelect').value;
   var t=getTenant(tid);
-  if(!t){document.getElementById('rentLedgerBody').innerHTML='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted);">Select a tenant</td></tr>';return;}
+  var bodyEl = document.getElementById('rentLedgerBody');
+  var countEl = document.getElementById('rentLedgerCount');
+  var metaEl  = document.getElementById('rent_page_meta');
+
+  if(!t){
+    if (bodyEl) bodyEl.innerHTML='<tr class="empty-row"><td colspan="8">Select a tenant above to view their ledger.</td></tr>';
+    if (countEl) countEl.textContent = '—';
+    if (metaEl) metaEl.textContent = 'No tenant selected';
+    document.getElementById('rentStats').innerHTML='';
+    return;
+  }
   var badge=typePill(t.type)+(t.autoPay?' <span class="pill pill-green">Auto-Pay</span>':'')+collectionsBadge(tid);
   document.getElementById('rentTenantBadge').innerHTML=badge;
   var ob=document.getElementById('ob-tenant');if(ob)ob.value=tenantName(t);
-  var rows=d.rentLedger.filter(function(r){return r.tenantId===tid;}).sort(function(a,b){return a.date.localeCompare(b.date);});
-  var balance=0,totalCharged=0,totalPaid=0;
-  var html=rows.map(function(r){
-    balance+=r.charge-r.payment;totalCharged+=r.charge;totalPaid+=r.payment;
+
+  // Pull filter selections
+  var fDate   = (document.getElementById('rfilt_date')  ||{}).value || 'all';
+  var fType   = (document.getElementById('rfilt_type')  ||{}).value || '';
+  var fStatus = (document.getElementById('rfilt_status')||{}).value || '';
+  var fMin    = parseFloat((document.getElementById('rfilt_amt_min')||{}).value);
+  var fMax    = parseFloat((document.getElementById('rfilt_amt_max')||{}).value);
+
+  // Date cutoff
+  var cutoff = null;
+  var todayD = new Date();
+  if (fDate === 'this_month') {
+    cutoff = new Date(todayD.getFullYear(), todayD.getMonth(), 1);
+  } else if (fDate === '30') {
+    cutoff = new Date(todayD.getTime() - 30*24*60*60*1000);
+  } else if (fDate === '90') {
+    cutoff = new Date(todayD.getTime() - 90*24*60*60*1000);
+  }
+  function passDate(dateStr){
+    if (!cutoff) return true;
+    var dt = new Date(dateStr);
+    return dt >= cutoff;
+  }
+
+  // Running balance is computed on UNFILTERED rows to stay accurate.
+  // Then we apply filters for display only.
+  var allRows = d.rentLedger.filter(function(r){return r.tenantId===tid;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+  var balance=0, totalCharged=0, totalPaid=0;
+
+  // First pass — compute running balance and totals across all rows
+  allRows.forEach(function(r){
+    balance += r.charge - r.payment;
+    totalCharged += r.charge;
+    totalPaid += r.payment;
+    r._runningBalance = balance;
+  });
+
+  // Second pass — apply filters for what we render
+  var rows = allRows.filter(function(r){
+    if (!passDate(r.date)) return false;
+    if (fType && (r.type || '') !== fType) return false;
+    if (fStatus) {
+      // 'active' = default (not reversed, not voided, not overdue)
+      var st = r.status || '';
+      if (fStatus === 'active' && (st === 'reversed' || st === 'voided' || st === 'overdue')) return false;
+      if (fStatus === 'paid'    && r.type !== 'payment') return false;
+      if (fStatus === 'voided'  && st !== 'reversed' && st !== 'voided') return false;
+      if (fStatus === 'overdue' && st !== 'overdue') return false;
+    }
+    var amt = (r.charge||0) + (r.payment||0);
+    if (!isNaN(fMin) && amt < fMin) return false;
+    if (!isNaN(fMax) && amt > fMax) return false;
+    return true;
+  });
+
+  var html = rows.map(function(r){
     var isArr=r.type==='arrangement-line';
-    return '<tr'+(isArr?' style="background:var(--yellow-light);"':'')+'><td>'+r.date+'</td><td>'+r.desc+(isArr?' <span class="pill pill-yellow" style="font-size:10px;">Arrangement</span>':'')+'</td>'+
-      '<td>'+(r.charge>0?'<span class="amt-debit">'+fmt(r.charge)+'</span>':'&mdash;')+'</td>'+
-      '<td>'+(r.payment>0?'<span class="amt-credit">'+fmt(r.payment)+'</span>':'&mdash;')+'</td>'+
-      '<td class="balance-col '+(balance>0?'balance-owed':'balance-clear')+'">'+fmt(balance)+'</td>'+
+    var bal = r._runningBalance;
+    return '<tr'+(isArr?' style="background:var(--yellow-light);"':'')+'>'+
+      '<td>'+r.date+'</td>'+
+      '<td>'+r.desc+(isArr?' <span class="pill pill-yellow" style="font-size:10px;">Arrangement</span>':'')+'</td>'+
+      '<td class="std-cell-right">'+(r.charge>0?'<span class="amt-debit">'+fmt(r.charge)+'</span>':'<span class="std-cell-dash">&mdash;</span>')+'</td>'+
+      '<td class="std-cell-right">'+(r.payment>0?'<span class="amt-credit">'+fmt(r.payment)+'</span>':'<span class="std-cell-dash">&mdash;</span>')+'</td>'+
+      '<td class="std-cell-right balance-col '+(bal>0?'balance-owed':'balance-clear')+'">'+fmt(bal)+'</td>'+
       '<td style="font-size:12px;">'+methodLabel(r.method)+'</td>'+
       '<td>'+statusPill(r.status)+'</td>'+
       '<td>'+(r.type==='payment'?'<button class="btn btn-danger btn-sm" onclick="openReversal(\''+r.id+'\',\'rent\')">Rev.</button>':'')+'</td></tr>';
   }).join('');
-  document.getElementById('rentLedgerBody').innerHTML=html||'<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted);">No transactions yet</td></tr>';
+
+  if (bodyEl) {
+    bodyEl.innerHTML = html || '<tr class="empty-row"><td colspan="8">No entries match the current filters. <a href="#" onclick="clearRentFilters();return false;" style="color:var(--text);text-decoration:underline;">Clear filters</a> to show all.</td></tr>';
+  }
+  if (countEl) countEl.textContent = rows.length + ' shown · ' + allRows.length + ' total';
+  if (metaEl) {
+    var today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+    metaEl.textContent = tenantName(t) + ' · ' + (t.unit||'no unit') + ' · Last updated ' + today;
+  }
   document.getElementById('rentStats').innerHTML=statCard('Monthly Rent',fmt(t.rent),'','')+statCard('Total Charged',fmt(totalCharged),'','')+statCard('Balance Owing',fmt(balance),'',balance>0?'danger':'success');
 }
 

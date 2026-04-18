@@ -1065,3 +1065,105 @@ body.modal-open { overflow: hidden; position: fixed; width: 100%; }
 
 
 /* ── Sidebar nav buttons (renos.html) ─────────────────────────────────────── */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * STANDARD DESIGN SYSTEM — .std-* classes
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Reusable primitives for page headers, filter rows, and tables. Apply these
+ * across housing.html, renos.html, and finance.html so every list view feels
+ * like one product. Introduced as the canonical pattern in April 2026.
+ *
+ * Usage pattern for any list view:
+ *   <div class="std-page-header">
+ *     <div class="std-page-header-main">
+ *       <h1 class="std-page-title">Rent Ledger</h1>
+ *       <p class="std-page-subtitle">Monthly rent charges, opening balances, and payments</p>
+ *     </div>
+ *     <div class="std-page-actions"> ... buttons ... </div>
+ *   </div>
+ *   <div class="std-filter-row">
+ *     <select class="std-filter-control"> ... </select>
+ *     ...
+ *   </div>
+ *   <div class="std-table-card">
+ *     <div class="std-table-hdr"><span>Title</span><span class="std-table-count">N total</span></div>
+ *     <table class="std-table"> ... </table>
+ *   </div>
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* Page header — title + subtitle on left, action buttons on right. Replaces
+ * the ad-hoc <div class="page-hdr"> pattern used inconsistently across pages. */
+.std-page-header{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px;}
+.std-page-header-main{flex:1;min-width:0;}
+.std-page-title{font-size:24px;font-weight:700;color:var(--text);margin:0 0 4px 0;line-height:1.2;}
+.std-page-subtitle{font-size:13px;color:var(--muted);margin:0;line-height:1.4;}
+.std-page-meta{font-size:11px;color:var(--muted);margin-top:4px;font-weight:600;letter-spacing:.3px;}
+.std-page-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+
+/* Filter row — a card-like strip of controls that sits between a search bar
+ * (if any) and a table. Holds selects, pill buttons, date pickers, etc. */
+.std-filter-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;}
+.std-filter-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;white-space:nowrap;}
+.std-filter-control{border:1.5px solid var(--border);border-radius:7px;padding:7px 11px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--surface);outline:none;cursor:pointer;transition:border-color .15s;min-width:140px;}
+.std-filter-control:focus,.std-filter-control:hover{border-color:var(--yellow);}
+.std-filter-control.narrow{min-width:100px;}
+.std-filter-divider{width:1px;align-self:stretch;background:var(--border);margin:0 2px;}
+.std-filter-spacer{flex:1;}
+.std-filter-clear{background:none;border:none;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;padding:4px 8px;border-radius:6px;}
+.std-filter-clear:hover{color:var(--danger);background:rgba(185,28,28,.05);}
+
+/* Amount range mini-input pair */
+.std-amount-range{display:inline-flex;align-items:center;gap:4px;}
+.std-amount-range input{border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-family:'DM Sans',sans-serif;font-size:13px;width:90px;outline:none;transition:border-color .15s;}
+.std-amount-range input:focus{border-color:var(--yellow);}
+.std-amount-range .sep{color:var(--muted);font-size:12px;font-weight:600;}
+
+/* Standard table — unified styling for every list/ledger table in the suite.
+ * The wrapper card (std-table-card) gives the rounded border + bg; inside,
+ * std-table-hdr holds the title row with right-aligned count; below that
+ * sits the actual table. */
+.std-table-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;}
+.std-table-hdr{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);}
+.std-table-count{font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:500;}
+.std-table{width:100%;border-collapse:collapse;font-size:13px;}
+.std-table thead tr{background:var(--bg);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;}
+.std-table th{text-align:left;padding:10px 14px;font-weight:700;border-bottom:1px solid var(--border);}
+.std-table td{padding:12px 14px;border-top:1px solid var(--border);vertical-align:middle;}
+.std-table tbody tr{transition:background .12s;}
+.std-table tbody tr.clickable{cursor:pointer;}
+.std-table tbody tr.clickable:hover{background:var(--bg);}
+.std-table tr.empty-row td{text-align:center;color:var(--muted);padding:40px 14px;font-size:13px;}
+
+/* Avatar circle for first table column (names) */
+.std-row-avatar{width:32px;height:32px;border-radius:50%;background:var(--dark);color:var(--yellow);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.std-row-avatar-cell{width:52px;padding-right:0 !important;}
+
+/* Primary cell (usually the name column) */
+.std-cell-primary{font-weight:600;color:var(--text);}
+.std-cell-muted{color:var(--muted);}
+.std-cell-dash{color:var(--muted);}
+.std-cell-right{text-align:right;}
+.std-cell-tail{text-align:right;color:var(--muted);font-size:12px;white-space:nowrap;}
+.std-cell-mono{font-family:'SF Mono',Menlo,Consolas,monospace;font-size:12px;}
+
+/* Status pills — reuse existing .pill spec but with standardized color variants */
+.std-pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap;}
+.std-pill-active{background:#dcfce7;color:#166534;}
+.std-pill-former{background:#fee2e2;color:#991b1b;}
+.std-pill-deceased{background:#e5e7eb;color:#4b5563;}
+.std-pill-pending{background:#fef9ec;color:#7a6000;}
+.std-pill-approved{background:#dcfce7;color:#166534;}
+.std-pill-paid{background:#dcfce7;color:#166534;}
+.std-pill-overdue{background:#fee2e2;color:#991b1b;}
+.std-pill-voided{background:#e5e7eb;color:#4b5563;}
+.std-pill-info{background:#e8eef5;color:#1e3a5f;}
+
+/* Responsive: on narrow screens, fallback to stacked filter row */
+@media (max-width:680px){
+  .std-page-header{flex-direction:column;align-items:stretch;}
+  .std-filter-row{padding:10px;}
+  .std-filter-control{flex:1;min-width:0;}
+  .std-table{font-size:12px;}
+  .std-table th,.std-table td{padding:8px 10px;}
+}
