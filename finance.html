@@ -136,6 +136,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .txn-type-charge{color:var(--danger);font-weight:600;}
 .txn-type-payment{color:var(--success);font-weight:600;}
 
+/* ── TIC history chips (category toggle inside tenant profile) ── */
+.tic-hist-chip{font-size:11px;padding:4px 10px;border:1px solid var(--line,#e5e7eb);background:#fff;color:var(--muted);border-radius:999px;cursor:pointer;transition:var(--tr);}
+.tic-hist-chip:hover{background:#f9fafb;}
+.tic-hist-chip.is-active{background:var(--dark);color:var(--yellow);border-color:var(--dark);}
+
 /* ── Info boxes ── */
 .ibox{border-radius:8px;padding:10px 14px;font-size:13px;line-height:1.5;border:1px solid;}
 .ibox.yellow,.ibox-yellow,.ibox{background:var(--yellow-light);border-color:var(--yellow-mid);color:#7a6000;}
@@ -421,29 +426,33 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
   <div class="std-page-header">
     <div class="std-page-header-main">
       <h1 class="std-page-title">Tenants</h1>
-      <p class="std-page-subtitle">Browse every tenant account. Use the search bar for quick lookup or narrow the list by status, type, arrears, or collections.</p>
-      <div class="std-page-meta" id="tenants_page_meta">—</div>
+      <div id="tenantsListChromeSubtitle">
+        <p class="std-page-subtitle">Browse every tenant account. Use the search bar for quick lookup or narrow the list by status, type, arrears, or collections.</p>
+        <div class="std-page-meta" id="tenants_page_meta">—</div>
+      </div>
     </div>
-    <div class="std-page-actions">
+    <div class="std-page-actions" id="tenantsListChromeActions">
       <button class="btn btn-ghost btn-sm" onclick="exportTenants()">&#128196; Export CSV</button>
       <button class="btn btn-primary btn-sm" onclick="openModal('modalAddTenant')">+ Add Tenant</button>
     </div>
   </div>
 
-  <!-- Quick search bar -->
-  <div style="margin-bottom:14px;">
-    <div class="search-wrap" style="margin:0;">
-      <span class="search-icon">&#128269;</span>
-      <input type="text" id="tenantSearchInput"
-        placeholder="Search by name, unit, phone or email..."
-        oninput="searchTenants(this.value)"
-        autocomplete="off"/>
-      <div id="tenantSearchResults" class="tenant-search-results"></div>
+  <!-- Listing-only chrome: search bar + filter row. Hidden when a tenant profile (TIC) is open. -->
+  <div id="tenantsListChrome">
+    <!-- Quick search bar -->
+    <div style="margin-bottom:14px;">
+      <div class="search-wrap" style="margin:0;">
+        <span class="search-icon">&#128269;</span>
+        <input type="text" id="tenantSearchInput"
+          placeholder="Search by name, unit, phone or email..."
+          oninput="searchTenants(this.value)"
+          autocomplete="off"/>
+        <div id="tenantSearchResults" class="tenant-search-results"></div>
+      </div>
     </div>
-  </div>
 
-  <!-- Filter row (between search and table) -->
-  <div class="std-filter-row">
+    <!-- Filter row (between search and table) -->
+    <div class="std-filter-row">
     <span class="std-filter-label">Status</span>
     <select class="std-filter-control narrow" id="tfilt_status" onchange="renderTenantList()">
       <option value="">All</option>
@@ -477,10 +486,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     </select>
     <div class="std-filter-spacer"></div>
     <button class="std-filter-clear" onclick="clearTenantFilters()">Clear</button>
-  </div>
+    </div>
 
-  <!-- Browseable tenant list — shown when no profile is selected. -->
-  <div id="tenantListPanel" style="margin-bottom:16px;"></div>
+    <!-- Browseable tenant list — shown when no profile is selected. -->
+    <div id="tenantListPanel" style="margin-bottom:16px;"></div>
+  </div><!-- /#tenantsListChrome -->
 
   <!-- TIC — hidden until tenant selected -->
   <div id="tenantProfilePanel">
@@ -3397,6 +3407,7 @@ function showPage(id) {
   if(id==='home') renderHome();
   if(id==='tenants') {
     setTimeout(function(){
+      setTenantsChromeMode('list');
       var inp = document.getElementById('tenantSearchInput');
       if(inp){ inp.value=''; searchTenants(''); inp.focus(); }
       var pp = document.getElementById('tenantProfilePanel');
@@ -3798,16 +3809,38 @@ function searchTenants(q) {
   }).join('');
 }
 
+function setTenantsChromeMode(mode) {
+  // mode === 'list'   -> show listing header/search/filters/list
+  // mode === 'profile' -> hide them (TIC is up)
+  var ids = ['tenantsListChromeSubtitle','tenantsListChromeActions','tenantsListChrome'];
+  var disp = (mode === 'profile') ? 'none' : '';
+  ids.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.style.display = disp;
+  });
+}
+
 function selectTenantProfile(tid) {
   var resultsEl = document.getElementById('tenantSearchResults');
   if (resultsEl) resultsEl.style.display = 'none';
-  var listEl = document.getElementById('tenantListPanel');
-  if (listEl) listEl.style.display = 'none';   // hide browse list when a profile is up
   var inp = document.getElementById('tenantSearchInput');
   var t = getTenant(tid);
   if (!t) return;
   if (inp) inp.value = tenantName(t);
+  setTenantsChromeMode('profile');
   renderTenantProfile(tid);
+}
+
+function backToTenantList() {
+  setTenantsChromeMode('list');
+  var inp = document.getElementById('tenantSearchInput');
+  if (inp) { inp.value = ''; searchTenants(''); }
+  var pp = document.getElementById('tenantProfilePanel');
+  if (pp) pp.innerHTML = '<div style="text-align:center;padding:60px 0;color:var(--muted);">'+
+    '<div style="font-size:32px;margin-bottom:12px;">&#128101;</div>'+
+    '<div style="font-size:14px;">Search for a tenant above or pick one from the list below to view their information card</div></div>';
+  renderTenantList();
+  window.scrollTo({top:0, behavior:'instant'});
 }
 
 // Phase F3A — browseable tenant list on the Tenants tab. Shown when no
@@ -4000,6 +4033,7 @@ function renderTenantProfile(tid) {
   var s2btns = s2hdr.appendChild(document.createElement('div'));
   s2btns.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;';
   [
+    {lbl:'\u2190 Back to list', fn:'backToTenantList()',                    cls:'btn btn-ghost btn-sm'},
     {lbl:'+ Invoice',  fn:'openInvoiceForTenant("'+tid+'")',  cls:'btn btn-ghost btn-sm'},
     {lbl:'+ Payment',  fn:'openPaymentForTenant("'+tid+'")',  cls:'btn btn-primary btn-sm'},
   ].forEach(function(b){
@@ -4008,10 +4042,10 @@ function renderTenantProfile(tid) {
     btn.setAttribute('onclick', b.fn);
   });
 
-  // Clickable balance tiles
+  // Clickable balance tiles (compact)
   var balGrid = s2.appendChild(document.createElement('div'));
   balGrid.className = 'balance-tiles';
-  balGrid.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:4px;';
+  balGrid.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px;';
 
   var tiles = [
     {key:'rent',        lbl:'Rent Owing',   val:Math.max(0,v.rent||0),        icon:'\uD83C\uDFE0', danger:(v.rent||0)>0},
@@ -4024,7 +4058,7 @@ function renderTenantProfile(tid) {
     var cell = balGrid.appendChild(document.createElement('div'));
     var owing = tile.val > 0.005;
     var isTotal = tile.bold;
-    cell.style.cssText = 'border-radius:10px;padding:12px 14px;text-align:center;transition:var(--tr);' +
+    cell.style.cssText = 'border-radius:8px;padding:8px 10px;text-align:center;transition:var(--tr);' +
       'background:' + (isTotal ? 'var(--dark)' : owing ? '#fef2f2' : '#f0fdf4') + ';' +
       (tile.key !== 'total' ? 'cursor:pointer;' : '');
     if (tile.key !== 'total') {
@@ -4033,24 +4067,21 @@ function renderTenantProfile(tid) {
       cell.onmouseleave = function(){ if(!this._active) this.style.opacity='1'; };
       cell.onclick = (function(k, el){ return function(){ showTicDetail(tid, k, balGrid, el); }; })(tile.key, cell);
     }
+    // Inline icon + label on one line for the compact layout
+    var labelRow = cell.appendChild(document.createElement('div'));
+    labelRow.style.cssText = 'font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:' +
+      (isTotal ? '#888' : 'var(--muted)') + ';margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px;';
     if (tile.icon) {
-      var icon = cell.appendChild(document.createElement('div'));
-      icon.style.cssText = 'font-size:18px;margin-bottom:4px;';
-      icon.textContent = tile.icon;
+      var ic = labelRow.appendChild(document.createElement('span'));
+      ic.style.cssText = 'font-size:11px;';
+      ic.textContent = tile.icon;
     }
-    var lbl = cell.appendChild(document.createElement('div'));
-    lbl.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:' +
-      (isTotal ? '#888' : 'var(--muted)') + ';margin-bottom:4px;';
-    lbl.textContent = tile.lbl;
+    var lblTxt = labelRow.appendChild(document.createElement('span'));
+    lblTxt.textContent = tile.lbl;
     var val = cell.appendChild(document.createElement('div'));
-    val.style.cssText = 'font-size:18px;font-weight:700;color:' +
+    val.style.cssText = 'font-size:15px;font-weight:700;color:' +
       (isTotal ? 'var(--yellow)' : owing ? 'var(--danger)' : 'var(--success)') + ';';
     val.textContent = fmt(tile.val);
-    if (tile.key !== 'total') {
-      var hint = cell.appendChild(document.createElement('div'));
-      hint.style.cssText = 'font-size:10px;color:' + (isTotal?'#666':'var(--muted)') + ';margin-top:3px;';
-      hint.textContent = 'tap for details';
-    }
   });
 
   // Detail panel \u2014 shown when a tile is clicked
@@ -4172,7 +4203,91 @@ function renderTenantProfile(tid) {
     notesEl.textContent = '\uD83D\uDCDD ' + t.notes;
   }
 
-  
+  // \u2500\u2500 SECTION 3: Transaction History (full ledger for this tenant) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // Uses the shared getAllTransactions() data source and .std-* design system.
+  // Filters: ledger-category chips, date range, amount range, transaction type,
+  // and status. Each row has an action button to void (reverse) the transaction
+  // \u2014 the void path is wired through voidTicTransaction(), which is approval-
+  // ready (immediate for now; later will branch on role to queue for approval).
+  var s3 = pp.appendChild(document.createElement('div'));
+  s3.className = 'std-table-card';
+  s3.id = 'tic-history-' + tid;
+  s3.style.marginBottom = '12px';
+
+  s3.innerHTML =
+    '<div class="std-table-hdr">'+
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'+
+        '<h3 style="margin:0;font-size:15px;font-weight:700;">Transaction History</h3>'+
+        '<span class="std-table-count" id="tic-hist-count-'+tid+'">\u2014</span>'+
+      '</div>'+
+      '<div style="display:flex;gap:6px;">'+
+        '<button class="btn btn-ghost btn-sm" onclick="exportTicHistory(\''+tid+'\')">&#128196; Export CSV</button>'+
+      '</div>'+
+    '</div>'+
+    // Ledger category chips
+    '<div class="std-filter-row" style="flex-wrap:wrap;">'+
+      '<span class="std-filter-label">Category</span>'+
+      '<div id="tic-hist-chips-'+tid+'" style="display:flex;gap:6px;flex-wrap:wrap;">'+
+        '<button type="button" class="btn btn-sm tic-hist-chip is-active" data-ledger="all" onclick="toggleTicHistChip(\''+tid+'\',\'all\')">All</button>'+
+        '<button type="button" class="btn btn-sm tic-hist-chip" data-ledger="rent" onclick="toggleTicHistChip(\''+tid+'\',\'rent\')">Rent</button>'+
+        '<button type="button" class="btn btn-sm tic-hist-chip" data-ledger="arrangement" onclick="toggleTicHistChip(\''+tid+'\',\'arrangement\')">Arrangement</button>'+
+        '<button type="button" class="btn btn-sm tic-hist-chip" data-ledger="loans" onclick="toggleTicHistChip(\''+tid+'\',\'loans\')">Loans</button>'+
+        '<button type="button" class="btn btn-sm tic-hist-chip" data-ledger="journal" onclick="toggleTicHistChip(\''+tid+'\',\'journal\')">Journal</button>'+
+      '</div>'+
+    '</div>'+
+    // Standard filter row: type / status / date / amount
+    '<div class="std-filter-row" style="flex-wrap:wrap;">'+
+      '<span class="std-filter-label">Type</span>'+
+      '<select class="std-filter-control narrow" id="tic-hist-type-'+tid+'" onchange="renderTicHistory(\''+tid+'\')">'+
+        '<option value="all">All</option>'+
+        '<option value="charge">Charges</option>'+
+        '<option value="payment">Payments</option>'+
+      '</select>'+
+      '<div class="std-filter-divider"></div>'+
+      '<span class="std-filter-label">Status</span>'+
+      '<select class="std-filter-control narrow" id="tic-hist-status-'+tid+'" onchange="renderTicHistory(\''+tid+'\')">'+
+        '<option value="all">All</option>'+
+        '<option value="posted">Posted</option>'+
+        '<option value="pending">Pending</option>'+
+        '<option value="reversed">Voided / Reversed</option>'+
+      '</select>'+
+      '<div class="std-filter-divider"></div>'+
+      '<span class="std-filter-label">Date</span>'+
+      '<input type="date" class="std-filter-control narrow" id="tic-hist-from-'+tid+'" onchange="renderTicHistory(\''+tid+'\')" title="From"/>'+
+      '<span style="color:var(--muted);font-size:11px;">to</span>'+
+      '<input type="date" class="std-filter-control narrow" id="tic-hist-to-'+tid+'" onchange="renderTicHistory(\''+tid+'\')" title="To"/>'+
+      '<div class="std-filter-divider"></div>'+
+      '<span class="std-filter-label">Amount</span>'+
+      '<div class="std-amount-range">'+
+        '<input type="number" class="std-filter-control narrow" id="tic-hist-amtmin-'+tid+'" onchange="renderTicHistory(\''+tid+'\')" placeholder="Min" style="width:80px;"/>'+
+        '<span style="color:var(--muted);font-size:11px;">\u2013</span>'+
+        '<input type="number" class="std-filter-control narrow" id="tic-hist-amtmax-'+tid+'" onchange="renderTicHistory(\''+tid+'\')" placeholder="Max" style="width:80px;"/>'+
+      '</div>'+
+      '<div class="std-filter-spacer"></div>'+
+      '<button class="std-filter-clear" onclick="clearTicHistoryFilters(\''+tid+'\')">Clear</button>'+
+    '</div>'+
+    '<div style="overflow-x:auto;">'+
+      '<table class="std-table" id="tic-hist-table-'+tid+'">'+
+        '<thead>'+
+          '<tr>'+
+            '<th>Date</th>'+
+            '<th>Category</th>'+
+            '<th>Description</th>'+
+            '<th class="std-cell-right">Charge</th>'+
+            '<th class="std-cell-right">Payment</th>'+
+            '<th>Method</th>'+
+            '<th>Status</th>'+
+            '<th class="std-cell-tail">Actions</th>'+
+          '</tr>'+
+        '</thead>'+
+        '<tbody id="tic-hist-body-'+tid+'">'+
+          '<tr class="empty-row"><td colspan="8">Loading\u2026</td></tr>'+
+        '</tbody>'+
+      '</table>'+
+    '</div>';
+
+  // Initial render (newest-first by default \u2014 getAllTransactions() already sorts desc)
+  renderTicHistory(tid);
 }
 
 function showTicDetail(tid, key, balGrid, clickedCell) {
@@ -4307,6 +4422,255 @@ function showTicDetail(tid, key, balGrid, clickedCell) {
     '</div>' +
     html +
     '</div>';
+}
+
+// \u2500\u2500 TIC Transaction History \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Per-tenant transaction history section embedded in the TIC (renderTenantProfile).
+// Reuses: getAllTransactions() (shared with the Transactions page), methodLabel(),
+// openVoucher(), the std-* design system. Each tenant's filter state lives in
+// window._ticHistState[tid] so chip-toggles survive re-renders.
+
+window._ticHistState = window._ticHistState || {};
+
+function _ticHistGetState(tid) {
+  if (!window._ticHistState[tid]) {
+    window._ticHistState[tid] = { ledger:'all' }; // default: all categories
+  }
+  return window._ticHistState[tid];
+}
+
+function toggleTicHistChip(tid, ledger) {
+  var st = _ticHistGetState(tid);
+  st.ledger = ledger;
+  // Update visual state on chip buttons
+  var group = document.getElementById('tic-hist-chips-' + tid);
+  if (group) {
+    group.querySelectorAll('.tic-hist-chip').forEach(function(btn){
+      if (btn.getAttribute('data-ledger') === ledger) btn.classList.add('is-active');
+      else btn.classList.remove('is-active');
+    });
+  }
+  renderTicHistory(tid);
+}
+
+function clearTicHistoryFilters(tid) {
+  var st = _ticHistGetState(tid);
+  st.ledger = 'all';
+  ['type','status','from','to','amtmin','amtmax'].forEach(function(k){
+    var el = document.getElementById('tic-hist-' + k + '-' + tid);
+    if (el) el.value = (k === 'type' || k === 'status') ? 'all' : '';
+  });
+  // Reset chip visuals
+  var group = document.getElementById('tic-hist-chips-' + tid);
+  if (group) {
+    group.querySelectorAll('.tic-hist-chip').forEach(function(btn){
+      if (btn.getAttribute('data-ledger') === 'all') btn.classList.add('is-active');
+      else btn.classList.remove('is-active');
+    });
+  }
+  renderTicHistory(tid);
+}
+
+function _ticHistFilteredRows(tid) {
+  var st = _ticHistGetState(tid);
+  // getAllTransactions() is the shared data source (see renderTransactions).
+  // It returns every txn across rent/arrangement/loans/journal already sorted
+  // newest-first (desc by date string).
+  var all = (typeof getAllTransactions === 'function') ? getAllTransactions() : [];
+  // Narrow to this tenant
+  var rows = all.filter(function(r){ return r.tenantId === tid; });
+  // Category chip
+  if (st.ledger && st.ledger !== 'all') {
+    rows = rows.filter(function(r){
+      // getAllTransactions normalizes loan payments to ledger:'loans'; keep it tolerant
+      if (st.ledger === 'loans') return r.ledger === 'loans' || r.ledger === 'loan';
+      return r.ledger === st.ledger;
+    });
+  }
+  // Type: charge vs payment
+  var typ = (document.getElementById('tic-hist-type-' + tid)||{}).value || 'all';
+  if (typ === 'charge')  rows = rows.filter(function(r){ return (r.charge||0) > 0; });
+  if (typ === 'payment') rows = rows.filter(function(r){ return (r.payment||0) > 0; });
+  // Status
+  var status = (document.getElementById('tic-hist-status-' + tid)||{}).value || 'all';
+  if (status !== 'all') {
+    rows = rows.filter(function(r){
+      var s = (r.status||'').toLowerCase();
+      if (status === 'posted')   return s === 'posted' || s === 'approved' || s === '';
+      if (status === 'pending')  return s === 'pending' || s === 'pending-ed';
+      if (status === 'reversed') return s === 'reversed' || s === 'voided';
+      return true;
+    });
+  }
+  // Date range
+  var from = (document.getElementById('tic-hist-from-' + tid)||{}).value || '';
+  var to   = (document.getElementById('tic-hist-to-'   + tid)||{}).value || '';
+  if (from) rows = rows.filter(function(r){ return (r.date||'') >= from; });
+  if (to)   rows = rows.filter(function(r){ return (r.date||'') <= to; });
+  // Amount range (applies to the larger of charge/payment per row)
+  var amin = parseFloat((document.getElementById('tic-hist-amtmin-' + tid)||{}).value);
+  var amax = parseFloat((document.getElementById('tic-hist-amtmax-' + tid)||{}).value);
+  if (!isNaN(amin)) rows = rows.filter(function(r){ return Math.max(r.charge||0, r.payment||0) >= amin; });
+  if (!isNaN(amax)) rows = rows.filter(function(r){ return Math.max(r.charge||0, r.payment||0) <= amax; });
+  return rows;
+}
+
+function renderTicHistory(tid) {
+  var body = document.getElementById('tic-hist-body-' + tid);
+  var countEl = document.getElementById('tic-hist-count-' + tid);
+  if (!body) return;
+
+  var rows = _ticHistFilteredRows(tid);
+  var totalAll = (typeof getAllTransactions === 'function')
+    ? getAllTransactions().filter(function(r){ return r.tenantId === tid; }).length
+    : 0;
+
+  if (countEl) {
+    countEl.textContent = rows.length === totalAll
+      ? (rows.length + ' total')
+      : (rows.length + ' shown \u00B7 ' + totalAll + ' total');
+  }
+
+  var ledgerPill = {
+    'rent':        '<span class="std-pill std-pill-info">Rent</span>',
+    'arrangement': '<span class="std-pill std-pill-pending">Arrangement</span>',
+    'loans':       '<span class="std-pill std-pill-info">Loans</span>',
+    'loan':        '<span class="std-pill std-pill-info">Loans</span>',
+    'journal':     '<span class="std-pill std-pill-voided">Journal</span>',
+    'utility':     '<span class="std-pill std-pill-pending">Utility</span>'
+  };
+
+  function stdStatusPill(st){
+    st = (st||'').toLowerCase();
+    if (st === 'posted' || st === 'approved' || st === '') return '<span class="std-pill std-pill-paid">Posted</span>';
+    if (st === 'pending' || st === 'pending-ed') return '<span class="std-pill std-pill-pending">'+(st==='pending-ed'?'Pending ED':'Pending')+'</span>';
+    if (st === 'reversed' || st === 'voided') return '<span class="std-pill std-pill-voided">'+(st==='voided'?'Voided':'Reversed')+'</span>';
+    if (st === 'overdue') return '<span class="std-pill std-pill-overdue">Overdue</span>';
+    return '<span class="std-pill std-pill-info">'+st+'</span>';
+  }
+
+  if (!rows.length) {
+    body.innerHTML = totalAll === 0
+      ? '<tr class="empty-row"><td colspan="8">No transactions yet for this tenant.</td></tr>'
+      : '<tr class="empty-row"><td colspan="8">No transactions match the current filters. <a href="#" onclick="clearTicHistoryFilters(\''+tid+'\');return false;" style="color:var(--text);text-decoration:underline;">Clear filters</a> to show all.</td></tr>';
+    return;
+  }
+
+  // Voucher cache (shared pattern used on the Transactions page)
+  window._txnVoucherCache = window._txnVoucherCache || {};
+
+  body.innerHTML = rows.map(function(r){
+    var cacheKey = 'txn_' + r.id;
+    window._txnVoucherCache[cacheKey] = r;
+    var isReversed = (r.status === 'reversed' || r.status === 'voided');
+    var canVoid = !isReversed && r.id;
+    // escape ledger/id for inline attribute use
+    var ledgerAttr = (r.ledger||'').replace(/"/g,'&quot;');
+    var idAttr = (r.id||'').replace(/"/g,'&quot;');
+    return '<tr'+(isReversed?' style="opacity:.55;"':'')+'>'+
+      '<td>'+(r.date||'<span class="std-cell-dash">\u2014</span>')+'</td>'+
+      '<td>'+(ledgerPill[r.ledger]||'<span class="std-pill std-pill-info">'+(r.ledger||'\u2014')+'</span>')+'</td>'+
+      '<td style="max-width:280px;white-space:normal;">'+(r.desc||'<span class="std-cell-dash">\u2014</span>')+'</td>'+
+      '<td class="std-cell-right">'+((r.charge||0)>0?'<span class="amt-debit">'+fmt(r.charge)+'</span>':'<span class="std-cell-dash">\u2014</span>')+'</td>'+
+      '<td class="std-cell-right">'+((r.payment||0)>0?'<span class="amt-credit">'+fmt(r.payment)+'</span>':'<span class="std-cell-dash">\u2014</span>')+'</td>'+
+      '<td style="font-size:12px;">'+(typeof methodLabel==='function'?methodLabel(r.method):(r.method||''))+'</td>'+
+      '<td>'+stdStatusPill(r.status)+'</td>'+
+      '<td class="std-cell-tail" style="white-space:nowrap;">'+
+        '<button class="btn btn-ghost btn-sm" title="View voucher" onclick="openVoucher(window._txnVoucherCache[\'txn_'+r.id+'\'])">&#128203;</button> '+
+        (canVoid
+          ? '<button class="btn btn-ghost btn-sm" title="Void / reverse this transaction" style="color:var(--danger);" onclick="voidTicTransaction(\''+ledgerAttr+'\',\''+idAttr+'\',\''+tid+'\')">&#8634; Void</button>'
+          : '<span class="std-cell-dash" style="font-size:11px;">\u2014</span>')+
+      '</td>'+
+    '</tr>';
+  }).join('');
+}
+
+function exportTicHistory(tid) {
+  if (typeof exportStdCSV !== 'function') { toast('CSV export unavailable.'); return; }
+  var t = getTenant(tid);
+  var name = t ? tenantName(t).replace(/\s+/g,'_') : 'tenant';
+  var rows = _ticHistFilteredRows(tid);
+  var headers = ['Date','Category','Description','Charge','Payment','Method','Status','Ref'];
+  var out = rows.map(function(r){
+    return [
+      r.date||'',
+      r.ledger||'',
+      r.desc||'',
+      (r.charge||0).toFixed(2),
+      (r.payment||0).toFixed(2),
+      r.method||'',
+      r.status||'',
+      r.ref||''
+    ];
+  });
+  exportStdCSV('tenant-history-' + name, headers, out);
+}
+
+// Approval-ready void. For now: immediate void with reason prompt and audit
+// entry. Later, this will branch on user role to queue the reversal for
+// approval instead of applying it immediately \u2014 the call-site signature
+// stays the same.
+function voidTicTransaction(ledger, id, tid) {
+  if (!id || !ledger) { toast('Cannot void \u2014 missing reference.'); return; }
+  var reason = prompt('Reason for voiding this transaction? (required)');
+  if (reason === null) return; // user cancelled
+  reason = reason.trim();
+  if (!reason) { toast('A reason is required to void a transaction.'); return; }
+
+  var d = getData();
+  var rec = null;
+  var table = null;
+
+  if (ledger === 'rent' || ledger === 'utility') {
+    rec = (d.rentLedger||[]).find(function(x){ return x.id === id; });
+    table = 'rentLedger';
+  } else if (ledger === 'arrangement') {
+    rec = (d.arrPayments||[]).find(function(x){ return x.id === id; });
+    table = 'arrPayments';
+  } else if (ledger === 'loans' || ledger === 'loan') {
+    rec = (d.loanPayments||[]).find(function(x){ return x.id === id; });
+    table = 'loanPayments';
+  } else if (ledger === 'journal') {
+    rec = (d.journalEntries||[]).find(function(x){ return x.id === id; });
+    table = 'journalEntries';
+  }
+
+  if (!rec) { toast('Transaction not found \u2014 it may have already been voided.'); return; }
+  if (rec.status === 'reversed' || rec.status === 'voided') {
+    toast('Already voided.');
+    return;
+  }
+
+  var before = { status: rec.status || 'posted' };
+  rec.status = 'reversed';
+  rec.voidReason = reason;
+  rec.voidedAt = new Date().toISOString();
+  rec.voidedBy = (typeof CURRENT_USER !== 'undefined' ? CURRENT_USER : '');
+
+  // Audit trail \u2014 use shared auditLog() helper if available, else push direct.
+  if (typeof auditLog === 'function') {
+    auditLog('update', table, id, 'Void from TIC: ' + (rec.desc || ledger) + ' \u2014 ' + reason, before, { status:'reversed' });
+  } else if (d.auditLog) {
+    d.auditLog.push({
+      id: (typeof uid === 'function' ? uid() : String(Date.now())),
+      ts: new Date().toISOString(),
+      user: (typeof CURRENT_USER !== 'undefined' ? CURRENT_USER : ''),
+      action: 'update',
+      entity: table,
+      entityId: id,
+      description: 'Void from TIC: ' + (rec.desc || ledger) + ' \u2014 ' + reason,
+      before: before,
+      after: { status: 'reversed' }
+    });
+  }
+
+  saveData(d);
+  toast('Transaction voided.');
+
+  // Re-render everything that may reflect the change
+  renderTicHistory(tid);
+  if (typeof renderTenantProfile === 'function') renderTenantProfile(tid);
+  if (typeof renderDashboard === 'function') renderDashboard();
 }
 
 // \u2500\u2500 Ledger row actions \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
