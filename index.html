@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<title>CLFN Housing</title>
+<title>Sign In</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 <style>
 /*
@@ -1225,8 +1225,9 @@ body{font-family:'DM Sans',sans-serif;background:#fafaf8;color:#111;font-size:14
   <div style="width:100%;max-width:420px;display:flex;flex-direction:column;gap:20px;">
 
     <div style="text-align:center;padding-top:8px;">
-      <div style="font-family:'DM Serif Display',serif;font-size:24px;color:#fff;margin-bottom:4px;">CLFN Housing</div>
-      <div style="font-size:12px;color:#666;">Constance Lake First Nation</div>
+      <div style="display:inline-block;background:#000;border-radius:8px;padding:10px 16px;">
+        <img src="" id="login-logo" alt="" class="hlogo" style="width:56px;height:56px;display:block;"/>
+      </div>
     </div>
 
     <!-- Sign-in panel -->
@@ -1235,11 +1236,9 @@ body{font-family:'DM Sans',sans-serif;background:#fafaf8;color:#111;font-size:14
 
       <div style="display:flex;flex-direction:column;gap:5px;">
         <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#666;">Email</label>
-        <input id="signin-email" type="email" placeholder="you@clfn.on.ca"
+        <input id="signin-email" type="email" placeholder="Email address"
           style="background:#111;border:1px solid #333;border-radius:8px;padding:10px 14px;font-size:14px;color:#fff;font-family:DM Sans,sans-serif;outline:none;width:100%;box-sizing:border-box;"
-          onkeydown="if(event.key==='Enter')document.getElementById('signin-password').focus()"
-          oninput="var e=this.value.trim();var h=document.getElementById('email-domain-hint');if(h){if(e&&!e.endsWith('@clfn.on.ca')){h.style.display='block';}else{h.style.display='none';}}"/>
-        <div id="email-domain-hint" style="display:none;font-size:11px;color:#f87171;margin-top:2px;">&#9888; Must be a @clfn.on.ca email address</div>
+          onkeydown="if(event.key==='Enter')document.getElementById('signin-password').focus()"/>
       </div>
 
       <div style="display:flex;flex-direction:column;gap:5px;">
@@ -1286,8 +1285,8 @@ body{font-family:'DM Sans',sans-serif;background:#fafaf8;color:#111;font-size:14
     <div id="forgot-panel" style="display:none;background:#1a1a18;border:1px solid #2a2a28;border-radius:14px;padding:28px;text-align:center;">
       <div style="font-size:2rem;margin-bottom:12px;">&#128273;</div>
       <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:8px;">Reset password</div>
-      <p style="font-size:13px;color:#888;line-height:1.6;margin-bottom:14px;">Enter your CLFN email and we'll send you a password reset link.</p>
-      <input id="forgot-email" type="email" placeholder="you@clfn.on.ca"
+      <p style="font-size:13px;color:#888;line-height:1.6;margin-bottom:14px;">Enter your email and we'll send you a password reset link.</p>
+      <input id="forgot-email" type="email" placeholder="Email address"
         style="background:#111;border:1px solid #333;border-radius:8px;padding:10px 14px;font-size:14px;color:#fff;font-family:DM Sans,sans-serif;outline:none;width:100%;box-sizing:border-box;margin-bottom:12px;"
         onkeydown="if(event.key==='Enter')sendPasswordReset()"/>
       <button onclick="sendPasswordReset()" style="background:var(--yellow);border:none;color:#111;padding:10px;border-radius:8px;font-size:13px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;width:100%;margin-bottom:10px;">Send reset link</button>
@@ -1295,13 +1294,13 @@ body{font-family:'DM Sans',sans-serif;background:#fafaf8;color:#111;font-size:14
       <div id="forgot-msg" style="display:none;margin-top:10px;font-size:12px;padding:8px 12px;border-radius:6px;"></div>
     </div>
 
-    <div style="text-align:center;font-size:11px;color:#444;padding-bottom:8px;">Constance Lake First Nation &middot; Housing Department</div>
   </div>
 </div>
 
 
 
 
+<script src="shared.js"></script>
 <script>
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1433,508 +1432,43 @@ body{font-family:'DM Sans',sans-serif;background:#fafaf8;color:#111;font-size:14
 var SUPABASE_URL   = window.NATION_CONFIG.supabase_url;
 var SUPABASE_ANON  = window.NATION_CONFIG.supabase_anon;
 var STORAGE_BUCKET = window.NATION_CONFIG.storage_bucket || 'housing-files';
-
-// ── Supabase Storage helpers ──────────────────────────────────────────────────
-// All file uploads go through these functions.
-// Path conventions:
-//   tenants/{unitId}/{timestamp}_{filename}
-//   applications/{appId}/{timestamp}_{filename}
-//   contractors/{contractorId}/{bucket}/{timestamp}_{filename}
-//   units/{unitId}/photos/{timestamp}_{filename}
-//   sow/{unitId}/{timestamp}_{filename}
-
-function sbStorageHeaders() {
-  var h = { 'apikey': SUPABASE_ANON };
-  if(HOUSING_HEADERS && HOUSING_HEADERS['Authorization']) {
-    h['Authorization'] = HOUSING_HEADERS['Authorization'];
-  }
-  return h;
-}
-
-// Upload a File object to Supabase Storage. Returns {path, url} or throws.
-async function sbUploadFile(path, file) {
-  var url = SUPABASE_URL + '/storage/v1/object/' + STORAGE_BUCKET + '/' + path;
-  var res = await fetch(url, {
-    method: 'POST',
-    headers: Object.assign({}, sbStorageHeaders(), { 'x-upsert': 'true' }),
-    body: file
-  });
-  if(!res.ok) {
-    var err = await res.text();
-    throw new Error('Upload failed: ' + err);
-  }
-  return { path: path, url: sbGetFileUrl(path) };
-}
-
-// Get a signed URL for a file (valid 1 hour)
-async function sbGetSignedUrl(path) {
-  // Use Supabase JS client createSignedUrl if available — handles encoding automatically
-  try {
-    if(window._sb) {
-      var r = await window._sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
-      if(r.data && r.data.signedUrl) return r.data.signedUrl;
-    }
-  } catch(e) { console.warn('createSignedUrl error:', e); }
-  // Fallback: authenticated URL — token in Authorization header via fetch, then blob URL
-  return sbGetFileUrl(path);
-}
-
-// Return authenticated URL with properly encoded path and token
-function sbGetFileUrl(path) {
-  var token = (HOUSING_HEADERS && HOUSING_HEADERS['Authorization'] || '').replace('Bearer ','');
-  var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
-  var base = SUPABASE_URL + '/storage/v1/object/authenticated/' + STORAGE_BUCKET + '/' + encodedPath;
-  return token ? (base + '?token=' + encodeURIComponent(token)) : base;
-}
-
-// Delete a file from storage
-async function sbDeleteFile(path) {
-  var url = SUPABASE_URL + '/storage/v1/object/' + STORAGE_BUCKET;
-  var res = await fetch(url, {
-    method: 'DELETE',
-    headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ prefixes: [path] })
-  });
-  return res.ok;
-}
-
-// List files under a path prefix
-async function sbListFiles(prefix) {
-  // Remove trailing slash for the prefix
-  var cleanPrefix = prefix.replace(/\/$/, '');
-  var url = SUPABASE_URL + '/storage/v1/object/list/' + STORAGE_BUCKET;
-  var res = await fetch(url, {
-    method: 'POST',
-    headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ prefix: cleanPrefix, limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } })
-  });
-  if(!res.ok) return [];
-  var data = await res.json();
-  return Array.isArray(data) ? data : [];
-}
-
-// Save file metadata to housing_audit_log (so we can list files without storage list calls)
-async function sbSaveFileMeta(entityType, entityId, filePath, fileName, fileSize, fileType) {
-  try {
-    await fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
-      method: 'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
-      body: JSON.stringify({
-        entity_type: entityType,
-        entity_id: String(entityId),
-        action: 'file_uploaded',
-        details: JSON.stringify({ path: filePath, name: fileName, size: fileSize, type: fileType }),
-        actor: window.currentRole || 'staff',
-        created_at: new Date().toISOString()
-      })
-    });
-  } catch(e) { console.warn('File meta save failed:', e); }
-}
-
-// Load file list for an entity from audit log
-async function sbLoadFileMeta(entityType, entityId) {
-  try {
-    var r = await fetch(
-      SUPABASE_URL + '/rest/v1/housing_audit_log?entity_type=eq.'+entityType+'&entity_id=eq.'+encodeURIComponent(String(entityId))+'&action=eq.file_uploaded&order=created_at.desc',
-      { headers: HOUSING_HEADERS }
-    );
-    if(!r.ok) return [];
-    var rows = await r.json();
-    // Filter out deleted files
-    var deleted = rows.filter(function(r){ return r.action === 'file_deleted'; }).map(function(r){ return JSON.parse(r.details||'{}').path; });
-    return rows
-      .filter(function(row){ var d = JSON.parse(row.details||'{}'); return !deleted.includes(d.path); })
-      .map(function(row){
-        var d = JSON.parse(row.details||'{}');
-        return { path: d.path, name: d.name, size: d.size, type: d.type, addedAt: (row.created_at||'').slice(0,10), addedBy: row.actor, logId: row.id };
-      });
-  } catch(e) { return []; }
-}
-
-// Unified upload handler: uploads to Supabase Storage + saves metadata
-// Returns { path, name, size, type, addedAt, addedBy }
-async function sbUploadAndSave(entityType, entityId, file, pathPrefix) {
-  var ts = Date.now();
-  var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  var path = pathPrefix + '/' + ts + '_' + safeName;
-  var result = await sbUploadFile(path, file);
-  await sbSaveFileMeta(entityType, String(entityId), path, file.name, file.size, file.type);
-  return { path: path, name: file.name, size: file.size, type: file.type,
-           addedAt: new Date().toISOString().slice(0,10), addedBy: window.currentRole || 'staff' };
-}
-
-
-window._sb = null;
-document.addEventListener('DOMContentLoaded', function() {
-  try {
-    if(window.supabase && window.supabase.createClient) {
-      window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-      console.log('[CLFN] Supabase client ready');
-    }
-  } catch(e) { console.log('[CLFN] Supabase init failed:', e.message); }
-});
-
-// ══════════════════════════════════════════════════════════════
-// SUPABASE DATA LAYER
-// All localStorage reads/writes have Supabase equivalents here.
-// The app falls back to localStorage if Supabase is unavailable.
-// ══════════════════════════════════════════════════════════════
-
-var _sbReady = false;
-
-function sbClient() {
-  if(!window._sb) {
-    if(window.supabase && window.supabase.createClient) {
-      window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-      _sbReady = true;
-    }
-  }
-  return window._sb;
-}
-
 // ── Map staff table role to housing app role ────────────────────────────────
+// Uses CLFN_PERMS.normalizeRole so all six canonical roles (and legacy
+// aliases) are recognized, not just 'ed' and 'manager+Housing'.
 function sbMapRole(staffRow) {
-  if(!staffRow) return 'employee';
-  if(staffRow.role === 'ed') return 'ed';
-  if(staffRow.role === 'manager' && (staffRow.department||'').toLowerCase().includes('housing')) return 'housing_manager';
-  return 'employee';
-}
-
-// ── AUTH: Look up staff by email ─────────────────────────────────────────────
-async function sbGetStaffByEmail(email) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?select=*&email=eq.'+encodeURIComponent(email)+'&is_active=eq.true&limit=1', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] || null;
-  } catch(e) { console.warn('[SB] staff lookup failed:', e); return null; }
-}
-
-// ── APPLICATIONS ─────────────────────────────────────────────────────────────
-async function sbLoadApplications() {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_applications?select=*&order=submitted_at.desc&limit=9999', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row) {
-      return Object.assign({}, row.data||{}, {
-        id:row.id, status:row.status, score:row.score, tier:row.tier,
-        classification:row.classification, reserve:row.reserve, archived:row.archived,
-        assignedUnit:row.assigned_unit_id, assignedAddress:row.assigned_address, submittedAt:row.submitted_at
-      });
-    });
-  } catch(e) { console.warn('[SB] load applications failed:', e); return null; }
-}
-
-async function sbSaveApplication(app) {
-  var row = {
-    id: app.id,
-    sp_id: app.spId || null,
-    data: app,
-    status: app.status || 'draft',
-    score: typeof app.score === 'number' ? app.score : null,
-    tier: app.tier || null,
-    classification: app.classification || null,
-    reserve: app.reserve || null,
-    archived: !!app.archived,
-    assigned_unit_id: app.assignedUnit || null,
-    assigned_address: app.assignedAddress || null,
-    submitted_at: app.submittedAt || null,
-    // ── V2 scoring input fields ──
-    urgent_need:           app.urgentNeed           || app.urgent_need           || 'none',
-    health_risk:           app.healthRisk           || app.health_risk           || 'none',
-    persons_over_standard: parseInt(app.personsOverStandard || app.persons_over_standard || 0) || 0,
-    lone_parent:           !!(app.loneParent           || app.lone_parent),
-    elder_in_household:    !!(app.elderInHousehold    || app.elder_in_household),
-    household_disability:  !!(app.householdDisability || app.household_disability),
-    no_prior_tenancy:      (app.noPriorTenancy !== undefined ? !!app.noPriorTenancy : !!(app.no_prior_tenancy !== false)),
-    rent_payment_history:  app.rentPaymentHistory  || app.rent_payment_history  || 'no_history',
-    unit_condition:        app.unitCondition        || app.unit_condition        || 'no_history',
-    tenancy_conduct:       app.tenancyConduct       || app.tenancy_conduct       || 'no_history',
-    income_stability:      app.incomeStability      || app.income_stability      || 'stable',
-    arrears_status:        app.arrearsStatus        || app.arrears_status        || 'none',
-    // ── V2 scoring output fields ──
-    score_v2:              typeof app.score_v2 === 'number' ? app.score_v2 : (typeof app.score === 'number' ? app.score : null),
-    tier_v2:               app.tier_v2 || app.tier || null,
-    score_breakdown_v2:    app.scoreBreakdown || null
-  };
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_applications', {
-      method: 'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body: JSON.stringify(row)
-    });
-    if(!r.ok) { var e=await r.text(); console.warn('[SB] save application failed:', e); return false; }
-    return true;
-  } catch(e) { console.warn('[SB] save application error:', e); return false; }
-}
-
-async function sbSaveAllApplications(apps) {
-  var rows = apps.map(function(app) {
-    return {
-      id: app.id,
-      sp_id: app.spId || null,
-      data: app,
-      status: app.status || 'draft',
-      score: typeof app.score === 'number' ? app.score : null,
-      tier: app.tier || null,
-      classification: app.classification || null,
-      reserve: app.reserve || null,
-      archived: !!app.archived,
-      assigned_unit_id: app.assignedUnit || null,
-      assigned_address: app.assignedAddress || null,
-      submitted_at: app.submittedAt || null
-    };
-  });
-  // Upsert in batches of 100
-  for(var i=0; i<rows.length; i+=100) {
-    var batch = rows.slice(i, i+100);
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_applications', {
-      method: 'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body: JSON.stringify(batch)
-    });
-    if(!r.ok) { console.warn('[SB] batch save applications failed:', await r.text()); return false; }
+  if(!staffRow) return 'housing_employee_l1';
+  var raw = staffRow.role;
+  // Legacy: a bare 'manager' role outside Housing collapses to HE-L1
+  if(raw === 'manager' && !(staffRow.department||'').toLowerCase().includes('housing')) {
+    return 'housing_employee_l1';
   }
-  return true;
-}
-
-// ── HOUSING UNITS ─────────────────────────────────────────────────────────────
-async function sbLoadUnits() {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_units?select=*&order=street,num&limit=9999', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row) {
-      return Object.assign({}, row.data||{}, {
-        id:row.id, num:row.num, street:row.street, bedrooms:row.bedrooms, bathrooms:row.bathrooms,
-        type:row.type, foundation:row.foundation, funder:row.funder, status:row.status,
-        accessible:row.accessible, isElders:row.is_elders, archived:row.archived,
-        assignedTo:row.assigned_to, assignedName:row.assigned_name, assignedDate:row.assigned_date
-      });
-    });
-  } catch(e) { console.warn('[SB] load units failed:', e); return null; }
-}
-
-async function sbSaveUnit(u) {
-  var row = {
-    id:u.id, num:u.num||null, street:u.street||null, bedrooms:u.bedrooms||null,
-    bathrooms:u.bathrooms||null, type:u.type||null, foundation:u.foundation||null,
-    funder:u.funder||null, status:u.status||'vacant', accessible:!!u.accessible,
-    is_elders:!!u.isElders, archived:!!u.archived, assigned_to:u.assignedTo||null,
-    assigned_name:u.assignedName||null, assigned_date:u.assignedDate||null, data:u
-  };
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_units', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify(row)
-    });
-    if(!r.ok){ console.warn('[SB] save unit failed:', await r.text()); return false; }
-    return true;
-  } catch(e){ console.warn('[SB] save unit error:',e); return false; }
-}
-
-async function sbSaveAllUnits(units) {
-  if(!units || !units.length) return true;
-  var rows = units.map(function(u) {
-    return {
-      id: u.id,
-      num: u.num || null,
-      street: u.street || null,
-      bedrooms: u.bedrooms || null,
-      bathrooms: u.bathrooms || null,
-      type: u.type || null,
-      foundation: u.foundation || null,
-      funder: u.funder || null,
-      status: u.status || 'vacant',
-      accessible: !!u.accessible,
-      is_elders: !!u.isElders,
-      archived: !!u.archived,
-      assigned_to: u.assignedTo || null,
-      assigned_name: u.assignedName || null,
-      assigned_date: u.assignedDate || null,
-      data: u
-    };
-  });
-  for(var i=0; i<rows.length; i+=100) {
-    var batch = rows.slice(i, i+100);
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_units', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify(batch)
-    });
-    if(!r.ok){ console.warn('[SB] batch save units failed:', await r.text()); return false; }
+  if(window.CLFN_PERMS && window.CLFN_PERMS.isValidRole(raw)) {
+    return window.CLFN_PERMS.normalizeRole(raw);
   }
-  return true;
+  return 'housing_employee_l1';
 }
 
 // ── AUDIT LOG ─────────────────────────────────────────────────────────────────
-async function sbLogAudit(appId, action, detail, userRole) {
-  try {
-    await fetch(SUPABASE_URL+'/rest/v1/housing_audit_log', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
-      body:JSON.stringify({ entity_type:'application', entity_id:String(appId||''), action:action, details:JSON.stringify({detail:detail}), actor:userRole||window.currentRole||'staff', created_at:new Date().toISOString() })
-    });
-  } catch(e){ console.warn('[SB] log audit failed:',e); }
+// Column is `detail` (singular). Tolerant parser handles text and jsonb shapes.
+function _idxParseDetail(v) {
+  if (v == null) return {};
+  if (typeof v === 'object') return v;
+  if (typeof v === 'string') { try { return JSON.parse(v); } catch(e) { return {}; } }
+  return {};
 }
-
 async function sbLoadAuditLog(limit) {
   try {
     var r = await fetch(SUPABASE_URL+'/rest/v1/housing_audit_log?select=*&order=created_at.desc&limit='+(limit||500), { headers:HOUSING_HEADERS });
     if(!r.ok) return null;
     var data = await r.json();
     return data.map(function(row){
-      var d = JSON.parse(row.details||'{}');
-      return { ts:row.created_at, appId:row.entity_id, action:row.action, detail:d.detail||row.details||'', user:row.actor };
+      var d = _idxParseDetail(row.detail);
+      return { ts:row.created_at, appId:row.entity_id, action:row.action, detail:(d.detail || d.summary || ''), user:row.actor };
     });
   } catch(e){ console.warn('[SB] load audit log failed:',e); return null; }
 }
 
-// ── SETTINGS ─────────────────────────────────────────────────────────────────
-async function sbLoadSetting(key) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=value&key=eq.'+encodeURIComponent(key)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].value : null;
-  } catch(e){ return null; }
-}
 
-async function sbSaveSetting(key, value) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_settings', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({key:key, value:value})
-    });
-    if(!r.ok){ console.warn('[SB] save setting failed:', await r.text()); return false; }
-    return true;
-  } catch(e){ console.warn('[SB] save setting error:',e); return false; }
-}
-
-// ── CONTRACTORS ───────────────────────────────────────────────────────────────
-async function sbLoadContractors() {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_contractors?select=*&order=created_at', { headers: HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row){ return Object.assign({}, row.data||{}, { id:row.id, name:row.name, trade:row.trade, status:row.status }); });
-  } catch(e) { console.warn('[SB] load contractors failed:', e); return null; }
-}
-
-async function sbSaveContractor(ct) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_contractors', {
-      method: 'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body: JSON.stringify({ id:ct.id, name:ct.name||null, trade:ct.trade||null, status:ct.status||'pending_review', data:ct, updated_at:new Date().toISOString() })
-    });
-    if(!r.ok) { console.warn('[SB] save contractor failed:', await r.text()); return false; }
-    return true;
-  } catch(e) { console.warn('[SB] save contractor error:', e); return false; }
-}
-
-// ── SOW ──────────────────────────────────────────────────────────────────────
-async function sbLoadSow(unitId) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=data&unit_id=eq.'+encodeURIComponent(unitId)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].data : null;
-  } catch(e){ return null; }
-}
-
-async function sbSaveSow(unitId, data) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_sow', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({unit_id:unitId, data:data, updated_at:new Date().toISOString()})
-    });
-    return r.ok;
-  } catch(e){ console.warn('[SB] save sow error:',e); return false; }
-}
-
-// ── RENO PROGRESS ─────────────────────────────────────────────────────────────
-async function sbLoadRenoProgress(unitId) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress?select=data&unit_id=eq.'+encodeURIComponent(unitId)+'&limit=1', { headers:HOUSING_HEADERS });
-    if(!r.ok) return null;
-    var data = await r.json();
-    return data[0] ? data[0].data : null;
-  } catch(e){ return null; }
-}
-
-async function sbSaveRenoProgress(unitId, data) {
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress', {
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({unit_id:unitId, data:data, updated_at:new Date().toISOString()})
-    });
-    return r.ok;
-  } catch(e){ console.warn('[SB] save reno progress error:',e); return false; }
-}
-
-// ── MIGRATE: Push localStorage → Supabase ────────────────────────────────────
-// Run this once from the browser console to seed Supabase with existing data:
-// await sbMigrateAll()
-window.sbMigrateAll = async function() {
-  console.log('[SB MIGRATE] Starting...');
-  showToast('Migration started — check console for progress');
-
-  // Applications
-  var apps = [];
-  try { apps = JSON.parse(localStorage.getItem('clfn_applications')||'[]'); } catch(e){}
-  if(!apps.length) apps = (typeof SP_APPLICATIONS !== 'undefined') ? SP_APPLICATIONS : [];
-  if(apps.length) {
-    var ok = await sbSaveAllApplications(apps);
-    console.log('[SB MIGRATE] Applications:', ok ? apps.length+' saved' : 'FAILED');
-  }
-
-  // Housing units
-  var units = [];
-  try { units = JSON.parse(localStorage.getItem('clfn_housing_units')||'[]'); } catch(e){}
-  if(!units.length) units = (typeof HOUSING_UNITS_DATA !== 'undefined') ? HOUSING_UNITS_DATA : [];
-  if(units.length) {
-    var ok2 = await sbSaveAllUnits(units);
-    console.log('[SB MIGRATE] Housing units:', ok2 ? units.length+' saved' : 'FAILED');
-  }
-
-  // Contractors
-  var contractors = [];
-  var contractors = window._contractors || [];
-  if(contractors.length) {
-    for(var ct of contractors) { await sbSaveContractor(ct); }
-    console.log('[SB MIGRATE] Contractors:', contractors.length+' saved');
-  }
-
-  // Settings
-  var settings = {};
-  settings = window._appSettings || {};
-  if(Object.keys(settings).length) {
-    await sbSaveSetting('app_settings', settings);
-    console.log('[SB MIGRATE] Settings saved');
-  }
-
-  // Scoring model
-  try {
-    var sm = localStorage.getItem('clfn_scoring_model');
-    if(sm) await sbSaveSetting('scoring_model', JSON.parse(sm));
-    var usm = localStorage.getItem('clfn_unit_score_model');
-    if(usm) await sbSaveSetting('unit_score_model', JSON.parse(usm));
-    var rsm = localStorage.getItem('clfn_reno_score_model_v3');
-    if(rsm) await sbSaveSetting('reno_score_model', JSON.parse(rsm));
-    var bp = localStorage.getItem('clfn_budget_pools');
-    if(bp) await sbSaveSetting('budget_pools', JSON.parse(bp));
-    console.log('[SB MIGRATE] Scoring models and budget saved');
-  } catch(e) { console.warn('[SB MIGRATE] Settings partial:', e); }
-
-  console.log('[SB MIGRATE] Complete!');
-  showToast('✓ Migration complete — check console for details');
-};
 
 
 
@@ -2187,14 +1721,14 @@ async function sendPasswordReset() {
       headers:{ 'apikey':SUPABASE_ANON, 'Content-Type':'application/json' },
       body:JSON.stringify({ email:email })
     });
-    // Supabase returns 200 even for unknown emails (to prevent enumeration); treat any non-error as success
-    if(!r.ok){
-      var d; try { d = await r.json(); } catch(e){ d = {}; }
-      throw new Error(d.error_description||d.msg||'Could not send reset link');
-    }
+    // Supabase returns 200 even for unknown emails (to prevent enumeration).
+    // On rare non-OK responses, we still show the generic "if registered"
+    // message — the server-side outcome is what matters for the user.
     if(msgEl){ msgEl.textContent='If that email is registered, a reset link has been sent. Check your inbox.'; msgEl.style.color='#86efac'; msgEl.style.background='rgba(22,101,52,0.2)'; }
   } catch(e){
-    if(msgEl){ msgEl.textContent=e.message||'Failed to send reset link.'; msgEl.style.color='#fca5a5'; msgEl.style.background='#3b0a0a'; }
+    console.warn('[FORGOT PWD]', e);
+    // Generic failure — do not reveal server-side details to unauthenticated user.
+    if(msgEl){ msgEl.textContent='Request could not be completed. Please try again.'; msgEl.style.color='#fca5a5'; msgEl.style.background='#3b0a0a'; }
   }
 }
 
@@ -2378,8 +1912,18 @@ async function startSignIn() {
     if(errEl){errEl.textContent='Please enter your email and password.';errEl.style.display='block';}
     return;
   }
+
+  // Generic error message used for all auth failures — do not leak specifics
+  // (wrong domain, invalid password, unverified email, missing user) to the
+  // unauthenticated visitor. The server-side staff-table lookup in
+  // resolveHousingRole is still the ultimate gate.
+  var GENERIC_AUTH_ERROR = 'Sign-in failed. Please check your email and password.';
+
+  // Silent domain prefilter: skip the network call for obviously-wrong
+  // emails. The visitor sees the same generic error either way, so this
+  // is only a performance/rate-limit optimization, not a disclosure.
   if(!email.endsWith('@clfn.on.ca')){
-    if(errEl){errEl.textContent='Only @clfn.on.ca email addresses are permitted to sign in.';errEl.style.display='block';}
+    if(errEl){errEl.textContent=GENERIC_AUTH_ERROR;errEl.style.display='block';}
     return;
   }
 
@@ -2389,7 +1933,7 @@ async function startSignIn() {
       method:'POST', headers:HOUSING_HEADERS, body:JSON.stringify({email:email,password:password})
     });
     var data = await r.json();
-    if(!r.ok) throw new Error(data.error_description||data.msg||'Sign-in failed');
+    if(!r.ok) throw new Error(GENERIC_AUTH_ERROR);
 
     // Check email verification
     var emailConfirmed = data.user.email_confirmed_at||data.user.confirmed_at;
@@ -2427,7 +1971,8 @@ async function startSignIn() {
 
   } catch(e) {
     console.error('[HOUSING LOGIN]', e);
-    if(errEl){errEl.textContent=e.message;errEl.style.display='block';}
+    // Always show the generic message to the user; real details stay in console.
+    if(errEl){errEl.textContent=GENERIC_AUTH_ERROR;errEl.style.display='block';}
   } finally {
     if(btn){btn.disabled=false;btn.textContent='Sign in';}
   }
@@ -2508,6 +2053,7 @@ async function doLogout() {
 }
 
 function showEmployeeHome(){
+  document.title = 'CLFN Housing';
   if(!window._navSkipPush) pushNav('home');
   setExportView(null);
   hideAllViews();
@@ -2899,6 +2445,13 @@ async function renderRecentActivity(role) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+  // Copy logo src from authenticated header to login screen — avoids duplicating
+  // the base64 string and keeps the login page visually branded without
+  // repeating the organization name in readable text.
+  var headerLogo = document.querySelector('.hbrand .hlogo');
+  var loginLogo  = document.getElementById('login-logo');
+  if(headerLogo && loginLogo) loginLogo.src = headerLogo.src;
+
   loadRememberedEmail();
 
   // Check for existing session — restore home screen if already logged in
