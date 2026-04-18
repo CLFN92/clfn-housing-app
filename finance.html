@@ -2211,7 +2211,7 @@ function _tenantToRow(t){
     notes: t.notes || null,
 
     // Personal (added F3A)
-    dob:             t.dob || null,
+    date_of_birth:   t.dob || null,
     band_number:     t.bandNumber || null,
 
     // Address (added F3A)
@@ -2248,7 +2248,7 @@ function _tenantFromRow(r){
     id: r.id, first: first, last: last,
 
     // Personal
-    dob:         r.dob || '',
+    dob:         r.date_of_birth || '',
     bandNumber:  r.band_number || '',
 
     // Address
@@ -2781,7 +2781,12 @@ function _writeAuditEntry(entry){
   return fetch(SUPABASE_URL + '/rest/v1/finance_audit_log', {
     method: 'POST', headers: headers, body: JSON.stringify([row])
   }).then(function(r){
-    if (!r.ok) return r.text().then(function(t){ throw new Error('audit ' + r.status + ': ' + t); });
+    if (!r.ok) {
+      return r.text().then(function(t){
+        console.error('[finance audit] rejected payload was:', JSON.stringify(row, null, 2));
+        throw new Error('audit ' + r.status + ': ' + (t || '(no body)'));
+      });
+    }
   }).catch(function(err){
     console.error('[finance audit] failed:', err);
     _toastError('Audit log write failed. Please report this.');
