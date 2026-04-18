@@ -13058,6 +13058,16 @@ function saveApplicationRecord(){
     status:      isFileUpdate ? 'file_update' : 'submitted',
     submittedAt: new Date().toISOString().slice(0,10),
     score:       isFileUpdate ? null : scoreTotal,
+    // ── Ownership ──
+    // On first create: set to the logged-in user.
+    // On subsequent edits: carry forward the original owner so the
+    // HE-L1 RLS rule (own-draft-only) keeps working correctly.
+    created_by_email: (function() {
+      var existing = applications.find(function(a){ return a.id === appId; });
+      return (existing && existing.created_by_email)
+        ? existing.created_by_email
+        : (HOUSING_SESSION.email || null);
+    })(),
     tier:        isFileUpdate ? 'File Update' : scoreTier,
     scoreBreakdown: isFileUpdate ? {} : (window._lastScoreBreakdown || {}),
 
