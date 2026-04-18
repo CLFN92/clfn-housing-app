@@ -32,20 +32,45 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .back-link:hover{background:rgba(248,228,26,.1);}
 
 /* ── Layout ── */
-.app-wrapper{display:flex;min-height:calc(100vh - 64px);}
-.sidebar{width:220px;background:var(--dark2);flex-shrink:0;position:sticky;top:64px;height:calc(100vh - 64px);overflow-y:auto;padding:12px 0;}
-main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
+/* Sidebar removed as of the home-tiles refactor. Main is now the only
+ * flex child and spans the full width below the sticky header. */
+.main{display:block;min-height:calc(100vh - 64px);padding:24px 28px;overflow-x:hidden;max-width:1200px;margin:0 auto;width:100%;}
 
-/* ── Sidebar nav ── */
-.sbar-label{display:block;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#555;padding:16px 16px 6px;}
-.snav-divider{height:1px;background:var(--dark3);margin:8px 12px;}
-.snav-btn{display:flex;align-items:center;gap:10px;width:100%;padding:9px 16px;background:none;border:none;color:#aaa;font-size:13px;font-weight:500;cursor:pointer;transition:var(--tr);text-align:left;border-radius:0;}
-.snav-btn:hover{background:var(--dark3);color:#fff;}
-.snav-btn.active{background:var(--yellow);color:#111;font-weight:700;}
-.snav-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0;}
-.hamburger-btn{display:none;background:none;border:none;color:#fff;font-size:24px;cursor:pointer;padding:4px 8px;line-height:1;}
-.sidebar-close-row{display:none;}
-.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:149;}
+/* ── Back-button row + sub-header (copied from shared.css) ── */
+/* Used by every non-home page so users always have a path back to the tile home. */
+.page-back-row{margin:0 0 10px 0;}
+.back-btn-yellow{
+  background:var(--yellow);border:1.5px solid var(--yellow);color:#111;
+  padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;
+  cursor:pointer;font-family:'DM Sans',sans-serif;
+  display:inline-flex;align-items:center;gap:5px;
+  transition:background .15s ease, box-shadow .15s ease;
+}
+.back-btn-yellow:hover{background:#fff0a6;box-shadow:0 2px 6px rgba(248,228,26,.35);}
+.back-btn-yellow svg{flex-shrink:0;}
+
+/* ── Home tile grid ── */
+.home-greeting{margin-bottom:28px;position:relative;padding-left:16px;}
+.home-accent-bar{position:absolute;left:0;top:6px;bottom:6px;width:4px;background:var(--yellow);border-radius:2px;}
+.home-date-line{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.home-welcome{font-family:var(--serif);font-size:30px;font-weight:400;line-height:1.15;margin:0 0 6px 0;}
+.home-welcome > span{color:var(--yellow);}
+.home-subtitle{color:var(--muted);font-size:14px;margin:0;}
+.home-tiles-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:32px;}
+.home-tile{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--muted);border-radius:12px;padding:18px 20px;cursor:pointer;transition:box-shadow .15s,border-color .15s;display:flex;flex-direction:column;gap:12px;}
+.home-tile:hover{box-shadow:0 4px 20px rgba(0,0,0,.1);}
+.home-tile-hdr{display:flex;align-items:center;gap:10px;}
+.home-tile-icon{font-size:22px;}
+.home-tile-title{font-weight:700;font-size:15px;}
+.home-tile-stat{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);}
+.home-tile-stat:last-child{border-bottom:none;}
+.home-tile-stat b{font-size:16px;font-weight:800;color:var(--text);}
+.home-tile-stat.alert b{color:var(--danger);}
+.home-tile-stat.good  b{color:var(--success);}
+.home-tile-stat.info  b{color:#1d4ed8;}
+
+/* ── Legacy sidebar styles kept for .snav-btn references elsewhere (no-op visually) ── */
+.sbar-label,.snav-divider,.snav-btn,.snav-icon,.hamburger-btn,.sidebar-close-row,.sidebar-overlay,.sidebar{display:none !important;}
 
 /* ── Pages ── */
 .page{display:none;}
@@ -234,15 +259,15 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
 </head>
 <body>
 <header class="app-header">
-  <div class="hbrand">
-    <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu">&#9776;</button>
+  <div class="hbrand" onclick="showHome()" style="cursor:pointer;" title="Return to Finance Home">
     <img id="headerLogo" class="hlogo" alt=""/>
-    <div class="htitles"><strong id="hdr-brand-name">—</strong><span id="hdr-brand-sub">Finance Module</span></div>
+    <div class="htitles">
+      <strong id="hdr-brand-name">—</strong>
+      <span id="hdr-brand-sub">Finance Module</span>
+    </div>
   </div>
   <div class="hright">
     <a href="housing.html" class="back-link">&#8592; Housing App</a>
-    <!-- Role switcher removed in Phase F1. Role is set by the housing login -->
-    <!-- session and cannot be changed client-side. -->
     <span class="sbadge" id="hdr-role-label">—</span>
     <span class="badge-name" id="hdr-user-btn" style="font-family:inherit;">
       <span id="hdr-user-name">—</span>
@@ -250,30 +275,28 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
     <button onclick="financeSignOut()" style="background:none;border:none;color:#666;font-size:11px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;padding:0 0 0 4px;" onmouseover="this.style.color='#ccc'" onmouseout="this.style.color='#666'">sign out</button>
   </div>
 </header>
-<div class="app-wrapper">
-<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
-<nav class="sidebar" id="appSidebar">
-  <div class="sidebar-close-row"><button class="hamburger-btn sidebar-close-btn" onclick="toggleSidebar()">&#x2715;</button></div>
-  <span class="sbar-label">Overview</span>
-  <button class="snav-btn active" onclick="showPage('dashboard');closeSidebarOnNav()" id="nav-dashboard"><span class="snav-icon">&#128202;</span> Dashboard</button>
-  <button class="snav-btn" onclick="showPage('tenants');closeSidebarOnNav()" id="nav-tenants"><span class="snav-icon">&#128101;</span> Tenants</button>
-  <div class="snav-divider"></div>
-  <span class="sbar-label">Ledgers</span>
-  <button class="snav-btn" onclick="showPage('rent');closeSidebarOnNav()" id="nav-rent"><span class="snav-icon">&#127968;</span> Rent</button>
-  <button class="snav-btn" onclick="showPage('arrangements');closeSidebarOnNav()" id="nav-arrangements"><span class="snav-icon">&#128203;</span> Arrangements</button>
-  <button class="snav-btn" onclick="showPage('loans');closeSidebarOnNav()" id="nav-loans"><span class="snav-icon">&#128188;</span> Loans</button>
-  <button class="snav-btn" onclick="showPage('journal');closeSidebarOnNav()" id="nav-journal"><span class="snav-icon">&#128211;</span> Journal</button>
-  <div class="snav-divider"></div>
-  <span class="sbar-label">Reports &amp; Admin</span>
-  <button class="snav-btn" onclick="showPage('reports');closeSidebarOnNav()" id="nav-reports"><span class="snav-icon">&#128196;</span> Reports</button>
-  <button class="snav-btn" onclick="showPage('collections');closeSidebarOnNav()" id="nav-collections"><span class="snav-icon">&#128680;</span> Collections</button>
-  <button class="snav-btn" onclick="showPage('transactions');closeSidebarOnNav()" id="nav-transactions"><span class="snav-icon">&#128260;</span> Transactions</button>
-  <button class="snav-btn" onclick="showPage('auditlog');closeSidebarOnNav()" id="nav-auditlog"><span class="snav-icon">&#128064;</span> Audit Log</button>
-</nav>
+
 <main class="main">
 
+<!-- HOME (tile grid — replaces sidebar nav) -->
+<div class="page on" id="page-home">
+  <div class="home-greeting">
+    <div class="home-accent-bar"></div>
+    <div id="home_date" class="home-date-line"></div>
+    <h1 class="home-welcome">Welcome back, <span id="home_user_name" style="color:var(--yellow);"></span></h1>
+    <p class="home-subtitle">Finance activity at a glance. Pick a tile below to get started.</p>
+  </div>
+  <div id="home_tiles_grid" class="home-tiles-grid"></div>
+</div>
+
 <!-- DASHBOARD -->
-<div class="page on" id="page-dashboard">
+<div class="page" id="page-dashboard">
+  <div class="page-back-row">
+    <button onclick="showHome()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Home
+    </button>
+  </div>
   <div class="page-hdr">
     <div><h1>Finance Dashboard</h1><p id="dashSubtitle">Overview of all tenant accounts</p></div>
     <div class="page-hdr-actions">
@@ -365,6 +388,12 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
 
 <!-- TENANTS -->
 <div class="page" id="page-tenants">
+  <div class="page-back-row">
+    <button onclick="showHome()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Home
+    </button>
+  </div>
 
   <!-- Compact search bar -->
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
@@ -397,6 +426,13 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
 
 <!-- RENT -->
 <div class="page" id="page-rent">
+
+  <div class="page-back-row">
+    <button onclick="showHome()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Home
+    </button>
+  </div>
   <div class="page-hdr">
     <div><h1>Rent Ledger</h1><p>Monthly rent charges, opening balances, and payments</p></div>
     <div class="page-hdr-actions">
@@ -422,6 +458,13 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
 
 <!-- ARRANGEMENTS -->
 <div class="page" id="page-arrangements">
+
+  <div class="page-back-row">
+    <button onclick="showHome()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Home
+    </button>
+  </div>
   <div class="page-hdr">
     <div><h1>Payment Arrangements</h1><p>Formal repayment plans for arrears across any ledger</p></div>
     <div class="page-hdr-actions">
@@ -438,6 +481,13 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
 
 <!-- LOANS -->
 <div class="page" id="page-loans">
+
+  <div class="page-back-row">
+    <button onclick="showHome()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Home
+    </button>
+  </div>
   <div class="page-hdr">
     <div><h1>Loans</h1><p>Renovation loans, rent-to-own, and repayment tracking</p></div>
     <div class="page-hdr-actions"><button class="btn btn-primary btn-sm" onclick="openModal('modalNewLoan')">+ New Loan</button></div>
@@ -454,6 +504,13 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
 
 <!-- JOURNAL -->
 <div class="page" id="page-journal">
+
+  <div class="page-back-row">
+    <button onclick="showHome()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Home
+    </button>
+  </div>
   <div class="page-hdr">
     <div><h1>Journal Entries</h1><p>Manual debits and credits - reviewed by ED</p></div>
     <div class="page-hdr-actions"><button class="btn btn-primary btn-sm" onclick="openModal('modalJournalEntry')">+ New Entry</button></div>
@@ -472,6 +529,13 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
 
 <!-- REPORTS -->
 <div class="page" id="page-reports">
+
+  <div class="page-back-row">
+    <button onclick="showHome()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Home
+    </button>
+  </div>
   <div class="page-hdr">
     <div><h1>Finance Reports</h1><p>Period summaries for entry into accounting software</p></div>
   </div>
@@ -593,6 +657,13 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
 </div>
 
 <div class="page" id="page-collections">
+
+  <div class="page-back-row">
+    <button onclick="showHome()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Home
+    </button>
+  </div>
   <div class="page-hdr">
     <div><h1>Collections</h1><p>Accounts referred to collections - requires ED approval</p></div>
     <div class="page-hdr-actions">
@@ -610,6 +681,13 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
 
 <!-- TRANSACTIONS -->
 <div class="page" id="page-transactions">
+
+  <div class="page-back-row">
+    <button onclick="showHome()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Home
+    </button>
+  </div>
   <div class="page-hdr">
     <div><h1>Transactions</h1><p>All financial entries across every ledger</p></div>
     <div class="page-hdr-actions">
@@ -648,6 +726,13 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
 
 <!-- AUDIT LOG -->
 <div class="page" id="page-auditlog">
+
+  <div class="page-back-row">
+    <button onclick="showHome()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Home
+    </button>
+  </div>
   <div class="page-hdr">
     <div><h1>Audit Log</h1><p>Full before/after record of every change</p></div>
     <div class="page-hdr-actions">
@@ -672,6 +757,13 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
 
 <!-- TENANT STATEMENT PAGE -->
 <div class="page" id="page-statement">
+
+  <div class="page-back-row">
+    <button onclick="showHome()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Home
+    </button>
+  </div>
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
     <button class="btn btn-ghost btn-sm" onclick="showPage('tenants');closeSidebarOnNav()" style="padding:6px 12px;">← Back to Tenants</button>
     <div style="flex:1;min-width:0;">
@@ -886,7 +978,6 @@ main{flex:1;min-width:0;padding:24px 28px;overflow-x:hidden;}
 
 
 </main>
-</div>
 
 <!-- ADD TENANT -->
 <div class="modal-ov" id="modalAddTenant">
@@ -2904,9 +2995,10 @@ function collectionsBadge(tenantId){
 // showPage defined below
 function showPage(id) {
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('on');});
-  document.querySelectorAll('.snav-btn').forEach(function(b){b.classList.remove('active');});
   var pg = document.getElementById('page-'+id); if(pg) pg.classList.add('on');
-  var nb = document.getElementById('nav-'+id); if(nb) nb.classList.add('active');
+  // Return to top whenever a new page is shown so users don't land mid-scroll
+  window.scrollTo({top:0, behavior:'instant'});
+  if(id==='home') renderHome();
   if(id==='dashboard') renderDashboard();
   if(id==='tenants') {
     setTimeout(function(){
@@ -2914,6 +3006,8 @@ function showPage(id) {
       if(inp){ inp.value=''; searchTenants(''); inp.focus(); }
       var pp = document.getElementById('tenantProfilePanel');
       if(pp) pp.innerHTML='<div style="text-align:center;padding:20px 0 40px;color:var(--muted);font-size:13px;">Select a tenant from the list below to view their record.</div>';
+      var listEl = document.getElementById('tenantListPanel');
+      if(listEl) listEl.style.display='block';
       renderTenantList();
     }, 80);
   }
@@ -2934,6 +3028,139 @@ function showPage(id) {
   if(id==='transactions'){initTxnFilters();renderTransactions();}
   if(id==='auditlog') renderAuditLog();
   if(id==='statement') { /* rendered on demand via goToTenant() */ }
+}
+
+// ── HOME — tile grid landing page ────────────────────────────────────────
+// Replaces the old sidebar-nav dashboard as the default view. Users pick a
+// tile to drill into a specific area. Mirrors housing.html's home.
+function showHome(){ showPage('home'); }
+
+function renderHome(){
+  // Greeting block: date line, "Welcome back, <n>"
+  var dateEl = document.getElementById('home_date');
+  if(dateEl){
+    var dd = new Date();
+    var dayStr  = dd.toLocaleDateString('en-US',{weekday:'long'});
+    var dateStr = dd.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+    dateEl.textContent = dayStr + ' · ' + dateStr;
+  }
+  var nameEl = document.getElementById('home_user_name');
+  if(nameEl){
+    var who = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.name)
+            ? HOUSING_SESSION.name : 'Finance Staff';
+    nameEl.textContent = who;
+  }
+
+  // Compute live counts from _memStore for the tile stat lines.
+  var d = getData();
+  var tenants = d.tenants || [];
+  var active  = tenants.filter(function(t){ return (t.status||'active')==='active' && !t.archived; }).length;
+  var former  = tenants.filter(function(t){ return t.status==='former' && !t.archived; }).length;
+
+  var rentEntries = d.rentLedger || [];
+  var openInvoices = rentEntries.filter(function(e){ return e.type==='invoice' && (e.payment||0) === 0 && !e.voided; }).length;
+
+  var loans = d.loanList || [];
+  var approvedLoans = loans.filter(function(l){ return l.status==='approved'; }).length;
+  var pendingLoans  = loans.filter(function(l){ return l.status==='pending-ed' || l.status==='pending'; }).length;
+
+  var arrangements = d.arrangements || [];
+  var activeArr = arrangements.filter(function(a){ return a.status==='approved' || a.status==='active'; }).length;
+
+  var collections = d.collections || [];
+  var openCol = collections.filter(function(c){ return c.status==='approved' || c.status==='pending-ed'; }).length;
+
+  var journal = d.journalEntries || [];
+  var pendingJournal = journal.filter(function(j){ return j.status==='pending-ed' || j.status==='pending'; }).length;
+
+  var hydro = (d.hydroLedger || []).length;
+  var gas   = (d.gasLedger || []).length;
+
+  var auditCount = (d.auditLog || []).length;
+  var txnCount   = rentEntries.length + (d.loanPayments||[]).length + (d.arrPayments||[]).length;
+
+  // Tile builder. Accent color shows as a 3px top border on the card.
+  function stat(label, value, cls){
+    return '<div class="home-tile-stat '+(cls||'')+'"><span>'+label+'</span><b>'+value+'</b></div>';
+  }
+  function tile(icon, title, clickFn, accent, statsHtml){
+    return '<div class="home-tile" onclick="'+clickFn+'" style="border-top-color:'+accent+';">'
+      + '<div class="home-tile-hdr"><span class="home-tile-icon">'+icon+'</span><span class="home-tile-title">'+title+'</span></div>'
+      + '<div>'+statsHtml+'</div>'
+      + '</div>';
+  }
+
+  var tiles = [];
+
+  // Dashboard — full-width overview of all accounts
+  tiles.push(tile('📊','Dashboard',"showPage('dashboard')",'#3b82f6',
+    stat('Active Tenants', active, 'info')
+    + stat('Former Tenants', former, 'neutral')
+    + stat('Open Invoices', openInvoices, openInvoices>0?'alert':'neutral')
+  ));
+
+  // Tenants
+  tiles.push(tile('👥','Tenants',"showPage('tenants')",'#0ea5e9',
+    stat('Active', active, 'info')
+    + stat('Former', former, 'neutral')
+    + stat('Total', tenants.length, 'neutral')
+  ));
+
+  // Rent ledger
+  tiles.push(tile('🏠','Rent Ledger',"showPage('rent')",'#F8E41A',
+    stat('Open Invoices', openInvoices, openInvoices>0?'alert':'good')
+    + stat('Total Entries', rentEntries.length, 'neutral')
+  ));
+
+  // Arrangements
+  tiles.push(tile('📋','Arrangements',"showPage('arrangements')",'#7c3aed',
+    stat('Active Plans', activeArr, activeArr>0?'info':'neutral')
+    + stat('Total', arrangements.length, 'neutral')
+  ));
+
+  // Loans
+  tiles.push(tile('💼','Loans',"showPage('loans')",'#15803d',
+    stat('Approved', approvedLoans, 'good')
+    + stat('Pending Approval', pendingLoans, pendingLoans>0?'alert':'neutral')
+    + stat('Total', loans.length, 'neutral')
+  ));
+
+  // Journal
+  tiles.push(tile('📓','Journal Entries',"showPage('journal')",'#6366f1',
+    stat('Pending ED Approval', pendingJournal, pendingJournal>0?'alert':'neutral')
+    + stat('Total Entries', journal.length, 'neutral')
+  ));
+
+  // Utilities — combined hydro + gas view (opens rent page for now)
+  tiles.push(tile('⚡','Utilities',"showPage('rent')",'#f59e0b',
+    stat('Hydro Records', hydro, 'neutral')
+    + stat('Gas Records', gas, 'neutral')
+  ));
+
+  // Collections
+  tiles.push(tile('🚨','Collections',"showPage('collections')",'#dc2626',
+    stat('Open Cases', openCol, openCol>0?'alert':'good')
+    + stat('Total', collections.length, 'neutral')
+  ));
+
+  // Reports
+  tiles.push(tile('📄','Reports',"showPage('reports')",'#64748b',
+    stat('Aging Reports', '—', 'neutral')
+    + stat('Period Summaries', '—', 'neutral')
+  ));
+
+  // Transactions
+  tiles.push(tile('🔄','Transactions',"showPage('transactions')",'#0891b2',
+    stat('Total', txnCount, 'neutral')
+  ));
+
+  // Audit Log
+  tiles.push(tile('👁','Audit Log',"showPage('auditlog')",'#475569',
+    stat('Entries', auditCount, 'neutral')
+  ));
+
+  var grid = document.getElementById('home_tiles_grid');
+  if(grid) grid.innerHTML = tiles.join('');
 }
 
 // \u2500\u2500 Invoice cache and search \u2500\u2500
@@ -4173,31 +4400,11 @@ function updateUnallocated() {
 // to the role label if no name is present in the session.
 var CURRENT_USER = (HOUSING_SESSION && HOUSING_SESSION.name) || 'Unknown User';
 
-function toggleSidebar() {
-  var sidebar = document.getElementById('appSidebar');
-  var overlay = document.getElementById('sidebarOverlay');
-  if (!sidebar) return;
-  var isOpen = sidebar.classList.contains('open');
-  if (isOpen) {
-    sidebar.classList.remove('open');
-    overlay.classList.remove('open');
-    document.body.style.overflow = '';
-  } else {
-    sidebar.classList.add('open');
-    overlay.classList.add('open');
-    document.body.style.overflow = 'hidden';
-  }
-}
-
-function closeSidebarOnNav() {
-  if (window.innerWidth < 768) {
-    var sidebar = document.getElementById('appSidebar');
-    var overlay = document.getElementById('sidebarOverlay');
-    if (sidebar) sidebar.classList.remove('open');
-    if (overlay) overlay.classList.remove('open');
-    document.body.style.overflow = '';
-  }
-}
+// Sidebar has been removed in the home-tiles refactor. These are kept as
+// no-ops because several legacy onclick handlers still call closeSidebarOnNav().
+// Safe to delete once no inline handlers reference them.
+function toggleSidebar(){}
+function closeSidebarOnNav(){}
 
 
 function auditLog(action, entity, entityId, description, before, after) {
@@ -8226,7 +8433,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // trigger-sync installed by the F2 migration.
     await _bootLoadFinanceData();
 
-    showPage('dashboard');
+    showPage('home');
     initTenantSelects();
   document.addEventListener('click', function(e) {
     if (!e.target.closest('.search-wrap') && !e.target.closest('.tenant-search-results')) {
@@ -8288,7 +8495,7 @@ function clearAndReseed() {
   if (!confirm('Clear all data and reload demo data? This cannot be undone.')) return;
   localStorage.removeItem('clfn_finance_v6');
   seedIfEmpty();
-  showPage('dashboard');
+  showPage('home');
   toast('Demo data reloaded.');
 }
 
