@@ -230,7 +230,7 @@ body {
 /* Back button row + sub-header band used on every non-home view            */
 
 .page-back-row {
-  padding: clamp(12px,2vw,20px) 0 0;
+  padding: 0 0 0;
   display: flex; align-items: center; gap: 8px;
   width: 100%; box-sizing: border-box;
 }
@@ -244,10 +244,13 @@ body {
 .back-btn-yellow:hover { background: #fff0a6; box-shadow: 0 2px 6px rgba(248,228,26,0.35); }
 .back-btn-yellow svg   { flex-shrink: 0; }
 
-/* View containers: consistent top padding */
+/* View containers — zero out top padding so page-back-row sits flush.
+   The view's inline padding handles left/right/bottom.
+   page-header-bar provides vertical breathing room below the back button. */
 #worklistView, #dashView, .dash-view, #settingsView, .settings-view,
 #inventoryView, #matchView, #tenantsView, #renoApprovalsView,
-#renosView, #contractorsView, #scorecardView { padding-top: clamp(12px,2vw,20px) !important; }
+#renosView, #contractorsView, #scorecardView,
+#employeeHomeView, #renoApprovalsView { padding-top: 0 !important; }
 .back-link {
   color: var(--yellow); font-size: 12px; font-weight: 600;
   text-decoration: none; border: 1px solid rgba(248,228,26,.3);
@@ -302,18 +305,18 @@ body {
    containers only — filter selects must always be width:auto.               */
 .dash-filters,
 .filter-bar {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 8px;
   flex-wrap: wrap; margin-bottom: 16px;
 }
 .dash-filters select, .dash-filters input,
 .filter-bar select,   .filter-bar input {
   width: auto; box-sizing: border-box;
   border: 1.5px solid var(--border); border-radius: 7px;
-  padding: 7px 11px; font-size: 13px;
+  padding: 6px 10px; font-size: 13px;
   font-family: var(--sans); background: var(--bg); color: var(--text);
 }
-.dash-filters input,  .filter-bar input  { min-width: 200px; flex: 1; }
-.dash-filters select, .filter-bar select { min-width: 140px; cursor: pointer; }
+.dash-filters input,  .filter-bar input  { min-width: 160px; max-width: 260px; flex: 1; }
+.dash-filters select, .filter-bar select { min-width: 120px; cursor: pointer; }
 .dash-filters select:focus, .dash-filters input:focus,
 .filter-bar select:focus,   .filter-bar input:focus { border-color: var(--yellow); outline: none; }
 
@@ -353,9 +356,10 @@ body {
 .dash-table tbody tr:hover td { background: var(--surface); }
 
 /* Table column width hints */
-.col-score             { width: 100px; white-space: nowrap; }
-.col-date              { width: 90px; white-space: nowrap; }
-.col-cls, .col-arr, .col-res { width: auto; }
+.col-score             { width: 130px; white-space: nowrap; }
+.col-date              { width: 90px;  white-space: nowrap; }
+.col-res, .col-arr     { width: auto;  white-space: nowrap; }
+.col-cls               { width: auto; }
 
 /* Empty state */
 .empty-state           { text-align: center; padding: 40px 20px; color: var(--muted); }
@@ -685,9 +689,15 @@ input:focus, select:focus, textarea:focus {
   /* Scorecard */
   #scorecardView > div:first-child  { padding: 10px 12px; }
   #scorecardView > div:nth-child(2) { padding: 14px 14px 40px !important; }
-  /* View padding */
+  /* View padding — reduce side/bottom padding on small screens, top stays 0 */
+  #worklistView, #dashView, #settingsView,
   #employeeHomeView, #inventoryView, #matchView,
-  #tenantsView, #renosView, #contractorsView { padding: clamp(10px,2vw,16px) !important; }
+  #tenantsView, #renosView, #contractorsView,
+  #renoApprovalsView, #scorecardView {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    padding-bottom: 16px !important;
+  }
   #employeeHomeView h1 { font-size: 20px !important; }
 }
 
