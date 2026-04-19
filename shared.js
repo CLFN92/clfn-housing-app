@@ -1014,13 +1014,34 @@ window.DocLibrary = (function(){
       root.querySelectorAll('[data-dl-del]').forEach(function(btn){
         btn.onclick = function(){
           var p = btn.getAttribute('data-dl-del');
-          var n = btn.getAttribute('data-dl-del-name');
-          if (!confirm('Delete "'+n+'"? This cannot be undone.')) return;
-          btn.disabled = true;
-          // customDelete opt overrides the default storage+tombstone flow.
-          // Receives the full file object (including any extra fields
-          // passed through from customLoader, like docId). Should return
-          // a Promise that resolves when the delete has been committed.
+          var n = btn.getAttribute('data-dl-del-name').replace(/^\d+_/, '');
+          // Branded confirm modal — replaces browser confirm()
+          var ov = document.createElement('div');
+          ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
+          ov.innerHTML =
+            '<div style="background:var(--surface);border-radius:14px;max-width:420px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;">' +
+              '<div class="modal-hdr compact">' +
+                '<div>' +
+                  '<div class="modal-hdr-title">Delete File?</div>' +
+                  '<div class="modal-hdr-sub">This cannot be undone</div>' +
+                '</div>' +
+              '</div>' +
+              '<div style="padding:20px;">' +
+                '<p style="margin:0 0 20px;font-size:13px;color:var(--muted);line-height:1.5;">' +
+                  'Are you sure you want to delete <strong style="color:var(--text);">' + _escHtml(n) + '</strong>?' +
+                '</p>' +
+                '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
+                  '<button class="btn btn-ghost" data-dl-cancel>Cancel</button>' +
+                  '<button class="btn" style="background:var(--danger);color:#fff;border-color:var(--danger);" data-dl-confirm>Delete</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+          document.body.appendChild(ov);
+          ov.querySelector('[data-dl-cancel]').onclick = function(){ document.body.removeChild(ov); };
+          ov.addEventListener('click', function(e){ if (e.target === ov) document.body.removeChild(ov); });
+          ov.querySelector('[data-dl-confirm]').onclick = function(){
+            document.body.removeChild(ov);
+            btn.disabled = true;
           var file = state.files.find(function(f){ return f.path === p; }) || { path:p, name:n };
           var deleteFlow;
           if (typeof opts.customDelete === 'function') {
@@ -1035,6 +1056,7 @@ window.DocLibrary = (function(){
               render();
             })
             .catch(function(){ _setError('Delete failed.'); btn.disabled = false; });
+          };
         };
       });
     }

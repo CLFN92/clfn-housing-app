@@ -821,6 +821,13 @@ input:focus, select:focus, textarea:focus {
 }
 .doclib-filter-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; white-space: nowrap; }
 .doclib-filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* DocLibrary table section — flush to card edges */
+.doclib .std-table td:first-child { padding-left: 16px; }
+.doclib .std-table td:last-child  { padding-right: 16px; }
+.doclib .std-table th:first-child { padding-left: 16px; }
+.doclib .std-table th:last-child  { padding-right: 16px; }
+.doclib .std-table tr.empty-row td { padding: 32px 16px; text-align: center; color: var(--muted); font-size: 13px; }
 .upload-zone  { border: 2px dashed var(--border); border-radius: 10px; padding: 28px 20px; text-align: center; cursor: pointer; transition: var(--tr); }
 .upload-zone:hover,
 .upload-zone.is-drag  { border-color: var(--yellow); background: var(--yellow-light); }

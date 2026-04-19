@@ -6122,7 +6122,7 @@ async function scLoadDocs(app) {
             entity_type: 'application',
             entity_id:   String(appId),
             action:      'file_deleted',
-            details:     JSON.stringify({ path: file.path, name: file.name }),
+            detail:      JSON.stringify({ path: file.path, name: file.name }),
             actor:       window.currentRole || 'staff',
             created_at:  new Date().toISOString()
           })
