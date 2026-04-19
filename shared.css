@@ -785,18 +785,42 @@ input:focus, select:focus, textarea:focus {
 /* ── File upload / DocLibrary widget ────────────────────────────────────────
    Used by DocLibrary (shared.js) across housing, renos and finance.
    All pages load shared.css so these belong here.                          */
-.doclib          { display: flex; flex-direction: column; gap: 8px; }
-.doclib-status        { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
+.doclib          { display: flex; flex-direction: column; }
+.doclib-status        { font-size: 11px; padding: 4px 12px; border-radius: 4px; font-weight: 700; margin: 0 16px 8px; }
 .doclib-status-info   { background: #eff6ff; color: #1d4ed8; }
 .doclib-status-error  { background: #fef2f2; color: var(--danger); }
-.doclib-upload-row    { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.doclib-upload-drop   { flex: 1; border: 2px dashed var(--border); border-radius: 8px; padding: 16px 12px; cursor: pointer; transition: var(--tr); display: flex; align-items: center; gap: 12px; }
+
+/* Upload area — drop zone + category selector side by side */
+.doclib-upload-area {
+  display: flex; align-items: stretch; gap: 0;
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.doclib-upload-drop {
+  flex: 1; border: 2px dashed var(--border); border-radius: 8px;
+  padding: 14px 16px; cursor: pointer; transition: var(--tr);
+  display: flex; align-items: center; gap: 12px;
+}
 .doclib-upload-drop:hover,
 .doclib-upload-drop.is-drag { border-color: var(--yellow); background: var(--yellow-light); }
-.doclib-upload-icon   { font-size: 24px; flex-shrink: 0; }
-.doclib-upload-text   { font-size: 12px; color: var(--muted); }
-.doclib-upload-text strong { font-size: 13px; font-weight: 600; color: var(--text); display: block; margin-bottom: 2px; }
-.doclib-upload-cat    { font-size: 12px; min-width: 140px; display: flex; flex-direction: column; gap: 4px; }
+.doclib-upload-icon   { font-size: 28px; flex-shrink: 0; }
+.doclib-upload-text   { display: flex; flex-direction: column; gap: 2px; }
+.doclib-upload-text strong { font-size: 13px; font-weight: 600; color: var(--text); }
+.doclib-upload-text span   { font-size: 11px; color: var(--muted); }
+.doclib-upload-cat    {
+  display: flex; flex-direction: column; justify-content: center; gap: 4px;
+  padding-left: 16px; min-width: 160px; flex-shrink: 0;
+}
+.doclib-upload-cat-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+
+/* Filter row */
+.doclib-filter-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.doclib-filter-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; white-space: nowrap; }
+.doclib-filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .upload-zone  { border: 2px dashed var(--border); border-radius: 10px; padding: 28px 20px; text-align: center; cursor: pointer; transition: var(--tr); }
 .upload-zone:hover,
 .upload-zone.is-drag  { border-color: var(--yellow); background: var(--yellow-light); }

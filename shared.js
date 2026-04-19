@@ -899,36 +899,36 @@ window.DocLibrary = (function(){
           return '<option value="'+_escAttr(c.key)+'"'+sel+'>'+(c.icon?c.icon+' ':'')+_escHtml(c.label)+'</option>';
         }).join('');
         uploadHTML =
-          '<div class="doclib-upload-row">' +
+          '<div class="doclib-upload-area">' +
             '<div class="doclib-upload-drop" data-dl-drop>' +
               '<input type="file" multiple data-dl-file-input style="display:none;">' +
               '<span class="doclib-upload-icon">\uD83D\uDCC1</span>' +
               '<div class="doclib-upload-text">' +
-                '<div style="font-size:13px;font-weight:600;">Drop files here or click to upload</div>' +
-                '<div style="font-size:11px;color:var(--muted);">Max ' + opts.maxSizeMB + ' MB per file</div>' +
+                '<strong>Drop files here or click to upload</strong>' +
+                '<span>Max ' + opts.maxSizeMB + ' MB per file</span>' +
               '</div>' +
             '</div>' +
-            '<label class="doclib-upload-cat">' +
-              '<span>Category</span>' +
-              '<select data-dl-cat class="std-filter-control narrow">'+catOptions+'</select>' +
-            '</label>' +
+            '<div class="doclib-upload-cat">' +
+              '<label class="doclib-upload-cat-label">Category</label>' +
+              '<select data-dl-cat class="std-filter-control">'+catOptions+'</select>' +
+            '</div>' +
           '</div>' +
           (state.uploading ? '<div class="doclib-status doclib-status-info">Uploading\u2026</div>' : '') +
           (state.error ? '<div class="doclib-status doclib-status-error">'+_escHtml(state.error)+'</div>' : '');
       }
 
       // Filter chips
-      var chipAll = '<button type="button" class="btn btn-sm tic-hist-chip' +
+      var chipAll = '<button type="button" class="tic-hist-chip' +
         (state.filter==='all'?' is-active':'') + '" data-dl-chip="all">All</button>';
       var chips = opts.categories.map(function(c){
         var active = state.filter === c.key ? ' is-active' : '';
-        return '<button type="button" class="btn btn-sm tic-hist-chip'+active+'" data-dl-chip="'+_escAttr(c.key)+'">' +
+        return '<button type="button" class="tic-hist-chip'+active+'" data-dl-chip="'+_escAttr(c.key)+'">' +
           (c.icon ? c.icon + ' ' : '') + _escHtml(c.label) + '</button>';
       }).join('');
       var filterHTML =
-        '<div class="std-filter-row" style="flex-wrap:wrap;">' +
-          '<span class="std-filter-label">Category</span>' +
-          '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + chipAll + chips + '</div>' +
+        '<div class="doclib-filter-row">' +
+          '<span class="doclib-filter-label">Category</span>' +
+          '<div class="doclib-filter-chips">' + chipAll + chips + '</div>' +
         '</div>';
 
       // Table body
@@ -947,7 +947,7 @@ window.DocLibrary = (function(){
           return '<tr>' +
             '<td style="font-size:16px;width:28px;">'+icon+'</td>' +
             '<td class="std-cell-primary" style="max-width:320px;white-space:normal;word-break:break-word;">' +
-              _escHtml(f.name) +
+              _escHtml(f.name.replace(/^\d+_/, '')) +
               '<div style="font-size:11px;color:var(--muted);font-weight:normal;">' +
                 _escHtml(f.addedAt||'') + (f.addedBy?' \u00B7 '+_escHtml(f.addedBy):'') + '</div>' +
             '</td>' +
