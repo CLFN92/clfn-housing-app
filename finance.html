@@ -2865,13 +2865,12 @@ function saveData(d){
     totalDeletes += diff.toDelete.length;
 
     if (diff.toUpsert.length) {
-      console.log('[finance trace] ' + spec.key + ' has ' + diff.toUpsert.length + ' rows to upsert to ' + spec.table);
       var rows = diff.toUpsert.map(function(x){
         try { return spec.toRow(x); } catch(e) { console.error('[finance] toRow failed on '+spec.key, x, e); return null; }
       }).filter(Boolean);
-      console.log('[finance trace] ' + spec.key + ' mapped to ' + rows.length + ' rows after toRow()');
+      console.log('[finance trace] ' + spec.key + ' → ' + spec.table + ': diff=' + diff.toUpsert.length + ' mapped=' + rows.length);
       if (rows.length) {
-        console.log('[finance trace] ' + spec.key + ' payload:', JSON.stringify(rows, null, 2));
+        console.log('[finance trace] ' + spec.key + ' payload:', JSON.stringify(rows));
         _writeInFlight++;
         var p = _upsertRows(spec.table, rows)
           .then(function(resp){
