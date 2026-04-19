@@ -5451,10 +5451,11 @@ function resolveCollectionFromTIC(tid) {
   var d = getData();
   var c = d.collections.find(function(x){ return x.tenantId === tid && x.status !== 'resolved'; });
   if (!c) { toast('No active collections flag found for this tenant.'); return; }
-  if (!confirm('Mark this collections file as resolved?')) return;
-  c.status = 'resolved';
-  saveData(d); renderCollections(); renderDashboard(); renderTenantProfile(tid);
-  toast('Collections file marked as resolved.');
+  showConfirm('Resolve Case', 'Mark this collections file as resolved?', function() {
+    c.status = 'resolved';
+    saveData(d); renderCollections(); renderDashboard(); renderTenantProfile(tid);
+    toast('Collections file marked as resolved.');
+  }, 'Resolve', false);
 }
 
 function resolveCollection(id) {
@@ -6114,7 +6115,7 @@ function saveReversal() {
 }
 
 function reverseLoanPayment(pmtId, loanId) {
-  if (!confirm('Reverse this loan payment?')) return;
+  showConfirm('Reverse Payment', 'Reverse this loan payment? This cannot be undone.', function() { _doReverseLoanPmt(pmtId, tid); }); return;
   var d = getData();
   var p = d.loanPayments.find(function(x){return x.id===pmtId;});
   if (p) { p.status='reversed'; saveData(d); renderLoanDetail(loanId); renderDashboard(); }
@@ -7186,7 +7187,7 @@ function renderJournal() {
     btn.addEventListener('click', function(e) { e.stopPropagation(); approveJournalEntry(btn.dataset.ref, btn.dataset.id); });
   });
   bodyEl.querySelectorAll('.je-tbl-decline').forEach(function(btn) {
-    btn.addEventListener('click', function(e) { e.stopPropagation(); if(confirm('Decline this journal entry?')) declineJournalEntry(btn.dataset.ref, btn.dataset.id); });
+    btn.addEventListener('click', function(e) { e.stopPropagation(); showConfirm('Decline Entry', 'Decline this journal entry? It will be marked as declined.', function() { declineJournalEntry(btn.dataset.ref, btn.dataset.id); }); });
   });
   bodyEl.querySelectorAll('.je-tbl-edit').forEach(function(btn) {
     btn.addEventListener('click', function(e) { e.stopPropagation(); openEditJournalModal(btn.dataset.ref, btn.dataset.id); });
@@ -7679,7 +7680,9 @@ function saveLoanQuickPayment(loanId, tid, loanType) {
 }
 
 function reverseRentEntry(entryId, tid) {
-  if (!confirm('Reverse this payment? A reversal entry will be posted.')) return;
+  showConfirm('Reverse Payment', 'Reverse this payment? A reversal entry will be posted to the ledger.', function() { _doReverseRentEntry(entryId, tid); });
+}
+function _doReverseRentEntry(entryId, tid) {
   var d = getData();
   var entry = d.rentLedger.find(function(r){return r.id===entryId;});
   if (!entry) return;
@@ -7691,7 +7694,9 @@ function reverseRentEntry(entryId, tid) {
 }
 
 function reverseArrPayment(pmtId, tid) {
-  if (!confirm('Reverse this arrangement payment?')) return;
+  showConfirm('Reverse Payment', 'Reverse this arrangement payment? This cannot be undone.', function() { _doReverseArrPayment(pmtId, tid); });
+}
+function _doReverseArrPayment(pmtId, tid) {
   var d = getData();
   var p = d.arrPayments.find(function(x){return x.id===pmtId;});
   if (!p) return;
@@ -7703,7 +7708,9 @@ function reverseArrPayment(pmtId, tid) {
 }
 
 function reverseLoanPmt(pmtId, tid) {
-  if (!confirm('Reverse this loan payment?')) return;
+  showConfirm('Reverse Payment', 'Reverse this loan payment? This cannot be undone.', function() { _doReverseLoanPmt(pmtId, tid); });
+}
+function _doReverseLoanPmt(pmtId, tid) {
   var d = getData();
   var p = d.loanPayments.find(function(x){return x.id===pmtId;});
   if (!p) return;
@@ -8977,9 +8984,9 @@ function renderFinanceWorklist() {
   });
   body.querySelectorAll('.fwl-decline-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      if (confirm('Decline this journal entry?')) {
+      showConfirm('Decline Entry', 'Decline this journal entry? It will be marked as declined and removed from the approval queue.', function() {
         declineJournalEntry(btn.dataset.ref, btn.dataset.id);
-      }
+      });
     });
   });
   body.querySelectorAll('.fwl-edit-btn').forEach(function(btn) {
@@ -9315,21 +9322,22 @@ function stmtOpenEntry(e) {
 }
 
 function stmtReverse(type, entryId) {
-  if (!confirm('Reverse this entry?')) return;
-  var d = getData();
-  if (type==='rent') {
-    var r = d.rentLedger.find(function(x){return x.id===entryId;});
-    if (r) { r.status='reversed'; auditLog('update','payment',entryId,'Reversed rent entry',{status:'posted'},{status:'reversed'}); }
-  } else if (type==='arr') {
-    var p = d.arrPayments.find(function(x){return x.id===entryId;});
-    if (p) { p.status='reversed'; auditLog('update','arrPayment',entryId,'Reversed arrangement payment',{status:'posted'},{status:'reversed'}); }
-  } else if (type==='loan') {
-    var lp = d.loanPayments.find(function(x){return x.id===entryId;});
-    if (lp) { lp.status='reversed'; auditLog('update','loanPayment',entryId,'Reversed loan payment',{status:'posted'},{status:'reversed'}); }
-  }
-  saveData(d);
-  renderStatementEntries();
-  renderDashboard();
+  showConfirm('Reverse Entry', 'Reverse this entry? A reversal will be posted to the ledger.', function() {
+    var d = getData();
+    if (type==='rent') {
+      var r = d.rentLedger.find(function(x){return x.id===entryId;});
+      if (r) { r.status='reversed'; auditLog('update','payment',entryId,'Reversed rent entry',{status:'posted'},{status:'reversed'}); }
+    } else if (type==='arr') {
+      var p = d.arrPayments.find(function(x){return x.id===entryId;});
+      if (p) { p.status='reversed'; auditLog('update','arrPayment',entryId,'Reversed arrangement payment',{status:'posted'},{status:'reversed'}); }
+    } else if (type==='loan') {
+      var lp = d.loanPayments.find(function(x){return x.id===entryId;});
+      if (lp) { lp.status='reversed'; auditLog('update','loanPayment',entryId,'Reversed loan payment',{status:'posted'},{status:'reversed'}); }
+    }
+    saveData(d);
+    renderStatementEntries();
+    renderDashboard();
+  });
 }
 
 function printTenantStatement() {
@@ -10393,6 +10401,30 @@ function toggleRoleMenu() { /* disabled in Phase F1 */ }
 window._onLogout = function() {
   window.location.replace('index.html');
 };
+// ── Branded confirm dialog ──────────────────────────────────────────────
+// Usage: showConfirm('Title', 'Message', function() { /* on confirm */ })
+// Replaces all browser confirm() calls with a styled modal.
+function showConfirm(title, message, onConfirm, confirmLabel, isDanger) {
+  var titleEl = document.getElementById('confirm-title');
+  var msgEl   = document.getElementById('confirm-message');
+  var okBtn   = document.getElementById('confirm-ok-btn');
+  if (!titleEl || !msgEl || !okBtn) { if (confirm(message)) onConfirm(); return; }
+  titleEl.textContent = title || 'Are you sure?';
+  msgEl.textContent   = message || '';
+  okBtn.textContent   = confirmLabel || 'Confirm';
+  okBtn.className     = 'btn ' + (isDanger === false ? 'btn-primary' : 'btn-danger');
+  // Remove previous listener and attach new one
+  var newBtn = okBtn.cloneNode(true);
+  okBtn.parentNode.replaceChild(newBtn, okBtn);
+  newBtn.textContent = confirmLabel || 'Confirm';
+  newBtn.className   = 'btn ' + (isDanger === false ? 'btn-primary' : 'btn-danger');
+  newBtn.addEventListener('click', function() {
+    closeModal('modalConfirm');
+    onConfirm();
+  });
+  openModal('modalConfirm');
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
   // Global error trap - surfaces crashes visibly on iPhone
   window.onerror = function(msg, src, line, col, err) {
@@ -10609,6 +10641,23 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 <!-- modalEditTenant removed in Phase F3 — replaced by the unified
      modalTenantForm which handles both new and edit modes. -->
+<!-- BRANDED CONFIRM DIALOG -->
+<div class="modal-ov" style="display:none" id="modalConfirm">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-hdr compact">
+      <div><h2 id="confirm-title">Are you sure?</h2></div>
+      <button class="modal-close" onclick="closeModal('modalConfirm')">&#x2715;</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px;">
+      <p id="confirm-message" style="margin:0;font-size:14px;color:var(--text);line-height:1.5;"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalConfirm')">Cancel</button>
+      <button class="btn btn-danger" id="confirm-ok-btn">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <div id="app-toast" style="position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-20px);background:#111;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:500;z-index:99999;opacity:0;transition:all .25s ease;pointer-events:none;max-width:calc(100vw - 40px);text-align:center;box-shadow:0 4px 16px rgba(0,0,0,0.15);"></div>
 </body>
 </html>
