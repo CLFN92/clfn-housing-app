@@ -123,7 +123,7 @@
       <span class="action-label">New Loan</span>
       <span class="action-sub">Renovation or rent-to-own</span>
     </button>
-    <button class="action-btn-card" onclick="openModal('modalJournalEntry')">
+    <button class="action-btn-card" onclick="jeResetModal();openModal('modalJournalEntry')">
       <span class="action-icon">&#128211;</span>
       <span class="action-label">Journal Entry</span>
       <span class="action-sub">Manual debit or credit</span>
@@ -522,7 +522,7 @@
     </div>
     <div class="std-page-actions">
       <button class="btn btn-ghost btn-sm" onclick="exportJournal()">&#128196; Export CSV</button>
-      <button class="btn btn-primary btn-sm" onclick="openModal('modalJournalEntry')">+ New Entry</button>
+      <button class="btn btn-primary btn-sm" onclick="jeResetModal();openModal('modalJournalEntry')">+ New Entry</button>
     </div>
   </div>
 
@@ -1874,51 +1874,46 @@
 
 <!-- JOURNAL ENTRY -->
 <div class="modal-ov" id="modalJournalEntry">
-  <div class="modal">
-    <div class="modal-hdr"><div><h2>New Journal Entry</h2><p>Manual debit/credit — ED review required</p></div><button class="modal-close" onclick="closeModal('modalJournalEntry')">&#x2715;</button></div>
+  <div class="modal modal-lg">
+    <div class="modal-hdr"><div><h2>New Journal Entry</h2><p>Multi-line double-entry — must balance before posting</p></div><button class="modal-close" onclick="closeModal('modalJournalEntry')">&#x2715;</button></div>
     <div class="modal-body">
       <div class="approval-row">&#9888; This entry will be flagged for ED review before finalising.</div>
       <div class="fg" style="gap:13px;">
-        <div class="f"><label>Tenant <span class="r">*</span></label><select id="je-tenant"></select></div>
-        <div class="f"><label>Date <span class="r">*</span></label><input id="je-date" type="date"/></div>
-
-        <!-- Debit row -->
-        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--danger);margin-bottom:8px;">&#8593; Debit (Charge)</div>
-          <div class="fg c2" style="gap:10px;">
-            <div class="f"><label>Ledger</label>
-              <select id="je-debit-ledger">
-                <option value="rent">Rent</option>
-                <option value="arrangement">Arrangement</option>
-                <option value="loans">Loans</option>
-                <option value="utilities">Utilities</option>
-                <option value="bad-debt">Bad Debt</option>
-                <option value="debt-recovery">Debt Recovery</option>
-                <option value="misc">Miscellaneous</option>
-                <option value="general">General</option>
-              </select>
-            </div>
-            <div class="f"><label>Amount ($)</label><input id="je-debit" type="number" step="0.01" placeholder="0.00"/></div>
-          </div>
+        <div class="fg c2" style="gap:10px;">
+          <div class="f"><label>Tenant <span class="r">*</span></label><select id="je-tenant"></select></div>
+          <div class="f"><label>Date <span class="r">*</span></label><input id="je-date" type="date"/></div>
         </div>
 
-        <!-- Credit row -->
-        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--success);margin-bottom:8px;">&#8595; Credit (Reduction)</div>
-          <div class="fg c2" style="gap:10px;">
-            <div class="f"><label>Ledger</label>
-              <select id="je-credit-ledger">
-                <option value="rent">Rent</option>
-                <option value="arrangement">Arrangement</option>
-                <option value="loans">Loans</option>
-                <option value="utilities">Utilities</option>
-                <option value="bad-debt">Bad Debt</option>
-                <option value="debt-recovery">Debt Recovery</option>
-                <option value="misc">Miscellaneous</option>
-                <option value="general">General</option>
-              </select>
-            </div>
-            <div class="f"><label>Amount ($)</label><input id="je-credit" type="number" step="0.01" placeholder="0.00"/></div>
+        <!-- Line items table -->
+        <div class="je-lines-wrap">
+          <div class="je-lines-header">
+            <span style="flex:0 0 110px;">Type</span>
+            <span style="flex:1;">GL Account</span>
+            <span style="flex:0 0 130px;text-align:right;">Amount ($)</span>
+            <span style="flex:0 0 32px;"></span>
+          </div>
+          <div id="je-lines"></div>
+          <button type="button" class="btn btn-ghost btn-sm je-add-line" onclick="jeAddLine()">+ Add Line</button>
+        </div>
+
+        <!-- Balance bar -->
+        <div class="je-balance-bar" id="je-balance-bar">
+          <div class="je-balance-cell">
+            <span class="je-balance-label">Total Debits</span>
+            <span class="je-balance-amt" id="je-total-debits">$0.00</span>
+          </div>
+          <div class="je-balance-divider"></div>
+          <div class="je-balance-cell">
+            <span class="je-balance-label">Total Credits</span>
+            <span class="je-balance-amt" id="je-total-credits">$0.00</span>
+          </div>
+          <div class="je-balance-divider"></div>
+          <div class="je-balance-cell">
+            <span class="je-balance-label">Difference</span>
+            <span class="je-balance-amt je-balance-diff" id="je-balance-diff">$0.00</span>
+          </div>
+          <div class="je-balance-status" id="je-balance-status">
+            <span class="je-status-pill je-status-unbalanced">Unbalanced</span>
           </div>
         </div>
 
@@ -1926,7 +1921,10 @@
       </div>
     </div>
     <div id="je-error" style="display:none;color:var(--danger);font-size:12px;padding:8px 20px;"></div>
-    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modalJournalEntry')">Cancel</button><button class="btn btn-primary" onclick="saveJournalEntry()">Submit for ED Review</button></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalJournalEntry')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveJournalEntry()" id="je-submit-btn">Submit for ED Review</button>
+    </div>
   </div>
 </div>
 
@@ -6085,39 +6083,165 @@ function reverseLoanPayment(pmtId, loanId) {
 }
 
 // \u2500\u2500 JOURNAL ENTRY \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function saveJournalEntry() {
-  var tid    = (document.getElementById('je-tenant')||{}).value||'';
-  var date   = (document.getElementById('je-date')||{}).value||today();
-  var memo   = ((document.getElementById('je-memo')||{}).value||'').trim();
-  var debitLedger  = (document.getElementById('je-debit-ledger')||{}).value||'rent';
-  var creditLedger = (document.getElementById('je-credit-ledger')||{}).value||'rent';
-  var debit  = parseFloat((document.getElementById('je-debit')||{}).value)||0;
-  var credit = parseFloat((document.getElementById('je-credit')||{}).value)||0;
+var _jeLineCount = 0;
 
-  // Validate without alert \u2014 show inline error
-  var errEl = document.getElementById('je-error');
-  if (!memo) {
-    if (errEl) { errEl.textContent = 'Description is required.'; errEl.style.display='block'; }
-    return;
+var JE_ACCOUNTS = [
+  {value:'rent',         label:'Rent'},
+  {value:'arrangement',  label:'Payment Arrangement'},
+  {value:'loans',        label:'Loans'},
+  {value:'utilities',    label:'Utilities'},
+  {value:'bad-debt',     label:'Bad Debt'},
+  {value:'debt-recovery',label:'Debt Recovery'},
+  {value:'misc',         label:'Miscellaneous'},
+  {value:'general',      label:'General'},
+];
+
+function _jeAccountOptions(selected) {
+  return JE_ACCOUNTS.map(function(a) {
+    return '<option value="'+a.value+'"'+(a.value===selected?' selected':'')+'>'+a.label+'</option>';
+  }).join('');
+}
+
+function jeAddLine(type, account, amount) {
+  _jeLineCount++;
+  var idx = _jeLineCount;
+  var t = type || 'debit';
+  var container = document.getElementById('je-lines');
+  if (!container) return;
+  var row = document.createElement('div');
+  row.className = 'je-line-row';
+  row.id = 'je-line-'+idx;
+  row.innerHTML =
+    '<div class="je-line-type-wrap">'+
+      '<button type="button" class="je-type-btn je-type-debit'+(t==='debit'?' active':'')+'" onclick="jeSetType('+idx+',\'debit\')">DR</button>'+
+      '<button type="button" class="je-type-btn je-type-credit'+(t==='credit'?' active':'')+'" onclick="jeSetType('+idx+',\'credit\')">CR</button>'+
+    '</div>'+
+    '<select class="je-line-account" id="je-account-'+idx+'" onchange="jeRecalc()">'+_jeAccountOptions(account||'rent')+'</select>'+
+    '<input class="je-line-amount" id="je-amount-'+idx+'" type="number" step="0.01" min="0" placeholder="0.00" value="'+(amount||'')+'" oninput="jeRecalc()"/>'+
+    '<button type="button" class="je-line-remove" onclick="jeRemoveLine('+idx+')" title="Remove line">&#x2715;</button>';
+  container.appendChild(row);
+  jeRecalc();
+}
+
+function jeSetType(idx, type) {
+  var row = document.getElementById('je-line-'+idx);
+  if (!row) return;
+  row.querySelectorAll('.je-type-btn').forEach(function(b) { b.classList.remove('active'); });
+  var btn = row.querySelector('.je-type-'+type);
+  if (btn) btn.classList.add('active');
+  jeRecalc();
+}
+
+function jeRemoveLine(idx) {
+  var row = document.getElementById('je-line-'+idx);
+  if (row) row.remove();
+  jeRecalc();
+}
+
+function jeGetLines() {
+  var container = document.getElementById('je-lines');
+  if (!container) return [];
+  var lines = [];
+  container.querySelectorAll('.je-line-row').forEach(function(row) {
+    var id = row.id.replace('je-line-','');
+    var debitBtn = row.querySelector('.je-type-debit');
+    var type = (debitBtn && debitBtn.classList.contains('active')) ? 'debit' : 'credit';
+    var account = (row.querySelector('.je-line-account')||{}).value || 'rent';
+    var amount = parseFloat((row.querySelector('.je-line-amount')||{}).value) || 0;
+    lines.push({id:id, type:type, account:account, amount:amount});
+  });
+  return lines;
+}
+
+function jeRecalc() {
+  var lines = jeGetLines();
+  var totalDebit = 0, totalCredit = 0;
+  lines.forEach(function(l) {
+    if (l.type === 'debit') totalDebit += l.amount;
+    else totalCredit += l.amount;
+  });
+  var diff = Math.abs(totalDebit - totalCredit);
+  var balanced = lines.length >= 2 && diff < 0.005;
+
+  var fmtDebit  = document.getElementById('je-total-debits');
+  var fmtCredit = document.getElementById('je-total-credits');
+  var fmtDiff   = document.getElementById('je-balance-diff');
+  var statusEl  = document.getElementById('je-balance-status');
+  var submitBtn = document.getElementById('je-submit-btn');
+
+  if (fmtDebit)  fmtDebit.textContent  = '$'+totalDebit.toFixed(2);
+  if (fmtCredit) fmtCredit.textContent = '$'+totalCredit.toFixed(2);
+  if (fmtDiff) {
+    fmtDiff.textContent = '$'+diff.toFixed(2);
+    fmtDiff.className = 'je-balance-amt je-balance-diff' + (balanced ? ' balanced' : ' unbalanced');
   }
-  if (!debit && !credit) {
-    if (errEl) { errEl.textContent = 'Enter a debit or credit amount.'; errEl.style.display='block'; }
+  if (statusEl) {
+    statusEl.innerHTML = balanced
+      ? '<span class="je-status-pill je-status-balanced">&#10003; Balanced</span>'
+      : '<span class="je-status-pill je-status-unbalanced">Unbalanced</span>';
+  }
+  if (submitBtn) {
+    submitBtn.disabled = !balanced;
+    submitBtn.title = balanced ? '' : 'Entry must balance before posting';
+  }
+}
+
+function jeResetModal() {
+  _jeLineCount = 0;
+  var container = document.getElementById('je-lines');
+  if (container) container.innerHTML = '';
+  var memo = document.getElementById('je-memo');
+  if (memo) memo.value = '';
+  var date = document.getElementById('je-date');
+  if (date) date.value = today();
+  var errEl = document.getElementById('je-error');
+  if (errEl) errEl.style.display = 'none';
+  jeAddLine('debit');
+  jeAddLine('credit');
+}
+
+function saveJournalEntry() {
+  var tid  = (document.getElementById('je-tenant')||{}).value||'';
+  var date = (document.getElementById('je-date')||{}).value||today();
+  var memo = ((document.getElementById('je-memo')||{}).value||'').trim();
+  var lines = jeGetLines();
+  var errEl = document.getElementById('je-error');
+
+  function showErr(msg) { if (errEl) { errEl.textContent=msg; errEl.style.display='block'; } }
+
+  if (!memo) { showErr('Memo / description is required.'); return; }
+  if (lines.length < 2) { showErr('At least two lines are required.'); return; }
+
+  var totalDebit = 0, totalCredit = 0;
+  lines.forEach(function(l) {
+    if (l.type==='debit') totalDebit += l.amount;
+    else totalCredit += l.amount;
+  });
+  if (Math.abs(totalDebit - totalCredit) >= 0.005) {
+    showErr('Entry does not balance. Debits ($'+totalDebit.toFixed(2)+') must equal Credits ($'+totalCredit.toFixed(2)+').');
     return;
   }
   if (errEl) errEl.style.display = 'none';
 
   var d = getData();
-  var entry = {
-    id:uid(), tenantId:tid||null, date:date,
-    desc:memo, ledger:debitLedger,
-    charge:debit, payment:credit,
-    debit:debit, credit:credit,
-    type:'journal', method:'journal', status:'pending-ed', ref:''
-  };
-  d.rentLedger.push(entry);
   d.journalEntries = d.journalEntries || [];
-  d.journalEntries.push(entry);
-  auditLog('create','journal',entry.id,'Journal entry: '+memo,null,entry);
+  var groupRef = uid();
+
+  lines.forEach(function(l) {
+    var entry = {
+      id: uid(), tenantId: tid||null, date: date,
+      desc: memo, ledger: l.account,
+      charge: l.type==='debit' ? l.amount : 0,
+      payment: l.type==='credit' ? l.amount : 0,
+      debit: l.type==='debit' ? l.amount : 0,
+      credit: l.type==='credit' ? l.amount : 0,
+      type: 'journal', method: 'journal', status: 'pending-ed', ref: groupRef
+    };
+    d.rentLedger.push(entry);
+    d.journalEntries.push(entry);
+    auditLog('create','journal',entry.id,'Journal entry ('+l.type+'): '+memo,null,entry);
+  });
+
   saveData(d);
   closeModal('modalJournalEntry');
   renderDashboard();

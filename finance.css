@@ -136,3 +136,157 @@
 /* Collections */
 .collections-badge { display: inline-flex; align-items: center; gap: 4px; background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
 
+
+/* ── Journal Entry Multi-Line Form ──────────────────────── */
+.modal-lg { max-width: 680px; width: 96%; }
+
+.je-lines-wrap {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.je-lines-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--muted);
+}
+.je-line-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
+}
+.je-line-row:last-child { border-bottom: none; }
+.je-line-row:hover { background: var(--surface); }
+
+.je-line-type-wrap {
+  display: flex;
+  gap: 2px;
+  flex: 0 0 110px;
+}
+.je-type-btn {
+  flex: 1;
+  padding: 5px 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s;
+}
+.je-type-btn:hover { border-color: var(--yellow); color: var(--text); }
+.je-type-debit.active  { background: #fef2f2; border-color: var(--danger); color: var(--danger); }
+.je-type-credit.active { background: #f0fdf4; border-color: var(--success); color: var(--success); }
+
+.je-line-account {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+}
+.je-line-amount {
+  flex: 0 0 120px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  text-align: right;
+}
+.je-line-remove {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .15s;
+}
+.je-line-remove:hover { background: #fef2f2; color: var(--danger); }
+
+.je-add-line {
+  margin: 8px 12px 10px;
+  font-size: 12px;
+}
+
+/* Balance bar */
+.je-balance-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  padding: 0;
+}
+.je-balance-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 12px;
+  gap: 2px;
+}
+.je-balance-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--muted);
+}
+.je-balance-amt {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+}
+.je-balance-amt.je-balance-diff.balanced   { color: var(--success); }
+.je-balance-amt.je-balance-diff.unbalanced { color: var(--danger); }
+.je-balance-divider {
+  width: 1px;
+  height: 40px;
+  background: var(--border);
+}
+.je-balance-status {
+  flex: 0 0 auto;
+  padding: 0 16px;
+}
+.je-status-pill {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .4px;
+}
+.je-status-balanced   { background: #f0fdf4; color: var(--success); border: 1px solid var(--success); }
+.je-status-unbalanced { background: #fef2f2; color: var(--danger);  border: 1px solid #fca5a5; }
+
+#je-submit-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
