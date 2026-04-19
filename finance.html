@@ -969,7 +969,7 @@
 </div>
 
 <!-- REVERSE ENTRY MODAL -->
-<div class="modal-ov" id="modalReverseEntry">
+<div class="modal-ov" style="display:none" id="modalReverseEntry">
   <div class="modal modal-lg">
     <div class="modal-hdr">
       <div>
@@ -1033,7 +1033,7 @@
 </div>
 
 <!-- ADJUST ENTRY MODAL -->
-<div class="modal-ov" id="modalAdjustEntry">
+<div class="modal-ov" style="display:none" id="modalAdjustEntry">
   <div class="modal modal-lg">
     <div class="modal-hdr">
       <div>
@@ -1100,7 +1100,7 @@
 
 
 <!-- LOAN AGREEMENT MODAL -->
-<div class="modal-ov" id="modalLoanAgreement" style="z-index:400;">
+<div class="modal-ov" style="display:none" id="modalLoanAgreement" style="z-index:400;">
   <div class="modal modal-lg" style="max-width:780px;">
     <div class="modal-hdr">
       <div><h2>&#128196; Loan Agreement</h2><p>Draft — Pending ED Approval</p></div>
@@ -1118,7 +1118,7 @@
 
 
 <!-- ARRANGEMENT AGREEMENT MODAL -->
-<div class="modal-ov" id="modalArrAgreement" style="z-index:400;">
+<div class="modal-ov" style="display:none" id="modalArrAgreement" style="z-index:400;">
   <div class="modal modal-lg" style="max-width:780px;">
     <div class="modal-hdr">
       <div><h2>&#128196; Payment Arrangement Agreement</h2><p>Draft — Pending ED Approval</p></div>
@@ -1143,7 +1143,7 @@
 <!-- Opened via openAddTenant() for new, openEditTenant(tid) for edit.     -->
 <!-- Mode + tid stored on modal.dataset. Uses tf-* id prefix.              -->
 <!-- ═════════════════════════════════════════════════════════════════════ -->
-<div class="modal-ov" id="modalTenantForm">
+<div class="modal-ov" style="display:none" id="modalTenantForm">
   <div class="modal modal-lg">
     <div class="modal-hdr">
       <div>
@@ -1262,7 +1262,7 @@
 
 
 <!-- OPENING BALANCE -->
-<div class="modal-ov" id="modalOpeningBalance">
+<div class="modal-ov" style="display:none" id="modalOpeningBalance">
   <div class="modal">
     <div class="modal-hdr"><div><h2>Set Opening Balance</h2><p>Arrears carried forward - requires ED approval</p></div><button class="modal-close" onclick="closeModal('modalOpeningBalance')">&#x2715;</button></div>
     <div class="modal-body">
@@ -1279,7 +1279,7 @@
 </div>
 
 <!-- NEW INVOICE -->
-<div class="modal-ov" id="modalNewInvoice">
+<div class="modal-ov" style="display:none" id="modalNewInvoice">
   <div class="modal modal-lg">
     <div class="modal-hdr">
       <div><h2>Post Charge / Invoice</h2><p>Post a charge to any account GL</p></div>
@@ -1382,7 +1382,7 @@
 </div>
 
 <!-- UNIFIED PAYMENT MODAL -->
-<div class="modal-ov" id="modalRentPayment">
+<div class="modal-ov" style="display:none" id="modalRentPayment">
   <div class="modal modal-lg">
     <div class="modal-hdr">
       <div><h2>Record Payment</h2><p>Enter total received — allocate across Rent, Arrangement &amp; Loan</p></div>
@@ -1533,7 +1533,7 @@
 </div>
 
 <!-- BATCH PRINT -->
-<div class="modal-ov" id="modalBatchInvoice">
+<div class="modal-ov" style="display:none" id="modalBatchInvoice">
   <div class="modal">
     <div class="modal-hdr"><div><h2>Batch Print Invoices</h2></div><button class="modal-close" onclick="closeModal('modalBatchInvoice')">&#x2715;</button></div>
     <div class="modal-body">
@@ -1549,7 +1549,7 @@
 </div>
 
 <!-- NEW ARRANGEMENT -->
-<div class="modal-ov" id="modalNewArrangement">
+<div class="modal-ov" style="display:none" id="modalNewArrangement">
   <div class="modal modal-lg">
     <div class="modal-hdr">
       <div><h2>New Payment Arrangement</h2><p>Formal repayment plan for rent arrears — requires ED approval</p></div>
@@ -1674,7 +1674,7 @@
 >
 
 <!-- ARRANGEMENT PAYMENT -->
-<div class="modal-ov" id="modalArrPayment">
+<div class="modal-ov" style="display:none" id="modalArrPayment">
   <div class="modal">
     <div class="modal-hdr"><div><h2>Record Arrangement Payment</h2></div><button class="modal-close" onclick="closeModal('modalArrPayment')">&#x2715;</button></div>
     <div class="modal-body">
@@ -1713,7 +1713,7 @@
 </div>
 
 <!-- NEW LOAN -->
-<div class="modal-ov" id="modalNewLoan">
+<div class="modal-ov" style="display:none" id="modalNewLoan">
   <div class="modal modal-lg">
     <div class="modal-hdr">
       <div><h2>New Loan Application</h2><p>Renovation, rent-to-own or utilities — requires ED approval</p></div>
@@ -1854,7 +1854,7 @@
 </div>
 
 <!-- LOAN PAYMENT -->
-<div class="modal-ov" id="modalLoanPayment">
+<div class="modal-ov" style="display:none" id="modalLoanPayment">
   <div class="modal">
     <div class="modal-hdr"><div><h2>Record Loan Payment</h2></div><button class="modal-close" onclick="closeModal('modalLoanPayment')">&#x2715;</button></div>
     <div class="modal-body">
@@ -1883,7 +1883,7 @@
 </div>
 
 <!-- JOURNAL ENTRY -->
-<div class="modal-ov" id="modalJournalEntry">
+<div class="modal-ov" style="display:none" id="modalJournalEntry">
   <div class="modal modal-lg">
     <div class="modal-hdr"><div><h2>New Journal Entry</h2><p>Multi-line double-entry — must balance before posting</p></div><button class="modal-close" onclick="closeModal('modalJournalEntry')">&#x2715;</button></div>
     <div class="modal-body">
@@ -1934,7 +1934,7 @@
 </div>
 
 <!-- REVERSAL -->
-<div class="modal-ov" id="modalReversal">
+<div class="modal-ov" style="display:none" id="modalReversal">
   <div class="modal">
     <div class="modal-hdr"><div><h2>Reverse Payment</h2><p>HM proposes - ED must approve</p></div><button class="modal-close" onclick="closeModal('modalReversal')">&#x2715;</button></div>
     <div class="modal-body">
@@ -1947,7 +1947,7 @@
 </div>
 
 <!-- FLAG COLLECTIONS -->
-<div class="modal-ov" id="modalFlagCollections">
+<div class="modal-ov" style="display:none" id="modalFlagCollections">
   <div class="modal modal-lg">
     <div class="modal-hdr"><div><h2>Flag Account for Collections</h2><p>Requires ED approval - billing continues alongside flag</p></div><button class="modal-close" onclick="closeModal('modalFlagCollections')">&#x2715;</button></div>
     <div class="modal-body">
@@ -1975,7 +1975,7 @@
 </div>
 
 <!-- REVERSAL MODAL -->
-<div class="modal-ov" id="modalReverse">
+<div class="modal-ov" style="display:none" id="modalReverse">
   <div class="modal">
     <div class="modal-hdr">
       <div>
@@ -2033,7 +2033,7 @@
 </div>
 
 <!-- ADJUSTMENT MODAL -->
-<div class="modal-ov" id="modalAdjustment">
+<div class="modal-ov" style="display:none" id="modalAdjustment">
   <div class="modal">
     <div class="modal-hdr">
       <div>
@@ -2943,8 +2943,7 @@ function _writeAuditEntry(entry){
     entity_id:   entry.entity_id || null,
     summary:     entry.summary || '(no summary)',
     detail:      detail,
-    occurred_at: now,
-    created_at:  now
+    occurred_at: now
   };
   var headers = Object.assign({}, FINANCE_HEADERS || {}, {
     'Prefer': 'return=minimal', 'Content-Type': 'application/json'
@@ -4841,6 +4840,7 @@ function showAutoEngineModal() {
       '<button class="btn btn-primary" onclick="if(document.getElementById(\'ae-mode\').value===\'live\'&&confirm(\'Post entries for all eligible tenants?\'))runEngineFromModal();">&#9654; Run Engine</button>'+
     '</div></div>';
   document.body.appendChild(mo);
+  mo.style.display = '';
   mo.classList.add('on');
 }
 
@@ -7141,6 +7141,18 @@ function renderJournal() {
     // Multi-line grouped entry
     var totalDR = 0, totalCR = 0;
     group.forEach(function(r){ totalDR += (r.charge||r.debit||0); totalCR += (r.payment||r.credit||0); });
+    var groupRef = first.ref || '';
+    var groupId  = first.id  || '';
+    var isPending = (first.status === 'pending-ed' || first.status === 'pending');
+    var isED = (typeof _currentRole !== 'undefined' && _currentRole === 'ed')
+            || (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.role === 'ed');
+    var actionCell = isPending && isED
+      ? '<td class="je-action-cell">'
+        + '<button class="btn btn-xs btn-primary je-tbl-approve" data-ref="'+groupRef+'" data-id="'+groupId+'">Approve</button> '
+        + '<button class="btn btn-xs btn-ghost je-tbl-edit" data-ref="'+groupRef+'" data-id="'+groupId+'">Edit</button> '
+        + '<button class="btn btn-xs btn-ghost je-tbl-decline" data-ref="'+groupRef+'" data-id="'+groupId+'" style="color:var(--danger);border-color:var(--danger);">Decline</button>'
+        + '</td>'
+      : '<td></td>';
     var header = '<tr class="je-group-header-row">'+
       '<td>'+first.date+'</td>'+
       '<td class="std-cell-primary">'+(t?tenantName(t):'<span class="std-cell-dash">—</span>')+'</td>'+
@@ -7168,6 +7180,17 @@ function renderJournal() {
     }).join('');
     return header + subRows;
   }).join('');
+
+  // Wire journal table action buttons
+  bodyEl.querySelectorAll('.je-tbl-approve').forEach(function(btn) {
+    btn.addEventListener('click', function(e) { e.stopPropagation(); approveJournalEntry(btn.dataset.ref, btn.dataset.id); });
+  });
+  bodyEl.querySelectorAll('.je-tbl-decline').forEach(function(btn) {
+    btn.addEventListener('click', function(e) { e.stopPropagation(); if(confirm('Decline this journal entry?')) declineJournalEntry(btn.dataset.ref, btn.dataset.id); });
+  });
+  bodyEl.querySelectorAll('.je-tbl-edit').forEach(function(btn) {
+    btn.addEventListener('click', function(e) { e.stopPropagation(); openEditJournalModal(btn.dataset.ref, btn.dataset.id); });
+  });
 }
 
 
@@ -8605,7 +8628,8 @@ function openModal(id,extra){
   populateModalSelects(id);
   // Ensure unit picker datalist is current when the tenant form is opening
   if(id==='modalTenantForm' && typeof _populateUnitDatalist === 'function') _populateUnitDatalist();
-  document.getElementById(id).classList.add('on');
+  var _mEl = document.getElementById(id);
+  if (_mEl) { _mEl.style.display = ''; _mEl.classList.add('on'); }
   // Auto-init payment modal
   if(id==='modalRentPayment'){
     var dateEl=document.getElementById('rp-date');
@@ -8613,7 +8637,10 @@ function openModal(id,extra){
     setTimeout(function(){ loadUnifiedPaymentContext(); }, 100);
   }
 }
-function closeModal(id){document.getElementById(id).classList.remove('on');}
+function closeModal(id){
+  var _mEl = document.getElementById(id);
+  if (_mEl) { _mEl.classList.remove('on'); _mEl.style.display = 'none'; }
+}
 
 function populateModalSelects(id){
   var d=getData();
@@ -8920,12 +8947,18 @@ function renderFinanceWorklist() {
   if (countEl) countEl.textContent = items.length;
   if (titleEl) titleEl.innerHTML = '&#9888; ' + (isED ? 'Requires Your Approval' : 'Pending Items');
   body.innerHTML = items.map(function(item) {
-    var approveBtn = '';
+    var actionBtns = '';
     if (item.isEDAction && item.approveRef !== undefined) {
-      approveBtn = '<button class="btn btn-xs btn-primary fwl-approve-btn"'
-        + ' data-ref="'+item.approveRef+'" data-id="'+item.approveId+'"'
-        + '>Approve</button> ';
+      actionBtns +=
+        '<button class="btn btn-xs btn-primary fwl-approve-btn"'
+        + ' data-ref="'+item.approveRef+'" data-id="'+item.approveId+'">Approve</button> '
+        + '<button class="btn btn-xs btn-ghost fwl-edit-btn"'
+        + ' data-ref="'+item.approveRef+'" data-id="'+item.approveId+'">Edit</button> '
+        + '<button class="btn btn-xs btn-ghost fwl-decline-btn"'
+        + ' data-ref="'+item.approveRef+'" data-id="'+item.approveId+'"
+        style="color:var(--danger);border-color:var(--danger);">Decline</button> ';
     }
+    actionBtns += item.action;
     return '<div class="fwl-item">'+
       '<div class="fwl-icon">'+item.icon+'</div>'+
       '<div class="fwl-main">'+
@@ -8933,13 +8966,25 @@ function renderFinanceWorklist() {
         (item.memo ? '<div class="fwl-memo">'+item.memo+'</div>' : '')+
       '</div>'+
       '<div class="fwl-date">'+item.date+'</div>'+
-      '<div class="fwl-actions">'+approveBtn+item.action+'</div>'+
+      '<div class="fwl-actions">'+actionBtns+'</div>'+
     '</div>';
   }).join('');
-  // Wire approve buttons via event delegation (avoids inline quoting issues)
+  // Wire action buttons via event delegation
   body.querySelectorAll('.fwl-approve-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       approveJournalEntry(btn.dataset.ref, btn.dataset.id);
+    });
+  });
+  body.querySelectorAll('.fwl-decline-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (confirm('Decline this journal entry?')) {
+        declineJournalEntry(btn.dataset.ref, btn.dataset.id);
+      }
+    });
+  });
+  body.querySelectorAll('.fwl-edit-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      openEditJournalModal(btn.dataset.ref, btn.dataset.id);
     });
   });
 }
@@ -8966,6 +9011,63 @@ function approveJournalEntry(ref, fallbackId) {
   renderFinanceWorklist();
   renderDashboard();
   if (document.getElementById('page-journal') && document.getElementById('page-journal').classList.contains('on')) renderJournal();
+}
+
+function declineJournalEntry(ref, fallbackId) {
+  var d = getData();
+  var toDecline = (ref && ref !== '')
+    ? (d.journalEntries||[]).filter(function(j){ return j.ref === ref; })
+    : (d.journalEntries||[]).filter(function(j){ return j.id === fallbackId; });
+  if (!toDecline.length) return;
+  d.auditLog = d.auditLog || [];
+  var actor = (typeof HOUSING_SESSION !== 'undefined') ? (HOUSING_SESSION.name || HOUSING_SESSION.email) : 'ED';
+  toDecline.forEach(function(j) {
+    var prev = j.status;
+    j.status = 'declined';
+    j.declinedBy = actor;
+    j.declinedAt = today();
+    var rl = (d.rentLedger||[]).find(function(r){ return r.id === j.id; });
+    if (rl) { rl.status = 'declined'; }
+    d.auditLog.push({id:uid(), ts:new Date().toISOString(), user:CURRENT_USER,
+      action:'update', entity:'journal', entityId:j.id,
+      description:'Journal entry declined by '+actor, before:{status:prev}, after:{status:'declined'}});
+  });
+  saveData(d);
+  renderFinanceWorklist();
+  renderDashboard();
+  if (document.getElementById('page-journal') && document.getElementById('page-journal').classList.contains('on')) renderJournal();
+}
+
+function openEditJournalModal(ref, fallbackId) {
+  var d = getData();
+  var group = (ref && ref !== '')
+    ? (d.journalEntries||[]).filter(function(j){ return j.ref === ref; })
+    : (d.journalEntries||[]).filter(function(j){ return j.id === fallbackId; });
+  if (!group.length) return;
+  var first = group[0];
+  // Open journal modal pre-populated with the existing entry's lines
+  jeResetModal();
+  openModal('modalJournalEntry');
+  // Set tenant and date
+  var tenantEl = document.getElementById('je-tenant');
+  if (tenantEl && first.tenantId) tenantEl.value = first.tenantId;
+  var dateEl = document.getElementById('je-date');
+  if (dateEl && first.date) dateEl.value = first.date;
+  var memoEl = document.getElementById('je-memo');
+  if (memoEl) memoEl.value = first.memo || first.desc || '';
+  // Clear seed lines and repopulate from group
+  _jeLineCount = 0;
+  var container = document.getElementById('je-lines');
+  if (container) container.innerHTML = '';
+  group.forEach(function(j) {
+    var type = (j.debit||j.charge||0) > 0 ? 'debit' : 'credit';
+    var amount = type === 'debit' ? (j.debit||j.charge||0) : (j.credit||j.payment||0);
+    jeAddLine(type, j.ledger, amount);
+  });
+  jeRecalc();
+  // Mark the old entry as replaced when submitted — store ref for save
+  window._jeEditRef = ref || fallbackId;
+  window._jeEditIds = group.map(function(j){ return j.id; });
 }
 
 function renderDashboard(){
@@ -10354,7 +10456,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 </script>
 
 <!-- CASH DENOMINATION MODAL -->
-<div class="modal-ov" id="modalCashDenom">
+<div class="modal-ov" style="display:none" id="modalCashDenom">
   <div class="modal">
     <div class="modal-hdr"><div><h2>Cash Payment — Denomination Breakdown</h2><p>Record bills and coins received</p></div><button class="modal-close" onclick="closeModal('modalCashDenom')">&#x2715;</button></div>
     <div class="modal-body">
@@ -10442,7 +10544,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 </div>
 
 <!-- VOUCHER MODAL -->
-<div class="modal-ov" id="modalVoucher">
+<div class="modal-ov" style="display:none" id="modalVoucher">
   <div class="modal modal-lg">
     <div class="modal-hdr">
       <div><h2>Transaction Voucher</h2><p>Print or email to Finance</p></div>
