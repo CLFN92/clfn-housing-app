@@ -2182,25 +2182,70 @@ function renderRenosView(){
   /* getSowData defined globally below */
   function getRenoProgress(uid){ return window._renoProgress && window._renoProgress[uid] ? window._renoProgress[uid] : {}; }
   var units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-  var repair=units.filter(function(u){return u.status==='under_repair' && !u.archived;});
-  var condemned=units.filter(function(u){return u.status==='condemned' && !u.archived;});
+
+  // Combine under_repair and condemned into one list
+  var allReno = units.filter(function(u){
+    return (u.status==='under_repair' || u.status==='condemned') && !u.archived;
+  });
 
   function byScore(a,b){ return calcRenoScore(b.id).score - calcRenoScore(a.id).score; }
-  repair.sort(byScore);
-  condemned.sort(byScore);
+  allReno.sort(byScore);
 
-  setText('renos_count',repair.length);
-  setText('condemned_count',condemned.length);
+  // Active filter — stored on window so pill clicks re-render
+  var activeFilter = window._renoViewFilter || 'all';
+
+  var filtered = activeFilter === 'repair'    ? allReno.filter(function(u){ return u.status==='under_repair'; })
+               : activeFilter === 'condemned' ? allReno.filter(function(u){ return u.status==='condemned'; })
+               : allReno;
+
+  // ── Pill chips ────────────────────────────────────────────────────────────
+  var repairCount    = allReno.filter(function(u){ return u.status==='under_repair'; }).length;
+  var condemnedCount = allReno.filter(function(u){ return u.status==='condemned'; }).length;
+
+  var chipDefs = [
+    { key:'all',       label:'All',             count: allReno.length },
+    { key:'repair',    label:'🔨 Under Repair',  count: repairCount },
+    { key:'condemned', label:'🚫 Condemned',     count: condemnedCount },
+  ];
+
+  function chip(def) {
+    var active = activeFilter === def.key;
+    return '<button onclick="window._renoViewFilter=\''+def.key+'\';renderRenosView();" style="'
+      +'display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;border:1.5px solid '
+      +(active ? 'var(--yellow);background:var(--yellow);color:#111;font-weight:700;' : 'var(--border);background:none;color:var(--muted);font-weight:600;')
+      +'font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .15s;">'
+      +def.label
+      +' <span style="font-size:11px;font-weight:800;padding:1px 7px;border-radius:10px;background:'+(active?'rgba(0,0,0,.15)':'var(--surface)')+';">'+def.count+'</span>'
+      +'</button>';
+  }
 
   function scoreBadge(uid){
     var r=calcRenoScore(uid); var s=r.score;
     var tier=s>=40?{label:'Critical',c:'#b91c1c',bg:'#fef2f2'}:s>=25?{label:'High',c:'#7a6000',bg:'#fef9ec'}:s>=12?{label:'Medium',c:'#1d4ed8',bg:'#eff6ff'}:{label:'Low',c:'#15803d',bg:'#f0fdf4'};
-    return '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:15px;font-weight:800;color:var(--text);">'+s+'</span><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+tier.bg+';color:'+tier.c+';">'+tier.label+'</span></div>';
+    return '<span style="font-size:15px;font-weight:800;color:var(--text);">'+s+'</span>'
+      +' <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+tier.bg+';color:'+tier.c+';">'+tier.label+'</span>';
   }
 
-  var rt=document.getElementById('renos_tbody');
-  if(rt) rt.innerHTML=repair.length?repair.map(function(u){
-    var fnd=(u.foundation&&u.foundation!=='nan'&&u.foundation!=='0')?u.foundation:'—';
+  var cols = '<colgroup>'
+    +'<col style="width:30%"/><col style="width:8%"/><col style="width:12%"/>'
+    +'<col style="width:22%"/><col style="width:12%"/><col style="width:10%"/><col style="width:6%"/>'
+    +'</colgroup>';
+
+  var thead = '<thead><tr style="background:var(--dark2);border-bottom:2px solid var(--yellow);">'
+    +'<th style="text-align:left;padding:9px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Address</th>'
+    +'<th style="text-align:center;padding:9px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Beds</th>'
+    +'<th style="text-align:left;padding:9px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Status</th>'
+    +'<th style="text-align:left;padding:9px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Progress</th>'
+    +'<th style="text-align:left;padding:9px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Contractor</th>'
+    +'<th style="text-align:left;padding:9px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Priority</th>'
+    +'<th style="padding:9px 14px;"></th>'
+    +'</tr></thead>';
+
+  var rows = filtered.length ? filtered.map(function(u){
+    var isCondemned = u.status === 'condemned';
+    var statusPill = isCondemned
+      ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:#fef2f2;color:#b91c1c;">🚫 Condemned</span>'
+      : '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:#fffbeb;color:#92400e;">🔨 Under Repair</span>';
     var sow=getSowData(u.id);
     var prog=getRenoProgress(u.id);
     var pct=prog.overallPct||0;
@@ -2210,50 +2255,44 @@ function renderRenosView(){
       :'<span style="font-size:11px;color:var(--muted);">No SOW filed</span>';
     var ctName=sow&&sow.contractor?sow.contractor:'—';
     return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-rpid="'+u.id+'">'
-      +'<td style="padding:10px 14px;font-weight:600;font-size:13px;">'+u.num+' '+u.street+'</td>'
+      +'<td style="padding:10px 14px;font-weight:600;font-size:13px;'+(isCondemned?'color:#b91c1c;':'')+'">'+u.num+' '+u.street+'</td>'
       +'<td style="padding:10px 10px;text-align:center;font-weight:700;">'+u.bedrooms+'</td>'
-      +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);">'+fnd+'</td>'
+      +'<td style="padding:10px 10px;">'+statusPill+'</td>'
       +'<td style="padding:10px 10px;">'+progressCell+'</td>'
       +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);">'+ctName+'</td>'
       +'<td style="padding:10px 10px;">'+scoreBadge(u.id)+'</td>'
       +'<td style="padding:10px 14px;text-align:right;white-space:nowrap;">'
         +'<div style="display:flex;gap:5px;justify-content:flex-end;">'
-        +'<button type="button" data-sow-rpid="'+u.id+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;transition:all .15s;color:var(--muted);">🔨 SOW</button>'
-        +'<button type="button" data-rp-rpid="'+u.id+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;transition:all .15s;background:var(--yellow);border-color:var(--yellow);color:#111;">📊 Progress</button>'
+        +'<button type="button" data-sow-rpid="'+u.id+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;color:var(--muted);">🔨 SOW</button>'
+        +'<button type="button" data-rp-rpid="'+u.id+'" style="background:var(--yellow);border:1px solid var(--yellow);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;color:#111;">📊 Progress</button>'
         +'</div>'
       +'</td></tr>';
-  }).join(''):'<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted);">No units currently under repair.</td></tr>';
+  }).join('')
+  : '<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--muted);">No units match this filter.</td></tr>';
 
-  if(rt){
-    rt.querySelectorAll('[data-rpid]').forEach(function(row){row.addEventListener('click',function(){openRenoProgress(row.getAttribute('data-rpid'));});});
-    rt.querySelectorAll('[data-sow-rpid]').forEach(function(btn){btn.addEventListener('click',function(e){e.stopPropagation();openSowModal(btn.getAttribute('data-sow-rpid'));});});
-    rt.querySelectorAll('[data-rp-rpid]').forEach(function(btn){btn.addEventListener('click',function(e){e.stopPropagation();openRenoProgress(btn.getAttribute('data-rp-rpid'));});});
-  }
+  var container = document.getElementById('renos_unified');
+  if(!container) return;
 
-  var ct=document.getElementById('condemned_tbody');
-  if(ct) ct.innerHTML=condemned.length?condemned.map(function(u){
-    var fnd=(u.foundation&&u.foundation!=='nan'&&u.foundation!=='0')?u.foundation:'—';
-    var type=(u.type&&u.type!=='0'&&u.type!=='nan')?u.type:'—';
-    return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-rpid="'+u.id+'">'
-      +'<td style="padding:10px 14px;font-weight:600;font-size:13px;color:#b91c1c;">'+u.num+' '+u.street+'</td>'
-      +'<td style="padding:10px 10px;text-align:center;font-weight:700;">'+u.bedrooms+'</td>'
-      +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);">'+type+'</td>'
-      +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);">'+fnd+'</td>'
-      +'<td style="padding:10px 10px;">'+scoreBadge(u.id)+'</td>'
-      +'<td style="padding:10px 14px;text-align:right;">'
-        +'<div style="display:flex;gap:5px;justify-content:flex-end;">'
-        +'<button type="button" data-sow-rpid="'+u.id+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;transition:all .15s;color:var(--muted);">🔨 SOW</button>'
-        +'<button type="button" data-rp-rpid="'+u.id+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;transition:all .15s;background:var(--yellow);border-color:var(--yellow);color:#111;">📊 Progress</button>'
-        +'</div>'
-      +'</td></tr>';
-  }).join(''):'<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--muted);">No condemned units.</td></tr>';
+  container.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">'
+    + chipDefs.map(chip).join('') + '</div>'
+    + '<div class="card" style="padding:0;overflow:hidden;">'
+    + '<table style="width:100%;border-collapse:collapse;">'+cols+thead+'<tbody id="renos_unified_tbody">'+rows+'</tbody></table>'
+    + '</div>';
 
-  if(ct){
-    ct.querySelectorAll('[data-rpid]').forEach(function(row){row.addEventListener('click',function(){openRenoProgress(row.getAttribute('data-rpid'));});});
-    ct.querySelectorAll('[data-sow-rpid]').forEach(function(btn){btn.addEventListener('click',function(e){e.stopPropagation();openSowModal(btn.getAttribute('data-sow-rpid'));});});
-    ct.querySelectorAll('[data-rp-rpid]').forEach(function(btn){btn.addEventListener('click',function(e){e.stopPropagation();openRenoProgress(btn.getAttribute('data-rp-rpid'));});});
+  var tbody2 = document.getElementById('renos_unified_tbody');
+  if(tbody2){
+    tbody2.querySelectorAll('[data-rpid]').forEach(function(row){
+      row.addEventListener('click',function(){ openRenoProgress(row.getAttribute('data-rpid')); });
+    });
+    tbody2.querySelectorAll('[data-sow-rpid]').forEach(function(btn){
+      btn.addEventListener('click',function(e){ e.stopPropagation(); openSowModal(btn.getAttribute('data-sow-rpid')); });
+    });
+    tbody2.querySelectorAll('[data-rp-rpid]').forEach(function(btn){
+      btn.addEventListener('click',function(e){ e.stopPropagation(); openRenoProgress(btn.getAttribute('data-rp-rpid')); });
+    });
   }
 }
+
 function renderScoresTable() {
   var fTier    = document.getElementById('scFilterTier')    ? document.getElementById('scFilterTier').value    : '';
   var fReserve = document.getElementById('scFilterReserve') ? document.getElementById('scFilterReserve').value : '';
