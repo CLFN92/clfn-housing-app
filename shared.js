@@ -688,12 +688,36 @@ window.DocLibrary = (function(){
     };
   }
 
+  function _mimeType(file) {
+    // Browsers sometimes return empty or wrong MIME for Office files.
+    // Use file extension as authoritative source when browser type is absent.
+    var t = file.type || '';
+    if (t && t !== 'application/octet-stream') return t;
+    var ext = (file.name || '').split('.').pop().toLowerCase();
+    var map = {
+      'pdf':  'application/pdf',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'doc':  'application/msword',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'xls':  'application/vnd.ms-excel',
+      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'png':  'image/png',
+      'jpg':  'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'gif':  'image/gif',
+      'webp': 'image/webp',
+      'txt':  'text/plain',
+      'csv':  'text/csv',
+    };
+    return map[ext] || 'application/octet-stream';
+  }
+
   function _uploadBytes(opts, path, file) {
     var url = opts.supabaseUrl + '/storage/v1/object/' + opts.storageBucket + '/' + path;
     return fetch(url, {
       method: 'POST',
       headers: Object.assign({}, _storageHeaders(opts), {
-        'Content-Type': file.type || 'application/octet-stream',
+        'Content-Type': _mimeType(file),
         'x-upsert': 'true'
       }),
       body: file
@@ -1039,7 +1063,12 @@ window.DocLibrary = (function(){
         var ts = Date.now();
         var path = opts.pathPrefix.replace(/\/$/,'') + '/' + ts + '_' + _safeName(f.name);
         _uploadBytes(opts, path, f).then(function(r){
-          if (!r.ok) throw new Error('upload failed');
+          if (!r.ok) {
+            return r.text().then(function(body){
+              console.error('[DocLib] Storage upload failed:', r.status, body, 'path:', path, 'type:', _mimeType(f));
+              throw new Error('upload failed: ' + body);
+            });
+          }
           return _saveMeta(opts, path, f.name, f.size, f.type, state.uploadCategory);
         }).then(function(){
           if (typeof opts.onChange === 'function') {
