@@ -1350,11 +1350,13 @@
       <p>Occupied and reserved units — <span id="tenant_count" style="font-weight:600;color:var(--text);">—</span> tenants</p>
     </div>
     <div class="phb-actions">
-      <input id="tenant_search" type="text" placeholder="🔍 Search name or address..." oninput="renderTenantsView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);min-width:200px;"/>
       <button type="button" onclick="openAddTenantModal()" style="background:var(--yellow);border:none;color:#111;padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Tenant
       </button>
     </div>
+  </div>
+  <div class="filter-bar" style="margin-bottom:16px;">
+    <input id="tenant_search" type="text" placeholder="🔍 Search name or address..." oninput="renderTenantsView()"/>
   </div>
   <div class="card" style="padding:0;overflow:hidden;">
     <div style="overflow-x:auto;">

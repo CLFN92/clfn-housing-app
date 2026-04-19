@@ -81,6 +81,7 @@
 
 body {
   font-family: var(--sans);
+  background:  #fafaf8; /* fallback before --bg resolves, prevents white flash */
   background:  var(--bg);
   color:       var(--text);
   font-size:   14px;
@@ -287,14 +288,13 @@ body {
 .phb-actions select,
 .phb-actions input     { width: auto; min-width: 0; box-sizing: border-box; }
 
-/* phb-actions containing filter inputs: eject below the dark bar as a light strip */
-.phb-actions:has(input[type="text"]),
-.phb-actions:has(select) {
+/* inventoryView filters: eject phb-actions below the dark bar as a filter strip.
+   inventoryView phb-actions is all filters (no buttons), so the whole thing moves below. */
+#inventoryView .phb-actions {
   flex-basis: 100%;
   width: calc(100% + 2 * clamp(14px,3vw,40px));
   margin-left:  calc(-1 * clamp(14px,3vw,40px));
   margin-right: calc(-1 * clamp(14px,3vw,40px));
-  /* Pull up to stick to the underside of the dark bar */
   margin-top: clamp(16px,2.5vw,28px);
   padding: 12px clamp(14px,3vw,40px);
   background: var(--bg);
