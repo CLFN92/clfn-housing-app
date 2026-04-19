@@ -137,6 +137,7 @@
   </div>
   <div class="page-header-bar">
     <div class="phb-title">
+      <div id="worklist_datetime" style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;"></div>
       <h1>My Worklist</h1>
       <p id="worklist_subtitle"></p>
     </div>
@@ -10395,7 +10396,14 @@ window._onSwitchRole = function(role) {
   if (window._currentScorecardApp && typeof renderScorecardActions === 'function')
     renderScorecardActions(window._currentScorecardApp);
   if (typeof applyTenancyFieldRoles === 'function') applyTenancyFieldRoles();
-  if (typeof showEmployeeHome === 'function') showEmployeeHome();
+  // Only navigate home if no view is currently visible (i.e. during boot)
+  // Not on every role switch — that causes the worklist flash
+  var anyVisible = ['worklistView','dashView','inventoryView','matchView',
+    'tenantsView','settingsView','scorecardView','appLayout'].some(function(id) {
+    var el = document.getElementById(id);
+    return el && el.style.display !== 'none' && el.style.display !== '';
+  });
+  if (!anyVisible && typeof showEmployeeHome === 'function') showEmployeeHome();
 };
 
 // ── Page-specific logout hook ─────────────────────────────────────────────────

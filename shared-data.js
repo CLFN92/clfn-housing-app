@@ -2865,6 +2865,17 @@ function showWorklist() {
   setNavActive('tab_worklist');
   var view = document.getElementById('worklistView');
   if(view){ view.style.display='flex'; view.style.flexDirection='column'; }
+  // Date/time stamp — matches landing page pattern
+  var dtEl = document.getElementById('worklist_datetime');
+  if(dtEl) {
+    var now = new Date();
+    var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var h = now.getHours(), m = now.getMinutes();
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    dtEl.textContent = days[now.getDay()] + ' · ' + months[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear() + ' · ' + h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+  }
   renderWorklist();
 }
 function sowAddNewContractor() {
