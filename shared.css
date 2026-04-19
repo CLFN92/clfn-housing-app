@@ -923,9 +923,8 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 
 /* ── Signature widget (SigWidget in shared.js) — used by housing + finance ── */
 .sigw           { display: flex; flex-direction: column; gap: 12px; }
-.sigw-tabs      { display: flex; border-bottom: 2px solid var(--border); }
 .sigw-tabs      { display: flex; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
-.sigw-tab       { padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; border: 1.5px solid var(--border); border-radius: 7px; background: var(--bg); font-family: var(--sans); transition: var(--tr); }
+.sigw-tab       { padding: 5px 10px; font-size: 11px; font-weight: 600; color: var(--muted); cursor: pointer; border: 1.5px solid var(--border); border-radius: 7px; background: var(--bg); font-family: var(--sans); transition: var(--tr); white-space: nowrap; }
 .sigw-tab:hover { border-color: var(--yellow); color: var(--text); }
 .sigw-tab.active{ color: #111; background: var(--yellow); border-color: var(--yellow); }
 .sigw-panel     { padding: 12px 0; }
