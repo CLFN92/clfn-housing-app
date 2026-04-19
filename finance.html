@@ -2952,7 +2952,16 @@ function _writeAuditEntry(entry) {
   var actor = _ACTOR();
   var role = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION.role : null;
 
-  // Full candidate row — we'll filter to only known columns before sending
+  // Full candidate row — filtered to known columns before sending.
+  // Notes:
+  //   id: omitted — Supabase auto-generates uuid PKs
+  //   tenant_id: always null — FK race condition (see comment above)
+  //   entity_id: must be uuid or null — pass null for non-uuid entity refs
+  var entityId = entry.entity_id || null;
+  // Validate entity_id is uuid-shaped before sending (avoids FK/type errors)
+  var uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (entityId && !uuidRe.test(entityId)) entityId = null;
+
   var fullRow = {
     nation_id:   _NATION(),
     actor_email: actor,
@@ -2960,7 +2969,8 @@ function _writeAuditEntry(entry) {
     actor_role:  role,
     action:      entry.action || 'unknown',
     entity_type: entry.entity_type || 'unknown',
-    entity_id:   entry.entity_id || null,
+    entity_id:   entityId,
+    tenant_id:   null,
     summary:     entry.summary || '(no summary)',
     description: entry.summary || '(no summary)',
     detail:      JSON.stringify(detail),
@@ -2991,9 +3001,11 @@ function _writeAuditEntry(entry) {
   }
 
   // If we already know the columns, filter and send immediately
+  // Always exclude 'id' — Supabase auto-generates the PK
+  var _skipCols = { id: true, updated_at: true };
   if (Array.isArray(_auditCols)) {
     var row = {};
-    _auditCols.forEach(function(col) { if (col in fullRow) row[col] = fullRow[col]; });
+    _auditCols.forEach(function(col) { if (!_skipCols[col] && col in fullRow) row[col] = fullRow[col]; });
     return doInsert(row);
   }
 
@@ -3012,7 +3024,7 @@ function _writeAuditEntry(entry) {
         }
         console.log('[finance audit] columns:', _auditCols.join(', '));
         var row = {};
-        _auditCols.forEach(function(col) { if (col in fullRow) row[col] = fullRow[col]; });
+        _auditCols.forEach(function(col) { if (!_skipCols[col] && col in fullRow) row[col] = fullRow[col]; });
         return doInsert(row);
       });
     } else {
