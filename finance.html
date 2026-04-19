@@ -289,6 +289,7 @@
         placeholder="Search for a tenant by name, unit, phone or email..."
         oninput="tenantPickerSearch('rent', this.value)"
         onfocus="tenantPickerFocus('rent')"
+        onblur="setTimeout(function(){var r=document.getElementById('rentTenantResults');if(r)r.innerHTML='';},200)"
         autocomplete="off"/>
       <div id="rentTenantResults" class="tenant-search-results"></div>
     </div>
@@ -390,6 +391,7 @@
         placeholder="All Tenants — click to filter by name, unit, phone or email..."
         oninput="tenantPickerSearch('arr', this.value)"
         onfocus="tenantPickerFocus('arr')"
+        onblur="setTimeout(function(){var r=document.getElementById('arrTenantResults');if(r)r.innerHTML='';},200)"
         autocomplete="off"/>
       <div id="arrTenantResults" class="tenant-search-results"></div>
     </div>
@@ -471,6 +473,7 @@
         placeholder="All Tenants — click to filter by name, unit, phone or email..."
         oninput="tenantPickerSearch('loan', this.value)"
         onfocus="tenantPickerFocus('loan')"
+        onblur="setTimeout(function(){var r=document.getElementById('loanTenantResults');if(r)r.innerHTML='';},200)"
         autocomplete="off"/>
       <div id="loanTenantResults" class="tenant-search-results"></div>
     </div>
@@ -544,6 +547,7 @@
         placeholder="All Tenants — click to filter by name, unit, phone or email..."
         oninput="tenantPickerSearch('journal', this.value)"
         onfocus="tenantPickerFocus('journal')"
+        onblur="setTimeout(function(){var r=document.getElementById('journalTenantResults');if(r)r.innerHTML='';},200)"
         autocomplete="off"/>
       <div id="journalTenantResults" class="tenant-search-results"></div>
     </div>
@@ -9644,9 +9648,26 @@ function renderRentLedger(){
   var metaEl  = document.getElementById('rent_page_meta');
 
   if(!t){
-    if (bodyEl) bodyEl.innerHTML='<tr class="empty-row"><td colspan="8">Select a tenant above to view their ledger.</td></tr>';
-    if (countEl) countEl.textContent = '—';
-    if (metaEl) metaEl.textContent = 'No tenant selected';
+    // No tenant selected — show summary of all tenants with balances
+    var allEntries = d.rentLedger || [];
+    var summaryRows = d.tenants.filter(function(tn){ return !tn.archived; }).map(function(tn) {
+      var entries = allEntries.filter(function(e){ return e.tenantId === tn.id && e.status !== 'reversed'; });
+      if (!entries.length) return null;
+      var balance = entries.reduce(function(sum, e){ return sum + (e.charge||0) - (e.payment||0); }, 0);
+      var lastEntry = entries[entries.length-1];
+      return '<tr style="cursor:pointer;" onclick="tenantPickerSelect(\'rent\',\''+tn.id+'\');">'
+        + '<td class="std-cell-primary">'+tenantName(tn)+'</td>'
+        + '<td>'+tn.unit+'</td>'
+        + '<td>'+entries.length+' entries</td>'
+        + '<td class="std-cell-right">'+(balance>0?'<span class="amt-debit">$'+balance.toFixed(2)+'</span>':'<span class="amt-credit">$'+Math.abs(balance).toFixed(2)+'</span>')+'</td>'
+        + '<td style="font-size:11px;color:var(--muted);">'+(lastEntry?lastEntry.date:'—')+'</td>'
+        + '</tr>';
+    }).filter(Boolean);
+    if (bodyEl) bodyEl.innerHTML = summaryRows.length
+      ? summaryRows.join('')
+      : '<tr class="empty-row"><td colspan="8">No ledger entries yet.</td></tr>';
+    if (countEl) countEl.textContent = summaryRows.length + ' tenants';
+    if (metaEl) metaEl.textContent = 'All tenants — click a row to filter';
     document.getElementById('rentStats').innerHTML='';
     return;
   }
