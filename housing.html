@@ -2852,40 +2852,6 @@ const SCORING_RUBRIC={
 // ── Live Scoring Model (editable, stored in localStorage) ──
 var SCORING_MODEL_KEY = 'clfn_scoring_model';
 
-var DEFAULT_SCORING_MODEL = [
-  // ── Urgent Need / Displacement ──────────────────────────────────────────────
-  {id:'un1', cat:'urgent_need',    label:'No urgent need',                        pts:0,  p:0},
-  {id:'un2', cat:'urgent_need',    label:'Unsafe / overcrowded conditions',       pts:5,  p:5},
-  {id:'un3', cat:'urgent_need',    label:'Eviction / displacement / fire / flood',pts:8,  p:8},
-  {id:'un4', cat:'urgent_need',    label:'Immediate health / safety emergency',   pts:10, p:10},
-
-  // ── Health & Safety Risk ─────────────────────────────────────────────────────
-  {id:'hs1', cat:'health_safety',  label:'None',                                  pts:0,  p:0},
-  {id:'hs2', cat:'health_safety',  label:'Minor risk — cosmetic / low priority',  pts:2,  p:2},
-  {id:'hs3', cat:'health_safety',  label:'Moderate risk — verified by report',    pts:5,  p:5},
-  {id:'hs4', cat:'health_safety',  label:'Severe risk — structural / health order',pts:8, p:8},
-
-  // ── Persons Over Occupancy Standard ─────────────────────────────────────────
-  {id:'oc1', cat:'occupancy',      label:'1 pt per person over NOS (max 10 pts)', pts:1,  p:1},
-
-  // ── Income Stability ─────────────────────────────────────────────────────────
-  {id:'is1', cat:'income_stability', label:'Stable income — employment, pension, social assistance', pts:5, p:5},
-  {id:'is2', cat:'income_stability', label:'Unstable / no income',                pts:0,  p:0},
-
-  // ── Household Composition ────────────────────────────────────────────────────
-  {id:'hc1', cat:'household_comp', label:'Lone parent household',                 pts:3,  p:3},
-  {id:'hc2', cat:'household_comp', label:'Elder in household (55+)',              pts:3,  p:3},
-  {id:'hc3', cat:'household_comp', label:'Household member with disability',      pts:2,  p:2},
-
-  // ── Prior CLFN Tenancy ───────────────────────────────────────────────────────
-  {id:'pt1', cat:'prior_tenancy',  label:'No prior tenancy — first-time applicant (neutral)', pts:0,  p:0},
-  {id:'pt2', cat:'prior_tenancy',  label:'Good standing — positive tenancy history',          pts:3,  p:3},
-  {id:'pt3', cat:'prior_tenancy',  label:'Mixed record — minor issues',                       pts:1,  p:1},
-  {id:'pt4', cat:'prior_tenancy',  label:'Poor standing — arrears or damage on file',         pts:-2, p:-2},
-
-  // ── Application Age (Waitlist Duration) ──────────────────────────────────────
-  {id:'wa1', cat:'waitlist_age',   label:'1 point per full year on waitlist',     pts:1,  p:1}
-];
 
 // ── V2 Scoring Model Defaults ──────────────────────────────────────────
 // These are the editable point values for each option in the V2 model.
