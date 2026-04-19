@@ -19,6 +19,7 @@
 // Each entry is a fully independent Supabase project → physical data isolation.
 // Subdomain routing: clfn.yourdomain.com → REGISTRY['clfn']
 // ──────────────────────────────────────────────────────────────────────────
+try {
 (function initNationConfig() {
 
   var REGISTRY = {
@@ -80,6 +81,9 @@
   window.NATION_CONFIG = Object.freeze(JSON.parse(JSON.stringify(config)));
 
 })();
+} catch(e) {
+  console.error('[CLFN] initNationConfig failed:', e.message);
+}
 
 // ── Module Registry ────────────────────────────────────────────────────────
 // Separates "what the app can do" from "what this nation has licensed."
@@ -151,6 +155,17 @@
 // Derive connection constants from NATION_CONFIG so every other module
 // can reference SUPABASE_URL / SUPABASE_ANON / STORAGE_BUCKET directly.
 // ──────────────────────────────────────────────────────────────────────────
+if (!window.NATION_CONFIG) {
+  console.error('[CLFN] FATAL: NATION_CONFIG not set — falling back to CLFN defaults.');
+  window.NATION_CONFIG = {
+    id: 'clfn', display_name: 'Constance Lake First Nation', display_short: 'CLFN',
+    supabase_url:  'https://fkhzrbalumzeripzolph.supabase.co',
+    supabase_anon: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo',
+    storage_bucket: 'housing-files',
+    branding: { primary_color: '#F8E41A', dark_color: '#000000', font_serif: 'DM Serif Display', font_sans: 'DM Sans' },
+    modules_enabled: { renovations: true, finance: true, contractors: true, match: true }
+  };
+}
 var SUPABASE_URL   = window.NATION_CONFIG.supabase_url;
 var SUPABASE_ANON  = window.NATION_CONFIG.supabase_anon;
 var STORAGE_BUCKET = window.NATION_CONFIG.storage_bucket || 'housing-files';
