@@ -2553,6 +2553,11 @@ function _collectionFromRow(r){
 
 function _journalToRow(j){
   var debit = Number(j.debit||0), credit = Number(j.credit||0);
+  // Encode status + groupRef into the reference column as 'status|groupRef'
+  // since finance_journal has no dedicated status/group_ref columns.
+  var status = j.status || 'posted';
+  var groupRef = j.ref || '';
+  var encodedRef = status + '|' + groupRef;
   return {
     id: j.id, nation_id: _NATION(),
     tenant_id: j.tenantId || null,
@@ -2560,20 +2565,39 @@ function _journalToRow(j){
     account_code: j.ledger || null,
     debit: debit, credit: credit,
     description: j.memo || j.desc || '(no memo)',
-    reference: j.ref || null,
+    reference: encodedRef,
     voids_id: j.voidsId || null,
     void_reason: j.voidReason || null,
     created_by: j.postedBy || j.createdBy || _ACTOR()
   };
 }
 function _journalFromRow(r){
+  // Decode status + groupRef from reference column ('status|groupRef')
+  var rawRef = r.reference || '';
+  var pipeIdx = rawRef.indexOf('|');
+  var status, groupRef;
+  var knownStatuses = ['pending-ed','pending','posted','approved','reversed','declined'];
+  if (pipeIdx >= 0) {
+    var maybeStatus = rawRef.slice(0, pipeIdx);
+    if (knownStatuses.indexOf(maybeStatus) >= 0) {
+      status   = maybeStatus;
+      groupRef = rawRef.slice(pipeIdx + 1);
+    } else {
+      // Legacy row — reference column holds a plain ref string
+      status   = 'posted';
+      groupRef = rawRef;
+    }
+  } else {
+    status   = knownStatuses.indexOf(rawRef) >= 0 ? rawRef : 'posted';
+    groupRef = '';
+  }
   return {
     id: r.id, tenantId: r.tenant_id || '',
     date: r.entry_date,
     ledger: r.account_code || 'rent',
     debit: Number(r.debit||0), credit: Number(r.credit||0),
-    memo: r.description || '', ref: r.reference || '',
-    postedBy: r.created_by, status: 'posted',
+    memo: r.description || '', desc: r.description || '',
+    ref: groupRef, postedBy: r.created_by, status: status,
     voidsId: r.voids_id, voidReason: r.void_reason
   };
 }
@@ -8804,11 +8828,15 @@ function renderFinanceWorklist() {
   var countEl = document.getElementById('finance-worklist-count');
   var titleEl = document.getElementById('finance-worklist-title');
   if (!wrap || !body) return;
-  var role = _currentRole;
+  // Read role fresh at call time — _currentRole is set at parse time and may
+  // not yet reflect the restored session when called during boot.
+  var role = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.role)
+    ? (window.CLFN_PERMS ? window.CLFN_PERMS.normalizeRole(HOUSING_SESSION.role) : HOUSING_SESSION.role)
+    : _currentRole;
   var d = getData();
   var items = [];
   var isED = (role === 'ed');
-  var isFinance = (role === 'cfo' || role === 'finance_l1');
+  var isFinance = (role === 'cfo' || role === 'finance_l1' || role === 'housing_manager');
   if (isED || isFinance) {
     // Journal entries pending ED review — group by ref
     var seenRefs = {};
@@ -10276,13 +10304,29 @@ document.addEventListener('DOMContentLoaded', async function() {
     // trigger-sync installed by the F2 migration.
     await _bootLoadFinanceData();
 
+    // One-time migration: force-resave all journal entries so Supabase gets
+    // the pipe-encoded status in the reference column. Safe to run every boot
+    // because _diffCollection will only upsert rows that actually changed.
+    (function migrateJournalRefs() {
+      var d = getData();
+      if (!d.journalEntries || !d.journalEntries.length) return;
+      console.log('[finance] Re-encoding ' + d.journalEntries.length + ' journal reference columns');
+      // Touch each entry with a non-breaking sentinel so _diffCollection sees a diff
+      d.journalEntries.forEach(function(j) { j._refEncoded = 1; });
+      saveData(d);
+    })();
+
     showPage('home');
     initTenantSelects();
   document.addEventListener('click', function(e) {
     if (!e.target.closest('.search-wrap') && !e.target.closest('.tenant-search-results')) {
       document.querySelectorAll('.tenant-search-results').forEach(function(el){
         el.style.display = 'none';
+        el.innerHTML = ''; // clear content so nothing bleeds through
       });
+      // Also clear the dash search input text
+      var di = document.getElementById('dashTenantSearch');
+      if (di && di.value) { /* leave value, just hide results */ }
     }
   });
   } catch(e) {
