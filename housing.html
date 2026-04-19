@@ -3911,8 +3911,9 @@ function autoPopulateScore(){
 
 // ── calcScore ──
 function calcScore(){
-  // Local helper — reads a form field value by id
+  // Local helpers — read form field values by id
   function fv(id){ var e=document.getElementById(id); return e ? e.value.trim() : ''; }
+  function fb(id){ var e=document.getElementById(id); return e ? e.checked : false; }
   // If this is a file update for an existing tenant, don't score
   if(typeof getAppType === 'function' && getAppType() === 'existing_tenant') {
     var sc = document.getElementById('sc_score_total');
