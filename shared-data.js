@@ -156,7 +156,11 @@ async function sbSaveApplication(app) {
   try {
     var r = await fetch(SUPABASE_URL + '/rest/v1/housing_applications', {
       method:  'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+      headers: Object.assign({}, HOUSING_HEADERS, {
+        'Prefer': 'resolution=merge-duplicates,return=minimal',
+        'Accept-Profile': 'public',
+        'Content-Profile': 'public'
+      }),
       body:    JSON.stringify(row)
     });
     if (!r.ok) {
