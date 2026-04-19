@@ -230,14 +230,9 @@ body {
 /* Back button row + sub-header band used on every non-home view            */
 
 .page-back-row {
-  padding: clamp(10px,1.5vw,16px) clamp(14px,3vw,40px) 8px;
+  padding: clamp(12px,2vw,20px) 0 0;
   display: flex; align-items: center; gap: 8px;
-  width: calc(100% + 2 * clamp(14px,3vw,28px));
-  margin-left: calc(-1 * clamp(14px,3vw,28px));
-  margin-right: calc(-1 * clamp(14px,3vw,28px));
-  margin-bottom: 0;
-  background: var(--dark2);
-  box-sizing: border-box;
+  width: 100%; box-sizing: border-box;
 }
 .back-btn-yellow {
   background: var(--yellow); border: 1.5px solid var(--yellow); color: #111;
@@ -249,10 +244,10 @@ body {
 .back-btn-yellow:hover { background: #fff0a6; box-shadow: 0 2px 6px rgba(248,228,26,0.35); }
 .back-btn-yellow svg   { flex-shrink: 0; }
 
-/* View containers: zero top padding so .page-back-row sits flush at top */
+/* View containers: consistent top padding */
 #worklistView, #dashView, .dash-view, #settingsView, .settings-view,
 #inventoryView, #matchView, #tenantsView, #renoApprovalsView,
-#renosView, #contractorsView, #scorecardView { padding-top: 0 !important; }
+#renosView, #contractorsView, #scorecardView { padding-top: clamp(12px,2vw,20px) !important; }
 .back-link {
   color: var(--yellow); font-size: 12px; font-weight: 600;
   text-decoration: none; border: 1px solid rgba(248,228,26,.3);
@@ -261,44 +256,43 @@ body {
 .back-link:hover { background: rgba(248,228,26,.1); }
 
 .page-header-bar {
-  background: var(--dark2); border-bottom: 2px solid var(--yellow);
-  padding: clamp(16px,2.5vw,28px) clamp(14px,3vw,40px);
-  display: flex; align-items: center;
+  position: relative;
+  padding: clamp(20px,3vw,36px) 0 clamp(16px,2.5vw,24px) 20px;
+  display: flex; align-items: flex-start;
   justify-content: space-between; gap: 16px; flex-wrap: wrap;
-  width: calc(100% + 2 * clamp(14px,3vw,28px));
-  margin-left: calc(-1 * clamp(14px,3vw,28px));
-  margin-right: calc(-1 * clamp(14px,3vw,28px));
+  width: 100%; box-sizing: border-box;
+  border-bottom: 1px solid var(--border);
   margin-bottom: clamp(16px,2.5vw,24px);
-  box-sizing: border-box;
+}
+/* Yellow left accent bar — same as landing page */
+.page-header-bar::before {
+  content: '';
+  position: absolute; left: 0; top: clamp(20px,3vw,36px);
+  bottom: clamp(16px,2.5vw,24px);
+  width: 4px; background: var(--yellow); border-radius: 2px;
 }
 .page-header-bar h1 {
-  font-family: var(--serif); font-size: clamp(18px,3vw,28px);
-  font-weight: 400; color: #fff; line-height: 1.2;
+  font-family: var(--serif); font-size: clamp(22px,3vw,32px);
+  font-weight: 400; color: var(--text); line-height: 1.15;
 }
-.page-header-bar p     { font-size: 13px; color: #999; margin-top: 2px; }
+.page-header-bar p     { font-size: 13px; color: var(--muted); margin-top: 2px; }
 .page-header-actions   { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* phb-title / phb-actions — inner children of .page-header-bar */
 .phb-title             { flex: 1; min-width: 0; }
-.phb-title h1          { font-family: var(--serif); font-size: clamp(18px,3vw,28px); font-weight: 400; color: #fff; line-height: 1.2; margin: 0; }
-.phb-title p           { font-size: 13px; color: #999; margin: 2px 0 0; }
+.phb-title h1          { font-family: var(--serif); font-size: clamp(22px,3vw,32px); font-weight: 400; color: var(--text); line-height: 1.15; margin: 0; }
+.phb-title p           { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
 
-/* phb-actions with only buttons: right-aligned in the header bar */
+/* phb-actions with only buttons: right-aligned alongside the title */
 .phb-actions           { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
 .phb-actions select,
 .phb-actions input     { width: auto; min-width: 0; box-sizing: border-box; }
 
-/* inventoryView filters: eject phb-actions below the dark bar as a filter strip.
-   inventoryView phb-actions is all filters (no buttons), so the whole thing moves below. */
+/* inventoryView filters below the header */
 #inventoryView .phb-actions {
   flex-basis: 100%;
-  width: calc(100% + 2 * clamp(14px,3vw,40px));
-  margin-left:  calc(-1 * clamp(14px,3vw,40px));
-  margin-right: calc(-1 * clamp(14px,3vw,40px));
-  margin-top: clamp(16px,2.5vw,28px);
-  padding: 12px clamp(14px,3vw,40px);
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
+  padding: 12px 0 4px;
+  border-top: 1px solid var(--border);
   gap: 10px;
 }
 
