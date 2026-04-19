@@ -2892,14 +2892,14 @@ function saveData(d){
     return;
   }
 
-  // 3) Audit log write (also fire-and-forget).
-  var auditPromise = _writeAuditEntry({
+  // 3) Audit log write — fire-and-forget, NOT included in writePromises.
+  // Audit failures must never block or fail the main save flow.
+  _writeAuditEntry({
     action: 'saveData',
     summary: 'Saved finance state (' + totalUpserts + ' upserts, ' + totalDeletes + ' deletes)',
     entity_type: 'batch',
     detail: { upserts: totalUpserts, deletes: totalDeletes }
   });
-  writePromises.push(auditPromise);
 
   // 4) Handle outcome. Log per-table report on success; toast red on failure.
   Promise.all(writePromises).then(function(){
@@ -2927,15 +2927,16 @@ function _writeAuditEntry(entry){
   if (entry.entity_id) detail.entity_id = entry.entity_id;
 
   var row = {
-    nation_id: _NATION(),
+    nation_id:   _NATION(),
     actor_email: _ACTOR(),
     actor_role:  (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION.role : null,
-    action: entry.action,
+    action:      entry.action,
     entity_type: entry.entity_type || 'unknown',
-    entity_id: entry.entity_id || null,
+    entity_id:   entry.entity_id || null,
     // Intentionally NOT set: tenant_id (FK race risk). See comment above.
-    summary: entry.summary || '(no summary)',
-    detail: detail
+    summary:     entry.summary || '(no summary)',
+    detail:      detail,
+    occurred_at: new Date().toISOString()
   };
   var headers = Object.assign({}, FINANCE_HEADERS || {}, {
     'Prefer': 'return=minimal', 'Content-Type': 'application/json'
@@ -2950,8 +2951,8 @@ function _writeAuditEntry(entry){
       });
     }
   }).catch(function(err){
-    console.error('[finance audit] failed:', err);
-    _toastError('Audit log write failed. Please report this.');
+    // Silent failure — audit log errors must not disrupt the user.
+    console.warn('[finance audit] write failed (non-blocking):', err.message || err);
   });
 }
 
@@ -10304,16 +10305,43 @@ document.addEventListener('DOMContentLoaded', async function() {
     // trigger-sync installed by the F2 migration.
     await _bootLoadFinanceData();
 
-    // One-time migration: force-resave all journal entries so Supabase gets
-    // the pipe-encoded status in the reference column. Safe to run every boot
-    // because _diffCollection will only upsert rows that actually changed.
-    (function migrateJournalRefs() {
-      var d = getData();
-      if (!d.journalEntries || !d.journalEntries.length) return;
-      console.log('[finance] Re-encoding ' + d.journalEntries.length + ' journal reference columns');
-      // Touch each entry with a non-breaking sentinel so _diffCollection sees a diff
-      d.journalEntries.forEach(function(j) { j._refEncoded = 1; });
-      saveData(d);
+    // Patch existing finance_journal rows that have reference=null:
+    // set them to 'pending-ed|' so they show up in the worklist.
+    // This runs once; after the patch, reference will be non-null and this
+    // PATCH will affect 0 rows on subsequent loads.
+    (function patchLegacyJournalRefs() {
+      var patchHeaders = Object.assign({}, FINANCE_HEADERS, {
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      });
+      // Only patch rows where reference IS NULL (never been encoded)
+      fetch(SUPABASE_URL + '/rest/v1/finance_journal?reference=is.null', {
+        method: 'PATCH',
+        headers: patchHeaders,
+        body: JSON.stringify({ reference: 'pending-ed|' })
+      }).then(function(r) {
+        if (r.ok) {
+          console.log('[finance] Legacy journal reference patch applied.');
+          // Reload journal entries so the worklist sees the updated status
+          return fetch(SUPABASE_URL + '/rest/v1/finance_journal?select=*&order=entry_date.desc&limit=1000', {
+            headers: FINANCE_HEADERS
+          }).then(function(r2) { return r2.ok ? r2.json() : []; })
+          .then(function(rows) {
+            if (!rows.length) return;
+            var d = getData();
+            d.journalEntries = rows.map(_journalFromRow);
+            _memStore.journalEntries = d.journalEntries;
+            renderDashboard();
+            console.log('[finance] Journal entries reloaded after patch:', rows.length);
+          });
+        } else {
+          r.text().then(function(t) {
+            console.warn('[finance] Legacy journal patch failed:', t);
+          });
+        }
+      }).catch(function(e) {
+        console.warn('[finance] Legacy journal patch error:', e.message);
+      });
     })();
 
     showPage('home');
