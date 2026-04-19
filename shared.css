@@ -880,6 +880,28 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 /* ── Shared utility classes (used across housing + finance) ── */
 .ctitle    { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 12px; }
 
+/* ── Finance std-page-header — same yellow accent pattern as page-header-bar ── */
+.std-page-header {
+  position: relative;
+  padding: clamp(16px,2.5vw,28px) 0 clamp(12px,2vw,20px) 20px;
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  width: 100%; box-sizing: border-box;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: clamp(16px,2.5vw,24px);
+}
+.std-page-header::before {
+  content: '';
+  position: absolute; left: 0; top: clamp(16px,2.5vw,28px);
+  bottom: clamp(12px,2vw,20px);
+  width: 4px; background: var(--yellow); border-radius: 2px;
+}
+.std-page-header-main { flex: 1; min-width: 0; }
+.std-page-title    { font-family: var(--serif); font-size: clamp(22px,3vw,32px); font-weight: 400; color: var(--text); line-height: 1.15; margin: 0 0 4px; }
+.std-page-subtitle { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+.std-page-meta     { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.std-page-actions  { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex-shrink: 0; }
+
 /* Home/landing page greeting pattern */
 .home-accent-bar { position: absolute; left: 0; top: 6px; bottom: 6px; width: 4px; background: var(--yellow); border-radius: 2px; }
 .home-subtitle   { color: var(--muted); font-size: 14px; margin: 0; }
