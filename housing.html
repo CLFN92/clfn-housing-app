@@ -6033,6 +6033,7 @@ async function scLoadDocs(app) {
     supabaseUrl:   SUPABASE_URL,
     supabaseAnon:  SUPABASE_ANON,
     storageBucket: STORAGE_BUCKET,
+    getAuthToken:  function(){ return (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ',''); },
     auditTable:    'housing_audit_log',
     getActor:      function(){ return window.currentRole || 'staff'; },
     categories:    _SCORECARD_APP_DOC_CATEGORIES,
