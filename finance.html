@@ -81,6 +81,7 @@
       <input type="text" id="dashTenantSearch"
         placeholder="Find a tenant by name, unit, phone or email..."
         oninput="dashSearchTenants(this.value)"
+        onblur="setTimeout(function(){var r=document.getElementById('dashSearchResults');if(r)r.innerHTML='';},200)"
         autocomplete="off"/>
       <div id="dashSearchResults" class="tenant-search-results"></div>
     </div>
@@ -2558,7 +2559,7 @@ function _journalToRow(j){
     entry_date: j.date,
     account_code: j.ledger || null,
     debit: debit, credit: credit,
-    description: j.memo || '(no memo)',
+    description: j.memo || j.desc || '(no memo)',
     reference: j.ref || null,
     voids_id: j.voidsId || null,
     void_reason: j.voidReason || null,
@@ -6214,11 +6215,12 @@ function saveJournalEntry() {
   if (errEl) errEl.style.display = 'none';
   var d = getData();
   d.journalEntries = d.journalEntries || [];
+  d.auditLog = d.auditLog || [];
   var groupRef = uid();
   lines.forEach(function(l) {
     var entry = {
       id: uid(), tenantId: tid||null, date: date,
-      desc: memo, ledger: l.account,
+      memo: memo, desc: memo, ledger: l.account,
       charge: l.type==='debit' ? l.amount : 0,
       payment: l.type==='credit' ? l.amount : 0,
       debit: l.type==='debit' ? l.amount : 0,
@@ -6227,7 +6229,10 @@ function saveJournalEntry() {
     };
     d.rentLedger.push(entry);
     d.journalEntries.push(entry);
-    auditLog('create','journal',entry.id,'Journal entry ('+l.type+'): '+memo,null,entry);
+    // Push audit directly — do NOT call auditLog() here as it calls saveData() internally
+    d.auditLog.push({id:uid(), ts:new Date().toISOString(), user:CURRENT_USER,
+      action:'create', entity:'journal', entityId:entry.id,
+      description:'Journal entry ('+l.type+'): '+memo, before:null, after:entry});
   });
   saveData(d);
   closeModal('modalJournalEntry');
@@ -8825,9 +8830,11 @@ function renderFinanceWorklist() {
         sub: tName + ' · ' + groupLines.length + ' lines · $' + totalDR.toFixed(2) + ' DR',
         memo: j.desc || j.memo || '',
         date: j.date || '',
+        approveRef: j.ref || '',
+        approveId:  j.id  || '',
+        isEDAction: isED,
         action: isED
-          ? '<button class="btn btn-xs btn-primary" onclick="approveJournalEntry(\''+j.ref||j.id+'\',\''+j.id+'\')">Approve</button>'
-            + '<button class="btn btn-xs btn-ghost" onclick="showPage(\'journal\')">View</button>'
+          ? '<button class="btn btn-xs btn-ghost" onclick="showPage(\'journal\')">View All</button>'
           : '<button class="btn btn-xs btn-ghost" onclick="showPage(\'journal\')">View</button>'
       });
     });
@@ -8876,6 +8883,12 @@ function renderFinanceWorklist() {
   if (countEl) countEl.textContent = items.length;
   if (titleEl) titleEl.innerHTML = '&#9888; ' + (isED ? 'Requires Your Approval' : 'Pending Items');
   body.innerHTML = items.map(function(item) {
+    var approveBtn = '';
+    if (item.isEDAction && item.approveRef !== undefined) {
+      approveBtn = '<button class="btn btn-xs btn-primary fwl-approve-btn"'
+        + ' data-ref="'+item.approveRef+'" data-id="'+item.approveId+'"'
+        + '>Approve</button> ';
+    }
     return '<div class="fwl-item">'+
       '<div class="fwl-icon">'+item.icon+'</div>'+
       '<div class="fwl-main">'+
@@ -8883,9 +8896,15 @@ function renderFinanceWorklist() {
         (item.memo ? '<div class="fwl-memo">'+item.memo+'</div>' : '')+
       '</div>'+
       '<div class="fwl-date">'+item.date+'</div>'+
-      '<div class="fwl-actions">'+item.action+'</div>'+
+      '<div class="fwl-actions">'+approveBtn+item.action+'</div>'+
     '</div>';
   }).join('');
+  // Wire approve buttons via event delegation (avoids inline quoting issues)
+  body.querySelectorAll('.fwl-approve-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      approveJournalEntry(btn.dataset.ref, btn.dataset.id);
+    });
+  });
 }
 function approveJournalEntry(ref, fallbackId) {
   var d = getData();
@@ -8893,14 +8912,18 @@ function approveJournalEntry(ref, fallbackId) {
     ? (d.journalEntries||[]).filter(function(j){ return j.ref === ref; })
     : (d.journalEntries||[]).filter(function(j){ return j.id === fallbackId; });
   if (!toApprove.length) return;
+  d.auditLog = d.auditLog || [];
+  var approver = (typeof HOUSING_SESSION !== 'undefined') ? (HOUSING_SESSION.name || HOUSING_SESSION.email) : 'ED';
   toApprove.forEach(function(j) {
     var prev = j.status;
     j.status = 'posted';
-    j.approvedBy = (typeof HOUSING_SESSION !== 'undefined') ? (HOUSING_SESSION.name || HOUSING_SESSION.email) : 'ED';
+    j.approvedBy = approver;
     j.approvedAt = today();
     var rl = (d.rentLedger||[]).find(function(r){ return r.id === j.id; });
-    if (rl) rl.status = 'posted';
-    auditLog('update','journal',j.id,'Journal entry approved',{status:prev},{status:'posted'});
+    if (rl) { rl.status = 'posted'; rl.approvedBy = approver; rl.approvedAt = today(); }
+    d.auditLog.push({id:uid(), ts:new Date().toISOString(), user:CURRENT_USER,
+      action:'update', entity:'journal', entityId:j.id,
+      description:'Journal entry approved by '+approver, before:{status:prev}, after:{status:'posted'}});
   });
   saveData(d);
   renderFinanceWorklist();
