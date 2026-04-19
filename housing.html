@@ -756,7 +756,7 @@
       </div>
       <div class="card">
         <div class="ctitle">File Upload</div>
-        <div id="dropZone" style="border:2px dashed var(--border);border-radius:8px;padding:32px;text-align:center;color:var(--muted);cursor:pointer;" onclick="document.getElementById('fileInput').click()">
+        <div id="dropZone" class="upload-zone" onclick="document.getElementById('fileInput').click()">
           <div style="font-size:24px;margin-bottom:8px;">📎</div>
           <div style="font-size:13px;">Drop files here or click to upload</div>
           <div style="font-size:11px;margin-top:4px;">PDF, JPG, PNG accepted</div>
@@ -1477,7 +1477,7 @@
         <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:8px;">Photos</label>
         <div id="au_photo_preview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;min-height:0;"></div>
         <div ondragover="photoDragOver(event,'au_drop_zone')" ondragleave="photoDragLeave('au_drop_zone')" ondrop="photoDrop(event,'add')"
-          id="au_drop_zone" style="border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;background:var(--bg);"
+          id="au_drop_zone" class="upload-zone" style="padding:16px;"
           onclick="document.getElementById('au_photo_input').click()">
           <div style="font-size:13px;color:var(--muted);">Drag photos or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
           <input type="file" id="au_photo_input" accept="image/*" multiple style="display:none;" onchange="handleAddUnitPhotoUpload(this)"/>
@@ -2087,7 +2087,7 @@
         <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:8px;">Photos</label>
         <div id="ue_photo_preview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;min-height:0;"></div>
         <div id="ue_drop_zone" ondragover="photoDragOver(event,'ue_drop_zone')" ondragleave="photoDragLeave('ue_drop_zone')" ondrop="photoDrop(event,'edit')"
-          style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .15s;background:var(--bg);"
+          class="upload-zone"
           onclick="document.getElementById('ue_photo_input').click()">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--muted);margin-bottom:6px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;">Drag photos here or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>

@@ -10,20 +10,6 @@
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
 }
-.dash-filters {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-.dash-filters label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
-.dash-filters select, .dash-filters input {
-  border: 1.5px solid var(--border); border-radius: 7px; padding: 7px 11px;
-  font-family: var(--sans); font-size: 13px; background: var(--bg);
-  width: auto; box-sizing: border-box; color: var(--text);
-}
-.dash-filters select { min-width: 160px; cursor: pointer; }
-.dash-filters input  { min-width: 220px; flex: 1; width: auto; }
-.dash-filters select:focus, .dash-filters select:hover,
-.dash-filters input:focus   { border-color: var(--yellow); outline: none; }
 .dash-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 /* Applicant cell — name bold, ID+date muted small below, no date repetition */
@@ -43,15 +29,16 @@
 /* Status pills — base shape + color variants */
 
 
-/* Score cell — plain inline, no dark button background that clips the tier badge */
-.score-right { display: inline-flex; align-items: center; gap: 6px; }
-.score-num   { font-size: 16px; font-weight: 800; color: var(--text); }
+/* Score cell — number left, badge+bar stacked right */
 .score-cell-btn {
   background: none; border: none; padding: 0; cursor: pointer;
-  font-family: var(--sans); display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--sans); display: inline-flex; align-items: center; gap: 8px;
+  white-space: nowrap;
 }
 .score-cell-btn:hover .score-num { color: var(--yellow); }
-.score-tier-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 8px; white-space: nowrap; }
+.score-num   { font-size: 15px; font-weight: 800; color: var(--text); flex-shrink: 0; }
+.score-right { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.score-tier-badge { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 6px; white-space: nowrap; line-height: 1.4; }
 /* Worklist chips */
 .wl-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
 .wl-chip  {
@@ -211,16 +198,7 @@
 .spop-pts{ font-weight: 700; }
 
 /* Document library */
-.doclib          { display: flex; flex-direction: column; gap: 8px; }
-.doclib-status        { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
-.doclib-status-info   { background: #eff6ff; color: #1d4ed8; }
-.doclib-status-error  { background: #fef2f2; color: var(--danger); }
-.doclib-upload-row    { display: flex; align-items: center; gap: 10px; }
-.doclib-upload-drop   { flex: 1; border: 2px dashed var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: var(--tr); }
-.doclib-upload-drop:hover { border-color: var(--yellow); background: var(--yellow-light); }
-.doclib-upload-icon   { font-size: 20px; }
-.doclib-upload-text   { font-size: 12px; color: var(--muted); }
-.doclib-upload-cat    { font-size: 12px; min-width: 140px; }
+
 
 
 /* ── 17. TABLES ─────────────────────────────────────────────────────────── */
@@ -263,9 +241,6 @@
 /* ── 21. RESPONSIVE ─────────────────────────────────────────────────────── */
 
 /* ── JS-rendered component classes (housing.html) ── */
-
-/* Score cell tier badge */
-.score-tier-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 8px; white-space: nowrap; }
 
 /* Dashboard row action buttons */
 .edit-app-btn, .preview-app-btn, .assign-app-btn, .review-app-btn, .app-menu-btn {

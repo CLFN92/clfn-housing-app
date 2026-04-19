@@ -15,11 +15,8 @@
 .ibox.danger  { background: #fef2f2; border-color: #fecaca; color: var(--danger); }
 
 /* Upload zone */
-.upload-zone  { border: 2px dashed var(--border); border-radius: 10px; padding: 28px 20px; text-align: center; cursor: pointer; transition: var(--tr); }
-.upload-zone:hover,
-.upload-zone.is-drag { border-color: var(--yellow); background: var(--yellow-light); }
 .upload-icon  { font-size: 28px; margin-bottom: 8px; }
-.upload-zone  { border: 2px dashed var(--border); border-radius: 10px; padding: 28px 20px; text-align: center; cursor: pointer; transition: var(--tr); }
+
 
 /* File list */
 .file-list      { display: flex; flex-direction: column; gap: 8px; }

@@ -47,10 +47,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .std-row-avatar       { width: 32px; height: 32px; border-radius: 50%; background: var(--dark2); color: var(--yellow); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
 
 /* ── Standard filter row ── */
-.std-filter-row       { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--bg); }
-.std-filter-label     { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
-.std-filter-control   { border: 1.5px solid var(--border); border-radius: 7px; padding: 6px 10px; font-size: 12px; font-family: var(--sans); background: var(--surface); color: var(--text); width: auto; }
-.std-filter-control.narrow { min-width: 0; }
+
 .std-filter-divider   { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
 .std-filter-spacer    { flex: 1; }
 .std-filter-clear     { background: none; border: none; font-size: 12px; color: var(--muted); cursor: pointer; padding: 4px 8px; font-family: var(--sans); }
@@ -87,8 +84,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .tenant-info-badge    { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 12px; }
 .tenant-picker        { position: relative; }
 .tf-section-label     { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 16px 0 8px; }
-.tic-hist-chip        { font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 20px; border: 1.5px solid var(--border); background: none; color: var(--muted); cursor: pointer; font-family: var(--sans); }
-.tic-hist-chip:hover  { border-color: var(--yellow); color: var(--text); }
+
 .stmt-filter-btn      { font-size: 11px; font-weight: 600; }
 
 /* ── Voucher ── */
