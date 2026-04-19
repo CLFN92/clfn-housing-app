@@ -557,19 +557,59 @@ input:focus, select:focus, textarea:focus {
 }
 .dash-filters {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  margin-bottom: 16px; background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px;
+  margin-bottom: 16px;
 }
 .dash-filters label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
 .dash-filters select, .dash-filters input {
   border: 1.5px solid var(--border); border-radius: 7px; padding: 7px 11px;
   font-family: var(--sans); font-size: 13px; background: var(--bg);
+  width: auto; box-sizing: border-box; color: var(--text);
 }
 .dash-filters select { min-width: 160px; cursor: pointer; }
-.dash-filters input  { min-width: 200px; flex: 1; }
+.dash-filters input  { min-width: 220px; flex: 1; width: auto; }
 .dash-filters select:focus, .dash-filters select:hover,
-.dash-filters input:focus   { border-color: var(--yellow); }
+.dash-filters input:focus   { border-color: var(--yellow); outline: none; }
 .dash-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Dashboard table — applicant cell */
+.appl-name { font-size: 13px; font-weight: 600; line-height: 1.3; }
+.appl-id   { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+/* Dashboard action buttons */
+.dash-action-btn {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  color: var(--muted); cursor: pointer; display: inline-flex;
+  align-items: center; justify-content: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+.dash-action-btn:hover { border-color: var(--yellow); color: var(--text); }
+
+/* Status pills used in dash table */
+.pill-dot   { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; flex-shrink: 0; }
+.pill-draft     { background: #f4f4f0; color: #666; }
+.pill-draft .pill-dot     { background: #aaa; }
+.pill-submitted { background: #eff6ff; color: #1d4ed8; }
+.pill-submitted .pill-dot { background: #3b82f6; }
+.pill-mgr       { background: #faf5ff; color: #7c3aed; }
+.pill-mgr .pill-dot       { background: #7c3aed; }
+.pill-approved  { background: #f0fdf4; color: #15803d; }
+.pill-approved .pill-dot  { background: #22c55e; }
+.pill-declined  { background: #fef2f2; color: #b91c1c; }
+.pill-declined .pill-dot  { background: #ef4444; }
+.pill-returned  { background: #fff7ed; color: #c2410c; }
+.pill-returned .pill-dot  { background: #f97316; }
+.pill-assigned  { background: #f0fdf4; color: #15803d; }
+.pill-assigned .pill-dot  { background: #15803d; }
+
+/* Score cell */
+.score-right { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.score-num   { font-size: 18px; font-weight: 800; }
+
+/* Back button: override page-back-row side padding inside dash-view
+   so it aligns with the dash-view's own 16px padding */
+.dash-view .page-back-row {
+  padding-left: 0; padding-right: 0;
+}
 
 /* Worklist chips */
 .wl-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
