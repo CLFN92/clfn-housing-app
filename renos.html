@@ -1534,6 +1534,7 @@ function updateRenosHeader() {
   document.querySelectorAll('.ed-only').forEach(function(e){e.style.display=(role=== ROLE.ED)?'':'none';});
 }
 function goHome(){window.location.href='index.html';}
+function goBack(){window.location.href='index.html';}
 function setRenosNav(active){
   ['renos','contractors','approvals'].forEach(function(n){var b=document.getElementById('renos-nav-'+n);if(b)b.classList.toggle('active',n===active);});
 }

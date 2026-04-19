@@ -267,6 +267,7 @@ body {
   width: calc(100% + 2 * clamp(14px,3vw,28px));
   margin-left: calc(-1 * clamp(14px,3vw,28px));
   margin-right: calc(-1 * clamp(14px,3vw,28px));
+  margin-bottom: clamp(16px,2.5vw,24px);
   box-sizing: border-box;
 }
 .page-header-bar h1 {
@@ -605,6 +606,12 @@ input:focus, select:focus, textarea:focus {
 .dash-action-btn:hover { border-color: var(--yellow); color: var(--text); }
 
 /* Status pills used in dash table */
+/* Status pills — base shape + color variants */
+.pill {
+  display: inline-flex; align-items: center;
+  font-size: 11px; font-weight: 700; padding: 3px 9px;
+  border-radius: 20px; white-space: nowrap; gap: 4px;
+}
 .pill-dot   { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; flex-shrink: 0; }
 .pill-draft     { background: #f4f4f0; color: #666; }
 .pill-draft .pill-dot     { background: #aaa; }
@@ -1014,6 +1021,7 @@ input:focus, select:focus, textarea:focus {
 .std-table tr:last-child td { border-bottom: none; }
 .std-table tr.clickable { cursor: pointer; }
 .std-table tr.clickable:hover td { background: var(--surface); }
+.empty-row { }
 .std-table tr.empty-row td,
 tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 
@@ -1175,3 +1183,46 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
   .tic-4col                   { grid-template-columns: 1fr 1fr !important; }
   .action-sub                 { display: none; }
 }
+
+/* ── JS-rendered component classes (housing.html) ── */
+
+/* Score cell tier badge */
+.score-tier-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 8px; white-space: nowrap; }
+
+/* Dashboard row action buttons */
+.edit-app-btn, .preview-app-btn, .assign-app-btn, .review-app-btn, .app-menu-btn {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  color: var(--muted); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--sans); font-size: 12px; font-weight: 600;
+  transition: border-color 0.15s, color 0.15s;
+}
+.edit-app-btn:hover, .preview-app-btn:hover,
+.assign-app-btn:hover, .review-app-btn:hover,
+.app-menu-btn:hover { border-color: var(--yellow); color: var(--text); }
+.review-app-btn { background: var(--yellow); color: #111; border-color: var(--yellow); font-weight: 700; }
+.review-app-btn:hover { background: #fff0a6; }
+
+/* Record row header (SOW / renovation records) */
+.rhdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.rlbl { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Error display */
+.err-title { font-size: 14px; font-weight: 700; color: var(--danger); display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+
+/* File upload list items */
+.file-name { font-size: 12px; font-weight: 600; color: var(--text); }
+.file-size { font-size: 11px; color: var(--muted); margin-left: 6px; }
+
+/* Generic footer strip */
+.footer { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
+
+/* ── Scorecard table rows (renderDashTable wl-mode) ── */
+.sc-tr { cursor: pointer; border-bottom: 1px solid var(--border); }
+.sc-tr:hover td { background: var(--surface); }
+.sc-td { padding: 10px 16px; vertical-align: middle; }
+
+/* Contractor person fields */
+.ct-person-name  { font-weight: 600; font-size: 13px; }
+.ct-person-email { font-size: 12px; color: var(--muted); }
+.ct-person-phone { font-size: 12px; color: var(--muted); }
