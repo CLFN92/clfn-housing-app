@@ -3562,3 +3562,110 @@ function showScorecard(app){
   if(typeof renderScorecardActions === 'function') renderScorecardActions(app);
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SIGNATURE PAD HELPERS
+ * Canvas-based signature pads used in housing.html application form.
+ * clearSig / getSigDataURL / setSigMethod take a canvasId string.
+ * finance.html uses a different pair-widget API (clearVoucherSig etc.)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+function clearSig(canvasId) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  canvas.classList.remove('has-sig');
+}
+
+function getSigDataURL(canvasId) {
+  // Typed tab takes priority
+  var typePanel = document.getElementById(canvasId + '_panel_type');
+  if (typePanel && typePanel.style.display !== 'none') {
+    var typed = document.getElementById(canvasId + '_typed');
+    return (typed && typed.value.trim()) ? 'typed:' + typed.value.trim() : '';
+  }
+  // Wet/e-sign tab
+  var wetPanel = document.getElementById(canvasId + '_panel_wet');
+  if (wetPanel && wetPanel.style.display !== 'none') {
+    var ref = document.getElementById(canvasId + '_wet_ref');
+    return (ref && ref.value.trim()) ? 'wet:' + ref.value.trim() : 'wet:pending';
+  }
+  // Canvas draw mode
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return '';
+  var ctx = canvas.getContext('2d');
+  var data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  for (var i = 3; i < data.length; i += 4) {
+    if (data[i] > 0) return canvas.toDataURL('image/png');
+  }
+  return '';
+}
+
+function setSigMethod(canvasId, method) {
+  ['canvas', 'type', 'wet'].forEach(function(m) {
+    var panel = document.getElementById(canvasId + '_panel_' + m);
+    var tab   = document.getElementById(canvasId + '_tab_'   + m);
+    if (panel) panel.style.display = (m === method) ? 'block' : 'none';
+    if (tab) {
+      tab.style.borderBottomColor = (m === method) ? 'var(--yellow)' : 'transparent';
+      tab.style.color      = (m === method) ? 'var(--text)'  : 'var(--muted)';
+      tab.style.fontWeight = (m === method) ? '700' : '600';
+    }
+  });
+  if (method === 'canvas') _initSigPad(canvasId);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SIGNATURE PAD HELPERS
+ * Canvas-based signature pads used in housing.html application form.
+ * clearSig / getSigDataURL / setSigMethod take a canvasId string.
+ * finance.html uses its own pair-widget API (clearVoucherSig etc).
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+function clearSig(canvasId) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  canvas.classList.remove('has-sig');
+}
+
+function getSigDataURL(canvasId) {
+  // Typed tab takes priority
+  var typePanel = document.getElementById(canvasId + '_panel_type');
+  if (typePanel && typePanel.style.display !== 'none') {
+    var typed = document.getElementById(canvasId + '_typed');
+    return (typed && typed.value.trim()) ? 'typed:' + typed.value.trim() : '';
+  }
+  // Wet/e-sign tab
+  var wetPanel = document.getElementById(canvasId + '_panel_wet');
+  if (wetPanel && wetPanel.style.display !== 'none') {
+    var ref = document.getElementById(canvasId + '_wet_ref');
+    return (ref && ref.value.trim()) ? 'wet:' + ref.value.trim() : 'wet:pending';
+  }
+  // Canvas draw mode
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return '';
+  var ctx = canvas.getContext('2d');
+  var data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  for (var i = 3; i < data.length; i += 4) {
+    if (data[i] > 0) return canvas.toDataURL('image/png');
+  }
+  return '';
+}
+
+function setSigMethod(canvasId, method) {
+  ['canvas', 'type', 'wet'].forEach(function(m) {
+    var panel = document.getElementById(canvasId + '_panel_' + m);
+    var tab   = document.getElementById(canvasId + '_tab_'   + m);
+    if (panel) panel.style.display = (m === method) ? 'block' : 'none';
+    if (tab) {
+      tab.style.borderBottomColor = (m === method) ? 'var(--yellow)' : 'transparent';
+      tab.style.color      = (m === method) ? 'var(--text)'  : 'var(--muted)';
+      tab.style.fontWeight = (m === method) ? '700' : '600';
+    }
+  });
+  if (method === 'canvas') _initSigPad(canvasId);
+}
