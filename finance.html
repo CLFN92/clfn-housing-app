@@ -2953,13 +2953,15 @@ function _writeAuditEntry(entry){
   }).then(function(r){
     if (!r.ok) {
       return r.text().then(function(t){
-        console.error('[finance audit] rejected payload was:', JSON.stringify(row, null, 2));
-        throw new Error('audit ' + r.status + ': ' + (t || '(no body)'));
+        var parsed = {};
+        try { parsed = JSON.parse(t); } catch(e) {}
+        console.warn('[finance audit] REJECTED — HTTP '+r.status);
+        console.warn('[finance audit] Supabase says:', parsed.message || parsed.hint || t);
+        console.warn('[finance audit] Payload sent:', JSON.stringify(row));
       });
     }
   }).catch(function(err){
-    // Silent failure — audit log errors must not disrupt the user.
-    console.warn('[finance audit] write failed (non-blocking):', err.message || err);
+    console.warn('[finance audit] network error (non-blocking):', err.message || err);
   });
 }
 
@@ -6261,7 +6263,6 @@ function saveJournalEntry() {
       credit: l.type==='credit' ? l.amount : 0,
       type: 'journal', method: 'journal', status: 'pending-ed', ref: groupRef
     };
-    d.rentLedger.push(entry);
     d.journalEntries.push(entry);
     // Push audit directly — do NOT call auditLog() here as it calls saveData() internally
     d.auditLog.push({id:uid(), ts:new Date().toISOString(), user:CURRENT_USER,
@@ -7049,8 +7050,12 @@ function clearJournalFilters(){
 function renderJournal() {
   var tid = (document.getElementById('journalTenantSelect')||{}).value||'all';
   var d = getData();
-  // Source: rentLedger entries flagged as journal or opening balance
-  var all = (d.rentLedger||[]).filter(function(r){ return r.type==='journal' || r.type==='opening' || r.type==='opening_balance'; });
+  // Source: journalEntries table + opening balances from rentLedger
+  var openingBalances = (d.rentLedger||[]).filter(function(r){ return r.type==='opening' || r.type==='opening_balance'; });
+  var all = (d.journalEntries||[]).concat(openingBalances);
+  // Deduplicate by id in case any overlap
+  var seenIds = {};
+  all = all.filter(function(r){ if (seenIds[r.id]) return false; seenIds[r.id]=true; return true; });
 
   // Tenant filter
   var list = tid === 'all' ? all : all.filter(function(r){ return r.tenantId === tid; });
@@ -7468,7 +7473,9 @@ function exportLoans(){
 function exportJournal(){
   var d = getData();
   var tid = (document.getElementById('journalTenantSelect')||{}).value || 'all';
-  var all = (d.rentLedger||[]).filter(function(r){ return r.type==='journal' || r.type==='opening' || r.type==='opening_balance'; });
+  var openingBals = (d.rentLedger||[]).filter(function(r){ return r.type==='opening' || r.type==='opening_balance'; });
+  var all = (d.journalEntries||[]).concat(openingBals);
+  var _seen={}; all=all.filter(function(r){if(_seen[r.id])return false;_seen[r.id]=true;return true;});
   if (tid !== 'all') all = all.filter(function(r){ return r.tenantId === tid; });
 
   var fStatus = (document.getElementById('jfilt_status')||{}).value || '';
@@ -9008,8 +9015,6 @@ function approveJournalEntry(ref, fallbackId) {
     j.status = 'posted';
     j.approvedBy = approver;
     j.approvedAt = today();
-    var rl = (d.rentLedger||[]).find(function(r){ return r.id === j.id; });
-    if (rl) { rl.status = 'posted'; rl.approvedBy = approver; rl.approvedAt = today(); }
     d.auditLog.push({id:uid(), ts:new Date().toISOString(), user:CURRENT_USER,
       action:'update', entity:'journal', entityId:j.id,
       description:'Journal entry approved by '+approver, before:{status:prev}, after:{status:'posted'}});
