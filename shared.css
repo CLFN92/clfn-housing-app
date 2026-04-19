@@ -257,18 +257,18 @@ body {
 
 .page-header-bar {
   position: relative;
-  padding: clamp(20px,3vw,36px) 0 clamp(16px,2.5vw,24px) 20px;
-  display: flex; align-items: flex-start;
+  padding: clamp(16px,2.5vw,28px) 0 clamp(12px,2vw,20px) 20px;
+  display: flex; align-items: center;
   justify-content: space-between; gap: 16px; flex-wrap: wrap;
   width: 100%; box-sizing: border-box;
   border-bottom: 1px solid var(--border);
   margin-bottom: clamp(16px,2.5vw,24px);
 }
-/* Yellow left accent bar — same as landing page */
+/* Yellow left accent bar — same as landing page greeting */
 .page-header-bar::before {
   content: '';
-  position: absolute; left: 0; top: clamp(20px,3vw,36px);
-  bottom: clamp(16px,2.5vw,24px);
+  position: absolute; left: 0; top: clamp(16px,2.5vw,28px);
+  bottom: clamp(12px,2vw,20px);
   width: 4px; background: var(--yellow); border-radius: 2px;
 }
 .page-header-bar h1 {
@@ -295,6 +295,31 @@ body {
   border-top: 1px solid var(--border);
   gap: 10px;
 }
+
+/* ── Universal filter row ────────────────────────────────────────────────────
+   Applies to: .dash-filters, .filter-bar, and any bare flex div containing
+   filter inputs. The global select { width:100% } is scoped to .f form
+   containers only — filter selects must always be width:auto.               */
+.dash-filters,
+.filter-bar {
+  display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap; margin-bottom: 16px;
+}
+.dash-filters select, .dash-filters input,
+.filter-bar select,   .filter-bar input {
+  width: auto; box-sizing: border-box;
+  border: 1.5px solid var(--border); border-radius: 7px;
+  padding: 7px 11px; font-size: 13px;
+  font-family: var(--sans); background: var(--bg); color: var(--text);
+}
+.dash-filters input,  .filter-bar input  { min-width: 200px; flex: 1; }
+.dash-filters select, .filter-bar select { min-width: 140px; cursor: pointer; }
+.dash-filters select:focus, .dash-filters input:focus,
+.filter-bar select:focus,   .filter-bar input:focus { border-color: var(--yellow); outline: none; }
+
+/* matchView bare filter div — selects and inputs inside any flex filter row */
+#matchView > div > select,
+#matchView > div > input  { width: auto; min-width: 0; box-sizing: border-box; }
 
 /* Application type card text */
 .appty-title           { font-weight: 700; font-size: 13px; }
