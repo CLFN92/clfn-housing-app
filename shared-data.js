@@ -152,7 +152,12 @@ async function sbSaveApplication(app) {
       headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
       body:    JSON.stringify(row)
     });
-    if (!r.ok) { var e = await r.text(); console.warn('[SB] save application failed:', e); return false; }
+    if (!r.ok) {
+      var e = await r.text();
+      console.error('[SB] save application 400 — Supabase says:', e);
+      console.error('[SB] row keys sent:', Object.keys(row).join(', '));
+      return false;
+    }
     return true;
   } catch(e) {
     console.warn('[SB] save application error:', e);
