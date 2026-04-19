@@ -6,6 +6,7 @@
 <title>Housing Finance Module</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="shared.css"/>
+<link rel="stylesheet" href="finance.css"/>
 <script src="shared.js"></script>
 <script src="shared-config.js"></script>
 <script src="shared-auth.js"></script>
@@ -2123,12 +2124,13 @@ try {
 } catch(e) { console.warn('[finance] session restore failed:', e); }
 
 // Finance-module access gate
-if (!HOUSING_SESSION || !HOUSING_SESSION.accessToken) {
+var _hs = (typeof HOUSING_SESSION !== 'undefined') ? HOUSING_SESSION : null;
+if (!_hs || !_hs.accessToken) {
   console.warn('[finance] No authenticated session; redirecting to login.');
   window.location.replace('index.html');
 }
-if (HOUSING_SESSION && !window.CLFN_PERMS.hasFinanceAccess(HOUSING_SESSION.role)) {
-  console.warn('[finance] Role ' + HOUSING_SESSION.role + ' has no finance access.');
+if (_hs && window.CLFN_PERMS && !window.CLFN_PERMS.hasFinanceAccess(_hs.role)) {
+  console.warn('[finance] Role ' + _hs.role + ' has no finance access.');
   window.location.replace('housing.html');
 }
 

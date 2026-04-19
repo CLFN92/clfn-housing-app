@@ -1,0 +1,334 @@
+/* ============================================================
+ * housing.css — CLFN Housing Suite
+ * Housing-specific styles: Dashboard, Worklist, Settings,
+ * Application Form, Tables, Renovations, Inventory, Match
+ * Depends on: shared.css (loaded first)
+ * ============================================================ */
+/* ── 14. DASHBOARD ──────────────────────────────────────────────────────── */
+
+.dash-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+}
+.dash-filters {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.dash-filters label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+.dash-filters select, .dash-filters input {
+  border: 1.5px solid var(--border); border-radius: 7px; padding: 7px 11px;
+  font-family: var(--sans); font-size: 13px; background: var(--bg);
+  width: auto; box-sizing: border-box; color: var(--text);
+}
+.dash-filters select { min-width: 160px; cursor: pointer; }
+.dash-filters input  { min-width: 220px; flex: 1; width: auto; }
+.dash-filters select:focus, .dash-filters select:hover,
+.dash-filters input:focus   { border-color: var(--yellow); outline: none; }
+.dash-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Applicant cell — name bold, ID+date muted small below, no date repetition */
+.appl-name { font-size: 13px; font-weight: 600; line-height: 1.3; color: var(--text); }
+.appl-id   { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
+
+/* Action buttons — consistent with finance icon buttons */
+.dash-action-btn {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  color: var(--muted); cursor: pointer; display: inline-flex;
+  align-items: center; justify-content: center; padding: 5px 8px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.dash-action-btn:hover { border-color: var(--yellow); color: var(--text); }
+
+/* Status pills used in dash table */
+/* Status pills — base shape + color variants */
+.pill {
+  display: inline-flex; align-items: center;
+  font-size: 11px; font-weight: 700; padding: 3px 9px;
+  border-radius: 20px; white-space: nowrap; gap: 4px;
+}
+.pill-dot   { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; flex-shrink: 0; }
+.pill-draft     { background: #f4f4f0; color: #666; }
+.pill-draft .pill-dot     { background: #aaa; }
+.pill-submitted { background: #eff6ff; color: #1d4ed8; }
+.pill-submitted .pill-dot { background: #3b82f6; }
+.pill-mgr       { background: #faf5ff; color: #7c3aed; }
+.pill-mgr .pill-dot       { background: #7c3aed; }
+.pill-approved  { background: #f0fdf4; color: #15803d; }
+.pill-approved .pill-dot  { background: #22c55e; }
+.pill-declined  { background: #fef2f2; color: #b91c1c; }
+.pill-declined .pill-dot  { background: #ef4444; }
+.pill-returned  { background: #fff7ed; color: #c2410c; }
+.pill-returned .pill-dot  { background: #f97316; }
+.pill-assigned  { background: #f0fdf4; color: #15803d; }
+.pill-assigned .pill-dot  { background: #15803d; }
+
+/* Score cell — plain inline, no dark button background that clips the tier badge */
+.score-right { display: inline-flex; align-items: center; gap: 6px; }
+.score-num   { font-size: 16px; font-weight: 800; color: var(--text); }
+.score-cell-btn {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-family: var(--sans); display: inline-flex; align-items: center; gap: 6px;
+}
+.score-cell-btn:hover .score-num { color: var(--yellow); }
+.score-tier-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 8px; white-space: nowrap; }
+/* Worklist chips */
+.wl-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.wl-chip  {
+  padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  border: 1.5px solid var(--border); background: var(--surface);
+  cursor: pointer; font-family: var(--sans); transition: var(--tr);
+}
+.wl-chip.on { background: var(--yellow); border-color: var(--yellow); color: #111; }
+
+/* Worklist empty states */
+.wl-section-hdr {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.6px; color: var(--muted);
+  padding: 12px 0 6px; border-bottom: 1px solid var(--border); margin-bottom: 8px;
+}
+.wl-empty { text-align: center; padding: 32px; color: var(--muted); font-size: 13px; }
+.wl-empty strong { display: block; font-size: 15px; margin-bottom: 4px; color: var(--text); }
+
+/* App progress footer (sticky bottom) */
+#appProgressFoot {
+  position: sticky; bottom: 0;
+  background: var(--surface); border-top: 2px solid var(--border); padding: 10px 16px; z-index: 50;
+}
+.sfoot { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Role queue banner */
+#role_queue_banner { padding: 0; margin-bottom: 0; background: none; border: none; }
+#role_queue_banner:empty { display: none; }
+
+
+/* ── 15. SETTINGS ───────────────────────────────────────────────────────── */
+
+.settings-view { padding: clamp(16px,3vw,36px) clamp(14px,3vw,44px); max-width: 780px; width: 100%; box-sizing: border-box; }
+.settings-header { margin-bottom: 24px; }
+.settings-header h1 { font-family: var(--serif); font-size: 26px; font-weight: 400; }
+.settings-header p  { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.settings-section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: var(--muted); padding: 20px 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.settings-form     { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.settings-form-row { grid-column: span 2; }
+.settings-save-btn { margin-top: 20px; }
+
+/* User management table */
+.user-table  { width: 100%; border-collapse: collapse; font-size: 13px; }
+.user-table th { background: var(--dark); color: #fff; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
+.user-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.user-table tr:hover td { background: var(--bg); }
+.user-role-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; background: var(--dark2); color: #ccc; }
+.user-actions    { display: flex; gap: 6px; }
+.add-user-row    { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-top: 16px; }
+.btn-edit-user, .btn-del-user { padding: 4px 10px; font-size: 11px; border-radius: 5px; border: none; cursor: pointer; font-family: var(--sans); font-weight: 600; }
+.btn-edit-user { background: var(--yellow-light); color: #7a6000; }
+.btn-del-user  { background: #fef2f2; color: var(--danger); }
+
+
+/* ── 16. APPLICATION FORM ───────────────────────────────────────────────── */
+
+/* Step panels */
+.sp       { display: none; }
+.sp.on    { display: block; width: 100%; box-sizing: border-box; animation: fup .22s ease; }
+
+/* Score mini display */
+.score-mini { display: inline-flex; flex-direction: column; align-items: center; background: var(--dark2); border-radius: 8px; padding: 4px 10px; font-size: 11px; color: #aaa; }
+.score-mini strong { font-size: 22px; color: var(--yellow); font-weight: 800; line-height: 1; }
+.snum    { font-size: 28px; font-weight: 800; }
+.snum-sm { font-size: 18px; font-weight: 800; }
+
+/* Application preview panel */
+.preview-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 150; display: none; }
+.preview-overlay.on { display: block; }
+.preview-panel {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: min(480px,100vw); background: var(--surface);
+  box-shadow: -8px 0 32px rgba(0,0,0,0.2); z-index: 151;
+  display: flex; flex-direction: column;
+  transform: translateX(100%); transition: transform 0.25s ease;
+}
+.preview-panel.on    { transform: translateX(0); }
+.preview-bar         { background: var(--dark); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
+.preview-close       { background: none; border: none; color: #888; font-size: 20px; cursor: pointer; }
+.preview-body        { flex: 1; overflow-y: auto; padding: 20px; }
+.preview-bar-actions { display: flex; gap: 8px; }
+
+/* Document / print output styles */
+.doc-header  { background: var(--dark); color: #fff; padding: 20px 24px; }
+.doc-logo    { width: 48px; height: 48px; object-fit: contain; border-radius: 4px; }
+.doc-meta    { font-size: 12px; color: #888; margin-top: 8px; }
+.doc-section { margin: 20px 0; }
+.doc-flow    { display: flex; flex-direction: column; gap: 12px; }
+.doc-table   { width: 100%; border-collapse: collapse; font-size: 12px; }
+.doc-table th { background: #f5f5f3; padding: 8px 10px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.doc-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.doc-tag     { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; background: var(--yellow-light); color: #7a6000; font-weight: 600; }
+
+/* Signature widget */
+.sig-section    { margin: 20px 0; }
+.sig-row        { display: grid; gap: 20px; }
+.sig-row-1      { grid-template-columns: 1fr; }
+.sig-row-2      { grid-template-columns: 1fr 1fr; }
+.sig-meta       { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.sig-meta-field { font-size: 12px; }
+.sig-meta-field label { font-weight: 700; color: var(--muted); }
+.sig-canvas     { border: 1.5px solid var(--border); border-radius: 8px; touch-action: none; }
+.sig-hint       { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.sig-clear      { font-size: 11px; color: var(--danger); cursor: pointer; background: none; border: none; font-family: var(--sans); padding: 0; }
+.sig-print-line { border-bottom: 1px solid var(--text); margin-top: 32px; }
+.is-signed      { border-color: var(--success) !important; }
+
+/* SigWidget internal styles */
+.sigw           { display: flex; flex-direction: column; gap: 12px; }
+.sigw-tabs      { display: flex; border-bottom: 2px solid var(--border); }
+.sigw-tab       { padding: 8px 14px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; border: none; background: none; font-family: var(--sans); border-bottom: 2px solid transparent; margin-bottom: -2px; }
+.sigw-tab.active{ color: var(--text); border-bottom-color: var(--yellow); }
+.sigw-panel     { padding: 12px 0; }
+.sigw-canvas    { border: 1.5px solid var(--border); border-radius: 8px; touch-action: none; display: block; }
+.sigw-canvas-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+.sigw-clear     { font-size: 11px; color: var(--danger); cursor: pointer; background: none; border: none; font-family: var(--sans); }
+.sigw-hint      { font-size: 11px; color: var(--muted); }
+.sigw-type-pad  { display: flex; flex-direction: column; gap: 8px; }
+.sigw-type-input{ border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 22px; font-family: var(--serif); width: 100%; box-sizing: border-box; }
+.sigw-type-note { font-size: 11px; color: var(--muted); }
+.sigw-wet-pad, .sigw-wet-input, .sigw-wet-note { /* same as type- variants */ }
+.sigw-presence  { display: flex; flex-direction: column; gap: 8px; }
+.sigw-presence-label{ font-size: 12px; font-weight: 600; }
+.sigw-presence-desc { font-size: 11px; color: var(--muted); }
+.sigw-presence-btns { display: flex; gap: 8px; }
+.sigw-presence-btn  { flex: 1; padding: 8px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--bg); cursor: pointer; font-family: var(--sans); font-size: 13px; font-weight: 600; transition: var(--tr); }
+.sigw-presence-btn.active { background: var(--yellow); border-color: var(--yellow); color: #111; }
+
+/* Internal approval body */
+.internal-header  { background: var(--dark); padding: 16px 20px; border-radius: 10px 10px 0 0; }
+.internal-section { padding: 16px 20px; }
+.internal-body    { padding: 20px; }
+.internal-note    { font-size: 12px; color: var(--muted); }
+.int-sig-grid     { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.int-sig-box      { border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; }
+.int-sig-meta     { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.int-sig-meta-field { font-size: 12px; }
+.int-sig-line     { border-bottom: 1px solid var(--text); margin-top: 24px; }
+.int-badge        { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+
+/* Scorecard */
+.sc-th           { background: var(--dark); color: #fff; padding: 8px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
+.sc-th-applicant { min-width: 200px; }
+.sc-th-total     { min-width: 80px; text-align: right; }
+.sc-td-applicant { font-weight: 600; }
+.sc-td-total     { font-weight: 800; text-align: right; }
+.sc-pts-pos      { color: var(--success); font-weight: 600; }
+.sc-pts-neg      { color: var(--danger); font-weight: 600; }
+.sc-pts-zero     { color: var(--muted); }
+
+/* Rubric */
+.sc-rub  { width: 100%; border-collapse: collapse; font-size: 12px; }
+.rk      { font-weight: 600; }
+.rrev    { font-size: 11px; color: var(--muted); }
+.rtag    { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; background: var(--yellow-light); color: #7a6000; }
+.spop-row{ display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.spop-pts{ font-weight: 700; }
+
+/* Document library */
+.doclib          { display: flex; flex-direction: column; gap: 8px; }
+.doclib-status        { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
+.doclib-status-info   { background: #eff6ff; color: #1d4ed8; }
+.doclib-status-error  { background: #fef2f2; color: var(--danger); }
+.doclib-upload-row    { display: flex; align-items: center; gap: 10px; }
+.doclib-upload-drop   { flex: 1; border: 2px dashed var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: var(--tr); }
+.doclib-upload-drop:hover { border-color: var(--yellow); background: var(--yellow-light); }
+.doclib-upload-icon   { font-size: 20px; }
+.doclib-upload-text   { font-size: 12px; color: var(--muted); }
+.doclib-upload-cat    { font-size: 12px; min-width: 140px; }
+
+
+/* ── 17. TABLES ─────────────────────────────────────────────────────────── */
+
+
+
+/* Inventory column visibility */
+.inv-col-bath, .inv-col-foundation, .inv-col-funder, .inv-col-phase { }
+.match-col-score  { font-weight: 800; }
+
+/* Edit grids */
+.edit-grid-2    { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.edit-grid-3    { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.edit-record-card   { background: var(--bg); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+.edit-record-label  { font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.6px; }
+.edit-section-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin: 16px 0 8px; }
+.edit-score-badge   { display: inline-flex; align-items: center; gap: 6px; background: var(--dark); color: var(--yellow); border-radius: 8px; padding: 6px 12px; }
+.edit-field         { margin-bottom: 12px; }
+.std-cell-mono      { font-family: monospace; font-size: 12px; }
+.std-cell-muted     { color: var(--muted); font-size: 11px; }
+
+/* ── 19. PRINT ──────────────────────────────────────────────────────────── */
+
+.print-panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 400; display: none; align-items: flex-start; justify-content: center; padding: 40px 20px; }
+.print-panel-overlay.on { display: flex; }
+.print-panel  { background: var(--surface); border-radius: 14px; width: 100%; max-width: 860px; max-height: 88vh; overflow-y: auto; box-shadow: 0 24px 60px rgba(0,0,0,0.4); }
+.btn-print    { background: var(--yellow); border: none; color: #111; padding: 8px 18px; border-radius: 8px; font-weight: 700; font-family: var(--sans); font-size: 13px; cursor: pointer; }
+
+@media print {
+  .app-header, .sidebar, .sidebar-overlay, .page-header-actions,
+  .modal-ov, .hamburger-btn, .sidebar-close-row, nav { display: none !important; }
+  .main   { padding: 0 !important; }
+  .card   { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
+  body    { background: #fff; color: #000; }
+}
+
+
+/* ── 20. ANIMATIONS ─────────────────────────────────────────────────────── */
+
+@keyframes fup    { from { opacity:0; transform:translateY(8px);  } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeUp { from { opacity:0; transform:translateY(6px);  } to { opacity:1; transform:translateY(0); } }
+@keyframes spin   { from { transform:rotate(0deg); }               to { transform:rotate(360deg); } }
+@keyframes shake  { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
+
+
+/* ── 21. RESPONSIVE ─────────────────────────────────────────────────────── */
+
+/* ── JS-rendered component classes (housing.html) ── */
+
+/* Score cell tier badge */
+.score-tier-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 8px; white-space: nowrap; }
+
+/* Dashboard row action buttons */
+.edit-app-btn, .preview-app-btn, .assign-app-btn, .review-app-btn, .app-menu-btn {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  color: var(--muted); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--sans); font-size: 12px; font-weight: 600;
+  transition: border-color 0.15s, color 0.15s;
+}
+.edit-app-btn:hover, .preview-app-btn:hover,
+.assign-app-btn:hover, .review-app-btn:hover,
+.app-menu-btn:hover { border-color: var(--yellow); color: var(--text); }
+.review-app-btn { background: var(--yellow); color: #111; border-color: var(--yellow); font-weight: 700; }
+.review-app-btn:hover { background: #fff0a6; }
+
+/* Record row header (SOW / renovation records) */
+.rhdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.rlbl { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Error display */
+.err-title { font-size: 14px; font-weight: 700; color: var(--danger); display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+
+/* File upload list items */
+.file-name { font-size: 12px; font-weight: 600; color: var(--text); }
+.file-size { font-size: 11px; color: var(--muted); margin-left: 6px; }
+
+/* Generic footer strip */
+.footer { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
+
+/* ── Scorecard table rows (renderDashTable wl-mode) ── */
+.sc-tr { cursor: pointer; border-bottom: 1px solid var(--border); }
+.sc-tr:hover td { background: var(--surface); }
+.sc-td { padding: 10px 16px; vertical-align: middle; }
+
+/* Contractor person fields */
+.ct-person-name  { font-weight: 600; font-size: 13px; }
+.ct-person-email { font-size: 12px; color: var(--muted); }
+.ct-person-phone { font-size: 12px; color: var(--muted); }
+
+/* Finance info boxes and table wrappers */
+
