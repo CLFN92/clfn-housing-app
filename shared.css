@@ -186,7 +186,7 @@ body {
 
 .layout       { display: flex; min-height: calc(100vh - 64px); flex-direction: column; }
 .app-wrapper  { display: flex; min-height: calc(100vh - 64px); background: var(--bg); }
-.content-area { flex: 1; display: flex; flex-direction: column; min-width: 0; align-items: stretch; }
+.content-area { flex: 1; display: flex; flex-direction: column; min-width: 0; align-items: stretch; overflow-y: auto; }
 #appLayout    { flex: 1; display: flex; flex-direction: column; min-width: 0; align-items: center; }
 
 /* Sidebar */
@@ -635,122 +635,117 @@ input:focus, select:focus, textarea:focus {
 /* ──────────────────────────────────────────────────────────────────────── */
 
 /* ≥1024px — Desktop enhancements */
+/* ══════════════════════════════════════════════════════════════════════════
+ * RESPONSIVE DESIGN — Single source of truth for ALL pages
+ * Breakpoints: 1024px (large), 960px (tablet), 700px (mobile), 480px (small)
+ * Finance-specific grid rules included here so finance.css stays clean.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── ≥1024px Large desktop ── */
 @media (min-width: 1024px) {
   .app-header    { padding: 0 32px; }
   .hbrand .hlogo { width: 44px; height: 44px; }
 }
 
-/* ≤960px — Tablet */
+/* ── ≤960px Tablet ── */
 @media (max-width: 960px) {
-  .main           { padding: 24px 20px; }
-  .sidebar        { width: 180px; min-width: 180px; }
-  .dash-stats     { grid-template-columns: 1fr 1fr; }
-  .fg.c3, .c3     { grid-template-columns: 1fr 1fr; }
-  .settings-form  { grid-template-columns: 1fr; }
-  .settings-form-row { grid-column: span 1; }
+  .main                { padding: 24px 20px; }
+  .sidebar             { width: 180px; min-width: 180px; }
+  .dash-stats          { grid-template-columns: 1fr 1fr; }
+  .fg.c3, .c3          { grid-template-columns: 1fr 1fr; }
+  .settings-form       { grid-template-columns: 1fr; }
+  .settings-form-row   { grid-column: span 1; }
+  /* Finance grids */
+  .action-panel, .action-grid { grid-template-columns: repeat(3,1fr); }
+  .stats-grid, .aging-grid    { grid-template-columns: repeat(2,1fr); }
 }
 
-/* ≤700px — Mobile */
+/* ── ≤700px Mobile ── */
 @media (max-width: 700px) {
   /* Layout */
-  .app-wrapper   { flex-direction: column; height: auto; min-height: calc(100vh - 64px); }
-  .content-area  { width: 100%; overflow-x: hidden; }
-  .sidebar       { position: fixed !important; top: 0; left: 0; height: 100vh !important;
-                    width: 260px !important; z-index: 150;
-                    transform: translateX(-100%); transition: transform .25s; }
-  .col-hide-mobile { display: none; }
-  .sidebar.open  { transform: translateX(0); box-shadow: 8px 0 32px rgba(0,0,0,.5); }
-  .sidebar-close-row  { display: flex; }
-  .hamburger-btn      { display: flex !important; }
-  .main          { padding: 16px 12px; }
-  .dash-view     { padding: 12px 10px; }
-  .card          { padding: 16px 14px; }
-  /* Grids collapse */
-  .fg.c2, .fg.c3, .c2, .c3   { grid-template-columns: 1fr !important; }
-  .sig-row-2      { grid-template-columns: 1fr; }
-  .dash-stats     { grid-template-columns: 1fr 1fr !important; gap: 10px; }
+  .app-wrapper         { flex-direction: column; height: auto; min-height: calc(100vh - 56px); }
+  .content-area        { width: 100%; overflow-x: hidden; }
+  .sidebar             { position: fixed !important; top: 0; left: 0; height: 100vh !important;
+                          width: 260px !important; z-index: 150;
+                          transform: translateX(-100%); transition: transform .25s; }
+  .sidebar.open        { transform: translateX(0); box-shadow: 8px 0 32px rgba(0,0,0,.5); }
+  .sidebar-close-row   { display: flex; }
+  .hamburger-btn       { display: flex !important; }
   /* Header */
-  .hbrand        { gap: 8px; }
-  .hlogo         { width: 34px; height: 34px; }
-  .htitles small { display: none; }
-  /* Settings */
-  .settings-view { padding: 16px 12px !important; max-width: 100%; }
-  .settings-form { grid-template-columns: 1fr !important; }
-  .settings-form-row { grid-column: span 1 !important; }
-  /* Modals */
-  .modal         { width: calc(100vw - 24px) !important; max-width: 100% !important; }
-  .modal-footer  { flex-wrap: wrap; gap: 8px; }
-  .edit-modal    { width: calc(100vw - 24px) !important; }
-  /* Nav */
-  .fnav          { flex-wrap: wrap; gap: 8px; }
-  .fnav .btn     { flex: 1; min-width: 120px; justify-content: center; }
-  /* Inventory: hide lower-priority columns */
+  .app-header          { padding: 0 14px; height: 56px; }
+  .hbrand              { gap: 8px; }
+  .hlogo               { width: 32px; height: 32px; }
+  .htitles small       { display: none; }
+  .header-user-name    { display: none; }
+  /* Main content */
+  .main                { padding: 16px 12px; }
+  .dash-view           { padding: 12px 10px; }
+  .card                { padding: 16px 14px; }
+  /* View containers — sides only, top stays 0 */
+  #worklistView, #dashView, #settingsView, #employeeHomeView,
+  #inventoryView, #matchView, #tenantsView, #renoApprovalsView,
+  #renosView, #contractorsView, #scorecardView {
+    padding-left:   14px !important;
+    padding-right:  14px !important;
+    padding-bottom: 16px !important;
+  }
+  /* Home greeting — prevent overflow into header */
+  .home-greeting       { margin-bottom: 16px; }
+  .home-welcome        { font-size: 22px !important; }
+  .home-date-line      { font-size: 10px; }
+  /* Grids collapse */
+  .fg.c2, .fg.c3, .c2, .c3 { grid-template-columns: 1fr !important; }
+  .sig-row-2           { grid-template-columns: 1fr; }
+  .dash-stats          { grid-template-columns: 1fr 1fr !important; gap: 10px; }
+  /* Tables */
+  .col-hide-mobile     { display: none; }
   #inv_table th:nth-child(7), #inv_table td:nth-child(7) { display: none; }
+  /* Modals */
+  .modal               { width: calc(100vw - 24px) !important; max-width: 100% !important; }
+  .modal-footer        { flex-wrap: wrap; gap: 8px; }
+  .edit-modal          { width: calc(100vw - 24px) !important; }
+  /* Nav */
+  .fnav                { flex-wrap: wrap; gap: 8px; }
+  .fnav .btn           { flex: 1; min-width: 120px; justify-content: center; }
+  /* Settings */
+  .settings-view       { padding: 14px 12px !important; max-width: 100%; }
+  .settings-form       { grid-template-columns: 1fr !important; }
+  .settings-form-row   { grid-column: span 1 !important; }
   /* Scorecard */
   #scorecardView > div:first-child  { padding: 10px 12px; }
   #scorecardView > div:nth-child(2) { padding: 14px 14px 40px !important; }
-  /* View padding — reduce side/bottom padding on small screens, top stays 0 */
-  #worklistView, #dashView, #settingsView,
-  #employeeHomeView, #inventoryView, #matchView,
-  #tenantsView, #renosView, #contractorsView,
-  #renoApprovalsView, #scorecardView {
-    padding-left: 12px !important;
-    padding-right: 12px !important;
-    padding-bottom: 16px !important;
-  }
-  #employeeHomeView h1 { font-size: 20px !important; }
+  /* Finance grids */
+  .action-panel, .action-grid { grid-template-columns: 1fr 1fr; }
+  .stats-grid, .aging-grid,
+  .balance-tiles              { grid-template-columns: 1fr 1fr !important; }
+  .tic-contact-grid           { grid-template-columns: 1fr !important; }
+  .tic-4col                   { grid-template-columns: 1fr 1fr !important; }
+  .action-sub                 { display: none; }
+  /* Filters — stack on mobile */
+  .dash-filters, .filter-bar  { gap: 6px; }
+  .dash-filters input, .filter-bar input { min-width: 100%; }
 }
 
-/* ≤480px — Small mobile */
+/* ── ≤480px Small mobile ── */
 @media (max-width: 480px) {
-  .app-header    { padding: 0 12px; height: 56px; }
-  .hlogo         { width: 30px; height: 30px; }
-  .main          { padding: 12px 10px; }
-  .card          { padding: 14px 12px; }
-  .dash-stats    { grid-template-columns: 1fr !important; }
-  .modal-footer  { flex-direction: column; }
-  .modal-footer .btn { width: 100%; justify-content: center; }
+  .app-header          { padding: 0 10px; height: 52px; }
+  .hlogo               { width: 28px; height: 28px; }
+  .main                { padding: 10px 10px; }
+  .card                { padding: 12px 10px; }
+  .dash-stats          { grid-template-columns: 1fr !important; }
+  .modal-footer        { flex-direction: column; }
+  .modal-footer .btn   { width: 100%; justify-content: center; }
+  .home-welcome        { font-size: 19px !important; }
+  .page-header-bar h1,
+  .phb-title h1        { font-size: 20px !important; }
+  /* View containers tighter */
+  #worklistView, #dashView, #settingsView, #employeeHomeView,
+  #inventoryView, #matchView, #tenantsView, #renoApprovalsView,
+  #renosView, #contractorsView, #scorecardView {
+    padding-left:   10px !important;
+    padding-right:  10px !important;
+  }
 }
-
-/* iOS safe-area (notch / home bar) */
-@supports (padding: env(safe-area-inset-bottom)) {
-  #appProgressFoot { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
-  .modal-footer    { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
-}
-
-/* ── Shared component classes (used across housing + finance) ── */
-.ctitle    { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 12px; }
-
-.filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; }
-.filter-bar label  { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
-.filter-bar select, .filter-bar input { border: 1.5px solid var(--border); border-radius: 7px; padding: 7px 11px; font-family: var(--sans); font-size: 13px; background: var(--bg); }
-.filter-bar select { min-width: 160px; }
-.filter-bar input  { min-width: 200px; flex: 1; }
-.filter-bar select:focus, .filter-bar select:hover,
-.filter-bar input:focus  { border-color: var(--yellow); }
-
-/* Tenant selector (shared by housing + finance) */
-.tenant-selector { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; }
-.tenant-selector label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
-/* ── Shared table + info box primitives (used by housing + finance) ── */
-.tbl-wrap, .dash-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.tbl      { width: 100%; border-collapse: collapse; font-size: 13px; }
-.tbl th   { background: var(--dark2); color: #fff; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; }
-.tbl td   { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-.tbl tr:hover td { background: var(--surface); }
-.tbl-name { font-weight: 600; }
-.tbl-sub  { font-size: 11px; color: var(--muted); }
-.ibox      { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
-.ibox.dark { background: var(--dark2); border-color: var(--dark2); color: #fff; }
-
-/* ── Landing page / home view ── */
-.home-greeting   { margin-bottom: 28px; position: relative; padding-left: 16px; }
-.home-accent-bar { position: absolute; left: 0; top: 6px; bottom: 6px; width: 4px; background: var(--yellow); border-radius: 2px; }
-.home-date-line  { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
-.home-welcome    { font-family: var(--serif); font-size: 30px; font-weight: 400; line-height: 1.15; margin: 0 0 6px; }
-.home-welcome > span { color: var(--yellow); }
-.home-subtitle   { color: var(--muted); font-size: 14px; margin: 0; }
-.home-tiles-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(230px,1fr)); gap: 14px; margin-bottom: 32px; }
 
 /* ── Print ── */
 @media print {
