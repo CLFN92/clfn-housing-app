@@ -106,6 +106,7 @@ function getRole() { return window.CLFN_AUTH.getRole(); }
 // from the staff table using the stored session token.
 // Depends on: sbMapRole() from shared-data.js (loaded after this file).
 async function resolveHousingRole() {
+  window._booting = true;
   try {
     var r = await fetch(
       SUPABASE_URL + '/rest/v1/staff?select=role,department,name&email=eq.' +
@@ -143,6 +144,8 @@ async function resolveHousingRole() {
     console.warn('[HOUSING] role lookup failed:', e);
     HOUSING_SESSION.role = 'housing_employee_l1';
     window.currentRole   = 'housing_employee_l1';
+  } finally {
+    window._booting = false;
   }
 }
 

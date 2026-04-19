@@ -214,8 +214,11 @@ function switchRole(role) {
   if (settingsBtn) settingsBtn.style.display =
     (ROLE.isManagement(role)) ? '' : 'none';
 
-  // Notify page — e.g. housing.html refreshes scorecard actions, applies field locks
-  if (typeof window._onSwitchRole === 'function') {
+  // Notify page — skip during boot to prevent flash back to landing page
+  // window._booting is set true before resolveHousingRole and cleared after
+  // initHousingPage completes. Interactive role switches (My Role dropdown)
+  // happen after boot so _booting is false and _onSwitchRole fires normally.
+  if (!window._booting && typeof window._onSwitchRole === 'function') {
     try { window._onSwitchRole(role); } catch(e) { console.warn('[ui] _onSwitchRole error:', e); }
   }
 }
