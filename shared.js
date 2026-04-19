@@ -964,8 +964,8 @@ window.DocLibrary = (function(){
       }
 
       var tableHTML =
-        '<div style="overflow-x:auto;">' +
-          '<table class="std-table">' +
+        '<div class="doclib-table-wrap">' +
+          '<table class="std-table doclib-table">' +
             '<thead><tr>' +
               '<th></th><th>File</th><th>Category</th>' +
               '<th class="std-cell-right">Size</th>' +
