@@ -234,14 +234,19 @@ body {
   width: 100%; box-sizing: border-box;
 }
 .back-btn-yellow {
-  background: rgba(248,228,26,0.1); border: 1px solid rgba(248,228,26,0.35);
-  color: var(--yellow); padding: 6px 14px; border-radius: 8px;
+  background: var(--yellow); border: 1.5px solid var(--yellow); color: #111;
+  padding: 6px 14px; border-radius: 7px;
   font-size: 12px; font-weight: 700; font-family: var(--sans);
-  cursor: pointer; display: flex; align-items: center; gap: 6px; transition: var(--tr);
+  cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
-.back-btn-yellow:hover {
-  background: rgba(248,228,26,0.18); box-shadow: 0 2px 6px rgba(248,228,26,0.25);
-}
+.back-btn-yellow:hover { background: #fff0a6; box-shadow: 0 2px 6px rgba(248,228,26,0.35); }
+.back-btn-yellow svg   { flex-shrink: 0; }
+
+/* View containers: reset top padding so .page-back-row controls the gap */
+#worklistView, #dashView, .dash-view, #settingsView, .settings-view,
+#inventoryView, #matchView, #tenantsView, #renoApprovalsView,
+#renosView, #contractorsView, #scorecardView { padding-top: 12px !important; }
 .back-link {
   color: var(--yellow); font-size: 12px; font-weight: 600;
   text-decoration: none; border: 1px solid rgba(248,228,26,.3);
@@ -262,6 +267,52 @@ body {
 }
 .page-header-bar p     { font-size: 13px; color: #999; margin-top: 2px; }
 .page-header-actions   { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* phb-title / phb-actions — inner children of .page-header-bar */
+.phb-title             { flex: 1; min-width: 0; }
+.phb-title h1          { font-family: var(--serif); font-size: clamp(18px,3vw,28px); font-weight: 400; color: #fff; line-height: 1.2; margin: 0; }
+.phb-title p           { font-size: 13px; color: #999; margin: 2px 0 0; }
+.phb-actions           { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+
+/* Application type card text */
+.appty-title           { font-weight: 700; font-size: 13px; }
+.appty-desc            { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+/* Divider */
+.divider               { height: 1px; background: var(--border); margin: 16px 0; }
+
+/* Filter toggle row */
+.ftog                  { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+
+/* Signature step action bar */
+.sig-actions           { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* Settings tabs + sections */
+.settings-tab {
+  padding: 8px 16px; border: none; background: none;
+  border-bottom: 2px solid transparent; font-size: 13px; font-weight: 600;
+  color: var(--muted); cursor: pointer; font-family: var(--sans);
+  transition: color 0.15s, border-color 0.15s;
+}
+.settings-tab.active, .settings-tab:hover { color: var(--text); }
+.settings-tab.active   { border-bottom-color: var(--yellow); color: #fff; }
+.settings-section      { padding: 16px 0; }
+
+/* Dashboard table */
+.dash-table            { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dash-table th, .dash-table td { padding: 9px 14px; text-align: left; }
+.dash-table thead tr   { background: var(--dark2); }
+.dash-table thead th   { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #888; }
+.dash-table tbody tr   { border-bottom: 1px solid var(--border); }
+.dash-table tbody tr:hover { background: var(--surface); }
+
+/* Table column width hints */
+.col-score             { width: 80px; text-align: center; }
+.col-date, .col-cls, .col-arr, .col-res { width: auto; }
+
+/* Empty state */
+.empty-state           { text-align: center; padding: 40px 20px; color: var(--muted); }
+.empty-icon            { font-size: 32px; margin-bottom: 10px; }
 
 /* Section headers within a view */
 .sec-hdr   { margin-bottom: 16px; }
@@ -299,11 +350,14 @@ body {
   display: flex; flex-direction: column; gap: 4px;
 }
 .stat-num   { font-size: 28px; font-weight: 800; line-height: 1; }
-.stat-label {
+.stat-label,
+.stat-lbl   {
   font-size: 11px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.6px; color: var(--muted);
 }
 .stat-sub   { font-size: 11px; color: var(--muted); }
+.stat-bar   { height: 4px; background: var(--border); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+.stat-fill  { height: 100%; border-radius: 2px; transition: width .4s ease; }
 
 
 /* ── 9. FORM FIELDS ─────────────────────────────────────────────────────── */
@@ -820,6 +874,7 @@ input:focus, select:focus, textarea:focus {
   .sidebar       { position: fixed !important; top: 0; left: 0; height: 100vh !important;
                     width: 260px !important; z-index: 150;
                     transform: translateX(-100%); transition: transform .25s; }
+  .col-hide-mobile { display: none; }
   .sidebar.open  { transform: translateX(0); box-shadow: 8px 0 32px rgba(0,0,0,.5); }
   .sidebar-close-row  { display: flex; }
   .hamburger-btn      { display: flex !important; }
