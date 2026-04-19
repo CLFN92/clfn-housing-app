@@ -28,6 +28,12 @@
  *     and the Supabase housing_audit_log table (for persistence + compliance)
  * ============================================================ */
 
+// ── Module-level state ────────────────────────────────────────────────────────
+// Declare all implicit globals here so they're never undefined on first access.
+var _raFilter        = '';   // reno approvals active filter key
+var _scoresSortKey   = 'score';
+var _scoresSortDir   = -1;
+
 // ── sbMapRole ─────────────────────────────────────────────────────────────────
 // Maps a staff table row to a canonical role string.
 // Uses CLFN_PERMS.normalizeRole() to handle legacy aliases.

@@ -1,0 +1,54 @@
+/* ============================================================
+ * renos.css — CLFN Housing Suite
+ * Renovation module styles: reno cards, budget bars, SOW,
+ * approval flow, upload zones, reno score badges
+ * Depends on: shared.css (loaded first)
+ * ============================================================ */
+
+/* ── 18. RENOVATIONS ────────────────────────────────────────────────────── */
+
+/* Info boxes */
+.ibox         { border-radius: 8px; padding: 10px 14px; font-size: 13px; line-height: 1.5; border: 1px solid; }
+.ibox-yellow,
+.ibox.yellow  { background: var(--yellow-light); border-color: var(--yellow-mid); color: #7a6000; }
+.ibox.dark    { background: var(--dark2); border-color: var(--dark3); color: #aaa; }
+.ibox.danger  { background: #fef2f2; border-color: #fecaca; color: var(--danger); }
+
+/* Upload zone */
+.upload-zone  { border: 2px dashed var(--border); border-radius: 10px; padding: 28px 20px; text-align: center; cursor: pointer; transition: var(--tr); }
+.upload-zone:hover,
+.upload-zone.is-drag { border-color: var(--yellow); background: var(--yellow-light); }
+.upload-icon  { font-size: 28px; margin-bottom: 8px; }
+.upload-zone  { border: 2px dashed var(--border); border-radius: 10px; padding: 28px 20px; text-align: center; cursor: pointer; transition: var(--tr); }
+
+/* File list */
+.file-list      { display: flex; flex-direction: column; gap: 8px; }
+.file-item-left { display: flex; align-items: center; gap: 8px; }
+.file-icon      { font-size: 20px; }
+.file-rm        { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; }
+
+/* Reno cards */
+.rev-grid  { display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: 14px; }
+.rev-card  { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; cursor: pointer; transition: var(--tr); }
+.rev-card:hover { box-shadow: var(--shadow); border-color: var(--yellow); }
+
+/* Budget progress bars */
+.pbar-row  { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.pbar      { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.pbar > div{ height: 100%; background: var(--yellow); border-radius: 4px; transition: width 0.3s; }
+
+/* RBA allocation */
+.rlist  { display: flex; flex-direction: column; gap: 8px; }
+.rrev   { font-size: 11px; color: var(--muted); }
+
+/* Approval flow cards */
+.ap-flow { display: flex; gap: 8px; flex-direction: column; }
+.ap-con  { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.ap-ic   { font-size: 18px; flex-shrink: 0; }
+.ap-lb   { font-weight: 600; font-size: 13px; }
+.ap-s    { font-size: 11px; color: var(--muted); }
+.ap-sub  { font-size: 11px; color: var(--muted); margin-left: auto; }
+
+/* Reno score badge */
+.reno-score-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--dark); color: var(--yellow); border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 700; }
+
