@@ -118,7 +118,8 @@ function hideAllViews() {
     'appLayout','settingsView','scorecardView',
     'dashView','employeeHomeView','worklistView',
     'inventoryView','matchView','tenantsView',
-    'renoApprovalsView','renosView','contractorsView'
+    'renoApprovalsView','renosView','contractorsView',
+    'renosLoadingView'
   ];
   var extra = window._extraViewIds || [];
   base.concat(extra).forEach(function(id) {
