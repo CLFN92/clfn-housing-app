@@ -113,7 +113,7 @@ function setNavActive(id) {
 // ── hideAllViews ──────────────────────────────────────────────────────────────
 // Hides every top-level view container. Pages can extend window._viewIds
 // to include page-specific view IDs.
-function hideAllViews() {
+function hideAllViews(keepId) {
   var base = [
     'appLayout','settingsView','scorecardView',
     'dashView','employeeHomeView','worklistView',
@@ -123,6 +123,7 @@ function hideAllViews() {
   ];
   var extra = window._extraViewIds || [];
   base.concat(extra).forEach(function(id) {
+    if (id === keepId) return; // keep the target visible during transition
     var el = document.getElementById(id);
     if (el) { el.style.display = 'none'; el.style.flex = ''; }
   });
@@ -132,10 +133,11 @@ function hideAllViews() {
 }
 
 // ── _showView ─────────────────────────────────────────────────────────────────
-// Hide everything, show one view, run its render function.
+// Show target view first (before hiding others) so there's never a blank frame.
 function _showView(id, renderFn) {
-  hideAllViews();
   var el = document.getElementById(id);
+  if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
+  hideAllViews(id);
   if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
   if (typeof renderFn === 'function') renderFn();
 }

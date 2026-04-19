@@ -1539,7 +1539,7 @@ function setRenosNav(active){
   ['renos','contractors','approvals'].forEach(function(n){var b=document.getElementById('renos-nav-'+n);if(b)b.classList.toggle('active',n===active);});
 }
 function showRenoApprovals(){
-  hideAllViews();setRenosNav('approvals');
+  hideAllViews('renoApprovalsView');setRenosNav('approvals');
   var v=document.getElementById('renoApprovalsView');
   if(v){v.style.display='flex';v.style.flexDirection='column';}
   renderRenoApprovalsView();
@@ -1557,7 +1557,7 @@ function showRenosSimple(){
 // Override shared-data.js showContractors() — on renos.html we switch the
 // view directly instead of navigating (which would cause an infinite redirect).
 function showContractors() {
-  hideAllViews();
+  hideAllViews('contractorsView');
   setRenosNav('contractors');
   var v = document.getElementById('contractorsView');
   if (v) { v.style.display = 'flex'; v.style.flexDirection = 'column'; }
@@ -1566,7 +1566,7 @@ function showContractors() {
 
 // Override shared-data.js showRenos() — same redirect-loop fix as showContractors.
 function showRenos() {
-  hideAllViews();
+  hideAllViews('renosView');
   setRenosNav('renos');
   var v = document.getElementById('renosView');
   if (v) { v.style.display = 'flex'; v.style.flexDirection = 'column'; }

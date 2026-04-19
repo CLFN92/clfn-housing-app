@@ -2861,7 +2861,7 @@ function showTenants(){
 }
 function showWorklist() {
   if(!window._navSkipPush) pushNav('worklist');
-  hideAllViews();
+  hideAllViews('worklistView');
   setNavActive('tab_worklist');
   var view = document.getElementById('worklistView');
   if(view){ view.style.display='flex'; view.style.flexDirection='column'; }
@@ -3487,7 +3487,7 @@ function _getAllRenoUnits() {
 function showScorecard(app){
   if(!app)return;
   window._currentScorecardApp=app;
-  hideAllViews();
+  hideAllViews('scorecardView');
   var _scv=document.getElementById('scorecardView');if(!_scv)return;
   _scv.style.display='block';
   setNavActive('tab_dash');

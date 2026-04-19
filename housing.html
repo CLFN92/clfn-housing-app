@@ -4874,7 +4874,7 @@ function showDash(){
   }
 }
 function showApp(){
-  hideAllViews();
+  hideAllViews('appLayout');
   setNavActive('tab_app');
   var _al=document.getElementById('appLayout');if(_al)_al.style.display='flex';
   var spb=document.getElementById('stepProgressBar');if(spb)spb.style.display='block';
@@ -4891,7 +4891,7 @@ function showSettings(){
     return;
   }
   if(!window._navSkipPush) pushNav('settings');
-  hideAllViews();
+  hideAllViews('settingsView');
   setNavActive('tab_settings');
   var sv=document.getElementById('settingsView');
   if(sv){sv.style.display='flex';sv.style.flexDirection='column';sv.style.flex='1';}
@@ -9833,7 +9833,7 @@ function showDashboard(){
   var role = window.currentRole || 'housing_employee_l1';
   if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) { showToast('Dashboard access requires Housing Manager or Executive Director role.'); return; }
   if(!window._navSkipPush) pushNav('dashboard');
-  hideAllViews();
+  hideAllViews('dashView');
   setNavActive('tab_dash');
   window._userSetDashFilter = false;
   var fs = document.getElementById('dashFilterStatus');
@@ -9845,7 +9845,7 @@ function showDashboard(){
 function showEmployeeHome(){
   if(!window._navSkipPush) pushNav('home');
   setExportView(null);
-  hideAllViews();
+  hideAllViews('employeeHomeView');
   setNavActive('tab_dash');
   // Authoritative role resolution. HOUSING_SESSION.role is set by
   // resolveHousingRole() at login and is the canonical source. Fall back to
