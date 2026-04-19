@@ -10451,21 +10451,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     // (old _journalFromRow default before encoded-reference was introduced).
     // Any entry with reference='' (decoded from null) and no approvedBy is
     // assumed to still be pending-ed. New saves will persist status correctly.
-    (function fixLegacyJournalStatus() {
-      var d = getData();
-      var fixed = 0;
-      (d.journalEntries || []).forEach(function(j) {
-        if (j.status === 'posted' && !j.approvedBy && !j.approvedAt && j.ref === '') {
-          j.status = 'pending-ed';
-          fixed++;
-        }
-      });
-      if (fixed > 0) {
-        _memStore.journalEntries = d.journalEntries;
-        console.log('[finance] Fixed ' + fixed + ' legacy journal entries to pending-ed in memory.');
-        renderDashboard();
-      }
-    })();
+    // Legacy journal status fix removed — _journalFromRow now correctly
+    // decodes status from the encoded reference column ('status|groupRef').
+    // Old entries with reference=null decode as 'posted' which is correct
+    // (they predate the multi-line JE feature and have no pending status).
 
     showPage('home');
     initTenantSelects();
