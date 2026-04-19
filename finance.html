@@ -2785,13 +2785,19 @@ function _resolveUnitId(typedValue){
 // Given a new _memStore candidate d, find rows added/changed/removed per
 // table vs the prior _memStore, then upsert/delete against Supabase. Done
 // fire-and-forget. Best-effort; failures toast red.
-function _diffCollection(prev, next){
+function _diffCollection(prev, next, toRow){
+  // Compare using toRow output when available — prevents extra in-memory fields
+  // (charge, payment, type, method etc.) from causing spurious re-upserts.
+  function sig(x) {
+    if (!toRow) return JSON.stringify(x);
+    try { var r = toRow(x); return r ? JSON.stringify(r) : JSON.stringify(x); } catch(e) { return JSON.stringify(x); }
+  }
   var prevMap = {}; (prev||[]).forEach(function(x){ if (x && x.id) prevMap[x.id] = x; });
   var nextMap = {}; (next||[]).forEach(function(x){ if (x && x.id) nextMap[x.id] = x; });
   var toUpsert = [], toDelete = [];
   Object.keys(nextMap).forEach(function(id){
-    var prev = prevMap[id];
-    if (!prev || JSON.stringify(prev) !== JSON.stringify(nextMap[id])) {
+    var p = prevMap[id];
+    if (!p || sig(p) !== sig(nextMap[id])) {
       toUpsert.push(nextMap[id]);
     }
   });
@@ -2854,7 +2860,7 @@ function saveData(d){
   var perTableReport = [];
 
   _FIN_TABLES.forEach(function(spec){
-    var diff = _diffCollection(prev[spec.key], next[spec.key]);
+    var diff = _diffCollection(prev[spec.key], next[spec.key], spec.toRow);
     totalUpserts += diff.toUpsert.length;
     totalDeletes += diff.toDelete.length;
 
@@ -7160,7 +7166,8 @@ function renderJournal() {
       ? '<td class="je-action-cell">'
         + '<button class="btn btn-xs btn-primary je-tbl-approve" data-ref="'+groupRef+'" data-id="'+groupId+'">Approve</button> '
         + '<button class="btn btn-xs btn-ghost je-tbl-edit" data-ref="'+groupRef+'" data-id="'+groupId+'">Edit</button> '
-        + '<button class="btn btn-xs btn-ghost je-tbl-decline" data-ref="'+groupRef+'" data-id="'+groupId+'" style="color:var(--danger);border-color:var(--danger);">Decline</button>'
+        + '<button class="btn btn-xs btn-ghost je-tbl-decline" data-ref="'+groupRef+'" data-id="'+groupId+'" style="color:var(--danger);border-color:var(--danger);">Decline</button> '
+        + '<button class="btn btn-xs btn-ghost je-tbl-void" data-ref="'+groupRef+'" data-id="'+groupId+'" style="color:var(--muted);">Void</button>'
         + '</td>'
       : '<td></td>';
     var header = '<tr class="je-group-header-row">'+
@@ -7179,8 +7186,8 @@ function renderJournal() {
       var drCell = isDebit ? '<span class="amt-debit">'+fmt(r.charge||r.debit)+'</span>' : '<span class="std-cell-dash">—</span>';
       var crCell = !isDebit ? '<span class="amt-credit">'+fmt(r.payment||r.credit)+'</span>' : '<span class="std-cell-dash">—</span>';
       return '<tr class="je-group-line-row'+(isLast?' je-group-line-last':'')+'">'+
-        '<td class="je-group-tree-cell"><span class="je-tree-connector">'+(isLast?'└':'├')+'</span></td>'+
-        '<td style="font-size:11px;color:var(--muted);">'+first.date+'</td>'+
+        '<td style="font-size:11px;color:var(--muted);padding-left:8px;"><span class="je-tree-connector">'+(isLast?'└':'├')+'</span> '+first.date+'</td>'+
+        '<td></td>'+
         '<td>'+(isDebit?'<span class="je-dr-badge">DR</span>':'<span class="je-cr-badge">CR</span>')+'</td>'+
         '<td style="font-size:12px;text-transform:capitalize;color:var(--muted);">'+(r.ledger||'rent')+'</td>'+
         '<td class="std-cell-right">'+drCell+'</td>'+
@@ -7200,6 +7207,9 @@ function renderJournal() {
   });
   bodyEl.querySelectorAll('.je-tbl-edit').forEach(function(btn) {
     btn.addEventListener('click', function(e) { e.stopPropagation(); openEditJournalModal(btn.dataset.ref, btn.dataset.id); });
+  });
+  bodyEl.querySelectorAll('.je-tbl-void').forEach(function(btn) {
+    btn.addEventListener('click', function(e) { e.stopPropagation(); voidJournalEntry(btn.dataset.ref, btn.dataset.id); });
   });
 }
 
@@ -8974,7 +8984,10 @@ function renderFinanceWorklist() {
         + ' data-ref="'+item.approveRef+'" data-id="'+item.approveId+'">Edit</button> '
         + '<button class="btn btn-xs btn-ghost fwl-decline-btn"'
         + ' data-ref="'+item.approveRef+'" data-id="'+item.approveId+'"'
-        + ' style="color:var(--danger);border-color:var(--danger);">Decline</button> ';
+        + ' style="color:var(--danger);border-color:var(--danger);">Decline</button> '
+        + '<button class="btn btn-xs btn-ghost fwl-void-btn"'
+        + ' data-ref="'+item.approveRef+'" data-id="'+item.approveId+'"'
+        + ' style="color:var(--muted);">Void</button> ';
     }
     actionBtns += item.action;
     return '<div class="fwl-item">'+
@@ -9003,6 +9016,11 @@ function renderFinanceWorklist() {
   body.querySelectorAll('.fwl-edit-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       openEditJournalModal(btn.dataset.ref, btn.dataset.id);
+    });
+  });
+  body.querySelectorAll('.fwl-void-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      voidJournalEntry(btn.dataset.ref, btn.dataset.id);
     });
   });
 }
@@ -9052,6 +9070,31 @@ function declineJournalEntry(ref, fallbackId) {
   renderFinanceWorklist();
   renderDashboard();
   if (document.getElementById('page-journal') && document.getElementById('page-journal').classList.contains('on')) renderJournal();
+}
+
+function voidJournalEntry(ref, fallbackId) {
+  showConfirm('Void Entry', 'Void this journal entry? It will be marked as reversed and removed from all balances.', function() {
+    var d = getData();
+    var toVoid = (ref && ref !== '')
+      ? (d.journalEntries||[]).filter(function(j){ return j.ref === ref; })
+      : (d.journalEntries||[]).filter(function(j){ return j.id === fallbackId; });
+    if (!toVoid.length) return;
+    d.auditLog = d.auditLog || [];
+    var actor = (typeof HOUSING_SESSION !== 'undefined') ? (HOUSING_SESSION.name || HOUSING_SESSION.email) : 'ED';
+    toVoid.forEach(function(j) {
+      var prev = j.status;
+      j.status = 'reversed';
+      j.voidedBy = actor;
+      j.voidedAt = today();
+      d.auditLog.push({id:uid(), ts:new Date().toISOString(), user:CURRENT_USER,
+        action:'update', entity:'journal', entityId:j.id,
+        description:'Journal entry voided by '+actor, before:{status:prev}, after:{status:'reversed'}});
+    });
+    saveData(d);
+    renderFinanceWorklist();
+    renderDashboard();
+    if (document.getElementById('page-journal') && document.getElementById('page-journal').classList.contains('on')) renderJournal();
+  });
 }
 
 function openEditJournalModal(ref, fallbackId) {
@@ -9653,14 +9696,23 @@ function renderRentLedger(){
     var summaryRows = d.tenants.filter(function(tn){ return !tn.archived; }).map(function(tn) {
       var entries = allEntries.filter(function(e){ return e.tenantId === tn.id && e.status !== 'reversed'; });
       if (!entries.length) return null;
-      var balance = entries.reduce(function(sum, e){ return sum + (e.charge||0) - (e.payment||0); }, 0);
-      var lastEntry = entries[entries.length-1];
-      return '<tr style="cursor:pointer;" onclick="tenantPickerSelect(\'rent\',\''+tn.id+'\');">'
-        + '<td class="std-cell-primary">'+tenantName(tn)+'</td>'
-        + '<td>'+tn.unit+'</td>'
-        + '<td>'+entries.length+' entries</td>'
-        + '<td class="std-cell-right">'+(balance>0?'<span class="amt-debit">$'+balance.toFixed(2)+'</span>':'<span class="amt-credit">$'+Math.abs(balance).toFixed(2)+'</span>')+'</td>'
-        + '<td style="font-size:11px;color:var(--muted);">'+(lastEntry?lastEntry.date:'—')+'</td>'
+      var charged = entries.reduce(function(s,e){ return s+(e.charge||0); }, 0);
+      var paid    = entries.reduce(function(s,e){ return s+(e.payment||0); }, 0);
+      var balance = charged - paid;
+      var sorted  = entries.slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
+      var lastDate = sorted[0] ? sorted[0].date : '—';
+      var balCell = balance > 0
+        ? '<span class="amt-debit">$'+balance.toFixed(2)+'</span>'
+        : balance < 0 ? '<span class="amt-credit">$'+Math.abs(balance).toFixed(2)+' CR</span>'
+        : '<span style="color:var(--success);">Nil</span>';
+      return '<tr style="cursor:pointer;" onclick="tenantPickerSelect(\'rent\',\''+tn.id+'\')" title="Click to view ledger">'
+        + '<td style="font-size:11px;color:var(--muted);">'+lastDate+'</td>'
+        + '<td class="std-cell-primary">'+tenantName(tn)+'<span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:6px;">'+tn.unit+'</span></td>'
+        + '<td style="color:var(--muted);font-size:12px;">'+entries.length+' entries</td>'
+        + '<td class="std-cell-right"><span class="amt-debit">$'+charged.toFixed(2)+'</span></td>'
+        + '<td class="std-cell-right"><span class="amt-credit">$'+paid.toFixed(2)+'</span></td>'
+        + '<td class="std-cell-right">'+balCell+'</td>'
+        + '<td></td><td><span class="std-pill std-pill-info">Click to view</span></td>'
         + '</tr>';
     }).filter(Boolean);
     if (bodyEl) bodyEl.innerHTML = summaryRows.length
