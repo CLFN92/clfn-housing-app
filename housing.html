@@ -10282,56 +10282,6 @@ async function getTenantFiles(unitId){
 }
 function saveTenantFiles(unitId, files){ /* legacy no-op — files saved via DocLibrary */ }
 
-function openTenantFilesPanel(unitId){
-  _tenantFilesUnitId = unitId;
-  var allUnits = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-  var u = allUnits.find(function(x){ return x.id===unitId; });
-  var title = document.getElementById('tfp_title');
-  if(title) title.textContent = u ? u.num+' '+u.street+(u.assignedName?' — '+u.assignedName:'') : unitId;
-
-  // Mount DocLibrary into #tfp_mount. If a prior instance exists from a
-  // different tenant, clear it so the mount re-initializes cleanly.
-  var mount = document.getElementById('tfp_mount');
-  if (mount) {
-    mount.innerHTML = '';
-    if (window.DocLibrary) {
-      _tenantFilesLib = window.DocLibrary.create(mount, {
-        entityType:    'tenant',
-        entityId:      unitId,
-        pathPrefix:    'tenants/' + unitId,
-        supabaseUrl:   SUPABASE_URL,
-        supabaseAnon:  SUPABASE_ANON,
-        storageBucket: STORAGE_BUCKET,
-        auditTable:    'housing_audit_log',
-        getActor:      function(){ return window.currentRole || 'staff'; },
-        categories:    _HOUSING_TENANT_DOC_CATEGORIES,
-        // When anything changes, refresh the Unit Detail Panel preview if
-        // it's currently rendered for the same unit (shares data source).
-        onChange: function(){
-          if (typeof _currentDetailUnitId !== 'undefined' &&
-              _currentDetailUnitId === unitId) {
-            udpRenderFilePreviews(unitId);
-          }
-        }
-      });
-    } else {
-      mount.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">Document library unavailable (shared.js not loaded).</div>';
-    }
-  }
-
-  var panel = document.getElementById('tenantFilesPanel');
-  if(panel){ panel.style.setProperty('display','flex','important'); document.body.classList.add('modal-open'); }
-}
-
-function closeTenantFilesPanel(){
-  var panel = document.getElementById('tenantFilesPanel');
-  if(panel) panel.style.display='none';
-  document.body.classList.remove('modal-open');
-  _tenantFilesUnitId = null;
-  _tenantFilesLib = null;
-  // Refresh tenants view so file count badge updates
-  if(typeof renderTenantsView === 'function') renderTenantsView();
-}
 
 // ── Legacy compat wrappers ──────────────────────────────────────────
 // Older code paths (and the Unit Detail Panel preview) may still call
@@ -10606,10 +10556,6 @@ function initSignaturePads() {
 // ══════════════════════════════════════════════════════
 // MISSING CLOSE FUNCTIONS
 // ══════════════════════════════════════════════════════
-function closeUnitDetail() {
-  var p = document.getElementById('unitDetailPanel');
-  if (p) p.style.display = 'none';
-}
 function closeContractorDetail() {
   var p = document.getElementById('contractorDetailPanel');
   if (p) p.style.display = 'none';
