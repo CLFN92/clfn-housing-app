@@ -130,10 +130,8 @@
 /* TIC grids */
 .tic-contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .tic-4col  { grid-template-columns: repeat(4,1fr) !important; }
-.voucher-sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
-@media (max-width: 580px) {
-  .voucher-sig-grid { grid-template-columns: 1fr; }
-}
+.voucher-sig-grid { display: flex; flex-direction: column; gap: 0; }
+.voucher-sig-grid > div { padding: 14px 16px; border-bottom: 1px solid var(--border); }
 
 /* Collections */
 .collections-badge { display: inline-flex; align-items: center; gap: 4px; background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
