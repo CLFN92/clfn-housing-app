@@ -30,9 +30,13 @@ var HOUSING_SESSION = { email: '', name: '', role: '', accessToken: '' };
 
 // ── Supabase REST headers ───────────────────────────────────────────────────
 // Rebuilt on login (Bearer = user access token) and on logout (Bearer = anon).
+// Guard against SUPABASE_ANON being undefined if shared-config.js failed to load.
+if (typeof SUPABASE_ANON === 'undefined') {
+  console.error('[CLFN] FATAL: shared-config.js did not load before shared-auth.js. Check your <script> tags and that shared-config.js is accessible.');
+}
 var HOUSING_HEADERS = {
-  'apikey':        SUPABASE_ANON,
-  'Authorization': 'Bearer ' + SUPABASE_ANON,
+  'apikey':        (typeof SUPABASE_ANON !== 'undefined' ? SUPABASE_ANON : ''),
+  'Authorization': 'Bearer ' + (typeof SUPABASE_ANON !== 'undefined' ? SUPABASE_ANON : ''),
   'Content-Type':  'application/json'
 };
 
