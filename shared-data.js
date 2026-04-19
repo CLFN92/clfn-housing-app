@@ -109,42 +109,46 @@ async function sbLoadApplications() {
 // ── sbSaveApplication ─────────────────────────────────────────────────────────
 // Upserts one application. All V2 scoring fields are promoted to dedicated
 // columns so they're queryable; the full app object is also stored in data jsonb.
+// COLUMNS: only send columns confirmed to exist in housing_applications table.
+// Columns data, archived, no_prior_tenancy, sp_id require a migration before
+// being re-enabled (see CLFN Supabase migration notes).
 async function sbSaveApplication(app) {
   var row = {
     id:               app.id,
-    sp_id:            app.spId || null,
-    data:             app,
     status:           app.status || 'draft',
     score:            typeof app.score === 'number' ? app.score : null,
     tier:             app.tier || null,
     classification:   app.classification || null,
     reserve:          app.reserve || null,
-    archived:         !!app.archived,
     assigned_unit_id: app.assignedUnit || null,
     assigned_address: app.assignedAddress || null,
     submitted_at:     app.submittedAt || null,
-    // V2 scoring inputs
+    // V2 scoring inputs (all confirmed in table)
     urgent_need:           app.urgentNeed           || app.urgent_need           || 'none',
     health_risk:           app.healthRisk           || app.health_risk           || 'none',
     persons_over_standard: parseInt(app.personsOverStandard || app.persons_over_standard || 0) || 0,
     lone_parent:           !!(app.loneParent        || app.lone_parent),
     elder_in_household:    !!(app.elderInHousehold  || app.elder_in_household),
     household_disability:  !!(app.householdDisability || app.household_disability),
-    no_prior_tenancy:      (app.noPriorTenancy !== undefined ? !!app.noPriorTenancy : !!(app.no_prior_tenancy !== false)),
     rent_payment_history:  app.rentPaymentHistory   || app.rent_payment_history  || 'no_history',
     unit_condition:        app.unitCondition        || app.unit_condition        || 'no_history',
     tenancy_conduct:       app.tenancyConduct       || app.tenancy_conduct       || 'no_history',
     income_stability:      app.incomeStability      || app.income_stability      || 'stable',
     arrears_status:        app.arrearsStatus        || app.arrears_status        || 'none',
-    // V2 scoring outputs
+    // V2 scoring outputs (all confirmed in table)
     score_v2:           typeof app.score_v2 === 'number' ? app.score_v2 : (typeof app.score === 'number' ? app.score : null),
     tier_v2:            app.tier_v2 || app.tier || null,
     score_breakdown_v2: app.scoreBreakdown || null,
-    // Application type
+    // Application type (confirmed in table)
     app_type:           app.appType || app.app_type || 'new_housing',
     transfer_pending:   !!(app.transferPending || app.transfer_pending),
-    // Ownership — enforces HE-L1 own-draft rule via RLS
+    // Ownership (confirmed in table)
     created_by_email:   app.created_by_email || HOUSING_SESSION.email || null
+    // PENDING MIGRATION — add these columns to Supabase before re-enabling:
+    // sp_id:            app.spId || null,
+    // data:             app,
+    // archived:         !!app.archived,
+    // no_prior_tenancy: (app.noPriorTenancy !== undefined ? !!app.noPriorTenancy : !!(app.no_prior_tenancy !== false)),
   };
   try {
     var r = await fetch(SUPABASE_URL + '/rest/v1/housing_applications', {
