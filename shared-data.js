@@ -97,7 +97,10 @@ async function sbLoadApplications() {
         tier_v2:             row.tier_v2              || (row.data || {}).tier_v2,
         scoreBreakdown:      row.score_breakdown_v2   || (row.data || {}).scoreBreakdown || null,
         // Ownership (RLS — HE-L1 own-draft rule)
-        created_by_email:    row.created_by_email     || null
+        created_by_email:    row.created_by_email     || null,
+        // Columns added via migration 2026-04-19
+        spId:                row.sp_id                || null,
+        noPriorTenancy:      row.no_prior_tenancy     !== undefined ? !!row.no_prior_tenancy : !!(row.data || {}).noPriorTenancy
       });
     });
   } catch(e) {
@@ -143,12 +146,12 @@ async function sbSaveApplication(app) {
     app_type:           app.appType || app.app_type || 'new_housing',
     transfer_pending:   !!(app.transferPending || app.transfer_pending),
     // Ownership (confirmed in table)
-    created_by_email:   app.created_by_email || HOUSING_SESSION.email || null
-    // PENDING MIGRATION — add these columns to Supabase before re-enabling:
-    // sp_id:            app.spId || null,
-    // data:             app,
-    // archived:         !!app.archived,
-    // no_prior_tenancy: (app.noPriorTenancy !== undefined ? !!app.noPriorTenancy : !!(app.no_prior_tenancy !== false)),
+    created_by_email:   app.created_by_email || HOUSING_SESSION.email || null,
+    // Columns added via migration 2026-04-19
+    sp_id:            app.spId || null,
+    data:             app,
+    archived:         !!app.archived,
+    no_prior_tenancy: (app.noPriorTenancy !== undefined ? !!app.noPriorTenancy : !!(app.no_prior_tenancy !== false))
   };
   try {
     var r = await fetch(SUPABASE_URL + '/rest/v1/housing_applications', {
