@@ -123,7 +123,7 @@
     <div style="overflow-x:auto;">
       <table id="ra_table" style="width:100%;border-collapse:collapse;min-width:760px;">
         <thead>
-          <tr style="background:var(--dark);border-bottom:2px solid var(--yellow);">
+          <tr class="modal-hdr">
             <th style="text-align:left;padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Address</th>
             <th style="text-align:left;padding:10px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:155px;">Project #</th>
             <th style="text-align:left;padding:10px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:80px;">Priority</th>
@@ -192,7 +192,7 @@
 <div id="ctApprovalPanel" style="display:none;position:fixed;inset:0;z-index:850;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:flex-end;" onclick="if(event.target===this)closeCtApprovalPanel()">
   <div style="background:var(--surface);width:100%;max-width:480px;height:100%;overflow-y:auto;box-shadow:-8px 0 40px rgba(0,0,0,0.3);display:flex;flex-direction:column;">
     <!-- Panel header -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;flex-shrink:0;">
+    <div class="modal-hdr sticky">
       <div>
         <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Contractor Application</div>
         <div id="ctap_name" style="font-size:15px;font-weight:700;color:#fff;"></div>
@@ -209,7 +209,7 @@
 
       <!-- Info summary -->
       <div class="card" style="padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:8px 14px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Application Summary</div>
         </div>
         <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">
@@ -247,7 +247,7 @@
 
       <!-- Audit trail -->
       <div class="card" style="padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:8px 14px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Audit Trail</div>
         </div>
         <div id="ctap_audit" style="padding:14px;display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;"></div>
@@ -258,7 +258,7 @@
 </div>
 <div id="addContractorModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:14px 20px;">
+    <div class="modal-hdr">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">
         <div>
           <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Constance Lake First Nation — Housing</div>
@@ -275,7 +275,7 @@
 
       <!-- ── Company Information ── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Company Information</div>
         </div>
         <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -299,7 +299,7 @@
 
       <!-- ── Key People ── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Key People</div>
           <button type="button" onclick="ctAddPerson()" style="background:none;border:1px solid #555;color:#ccc;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:4px;">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Person
@@ -312,7 +312,7 @@
 
       <!-- ── WSIB ── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">WSIB Clearance Certificate</div>
         </div>
         <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
@@ -330,7 +330,7 @@
 
       <!-- ── Liability Insurance ── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Liability Insurance</div>
         </div>
         <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
@@ -350,7 +350,7 @@
 
       <!-- ── Other Documents ── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Other Documents</div>
         </div>
         <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
@@ -364,7 +364,7 @@
 
       <!-- ── Notes ── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Notes</div>
         </div>
         <div style="padding:16px;">
@@ -374,7 +374,7 @@
 
       <!-- ── Business Classification ── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Business Classification</div>
         </div>
         <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
@@ -411,7 +411,7 @@
 
       <!-- ── Terms of Reference ── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;"
+        <div class="modal-hdr compact"
           onclick="var b=document.getElementById('ct_tor_body');var c=document.getElementById('ct_tor_chev');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Terms of Reference</div>
           <svg id="ct_tor_chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
@@ -459,7 +459,7 @@
 
       <!-- ── Signatures ── -->
       <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Signatures</div>
         </div>
         <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
@@ -517,7 +517,7 @@
 <div id="renoBudgetModal" style="display:none;position:fixed;inset:0;z-index:850;background:rgba(0,0,0,0.65);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:720px;box-shadow:0 24px 60px rgba(0,0,0,0.5);overflow:hidden;margin:auto;">
     <!-- Header -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
+    <div class="modal-hdr spacious">
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Renovation Budget Approval</div>
         <div id="rba_unit_header" style="font-size:16px;font-weight:700;color:#fff;"></div>
@@ -592,7 +592,7 @@
 <div id="renoProgressModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:700px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
     <!-- Header -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;">
+    <div class="modal-hdr spacious">
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Renovation Progress</div>
         <div id="rp_unit_header" style="font-size:16px;font-weight:700;color:#fff;"></div>
@@ -700,7 +700,7 @@
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:700px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
 
     <!-- Header -->
-    <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;">
+    <div class="modal-hdr spacious sticky">
       <div>
         <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:3px;">Constance Lake First Nation — Housing</div>
         <div style="font-size:16px;font-weight:700;color:#fff;">Renovation Scope of Work</div>
@@ -718,7 +718,7 @@
 
       <!-- ── UNIT INFORMATION ─────────────────────────────────────────────── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Unit Information</div>
         </div>
         <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -738,7 +738,7 @@
 
       <!-- ── CONDITION ASSESSMENT ────────────────────────────────────────── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Condition Assessment</div>
         </div>
         <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -762,7 +762,7 @@
 
       <!-- ── SCOPE OF WORK ITEMS ─────────────────────────────────────────── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Scope of Work Items</div>
         </div>
         <div style="padding:16px;">
@@ -776,7 +776,7 @@
 
       <!-- ── HEALTH & SAFETY ─────────────────────────────────────────────── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Health &amp; Safety Concerns</div>
         </div>
         <div style="padding:16px;">
@@ -793,7 +793,7 @@
 
       <!-- ── TENANT ACCOUNTABILITY ───────────────────────────────────────── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Tenant Accountability</div>
         </div>
         <div style="padding:16px;">
@@ -813,7 +813,7 @@
 
       <!-- ── ADDITIONAL NOTES ────────────────────────────────────────────── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Additional Notes</div>
         </div>
         <div style="padding:16px;">
@@ -825,7 +825,7 @@
 
       <!-- ── TERMS & CONDITIONS ────────────────────────────────────────── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;"
+        <div class="modal-hdr compact"
           onclick="var b=document.getElementById('sow_terms_body');var c=document.getElementById('sow_terms_chevron');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Terms &amp; Conditions</div>
           <svg id="sow_terms_chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
@@ -875,7 +875,7 @@
 
       <!-- ── SIGNATURES ──────────────────────────────────────────────────── -->
       <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Signatures &amp; Acknowledgement</div>
         </div>
         <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
@@ -917,7 +917,7 @@
 
       <!-- ── APPROVALS ───────────────────────────────────────────────────── -->
       <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;border-color:var(--yellow);">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;">
+        <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Approvals</div>
           <span id="sow_budget_badge" style="display:none;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;background:#fffbeb;color:#7a5c00;"></span>
         </div>
@@ -932,7 +932,7 @@
 
       <!-- ── AUDIT LOG (internal, not printed) ──────────────────────────── -->
       <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;">
-        <div style="background:var(--dark);border-bottom:2px solid var(--yellow);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;"
+        <div class="modal-hdr compact"
           onclick="var b=document.getElementById('sow_audit_body');var c=document.getElementById('sow_audit_chevron');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';if(!open&&typeof renderSowAuditLog==='function')renderSowAuditLog(window._sowUnitId);">
           <div style="display:flex;align-items:center;gap:8px;">
             <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">📋 Audit Log</div>
