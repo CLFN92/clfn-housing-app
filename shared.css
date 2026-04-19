@@ -919,3 +919,4 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .tbl tr:hover td { background: var(--surface); }
 .tbl-name  { font-weight: 600; }
 .tbl-sub   { font-size: 11px; color: var(--muted); }
+@keyframes fadeUp { from { opacity:0; transform:translateY(6px);  } to { opacity:1; transform:translateY(0); } }
