@@ -754,16 +754,7 @@
           <div class="ftog"><label class="tsw"><input type="checkbox"/><span class="tsl"></span></label><label>Arrears Payment Agreement (if applicable)</label></div>
         </div>
       </div>
-      <div class="card">
-        <div class="ctitle">File Upload</div>
-        <div id="dropZone" class="upload-zone" onclick="document.getElementById('fileInput').click()">
-          <div style="font-size:24px;margin-bottom:8px;">📎</div>
-          <div style="font-size:13px;">Drop files here or click to upload</div>
-          <div style="font-size:11px;margin-top:4px;">PDF, JPG, PNG accepted</div>
-        </div>
-        <input type="file" id="fileInput" multiple style="display:none;" onchange="handleFiles(this.files)"/>
-        <div id="fileList" style="margin-top:12px;display:flex;flex-direction:column;gap:6px;"></div>
-      </div>
+      <div id="step6_doclib_mount"></div>
       <div class="fnav"><button class="btn btn-ghost" onclick="goTo(5)">← Back</button><button class="btn btn-primary" onclick="goTo(8)">Review Application →</button></div>
     </div>
 
@@ -2517,6 +2508,8 @@ function goTo(s){
 
   cur=s;
   window.scrollTo(0,0);
+  // Init DocLibrary when user reaches step 6 (Documents)
+  if(s === 6) _initStep6DocLib();
   // Restore toggle states for new step
 
   // Sync step progress bar — fill bar + step states
@@ -4125,6 +4118,8 @@ function autoPopulateScore(){
 
 // ── calcScore ──
 function calcScore(){
+  // Local helper — reads a form field value by id
+  function fv(id){ var e=document.getElementById(id); return e ? e.value.trim() : ''; }
   // If this is a file update for an existing tenant, don't score
   if(typeof getAppType === 'function' && getAppType() === 'existing_tenant') {
     var sc = document.getElementById('sc_score_total');
@@ -5998,6 +5993,32 @@ var _scoresSortKey='score', _scoresSortDir=-1;
 // Note on upload behavior: the factory's built-in upload writes a
 // file_uploaded audit row keyed by entity_type='application'. The storage
 // listing in our customLoader picks that file up on the next refresh.
+
+// ── Step 6 Document Library ───────────────────────────────────────────────────
+// Initialised once when the user navigates to the Documents step.
+// Re-uses the same DocLibrary factory as the scorecard panel.
+var _step6DocLib = null;
+function _initStep6DocLib() {
+  var mount = document.getElementById('step6_doclib_mount');
+  if (!mount || !window.DocLibrary) return;
+  // Already mounted — just refresh
+  if (_step6DocLib) { _step6DocLib.refresh(); return; }
+  var appId = window.currentAppId;
+  if (!appId) return;
+  _step6DocLib = window.DocLibrary.create(mount, {
+    entityType:    'application',
+    entityId:      appId,
+    pathPrefix:    'applications/' + appId,
+    supabaseUrl:   SUPABASE_URL,
+    supabaseAnon:  SUPABASE_ANON,
+    storageBucket: STORAGE_BUCKET,
+    getAuthToken:  function(){ return (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ',''); },
+    auditTable:    'housing_audit_log',
+    getActor:      function(){ return window.currentRole || 'staff'; },
+    categories:    _SCORECARD_APP_DOC_CATEGORIES,
+    maxSizeMB:     25
+  });
+}
 
 // Categories for application documents. Drive the upload picker + chips.
 var _SCORECARD_APP_DOC_CATEGORIES = [
@@ -10497,6 +10518,7 @@ function newApp(){
   // Reset editing state
   currentAppId = null;
   window._appFormReturnTo = null;
+  _step6DocLib = null; // reset so DocLibrary re-mounts for new app ID
 
   // Clear all form fields
   document.querySelectorAll('#appLayout input[type="text"], #appLayout input[type="email"], #appLayout input[type="tel"], #appLayout input[type="number"], #appLayout input[type="date"], #appLayout textarea').forEach(function(el){
