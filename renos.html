@@ -1553,6 +1553,24 @@ function showRenosSimple(){
 }
 
 // ── Contractors view ──
+// Override shared-data.js showContractors() — on renos.html we switch the
+// view directly instead of navigating (which would cause an infinite redirect).
+function showContractors() {
+  hideAllViews();
+  setRenosNav('contractors');
+  var v = document.getElementById('contractorsView');
+  if (v) { v.style.display = 'flex'; v.style.flexDirection = 'column'; }
+  if (typeof renderContractorsView === 'function') renderContractorsView();
+}
+
+// Override shared-data.js showRenos() — same redirect-loop fix as showContractors.
+function showRenos() {
+  hideAllViews();
+  setRenosNav('renos');
+  var v = document.getElementById('renosView');
+  if (v) { v.style.display = 'flex'; v.style.flexDirection = 'column'; }
+  if (typeof renderRenosView === 'function') renderRenosView();
+}
 
 
 
@@ -2245,7 +2263,6 @@ function saveSOW(){
 
 
 
-async 
 
 
 
@@ -2304,7 +2321,6 @@ async function udpProcessFiles(files) {
 
 
 
-async 
 
 // ── addScoringCriteria ──
 

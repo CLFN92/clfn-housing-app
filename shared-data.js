@@ -1296,14 +1296,16 @@ function getDefaultBudget(){
   return obj;
 }
 function getRenoScoreModel() {
+  var model = (typeof DEFAULT_RENO_SCORE_MODEL !== 'undefined') ? DEFAULT_RENO_SCORE_MODEL : [];
+  if (!model.length) return [];
   try {
     var saved = (window._appSettings && window._appSettings['reno_score_model']) || null;
-    if(!saved) return DEFAULT_RENO_SCORE_MODEL.map(function(r){ return Object.assign({},r); });
-    return DEFAULT_RENO_SCORE_MODEL.map(function(def) {
+    if(!saved) return model.map(function(r){ return Object.assign({},r); });
+    return model.map(function(def) {
       var match = saved.find(function(s){ return s.id === def.id; });
       return match ? Object.assign({},def,{pts:match.pts}) : Object.assign({},def);
     });
-  } catch(e) { return DEFAULT_RENO_SCORE_MODEL.map(function(r){ return Object.assign({},r); }); }
+  } catch(e) { return model.map(function(r){ return Object.assign({},r); }); }
 }
 function getUnitScoreModel(){
   var saved=loadUnitScoreModel();
