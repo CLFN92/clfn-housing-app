@@ -288,7 +288,7 @@ window.SigWidget = (function(){
       root.appendChild(drawPanel);
       panels.draw = drawPanel;
 
-      drawCtx = canvas.getContext('2d');
+      drawCtx = canvas.getContext('2d', { willReadFrequently: true });
       drawCtx.strokeStyle = '#111';
       drawCtx.lineWidth = 2;
       drawCtx.lineCap = 'round';

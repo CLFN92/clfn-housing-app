@@ -920,3 +920,24 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .tbl-name  { font-weight: 600; }
 .tbl-sub   { font-size: 11px; color: var(--muted); }
 @keyframes fadeUp { from { opacity:0; transform:translateY(6px);  } to { opacity:1; transform:translateY(0); } }
+
+/* ── Signature widget (SigWidget in shared.js) — used by housing + finance ── */
+.sigw           { display: flex; flex-direction: column; gap: 12px; }
+.sigw-tabs      { display: flex; border-bottom: 2px solid var(--border); }
+.sigw-tab       { padding: 8px 14px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; border: none; background: none; font-family: var(--sans); border-bottom: 2px solid transparent; margin-bottom: -2px; }
+.sigw-tab.active{ color: var(--text); border-bottom-color: var(--yellow); }
+.sigw-panel     { padding: 12px 0; }
+.sigw-canvas    { border: 1.5px solid var(--border); border-radius: 8px; touch-action: none; display: block; }
+.sigw-canvas-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+.sigw-clear     { font-size: 11px; color: var(--danger); cursor: pointer; background: none; border: none; font-family: var(--sans); }
+.sigw-hint      { font-size: 11px; color: var(--muted); }
+.sigw-type-pad  { display: flex; flex-direction: column; gap: 8px; }
+.sigw-type-input{ border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 22px; font-family: var(--serif); width: 100%; box-sizing: border-box; }
+.sigw-type-note { font-size: 11px; color: var(--muted); }
+.sigw-wet-pad, .sigw-wet-input, .sigw-wet-note { /* same as type- variants */ }
+.sigw-presence  { display: flex; flex-direction: column; gap: 8px; }
+.sigw-presence-label{ font-size: 12px; font-weight: 600; }
+.sigw-presence-desc { font-size: 11px; color: var(--muted); }
+.sigw-presence-btns { display: flex; gap: 8px; }
+.sigw-presence-btn  { flex: 1; padding: 8px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--bg); cursor: pointer; font-family: var(--sans); font-size: 13px; font-weight: 600; transition: var(--tr); }
+.sigw-presence-btn.active { background: var(--yellow); border-color: var(--yellow); color: #111; }
