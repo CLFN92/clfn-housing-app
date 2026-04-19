@@ -2205,9 +2205,16 @@ function renderRenosView(){
   function getRenoProgress(uid){ return window._renoProgress && window._renoProgress[uid] ? window._renoProgress[uid] : {}; }
   var units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
 
-  // Combine under_repair and condemned into one list
+  // Combine under_repair, condemned, and vacant-with-SOW/progress into one list.
+  // Supabase units may still carry status='vacant' even when a SOW or reno progress
+  // record exists — include those so the view is never empty due to a stale status.
   var allReno = units.filter(function(u){
-    return (u.status==='under_repair' || u.status==='condemned') && !u.archived;
+    if (u.archived) return false;
+    if (u.status === 'under_repair' || u.status === 'condemned') return true;
+    // Fallback: vacant/other units that have a SOW or reno progress filed
+    var hasSow      = !!(window._sowCache      && window._sowCache[u.id]);
+    var hasProgress = !!(window._renoProgress  && window._renoProgress[u.id]);
+    return hasSow || hasProgress;
   });
 
   function byScore(a,b){ return calcRenoScore(b.id).score - calcRenoScore(a.id).score; }
@@ -2216,19 +2223,22 @@ function renderRenosView(){
   // Active filter — stored on window so pill clicks re-render
   var activeFilter = window._renoViewFilter || 'all';
 
+  var repairCount    = allReno.filter(function(u){ return u.status==='under_repair'; }).length;
+  var condemnedCount = allReno.filter(function(u){ return u.status==='condemned'; }).length;
+  var vacantRenoCount = allReno.filter(function(u){ return u.status!=='under_repair' && u.status!=='condemned'; }).length;
+
   var filtered = activeFilter === 'repair'    ? allReno.filter(function(u){ return u.status==='under_repair'; })
                : activeFilter === 'condemned' ? allReno.filter(function(u){ return u.status==='condemned'; })
+               : activeFilter === 'in_reno'   ? allReno.filter(function(u){ return u.status!=='under_repair' && u.status!=='condemned'; })
                : allReno;
 
   // ── Pill chips ────────────────────────────────────────────────────────────
-  var repairCount    = allReno.filter(function(u){ return u.status==='under_repair'; }).length;
-  var condemnedCount = allReno.filter(function(u){ return u.status==='condemned'; }).length;
-
   var chipDefs = [
     { key:'all',       label:'All',             count: allReno.length },
     { key:'repair',    label:'🔨 Under Repair',  count: repairCount },
     { key:'condemned', label:'🚫 Condemned',     count: condemnedCount },
   ];
+  if (vacantRenoCount > 0) chipDefs.push({ key:'in_reno', label:'📋 Filed (Vacant)', count: vacantRenoCount });
 
   function chip(def) {
     var active = activeFilter === def.key;

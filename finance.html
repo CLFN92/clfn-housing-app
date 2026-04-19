@@ -56,7 +56,7 @@
     <div id="home_date" class="home-date-line"></div>
     <h1 class="home-welcome">Welcome back, <span id="home_user_name" style="color:var(--yellow);"></span></h1>
     <p class="home-subtitle">Finance activity at a glance.</p>
-    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+    <div class="home-quick-actions">
       <button class="btn btn-primary btn-sm" onclick="openModal('modalRentPayment')">&#127968; Record Payment</button>
       <button class="btn btn-ghost btn-sm" onclick="openAddTenant()">+ Add Tenant</button>
     </div>
@@ -64,6 +64,15 @@
 
   <!-- Summary stats (previously on Dashboard) -->
   <div class="stats-grid" id="dashStats" style="margin-bottom:18px;"></div>
+
+  <!-- Role-aware Worklist -->
+  <div id="finance-worklist-wrap" style="display:none;margin-bottom:20px;">
+    <div class="finance-worklist-hdr">
+      <span id="finance-worklist-title">&#9888; Pending Review</span>
+      <span class="finance-worklist-count" id="finance-worklist-count">0</span>
+    </div>
+    <div id="finance-worklist-body"></div>
+  </div>
 
   <!-- Find-a-Tenant (compact) -->
   <div style="margin-bottom:18px;">
@@ -1883,8 +1892,6 @@
           <div class="f"><label>Tenant <span class="r">*</span></label><select id="je-tenant"></select></div>
           <div class="f"><label>Date <span class="r">*</span></label><input id="je-date" type="date"/></div>
         </div>
-
-        <!-- Line items table -->
         <div class="je-lines-wrap">
           <div class="je-lines-header">
             <span style="flex:0 0 110px;">Type</span>
@@ -1895,8 +1902,6 @@
           <div id="je-lines"></div>
           <button type="button" class="btn btn-ghost btn-sm je-add-line" onclick="jeAddLine()">+ Add Line</button>
         </div>
-
-        <!-- Balance bar -->
         <div class="je-balance-bar" id="je-balance-bar">
           <div class="je-balance-cell">
             <span class="je-balance-label">Total Debits</span>
@@ -1916,7 +1921,6 @@
             <span class="je-status-pill je-status-unbalanced">Unbalanced</span>
           </div>
         </div>
-
         <div class="f"><label>Memo <span class="r">*</span></label><textarea id="je-memo" placeholder="Describe the reason for this journal entry..."></textarea></div>
       </div>
     </div>
@@ -6084,7 +6088,6 @@ function reverseLoanPayment(pmtId, loanId) {
 
 // \u2500\u2500 JOURNAL ENTRY \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 var _jeLineCount = 0;
-
 var JE_ACCOUNTS = [
   {value:'rent',         label:'Rent'},
   {value:'arrangement',  label:'Payment Arrangement'},
@@ -6095,13 +6098,11 @@ var JE_ACCOUNTS = [
   {value:'misc',         label:'Miscellaneous'},
   {value:'general',      label:'General'},
 ];
-
 function _jeAccountOptions(selected) {
   return JE_ACCOUNTS.map(function(a) {
     return '<option value="'+a.value+'"'+(a.value===selected?' selected':'')+'>'+a.label+'</option>';
   }).join('');
 }
-
 function jeAddLine(type, account, amount) {
   _jeLineCount++;
   var idx = _jeLineCount;
@@ -6122,7 +6123,6 @@ function jeAddLine(type, account, amount) {
   container.appendChild(row);
   jeRecalc();
 }
-
 function jeSetType(idx, type) {
   var row = document.getElementById('je-line-'+idx);
   if (!row) return;
@@ -6131,13 +6131,11 @@ function jeSetType(idx, type) {
   if (btn) btn.classList.add('active');
   jeRecalc();
 }
-
 function jeRemoveLine(idx) {
   var row = document.getElementById('je-line-'+idx);
   if (row) row.remove();
   jeRecalc();
 }
-
 function jeGetLines() {
   var container = document.getElementById('je-lines');
   if (!container) return [];
@@ -6152,7 +6150,6 @@ function jeGetLines() {
   });
   return lines;
 }
-
 function jeRecalc() {
   var lines = jeGetLines();
   var totalDebit = 0, totalCredit = 0;
@@ -6162,18 +6159,16 @@ function jeRecalc() {
   });
   var diff = Math.abs(totalDebit - totalCredit);
   var balanced = lines.length >= 2 && diff < 0.005;
-
   var fmtDebit  = document.getElementById('je-total-debits');
   var fmtCredit = document.getElementById('je-total-credits');
   var fmtDiff   = document.getElementById('je-balance-diff');
   var statusEl  = document.getElementById('je-balance-status');
   var submitBtn = document.getElementById('je-submit-btn');
-
   if (fmtDebit)  fmtDebit.textContent  = '$'+totalDebit.toFixed(2);
   if (fmtCredit) fmtCredit.textContent = '$'+totalCredit.toFixed(2);
   if (fmtDiff) {
     fmtDiff.textContent = '$'+diff.toFixed(2);
-    fmtDiff.className = 'je-balance-amt je-balance-diff' + (balanced ? ' balanced' : ' unbalanced');
+    fmtDiff.className = 'je-balance-amt je-balance-diff'+(balanced?' balanced':' unbalanced');
   }
   if (statusEl) {
     statusEl.innerHTML = balanced
@@ -6185,7 +6180,6 @@ function jeRecalc() {
     submitBtn.title = balanced ? '' : 'Entry must balance before posting';
   }
 }
-
 function jeResetModal() {
   _jeLineCount = 0;
   var container = document.getElementById('je-lines');
@@ -6199,19 +6193,15 @@ function jeResetModal() {
   jeAddLine('debit');
   jeAddLine('credit');
 }
-
 function saveJournalEntry() {
   var tid  = (document.getElementById('je-tenant')||{}).value||'';
   var date = (document.getElementById('je-date')||{}).value||today();
   var memo = ((document.getElementById('je-memo')||{}).value||'').trim();
   var lines = jeGetLines();
   var errEl = document.getElementById('je-error');
-
   function showErr(msg) { if (errEl) { errEl.textContent=msg; errEl.style.display='block'; } }
-
   if (!memo) { showErr('Memo / description is required.'); return; }
   if (lines.length < 2) { showErr('At least two lines are required.'); return; }
-
   var totalDebit = 0, totalCredit = 0;
   lines.forEach(function(l) {
     if (l.type==='debit') totalDebit += l.amount;
@@ -6222,11 +6212,9 @@ function saveJournalEntry() {
     return;
   }
   if (errEl) errEl.style.display = 'none';
-
   var d = getData();
   d.journalEntries = d.journalEntries || [];
   var groupRef = uid();
-
   lines.forEach(function(l) {
     var entry = {
       id: uid(), tenantId: tid||null, date: date,
@@ -6241,13 +6229,13 @@ function saveJournalEntry() {
     d.journalEntries.push(entry);
     auditLog('create','journal',entry.id,'Journal entry ('+l.type+'): '+memo,null,entry);
   });
-
   saveData(d);
   closeModal('modalJournalEntry');
   renderDashboard();
   if (document.getElementById('page-journal').classList.contains('on')) renderJournal();
   if (document.getElementById('page-transactions').classList.contains('on')) renderTransactions();
 }
+
 
 // \u2500\u2500 OPENING BALANCE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function saveOpeningBalance() {
@@ -7085,21 +7073,65 @@ function renderJournal() {
     return '<span class="std-pill std-pill-info">'+(st||'—')+'</span>';
   }
 
-  bodyEl.innerHTML = list.map(function(r){
-    var t = getTenant(r.tenantId);
-    var postedBy = r.postedBy || r.enteredBy || '<span class="std-cell-dash">—</span>';
-    return '<tr>'+
-      '<td>'+r.date+'</td>'+
+  // Group multi-line entries by ref (shared groupRef from multi-line JE form).
+  var refGroups = {};
+  var refOrder  = [];
+  list.forEach(function(r) {
+    var key = (r.ref && r.ref !== '') ? r.ref : r.id;
+    if (!refGroups[key]) { refGroups[key] = []; refOrder.push(key); }
+    refGroups[key].push(r);
+  });
+  bodyEl.innerHTML = refOrder.map(function(key) {
+    var group = refGroups[key];
+    var first = group[0];
+    var t = getTenant(first.tenantId);
+    var postedBy = first.postedBy || first.enteredBy || '<span class="std-cell-dash">—</span>';
+    var memo = first.desc || '<span class="std-cell-dash">—</span>';
+    if (group.length === 1) {
+      var r = first;
+      return '<tr>'+
+        '<td>'+r.date+'</td>'+
+        '<td class="std-cell-primary">'+(t?tenantName(t):'<span class="std-cell-dash">—</span>')+'</td>'+
+        '<td>'+memo+'</td>'+
+        '<td style="text-transform:capitalize;">'+(r.ledger||'rent')+'</td>'+
+        '<td class="std-cell-right">'+(r.charge>0?'<span class="amt-debit">'+fmt(r.charge)+'</span>':'<span class="std-cell-dash">—</span>')+'</td>'+
+        '<td class="std-cell-right">'+(r.payment>0?'<span class="amt-credit">'+fmt(r.payment)+'</span>':'<span class="std-cell-dash">—</span>')+'</td>'+
+        '<td style="font-size:12px;color:var(--muted);">'+postedBy+'</td>'+
+        '<td>'+stdPillForStatus(r.status)+'</td>'+
+      '</tr>';
+    }
+    // Multi-line grouped entry
+    var totalDR = 0, totalCR = 0;
+    group.forEach(function(r){ totalDR += (r.charge||r.debit||0); totalCR += (r.payment||r.credit||0); });
+    var header = '<tr class="je-group-header-row">'+
+      '<td>'+first.date+'</td>'+
       '<td class="std-cell-primary">'+(t?tenantName(t):'<span class="std-cell-dash">—</span>')+'</td>'+
-      '<td>'+(r.desc||'<span class="std-cell-dash">—</span>')+'</td>'+
-      '<td style="text-transform:capitalize;">'+(r.ledger||'rent')+'</td>'+
-      '<td class="std-cell-right">'+(r.charge>0?'<span class="amt-debit">'+fmt(r.charge)+'</span>':'<span class="std-cell-dash">—</span>')+'</td>'+
-      '<td class="std-cell-right">'+(r.payment>0?'<span class="amt-credit">'+fmt(r.payment)+'</span>':'<span class="std-cell-dash">—</span>')+'</td>'+
+      '<td><span class="je-group-label">📓 '+memo+'</span></td>'+
+      '<td><span class="je-group-badge">'+group.length+' lines</span></td>'+
+      '<td class="std-cell-right"><span class="amt-debit">'+fmt(totalDR)+'</span></td>'+
+      '<td class="std-cell-right"><span class="amt-credit">'+fmt(totalCR)+'</span></td>'+
       '<td style="font-size:12px;color:var(--muted);">'+postedBy+'</td>'+
-      '<td>'+stdPillForStatus(r.status)+'</td>'+
+      '<td>'+stdPillForStatus(first.status)+'</td>'+
     '</tr>';
+    var subRows = group.map(function(r, i) {
+      var isLast = i === group.length - 1;
+      var isDebit = (r.charge||r.debit||0) > 0;
+      var drCell = isDebit ? '<span class="amt-debit">'+fmt(r.charge||r.debit)+'</span>' : '<span class="std-cell-dash">—</span>';
+      var crCell = !isDebit ? '<span class="amt-credit">'+fmt(r.payment||r.credit)+'</span>' : '<span class="std-cell-dash">—</span>';
+      return '<tr class="je-group-line-row'+(isLast?' je-group-line-last':'')+'">'+
+        '<td class="je-group-tree-cell"><span class="je-tree-connector">'+(isLast?'└':'├')+'</span></td>'+
+        '<td></td>'+
+        '<td>'+(isDebit?'<span class="je-dr-badge">DR</span>':'<span class="je-cr-badge">CR</span>')+'</td>'+
+        '<td style="font-size:12px;text-transform:capitalize;color:var(--muted);">'+(r.ledger||'rent')+'</td>'+
+        '<td class="std-cell-right">'+drCell+'</td>'+
+        '<td class="std-cell-right">'+crCell+'</td>'+
+        '<td colspan="2"></td>'+
+      '</tr>';
+    }).join('');
+    return header + subRows;
   }).join('');
 }
+
 
 function renderBatchList() {
   var d = getData();
@@ -8760,7 +8792,124 @@ function dashSelectTenant(tid) {
   }, 150);
 }
 
+// \u2500\u2500 FINANCE WORKLIST (role-aware) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function renderFinanceWorklist() {
+  var wrap = document.getElementById('finance-worklist-wrap');
+  var body = document.getElementById('finance-worklist-body');
+  var countEl = document.getElementById('finance-worklist-count');
+  var titleEl = document.getElementById('finance-worklist-title');
+  if (!wrap || !body) return;
+  var role = _currentRole;
+  var d = getData();
+  var items = [];
+  var isED = (role === 'ed');
+  var isFinance = (role === 'cfo' || role === 'finance_l1');
+  if (isED || isFinance) {
+    // Journal entries pending ED review — group by ref
+    var seenRefs = {};
+    (d.journalEntries || []).forEach(function(j) {
+      if (j.status !== 'pending-ed') return;
+      var key = (j.ref && j.ref !== '') ? j.ref : j.id;
+      if (seenRefs[key]) return;
+      seenRefs[key] = true;
+      var groupLines = (j.ref && j.ref !== '')
+        ? (d.journalEntries||[]).filter(function(x){ return x.ref === j.ref; })
+        : [j];
+      var t = getTenant(j.tenantId);
+      var tName = t ? (t.name || (t.firstName||'')+' '+(t.lastName||'')) : 'No tenant';
+      var totalDR = 0;
+      groupLines.forEach(function(x){ totalDR += (x.debit||x.charge||0); });
+      items.push({
+        icon: '📓',
+        label: 'Journal Entry',
+        sub: tName + ' · ' + groupLines.length + ' lines · $' + totalDR.toFixed(2) + ' DR',
+        memo: j.desc || j.memo || '',
+        date: j.date || '',
+        action: isED
+          ? '<button class="btn btn-xs btn-primary" onclick="approveJournalEntry(\''+j.ref||j.id+'\',\''+j.id+'\')">Approve</button>'
+            + '<button class="btn btn-xs btn-ghost" onclick="showPage(\'journal\')">View</button>'
+          : '<button class="btn btn-xs btn-ghost" onclick="showPage(\'journal\')">View</button>'
+      });
+    });
+    // Loans pending ED approval
+    (d.loanList || []).forEach(function(l) {
+      if (l.status !== 'pending-ed') return;
+      var t = getTenant(l.tenantId);
+      var tName = t ? (t.name || (t.firstName||'')+' '+(t.lastName||'')) : 'No tenant';
+      items.push({
+        icon: '💰', label: 'Loan Approval',
+        sub: tName + ' · $' + (l.principal||0).toFixed(2),
+        memo: l.purpose || l.notes || '', date: l.start || '',
+        action: isED
+          ? '<button class="btn btn-xs btn-primary" onclick="approveLoan(\''+l.id+'\')">Approve</button>'
+            + '<button class="btn btn-xs btn-ghost" onclick="showPage(\'loans\')">View</button>'
+          : '<button class="btn btn-xs btn-ghost" onclick="showPage(\'loans\')">View</button>'
+      });
+    });
+    // Arrangements pending
+    (d.arrangements || []).forEach(function(a) {
+      if (a.status !== 'pending-ed' && a.status !== 'pending') return;
+      var t = getTenant(a.tenantId);
+      var tName = t ? (t.name || (t.firstName||'')+' '+(t.lastName||'')) : 'No tenant';
+      items.push({
+        icon: '📋', label: 'Payment Arrangement',
+        sub: tName + ' · $' + (a.totalOwing||a.amount||0).toFixed(2),
+        memo: a.notes || '', date: a.startDate || a.date || '',
+        action: '<button class="btn btn-xs btn-ghost" onclick="showPage(\'arrangements\')">View</button>'
+      });
+    });
+    // Pending reversals
+    (d.rentLedger || []).forEach(function(r) {
+      if (r.status !== 'pending-reversal') return;
+      var t = getTenant(r.tenantId);
+      var tName = t ? (t.name || (t.firstName||'')+' '+(t.lastName||'')) : 'No tenant';
+      items.push({
+        icon: '\u21a9\ufe0f', label: 'Pending Reversal',
+        sub: tName + ' · $' + (r.amount||r.charge||r.payment||0).toFixed(2),
+        memo: r.desc || r.memo || '', date: r.date || '',
+        action: '<button class="btn btn-xs btn-ghost" onclick="showPage(\'rent\')">View</button>'
+      });
+    });
+  }
+  if (items.length === 0) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  if (countEl) countEl.textContent = items.length;
+  if (titleEl) titleEl.innerHTML = '&#9888; ' + (isED ? 'Requires Your Approval' : 'Pending Items');
+  body.innerHTML = items.map(function(item) {
+    return '<div class="fwl-item">'+
+      '<div class="fwl-icon">'+item.icon+'</div>'+
+      '<div class="fwl-main">'+
+        '<div class="fwl-label">'+item.label+'<span class="fwl-sub">'+item.sub+'</span></div>'+
+        (item.memo ? '<div class="fwl-memo">'+item.memo+'</div>' : '')+
+      '</div>'+
+      '<div class="fwl-date">'+item.date+'</div>'+
+      '<div class="fwl-actions">'+item.action+'</div>'+
+    '</div>';
+  }).join('');
+}
+function approveJournalEntry(ref, fallbackId) {
+  var d = getData();
+  var toApprove = (ref && ref !== '')
+    ? (d.journalEntries||[]).filter(function(j){ return j.ref === ref; })
+    : (d.journalEntries||[]).filter(function(j){ return j.id === fallbackId; });
+  if (!toApprove.length) return;
+  toApprove.forEach(function(j) {
+    var prev = j.status;
+    j.status = 'posted';
+    j.approvedBy = (typeof HOUSING_SESSION !== 'undefined') ? (HOUSING_SESSION.name || HOUSING_SESSION.email) : 'ED';
+    j.approvedAt = today();
+    var rl = (d.rentLedger||[]).find(function(r){ return r.id === j.id; });
+    if (rl) rl.status = 'posted';
+    auditLog('update','journal',j.id,'Journal entry approved',{status:prev},{status:'posted'});
+  });
+  saveData(d);
+  renderFinanceWorklist();
+  renderDashboard();
+  if (document.getElementById('page-journal') && document.getElementById('page-journal').classList.contains('on')) renderJournal();
+}
+
 function renderDashboard(){
+  if (typeof renderFinanceWorklist === 'function') renderFinanceWorklist();
   // NOTE: #dashSubtitle used to live on the old Dashboard page which was
   // consolidated into Home. We keep the null-guard in case other callers
   // (or future markup changes) re-introduce it.

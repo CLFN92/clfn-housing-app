@@ -290,3 +290,86 @@
   opacity: .45;
   cursor: not-allowed;
 }
+
+/* ── Home quick-action buttons ──────────────────────────── */
+.home-quick-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+/* ── Finance Worklist ───────────────────────────────────── */
+.finance-worklist-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.finance-worklist-count {
+  background: var(--yellow);
+  color: #111;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 20px;
+  padding: 2px 9px;
+  min-width: 22px;
+  text-align: center;
+}
+#finance-worklist-body {
+  border: 1px solid var(--border);
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
+}
+.fwl-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  transition: background .15s;
+}
+.fwl-item:last-child { border-bottom: none; }
+.fwl-item:hover { background: var(--surface); }
+.fwl-icon { font-size: 18px; flex: 0 0 26px; text-align: center; }
+.fwl-main { flex: 1; min-width: 0; }
+.fwl-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fwl-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.fwl-memo {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fwl-date {
+  font-size: 11px;
+  color: var(--muted);
+  flex: 0 0 90px;
+  text-align: right;
+}
+.fwl-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
