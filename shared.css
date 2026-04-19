@@ -186,7 +186,7 @@ body {
 
 .layout       { display: flex; min-height: calc(100vh - 64px); flex-direction: column; }
 .app-wrapper  { display: flex; min-height: calc(100vh - 64px); background: var(--bg); }
-.content-area { flex: 1; display: flex; flex-direction: column; min-width: 0; align-items: stretch; overflow-y: auto; }
+.content-area { flex: 1; display: flex; flex-direction: column; min-width: 0; align-items: stretch; }
 #appLayout    { flex: 1; display: flex; flex-direction: column; min-width: 0; align-items: center; }
 
 /* Sidebar */
@@ -230,16 +230,17 @@ body {
 /* Back button row + sub-header band used on every non-home view            */
 
 .page-back-row {
-  padding: 0 0 0;
+  padding: 16px 0 0;
   display: flex; align-items: center; gap: 8px;
   width: 100%; box-sizing: border-box;
 }
 .back-btn-yellow {
   background: var(--yellow); border: 1.5px solid var(--yellow); color: #111;
-  padding: 6px 14px; border-radius: 7px;
-  font-size: 12px; font-weight: 700; font-family: var(--sans);
-  cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 16px; border-radius: 7px;
+  font-size: 13px; font-weight: 700; font-family: var(--sans);
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
   transition: background 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
 }
 .back-btn-yellow:hover { background: #fff0a6; box-shadow: 0 2px 6px rgba(248,228,26,0.35); }
 .back-btn-yellow svg   { flex-shrink: 0; }
@@ -724,6 +725,9 @@ input:focus, select:focus, textarea:focus {
   /* Filters — stack on mobile */
   .dash-filters, .filter-bar  { gap: 6px; }
   .dash-filters input, .filter-bar input { min-width: 100%; }
+  /* Back button — bigger tap target on mobile */
+  .page-back-row   { padding-top: 12px; }
+  .back-btn-yellow { padding: 9px 18px; font-size: 13px; }
 }
 
 /* ── ≤480px Small mobile ── */
