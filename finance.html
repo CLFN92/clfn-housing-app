@@ -2290,18 +2290,23 @@ var _NATION = function(){
 // entry_type values align with schema CHECK: opening_balance, rent_charge,
 // payment, adjustment_credit, adjustment_debit, void.
 function _rentLedgerToRow(e){
+  // Journal entries live in finance_journal — skip them here to avoid
+  // entry_type constraint violations on finance_rent_ledger.
+  if (e.type === 'journal') return null;
   // Determine signed amount and entry_type from legacy fields.
   var amt = 0, etype = 'rent_charge';
-  if (e.type === 'opening') { amt = Number(e.charge||0); etype = 'opening_balance'; }
+  if (e.type === 'opening' || e.type === 'opening_balance') { amt = Number(e.charge||0); etype = 'opening_balance'; }
   else if (e.type === 'invoice') { amt = Number(e.charge||0); etype = 'rent_charge'; }
   else if (e.type === 'payment') { amt = -Number(e.payment||0); etype = 'payment'; }
   else if (Number(e.charge||0) > 0) { amt = Number(e.charge); etype = 'adjustment_debit'; }
   else if (Number(e.payment||0) > 0) { amt = -Number(e.payment); etype = 'adjustment_credit'; }
+  var tenantId = e.tenantId && e.tenantId !== '' ? e.tenantId : null;
+  var entryDate = e.date || new Date().toISOString().slice(0,10);
   return {
     id: e.id, nation_id: _NATION(),
-    tenant_id: e.tenantId, unit_id: e.unitId || null,
+    tenant_id: tenantId, unit_id: e.unitId || null,
     entry_type: etype, amount: amt,
-    entry_date: e.date, description: e.desc || '',
+    entry_date: entryDate, description: e.desc || '',
     voids_id: e.voidsId || null, void_reason: e.voidReason || null,
     created_by: e.createdBy || _ACTOR()
   };
@@ -2558,10 +2563,12 @@ function _journalToRow(j){
   var status = j.status || 'posted';
   var groupRef = j.ref || '';
   var encodedRef = status + '|' + groupRef;
+  var tenantId = j.tenantId && j.tenantId !== '' ? j.tenantId : null;
+  var entryDate = j.date || new Date().toISOString().slice(0,10);
   return {
     id: j.id, nation_id: _NATION(),
-    tenant_id: j.tenantId || null,
-    entry_date: j.date,
+    tenant_id: tenantId,
+    entry_date: entryDate,
     account_code: j.ledger || null,
     debit: debit, credit: credit,
     description: j.memo || j.desc || '(no memo)',
