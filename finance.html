@@ -2813,6 +2813,9 @@ function _upsertRows(table, rows){
     'Prefer': 'resolution=merge-duplicates,return=minimal',
     'Content-Type': 'application/json'
   });
+  if (table === 'finance_journal') {
+    console.log('[finance trace] finance_journal POST (' + rows.length + ' rows) caller:', new Error().stack.split('\n').slice(1,5).join(' | '));
+  }
   return fetch(SUPABASE_URL + '/rest/v1/' + table, {
     method: 'POST', headers: headers, body: JSON.stringify(rows)
   }).then(function(r){
@@ -2938,102 +2941,14 @@ function saveData(d){
 // the detail JSON instead. Reports that need per-tenant audit history can
 // filter on detail->>'tenant_id' until we drop/relax the FK in F3B.
 // ── Finance Audit Log ──────────────────────────────────────────────────────
-// Probes the table schema on first call to discover actual columns,
-// then only sends columns that exist. This avoids guessing the schema.
-var _auditCols = null; // null = unknown, false = probe failed, array = known cols
+// Delegates to sbWriteAuditEntry() in shared-data.js which handles both
+// finance_audit_log and housing_audit_log based on page context.
+var _auditCols = null; // kept for backward compat — no longer used
 
 function _writeAuditEntry(entry) {
-  var detail = Object.assign({}, entry.detail || {});
-  if (entry.tenant_id) detail.tenant_id = entry.tenant_id;
-  if (entry.entity_id) detail.entity_id = entry.entity_id;
-
-  var now = new Date().toISOString();
-  var actor = _ACTOR();
-  var role = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION.role : null;
-
-  // Full candidate row — filtered to known columns before sending.
-  // Notes:
-  //   id: omitted — Supabase auto-generates uuid PKs
-  //   tenant_id: always null — FK race condition (see comment above)
-  //   entity_id: must be uuid or null — pass null for non-uuid entity refs
-  var entityId = entry.entity_id || null;
-  // Validate entity_id is uuid-shaped before sending (avoids FK/type errors)
-  var uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (entityId && !uuidRe.test(entityId)) entityId = null;
-
-  var fullRow = {
-    nation_id:   _NATION(),
-    actor_email: actor,
-    actor:       actor,
-    actor_role:  role,
-    action:      entry.action || 'unknown',
-    entity_type: entry.entity_type || 'unknown',
-    entity_id:   entityId,
-    tenant_id:   null,
-    summary:     entry.summary || '(no summary)',
-    description: entry.summary || '(no summary)',
-    detail:      JSON.stringify(detail),
-    occurred_at: now,
-    created_at:  now
-  };
-
-  var headers = Object.assign({}, FINANCE_HEADERS || {}, {
-    'Prefer': 'return=minimal', 'Content-Type': 'application/json'
-  });
-
-  function doInsert(row) {
-    return fetch(SUPABASE_URL + '/rest/v1/finance_audit_log', {
-      method: 'POST', headers: headers, body: JSON.stringify([row])
-    }).then(function(r) {
-      if (!r.ok) {
-        return r.text().then(function(t) {
-          var parsed = {};
-          try { parsed = JSON.parse(t); } catch(e) {}
-          console.warn('[finance audit] REJECTED HTTP ' + r.status + ':', parsed.message || parsed.hint || t);
-        });
-      } else {
-        console.log('[finance audit] OK');
-      }
-    }).catch(function(e) {
-      console.warn('[finance audit] network error:', e.message);
-    });
+  if (typeof sbWriteAuditEntry === 'function') {
+    sbWriteAuditEntry(entry);
   }
-
-  // If we already know the columns, filter and send immediately
-  // Always exclude 'id' — Supabase auto-generates the PK
-  var _skipCols = { id: true, updated_at: true };
-  if (Array.isArray(_auditCols)) {
-    var row = {};
-    _auditCols.forEach(function(col) { if (!_skipCols[col] && col in fullRow) row[col] = fullRow[col]; });
-    return doInsert(row);
-  }
-
-  // Probe: fetch one row to discover columns
-  return fetch(SUPABASE_URL + '/rest/v1/finance_audit_log?limit=1', {
-    headers: Object.assign({}, FINANCE_HEADERS, { 'Accept': 'application/json' })
-  }).then(function(r) {
-    if (r.ok) {
-      return r.json().then(function(rows) {
-        if (rows && rows.length > 0) {
-          _auditCols = Object.keys(rows[0]);
-        } else {
-          // Empty table — try to detect columns via OPTIONS or send full row
-          // Use a trial insert to discover what's accepted
-          _auditCols = Object.keys(fullRow);
-        }
-        console.log('[finance audit] columns:', _auditCols.join(', '));
-        var row = {};
-        _auditCols.forEach(function(col) { if (!_skipCols[col] && col in fullRow) row[col] = fullRow[col]; });
-        return doInsert(row);
-      });
-    } else {
-      // Probe failed — send full row and let Supabase tell us what's wrong
-      _auditCols = false;
-      return doInsert(fullRow);
-    }
-  }).catch(function() {
-    return doInsert(fullRow);
-  });
 }
 
 // Public wrapper so action-specific callers (approveLoan, postPayment, etc.)

@@ -3739,3 +3739,81 @@ function closeUnitDetail() {
   var p = document.getElementById('unitDetailPanel');
   if (p) p.style.display = 'none';
 }
+
+// ── Shared Audit Log Writer ─────────────────────────────────────────────────
+// Single function used by ALL pages (housing, finance, renos) to write audit
+// entries. Detects which table to use based on the current page context.
+// Fire-and-forget — failures are logged but never block the user.
+//
+// Usage:
+//   sbWriteAuditEntry({ action, entity_type, entity_id, summary, detail, tenant_id })
+//
+// On housing.html / renos.html → writes to housing_audit_log
+// On finance.html             → writes to finance_audit_log
+function sbWriteAuditEntry(entry) {
+  var isFinance = (typeof FINANCE_HEADERS !== 'undefined');
+  var headers   = isFinance
+    ? Object.assign({}, FINANCE_HEADERS, { 'Prefer': 'return=minimal', 'Content-Type': 'application/json' })
+    : Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' });
+
+  var actor = '';
+  if (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) {
+    actor = HOUSING_SESSION.email || HOUSING_SESSION.name || '';
+  } else if (typeof window !== 'undefined' && window.currentRole) {
+    actor = window.currentRole;
+  }
+
+  var now = new Date().toISOString();
+  var detail = entry.detail || {};
+  var detailStr = typeof detail === 'string' ? detail : JSON.stringify(detail);
+
+  var row, table;
+
+  if (isFinance) {
+    table = 'finance_audit_log';
+    // Columns confirmed: id(auto), nation_id, occurred_at, actor_email,
+    // actor_role, action, entity_type, entity_id, tenant_id, summary, detail
+    var entityId = entry.entity_id || null;
+    var uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (entityId && !uuidRe.test(String(entityId))) entityId = null;
+    row = {
+      nation_id:   (typeof _NATION === 'function') ? _NATION() : 'clfn',
+      actor_email: actor,
+      actor_role:  (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION.role : null,
+      action:      entry.action || 'unknown',
+      entity_type: entry.entity_type || 'unknown',
+      entity_id:   entityId,
+      tenant_id:   null, // FK race — always embed in detail instead
+      summary:     entry.summary || '(no summary)',
+      detail:      detailStr,
+      occurred_at: now
+    };
+  } else {
+    table = 'housing_audit_log';
+    // Columns: entity_type, entity_id, action, detail (JSON string), actor, created_at
+    row = {
+      entity_type: entry.entity_type || 'unknown',
+      entity_id:   String(entry.entity_id || ''),
+      action:      entry.action || 'unknown',
+      detail:      detailStr,
+      actor:       actor,
+      created_at:  now
+    };
+  }
+
+  fetch(SUPABASE_URL + '/rest/v1/' + table, {
+    method:  'POST',
+    headers: headers,
+    body:    JSON.stringify([row])
+  }).then(function(r) {
+    if (!r.ok) {
+      r.text().then(function(t) {
+        console.warn('[audit] ' + table + ' rejected HTTP ' + r.status + ':', t);
+      });
+    } else {
+      console.log('[audit] ' + table + ' OK');
+    }
+  }).catch(function(e) {
+    console.warn('[audit] ' + table + ' network error:', e.message);
+  });
+}
