@@ -81,7 +81,8 @@
 
 /* User management table */
 .user-table  { width: 100%; border-collapse: collapse; font-size: 13px; }
-.user-table th { background: var(--dark); color: #fff; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
+.user-table thead tr { border-bottom: 2px solid var(--yellow); }
+.user-table th { background: var(--dark2); color: #888; padding: 9px 14px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }
 .user-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
 .user-table tr:hover td { background: var(--bg); }
 .user-role-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; background: var(--dark2); color: #ccc; }
@@ -160,7 +161,7 @@
 .int-badge        { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
 
 /* Scorecard */
-.sc-th           { background: var(--dark); color: #fff; padding: 8px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
+.sc-th           { background: var(--dark2); color: #888; padding: 9px 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }
 .sc-th-applicant { min-width: 200px; }
 .sc-th-total     { min-width: 80px; text-align: right; }
 .sc-td-applicant { font-weight: 600; }
@@ -261,3 +262,13 @@
 
 /* Finance info boxes and table wrappers */
 
+
+/* ── Applications table — standard shared table style ─────────────────── */
+/* Explicit here to ensure correct styling regardless of CSS load order     */
+.dash-table-wrap       { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.dash-table            { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dash-table thead tr   { border-bottom: 2px solid var(--yellow); }
+.dash-table th         { padding: 9px 14px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #888; background: var(--dark2); }
+.dash-table td         { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.dash-table tbody tr:last-child td { border-bottom: none; }
+.dash-table tbody tr:hover td      { background: var(--surface); }
