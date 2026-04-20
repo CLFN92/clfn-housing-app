@@ -1571,8 +1571,8 @@ function populateSettings(){
   // Show and render the scoring model section
   var sms = document.getElementById('scoring_model_section');
   if(sms) sms.style.display = 'block';
-  // V2 scoring editor — ED only
-  if (window.currentRole === ROLE.ED) {
+  // Scoring editor — controlled by editScoreModel authority
+  if (APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole)) {
     renderV2ScoringEditor();
   } else {
     var wrap = document.getElementById('scoring_model_table_wrap');
@@ -2173,7 +2173,7 @@ async function renderHousingUserTable(){
         +'<td style="padding:10px 12px;"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+rc+'22;color:'+rc+';">'+rl+'</span></td>'
         +'<td style="padding:10px 12px;text-align:right;">'
         +(isMe ? '<span style="font-size:11px;color:var(--muted);">You</span>'
-          : (window.currentRole=== ROLE.ED
+          : (APPROVAL_AUTHORITY.can('manageStaff', window.currentRole)
             ? '<div style="display:flex;gap:6px;justify-content:flex-end;">'
               +'<button onclick="_sbEditStaffModal('+u.id+')" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;">Edit</button>'
               +'<button onclick="deactivateStaff('+u.id+',this)" style="background:none;border:1px solid #fecaca;color:#b91c1c;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;">Deactivate</button>'

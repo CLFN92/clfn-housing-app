@@ -3518,7 +3518,7 @@ function renderNosTable() {
   var bedLabels = {'0':'Studio / 0 bedrooms','1':'1 bedroom','2':'2 bedrooms','3':'3 bedrooms','4':'4 bedrooms','5':'5+ bedrooms'};
   var nos = defaults;
   try { if(typeof getNosTable === 'function') nos = getNosTable(); } catch(e) { nos = defaults; }
-  var isED = (window.currentRole === ROLE.ED);
+  var isED = APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole);
   tbody.innerHTML = Object.keys(bedLabels).map(function(beds) {
     var maxPeople = (nos[beds] !== undefined) ? nos[beds] : defaults[beds];
     var label = bedLabels[beds];
@@ -3534,7 +3534,7 @@ function renderNosTable() {
 
 
 function saveNosTable() {
-  if(window.currentRole !== ROLE.ED) {
+  if(!APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole)) {
     showToast('Only the Executive Director can update the NOS table.');
     return;
   }
@@ -5120,7 +5120,7 @@ function openUnitEditModal(unitId){
   var archWrap = document.getElementById('ue_archive_btn_wrap');
   if(archWrap) {
     var role = window.currentRole || 'housing_employee_l1';
-    if(role === ROLE.ED) {
+    if(APPROVAL_AUTHORITY.can('editScoreModel', role)) {
       if(u.archived) {
         archWrap.innerHTML = '<button type="button" onclick="unarchiveUnit(\''+unitId.replace(/'/g,"\\'")+'\')" style="background:none;border:1.5px solid #888;color:#888;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">📤 Restore Unit</button>';
       } else {
@@ -6068,7 +6068,7 @@ document.addEventListener('keydown', function(e) {
 
 // ── Save ED adjustment ──
 function saveEdAdjustment(){
-  if(window.currentRole !== ROLE.ED){ showToast('Only the Executive Director can apply adjustments.'); return; }
+  if(!APPROVAL_AUTHORITY.can('applyScoreAdjustment', window.currentRole)){ showToast('Only the Executive Director can apply adjustments.'); return; }
   var app = window._currentScorecardApp;
   if(!app){ showToast('No application selected.'); return; }
   var pts = parseInt((document.getElementById('sc_ed_adj_pts')||{}).value||0)||0;
@@ -7433,7 +7433,7 @@ function renderApprovalAuthorityPanel() {
   var container = document.getElementById('approval_authority_body');
   if (!container) return;
 
-  if (window.currentRole !== ROLE.ED) {
+  if (!APPROVAL_AUTHORITY.can('editApprovalAuthority', window.currentRole)) {
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">Only the Executive Director can edit approval authorities.</div>';
     return;
   }
@@ -7607,7 +7607,7 @@ function showSettingsSection(section) {
   if(section==='sec_app_scoring') {
     // ED sees the V2 editor (object-based model with tier threshold controls).
     // Other roles see a read-only message (populateSettings handles that on initial load).
-    if(window.currentRole === ROLE.ED && typeof renderV2ScoringEditor === 'function') {
+    if(APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole) && typeof renderV2ScoringEditor === 'function') {
       renderV2ScoringEditor();
     } else {
       var wrap = document.getElementById('scoring_model_table_wrap');
@@ -7895,7 +7895,7 @@ function getAppType() {
 
 // ── Settings role locks ──
 function applySettingsRoleLocks() {
-  var isED = (window.currentRole === ROLE.ED);
+  var isED = APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole);
   var locked = !isED;
 
   // Selectors for all score/budget editable inputs
@@ -8016,7 +8016,7 @@ function confirmResetScoringModelED() {
   });
 }
 function openAddCriteriaModalED() {
-  if(window.currentRole !== ROLE.ED) { showToast('Only the Executive Director can add scoring criteria.'); return; }
+  if(!APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole)) { showToast('Only the Executive Director can add scoring criteria.'); return; }
   openAddCriteriaModal();
 }
 
@@ -12261,7 +12261,7 @@ async function loadAppDataFromSupabase() {
 // ══════════════════════════════════════════════════════════════
 
 function showAddHousingStaff() {
-  var isED = window.currentRole === ROLE.ED;
+  var isED = APPROVAL_AUTHORITY.can('manageStaff', window.currentRole);
   var modal = document.getElementById('globalModal') || document.getElementById('approvalModal');
   // Use the existing showToast + a custom modal approach
   // Build inline modal
@@ -12435,11 +12435,11 @@ async function submitAddHousingStaff() {
   if(!email||!email.includes('@')) { showToast('Please enter a valid email address'); return; }
   if(!email.endsWith('@clfn.on.ca')) { showToast('Only @clfn.on.ca email addresses can be registered'); return; }
 
-  // Role-based add-staff gate. HM can only add HE-L1 or HE-L2. ED can add any role.
-  if(window.currentRole === ROLE.HOUSING_MANAGER){
+  // Role-based add-staff gate. Only full staff managers can add any role.
+  if(APPROVAL_AUTHORITY.can('manageStaff', window.currentRole) && !APPROVAL_AUTHORITY.can('editApprovalAuthority', window.currentRole)){
     var allowedForHm = ['housing_employee_l1','housing_employee_l2'];
     if(allowedForHm.indexOf(role) === -1){
-      showToast('Housing managers can only add Housing Employees. Only the ED can add other roles.');
+      showToast('Your role can only add Housing Employees. Only the Executive Director can add other roles.');
       return;
     }
   }
