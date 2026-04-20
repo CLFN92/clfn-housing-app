@@ -236,7 +236,7 @@ var APPROVAL_AUTHORITY = (function() {
       approveSowUnderThreshold: 'Approve SOW under threshold',
       approveSowOverThreshold:  'Approve SOW over threshold',
       lockSow:                  'Lock completed SOW',
-      recommendContractor:      'Recommend contractor to ED',
+      recommendContractor:      'Approve contractor (first stage — HM)',
       approveContractor:        'Final contractor approval',
       declineContractor:        'Decline contractor',
       editScoreModel:           'Edit scoring model',
