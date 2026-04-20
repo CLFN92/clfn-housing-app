@@ -2790,7 +2790,12 @@ function _diffCollection(prev, next, toRow){
   // (charge, payment, type, method etc.) from causing spurious re-upserts.
   function sig(x) {
     if (!toRow) return JSON.stringify(x);
-    try { var r = toRow(x); return r ? JSON.stringify(r) : JSON.stringify(x); } catch(e) { return JSON.stringify(x); }
+    try {
+      var r = toRow(x);
+      // null means 'skip this row entirely' — use a fixed sentinel so it
+      // never appears to have changed vs itself
+      return r ? JSON.stringify(r) : '__SKIP__';
+    } catch(e) { return JSON.stringify(x); }
   }
   var prevMap = {}; (prev||[]).forEach(function(x){ if (x && x.id) prevMap[x.id] = x; });
   var nextMap = {}; (next||[]).forEach(function(x){ if (x && x.id) nextMap[x.id] = x; });
@@ -2816,7 +2821,10 @@ function _upsertRows(table, rows){
   return fetch(SUPABASE_URL + '/rest/v1/' + table, {
     method: 'POST', headers: headers, body: JSON.stringify(rows)
   }).then(function(r){
-    if (!r.ok) return r.text().then(function(t){ throw new Error(table + ' upsert ' + r.status + ': ' + t); });
+    if (!r.ok) return r.text().then(function(t){
+      console.error('[finance] UPSERT FAILED', table, r.status, t, 'rows:', JSON.stringify(rows));
+      throw new Error(table + ' upsert ' + r.status + ': ' + t);
+    });
   });
 }
 
