@@ -79,12 +79,7 @@
 .settings-form-row { grid-column: span 2; }
 .settings-save-btn { margin-top: 20px; }
 
-/* User management table */
-.user-table  { width: 100%; border-collapse: collapse; font-size: 13px; }
-.user-table thead tr { border-bottom: 2px solid var(--yellow); }
-.user-table th { background: var(--dark2); color: #888; padding: 9px 14px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }
-.user-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-.user-table tr:hover td { background: var(--bg); }
+/* user-table — now aliased to std-table in shared.css */
 .user-role-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; background: var(--dark2); color: #ccc; }
 .user-actions    { display: flex; gap: 6px; }
 .add-user-row    { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-top: 16px; }
@@ -127,9 +122,7 @@
 .doc-meta    { font-size: 12px; color: #888; margin-top: 8px; }
 .doc-section { margin: 20px 0; }
 .doc-flow    { display: flex; flex-direction: column; gap: 12px; }
-.doc-table   { width: 100%; border-collapse: collapse; font-size: 12px; }
-.doc-table th { background: #f5f5f3; padding: 8px 10px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; }
-.doc-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+/* doc-table — now aliased to std-table in shared.css */
 .doc-tag     { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; background: var(--yellow-light); color: #7a6000; font-weight: 600; }
 
 /* Signature widget */

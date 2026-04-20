@@ -169,7 +169,7 @@
   </div>
 
   <!-- Stats -->
-  <div class="dash-stats" style="grid-template-columns:repeat(5,1fr);display:grid;gap:12px;">
+  <div class="dash-stats">
     <div class="stat-card">
       <div class="stat-num" id="ds_total">0</div>
       <div class="stat-lbl">Total Applications</div>
@@ -203,7 +203,7 @@
 
 
   <!-- Housing Match Stats -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+  <div class="dash-match-stats">
     <div class="stat-card" style="border-left:3px solid #15803d;">
       <div class="stat-num" id="ds_vacant_count" style="font-size:24px;color:#15803d;">—</div>
       <div class="stat-lbl">Vacant Units</div>
@@ -294,7 +294,7 @@
 <!-- ── STEP PROGRESS BAR ── -->
 <div id="stepProgressBar" style="background:#fff;border-bottom:1px solid #e5e5e5;padding:0;display:none;">
   <!-- Back button row — matches the pattern used on every other view (yellow pill, flush-left, under the app header). -->
-  <div class="page-back-row" style="margin:12px 16px 10px 16px;">
+  <div class="page-back-row">
     <button type="button" onclick="closeApplicationForm()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
@@ -558,7 +558,7 @@
                   <div style="font-size:11px;font-weight:700;color:var(--yellow);margin-bottom:8px;text-transform:uppercase;letter-spacing:.6px;">National Occupancy Standard (NOS)</div>
                   <div style="font-size:11px;color:var(--text);line-height:1.6;margin-bottom:10px;">The NOS defines the appropriate number of bedrooms for a household. A dwelling is considered overcrowded when the number of people exceeds what the NOS allows for that bedroom count.</div>
                   <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Bedroom Guide (NOS)</div>
-                  <table style="width:100%;font-size:11px;border-collapse:collapse;">
+                  <table class="std-table">
                     <tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">Bachelor / Studio</td><td style="padding:4px 6px;font-weight:600;">1 person</td></tr>
                     <tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">1 Bedroom</td><td style="padding:4px 6px;font-weight:600;">1–2 persons</td></tr>
                     <tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">2 Bedrooms</td><td style="padding:4px 6px;font-weight:600;">2–4 persons</td></tr>
@@ -979,12 +979,12 @@
       </div>
       <div id="user_lookup_result" style="display:none;"></div>
       <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px;">
-        <table style="width:100%;border-collapse:collapse;min-width:320px;">
+        <table class="std-table" style="min-width:320px;">
           <thead><tr>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--yellow);">Name</th>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--yellow);">Email</th>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--yellow);">Housing Role</th>
-            <th style="padding:8px 12px;border-bottom:1px solid var(--yellow);"></th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Housing Role</th>
+            <th></th>
           </tr></thead>
           <tbody id="userTableBody"></tbody>
         </table>
@@ -1058,8 +1058,8 @@
         <button type="button" id="settings_save_unit_btn" onclick="saveUnitScoreModelED()" style="background:var(--yellow);border:none;color:#111;padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save</button>
       </div>
       <div style="padding:20px;display:flex;flex-direction:column;gap:0;">
-        <table style="width:100%;border-collapse:collapse;">
-          <thead><tr style="border-bottom:2px solid var(--border);">
+        <table class="std-table">
+          <thead><tr>
             <th>Factor</th>
             <th>Condition</th>
             <th style="text-align:center;">Points</th>
@@ -1086,8 +1086,8 @@
         </div>
       </div>
       <div style="padding:20px;">
-        <table style="width:100%;border-collapse:collapse;">
-          <thead><tr style="border-bottom:2px solid var(--border);">
+        <table class="std-table">
+          <thead><tr>
             <th>Category</th>
             <th>Condition</th>
             <th style="text-align:center;">Points</th>
@@ -1123,8 +1123,8 @@
         </div>
       </div>
       <div style="padding:20px;">
-        <table style="width:100%;border-collapse:collapse;">
-          <thead><tr style="border-bottom:2px solid var(--border);">
+        <table class="std-table">
+          <thead><tr>
             <th>Fund Source</th>
             <th style="text-align:right;">Annual Allocation ($)</th>
             <th>Notes</th>
@@ -1152,7 +1152,7 @@
         <button type="button" onclick="renderAuditLog()" style="background:none;border:1px solid #444;color:#888;padding:6px 12px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;">↻ Refresh</button>
       </div>
       <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;min-width:640px;">
+        <table class="std-table" style="min-width:640px;">
           <thead><tr style="border-bottom:2px solid var(--border);background:var(--bg);">
             <th>Date / Time</th>
             <th>ID / Ref</th>
@@ -1194,7 +1194,7 @@
         A household is considered <strong>overcrowded</strong> when the total number of people exceeds the NOS maximum for their current home.
         Each person over the standard earns 1 point (up to 10 pts) on their application score.
       </div>
-      <table style="width:100%;border-collapse:collapse;max-width:480px;">
+      <table class="std-table" style="max-width:480px;">
         <thead>
           <tr style="border-bottom:2px solid var(--border);">
             <th>Bedroom Count</th>
@@ -1260,20 +1260,20 @@
       <h1>Housing Inventory</h1>
       <p>All <span id="inv_count">—</span> CLFN housing units — <span id="inv_vacant_count" style="color:#15803d;font-weight:600;">—</span> vacant</p>
     </div>
-    <div class="phb-actions">
-      <input id="inv_search" type="text" placeholder="🔍 Search address..." oninput="renderInventoryView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);min-width:180px;"/>
-      <select id="inv_filter_status" onchange="renderInventoryView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
-        <option value="">All Statuses</option><option value="vacant">Vacant</option><option value="occupied">Occupied</option><option value="under_repair">Under Repair</option><option value="reserved">Reserved</option><option value="condemned">Condemned</option><option value="archived">Archived</option>
-      </select>
-      <select id="inv_filter_type" onchange="renderInventoryView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
-        <option value="">All Types</option><option value="detached">Detached</option><option value="duplex">Duplex</option><option value="plex">Multi-unit</option><option value="complex">Complex</option><option value="mobile">Mobile</option>
-      </select>
-      <select id="inv_filter_access" onchange="renderInventoryView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
-        <option value="">Accessibility: All</option><option value="yes">Accessible Only</option><option value="no">Non-Accessible</option>
-      </select>
-    </div>
   </div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;" id="inv_stat_chips_row">
+  <div class="filter-bar">
+    <input id="inv_search" type="text" placeholder="🔍 Search address..." oninput="renderInventoryView()"/>
+    <select id="inv_filter_status" onchange="renderInventoryView()">
+      <option value="">All Statuses</option><option value="vacant">Vacant</option><option value="occupied">Occupied</option><option value="under_repair">Under Repair</option><option value="reserved">Reserved</option><option value="condemned">Condemned</option><option value="archived">Archived</option>
+    </select>
+    <select id="inv_filter_type" onchange="renderInventoryView()">
+      <option value="">All Types</option><option value="detached">Detached</option><option value="duplex">Duplex</option><option value="plex">Multi-unit</option><option value="complex">Complex</option><option value="mobile">Mobile</option>
+    </select>
+    <select id="inv_filter_access" onchange="renderInventoryView()">
+      <option value="">Accessibility: All</option><option value="yes">Accessible Only</option><option value="no">Non-Accessible</option>
+    </select>
+  </div>
+  <div class="chip-row" id="inv_stat_chips_row" style="align-items:center;">
     <div style="display:flex;gap:10px;flex-wrap:wrap;" id="inv_stat_chips"></div>
     <button type="button" onclick="openAddUnitModal()" style="background:var(--yellow);border:none;color:#111;padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;margin-left:4px;">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Unit
@@ -1282,7 +1282,7 @@
   <div class="card" style="padding:0;overflow:hidden;">
     <div style="overflow-x:auto;">
       <table class="std-table" style="width:100%;min-width:640px;table-layout:fixed;">
-        <thead><tr style="background:var(--dark2);border-bottom:2px solid var(--yellow);">
+        <thead><tr>
           <th>Address</th>
           <th style="width:50px;text-align:center;">Beds</th>
           <th style="width:50px;text-align:center;">Bath</th>
@@ -1314,19 +1314,19 @@
       <p>Applicants ranked by score matched against vacant units</p>
     </div>
   </div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-    <input id="match_search" type="text" placeholder="🔍 Search applicant..." oninput="renderMatchView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);min-width:200px;"/>
-    <select id="match_filter_tier" onchange="renderMatchView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
+  <div class="filter-bar">
+    <input id="match_search" type="text" placeholder="🔍 Search applicant..." oninput="renderMatchView()"/>
+    <select id="match_filter_tier" onchange="renderMatchView()">
       <option value="">All Priority Tiers</option><option value="Critical Priority">Critical Priority</option><option value="High Priority">High Priority</option><option value="Medium Priority">Medium Priority</option><option value="Low Priority">Low Priority</option>
     </select>
-    <select id="match_filter_status" onchange="renderMatchView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
+    <select id="match_filter_status" onchange="renderMatchView()">
       <option value="">All Statuses</option><option value="submitted">Submitted</option><option value="ed_approved">ED Approved</option><option value="mgr_approved">Manager Approved</option>
     </select>
-    <select id="match_filter_reserve" onchange="renderMatchView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
+    <select id="match_filter_reserve" onchange="renderMatchView()">
       <option value="">All Reserve</option><option value="On Reserve">On Reserve</option><option value="Off Reserve">Off Reserve</option>
     </select>
   </div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;" id="match_chips"></div>
+  <div class="chip-row" id="match_chips"></div>
   <div id="match_content"></div>
 </div><!-- end matchView -->
 
@@ -1349,7 +1349,7 @@
       </button>
     </div>
   </div>
-  <div class="filter-bar" style="margin-bottom:16px;">
+  <div class="filter-bar">
     <input id="tenant_search" type="text" placeholder="🔍 Search name or address..." oninput="renderTenantsView()" style="width:360px;max-width:100%;padding:9px 14px;font-size:13px;border:1.5px solid var(--border);border-radius:8px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>
   </div>
   <div class="card" style="padding:0;overflow:hidden;">
@@ -1813,7 +1813,7 @@
         </div>
         <div id="sow_audit_body" style="display:none;">
           <div style="padding:0 0 4px 0;">
-            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <table class="std-table">
               <thead>
                 <tr style="background:var(--bg);border-bottom:1px solid var(--border);">
                   <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);white-space:nowrap;">Time</th>
@@ -6160,7 +6160,7 @@ function printScorecard(){
     +'<div style="width:1px;height:40px;background:#333;"></div>'
     +'<div><div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:6px;">Priority Tier</div><div style="font-size:13px;font-weight:700;padding:6px 14px;border-radius:6px;background:'+tierBg2+';color:'+tierColor2+';">'+(app.tier||'—')+'</div></div>'
     +'<div style="flex:1;"><div style="font-size:9px;color:#888;margin-bottom:4px;">Score Bar</div><div style="height:6px;background:#333;border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+Math.min(100,Math.max(0,Math.round((s/Math.max(100,(_t.critical||80)*1.25))*100)))+'%;background:'+tierColor2+';border-radius:3px;"></div></div></div></div>'
-    +'<table style="width:100%;border-collapse:collapse;border:1px solid #eee;margin-bottom:16px;">'
+    +'<table class="std-table" style="margin-bottom:16px;">'
     +'<thead><tr style="background:#111;border-bottom:2px solid #F8E41A;"><th style="padding:8px 12px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:#888;font-weight:700;">Category</th><th style="padding:8px 12px;text-align:right;font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:#888;font-weight:700;width:60px;">Score</th></tr></thead>'
     +'<tbody>'+tableRows+'</tbody>'
     +'<tfoot><tr style="background:#f5f5f3;border-top:2px solid #111;"><td style="padding:10px 12px;font-weight:700;">Total</td><td style="padding:10px 12px;text-align:right;font-size:18px;font-weight:700;">'+(s>0?'+':'')+s+'</td></tr></tfoot></table>'
@@ -6196,7 +6196,7 @@ function previewFromDash(app){
       +'<div style="font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;'
       +'color:#555;border-bottom:2.5px solid #F8E41A;padding-bottom:3px;margin-bottom:0;">'
       +title+'</div>'
-      +'<table style="width:100%;border-collapse:collapse;">'+body+'</table>'
+      +'<table class="std-table">'+body+'</table>'
       +'</div>';
   }
   function yn(v) { return v ? 'Yes' : 'No'; }
@@ -6856,7 +6856,7 @@ function udpRenderSowTable(unitId){
       +'</tr>';
   }).join('');
 
-  wrap.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-family:DM Sans,sans-serif;">'
+  wrap.innerHTML = '<div style="overflow-x:auto;"><table class="std-table">'
     +'<thead><tr style="background:var(--bg);"><th style="padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;">Date</th>'
     +'<th style="padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;">Status</th>'
     +'<th style="padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;">Amount</th>'
@@ -7488,7 +7488,7 @@ function renderWlTable(apps, showScore, showReview) {
       + '</tr>';
   }).join('');
 
-  return '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+  return '<div style="overflow-x:auto;"><table class="std-table">'
     + '<thead><tr style="background:var(--dark);">'
     + '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Applicant</th>'
     + '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">ID</th>'
@@ -9523,7 +9523,7 @@ function printApplicationPreview() {
       +'<div style="font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;'
       +'color:#555;border-bottom:2.5px solid #F8E41A;padding-bottom:3px;margin-bottom:0;">'
       +title+'</div>'
-      +'<table style="width:100%;border-collapse:collapse;">'+body+'</table>'
+      +'<table class="std-table">'+body+'</table>'
       +'</div>';
   }
   function yn(v) { return v ? 'Yes' : 'No'; }
@@ -11696,7 +11696,7 @@ function exportRenoApprovalsPDF() {
       +'<div style="text-align:right;font-size:9px;color:#aaa;">'+today+'<br/>'+relevant.length+' units<br/>Filter: '+(_raFilter||'All')+'</div>'
     +'</div>'
     +'<div style="background:#F8E41A;height:3px;margin-bottom:14px;"></div>'
-    +'<table style="width:100%;border-collapse:collapse;">'
+    +'<table class="std-table">'
       +'<thead><tr style="background:#111;">'
         +'<th style="padding:8px 10px;text-align:left;font-size:9px;color:#F8E41A;text-transform:uppercase;letter-spacing:.06em;">Address</th>'
         +'<th style="padding:8px 8px;text-align:center;font-size:9px;color:#F8E41A;text-transform:uppercase;letter-spacing:.06em;width:60px;">Score</th>'

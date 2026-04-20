@@ -345,9 +345,8 @@ body {
 .dash-filters select:focus, .dash-filters input:focus,
 .filter-bar select:focus,   .filter-bar input:focus { border-color: var(--yellow); outline: none; }
 
-/* matchView bare filter div — selects and inputs inside any flex filter row */
-#matchView > div > select,
-#matchView > div > input  { width: auto; min-width: 0; box-sizing: border-box; }
+/* Chip rows — status filter chips below filter-bar */
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; align-items: center; }
 
 /* Application type card text */
 .appty-title           { font-weight: 700; font-size: 13px; }
@@ -423,6 +422,10 @@ body {
   display: grid; grid-template-columns: repeat(4,1fr);
   gap: 14px; margin-bottom: 20px;
 }
+/* Dashboard stat grids */
+.dash-stats       { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.dash-match-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
 .stat-card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 16px 20px;
@@ -701,6 +704,8 @@ input:focus, select:focus, textarea:focus {
 @media (max-width: 960px) {
   .main                { padding: 24px 20px; }
   .page-view, .page-view-wide { padding: 20px; }
+  .dash-stats       { grid-template-columns: repeat(3, 1fr); }
+  .dash-match-stats { grid-template-columns: repeat(2, 1fr); }
   .sidebar             { width: 180px; min-width: 180px; }
   .dash-stats          { grid-template-columns: 1fr 1fr; }
   .fg.c3, .c3          { grid-template-columns: 1fr 1fr; }
@@ -748,6 +753,8 @@ input:focus, select:focus, textarea:focus {
   .fg.c2, .fg.c3, .c2, .c3 { grid-template-columns: 1fr !important; }
   .sig-row-2           { grid-template-columns: 1fr; }
   .dash-stats          { grid-template-columns: 1fr 1fr !important; gap: 10px; }
+  .dash-match-stats    { grid-template-columns: 1fr 1fr !important; gap: 10px; }
+  .chip-row            { gap: 6px; }
   /* Tables */
   .col-hide-mobile     { display: none; }
   #inv_table th:nth-child(7), #inv_table td:nth-child(7) { display: none; }
@@ -773,8 +780,9 @@ input:focus, select:focus, textarea:focus {
   .tic-4col                   { grid-template-columns: 1fr 1fr !important; }
   .action-sub                 { display: none; }
   /* Filters — stack on mobile */
-  .dash-filters, .filter-bar  { gap: 6px; }
-  .dash-filters input, .filter-bar input { min-width: 100%; }
+  .dash-filters, .filter-bar  { gap: 6px; flex-direction: column; }
+  .dash-filters input, .filter-bar input,
+  .dash-filters select, .filter-bar select { min-width: 100%; max-width: 100%; }
   /* Back button — bigger tap target on mobile */
   .page-back-row   { padding-top: 12px; }
   .back-btn-yellow { padding: 9px 18px; font-size: 13px; }
@@ -787,6 +795,7 @@ input:focus, select:focus, textarea:focus {
   .main                { padding: 10px 10px; }
   .card                { padding: 12px 10px; }
   .dash-stats          { grid-template-columns: 1fr !important; }
+  .dash-match-stats    { grid-template-columns: 1fr 1fr !important; }
   .modal-footer        { flex-direction: column; }
   .modal-footer .btn   { width: 100%; justify-content: center; }
   .home-welcome        { font-size: 19px !important; }
@@ -815,12 +824,18 @@ input:focus, select:focus, textarea:focus {
 .std-table-hdr        { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); gap: 8px; flex-wrap: wrap; }
 .std-table-count      { font-size: 11px; font-weight: 700; color: var(--muted); }
 .std-table            { width: 100%; border-collapse: collapse; font-size: 13px; }
-.std-table thead tr   { border-bottom: 2px solid var(--yellow); }
+.std-table thead tr   { border-bottom: 2px solid var(--yellow); background: var(--dark2); }
 .std-table th         { padding: 9px 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #888; text-align: left; background: var(--dark2); }
 .std-table td         { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .std-table tr:last-child td { border-bottom: none; }
 .std-table tr.clickable { cursor: pointer; }
 .std-table tr.clickable:hover td { background: var(--surface); }
+/* Aliases — legacy class names mapped to std-table pattern */
+.user-table, .doc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.user-table thead tr, .doc-table thead tr { border-bottom: 2px solid var(--yellow); }
+.user-table th, .doc-table th { padding: 9px 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #888; text-align: left; background: var(--dark2); }
+.user-table td, .doc-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.user-table tr:hover td, .doc-table tr:hover td { background: var(--surface); }
 .empty-row { }
 .std-table tr.empty-row td,
 tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
