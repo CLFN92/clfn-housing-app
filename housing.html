@@ -1993,28 +1993,13 @@
       <!-- Budget Approval Indicator (shown when SOW cost exists) -->
       <div id="ue_budget_indicator" style="display:none;padding:12px 14px;border-radius:8px;font-size:12px;"></div>
 
-      <!-- Tenant -->
+      <!-- Tenant signatures -->
       <div id="ue_sig_section">
-        <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Tenant</div>
-        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-            <div style="width:32px;height:32px;border-radius:50%;background:var(--yellow);color:#111;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">T</div>
-            <div>
-              <div id="ue_tenant_display_name" style="font-size:14px;font-weight:700;color:var(--text);">Vacant</div>
-              <div id="ue_tenant_display_meta" style="font-size:11px;color:var(--muted);margin-top:1px;">No tenant assigned</div>
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="f">
-              <label>Tenant Name</label>
-              <input type="text" id="ue_sig_tenant_name" placeholder="Vacant" style="background:var(--bg);"/>
-            </div>
-            <div class="f">
-              <label>Move-in Date</label>
-              <input type="date" id="ue_sig_tenant_date"/>
-            </div>
-          </div>
-        </div>
+        <!-- Hidden inputs kept for compatibility -->
+        <input type="hidden" id="ue_sig_tenant_name"/>
+        <input type="hidden" id="ue_tenant_display_name"/>
+        <input type="hidden" id="ue_tenant_display_meta"/>
+        <input type="date" id="ue_sig_tenant_date" style="display:none;"/>
 
         <!-- HM approval signature (shown when SOW requires HM or ED approval) -->
         <div id="ue_sig_hm_block" style="display:none;margin-top:12px;background:var(--bg);border:1.5px solid #1d4ed8;border-radius:8px;padding:14px;">
@@ -5304,9 +5289,11 @@ function ueTenantSearch(q) {
   var apps = typeof applications !== 'undefined' ? applications : [];
   var role = window.currentRole || 'housing_employee_l1';
 
-  // Show ed_approved to all roles; also mgr_approved for HM and ED
+  // Show ed_approved, hm_approved (file update approved), and mgr_approved for HM/ED
   var eligible = apps.filter(function(a) {
+    if (a.archived) return false;
     if (a.status === APP_STATUS.ED_APPROVED) return true;
+    if (a.status === 'hm_approved') return true;  // File Update Approved
     if ((ROLE.isManagement(role)) && a.status === APP_STATUS.MGR_APPROVED) return true;
     return false;
   });
@@ -10995,9 +10982,12 @@ function openAssignModal(appId, suggestedUnitId) {
   document.getElementById('am_app_name').textContent  = name;
   document.getElementById('am_app_id').textContent    = app.id;
   var scoreEl = document.getElementById('am_app_score');
-  if(scoreEl) scoreEl.textContent = (app.score||0)+' pts · '+(app.tier||'—').replace(' Priority','');
-  var statusLabels={ed_approved:'ED Approved',mgr_approved:'HM Recommended',submitted:'Pending HM Review'};
-  var statusColors={ed_approved:'#15803d',mgr_approved:'#1d4ed8',submitted:'#92400e'};
+  var isFileUpdate = app.appType==='existing_tenant'||app.status==='hm_approved';
+  if(scoreEl) scoreEl.textContent = isFileUpdate
+    ? 'File Update'
+    : (app.score||0)+' pts · '+(app.tier||'—').replace(' Priority','');
+  var statusLabels={ed_approved:'ED Approved',mgr_approved:'HM Recommended',hm_approved:'File Update Approved',submitted:'Pending HM Review'};
+  var statusColors={ed_approved:'#15803d',mgr_approved:'#1d4ed8',hm_approved:'#15803d',submitted:'#92400e'};
   var statusEl=document.getElementById('am_app_status');
   if(statusEl){ statusEl.textContent=statusLabels[app.status]||app.status; statusEl.style.color=statusColors[app.status]||'#888'; }
   var reqs=[needsBeds+' bed'+(needsBeds!==1?'s':'')+' needed'];
