@@ -5283,18 +5283,17 @@ function saveUnitEdit(){
     var role2 = window.currentRole||'housing_employee_l1';
     if(linkedApp2) {
       var appStatus = linkedApp2.status||'';
-      var edApproved   = appStatus===APP_STATUS.ED_APPROVED;
-      var fileApproved = appStatus==='hm_approved';
-      var hmApproved   = appStatus===APP_STATUS.MGR_APPROVED||edApproved||fileApproved||appStatus==='assigned';
-      if(role2=== ROLE.ED && !edApproved && !fileApproved && appStatus!=='assigned') {
-        showToast('⚠ ED Approval required before assigning tenant. Application is: '+appStatus.replace(/_/g,' '));
+      var appFullyApproved = appStatus===APP_STATUS.ED_APPROVED||appStatus==='hm_approved'||appStatus==='assigned';
+      var appHMApproved    = appStatus===APP_STATUS.MGR_APPROVED||appFullyApproved;
+      if(APPROVAL_AUTHORITY.can('finalApproveApp', role2) && !appFullyApproved) {
+        showToast('⚠ Final approval required before assigning tenant. Application is: '+appStatus.replace(/_/g,' '));
         return;
       }
-      if(role2=== ROLE.HOUSING_MANAGER && !hmApproved) {
-        showToast('⚠ Housing Manager approval required before assigning tenant. Application is: '+appStatus.replace(/_/g,' '));
+      if(APPROVAL_AUTHORITY.can('reviewApplication', role2) && !APPROVAL_AUTHORITY.can('finalApproveApp', role2) && !appHMApproved) {
+        showToast('⚠ Application approval required before assigning tenant. Application is: '+appStatus.replace(/_/g,' '));
         return;
       }
-      u.tenantApprovedBy = role2=== ROLE.ED?'Executive Director':'Housing Manager';
+      u.tenantApprovedBy = role2;
       u.tenantApprovedAt = new Date().toISOString().split('T')[0];
     }
   }
@@ -11319,7 +11318,9 @@ function openAssignModal(appId, suggestedUnitId) {
   // Role badge
   var roleBadge = document.getElementById('am_role_badge');
   if(roleBadge){
-    roleBadge.textContent = role=== ROLE.ED ? 'Executive Director — can override' : role=== ROLE.HOUSING_MANAGER ? 'Housing Manager — notes required' : 'Staff';
+    var _canOvr = APPROVAL_AUTHORITY.can('overrideMatch', role);
+    var _canTied = APPROVAL_AUTHORITY.can('assignTiedBand', role);
+    roleBadge.textContent = _canOvr ? 'Override authority — can assign any unit' : _canTied ? 'Tied band — notes required' : 'Staff';
   }
 
   // Score and rank all vacant units
@@ -11462,9 +11463,12 @@ function amSelectUnit(unitId) {
   var onReq   = document.getElementById('am_notes_req_star');
   var onPlaceholder = document.getElementById('am_override_notes');
 
-  if(role === ROLE.HOUSING_MANAGER) {
+  var canOverride   = APPROVAL_AUTHORITY.can('overrideMatch', role);
+  var canAssignTied = APPROVAL_AUTHORITY.can('assignTiedBand', role);
+
+  if(canAssignTied && !canOverride) {
+    // Reviewer role: can assign within tied band, notes required; cannot override
     if(isTied) {
-      // Tied — HM can select, notes required
       if(ow) ow.style.display = '';
       if(onLabel) { onLabel.textContent = 'Selection Notes (required) — why this unit for this applicant?'; onLabel.style.color = 'var(--text)'; }
       if(onReq)   onReq.style.display = '';
@@ -11472,12 +11476,13 @@ function amSelectUnit(unitId) {
       var cb = document.getElementById('am_confirm_btn');
       if(cb){ cb.textContent='✓ Confirm Selection'; cb.disabled=false; cb.style.opacity='1'; cb.style.cursor='pointer'; cb.style.background='var(--yellow)'; cb.style.color='#111'; }
     } else {
-      // Below tied band — HM cannot override, ED approval required
+      // Below tied band — cannot override
       if(ow) ow.style.display = 'none';
       var cb = document.getElementById('am_confirm_btn');
-      if(cb){ cb.textContent='⛔ ED Approval Required'; cb.disabled=true; cb.style.opacity='1'; cb.style.cursor='not-allowed'; cb.style.background='#fef2f2'; cb.style.color='#b91c1c'; }
+      if(cb){ cb.textContent='⛔ Override Required'; cb.disabled=true; cb.style.opacity='1'; cb.style.cursor='not-allowed'; cb.style.background='#fef2f2'; cb.style.color='#b91c1c'; }
     }
-  } else if(role === ROLE.ED) {
+  } else if(canOverride) {
+    // Override authority: can assign any unit, notes required when below tied band
     if(ow) ow.style.display = isEdOverride ? '' : 'none';
     if(onLabel) onLabel.textContent = 'Override Notes (required) — this unit scores below the top match band.';
     if(onLabel) onLabel.style.color = '#d97706';
@@ -11487,20 +11492,20 @@ function amSelectUnit(unitId) {
     if(ow) ow.style.display = 'none';
   }
 
-  // Accessibility warning (shown alongside whatever state the button is in)
+  // Accessibility warning
   var warn=document.getElementById('am_warn');
   if(warn && u){
     var warnMsgs = [];
     if(needsAccess && !u.accessible) warnMsgs.push('⚠ Applicant requires accessible unit — this unit is not accessible');
-    if(role=== ROLE.HOUSING_MANAGER && !isTied) warnMsgs.push('⛔ This unit scores below the recommended match band — only the Executive Director can assign a lower-scored unit');
+    if(canAssignTied && !canOverride && !isTied) warnMsgs.push('⛔ This unit scores below the recommended match band — override authority required');
     if(warnMsgs.length){
       warn.style.display=''; warn.style.background='#fef2f2'; warn.style.color='#b91c1c';
       warn.textContent = warnMsgs.join(' · ');
     } else { warn.style.display='none'; }
   }
 
-  // Confirm button for ED (HM button already set in branch above)
-  if(role !== ROLE.HOUSING_MANAGER) {
+  // Confirm button for override roles (assignTied role button set in branch above)
+  if(canOverride) {
     var cb = document.getElementById('am_confirm_btn');
     if(cb){
       cb.textContent = isEdOverride ? '✓ Override & Assign' : '✓ Confirm Selection';
@@ -11532,19 +11537,26 @@ function confirmAssignment() {
   var selectedObj2 = _amAllScored.find(function(o){ return o.unit.id === unitId; });
   var selectedScore2 = selectedObj2 ? selectedObj2.score : 0;
   var isTied2 = selectedScore2 >= topScore2 - 1;
-  var isEdOverride2 = role=== ROLE.ED && !isTied2;
+  var canOverride2   = APPROVAL_AUTHORITY.can('overrideMatch', role);
+  var canAssignTied2 = APPROVAL_AUTHORITY.can('assignTiedBand', role);
+  var isOverride2    = !isTied2; // selected unit is below the tied band
 
-  // Hard gate: HM cannot assign outside the tied score band — ED only
-  if(role === ROLE.HOUSING_MANAGER && !isTied2) {
-    showToast('This unit requires Executive Director approval to assign');
+  // Hard gate: assignTied-only roles cannot go below the tied score band
+  if(canAssignTied2 && !canOverride2 && !isTied2) {
+    showToast('This unit requires override authority to assign outside the top match band');
+    return;
+  }
+  // Hard gate: must have at least assignUnit authority
+  if(!APPROVAL_AUTHORITY.can('assignUnit', role)) {
+    showToast('You do not have authority to assign units');
     return;
   }
 
-  // HM always requires notes; ED requires notes only when overriding below tied band
+  // Notes required: assignTied roles always; override roles only when overriding
   var overrideNotes = ((document.getElementById('am_override_notes')||{}).value||'').trim();
-  var needsNotes = (role=== ROLE.HOUSING_MANAGER && isTied2) || isEdOverride2;
+  var needsNotes = (canAssignTied2 && !canOverride2) || (canOverride2 && isOverride2);
   if(needsNotes && !overrideNotes){
-    showToast(role=== ROLE.HOUSING_MANAGER ? 'Please add selection notes before confirming' : 'Please add override notes explaining your selection');
+    showToast(canOverride2 ? 'Please add override notes explaining your selection' : 'Please add selection notes before confirming');
     var notesEl = document.getElementById('am_override_notes');
     if(notesEl) notesEl.focus();
     return;
@@ -11563,9 +11575,14 @@ function confirmAssignment() {
   var app=allApps[appIdx]; var u=allUnits[unitIdx];
   var name=((app.fn||'')+' '+(app.ln||'')).trim();
 
-  // Role gate
-  if(role=== ROLE.ED&&app.status!==APP_STATUS.ED_APPROVED&&app.status!=='hm_approved'){showToast('ED approval required — status: '+app.status.replace(/_/g,' '));return;}
-  if(role=== ROLE.HOUSING_MANAGER&&app.status!==APP_STATUS.MGR_APPROVED&&app.status!==APP_STATUS.ED_APPROVED&&app.status!=='hm_approved'){showToast('HM recommendation required — status: '+app.status.replace(/_/g,' '));return;}
+  // Application approval gate
+  var appReadyForAssign = app.status===APP_STATUS.ED_APPROVED||app.status==='hm_approved'||app.status===APP_STATUS.MGR_APPROVED;
+  if(!appReadyForAssign){showToast('Application must be approved before assigning a unit. Status: '+app.status.replace(/_/g,' '));return;}
+  if(APPROVAL_AUTHORITY.can('finalApproveApp', role) && app.status===APP_STATUS.MGR_APPROVED) {
+    // Final approvers can assign directly from mgr_approved — implicitly grants final approval
+  } else if(!APPROVAL_AUTHORITY.can('finalApproveApp', role) && app.status===APP_STATUS.MGR_APPROVED) {
+    showToast('Application requires final approval before assignment. Status: '+app.status.replace(/_/g,' '));return;
+  }
 
   // Write unit
   var isTransferReq = (app.appType === 'transfer_request');
@@ -11573,7 +11590,7 @@ function confirmAssignment() {
   // For transfer requests: mark new unit as 'reserved' not 'occupied'
   // Tenant stays in current unit until physical move
   u.status = isTransferReq ? 'reserved' : 'occupied';
-  u.tenantApprovedBy=role=== ROLE.ED?'Executive Director':'Housing Manager';
+  u.tenantApprovedBy=role;
   u.tenantApprovedAt=new Date().toISOString().split('T')[0];
   if(overrideNotes) u.assignmentOverrideNotes = overrideNotes;
   if(isTransferReq) u.transferPending = true;
