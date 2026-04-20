@@ -10,7 +10,6 @@
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
 }
-.dash-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 /* Applicant cell — name bold, ID+date muted small below, no date repetition */
 .appl-name { font-size: 13px; font-weight: 600; line-height: 1.3; color: var(--text); }
