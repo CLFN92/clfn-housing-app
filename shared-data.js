@@ -594,21 +594,29 @@ function _ctRenderActions(ct) {
   var status = ct.status || 'pending_review';
   var actions = [];
 
-  if(role === ROLE.HOUSING_MANAGER) {
+  // First-stage: recommend contractor (was HM-only)
+  if(APPROVAL_AUTHORITY.can('recommendContractor', role)) {
     if(status === 'pending_review' || status === 'returned') {
-      actions.push({label:'✅ Recommend to ED', cls:'btn-primary', action:'hm_recommended', needsNotes:false});
-      actions.push({label:'↩ Return for Info',  cls:'btn-ghost',   action:'returned',       needsNotes:true});
-      actions.push({label:'❌ Decline',           cls:'btn-ghost',   action:'declined',       needsNotes:true, danger:true});
+      actions.push({label:'✅ Approve (Stage 1)', cls:'btn-primary', action:'hm_recommended', needsNotes:false});
+      actions.push({label:'↩ Return for Info',    cls:'btn-ghost',   action:'returned',        needsNotes:true});
+      actions.push({label:'❌ Decline',             cls:'btn-ghost',   action:'declined',        needsNotes:true, danger:true});
     }
   }
-  if(role === ROLE.ED) {
+  // Final approval: approve contractor (was ED-only)
+  if(APPROVAL_AUTHORITY.can('approveContractor', role)) {
     if(status === 'hm_recommended' || status === 'pending_review') {
       actions.push({label:'✅ Final Approval',  cls:'btn-primary', action:'approved',  needsNotes:false});
-      actions.push({label:'↩ Return to HM',    cls:'btn-ghost',   action:'returned',  needsNotes:true});
+      actions.push({label:'↩ Return',          cls:'btn-ghost',   action:'returned',  needsNotes:true});
       actions.push({label:'❌ Decline',          cls:'btn-ghost',   action:'declined',  needsNotes:true, danger:true});
     }
     if(status === 'approved') {
       actions.push({label:'⛔ Revoke Approval', cls:'btn-ghost',  action:'declined',  needsNotes:true, danger:true});
+    }
+  }
+  // Decline-only authority
+  if(APPROVAL_AUTHORITY.can('declineContractor', role) && !APPROVAL_AUTHORITY.can('recommendContractor', role) && !APPROVAL_AUTHORITY.can('approveContractor', role)) {
+    if(status !== 'approved' && status !== 'declined') {
+      actions.push({label:'❌ Decline', cls:'btn-ghost', action:'declined', needsNotes:true, danger:true});
     }
   }
 
