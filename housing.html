@@ -4387,7 +4387,8 @@ function renderDashTable(){
     var role=window.currentRole||'housing_employee_l1';
     var canAssignFromDash = !a.assignedUnit && !a.archived
       && (a.status===APP_STATUS.ED_APPROVED && APPROVAL_AUTHORITY.can('assignUnit', role)
-       || a.status==='hm_approved' && APPROVAL_AUTHORITY.can('approveFileUpdate', role));
+       || a.status==='hm_approved' && APPROVAL_AUTHORITY.can('approveFileUpdate', role)
+       || a.status===APP_STATUS.MGR_APPROVED && APPROVAL_AUTHORITY.can('finalApproveApp', role));
     var canReviewFileUpdate = a.status===APP_STATUS.FILE_UPDATE && APPROVAL_AUTHORITY.can('reviewFileUpdate', role);
     var canReviewFromDash = canReviewFileUpdate
       || (APPROVAL_AUTHORITY.can('reviewApplication', role) && (a.status===APP_STATUS.SUBMITTED||a.status==='returned'))
@@ -5676,7 +5677,9 @@ function renderMatchView(){
     var sl = statusLabel[app.status] || (app.status==='hm_approved'?'File Update Approved':app.status) || '';
     var appDateStr = app.appDate ? 'Applied '+app.appDate : '';
 
-    var canAssign = app.status===APP_STATUS.ED_APPROVED || (app.status==='hm_approved' && APPROVAL_AUTHORITY.can('approveFileUpdate', role));
+    var canAssign = app.status===APP_STATUS.ED_APPROVED
+      || (app.status==='hm_approved' && APPROVAL_AUTHORITY.can('approveFileUpdate', role))
+      || (app.status===APP_STATUS.MGR_APPROVED && APPROVAL_AUTHORITY.can('finalApproveApp', role));
     var isAssigned = app.status==='assigned';
     var assignCell = isAssigned
       ? '<div style="font-size:11px;font-weight:700;color:#15803d;">✓ '+(app.assignedAddress||'Assigned')+'</div>'
