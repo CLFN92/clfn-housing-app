@@ -5249,9 +5249,10 @@ function saveUnitEdit(){
     var role2 = window.currentRole||'housing_employee_l1';
     if(linkedApp2) {
       var appStatus = linkedApp2.status||'';
-      var edApproved = appStatus===APP_STATUS.ED_APPROVED;
-      var hmApproved = appStatus===APP_STATUS.MGR_APPROVED||edApproved;
-      if(role2=== ROLE.ED && !edApproved) {
+      var edApproved   = appStatus===APP_STATUS.ED_APPROVED;
+      var fileApproved = appStatus==='hm_approved'; // File Update Approved by HM
+      var hmApproved   = appStatus===APP_STATUS.MGR_APPROVED||edApproved||fileApproved;
+      if(role2=== ROLE.ED && !edApproved && !fileApproved) {
         showToast('⚠ ED Approval required before assigning tenant. Application is: '+appStatus.replace(/_/g,' '));
         return;
       }
@@ -5388,16 +5389,18 @@ function ueTenantSelect(appId, name, status) {
   var sel = document.getElementById('ue_tenant_selected');
   if (!sel) return;
 
-  var isED = status === APP_STATUS.ED_APPROVED;
-  var isHM = status === APP_STATUS.MGR_APPROVED;
-  var statusLabel = isED ? 'ED Approved' : isHM ? 'HM Recommended' : status.replace(/_/g,' ');
-  var statusColor = isED ? '#15803d' : isHM ? '#1d4ed8' : '#92400e';
-  var statusBg    = isED ? '#f0fdf4'  : isHM ? '#eff6ff' : '#fffbeb';
+  var isED       = status === APP_STATUS.ED_APPROVED;
+  var isHM       = status === APP_STATUS.MGR_APPROVED;
+  var isHMApproved = status === 'hm_approved'; // File Update Approved
+  var isApproved = isED || isHM || isHMApproved;
+  var statusLabel = isED ? 'ED Approved' : isHM ? 'HM Recommended' : isHMApproved ? 'File Update Approved' : status.replace(/_/g,' ');
+  var statusColor = isED ? '#15803d' : isHM ? '#1d4ed8' : isHMApproved ? '#15803d' : '#92400e';
+  var statusBg    = isED ? '#f0fdf4'  : isHM ? '#eff6ff' : isHMApproved ? '#f0fdf4' : '#fffbeb';
 
   // Role-based warning
   var role = window.currentRole || 'housing_employee_l1';
   var warn = '';
-  if (!isED && !isHM) {
+  if (!isApproved) {
     warn = '<div style="margin-top:8px;padding:8px 10px;background:#fef2f2;border-radius:6px;font-size:11px;color:#b91c1c;font-weight:600;">⛔ This application has not been approved. Cannot assign tenant.</div>';
   } else if (isHM && role === ROLE.ED) {
     warn = '<div style="margin-top:8px;padding:8px 10px;background:#eff6ff;border-radius:6px;font-size:11px;color:#1d4ed8;">ℹ️ Recommended by Housing Manager — awaiting your final approval. You may proceed with assignment.</div>';
@@ -8381,10 +8384,11 @@ function atSelectApp(appId,name,status){
   var hidden=document.getElementById('at_appid_val'); if(hidden) hidden.value=appId;
   var sel=document.getElementById('at_app_selected');
   if(sel){
-    var statusCol=status===APP_STATUS.ED_APPROVED?'#15803d':status===APP_STATUS.MGR_APPROVED?'#1d4ed8':'#92400e';
-    var statusBg=status===APP_STATUS.ED_APPROVED?'#f0fdf4':status===APP_STATUS.MGR_APPROVED?'#eff6ff':'#fffbeb';
-    var statusLabel={'ed_approved':'ED Approved','mgr_approved':'HM Recommended','submitted':'Submitted','returned':'Returned','declined':'Declined'}[status]||status;
-    var warn=status!==APP_STATUS.ED_APPROVED&&status!==APP_STATUS.MGR_APPROVED
+    var isApproved2 = status===APP_STATUS.ED_APPROVED||status===APP_STATUS.MGR_APPROVED||status==='hm_approved';
+    var statusCol=status===APP_STATUS.ED_APPROVED||status==='hm_approved'?'#15803d':status===APP_STATUS.MGR_APPROVED?'#1d4ed8':'#92400e';
+    var statusBg=status===APP_STATUS.ED_APPROVED||status==='hm_approved'?'#f0fdf4':status===APP_STATUS.MGR_APPROVED?'#eff6ff':'#fffbeb';
+    var statusLabel={'ed_approved':'ED Approved','mgr_approved':'HM Recommended','hm_approved':'File Update Approved','submitted':'Submitted','returned':'Returned','declined':'Declined'}[status]||status;
+    var warn=!isApproved2
       ? '<div style="font-size:11px;color:#92400e;margin-top:4px;">⚠️ This application has not been fully approved. Housing Manager confirmation required before assigning.</div>'
       : (status===APP_STATUS.MGR_APPROVED?'<div style="font-size:11px;color:#1d4ed8;margin-top:4px;">ℹ️ Recommended by HM — awaiting Executive Director final approval.</div>':'');
     sel.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;">'
