@@ -136,9 +136,19 @@ function hideAllViews(keepId) {
 // Show target view first (before hiding others) so there's never a blank frame.
 function _showView(id, renderFn) {
   var el = document.getElementById(id);
-  if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
+  if (el) {
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.style.marginLeft  = 'auto';
+    el.style.marginRight = 'auto';
+  }
   hideAllViews(id);
-  if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
+  if (el) {
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.style.marginLeft  = 'auto';
+    el.style.marginRight = 'auto';
+  }
   if (typeof renderFn === 'function') renderFn();
 }
 

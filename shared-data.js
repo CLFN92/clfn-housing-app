@@ -2965,7 +2965,7 @@ function showWorklist() {
   hideAllViews('worklistView');
   setNavActive('tab_worklist');
   var view = document.getElementById('worklistView');
-  if(view){ view.style.display='flex'; view.style.flexDirection='column'; }
+  if(view){ view.style.display='flex'; view.style.flexDirection='column'; view.style.marginLeft='auto'; view.style.marginRight='auto'; }
   // Date/time stamp — matches landing page pattern
   var dtEl = document.getElementById('worklist_datetime');
   if(dtEl) {
