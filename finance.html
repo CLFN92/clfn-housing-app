@@ -2851,6 +2851,8 @@ function saveData(d){
   var prev = _cloneStore(_memStore);
   var next = Object.assign(_emptyStore(), d || {});
 
+  var _saveStack = new Error().stack.split('\n').slice(1,4).map(function(l){return l.trim();}).join(' | ');
+  console.log('[finance trace] saveData called from:', _saveStack);
   console.log('[finance trace] saveData called. tenants: prev=' + (prev.tenants||[]).length + ', next=' + (next.tenants||[]).length);
 
   // 1) Update in-memory authoritative store immediately.
@@ -2862,6 +2864,7 @@ function saveData(d){
   var totalUpserts = 0, totalDeletes = 0;
   var perTableReport = [];
 
+  console.log('[finance trace] saveData processing tables:', _FIN_TABLES.map(function(s){return s.key+'→'+s.table;}).join(', '));
   _FIN_TABLES.forEach(function(spec){
     var diff = _diffCollection(prev[spec.key], next[spec.key], spec.toRow);
     totalUpserts += diff.toUpsert.length;
