@@ -1,0 +1,258 @@
+/**
+ * approval-authority.js — CLFN Housing Suite
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Single source of truth for all approval authorities in the housing system.
+ *
+ * USAGE:
+ *   APPROVAL_AUTHORITY.can('reviewApplication', role)    → true/false
+ *   APPROVAL_AUTHORITY.who('finalApproveApp')            → ['ed']
+ *   APPROVAL_AUTHORITY.get('sowEdThreshold')             → 25000
+ *
+ * LOADING:
+ *   Defaults are defined here. At login, initApprovalAuthority() is called
+ *   which merges any overrides saved in housing_settings (key: 'approval_authority')
+ *   on top of the defaults, so ED changes persist across sessions.
+ *
+ * TO ADD A NEW AUTHORITY:
+ *   1. Add a default entry below in the DEFAULTS block
+ *   2. Add a row to the Settings UI in housing.html sec_approval section
+ *   3. Replace inline role checks in code with APPROVAL_AUTHORITY.can(...)
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+var APPROVAL_AUTHORITY = (function() {
+
+  // ── DEFAULTS ────────────────────────────────────────────────────────────
+  // These are the baseline rules. All values are overridable via Settings UI.
+  // roles must match values in shared-config.js ROLE constants.
+
+  var DEFAULTS = {
+
+    // ── Housing Application workflow ──────────────────────────────────────
+    // Who can review a submitted application (first level)
+    reviewApplication:        ['housing_manager'],
+    // Who can give final approval for housing
+    finalApproveApp:          ['ed'],
+    // Who can decline an application
+    declineApplication:       ['housing_manager', 'ed'],
+    // Who can return an application for more info
+    returnApplication:        ['housing_manager', 'ed'],
+
+    // ── File Update workflow ──────────────────────────────────────────────
+    // File updates only need HM approval — no ED sign-off required
+    reviewFileUpdate:         ['housing_manager'],
+    approveFileUpdate:        ['housing_manager'],
+
+    // ── Unit Assignment ───────────────────────────────────────────────────
+    // Who can assign a unit to an applicant
+    assignUnit:               ['housing_manager', 'ed'],
+    // Who can override the top match recommendation
+    overrideMatch:            ['ed'],
+    // Who can assign within the tied score band (notes required)
+    assignTiedBand:           ['housing_manager', 'ed'],
+
+    // ── SOW / Renovation Budget ───────────────────────────────────────────
+    // Dollar threshold — above this, ED approval required
+    sowEdThreshold:           25000,
+    // Who can approve SOW under the threshold
+    approveSowUnderThreshold: ['housing_manager'],
+    // Who can approve SOW over the threshold
+    approveSowOverThreshold:  ['ed'],
+    // Who can lock a completed SOW
+    lockSow:                  ['ed'],
+
+    // ── Contractor approvals ──────────────────────────────────────────────
+    // Who can recommend a contractor to ED
+    recommendContractor:      ['housing_manager'],
+    // Who gives final contractor approval
+    approveContractor:        ['ed'],
+    // Who can decline a contractor
+    declineContractor:        ['housing_manager', 'ed'],
+
+    // ── Score model ───────────────────────────────────────────────────────
+    // Who can edit the scoring model criteria and weights
+    editScoreModel:           ['ed'],
+    // Who can apply a manual score adjustment on an application
+    applyScoreAdjustment:     ['ed'],
+
+    // ── Settings & config ─────────────────────────────────────────────────
+    // Who can access the Settings page
+    accessSettings:           ['housing_manager', 'ed'],
+    // Who can edit approval authorities (this panel)
+    editApprovalAuthority:    ['ed'],
+    // Who can add/edit staff
+    manageStaff:              ['housing_manager', 'ed'],
+
+  };
+
+  // ── LIVE CONFIG (defaults + any saved overrides) ──────────────────────
+  var _live = JSON.parse(JSON.stringify(DEFAULTS));
+
+  // ── PUBLIC API ────────────────────────────────────────────────────────
+
+  return {
+
+    /**
+     * Check if a role can perform an action.
+     * @param {string} action  — key from DEFAULTS
+     * @param {string} role    — current role string (e.g. 'ed', 'housing_manager')
+     * @returns {boolean}
+     */
+    can: function(action, role) {
+      if (!action || !role) return false;
+      var allowed = _live[action];
+      if (Array.isArray(allowed)) return allowed.indexOf(role) !== -1;
+      return false; // non-array entries are thresholds/values, not role lists
+    },
+
+    /**
+     * Get the list of roles allowed for an action, or a threshold value.
+     * @param {string} action
+     * @returns {Array|number}
+     */
+    get: function(action) {
+      return _live[action] !== undefined ? _live[action] : null;
+    },
+
+    /**
+     * Get all role-list entries (excludes numeric thresholds).
+     * Used by the Settings UI to render the editor.
+     * @returns {Object}
+     */
+    allRoleEntries: function() {
+      var out = {};
+      Object.keys(_live).forEach(function(k) {
+        if (Array.isArray(_live[k])) out[k] = _live[k].slice();
+      });
+      return out;
+    },
+
+    /**
+     * Get all threshold entries (numeric values).
+     * @returns {Object}
+     */
+    allThresholds: function() {
+      var out = {};
+      Object.keys(_live).forEach(function(k) {
+        if (typeof _live[k] === 'number') out[k] = _live[k];
+      });
+      return out;
+    },
+
+    /**
+     * Merge saved overrides on top of defaults.
+     * Called at login after housing_settings loads.
+     * @param {Object} saved — parsed JSON from housing_settings 'approval_authority' key
+     */
+    loadOverrides: function(saved) {
+      if (!saved || typeof saved !== 'object') return;
+      var self = this;
+      Object.keys(saved).forEach(function(k) {
+        if (DEFAULTS[k] !== undefined) {
+          _live[k] = saved[k];
+        }
+      });
+      console.info('[APPROVAL_AUTHORITY] Loaded overrides:', Object.keys(saved).length, 'keys');
+    },
+
+    /**
+     * Serialize current live config for saving to housing_settings.
+     * Only saves keys that differ from defaults.
+     * @returns {Object}
+     */
+    serialize: function() {
+      var out = {};
+      Object.keys(_live).forEach(function(k) {
+        var liveVal = JSON.stringify(_live[k]);
+        var defVal  = JSON.stringify(DEFAULTS[k]);
+        if (liveVal !== defVal) out[k] = _live[k];
+      });
+      return out;
+    },
+
+    /**
+     * Update a single authority entry and persist.
+     * @param {string}        action  — key to update
+     * @param {Array|number}  value   — new value
+     */
+    update: function(action, value) {
+      if (DEFAULTS[action] === undefined) {
+        console.warn('[APPROVAL_AUTHORITY] Unknown action:', action);
+        return;
+      }
+      _live[action] = value;
+    },
+
+    /**
+     * Reset a single entry (or all) back to defaults.
+     * @param {string} [action] — omit to reset all
+     */
+    reset: function(action) {
+      if (action) {
+        _live[action] = JSON.parse(JSON.stringify(DEFAULTS[action]));
+      } else {
+        _live = JSON.parse(JSON.stringify(DEFAULTS));
+      }
+    },
+
+    /** Expose defaults for display in Settings UI */
+    defaults: DEFAULTS,
+
+    /** Human-readable labels for each action key */
+    labels: {
+      reviewApplication:        'Review submitted application',
+      finalApproveApp:          'Final approval — housing application',
+      declineApplication:       'Decline application',
+      returnApplication:        'Return application for more info',
+      reviewFileUpdate:         'Review file update',
+      approveFileUpdate:        'Approve file update',
+      assignUnit:               'Assign unit to applicant',
+      overrideMatch:            'Override top match recommendation',
+      assignTiedBand:           'Assign within tied score band',
+      sowEdThreshold:           'SOW dollar threshold for ED approval ($)',
+      approveSowUnderThreshold: 'Approve SOW under threshold',
+      approveSowOverThreshold:  'Approve SOW over threshold',
+      lockSow:                  'Lock completed SOW',
+      recommendContractor:      'Recommend contractor to ED',
+      approveContractor:        'Final contractor approval',
+      declineContractor:        'Decline contractor',
+      editScoreModel:           'Edit scoring model',
+      applyScoreAdjustment:     'Apply manual score adjustment',
+      accessSettings:           'Access settings page',
+      editApprovalAuthority:    'Edit approval authorities',
+      manageStaff:              'Add / edit staff',
+    },
+
+    /** Group labels for the Settings UI sections */
+    groups: {
+      'Housing Application':  ['reviewApplication','finalApproveApp','declineApplication','returnApplication'],
+      'File Update':          ['reviewFileUpdate','approveFileUpdate'],
+      'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand'],
+      'SOW & Renovation':     ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow'],
+      'Contractors':          ['recommendContractor','approveContractor','declineContractor'],
+      'Scoring':              ['editScoreModel','applyScoreAdjustment'],
+      'System':               ['accessSettings','editApprovalAuthority','manageStaff'],
+    },
+
+  };
+
+})();
+
+/**
+ * initApprovalAuthority()
+ * Called at login after window._appSettings is populated.
+ * Merges any saved overrides from housing_settings into the live config.
+ */
+function initApprovalAuthority() {
+  try {
+    var saved = window._appSettings && window._appSettings['approval_authority'];
+    if (saved) {
+      var parsed = typeof saved === 'string' ? JSON.parse(saved) : saved;
+      APPROVAL_AUTHORITY.loadOverrides(parsed);
+    }
+  } catch(e) {
+    console.warn('[APPROVAL_AUTHORITY] Could not load overrides:', e);
+  }
+}

@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="housing.css"/>
 <script src="shared.js"></script>
 <script src="shared-config.js"></script>
+<script src="approval-authority.js"></script>
 <script src="shared-auth.js"></script>
 <script src="shared-ui.js"></script>
 <script src="shared-data.js"></script>
@@ -957,6 +958,7 @@
 
   <!-- Section nav tabs -->
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0;">
+    <button onclick="showSettingsSection('sec_approval');renderApprovalAuthorityPanel();" id="stab_approval" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">🔐 Approval Authority</button>
     <button onclick="showSettingsSection('sec_users')" id="stab_users" class="settings-tab active" style="padding:8px 16px;border:none;border-bottom:2px solid var(--yellow);background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;margin-bottom:-1px;">👥 Users</button>
     <button onclick="showSettingsSection('sec_app_scoring')" id="stab_app_scoring" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">⭐ Application Scoring</button>
     <button onclick="showSettingsSection('sec_unit_match')" id="stab_unit_match" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">🏠 Unit Matching</button>
@@ -966,6 +968,15 @@
     <button onclick="showSettingsSection('sec_nation');renderNationPanel();" id="stab_nation" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">🌐 Nation</button>
     <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;display:none;">📋 Audit Log</button>
     <button onclick="showSettingsSection('sec_occupancy')" id="stab_occupancy" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;display:none;">🏘 Occupancy</button>
+  </div>
+
+  <!-- ── APPROVAL AUTHORITY ── -->
+  <div id="sec_approval" class="settings-section" style="display:none;">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="ctitle" style="margin-bottom:4px;">🔐 Approval Authority</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Control who can perform each approval action. Changes are saved immediately and take effect on next login. <span style="color:var(--yellow);font-weight:600;">Executive Director access only.</span></div>
+      <div id="approval_authority_body">Loading…</div>
+    </div>
   </div>
 
   <!-- ── USERS ── -->
@@ -5265,8 +5276,10 @@ function saveUnitEdit(){
   if(u.status==='vacant'||u.status==='under_repair'||u.status==='condemned'){
     u.assignedTo=null; u.assignedName=null; u.assignedDate=null;
   }
-  // HM approval gate — must have at least mgr_approved to assign tenant
-  if(u.assignedTo && (u.status==='occupied'||u.status==='reserved')) {
+  // Approval gate — only applies when assigning a NEW tenant (not already assigned)
+  var _origUnit = (typeof housingUnits!=='undefined'?housingUnits:[]).find(function(x){return x.id===u.id;});
+  var _isNewAssignment = u.assignedTo && (!_origUnit || !_origUnit.assignedTo || _origUnit.assignedTo !== u.assignedTo);
+  if(_isNewAssignment && (u.status==='occupied'||u.status==='reserved')) {
     var apps2 = typeof applications!=='undefined'?applications:[];
     var linkedApp2 = apps2.find(function(a){return a.id===u.assignedTo;});
     var role2 = window.currentRole||'housing_employee_l1';
@@ -5274,8 +5287,8 @@ function saveUnitEdit(){
       var appStatus = linkedApp2.status||'';
       var edApproved   = appStatus===APP_STATUS.ED_APPROVED;
       var fileApproved = appStatus==='hm_approved';
-      var hmApproved   = appStatus===APP_STATUS.MGR_APPROVED||edApproved||fileApproved;
-      if(role2=== ROLE.ED && !edApproved && !fileApproved) {
+      var hmApproved   = appStatus===APP_STATUS.MGR_APPROVED||edApproved||fileApproved||appStatus==='assigned';
+      if(role2=== ROLE.ED && !edApproved && !fileApproved && appStatus!=='assigned') {
         showToast('⚠ ED Approval required before assigning tenant. Application is: '+appStatus.replace(/_/g,' '));
         return;
       }
@@ -7407,9 +7420,137 @@ var CRITICAL_SOW_CATS = ['Heating / HVAC','Electrical','Roofing','Windows & Door
 
 // ══ END RENOVATION BUDGET APPROVAL ═══════════════════════════════════════════
 
+
+// ── Approval Authority Settings Panel ──────────────────────────────────────
+function renderApprovalAuthorityPanel() {
+  var container = document.getElementById('approval_authority_body');
+  if (!container) return;
+
+  // ED only
+  if (window.currentRole !== ROLE.ED) {
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">Only the Executive Director can edit approval authorities.</div>';
+    return;
+  }
+
+  var allRoles = [
+    { value: 'ed',                  label: 'Executive Director' },
+    { value: 'housing_manager',     label: 'Housing Manager' },
+    { value: 'housing_employee_l1', label: 'Housing Employee L1' },
+    { value: 'housing_employee_l2', label: 'Housing Employee L2' },
+  ];
+
+  var groups   = APPROVAL_AUTHORITY.groups;
+  var labels   = APPROVAL_AUTHORITY.labels;
+  var saveStatus = document.createElement('div');
+
+  function roleCheckboxes(action, currentRoles) {
+    return allRoles.map(function(r) {
+      var checked = (currentRoles || []).indexOf(r.value) !== -1 ? 'checked' : '';
+      return '<label style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;font-size:12px;cursor:pointer;white-space:nowrap;">'
+        + '<input type="checkbox" data-action="' + action + '" data-role="' + r.value + '" ' + checked
+        + ' onchange="apUpdateAuthority(this)" style="accent-color:var(--yellow);cursor:pointer;"/>'
+        + r.label + '</label>';
+    }).join('');
+  }
+
+  var html = '';
+  Object.keys(groups).forEach(function(groupName) {
+    html += '<div style="margin-bottom:20px;">';
+    html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">' + groupName + '</div>';
+
+    groups[groupName].forEach(function(action) {
+      var current = APPROVAL_AUTHORITY.get(action);
+      var label   = labels[action] || action;
+      var isDefault = JSON.stringify(current) === JSON.stringify(APPROVAL_AUTHORITY.defaults[action]);
+
+      html += '<div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-bottom:1px solid var(--border);">';
+      html += '<div style="min-width:220px;flex-shrink:0;">';
+      html += '<div style="font-size:13px;font-weight:600;color:var(--text);">' + label + '</div>';
+      if (!isDefault) {
+        html += '<div style="font-size:10px;color:var(--yellow);font-weight:700;margin-top:2px;">Modified</div>';
+      }
+      html += '</div>';
+
+      if (typeof current === 'number') {
+        // Threshold — show number input
+        html += '<div style="display:flex;align-items:center;gap:8px;">';
+        html += '<span style="font-size:12px;color:var(--muted);">$</span>';
+        html += '<input type="number" data-action="' + action + '" value="' + current + '" min="0" step="1000"'
+          + ' onchange="apUpdateThreshold(this)"'
+          + ' style="width:120px;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>';
+        html += '<span style="font-size:11px;color:var(--muted);">Above this amount ED approval is required</span>';
+        html += '</div>';
+      } else {
+        // Role checkboxes
+        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' + roleCheckboxes(action, current) + '</div>';
+      }
+
+      // Reset to default button
+      if (!isDefault) {
+        html += '<button onclick="apResetToDefault('' + action + '')" title="Reset to default"'
+          + ' style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;flex-shrink:0;">↺ Default</button>';
+      }
+
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+
+  // Save status indicator
+  html += '<div id="ap_save_status" style="font-size:12px;font-weight:600;color:#15803d;display:none;margin-top:8px;">✓ Saved</div>';
+  html += '<div style="display:flex;gap:10px;margin-top:4px;">';
+  html += '<button onclick="apSaveAll()" class="btn btn-primary">Save Changes</button>';
+  html += '<button onclick="apResetToDefault(null)" class="btn btn-ghost">Reset All to Defaults</button>';
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+function apUpdateAuthority(checkbox) {
+  var action  = checkbox.getAttribute('data-action');
+  var role    = checkbox.getAttribute('data-role');
+  var current = APPROVAL_AUTHORITY.get(action) || [];
+  var arr     = current.slice();
+  if (checkbox.checked) {
+    if (arr.indexOf(role) === -1) arr.push(role);
+  } else {
+    arr = arr.filter(function(r) { return r !== role; });
+  }
+  APPROVAL_AUTHORITY.update(action, arr);
+}
+
+function apUpdateThreshold(input) {
+  var action = input.getAttribute('data-action');
+  var val    = parseInt(input.value, 10);
+  if (!isNaN(val) && val >= 0) APPROVAL_AUTHORITY.update(action, val);
+}
+
+function apResetToDefault(action) {
+  APPROVAL_AUTHORITY.reset(action || undefined);
+  renderApprovalAuthorityPanel();
+  showToast(action ? 'Reset to default' : 'All authorities reset to defaults');
+}
+
+async function apSaveAll() {
+  var data     = APPROVAL_AUTHORITY.serialize();
+  var saveBtn  = document.querySelector('#sec_approval .btn-primary');
+  var status   = document.getElementById('ap_save_status');
+  if (saveBtn) saveBtn.textContent = 'Saving…';
+  var ok = await sbSaveSetting('approval_authority', data);
+  if (saveBtn) saveBtn.textContent = 'Save Changes';
+  if (status) { status.style.display = 'block'; setTimeout(function(){ status.style.display='none'; }, 2500); }
+  if (ok) {
+    showToast('✓ Approval authorities saved');
+    // Re-render to refresh Modified badges
+    renderApprovalAuthorityPanel();
+  } else {
+    showToast('Save failed — check console');
+  }
+}
+
 // ── Settings section tabs ──
 function showSettingsSection(section) {
-  var sections = ['sec_users','sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget','sec_contacts','sec_nation','sec_audit','sec_occupancy'];
+  var sections = ['sec_approval','sec_users','sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget','sec_contacts','sec_nation','sec_audit','sec_occupancy'];
   sections.forEach(function(id){
     var el=document.getElementById(id);
     if(el) el.style.display=(id===section)?'block':'none';
@@ -7422,6 +7563,7 @@ function showSettingsSection(section) {
     t.style.color=active?'var(--text)':'var(--muted)';
   });
   if(section==='sec_users'       && typeof renderHousingUserTable==='function') renderHousingUserTable();
+  if(section==='sec_approval'    && typeof renderApprovalAuthorityPanel==='function') renderApprovalAuthorityPanel();
   if(section==='sec_nation'      && typeof renderNationPanel==='function') renderNationPanel();
   if(section==='sec_app_scoring') {
     // ED sees the V2 editor (object-based model with tier threshold controls).
@@ -12027,6 +12169,7 @@ async function loadAppDataFromSupabase() {
       if(conR.ok){var cond=await conR.json();window._contacts=cond.length?(cond[0].data||{}):{}}
     } catch(e){console.warn('Contacts:',e);}
 
+    initApprovalAuthority();
     console.info('[CLFN] Loaded '+applications.length+' applications, '+housingUnits.length+' units');
     console.info('[CLFN Housing] Data loaded:',applications.length,'apps,',housingUnits.length,'units');
 
