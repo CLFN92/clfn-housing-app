@@ -139,16 +139,10 @@ function _showView(id, renderFn) {
   if (el) {
     el.style.display = 'flex';
     el.style.flexDirection = 'column';
-    el.style.marginLeft  = 'auto';
-    el.style.marginRight = 'auto';
+    // align-self:center handled by CSS .page-view-wide / .page-view classes
   }
   hideAllViews(id);
-  if (el) {
-    el.style.display = 'flex';
-    el.style.flexDirection = 'column';
-    el.style.marginLeft  = 'auto';
-    el.style.marginRight = 'auto';
-  }
+  if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
   if (typeof renderFn === 'function') renderFn();
 }
 
