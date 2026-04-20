@@ -265,10 +265,13 @@ body {
 /* View containers — zero out top padding so page-back-row sits flush.
    The view's inline padding handles left/right/bottom.
    page-header-bar provides vertical breathing room below the back button. */
+/* Views with a back button: padding-top:0 so back button provides top spacing */
 #worklistView, #dashView, .dash-view, #settingsView, .settings-view,
-#inventoryView, #matchView, #tenantsView, #renoApprovalsView,
+#inventoryView, #matchView, #tenantsView,
 #renosView, #contractorsView, #scorecardView,
-#employeeHomeView, #renoApprovalsView { padding-top: 0 !important; }
+#renoApprovalsView { padding-top: 0 !important; }
+/* Landing page: needs top padding — no back button present */
+#employeeHomeView { padding-top: clamp(20px, 3vw, 36px) !important; }
 .back-link {
   color: var(--yellow); font-size: 12px; font-weight: 600;
   text-decoration: none; border: 1px solid rgba(248,228,26,.3);
