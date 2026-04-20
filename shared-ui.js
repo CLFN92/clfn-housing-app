@@ -137,12 +137,22 @@ function hideAllViews(keepId) {
 function _showView(id, renderFn) {
   var el = document.getElementById(id);
   if (el) {
-    el.style.display = 'flex';
+    el.style.display       = 'flex';
     el.style.flexDirection = 'column';
-    // align-self:center handled by CSS .page-view-wide / .page-view classes
+    el.style.width         = 'min(100%, 1400px)';
+    el.style.marginLeft    = 'auto';
+    el.style.marginRight   = 'auto';
+    el.style.boxSizing     = 'border-box';
   }
   hideAllViews(id);
-  if (el) { el.style.display = 'flex'; el.style.flexDirection = 'column'; }
+  if (el) {
+    el.style.display       = 'flex';
+    el.style.flexDirection = 'column';
+    el.style.width         = 'min(100%, 1400px)';
+    el.style.marginLeft    = 'auto';
+    el.style.marginRight   = 'auto';
+    el.style.boxSizing     = 'border-box';
+  }
   if (typeof renderFn === 'function') renderFn();
 }
 

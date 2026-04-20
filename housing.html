@@ -9664,7 +9664,8 @@ function showDashboard(){
   window._userSetDashFilter = false;
   var fs = document.getElementById('dashFilterStatus');
   if(fs) fs.value = '';
-  document.getElementById('dashView').style.display='flex';
+  var _dv=document.getElementById('dashView');
+  if(_dv){ _dv.style.display='flex'; _dv.style.width='min(100%, 1400px)'; _dv.style.marginLeft='auto'; _dv.style.marginRight='auto'; _dv.style.boxSizing='border-box'; }
   updateDashStats();renderDashTable();wireDashTable();
 }
 
@@ -9903,7 +9904,7 @@ function showEmployeeHome(){
   }
 
   var view = document.getElementById('employeeHomeView');
-  if(view){ view.style.display='flex'; view.style.flexDirection='column'; }
+  if(view){ view.style.display='flex'; view.style.flexDirection='column'; view.style.width='min(100%, 1400px)'; view.style.marginLeft='auto'; view.style.marginRight='auto'; view.style.boxSizing='border-box'; }
 
   // Populate recent activity
   renderRecentActivity(role);
