@@ -200,6 +200,27 @@ var APPROVAL_AUTHORITY = (function() {
     /** Expose defaults for display in Settings UI */
     defaults: DEFAULTS,
 
+    /**
+     * Returns all available roles in display order, using CLFN_PERMS if available.
+     * Falls back to the known static list if shared.js hasn't loaded yet.
+     */
+    allRoles: function() {
+      if (window.CLFN_PERMS && window.CLFN_PERMS.ROLE_LABELS) {
+        return Object.keys(window.CLFN_PERMS.ROLE_LABELS).map(function(k) {
+          return { value: k, label: window.CLFN_PERMS.ROLE_LABELS[k] };
+        });
+      }
+      // Static fallback
+      return [
+        { value: 'ed',                  label: 'Executive Director' },
+        { value: 'housing_manager',     label: 'Housing Manager' },
+        { value: 'housing_employee_l2', label: 'Housing Employee L2' },
+        { value: 'housing_employee_l1', label: 'Housing Employee L1' },
+        { value: 'cfo',                 label: 'CFO' },
+        { value: 'finance_l1',          label: 'Finance Clerk L1' },
+      ];
+    },
+
     /** Human-readable labels for each action key */
     labels: {
       reviewApplication:        'Review submitted application',

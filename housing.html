@@ -7426,97 +7426,130 @@ function renderApprovalAuthorityPanel() {
   var container = document.getElementById('approval_authority_body');
   if (!container) return;
 
-  // ED only
   if (window.currentRole !== ROLE.ED) {
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">Only the Executive Director can edit approval authorities.</div>';
     return;
   }
 
-  var allRoles = [
-    { value: 'ed',                  label: 'Executive Director' },
-    { value: 'housing_manager',     label: 'Housing Manager' },
-    { value: 'housing_employee_l1', label: 'Housing Employee L1' },
-    { value: 'housing_employee_l2', label: 'Housing Employee L2' },
-  ];
-
+  var allRoles = APPROVAL_AUTHORITY.allRoles();
   var groups   = APPROVAL_AUTHORITY.groups;
   var labels   = APPROVAL_AUTHORITY.labels;
-  var saveStatus = document.createElement('div');
 
-  function roleCheckboxes(action, currentRoles) {
-    return allRoles.map(function(r) {
-      var checked = (currentRoles || []).indexOf(r.value) !== -1 ? 'checked' : '';
-      return '<label style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;font-size:12px;cursor:pointer;white-space:nowrap;">'
-        + '<input type="checkbox" data-action="' + action + '" data-role="' + r.value + '" ' + checked
-        + ' onchange="apUpdateAuthority(this)" style="accent-color:var(--yellow);cursor:pointer;"/>'
-        + r.label + '</label>';
-    }).join('');
+  // Plain-English summary of who holds a set of roles
+  function rolesText(roleArr) {
+    if (!roleArr || !roleArr.length) return '<span style="color:#b91c1c;font-weight:700;">Nobody (blocked)</span>';
+    var names = roleArr.map(function(r) {
+      var match = allRoles.find(function(x){ return x.value === r; });
+      return match ? match.label : r;
+    });
+    if (names.length === 1) return '<strong>' + names[0] + '</strong> only';
+    var last = names.pop();
+    return '<strong>' + names.join(', ') + '</strong> and <strong>' + last + '</strong>';
+  }
+
+  // Tighten/loosen indicator
+  function strictnessLabel(action, roleArr) {
+    var def = APPROVAL_AUTHORITY.defaults[action];
+    if (!Array.isArray(def) || !Array.isArray(roleArr)) return '';
+    var isDefault = JSON.stringify(roleArr.slice().sort()) === JSON.stringify(def.slice().sort());
+    if (isDefault) return '';
+    var tighter = roleArr.length < def.length;
+    return tighter
+      ? '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:#fef2f2;color:#b91c1c;margin-left:6px;">Tightened</span>'
+      : '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:#f0fdf4;color:#15803d;margin-left:6px;">Loosened</span>';
+  }
+
+  function roleRow(action) {
+    var current  = APPROVAL_AUTHORITY.get(action);
+    var label    = labels[action] || action;
+    var isThresh = typeof current === 'number';
+    var isModified = JSON.stringify(current) !== JSON.stringify(APPROVAL_AUTHORITY.defaults[action]);
+
+    var html = '<div style="padding:12px 0;border-bottom:1px solid var(--border);">';
+
+    // Label row
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">';
+    html += '<div>';
+    html += '<span style="font-size:13px;font-weight:600;color:var(--text);">' + label + '</span>';
+    if (!isThresh) html += strictnessLabel(action, current);
+    html += '</div>';
+    if (isModified) {
+      html += '<button onclick="apResetToDefault('' + action + '')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">↺ Default</button>';
+    }
+    html += '</div>';
+
+    if (isThresh) {
+      // Dollar threshold
+      html += '<div style="display:flex;align-items:center;gap:10px;">';
+      html += '<div style="font-size:12px;color:var(--muted);">ED approval required above:</div>';
+      html += '<div style="display:flex;align-items:center;gap:4px;">';
+      html += '<span style="font-size:13px;font-weight:700;color:var(--muted);">$</span>';
+      html += '<input type="number" data-action="' + action + '" value="' + current + '" min="0" step="1000"'
+        + ' onchange="apUpdateThreshold(this)"'
+        + ' style="width:110px;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:14px;font-weight:700;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);text-align:right;"/>';
+      html += '</div>';
+      if (isModified) html += '<span style="font-size:11px;color:var(--yellow);font-weight:700;">Modified (default: $' + APPROVAL_AUTHORITY.defaults[action].toLocaleString() + ')</span>';
+      html += '</div>';
+    } else {
+      // Summary line
+      html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Currently: ' + rolesText(current) + '</div>';
+      // Role toggle pills
+      html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+      allRoles.forEach(function(r) {
+        var active = (current || []).indexOf(r.value) !== -1;
+        var bg     = active ? 'var(--yellow)' : 'var(--bg)';
+        var color  = active ? '#111' : 'var(--muted)';
+        var border = active ? 'var(--yellow)' : 'var(--border)';
+        html += '<button onclick="apToggleRole(this,'' + action + '','' + r.value + '')"'
+          + ' data-action="' + action + '" data-role="' + r.value + '" data-active="' + active + '"'
+          + ' style="padding:5px 14px;border-radius:20px;border:1.5px solid ' + border + ';background:' + bg + ';color:' + color + ';font-size:12px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .15s;white-space:nowrap;">'
+          + (active ? '✓ ' : '') + r.label
+          + '</button>';
+      });
+      html += '</div>';
+    }
+
+    html += '</div>';
+    return html;
   }
 
   var html = '';
+  // Intro callout
+  html += '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:var(--muted);line-height:1.6;">'
+    + '🔒 <strong style="color:var(--text);">Tighten</strong> an authority by removing roles — fewer people can act. '
+    + '🔓 <strong style="color:var(--text);">Loosen</strong> it by adding roles — more people can act. '
+    + 'Toggle a role pill to add or remove it. Changes are not applied until you click <strong style="color:var(--text);">Save Changes</strong>.</div>';
+
   Object.keys(groups).forEach(function(groupName) {
-    html += '<div style="margin-bottom:20px;">';
-    html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">' + groupName + '</div>';
-
+    html += '<div style="margin-bottom:24px;">';
+    html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:2px;padding:8px 0 6px;border-bottom:2px solid var(--border);">' + groupName + '</div>';
     groups[groupName].forEach(function(action) {
-      var current = APPROVAL_AUTHORITY.get(action);
-      var label   = labels[action] || action;
-      var isDefault = JSON.stringify(current) === JSON.stringify(APPROVAL_AUTHORITY.defaults[action]);
-
-      html += '<div style="display:flex;align-items:flex-start;gap:16px;padding:10px 0;border-bottom:1px solid var(--border);">';
-      html += '<div style="min-width:220px;flex-shrink:0;">';
-      html += '<div style="font-size:13px;font-weight:600;color:var(--text);">' + label + '</div>';
-      if (!isDefault) {
-        html += '<div style="font-size:10px;color:var(--yellow);font-weight:700;margin-top:2px;">Modified</div>';
-      }
-      html += '</div>';
-
-      if (typeof current === 'number') {
-        // Threshold — show number input
-        html += '<div style="display:flex;align-items:center;gap:8px;">';
-        html += '<span style="font-size:12px;color:var(--muted);">$</span>';
-        html += '<input type="number" data-action="' + action + '" value="' + current + '" min="0" step="1000"'
-          + ' onchange="apUpdateThreshold(this)"'
-          + ' style="width:120px;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>';
-        html += '<span style="font-size:11px;color:var(--muted);">Above this amount ED approval is required</span>';
-        html += '</div>';
-      } else {
-        // Role checkboxes
-        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' + roleCheckboxes(action, current) + '</div>';
-      }
-
-      // Reset to default button
-      if (!isDefault) {
-        html += '<button onclick="apResetToDefault('' + action + '')" title="Reset to default"'
-          + ' style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;flex-shrink:0;">↺ Default</button>';
-      }
-
-      html += '</div>';
+      html += roleRow(action);
     });
     html += '</div>';
   });
 
-  // Save status indicator
-  html += '<div id="ap_save_status" style="font-size:12px;font-weight:600;color:#15803d;display:none;margin-top:8px;">✓ Saved</div>';
-  html += '<div style="display:flex;gap:10px;margin-top:4px;">';
+  html += '<div id="ap_save_status" style="font-size:12px;font-weight:600;color:#15803d;display:none;margin-top:4px;">✓ Saved</div>';
+  html += '<div style="display:flex;gap:10px;margin-top:8px;padding-top:16px;border-top:1px solid var(--border);">';
   html += '<button onclick="apSaveAll()" class="btn btn-primary">Save Changes</button>';
-  html += '<button onclick="apResetToDefault(null)" class="btn btn-ghost">Reset All to Defaults</button>';
+  html += '<button onclick="apResetToDefault(null)" class="btn btn-ghost">↺ Reset All to Defaults</button>';
   html += '</div>';
 
   container.innerHTML = html;
 }
 
-function apUpdateAuthority(checkbox) {
-  var action  = checkbox.getAttribute('data-action');
-  var role    = checkbox.getAttribute('data-role');
+function apToggleRole(btn, action, role) {
+  var active  = btn.getAttribute('data-active') === 'true';
   var current = APPROVAL_AUTHORITY.get(action) || [];
   var arr     = current.slice();
-  if (checkbox.checked) {
-    if (arr.indexOf(role) === -1) arr.push(role);
+  if (active) {
+    arr = arr.filter(function(r){ return r !== role; });
   } else {
-    arr = arr.filter(function(r) { return r !== role; });
+    if (arr.indexOf(role) === -1) arr.push(role);
   }
   APPROVAL_AUTHORITY.update(action, arr);
+  // Re-render the whole panel to keep summary text and indicators in sync
+  renderApprovalAuthorityPanel();
 }
 
 function apUpdateThreshold(input) {
@@ -7532,16 +7565,15 @@ function apResetToDefault(action) {
 }
 
 async function apSaveAll() {
-  var data     = APPROVAL_AUTHORITY.serialize();
-  var saveBtn  = document.querySelector('#sec_approval .btn-primary');
-  var status   = document.getElementById('ap_save_status');
-  if (saveBtn) saveBtn.textContent = 'Saving…';
+  var data    = APPROVAL_AUTHORITY.serialize();
+  var saveBtn = document.querySelector('#sec_approval .btn-primary');
+  var status  = document.getElementById('ap_save_status');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
   var ok = await sbSaveSetting('approval_authority', data);
-  if (saveBtn) saveBtn.textContent = 'Save Changes';
-  if (status) { status.style.display = 'block'; setTimeout(function(){ status.style.display='none'; }, 2500); }
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Changes'; }
+  if (status)  { status.style.display = 'block'; setTimeout(function(){ status.style.display='none'; }, 2500); }
   if (ok) {
-    showToast('✓ Approval authorities saved');
-    // Re-render to refresh Modified badges
+    showToast('✓ Approval authorities saved — takes effect on next login');
     renderApprovalAuthorityPanel();
   } else {
     showToast('Save failed — check console');
