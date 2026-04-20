@@ -12,7 +12,14 @@
 
 /* Page structure */
 .page      { display: none; }
-.page.on   { display: block !important; animation: fadeUp .2s ease; }
+.page.on   {
+  display: block !important;
+  animation: fadeUp .2s ease;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
 .page-hdr  { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
 .page-hdr-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 
