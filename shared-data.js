@@ -774,6 +774,16 @@ function _getPoolSpent(pid) {
 // ── Signature block HTML generator (used by contractor/SOW print functions) ──
 var _sigPads = {}; // track initialized signature canvases
 
+// Returns an inline HTML badge showing expiry status for a date string
+function expiryBadge(dateStr, label) {
+  if (!dateStr) return '<span style="font-size:10px;color:#888;padding:2px 7px;border-radius:10px;background:var(--border);">' + label + ': —</span>';
+  var days = Math.round((new Date(dateStr) - new Date()) / (1000*60*60*24));
+  var color = days < 0 ? '#b91c1c' : days < 30 ? '#d97706' : '#15803d';
+  var bg    = days < 0 ? '#fef2f2' : days < 30 ? '#fffbeb' : '#f0fdf4';
+  var text  = days < 0 ? label+': Expired' : days < 30 ? label+': '+dateStr+' ('+days+'d)' : label+': '+dateStr;
+  return '<span style="font-size:10px;color:'+color+';padding:2px 7px;border-radius:10px;background:'+bg+';font-weight:600;">'+text+'</span>';
+}
+
 function sigBlock(label, name, title, date, imgSrc) {
   var img = imgSrc ? '<img src="'+imgSrc+'" style="max-width:180px;max-height:60px;display:block;margin-bottom:4px;"/>' : '<div style="height:60px;border-bottom:1px solid #999;margin-bottom:4px;"></div>';
   return '<div style="flex:1;min-width:200px;">'
@@ -3297,6 +3307,22 @@ function ctAddPerson() {
   // Focus the new name field
   var inputs = document.querySelectorAll('.ct-person-name');
   if(inputs.length) inputs[inputs.length-1].focus();
+}
+
+function ctRemovePerson(idx) {
+  var people = [];
+  var rows = document.querySelectorAll('#ct_people_list [data-pi]');
+  var seen = {};
+  rows.forEach(function(el) {
+    var i = parseInt(el.getAttribute('data-pi'));
+    if(!seen[i]) { seen[i] = {name:'', phone:'', email:''}; people[i] = seen[i]; }
+    if(el.classList.contains('ct-person-name'))  seen[i].name  = el.value.trim();
+    if(el.classList.contains('ct-person-phone')) seen[i].phone = el.value.trim();
+    if(el.classList.contains('ct-person-email')) seen[i].email = el.value.trim();
+  });
+  people = people.filter(Boolean);
+  people.splice(idx, 1);
+  ctRenderPeople(people);
 }
 
 function deleteContractor(idx){
