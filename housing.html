@@ -4665,6 +4665,7 @@ function showDash(){
 }
 function showApp(){
   hideAllViews('appLayout');
+  setTimeout(initAutosave, 200);
   setNavActive('tab_app');
   var _al=document.getElementById('appLayout');if(_al)_al.style.display='flex';
   var spb=document.getElementById('stepProgressBar');if(spb)spb.style.display='block';
@@ -5296,7 +5297,10 @@ function saveUnitEdit(){
       apps3[aIdx].assignedUnit = u.id;
       apps3[aIdx].assignedAddress = (u.num+' '+u.street).trim();
       apps3[aIdx].status = 'assigned';
-      sbSaveApplication(apps3[aIdx]).catch(function(e){ console.warn('App assignment save failed:', e); });
+      console.log('[saveUnitEdit] Saving app status=assigned for', apps3[aIdx].id);
+      sbSaveApplication(apps3[aIdx]).then(function(r){
+        console.log('[saveUnitEdit] App save response:', r);
+      }).catch(function(e){ console.error('[saveUnitEdit] App assignment save failed:', e); });
     }
   }
   auditEntry(u.id,'unit_edit','Unit saved'+(u.assignedTo?' — tenant: '+u.assignedName:''),window.currentRole||'staff');
@@ -8754,10 +8758,25 @@ window.openEditModal = function(appId) {
         var sels = row.querySelectorAll('select');
         var txts = row.querySelectorAll('input[type="text"]');
         var nums = row.querySelectorAll('input[type="number"]');
-        if(sels[0]) sels[0].value = inc.person    || 'Applicant';
-        if(sels[1]) sels[1].value = inc.incomeType || '';
-        if(txts[0]) txts[0].value = inc.employer   || '';
-        if(nums[0]) nums[0].value = inc.primaryAmt  || '';
+        if(sels[0]) { sels[0].value = inc.person || 'Applicant'; onIncomePersonChange(sels[0]); }
+        if(sels[1]) { sels[1].value = inc.incomeType || ''; onIncomeTypeChange(sels[1]); }
+        // Employer details
+        var empNameEl = row.querySelector('[data-role="empName"]');
+        var empPhoneEl = row.querySelector('[data-role="empPhone"]');
+        var mgrEl = row.querySelector('[data-role="mgr"]');
+        var startDateEl = row.querySelector('[data-role="startDate"]');
+        var empAddrEl = row.querySelector('[data-role="empAddr"]');
+        var empStatusEl = row.querySelector('[data-role="empStatus"]');
+        if(empNameEl)   empNameEl.value   = inc.employer     || '';
+        if(empPhoneEl)  empPhoneEl.value  = inc.empPhone     || '';
+        if(mgrEl)       mgrEl.value       = inc.mgr          || '';
+        if(startDateEl) startDateEl.value = inc.startDate    || '';
+        if(empAddrEl)   empAddrEl.value   = inc.empAddr      || '';
+        if(empStatusEl) empStatusEl.value = inc.empStatus    || '';
+        // Amount field
+        var amtGrp = row.querySelector('[data-grp="amount_grp"]');
+        var amtEl  = amtGrp ? amtGrp.querySelector('input[type="text"]') : null;
+        if(amtEl)   amtEl.value = inc.primaryAmt ? '$'+inc.primaryAmt.toLocaleString() : '';
       });
     }
   }
@@ -8964,10 +8983,15 @@ function saveApplicationRecord(){
     var amt=amtGrp?amtGrp.querySelector('input[type="text"]'):null;
     if(person&&person.value){
       incomes.push({
-        person:person.value||'Applicant',
-        incomeType:(type&&type.value)||'',
-        employer:(empName&&empName.value)||'',
-        primaryAmt:amt?parseFloat((amt.value||'').replace(/[^0-9.]/g,''))||null:null
+        person:      person.value||'Applicant',
+        incomeType:  (type&&type.value)||'',
+        employer:    (empName&&empName.value)||'',
+        primaryAmt:  amt?parseFloat((amt.value||'').replace(/[^0-9.]/g,''))||null:null,
+        empPhone:    (row.querySelector('[data-role="empPhone"]')||{}).value||'',
+        mgr:         (row.querySelector('[data-role="mgr"]')||{}).value||'',
+        startDate:   (row.querySelector('[data-role="startDate"]')||{}).value||'',
+        empAddr:     (row.querySelector('[data-role="empAddr"]')||{}).value||'',
+        empStatus:   (row.querySelector('[data-role="empStatus"]')||{}).value||''
       });
     }
   });
@@ -10382,6 +10406,50 @@ function selectCurrentUnit(el){
 function saveApplicant(){ /* auto-save stub - data saved on submit */ }
 function nextStep(){ if(typeof goTo==='function'){ var c=document.getElementById('cur'); goTo((parseInt((c&&c.value)||0)+1)); } }
 function prevStep(){ if(typeof goTo==='function'){ var c=document.getElementById('cur'); goTo((parseInt((c&&c.value)||1)-1)); } }
+
+// ── Autosave ─────────────────────────────────────────────────────────────────
+var _autosaveTimer = null;
+var _autosaveIndicator = null;
+
+function _showAutosaveStatus(msg, color) {
+  var ind = document.getElementById('autosave_indicator');
+  if(!ind) return;
+  ind.textContent = msg;
+  ind.style.color = color || 'var(--muted)';
+  ind.style.opacity = '1';
+  if(color === '#15803d') setTimeout(function(){ ind.style.opacity='0'; }, 2000);
+}
+
+function triggerAutosave() {
+  clearTimeout(_autosaveTimer);
+  _showAutosaveStatus('Saving…', 'var(--muted)');
+  _autosaveTimer = setTimeout(function() {
+    try {
+      var id = saveApplicationRecord();
+      if(id) {
+        var app = (typeof applications !== 'undefined' ? applications : []).find(function(a){ return a.id===id; });
+        if(app) sbSaveApplication(app).then(function(){ _showAutosaveStatus('✓ Saved', '#15803d'); }).catch(function(){ _showAutosaveStatus('Save failed', '#b91c1c'); });
+        else _showAutosaveStatus('✓ Saved locally', '#15803d');
+      }
+    } catch(e) { console.warn('Autosave error:', e); }
+  }, 1500);
+}
+
+function initAutosave() {
+  var appLayout = document.getElementById('appLayout');
+  if(!appLayout) return;
+  // Add status indicator to the step progress bar area
+  var ind = document.getElementById('autosave_indicator');
+  if(!ind) {
+    ind = document.createElement('div');
+    ind.id = 'autosave_indicator';
+    ind.style.cssText = 'position:fixed;bottom:16px;right:20px;font-size:11px;font-weight:600;color:var(--muted);transition:opacity 1s;opacity:0;z-index:100;pointer-events:none;';
+    document.body.appendChild(ind);
+  }
+  // Listen on the whole appLayout for any input or change
+  appLayout.addEventListener('input', triggerAutosave);
+  appLayout.addEventListener('change', triggerAutosave);
+}
 
 function closeApplicationForm(){
   // Hide the form
