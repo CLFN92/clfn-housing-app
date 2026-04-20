@@ -108,7 +108,7 @@
 <div class="app-wrapper" id="appWrapper">
 <div class="content-area">
 <!-- ═══ EMPLOYEE HOME VIEW ═══ -->
-<div id="employeeHomeView" style="display:none;width:100%;flex-direction:column;padding:clamp(16px,4vw,40px) clamp(14px,3vw,40px);box-sizing:border-box;max-width:1100px;margin:0 auto;">
+<div id="employeeHomeView" class="page-view-wide" style="display:none;">
   <!-- Greeting block — brand: CLFN serif heading, yellow accent, muted meta line -->
   <div style="margin-bottom:28px;position:relative;padding-left:16px;">
     <!-- Yellow accent bar anchored to the left of the heading -->
@@ -130,7 +130,7 @@
 
 
 <!-- ═══ WORKLIST VIEW ═══ -->
-<div id="worklistView" style="display:none;width:100%;flex-direction:column;padding:clamp(16px,4vw,40px) clamp(14px,3vw,40px);box-sizing:border-box;max-width:1100px;margin:0 auto;">
+<div id="worklistView" class="page-view-wide" style="display:none;">
   <div class="page-back-row">
     <button onclick="showEmployeeHome()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -837,7 +837,7 @@
 </div><!-- end appLayout -->
 
 <!-- ═══ INDIVIDUAL SCORECARD VIEW ═══ -->
-<div id="scorecardView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
+<div id="scorecardView" class="page-view-wide" style="display:none;">
   <div class="page-back-row">
     <button onclick="showDash()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -940,7 +940,7 @@
 </div><!-- end scorecardView -->
 
 <!-- ═══ SETTINGS VIEW ═══ -->
-<div id="settingsView" style="display:none;width:100%;flex-direction:column;max-width:1200px;margin:0 auto;box-sizing:border-box;">
+<div id="settingsView" class="page-view-wide" style="display:none;">
 <div class="settings-view" style="display:flex;flex-direction:column;gap:0;padding:clamp(14px,3vw,28px);">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
@@ -1248,7 +1248,7 @@
   </div>
 </div>
 
-<div id="inventoryView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
+<div id="inventoryView" class="page-view-wide" style="display:none;">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -1301,7 +1301,7 @@
 </div><!-- end inventoryView -->
 
 <!-- ═══ MATCH VIEW ═══ -->
-<div id="matchView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
+<div id="matchView" class="page-view-wide" style="display:none;">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -1331,7 +1331,7 @@
 </div><!-- end matchView -->
 
 <!-- ═══ TENANTS VIEW ═══ -->
-<div id="tenantsView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
+<div id="tenantsView" class="page-view-wide" style="display:none;">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>

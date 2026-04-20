@@ -217,12 +217,28 @@ body {
 /* Main */
 .main {
   flex: 1; padding: 36px 44px;
-  max-width: 880px; width: 100%; margin: 0 auto; box-sizing: border-box;
+  width: 100%; box-sizing: border-box;
 }
 .dash-view {
   display: flex; padding: 20px 16px; flex-direction: column;
   gap: 16px; width: 100%; box-sizing: border-box;
   max-width: 1200px; margin: 0 auto;
+}
+
+/* ── Standard page view containers ──────────────────────────────────────── */
+/* Use .page-view for standard content pages (forms, scorecard, settings)   */
+/* Use .page-view-wide for full-width table/list views (inventory, match)   */
+.page-view {
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 960px;
+  padding: clamp(14px,3vw,36px) clamp(14px,3vw,44px);
+  margin: 0 auto; box-sizing: border-box;
+}
+.page-view-wide {
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 1400px;
+  padding: clamp(14px,3vw,28px);
+  margin: 0 auto; box-sizing: border-box;
 }
 
 
@@ -673,6 +689,7 @@ input:focus, select:focus, textarea:focus {
 /* ── ≤960px Tablet ── */
 @media (max-width: 960px) {
   .main                { padding: 24px 20px; }
+  .page-view, .page-view-wide { padding: 20px; }
   .sidebar             { width: 180px; min-width: 180px; }
   .dash-stats          { grid-template-columns: 1fr 1fr; }
   .fg.c3, .c3          { grid-template-columns: 1fr 1fr; }
