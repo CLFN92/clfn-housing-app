@@ -1929,6 +1929,17 @@ function openSowModal(unitId) {
     }
   }
 
+  // Auto-populate Prepared By from logged-in user if not already set
+  if(!saved) {
+    var pbEl = document.getElementById('sow_prepared_by');
+    if(pbEl && !pbEl.value) {
+      var staffName = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION)
+        ? (HOUSING_SESSION.name || HOUSING_SESSION.email || '')
+        : (window.currentRole || '');
+      pbEl.value = staffName;
+    }
+  }
+
   var modal = document.getElementById('sowModal');
   if(modal){ modal.style.removeProperty('display'); modal.style.setProperty('display','flex','important'); }
 

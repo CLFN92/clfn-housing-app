@@ -2993,11 +2993,17 @@ function sowAddNewContractor() {
 function sowContractorSearch(q) {
   var dd = document.getElementById('sow_ct_dropdown');
   if(!dd) return;
-  var contractors = [];
   var contractors = window._contractors || [];
+  // For SOW assignment, show all contractors (approved + pending) so staff can select
   var term = (q||'').toLowerCase().trim();
   var matches = term
-    ? contractors.filter(function(c){ return (c.name||'').toLowerCase().includes(term)||(c.trade||'').toLowerCase().includes(term); })
+    ? contractors.filter(function(c){
+        var name  = (c.name||'').toLowerCase();
+        var trade = (c.trade||'').toLowerCase();
+        // Match any word that starts with the term, or full substring
+        return name.includes(term) || trade.includes(term)
+          || name.split(' ').some(function(w){ return w.startsWith(term); });
+      })
     : contractors;
 
   var rows = matches.map(function(c){
