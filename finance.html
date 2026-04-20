@@ -2813,9 +2813,6 @@ function _upsertRows(table, rows){
     'Prefer': 'resolution=merge-duplicates,return=minimal',
     'Content-Type': 'application/json'
   });
-  if (table === 'finance_journal') {
-    console.log('[finance trace] finance_journal POST (' + rows.length + ' rows) caller:', new Error().stack.split('\n').slice(1,5).join(' | '));
-  }
   return fetch(SUPABASE_URL + '/rest/v1/' + table, {
     method: 'POST', headers: headers, body: JSON.stringify(rows)
   }).then(function(r){
@@ -2851,8 +2848,6 @@ function saveData(d){
   var prev = _cloneStore(_memStore);
   var next = Object.assign(_emptyStore(), d || {});
 
-  var _saveStack = new Error().stack.split('\n').slice(1,4).map(function(l){return l.trim();}).join(' | ');
-  console.log('[finance trace] saveData called from:', _saveStack);
   console.log('[finance trace] saveData called. tenants: prev=' + (prev.tenants||[]).length + ', next=' + (next.tenants||[]).length);
 
   // 1) Update in-memory authoritative store immediately.
@@ -2864,7 +2859,6 @@ function saveData(d){
   var totalUpserts = 0, totalDeletes = 0;
   var perTableReport = [];
 
-  console.log('[finance trace] saveData processing tables:', _FIN_TABLES.map(function(s){return s.key+'→'+s.table;}).join(', '));
   _FIN_TABLES.forEach(function(spec){
     var diff = _diffCollection(prev[spec.key], next[spec.key], spec.toRow);
     totalUpserts += diff.toUpsert.length;
@@ -7148,12 +7142,13 @@ function renderJournal() {
     var isPending = (first.status === 'pending-ed' || first.status === 'pending');
     var isED = (typeof _currentRole !== 'undefined' && _currentRole === 'ed')
             || (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.role === 'ed');
+    var _r = groupRef.replace(/"/g,'&quot;'), _i = groupId.replace(/"/g,'&quot;');
     var actionCell = isPending && isED
       ? '<td class="je-action-cell">'
-        + '<button class="btn btn-xs btn-primary je-tbl-approve" data-ref="'+groupRef+'" data-id="'+groupId+'">Approve</button> '
-        + '<button class="btn btn-xs btn-ghost je-tbl-edit" data-ref="'+groupRef+'" data-id="'+groupId+'">Edit</button> '
-        + '<button class="btn btn-xs btn-ghost je-tbl-decline" data-ref="'+groupRef+'" data-id="'+groupId+'" style="color:var(--danger);border-color:var(--danger);">Decline</button> '
-        + '<button class="btn btn-xs btn-ghost je-tbl-void" data-ref="'+groupRef+'" data-id="'+groupId+'" style="color:var(--muted);">Void</button>'
+        + '<button class="btn btn-xs btn-primary" onclick="approveJournalEntry(&quot;'+_r+'&quot;,&quot;'+_i+'&quot;)">Approve</button> '
+        + '<button class="btn btn-xs btn-ghost" onclick="openEditJournalModal(&quot;'+_r+'&quot;,&quot;'+_i+'&quot;)">Edit</button> '
+        + '<button class="btn btn-xs btn-ghost" style="color:var(--danger);border-color:var(--danger);" onclick="showConfirm(\'Decline\',\'Decline this entry?\',function(){declineJournalEntry(&quot;'+_r+'&quot;,&quot;'+_i+'&quot;);})">Decline</button> '
+        + '<button class="btn btn-xs btn-ghost" style="color:var(--muted);" onclick="voidJournalEntry(&quot;'+_r+'&quot;,&quot;'+_i+'&quot;)">Void</button>'
         + '</td>'
       : '<td></td>';
     var header = '<tr class="je-group-header-row">'+
@@ -7184,19 +7179,6 @@ function renderJournal() {
     return header + subRows;
   }).join('');
 
-  // Wire journal table action buttons
-  bodyEl.querySelectorAll('.je-tbl-approve').forEach(function(btn) {
-    btn.addEventListener('click', function(e) { e.stopPropagation(); approveJournalEntry(btn.dataset.ref, btn.dataset.id); });
-  });
-  bodyEl.querySelectorAll('.je-tbl-decline').forEach(function(btn) {
-    btn.addEventListener('click', function(e) { e.stopPropagation(); showConfirm('Decline Entry', 'Decline this journal entry? It will be marked as declined.', function() { declineJournalEntry(btn.dataset.ref, btn.dataset.id); }); });
-  });
-  bodyEl.querySelectorAll('.je-tbl-edit').forEach(function(btn) {
-    btn.addEventListener('click', function(e) { e.stopPropagation(); openEditJournalModal(btn.dataset.ref, btn.dataset.id); });
-  });
-  bodyEl.querySelectorAll('.je-tbl-void').forEach(function(btn) {
-    btn.addEventListener('click', function(e) { e.stopPropagation(); voidJournalEntry(btn.dataset.ref, btn.dataset.id); });
-  });
 }
 
 
@@ -8963,17 +8945,13 @@ function renderFinanceWorklist() {
   body.innerHTML = items.map(function(item) {
     var actionBtns = '';
     if (item.isEDAction && item.approveRef !== undefined) {
+      var r = item.approveRef.replace(/"/g,'&quot;');
+      var i = item.approveId.replace(/"/g,'&quot;');
       actionBtns +=
-        '<button class="btn btn-xs btn-primary fwl-approve-btn"'
-        + ' data-ref="'+item.approveRef+'" data-id="'+item.approveId+'">Approve</button> '
-        + '<button class="btn btn-xs btn-ghost fwl-edit-btn"'
-        + ' data-ref="'+item.approveRef+'" data-id="'+item.approveId+'">Edit</button> '
-        + '<button class="btn btn-xs btn-ghost fwl-decline-btn"'
-        + ' data-ref="'+item.approveRef+'" data-id="'+item.approveId+'"'
-        + ' style="color:var(--danger);border-color:var(--danger);">Decline</button> '
-        + '<button class="btn btn-xs btn-ghost fwl-void-btn"'
-        + ' data-ref="'+item.approveRef+'" data-id="'+item.approveId+'"'
-        + ' style="color:var(--muted);">Void</button> ';
+        '<button class="btn btn-xs btn-primary" onclick="approveJournalEntry(&quot;'+r+'&quot;,&quot;'+i+'&quot;)">Approve</button> '
+        + '<button class="btn btn-xs btn-ghost" onclick="openEditJournalModal(&quot;'+r+'&quot;,&quot;'+i+'&quot;)">Edit</button> '
+        + '<button class="btn btn-xs btn-ghost" style="color:var(--danger);border-color:var(--danger);" onclick="showConfirm(\'Decline Entry\',\'Decline this journal entry?\',function(){declineJournalEntry(&quot;'+r+'&quot;,&quot;'+i+'&quot;);})">Decline</button> '
+        + '<button class="btn btn-xs btn-ghost" style="color:var(--muted);" onclick="voidJournalEntry(&quot;'+r+'&quot;,&quot;'+i+'&quot;)">Void</button> ';
     }
     actionBtns += item.action;
     return '<div class="fwl-item">'+
@@ -8986,29 +8964,6 @@ function renderFinanceWorklist() {
       '<div class="fwl-actions">'+actionBtns+'</div>'+
     '</div>';
   }).join('');
-  // Wire action buttons via event delegation
-  body.querySelectorAll('.fwl-approve-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      approveJournalEntry(btn.dataset.ref, btn.dataset.id);
-    });
-  });
-  body.querySelectorAll('.fwl-decline-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      showConfirm('Decline Entry', 'Decline this journal entry? It will be marked as declined and removed from the approval queue.', function() {
-        declineJournalEntry(btn.dataset.ref, btn.dataset.id);
-      });
-    });
-  });
-  body.querySelectorAll('.fwl-edit-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      openEditJournalModal(btn.dataset.ref, btn.dataset.id);
-    });
-  });
-  body.querySelectorAll('.fwl-void-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      voidJournalEntry(btn.dataset.ref, btn.dataset.id);
-    });
-  });
 }
 function approveJournalEntry(ref, fallbackId) {
   var d = getData();
