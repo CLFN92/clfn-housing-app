@@ -7500,7 +7500,7 @@ function renderApprovalAuthorityPanel() {
         var bg     = active ? 'var(--yellow)' : 'var(--bg)';
         var color  = active ? '#111' : 'var(--muted)';
         var border = active ? 'var(--yellow)' : 'var(--border)';
-        html += '<button onclick="apToggleRole(this,'' + action + '','' + r.value + '')"'
+        html += '<button onclick="apToggleRole(this,\''+action+'\',\''+r.value+'\')"'
           + ' data-action="' + action + '" data-role="' + r.value + '" data-active="' + active + '"'
           + ' style="padding:5px 14px;border-radius:20px;border:1.5px solid ' + border + ';background:' + bg + ';color:' + color + ';font-size:12px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .15s;white-space:nowrap;">'
           + (active ? '✓ ' : '') + r.label
