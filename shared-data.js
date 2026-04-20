@@ -771,6 +771,20 @@ function _getPoolSpent(pid) {
   });
   return total;
 }
+// ── Signature block HTML generator (used by contractor/SOW print functions) ──
+var _sigPads = {}; // track initialized signature canvases
+
+function sigBlock(label, name, title, date, imgSrc) {
+  var img = imgSrc ? '<img src="'+imgSrc+'" style="max-width:180px;max-height:60px;display:block;margin-bottom:4px;"/>' : '<div style="height:60px;border-bottom:1px solid #999;margin-bottom:4px;"></div>';
+  return '<div style="flex:1;min-width:200px;">'
+    +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#555;margin-bottom:4px;">'+label+'</div>'
+    +img
+    +'<div style="font-size:10px;font-weight:600;">'+( name||'')+'</div>'
+    +(title ? '<div style="font-size:9px;color:#555;">'+title+'</div>' : '')
+    +'<div style="font-size:9px;color:#555;margin-top:2px;">Date: '+(date||'')+'</div>'
+    +'</div>';
+}
+
 function _initSigPad(canvasId) {
   var canvas = document.getElementById(canvasId);
   if (!canvas || _sigPads[canvasId]) return;
@@ -1134,7 +1148,7 @@ function ctRenderPeople(people) {
   var list = document.getElementById('ct_people_list');
   if(!list) return;
   people = people || [];
-  if(!people.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);font-style:italic;padding:4px 0;">No key contacts added yet.</div>'; return; }
+  if(!people || !people.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);font-style:italic;padding:4px 0;">No key contacts added yet. Click + Add Person to add one.</div>'; return; }
   list.innerHTML = people.map(function(p, i) {
     return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">'
       +'<input type="text" class="ct-person-name" data-pi="'+i+'" value="'+(p.name||'')+'" placeholder="Full name" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
@@ -2724,7 +2738,7 @@ function saveContractor(){
   }
   window._contractors = contractors;
   // Persist to Supabase
-  sbSaveContractor(ct).catch(function(e){ console.warn('saveContractor SB failed:',e); });
+  sbSaveContractor(data).catch(function(e){ console.warn('saveContractor SB failed:',e); });
   // Upload contractor files to Supabase Storage
   var ctf = window._ctFiles||{wsib:[],insurance:[],other:[]};
   ['wsib','insurance','other'].forEach(function(bucket){
@@ -3266,7 +3280,18 @@ function calcRenoScore(unitId) {
 }
 
 function ctAddPerson() {
-  var people = ctGetPeople();
+  // Read current rows WITHOUT filtering empties, then append a new blank row
+  var people = [];
+  var rows = document.querySelectorAll('#ct_people_list [data-pi]');
+  var seen = {};
+  rows.forEach(function(el) {
+    var i = parseInt(el.getAttribute('data-pi'));
+    if(!seen[i]) { seen[i] = {name:'', phone:'', email:''}; people[i] = seen[i]; }
+    if(el.classList.contains('ct-person-name'))  seen[i].name  = el.value.trim();
+    if(el.classList.contains('ct-person-phone')) seen[i].phone = el.value.trim();
+    if(el.classList.contains('ct-person-email')) seen[i].email = el.value.trim();
+  });
+  people = people.filter(Boolean); // remove undefined slots but keep empty-string rows
   people.push({name:'', phone:'', email:''});
   ctRenderPeople(people);
   // Focus the new name field
