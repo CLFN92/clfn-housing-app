@@ -2203,6 +2203,20 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/emailjs-com/3.2.0/email.min.js"></script>
 <script>
+// Safety shim — ensures ROLE is available even if shared-config.js loads late
+if (typeof ROLE === 'undefined') {
+  var ROLE = { HE_L1:'housing_employee_l1', HE_L2:'housing_employee_l2',
+    HOUSING_MANAGER:'housing_manager', ED:'ed', CFO:'cfo', FINANCE_L1:'finance_l1',
+    isManagement: function(r){ return r==='housing_manager'||r==='ed'||r==='hm'; } };
+}
+if (typeof APP_STATUS === 'undefined') {
+  var APP_STATUS = { DRAFT:'draft', SUBMITTED:'submitted', MGR_APPROVED:'mgr_approved',
+    ED_APPROVED:'ed_approved', FILE_UPDATE:'file_update', ARCHIVED:'archived',
+    label: function(s){ return s; }, all: function(){ return []; } };
+}
+// Safe navigation helpers for use in dynamically created modal onclicks
+function _goInventory() { if(typeof showInventory==='function') showInventory(); else window.location.reload(); }
+function _goEmployeeHome() { if(typeof showEmployeeHome==='function') showEmployeeHome(); }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BUILD MARKER — if you see this in the console, you are running the F1 build.
@@ -2271,7 +2285,7 @@ const uploadedFiles = [];
 const DRAFT_KEY = 'clfn_housing_draft';
 let currentAppId = null;
 let approvalState  = 'draft';
-let approvalRole   = ROLE.HE_L1;
+let approvalRole   = (typeof ROLE !== 'undefined') ? ROLE.HE_L1 : 'housing_employee_l1';
 
 // ── Helpers ──
 
@@ -5320,7 +5334,7 @@ function showUnitSaveConfirmation(u) {
       +'</div>'
       +'<div style="display:flex;gap:10px;justify-content:flex-end;">'
         +'<button onclick="document.getElementById(\'unit_save_confirmation\').remove();" class="btn btn-ghost">Close</button>'
-        +'<button onclick="document.getElementById(\'unit_save_confirmation\').remove();showInventory();" style="padding:10px 24px;border-radius:8px;border:none;background:var(--yellow);color:#111;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;">View Inventory</button>'
+        +'<button onclick="document.getElementById(\'unit_save_confirmation\').remove();_goInventory();" style="padding:10px 24px;border-radius:8px;border:none;background:var(--yellow);color:#111;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;">View Inventory</button>'
       +'</div>'
     +'</div>'
     +'</div>';
@@ -7176,7 +7190,7 @@ function showAddUnitConfirmation(unit) {
         '</div>' +
       '</div>' +
       '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
-        '<button onclick="document.getElementById(\'add_unit_confirmation\').remove();showInventory();" style="padding:10px 24px;border-radius:8px;border:none;background:var(--yellow);color:#111;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;">View Inventory</button>' +
+        '<button onclick="document.getElementById(\'add_unit_confirmation\').remove();_goInventory();" style="padding:10px 24px;border-radius:8px;border:none;background:var(--yellow);color:#111;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;">View Inventory</button>' +
       '</div>' +
     '</div>' +
     '</div>';
