@@ -2610,9 +2610,14 @@ function renderWorklist() {
     var actionBtn = '';
     if(a.status==='returned') {
       actionBtn = '<button data-wl-edit="'+a.id+'" onclick="event.stopPropagation();wlEditApp(this)" style="background:var(--yellow);border:none;color:#111;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Update →</button>';
-    } else if((role=== ROLE.HOUSING_MANAGER&&(a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)) || (role=== ROLE.ED&&a.status===APP_STATUS.MGR_APPROVED)) {
+    } else if(
+        (APPROVAL_AUTHORITY.can('reviewFileUpdate', role) && a.status===APP_STATUS.FILE_UPDATE)
+        || (APPROVAL_AUTHORITY.can('reviewApplication', role) && (a.status===APP_STATUS.SUBMITTED))
+        || (APPROVAL_AUTHORITY.can('finalApproveApp', role) && a.status===APP_STATUS.MGR_APPROVED)) {
       actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:#1d4ed8;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Review →</button>';
-    } else if((typeof ROLE !== 'undefined' && ROLE.isManagement(role))&&(a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit) {
+    } else if(!a.assignedUnit
+        && (a.status===APP_STATUS.ED_APPROVED && APPROVAL_AUTHORITY.can('assignUnit', role)
+         || a.status==='hm_approved' && APPROVAL_AUTHORITY.can('approveFileUpdate', role))) {
       actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:#15803d;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
     }
     return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-wl-id="'+a.id+'" onclick="wlOpenApp(this)">'

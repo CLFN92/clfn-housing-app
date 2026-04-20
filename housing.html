@@ -4385,11 +4385,13 @@ function renderDashTable(){
     var statusMap={draft:['Draft','pill-draft'],submitted:['Awaiting HM Review','pill-submitted'],file_update:['File Update — Awaiting HM','pill-submitted'],mgr_approved:['Awaiting ED Approval','pill-mgr'],hm_recommended:['HM Recommended','pill-mgr'],hm_approved:['File Update Approved','pill-approved'],ed_approved:['ED Approved','pill-approved'],declined:['Declined','pill-declined'],returned:['Returned for Info','pill-returned'],housed:['Housed','pill-approved'],assigned:['Assigned','pill-assigned']};
     var sp=statusMap[a.status]||['—','pill-draft'];
     var role=window.currentRole||'housing_employee_l1';
-    var canAssignFromDash = (ROLE.isManagement(role))
-      && (a.status===APP_STATUS.ED_APPROVED||a.status==='hm_approved')
-      && !a.assignedUnit && !a.archived;
-    var canReviewFromDash = (role=== ROLE.HOUSING_MANAGER && (a.status===APP_STATUS.SUBMITTED||a.status==='returned'||a.status===APP_STATUS.FILE_UPDATE))
-      || (role=== ROLE.ED && (a.status===APP_STATUS.MGR_APPROVED||a.status===APP_STATUS.SUBMITTED));
+    var canAssignFromDash = !a.assignedUnit && !a.archived
+      && (a.status===APP_STATUS.ED_APPROVED && APPROVAL_AUTHORITY.can('assignUnit', role)
+       || a.status==='hm_approved' && APPROVAL_AUTHORITY.can('approveFileUpdate', role));
+    var canReviewFileUpdate = a.status===APP_STATUS.FILE_UPDATE && APPROVAL_AUTHORITY.can('reviewFileUpdate', role);
+    var canReviewFromDash = canReviewFileUpdate
+      || (APPROVAL_AUTHORITY.can('reviewApplication', role) && (a.status===APP_STATUS.SUBMITTED||a.status==='returned'))
+      || (APPROVAL_AUTHORITY.can('finalApproveApp', role) && a.status===APP_STATUS.MGR_APPROVED);
     return '<tr>'
       +'<td style="cursor:pointer;" data-sc-id="'+a.id+'">'
       +'<div class="appl-name" style="text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;">'+(a.fn ? (a.fn+' '+(a.ln||'')).trim() : ('<span style="color:var(--muted);font-style:italic;">'+( (a.data&&(a.data.name||a.data.fullName)) || 'Unknown applicant')+'</span>'))+'</div>'
@@ -5374,8 +5376,8 @@ function ueTenantSearch(q) {
   var eligible = apps.filter(function(a) {
     if (a.archived) return false;
     if (a.status === APP_STATUS.ED_APPROVED) return true;
-    if (a.status === 'hm_approved') return true;  // File Update Approved
-    if ((ROLE.isManagement(role)) && a.status === APP_STATUS.MGR_APPROVED) return true;
+    if (a.status === 'hm_approved' && APPROVAL_AUTHORITY.can('approveFileUpdate', role)) return true;
+    if (APPROVAL_AUTHORITY.can('finalApproveApp', role) && a.status === APP_STATUS.MGR_APPROVED) return true;
     return false;
   });
 
@@ -5671,7 +5673,7 @@ function renderMatchView(){
     var sl = statusLabel[app.status] || (app.status==='hm_approved'?'File Update Approved':app.status) || '';
     var appDateStr = app.appDate ? 'Applied '+app.appDate : '';
 
-    var canAssign = app.status===APP_STATUS.ED_APPROVED||app.status==='hm_approved';
+    var canAssign = app.status===APP_STATUS.ED_APPROVED || (app.status==='hm_approved' && APPROVAL_AUTHORITY.can('approveFileUpdate', role));
     var isAssigned = app.status==='assigned';
     var assignCell = isAssigned
       ? '<div style="font-size:11px;font-weight:700;color:#15803d;">✓ '+(app.assignedAddress||'Assigned')+'</div>'
@@ -10918,16 +10920,18 @@ function renderScorecardActions(app) {
   var isFileUpdate = (app.appType === 'existing_tenant');
   var actions = [];
 
-  // ── Housing Manager actions ──
-  if(role === ROLE.HOUSING_MANAGER) {
+  // ── Housing Manager / reviewApplication authority ──
+  if(APPROVAL_AUTHORITY.can('reviewApplication', role)) {
     if(status === APP_STATUS.SUBMITTED) {
-      // New housing app — HM recommends to ED
+      // New housing app — recommends to ED
       actions.push({ label: '✅ Recommend to ED', cls: 'btn-green',   action: 'mgr_approved',  confirmLabel: 'Recommend to Executive Director' });
       actions.push({ label: '↩️ Return for Info',  cls: 'btn-sec',    action: 'returned',       confirmLabel: 'Return to Submitter' });
       actions.push({ label: '❌ Decline',           cls: 'btn-ghost',  action: 'declined',       confirmLabel: 'Decline Application', needsNotes: true });
     }
+  }
+  // ── File Update approver ──
+  if(APPROVAL_AUTHORITY.can('approveFileUpdate', role)) {
     if(status === APP_STATUS.FILE_UPDATE) {
-      // File update — HM is final approver
       actions.push({ label: '✅ Approve File Update', cls: 'btn-green', action: 'hm_approved', confirmLabel: 'Approve File Update' });
       actions.push({ label: '↩️ Return for Info',     cls: 'btn-sec',   action: 'returned',    confirmLabel: 'Return to Submitter' });
     }
