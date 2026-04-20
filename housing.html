@@ -4341,7 +4341,7 @@ function updateDashStats(){
     var vacant   = housingUnits.filter(function(u){ return u.status==='vacant' && !u.archived; }).length;
     var assigned = applications.filter(function(a){ return a.assignedUnit; }).length;
     var ready    = applications.filter(function(a){
-      return (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit&&!a.archived;
+      return (a.status===APP_STATUS.ED_APPROVED)&&!a.assignedUnit&&!a.archived;
     }).length;
     var unhoused = applications.filter(function(a){
       return !a.assignedUnit&&!a.archived&&a.status!=='declined';
@@ -4686,7 +4686,7 @@ function showApp(){
 
 function showSettings(){
   var role = window.currentRole || 'housing_employee_l1';
-  if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) {
+  if(!APPROVAL_AUTHORITY.can('accessSettings', role)) {
     showToast('Settings are only accessible to the Housing Manager and Executive Director.');
     return;
   }
@@ -5478,7 +5478,7 @@ function ueTenantSelect(appId, name, status) {
   var warn = '';
   if (!isApproved) {
     warn = '<div style="margin-top:8px;padding:8px 10px;background:#fef2f2;border-radius:6px;font-size:11px;color:#b91c1c;font-weight:600;">⛔ This application has not been approved. Cannot assign tenant.</div>';
-  } else if (isHM && role === ROLE.ED) {
+  } else if (isHM && APPROVAL_AUTHORITY.can('finalApproveApp', role)) {
     warn = '<div style="margin-top:8px;padding:8px 10px;background:#eff6ff;border-radius:6px;font-size:11px;color:#1d4ed8;">ℹ️ Recommended by Housing Manager — awaiting your final approval. You may proceed with assignment.</div>';
   }
 
@@ -5575,7 +5575,7 @@ function renderMatchView(){
   var awaitingCount = allApps.filter(function(a){ return a.status!==APP_STATUS.DRAFT&&a.status!==APP_STATUS.ARCHIVED&&a.status!=='assigned'; }).length;
   var activeChip = window._matchActiveChip || '';
   var totalActiveCount = allApps.filter(function(a){ return !a.archived && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.FILE_UPDATE; }).length;
-  var readyCount    = allApps.filter(function(a){ return (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit&&!a.archived; }).length;
+  var readyCount    = allApps.filter(function(a){ return a.status===APP_STATUS.ED_APPROVED&&!a.assignedUnit&&!a.archived; }).length;
   var needsHousingCount = allApps.filter(function(a){ return a.status!=='assigned'&&a.status!==APP_STATUS.DRAFT&&a.status!==APP_STATUS.ARCHIVED&&a.status!==APP_STATUS.FILE_UPDATE; }).length;
   var chipDefs = [
     {label:'Total Active: '+totalActiveCount,      color:'#15803d', bg:'#f0fdf4', key:''},
@@ -8583,8 +8583,8 @@ function atSearchApps(q){
   // ed_approved = fully approved; mgr_approved = HM recommended (HM role can assign)
   var role = window.currentRole || 'housing_employee_l1';
   var valid=apps.filter(function(a){
-    if(role=== ROLE.ED) return a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED;
-    if(role=== ROLE.HOUSING_MANAGER) return a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED;
+    if(APPROVAL_AUTHORITY.can('finalApproveApp', role)) return a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED;
+    if(APPROVAL_AUTHORITY.can('reviewApplication', role)) return a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED;
     return a.status===APP_STATUS.ED_APPROVED;
   });
   var matches=q.trim().length>0
@@ -9959,7 +9959,7 @@ window._navMap = {
 function showDashboard(){
   // The actual applications dashboard — HM and ED only
   var role = window.currentRole || 'housing_employee_l1';
-  if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) { showToast('Dashboard access requires Housing Manager or Executive Director role.'); return; }
+  if(!APPROVAL_AUTHORITY.can('accessSettings', role)) { showToast('Dashboard access requires Housing Manager or Executive Director role.'); return; }
   if(!window._navSkipPush) pushNav('dashboard');
   hideAllViews('dashView');
   setNavActive('tab_dash');
@@ -10081,7 +10081,7 @@ function showEmployeeHome(){
       +'<span style="font-size:12px;color:#888;">Enter a housing application for a community member</span>'
       +'</div>';
 
-    var _wlActionCount = role=== ROLE.HOUSING_MANAGER
+    var _wlActionCount = APPROVAL_AUTHORITY.can('reviewApplication', role)
       ? apps.filter(function(a){return (a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)&&!a.archived;}).length
       : apps.filter(function(a){return a.status===APP_STATUS.MGR_APPROVED&&!a.archived;}).length;
     var _wlReturnCount = apps.filter(function(a){return a.status==='returned'&&!a.archived;}).length;
@@ -10940,15 +10940,14 @@ function renderScorecardActions(app) {
     }
   }
 
-  // ── Executive Director actions ──
-  if(role === ROLE.ED) {
+  // ── Final approver actions ──
+  if(APPROVAL_AUTHORITY.can('finalApproveApp', role)) {
     if(status === APP_STATUS.MGR_APPROVED) {
       actions.push({ label: '✅ Final Approval',  cls: 'btn-green',  action: 'ed_approved', confirmLabel: 'Grant Final Approval' });
       actions.push({ label: '↩️ Return to HM',    cls: 'btn-sec',    action: 'returned',    confirmLabel: 'Return to Housing Manager' });
       actions.push({ label: '❌ Decline',          cls: 'btn-ghost',  action: 'declined',    confirmLabel: 'Decline Application', needsNotes: true });
     }
     if(status === APP_STATUS.SUBMITTED) {
-      // ED can also act directly on submitted apps
       actions.push({ label: '✅ Final Approval',  cls: 'btn-green',  action: 'ed_approved', confirmLabel: 'Grant Final Approval' });
       actions.push({ label: '↩️ Return for Info', cls: 'btn-sec',    action: 'returned',    confirmLabel: 'Return for More Info' });
       actions.push({ label: '❌ Decline',          cls: 'btn-ghost',  action: 'declined',    confirmLabel: 'Decline Application', needsNotes: true });

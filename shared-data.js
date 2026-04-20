@@ -2545,20 +2545,20 @@ function renderWorklist() {
       {key:'draft',     label:'Draft',          filter: function(a){ return a.status===APP_STATUS.DRAFT; }},
       {key:'declined',  label:'Declined',       filter: function(a){ return a.status==='declined'; }}
     ];
-  } else if(role === ROLE.HOUSING_MANAGER) {
+  } else if(APPROVAL_AUTHORITY.can('reviewApplication', role)) {
     chipDefs = [
       {key:'',          label:'All Active',     filter: function(a){ return !a.archived; }},
       {key:'action',    label:'Needs Review',   filter: function(a){ return ['submitted','file_update'].indexOf(a.status)!==-1; }, alert:true},
       {key:'returned',  label:'Returned',       filter: function(a){ return a.status==='returned'; }, alert:true},
-      {key:'pending',   label:'Awaiting ED',    filter: function(a){ return a.status===APP_STATUS.MGR_APPROVED; }},
-      {key:'approved',  label:'ED Approved',    filter: function(a){ return a.status===APP_STATUS.ED_APPROVED; }},
+      {key:'pending',   label:'Awaiting Approval', filter: function(a){ return a.status===APP_STATUS.MGR_APPROVED; }},
+      {key:'approved',  label:'Final Approved', filter: function(a){ return a.status===APP_STATUS.ED_APPROVED; }},
       {key:'assigned',  label:'Assigned',       filter: function(a){ return a.status==='assigned'; }}
     ];
-  } else {
+  } else if(APPROVAL_AUTHORITY.can('finalApproveApp', role)) {
     chipDefs = [
       {key:'',          label:'All Active',     filter: function(a){ return !a.archived; }},
       {key:'action',    label:'Needs Approval', filter: function(a){ return a.status===APP_STATUS.MGR_APPROVED; }, alert:true},
-      {key:'submitted', label:'Awaiting HM',    filter: function(a){ return a.status===APP_STATUS.SUBMITTED; }},
+      {key:'submitted', label:'Awaiting Review',filter: function(a){ return a.status===APP_STATUS.SUBMITTED; }},
       {key:'approved',  label:'Approved',       filter: function(a){ return a.status===APP_STATUS.ED_APPROVED; }},
       {key:'assigned',  label:'Assigned',       filter: function(a){ return a.status==='assigned'; }},
       {key:'declined',  label:'Declined',       filter: function(a){ return a.status==='declined'; }}
