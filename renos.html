@@ -189,23 +189,24 @@
 </div><!-- end contractorsView -->
 
 <!-- ── Contractor Approval Panel (slide-in from right) ── -->
-<div id="ctApprovalPanel" style="display:none;position:fixed;inset:0;z-index:850;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:flex-end;" onclick="if(event.target===this)closeCtApprovalPanel()">
-  <div style="background:var(--surface);width:100%;max-width:480px;height:100%;overflow-y:auto;box-shadow:-8px 0 40px rgba(0,0,0,0.3);display:flex;flex-direction:column;">
-    <!-- Panel header -->
+<div id="ctApprovalPanel" class="modal-ov" style="z-index:850;" onclick="if(event.target===this)closeCtApprovalPanel()">
+  <div class="modal modal-lg" style="padding:0;max-height:90vh;overflow-y:auto;">
+
+    <!-- Header -->
     <div class="modal-hdr sticky">
       <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Contractor Application</div>
-        <div id="ctap_name" style="font-size:15px;font-weight:700;color:#fff;"></div>
+        <div class="modal-hdr-sub" style="margin-bottom:2px;">Contractor Application</div>
+        <div id="ctap_name" class="modal-hdr-title"></div>
         <div id="ctap_trade" style="font-size:11px;color:#888;margin-top:1px;"></div>
       </div>
-      <button onclick="closeCtApprovalPanel()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+      <button onclick="closeCtApprovalPanel()" class="modal-close-btn" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
     </div>
 
     <!-- Status banner -->
     <div id="ctap_status_banner" style="padding:10px 20px;font-size:12px;font-weight:700;text-align:center;"></div>
 
-    <!-- Panel body -->
-    <div style="padding:20px;flex:1;display:flex;flex-direction:column;gap:16px;">
+    <!-- Body -->
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:16px;">
 
       <!-- Info summary -->
       <div class="card" style="padding:0;overflow:hidden;">
@@ -230,10 +231,10 @@
         <div id="ctap_flow" style="display:flex;align-items:center;gap:0;"></div>
       </div>
 
-      <!-- Action buttons (role-gated) -->
+      <!-- Action buttons -->
       <div id="ctap_actions" style="display:flex;flex-direction:column;gap:10px;"></div>
 
-      <!-- Notes input (shown when action needs notes) -->
+      <!-- Notes input -->
       <div id="ctap_notes_wrap" style="display:none;">
         <div class="f">
           <label>Notes / Reason <span id="ctap_notes_req" style="color:#b91c1c;"></span></label>
@@ -250,7 +251,7 @@
         <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Audit Trail</div>
         </div>
-        <div id="ctap_audit" style="padding:14px;display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;"></div>
+        <div id="ctap_audit" style="padding:14px;display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto;"></div>
       </div>
 
     </div>

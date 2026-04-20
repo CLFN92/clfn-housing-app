@@ -1048,7 +1048,7 @@ function closeAddContractorModal(){
 }
 function closeCtApprovalPanel() {
   var panel = document.getElementById('ctApprovalPanel');
-  if(panel) panel.style.display='none';
+  if(panel) { panel.classList.remove('on'); document.body.classList.remove('modal-open'); }
   _ctApprovalIdx = -1;
   _ctPendingAction = null;
 }
@@ -1544,7 +1544,7 @@ function openCtApprovalPanel(idx) {
 
   // Show panel
   var panel = document.getElementById('ctApprovalPanel');
-  if(panel){ panel.style.removeProperty('display'); panel.style.setProperty('display','flex','important'); }
+  if(panel){ panel.classList.add('on'); document.body.classList.add('modal-open'); }
 }
 function populateSettings(){
   // Populate HM budget limit
