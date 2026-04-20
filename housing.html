@@ -1350,7 +1350,7 @@
     </div>
   </div>
   <div class="filter-bar" style="margin-bottom:16px;">
-    <input id="tenant_search" type="text" placeholder="🔍 Search name or address..." oninput="renderTenantsView()"/>
+    <input id="tenant_search" type="text" placeholder="🔍 Search name or address..." oninput="renderTenantsView()" style="width:360px;max-width:100%;padding:9px 14px;font-size:13px;border:1.5px solid var(--border);border-radius:8px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>
   </div>
   <div class="card" style="padding:0;overflow:hidden;">
     <div style="overflow-x:auto;">
@@ -5782,9 +5782,8 @@ function renderTenantsView(){
     btn.addEventListener('click',function(e){
       e.stopPropagation();
       var appId = btn.getAttribute('data-app-link');
-      var app = (typeof applications!=='undefined'?applications:[]).find(function(a){return a.id===appId;});
-      if(app) { openScorecard(app); }
-      else { showToast('Application not found: '+appId); }
+      if(typeof window.openEditModal === 'function') window.openEditModal(appId);
+      else showToast('Application not found: '+appId);
     });
   });
   tbody.querySelectorAll('[data-sow-uid]').forEach(function(btn){
