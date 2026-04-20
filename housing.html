@@ -5487,9 +5487,9 @@ function renderMatchView(){
     }
     // Chip filter
     if(chipFilter === 'vacant')   return a.status!=='assigned' && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.ARCHIVED && a.status!==APP_STATUS.FILE_UPDATE;
-    if(chipFilter === 'ready')    return a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED;
+    if(chipFilter === 'ready')    return a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED||a.status==='hm_approved';
     if(chipFilter === 'assigned') return a.status==='assigned';
-    if(chipFilter === 'awaiting') return a.status!==APP_STATUS.DRAFT&&a.status!==APP_STATUS.ARCHIVED&&a.status!=='assigned'&&a.status!==APP_STATUS.ED_APPROVED&&a.status!==APP_STATUS.MGR_APPROVED;
+    if(chipFilter === 'awaiting') return a.status!==APP_STATUS.DRAFT&&a.status!==APP_STATUS.ARCHIVED&&a.status!=='assigned'&&a.status!==APP_STATUS.ED_APPROVED&&a.status!==APP_STATUS.MGR_APPROVED&&a.status!=='hm_approved';
     return true;
   });
 
@@ -5568,6 +5568,7 @@ function renderMatchView(){
     'submitted':    'Pending HM',
     'ed_approved':  'ED Approved',
     'mgr_approved': 'Mgr Approved',
+    'hm_approved':  'File Update Approved',
     'assigned':     'Assigned'
   };
 
