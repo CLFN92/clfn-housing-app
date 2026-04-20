@@ -2953,12 +2953,16 @@ function showInventory(){
   setExportView('inventory');
   setNavActive('tab_inventory');
   _showView('inventoryView', renderInventoryView);
+  var _iv=document.getElementById('inventoryView');
+  if(_iv){_iv.style.marginLeft='auto';_iv.style.marginRight='auto';_iv.style.maxWidth='1400px';_iv.style.width='100%';}
 }
 function showTenants(){
   if(!window._navSkipPush) pushNav('tenants');
   setExportView(null);
   setNavActive('tab_tenants');
   _showView('tenantsView', renderTenantsView);
+  var _tv=document.getElementById('tenantsView');
+  if(_tv){_tv.style.marginLeft='auto';_tv.style.marginRight='auto';_tv.style.maxWidth='1400px';_tv.style.width='100%';}
 }
 function showWorklist() {
   if(!window._navSkipPush) pushNav('worklist');
@@ -3658,6 +3662,8 @@ function showMatch(){
   setNavActive('tab_match');
   window._matchActiveChip = '';
   _showView('matchView', renderMatchView);
+  var _mv=document.getElementById('matchView');
+  if(_mv){_mv.style.marginLeft='auto';_mv.style.marginRight='auto';_mv.style.maxWidth='1400px';_mv.style.width='100%';}
 }
 
 function showContractors(){
