@@ -2849,7 +2849,13 @@ function _deleteRows(table, ids){
 // exist in Supabase. That masked real persistence failures. Now: if a
 // Supabase write fails, the user sees a red toast AND the data won't be
 // there on refresh. Painful, but honest.
+// Queue to serialize saveData calls - prevents concurrent writes causing duplicate upserts
+var _saveQueue = Promise.resolve();
 function saveData(d){
+  // Enqueue this save - runs after any in-flight save completes
+  _saveQueue = _saveQueue.then(function(){ return _doSaveData(d); }).catch(function(){});
+}
+function _doSaveData(d){
   // Snapshot prev BEFORE we touch _memStore. Deep-clone so later mutations
   // (including _memStore = next on the next line) can't retroactively change
   // what prev looks like during the diff.
@@ -2916,17 +2922,8 @@ function saveData(d){
     return;
   }
 
-  // 3) Audit log write — fire-and-forget, NOT included in writePromises.
-  // Audit failures must never block or fail the main save flow.
-  _writeAuditEntry({
-    action: 'saveData',
-    summary: 'Saved finance state (' + totalUpserts + ' upserts, ' + totalDeletes + ' deletes)',
-    entity_type: 'batch',
-    detail: { upserts: totalUpserts, deletes: totalDeletes }
-  });
-
-  // 4) Handle outcome. Log per-table report on success; toast red on failure.
-  Promise.all(writePromises).then(function(){
+  // 3) Handle outcome. Log per-table report on success; toast red on failure.
+  return Promise.all(writePromises).then(function(){
     console.log('[finance] save OK —', perTableReport.join(', '));
   }).catch(function(err){
     console.error('[finance] save FAILED —', perTableReport.join(', '), err);
