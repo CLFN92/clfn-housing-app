@@ -2612,7 +2612,7 @@ function renderWorklist() {
       actionBtn = '<button data-wl-edit="'+a.id+'" onclick="event.stopPropagation();wlEditApp(this)" style="background:var(--yellow);border:none;color:#111;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Update →</button>';
     } else if((role=== ROLE.HOUSING_MANAGER&&(a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)) || (role=== ROLE.ED&&a.status===APP_STATUS.MGR_APPROVED)) {
       actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:#1d4ed8;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Review →</button>';
-    } else if((ROLE.isManagement(role))&&(a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit) {
+    } else if((typeof ROLE !== 'undefined' && ROLE.isManagement(role))&&(a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit) {
       actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:#15803d;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
     }
     return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-wl-id="'+a.id+'" onclick="wlOpenApp(this)">'
@@ -2948,21 +2948,31 @@ function showContractorsForRole() {
     openContractorSearch();
   }
 }
+
+// Center a page-view-wide element - same pattern as showDashboard
+function _centerView(el) {
+  if (!el) return;
+  el.style.display       = 'flex';
+  el.style.flexDirection = 'column';
+  el.style.width         = 'min(100%, 1400px)';
+  el.style.marginLeft    = 'auto';
+  el.style.marginRight   = 'auto';
+  el.style.boxSizing     = 'border-box';
+}
+
 function showInventory(){
   if(!window._navSkipPush) pushNav('inventory');
   setExportView('inventory');
   setNavActive('tab_inventory');
   _showView('inventoryView', renderInventoryView);
-  var _iv=document.getElementById('inventoryView');
-  if(_iv){_iv.style.marginLeft='auto';_iv.style.marginRight='auto';_iv.style.maxWidth='1400px';_iv.style.width='100%';}
+  _centerView(document.getElementById('inventoryView'));
 }
 function showTenants(){
   if(!window._navSkipPush) pushNav('tenants');
   setExportView(null);
   setNavActive('tab_tenants');
   _showView('tenantsView', renderTenantsView);
-  var _tv=document.getElementById('tenantsView');
-  if(_tv){_tv.style.marginLeft='auto';_tv.style.marginRight='auto';_tv.style.maxWidth='1400px';_tv.style.width='100%';}
+  _centerView(document.getElementById('tenantsView'));
 }
 function showWorklist() {
   if(!window._navSkipPush) pushNav('worklist');
@@ -3662,8 +3672,7 @@ function showMatch(){
   setNavActive('tab_match');
   window._matchActiveChip = '';
   _showView('matchView', renderMatchView);
-  var _mv=document.getElementById('matchView');
-  if(_mv){_mv.style.marginLeft='auto';_mv.style.marginRight='auto';_mv.style.maxWidth='1400px';_mv.style.width='100%';}
+  _centerView(document.getElementById('matchView'));
 }
 
 function showContractors(){
