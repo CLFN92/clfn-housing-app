@@ -4379,7 +4379,7 @@ function renderDashTable(){
     var sp=statusMap[a.status]||['—','pill-draft'];
     var role=window.currentRole||'housing_employee_l1';
     var canAssignFromDash = (ROLE.isManagement(role))
-      && (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED||a.status==='hm_approved')
+      && (a.status===APP_STATUS.ED_APPROVED||a.status==='hm_approved')
       && !a.assignedUnit && !a.archived;
     var canReviewFromDash = (role=== ROLE.HOUSING_MANAGER && (a.status===APP_STATUS.SUBMITTED||a.status==='returned'||a.status===APP_STATUS.FILE_UPDATE))
       || (role=== ROLE.ED && (a.status===APP_STATUS.MGR_APPROVED||a.status===APP_STATUS.SUBMITTED));
@@ -5252,7 +5252,15 @@ function saveUnitEdit(){
   var nmVal=(document.getElementById('ue_assignedName')||{}).value||'';
   u.assignedTo=toVal; u.assignedName=nmVal;
   u.assignedDate=get('ue_assignedDate');
-  // If status changed to vacant/repair/condemned, clear assignment
+  // Auto-set status to occupied when tenant is being assigned
+  // Must run BEFORE the vacant-clear block so the assignment isn't wiped
+  var toVal2=(document.getElementById('ue_assignedTo')||{}).value||'';
+  if(toVal2 && u.status==='vacant') {
+    u.status = 'occupied';
+    var statusEl2 = document.getElementById('ue_status');
+    if(statusEl2) statusEl2.value = 'occupied';
+  }
+  // If status is vacant/repair/condemned, clear any assignment
   if(u.status==='vacant'||u.status==='under_repair'||u.status==='condemned'){
     u.assignedTo=null; u.assignedName=null; u.assignedDate=null;
   }
@@ -5264,7 +5272,7 @@ function saveUnitEdit(){
     if(linkedApp2) {
       var appStatus = linkedApp2.status||'';
       var edApproved   = appStatus===APP_STATUS.ED_APPROVED;
-      var fileApproved = appStatus==='hm_approved'; // File Update Approved by HM
+      var fileApproved = appStatus==='hm_approved';
       var hmApproved   = appStatus===APP_STATUS.MGR_APPROVED||edApproved||fileApproved;
       if(role2=== ROLE.ED && !edApproved && !fileApproved) {
         showToast('⚠ ED Approval required before assigning tenant. Application is: '+appStatus.replace(/_/g,' '));
@@ -5274,16 +5282,9 @@ function saveUnitEdit(){
         showToast('⚠ Housing Manager approval required before assigning tenant. Application is: '+appStatus.replace(/_/g,' '));
         return;
       }
-      // Write back HM approval flag on unit
       u.tenantApprovedBy = role2=== ROLE.ED?'Executive Director':'Housing Manager';
       u.tenantApprovedAt = new Date().toISOString().split('T')[0];
     }
-  }
-  // Auto-set status to occupied when tenant assigned, vacant when removed
-  if(u.assignedTo && u.status === 'vacant') {
-    u.status = 'occupied';
-    var statusEl2 = document.getElementById('ue_status');
-    if(statusEl2) statusEl2.value = 'occupied';
   }
   // Save unit to Supabase
   sbSaveUnit(u).catch(function(e){ console.warn('Unit save failed:', e); });
@@ -5656,7 +5657,7 @@ function renderMatchView(){
     var sl = statusLabel[app.status] || (app.status==='hm_approved'?'File Update Approved':app.status) || '';
     var appDateStr = app.appDate ? 'Applied '+app.appDate : '';
 
-    var canAssign = app.status===APP_STATUS.ED_APPROVED||app.status===APP_STATUS.MGR_APPROVED||app.status==='hm_approved';
+    var canAssign = app.status===APP_STATUS.ED_APPROVED||app.status==='hm_approved';
     var isAssigned = app.status==='assigned';
     var assignCell = isAssigned
       ? '<div style="font-size:11px;font-weight:700;color:#15803d;">✓ '+(app.assignedAddress||'Assigned')+'</div>'
@@ -11312,8 +11313,8 @@ function confirmAssignment() {
   var name=((app.fn||'')+' '+(app.ln||'')).trim();
 
   // Role gate
-  if(role=== ROLE.ED&&app.status!==APP_STATUS.ED_APPROVED){showToast('ED approval required — status: '+app.status.replace(/_/g,' '));return;}
-  if(role=== ROLE.HOUSING_MANAGER&&app.status!==APP_STATUS.MGR_APPROVED&&app.status!==APP_STATUS.ED_APPROVED){showToast('HM recommendation required — status: '+app.status.replace(/_/g,' '));return;}
+  if(role=== ROLE.ED&&app.status!==APP_STATUS.ED_APPROVED&&app.status!=='hm_approved'){showToast('ED approval required — status: '+app.status.replace(/_/g,' '));return;}
+  if(role=== ROLE.HOUSING_MANAGER&&app.status!==APP_STATUS.MGR_APPROVED&&app.status!==APP_STATUS.ED_APPROVED&&app.status!=='hm_approved'){showToast('HM recommendation required — status: '+app.status.replace(/_/g,' '));return;}
 
   // Write unit
   var isTransferReq = (app.appType === 'transfer_request');
@@ -11349,7 +11350,41 @@ function confirmAssignment() {
   if(typeof renderMatchView === 'function') renderMatchView();
   if(typeof renderDashTable === 'function') renderDashTable();
   if(typeof updateDashStats === 'function') updateDashStats();
-  showToast('✓ '+name+' assigned to '+u.num+' '+u.street+(isEdOverride2?' (override)':''));
+  showAssignConfirmation(name, u, moveIn, isEdOverride2);
+}
+
+function showAssignConfirmation(tenantName, unit, moveIn, isOverride) {
+  var existing = document.getElementById('assign_confirmation');
+  if(existing) existing.remove();
+  var addr = unit.num + ' ' + unit.street;
+  var overlay = document.createElement('div');
+  overlay.id = 'assign_confirmation';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML =
+    '<div style="background:var(--surface);border-radius:16px;max-width:480px;width:100%;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.5);">'
+    +'<div style="background:#000;padding:20px 28px;border-bottom:3px solid var(--yellow);text-align:center;">'
+      +'<div style="font-size:36px;margin-bottom:8px;">🏠</div>'
+      +'<div style="font-size:18px;font-weight:700;color:var(--yellow);">Unit Assigned</div>'
+      +'<div style="font-size:12px;color:#aaa;margin-top:4px;">' + (isOverride ? 'Override Assignment' : 'Confirmed') + '</div>'
+    +'</div>'
+    +'<div style="padding:24px 28px;">'
+      +'<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:20px;">'
+        +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px;">Assignment Details</div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">'
+          +'<div><div style="color:var(--muted);margin-bottom:2px;">Tenant</div><div style="font-weight:700;color:var(--yellow);">' + tenantName + '</div></div>'
+          +'<div><div style="color:var(--muted);margin-bottom:2px;">Unit</div><div style="font-weight:600;">' + addr + '</div></div>'
+          +'<div><div style="color:var(--muted);margin-bottom:2px;">Move-in Date</div><div style="font-weight:600;">' + (moveIn||'—') + '</div></div>'
+          +'<div><div style="color:var(--muted);margin-bottom:2px;">Status</div><div style="font-weight:600;color:#4ade80;">Occupied</div></div>'
+        +'</div>'
+      +'</div>'
+      +'<div style="display:flex;gap:10px;justify-content:flex-end;">'
+        +'<button onclick="document.getElementById(\'assign_confirmation\').remove();" class="btn btn-ghost">Close</button>'
+        +'<button onclick="document.getElementById(\'assign_confirmation\').remove();_goInventory();" style="padding:10px 24px;border-radius:8px;border:none;background:var(--yellow);color:#111;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;">View Inventory</button>'
+      +'</div>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e){ if(e.target===overlay) overlay.remove(); });
 }
 
 
