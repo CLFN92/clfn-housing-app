@@ -279,7 +279,7 @@
         <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Company Information</div>
         </div>
-        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;overflow:visible;">
           <div class="f" style="grid-column:1/-1"><label>Company / Name <span class="r">*</span></label><input id="ct_name" type="text" placeholder="e.g. Northern Builds Ltd."/></div>
           <div class="f"><label>Trade / Specialty</label>
             <select id="ct_trade">
@@ -652,7 +652,7 @@
             onfocus="rpContractorSearch(this.value)"
             onblur="setTimeout(function(){var d=document.getElementById('rp_ct_dropdown');if(d)d.style.display='none';},180)"/>
           <input type="hidden" id="rp_contractor_id"/>
-          <div id="rp_ct_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:999;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.15);"></div>
+          <div id="rp_ct_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:9999;max-height:240px;overflow-y:auto;box-shadow:0 12px 32px rgba(0,0,0,0.25);"></div>
         </div>
         <div class="f">
           <label>Target Completion</label>
@@ -722,7 +722,7 @@
         <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Unit Information</div>
         </div>
-        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;overflow:visible;">
           <div class="f"><label>Unit Address</label><input id="sow_address" type="text" placeholder="e.g. 11 Musko Road"/></div>
           <div class="f"><label>Date Prepared</label><input id="sow_date" type="date"/></div>
           <div class="f"><label>Current Tenant Name</label><input id="sow_tenant_name" type="text" placeholder="Full name of tenant"/></div>
@@ -732,7 +732,7 @@
               oninput="sowContractorSearch(this.value)" onfocus="sowContractorSearch(this.value)"
               onblur="setTimeout(function(){var d=document.getElementById('sow_ct_dropdown');if(d)d.style.display='none';},180)"/>
             <input type="hidden" id="sow_contractor_id"/>
-            <div id="sow_ct_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:1100;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.15);"></div>
+            <div id="sow_ct_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:9999;max-height:240px;overflow-y:auto;box-shadow:0 12px 32px rgba(0,0,0,0.25);"></div>
           </div>
         </div>
       </div>
@@ -742,7 +742,7 @@
         <div class="modal-hdr compact">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Condition Assessment</div>
         </div>
-        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;overflow:visible;">
           <div class="f"><label>Overall Condition</label>
             <select id="sow_condition">
               <option value="">— Select —</option>
@@ -922,7 +922,7 @@
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Approvals</div>
           <span id="sow_budget_badge" style="display:none;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;background:#fffbeb;color:#7a5c00;"></span>
         </div>
-        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;overflow:visible;">
           <div class="f"><label>Housing Manager Name</label><input id="sow_hm_name" type="text" placeholder="Full name"/></div>
           <div class="f"><label>HM Approval Date</label><input id="sow_hm_date" type="date"/></div>
           <div class="f"><label>Executive Director Name</label><input id="sow_ed_name" type="text" placeholder="Full name — required if over budget"/></div>
@@ -2051,40 +2051,13 @@ function saveRenoProgress() {
 
 
 
+// rpContractorSearch + rpSelectContractor use shared ctSearchWidget
 function rpContractorSearch(q) {
-  var dd = document.getElementById('rp_ct_dropdown');
-  if(!dd) return;
-  var contractors = [];
-  var contractors = window._contractors || [];
-  var term = (q||'').toLowerCase().trim();
-  var matches = term
-    ? contractors.filter(function(c){ return (c.name||'').toLowerCase().includes(term) || (c.trade||'').toLowerCase().includes(term); })
-    : contractors;
-
-  var rows = matches.map(function(c) {
-    return '<div data-ct-name="'+c.name+'" data-ct-id="'+(c.id||'')+'" style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" '
-      +'onmousedown="rpSelectContractor(this)" '
-      +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-      +'<div style="font-weight:600;">'+c.name+'</div>'
-      +(c.trade?'<div style="font-size:11px;color:var(--muted);">'+c.trade+'</div>':'')
-      +'</div>';
-  });
-
-  // Always show "Add new contractor" option
-  rows.push('<div onmousedown="rpAddNewContractor()" style="padding:9px 14px;cursor:pointer;font-size:12px;font-weight:700;color:var(--yellow);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;" '
-    +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-    +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
-    +(term && !matches.length ? 'Add "'+q+'" as new contractor' : 'Add new contractor')
-    +'</div>');
-
-  dd.innerHTML = rows.join('');
-  dd.style.display = 'block';
+  ctSearchWidget(q, 'rp_ct_dropdown', 'rp_contractor', 'rp_contractor_id', rpAddNewContractor);
 }
-
-
-
-
-
+function rpSelectContractor(el) {
+  ctSearchWidgetSelect(el);
+}
 
 function handleRenoPhotoUpload(input) {
   var files = Array.from(input.files);

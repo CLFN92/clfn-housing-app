@@ -2979,6 +2979,78 @@ function showWorklist() {
   }
   renderWorklist();
 }
+// ── Shared Contractor Search Widget ──────────────────────────────────────────
+// One reusable function for all contractor typeahead dropdowns.
+// inputId / hiddenId: the text input and hidden ID field element IDs
+// dropdownId: the dropdown container element ID
+// onAdd: callback to invoke when "Add new contractor" is clicked
+function ctSearchWidget(q, dropdownId, inputId, hiddenId, onAdd) {
+  var dd = document.getElementById(dropdownId);
+  if(!dd) return;
+  var contractors = window._contractors || [];
+  var term = (q||'').toLowerCase().trim();
+
+  var matches = term
+    ? contractors.filter(function(c) {
+        var name  = (c.name||'').toLowerCase();
+        var trade = (c.trade||'').toLowerCase();
+        return name.includes(term) || trade.includes(term)
+          || name.split(/\s+/).some(function(w){ return w.startsWith(term); });
+      })
+    : contractors;
+
+  var plusIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">'
+    +'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+
+  var rows = matches.map(function(c) {
+    var badge = c.status === 'approved'
+      ? '<span style="font-size:9px;background:#f0fdf4;color:#15803d;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:6px;">Active</span>'
+      : '<span style="font-size:9px;background:#fffbeb;color:#92400e;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:6px;">Pending</span>';
+    return '<div data-ct-name="'+c.name+'" data-ct-id="'+(c.id||'')+'"'
+      +' data-dd-id="'+dropdownId+'" data-inp-id="'+inputId+'" data-hid-id="'+hiddenId+'"'
+      +' onmousedown="ctSearchWidgetSelect(this)"'
+      +' style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);"'
+      +' onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
+      +'<div style="display:flex;align-items:center;">'+c.name+badge+'</div>'
+      +(c.trade?'<div style="font-size:11px;color:var(--muted);">'+c.trade+'</div>':'')
+      +'</div>';
+  });
+
+  if(!matches.length) {
+    rows.push('<div style="padding:9px 14px;font-size:12px;color:var(--muted);">'
+      +(term ? 'No contractor matching "'+term+'" found.' : 'No contractors added yet.')
+      +'</div>');
+  }
+
+  // Always show Add option
+  var addLabel = (term && !matches.length) ? 'Add "'+q+'" as new contractor' : 'Add new contractor';
+  rows.push('<div onmousedown="('+onAdd+')()"'
+    +' style="padding:9px 14px;cursor:pointer;font-size:12px;font-weight:700;color:var(--yellow);border-top:2px solid var(--yellow);display:flex;align-items:center;gap:6px;"'
+    +' onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
+    +plusIcon+' '+addLabel+'</div>');
+
+  dd.innerHTML = rows.join('');
+  // Critical: ensure dropdown floats above all other content
+  dd.style.cssText = 'display:block;position:absolute;top:100%;left:0;right:0;'
+    +'background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;'
+    +'z-index:9999;max-height:240px;overflow-y:auto;box-shadow:0 12px 32px rgba(0,0,0,0.25);';
+}
+
+// Select handler — reads config from data attributes so it works for any dropdown
+function ctSearchWidgetSelect(el) {
+  var name  = el.getAttribute('data-ct-name');
+  var id    = el.getAttribute('data-ct-id');
+  var ddId  = el.getAttribute('data-dd-id');
+  var inpId = el.getAttribute('data-inp-id');
+  var hidId = el.getAttribute('data-hid-id');
+  var inp = document.getElementById(inpId);
+  var hid = document.getElementById(hidId);
+  var dd  = document.getElementById(ddId);
+  if(inp) inp.value = name || '';
+  if(hid) hid.value = id   || '';
+  if(dd)  dd.style.display = 'none';
+}
+
 function sowAddNewContractor() {
   var dd = document.getElementById('sow_ct_dropdown');
   if(dd) dd.style.display = 'none';
@@ -2990,53 +3062,12 @@ function sowAddNewContractor() {
   var m = document.getElementById('addContractorModal');
   if(m) m.style.display = 'flex';
 }
+// sowContractorSearch + sowSelectContractor delegate to shared ctSearchWidget
 function sowContractorSearch(q) {
-  var dd = document.getElementById('sow_ct_dropdown');
-  if(!dd) return;
-  var contractors = window._contractors || [];
-  // For SOW assignment, show all contractors (approved + pending) so staff can select
-  var term = (q||'').toLowerCase().trim();
-  var matches = term
-    ? contractors.filter(function(c){
-        var name  = (c.name||'').toLowerCase();
-        var trade = (c.trade||'').toLowerCase();
-        // Match any word that starts with the term, or full substring
-        return name.includes(term) || trade.includes(term)
-          || name.split(' ').some(function(w){ return w.startsWith(term); });
-      })
-    : contractors;
-
-  var rows = matches.map(function(c){
-    return '<div data-ct-name="'+c.name+'" data-ct-id="'+(c.id||'')+'" onmousedown="sowSelectContractor(this)" '
-      +'style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" '
-      +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-      +'<div style="font-weight:600;">'+c.name+'</div>'
-      +(c.trade?'<div style="font-size:11px;color:var(--muted);">'+c.trade+'</div>':'')
-      +'</div>';
-  });
-
-  if(!matches.length) {
-    rows.push('<div style="padding:9px 14px;font-size:12px;color:var(--muted);">'
-      +(term?'No contractor matching "'+q+'" found.':'No contractors added yet.')+'</div>');
-  }
-  rows.push('<div onmousedown="sowAddNewContractor()" style="padding:9px 14px;cursor:pointer;font-size:12px;font-weight:700;color:var(--yellow);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;" '
-    +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-    +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
-    +(term&&!matches.length?'Add "'+q+'" as new contractor':'Add new contractor')
-    +'</div>');
-
-  dd.innerHTML = rows.join('');
-  dd.style.display = 'block';
+  ctSearchWidget(q, 'sow_ct_dropdown', 'sow_contractor', 'sow_contractor_id', sowAddNewContractor);
 }
 function sowSelectContractor(el) {
-  var name = el.getAttribute('data-ct-name');
-  var id   = el.getAttribute('data-ct-id');
-  var inp  = document.getElementById('sow_contractor');
-  var hid  = document.getElementById('sow_contractor_id');
-  if(inp) inp.value = name;
-  if(hid) hid.value = id;
-  var dd = document.getElementById('sow_ct_dropdown');
-  if(dd) dd.style.display = 'none';
+  ctSearchWidgetSelect(el);
 }
 function toggleHeaderExportMenu() {
   var m = document.getElementById('header_export_menu');
