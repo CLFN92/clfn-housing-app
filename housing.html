@@ -4380,7 +4380,7 @@ function renderDashTable(){
       || (role=== ROLE.ED && (a.status===APP_STATUS.MGR_APPROVED||a.status===APP_STATUS.SUBMITTED));
     return '<tr>'
       +'<td style="cursor:pointer;" data-sc-id="'+a.id+'">'
-      +'<div class="appl-name" style="text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;">'+(a.fn||'—')+' '+(a.ln||'')+'</div>'
+      +'<div class="appl-name" style="text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;">'+(a.fn ? (a.fn+' '+(a.ln||'')).trim() : ('<span style="color:var(--muted);font-style:italic;">'+( (a.data&&(a.data.name||a.data.fullName)) || 'Unknown applicant')+'</span>'))+'</div>'
       +'<div class="appl-id">'+a.id+' · '+(a.appDate||'—')+'</div></td>'
       +'<td class="col-date col-hide-mobile" style="font-size:12px;color:var(--muted);">'+(a.appDate||'—')+'</td>'
       +'<td class="col-cls col-hide-mobile"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:'+clsBg+';color:'+clsColor+';white-space:nowrap;">'+(a.classification||'—').replace(' Housing','')+'</span></td>'
@@ -11665,13 +11665,30 @@ async function loadAppDataFromSupabase() {
     }
     if(allAppsData.length) {
       applications = allAppsData.map(function(row){
-        return Object.assign({},row.data||{},{
+        var d = row.data || {};
+        var app = Object.assign({}, d, {
           id:row.id, status:row.status, score:row.score, tier:row.tier,
           classification:row.classification, reserve:row.reserve,
           archived:!!row.archived, assignedUnit:row.assigned_unit_id,
           assignedAddress:row.assigned_address, submittedAt:row.submitted_at,
           created_by_email: row.created_by_email || null
         });
+        // Recover fn/ln from legacy field names (old apps used firstName/lastName)
+        if (!app.fn) app.fn = d.firstName || d.first_name || '';
+        if (!app.ln) app.ln = d.lastName  || d.last_name  || '';
+        // If still missing, try a combined name field
+        if (!app.fn && !app.ln) {
+          var full = d.name || d.fullName || d.full_name || d.applicantName || '';
+          if (full) {
+            var parts = full.trim().split(/\s+/);
+            app.fn = parts[0] || '';
+            app.ln = parts.slice(1).join(' ') || '';
+          }
+        }
+        // Mirror back so firstName/lastName are also consistent
+        if (app.fn && !app.firstName) app.firstName = app.fn;
+        if (app.ln && !app.lastName)  app.lastName  = app.ln;
+        return app;
       });
     } else {
       // Supabase returned no rows — fall back to localStorage so existing

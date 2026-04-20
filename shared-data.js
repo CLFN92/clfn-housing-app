@@ -149,7 +149,13 @@ async function sbSaveApplication(app) {
     created_by_email:   app.created_by_email || HOUSING_SESSION.email || null,
     // Columns added via migration 2026-04-19
     sp_id:            app.spId || null,
-    data:             app,
+    data:             Object.assign({}, app, {
+      // Normalize: always store both fn/ln AND firstName/lastName
+      fn:        app.fn        || app.firstName || '',
+      ln:        app.ln        || app.lastName  || '',
+      firstName: app.firstName || app.fn        || '',
+      lastName:  app.lastName  || app.ln        || ''
+    }),
     archived:         !!app.archived,
     no_prior_tenancy: (app.noPriorTenancy !== undefined ? !!app.noPriorTenancy : !!(app.no_prior_tenancy !== false))
   };
