@@ -1410,7 +1410,13 @@
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Available Units — Ranked by Match</div>
           <div id="am_role_badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,0.1);color:#ccc;"></div>
         </div>
-        <div id="am_unit_list" style="display:flex;flex-direction:column;gap:0;max-height:340px;overflow-y:auto;"></div>
+        <!-- Unit search -->
+        <div style="padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg);">
+          <input id="am_unit_search" type="text" placeholder="🔍 Search by address or street…" autocomplete="off"
+            oninput="amFilterUnits(this.value)"
+            style="width:100%;box-sizing:border-box;padding:7px 11px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>
+        </div>
+        <div id="am_unit_list" style="display:flex;flex-direction:column;gap:0;max-height:300px;overflow-y:auto;"></div>
       </div>
 
       <!-- Selection / Override notes -->
@@ -11009,6 +11015,8 @@ function openAssignModal(appId, suggestedUnitId) {
   // Render the unit card list
   amRenderUnitList(role, needsAccess);
 
+  // Clear unit search
+  var us = document.getElementById('am_unit_search'); if(us) us.value = '';
   // Default move-in to today
   var mi=document.getElementById('am_movein_date'); if(mi) mi.value=new Date().toISOString().split('T')[0];
 
@@ -11024,6 +11032,34 @@ function openAssignModal(appId, suggestedUnitId) {
   // Show modal
   var modal=document.getElementById('assignUnitModal');
   if(modal){ modal.style.removeProperty('display'); modal.style.setProperty('display','flex','important'); }
+}
+
+function amFilterUnits(q) {
+  var role = window.currentRole || 'housing_employee_l1';
+  var app = (typeof applications !== 'undefined' ? applications : []).find(function(a){ return a.id === _amAppId; });
+  var needsAccess = app && app.accessibility && app.accessibility !== 'None' && app.accessibility !== '0' && app.accessibility !== 0;
+  var term = (q || '').trim().toLowerCase();
+  if (!term) {
+    // Reset to full sorted list
+    amRenderUnitList(role, needsAccess);
+    return;
+  }
+  // Filter _amAllScored by address match, then re-render
+  var filtered = _amAllScored.filter(function(obj) {
+    var addr = (obj.unit.num + ' ' + obj.unit.street).toLowerCase();
+    return addr.includes(term);
+  });
+  var list = document.getElementById('am_unit_list');
+  if (!list) return;
+  if (!filtered.length) {
+    list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">No units matching "' + q + '".</div>';
+    return;
+  }
+  // Temporarily replace _amAllScored, render, restore
+  var saved = _amAllScored;
+  _amAllScored = filtered;
+  amRenderUnitList(role, needsAccess);
+  _amAllScored = saved;
 }
 
 function amRenderUnitList(role, needsAccess) {
