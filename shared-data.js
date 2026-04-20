@@ -2314,7 +2314,7 @@ function renderRenosView(){
   container.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">'
     + chipDefs.map(chip).join('') + '</div>'
     + '<div class="card" style="padding:0;overflow:hidden;">'
-    + '<table style="width:100%;border-collapse:collapse;">'+cols+thead+'<tbody id="renos_unified_tbody">'+rows+'</tbody></table>'
+    + '<table class="std-table" style="width:100%;">'+cols+thead+'<tbody id="renos_unified_tbody">'+rows+'</tbody></table>'
     + '</div>';
 
   var tbody2 = document.getElementById('renos_unified_tbody');
