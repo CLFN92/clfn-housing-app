@@ -7097,11 +7097,19 @@ function saveNewUnit(){
 
   units.push(newUnit);
   housingUnits.push(newUnit);
-  sbSaveUnit(newUnit).catch(function(e){ console.warn('Add unit save failed:',e); });
+  sbSaveUnit(newUnit).then(function(ok){
+    if(ok) {
+      showToast('✓ ' + num + ' ' + street + ' added to inventory');
+    } else {
+      showToast('Unit saved locally — Supabase sync may have failed. Check console.', {type:'warning'});
+    }
+  }).catch(function(e){
+    console.error('[addUnit] Supabase save error:', e);
+    showToast('Error saving unit to database. Check console.');
+  });
   if(_auStagedPhotos.length){ saveUnitPhotos(newId, _auStagedPhotos); _auStagedPhotos=[]; }
   closeAddUnitModal();
   renderInventoryView();
-  showToast(num + ' ' + street + ' added to inventory');
 }
 
 function openAddUnitModal(){
