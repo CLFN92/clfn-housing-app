@@ -753,6 +753,7 @@ function _doExport(format, headers, data, filename, colWidths, pdfLandscape) {
   }
 }
 function _getHmLimit() {
+  if(typeof APPROVAL_AUTHORITY !== 'undefined') return APPROVAL_AUTHORITY.get('sowEdThreshold')||25000;
   try { return parseFloat((window._appSettings||{}).hmBudgetLimit)||25000; } catch(e) { return 25000; }
 }
 function _getPoolSpent(pid) {

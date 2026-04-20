@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="renos.css"/>
 <script src="shared.js"></script>
 <script src="shared-config.js"></script>
+<script src="approval-authority.js"></script>
 <script src="shared-auth.js"></script>
 <script src="shared-ui.js"></script>
 <script src="shared-data.js"></script>
@@ -931,34 +932,6 @@
       </div>
 
 
-      <!-- ── AUDIT LOG (internal, not printed) ──────────────────────────── -->
-      <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact"
-          onclick="var b=document.getElementById('sow_audit_body');var c=document.getElementById('sow_audit_chevron');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';if(!open&&typeof renderSowAuditLog==='function')renderSowAuditLog(window._sowUnitId);">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">📋 Audit Log</div>
-            <span style="font-size:10px;color:#666;font-weight:400;text-transform:none;letter-spacing:0;">— internal use only, not printed</span>
-          </div>
-          <svg id="sow_audit_chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transform:rotate(-90deg);transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div id="sow_audit_body" style="display:none;">
-          <div style="padding:0 0 4px 0;">
-            <table style="width:100%;border-collapse:collapse;font-size:12px;">
-              <thead>
-                <tr style="background:var(--bg);border-bottom:1px solid var(--border);">
-                  <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);white-space:nowrap;">Time</th>
-                  <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Action</th>
-                  <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Detail</th>
-                  <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">By</th>
-                </tr>
-              </thead>
-              <tbody id="sow_audit_tbody">
-                <tr><td colspan="4" style="padding:16px 14px;color:var(--muted);font-style:italic;font-size:12px;">Save the SOW to generate audit entries.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
 
     </div><!-- /body -->
 
@@ -1019,7 +992,7 @@ function showDash() {
 }
 function showSettings() {
   var role = window.currentRole || 'housing_employee_l1';
-  if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) {
+  if(!APPROVAL_AUTHORITY.can('accessSettings', role)) {
     showToast('Settings are only accessible to the Housing Manager and Executive Director.');
     return;
   }
@@ -1027,7 +1000,7 @@ function showSettings() {
 }
 function showAddHousingStaff() {
   var role = window.currentRole || 'housing_employee_l1';
-  if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) {
+  if(!APPROVAL_AUTHORITY.can('manageStaff', role)) {
     showToast('Staff management is only accessible to the Housing Manager and Executive Director.');
     return;
   }
@@ -1239,7 +1212,7 @@ function openRenoProgress(unitId) {
 function _applyProgressModalLock(unitId){
   var modal = document.getElementById('renoProgressModal');
   if(!modal) return;
-  var locked = unitHasCompletedSow(unitId) && _realRoleForPermissions() !== ROLE.ED;
+  var locked = unitHasCompletedSow(unitId) && !APPROVAL_AUTHORITY.can('lockSow', _realRoleForPermissions());
 
   var banner = document.getElementById('rp_readonly_banner');
   if(banner) banner.style.display = locked ? 'block' : 'none';
@@ -2107,9 +2080,8 @@ function unitHasCompletedSow(unitId){
   return getUnitSowList(unitId).some(isSowCompleted);
 }
 function canEditProgressFor(unitId){
-  // Only ED can edit progress when a completed SOW exists for this unit.
   if(!unitHasCompletedSow(unitId)) return true;
-  return _realRoleForPermissions() === ROLE.ED;
+  return APPROVAL_AUTHORITY.can('lockSow', _realRoleForPermissions());
 }
 
 
@@ -2562,9 +2534,9 @@ function renderRenoApprovalsView() {
     // Inline approve button — role gated, only meaningful when there's an actual SOW.
     var approveBtn = '';
     if(sow && !locked){
-      if(role=== ROLE.HOUSING_MANAGER && appr.key==='pending_hm')
+      if(APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role) && appr.key==='pending_hm')
         approveBtn = '<button data-ra-approve="'+uid+'"'+dataProj+' data-ra-role="hm" style="background:var(--yellow);border:none;color:#111;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">✓ Approve</button>';
-      else if(role=== ROLE.ED && (appr.key==='pending_ed'||appr.key==='pending_hm'))
+      else if(APPROVAL_AUTHORITY.can('approveSowOverThreshold', role) && (appr.key==='pending_ed'||appr.key==='pending_hm'))
         approveBtn = '<button data-ra-approve="'+uid+'"'+dataProj+' data-ra-role="ed" style="background:var(--yellow);border:none;color:#111;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'+(appr.key==='pending_hm'?'Override →':'✓ Approve')+'</button>';
     }
 

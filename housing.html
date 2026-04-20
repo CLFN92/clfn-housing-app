@@ -5156,7 +5156,11 @@ function ueOpenSow() {
 
 // ── Budget threshold helpers ──────────────────────────────────────────────────
 function getHmBudgetLimit() {
-  // Default: HM can approve up to $25,000 unilaterally; above that needs ED
+  // SOW threshold — above this amount ED approval required
+  // Reads from APPROVAL_AUTHORITY first, falls back to legacy app_settings key
+  if(typeof APPROVAL_AUTHORITY !== 'undefined') {
+    return APPROVAL_AUTHORITY.get('sowEdThreshold') || 25000;
+  }
   try {
     var s = window._appSettings || {};
     return (s.hmBudgetLimit && parseFloat(s.hmBudgetLimit)) || 25000;
@@ -6758,19 +6762,22 @@ function getSowByProjectNumber(unitId, projectNumber){
 
 
 function canEditSow(sow){
-  // Anyone authenticated can edit a non-completed SOW (existing behavior).
-  // Only the ED (real role) can edit a completed one.
+  // Anyone authenticated can edit a non-completed SOW.
+  // Only roles with lockSow authority can edit a completed one.
   if(!isSowCompleted(sow)) return true;
-  return _realRoleForPermissions() === ROLE.ED;
+  var r = _realRoleForPermissions();
+  if(typeof APPROVAL_AUTHORITY !== 'undefined') return APPROVAL_AUTHORITY.can('lockSow', r);
+  return r === ROLE.ED;
 }
 function canMarkSowComplete(){
-  // HM or ED can mark a SOW complete; staff/employee cannot.
   var r = _realRoleForPermissions();
+  if(typeof APPROVAL_AUTHORITY !== 'undefined') return APPROVAL_AUTHORITY.can('approveSowUnderThreshold', r)||APPROVAL_AUTHORITY.can('approveSowOverThreshold', r);
   return ROLE.isManagement(r) || r === 'hm';
 }
 function canReopenSow(){
-  // Only ED can reopen a completed SOW.
-  return _realRoleForPermissions() === ROLE.ED;
+  var r = _realRoleForPermissions();
+  if(typeof APPROVAL_AUTHORITY !== 'undefined') return APPROVAL_AUTHORITY.can('lockSow', r);
+  return r === ROLE.ED;
 }
 
 
@@ -7264,8 +7271,11 @@ function saveBudgetPools(){
   if(limitEl && limitEl.value) {
     var s = window._appSettings || {};
     var prevLimit = s.hmBudgetLimit;
-    s.hmBudgetLimit = parseFloat(limitEl.value)||25000;
+    var newLimit = parseFloat(limitEl.value)||25000;
+    s.hmBudgetLimit = newLimit;
     window._appSettings = s;
+    // Keep APPROVAL_AUTHORITY in sync
+    if(typeof APPROVAL_AUTHORITY !== 'undefined') APPROVAL_AUTHORITY.update('sowEdThreshold', newLimit);
     sbSaveSetting('app_settings', s).then(function(ok){
       if(!ok){
         s.hmBudgetLimit = prevLimit;
@@ -10113,7 +10123,7 @@ function showEmployeeHome(){
     try {
       var allU=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
       var renoUnits=allU.filter(function(u){return (u.status==='under_repair'||u.status==='condemned')&&!u.archived;});
-      var hmLimit2=parseFloat(((window._appSettings||{}).hmBudgetLimit)||25000);
+      var hmLimit2 = (typeof APPROVAL_AUTHORITY!=='undefined') ? APPROVAL_AUTHORITY.get('sowEdThreshold')||25000 : parseFloat(((window._appSettings||{}).hmBudgetLimit)||25000);
       renoUnits.forEach(function(u){
         var sow=null; sow = getSowData(u.id);
         var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
@@ -11753,9 +11763,9 @@ function renderRenoApprovalsView() {
 
     // Inline approve button — role gated
     var approveBtn = '';
-    if(role=== ROLE.HOUSING_MANAGER && appr.key==='pending_hm')
+    if(APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role) && appr.key==='pending_hm')
       approveBtn = '<button data-ra-approve="'+uid+'" data-ra-role="hm" style="background:var(--yellow);border:none;color:#111;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">✓ Approve</button>';
-    else if(role=== ROLE.ED && (appr.key==='pending_ed'||appr.key==='pending_hm'))
+    else if(APPROVAL_AUTHORITY.can('approveSowOverThreshold', role) && (appr.key==='pending_ed'||appr.key==='pending_hm'))
       approveBtn = '<button data-ra-approve="'+uid+'" data-ra-role="ed" style="background:var(--yellow);border:none;color:#111;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'+(appr.key==='pending_hm'?'Override →':'✓ Approve')+'</button>';
 
     return '<tr data-ra-uid="'+uid+'" style="border-bottom:1px solid var(--border);cursor:pointer;">'
