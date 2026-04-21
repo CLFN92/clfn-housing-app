@@ -7,6 +7,11 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="shared.css"/>
 <link rel="stylesheet" href="housing.css"/>
+<style>
+  /* Fix: modal-hdr sets display:flex which breaks table header rows */
+  thead tr.modal-hdr { display: table-row; background: var(--dark); border-bottom: 2px solid var(--yellow); }
+  thead tr.modal-hdr th { color: #888; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; }
+</style>
 <script src="shared.js"></script>
 <script src="shared-config.js"></script>
 <script src="shared-auth.js"></script>
