@@ -7335,7 +7335,7 @@ function renderApprovalAuthorityPanel() {
     return;
   }
 
-  var allRoles = APPROVAL_AUTHORITY.allRoles(); // [{value, label}]
+  var allRoles = APPROVAL_AUTHORITY.allRoles();
   var groups   = APPROVAL_AUTHORITY.groups;
   var labels   = APPROVAL_AUTHORITY.labels;
   var defaults = APPROVAL_AUTHORITY.defaults;
@@ -7344,9 +7344,7 @@ function renderApprovalAuthorityPanel() {
   Object.keys(groups).forEach(function(groupName) {
     var keys = groups[groupName];
     html += '<div style="margin-bottom:28px;">';
-    html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;'
-          + 'color:var(--yellow);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:14px;">'
-          + groupName + '</div>';
+    html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--yellow);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:4px;">' + groupName + '</div>';
 
     keys.forEach(function(key) {
       var cur = APPROVAL_AUTHORITY.get(key);
@@ -7354,64 +7352,51 @@ function renderApprovalAuthorityPanel() {
       var isThreshold = (typeof cur === 'number');
       var isModified  = JSON.stringify(cur) !== JSON.stringify(def);
 
-      // Tighten / loosen badge
       var badgeHtml = '';
       if(!isThreshold && Array.isArray(cur) && Array.isArray(def)) {
         if(cur.length < def.length)
-          badgeHtml = '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;'
-            + 'background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;margin-left:6px;">Tighter</span>';
+          badgeHtml = ' <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;">Tighter</span>';
         else if(cur.length > def.length)
-          badgeHtml = '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;'
-            + 'background:#f0fdf4;color:#15803d;border:1px solid #86efac;margin-left:6px;">Looser</span>';
+          badgeHtml = ' <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:#f0fdf4;color:#15803d;border:1px solid #86efac;">Looser</span>';
       }
       if(isModified && !badgeHtml)
-        badgeHtml = '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;'
-                  + 'background:#fffbeb;color:#d97706;border:1px solid #fde68a;margin-left:6px;">Modified</span>';
+        badgeHtml = ' <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;">Modified</span>';
 
-      html += '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);">';
+      // Two-row layout: label on top, pills + reset below
+      html += '<div style="padding:12px 0;border-bottom:1px solid var(--border);">';
 
-      // Label
-      html += '<div style="flex:1;min-width:0;">'
-            + '<div style="font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;flex-wrap:wrap;">'
-            + (labels[key] || key) + badgeHtml + '</div>'
-            + '</div>';
+      // Label row
+      html += '<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px;">' + (labels[key] || key) + badgeHtml + '</div>';
 
-      // Value
+      // Pills row
+      html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
       if(isThreshold) {
         html += '<input type="number" data-aa-key="' + key + '" value="' + cur + '" min="0" step="1000"'
-          + ' style="width:120px;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;'
-          + 'font-size:13px;font-weight:700;color:var(--text);font-family:DM Sans,sans-serif;'
-          + 'background:var(--surface);text-align:right;"'
+          + ' style="width:130px;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;color:var(--text);font-family:DM Sans,sans-serif;background:var(--surface);text-align:right;"'
           + ' oninput="APPROVAL_AUTHORITY.update(\'' + key + '\', parseFloat(this.value)||0)"/>';
       } else {
-        html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
         allRoles.forEach(function(r) {
           var rVal   = r.value || r;
           var rLabel = r.label || rVal;
           var active = Array.isArray(cur) && cur.indexOf(rVal) !== -1;
           html += '<button data-aa-key="' + key + '" data-aa-role="' + rVal + '" onclick="aaToggleRole(this)"'
-            + ' style="padding:4px 13px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;'
-            + 'font-family:DM Sans,sans-serif;transition:all .12s;'
+            + ' style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .12s;white-space:nowrap;'
             + 'background:' + (active ? 'var(--yellow)' : 'var(--surface)') + ';'
             + 'color:'       + (active ? '#111'          : 'var(--muted)')   + ';'
-            + 'border:1.5px solid ' + (active ? 'var(--yellow)' : 'var(--border)') + ';">'
-            + rLabel + '</button>';
+            + 'border:1.5px solid ' + (active ? 'var(--yellow)' : 'var(--border)') + ';">' + rLabel + '</button>';
         });
-        html += '</div>';
       }
-
-      // Reset
       html += '<button onclick="aaResetAction(\'' + key + '\')" title="Reset to default"'
-        + ' style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;'
-        + 'padding:3px 9px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'
+        + ' style="margin-left:auto;background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;flex-shrink:0;">'
         + '↺ Default</button>';
-      html += '</div>';
+      html += '</div>'; // pills row
+      html += '</div>'; // action row
     });
-    html += '</div>';
+    html += '</div>'; // group
   });
 
-  html += '<div style="padding:10px 14px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--muted);margin-top:4px;">'
-        + '⚠ Changes apply immediately in memory. Click <strong>Save Changes</strong> to persist across sessions.</div>';
+  html += '<div style="padding:10px 14px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--muted);margin-top:8px;">'
+        + '⚠ Changes apply immediately in memory. Click <strong>Save Changes</strong> to persist.</div>';
 
   el.innerHTML = html;
 }
