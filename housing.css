@@ -438,18 +438,22 @@
 }
 
 /* ── View centering fix ──────────────────────────────────────────────────
- * content-area is display:flex flex-direction:column align-items:stretch.
- * margin:0 auto is ignored in flex context for centering.
- * Fix: override content-area for housing pages to be display:block so
- * margin:0 auto works normally on max-width children.
- * appLayout (.layout) is given width:100% so it still fills full width.
+ * The view divs have width:100% + max-width:1200px + margin:0 auto.
+ * We explicitly set margin-left:auto and margin-right:auto via box-sizing
+ * to guarantee centering regardless of parent display model.
  * ──────────────────────────────────────────────────────────────────────── */
-.content-area {
-  display: block !important;
-  flex: 1;          /* keep flex:1 so app-wrapper fills viewport height */
-  min-width: 0;     /* prevent overflow in narrow viewports */
-}
-/* appLayout must remain full-width (it has its own flex layout inside) */
-#appLayout {
-  width: 100%;
+#inventoryView,
+#matchView,
+#tenantsView,
+#worklistView,
+#employeeHomeView,
+#scorecardView,
+#settingsView,
+#dashView,
+#renoApprovalsView,
+#renosView,
+#contractorsView {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  width: 100% !important;
 }
