@@ -412,3 +412,27 @@
   /* AA pills smaller */
   #approval_authority_panel_body button[data-aa-role] { font-size: 11px; padding: 4px 10px; }
 }
+
+/* ── Renos-specific responsive ── */
+@media (max-width: 700px) {
+  /* SOW modal health/safety 3-col → 1-col */
+  #sowModal [style*="1fr 1fr 1fr"]   { grid-template-columns: 1fr 1fr !important; }
+  /* Budget panel 3-col → 1-col */
+  #rba_summary                       { grid-template-columns: 1fr 1fr !important; }
+  #rba_repayment_section [style*="1fr 1fr 1fr"] { grid-template-columns: 1fr !important; }
+  /* Contractor panel 2-col details → 1-col */
+  #ctApprovalPanel [style*="1fr 1fr"] { grid-template-columns: 1fr !important; }
+  /* Contractor panel — full width on narrow screens */
+  #ctApprovalPanel > div             { max-width: 100% !important; }
+}
+
+@media (max-width: 480px) {
+  /* SOW modal 2-col form grids → 1-col */
+  #sowModal [style*="1fr 1fr"]       { grid-template-columns: 1fr !important; }
+  /* SOW modal 3-col health → 1-col */
+  #sowModal [style*="1fr 1fr 1fr"]   { grid-template-columns: 1fr !important; }
+  /* Budget panel → 1-col */
+  #rba_summary                       { grid-template-columns: 1fr !important; }
+  /* Renos view 2-col inner grids → 1-col */
+  #renosView [style*="1fr 1fr"]      { grid-template-columns: 1fr !important; }
+}
