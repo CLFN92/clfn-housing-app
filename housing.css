@@ -438,22 +438,19 @@
 }
 
 /* ── View centering fix ──────────────────────────────────────────────────
- * The view divs have width:100% + max-width:1200px + margin:0 auto.
- * We explicitly set margin-left:auto and margin-right:auto via box-sizing
- * to guarantee centering regardless of parent display model.
+ * content-area is display:flex flex-direction:column align-items:stretch.
+ * align-items:stretch overrides margin:auto on the cross axis, so views
+ * always fill full content-area width regardless of max-width + margin:auto.
+ *
+ * Fix: override content-area to align-items:center so views with
+ * max-width:1200px get centered when the container is wider than 1200px.
+ * All views have width:100% inline so they still fill when container <1200px.
+ * appLayout gets align-self:stretch so the application form still fills full width.
  * ──────────────────────────────────────────────────────────────────────── */
-#inventoryView,
-#matchView,
-#tenantsView,
-#worklistView,
-#employeeHomeView,
-#scorecardView,
-#settingsView,
-#dashView,
-#renoApprovalsView,
-#renosView,
-#contractorsView {
-  margin-left: auto !important;
-  margin-right: auto !important;
-  width: 100% !important;
+.content-area {
+  align-items: center !important;
+}
+#appLayout {
+  align-self: stretch;
+  width: 100%;
 }
