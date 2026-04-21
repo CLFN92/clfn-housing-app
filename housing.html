@@ -3043,8 +3043,8 @@ function saveScoringModel() {
   }).catch(function(e){ console.warn('Scoring model save failed:',e); });
   rescoreAllApplications();
   // Refresh dashboard if visible
-  if(document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none') {
-    updateDashStats(); renderDashTable();
+  if(document.getElementById('pipelineView') && document.getElementById('pipelineView').style.display !== 'none') {
+    plRender();
   }
 }
 
@@ -5047,15 +5047,7 @@ window.addEventListener('resize', function(){
 });
 
 
-function showDash(){
-  var role = window.currentRole || 'housing_employee_l1';
-  if(ROLE.isManagement(role)) {
-    // HM and ED go to the home tile page with live stats
-    showEmployeeHome();
-  } else {
-    showEmployeeHome();
-  }
-}
+function showDash(){ showPipeline(); }
 function showApp(){
   hideAllViews('appLayout');
   setTimeout(initAutosave, 200);
@@ -11049,7 +11041,7 @@ function closeApplicationForm(){
   if(prev && navMap[prev]) {
     navMap[prev]();
   } else {
-    showEmployeeHome();
+    showPipeline();
   }
   window._navSkipPush = false;
 }
@@ -12443,7 +12435,7 @@ async function startSignIn() {
     // Load data and launch app
     await loadAppDataFromSupabase();
     hidLoginScreen();
-    showEmployeeHome();
+    showPipeline();
     console.log('[CLFN] Welcome, '+HOUSING_SESSION.name+' ('+HOUSING_SESSION.role+')');
 
   } catch(e) {
