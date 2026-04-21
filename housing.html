@@ -5539,6 +5539,7 @@ function ueRemoveTenant() {
 
 
 function renderMatchView(){
+  var role = window.currentRole || 'housing_employee_l1';
   var allApps = (typeof applications !== 'undefined' ? applications : []);
   var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
   var vacantUnits = allUnits.filter(function(u){ return u.status==='vacant' && !u.archived; });
