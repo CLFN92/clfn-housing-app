@@ -436,3 +436,22 @@
   /* Renos view 2-col inner grids → 1-col */
   #renosView [style*="1fr 1fr"]      { grid-template-columns: 1fr !important; }
 }
+
+/* ── View centering fix ──────────────────────────────────────────────────
+ * content-area uses align-items:stretch (flex) which ignores margin:0 auto
+ * on children. These views need align-self:center to center within the
+ * flex column when the screen is wider than their max-width.
+ * ──────────────────────────────────────────────────────────────────────── */
+#inventoryView,
+#matchView,
+#tenantsView,
+#worklistView,
+#employeeHomeView,
+#scorecardView,
+#settingsView,
+#dashView,
+#renoApprovalsView,
+#renosView,
+#contractorsView {
+  align-self: center;
+}
