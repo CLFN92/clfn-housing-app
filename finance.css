@@ -1,382 +1,279 @@
-/* ============================================================
- * finance.css — CLFN Housing Suite
- * Finance module styles + shared JS-rendered component classes
- * used by renderDashTable, renderWorklist etc.
- * Depends on: shared.css (loaded first)
- * ============================================================ */
-/* ══════════════════════════════════════════════════════════════════════════
-   22. FINANCE MODULE
-   Component styles for finance.html. Uses shared design tokens.
-   Classes here may also be referenced by housing.html / index.html.
-   ══════════════════════════════════════════════════════════════════════════ */
+/**
+ * approval-authority.js — CLFN Housing Suite
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Single source of truth for all approval authorities in the housing system.
+ *
+ * USAGE:
+ *   APPROVAL_AUTHORITY.can('reviewApplication', role)    → true/false
+ *   APPROVAL_AUTHORITY.who('finalApproveApp')            → ['ed']
+ *   APPROVAL_AUTHORITY.get('sowEdThreshold')             → 25000
+ *
+ * LOADING:
+ *   Defaults are defined here. At login, initApprovalAuthority() is called
+ *   which merges any overrides saved in housing_settings (key: 'approval_authority')
+ *   on top of the defaults, so ED changes persist across sessions.
+ *
+ * TO ADD A NEW AUTHORITY:
+ *   1. Add a default entry below in the DEFAULTS block
+ *   2. Add a row to the Settings UI in housing.html sec_approval section
+ *   3. Replace inline role checks in code with APPROVAL_AUTHORITY.can(...)
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
-/* Page structure */
-.page      { display: none; }
-.page.on   {
-  display: block !important;
-  animation: fadeUp .2s ease;
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
-  box-sizing: border-box;
-}
-.page-hdr  { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
-.page-hdr-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+var APPROVAL_AUTHORITY = (function() {
 
+  // ── DEFAULTS ────────────────────────────────────────────────────────────
+  // These are the baseline rules. All values are overridable via Settings UI.
+  // roles must match values in shared-config.js ROLE constants.
 
-/* ── Standard table card ── */
+  var DEFAULTS = {
 
-/* Table cell variants */
+    // ── Housing Application workflow ──────────────────────────────────────
+    // Who can review a submitted application (first level)
+    reviewApplication:        ['housing_manager'],
+    // Who can give final approval for housing
+    finalApproveApp:          ['ed'],
+    // Who can decline an application
+    declineApplication:       ['housing_manager', 'ed'],
+    // Who can return an application for more info
+    returnApplication:        ['housing_manager', 'ed'],
 
-/* ── Standard filter row ── */
+    // ── File Update workflow ──────────────────────────────────────────────
+    // File updates only need HM approval — no ED sign-off required
+    reviewFileUpdate:         ['housing_manager'],
+    approveFileUpdate:        ['housing_manager'],
 
-.std-filter-divider   { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
-.std-filter-spacer    { flex: 1; }
-.std-filter-clear     { background: none; border: none; font-size: 12px; color: var(--muted); cursor: pointer; padding: 4px 8px; font-family: var(--sans); }
-.std-filter-clear:hover { color: var(--text); }
+    // ── Unit Assignment ───────────────────────────────────────────────────
+    // Who can assign a unit to an applicant
+    assignUnit:               ['housing_manager', 'ed'],
+    // Who can override the top match recommendation
+    overrideMatch:            ['ed'],
+    // Who can assign within the tied score band (notes required)
+    assignTiedBand:           ['housing_manager', 'ed'],
 
-/* ── Standard status pills ── */
+    // ── SOW / Renovation Budget ───────────────────────────────────────────
+    // Dollar threshold — above this, ED approval required
+    sowEdThreshold:           25000,
+    // Who can approve SOW under the threshold
+    approveSowUnderThreshold: ['housing_manager'],
+    // Who can approve SOW over the threshold
+    approveSowOverThreshold:  ['ed'],
+    // Who can lock a completed SOW
+    lockSow:                  ['ed'],
 
-/* ── Amount display ── */
-.amt-debit            { color: #b91c1c; font-weight: 700; }
-.amt-credit           { color: #15803d; font-weight: 700; }
-.std-amount-range     { font-size: 11px; color: var(--muted); }
-.txn-type-charge      { color: #b91c1c; font-weight: 600; }
-.txn-type-payment     { color: #15803d; font-weight: 600; }
+    // ── Contractor approvals ──────────────────────────────────────────────
+    // Who can recommend a contractor to ED
+    recommendContractor:      ['housing_manager'],
+    // Who gives final contractor approval
+    approveContractor:        ['ed'],
+    // Who can decline a contractor
+    declineContractor:        ['housing_manager', 'ed'],
 
-/* ── Finance misc ── */
-.lbl                  { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
-.sep                  { color: var(--muted); margin: 0 4px; }
-.narrow               { max-width: 140px; }
-.no-print             { }
-.sig-line             { border-bottom: 1.5px solid var(--text); height: 32px; margin: 16px 0 4px; }
-.htitles              { display: flex; flex-direction: column; gap: 2px; }
-.is-active            { background: var(--yellow) !important; color: #111 !important; }
-.approval-row         { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; font-size: 13px; }
-.clickable            { cursor: pointer; }
-.pill-orange          { background: #fff7ed; color: #c2410c; }
+    // ── Score model ───────────────────────────────────────────────────────
+    // Who can edit the scoring model criteria and weights
+    editScoreModel:           ['ed'],
+    // Who can apply a manual score adjustment on an application
+    applyScoreAdjustment:     ['ed'],
 
-/* ── Tenant UI ── */
-.tenant-info-badge    { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 12px; }
-.tenant-picker        { position: relative; }
-.tf-section-label     { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 16px 0 8px; }
+    // ── Settings & config ─────────────────────────────────────────────────
+    // Who can access the Settings page
+    accessSettings:           ['housing_manager', 'ed'],
+    // Who can edit approval authorities (this panel)
+    editApprovalAuthority:    ['ed'],
+    // Who can add/edit staff
+    manageStaff:              ['housing_manager', 'ed'],
 
-.stmt-filter-btn      { font-size: 11px; font-weight: 600; }
+  };
 
-/* ── Voucher ── */
-.voucher              { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-.voucher-hdr          { background: var(--dark); color: #fff; padding: 14px 18px; border-bottom: 2px solid var(--yellow); }
-.voucher-body         { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
-.voucher-row          { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 13px; }
-.voucher-total        { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 15px; font-weight: 700; padding-top: 10px; border-top: 1.5px solid var(--border); margin-top: 4px; }
+  // ── LIVE CONFIG (defaults + any saved overrides) ──────────────────────
+  var _live = JSON.parse(JSON.stringify(DEFAULTS));
 
-/* Home tiles */
-.home-tile       { background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--muted); border-radius: 12px; padding: 18px 20px; cursor: pointer; transition: box-shadow .15s, border-color .15s; display: flex; flex-direction: column; gap: 12px; }
-.home-tile:hover { box-shadow: 0 4px 20px rgba(0,0,0,.1); }
-.home-tile-hdr   { display: flex; align-items: center; gap: 10px; }
-.home-tile-icon  { font-size: 22px; }
-.home-tile-title { font-weight: 700; font-size: 15px; }
-.home-tile-stat  { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted); }
-.home-tile-stat:last-child { border-bottom: none; }
-.home-tile-stat b { font-size: 16px; font-weight: 800; color: var(--text); }
-.home-tile-stat.alert b { color: var(--danger); }
-.home-tile-stat.good  b { color: var(--success); }
-.home-tile-stat.info  b { color: #1d4ed8; }
+  // ── PUBLIC API ────────────────────────────────────────────────────────
 
-/* Action panel */
-.action-panel, .action-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 8px; }
-.action-section-label { grid-column: 1/-1; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
-.action-btn-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; padding: 14px 12px; cursor: pointer; transition: var(--tr); text-align: left; font-family: var(--sans); }
-.action-btn-card:hover         { border-color: var(--yellow); background: var(--yellow-light); }
-.action-btn-card.primary       { border-color: var(--yellow); background: var(--yellow); }
-.action-btn-card.primary:hover { background: #e8d418; }
-.action-btn-card.danger:hover  { border-color: var(--danger); background: #fef2f2; }
-.action-icon  { font-size: 22px; line-height: 1; }
-.action-label { font-size: 13px; font-weight: 700; color: var(--text); }
-.action-btn-card.primary .action-label { color: var(--dark); }
-.action-sub   { font-size: 11px; color: var(--muted); }
+  return {
 
-/* Stats grids */
-.stats-grid, .aging-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
-.balance-tiles { display: grid !important; grid-template-columns: repeat(4,1fr) !important; gap: 10px; }
+    /**
+     * Check if a role can perform an action.
+     * @param {string} action  — key from DEFAULTS
+     * @param {string} role    — current role string (e.g. 'ed', 'housing_manager')
+     * @returns {boolean}
+     */
+    can: function(action, role) {
+      if (!action || !role) return false;
+      var allowed = _live[action];
+      if (Array.isArray(allowed)) return allowed.indexOf(role) !== -1;
+      return false; // non-array entries are thresholds/values, not role lists
+    },
 
-/* Filter bar */
+    /**
+     * Get the list of roles allowed for an action, or a threshold value.
+     * @param {string} action
+     * @returns {Array|number}
+     */
+    get: function(action) {
+      return _live[action] !== undefined ? _live[action] : null;
+    },
 
+    /**
+     * Get all role-list entries (excludes numeric thresholds).
+     * Used by the Settings UI to render the editor.
+     * @returns {Object}
+     */
+    allRoleEntries: function() {
+      var out = {};
+      Object.keys(_live).forEach(function(k) {
+        if (Array.isArray(_live[k])) out[k] = _live[k].slice();
+      });
+      return out;
+    },
 
-/* Filter pills */
-.filter-pills { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
-.filter-pill  { padding: 6px 14px; border: 1.5px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--muted); cursor: pointer; font-family: var(--sans); font-size: 12px; font-weight: 600; transition: var(--tr); }
-.filter-pill:hover  { border-color: var(--yellow); color: var(--text); }
-.filter-pill.active { background: var(--yellow); border-color: var(--yellow); color: #111; }
+    /**
+     * Get all threshold entries (numeric values).
+     * @returns {Object}
+     */
+    allThresholds: function() {
+      var out = {};
+      Object.keys(_live).forEach(function(k) {
+        if (typeof _live[k] === 'number') out[k] = _live[k];
+      });
+      return out;
+    },
 
-/* Tenant search */
-.search-wrap   { position: relative; }
-.search-wrap input { width: 100%; border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px 10px 40px; font-size: 13px; font-family: var(--sans); }
-.search-wrap input:focus { border-color: var(--yellow); box-shadow: 0 0 0 3px rgba(248,228,26,.15); }
-.search-icon   { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); font-size: 16px; pointer-events: none; }
-.tenant-search-results { position: absolute; top: 100%; left: 0; right: 0; background: var(--surface); border: 1.5px solid var(--border); border-top: none; border-radius: 0 0 10px 10px; z-index: 100; max-height: 240px; overflow-y: auto; }
-.tenant-search-result  { display: flex; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border); }
-.tenant-search-result:hover { background: var(--bg); }
-.tsr-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--dark); color: var(--yellow); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
-.tsr-name   { font-size: 13px; font-weight: 600; }
-.tsr-meta   { font-size: 11px; color: var(--muted); }
+    /**
+     * Merge saved overrides on top of defaults.
+     * Called at login after housing_settings loads.
+     * @param {Object} saved — parsed JSON from housing_settings 'approval_authority' key
+     */
+    loadOverrides: function(saved) {
+      if (!saved || typeof saved !== 'object') return;
+      var self = this;
+      Object.keys(saved).forEach(function(k) {
+        if (DEFAULTS[k] !== undefined) {
+          _live[k] = saved[k];
+        }
+      });
+      console.info('[APPROVAL_AUTHORITY] Loaded overrides:', Object.keys(saved).length, 'keys');
+    },
 
-/* Amounts */
-.amt-credit { color: var(--success); font-weight: 600; }
-.amt-debit  { color: var(--danger);  font-weight: 600; }
-.amtg       { font-weight: 800; }
+    /**
+     * Serialize current live config for saving to housing_settings.
+     * Only saves keys that differ from defaults.
+     * @returns {Object}
+     */
+    serialize: function() {
+      var out = {};
+      Object.keys(_live).forEach(function(k) {
+        var liveVal = JSON.stringify(_live[k]);
+        var defVal  = JSON.stringify(DEFAULTS[k]);
+        if (liveVal !== defVal) out[k] = _live[k];
+      });
+      return out;
+    },
 
-/* Audit trail */
-.audit-entry       { background: var(--surface); border-radius: 8px; padding: 12px 14px; border-left: 3px solid var(--border); margin-bottom: 8px; }
-.audit-entry.create{ border-left-color: var(--success); }
-.audit-entry.update{ border-left-color: #f59e0b; }
-.audit-entry.delete{ border-left-color: var(--danger); }
-.audit-meta        { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
-.audit-diff        { font-size: 11px; font-family: monospace; background: var(--bg); border-radius: 4px; padding: 6px 8px; margin-top: 6px; }
+    /**
+     * Update a single authority entry and persist.
+     * @param {string}        action  — key to update
+     * @param {Array|number}  value   — new value
+     */
+    update: function(action, value) {
+      if (DEFAULTS[action] === undefined) {
+        console.warn('[APPROVAL_AUTHORITY] Unknown action:', action);
+        return;
+      }
+      _live[action] = value;
+    },
 
-/* TIC grids */
-.tic-contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-.tic-4col  { grid-template-columns: repeat(4,1fr) !important; }
-.voucher-sig-grid { display: flex; flex-direction: column; gap: 0; }
-.voucher-sig-grid > div { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+    /**
+     * Reset a single entry (or all) back to defaults.
+     * @param {string} [action] — omit to reset all
+     */
+    reset: function(action) {
+      if (action) {
+        _live[action] = JSON.parse(JSON.stringify(DEFAULTS[action]));
+      } else {
+        _live = JSON.parse(JSON.stringify(DEFAULTS));
+      }
+    },
 
-/* Collections */
-.collections-badge { display: inline-flex; align-items: center; gap: 4px; background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+    /** Expose defaults for display in Settings UI */
+    defaults: DEFAULTS,
 
+    /**
+     * Returns all available roles in display order, using CLFN_PERMS if available.
+     * Falls back to the known static list if shared.js hasn't loaded yet.
+     */
+    allRoles: function() {
+      if (window.CLFN_PERMS && window.CLFN_PERMS.ROLE_LABELS) {
+        return Object.keys(window.CLFN_PERMS.ROLE_LABELS).map(function(k) {
+          return { value: k, label: window.CLFN_PERMS.ROLE_LABELS[k] };
+        });
+      }
+      // Static fallback
+      return [
+        { value: 'ed',                  label: 'Executive Director' },
+        { value: 'housing_manager',     label: 'Housing Manager' },
+        { value: 'housing_employee_l2', label: 'Housing Employee L2' },
+        { value: 'housing_employee_l1', label: 'Housing Employee L1' },
+        { value: 'cfo',                 label: 'CFO' },
+        { value: 'finance_l1',          label: 'Finance Clerk L1' },
+      ];
+    },
 
-/* ── Journal Entry Multi-Line Form ──────────────────────── */
-.modal-lg { max-width: 680px; width: 96%; }
+    /** Human-readable labels for each action key */
+    labels: {
+      reviewApplication:        'Review submitted application',
+      finalApproveApp:          'Final approval — housing application',
+      declineApplication:       'Decline application',
+      returnApplication:        'Return application for more info',
+      reviewFileUpdate:         'Review file update',
+      approveFileUpdate:        'Approve file update',
+      assignUnit:               'Assign unit to applicant',
+      overrideMatch:            'Override top match recommendation',
+      assignTiedBand:           'Assign within tied score band',
+      sowEdThreshold:           'SOW dollar threshold for ED approval ($)',
+      approveSowUnderThreshold: 'Approve SOW under threshold',
+      approveSowOverThreshold:  'Approve SOW over threshold',
+      lockSow:                  'Lock completed SOW',
+      recommendContractor:      'Approve contractor (first stage — HM)',
+      approveContractor:        'Final contractor approval',
+      declineContractor:        'Decline contractor',
+      editScoreModel:           'Edit scoring model',
+      applyScoreAdjustment:     'Apply manual score adjustment',
+      accessSettings:           'Access settings page',
+      editApprovalAuthority:    'Edit approval authorities',
+      manageStaff:              'Add / edit staff',
+    },
 
-.je-lines-wrap {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.je-lines-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .6px;
-  color: var(--muted);
-}
-.je-line-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  transition: background .15s;
-}
-.je-line-row:last-child { border-bottom: none; }
-.je-line-row:hover { background: var(--surface); }
+    /** Group labels for the Settings UI sections */
+    groups: {
+      'Housing Application':  ['reviewApplication','finalApproveApp','declineApplication','returnApplication'],
+      'File Update':          ['reviewFileUpdate','approveFileUpdate'],
+      'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand'],
+      'SOW & Renovation':     ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow'],
+      'Contractors':          ['recommendContractor','approveContractor','declineContractor'],
+      'Scoring':              ['editScoreModel','applyScoreAdjustment'],
+      'System':               ['accessSettings','editApprovalAuthority','manageStaff'],
+    },
 
-.je-line-type-wrap {
-  display: flex;
-  gap: 2px;
-  flex: 0 0 110px;
-}
-.je-type-btn {
-  flex: 1;
-  padding: 5px 0;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--bg);
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all .15s;
-}
-.je-type-btn:hover { border-color: var(--yellow); color: var(--text); }
-.je-type-debit.active  { background: #fef2f2; border-color: var(--danger); color: var(--danger); }
-.je-type-credit.active { background: #f0fdf4; border-color: var(--success); color: var(--success); }
+  };
 
-.je-line-account {
-  flex: 1;
-  min-width: 0;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 13px;
-}
-.je-line-amount {
-  flex: 0 0 120px;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 13px;
-  text-align: right;
-}
-.je-line-remove {
-  flex: 0 0 28px;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--muted);
-  font-size: 11px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all .15s;
-}
-.je-line-remove:hover { background: #fef2f2; color: var(--danger); }
+})();
 
-.je-add-line {
-  margin: 8px 12px 10px;
-  font-size: 12px;
-}
-
-/* Balance bar */
-.je-balance-bar {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-  padding: 0;
-}
-.je-balance-cell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px 12px;
-  gap: 2px;
-}
-.je-balance-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  color: var(--muted);
-}
-.je-balance-amt {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--text);
-}
-.je-balance-amt.je-balance-diff.balanced   { color: var(--success); }
-.je-balance-amt.je-balance-diff.unbalanced { color: var(--danger); }
-.je-balance-divider {
-  width: 1px;
-  height: 40px;
-  background: var(--border);
-}
-.je-balance-status {
-  flex: 0 0 auto;
-  padding: 0 16px;
-}
-.je-status-pill {
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .4px;
-}
-.je-status-balanced   { background: #f0fdf4; color: var(--success); border: 1px solid var(--success); }
-.je-status-unbalanced { background: #fef2f2; color: var(--danger);  border: 1px solid #fca5a5; }
-
-#je-submit-btn:disabled {
-  opacity: .45;
-  cursor: not-allowed;
-}
-
-/* ── Home quick-action buttons ──────────────────────────── */
-.home-quick-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 16px;
-}
-
-/* ── Finance Worklist ───────────────────────────────────── */
-.finance-worklist-hdr {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-bottom: none;
-  border-radius: 10px 10px 0 0;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
-}
-.finance-worklist-count {
-  background: var(--yellow);
-  color: #111;
-  font-size: 11px;
-  font-weight: 800;
-  border-radius: 20px;
-  padding: 2px 9px;
-  min-width: 22px;
-  text-align: center;
-}
-#finance-worklist-body {
-  border: 1px solid var(--border);
-  border-radius: 0 0 10px 10px;
-  overflow: hidden;
-}
-.fwl-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
-  transition: background .15s;
-}
-.fwl-item:last-child { border-bottom: none; }
-.fwl-item:hover { background: var(--surface); }
-.fwl-icon { font-size: 18px; flex: 0 0 26px; text-align: center; }
-.fwl-main { flex: 1; min-width: 0; }
-.fwl-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.fwl-sub {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--muted);
-}
-.fwl-memo {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.fwl-date {
-  font-size: 11px;
-  color: var(--muted);
-  flex: 0 0 90px;
-  text-align: right;
-}
-.fwl-actions {
-  display: flex;
-  gap: 6px;
-  flex: 0 0 auto;
+/**
+ * initApprovalAuthority()
+ * Called at login after window._appSettings is populated.
+ * Merges any saved overrides from housing_settings into the live config.
+ */
+function initApprovalAuthority() {
+  try {
+    var saved = window._appSettings && window._appSettings['approval_authority'];
+    if (saved) {
+      var parsed = typeof saved === 'string' ? JSON.parse(saved) : saved;
+      APPROVAL_AUTHORITY.loadOverrides(parsed);
+    }
+  } catch(e) {
+    console.warn('[APPROVAL_AUTHORITY] Could not load overrides:', e);
+  }
 }
