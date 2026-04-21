@@ -976,6 +976,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script>
+// ── ROLE safety fallback — in case shared-config.js fails to load ────────────
+if(typeof ROLE === 'undefined') {
+  window.ROLE = {
+    ED:              'ed',
+    HOUSING_MANAGER: 'housing_manager',
+    HE_L2:           'housing_employee_l2',
+    HE_L1:           'housing_employee_l1',
+    isManagement: function(r) { return r==='ed'||r==='housing_manager'; }
+  };
+  console.warn('[CLFN] ROLE fallback — shared-config.js may not have loaded');
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // NATION CONFIG (multi-tenant foundation) — mirrored from housing.html

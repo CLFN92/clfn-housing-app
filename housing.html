@@ -1281,14 +1281,14 @@
       <p>All <span id="inv_count">—</span> CLFN housing units — <span id="inv_vacant_count" style="color:#15803d;font-weight:600;">—</span> vacant</p>
     </div>
     <div class="phb-actions">
-      <input id="inv_search" type="text" placeholder="🔍 Search address..." oninput="renderInventoryView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);min-width:180px;"/>
-      <select id="inv_filter_status" onchange="renderInventoryView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
+      <input id="inv_search" class="std-filter-control" type="text" placeholder="🔍 Search address..." oninput="renderInventoryView()"/>
+      <select id="inv_filter_status" class="std-filter-control" onchange="renderInventoryView()">
         <option value="">All Statuses</option><option value="vacant">Vacant</option><option value="occupied">Occupied</option><option value="under_repair">Under Repair</option><option value="reserved">Reserved</option><option value="condemned">Condemned</option><option value="archived">Archived</option>
       </select>
-      <select id="inv_filter_type" onchange="renderInventoryView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
+      <select id="inv_filter_type" class="std-filter-control" onchange="renderInventoryView()">
         <option value="">All Types</option><option value="detached">Detached</option><option value="duplex">Duplex</option><option value="plex">Multi-unit</option><option value="complex">Complex</option><option value="mobile">Mobile</option>
       </select>
-      <select id="inv_filter_access" onchange="renderInventoryView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
+      <select id="inv_filter_access" class="std-filter-control" onchange="renderInventoryView()">
         <option value="">Accessibility: All</option><option value="yes">Accessible Only</option><option value="no">Non-Accessible</option>
       </select>
     </div>
@@ -1334,15 +1334,15 @@
       <p>Applicants ranked by score matched against vacant units</p>
     </div>
   </div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-    <input id="match_search" type="text" placeholder="🔍 Search applicant..." oninput="renderMatchView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);min-width:200px;"/>
-    <select id="match_filter_tier" onchange="renderMatchView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
+  <div class="filter-bar">
+    <input id="match_search" class="std-filter-control" type="text" placeholder="🔍 Search applicant..." oninput="renderMatchView()"/>
+    <select id="match_filter_tier" class="std-filter-control" onchange="renderMatchView()">
       <option value="">All Priority Tiers</option><option value="Critical Priority">Critical Priority</option><option value="High Priority">High Priority</option><option value="Medium Priority">Medium Priority</option><option value="Low Priority">Low Priority</option>
     </select>
-    <select id="match_filter_status" onchange="renderMatchView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
+    <select id="match_filter_status" class="std-filter-control" onchange="renderMatchView()">
       <option value="">All Statuses</option><option value="submitted">Submitted</option><option value="ed_approved">ED Approved</option><option value="mgr_approved">Manager Approved</option>
     </select>
-    <select id="match_filter_reserve" onchange="renderMatchView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">
+    <select id="match_filter_reserve" class="std-filter-control" onchange="renderMatchView()">
       <option value="">All Reserve</option><option value="On Reserve">On Reserve</option><option value="Off Reserve">Off Reserve</option>
     </select>
   </div>
@@ -1370,7 +1370,7 @@
     </div>
   </div>
   <div class="filter-bar">
-    <input id="tenant_search" type="text" placeholder="🔍 Search name or address..." oninput="renderTenantsView()"/>
+    <input id="tenant_search" class="std-filter-control" type="text" placeholder="🔍 Search name or address..." oninput="renderTenantsView()"/>
   </div>
   <div class="std-table-card">
     <div class="doclib-table-wrap">
@@ -2232,6 +2232,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/emailjs-com/3.2.0/email.min.js"></script>
 <script>
+// ── ROLE safety fallback — in case shared-config.js fails to load ────────────
+if(typeof ROLE === 'undefined') {
+  window.ROLE = {
+    ED:              'ed',
+    HOUSING_MANAGER: 'housing_manager',
+    HE_L2:           'housing_employee_l2',
+    HE_L1:           'housing_employee_l1',
+    isManagement: function(r) { return r==='ed'||r==='housing_manager'; }
+  };
+  console.warn('[CLFN] ROLE fallback — shared-config.js may not have loaded');
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BUILD MARKER — if you see this in the console, you are running the F1 build.
@@ -5719,13 +5730,13 @@ function renderTenantsView(){
       renoCell='<span style="font-size:11px;color:var(--border);">—</span>';
     }
     // fileCount already set above
-    return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-tuid="'+u.id+'">'
-      +'<td style="padding:10px 14px;"><div style="font-weight:600;font-size:13px;">'+u.num+' '+u.street+(u.isElders?' <span style="font-size:9px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>':'')+'</div><div style="font-size:11px;color:var(--muted);">'+u.bedrooms+'-bed'+(u.accessible?' · Accessible':'')+'</div></td>'
-      +'<td style="padding:10px 10px;font-size:13px;font-weight:600;">'+name+'</td>'
-      +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);">'+date+'</td>'
-      +'<td style="padding:10px 10px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:'+statusBg+';color:'+statusC+';">'+(u.status==='reserved'?'Reserved':'Occupied')+'</span></td>'
-      +(_showRenoScore?'<td style="padding:10px 10px;">'+renoCell+'</td>':'')
-      +'<td style="padding:10px 10px;">'
+    return '<tr class="clickable" data-tuid="'+u.id+'">'
+      +'<td><div class="std-cell-primary">'+u.num+' '+u.street+(u.isElders?' <span style="font-size:9px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>':'')+'</div><div class="tbl-sub">'+u.bedrooms+'-bed'+(u.accessible?' · Accessible':'')+'</div></td>'
+      +'<td class="std-cell-primary">'+name+'</td>'
+      +'<td class="std-cell-dash">'+date+'</td>'
+      +'<td><span class="std-pill std-pill-info">'+(u.status==='reserved'?'Reserved':'Occupied')+'</span></td>'
+      +(_showRenoScore?'<td>'+renoCell+'</td>':'')
+      +'<td>'
         +'<button type="button" data-files-uid="'+u.id+'" title="Tenant Files" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;color:var(--muted);font-size:12px;font-weight:600;padding:3px 6px;border-radius:5px;">'
           +'\uD83D\uDCCE '+(fileCount>0?'<span style="background:var(--yellow);color:#111;font-size:10px;font-weight:800;padding:1px 5px;border-radius:8px;">'+fileCount+'</span>':'<span style="color:var(--border);font-size:11px;">—</span>')
         +'</button>'
