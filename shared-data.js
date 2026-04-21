@@ -2072,7 +2072,20 @@ function renderContractorsView(){
       +(ct.email?'<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">✉ '+ct.email+'</div>':'')
       +(ct.classification?'<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">🏷 '+(classLabels[ct.classification]||ct.classification)+'</div>':'')
       +'<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">'
-        +expiryBadge(ct.wsibExpiry,'WSIB')+' '+expiryBadge(ct.insExpiry,'Insurance')
+        +(function(dateStr,label){
+            if(!dateStr) return '';
+            var days=Math.round((new Date(dateStr)-new Date())/(1000*60*60*24));
+            var c=days<0?'#b91c1c':days<30?'#d97706':'#15803d';
+            var t=days<0?'Expired':days<30?'Expiring soon':'Valid';
+            return '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+c+'22;color:'+c+';">'+label+': '+t+'</span>';
+          })(ct.wsibExpiry,'WSIB')
+        +' '+(function(dateStr,label){
+            if(!dateStr) return '';
+            var days=Math.round((new Date(dateStr)-new Date())/(1000*60*60*24));
+            var c=days<0?'#b91c1c':days<30?'#d97706':'#15803d';
+            var t=days<0?'Expired':days<30?'Expiring soon':'Valid';
+            return '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+c+'22;color:'+c+';">'+label+': '+t+'</span>';
+          })(ct.insExpiry,'Insurance')
       +'</div>'
       +(totalFiles?'<div style="font-size:11px;color:var(--muted);margin-top:5px;">📎 '+totalFiles+' file'+(totalFiles!==1?'s':'')+' on file</div>':'')
       +'<div style="display:flex;gap:6px;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">'
