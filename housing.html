@@ -3042,9 +3042,9 @@ function saveScoringModel() {
     body: JSON.stringify({ key: 'scoring_model', value: liveScoreModel })
   }).catch(function(e){ console.warn('Scoring model save failed:',e); });
   rescoreAllApplications();
-  // Refresh dashboard if visible
-  if(document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none') {
-    updateDashStats(); renderDashTable();
+  // Refresh pipeline if visible
+  if(document.getElementById('pipelineView') && document.getElementById('pipelineView').style.display !== 'none') {
+    plRender();
   }
 }
 
@@ -5047,15 +5047,6 @@ window.addEventListener('resize', function(){
 });
 
 
-function showDash(){
-  var role = window.currentRole || 'housing_employee_l1';
-  if(ROLE.isManagement(role)) {
-    // HM and ED go to the home tile page with live stats
-    showEmployeeHome();
-  } else {
-    showEmployeeHome();
-  }
-}
 function showApp(){
   hideAllViews('appLayout');
   setTimeout(initAutosave, 200);
@@ -8360,8 +8351,8 @@ function saveScoringModelED() {
     body: JSON.stringify({ key: 'scoring_model', value: liveScoreModel })
   }).catch(function(e){ console.warn('Scoring model save failed:',e); });
     rescoreAllApplications();
-    if(document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none') {
-      updateDashStats(); renderDashTable();
+    if(document.getElementById('pipelineView') && document.getElementById('pipelineView').style.display !== 'none') {
+      plRender();
     }
     showToast('Application scoring model saved.');
   });
@@ -10341,11 +10332,10 @@ window._navStack = [];
 
 // ── Page nav map (used by shared-ui.js goBack) ─────────────────────────────
 window._navMap = {
-  'home': showEmployeeHome,
   'pipeline':  showPipeline,
-  'home':     showPipeline,
+  'home':      showPipeline,
   'dashboard': showPipeline,
-  'worklist': showPipeline,
+  'worklist':  showPipeline,
   'inventory': showInventory,
   'match': showMatch,
   'tenants': showTenants,
@@ -10355,261 +10345,11 @@ window._navMap = {
 };
 
 
-function showDashboard(){
-  // The actual applications dashboard — HM and ED only
-  var role = window.currentRole || 'housing_employee_l1';
-  if(!APPROVAL_AUTHORITY.can('accessSettings', role)) { showToast('Dashboard access requires Housing Manager or Executive Director role.'); return; }
-  if(!window._navSkipPush) pushNav('dashboard');
-  hideAllViews('dashView');
-  setNavActive('tab_dash');
-  window._userSetDashFilter = false;
-  var fs = document.getElementById('dashFilterStatus');
-  if(fs) fs.value = '';
-  var _dv=document.getElementById('dashView');
-  if(_dv){ _dv.style.display='flex'; _dv.style.width='min(100%, 1400px)'; _dv.style.marginLeft='auto'; _dv.style.marginRight='auto'; _dv.style.boxSizing='border-box'; }
-  updateDashStats();renderDashTable();wireDashTable();
-}
+// showDashboard — legacy alias, redirects to pipeline
+// (old dashView removed; Pipeline is the unified landing view)
 
-function showEmployeeHome(){
-  if(!window._navSkipPush) pushNav('home');
-  setExportView(null);
-  hideAllViews('employeeHomeView');
-  setNavActive('tab_dash');
-  // Authoritative role resolution. HOUSING_SESSION.role is set by
-  // resolveHousingRole() at login and is the canonical source. Fall back to
-  // window.currentRole (legacy writers still touch this) and finally to
-  // 'employee' if neither is populated (very first render before login
-  // completes — should never actually render visible tiles in that case).
-  var role = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.role)
-          || window._realRole
-          || window.currentRole
-          || 'housing_employee_l1';
-  console.log('[housing] showEmployeeHome: role=' + role
-    + ' (HOUSING_SESSION.role=' + (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.role : 'n/a')
-    + ', _realRole=' + window._realRole
-    + ', currentRole=' + window.currentRole + ')');
-  var roleLabels = {
-    employee: 'Staff',
-    housing_employee_l1: 'Staff',
-    housing_employee_l2: 'Staff',
-    housing_manager: 'Housing Manager',
-    ed: 'Executive Director',
-    cfo: 'CFO',
-    finance_l1: 'Finance'
-  };
-  var subtitles = {
-    employee: 'Select a tile below to get started.',
-    housing_employee_l1: 'Select a tile below to get started.',
-    housing_employee_l2: 'Select a tile below to get started.',
-    housing_manager: "Here's what's happening across housing today.",
-    ed: "Here's what's happening across housing today.",
-    cfo: "Here's an overview of finance activity.",
-    finance_l1: 'Select a tile below to get started.'
-  };
-
-  // Today's date — formatted "THURSDAY · APRIL 17, 2026" for the uppercase meta line.
-  var dateEl = document.getElementById('emp_home_date');
-  if(dateEl){
-    var d = new Date();
-    var dayStr   = d.toLocaleDateString('en-US', { weekday: 'long' });
-    var dateStr  = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    dateEl.textContent = dayStr + ' · ' + dateStr;
-  }
-
-  var nameEl = document.getElementById('emp_home_name');
-  if(nameEl) {
-    var userName = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.name) ? HOUSING_SESSION.name : '';
-    var roleLbl  = roleLabels[role] || 'Staff';
-    if(userName) {
-      nameEl.innerHTML = userName + '<span style="color:var(--muted);font-weight:400;font-size:0.7em;font-style:italic;margin-left:10px;">' + roleLbl + '</span>';
-    } else {
-      nameEl.textContent = roleLbl;
-    }
-  }
-  var subEl = document.getElementById('emp_home_subtitle');
-  if(subEl) subEl.textContent = subtitles[role] || '';
-
-  // Build role-appropriate tile grid
-  var tilesEl = document.getElementById('emp_tiles_grid');
-  if(!tilesEl) { var view2=document.getElementById('employeeHomeView'); if(view2){view2.style.display='flex';view2.style.flexDirection='column';} return; }
-
-  if(ROLE.isManagement(role)) {
-    // ── Rich stat tiles for HM / ED ──
-    var apps  = (typeof applications !== 'undefined') ? applications : [];
-    var units = (typeof housingUnits  !== 'undefined') ? housingUnits  : [];
-
-    var pending     = apps.filter(function(a){return a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE;}).length;
-    var awaitingED  = apps.filter(function(a){return a.status===APP_STATUS.MGR_APPROVED;}).length;
-    var totalApps   = apps.filter(function(a){return !a.archived;}).length;
-    var critical   = apps.filter(function(a){return a.tier==='Critical Priority'&&!a.archived;}).length;
-
-    var vacant      = units.filter(function(u){return u.status==='vacant';}).length;
-    var occupied    = units.filter(function(u){return u.status==='occupied';}).length;
-    var totalUnits  = units.length;
-
-    var readyMatch  = apps.filter(function(a){return (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit&&!a.archived;}).length;
-    var matched     = apps.filter(function(a){return !!a.assignedUnit;}).length;
-
-    var tenanted    = units.filter(function(u){return u.status==='occupied'||u.status==='reserved';}).length;
-    var underRepair = units.filter(function(u){return u.status==='under_repair';}).length;
-    var condemned   = units.filter(function(u){return u.status==='condemned';}).length;
-    var ctCount = 0;
-
-    function makeStat(label, value, type) {
-      var c = type==='alert'?'#b91c1c':type==='good'?'#15803d':type==='info'?'#1d4ed8':'var(--muted)';
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);">'
-        +'<span style="font-size:11px;color:var(--muted);">'+label+'</span>'
-        +'<span style="font-size:16px;font-weight:800;color:'+c+';">'+value+'</span>'
-        +'</div>';
-    }
-    function tile(icon, label, fn, accentColor, statsHtml) {
-      var hover = 'onmouseover="this.style.boxShadow=\'0 4px 20px rgba(0,0,0,0.1)\';this.style.borderColor=\'' + accentColor + '\'"';
-      var out   = 'onmouseout="this.style.boxShadow=\'\';this.style.borderColor=\'var(--border)\'"';
-      return '<div onclick="'+fn+'" style="background:var(--surface);border:1px solid var(--border);border-top:3px solid '+accentColor+';border-radius:12px;padding:18px 20px;cursor:pointer;transition:box-shadow .15s,border-color .15s;display:flex;flex-direction:column;gap:12px;" '+hover+' '+out+'>'
-        +'<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:22px;">'+icon+'</span>'
-        +'<span style="font-weight:700;font-size:15px;">'+label+'</span></div>'
-        +'<div>'+statsHtml+'</div>'
-        +'</div>';
-    }
-
-    // New Application — dark accent tile
-        var newAppTile = '<div onclick="newApp()" style="background:var(--dark);border:2px solid var(--yellow);border-radius:12px;padding:20px;cursor:pointer;transition:background .15s;display:flex;flex-direction:column;gap:8px;"'
-      +' onmouseover="this.style.background=&quot;#1c1c1a&quot;" onmouseout="this.style.background=&quot;var(--dark)&quot;">'
-      +'<span style="font-size:26px;">📝</span>'
-      +'<span style="font-weight:700;font-size:15px;color:var(--yellow);">New Application</span>'
-      +'<span style="font-size:12px;color:#888;">Enter a housing application for a community member</span>'
-      +'</div>';
-
-    var _wlActionCount = APPROVAL_AUTHORITY.can('reviewApplication', role)
-      ? apps.filter(function(a){return (a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)&&!a.archived;}).length
-      : apps.filter(function(a){return a.status===APP_STATUS.MGR_APPROVED&&!a.archived;}).length;
-    var _wlReturnCount = apps.filter(function(a){return a.status==='returned'&&!a.archived;}).length;
-    var worklistTile = tile('📋','My Worklist','showWorklist()','#F8E41A',
-      makeStat(role=== ROLE.ED?'Awaiting Final Approval':'Awaiting Your Review', _wlActionCount, _wlActionCount>0?'alert':'neutral') +
-      makeStat('Returned for Info', _wlReturnCount, _wlReturnCount>0?'alert':'neutral') +
-      makeStat('Total Active', totalApps, 'neutral'));
-    var appTile = tile('📋','Applications','showDashboard()','#3b82f6',
-      makeStat('Awaiting HM Review', pending,   pending>0?'alert':'info') +
-      makeStat('Awaiting ED Approval', awaitingED, (awaitingED>0&&role=== ROLE.ED)?'alert':'info') +
-      makeStat('Critical Priority',    critical,    critical>0?'alert':'info') +
-      makeStat('Total Active',       totalApps, 'neutral'));
-
-    var invTile = tile('🏠','Inventory','showInventory()','#7c3aed',
-      makeStat('Vacant', vacant,   vacant>0?'good':'alert') +
-      makeStat('Occupied', occupied, 'info') +
-      makeStat('Total Units', totalUnits, 'neutral'));
-
-    var matchTile = tile('🔗','Match','showMatch()','#15803d',
-      makeStat('Ready to Match', readyMatch, readyMatch>0?'good':'neutral') +
-      makeStat('Matched', matched, matched>0?'good':'neutral') +
-      makeStat('Vacant Units', vacant, vacant>0?'good':'alert'));
-
-    var tenantTile = tile('👥','Tenants','showTenants()','#0ea5e9',
-      makeStat('Occupied / Reserved', tenanted, 'info') +
-      makeStat('Total Units', totalUnits, 'neutral'));
-
-    // Reno approval workflow stats
-    var sowPendingHM=0, sowPendingED=0, sowApproved=0, sowNoSow=0, sowInProgress=0;
-    try {
-      var allU=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-      var renoUnits=allU.filter(function(u){return (u.status==='under_repair'||u.status==='condemned')&&!u.archived;});
-      var hmLimit2 = (typeof APPROVAL_AUTHORITY!=='undefined') ? APPROVAL_AUTHORITY.get('sowEdThreshold')||25000 : parseFloat(((window._appSettings||{}).hmBudgetLimit)||25000);
-      renoUnits.forEach(function(u){
-        var sow=null; sow = getSowData(u.id);
-        var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
-        if(!sow){sowNoSow++;return;}
-        var cost=parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))||0;
-        var hmDec=(u.unitHmSig&&u.unitHmSig.decision)||'';
-        var edDec=(u.unitEdSig&&u.unitEdSig.decision)||'';
-        var needsED=cost>hmLimit2;
-        if(prog&&(prog.overallPct||0)>=100){sowInProgress++; return;}
-        if(prog&&(prog.overallPct||0)>0){sowInProgress++; return;}
-        if(edDec==='approved'||(hmDec==='approved'&&!needsED)){sowApproved++;}
-        else if(hmDec==='approved'&&needsED){sowPendingED++;}
-        else{sowPendingHM++;}
-      });
-    }catch(e){}
-    var renoTile = tile('🔨','Renovations','showRenos()','#d97706',
-      makeStat('Under Repair', underRepair, underRepair>0?'alert':'good') +
-      makeStat('Condemned',    condemned,   condemned>0?'alert':'good') +
-      makeStat('Pending HM Approval',  sowPendingHM,  sowPendingHM>0?(role=== ROLE.HOUSING_MANAGER?'alert':'info'):'neutral') +
-      makeStat('Pending ED Approval',  sowPendingED,  sowPendingED>0?(role=== ROLE.ED?'alert':'info'):'neutral') +
-      makeStat('SOW Approved',         sowApproved,   sowApproved>0?'good':'neutral') +
-      makeStat('In Progress',          sowInProgress, sowInProgress>0?'good':'neutral'));
-
-    var ctPending = 0, ctAwaitingED = 0, ctApproved = 0, ctDeclined = 0;
-    try {
-      var ctList = window._contractors || [];
-      ctCount = ctList.length;
-      ctPending    = ctList.filter(function(c){ return (c.status||'pending_review')==='pending_review'||(c.status||'')==='returned'; }).length;
-      ctAwaitingED = ctList.filter(function(c){ return c.status==='hm_recommended'; }).length;
-      ctApproved   = ctList.filter(function(c){ return c.status==='approved'; }).length;
-      ctDeclined   = ctList.filter(function(c){ return c.status==='declined'; }).length;
-    } catch(e){}
-
-    var ctTile = tile('🧰','Contractors','showContractorsForRole()','#6b7280',
-      makeStat('Pending HM Review',  ctPending,    ctPending>0?(role=== ROLE.HOUSING_MANAGER?'alert':'info'):'neutral') +
-      makeStat('Awaiting ED Approval', ctAwaitingED, ctAwaitingED>0?(role=== ROLE.ED?'alert':'info'):'neutral') +
-      makeStat('Approved',           ctApproved,   ctApproved>0?'good':'neutral') +
-      (ctDeclined>0?makeStat('Declined', ctDeclined, 'alert'):''));
-
-        // Settings tile removed — Settings is accessible via the gear icon in the header.
-
-    tilesEl.style.gridTemplateColumns = 'repeat(auto-fill,minmax(240px,1fr))';
-
-    // ── Module gating (Phase A0) ─────────────────────────────────────
-    // Optional-module tiles only render if CLFN_MODULES.isEnabled() returns true.
-    // Core-module tiles (Applications, Worklist, Inventory, Tenants) always render.
-    var mods = window.CLFN_MODULES;
-    var matchTileOut = (mods && mods.isEnabled('match'))        ? matchTile : '';
-    var renoTileOut  = (mods && mods.isEnabled('renovations'))  ? renoTile  : '';
-    var ctTileOut    = (mods && mods.isEnabled('contractors')) ? ctTile    : '';
-
-    // Finance module placeholder — real UI comes in a later phase.
-    // Shown when the nation has the Finance module licensed AND the user has
-    // finance access (ED, HM, HE-L2, CFO, Finance L1 — actual check comes in Phase A).
-    var financeTile = '';
-    if(mods && mods.isEnabled('finance')){
-      financeTile = '<div onclick="showFinance()" style="background:var(--surface);border:1px solid var(--border);border-top:3px solid #1d4ed8;border-radius:12px;padding:18px 20px;cursor:pointer;transition:box-shadow .15s;"'
-        +' onmouseover="this.style.boxShadow=&quot;0 4px 20px rgba(0,0,0,0.1)&quot;" onmouseout="this.style.boxShadow=&quot;&quot;">'
-        +'<div style="display:flex;align-items:center;gap:12px;"><span style="font-size:22px;">💰</span>'
-        +'<div><div style="font-weight:700;font-size:14px;">Finance Module</div>'
-        +'<div style="font-size:12px;color:var(--muted);">Budgets, payments &amp; financial reporting</div></div></div>'
-        +'</div>';
-    }
-
-    tilesEl.innerHTML = newAppTile + worklistTile + appTile + invTile + matchTileOut + tenantTile + renoTileOut + ctTileOut + financeTile;
-
-  } else {
-    // ── Employee: simple tiles ──
-    tilesEl.style.gridTemplateColumns = 'repeat(auto-fill,minmax(200px,1fr))';
-    var mods2 = window.CLFN_MODULES;
-    var empTiles = [
-      {icon:'📝', label:'New Application', desc:'Start a new housing application', fn:'newApp()', accent:true, module:'applications'},
-      {icon:'📋', label:'My Worklist',     desc:'Track applications you have submitted', fn:'showWorklist()', module:'applications'},
-      {icon:'👥', label:'Tenants',         desc:'Search and update tenant records',   fn:'showTenantsForRole()', module:'tenants'},
-      {icon:'🔨', label:'Renovations',     desc:'Renovation progress and requests',   fn:'showRenosForRole()', module:'renovations'},
-      {icon:'🧰', label:'Contractors',     desc:'Browse contractor directory',         fn:'showContractorsForRole()', module:'contractors'}
-    ].filter(function(t){ return !t.module || !mods2 || mods2.isEnabled(t.module); });
-    tilesEl.innerHTML = empTiles.map(function(t) {
-      var ab = t.accent ? 'background:var(--dark);border:2px solid var(--yellow);' : 'background:var(--surface);border:1px solid var(--border);';
-      var lc = t.accent ? 'color:var(--yellow);' : '';
-      var dc = t.accent ? 'color:#888;' : 'color:var(--muted);';
-            return '<div onclick="'+t.fn+'" style="'+ab+'border-radius:12px;padding:22px;cursor:pointer;transition:box-shadow .15s;display:flex;flex-direction:column;gap:10px;"'
-        +' onmouseover="this.style.boxShadow=&quot;0 4px 16px rgba(0,0,0,0.1)&quot;" onmouseout="this.style.boxShadow=&quot;&quot;">'
-        +'<div style="font-size:28px;">'+t.icon+'</div>'
-        +'<div style="font-weight:700;font-size:14px;'+lc+'">'+t.label+'</div>'
-        +'<div style="font-size:12px;'+dc+'">'+t.desc+'</div>'
-        +'</div>';
-    }).join('');
-  }
-
-  var view = document.getElementById('employeeHomeView');
-  if(view){ view.style.display='flex'; view.style.flexDirection='column'; view.style.width='min(100%, 1400px)'; view.style.marginLeft='auto'; view.style.marginRight='auto'; view.style.boxSizing='border-box'; }
-
-  // Populate recent activity
-  renderRecentActivity(role);
-}
+// showEmployeeHome — legacy alias, redirects to pipeline
+// (old employeeHomeView tile grid removed; Pipeline is the unified landing view)
 
 async function renderRecentActivity(role) {
   var el = document.getElementById('emp_recent_activity');
@@ -10875,7 +10615,7 @@ window._onSwitchRole = function(role) {
   if (typeof applyTenancyFieldRoles === 'function') applyTenancyFieldRoles();
   // Only navigate home if no view is currently visible (i.e. during boot)
   // Not on every role switch — that causes the worklist flash
-  var anyVisible = ['worklistView','dashView','inventoryView','matchView',
+  var anyVisible = ['pipelineView','inventoryView','matchView',
     'tenantsView','settingsView','scorecardView','appLayout'].some(function(id) {
     var el = document.getElementById(id);
     return el && el.style.display !== 'none' && el.style.display !== '';
@@ -11036,8 +10776,10 @@ function closeApplicationForm(){
 
   var prev = stack.length ? stack[stack.length-1] : null;
   var navMap = {
-    'home':        showEmployeeHome,
-    'dashboard':   showDashboard,
+    'home':        showPipeline,
+    'pipeline':    showPipeline,
+    'dashboard':   showPipeline,
+    'worklist':    showPipeline,
     'inventory':   showInventory,
     'match':       showMatch,
     'tenants':     showTenants,
@@ -11049,7 +10791,7 @@ function closeApplicationForm(){
   if(prev && navMap[prev]) {
     navMap[prev]();
   } else {
-    showEmployeeHome();
+    showPipeline();
   }
   window._navSkipPush = false;
 }
@@ -12966,7 +12708,7 @@ function initHousingPage() {
   var params = new URLSearchParams(window.location.search);
   var view = params.get('view') || 'dashboard';
   if(view==='newapp')          { if(typeof newApp==='function') newApp(); }
-  else if(view==='worklist')   { if(true) showWorklist(); }
+  else if(view==='worklist')   { showPipeline(); }
   else if(view==='inventory')  { if(true) showInventory(); }
   else if(view==='match')      { if(true) showMatch(); }
   else if(view==='tenants')    { if(true) showTenants(); }
