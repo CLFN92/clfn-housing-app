@@ -147,18 +147,22 @@
   // ── Approval authority ────────────────────────────────────────────────
   function canApproveSowHm(role){
     var r = assertRole(role, 'canApproveSowHm');
+    if(typeof APPROVAL_AUTHORITY !== 'undefined') return APPROVAL_AUTHORITY.can('approveSowUnderThreshold', r);
     return r === ROLES.HM || r === ROLES.ED;
   }
   function canApproveSowEd(role){
     var r = assertRole(role, 'canApproveSowEd');
+    if(typeof APPROVAL_AUTHORITY !== 'undefined') return APPROVAL_AUTHORITY.can('approveSowOverThreshold', r);
     return r === ROLES.ED;
   }
   function canMarkSowComplete(role){
     var r = assertRole(role, 'canMarkSowComplete');
+    if(typeof APPROVAL_AUTHORITY !== 'undefined') return APPROVAL_AUTHORITY.can('approveSowUnderThreshold', r) || APPROVAL_AUTHORITY.can('approveSowOverThreshold', r);
     return r === ROLES.ED || r === ROLES.HM;
   }
   function canReopenSow(role){
     var r = assertRole(role, 'canReopenSow');
+    if(typeof APPROVAL_AUTHORITY !== 'undefined') return APPROVAL_AUTHORITY.can('lockSow', r);
     return r === ROLES.ED;
   }
 

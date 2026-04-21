@@ -11,6 +11,7 @@
 <script src="shared-config.js"></script>
 <script src="shared-auth.js"></script>
 <script src="shared-ui.js"></script>
+<script src="approval-authority.js"></script>
 <script src="shared-data.js"></script>
 <script src="scoring.js"></script>
 
@@ -964,6 +965,7 @@
     <button onclick="showSettingsSection('sec_budget')" id="stab_budget" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">💰 Reno Budget</button>
     <button onclick="showSettingsSection('sec_contacts')" id="stab_contacts" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">📧 Contacts</button>
     <button onclick="showSettingsSection('sec_nation');renderNationPanel();" id="stab_nation" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">🌐 Nation</button>
+    <button onclick="showSettingsSection('sec_approval_authority');renderApprovalAuthorityPanel();" id="stab_approval_authority" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;display:none;">🔐 Approval Authority</button>
     <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;display:none;">📋 Audit Log</button>
     <button onclick="showSettingsSection('sec_occupancy')" id="stab_occupancy" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;display:none;">🏘 Occupancy</button>
   </div>
@@ -1140,6 +1142,22 @@
     </div>
   </div>
 
+
+
+<div id="sec_approval_authority" class="settings-section" style="display:none;">
+  <div class="card" style="padding:0;overflow:hidden;border-color:var(--yellow);">
+    <div class="modal-hdr">
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--yellow);">🔐 Approval Authority</div>
+        <div style="font-size:11px;color:#888;font-weight:400;margin-top:3px;">Controls which <strong>roles</strong> can perform each action — all staff with that role are included. ED only.</div>
+      </div>
+      <button onclick="saveApprovalAuthoritySettings()" style="background:var(--yellow);border:none;color:#111;padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save Changes</button>
+    </div>
+    <div style="padding:20px;" id="approval_authority_panel_body">
+      <div style="padding:32px;text-align:center;color:var(--muted);font-size:13px;">Loading…</div>
+    </div>
+  </div>
+</div>
 
   <!-- ── AUDIT LOG ── -->
   <div id="sec_audit" class="settings-section" style="display:none;">
@@ -3506,7 +3524,7 @@ function renderNosTable() {
   var bedLabels = {'0':'Studio / 0 bedrooms','1':'1 bedroom','2':'2 bedrooms','3':'3 bedrooms','4':'4 bedrooms','5':'5+ bedrooms'};
   var nos = defaults;
   try { if(typeof getNosTable === 'function') nos = getNosTable(); } catch(e) { nos = defaults; }
-  var isED = (window.currentRole === ROLE.ED);
+  var isED = APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole);
   tbody.innerHTML = Object.keys(bedLabels).map(function(beds) {
     var maxPeople = (nos[beds] !== undefined) ? nos[beds] : defaults[beds];
     var label = bedLabels[beds];
@@ -3522,7 +3540,7 @@ function renderNosTable() {
 
 
 function saveNosTable() {
-  if(window.currentRole !== ROLE.ED) {
+  if(!APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole)) {
     showToast('Only the Executive Director can update the NOS table.');
     return;
   }
@@ -4373,11 +4391,12 @@ function renderDashTable(){
     var statusMap={draft:['Draft','pill-draft'],submitted:['Awaiting HM Review','pill-submitted'],file_update:['File Update — Awaiting HM','pill-submitted'],mgr_approved:['Awaiting ED Approval','pill-mgr'],hm_recommended:['HM Recommended','pill-mgr'],hm_approved:['File Update Approved','pill-approved'],ed_approved:['ED Approved','pill-approved'],declined:['Declined','pill-declined'],returned:['Returned for Info','pill-returned'],housed:['Housed','pill-approved'],assigned:['Assigned','pill-assigned']};
     var sp=statusMap[a.status]||['—','pill-draft'];
     var role=window.currentRole||'housing_employee_l1';
-    var canAssignFromDash = (ROLE.isManagement(role))
-      && (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)
+    var canAssignFromDash = (APPROVAL_AUTHORITY.can('assignUnit', role))
+      && (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED||a.status===APP_STATUS.MGR_APPROVED)
       && !a.assignedUnit && !a.archived;
-    var canReviewFromDash = (role=== ROLE.HOUSING_MANAGER && (a.status===APP_STATUS.SUBMITTED||a.status==='returned'||a.status===APP_STATUS.FILE_UPDATE))
-      || (role=== ROLE.ED && (a.status===APP_STATUS.MGR_APPROVED||a.status===APP_STATUS.SUBMITTED));
+    var canReviewFromDash = (APPROVAL_AUTHORITY.can('reviewFileUpdate', role) && a.status===APP_STATUS.FILE_UPDATE)
+      || (APPROVAL_AUTHORITY.can('reviewApplication', role) && (a.status===APP_STATUS.SUBMITTED||a.status==='returned'))
+      || (APPROVAL_AUTHORITY.can('finalApproveApp', role) && (a.status===APP_STATUS.MGR_APPROVED||a.status===APP_STATUS.SUBMITTED));
     return '<tr>'
       +'<td style="cursor:pointer;" data-sc-id="'+a.id+'">'
       +'<div class="appl-name" style="text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;">'+(a.fn||'—')+' '+(a.ln||'')+'</div>'
@@ -4671,7 +4690,7 @@ function showApp(){
 
 function showSettings(){
   var role = window.currentRole || 'housing_employee_l1';
-  if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) {
+  if(!APPROVAL_AUTHORITY.can('accessSettings', role)) {
     showToast('Settings are only accessible to the Housing Manager and Executive Director.');
     return;
   }
@@ -5105,7 +5124,7 @@ function openUnitEditModal(unitId){
   var archWrap = document.getElementById('ue_archive_btn_wrap');
   if(archWrap) {
     var role = window.currentRole || 'housing_employee_l1';
-    if(role === ROLE.ED) {
+    if(APPROVAL_AUTHORITY.can('editScoreModel', role)) {
       if(u.archived) {
         archWrap.innerHTML = '<button type="button" onclick="unarchiveUnit(\''+unitId.replace(/'/g,"\\'")+'\')" style="background:none;border:1.5px solid #888;color:#888;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">📤 Restore Unit</button>';
       } else {
@@ -5142,7 +5161,9 @@ function ueOpenSow() {
 // ── Budget threshold helpers ──────────────────────────────────────────────────
 function getHmBudgetLimit() {
   // Default: HM can approve up to $25,000 unilaterally; above that needs ED
+  // Uses APPROVAL_AUTHORITY sowEdThreshold as the authoritative value
   try {
+    if(typeof APPROVAL_AUTHORITY !== 'undefined') return APPROVAL_AUTHORITY.get('sowEdThreshold') || 25000;
     var s = window._appSettings || {};
     return (s.hmBudgetLimit && parseFloat(s.hmBudgetLimit)) || 25000;
   } catch(e) { return 25000; }
@@ -5260,16 +5281,17 @@ function saveUnitEdit(){
       var appStatus = linkedApp2.status||'';
       var edApproved = appStatus===APP_STATUS.ED_APPROVED;
       var hmApproved = appStatus===APP_STATUS.MGR_APPROVED||edApproved;
-      if(role2=== ROLE.ED && !edApproved) {
+      var appFullyApproved = edApproved;
+      if(APPROVAL_AUTHORITY.can('finalApproveApp', role2) && !appFullyApproved) {
         showToast('⚠ ED Approval required before assigning tenant. Application is: '+appStatus.replace(/_/g,' '));
         return;
       }
-      if(role2=== ROLE.HOUSING_MANAGER && !hmApproved) {
+      if(APPROVAL_AUTHORITY.can('assignUnit', role2) && !APPROVAL_AUTHORITY.can('finalApproveApp', role2) && !hmApproved) {
         showToast('⚠ Housing Manager approval required before assigning tenant. Application is: '+appStatus.replace(/_/g,' '));
         return;
       }
-      // Write back HM approval flag on unit
-      u.tenantApprovedBy = role2=== ROLE.ED?'Executive Director':'Housing Manager';
+      // Write back approval flag on unit
+      u.tenantApprovedBy = APPROVAL_AUTHORITY.can('finalApproveApp', role2)?'Executive Director':'Housing Manager';
       u.tenantApprovedAt = new Date().toISOString().split('T')[0];
     }
   }
@@ -5304,10 +5326,10 @@ function ueTenantSearch(q) {
   var apps = typeof applications !== 'undefined' ? applications : [];
   var role = window.currentRole || 'housing_employee_l1';
 
-  // Show ed_approved to all roles; also mgr_approved for HM and ED
+  // Show ed_approved to all roles; also mgr_approved for roles that can finalApprove or approveFileUpdate
   var eligible = apps.filter(function(a) {
     if (a.status === APP_STATUS.ED_APPROVED) return true;
-    if ((ROLE.isManagement(role)) && a.status === APP_STATUS.MGR_APPROVED) return true;
+    if ((APPROVAL_AUTHORITY.can('finalApproveApp', role) || APPROVAL_AUTHORITY.can('approveFileUpdate', role)) && a.status === APP_STATUS.MGR_APPROVED) return true;
     return false;
   });
 
@@ -5463,6 +5485,7 @@ function ueRemoveTenant() {
 
 
 function renderMatchView(){
+  var role = window.currentRole || 'housing_employee_l1';
   var allApps = (typeof applications !== 'undefined' ? applications : []);
   var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
   var vacantUnits = allUnits.filter(function(u){ return u.status==='vacant' && !u.archived; });
@@ -5600,7 +5623,7 @@ function renderMatchView(){
     var sl = statusLabel[app.status] || app.status || '';
     var appDateStr = app.appDate ? 'Applied '+app.appDate : '';
 
-    var canAssign = app.status===APP_STATUS.ED_APPROVED||app.status===APP_STATUS.MGR_APPROVED;
+    var canAssign = (app.status===APP_STATUS.ED_APPROVED||app.status===APP_STATUS.MGR_APPROVED) && APPROVAL_AUTHORITY.can('assignUnit', role);
     var isAssigned = app.status==='assigned';
     var assignCell = isAssigned
       ? '<div style="font-size:11px;font-weight:700;color:#15803d;">✓ '+(app.assignedAddress||'Assigned')+'</div>'
@@ -5983,7 +6006,7 @@ document.addEventListener('keydown', function(e) {
 
 // ── Save ED adjustment ──
 function saveEdAdjustment(){
-  if(window.currentRole !== ROLE.ED){ showToast('Only the Executive Director can apply adjustments.'); return; }
+  if(!APPROVAL_AUTHORITY.can('applyScoreAdjustment', window.currentRole)){ showToast('Only the Executive Director can apply adjustments.'); return; }
   var app = window._currentScorecardApp;
   if(!app){ showToast('No application selected.'); return; }
   var pts = parseInt((document.getElementById('sc_ed_adj_pts')||{}).value||0)||0;
@@ -6678,18 +6701,23 @@ function getSowByProjectNumber(unitId, projectNumber){
 
 function canEditSow(sow){
   // Anyone authenticated can edit a non-completed SOW (existing behavior).
-  // Only the ED (real role) can edit a completed one.
+  // Only roles with lockSow authority can edit a completed one.
   if(!isSowCompleted(sow)) return true;
-  return _realRoleForPermissions() === ROLE.ED;
+  var r = _realRoleForPermissions();
+  return (typeof APPROVAL_AUTHORITY !== 'undefined') ? APPROVAL_AUTHORITY.can('lockSow', r) : r === ROLE.ED;
 }
 function canMarkSowComplete(){
-  // HM or ED can mark a SOW complete; staff/employee cannot.
+  // Roles with approveSowUnderThreshold or approveSowOverThreshold can mark complete.
   var r = _realRoleForPermissions();
+  if(typeof APPROVAL_AUTHORITY !== 'undefined') {
+    return APPROVAL_AUTHORITY.can('approveSowUnderThreshold', r) || APPROVAL_AUTHORITY.can('approveSowOverThreshold', r);
+  }
   return ROLE.isManagement(r) || r === 'hm';
 }
 function canReopenSow(){
-  // Only ED can reopen a completed SOW.
-  return _realRoleForPermissions() === ROLE.ED;
+  // Roles with lockSow authority can reopen a completed SOW.
+  var r = _realRoleForPermissions();
+  return (typeof APPROVAL_AUTHORITY !== 'undefined') ? APPROVAL_AUTHORITY.can('lockSow', r) : r === ROLE.ED;
 }
 
 
@@ -7298,9 +7326,129 @@ var CRITICAL_SOW_CATS = ['Heating / HVAC','Electrical','Roofing','Windows & Door
 
 // ══ END RENOVATION BUDGET APPROVAL ═══════════════════════════════════════════
 
+// ══════════════════════════════════════════════════════════════
+// APPROVAL AUTHORITY SETTINGS PANEL
+// ══════════════════════════════════════════════════════════════
+
+var _AA_GROUPS = [
+  { label: 'Application Approval', keys: ['reviewApplication','finalApproveApp','declineApplication','returnApplication'] },
+  { label: 'File Updates',         keys: ['reviewFileUpdate','approveFileUpdate'] },
+  { label: 'Unit Assignment',      keys: ['assignUnit','overrideMatch','assignTiedBand'] },
+  { label: 'SOW & Budget',         keys: ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow'] },
+  { label: 'Contractors',          keys: ['recommendContractor','approveContractor','declineContractor'] },
+  { label: 'System',               keys: ['editScoreModel','applyScoreAdjustment','accessSettings','editApprovalAuthority','manageStaff'] }
+];
+
+var _AA_LABELS = {
+  reviewApplication:       'Review Application',
+  finalApproveApp:         'Final Approve Application',
+  declineApplication:      'Decline Application',
+  returnApplication:       'Return Application',
+  reviewFileUpdate:        'Review File Update',
+  approveFileUpdate:       'Approve File Update',
+  assignUnit:              'Assign Unit',
+  overrideMatch:           'Override Match (below band)',
+  assignTiedBand:          'Assign Within Match Band',
+  sowEdThreshold:          'ED Approval Threshold ($)',
+  approveSowUnderThreshold:'Approve SOW Under Threshold',
+  approveSowOverThreshold: 'Approve SOW Over Threshold',
+  lockSow:                 'Lock / Reopen Completed SOW',
+  recommendContractor:     'Recommend Contractor',
+  approveContractor:       'Approve Contractor',
+  declineContractor:       'Decline Contractor',
+  editScoreModel:          'Edit Scoring Model',
+  applyScoreAdjustment:    'Apply Score Adjustment',
+  accessSettings:          'Access Settings',
+  editApprovalAuthority:   'Edit Approval Authority',
+  manageStaff:             'Manage Staff'
+};
+
+var _AA_ROLE_LABELS = { ed: 'ED', housing_manager: 'HM', housing_employee_l1: 'Employee' };
+
+function renderApprovalAuthorityPanel() {
+  var el = document.getElementById('approval_authority_panel_body');
+  if(!el) return;
+  if(!APPROVAL_AUTHORITY.can('editApprovalAuthority', window.currentRole)) {
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">Only the Executive Director can configure approval authorities.</div>';
+    return;
+  }
+  var allRoles = APPROVAL_AUTHORITY.allRoles();
+  var html = '';
+  _AA_GROUPS.forEach(function(grp) {
+    html += '<div style="margin-bottom:24px;">';
+    html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--yellow);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:12px;">'+grp.label+'</div>';
+    grp.keys.forEach(function(key) {
+      var val = APPROVAL_AUTHORITY.get(key);
+      var isThreshold = (typeof val === 'number');
+      var isModified = APPROVAL_AUTHORITY.isModified(key);
+      html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">';
+      html += '<div style="flex:1;min-width:0;">';
+      html += '<div style="font-size:13px;font-weight:600;color:var(--text);">'+_AA_LABELS[key]+'</div>';
+      if(isModified) html += '<span style="font-size:10px;font-weight:700;color:#d97706;background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:1px 6px;">Modified</span>';
+      html += '</div>';
+      if(isThreshold) {
+        html += '<input type="number" data-aa-key="'+key+'" value="'+val+'" min="0" step="1000"'
+          +' style="width:110px;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;'
+          +'color:var(--text);font-family:DM Sans,sans-serif;background:var(--surface);text-align:right;"'
+          +' oninput="APPROVAL_AUTHORITY.update(\''+key+'\', parseFloat(this.value)||0)"/>';
+      } else {
+        html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+        allRoles.forEach(function(r) {
+          var active = (val.indexOf(r) !== -1);
+          var label = _AA_ROLE_LABELS[r] || r;
+          html += '<button data-aa-key="'+key+'" data-aa-role="'+r+'" onclick="aaToggleRole(this)"'
+            +' style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;'
+            +'background:'+(active?'var(--yellow)':'var(--surface)')+';color:'+(active?'#111':'var(--muted)')+';'
+            +'border:1.5px solid '+(active?'var(--yellow)':'var(--border)')+';">'+label+'</button>';
+        });
+        html += '</div>';
+      }
+      html += '<button onclick="aaResetAction(\''+key+'\')" title="Reset to default"'
+        +' style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">↺ Default</button>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function aaToggleRole(btn) {
+  var key  = btn.getAttribute('data-aa-key');
+  var role = btn.getAttribute('data-aa-role');
+  var cur  = APPROVAL_AUTHORITY.get(key);
+  if(!Array.isArray(cur)) return;
+  var next = cur.indexOf(role) === -1 ? cur.concat([role]) : cur.filter(function(r){ return r !== role; });
+  APPROVAL_AUTHORITY.update(key, next);
+  renderApprovalAuthorityPanel();
+}
+
+function aaResetAction(key) {
+  APPROVAL_AUTHORITY.reset(key);
+  renderApprovalAuthorityPanel();
+}
+
+function saveApprovalAuthoritySettings() {
+  if(!APPROVAL_AUTHORITY.can('editApprovalAuthority', window.currentRole)) {
+    showToast('Only the Executive Director can save approval authority settings.');
+    return;
+  }
+  var data = APPROVAL_AUTHORITY.serialize();
+  if(!window._appSettings) window._appSettings = {};
+  window._appSettings['approval_authority'] = data;
+  sbSaveSetting('approval_authority', data).then(function(ok) {
+    if(ok) {
+      showToast('✓ Approval authority saved');
+      auditEntry('SETTINGS','approval_authority_save','Approval authority configuration updated',window.currentRole||'ed');
+    } else {
+      showToast('Save failed — check connection');
+    }
+  });
+}
+
+
 // ── Settings section tabs ──
 function showSettingsSection(section) {
-  var sections = ['sec_users','sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget','sec_contacts','sec_nation','sec_audit','sec_occupancy'];
+  var sections = ['sec_users','sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget','sec_contacts','sec_nation','sec_approval_authority','sec_audit','sec_occupancy'];
   sections.forEach(function(id){
     var el=document.getElementById(id);
     if(el) el.style.display=(id===section)?'block':'none';
@@ -7317,7 +7465,7 @@ function showSettingsSection(section) {
   if(section==='sec_app_scoring') {
     // ED sees the V2 editor (object-based model with tier threshold controls).
     // Other roles see a read-only message (populateSettings handles that on initial load).
-    if(window.currentRole === ROLE.ED && typeof renderV2ScoringEditor === 'function') {
+    if(APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole) && typeof renderV2ScoringEditor === 'function') {
       renderV2ScoringEditor();
     } else {
       var wrap = document.getElementById('scoring_model_table_wrap');
@@ -7330,6 +7478,7 @@ function showSettingsSection(section) {
   if(section==='sec_contacts'    && typeof populateContactSettings==='function') populateContactSettings();
   if(section==='sec_audit'       && typeof renderAuditLog==='function') renderAuditLog();
   if(section==='sec_occupancy'   && typeof renderNosTable==='function') renderNosTable();
+  if(section==='sec_approval_authority' && typeof renderApprovalAuthorityPanel==='function') renderApprovalAuthorityPanel();
 }
 
 
@@ -7605,7 +7754,7 @@ function getAppType() {
 
 // ── Settings role locks ──
 function applySettingsRoleLocks() {
-  var isED = (window.currentRole === ROLE.ED);
+  var isED = APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole);
   var locked = !isED;
 
   // Selectors for all score/budget editable inputs
@@ -7655,6 +7804,8 @@ function applySettingsRoleLocks() {
   if(auditTab) auditTab.style.display = isED ? '' : 'none';
   var occTab = document.getElementById('stab_occupancy');
   if(occTab) occTab.style.display = isED ? '' : 'none';
+  var aaTab = document.getElementById('stab_approval_authority');
+  if(aaTab) aaTab.style.display = APPROVAL_AUTHORITY.can('editApprovalAuthority', window.currentRole) ? '' : 'none';
 
   // Lock NOS inputs for non-ED
   document.querySelectorAll('#nos_table_tbody input').forEach(function(el) {
@@ -7726,7 +7877,7 @@ function confirmResetScoringModelED() {
   });
 }
 function openAddCriteriaModalED() {
-  if(window.currentRole !== ROLE.ED) { showToast('Only the Executive Director can add scoring criteria.'); return; }
+  if(!APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole)) { showToast('Only the Executive Director can add scoring criteria.'); return; }
   openAddCriteriaModal();
 }
 
@@ -9657,7 +9808,7 @@ window._navMap = {
 function showDashboard(){
   // The actual applications dashboard — HM and ED only
   var role = window.currentRole || 'housing_employee_l1';
-  if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) { showToast('Dashboard access requires Housing Manager or Executive Director role.'); return; }
+  if(!APPROVAL_AUTHORITY.can('accessSettings', role)) { showToast('Dashboard access requires Housing Manager or Executive Director role.'); return; }
   if(!window._navSkipPush) pushNav('dashboard');
   hideAllViews('dashView');
   setNavActive('tab_dash');
@@ -9778,17 +9929,17 @@ function showEmployeeHome(){
       +'<span style="font-size:12px;color:#888;">Enter a housing application for a community member</span>'
       +'</div>';
 
-    var _wlActionCount = role=== ROLE.HOUSING_MANAGER
+    var _wlActionCount = APPROVAL_AUTHORITY.can('reviewApplication', role)
       ? apps.filter(function(a){return (a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)&&!a.archived;}).length
       : apps.filter(function(a){return a.status===APP_STATUS.MGR_APPROVED&&!a.archived;}).length;
     var _wlReturnCount = apps.filter(function(a){return a.status==='returned'&&!a.archived;}).length;
     var worklistTile = tile('📋','My Worklist','showWorklist()','#F8E41A',
-      makeStat(role=== ROLE.ED?'Awaiting Final Approval':'Awaiting Your Review', _wlActionCount, _wlActionCount>0?'alert':'neutral') +
+      makeStat(APPROVAL_AUTHORITY.can('finalApproveApp', role)?'Awaiting Final Approval':'Awaiting Your Review', _wlActionCount, _wlActionCount>0?'alert':'neutral') +
       makeStat('Returned for Info', _wlReturnCount, _wlReturnCount>0?'alert':'neutral') +
       makeStat('Total Active', totalApps, 'neutral'));
     var appTile = tile('📋','Applications','showDashboard()','#3b82f6',
       makeStat('Awaiting HM Review', pending,   pending>0?'alert':'info') +
-      makeStat('Awaiting ED Approval', awaitingED, (awaitingED>0&&role=== ROLE.ED)?'alert':'info') +
+      makeStat('Awaiting ED Approval', awaitingED, (awaitingED>0&&APPROVAL_AUTHORITY.can('finalApproveApp',role))?'alert':'info') +
       makeStat('Critical Priority',    critical,    critical>0?'alert':'info') +
       makeStat('Total Active',       totalApps, 'neutral'));
 
@@ -9811,7 +9962,7 @@ function showEmployeeHome(){
     try {
       var allU=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
       var renoUnits=allU.filter(function(u){return (u.status==='under_repair'||u.status==='condemned')&&!u.archived;});
-      var hmLimit2=parseFloat(((window._appSettings||{}).hmBudgetLimit)||25000);
+      var hmLimit2=(typeof APPROVAL_AUTHORITY!=='undefined'?APPROVAL_AUTHORITY.get('sowEdThreshold'):null)||parseFloat(((window._appSettings||{}).hmBudgetLimit)||25000);
       renoUnits.forEach(function(u){
         var sow=null; sow = getSowData(u.id);
         var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
@@ -9830,8 +9981,8 @@ function showEmployeeHome(){
     var renoTile = tile('🔨','Renovations','showRenos()','#d97706',
       makeStat('Under Repair', underRepair, underRepair>0?'alert':'good') +
       makeStat('Condemned',    condemned,   condemned>0?'alert':'good') +
-      makeStat('Pending HM Approval',  sowPendingHM,  sowPendingHM>0?(role=== ROLE.HOUSING_MANAGER?'alert':'info'):'neutral') +
-      makeStat('Pending ED Approval',  sowPendingED,  sowPendingED>0?(role=== ROLE.ED?'alert':'info'):'neutral') +
+      makeStat('Pending HM Approval',  sowPendingHM,  sowPendingHM>0?(APPROVAL_AUTHORITY.can('approveSowUnderThreshold',role)?'alert':'info'):'neutral') +
+      makeStat('Pending ED Approval',  sowPendingED,  sowPendingED>0?(APPROVAL_AUTHORITY.can('approveSowOverThreshold',role)?'alert':'info'):'neutral') +
       makeStat('SOW Approved',         sowApproved,   sowApproved>0?'good':'neutral') +
       makeStat('In Progress',          sowInProgress, sowInProgress>0?'good':'neutral'));
 
@@ -9846,8 +9997,8 @@ function showEmployeeHome(){
     } catch(e){}
 
     var ctTile = tile('🧰','Contractors','showContractorsForRole()','#6b7280',
-      makeStat('Pending HM Review',  ctPending,    ctPending>0?(role=== ROLE.HOUSING_MANAGER?'alert':'info'):'neutral') +
-      makeStat('Awaiting ED Approval', ctAwaitingED, ctAwaitingED>0?(role=== ROLE.ED?'alert':'info'):'neutral') +
+      makeStat('Pending HM Review',  ctPending,    ctPending>0?(APPROVAL_AUTHORITY.can('recommendContractor',role)?'alert':'info'):'neutral') +
+      makeStat('Awaiting ED Approval', ctAwaitingED, ctAwaitingED>0?(APPROVAL_AUTHORITY.can('approveContractor',role)?'alert':'info'):'neutral') +
       makeStat('Approved',           ctApproved,   ctApproved>0?'good':'neutral') +
       (ctDeclined>0?makeStat('Declined', ctDeclined, 'alert'):''));
 
@@ -10574,14 +10725,14 @@ function renderScorecardActions(app) {
   var actions = [];
 
   // ── Housing Manager actions ──
-  if(role === ROLE.HOUSING_MANAGER) {
+  if(APPROVAL_AUTHORITY.can('reviewApplication', role)) {
     if(status === APP_STATUS.SUBMITTED) {
       // New housing app — HM recommends to ED
       actions.push({ label: '✅ Recommend to ED', cls: 'btn-green',   action: 'mgr_approved',  confirmLabel: 'Recommend to Executive Director' });
       actions.push({ label: '↩️ Return for Info',  cls: 'btn-sec',    action: 'returned',       confirmLabel: 'Return to Submitter' });
       actions.push({ label: '❌ Decline',           cls: 'btn-ghost',  action: 'declined',       confirmLabel: 'Decline Application', needsNotes: true });
     }
-    if(status === APP_STATUS.FILE_UPDATE) {
+    if(APPROVAL_AUTHORITY.can('approveFileUpdate', role) && status === APP_STATUS.FILE_UPDATE) {
       // File update — HM is final approver
       actions.push({ label: '✅ Approve File Update', cls: 'btn-green', action: 'hm_approved', confirmLabel: 'Approve File Update' });
       actions.push({ label: '↩️ Return for Info',     cls: 'btn-sec',   action: 'returned',    confirmLabel: 'Return to Submitter' });
@@ -10592,7 +10743,7 @@ function renderScorecardActions(app) {
   }
 
   // ── Executive Director actions ──
-  if(role === ROLE.ED) {
+  if(APPROVAL_AUTHORITY.can('finalApproveApp', role)) {
     if(status === APP_STATUS.MGR_APPROVED) {
       actions.push({ label: '✅ Final Approval',  cls: 'btn-green',  action: 'ed_approved', confirmLabel: 'Grant Final Approval' });
       actions.push({ label: '↩️ Return to HM',    cls: 'btn-sec',    action: 'returned',    confirmLabel: 'Return to Housing Manager' });
@@ -10968,7 +11119,7 @@ function openAssignModal(appId, suggestedUnitId) {
   // Role badge
   var roleBadge = document.getElementById('am_role_badge');
   if(roleBadge){
-    roleBadge.textContent = role=== ROLE.ED ? 'Executive Director — can override' : role=== ROLE.HOUSING_MANAGER ? 'Housing Manager — notes required' : 'Staff';
+    roleBadge.textContent = APPROVAL_AUTHORITY.can('overrideMatch', role) ? 'Executive Director — can override' : APPROVAL_AUTHORITY.can('assignTiedBand', role) ? 'Housing Manager — notes required' : 'Staff';
   }
 
   // Score and rank all vacant units
@@ -11053,7 +11204,9 @@ function amSelectUnit(unitId) {
   var selectedObj = _amAllScored.find(function(o){ return o.unit.id === unitId; });
   var selectedScore = selectedObj ? selectedObj.score : 0;
   var isTied = selectedScore >= topScore - 1; // within 1 pt of top = tied/recommended
-  var isEdOverride = role === ROLE.ED && !isTied; // ED picking below the tied band
+  var canOverride = APPROVAL_AUTHORITY.can('overrideMatch', role);
+  var canAssignTied = APPROVAL_AUTHORITY.can('assignTiedBand', role);
+  var isEdOverride = canOverride && !isTied; // can-override role picking below the tied band
 
   var allApps=(typeof applications!=='undefined'?applications:[]);
   var app=allApps.find(function(a){return a.id===_amAppId;});
@@ -11081,7 +11234,7 @@ function amSelectUnit(unitId) {
   var onReq   = document.getElementById('am_notes_req_star');
   var onPlaceholder = document.getElementById('am_override_notes');
 
-  if(role === ROLE.HOUSING_MANAGER) {
+  if(canAssignTied && !canOverride) {
     if(isTied) {
       // Tied — HM can select, notes required
       if(ow) ow.style.display = '';
@@ -11096,7 +11249,7 @@ function amSelectUnit(unitId) {
       var cb = document.getElementById('am_confirm_btn');
       if(cb){ cb.textContent='⛔ ED Approval Required'; cb.disabled=true; cb.style.opacity='1'; cb.style.cursor='not-allowed'; cb.style.background='#fef2f2'; cb.style.color='#b91c1c'; }
     }
-  } else if(role === ROLE.ED) {
+  } else if(canOverride) {
     if(ow) ow.style.display = isEdOverride ? '' : 'none';
     if(onLabel) onLabel.textContent = 'Override Notes (required) — this unit scores below the top match band.';
     if(onLabel) onLabel.style.color = '#d97706';
@@ -11111,7 +11264,7 @@ function amSelectUnit(unitId) {
   if(warn && u){
     var warnMsgs = [];
     if(needsAccess && !u.accessible) warnMsgs.push('⚠ Applicant requires accessible unit — this unit is not accessible');
-    if(role=== ROLE.HOUSING_MANAGER && !isTied) warnMsgs.push('⛔ This unit scores below the recommended match band — only the Executive Director can assign a lower-scored unit');
+    if(canAssignTied && !canOverride && !isTied) warnMsgs.push('⛔ This unit scores below the recommended match band — only the Executive Director can assign a lower-scored unit');
     if(warnMsgs.length){
       warn.style.display=''; warn.style.background='#fef2f2'; warn.style.color='#b91c1c';
       warn.textContent = warnMsgs.join(' · ');
@@ -11119,7 +11272,7 @@ function amSelectUnit(unitId) {
   }
 
   // Confirm button for ED (HM button already set in branch above)
-  if(role !== ROLE.HOUSING_MANAGER) {
+  if(canOverride || !canAssignTied) {
     var cb = document.getElementById('am_confirm_btn');
     if(cb){
       cb.textContent = isEdOverride ? '✓ Override & Assign' : '✓ Confirm Selection';
@@ -11151,19 +11304,21 @@ function confirmAssignment() {
   var selectedObj2 = _amAllScored.find(function(o){ return o.unit.id === unitId; });
   var selectedScore2 = selectedObj2 ? selectedObj2.score : 0;
   var isTied2 = selectedScore2 >= topScore2 - 1;
-  var isEdOverride2 = role=== ROLE.ED && !isTied2;
+  var canOverride2 = APPROVAL_AUTHORITY.can('overrideMatch', role);
+  var canAssignTied2 = APPROVAL_AUTHORITY.can('assignTiedBand', role);
+  var isEdOverride2 = canOverride2 && !isTied2;
 
-  // Hard gate: HM cannot assign outside the tied score band — ED only
-  if(role === ROLE.HOUSING_MANAGER && !isTied2) {
+  // Hard gate: assignTiedBand-only roles cannot assign outside the tied score band
+  if(canAssignTied2 && !canOverride2 && !isTied2) {
     showToast('This unit requires Executive Director approval to assign');
     return;
   }
 
   // HM always requires notes; ED requires notes only when overriding below tied band
   var overrideNotes = ((document.getElementById('am_override_notes')||{}).value||'').trim();
-  var needsNotes = (role=== ROLE.HOUSING_MANAGER && isTied2) || isEdOverride2;
+  var needsNotes = (canAssignTied2 && !canOverride2 && isTied2) || isEdOverride2;
   if(needsNotes && !overrideNotes){
-    showToast(role=== ROLE.HOUSING_MANAGER ? 'Please add selection notes before confirming' : 'Please add override notes explaining your selection');
+    showToast(canAssignTied2 && !canOverride2 ? 'Please add selection notes before confirming' : 'Please add override notes explaining your selection');
     var notesEl = document.getElementById('am_override_notes');
     if(notesEl) notesEl.focus();
     return;
@@ -11183,8 +11338,8 @@ function confirmAssignment() {
   var name=((app.fn||'')+' '+(app.ln||'')).trim();
 
   // Role gate
-  if(role=== ROLE.ED&&app.status!==APP_STATUS.ED_APPROVED){showToast('ED approval required — status: '+app.status.replace(/_/g,' '));return;}
-  if(role=== ROLE.HOUSING_MANAGER&&app.status!==APP_STATUS.MGR_APPROVED&&app.status!==APP_STATUS.ED_APPROVED){showToast('HM recommendation required — status: '+app.status.replace(/_/g,' '));return;}
+  if(APPROVAL_AUTHORITY.can('finalApproveApp',role)&&app.status===APP_STATUS.SUBMITTED){showToast('Application requires HM review before ED assignment — status: '+app.status.replace(/_/g,' '));return;}
+  if(canAssignTied2&&!canOverride2&&app.status!==APP_STATUS.MGR_APPROVED&&app.status!==APP_STATUS.ED_APPROVED){showToast('HM recommendation required — status: '+app.status.replace(/_/g,' '));return;}
 
   // Write unit
   var isTransferReq = (app.appType === 'transfer_request');
@@ -11192,7 +11347,7 @@ function confirmAssignment() {
   // For transfer requests: mark new unit as 'reserved' not 'occupied'
   // Tenant stays in current unit until physical move
   u.status = isTransferReq ? 'reserved' : 'occupied';
-  u.tenantApprovedBy=role=== ROLE.ED?'Executive Director':'Housing Manager';
+  u.tenantApprovedBy=canOverride2?'Executive Director':'Housing Manager';
   u.tenantApprovedAt=new Date().toISOString().split('T')[0];
   if(overrideNotes) u.assignmentOverrideNotes = overrideNotes;
   if(isTransferReq) u.transferPending = true;
@@ -11319,11 +11474,11 @@ function renderRenoApprovalsView() {
     var pct = prog?(prog.overallPct||0):0;
     var uid = u.id;
 
-    // Inline approve button — role gated
+    // Inline approve button — role gated via APPROVAL_AUTHORITY
     var approveBtn = '';
-    if(role=== ROLE.HOUSING_MANAGER && appr.key==='pending_hm')
+    if(APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role) && appr.key==='pending_hm')
       approveBtn = '<button data-ra-approve="'+uid+'" data-ra-role="hm" style="background:var(--yellow);border:none;color:#111;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">✓ Approve</button>';
-    else if(role=== ROLE.ED && (appr.key==='pending_ed'||appr.key==='pending_hm'))
+    else if(APPROVAL_AUTHORITY.can('approveSowOverThreshold', role) && (appr.key==='pending_ed'||appr.key==='pending_hm'))
       approveBtn = '<button data-ra-approve="'+uid+'" data-ra-role="ed" style="background:var(--yellow);border:none;color:#111;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'+(appr.key==='pending_hm'?'Override →':'✓ Approve')+'</button>';
 
     return '<tr data-ra-uid="'+uid+'" style="border-bottom:1px solid var(--border);cursor:pointer;">'
@@ -11781,6 +11936,9 @@ async function loadAppDataFromSupabase() {
       }
     } catch(e) {}
 
+    // Initialise approval authority overrides from loaded settings
+    if(typeof initApprovalAuthority === 'function') initApprovalAuthority();
+
     // Rescore all apps with live V2 model
     if(applications.length && typeof rescoreAllApplications === 'function') {
       rescoreAllApplications();
@@ -11801,7 +11959,9 @@ async function loadAppDataFromSupabase() {
 // ══════════════════════════════════════════════════════════════
 
 function showAddHousingStaff() {
-  var isED = window.currentRole === ROLE.ED;
+  var role = window.currentRole || 'housing_employee_l1';
+  if(!APPROVAL_AUTHORITY.can('manageStaff', role)) { showToast('Only Housing Managers and the Executive Director can add staff.'); return; }
+  var isED = APPROVAL_AUTHORITY.can('editApprovalAuthority', role);
   var modal = document.getElementById('globalModal') || document.getElementById('approvalModal');
   // Use the existing showToast + a custom modal approach
   // Build inline modal
@@ -11975,8 +12135,8 @@ async function submitAddHousingStaff() {
   if(!email||!email.includes('@')) { showToast('Please enter a valid email address'); return; }
   if(!email.endsWith('@clfn.on.ca')) { showToast('Only @clfn.on.ca email addresses can be registered'); return; }
 
-  // Role-based add-staff gate. HM can only add HE-L1 or HE-L2. ED can add any role.
-  if(window.currentRole === ROLE.HOUSING_MANAGER){
+  // Role-based add-staff gate. HM can only add HE-L1 or HE-L2. ED (editApprovalAuthority) can add any role.
+  if(!APPROVAL_AUTHORITY.can('editApprovalAuthority', window.currentRole)) {
     var allowedForHm = ['housing_employee_l1','housing_employee_l2'];
     if(allowedForHm.indexOf(role) === -1){
       showToast('Housing managers can only add Housing Employees. Only the ED can add other roles.');
@@ -12102,10 +12262,10 @@ function initHousingPage() {
   var role = window.currentRole || 'housing_employee_l1';
   if(settingsBtn) settingsBtn.style.display = (ROLE.isManagement(role)) ? '' : 'none';
   document.querySelectorAll('.hm-ed-only').forEach(function(e){
-    e.style.display=(ROLE.isManagement(role))?'':'none';
+    e.style.display=APPROVAL_AUTHORITY.can('accessSettings', role)?'':'none';
   });
   document.querySelectorAll('.ed-only').forEach(function(e){
-    e.style.display=(role=== ROLE.ED)?'':'none';
+    e.style.display=APPROVAL_AUTHORITY.can('editScoreModel', role)?'':'none';
   });
 
   // Update header

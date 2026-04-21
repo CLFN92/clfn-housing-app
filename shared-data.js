@@ -588,14 +588,14 @@ function _ctRenderActions(ct) {
   var status = ct.status || 'pending_review';
   var actions = [];
 
-  if(role === ROLE.HOUSING_MANAGER) {
+  if(APPROVAL_AUTHORITY.can('recommendContractor', role)) {
     if(status === 'pending_review' || status === 'returned') {
       actions.push({label:'✅ Recommend to ED', cls:'btn-primary', action:'hm_recommended', needsNotes:false});
       actions.push({label:'↩ Return for Info',  cls:'btn-ghost',   action:'returned',       needsNotes:true});
       actions.push({label:'❌ Decline',           cls:'btn-ghost',   action:'declined',       needsNotes:true, danger:true});
     }
   }
-  if(role === ROLE.ED) {
+  if(APPROVAL_AUTHORITY.can('approveContractor', role)) {
     if(status === 'hm_recommended' || status === 'pending_review') {
       actions.push({label:'✅ Final Approval',  cls:'btn-primary', action:'approved',  needsNotes:false});
       actions.push({label:'↩ Return to HM',    cls:'btn-ghost',   action:'returned',  needsNotes:true});
@@ -747,7 +747,7 @@ function _doExport(format, headers, data, filename, colWidths, pdfLandscape) {
   }
 }
 function _getHmLimit() {
-  try { return parseFloat((window._appSettings||{}).hmBudgetLimit)||25000; } catch(e) { return 25000; }
+  try { return (typeof APPROVAL_AUTHORITY !== 'undefined' ? APPROVAL_AUTHORITY.get('sowEdThreshold') : null) || parseFloat((window._appSettings||{}).hmBudgetLimit) || 25000; } catch(e) { return 25000; }
 }
 function _getPoolSpent(pid) {
   // Sum all previously approved reno budgets for this pool
@@ -1521,7 +1521,7 @@ function populateSettings(){
   var limitEl = document.getElementById('settings_hm_budget_limit');
   if(limitEl) {
     var s = window._appSettings || {};
-    limitEl.value = s.hmBudgetLimit || 25000;
+    limitEl.value = (typeof APPROVAL_AUTHORITY !== 'undefined' ? APPROVAL_AUTHORITY.get('sowEdThreshold') : null) || s.hmBudgetLimit || 25000;
   }
   var settings = window._appSettings || {};
   // Also populate contact fields
@@ -1532,8 +1532,8 @@ function populateSettings(){
   // Show and render the scoring model section
   var sms = document.getElementById('scoring_model_section');
   if(sms) sms.style.display = 'block';
-  // V2 scoring editor — ED only
-  if (window.currentRole === ROLE.ED) {
+  // V2 scoring editor — editScoreModel roles only
+  if (APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole)) {
     renderV2ScoringEditor();
   } else {
     var wrap = document.getElementById('scoring_model_table_wrap');
@@ -2134,7 +2134,7 @@ async function renderHousingUserTable(){
         +'<td style="padding:10px 12px;"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+rc+'22;color:'+rc+';">'+rl+'</span></td>'
         +'<td style="padding:10px 12px;text-align:right;">'
         +(isMe ? '<span style="font-size:11px;color:var(--muted);">You</span>'
-          : (window.currentRole=== ROLE.ED
+          : (APPROVAL_AUTHORITY.can('manageStaff', window.currentRole)
             ? '<div style="display:flex;gap:6px;justify-content:flex-end;">'
               +'<button onclick="_sbEditStaffModal('+u.id+')" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;">Edit</button>'
               +'<button onclick="deactivateStaff('+u.id+',this)" style="background:none;border:1px solid #fecaca;color:#b91c1c;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;">Deactivate</button>'
@@ -2492,7 +2492,8 @@ function renderWorklist() {
     housing_manager: 'Review and action applications across the queue.',
     ed:              'Final approvals, recommendations, and recently actioned applications.'
   };
-  if(sub) sub.textContent = subtitles[role] || '';
+  var _subRole = APPROVAL_AUTHORITY.can('finalApproveApp', role) ? 'ed' : APPROVAL_AUTHORITY.can('reviewApplication', role) ? 'housing_manager' : 'employee';
+  if(sub) sub.textContent = subtitles[_subRole] || '';
 
   // ── Chip filter definitions ───────────────────────────────────────────────
   var chipDefs;
@@ -2505,7 +2506,7 @@ function renderWorklist() {
       {key:'draft',     label:'Draft',          filter: function(a){ return a.status===APP_STATUS.DRAFT; }},
       {key:'declined',  label:'Declined',       filter: function(a){ return a.status==='declined'; }}
     ];
-  } else if(role === ROLE.HOUSING_MANAGER) {
+  } else if(APPROVAL_AUTHORITY.can('reviewApplication', role)) {
     chipDefs = [
       {key:'',          label:'All Active',     filter: function(a){ return !a.archived; }},
       {key:'action',    label:'Needs Review',   filter: function(a){ return ['submitted','file_update'].indexOf(a.status)!==-1; }, alert:true},
@@ -2540,7 +2541,7 @@ function renderWorklist() {
       return name.includes(search) || (a.id||'').toLowerCase().includes(search);
     });
   }
-  var showScore = (role !== ROLE.HE_L1);
+  var showScore = APPROVAL_AUTHORITY.can('accessSettings', role) || role !== ROLE.HE_L1;
 
   // ── Chip counts ───────────────────────────────────────────────────────────
   var chipsHtml = chipDefs.map(function(c){
@@ -2570,9 +2571,9 @@ function renderWorklist() {
     var actionBtn = '';
     if(a.status==='returned') {
       actionBtn = '<button data-wl-edit="'+a.id+'" onclick="event.stopPropagation();wlEditApp(this)" style="background:var(--yellow);border:none;color:#111;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Update →</button>';
-    } else if((role=== ROLE.HOUSING_MANAGER&&(a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)) || (role=== ROLE.ED&&a.status===APP_STATUS.MGR_APPROVED)) {
+    } else if((APPROVAL_AUTHORITY.can('reviewApplication', role)&&(a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)) || (APPROVAL_AUTHORITY.can('finalApproveApp', role)&&a.status===APP_STATUS.MGR_APPROVED)) {
       actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:#1d4ed8;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Review →</button>';
-    } else if((ROLE.isManagement(role))&&(a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit) {
+    } else if(APPROVAL_AUTHORITY.can('assignUnit', role)&&(a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit) {
       actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:#15803d;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
     }
     return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-wl-id="'+a.id+'" onclick="wlOpenApp(this)">'

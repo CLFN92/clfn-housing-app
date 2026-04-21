@@ -12,6 +12,7 @@
 <script src="shared-config.js"></script>
 <script src="shared-auth.js"></script>
 <script src="shared-ui.js"></script>
+<script src="approval-authority.js"></script>
 <script src="shared-data.js"></script>
 
 
@@ -1018,7 +1019,7 @@ function showDash() {
 }
 function showSettings() {
   var role = window.currentRole || 'housing_employee_l1';
-  if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) {
+  if(!APPROVAL_AUTHORITY.can('accessSettings', role)) {
     showToast('Settings are only accessible to the Housing Manager and Executive Director.');
     return;
   }
@@ -1026,7 +1027,7 @@ function showSettings() {
 }
 function showAddHousingStaff() {
   var role = window.currentRole || 'housing_employee_l1';
-  if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) {
+  if(!APPROVAL_AUTHORITY.can('manageStaff', role)) {
     showToast('Staff management is only accessible to the Housing Manager and Executive Director.');
     return;
   }
@@ -1098,8 +1099,8 @@ function showAddHousingStaff() {
 
 // ── Page-specific role switch hook (called by shared-ui.js switchRole) ──
 window._onSwitchRole = function(role) {
-  document.querySelectorAll('.hm-ed-only').forEach(function(e){e.style.display=(ROLE.isManagement(role))?'':'none';});
-  document.querySelectorAll('.ed-only').forEach(function(e){e.style.display=(role=== ROLE.ED)?'':'none';});
+  document.querySelectorAll('.hm-ed-only').forEach(function(e){e.style.display=APPROVAL_AUTHORITY.can('accessSettings', role)?'':'none';});
+  document.querySelectorAll('.ed-only').forEach(function(e){e.style.display=APPROVAL_AUTHORITY.can('editScoreModel', role)?'':'none';});
   if(true) renderRenosView();
 };
 
@@ -1238,7 +1239,7 @@ function openRenoProgress(unitId) {
 function _applyProgressModalLock(unitId){
   var modal = document.getElementById('renoProgressModal');
   if(!modal) return;
-  var locked = unitHasCompletedSow(unitId) && _realRoleForPermissions() !== ROLE.ED;
+  var locked = unitHasCompletedSow(unitId) && !APPROVAL_AUTHORITY.can('lockSow', _realRoleForPermissions());
 
   var banner = document.getElementById('rp_readonly_banner');
   if(banner) banner.style.display = locked ? 'block' : 'none';
@@ -1478,6 +1479,7 @@ async function loadRenosData() {
     if(sowR && sowR.ok){var sd2=await sowR.json();sd2.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
     if(rpR && rpR.ok){var rpd=await rpR.json();rpd.forEach(function(r){window._renoProgress[r.unit_id]=r.data;});}
     if(stR && stR.ok){var stD=await stR.json();window._appSettings={};stD.forEach(function(r){window._appSettings[r.key]=r.value;});}
+    if(typeof initApprovalAuthority === 'function') initApprovalAuthority();
   } catch(e){console.warn('[RENOS] data load error:',e);}
 }
 function initRenosPage() {
@@ -1497,8 +1499,8 @@ function updateRenosHeader() {
   el=document.getElementById('header_avatar'); if(el) el.textContent=(HOUSING_SESSION.name||'S').charAt(0).toUpperCase();
   el=document.getElementById('header_role_badge');
   if(el) el.textContent={employee:'Employee',housing_manager:'HM',ed:'ED'}[role]||role;
-  document.querySelectorAll('.hm-ed-only').forEach(function(e){e.style.display=(ROLE.isManagement(role))?'':'none';});
-  document.querySelectorAll('.ed-only').forEach(function(e){e.style.display=(role=== ROLE.ED)?'':'none';});
+  document.querySelectorAll('.hm-ed-only').forEach(function(e){e.style.display=APPROVAL_AUTHORITY.can('accessSettings', role)?'':'none';});
+  document.querySelectorAll('.ed-only').forEach(function(e){e.style.display=APPROVAL_AUTHORITY.can('editScoreModel', role)?'':'none';});
 }
 function goHome(){window.location.href='index.html';}
 function goBack(){window.location.href='index.html';}
@@ -2122,9 +2124,9 @@ function unitHasCompletedSow(unitId){
   return getUnitSowList(unitId).some(isSowCompleted);
 }
 function canEditProgressFor(unitId){
-  // Only ED can edit progress when a completed SOW exists for this unit.
+  // Only roles with lockSow authority can edit progress when a completed SOW exists.
   if(!unitHasCompletedSow(unitId)) return true;
-  return _realRoleForPermissions() === ROLE.ED;
+  return APPROVAL_AUTHORITY.can('lockSow', _realRoleForPermissions());
 }
 
 
@@ -2577,9 +2579,9 @@ function renderRenoApprovalsView() {
     // Inline approve button — role gated, only meaningful when there's an actual SOW.
     var approveBtn = '';
     if(sow && !locked){
-      if(role=== ROLE.HOUSING_MANAGER && appr.key==='pending_hm')
+      if(APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role) && appr.key==='pending_hm')
         approveBtn = '<button data-ra-approve="'+uid+'"'+dataProj+' data-ra-role="hm" style="background:var(--yellow);border:none;color:#111;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">✓ Approve</button>';
-      else if(role=== ROLE.ED && (appr.key==='pending_ed'||appr.key==='pending_hm'))
+      else if(APPROVAL_AUTHORITY.can('approveSowOverThreshold', role) && (appr.key==='pending_ed'||appr.key==='pending_hm'))
         approveBtn = '<button data-ra-approve="'+uid+'"'+dataProj+' data-ra-role="ed" style="background:var(--yellow);border:none;color:#111;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'+(appr.key==='pending_hm'?'Override →':'✓ Approve')+'</button>';
     }
 
