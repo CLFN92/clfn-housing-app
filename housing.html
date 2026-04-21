@@ -11,6 +11,10 @@
   /* Fix: modal-hdr sets display:flex which breaks table header rows */
   thead tr.modal-hdr { display: table-row; background: var(--dark); border-bottom: 2px solid var(--yellow); }
   thead tr.modal-hdr th { color: #888; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; }
+  /* Approval Authority panel — override 780px settings-view constraint */
+  #sec_approval_authority { margin: 0 calc(-1 * clamp(14px,3vw,44px)); }
+  #sec_approval_authority .card { border-radius: 0; border-left: none; border-right: none; }
+  #approval_authority_panel_body { max-width: 900px; margin: 0 auto; }
 </style>
 <script src="shared.js"></script>
 <script src="shared-config.js"></script>
@@ -7340,7 +7344,13 @@ function renderApprovalAuthorityPanel() {
     return;
   }
 
-  var allRoles = APPROVAL_AUTHORITY.allRoles();
+  // Only show housing-relevant roles — exclude finance-only roles (cfo, finance_l1)
+  var housingRoles = ['ed', 'housing_manager', 'housing_employee_l2', 'housing_employee_l1'];
+  var allRolesRaw  = APPROVAL_AUTHORITY.allRoles(); // [{value, label}]
+  var allRoles     = allRolesRaw.filter(function(r) {
+    return housingRoles.indexOf(r.value || r) !== -1;
+  });
+
   var groups   = APPROVAL_AUTHORITY.groups;
   var labels   = APPROVAL_AUTHORITY.labels;
   var defaults = APPROVAL_AUTHORITY.defaults;
@@ -7348,8 +7358,10 @@ function renderApprovalAuthorityPanel() {
   var html = '';
   Object.keys(groups).forEach(function(groupName) {
     var keys = groups[groupName];
-    html += '<div style="margin-bottom:28px;">';
-    html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--yellow);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:4px;">' + groupName + '</div>';
+    html += '<div style="margin-bottom:24px;">';
+    html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;'
+          + 'color:var(--yellow);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:4px;">'
+          + groupName + '</div>';
 
     keys.forEach(function(key) {
       var cur = APPROVAL_AUTHORITY.get(key);
@@ -7357,50 +7369,65 @@ function renderApprovalAuthorityPanel() {
       var isThreshold = (typeof cur === 'number');
       var isModified  = JSON.stringify(cur) !== JSON.stringify(def);
 
+      // Tighten / loosen / modified badge
       var badgeHtml = '';
       if(!isThreshold && Array.isArray(cur) && Array.isArray(def)) {
         if(cur.length < def.length)
-          badgeHtml = ' <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;">Tighter</span>';
+          badgeHtml = ' <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;'
+            + 'background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;">Tighter</span>';
         else if(cur.length > def.length)
-          badgeHtml = ' <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:#f0fdf4;color:#15803d;border:1px solid #86efac;">Looser</span>';
+          badgeHtml = ' <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;'
+            + 'background:#f0fdf4;color:#15803d;border:1px solid #86efac;">Looser</span>';
       }
       if(isModified && !badgeHtml)
-        badgeHtml = ' <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;">Modified</span>';
+        badgeHtml = ' <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;'
+                  + 'background:#fffbeb;color:#d97706;border:1px solid #fde68a;">Modified</span>';
 
-      // Two-row layout: label on top, pills + reset below
-      html += '<div style="padding:12px 0;border-bottom:1px solid var(--border);">';
+      // Single-row layout: label | pills ... | reset
+      html += '<div style="display:grid;grid-template-columns:220px 1fr auto;align-items:center;'
+            + 'gap:16px;padding:10px 0;border-bottom:1px solid var(--border);">';
 
-      // Label row
-      html += '<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px;">' + (labels[key] || key) + badgeHtml + '</div>';
+      // Label column
+      html += '<div style="font-size:13px;font-weight:600;color:var(--text);">'
+            + (labels[key] || key) + badgeHtml + '</div>';
 
-      // Pills row
-      html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
+      // Pills / threshold column
       if(isThreshold) {
-        html += '<input type="number" data-aa-key="' + key + '" value="' + cur + '" min="0" step="1000"'
-          + ' style="width:130px;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;color:var(--text);font-family:DM Sans,sans-serif;background:var(--surface);text-align:right;"'
-          + ' oninput="APPROVAL_AUTHORITY.update(\'' + key + '\', parseFloat(this.value)||0)"/>';
+        html += '<div><input type="number" data-aa-key="' + key + '" value="' + cur + '" min="0" step="1000"'
+          + ' style="width:130px;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;'
+          + 'font-size:13px;font-weight:700;color:var(--text);font-family:DM Sans,sans-serif;'
+          + 'background:var(--surface);text-align:right;"'
+          + ' oninput="APPROVAL_AUTHORITY.update(\'' + key + '\', parseFloat(this.value)||0)"/></div>';
       } else {
+        html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
         allRoles.forEach(function(r) {
           var rVal   = r.value || r;
           var rLabel = r.label || rVal;
           var active = Array.isArray(cur) && cur.indexOf(rVal) !== -1;
           html += '<button data-aa-key="' + key + '" data-aa-role="' + rVal + '" onclick="aaToggleRole(this)"'
-            + ' style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .12s;white-space:nowrap;'
+            + ' style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;'
+            + 'font-family:DM Sans,sans-serif;transition:all .12s;white-space:nowrap;'
             + 'background:' + (active ? 'var(--yellow)' : 'var(--surface)') + ';'
             + 'color:'       + (active ? '#111'          : 'var(--muted)')   + ';'
-            + 'border:1.5px solid ' + (active ? 'var(--yellow)' : 'var(--border)') + ';">' + rLabel + '</button>';
+            + 'border:1.5px solid ' + (active ? 'var(--yellow)' : 'var(--border)') + ';">'
+            + rLabel + '</button>';
         });
+        html += '</div>';
       }
+
+      // Reset column
       html += '<button onclick="aaResetAction(\'' + key + '\')" title="Reset to default"'
-        + ' style="margin-left:auto;background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;flex-shrink:0;">'
+        + ' style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;'
+        + 'padding:3px 10px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'
         + '↺ Default</button>';
-      html += '</div>'; // pills row
-      html += '</div>'; // action row
+
+      html += '</div>'; // grid row
     });
     html += '</div>'; // group
   });
 
-  html += '<div style="padding:10px 14px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--muted);margin-top:8px;">'
+  html += '<div style="padding:10px 14px;background:var(--bg);border-radius:8px;font-size:12px;'
+        + 'color:var(--muted);margin-top:8px;">'
         + '⚠ Changes apply immediately in memory. Click <strong>Save Changes</strong> to persist.</div>';
 
   el.innerHTML = html;
