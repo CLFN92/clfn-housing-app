@@ -88,26 +88,22 @@ function goBack() {
 
 // ── setNavActive ──────────────────────────────────────────────────────────────
 function setNavActive(id) {
+  // Clear all nav items
+  document.querySelectorAll('.hnav-item').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  // Also clear legacy ids in case any remain
   var allTabs = [
     'tab_app','tab_dash','tab_scores','tab_settings','tab_match',
     'tab_inventory','tab_contractors','tab_tenants','tab_renos','tab_budget'
   ];
   allTabs.forEach(function(tid) {
     var b = document.getElementById(tid);
-    if (b) { b.classList.remove('nav-active'); b.style.background = ''; b.style.color = ''; b.style.borderColor = ''; }
+    if (b) { b.classList.remove('nav-active','active'); b.style.background='';b.style.color='';b.style.borderColor=''; }
   });
-  var el = document.getElementById(id);
-  if (!el) return;
-  if (id === 'tab_settings') {
-    el.style.background   = 'rgba(248,228,26,0.12)';
-    el.style.color        = 'var(--yellow)';
-    el.style.borderColor  = 'var(--yellow)';
-  } else {
-    el.style.background   = 'var(--yellow)';
-    el.style.color        = '#111';
-    el.style.borderColor  = 'var(--yellow)';
-  }
-  el.classList.add('nav-active');
+  // Set active by data-nav attribute (new header) or by id (legacy)
+  var el = document.querySelector('[data-nav="'+id+'"]') || document.getElementById(id);
+  if (el) el.classList.add('active');
 }
 
 // ── hideAllViews ──────────────────────────────────────────────────────────────
@@ -187,6 +183,17 @@ function updateHeaderUser(role) {
 }
 
 // ── headerSignOut ─────────────────────────────────────────────────────────────
+// ── Header nav more dropdown ───────────────────────────────────────────────
+function toggleHnavMore(e) {
+  e.stopPropagation();
+  var menu = document.getElementById('hnav_more_menu');
+  if (menu) menu.classList.toggle('open');
+}
+document.addEventListener('click', function() {
+  var menu = document.getElementById('hnav_more_menu');
+  if (menu) menu.classList.remove('open');
+});
+
 function headerSignOut() {
   if (HOUSING_SESSION && HOUSING_SESSION.accessToken) {
     if (confirm('Sign out of CLFN Housing?')) doLogout();
