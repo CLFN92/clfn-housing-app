@@ -7382,7 +7382,7 @@ function renderApprovalAuthorityPanel() {
           + ' style="width:120px;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;'
           + 'font-size:13px;font-weight:700;color:var(--text);font-family:DM Sans,sans-serif;'
           + 'background:var(--surface);text-align:right;"'
-          + ' oninput="APPROVAL_AUTHORITY.update('' + key + '', parseFloat(this.value)||0)"/>';
+          + ' oninput="APPROVAL_AUTHORITY.update(\'' + key + '\', parseFloat(this.value)||0)"/>';
       } else {
         html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
         allRoles.forEach(function(r) {
@@ -7401,7 +7401,7 @@ function renderApprovalAuthorityPanel() {
       }
 
       // Reset
-      html += '<button onclick="aaResetAction('' + key + '')" title="Reset to default"'
+      html += '<button onclick="aaResetAction(\'' + key + '\')" title="Reset to default"'
         + ' style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;'
         + 'padding:3px 9px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'
         + '↺ Default</button>';
