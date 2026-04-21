@@ -7328,42 +7328,8 @@ var CRITICAL_SOW_CATS = ['Heating / HVAC','Electrical','Roofing','Windows & Door
 
 // ══════════════════════════════════════════════════════════════
 // APPROVAL AUTHORITY SETTINGS PANEL
+// Uses APPROVAL_AUTHORITY.groups / .labels / .defaults from approval-authority.js
 // ══════════════════════════════════════════════════════════════
-
-var _AA_GROUPS = [
-  { label: 'Application Approval', keys: ['reviewApplication','finalApproveApp','declineApplication','returnApplication'] },
-  { label: 'File Updates',         keys: ['reviewFileUpdate','approveFileUpdate'] },
-  { label: 'Unit Assignment',      keys: ['assignUnit','overrideMatch','assignTiedBand'] },
-  { label: 'SOW & Budget',         keys: ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow'] },
-  { label: 'Contractors',          keys: ['recommendContractor','approveContractor','declineContractor'] },
-  { label: 'System',               keys: ['editScoreModel','applyScoreAdjustment','accessSettings','editApprovalAuthority','manageStaff'] }
-];
-
-var _AA_LABELS = {
-  reviewApplication:       'Review Application',
-  finalApproveApp:         'Final Approve Application',
-  declineApplication:      'Decline Application',
-  returnApplication:       'Return Application',
-  reviewFileUpdate:        'Review File Update',
-  approveFileUpdate:       'Approve File Update',
-  assignUnit:              'Assign Unit',
-  overrideMatch:           'Override Match (below band)',
-  assignTiedBand:          'Assign Within Match Band',
-  sowEdThreshold:          'ED Approval Threshold ($)',
-  approveSowUnderThreshold:'Approve SOW Under Threshold',
-  approveSowOverThreshold: 'Approve SOW Over Threshold',
-  lockSow:                 'Lock / Reopen Completed SOW',
-  recommendContractor:     'Recommend Contractor',
-  approveContractor:       'Approve Contractor',
-  declineContractor:       'Decline Contractor',
-  editScoreModel:          'Edit Scoring Model',
-  applyScoreAdjustment:    'Apply Score Adjustment',
-  accessSettings:          'Access Settings',
-  editApprovalAuthority:   'Edit Approval Authority',
-  manageStaff:             'Manage Staff'
-};
-
-var _AA_ROLE_LABELS = { ed: 'ED', housing_manager: 'HM', housing_employee_l1: 'Employee' };
 
 function renderApprovalAuthorityPanel() {
   var el = document.getElementById('approval_authority_panel_body');
@@ -7372,43 +7338,86 @@ function renderApprovalAuthorityPanel() {
     el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">Only the Executive Director can configure approval authorities.</div>';
     return;
   }
-  var allRoles = APPROVAL_AUTHORITY.allRoles();
+
+  var allRoles = APPROVAL_AUTHORITY.allRoles(); // [{value, label}]
+  var groups   = APPROVAL_AUTHORITY.groups;
+  var labels   = APPROVAL_AUTHORITY.labels;
+  var defaults = APPROVAL_AUTHORITY.defaults;
+
   var html = '';
-  _AA_GROUPS.forEach(function(grp) {
-    html += '<div style="margin-bottom:24px;">';
-    html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--yellow);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:12px;">'+grp.label+'</div>';
-    grp.keys.forEach(function(key) {
-      var val = APPROVAL_AUTHORITY.get(key);
-      var isThreshold = (typeof val === 'number');
-      var isModified = APPROVAL_AUTHORITY.isModified(key);
-      html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">';
+  Object.keys(groups).forEach(function(groupName) {
+    var keys = groups[groupName];
+    html += '<div style="margin-bottom:28px;">';
+    html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;'
+          + 'color:var(--yellow);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:14px;">'
+          + groupName + '</div>';
+
+    keys.forEach(function(key) {
+      var cur = APPROVAL_AUTHORITY.get(key);
+      var def = defaults[key];
+      var isThreshold = (typeof cur === 'number');
+      var isModified  = JSON.stringify(cur) !== JSON.stringify(def);
+
+      // Tighten / loosen badge
+      var badgeHtml = '';
+      if(!isThreshold && Array.isArray(cur) && Array.isArray(def)) {
+        if(cur.length < def.length)
+          badgeHtml = '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;'
+            + 'background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;">Tighter</span> ';
+        else if(cur.length > def.length)
+          badgeHtml = '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;'
+            + 'background:#f0fdf4;color:#15803d;border:1px solid #86efac;">Looser</span> ';
+      }
+
+      html += '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);">';
+
+      // Label col
       html += '<div style="flex:1;min-width:0;">';
-      html += '<div style="font-size:13px;font-weight:600;color:var(--text);">'+_AA_LABELS[key]+'</div>';
-      if(isModified) html += '<span style="font-size:10px;font-weight:700;color:#d97706;background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:1px 6px;">Modified</span>';
-      html += '</div>';
+      html += '<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;">' + (labels[key] || key) + '</div>';
+      html += '<div style="display:flex;align-items:center;gap:6px;">' + badgeHtml;
+      if(isModified)
+        html += '<span style="font-size:10px;font-weight:700;color:#d97706;background:#fffbeb;'
+              + 'border:1px solid #fde68a;border-radius:4px;padding:1px 6px;">Modified</span>';
+      html += '</div></div>';
+
+      // Value col
       if(isThreshold) {
-        html += '<input type="number" data-aa-key="'+key+'" value="'+val+'" min="0" step="1000"'
-          +' style="width:110px;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;'
-          +'color:var(--text);font-family:DM Sans,sans-serif;background:var(--surface);text-align:right;"'
-          +' oninput="APPROVAL_AUTHORITY.update(\''+key+'\', parseFloat(this.value)||0)"/>';
+        html += '<input type="number" data-aa-key="' + key + '" value="' + cur + '" min="0" step="1000"'
+          + ' style="width:120px;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;'
+          + 'font-size:13px;font-weight:700;color:var(--text);font-family:DM Sans,sans-serif;'
+          + 'background:var(--surface);text-align:right;"'
+          + ' oninput="APPROVAL_AUTHORITY.update('' + key + '', parseFloat(this.value)||0)"/>';
       } else {
         html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
         allRoles.forEach(function(r) {
-          var active = (val.indexOf(r) !== -1);
-          var label = _AA_ROLE_LABELS[r] || r;
-          html += '<button data-aa-key="'+key+'" data-aa-role="'+r+'" onclick="aaToggleRole(this)"'
-            +' style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;'
-            +'background:'+(active?'var(--yellow)':'var(--surface)')+';color:'+(active?'#111':'var(--muted)')+';'
-            +'border:1.5px solid '+(active?'var(--yellow)':'var(--border)')+';">'+label+'</button>';
+          var rVal   = r.value || r;
+          var rLabel = r.label || rVal;
+          var active = Array.isArray(cur) && cur.indexOf(rVal) !== -1;
+          html += '<button data-aa-key="' + key + '" data-aa-role="' + rVal + '" onclick="aaToggleRole(this)"'
+            + ' style="padding:4px 13px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;'
+            + 'font-family:DM Sans,sans-serif;transition:all .12s;'
+            + 'background:' + (active ? 'var(--yellow)' : 'var(--surface)') + ';'
+            + 'color:'       + (active ? '#111'          : 'var(--muted)')   + ';'
+            + 'border:1.5px solid ' + (active ? 'var(--yellow)' : 'var(--border)') + ';">'
+            + rLabel + '</button>';
         });
         html += '</div>';
       }
-      html += '<button onclick="aaResetAction(\''+key+'\')" title="Reset to default"'
-        +' style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">↺ Default</button>';
+
+      // Reset button
+      html += '<button onclick="aaResetAction('' + key + '')" title="Reset to default"'
+        + ' style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;'
+        + 'padding:3px 9px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'
+        + '↺ Default</button>';
+
       html += '</div>';
     });
     html += '</div>';
   });
+
+  html += '<div style="padding:10px 14px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--muted);margin-top:4px;">'
+        + '⚠ Changes apply immediately in memory. Click <strong>Save Changes</strong> to persist.</div>';
+
   el.innerHTML = html;
 }
 
@@ -7417,7 +7426,9 @@ function aaToggleRole(btn) {
   var role = btn.getAttribute('data-aa-role');
   var cur  = APPROVAL_AUTHORITY.get(key);
   if(!Array.isArray(cur)) return;
-  var next = cur.indexOf(role) === -1 ? cur.concat([role]) : cur.filter(function(r){ return r !== role; });
+  var next = cur.indexOf(role) === -1
+    ? cur.concat([role])
+    : cur.filter(function(r){ return r !== role; });
   APPROVAL_AUTHORITY.update(key, next);
   renderApprovalAuthorityPanel();
 }
@@ -7438,15 +7449,13 @@ function saveApprovalAuthoritySettings() {
   sbSaveSetting('approval_authority', data).then(function(ok) {
     if(ok) {
       showToast('✓ Approval authority saved');
-      auditEntry('SETTINGS','approval_authority_save','Approval authority configuration updated',window.currentRole||'ed');
+      auditEntry('SETTINGS', 'approval_authority_save', 'Approval authority configuration updated', window.currentRole || 'ed');
     } else {
       showToast('Save failed — check connection');
     }
   });
 }
 
-
-// ── Settings section tabs ──
 function showSettingsSection(section) {
   var sections = ['sec_users','sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget','sec_contacts','sec_nation','sec_approval_authority','sec_audit','sec_occupancy'];
   sections.forEach(function(id){
