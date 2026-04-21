@@ -12,6 +12,7 @@
 <script src="shared-config.js"></script>
 <script src="shared-auth.js"></script>
 <script src="shared-ui.js"></script>
+<script src="approval-authority.js"></script>
 <script src="shared-data.js"></script>
 
 
@@ -1478,6 +1479,7 @@ async function loadRenosData() {
     if(sowR && sowR.ok){var sd2=await sowR.json();sd2.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
     if(rpR && rpR.ok){var rpd=await rpR.json();rpd.forEach(function(r){window._renoProgress[r.unit_id]=r.data;});}
     if(stR && stR.ok){var stD=await stR.json();window._appSettings={};stD.forEach(function(r){window._appSettings[r.key]=r.value;});}
+    if(typeof initApprovalAuthority === 'function') initApprovalAuthority();
   } catch(e){console.warn('[RENOS] data load error:',e);}
 }
 function initRenosPage() {
