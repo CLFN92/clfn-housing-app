@@ -149,13 +149,7 @@ async function sbSaveApplication(app) {
     created_by_email:   app.created_by_email || HOUSING_SESSION.email || null,
     // Columns added via migration 2026-04-19
     sp_id:            app.spId || null,
-    data:             Object.assign({}, app, {
-      // Normalize: always store both fn/ln AND firstName/lastName
-      fn:        app.fn        || app.firstName || '',
-      ln:        app.ln        || app.lastName  || '',
-      firstName: app.firstName || app.fn        || '',
-      lastName:  app.lastName  || app.ln        || ''
-    }),
+    data:             app,
     archived:         !!app.archived,
     no_prior_tenancy: (app.noPriorTenancy !== undefined ? !!app.noPriorTenancy : !!(app.no_prior_tenancy !== false))
   };
@@ -594,29 +588,21 @@ function _ctRenderActions(ct) {
   var status = ct.status || 'pending_review';
   var actions = [];
 
-  // First-stage: recommend contractor (was HM-only)
-  if(APPROVAL_AUTHORITY.can('recommendContractor', role)) {
+  if(role === ROLE.HOUSING_MANAGER) {
     if(status === 'pending_review' || status === 'returned') {
-      actions.push({label:'✅ Approve (Stage 1)', cls:'btn-primary', action:'hm_recommended', needsNotes:false});
-      actions.push({label:'↩ Return for Info',    cls:'btn-ghost',   action:'returned',        needsNotes:true});
-      actions.push({label:'❌ Decline',             cls:'btn-ghost',   action:'declined',        needsNotes:true, danger:true});
+      actions.push({label:'✅ Recommend to ED', cls:'btn-primary', action:'hm_recommended', needsNotes:false});
+      actions.push({label:'↩ Return for Info',  cls:'btn-ghost',   action:'returned',       needsNotes:true});
+      actions.push({label:'❌ Decline',           cls:'btn-ghost',   action:'declined',       needsNotes:true, danger:true});
     }
   }
-  // Final approval: approve contractor (was ED-only)
-  if(APPROVAL_AUTHORITY.can('approveContractor', role)) {
+  if(role === ROLE.ED) {
     if(status === 'hm_recommended' || status === 'pending_review') {
       actions.push({label:'✅ Final Approval',  cls:'btn-primary', action:'approved',  needsNotes:false});
-      actions.push({label:'↩ Return',          cls:'btn-ghost',   action:'returned',  needsNotes:true});
+      actions.push({label:'↩ Return to HM',    cls:'btn-ghost',   action:'returned',  needsNotes:true});
       actions.push({label:'❌ Decline',          cls:'btn-ghost',   action:'declined',  needsNotes:true, danger:true});
     }
     if(status === 'approved') {
       actions.push({label:'⛔ Revoke Approval', cls:'btn-ghost',  action:'declined',  needsNotes:true, danger:true});
-    }
-  }
-  // Decline-only authority
-  if(APPROVAL_AUTHORITY.can('declineContractor', role) && !APPROVAL_AUTHORITY.can('recommendContractor', role) && !APPROVAL_AUTHORITY.can('approveContractor', role)) {
-    if(status !== 'approved' && status !== 'declined') {
-      actions.push({label:'❌ Decline', cls:'btn-ghost', action:'declined', needsNotes:true, danger:true});
     }
   }
 
@@ -761,7 +747,6 @@ function _doExport(format, headers, data, filename, colWidths, pdfLandscape) {
   }
 }
 function _getHmLimit() {
-  if(typeof APPROVAL_AUTHORITY !== 'undefined') return APPROVAL_AUTHORITY.get('sowEdThreshold')||25000;
   try { return parseFloat((window._appSettings||{}).hmBudgetLimit)||25000; } catch(e) { return 25000; }
 }
 function _getPoolSpent(pid) {
@@ -780,30 +765,6 @@ function _getPoolSpent(pid) {
   });
   return total;
 }
-// ── Signature block HTML generator (used by contractor/SOW print functions) ──
-var _sigPads = {}; // track initialized signature canvases
-
-// Returns an inline HTML badge showing expiry status for a date string
-function expiryBadge(dateStr, label) {
-  if (!dateStr) return '<span style="font-size:10px;color:#888;padding:2px 7px;border-radius:10px;background:var(--border);">' + label + ': —</span>';
-  var days = Math.round((new Date(dateStr) - new Date()) / (1000*60*60*24));
-  var color = days < 0 ? '#b91c1c' : days < 30 ? '#d97706' : '#15803d';
-  var bg    = days < 0 ? '#fef2f2' : days < 30 ? '#fffbeb' : '#f0fdf4';
-  var text  = days < 0 ? label+': Expired' : days < 30 ? label+': '+dateStr+' ('+days+'d)' : label+': '+dateStr;
-  return '<span style="font-size:10px;color:'+color+';padding:2px 7px;border-radius:10px;background:'+bg+';font-weight:600;">'+text+'</span>';
-}
-
-function sigBlock(label, name, title, date, imgSrc) {
-  var img = imgSrc ? '<img src="'+imgSrc+'" style="max-width:180px;max-height:60px;display:block;margin-bottom:4px;"/>' : '<div style="height:60px;border-bottom:1px solid #999;margin-bottom:4px;"></div>';
-  return '<div style="flex:1;min-width:200px;">'
-    +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#555;margin-bottom:4px;">'+label+'</div>'
-    +img
-    +'<div style="font-size:10px;font-weight:600;">'+( name||'')+'</div>'
-    +(title ? '<div style="font-size:9px;color:#555;">'+title+'</div>' : '')
-    +'<div style="font-size:9px;color:#555;margin-top:2px;">Date: '+(date||'')+'</div>'
-    +'</div>';
-}
-
 function _initSigPad(canvasId) {
   var canvas = document.getElementById(canvasId);
   if (!canvas || _sigPads[canvasId]) return;
@@ -1057,7 +1018,7 @@ function closeAddContractorModal(){
 }
 function closeCtApprovalPanel() {
   var panel = document.getElementById('ctApprovalPanel');
-  if(panel) { panel.classList.remove('on'); document.body.classList.remove('modal-open'); }
+  if(panel) panel.style.display='none';
   _ctApprovalIdx = -1;
   _ctPendingAction = null;
 }
@@ -1167,7 +1128,7 @@ function ctRenderPeople(people) {
   var list = document.getElementById('ct_people_list');
   if(!list) return;
   people = people || [];
-  if(!people || !people.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);font-style:italic;padding:4px 0;">No key contacts added yet. Click + Add Person to add one.</div>'; return; }
+  if(!people.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);font-style:italic;padding:4px 0;">No key contacts added yet.</div>'; return; }
   list.innerHTML = people.map(function(p, i) {
     return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">'
       +'<input type="text" class="ct-person-name" data-pi="'+i+'" value="'+(p.name||'')+'" placeholder="Full name" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
@@ -1553,7 +1514,7 @@ function openCtApprovalPanel(idx) {
 
   // Show panel
   var panel = document.getElementById('ctApprovalPanel');
-  if(panel){ panel.classList.add('on'); document.body.classList.add('modal-open'); }
+  if(panel){ panel.style.removeProperty('display'); panel.style.setProperty('display','flex','important'); }
 }
 function populateSettings(){
   // Populate HM budget limit
@@ -1571,8 +1532,8 @@ function populateSettings(){
   // Show and render the scoring model section
   var sms = document.getElementById('scoring_model_section');
   if(sms) sms.style.display = 'block';
-  // Scoring editor — controlled by editScoreModel authority
-  if (APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole)) {
+  // V2 scoring editor — ED only
+  if (window.currentRole === ROLE.ED) {
     renderV2ScoringEditor();
   } else {
     var wrap = document.getElementById('scoring_model_table_wrap');
@@ -2173,7 +2134,7 @@ async function renderHousingUserTable(){
         +'<td style="padding:10px 12px;"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+rc+'22;color:'+rc+';">'+rl+'</span></td>'
         +'<td style="padding:10px 12px;text-align:right;">'
         +(isMe ? '<span style="font-size:11px;color:var(--muted);">You</span>'
-          : (APPROVAL_AUTHORITY.can('manageStaff', window.currentRole)
+          : (window.currentRole=== ROLE.ED
             ? '<div style="display:flex;gap:6px;justify-content:flex-end;">'
               +'<button onclick="_sbEditStaffModal('+u.id+')" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;">Edit</button>'
               +'<button onclick="deactivateStaff('+u.id+',this)" style="background:none;border:1px solid #fecaca;color:#b91c1c;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;">Deactivate</button>'
@@ -2244,16 +2205,9 @@ function renderRenosView(){
   function getRenoProgress(uid){ return window._renoProgress && window._renoProgress[uid] ? window._renoProgress[uid] : {}; }
   var units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
 
-  // Combine under_repair, condemned, and vacant-with-SOW/progress into one list.
-  // Supabase units may still carry status='vacant' even when a SOW or reno progress
-  // record exists — include those so the view is never empty due to a stale status.
+  // Combine under_repair and condemned into one list
   var allReno = units.filter(function(u){
-    if (u.archived) return false;
-    if (u.status === 'under_repair' || u.status === 'condemned') return true;
-    // Fallback: vacant/other units that have a SOW or reno progress filed
-    var hasSow      = !!(window._sowCache      && window._sowCache[u.id]);
-    var hasProgress = !!(window._renoProgress  && window._renoProgress[u.id]);
-    return hasSow || hasProgress;
+    return (u.status==='under_repair' || u.status==='condemned') && !u.archived;
   });
 
   function byScore(a,b){ return calcRenoScore(b.id).score - calcRenoScore(a.id).score; }
@@ -2262,22 +2216,19 @@ function renderRenosView(){
   // Active filter — stored on window so pill clicks re-render
   var activeFilter = window._renoViewFilter || 'all';
 
-  var repairCount    = allReno.filter(function(u){ return u.status==='under_repair'; }).length;
-  var condemnedCount = allReno.filter(function(u){ return u.status==='condemned'; }).length;
-  var vacantRenoCount = allReno.filter(function(u){ return u.status!=='under_repair' && u.status!=='condemned'; }).length;
-
   var filtered = activeFilter === 'repair'    ? allReno.filter(function(u){ return u.status==='under_repair'; })
                : activeFilter === 'condemned' ? allReno.filter(function(u){ return u.status==='condemned'; })
-               : activeFilter === 'in_reno'   ? allReno.filter(function(u){ return u.status!=='under_repair' && u.status!=='condemned'; })
                : allReno;
 
   // ── Pill chips ────────────────────────────────────────────────────────────
+  var repairCount    = allReno.filter(function(u){ return u.status==='under_repair'; }).length;
+  var condemnedCount = allReno.filter(function(u){ return u.status==='condemned'; }).length;
+
   var chipDefs = [
     { key:'all',       label:'All',             count: allReno.length },
     { key:'repair',    label:'🔨 Under Repair',  count: repairCount },
     { key:'condemned', label:'🚫 Condemned',     count: condemnedCount },
   ];
-  if (vacantRenoCount > 0) chipDefs.push({ key:'in_reno', label:'📋 Filed (Vacant)', count: vacantRenoCount });
 
   function chip(def) {
     var active = activeFilter === def.key;
@@ -2347,7 +2298,7 @@ function renderRenosView(){
   container.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">'
     + chipDefs.map(chip).join('') + '</div>'
     + '<div class="card" style="padding:0;overflow:hidden;">'
-    + '<table class="std-table" style="width:100%;">'+cols+thead+'<tbody id="renos_unified_tbody">'+rows+'</tbody></table>'
+    + '<table style="width:100%;border-collapse:collapse;">'+cols+thead+'<tbody id="renos_unified_tbody">'+rows+'</tbody></table>'
     + '</div>';
 
   var tbody2 = document.getElementById('renos_unified_tbody');
@@ -2554,20 +2505,20 @@ function renderWorklist() {
       {key:'draft',     label:'Draft',          filter: function(a){ return a.status===APP_STATUS.DRAFT; }},
       {key:'declined',  label:'Declined',       filter: function(a){ return a.status==='declined'; }}
     ];
-  } else if(APPROVAL_AUTHORITY.can('reviewApplication', role)) {
+  } else if(role === ROLE.HOUSING_MANAGER) {
     chipDefs = [
       {key:'',          label:'All Active',     filter: function(a){ return !a.archived; }},
       {key:'action',    label:'Needs Review',   filter: function(a){ return ['submitted','file_update'].indexOf(a.status)!==-1; }, alert:true},
       {key:'returned',  label:'Returned',       filter: function(a){ return a.status==='returned'; }, alert:true},
-      {key:'pending',   label:'Awaiting Approval', filter: function(a){ return a.status===APP_STATUS.MGR_APPROVED; }},
-      {key:'approved',  label:'Final Approved', filter: function(a){ return a.status===APP_STATUS.ED_APPROVED; }},
+      {key:'pending',   label:'Awaiting ED',    filter: function(a){ return a.status===APP_STATUS.MGR_APPROVED; }},
+      {key:'approved',  label:'ED Approved',    filter: function(a){ return a.status===APP_STATUS.ED_APPROVED; }},
       {key:'assigned',  label:'Assigned',       filter: function(a){ return a.status==='assigned'; }}
     ];
-  } else if(APPROVAL_AUTHORITY.can('finalApproveApp', role)) {
+  } else {
     chipDefs = [
       {key:'',          label:'All Active',     filter: function(a){ return !a.archived; }},
       {key:'action',    label:'Needs Approval', filter: function(a){ return a.status===APP_STATUS.MGR_APPROVED; }, alert:true},
-      {key:'submitted', label:'Awaiting Review',filter: function(a){ return a.status===APP_STATUS.SUBMITTED; }},
+      {key:'submitted', label:'Awaiting HM',    filter: function(a){ return a.status===APP_STATUS.SUBMITTED; }},
       {key:'approved',  label:'Approved',       filter: function(a){ return a.status===APP_STATUS.ED_APPROVED; }},
       {key:'assigned',  label:'Assigned',       filter: function(a){ return a.status==='assigned'; }},
       {key:'declined',  label:'Declined',       filter: function(a){ return a.status==='declined'; }}
@@ -2619,14 +2570,9 @@ function renderWorklist() {
     var actionBtn = '';
     if(a.status==='returned') {
       actionBtn = '<button data-wl-edit="'+a.id+'" onclick="event.stopPropagation();wlEditApp(this)" style="background:var(--yellow);border:none;color:#111;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Update →</button>';
-    } else if(
-        (APPROVAL_AUTHORITY.can('reviewFileUpdate', role) && a.status===APP_STATUS.FILE_UPDATE)
-        || (APPROVAL_AUTHORITY.can('reviewApplication', role) && (a.status===APP_STATUS.SUBMITTED))
-        || (APPROVAL_AUTHORITY.can('finalApproveApp', role) && a.status===APP_STATUS.MGR_APPROVED)) {
+    } else if((role=== ROLE.HOUSING_MANAGER&&(a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)) || (role=== ROLE.ED&&a.status===APP_STATUS.MGR_APPROVED)) {
       actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:#1d4ed8;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Review →</button>';
-    } else if(!a.assignedUnit
-        && (a.status===APP_STATUS.ED_APPROVED && APPROVAL_AUTHORITY.can('assignUnit', role)
-         || a.status==='hm_approved' && APPROVAL_AUTHORITY.can('approveFileUpdate', role))) {
+    } else if((ROLE.isManagement(role))&&(a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit) {
       actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:#15803d;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
     }
     return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-wl-id="'+a.id+'" onclick="wlOpenApp(this)">'
@@ -2762,7 +2708,7 @@ function saveContractor(){
   }
   window._contractors = contractors;
   // Persist to Supabase
-  sbSaveContractor(data).catch(function(e){ console.warn('saveContractor SB failed:',e); });
+  sbSaveContractor(ct).catch(function(e){ console.warn('saveContractor SB failed:',e); });
   // Upload contractor files to Supabase Storage
   var ctf = window._ctFiles||{wsib:[],insurance:[],other:[]};
   ['wsib','insurance','other'].forEach(function(bucket){
@@ -2962,35 +2908,24 @@ function showContractorsForRole() {
     openContractorSearch();
   }
 }
-
-// Center a page-view-wide element - same pattern as showDashboard
-function _centerView(el) {
-  if (!el) return;
-  el.style.display       = 'flex';
-  el.style.flexDirection = 'column';
-  el.style.width         = 'min(100%, 1400px)';
-  el.style.marginLeft    = 'auto';
-  el.style.marginRight   = 'auto';
-  el.style.boxSizing     = 'border-box';
-}
-
 function showInventory(){
   if(!window._navSkipPush) pushNav('inventory');
   setExportView('inventory');
   setNavActive('tab_inventory');
   _showView('inventoryView', renderInventoryView);
-  _centerView(document.getElementById('inventoryView'));
 }
 function showTenants(){
   if(!window._navSkipPush) pushNav('tenants');
   setExportView(null);
   setNavActive('tab_tenants');
   _showView('tenantsView', renderTenantsView);
-  _centerView(document.getElementById('tenantsView'));
 }
 function showWorklist() {
-  if(typeof showPipeline === 'function') { showPipeline(); return; }
-  if(!window._navSkipPush) pushNav('pipeline');
+  if(!window._navSkipPush) pushNav('worklist');
+  hideAllViews('worklistView');
+  setNavActive('tab_worklist');
+  var view = document.getElementById('worklistView');
+  if(view){ view.style.display='flex'; view.style.flexDirection='column'; }
   // Date/time stamp — matches landing page pattern
   var dtEl = document.getElementById('worklist_datetime');
   if(dtEl) {
@@ -3004,78 +2939,6 @@ function showWorklist() {
   }
   renderWorklist();
 }
-// ── Shared Contractor Search Widget ──────────────────────────────────────────
-// One reusable function for all contractor typeahead dropdowns.
-// inputId / hiddenId: the text input and hidden ID field element IDs
-// dropdownId: the dropdown container element ID
-// onAdd: callback to invoke when "Add new contractor" is clicked
-function ctSearchWidget(q, dropdownId, inputId, hiddenId, onAdd) {
-  var dd = document.getElementById(dropdownId);
-  if(!dd) return;
-  var contractors = window._contractors || [];
-  var term = (q||'').toLowerCase().trim();
-
-  var matches = term
-    ? contractors.filter(function(c) {
-        var name  = (c.name||'').toLowerCase();
-        var trade = (c.trade||'').toLowerCase();
-        return name.includes(term) || trade.includes(term)
-          || name.split(/\s+/).some(function(w){ return w.startsWith(term); });
-      })
-    : contractors;
-
-  var plusIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">'
-    +'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
-
-  var rows = matches.map(function(c) {
-    var badge = c.status === 'approved'
-      ? '<span style="font-size:9px;background:#f0fdf4;color:#15803d;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:6px;">Active</span>'
-      : '<span style="font-size:9px;background:#fffbeb;color:#92400e;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:6px;">Pending</span>';
-    return '<div data-ct-name="'+c.name+'" data-ct-id="'+(c.id||'')+'"'
-      +' data-dd-id="'+dropdownId+'" data-inp-id="'+inputId+'" data-hid-id="'+hiddenId+'"'
-      +' onmousedown="ctSearchWidgetSelect(this)"'
-      +' style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);"'
-      +' onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-      +'<div style="display:flex;align-items:center;">'+c.name+badge+'</div>'
-      +(c.trade?'<div style="font-size:11px;color:var(--muted);">'+c.trade+'</div>':'')
-      +'</div>';
-  });
-
-  if(!matches.length) {
-    rows.push('<div style="padding:9px 14px;font-size:12px;color:var(--muted);">'
-      +(term ? 'No contractor matching "'+term+'" found.' : 'No contractors added yet.')
-      +'</div>');
-  }
-
-  // Always show Add option
-  var addLabel = (term && !matches.length) ? 'Add "'+q+'" as new contractor' : 'Add new contractor';
-  rows.push('<div onmousedown="('+onAdd+')()"'
-    +' style="padding:9px 14px;cursor:pointer;font-size:12px;font-weight:700;color:var(--yellow);border-top:2px solid var(--yellow);display:flex;align-items:center;gap:6px;"'
-    +' onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-    +plusIcon+' '+addLabel+'</div>');
-
-  dd.innerHTML = rows.join('');
-  // Critical: ensure dropdown floats above all other content
-  dd.style.cssText = 'display:block;position:absolute;top:100%;left:0;right:0;'
-    +'background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;'
-    +'z-index:9999;max-height:240px;overflow-y:auto;box-shadow:0 12px 32px rgba(0,0,0,0.25);';
-}
-
-// Select handler — reads config from data attributes so it works for any dropdown
-function ctSearchWidgetSelect(el) {
-  var name  = el.getAttribute('data-ct-name');
-  var id    = el.getAttribute('data-ct-id');
-  var ddId  = el.getAttribute('data-dd-id');
-  var inpId = el.getAttribute('data-inp-id');
-  var hidId = el.getAttribute('data-hid-id');
-  var inp = document.getElementById(inpId);
-  var hid = document.getElementById(hidId);
-  var dd  = document.getElementById(ddId);
-  if(inp) inp.value = name || '';
-  if(hid) hid.value = id   || '';
-  if(dd)  dd.style.display = 'none';
-}
-
 function sowAddNewContractor() {
   var dd = document.getElementById('sow_ct_dropdown');
   if(dd) dd.style.display = 'none';
@@ -3087,12 +2950,47 @@ function sowAddNewContractor() {
   var m = document.getElementById('addContractorModal');
   if(m) m.style.display = 'flex';
 }
-// sowContractorSearch + sowSelectContractor delegate to shared ctSearchWidget
 function sowContractorSearch(q) {
-  ctSearchWidget(q, 'sow_ct_dropdown', 'sow_contractor', 'sow_contractor_id', sowAddNewContractor);
+  var dd = document.getElementById('sow_ct_dropdown');
+  if(!dd) return;
+  var contractors = [];
+  var contractors = window._contractors || [];
+  var term = (q||'').toLowerCase().trim();
+  var matches = term
+    ? contractors.filter(function(c){ return (c.name||'').toLowerCase().includes(term)||(c.trade||'').toLowerCase().includes(term); })
+    : contractors;
+
+  var rows = matches.map(function(c){
+    return '<div data-ct-name="'+c.name+'" data-ct-id="'+(c.id||'')+'" onmousedown="sowSelectContractor(this)" '
+      +'style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" '
+      +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
+      +'<div style="font-weight:600;">'+c.name+'</div>'
+      +(c.trade?'<div style="font-size:11px;color:var(--muted);">'+c.trade+'</div>':'')
+      +'</div>';
+  });
+
+  if(!matches.length) {
+    rows.push('<div style="padding:9px 14px;font-size:12px;color:var(--muted);">'
+      +(term?'No contractor matching "'+q+'" found.':'No contractors added yet.')+'</div>');
+  }
+  rows.push('<div onmousedown="sowAddNewContractor()" style="padding:9px 14px;cursor:pointer;font-size:12px;font-weight:700;color:var(--yellow);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;" '
+    +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
+    +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+    +(term&&!matches.length?'Add "'+q+'" as new contractor':'Add new contractor')
+    +'</div>');
+
+  dd.innerHTML = rows.join('');
+  dd.style.display = 'block';
 }
 function sowSelectContractor(el) {
-  ctSearchWidgetSelect(el);
+  var name = el.getAttribute('data-ct-name');
+  var id   = el.getAttribute('data-ct-id');
+  var inp  = document.getElementById('sow_contractor');
+  var hid  = document.getElementById('sow_contractor_id');
+  if(inp) inp.value = name;
+  if(hid) hid.value = id;
+  var dd = document.getElementById('sow_ct_dropdown');
+  if(dd) dd.style.display = 'none';
 }
 function toggleHeaderExportMenu() {
   var m = document.getElementById('header_export_menu');
@@ -3352,39 +3250,12 @@ function calcRenoScore(unitId) {
 }
 
 function ctAddPerson() {
-  // Read current rows WITHOUT filtering empties, then append a new blank row
-  var people = [];
-  var rows = document.querySelectorAll('#ct_people_list [data-pi]');
-  var seen = {};
-  rows.forEach(function(el) {
-    var i = parseInt(el.getAttribute('data-pi'));
-    if(!seen[i]) { seen[i] = {name:'', phone:'', email:''}; people[i] = seen[i]; }
-    if(el.classList.contains('ct-person-name'))  seen[i].name  = el.value.trim();
-    if(el.classList.contains('ct-person-phone')) seen[i].phone = el.value.trim();
-    if(el.classList.contains('ct-person-email')) seen[i].email = el.value.trim();
-  });
-  people = people.filter(Boolean); // remove undefined slots but keep empty-string rows
+  var people = ctGetPeople();
   people.push({name:'', phone:'', email:''});
   ctRenderPeople(people);
   // Focus the new name field
   var inputs = document.querySelectorAll('.ct-person-name');
   if(inputs.length) inputs[inputs.length-1].focus();
-}
-
-function ctRemovePerson(idx) {
-  var people = [];
-  var rows = document.querySelectorAll('#ct_people_list [data-pi]');
-  var seen = {};
-  rows.forEach(function(el) {
-    var i = parseInt(el.getAttribute('data-pi'));
-    if(!seen[i]) { seen[i] = {name:'', phone:'', email:''}; people[i] = seen[i]; }
-    if(el.classList.contains('ct-person-name'))  seen[i].name  = el.value.trim();
-    if(el.classList.contains('ct-person-phone')) seen[i].phone = el.value.trim();
-    if(el.classList.contains('ct-person-email')) seen[i].email = el.value.trim();
-  });
-  people = people.filter(Boolean);
-  people.splice(idx, 1);
-  ctRenderPeople(people);
 }
 
 function deleteContractor(idx){
@@ -3683,7 +3554,6 @@ function showMatch(){
   setNavActive('tab_match');
   window._matchActiveChip = '';
   _showView('matchView', renderMatchView);
-  _centerView(document.getElementById('matchView'));
 }
 
 function showContractors(){
@@ -3858,82 +3728,4 @@ function closeTenantFilesPanel(){
 function closeUnitDetail() {
   var p = document.getElementById('unitDetailPanel');
   if (p) p.style.display = 'none';
-}
-
-// ── Shared Audit Log Writer ─────────────────────────────────────────────────
-// Single function used by ALL pages (housing, finance, renos) to write audit
-// entries. Detects which table to use based on the current page context.
-// Fire-and-forget — failures are logged but never block the user.
-//
-// Usage:
-//   sbWriteAuditEntry({ action, entity_type, entity_id, summary, detail, tenant_id })
-//
-// On housing.html / renos.html → writes to housing_audit_log
-// On finance.html             → writes to finance_audit_log
-function sbWriteAuditEntry(entry) {
-  var isFinance = (typeof FINANCE_HEADERS !== 'undefined');
-  var headers   = isFinance
-    ? Object.assign({}, FINANCE_HEADERS, { 'Prefer': 'return=minimal', 'Content-Type': 'application/json' })
-    : Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' });
-
-  var actor = '';
-  if (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) {
-    actor = HOUSING_SESSION.email || HOUSING_SESSION.name || '';
-  } else if (typeof window !== 'undefined' && window.currentRole) {
-    actor = window.currentRole;
-  }
-
-  var now = new Date().toISOString();
-  var detail = entry.detail || {};
-  var detailStr = typeof detail === 'string' ? detail : JSON.stringify(detail);
-
-  var row, table;
-
-  if (isFinance) {
-    table = 'finance_audit_log';
-    // Columns confirmed: id(auto), nation_id, occurred_at, actor_email,
-    // actor_role, action, entity_type, entity_id, tenant_id, summary, detail
-    var entityId = entry.entity_id || null;
-    var uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (entityId && !uuidRe.test(String(entityId))) entityId = null;
-    row = {
-      nation_id:   (typeof _NATION === 'function') ? _NATION() : 'clfn',
-      actor_email: actor,
-      actor_role:  (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION.role : null,
-      action:      entry.action || 'unknown',
-      entity_type: entry.entity_type || 'unknown',
-      entity_id:   entityId,
-      tenant_id:   null, // FK race — always embed in detail instead
-      summary:     entry.summary || '(no summary)',
-      detail:      detailStr,
-      occurred_at: now
-    };
-  } else {
-    table = 'housing_audit_log';
-    // Columns: entity_type, entity_id, action, detail (JSON string), actor, created_at
-    row = {
-      entity_type: entry.entity_type || 'unknown',
-      entity_id:   String(entry.entity_id || ''),
-      action:      entry.action || 'unknown',
-      detail:      detailStr,
-      actor:       actor,
-      created_at:  now
-    };
-  }
-
-  fetch(SUPABASE_URL + '/rest/v1/' + table, {
-    method:  'POST',
-    headers: headers,
-    body:    JSON.stringify([row])
-  }).then(function(r) {
-    if (!r.ok) {
-      r.text().then(function(t) {
-        console.warn('[audit] ' + table + ' rejected HTTP ' + r.status + ':', t);
-      });
-    } else {
-      console.log('[audit] ' + table + ' OK');
-    }
-  }).catch(function(e) {
-    console.warn('[audit] ' + table + ' network error:', e.message);
-  });
 }
