@@ -94,7 +94,7 @@ function setNavActive(id) {
   });
   // Also clear legacy ids in case any remain
   var allTabs = [
-    'tab_app','tab_dash','tab_scores','tab_settings','tab_match',
+    'tab_app','tab_dash','tab_pipeline','tab_scores','tab_settings','tab_match',
     'tab_inventory','tab_contractors','tab_tenants','tab_renos','tab_budget'
   ];
   allTabs.forEach(function(tid) {
@@ -112,7 +112,7 @@ function setNavActive(id) {
 function hideAllViews(keepId) {
   var base = [
     'appLayout','settingsView','scorecardView',
-    'dashView','employeeHomeView','worklistView',
+    'pipelineView','dashView','employeeHomeView','worklistView',
     'inventoryView','matchView','tenantsView',
     'renoApprovalsView','renosView','contractorsView',
     'renosLoadingView'
@@ -217,9 +217,9 @@ function switchRole(role) {
     (ROLE.isManagement(role)) ? 'Dashboard' : 'Home';
 
   // Hide Settings nav for HE-L1/L2
-  var settingsBtn = document.getElementById('tab_settings');
+  var settingsBtn = document.getElementById('header_settings_btn');
   if (settingsBtn) settingsBtn.style.display =
-    (ROLE.isManagement(role)) ? '' : 'none';
+    (ROLE.isManagement(role)) ? 'flex' : 'none';
 
   // Notify page — skip during boot to prevent flash back to landing page
   // window._booting is set true before resolveHousingRole and cleared after

@@ -2989,11 +2989,8 @@ function showTenants(){
   _centerView(document.getElementById('tenantsView'));
 }
 function showWorklist() {
-  if(!window._navSkipPush) pushNav('worklist');
-  hideAllViews('worklistView');
-  setNavActive('tab_worklist');
-  var view = document.getElementById('worklistView');
-  if(view){ view.style.display='flex'; view.style.flexDirection='column'; view.style.width='min(100%, 1400px)'; view.style.marginLeft='auto'; view.style.marginRight='auto'; view.style.boxSizing='border-box'; }
+  if(typeof showPipeline === 'function') { showPipeline(); return; }
+  if(!window._navSkipPush) pushNav('pipeline');
   // Date/time stamp — matches landing page pattern
   var dtEl = document.getElementById('worklist_datetime');
   if(dtEl) {
