@@ -7,12 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="shared.css"/>
 <link rel="stylesheet" href="housing.css"/>
-<style>
-  /* Fix: modal-hdr sets display:flex which breaks table header rows */
-  thead tr.modal-hdr { display: table-row; background: var(--dark); border-bottom: 2px solid var(--yellow); }
-  thead tr.modal-hdr th { color: #888; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; }
-  /* Approval Authority panel */
-</style>
+
 <script src="shared.js"></script>
 <script src="shared-config.js"></script>
 <script src="shared-auth.js"></script>
@@ -115,7 +110,7 @@
 <div class="app-wrapper" id="appWrapper">
 <div class="content-area">
 <!-- ═══ EMPLOYEE HOME VIEW ═══ -->
-<div id="employeeHomeView" style="display:none;width:100%;flex-direction:column;padding:clamp(16px,4vw,40px) clamp(14px,3vw,40px);box-sizing:border-box;max-width:1100px;margin:0 auto;">
+<div id="employeeHomeView" style="display:none;width:100%;flex-direction:column;padding:clamp(16px,4vw,40px) clamp(14px,3vw,40px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
   <!-- Greeting block — brand: CLFN serif heading, yellow accent, muted meta line -->
   <div style="margin-bottom:28px;position:relative;padding-left:16px;">
     <!-- Yellow accent bar anchored to the left of the heading -->
@@ -137,7 +132,7 @@
 
 
 <!-- ═══ WORKLIST VIEW ═══ -->
-<div id="worklistView" style="display:none;width:100%;flex-direction:column;padding:clamp(16px,4vw,40px) clamp(14px,3vw,40px);box-sizing:border-box;max-width:1100px;margin:0 auto;">
+<div id="worklistView" style="display:none;width:100%;flex-direction:column;padding:clamp(16px,4vw,40px) clamp(14px,3vw,40px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
   <div class="page-back-row">
     <button onclick="showEmployeeHome()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -176,7 +171,7 @@
   </div>
 
   <!-- Stats -->
-  <div class="dash-stats" style="grid-template-columns:repeat(5,1fr);display:grid;gap:12px;">
+  <div class="dash-stats" style="gap:12px;">
     <div class="stat-card">
       <div class="stat-num" id="ds_total">0</div>
       <div class="stat-lbl">Total Applications</div>
@@ -210,7 +205,7 @@
 
 
   <!-- Housing Match Stats -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+  <div class="fg c4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
     <div class="stat-card" style="border-left:3px solid #15803d;">
       <div class="stat-num" id="ds_vacant_count" style="font-size:24px;color:#15803d;">—</div>
       <div class="stat-lbl">Vacant Units</div>
@@ -948,7 +943,7 @@
 
 <!-- ═══ SETTINGS VIEW ═══ -->
 <div id="settingsView" style="display:none;width:100%;flex-direction:column;max-width:1200px;margin:0 auto;box-sizing:border-box;">
-<div class="settings-view" style="display:flex;flex-direction:column;gap:0;padding:clamp(14px,3vw,28px);max-width:none;width:100%;">
+<div style="display:flex;flex-direction:column;gap:0;padding:clamp(14px,3vw,28px);width:100%;box-sizing:border-box;">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -963,17 +958,17 @@
   </div>
 
   <!-- Section nav tabs -->
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0;">
-    <button onclick="showSettingsSection('sec_users')" id="stab_users" class="settings-tab active" style="padding:8px 16px;border:none;border-bottom:2px solid var(--yellow);background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;margin-bottom:-1px;">👥 Users</button>
-    <button onclick="showSettingsSection('sec_app_scoring')" id="stab_app_scoring" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">⭐ Application Scoring</button>
-    <button onclick="showSettingsSection('sec_unit_match')" id="stab_unit_match" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">🏠 Unit Matching</button>
-    <button onclick="showSettingsSection('sec_reno_score')" id="stab_reno_score" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">🔨 Reno Priority</button>
-    <button onclick="showSettingsSection('sec_budget')" id="stab_budget" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">💰 Reno Budget</button>
-    <button onclick="showSettingsSection('sec_contacts')" id="stab_contacts" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">📧 Contacts</button>
-    <button onclick="showSettingsSection('sec_nation');renderNationPanel();" id="stab_nation" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;">🌐 Nation</button>
-    <button onclick="showSettingsSection('sec_approval_authority');renderApprovalAuthorityPanel();" id="stab_approval_authority" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;display:none;">🔐 Approval Authority</button>
-    <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;display:none;">📋 Audit Log</button>
-    <button onclick="showSettingsSection('sec_occupancy')" id="stab_occupancy" class="settings-tab" style="padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;display:none;">🏘 Occupancy</button>
+  <div class="tabs" style="margin-bottom:20px;">
+    <button onclick="showSettingsSection('sec_users')" id="stab_users" class="settings-tab tab-btn active">👥 Users</button>
+    <button onclick="showSettingsSection('sec_app_scoring')" id="stab_app_scoring" class="settings-tab tab-btn">⭐ Application Scoring</button>
+    <button onclick="showSettingsSection('sec_unit_match')" id="stab_unit_match" class="settings-tab tab-btn">🏠 Unit Matching</button>
+    <button onclick="showSettingsSection('sec_reno_score')" id="stab_reno_score" class="settings-tab tab-btn">🔨 Reno Priority</button>
+    <button onclick="showSettingsSection('sec_budget')" id="stab_budget" class="settings-tab tab-btn">💰 Reno Budget</button>
+    <button onclick="showSettingsSection('sec_contacts')" id="stab_contacts" class="settings-tab tab-btn">📧 Contacts</button>
+    <button onclick="showSettingsSection('sec_nation');renderNationPanel();" id="stab_nation" class="settings-tab tab-btn">🌐 Nation</button>
+    <button onclick="showSettingsSection('sec_approval_authority');renderApprovalAuthorityPanel();" id="stab_approval_authority" class="settings-tab tab-btn" style="display:none;">🔐 Approval Authority</button>
+    <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="settings-tab tab-btn" style="display:none;">📋 Audit Log</button>
+    <button onclick="showSettingsSection('sec_occupancy')" id="stab_occupancy" class="settings-tab tab-btn" style="display:none;">🏘 Occupancy</button>
   </div>
 
   <!-- ── USERS ── -->
@@ -1304,22 +1299,22 @@
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Unit
     </button>
   </div>
-  <div class="card" style="padding:0;overflow:hidden;">
-    <div style="overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;min-width:640px;table-layout:fixed;">
-        <thead><tr class="modal-hdr">
-          <th style="text-align:left;padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Address</th>
-          <th style="text-align:center;padding:10px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:50px;">Beds</th>
-          <th style="text-align:center;padding:10px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:50px;">Bath</th>
-          <th style="text-align:left;padding:10px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:130px;">Type</th>
-          <th style="text-align:left;padding:10px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:110px;">Foundation</th>
-          <th style="text-align:center;padding:10px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:60px;">Access.</th>
-          <th style="text-align:left;padding:10px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:80px;">Funder</th>
-          <th style="text-align:left;padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:110px;">Status</th>
-          <th id="inv_reno_score_th" style="text-align:left;padding:10px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:120px;">Reno Score</th>
-          <th style="padding:10px 14px;width:80px;white-space:nowrap;"></th>
+  <div class="std-table-card">
+    <div class="doclib-table-wrap">
+      <table class="std-table" style="min-width:640px;table-layout:fixed;">
+        <thead><tr>
+          <th>Address</th>
+          <th style="text-align:center;width:50px;">Beds</th>
+          <th style="text-align:center;width:50px;">Bath</th>
+          <th style="width:130px;">Type</th>
+          <th style="width:110px;">Foundation</th>
+          <th style="text-align:center;width:60px;">Access.</th>
+          <th style="width:80px;">Funder</th>
+          <th style="width:110px;">Status</th>
+          <th id="inv_reno_score_th" style="width:120px;">Reno Score</th>
+          <th style="width:80px;white-space:nowrap;"></th>
         </tr></thead>
-        <tbody id="inv_tbody"><tr><td colspan="10" style="padding:40px;text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+        <tbody id="inv_tbody"><tr><td colspan="10" class="empty-state" style="padding:40px;text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1374,22 +1369,22 @@
       </button>
     </div>
   </div>
-  <div class="filter-bar" style="margin-bottom:16px;">
+  <div class="filter-bar">
     <input id="tenant_search" type="text" placeholder="🔍 Search name or address..." oninput="renderTenantsView()"/>
   </div>
-  <div class="card" style="padding:0;overflow:hidden;">
-    <div style="overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;min-width:600px;">
-        <thead><tr class="modal-hdr">
-          <th style="text-align:left;padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Unit / Address</th>
-          <th style="text-align:left;padding:10px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Tenant Name</th>
-          <th style="text-align:left;padding:10px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Move-In Date</th>
-          <th style="text-align:left;padding:10px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Status</th>
-          <th id="ten_reno_score_th" style="text-align:left;padding:10px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Reno Score</th>
-          <th style="text-align:left;padding:10px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Files</th>
-          <th style="padding:10px 14px;width:80px;"></th>
+  <div class="std-table-card">
+    <div class="doclib-table-wrap">
+      <table class="std-table" style="min-width:600px;">
+        <thead><tr>
+          <th>Unit / Address</th>
+          <th>Tenant Name</th>
+          <th>Move-In Date</th>
+          <th>Status</th>
+          <th id="ten_reno_score_th">Reno Score</th>
+          <th>Files</th>
+          <th style="width:80px;"></th>
         </tr></thead>
-        <tbody id="tenants_tbody"><tr><td colspan="7" style="padding:40px;text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+        <tbody id="tenants_tbody"><tr><td colspan="7" class="empty-state" style="padding:40px;text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -5654,18 +5649,19 @@ function renderMatchView(){
   }).join('');
 
 
-  content.innerHTML = '<div class="card" style="padding:0;overflow:hidden;">'
-    +'<table style="width:100%;border-collapse:collapse;min-width:650px;">'
-    +'<thead><tr class="modal-hdr">'
-    +'<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">#</th>'
-    +'<th style="padding:10px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Applicant</th>'
-    +'<th style="padding:10px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Score</th>'
-    +'<th style="padding:10px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Best Unit Match</th>'
-    +'<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Requirements & Status</th>'
-    +'<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Action</th>'
+  content.innerHTML = '<div class="std-table-card">'
+    +'<div class="doclib-table-wrap">'
+    +'<table class="std-table" style="min-width:650px;">'
+    +'<thead><tr>'
+    +'<th>#</th>'
+    +'<th>Applicant</th>'
+    +'<th>Score</th>'
+    +'<th>Best Unit Match</th>'
+    +'<th>Requirements &amp; Status</th>'
+    +'<th>Action</th>'
     +'</tr></thead>'
     +'<tbody id="match_tbody">'+rows+'</tbody>'
-    +'</table></div>';
+    +'</table></div></div>';
   // Wire assign buttons
   var matchContent = document.getElementById('match_content');
   if(matchContent) matchContent.querySelectorAll('[data-assign-app]').forEach(function(btn){
@@ -7473,10 +7469,7 @@ function showSettingsSection(section) {
   });
   document.querySelectorAll('.settings-tab').forEach(function(t){
     var tabSec='sec_'+t.id.replace('stab_','');
-    var active=(tabSec===section);
-    t.style.borderBottom=active?'2px solid var(--yellow)':'2px solid transparent';
-    t.style.fontWeight=active?'700':'500';
-    t.style.color=active?'var(--text)':'var(--muted)';
+    t.classList.toggle('active', tabSec===section);
   });
   if(section==='sec_users'       && typeof renderHousingUserTable==='function') renderHousingUserTable();
   if(section==='sec_nation'      && typeof renderNationPanel==='function') renderNationPanel();

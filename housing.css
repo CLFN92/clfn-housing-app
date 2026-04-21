@@ -262,3 +262,153 @@
 
 /* Finance info boxes and table wrappers */
 
+
+/* Settings tabs — extend shared .tab-btn with settings-specific alias */
+.settings-tab { /* inherits from .tab-btn via shared.css */ }
+
+/* dashView stats is 5-col on desktop (overrides shared.css 4-col default) */
+#dashView .dash-stats { grid-template-columns: repeat(5,1fr); }
+/* 4-column grid utility used in dashView match stats */
+.fg.c4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+
+
+/* ══════════════════════════════════════════════════════════════
+ * RESPONSIVE — housing-specific additions
+ * shared.css handles layout shell, sidebars, modals, view pads
+ * These rules handle housing-specific inline grids and components
+ * ══════════════════════════════════════════════════════════════ */
+
+/* ── ≤960px Tablet ── */
+@media (max-width: 960px) {
+  /* dashView stats: 5-col → 3-col */
+  #dashView .dash-stats { grid-template-columns: repeat(3,1fr) !important; }
+
+  /* dashView match stats: 4-col → 2-col */
+  #dashView > div[style*="repeat(4,1fr)"] { grid-template-columns: repeat(2,1fr) !important; }
+
+  /* Approval Authority panel grid: fixed 220px label → auto */
+  #approval_authority_panel_body [style*="grid-template-columns:220px"] {
+    grid-template-columns: 180px 1fr auto !important;
+  }
+}
+
+/* ── ≤700px Mobile ── */
+@media (max-width: 700px) {
+  /* dashView stats: collapse to 2-col (shared handles the !important at 700) */
+  #dashView > div[style*="repeat(4,1fr)"] { grid-template-columns: 1fr 1fr !important; }
+
+  /* Approval Authority panel: switch to stacked layout */
+  #approval_authority_panel_body [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+  #approval_authority_panel_body [style*="grid-template-columns"] > *:last-child {
+    justify-self: start;
+  }
+
+  /* Application form — 3-col section sub-grids → 1-col */
+  .appLayout [style*="grid-template-columns:1fr 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Assign modal / unit edit — 3-col stat blocks → 1-col */
+  #assignUnitModal [style*="grid-template-columns:1fr 1fr 1fr"],
+  #unitEditModal   [style*="grid-template-columns:1fr 1fr 1fr"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Settings tabs — allow horizontal scroll rather than wrapping */
+  .tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+
+  /* Page header actions — stack vertically */
+  .phb-actions { flex-direction: column; align-items: stretch; width: 100%; }
+  .phb-actions select,
+  .phb-actions input  { width: 100%; min-width: 0; }
+
+  /* Worklist/inventory chip rows — wrap tighter */
+  #inv_stat_chips { gap: 6px; }
+
+  /* Tenants filter bar input — full width */
+  #tenant_search { width: 100%; box-sizing: border-box; }
+
+  /* Match view chip row */
+  #match_chips { gap: 6px; }
+}
+
+/* ── ≤480px Small mobile ── */
+@media (max-width: 480px) {
+  /* dashView stats: 1-col (shared already does this with !important) */
+  #dashView > div[style*="repeat(4,1fr)"] { grid-template-columns: 1fr !important; }
+
+  /* Tile grid on home: minimum 160px so 2 tiles fit on very small phones */
+  #emp_tiles_grid { grid-template-columns: repeat(auto-fill,minmax(160px,1fr)) !important; }
+
+  /* Application form 2-col signature grids → 1-col */
+  .appLayout [style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Unit detail / assign modal 2-col → 1-col */
+  #assignUnitModal [style*="grid-template-columns:1fr 1fr"],
+  #unitEditModal   [style*="grid-template-columns:1fr 1fr"],
+  #sec_occupancy   [style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Approval Authority panel pills — allow full wrap */
+  #approval_authority_panel_body button[data-aa-role] {
+    font-size: 11px;
+    padding: 4px 10px;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+ * RESPONSIVE — housing-specific additions
+ * shared.css handles layout shell, sidebars, modals, view pads
+ * ══════════════════════════════════════════════════════════════ */
+
+/* ── ≤960px Tablet ── */
+@media (max-width: 960px) {
+  /* dashView stats: 5-col → 3-col; match stats 4-col → 2-col */
+  #dashView .dash-stats { grid-template-columns: repeat(3,1fr) !important; }
+  .fg.c4 { grid-template-columns: repeat(2,1fr) !important; }
+  /* Approval Authority panel: narrow label col */
+  #approval_authority_panel_body [style*="220px"] { grid-template-columns: 160px 1fr auto !important; }
+}
+
+/* ── ≤700px Mobile ── */
+@media (max-width: 700px) {
+  /* dashView: stats 2-col, match stats 2-col */
+  .fg.c4 { grid-template-columns: 1fr 1fr !important; }
+  /* Approval Authority panel → stacked */
+  #approval_authority_panel_body [style*="220px"] {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+  /* Application form 3-col sub-grids → 1-col */
+  .appLayout [style*="1fr 1fr 1fr"] { grid-template-columns: 1fr !important; }
+  /* Modal stat blocks 3-col → 2-col */
+  #assignUnitModal [style*="1fr 1fr 1fr"],
+  #unitEditModal   [style*="1fr 1fr 1fr"] { grid-template-columns: 1fr 1fr !important; }
+  /* Settings tabs scroll horizontally rather than wrapping */
+  .tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+  /* Page header actions stack */
+  .phb-actions { flex-direction: column; align-items: stretch; }
+  .phb-actions select, .phb-actions input { width: 100%; min-width: 0 !important; }
+  /* Filter inputs full width */
+  #tenant_search, #inv_search { width: 100%; box-sizing: border-box; }
+}
+
+/* ── ≤480px Small mobile ── */
+@media (max-width: 480px) {
+  /* dashView match stats 4-col → 1-col */
+  .fg.c4 { grid-template-columns: 1fr !important; }
+  /* Tile grid: tighter min so 2 tiles fit on 375px phones */
+  #emp_tiles_grid { grid-template-columns: repeat(auto-fill,minmax(160px,1fr)) !important; }
+  /* Application form 2-col → 1-col (signatures, income rows etc) */
+  .appLayout [style*="1fr 1fr"] { grid-template-columns: 1fr !important; }
+  /* Modal 2-col → 1-col */
+  #assignUnitModal [style*="1fr 1fr"],
+  #unitEditModal   [style*="1fr 1fr"] { grid-template-columns: 1fr !important; }
+  /* AA pills smaller */
+  #approval_authority_panel_body button[data-aa-role] { font-size: 11px; padding: 4px 10px; }
+}
