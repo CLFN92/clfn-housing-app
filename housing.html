@@ -11,10 +11,7 @@
   /* Fix: modal-hdr sets display:flex which breaks table header rows */
   thead tr.modal-hdr { display: table-row; background: var(--dark); border-bottom: 2px solid var(--yellow); }
   thead tr.modal-hdr th { color: #888; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; }
-  /* Approval Authority panel — override 780px settings-view constraint */
-  #sec_approval_authority { margin: 0 calc(-1 * clamp(14px,3vw,44px)); }
-  #sec_approval_authority .card { border-radius: 0; border-left: none; border-right: none; }
-  #approval_authority_panel_body { max-width: 900px; margin: 0 auto; }
+  /* Approval Authority panel */
 </style>
 <script src="shared.js"></script>
 <script src="shared-config.js"></script>
@@ -951,7 +948,7 @@
 
 <!-- ═══ SETTINGS VIEW ═══ -->
 <div id="settingsView" style="display:none;width:100%;flex-direction:column;max-width:1200px;margin:0 auto;box-sizing:border-box;">
-<div class="settings-view" style="display:flex;flex-direction:column;gap:0;padding:clamp(14px,3vw,28px);">
+<div class="settings-view" style="display:flex;flex-direction:column;gap:0;padding:clamp(14px,3vw,28px);max-width:none;width:100%;">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
