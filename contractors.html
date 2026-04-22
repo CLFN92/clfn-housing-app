@@ -110,18 +110,18 @@
 </div><!-- end contractorsView -->
 
 <!-- ── Contractor Approval Panel (slide-in from right) ── -->
-<div id="ctApprovalPanel" class="ct-panel-overlay" onclick="if(event.target===this)closeCtApprovalPanel()">
-  <div class="ct-panel-body">
-    <div class="modal-hdr sticky">
+<div id="ctApprovalPanel" class="ct-modal-overlay" onclick="if(event.target===this)closeCtApprovalPanel()">
+  <div class="ct-modal-body">
+    <div class="modal-hdr spacious sticky">
       <div>
         <div class="ct-panel-supertitle">Contractor Application</div>
-        <div id="ctap_name" class="ct-panel-name"></div>
+        <div id="ctap_name" class="panel-title"></div>
         <div id="ctap_trade" class="ct-panel-trade"></div>
       </div>
       <button onclick="closeCtApprovalPanel()" class="btn-close-sm">✕</button>
     </div>
     <div id="ctap_status_banner" class="ct-status-banner"></div>
-    <div class="ct-panel-content">
+    <div class="ct-modal-form-body">
       <!-- Application Summary -->
       <div class="card ct-sec">
         <div class="modal-hdr compact"><div class="ct-lbl-yellow">Application Summary</div></div>
@@ -144,7 +144,7 @@
       <!-- Actions -->
       <div id="ctap_actions"></div>
       <!-- Audit Trail -->
-      <div class="card ct-sec">
+      <div class="card ct-sec-last">
         <div class="modal-hdr compact"><div class="ct-lbl-yellow">Audit Trail</div></div>
         <div id="ctap_audit" class="ct-audit-scroll"></div>
       </div>
@@ -196,11 +196,10 @@
       <div class="card ct-sec">
         <div class="modal-hdr compact flex-sb">
           <div class="ct-lbl-yellow">Key People</div>
-          <button type="button" onclick="ctAddPerson()" class="btn btn-ghost btn-sm">+ Add Person</button>
+          <button type="button" onclick="ctAddPerson()" class="btn btn-primary btn-sm">+ Add Person</button>
         </div>
         <div class="ct-sec-pad">
           <div id="ct_people_list" class="ct-people-list"></div>
-          <div id="ct_people_empty" class="ct-txt-sm-muted">No key contacts added yet.</div>
         </div>
       </div>
 
