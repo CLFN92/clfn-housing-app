@@ -948,6 +948,20 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .ct-card-btn:hover       { border-color: var(--yellow); color: var(--yellow); }
 .ct-card-btn.muted       { color: var(--muted); font-weight: 400; }
 
+/* Contractor status pills on card */
+.ct-status-pill                { align-self: flex-start; flex-shrink: 0; }
+.ct-status-pill.pending-review { background: #fffbeb; color: #92400e; }
+.ct-status-pill.hm-recommended { background: #eff6ff; color: #1d4ed8; }
+.ct-status-pill.approved       { background: #f0fdf4; color: #15803d; }
+.ct-status-pill.declined       { background: #fef2f2; color: #b91c1c; }
+.ct-status-pill.returned       { background: #faf5ff; color: #7c3aed; }
+
+/* Contractor expiry tags */
+.ct-tag-valid    { background: #f0fdf422; color: #15803d; }
+.ct-tag-expiring { background: #fef9ec22; color: #d97706; }
+.ct-tag-expired  { background: #fef2f222; color: #b91c1c; }
+
+
 
 /* Info boxes */
 .ibox      { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
