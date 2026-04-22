@@ -1019,8 +1019,6 @@ function closeAddContractorModal(){
 function closeCtApprovalPanel() {
   var panel = document.getElementById('ctApprovalPanel');
   if(panel) panel.style.display='none';
-  var _ca = document.getElementById('renosContentArea') || document.querySelector('.content-area');
-  if(_ca) _ca.style.overflowY = '';
   _ctApprovalIdx = -1;
   _ctPendingAction = null;
 }
@@ -1515,9 +1513,6 @@ function openCtApprovalPanel(idx) {
   _ctRenderAudit(ct.id);
 
   // Show panel
-  // Lock scroll on content-area (not body) so scrollbar-gutter:stable keeps its space
-  var _ca = document.getElementById('renosContentArea') || document.querySelector('.content-area');
-  if(_ca) _ca.style.overflowY = 'hidden';
   var panel = document.getElementById('ctApprovalPanel');
   if(panel) panel.style.display = 'flex';
 }
