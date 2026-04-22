@@ -503,6 +503,9 @@ window._navMap = {
 };
 
 // ── Contractor functions ─────────────────────────────────────────────────────
+// setRenosNav — no-op on contractors.html (nav tabs only exist on renos.html)
+function setRenosNav(active) {}
+
 function showContractors() {
   hideAllViews('contractorsView');
   setRenosNav('contractors');
@@ -726,6 +729,38 @@ function rpContractorSearch(q) {
   dd.style.display = 'block';
 }
 
+
+// ── loadRenosData — fetches units, SOW, reno progress, settings, contractors ──
+async function loadRenosData() {
+  try {
+    var results = await Promise.all([
+      fetch(SUPABASE_URL+'/rest/v1/housing_units?select=*&order=street,num&limit=9999',{headers:HOUSING_HEADERS}),
+      fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=*',{headers:HOUSING_HEADERS}),
+      fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress?select=*',{headers:HOUSING_HEADERS}),
+      fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=key,value',{headers:HOUSING_HEADERS}),
+      sbLoadContractors()
+    ]);
+    var uR=results[0], sowR=results[1], rpR=results[2], stR=results[3], cR=results[4];
+    if(uR && uR.ok) {
+      var rawU = await uR.json();
+      housingUnits = rawU.map(function(row){
+        return Object.assign({}, row.data||{}, {
+          id:row.id, num:row.num, street:row.street,
+          bedrooms:row.bedrooms, bathrooms:row.bathrooms,
+          type:row.type, foundation:row.foundation, funder:row.funder,
+          status:row.status||'vacant', accessible:!!row.accessible,
+          isElders:!!row.is_elders, archived:!!row.archived,
+          assignedTo:row.assigned_to, assignedName:row.assigned_name
+        });
+      });
+    }
+    if(cR) window._contractors = cR;
+    if(sowR && sowR.ok){var sd=await sowR.json();sd.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
+    if(rpR && rpR.ok){var rpd=await rpR.json();rpd.forEach(function(r){window._renoProgress[r.unit_id]=r.data;});}
+    if(stR && stR.ok){var stD=await stR.json();window._appSettings={};stD.forEach(function(r){window._appSettings[r.key]=r.value;});}
+    if(typeof initApprovalAuthority === 'function') initApprovalAuthority();
+  } catch(e){ console.warn('[contractors] data load error:', e); }
+}
 
 // ── Page boot ────────────────────────────────────────────────────────────────
 (async function initContractorsPage() {
