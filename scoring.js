@@ -1633,8 +1633,42 @@ async function rescoreAllApplications() {
 if (typeof DEFAULT_SCORING_MODEL === 'undefined') {
   window.DEFAULT_SCORING_MODEL = [];
 }
-if (typeof DEFAULT_V2_SCORE_MODEL === 'undefined') {
-  window.DEFAULT_V2_SCORE_MODEL = {};
+// ── DEFAULT_V2_SCORE_MODEL — full default point values ────────────────────────
+window.DEFAULT_V2_SCORE_MODEL = {
+  urgent_need: {
+    domestic_violence: 25, fire_disaster: 25, homeless_eviction: 20,
+    eviction_risk: 15, separation: 10, none: 0
+  },
+  health_risk: {
+    severe: 20, moderate: 12, minor: 6, none: 0
+  },
+  household: {
+    per_dependent_u18: 2, max_dependents: 10, elder: 5,
+    lone_parent: 5, disability: 5, max_total: 20
+  },
+  accessibility: {
+    high: 10, moderate: 5, none: 0
+  },
+  rent_payment: {
+    excellent: 10, mostly: 6, occasional: 2, frequent: -5, no_history: 0
+  },
+  unit_condition: {
+    excellent: 5, good: 3, fair: 1, damage: -5, no_history: 0
+  },
+  tenancy_conduct: {
+    clean: 5, minor: 2, unresolved: -10, no_history: 0
+  },
+  income_stability: {
+    stable: 5, irregular: 2, none: 0
+  },
+  arrears: {
+    none: 5, cleared: 3, repayment: 1, no_repayment: -10
+  }
+};
+
+// Initialise liveV2ScoreModel from DEFAULT_V2_SCORE_MODEL if not yet set
+if (!window.liveV2ScoreModel || !Object.keys(window.liveV2ScoreModel).length) {
+  window.liveV2ScoreModel = JSON.parse(JSON.stringify(window.DEFAULT_V2_SCORE_MODEL));
 }
 
 // Initialise liveScoreModel from DEFAULT_SCORING_MODEL

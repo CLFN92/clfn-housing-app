@@ -57,7 +57,7 @@ function showSettings(){
   renderRenoScoreTable();
   setTimeout(renderBudgetPools, 50);
   // Apply role-based locks after render
-  setTimeout(applySettingsRoleLocks, 80);
+  setTimeout(applySettingsRoleLocks, 200);
 }
 
 // ── Finance Module ────────────────────────────────────────────────────────

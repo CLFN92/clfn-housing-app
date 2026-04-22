@@ -453,7 +453,8 @@ function getAppType() {
 
 // ── Settings role locks ──
 function applySettingsRoleLocks() {
-  var isED = (window.currentRole === ROLE.ED);
+  var role = window.currentRole || window._realRole || (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.role) || '';
+  var isED = (role === ROLE.ED);
   var locked = !isED;
 
   // Selectors for all score/budget editable inputs
