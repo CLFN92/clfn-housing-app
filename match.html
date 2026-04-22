@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<title>CLFN Housing — Inventory</title>
+<title>CLFN Housing — Match</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="shared.css"/>
 <link rel="stylesheet" href="housing.css"/>
@@ -140,7 +140,7 @@
   </div>
 </div>
 
-<div id="inventoryView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
+<div id="matchView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
   <div class="page-back-row">
     <button onclick="showDash()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -149,93 +149,96 @@
   </div>
   <div class="page-header-bar">
     <div class="phb-title">
-      <h1>Housing Inventory</h1>
-      <p>All <span id="inv_count">—</span> CLFN housing units — <span id="inv_vacant_count" style="color:#15803d;font-weight:600;">—</span> vacant</p>
-    </div>
-    <div class="phb-actions">
-      <input id="inv_search" class="std-filter-control" type="text" placeholder="🔍 Search address..." oninput="renderInventoryView()"/>
-      <select id="inv_filter_status" class="std-filter-control" onchange="renderInventoryView()">
-        <option value="">All Statuses</option><option value="vacant">Vacant</option><option value="occupied">Occupied</option><option value="under_repair">Under Repair</option><option value="reserved">Reserved</option><option value="condemned">Condemned</option><option value="archived">Archived</option>
-      </select>
-      <select id="inv_filter_type" class="std-filter-control" onchange="renderInventoryView()">
-        <option value="">All Types</option><option value="detached">Detached</option><option value="duplex">Duplex</option><option value="plex">Multi-unit</option><option value="complex">Complex</option><option value="mobile">Mobile</option>
-      </select>
-      <select id="inv_filter_access" class="std-filter-control" onchange="renderInventoryView()">
-        <option value="">Accessibility: All</option><option value="yes">Accessible Only</option><option value="no">Non-Accessible</option>
-      </select>
+      <h1>Housing Match</h1>
+      <p>Applicants ranked by score matched against vacant units</p>
     </div>
   </div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;" id="inv_stat_chips_row">
-    <div style="display:flex;gap:10px;flex-wrap:wrap;" id="inv_stat_chips"></div>
-    <button type="button" onclick="openAddUnitModal()" style="background:var(--yellow);border:none;color:#111;padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;margin-left:4px;">
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Unit
-    </button>
+  <div class="filter-bar">
+    <input id="match_search" class="std-filter-control" type="text" placeholder="🔍 Search applicant..." oninput="renderMatchView()"/>
+    <select id="match_filter_tier" class="std-filter-control" onchange="renderMatchView()">
+      <option value="">All Priority Tiers</option><option value="Critical Priority">Critical Priority</option><option value="High Priority">High Priority</option><option value="Medium Priority">Medium Priority</option><option value="Low Priority">Low Priority</option>
+    </select>
+    <select id="match_filter_status" class="std-filter-control" onchange="renderMatchView()">
+      <option value="">All Statuses</option><option value="submitted">Submitted</option><option value="ed_approved">ED Approved</option><option value="mgr_approved">Manager Approved</option>
+    </select>
+    <select id="match_filter_reserve" class="std-filter-control" onchange="renderMatchView()">
+      <option value="">All Reserve</option><option value="On Reserve">On Reserve</option><option value="Off Reserve">Off Reserve</option>
+    </select>
   </div>
-  <div class="std-table-card">
-    <div class="doclib-table-wrap">
-      <table class="std-table" style="min-width:640px;table-layout:fixed;">
-        <thead><tr>
-          <th>Address</th>
-          <th style="text-align:center;width:50px;">Beds</th>
-          <th style="text-align:center;width:50px;">Bath</th>
-          <th style="width:130px;">Type</th>
-          <th style="width:110px;">Foundation</th>
-          <th style="text-align:center;width:60px;">Access.</th>
-          <th style="width:80px;">Funder</th>
-          <th style="width:110px;">Status</th>
-          <th id="inv_reno_score_th" style="width:120px;">Reno Score</th>
-          <th style="width:80px;white-space:nowrap;"></th>
-        </tr></thead>
-        <tbody id="inv_tbody"><tr><td colspan="10" class="empty-state" style="padding:40px;text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
-      </table>
-    </div>
-  </div>
-</div></div><!-- end inventoryView -->
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;" id="match_chips"></div>
+  <div id="match_content"></div>
+</div></div><!-- end matchView -->
 
-<!-- ═══ MATCH VIEW ═══ -->
-<div id="addUnitModal" class="modal-overlay modal-z-800">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:580px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
+<!-- ═══ TENANTS VIEW ═══ -->
+<div id="assignUnitModal" class="modal-overlay modal-z-900" onclick="if(event.target===this)closeAssignModal()">
+  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:600px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
+
+    <!-- Header -->
     <div class="modal-hdr spacious">
-      <div class="panel-title">Add New Unit</div>
-      <button onclick="closeAddUnitModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;">✕</button>
-    </div>
-    <div style="padding:24px;display:flex;flex-direction:column;gap:13px;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;">
-        <div class="f"><label>Street Address <span class="r">*</span></label><input type="text" id="au_street" placeholder="e.g. Musko Road"/></div>
-        <div class="f"><label>Unit Number <span class="r">*</span></label><input type="text" id="au_num" placeholder="e.g. 11"/></div>
-        <div class="f"><label>Bedrooms</label><select id="au_bedrooms"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></div>
-        <div class="f"><label>Bathrooms</label><select id="au_bathrooms"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
-        <div class="f"><label>Type</label><select id="au_type"><option value="">— Select —</option><option value="detached unit">Detached</option><option value="duplex unit">Duplex</option><option value="4-plex unit">4-Plex</option><option value="5-plex unit">5-Plex</option><option value="6-plex unit">6-Plex</option><option value="complex">Complex</option><option value="mobile unit">Mobile</option></select></div>
-        <div class="f"><label>Foundation</label><select id="au_foundation"><option value="">— Select —</option><option value="basement">Basement</option><option value="crawlspace">Crawlspace</option><option value="Slab">Slab</option><option value="unknown">Unknown</option></select></div>
-        <div class="f"><label>Funder / Program</label><select id="au_funder"><option value="">None / Band</option><option value="ISC">ISC</option><option value="CMHC_95">CMHC Sec. 95</option><option value="CMHC_56">CMHC Sec. 56.1</option><option value="Other">Other</option></select></div>
-        <div class="f"><label>Phase</label><input type="text" id="au_phase" placeholder="e.g. 15"/></div>
-        <div class="f"><label>Year Built</label><input type="text" id="au_year" placeholder="e.g. 1998"/></div>
-      </div>
-      <div style="display:flex;gap:20px;">
-        <div class="ftog"><label class="tsw"><input type="checkbox" id="au_accessible"/><span class="tsl"></span></label><label for="au_accessible">Accessible ♿</label></div>
-        <div class="ftog"><label class="tsw"><input type="checkbox" id="au_isElders"/><span class="tsl"></span></label><label for="au_isElders">Elders Unit</label></div>
-      </div>
-      <div class="f"><label>Notes</label><textarea id="au_notes" rows="2" placeholder="Internal notes…"></textarea></div>
-      <!-- Photo upload -->
       <div>
-        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:8px;">Photos</label>
-        <div id="au_photo_preview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;min-height:0;"></div>
-        <div ondragover="photoDragOver(event,'au_drop_zone')" ondragleave="photoDragLeave('au_drop_zone')" ondrop="photoDrop(event,'add')"
-          id="au_drop_zone" class="upload-zone" class="p-16"
-          onclick="document.getElementById('au_photo_input').click()">
-          <div style="font-size:13px;color:var(--muted);">Drag photos or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
-          <input type="file" id="au_photo_input" accept="image/*" multiple onchange="handleAddUnitPhotoUpload(this)"/>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Housing Match</div>
+        <div class="panel-title">Assign Unit to Applicant</div>
+      </div>
+      <button onclick="closeAssignModal()" class="btn-close-sm">✕</button>
+    </div>
+
+    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:16px;">
+
+      <!-- Applicant summary strip -->
+      <div style="background:var(--bg);border-radius:10px;padding:14px 16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;border:1px solid var(--border);">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Applicant</div>
+          <div id="am_app_name" class="txt-md-bold"></div>
+          <div id="am_app_id"   style="font-size:11px;color:var(--muted);margin-top:1px;"></div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Score</div>
+          <div id="am_app_score"  class="txt-md-bold"></div>
+          <div id="am_app_status" style="font-size:11px;font-weight:700;margin-top:1px;"></div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Needs</div>
+          <div id="am_app_reqs" style="font-size:12px;color:var(--text);line-height:1.4;"></div>
         </div>
       </div>
+
+      <!-- Unit match list -->
+      <div class="card card-flush">
+        <div class="modal-hdr compact">
+          <div class="lbl-yellow">Available Units — Ranked by Match</div>
+          <div id="am_role_badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,0.1);color:#ccc;"></div>
+        </div>
+        <div id="am_unit_list"></div>
+      </div>
+
+      <!-- Selection / Override notes -->
+      <div id="am_override_wrap">
+        <div class="f">
+          <label><span id="am_notes_label" style="font-weight:700;">Selection Notes</span> <span id="am_notes_req_star" style="color:#b91c1c;display:none;">*</span></label>
+          <textarea id="am_override_notes" rows="2" placeholder="Notes…" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);resize:vertical;"></textarea>
+        </div>
+      </div>
+
+      <!-- Move-in date + warning -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end;">
+        <div class="f">
+          <label>Move-in / Occupancy Date</label>
+          <input type="date" id="am_movein_date" style="font-size:13px;"/>
+        </div>
+        <div id="am_warn" style="display:none;padding:10px 12px;border-radius:8px;font-size:11px;font-weight:600;"></div>
+      </div>
+
     </div>
-    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:var(--bg);">
-      <button onclick="closeAddUnitModal()" class="btn btn-ghost">Cancel</button>
-      <button onclick="saveNewUnit()" class="btn btn-primary">Add Unit</button>
+
+    <!-- Footer -->
+    <div class="flex-sb" style="padding:14px 24px;border-top:1px solid var(--border);background:var(--bg)">
+      <button onclick="closeAssignModal()" class="btn btn-ghost">Cancel</button>
+      <button onclick="confirmAssignment()" id="am_confirm_btn" class="btn btn-primary" style="background:var(--yellow);color:#111;opacity:.45;cursor:not-allowed;" disabled>Select a unit above</button>
     </div>
   </div>
 </div>
 
-<!-- tenantFilesPanel -->
+<!-- addUnitModal -->
 <div id="tenantFilesPanel" class="modal-overlay modal-overlay-centered modal-z-800" onclick="if(event.target===this)closeTenantFilesPanel()">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,0.35);overflow:hidden;">
     <!-- Header — sticky inside the flex column -->
@@ -254,60 +257,6 @@
 </div>
 
 <!-- unitDetailPanel -->
-<div id="unitDetailPanel" class="modal-overlay modal-z-750">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.35);margin:auto;">
-    <div class="modal-hdr sticky">
-      <div>
-        <div id="udp_address" class="panel-title"></div>
-        <div id="udp_type" style="font-size:11px;color:#888;margin-top:2px;"></div>
-      </div>
-      <button onclick="closeUnitDetail()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;">✕</button>
-    </div>
-    <div style="padding:20px;display:flex;flex-direction:column;gap:16px;">
-      <div id="udp_status_row" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
-      <div id="udp_tenant_section">
-        <div class="lbl-muted" style="margin-bottom:8px">Tenant</div>
-        <div id="udp_tenant_info" style="font-size:13px;font-weight:600;"></div>
-      </div>
-      <div id="udp_details" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;"></div>
-      <div id="udp_notes_section">
-        <div class="lbl-muted" style="margin-bottom:6px">Notes</div>
-        <div id="udp_notes" style="font-size:13px;color:var(--text);"></div>
-      </div>
-      <!-- Scopes of Work -->
-      <div id="udp_sow_section">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <div class="lbl-muted">Scopes of Work</div>
-          <button onclick="udpNewSow()" style="background:var(--yellow);border:none;color:#111;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:4px;">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            New SOW
-          </button>
-        </div>
-        <div id="udp_sow_table_wrap"></div>
-      </div>
-      <div><!-- Photos -->
-        <div class="lbl-muted" style="margin-bottom:8px">Photos</div>
-        <div id="udp_photos"></div>
-      </div>
-      <!-- Tenant files — DocLibrary preview (read-only). Click "Manage"
-           to open the full tenant-files modal with upload/delete. -->
-      <div id="udp_files_section">
-        <div class="flex-sb" class="mb-12">
-          <div class="lbl-muted">Tenant Files</div>
-          <button type="button" onclick="udpOpenFilesModal()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:var(--text);cursor:pointer;">Manage&nbsp;\u2197</button>
-        </div>
-        <div id="udp_files_mount"></div>
-      </div>
-      <div style="display:flex;gap:8px;">
-        <button onclick="openUnitEditFromDetail()" class="btn btn-primary" style="flex:1;">Edit Unit</button>
-        <button onclick="closeUnitDetail()" class="btn btn-ghost">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-
-<!-- sowModal -->
 <div id="sowModal" class="modal-overlay modal-z-900">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:700px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
 
@@ -854,6 +803,69 @@
 
 
 <!-- addTenantModal -->
+<div class="modal-ov" id="submitModal">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-hdr icon-row spacious">
+      <span class="modal-hdr-icon">📋</span>
+      <div>
+        <div class="modal-hdr-title">Submit Application?</div>
+        <div class="modal-hdr-sub">CLFN Housing Department</div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--muted);font-size:13px;line-height:1.6;margin:0 0 20px;">This will send the application to the Housing Manager for review. You will not be able to edit it after submission.</p>
+      <div class="modal-footer" style="padding:0;background:none;border:none;border-radius:0;">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="finalSubmit()">Confirm Submit →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ MATCH SCORECARD MODAL ═══ -->
+<div id="matchScorecardModal" class="modal-overlay modal-overlay-centered modal-z-900" style="display:none;" onclick="if(event.target===this)closeMatchScorecard()">
+  <div class="modal-body modal-body-sm" style="max-width:560px;">
+    <div class="modal-hdr">
+      <div>
+        <div id="msc_title" class="panel-title">Match Scorecard</div>
+        <div id="msc_app" class="txt-xs-dim" style="margin-top:2px;"></div>
+      </div>
+      <button onclick="closeMatchScorecard()" class="btn-close-sm">✕</button>
+    </div>
+    <div style="padding:20px;">
+      <!-- Unit + Score summary -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div class="lbl-muted" style="margin-bottom:3px;">Unit</div>
+          <div id="msc_unit" class="txt-sm-bold"></div>
+        </div>
+        <div style="text-align:right;">
+          <div id="msc_score" style="font-size:32px;font-weight:800;color:var(--yellow);line-height:1;"></div>
+          <div id="msc_pct" class="txt-xs-dim" style="margin-top:2px;"></div>
+        </div>
+      </div>
+      <!-- Score bar -->
+      <div style="height:6px;background:var(--border);border-radius:3px;margin-bottom:16px;overflow:hidden;">
+        <div id="msc_bar_fill" style="height:100%;width:0%;background:var(--yellow);border-radius:3px;transition:width .3s;"></div>
+      </div>
+      <!-- Breakdown table -->
+      <table class="std-tbl" style="margin-bottom:14px;">
+        <thead>
+          <tr style="background:var(--bg);">
+            <th class="js-th">Factor</th>
+            <th class="js-th" style="text-align:right;width:60px;">Score</th>
+            <th class="js-th" style="text-align:right;width:60px;">Max</th>
+          </tr>
+        </thead>
+        <tbody id="msc_rows"></tbody>
+      </table>
+      <!-- Flags -->
+      <div id="msc_flags" class="txt-xs-muted" style="line-height:1.7;"></div>
+    </div>
+  </div>
+</div>
+
 <div id="printPanel" style="display:none;position:fixed;inset:0;z-index:1100;">
   <div class="modal-hdr sticky">
     <span id="printPanelTitle" style="color:#fff;font-weight:700;font-size:14px;">Document Preview</span>
@@ -881,8 +893,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/emailjs-com/3.2.0/email.min.js"></script>
 <script>
-// ── inventory.html page init ──────────────────────────────────────────────────
-(async function initInventoryPage() {
+// ── match.html page init ─────────────────────────────────────────────────────
+(async function initMatchPage() {
   var token = sessionStorage.getItem('clfn_housing_token');
   if (!token) { window.location.href = 'index.html'; return; }
   var savedRole  = sessionStorage.getItem('clfn_housing_role') || 'housing_employee_l1';
@@ -895,16 +907,16 @@
   }
   window.currentRole = savedRole; window._realRole = savedRole;
   if (HOUSING_SESSION.email && typeof resolveHousingRole === 'function') {
-    try { await resolveHousingRole(); } catch(e) { console.warn('[inventory] role resolve:', e); }
+    try { await resolveHousingRole(); } catch(e) { console.warn('[match] role resolve:', e); }
   }
   var role = HOUSING_SESSION.role || savedRole;
   window.currentRole = role; window._realRole = role;
   if (typeof updateHeaderUser === 'function') updateHeaderUser(role);
   if (typeof updateRoleSwitcherVisibility === 'function') updateRoleSwitcherVisibility();
   if (typeof loadHousingData === 'function') {
-    try { await loadHousingData(); } catch(e) { console.warn('[inventory] data load error:', e); }
+    try { await loadHousingData(); } catch(e) { console.warn('[match] data load error:', e); }
   }
-  if (typeof showInventory === 'function') showInventory();
+  if (typeof showMatch === 'function') showMatch();
 }());
 </script>
 </div><!-- end content-area -->

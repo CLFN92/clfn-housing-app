@@ -2688,14 +2688,14 @@ function showInventory(){
   }
 }
 function showTenants(){
-  // Tenants lives in inventory.html
-  if(window.location.pathname.includes('inventory.html')) {
+  // Tenants lives in tenants.html
+  if(window.location.pathname.includes('tenants.html')) {
     if(!window._navSkipPush) pushNav('tenants');
     setExportView(null);
     setNavActive('tab_tenants');
     _showView('tenantsView', renderTenantsView);
   } else {
-    window.location.href = 'inventory.html?view=tenants';
+    window.location.href = 'tenants.html';
   }
 }
 function showWorklist() {
@@ -3327,15 +3327,15 @@ function showMatch(){
     showToast('Match module is not enabled for this nation.');
     return;
   }
-  // Match lives in inventory.html
-  if(window.location.pathname.includes('inventory.html')) {
+  // Match lives in match.html
+  if(window.location.pathname.includes('match.html')) {
     if(!window._navSkipPush) pushNav('match');
     setExportView('match');
     setNavActive('tab_match');
     window._matchActiveChip = '';
     _showView('matchView', renderMatchView);
   } else {
-    window.location.href = 'inventory.html?view=match';
+    window.location.href = 'match.html';
   }
 }
 
