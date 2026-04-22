@@ -1817,13 +1817,13 @@ function renderContractorsView(){
     var ss = ctStatusStyle[ct.status||'pending_review'] || {bg:'#f4f4f0',c:'#888',label:ct.status||'Unknown'};
     var classLabels = {internal_indigenous:'Internal — Indigenous',external_indigenous:'External — Indigenous',external_non_indigenous:'External — Non-Indigenous'};
     return '<div class="card ct-card" onclick="openCtApprovalPanel('+i+')" title="View application">'
-      +'<div class="ct-card-head">'
-        +'<div class="ct-card-icon">🧰</div>'
-        +'<div class="ct-card-body">'
-          +'<div class="ct-card-name">'+ct.name+'</div>'
-          +'<div class="ct-card-trade">'+(ct.trade||'General Contractor')+'</div>'
+      +'<div class="modal-hdr compact" style="border-radius:var(--radius) var(--radius) 0 0;margin:-24px -24px 16px -24px;">'
+        +'<div style="min-width:0;flex:1;">'
+          +'<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:3px;">Contractor Application</div>'
+          +'<div style="font-size:15px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+ct.name+'</div>'
+          +'<div style="font-size:11px;color:#888;margin-top:2px;">'+(ct.trade||'General Contractor')+'</div>'
         +'</div>'
-        +'<span class="std-pill" style="background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
+        +'<span class="std-pill" style="background:'+ss.bg+';color:'+ss.c+';flex-shrink:0;">'+ss.label+'</span>'
       +'</div>'
       +(ct.phone?'<div class="ct-card-info">📞 '+ct.phone+'</div>':'')
       +(ct.email?'<div class="ct-card-info">✉ '+ct.email+'</div>':'')
@@ -1846,9 +1846,9 @@ function renderContractorsView(){
       +'</div>'
       +'<div class="ct-card-actions">'
         +(ROLE.isManagement(role)
-          ?'<button type="button" class="ct-card-btn" onclick="event.stopPropagation();openCtApprovalPanel('+i+')">Review</button>'
+          ?'<button type="button" class="btn btn-ghost btn-sm btn-full" onclick="event.stopPropagation();openCtApprovalPanel('+i+')">Review</button>'
           :'')
-        +'<button type="button" class="ct-card-btn muted" onclick="event.stopPropagation();openAddContractorModal('+i+')">Edit</button>'
+        +'<button type="button" class="btn btn-ghost btn-sm btn-full" onclick="event.stopPropagation();openAddContractorModal('+i+')">Edit</button>'
       +'</div>'
       +'</div>';
   }).join('');

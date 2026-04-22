@@ -182,17 +182,15 @@
 </div>
 <div id="addContractorModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-    <div class="modal-hdr">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">
-        <div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Constance Lake First Nation — Housing</div>
-          <div id="ct_modal_title" style="font-size:15px;font-weight:700;color:#fff;">Contractor Application</div>
-        </div>
-        <button type="button" onclick="closeAddContractorModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;flex-shrink:0;margin-left:12px;">✕</button>
+    <div class="modal-hdr spacious">
+      <div>
+        <div class="modal-hdr-sub" style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Contractor Application</div>
+        <div id="ct_modal_title" class="modal-hdr-title">Edit Contractor</div>
       </div>
-      <div style="display:flex;gap:8px;">
-        <button type="button" id="ct_header_print_btn" onclick="printContractorAgreement()" style="background:none;border:1px solid #555;color:#ccc;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">🖨 Print / Save PDF</button>
-        <button type="button" id="ct_header_email_btn" onclick="emailContractorAgreement()" style="background:none;border:1px solid #555;color:#ccc;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">✉ Email to Contractor</button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button type="button" id="ct_header_print_btn" class="btn btn-ghost btn-sm" onclick="printContractorAgreement()">🖨 Print / Save PDF</button>
+        <button type="button" id="ct_header_email_btn" class="btn btn-ghost btn-sm" onclick="emailContractorAgreement()">✉ Email to Contractor</button>
+        <button type="button" onclick="closeAddContractorModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;flex-shrink:0;">✕</button>
       </div>
     </div>
     <div style="padding:24px;display:flex;flex-direction:column;gap:0;">
