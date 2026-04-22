@@ -6,14 +6,39 @@
       "statusCode": 200
     },
     {
-      "route": "/*",
-      "serve": "/index.html",
+      "route": "/housing.html",
+      "serve": "/housing.html",
+      "statusCode": 200
+    },
+    {
+      "route": "/inventory.html",
+      "serve": "/inventory.html",
+      "statusCode": 200
+    },
+    {
+      "route": "/match.html",
+      "serve": "/match.html",
+      "statusCode": 200
+    },
+    {
+      "route": "/tenants.html",
+      "serve": "/tenants.html",
+      "statusCode": 200
+    },
+    {
+      "route": "/renos.html",
+      "serve": "/renos.html",
+      "statusCode": 200
+    },
+    {
+      "route": "/finance.html",
+      "serve": "/finance.html",
       "statusCode": 200
     }
   ],
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["*.css", "*.js", "*.png", "*.jpg", "*.json"]
+    "exclude": ["*.css", "*.js", "*.png", "*.jpg", "*.json", "*.html"]
   },
   "mimeTypes": {
     ".html": "text/html",
