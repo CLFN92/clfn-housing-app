@@ -20,13 +20,14 @@
 'use strict';
 
 function showDash(){
-  var role = window.currentRole || 'housing_employee_l1';
-  if(ROLE.isManagement(role)) {
-    // HM and ED go to the home tile page with live stats
-    showEmployeeHome();
-  } else {
-    showEmployeeHome();
+  // If on a sub-page (inventory.html etc), navigate back to housing.html
+  if (!window.location.pathname.includes('housing.html') &&
+      !window.location.pathname.endsWith('/') &&
+      window.location.pathname !== '/') {
+    window.location.href = 'housing.html';
+    return;
   }
+  showEmployeeHome();
 }
 function showApp(){
   hideAllViews('appLayout');

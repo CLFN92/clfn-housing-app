@@ -2677,16 +2677,26 @@ function showContractorsForRole() {
   }
 }
 function showInventory(){
-  if(!window._navSkipPush) pushNav('inventory');
-  setExportView('inventory');
-  setNavActive('tab_inventory');
-  _showView('inventoryView', renderInventoryView);
+  // Inventory lives in inventory.html
+  if(window.location.pathname.includes('inventory.html')) {
+    if(!window._navSkipPush) pushNav('inventory');
+    setExportView('inventory');
+    setNavActive('tab_inventory');
+    _showView('inventoryView', renderInventoryView);
+  } else {
+    window.location.href = 'inventory.html?view=inventory';
+  }
 }
 function showTenants(){
-  if(!window._navSkipPush) pushNav('tenants');
-  setExportView(null);
-  setNavActive('tab_tenants');
-  _showView('tenantsView', renderTenantsView);
+  // Tenants lives in inventory.html
+  if(window.location.pathname.includes('inventory.html')) {
+    if(!window._navSkipPush) pushNav('tenants');
+    setExportView(null);
+    setNavActive('tab_tenants');
+    _showView('tenantsView', renderTenantsView);
+  } else {
+    window.location.href = 'inventory.html?view=tenants';
+  }
 }
 function showWorklist() {
   if(!window._navSkipPush) pushNav('worklist');
@@ -3317,11 +3327,16 @@ function showMatch(){
     showToast('Match module is not enabled for this nation.');
     return;
   }
-  if(!window._navSkipPush) pushNav('match');
-  setExportView('match');
-  setNavActive('tab_match');
-  window._matchActiveChip = '';
-  _showView('matchView', renderMatchView);
+  // Match lives in inventory.html
+  if(window.location.pathname.includes('inventory.html')) {
+    if(!window._navSkipPush) pushNav('match');
+    setExportView('match');
+    setNavActive('tab_match');
+    window._matchActiveChip = '';
+    _showView('matchView', renderMatchView);
+  } else {
+    window.location.href = 'inventory.html?view=match';
+  }
 }
 
 function showContractors(){
