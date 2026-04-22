@@ -1462,7 +1462,7 @@ function openAddContractorModal(editIdx){
     if(btn) btn.textContent = 'Add Contractor';
   }
   var acm=document.getElementById('addContractorModal');
-  if(acm){acm.style.removeProperty('display');acm.style.setProperty('display','flex','important');}
+  if(acm) acm.style.display = 'flex';
 }
 function openCtApprovalPanel(idx) {
   var contractors = [];

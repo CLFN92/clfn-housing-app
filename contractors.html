@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <title>CLFN Housing — Renovations &amp; Contractors</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="shared.css"/>
-<link rel="stylesheet" href="housing.css"/>
-<link rel="stylesheet" href="renos.css"/>
+<link rel="stylesheet" href="shared.css?v=1776894729"/>
+<link rel="stylesheet" href="housing.css?v=1776894729"/>
 <script src="shared.js"></script>
 <script src="shared-config.js"></script>
 <script src="shared-auth.js"></script>
@@ -81,7 +80,7 @@
 
 <div class="app-wrapper" id="appWrapper">
 <div class="content-area" id="renosContentArea">
-<div id="contractorsView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
+<div id="contractorsView" class="page-view-wide">
   <div class="page-back-row">
     <button onclick="showDash()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -94,113 +93,88 @@
       <p>Manage contractor directory and approval workflow</p>
     </div>
     <div class="phb-actions">
-      <button onclick="openAddContractorModal()" style="background:var(--yellow);border:none;color:#111;padding:8px 18px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Contractor
+      <button onclick="openAddContractorModal()" class="btn btn-primary">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Contractor
       </button>
     </div>
   </div>
-
-  <!-- Status filter tabs -->
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;" id="ct_filter_tabs">
-    <button onclick="ctSetFilter('')" id="ct_tab_all" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">All</button>
-    <button onclick="ctSetFilter('pending_review')" id="ct_tab_pending" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">⏳ Pending Review</button>
-    <button onclick="ctSetFilter('hm_recommended')" id="ct_tab_hm" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">📋 Awaiting ED</button>
-    <button onclick="ctSetFilter('approved')" id="ct_tab_approved" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">✅ Approved</button>
-    <button onclick="ctSetFilter('declined')" id="ct_tab_declined" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">❌ Declined</button>
+  <div class="ct-filter-bar" id="ct_filter_tabs">
+    <button onclick="ctSetFilter('')"               id="ct_tab_all"      class="btn btn-ghost ct-filter-tab">All</button>
+    <button onclick="ctSetFilter('pending_review')" id="ct_tab_pending"  class="btn btn-ghost ct-filter-tab">⏳ Pending Review</button>
+    <button onclick="ctSetFilter('hm_recommended')" id="ct_tab_hm"       class="btn btn-ghost ct-filter-tab">📋 Awaiting ED</button>
+    <button onclick="ctSetFilter('approved')"       id="ct_tab_approved" class="btn btn-ghost ct-filter-tab">✅ Approved</button>
+    <button onclick="ctSetFilter('declined')"       id="ct_tab_declined" class="btn btn-ghost ct-filter-tab">❌ Declined</button>
   </div>
-
   <div id="contractors_list" class="ct-card-grid"></div>
 </div><!-- end contractorsView -->
 
 <!-- ── Contractor Approval Panel (slide-in from right) ── -->
-<div id="ctApprovalPanel" style="display:none;position:fixed;inset:0;z-index:850;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:flex-end;overflow-y:auto;" onclick="if(event.target===this)closeCtApprovalPanel()">
-  <div style="background:var(--surface);width:100%;max-width:480px;height:100%;overflow-y:auto;box-shadow:-8px 0 40px rgba(0,0,0,0.3);display:flex;flex-direction:column;">
-    <!-- Panel header -->
+<div id="ctApprovalPanel" class="ct-panel-overlay" onclick="if(event.target===this)closeCtApprovalPanel()">
+  <div class="ct-panel-body">
     <div class="modal-hdr sticky">
       <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Contractor Application</div>
-        <div id="ctap_name" style="font-size:15px;font-weight:700;color:#fff;"></div>
-        <div id="ctap_trade" style="font-size:11px;color:#888;margin-top:1px;"></div>
+        <div class="ct-panel-supertitle">Contractor Application</div>
+        <div id="ctap_name" class="ct-panel-name"></div>
+        <div id="ctap_trade" class="ct-panel-trade"></div>
       </div>
-      <button onclick="closeCtApprovalPanel()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+      <button onclick="closeCtApprovalPanel()" class="btn-close-sm">✕</button>
     </div>
-
-    <!-- Status banner -->
-    <div id="ctap_status_banner" style="padding:10px 20px;font-size:12px;font-weight:700;text-align:center;"></div>
-
-    <!-- Panel body -->
-    <div style="padding:20px;flex:1;display:flex;flex-direction:column;gap:16px;">
-
-      <!-- Info summary -->
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Application Summary</div>
-        </div>
-        <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Phone</div><div id="ctap_phone" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Email</div><div id="ctap_email" style="color:var(--text);word-break:break-all;"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Classification</div><div id="ctap_class" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">HST #</div><div id="ctap_hst" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">WSIB</div><div id="ctap_wsib" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Insurance Expiry</div><div id="ctap_ins" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">TOR Agreed</div><div id="ctap_tor" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Submitted</div><div id="ctap_submitted" style="color:var(--text);"></div></div>
+    <div id="ctap_status_banner" class="ct-status-banner"></div>
+    <div class="ct-panel-content">
+      <!-- Application Summary -->
+      <div class="card ct-sec">
+        <div class="modal-hdr compact"><div class="ct-lbl-yellow">Application Summary</div></div>
+        <div class="ct-sec-grid-sm">
+          <div><div class="ct-lbl-upper-sm">Phone</div>        <div id="ctap_phone" class="ct-txt-val"></div></div>
+          <div><div class="ct-lbl-upper-sm">Email</div>        <div id="ctap_email" class="ct-txt-val-wrap"></div></div>
+          <div><div class="ct-lbl-upper-sm">Classification</div><div id="ctap_class" class="ct-txt-val"></div></div>
+          <div><div class="ct-lbl-upper-sm">HST #</div>         <div id="ctap_hst"   class="ct-txt-val"></div></div>
+          <div><div class="ct-lbl-upper-sm">WSIB</div>          <div id="ctap_wsib"  class="ct-txt-val"></div></div>
+          <div><div class="ct-lbl-upper-sm">Insurance Expiry</div><div id="ctap_ins" class="ct-txt-val"></div></div>
+          <div><div class="ct-lbl-upper-sm">TOR Agreed</div>   <div id="ctap_tor"    class="ct-txt-val"></div></div>
+          <div><div class="ct-lbl-upper-sm">Submitted</div>    <div id="ctap_submitted" class="ct-txt-val"></div></div>
         </div>
       </div>
-
-      <!-- Approval flow diagram -->
-      <div class="card" style="padding:14px;">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px;">Approval Flow</div>
-        <div id="ctap_flow" style="display:flex;align-items:center;gap:0;"></div>
+      <!-- Approval Flow -->
+      <div class="card ct-sec">
+        <div class="modal-hdr compact"><div class="ct-lbl-yellow">Approval Flow</div></div>
+        <div class="ct-sec-pad"><div id="ctap_flow" class="ct-flow-row"></div></div>
       </div>
-
-      <!-- Action buttons (role-gated) -->
-      <div id="ctap_actions" style="display:flex;flex-direction:column;gap:10px;"></div>
-
-      <!-- Notes input (shown when action needs notes) -->
-      <div id="ctap_notes_wrap" style="display:none;">
-        <div class="f">
-          <label>Notes / Reason <span id="ctap_notes_req" style="color:#b91c1c;"></span></label>
-          <textarea id="ctap_notes" rows="3" placeholder="Add notes explaining this decision…" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);resize:vertical;"></textarea>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <button id="ctap_confirm_btn" onclick="confirmCtAction()" class="btn btn-primary" style="flex:1;"></button>
-          <button onclick="cancelCtAction()" class="btn btn-ghost">Cancel</button>
-        </div>
+      <!-- Actions -->
+      <div id="ctap_actions"></div>
+      <!-- Audit Trail -->
+      <div class="card ct-sec">
+        <div class="modal-hdr compact"><div class="ct-lbl-yellow">Audit Trail</div></div>
+        <div id="ctap_audit" class="ct-audit-scroll"></div>
       </div>
-
-      <!-- Audit trail -->
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Audit Trail</div>
-        </div>
-        <div id="ctap_audit" style="padding:14px;display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;"></div>
-      </div>
-
     </div>
   </div>
 </div>
-<div id="addContractorModal" class="modal-overlay modal-z-800">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
+
+<div id="addContractorModal" class="ct-modal-overlay">
+  <div class="ct-modal-body">
+    <!-- Header -->
     <div class="modal-hdr spacious">
       <div>
-        <p class="modal-hdr-sub">Contractor Application</p>
-        <div id="ct_modal_title" class="panel-title">Edit Contractor</div>
+        <div class="ct-panel-supertitle">Contractor Application</div>
+        <div id="ct_modal_title" class="panel-title">Contractor Application</div>
       </div>
-      <div class="flex-end gap-8">
-        <button type="button" id="ct_header_print_btn" class="btn btn-ghost-dark btn-sm" onclick="printContractorAgreement()">🖨 Print / Save PDF</button>
-        <button type="button" id="ct_header_email_btn" class="btn btn-ghost-dark btn-sm" onclick="emailContractorAgreement()">✉ Email to Contractor</button>
+      <div class="ct-modal-actions">
+        <button type="button" id="ct_header_print_btn" class="ct-hdr-btn hidden" onclick="printContractorAgreement()">🖨 Print / Save PDF</button>
+        <button type="button" id="ct_header_email_btn" class="ct-hdr-btn hidden" onclick="emailContractorAgreement()">✉ Email to Contractor</button>
         <button type="button" onclick="closeAddContractorModal()" class="btn-close-sm">✕</button>
       </div>
     </div>
 
-    <div class="modal-body-pad ct-modal-form">
+    <!-- Form body -->
+    <div class="ct-modal-form-body">
 
       <!-- Company Information -->
-      <div class="card card-flush">
-        <div class="modal-hdr compact"><div class="lbl-yellow">Company Information</div></div>
-        <div class="sec-pad edit-grid-2">
-          <div class="f s2"><label>Company / Name <span class="r">*</span></label><input id="ct_name" type="text" placeholder="e.g. Northern Builds Ltd."/></div>
+      <div class="card ct-sec">
+        <div class="modal-hdr compact"><div class="ct-lbl-yellow">Company Information</div></div>
+        <div class="ct-sec-grid">
+          <div class="f ct-full-col"><label>Company / Name <span class="r">*</span></label><input id="ct_name" type="text" placeholder="e.g. Northern Builds Ltd."/></div>
           <div class="f"><label>Trade / Specialty</label>
             <select id="ct_trade">
               <option value="">— Select trade —</option>
@@ -219,212 +193,190 @@
       </div>
 
       <!-- Key People -->
-      <div class="card card-flush">
+      <div class="card ct-sec">
         <div class="modal-hdr compact flex-sb">
-          <div class="lbl-yellow">Key People</div>
+          <div class="ct-lbl-yellow">Key People</div>
           <button type="button" onclick="ctAddPerson()" class="btn btn-ghost btn-sm">+ Add Person</button>
         </div>
-        <div class="sec-pad">
-          <div id="ct_people_list" class="flex-col gap-8"></div>
-          <div id="ct_people_empty" class="txt-sm-muted">No key contacts added yet.</div>
+        <div class="ct-sec-pad">
+          <div id="ct_people_list" class="ct-people-list"></div>
+          <div id="ct_people_empty" class="ct-txt-sm-muted">No key contacts added yet.</div>
         </div>
       </div>
 
       <!-- WSIB -->
-      <div class="card card-flush">
-        <div class="modal-hdr compact"><div class="lbl-yellow">WSIB Clearance Certificate</div></div>
-        <div class="sec-pad" style="display:flex;flex-direction:column;gap:10px;">
+      <div class="card ct-sec">
+        <div class="modal-hdr compact"><div class="ct-lbl-yellow">WSIB Clearance Certificate</div></div>
+        <div class="ct-sec-col">
           <div class="edit-grid-2">
             <div class="f"><label>WSIB Account #</label><input id="ct_wsib_num" type="text" placeholder="1234567"/></div>
             <div class="f"><label>Expiry Date</label><input id="ct_wsib_expiry" type="date"/></div>
           </div>
-          <div id="ct_wsib_preview" class="flex-wrap gap-6"></div>
+          <div id="ct_wsib_preview" class="ct-upload-preview"></div>
           <div id="ct_wsib_drop" ondragover="ctFileDragOver(event,'ct_wsib_drop')" ondragleave="ctFileDragLeave('ct_wsib_drop')" ondrop="ctFileDrop(event,'wsib')" class="upload-zone" onclick="document.getElementById('ct_wsib_input').click()">
-            <div class="lbl-sm">📎 Upload WSIB Certificate &nbsp;<span class="lbl-yellow">browse</span></div>
+            <div class="ct-upload-label">📎 Upload WSIB Certificate &nbsp;<span class="lbl-yellow">browse</span></div>
           </div>
           <input type="file" id="ct_wsib_input" accept=".pdf,image/*" style="display:none;" onchange="ctFileUpload(this,'wsib')"/>
         </div>
       </div>
 
-      <!-- Liability Insurance -->
-      <div class="card card-flush">
-        <div class="modal-hdr compact"><div class="lbl-yellow">Liability Insurance</div></div>
-        <div class="sec-pad" style="display:flex;flex-direction:column;gap:10px;">
+      <!-- Insurance -->
+      <div class="card ct-sec">
+        <div class="modal-hdr compact"><div class="ct-lbl-yellow">Liability Insurance</div></div>
+        <div class="ct-sec-col">
           <div class="edit-grid-2">
             <div class="f"><label>Policy #</label><input id="ct_ins_policy" type="text" placeholder="Policy number"/></div>
             <div class="f"><label>Expiry Date</label><input id="ct_ins_expiry" type="date"/></div>
           </div>
-          <div id="ct_ins_preview" class="flex-wrap gap-6"></div>
+          <div id="ct_ins_preview" class="ct-upload-preview"></div>
           <div id="ct_ins_drop" ondragover="ctFileDragOver(event,'ct_ins_drop')" ondragleave="ctFileDragLeave('ct_ins_drop')" ondrop="ctFileDrop(event,'insurance')" class="upload-zone" onclick="document.getElementById('ct_ins_input').click()">
-            <div class="lbl-sm">📎 Upload Insurance Certificate &nbsp;<span class="lbl-yellow">browse</span></div>
+            <div class="ct-upload-label">📎 Upload Insurance Certificate &nbsp;<span class="lbl-yellow">browse</span></div>
           </div>
           <input type="file" id="ct_ins_input" accept=".pdf,image/*" style="display:none;" onchange="ctFileUpload(this,'insurance')"/>
         </div>
       </div>
 
       <!-- Other Documents -->
-      <div class="card card-flush">
-        <div class="modal-hdr compact"><div class="lbl-yellow">Other Documents</div></div>
-        <div class="sec-pad" style="display:flex;flex-direction:column;gap:10px;">
-          <div id="ct_other_preview" class="flex-wrap gap-6"></div>
+      <div class="card ct-sec">
+        <div class="modal-hdr compact"><div class="ct-lbl-yellow">Other Documents</div></div>
+        <div class="ct-sec-col">
+          <div id="ct_other_preview" class="ct-upload-preview"></div>
           <div id="ct_other_drop" ondragover="ctFileDragOver(event,'ct_other_drop')" ondragleave="ctFileDragLeave('ct_other_drop')" ondrop="ctFileDrop(event,'other')" class="upload-zone" onclick="document.getElementById('ct_other_input').click()">
-            <div class="lbl-sm">📎 Upload Other Documents &nbsp;<span class="lbl-yellow">browse</span></div>
+            <div class="ct-upload-label">📎 Upload Other Documents &nbsp;<span class="lbl-yellow">browse</span></div>
           </div>
           <input type="file" id="ct_other_input" multiple accept=".pdf,image/*,.doc,.docx" style="display:none;" onchange="ctFileUpload(this,'other')"/>
         </div>
       </div>
 
-<div class="card card-flush">
-        <div class="modal-hdr compact">
-          <div class="lbl-yellow">Notes</div>
-        </div>
-        <div class="sec-pad">
-          <textarea id="ct_notes" rows="3" placeholder="Rates, availability, past work, special conditions…" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);resize:vertical;"></textarea>
-        </div>
-      </div>
-
-      <!-- ── Business Classification ── -->
-      <div class="card card-flush">
-        <div class="modal-hdr compact">
-          <div class="lbl-yellow">Business Classification</div>
-        </div>
-        <div class="sec-pad" style="display:flex;flex-direction:column;gap:12px;">
-          <div style="font-size:12px;color:var(--muted);line-height:1.5;">Select all that apply. Indigenous-owned businesses receive procurement preference in accordance with CLFN purchasing policy.</div>
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);transition:border-color .15s;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="ctUpdateClassBorder(this)">
-              <input type="radio" id="ct_class_internal" name="ct_classification" value="internal_indigenous" style="margin-top:2px;flex-shrink:0;" onchange="ctUpdateClassBorders()"/>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">Internal — Indigenous</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px;">Band-owned enterprise or business majority-owned by a CLFN band member</div>
-              </div>
-            </label>
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);transition:border-color .15s;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="ctUpdateClassBorder(this)">
-              <input type="radio" id="ct_class_external_indigenous" name="ct_classification" value="external_indigenous" style="margin-top:2px;flex-shrink:0;" onchange="ctUpdateClassBorders()"/>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">External — Indigenous</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px;">Indigenous-owned business not affiliated with CLFN</div>
-              </div>
-            </label>
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);transition:border-color .15s;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="ctUpdateClassBorder(this)">
-              <input type="radio" id="ct_class_external" name="ct_classification" value="external_non_indigenous" style="margin-top:2px;flex-shrink:0;" onchange="ctUpdateClassBorders()"/>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">External — Non-Indigenous</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px;">Business with no Indigenous ownership</div>
-              </div>
-            </label>
+      <!-- Classification & Compliance -->
+      <div class="card ct-sec">
+        <div class="modal-hdr compact"><div class="ct-lbl-yellow">Classification &amp; Compliance</div></div>
+        <div class="ct-sec-col-gap12">
+          <div>
+            <div class="ct-lbl-muted">Contractor Classification</div>
+            <div id="ct_class_options" class="ct-sec-col">
+              <label class="ct-class-option"><input type="radio" name="ct_classification" value="internal_indigenous" onchange="ctUpdateClassBorder(this)"/><div class="ct-class-meta"><div class="ct-txt-xs-val">Internal — Indigenous</div><div class="ct-txt-sm-muted">CLFN member or Indigenous-owned business</div></div></label>
+              <label class="ct-class-option"><input type="radio" name="ct_classification" value="external_indigenous" onchange="ctUpdateClassBorder(this)"/><div class="ct-class-meta"><div class="ct-txt-xs-val">External — Indigenous</div><div class="ct-txt-sm-muted">Non-CLFN Indigenous business</div></div></label>
+              <label class="ct-class-option"><input type="radio" name="ct_classification" value="external_non_indigenous" onchange="ctUpdateClassBorder(this)"/><div class="ct-class-meta"><div class="ct-txt-xs-val">External — Non-Indigenous</div><div class="ct-txt-sm-muted">Non-Indigenous owned business</div></div></label>
+            </div>
+            <div id="ct_class_proof_row" class="f" style="display:none;"><label>Classification Proof / Notes</label><input id="ct_class_proof" type="text" placeholder="Optional — document number, notes"/></div>
           </div>
-          <div class="f" id="ct_class_proof_row" style="display:none;">
-            <label>Proof of Indigenous Ownership <span style="font-size:10px;color:var(--muted);">(optional — band registry, status card, or statutory declaration)</span></label>
-            <input type="text" id="ct_class_proof" placeholder="Document reference or attach via Other Documents"/>
+          <div class="ct-class-actions">
+            <input type="checkbox" id="ct_tor_agreed" onchange="ctUpdateClassBorder(this)"/>
+            <label for="ct_tor_agreed" class="ct-txt-sm-muted">I agree to the Terms of Reference below</label>
           </div>
         </div>
       </div>
 
-      <!-- ── Terms of Reference ── -->
-      <div class="card card-flush">
-        <div class="modal-hdr compact"
-          onclick="var b=document.getElementById('ct_tor_body');var c=document.getElementById('ct_tor_chev');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';">
-          <div class="lbl-yellow">Terms of Reference</div>
-          <svg id="ct_tor_chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
+      <!-- Terms of Reference -->
+      <div class="card ct-sec">
+        <div class="modal-hdr compact" class="ct-tor-toggle" onclick="var b=document.getElementById('ct_tor_body');var a=this.querySelector('.ct-tor-arrow');if(b.style.display==='block'){b.style.display='none';a.style.transform='';}else{b.style.display='block';a.style.transform='rotate(90deg)';}">
+          <div class="ct-lbl-yellow">Terms of Reference</div>
+          <svg class="ct-tor-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
-        <div id="ct_tor_body" style="display:none;padding:18px 20px;font-size:12px;color:var(--text);line-height:1.7;">
-          <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;">Constance Lake First Nation — Housing Department</p>
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">1. Scope of Engagement</div>
-              <p style="font-size:12px;color:var(--muted);">The contractor agrees to perform only the work described in the approved Scope of Work (SOW) issued by the CLFN Housing Department. No work beyond the approved SOW may commence without written amendment signed by the Housing Manager or Executive Director.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">2. Licensing &amp; Insurance</div>
-              <p style="font-size:12px;color:var(--muted);">The contractor warrants that it holds all required trade licences, WSIB clearance, and liability insurance in force for the duration of the work. Expiry of any required coverage automatically suspends the right to work on CLFN property until coverage is reinstated and verified.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">3. Invoicing &amp; Payment</div>
-              <p style="font-size:12px;color:var(--muted);">Invoices must reference the SOW number, unit address, and work completed. Payment is subject to satisfactory inspection by the Housing Manager. CLFN's standard payment terms are Net 30 days from invoice approval. Holdback provisions apply as per the Construction Act (Ontario).</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">4. On-Reserve Conduct</div>
-              <p style="font-size:12px;color:var(--muted);">The contractor and all workers must conduct themselves respectfully on reserve lands. CLFN reserves the right to remove any individual from the reserve for misconduct. Alcohol, drugs, and firearms are prohibited on all work sites. All workers must check in with the Housing Department on first arrival.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">5. Deficiency &amp; Warranty</div>
-              <p style="font-size:12px;color:var(--muted);">The contractor guarantees all labour and materials for a minimum of one (1) year from the date of completion. Any deficiencies identified during inspection must be rectified within 30 days at no additional cost to CLFN.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">6. Indigenous Procurement Priority</div>
-              <p style="font-size:12px;color:var(--muted);">CLFN is committed to economic reconciliation. Where qualified, Indigenous-owned businesses are given preference in contract awards. Classification provided on this form is subject to verification and must be accurate. Misrepresentation of Indigenous status may result in termination of the engagement and removal from the approved contractor list.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">7. Termination</div>
-              <p style="font-size:12px;color:var(--muted);">CLFN may terminate the engagement with 5 days written notice for convenience, or immediately for cause (including safety violations, misconduct, or material breach of these terms). The contractor is entitled to payment only for work satisfactorily completed to the date of termination.</p>
-            </div>
+        <div id="ct_tor_body" class="ct-tor-body">
+          <div class="ct-tor-lbl">Constance Lake First Nation — Housing Contractor Terms of Reference</div>
+          <div class="ct-sec-col">
+            <div class="ct-tor-clause"><div class="ct-txt-xs-val">1. Compliance with Laws</div><div class="ct-txt-sm-muted">The contractor agrees to comply with all applicable federal, provincial, and municipal laws...</div></div>
+            <div class="ct-tor-clause"><div class="ct-txt-xs-val">2. Insurance &amp; WSIB</div><div class="ct-txt-sm-muted">Valid liability insurance and WSIB clearance must be maintained throughout the engagement.</div></div>
+            <div class="ct-tor-clause"><div class="ct-txt-xs-val">3. Indigenous Procurement</div><div class="ct-txt-sm-muted">CLFN prioritizes Indigenous-owned businesses and encourages subcontracting to community members.</div></div>
+            <div class="ct-tor-clause"><div class="ct-txt-xs-val">4. Community Conduct</div><div class="ct-txt-sm-muted">All personnel must conduct themselves respectfully on CLFN territory at all times.</div></div>
+            <div class="ct-tor-clause"><div class="ct-txt-xs-val">5. Confidentiality</div><div class="ct-txt-sm-muted">Contractor agrees to keep all resident and community information strictly confidential.</div></div>
+            <div class="ct-tor-clause"><div class="ct-txt-xs-val">6. Dispute Resolution</div><div class="ct-txt-sm-muted">Any disputes will be resolved through CLFN internal processes before external arbitration.</div></div>
+            <div class="ct-tor-clause"><div class="ct-txt-xs-val">7. Environmental Responsibility</div><div class="ct-txt-sm-muted">Work must comply with environmental standards; hazardous materials must be disposed of properly.</div></div>
           </div>
-          <div style="margin-top:16px;padding:10px 14px;background:rgba(248,228,26,0.07);border:1px solid var(--yellow);border-radius:8px;">
-            <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
-              <input type="checkbox" id="ct_tor_agreed" style="margin-top:2px;flex-shrink:0;"/>
-              <span style="font-size:12px;color:var(--text);">I have read, understood, and agree to these Terms of Reference on behalf of the contractor named above.</span>
-            </label>
-          </div>
+          <div class="ct-tor-note"><div class="ct-txt-sm-muted">This agreement becomes binding upon submission and CLFN approval of this contractor application.</div></div>
         </div>
       </div>
 
-      <!-- ── Signatures ── -->
-      <div class="card card-flush">
-        <div class="modal-hdr compact">
-          <div class="lbl-yellow">Signatures</div>
-        </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
-          <div style="font-size:12px;color:var(--muted);">By signing below, both parties acknowledge the accuracy of the information provided and agreement to the Terms of Reference above.</div>
+      <!-- Signatures -->
+      <div class="card ct-sec-last">
+        <div class="modal-hdr compact"><div class="ct-lbl-yellow">Signatures</div></div>
+        <div class="ct-sec-col-lg">
+          <div class="ct-txt-sm-muted">By signing below, both parties acknowledge the accuracy of the information provided and agreement to the Terms of Reference above.</div>
 
-          <!-- CLFN Employee signature -->
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-              <div style="width:26px;height:26px;border-radius:50%;background:#1d4ed8;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">HM</div>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">CLFN Housing Staff</div>
-                <div style="font-size:10px;color:var(--muted);">Employee taking this application</div>
-              </div>
+          <!-- CLFN Staff signature -->
+          <div class="ct-sig-block">
+            <div class="ct-sig-header">
+              <div class="ct-sig-avatar-hm">HM</div>
+              <div><div class="ct-txt-sm-val">CLFN Housing Staff</div><div class="ct-txt-xs-muted">Employee taking this application</div></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <div class="ct-sig-grid">
               <div class="f"><label>Printed Name</label><input type="text" id="ct_sig_staff_name" placeholder="Full name"/></div>
               <div class="f"><label>Date</label><input type="date" id="ct_sig_staff_date"/></div>
             </div>
-            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','canvas')" id="ct_sig_canvas_staff_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','type')" id="ct_sig_canvas_staff_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','wet')" id="ct_sig_canvas_staff_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="ct_sig_canvas_staff_panel_canvas" style="background:#fafaf8;"><canvas id="ct_sig_canvas_staff" width="560" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;border-radius:0;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('ct_sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="ct_sig_canvas_staff_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="ct_sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="ct_sig_canvas_staff_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="ct_sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+            <div class="ct-sig-wrap">
+              <div class="ct-sig-tabs">
+                <button type="button" onclick="setSigMethod('ct_sig_canvas_staff','canvas')" id="ct_sig_canvas_staff_tab_canvas" class="ct-sig-tab active">✏️ Draw</button>
+                <button type="button" onclick="setSigMethod('ct_sig_canvas_staff','type')"   id="ct_sig_canvas_staff_tab_type"   class="ct-sig-tab">⌨️ Type</button>
+                <button type="button" onclick="setSigMethod('ct_sig_canvas_staff','wet')"    id="ct_sig_canvas_staff_tab_wet"    class="ct-sig-tab">🖊 Wet / E-Sign</button>
+              </div>
+              <div id="ct_sig_canvas_staff_panel_canvas" class="ct-sig-panel">
+                <canvas id="ct_sig_canvas_staff" width="560" height="90" class="ct-sig-canvas"></canvas>
+                <div class="ct-sig-canvas-foot"><span class="ct-txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('ct_sig_canvas_staff')" class="ct-sig-clear">Clear</button></div>
+              </div>
+              <div id="ct_sig_canvas_staff_panel_type" class="ct-sig-panel hidden">
+                <input type="text" id="ct_sig_canvas_staff_typed" placeholder="Type full legal name" class="ct-sig-typed"/>
+                <div class="ct-sig-note">Typing your name constitutes a legal electronic signature</div>
+              </div>
+              <div id="ct_sig_canvas_staff_panel_wet" class="ct-sig-panel hidden">
+                <div class="ct-sig-wet-note">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div>
+                <input type="text" id="ct_sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" class="ct-sig-wet-input"/>
+              </div>
+            </div>
           </div>
 
           <!-- Contractor signature -->
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-              <div style="width:26px;height:26px;border-radius:50%;background:var(--yellow);color:#111;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">CT</div>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">Contractor Representative</div>
-                <div style="font-size:10px;color:var(--muted);">Authorized signatory for the contracting business</div>
-              </div>
+          <div class="ct-sig-block">
+            <div class="ct-sig-header">
+              <div class="ct-sig-avatar-ct">CT</div>
+              <div><div class="ct-txt-sm-val">Contractor Representative</div><div class="ct-txt-xs-muted">Authorized signatory for the contracting business</div></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <div class="ct-sig-grid">
               <div class="f"><label>Printed Name</label><input type="text" id="ct_sig_ct_name" placeholder="Full name"/></div>
               <div class="f"><label>Title / Role</label><input type="text" id="ct_sig_ct_title" placeholder="e.g. Owner, Project Manager"/></div>
               <div class="f"><label>Date</label><input type="date" id="ct_sig_ct_date"/></div>
             </div>
-            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','canvas')" id="ct_sig_canvas_ct_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','type')" id="ct_sig_canvas_ct_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','wet')" id="ct_sig_canvas_ct_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="ct_sig_canvas_ct_panel_canvas" style="background:#fafaf8;"><canvas id="ct_sig_canvas_ct" width="560" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;border-radius:0;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('ct_sig_canvas_ct')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="ct_sig_canvas_ct_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="ct_sig_canvas_ct_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="ct_sig_canvas_ct_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="ct_sig_canvas_ct_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+            <div class="ct-sig-wrap">
+              <div class="ct-sig-tabs">
+                <button type="button" onclick="setSigMethod('ct_sig_canvas_ct','canvas')" id="ct_sig_canvas_ct_tab_canvas" class="ct-sig-tab active">✏️ Draw</button>
+                <button type="button" onclick="setSigMethod('ct_sig_canvas_ct','type')"   id="ct_sig_canvas_ct_tab_type"   class="ct-sig-tab">⌨️ Type</button>
+                <button type="button" onclick="setSigMethod('ct_sig_canvas_ct','wet')"    id="ct_sig_canvas_ct_tab_wet"    class="ct-sig-tab">🖊 Wet / E-Sign</button>
+              </div>
+              <div id="ct_sig_canvas_ct_panel_canvas" class="ct-sig-panel">
+                <canvas id="ct_sig_canvas_ct" width="560" height="90" class="ct-sig-canvas"></canvas>
+                <div class="ct-sig-canvas-foot"><span class="ct-txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('ct_sig_canvas_ct')" class="ct-sig-clear">Clear</button></div>
+              </div>
+              <div id="ct_sig_canvas_ct_panel_type" class="ct-sig-panel hidden">
+                <input type="text" id="ct_sig_canvas_ct_typed" placeholder="Type full legal name" class="ct-sig-typed"/>
+                <div class="ct-sig-note">Typing your name constitutes a legal electronic signature</div>
+              </div>
+              <div id="ct_sig_canvas_ct_panel_wet" class="ct-sig-panel hidden">
+                <div class="ct-sig-wet-note">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div>
+                <input type="text" id="ct_sig_canvas_ct_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" class="ct-sig-wet-input"/>
+              </div>
+            </div>
           </div>
 
         </div>
       </div>
 
-    </div>
-    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);">
-      <div class="flex-end gap-8">
-        <button type="button" id="ct_print_btn" onclick="printContractorAgreement()" style="display:none;background:none;border:1.5px solid var(--border);color:var(--text);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">🖨 Print / Save PDF</button>
-        <button type="button" id="ct_email_btn" onclick="emailContractorAgreement()" style="display:none;background:none;border:1.5px solid var(--border);color:var(--text);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">✉ Email to Contractor</button>
+    </div><!-- end form body -->
+
+    <!-- Footer -->
+    <div class="ct-modal-footer">
+      <div class="ct-modal-actions">
+        <button type="button" id="ct_print_btn" class="ct-hdr-btn hidden" onclick="printContractorAgreement()">🖨 Print / Save PDF</button>
+        <button type="button" id="ct_email_btn" class="ct-hdr-btn hidden" onclick="emailContractorAgreement()">✉ Email to Contractor</button>
       </div>
-          </div>
-<div style="display:flex;gap:10px;">
+      <div class="flex-end gap-8">
         <button type="button" onclick="closeAddContractorModal()" class="btn btn-ghost">Cancel</button>
         <button type="button" id="ct_save_btn" onclick="saveContractorAndFinalize()" class="btn btn-primary">Save &amp; Finalize</button>
       </div>
     </div>
-  </div>
+
+  </div><!-- end ct-modal-body -->
+</div><!-- end addContractorModal -->
 </div><!-- end content-area -->
 </div><!-- end app-wrapper -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
