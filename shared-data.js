@@ -1019,6 +1019,7 @@ function closeAddContractorModal(){
 function closeCtApprovalPanel() {
   var panel = document.getElementById('ctApprovalPanel');
   if(panel) panel.style.display='none';
+  document.body.style.overflow = '';
   _ctApprovalIdx = -1;
   _ctPendingAction = null;
 }
@@ -1512,7 +1513,8 @@ function openCtApprovalPanel(idx) {
   // Render audit trail
   _ctRenderAudit(ct.id);
 
-  // Show panel
+  // Show panel — lock body scroll so page doesn't shift when scrollbar disappears
+  document.body.style.overflow = 'hidden';
   var panel = document.getElementById('ctApprovalPanel');
   if(panel){ panel.style.removeProperty('display'); panel.style.setProperty('display','flex','important'); }
 }
@@ -1817,7 +1819,7 @@ function renderContractorsView(){
     return '<div class="card ct-card" onclick="openCtApprovalPanel('+i+')" title="View application">'
       +'<div class="ct-card-head">'
         +'<div class="ct-card-icon">🧰</div>'
-        +'<div style="flex:1;min-width:0;">'
+        +'<div class="ct-card-body">'
           +'<div class="ct-card-name">'+ct.name+'</div>'
           +'<div class="ct-card-trade">'+(ct.trade||'General Contractor')+'</div>'
         +'</div>'
