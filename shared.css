@@ -910,10 +910,9 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 
 .ct-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 320px));
   gap: 14px;
-  max-width: 900px;   /* caps at ~3 cards wide, keeps them centred */
-  margin: 0 auto;
+  justify-content: center;   /* centres the track when fewer cards than columns */
   width: 100%;
 }
 

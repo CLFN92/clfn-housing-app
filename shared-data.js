@@ -1848,7 +1848,7 @@ function renderContractorsView(){
           ?'<button type="button" onclick="event.stopPropagation();openCtApprovalPanel('+i+')" style="flex:1;background:none;border:1px solid var(--border);color:var(--text);padding:5px 0;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;">Review</button>'
           :'')
         +'<button type="button" onclick="event.stopPropagation();openAddContractorModal('+i+')" style="flex:1;background:none;border:1px solid var(--border);color:var(--muted);padding:5px 0;border-radius:6px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;">Edit</button>'
-        +'<button type="button" onclick="event.stopPropagation();deleteContractor('+i+')" style="background:none;border:1px solid var(--border);color:#b91c1c;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;">✕</button>'
+
       +'</div>'
       +'</div>';
   }).join('');
