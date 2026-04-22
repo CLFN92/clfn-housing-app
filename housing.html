@@ -9187,6 +9187,18 @@ async function loadAppDataFromSupabase() {
       rescoreAllApplications();
       console.log('[CLFN] Rescored '+applications.length+' applications on V2 model');
     }
+
+    // Re-render dashboard if it's currently visible (fixes timing: data arrives after render)
+    var dv = document.getElementById('dashView');
+    if(dv && dv.style.display !== 'none') {
+      if(typeof updateDashStats === 'function') updateDashStats();
+      if(typeof renderDashTable === 'function') renderDashTable();
+    }
+    // Re-render worklist if visible
+    var wv = document.getElementById('worklistView');
+    if(wv && wv.style.display !== 'none') {
+      if(typeof renderWorklist === 'function') renderWorklist();
+    }
   } catch(e) {
     console.error('[CLFN Housing] loadAppData failed:',e);
     console.warn('[CLFN] Could not load data — using cached version');

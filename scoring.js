@@ -26,10 +26,14 @@
 
 'use strict';
 
+// ── Core data arrays (shared across all housing functions) ──────────────────
+window.applications = window.applications || [];
+window.housingUnits = window.housingUnits || [];
+
 // ── Mutable model references (populated from Supabase on login) ───────────────
-window.liveV2ScoreModel = {};
-window.liveV2Tiers      = { critical: 80, high: 60, medium: 40 };
-window.liveScoreModel   = null; // set after DEFAULT_SCORING_MODEL is declared below
+window.liveV2ScoreModel = window.liveV2ScoreModel || {};
+window.liveV2Tiers      = window.liveV2Tiers      || { critical: 80, high: 60, medium: 40 };
+window.liveScoreModel   = window.liveScoreModel   || null;
 
 var SCORING_MODEL_KEY = 'clfn_scoring_model';
 
@@ -1465,6 +1469,13 @@ window._openScoreById=function(id){
 };
 
 // ── Tier/score helpers ──
+function scoreMiniBar(score) {
+  var pct = Math.min(100, Math.max(0, Math.round((score || 0) / 100 * 100)));
+  var color = score >= 80 ? '#b91c1c' : score >= 60 ? '#1d4ed8' : score >= 40 ? '#7a6000' : '#15803d';
+  return '<div style="height:3px;width:48px;background:var(--border);border-radius:2px;margin-top:3px;">'
+       + '<div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:2px;"></div></div>';
+}
+
 function tierColor(tier){
   if(tier==='Critical Priority')return{bg:'#f0fdf4',c:'#15803d'};
   if(tier==='High Priority')return{bg:'#e8eef5',c:'#1e3a5f'};
@@ -1599,6 +1610,22 @@ var CRITICAL_SOW_CATS = ['Heating / HVAC','Electrical','Roofing','Windows & Door
 
 // ══ END RENOVATION BUDGET APPROVAL ═══════════════════════════════════════════
 
+
+// ── rescoreAllApplications ────────────────────────────────────────────────────
+// Re-score every application in the global array using the current V2 model.
+// Called after scoring model changes or on data load.
+async function rescoreAllApplications() {
+  if (!window.applications || !window.applications.length) return;
+  window.applications.forEach(function(app) {
+    try {
+      var result = scoreApplicationLocally(app);
+      if (result) {
+        app.score = result.score;
+        app.tier  = result.tier;
+      }
+    } catch(e) { /* skip individual failures silently */ }
+  });
+}
 
 // ── Default model initialisers ────────────────────────────────────────────────
 // These are used only when Supabase settings haven't loaded yet.
