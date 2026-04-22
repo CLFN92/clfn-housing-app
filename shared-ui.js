@@ -136,12 +136,10 @@ function hideAllViews(keepId) {
 // Show target view first (before hiding others) so there's never a blank frame.
 function _showView(id, renderFn) {
   var el = document.getElementById(id);
-  // Use 'flex' only if the element's CSS class defines flex layout (dash-view does)
-  // Setting flexDirection inline was overriding margin:0 auto centering
-  var display = el && el.classList.contains('dash-view') ? 'flex' : 'block';
-  if (el) { el.style.display = display; el.style.flexDirection = ''; }
+  // All views use flex layout (flex-direction:column is in their inline style)
+  if (el) { el.style.display = 'flex'; }
   hideAllViews(id);
-  if (el) { el.style.display = display; el.style.flexDirection = ''; }
+  if (el) { el.style.display = 'flex'; }
   if (typeof renderFn === 'function') renderFn();
 }
 

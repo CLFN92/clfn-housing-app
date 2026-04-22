@@ -223,7 +223,7 @@ body {
 .dash-view {
   display: flex; padding: 20px 16px; flex-direction: column;
   gap: 16px; width: 100%; box-sizing: border-box;
-  max-width: 1200px; margin: 0 auto; align-self: center;
+  max-width: 1200px; margin: 0 auto;
 }
 
 
