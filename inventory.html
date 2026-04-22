@@ -142,7 +142,7 @@
 
 <div id="inventoryView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
   <div class="page-back-row">
-    <button onclick="goBack()" class="back-btn-yellow">
+    <button onclick="showDash()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
     </button>
@@ -195,7 +195,7 @@
 <!-- ═══ MATCH VIEW ═══ -->
 <div id="matchView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
   <div class="page-back-row">
-    <button onclick="goBack()" class="back-btn-yellow">
+    <button onclick="showDash()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
     </button>
@@ -225,7 +225,7 @@
 <!-- ═══ TENANTS VIEW ═══ -->
 <div id="tenantsView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
   <div class="page-back-row">
-    <button onclick="goBack()" class="back-btn-yellow">
+    <button onclick="showDash()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
     </button>
@@ -1173,31 +1173,24 @@
   window.currentRole = savedRole;
   window._realRole   = savedRole;
 
-  // Update header UI
-  if (typeof updateHeaderUser === 'function') updateHeaderUser(savedRole);
+  // Resolve real role from Supabase staff table (sessionStorage value is stale)
+  if (HOUSING_SESSION.email && typeof resolveHousingRole === 'function') {
+    try { await resolveHousingRole(); } catch(e) { console.warn('[inventory] role resolve:', e); }
+  }
+  var role = HOUSING_SESSION.role || savedRole;
+  window.currentRole = role;
+  window._realRole   = role;
+
+  // Update header UI with resolved role
+  if (typeof updateHeaderUser === 'function') updateHeaderUser(role);
   if (typeof updateRoleSwitcherVisibility === 'function') updateRoleSwitcherVisibility();
 
-  // Load data
-  try {
-    if (typeof sbLoadApplications === 'function') {
-      var apps = await sbLoadApplications(); if (apps) window.applications = apps;
-    }
-    if (typeof sbLoadUnits === 'function') {
-      var units = await sbLoadUnits(); if (units) window.housingUnits = units;
-    }
-    if (typeof sbLoadContractors === 'function') {
-      var ctrs = await sbLoadContractors(); if (ctrs) window._contractors = ctrs;
-    }
-    // Load settings
-    var stR = await fetch(SUPABASE_URL + '/rest/v1/housing_settings?select=key,value',
-      { headers: HOUSING_HEADERS });
-    if (stR.ok) {
-      var stD = await stR.json();
-      window._appSettings = {};
-      stD.forEach(function(r) { window._appSettings[r.key] = r.value; });
-      if (window._appSettings['scoring_model_v2']) window.liveV2ScoreModel = window._appSettings['scoring_model_v2'];
-    }
-  } catch(e) { console.warn('[inventory] data load error:', e); }
+  // Load all data via shared loader — includes SOW cache, settings, rescore.
+  // Replaces the earlier per-fetch block which was missing SOW data,
+  // causing the inventory table to render empty.
+  if (typeof loadHousingData === 'function') {
+    try { await loadHousingData(); } catch(e) { console.warn('[inventory] data load error:', e); }
+  }
 
   // Show the right view
   var params = new URLSearchParams(window.location.search);

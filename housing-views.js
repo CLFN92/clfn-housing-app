@@ -31,8 +31,9 @@ function showDash(){
     path === '';
   console.log('[showDash] pathname=' + path + ' onHousingHome=' + onHousingHome);
   if (!onHousingHome) {
+    // Navigate to housing.html landing page (tile grid, not the applications dashboard).
     // Absolute path avoids any relative-URL ambiguity from query strings.
-    window.location.href = '/housing.html';
+    window.location.href = '/housing.html?view=home';
     return;
   }
   showEmployeeHome();

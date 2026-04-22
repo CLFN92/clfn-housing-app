@@ -2050,13 +2050,14 @@ function initHousingPage() {
   // Navigate to requested view from URL param
   var params = new URLSearchParams(window.location.search);
   var view = params.get('view') || 'dashboard';
-  if(view==='newapp')          { if(typeof newApp==='function') newApp(); }
-  else if(view==='worklist')   { if(true) showWorklist(); }
-  else if(view==='inventory')  { if(true) showInventory(); }
-  else if(view==='match')      { if(true) showMatch(); }
-  else if(view==='tenants')    { if(true) showTenants(); }
-  else if(view==='settings')   { if(typeof showSettings==='function') showSettings(); }
-  else if(view==='contractors'){ if(true) showContractors(); }
+  if(view==='home')             { if(typeof showEmployeeHome==='function') showEmployeeHome(); }
+  else if(view==='newapp')      { if(typeof newApp==='function') newApp(); }
+  else if(view==='worklist')    { if(true) showWorklist(); }
+  else if(view==='inventory')   { if(true) showInventory(); }
+  else if(view==='match')       { if(true) showMatch(); }
+  else if(view==='tenants')     { if(true) showTenants(); }
+  else if(view==='settings')    { if(typeof showSettings==='function') showSettings(); }
+  else if(view==='contractors') { if(true) showContractors(); }
   else                          { if(typeof showDashboard==='function') showDashboard(); else if(true) showWorklist(); }
 }
 
