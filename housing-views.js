@@ -20,11 +20,19 @@
 'use strict';
 
 function showDash(){
-  // If on a sub-page (inventory.html etc), navigate back to housing.html
-  if (!window.location.pathname.includes('housing.html') &&
-      !window.location.pathname.endsWith('/') &&
-      window.location.pathname !== '/') {
-    window.location.href = 'housing.html';
+  // If we're on a sub-page (inventory.html, renos.html, finance.html, etc.)
+  // we need to navigate back to housing.html — the dashboard view only
+  // exists there. Otherwise, render the home view in-place.
+  var path = window.location.pathname || '';
+  var onHousingHome =
+    path.endsWith('/housing.html') ||
+    path === '/housing.html' ||
+    path.endsWith('/') ||
+    path === '';
+  console.log('[showDash] pathname=' + path + ' onHousingHome=' + onHousingHome);
+  if (!onHousingHome) {
+    // Absolute path avoids any relative-URL ambiguity from query strings.
+    window.location.href = '/housing.html';
     return;
   }
   showEmployeeHome();
@@ -803,6 +811,18 @@ window._currentExportView = null; // set by each showXxx function
 
 
 function showEmployeeHome(){
+  // If we're on a sub-page (inventory.html, etc.), the employeeHomeView
+  // DOM element doesn't exist here — navigate back to housing.html instead
+  // of trying to render into a non-existent element (which would leave the
+  // page blank).
+  if (!document.getElementById('employeeHomeView')) {
+    if (!window.location.pathname.includes('housing.html') &&
+        !window.location.pathname.endsWith('/') &&
+        window.location.pathname !== '/') {
+      window.location.href = 'housing.html';
+      return;
+    }
+  }
   if(!window._navSkipPush) pushNav('home');
   setExportView(null);
   hideAllViews('employeeHomeView');
