@@ -23,7 +23,7 @@
 
 </head><body>
 <!-- ─── APPROVAL ACTION MODAL ─── -->
-<div id="approvalModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:800;align-items:center;justify-content:center;padding:20px;">
+<div id="approvalModal" class="modal-overlay modal-overlay-centered modal-z-800">
   <div style="background:var(--surface);border-radius:12px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.4);">
     <div id="approvalModal_header" class="modal-hdr spacious">
       <div>
@@ -126,7 +126,7 @@
   </div>
 
   <!-- Dynamic role-aware tile grid -->
-  <div id="emp_tiles_grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:32px;"></div>
+  <div id="emp_tiles_grid"></div>
 
   <!-- Recent activity -->
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;">
@@ -232,7 +232,7 @@
   <!-- Filters -->
 
   <!-- Alert Banner -->
-  <div id="dashAlertBanner" style="display:none;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;background:#fffbeb;border:1.5px solid var(--yellow);border-radius:10px;margin-bottom:16px;">
+  <div id="dashAlertBanner">
     <div style="display:flex;align-items:center;gap:10px;">
       <span style="font-size:16px;">⏳</span>
       <span id="dashAlertMsg" style="font-size:13px;font-weight:600;color:#7a6000;"></span>
@@ -399,13 +399,13 @@
             </div>
           </label>
         </div>
-        <div id="apptype_existing_notice" style="display:none;margin-top:12px;padding:10px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:12px;color:#7a6000;">
+        <div id="apptype_existing_notice">
           📋 This application is marked as a <strong>file update only</strong>. It will be saved and linked to the tenant record but will not appear in the scoring queue or waitlist.
         </div>
-          <div id="apptype_transfer_notice" style="display:none;margin-top:12px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:12px;color:#1d4ed8;">
+          <div id="apptype_transfer_notice">
             🏠 <strong>Transfer Request:</strong> This applicant is a current CLFN tenant seeking a different unit. Complete all scoring fields — this application will be scored and ranked on the waitlist.
           </div>
-          <div id="apptype_tenant_lookup" style="display:none;margin-top:12px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">
+          <div id="apptype_tenant_lookup">
             <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px;">Pre-fill from Existing Tenant Record</div>
             <div style="display:flex;gap:8px;align-items:center;">
               <input type="text" id="transfer_tenant_search" placeholder="Search by name or APP-ID…" 
@@ -415,7 +415,7 @@
                 style="background:none;border:1px solid var(--border);color:var(--muted);padding:6px 10px;border-radius:7px;font-size:11px;cursor:pointer;">Clear</button>
             </div>
             <div id="transfer_tenant_results" style="margin-top:6px;"></div>
-            <div id="transfer_prefilled_badge" style="display:none;margin-top:8px;padding:6px 10px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;font-size:12px;color:#15803d;">
+            <div id="transfer_prefilled_badge">
               ✓ Pre-filled from existing record — update any fields as needed.
             </div>
           </div>
@@ -466,11 +466,11 @@
             <label>Search Current Unit</label>
             <div style="position:relative;">
               <input type="text" id="currentUnitSearch" placeholder="Type street name or number to search..." autocomplete="off" oninput="searchCurrentUnit(this.value)" onfocus="searchCurrentUnit(this.value)" onblur="setTimeout(function(){var d=document.getElementById('currentUnitDropdown');if(d)d.style.display='none';},200)" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:DM Sans,sans-serif;"/>
-              <div id="currentUnitDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:200;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.2);"></div>
+              <div id="currentUnitDropdown"></div>
             </div>
             <input type="hidden" id="currentUnitId"/>
             <input type="hidden" id="currentUnitAddress"/>
-            <div id="currentUnitSelected" style="display:none;margin-top:8px;padding:10px 14px;background:rgba(248,228,26,0.06);border:1px solid rgba(248,228,26,0.2);border-radius:8px;">
+            <div id="currentUnitSelected">
               <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
                 <div>
                   <div style="font-size:13px;font-weight:700;color:var(--text);" id="currentUnitSelectedName"></div>
@@ -495,7 +495,7 @@
             <div class="f"><label>Home Condition <span class="r">*</span></label><select id="homeCondition"><option value="">Select condition</option><option value="Good">Good — well maintained</option><option value="Average">Average — minor wear</option><option value="Poor">Poor — major repairs needed</option></select></div>
             <div class="f"><label>Estimated Repair Cost ($) <span class="r">*</span></label><input type="text" id="renosCost" placeholder="e.g. $5,000" oninput="fmtCurrency(this);updateRenosHint();" inputmode="numeric"/></div>
           </div>
-          <div id="renosHint" style="display:none;font-size:11px;color:var(--muted);margin-top:4px;"></div>
+          <div id="renosHint"></div>
         </div>
       </div>
       <div class="card">
@@ -898,14 +898,14 @@
     <!-- ── APPROVAL ACTION BAR ── -->
     <div id="sc_action_bar" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:20px;display:none;">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:12px;">Approval Actions</div>
-      <div id="sc_action_buttons" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+      <div id="sc_action_buttons"></div>
     </div>
     <div class="card" style="border:2px solid var(--yellow);margin-bottom:20px;">
       <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="var b=document.getElementById('sc_ed_panel_body');b.style.display=b.style.display==='none'?'block':'none';">
         <div class="ctitle" style="margin:0;">⭐ ED Adjustment Factor <span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">— Executive Director only</span></div>
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div id="sc_ed_panel_body" style="display:none;margin-top:16px;">
+      <div id="sc_ed_panel_body">
         <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Apply a manual point adjustment. Changes are saved to this application record immediately.</div>
         <div class="fg c2">
           <div class="f"><label>Adjustment Points</label><input type="number" id="sc_ed_adj_pts" placeholder="e.g. +5 or -3" step="1" min="-20" max="20"/><span style="font-size:11px;color:var(--muted);margin-top:3px;">Positive = higher priority · Negative = lower priority</span></div>
@@ -935,7 +935,7 @@
          operates on a cross-app shared folder (applications/APP-/)
          and lets users link those migrated files to the current app
          via the app_documents table \u2014 a different data model. -->
-    <div id="sc_docs_section" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;">
+    <div id="sc_docs_section">
       <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
         <div style="font-size:13px;font-weight:700;">📎 Application Documents</div>
         <div style="display:flex;gap:8px;align-items:center;">
@@ -1251,7 +1251,7 @@
 
 <!-- ═══ INVENTORY VIEW ═══ -->
 <!-- Unit Search Modal (Employee) -->
-<div id="unitSearchModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;" onclick="if(event.target===this)closeUnitSearch()">
+<div id="unitSearchModal" class="modal-overlay modal-z-800" onclick="if(event.target===this)closeUnitSearch()">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
     <div class="modal-hdr spacious">
       <div>
@@ -1267,7 +1267,7 @@
           oninput="unitSearchFilter(this.value)"/>
         <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       </div>
-      <div id="unit_search_results" style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;"></div>
+      <div id="unit_search_results"></div>
     </div>
     <div style="padding:12px 24px 20px;display:flex;gap:10px;">
       <button type="button" onclick="openAddUnitModal()" style="flex:1;background:var(--yellow);border:none;color:#111;padding:10px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;">+ Add New Unit</button>
@@ -1399,7 +1399,7 @@
 
 
 <!-- ══ ASSIGN UNIT MODAL ══ -->
-<div id="assignUnitModal" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;" onclick="if(event.target===this)closeAssignModal()">
+<div id="assignUnitModal" class="modal-overlay modal-z-900" onclick="if(event.target===this)closeAssignModal()">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:600px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
 
     <!-- Header -->
@@ -1437,7 +1437,7 @@
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Available Units — Ranked by Match</div>
           <div id="am_role_badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,0.1);color:#ccc;"></div>
         </div>
-        <div id="am_unit_list" style="display:flex;flex-direction:column;gap:0;max-height:340px;overflow-y:auto;"></div>
+        <div id="am_unit_list"></div>
       </div>
 
       <!-- Selection / Override notes -->
@@ -1468,7 +1468,7 @@
 </div>
 
 <!-- addUnitModal -->
-<div id="addUnitModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
+<div id="addUnitModal" class="modal-overlay modal-z-800">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:580px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
     <div class="modal-hdr spacious">
       <div style="font-size:15px;font-weight:700;color:#fff;">Add New Unit</div>
@@ -1511,7 +1511,7 @@
 </div>
 
 <!-- tenantFilesPanel -->
-<div id="tenantFilesPanel" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;padding:20px 16px;" onclick="if(event.target===this)closeTenantFilesPanel()">
+<div id="tenantFilesPanel" class="modal-overlay modal-overlay-centered modal-z-800" onclick="if(event.target===this)closeTenantFilesPanel()">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,0.35);overflow:hidden;">
     <!-- Header — sticky inside the flex column -->
     <div class="modal-hdr">
@@ -1529,7 +1529,7 @@
 </div>
 
 <!-- unitDetailPanel -->
-<div id="unitDetailPanel" style="display:none;position:fixed;inset:0;z-index:750;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
+<div id="unitDetailPanel" class="modal-overlay modal-z-750">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.35);margin:auto;">
     <div class="modal-hdr sticky">
       <div>
@@ -1558,11 +1558,11 @@
             New SOW
           </button>
         </div>
-        <div id="udp_sow_table_wrap" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;"></div>
+        <div id="udp_sow_table_wrap"></div>
       </div>
       <div><!-- Photos -->
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;">Photos</div>
-        <div id="udp_photos" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+        <div id="udp_photos"></div>
       </div>
       <!-- Tenant files — DocLibrary preview (read-only). Click "Manage"
            to open the full tenant-files modal with upload/delete. -->
@@ -1583,7 +1583,7 @@
 
 
 <!-- sowModal -->
-<div id="sowModal" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
+<div id="sowModal" class="modal-overlay modal-z-900">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:700px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
 
     <!-- Header -->
@@ -1623,7 +1623,7 @@
               oninput="sowContractorSearch(this.value)" onfocus="sowContractorSearch(this.value)"
               onblur="setTimeout(function(){var d=document.getElementById('sow_ct_dropdown');if(d)d.style.display='none';},180)"/>
             <input type="hidden" id="sow_contractor_id"/>
-            <div id="sow_ct_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:1100;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.15);"></div>
+            <div id="sow_ct_dropdown"></div>
           </div>
         </div>
       </div>
@@ -1658,7 +1658,7 @@
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Scope of Work Items</div>
         </div>
         <div style="padding:16px;">
-          <div id="sow_items" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+          <div id="sow_items"></div>
           <button type="button" onclick="addSowItem()"
             style="background:none;border:1.5px dashed var(--border);color:var(--muted);padding:8px 16px;border-radius:8px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;width:100%;transition:all .15s;"
             onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--text)'"
@@ -1865,7 +1865,7 @@
 </div>
 
 <!-- unitEditModal -->
-<div id="unitEditModal" style="display:none;position:fixed;inset:0;z-index:700;background:rgba(0,0,0,0.55);align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;">
+<div id="unitEditModal" class="modal-overlay modal-z-700">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
     <!-- Header -->
     <div class="modal-hdr spacious">
@@ -1967,12 +1967,12 @@
       </div>
 
       <!-- Assignment (shown only for occupied/reserved) -->
-      <div id="ue_assign_row" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px;flex-direction:column;gap:12px;">
+      <div id="ue_assign_row">
         <!-- Section header -->
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Tenant Assignment — search approved applicants or start a new application</div>
 
         <!-- Current tenant card (shown when already assigned) -->
-        <div id="ue_current_tenant" style="display:none;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">
+        <div id="ue_current_tenant">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
             <div>
               <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Currently Assigned</div>
@@ -1994,17 +1994,17 @@
               onfocus="ueTenantSearch(this.value)"
               onblur="setTimeout(function(){var d=document.getElementById('ue_tenant_dropdown');if(d)d.style.display='none';},200)"
               style="width:100%;box-sizing:border-box;padding:8px 11px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>
-            <div id="ue_tenant_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:500;background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.15);"></div>
+            <div id="ue_tenant_dropdown"></div>
           </div>
           <input type="hidden" id="ue_assignedTo"/>
           <input type="hidden" id="ue_assignedName"/>
         </div>
 
         <!-- Selected applicant card -->
-        <div id="ue_tenant_selected" style="display:none;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;"></div>
+        <div id="ue_tenant_selected"></div>
 
         <!-- Not found — prompt new application -->
-        <div id="ue_tenant_notfound" style="display:none;padding:12px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;">
+        <div id="ue_tenant_notfound">
           <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:6px;">No approved application found</div>
           <div style="font-size:12px;color:#7a6000;margin-bottom:10px;">The applicant needs an approved housing application before being assigned to a unit.</div>
           <button type="button" onclick="closeUnitEditModal();newApp();" class="btn btn-primary" style="font-size:12px;padding:7px 16px;">📝 Start New Application</button>
@@ -2018,7 +2018,7 @@
       </div>
 
       <!-- Budget Approval Indicator (shown when SOW cost exists) -->
-      <div id="ue_budget_indicator" style="display:none;padding:12px 14px;border-radius:8px;font-size:12px;"></div>
+      <div id="ue_budget_indicator"></div>
 
       <!-- Tenant -->
       <div id="ue_sig_section">
@@ -2044,7 +2044,7 @@
         </div>
 
         <!-- HM approval signature (shown when SOW requires HM or ED approval) -->
-        <div id="ue_sig_hm_block" style="display:none;margin-top:12px;background:var(--bg);border:1.5px solid #1d4ed8;border-radius:8px;padding:14px;">
+        <div id="ue_sig_hm_block">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
             <div style="display:flex;align-items:center;gap:8px;">
               <div style="width:24px;height:24px;border-radius:50%;background:#1d4ed8;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">HM</div>
@@ -2071,7 +2071,7 @@
         </div>
 
         <!-- ED approval signature (shown when SOW exceeds HM budget limit) -->
-        <div id="ue_sig_ed_block" style="display:none;margin-top:12px;background:var(--bg);border:1.5px solid var(--yellow);border-radius:8px;padding:14px;">
+        <div id="ue_sig_ed_block">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
             <div style="display:flex;align-items:center;gap:8px;">
               <div style="width:24px;height:24px;border-radius:50%;background:var(--yellow);color:#111;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">ED</div>
@@ -2104,7 +2104,7 @@
       <!-- Photos -->
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:8px;">Photos</label>
-        <div id="ue_photo_preview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;min-height:0;"></div>
+        <div id="ue_photo_preview"></div>
         <div id="ue_drop_zone" ondragover="photoDragOver(event,'ue_drop_zone')" ondragleave="photoDragLeave('ue_drop_zone')" ondrop="photoDrop(event,'edit')"
           class="upload-zone"
           onclick="document.getElementById('ue_photo_input').click()">
@@ -2129,7 +2129,7 @@
 
 
 <!-- addTenantModal -->
-<div id="addTenantModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
+<div id="addTenantModal" class="modal-overlay modal-z-800">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
 
     <!-- Header -->
@@ -2178,9 +2178,9 @@
             style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"
             oninput="atSearchApps(this.value)" onfocus="atSearchApps(this.value)"
             onblur="setTimeout(function(){var d=document.getElementById('at_app_dropdown');if(d)d.style.display='none';},180)"/>
-          <div id="at_app_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:999;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.15);"></div>
+          <div id="at_app_dropdown"></div>
           <input type="hidden" id="at_appid_val"/>
-          <div id="at_app_selected" style="display:none;margin-top:6px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;font-size:12px;"></div>
+          <div id="at_app_selected"></div>
         </div>
         <div class="f">
           <label>Move-in Date <span class="r">*</span></label>
@@ -2193,7 +2193,7 @@
             <option value="reserved">Reserved</option>
           </select>
         </div>
-        <div id="at_error" style="display:none;color:#b91c1c;font-size:12px;font-weight:600;padding:8px 12px;background:#fef2f2;border-radius:7px;"></div>
+        <div id="at_error"></div>
       </div>
 
     </div>
@@ -2223,7 +2223,7 @@
   </div>
 </div>
 
-<div id="printPanel" style="display:none;position:fixed;inset:0;z-index:1100;background:#f0f0ec;overflow-y:auto;">
+<div id="printPanel" style="display:none;position:fixed;inset:0;z-index:1100;">
   <div class="modal-hdr sticky">
     <span id="printPanelTitle" style="color:#fff;font-weight:700;font-size:14px;">Document Preview</span>
     <div style="display:flex;gap:8px;">
@@ -2231,84 +2231,13 @@
       <button onclick="closePrintPanel()" style="background:none;border:1px solid #555;color:#ccc;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;">✕ Close</button>
     </div>
   </div>
-  <div id="printPanelBody" style="max-width:900px;margin:0 auto;padding:32px 24px;"></div>
+  <div id="printPanelBody"></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/emailjs-com/3.2.0/email.min.js"></script>
-<script>
-// ── ROLE safety fallback — in case shared-config.js fails to load ────────────
-if(typeof ROLE === 'undefined') {
-  window.ROLE = {
-    ED:              'ed',
-    HOUSING_MANAGER: 'housing_manager',
-    HE_L2:           'housing_employee_l2',
-    HE_L1:           'housing_employee_l1',
-    isManagement: function(r) { return r==='ed'||r==='housing_manager'; }
-  };
-  console.warn('[CLFN] ROLE fallback — shared-config.js may not have loaded');
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// BUILD MARKER — if you see this in the console, you are running the F1 build.
-// If you do NOT see this, your browser/CDN/server is serving an old file.
-// ═══════════════════════════════════════════════════════════════════════════
-console.log('%c[CLFN HOUSING] Build: F1-2026-04-17 — Finance module retrofit', 'background:#F8E41A;color:#111;font-weight:700;padding:4px 8px;');
-
-// ── Supabase Storage helpers ──────────────────────────────────────────────
-// Moved to /shared.js (Turn 3, Phase C dedup). See window.SbStorage and the
-// bare aliases (sbUploadFile, sbGetSignedUrl, sbUploadAndSave, etc.). Same
-// behavior, same call sites — just loaded from the shared file now.
-
-
-window._sb = null;
-document.addEventListener('DOMContentLoaded', function() {
-  try {
-    if(window.supabase && window.supabase.createClient) {
-      window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-      console.log('[CLFN] Supabase client ready');
-    }
-  } catch(e) { console.log('[CLFN] Supabase init failed:', e.message); }
-});
-
-// ══════════════════════════════════════════════════════════════
-// SUPABASE DATA LAYER
-// All localStorage reads/writes have Supabase equivalents here.
-// The app falls back to localStorage if Supabase is unavailable.
-// ══════════════════════════════════════════════════════════════
-
-// ── Map staff table role to housing app role ────────────────────────────────
-
-
-// ── APPLICATIONS ─────────────────────────────────────────────────────────────
-
-
-
-
-
-
-// ── HOUSING UNITS ─────────────────────────────────────────────────────────────
-
-
-
-
-
-
-// ── SETTINGS ─────────────────────────────────────────────────────────────────
-
-
-
-
-// ── CONTRACTORS ───────────────────────────────────────────────────────────────
-
-
-
-
-
-
-</script>
 </div>
 </body>
 </html>

@@ -11,6 +11,34 @@
 
 'use strict';
 
+// ── ROLE safety fallback — if shared-config.js fails to load ─────────────────
+if (typeof ROLE === 'undefined') {
+  window.ROLE = {
+    ED:              'ed',
+    HOUSING_MANAGER: 'housing_manager',
+    HE_L2:           'housing_employee_l2',
+    HE_L1:           'housing_employee_l1',
+    isManagement: function(r) { return r === 'ed' || r === 'housing_manager'; }
+  };
+  console.warn('[CLFN] ROLE fallback — shared-config.js may not have loaded');
+}
+
+// ── Build marker ──────────────────────────────────────────────────────────────
+console.log('%c[CLFN HOUSING] Build: F1-2026-04-21', 'background:#F8E41A;color:#111;font-weight:700;padding:4px 8px;');
+
+// ── Supabase client ───────────────────────────────────────────────────────────
+window._sb = null;
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    if (window.supabase && window.supabase.createClient) {
+      window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+      console.log('[CLFN] Supabase client ready');
+    }
+  } catch(e) { console.warn('[CLFN] Supabase init failed:', e.message); }
+});
+
+
+
 function showDashboard(){
   // The actual applications dashboard — HM and ED only
   var role = window.currentRole || 'housing_employee_l1';
