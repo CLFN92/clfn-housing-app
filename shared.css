@@ -910,13 +910,16 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 
 /* ── Contractor card ─────────────────────────────────────────────────────── */
 .ct-card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 320px));
+  display: flex;
+  flex-wrap: wrap;
   gap: 14px;
   justify-content: center;
   width: 100%;
-  /* Prevent layout shift when approval panel opens and scrollbar appears */
-  scrollbar-gutter: stable;
+}
+.ct-card-grid .card {
+  width: 320px;
+  max-width: 100%;
+  flex-shrink: 0;
 }
 .ct-card                 { cursor: pointer; position: relative; }
 .ct-card-head            { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
