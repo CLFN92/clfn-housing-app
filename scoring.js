@@ -1686,3 +1686,30 @@ if (!window.liveScoreModel && window.DEFAULT_SCORING_MODEL.length) {
     return Object.assign({}, r);
   });
 }
+
+// ── Built-in V1-format fallback for buildV2FormSelects ───────────────────────
+// DEFAULT_SCORING_MODEL is intentionally empty (model comes from Supabase).
+// If Supabase hasn't loaded the model yet (or was never saved), seed
+// liveScoreModel so New Application form dropdowns always have labelled options.
+if (!window.liveScoreModel || !window.liveScoreModel.length) {
+  var _v2 = window.DEFAULT_V2_SCORE_MODEL || {};
+  var _un = _v2.urgent_need || {};
+  var _hr = _v2.health_risk || {};
+  var _is = _v2.income_stability || {};
+  window.liveScoreModel = [
+    {id:'un1', cat:'urgent_need',      label:'None',                        pts: _un.none              || 0},
+    {id:'un2', cat:'urgent_need',      label:'Overcrowding',                pts: _un.eviction_risk     || 15},
+    {id:'un3', cat:'urgent_need',      label:'Eviction / Homelessness Risk',pts: _un.homeless_eviction || 20},
+    {id:'un4', cat:'urgent_need',      label:'Emergency (fire / DV)',       pts: _un.domestic_violence || 25},
+    {id:'hs1', cat:'health_safety',    label:'None',                        pts: _hr.none              || 0},
+    {id:'hs2', cat:'health_safety',    label:'Minor',                       pts: _hr.minor             || 6},
+    {id:'hs3', cat:'health_safety',    label:'Moderate',                    pts: _hr.moderate          || 12},
+    {id:'hs4', cat:'health_safety',    label:'Severe',                      pts: _hr.severe            || 20},
+    {id:'is1', cat:'income_stability', label:'Stable income',               pts: _is.stable            || 5},
+    {id:'is2', cat:'income_stability', label:'Unstable / irregular',        pts: _is.irregular         || 2},
+    {id:'hc1', cat:'household_comp',   label:'Lone parent',                 pts: (_v2.household||{}).lone_parent        || 5},
+    {id:'hc2', cat:'household_comp',   label:'Elder household',             pts: (_v2.household||{}).elder              || 5},
+    {id:'hc3', cat:'household_comp',   label:'Disability',                  pts: (_v2.household||{}).disability         || 5},
+    {id:'oc1', cat:'occupancy',        label:'Per person over NOS',         pts: (_v2.household||{}).per_dependent_u18  || 2},
+  ];
+}
