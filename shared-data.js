@@ -1112,29 +1112,36 @@ function ctFileUpload(input,bucket){
   input.value='';
 }
 function ctGetPeople() {
-  var people = [];
-  var rows = document.querySelectorAll('#ct_people_list [data-pi]');
-  var seen = {};
-  rows.forEach(function(el) {
+  // Flush current input values back into the in-memory array before returning.
+  // This keeps _ctPeople in sync with whatever the user has typed so far.
+  var people = window._ctPeople || [];
+  document.querySelectorAll('#ct_people_list [data-pi]').forEach(function(el) {
     var i = parseInt(el.getAttribute('data-pi'));
-    if(!seen[i]) { seen[i] = {name:'', phone:'', email:''}; people[i] = seen[i]; }
-    if(el.classList.contains('ct-person-name'))  seen[i].name  = el.value.trim();
-    if(el.classList.contains('ct-person-phone')) seen[i].phone = el.value.trim();
-    if(el.classList.contains('ct-person-email')) seen[i].email = el.value.trim();
+    if(!people[i]) people[i] = {name:'',phone:'',email:''};
+    if(el.classList.contains('ct-person-name'))  people[i].name  = el.value;
+    if(el.classList.contains('ct-person-phone')) people[i].phone = el.value;
+    if(el.classList.contains('ct-person-email')) people[i].email = el.value;
   });
+  window._ctPeople = people;
+  // Return a filtered copy for saving — blank rows are excluded from the payload.
   return people.filter(function(p){ return p && (p.name||p.phone||p.email); });
 }
 function ctRenderPeople(people) {
+  // Sync in-memory array — always render from _ctPeople, not a filtered copy,
+  // so blank rows persist while the user is still filling them in.
+  window._ctPeople = people || [];
   var list = document.getElementById('ct_people_list');
   if(!list) return;
-  people = people || [];
-  if(!people.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);font-style:italic;padding:4px 0;">No key contacts added yet.</div>'; return; }
-  list.innerHTML = people.map(function(p, i) {
-    return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">'
-      +'<input type="text" class="ct-person-name" data-pi="'+i+'" value="'+(p.name||'')+'" placeholder="Full name" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
-      +'<input type="tel" class="ct-person-phone" data-pi="'+i+'" value="'+(p.phone||'')+'" placeholder="Phone" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
-      +'<input type="email" class="ct-person-email" data-pi="'+i+'" value="'+(p.email||'')+'" placeholder="Email" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
-      +'<button type="button" onclick="ctRemovePerson('+i+')" style="background:none;border:none;color:#b91c1c;cursor:pointer;font-size:16px;padding:2px 4px;line-height:1;" title="Remove">✕</button>'
+  if(!window._ctPeople.length) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--muted);font-style:italic;padding:4px 0;">No key contacts added yet.</div>';
+    return;
+  }
+  list.innerHTML = window._ctPeople.map(function(p, i) {
+    return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;">'
+      +'<input type="text"  class="ct-person-name"  data-pi="'+i+'" value="'+(p.name||'')+'"  placeholder="Full name"  style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
+      +'<input type="tel"   class="ct-person-phone" data-pi="'+i+'" value="'+(p.phone||'')+'" placeholder="Phone"      style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
+      +'<input type="email" class="ct-person-email" data-pi="'+i+'" value="'+(p.email||'')+'" placeholder="Email"      style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
+      +'<button type="button" onclick="ctRemovePerson('+i+')" style="background:none;border:none;color:#b91c1c;cursor:pointer;font-size:16px;padding:2px 6px;line-height:1;" title="Remove">✕</button>'
       +'</div>';
   }).join('');
 }
@@ -2992,12 +2999,20 @@ function calcRenoScore(unitId) {
 }
 
 function ctAddPerson() {
-  var people = ctGetPeople();
+  // Flush any current DOM input values into _ctPeople first, then append blank row.
+  ctGetPeople(); // side-effect: syncs DOM → _ctPeople
+  var people = (window._ctPeople || []).slice();
   people.push({name:'', phone:'', email:''});
   ctRenderPeople(people);
-  // Focus the new name field
+  // Focus the name field of the new row
   var inputs = document.querySelectorAll('.ct-person-name');
   if(inputs.length) inputs[inputs.length-1].focus();
+}
+function ctRemovePerson(idx) {
+  ctGetPeople(); // flush current values first
+  var people = (window._ctPeople || []).slice();
+  people.splice(idx, 1);
+  ctRenderPeople(people);
 }
 
 function deleteContractor(idx){

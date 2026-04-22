@@ -922,10 +922,14 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 
 /* ── Contractor card ─────────────────────────────────────────────────────── */
 
-.ct-card                 { cursor: pointer; position: relative; }
+.ct-card                 { cursor: pointer; position: relative;
+                           border-top: 3px solid var(--yellow) !important;
+                           transition: box-shadow .15s, border-color .15s; }
+.ct-card:hover           { box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
 .ct-card-head            { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.ct-card-icon            { width: 40px; height: 40px; border-radius: 10px;
-                           background: var(--yellow); color: #111; font-size: 20px;
+.ct-card-icon            { width: 42px; height: 42px; border-radius: 10px;
+                           background: var(--dark); border: 1.5px solid var(--yellow);
+                           color: var(--yellow); font-size: 20px;
                            display: flex; align-items: center; justify-content: center;
                            flex-shrink: 0; }
 .ct-card-body            { flex: 1; min-width: 0; }
