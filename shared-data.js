@@ -1814,41 +1814,39 @@ function renderContractorsView(){
     var totalFiles=wsibFiles.length+insFiles.length+otherFiles.length;
     var ss = ctStatusStyle[ct.status||'pending_review'] || {bg:'#f4f4f0',c:'#888',label:ct.status||'Unknown'};
     var classLabels = {internal_indigenous:'Internal — Indigenous',external_indigenous:'External — Indigenous',external_non_indigenous:'External — Non-Indigenous'};
-    return '<div class="card" style="position:relative;cursor:pointer;" onclick="openCtApprovalPanel('+i+')" title="View application">'
-      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px;">'
-        +'<div style="width:38px;height:38px;border-radius:8px;background:var(--dark);color:var(--yellow);font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">🧰</div>'
+    return '<div class="card ct-card" onclick="openCtApprovalPanel('+i+')" title="View application">'
+      +'<div class="ct-card-head">'
+        +'<div class="ct-card-icon">🧰</div>'
         +'<div style="flex:1;min-width:0;">'
-          +'<div style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+ct.name+'</div>'
-          +'<div class="js-txt-muted-sm">'+(ct.trade||'General Contractor')+'</div>'
+          +'<div class="ct-card-name">'+ct.name+'</div>'
+          +'<div class="ct-card-trade">'+(ct.trade||'General Contractor')+'</div>'
         +'</div>'
-        +'<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+ss.bg+';color:'+ss.c+';white-space:nowrap;">'+ss.label+'</span>'
+        +'<span class="std-pill" style="background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
       +'</div>'
-      +(ct.phone?'<div style="font-size:12px;color:var(--muted);margin-bottom:2px;">📞 '+ct.phone+'</div>':'')
-      +(ct.email?'<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">✉ '+ct.email+'</div>':'')
-      +(ct.classification?'<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">🏷 '+(classLabels[ct.classification]||ct.classification)+'</div>':'')
-      +'<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">'
+      +(ct.phone?'<div class="ct-card-info">📞 '+ct.phone+'</div>':'')
+      +(ct.email?'<div class="ct-card-info">✉ '+ct.email+'</div>':'')
+      +(ct.classification?'<div class="ct-card-info">🏷 '+(classLabels[ct.classification]||ct.classification)+'</div>':'')
+      +'<div class="ct-card-tags">'
         +(function(dateStr,label){
             if(!dateStr) return '';
             var days=Math.round((new Date(dateStr)-new Date())/(1000*60*60*24));
             var c=days<0?'#b91c1c':days<30?'#d97706':'#15803d';
             var t=days<0?'Expired':days<30?'Expiring soon':'Valid';
-            return '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+c+'22;color:'+c+';">'+label+': '+t+'</span>';
+            return '<span class="ct-card-tag" style="background:'+c+'22;color:'+c+';">'+label+': '+t+'</span>';
           })(ct.wsibExpiry,'WSIB')
-        +' '+(function(dateStr,label){
+        +(function(dateStr,label){
             if(!dateStr) return '';
             var days=Math.round((new Date(dateStr)-new Date())/(1000*60*60*24));
             var c=days<0?'#b91c1c':days<30?'#d97706':'#15803d';
             var t=days<0?'Expired':days<30?'Expiring soon':'Valid';
-            return '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+c+'22;color:'+c+';">'+label+': '+t+'</span>';
+            return '<span class="ct-card-tag" style="background:'+c+'22;color:'+c+';">'+label+': '+t+'</span>';
           })(ct.insExpiry,'Insurance')
       +'</div>'
-      +(totalFiles?'<div style="font-size:11px;color:var(--muted);margin-top:5px;">📎 '+totalFiles+' file'+(totalFiles!==1?'s':'')+' on file</div>':'')
-      +'<div style="display:flex;gap:6px;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">'
+      +'<div class="ct-card-actions">'
         +(ROLE.isManagement(role)
-          ?'<button type="button" onclick="event.stopPropagation();openCtApprovalPanel('+i+')" style="flex:1;background:none;border:1px solid var(--border);color:var(--text);padding:5px 0;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;">Review</button>'
+          ?'<button type="button" class="ct-card-btn" onclick="event.stopPropagation();openCtApprovalPanel('+i+')">Review</button>'
           :'')
-        +'<button type="button" onclick="event.stopPropagation();openAddContractorModal('+i+')" style="flex:1;background:none;border:1px solid var(--border);color:var(--muted);padding:5px 0;border-radius:6px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;">Edit</button>'
-
+        +'<button type="button" class="ct-card-btn muted" onclick="event.stopPropagation();openAddContractorModal('+i+')">Edit</button>'
       +'</div>'
       +'</div>';
   }).join('');
