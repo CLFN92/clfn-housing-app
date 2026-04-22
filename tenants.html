@@ -50,7 +50,6 @@
   </div>
 </div>
 
-
 <!-- HEADER -->
 <header class="app-header">
   
@@ -154,7 +153,6 @@
     </div>
   </div>
 </div></div><!-- end tenantsView -->
-
 
 <!-- ══ ASSIGN UNIT MODAL ══ -->
 <div id="tenantFilesPanel" class="modal-overlay modal-overlay-centered modal-z-800" onclick="if(event.target===this)closeTenantFilesPanel()">
@@ -412,7 +410,6 @@
           <div class="f"><label>ED Approval Date</label><input id="sow_ed_date" type="date"/></div>
         </div>
       </div>
-
 
       <!-- ── AUDIT LOG (internal, not printed) ──────────────────────────── -->
       <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;">
@@ -719,7 +716,6 @@
   </div>
 </div>
 
-
 <!-- addTenantModal -->
 <div id="addTenantModal" class="modal-overlay modal-z-800">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
@@ -811,17 +807,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/emailjs-com/3.2.0/email.min.js"></script>
-</div>
-
-<script>
-// ── inventory.html page init ──────────────────────────────────────────────────
-// Shares auth/session from housing.html via sessionStorage
-// Restores the appropriate view based on URL param
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/emailjs-com/3.2.0/email.min.js"></script>
 <script>
 // ── tenants.html page init ───────────────────────────────────────────────────
 (async function initTenantsPage() {
@@ -849,7 +834,6 @@
   if (typeof showTenants === 'function') showTenants();
 }());
 </script>
-</div><!-- end content-area -->
 </div><!-- end app-wrapper -->
 </body>
 </html>
