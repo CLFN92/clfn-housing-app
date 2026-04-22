@@ -132,7 +132,7 @@
 
 
 <!-- ═══ WORKLIST VIEW ═══ -->
-<div class="dash-view" id="worklistView" style="display:none;">
+<div class="dash-view" id="worklistView" style="display:none;"><div class="page-wrap">
   <div class="page-back-row">
     <button onclick="showEmployeeHome()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -153,7 +153,7 @@
     </div>
   </div>
   <div id="worklist_body"></div>
-</div>
+</div></div><!-- end page-wrap -->
 
 <div class="dash-view" id="dashView" style="display:none;flex-direction:column;gap:16px;">
 <div id="role_queue_banner" style="padding:0 0 8px 0;"></div>
@@ -839,8 +839,7 @@
 </div><!-- end appLayout -->
 
 <!-- ═══ INDIVIDUAL SCORECARD VIEW ═══ -->
-<div class="dash-view" id="scorecardView" style="display:none;">
-  <div class="page-back-row">
+<div class="dash-view" id="scorecardView" style="display:none;"><div class="page-wrap">
     <button onclick="showDash()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
@@ -939,7 +938,7 @@
     </div>
 
   </div>
-</div><!-- end scorecardView -->
+</div></div><!-- end scorecardView -->
 
 <!-- ═══ SETTINGS VIEW ═══ -->
 <div id="settingsView" style="display:none;width:100%;flex-direction:column;max-width:1200px;margin:0 auto;box-sizing:border-box;">
@@ -1268,8 +1267,7 @@
   </div>
 </div>
 
-<div class="dash-view" id="inventoryView" style="display:none;">
-  <div class="page-back-row">
+<div class="dash-view" id="inventoryView" style="display:none;"><div class="page-wrap">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
@@ -1318,11 +1316,10 @@
       </table>
     </div>
   </div>
-</div><!-- end inventoryView -->
+</div></div><!-- end inventoryView -->
 
 <!-- ═══ MATCH VIEW ═══ -->
-<div class="dash-view" id="matchView" style="display:none;">
-  <div class="page-back-row">
+<div class="dash-view" id="matchView" style="display:none;"><div class="page-wrap">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
@@ -1348,11 +1345,10 @@
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;" id="match_chips"></div>
   <div id="match_content"></div>
-</div><!-- end matchView -->
+</div></div><!-- end matchView -->
 
 <!-- ═══ TENANTS VIEW ═══ -->
-<div class="dash-view" id="tenantsView" style="display:none;">
-  <div class="page-back-row">
+<div class="dash-view" id="tenantsView" style="display:none;"><div class="page-wrap">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
@@ -1388,7 +1384,7 @@
       </table>
     </div>
   </div>
-</div><!-- end tenantsView -->
+</div></div><!-- end tenantsView -->
 
 
 <!-- ══ ASSIGN UNIT MODAL ══ -->
