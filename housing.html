@@ -34,11 +34,11 @@
     </div>
     <div style="padding:24px;">
       <div id="approvalModal_unit_row" style="display:none;margin-bottom:16px;">
-        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);display:block;margin-bottom:6px;">Recommended Unit</label>
+        <label class="lbl-muted" style="display:block;margin-bottom:6px">Recommended Unit</label>
         <div id="approvalModal_unit_display" style="padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:7px;font-size:13px;font-weight:600;color:var(--text);"></div>
       </div>
-      <div style="margin-bottom:16px;">
-        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);display:block;margin-bottom:6px;">Notes <span id="approvalModal_notes_req" style="color:#b91c1c;"></span></label>
+      <div class="mb-16">
+        <label class="lbl-muted" style="display:block;margin-bottom:6px">Notes <span id="approvalModal_notes_req" style="color:#b91c1c;"></span></label>
         <textarea id="approvalModal_notes" rows="4" placeholder="Add notes visible to the applicant and staff..."
           style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;font-family:DM Sans,sans-serif;resize:vertical;"></textarea>
       </div>
@@ -54,7 +54,7 @@
 <!-- HEADER -->
 <header class="app-header">
   
-  <div class="hbrand" onclick="showDash()" style="cursor:pointer;" title="Return to Home">
+  <div class="hbrand" onclick="showDash()" title="Return to Home">
     <img src="data:image/png;base64,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" alt="CLFN" class="hlogo"/>
     <div>
       <strong style="display:block;font-size:14px;font-weight:700;color:#fff;letter-spacing:-.2px;">Housing Application</strong>
@@ -77,7 +77,7 @@
     </div>
     <div id="header_user_pill" style="display:flex;align-items:center;gap:8px;background:#1a1a18;border:1px solid #333;border-radius:20px;padding:5px 12px 5px 6px;">
       <div id="header_avatar" style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">—</div>
-      <span id="header_user_name" style="font-size:12px;font-weight:600;color:#fff;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span><span id="header_user_display" style="display:none;"></span>
+      <span id="header_user_name" style="font-size:12px;font-weight:600;color:#fff;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span><span id="header_user_display"></span>
       <span id="header_role_badge" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:#333;color:#aaa;"></span>
         <button onclick="headerSignOut()" style="background:none;border:none;color:#666;font-size:11px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;padding:0 0 0 4px;" onmouseover="this.style.color='#ccc'" onmouseout="this.style.color='#666'">sign out</button>
     </div>
@@ -120,7 +120,7 @@
   <div style="margin-bottom:28px;position:relative;padding-left:16px;">
     <!-- Yellow accent bar anchored to the left of the heading -->
     <div style="position:absolute;left:0;top:6px;bottom:6px;width:4px;background:var(--yellow);border-radius:2px;"></div>
-    <div id="emp_home_date" style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;"></div>
+    <div id="emp_home_date" class="lbl-muted" style="margin-bottom:4px"></div>
     <h1 style="font-family:'DM Serif Display',serif;font-size:30px;font-weight:400;line-height:1.15;margin:0 0 6px 0;">Welcome back, <span id="emp_home_name" style="color:var(--yellow);"></span></h1>
     <p id="emp_home_subtitle" style="color:var(--muted);font-size:14px;margin:0;"></p>
   </div>
@@ -130,7 +130,7 @@
 
   <!-- Recent activity -->
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;">
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:14px;">Recent Activity</div>
+    <div class="lbl-muted" style="margin-bottom:14px">Recent Activity</div>
     <div id="emp_recent_activity" style="font-size:13px;color:var(--muted);font-style:italic;">No recent activity.</div>
   </div>
 </div>
@@ -146,7 +146,7 @@
   </div>
   <div class="page-header-bar">
     <div class="phb-title">
-      <div id="worklist_datetime" style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;"></div>
+      <div id="worklist_datetime" class="lbl-muted" style="margin-bottom:6px"></div>
       <h1>My Worklist</h1>
       <p id="worklist_subtitle"></p>
     </div>
@@ -233,7 +233,7 @@
 
   <!-- Alert Banner -->
   <div id="dashAlertBanner">
-    <div style="display:flex;align-items:center;gap:10px;">
+    <div class="flex-gap10">
       <span style="font-size:16px;">⏳</span>
       <span id="dashAlertMsg" style="font-size:13px;font-weight:600;color:#7a6000;"></span>
     </div>
@@ -311,37 +311,37 @@
   </div>
   <!-- Steps row - transparent bg, black active border-top, yellow active circle -->
   <div style="display:flex;align-items:stretch;overflow-x:auto;background:transparent;">
-    <button onclick="goTo(0)" id="spb_0" style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 8px;background:transparent;border:none;border-top:3px solid #000;cursor:pointer;white-space:nowrap;font-family:DM Sans,sans-serif;min-width:60px;flex:1;transition:all .15s;">
-      <span id="spb_num_0" style="width:24px;height:24px;border-radius:50%;background:var(--yellow);color:#111;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</span>
+    <button onclick="goTo(0)" id="spb_0" class="spb-btn">
+      <span id="spb_num_0" class="spb-num">1</span>
       <span id="spb_lbl_0" style="font-size:10px;font-weight:700;color:#111;">Applicant</span>
     </button>
-    <button onclick="goTo(1)" id="spb_1" style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 8px;background:transparent;border:none;border-top:3px solid transparent;cursor:pointer;white-space:nowrap;font-family:DM Sans,sans-serif;min-width:60px;flex:1;transition:all .15s;">
-      <span id="spb_num_1" style="width:24px;height:24px;border-radius:50%;background:#e5e5e5;color:#999;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</span>
-      <span id="spb_lbl_1" style="font-size:10px;font-weight:500;color:#aaa;">Employment</span>
+    <button onclick="goTo(1)" id="spb_1" class="spb-btn">
+      <span id="spb_num_1" class="spb-num">2</span>
+      <span id="spb_lbl_1" class="txt-xs-dim">Employment</span>
     </button>
-    <button onclick="goTo(2)" id="spb_2" style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 8px;background:transparent;border:none;border-top:3px solid transparent;cursor:pointer;white-space:nowrap;font-family:DM Sans,sans-serif;min-width:60px;flex:1;transition:all .15s;">
-      <span id="spb_num_2" style="width:24px;height:24px;border-radius:50%;background:#e5e5e5;color:#999;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</span>
-      <span id="spb_lbl_2" style="font-size:10px;font-weight:500;color:#aaa;">Co-Applicant</span>
+    <button onclick="goTo(2)" id="spb_2" class="spb-btn">
+      <span id="spb_num_2" class="spb-num">3</span>
+      <span id="spb_lbl_2" class="txt-xs-dim">Co-Applicant</span>
     </button>
-    <button onclick="goTo(3)" id="spb_3" style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 8px;background:transparent;border:none;border-top:3px solid transparent;cursor:pointer;white-space:nowrap;font-family:DM Sans,sans-serif;min-width:60px;flex:1;transition:all .15s;">
-      <span id="spb_num_3" style="width:24px;height:24px;border-radius:50%;background:#e5e5e5;color:#999;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">4</span>
-      <span id="spb_lbl_3" style="font-size:10px;font-weight:500;color:#aaa;">Household</span>
+    <button onclick="goTo(3)" id="spb_3" class="spb-btn">
+      <span id="spb_num_3" class="spb-num">4</span>
+      <span id="spb_lbl_3" class="txt-xs-dim">Household</span>
     </button>
-    <button onclick="goTo(4)" id="spb_4" style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 8px;background:transparent;border:none;border-top:3px solid transparent;cursor:pointer;white-space:nowrap;font-family:DM Sans,sans-serif;min-width:60px;flex:1;transition:all .15s;">
-      <span id="spb_num_4" style="width:24px;height:24px;border-radius:50%;background:#e5e5e5;color:#999;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">5</span>
-      <span id="spb_lbl_4" style="font-size:10px;font-weight:500;color:#aaa;">References</span>
+    <button onclick="goTo(4)" id="spb_4" class="spb-btn">
+      <span id="spb_num_4" class="spb-num">5</span>
+      <span id="spb_lbl_4" class="txt-xs-dim">References</span>
     </button>
-    <button onclick="goTo(5)" id="spb_5" style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 8px;background:transparent;border:none;border-top:3px solid transparent;cursor:pointer;white-space:nowrap;font-family:DM Sans,sans-serif;min-width:60px;flex:1;transition:all .15s;">
-      <span id="spb_num_5" style="width:24px;height:24px;border-radius:50%;background:#e5e5e5;color:#999;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">6</span>
-      <span id="spb_lbl_5" style="font-size:10px;font-weight:500;color:#aaa;">Pets</span>
+    <button onclick="goTo(5)" id="spb_5" class="spb-btn">
+      <span id="spb_num_5" class="spb-num">6</span>
+      <span id="spb_lbl_5" class="txt-xs-dim">Pets</span>
     </button>
-    <button onclick="goTo(6)" id="spb_6" style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 8px;background:transparent;border:none;border-top:3px solid transparent;cursor:pointer;white-space:nowrap;font-family:DM Sans,sans-serif;min-width:60px;flex:1;transition:all .15s;">
-      <span id="spb_num_6" style="width:24px;height:24px;border-radius:50%;background:#e5e5e5;color:#999;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">7</span>
-      <span id="spb_lbl_6" style="font-size:10px;font-weight:500;color:#aaa;">Documents</span>
+    <button onclick="goTo(6)" id="spb_6" class="spb-btn">
+      <span id="spb_num_6" class="spb-num">7</span>
+      <span id="spb_lbl_6" class="txt-xs-dim">Documents</span>
     </button>
-    <button onclick="goTo(8)" id="spb_7" style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 8px;background:transparent;border:none;border-top:3px solid transparent;cursor:pointer;white-space:nowrap;font-family:DM Sans,sans-serif;min-width:60px;flex:1;transition:all .15s;">
-      <span id="spb_num_7" style="width:24px;height:24px;border-radius:50%;background:#e5e5e5;color:#999;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">8</span>
-      <span id="spb_lbl_7" style="font-size:10px;font-weight:500;color:#aaa;">Review</span>
+    <button onclick="goTo(8)" id="spb_7" class="spb-btn">
+      <span id="spb_num_7" class="spb-num">8</span>
+      <span id="spb_lbl_7" class="txt-xs-dim">Review</span>
     </button>
   </div>
 </div>
@@ -356,8 +356,8 @@
 
 <div class="layout" id="appLayout" style="display:none;flex-direction:column;">
   <!-- Hidden metadata spans used by JS to update header context when editing -->
-  <span id="appLayout_title" style="display:none;"></span>
-  <span id="appLayout_subtitle" style="display:none;"></span>
+  <span id="appLayout_title"></span>
+  <span id="appLayout_subtitle"></span>
   <main class="main">
 
     <!-- STEP 0: APPLICANT INFO -->
@@ -375,7 +375,7 @@
 
       <!-- Application Type Toggle -->
       <div class="card" style="padding:18px 20px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:12px;">Application Type</div>
+        <div class="lbl-muted" style="margin-bottom:12px">Application Type</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
           <label id="apptype_new_label" style="display:flex;align-items:flex-start;gap:12px;padding:14px;border:2px solid var(--yellow);border-radius:10px;cursor:pointer;background:var(--dark);">
             <input type="radio" name="appType" id="apptype_new" value="new_housing" checked onchange="onAppTypeChange()" style="margin-top:2px;accent-color:var(--yellow);"/>
@@ -406,7 +406,7 @@
             🏠 <strong>Transfer Request:</strong> This applicant is a current CLFN tenant seeking a different unit. Complete all scoring fields — this application will be scored and ranked on the waitlist.
           </div>
           <div id="apptype_tenant_lookup">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px;">Pre-fill from Existing Tenant Record</div>
+            <div class="lbl-muted" style="margin-bottom:8px">Pre-fill from Existing Tenant Record</div>
             <div style="display:flex;gap:8px;align-items:center;">
               <input type="text" id="transfer_tenant_search" placeholder="Search by name or APP-ID…" 
                 style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);"
@@ -449,11 +449,11 @@
         <div class="ctitle">Accessibility</div>
         <div class="f"><label style="margin-bottom:8px;display:block;">Accessibility Needs <span style="font-size:11px;color:var(--muted);font-weight:400;">(select all that apply)</span></label>
           <div style="display:flex;flex-wrap:wrap;gap:10px;">
-            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-weight:400;font-size:13px;"><input type="checkbox" id="acc_wheelchair" value="Wheelchair Accessible" onchange="syncAccessibility();triggerV2Score();"/> Wheelchair Accessible</label>
-            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-weight:400;font-size:13px;"><input type="checkbox" id="acc_visual" value="Visual Impairment" onchange="syncAccessibility();triggerV2Score();"/> Visual Impairment</label>
-            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-weight:400;font-size:13px;"><input type="checkbox" id="acc_hearing" value="Hearing Impairment" onchange="syncAccessibility();triggerV2Score();"/> Hearing Impairment</label>
-            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-weight:400;font-size:13px;"><input type="checkbox" id="acc_other" value="Other" onchange="syncAccessibility();triggerV2Score();"/> Other</label>
-            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-weight:400;font-size:13px;"><input type="checkbox" id="acc_none" value="None" onchange="syncAccessibility();triggerV2Score();"/> None</label>
+            <label class="check-row-sm"><input type="checkbox" id="acc_wheelchair" value="Wheelchair Accessible" onchange="syncAccessibility();triggerV2Score();"/> Wheelchair Accessible</label>
+            <label class="check-row-sm"><input type="checkbox" id="acc_visual" value="Visual Impairment" onchange="syncAccessibility();triggerV2Score();"/> Visual Impairment</label>
+            <label class="check-row-sm"><input type="checkbox" id="acc_hearing" value="Hearing Impairment" onchange="syncAccessibility();triggerV2Score();"/> Hearing Impairment</label>
+            <label class="check-row-sm"><input type="checkbox" id="acc_other" value="Other" onchange="syncAccessibility();triggerV2Score();"/> Other</label>
+            <label class="check-row-sm"><input type="checkbox" id="acc_none" value="None" onchange="syncAccessibility();triggerV2Score();"/> None</label>
           </div>
           <input type="hidden" id="accessibility" value=""/>
         </div>
@@ -461,10 +461,10 @@
       <div class="card">
         <div class="ctitle">Current Housing</div>
         <div class="ftog"><label class="tsw"><input type="checkbox" id="hasHouseToggle" onchange="var b=document.getElementById('homeCondBlk');if(b)b.style.display=this.checked?'block':'none';_saveToggleStates();if(typeof autoPopulateScore==='function'){autoPopulateScore();calcScore();}"/><span class="tsl"></span></label><label>Currently Has a House on Reserve</label></div>
-        <div id="homeCondBlk" style="display:none;">
+        <div id="homeCondBlk">
           <div class="f" style="margin-top:12px;margin-bottom:4px;">
             <label>Search Current Unit</label>
-            <div style="position:relative;">
+            <div class="pos-rel">
               <input type="text" id="currentUnitSearch" placeholder="Type street name or number to search..." autocomplete="off" oninput="searchCurrentUnit(this.value)" onfocus="searchCurrentUnit(this.value)" onblur="setTimeout(function(){var d=document.getElementById('currentUnitDropdown');if(d)d.style.display='none';},200)" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:DM Sans,sans-serif;"/>
               <div id="currentUnitDropdown"></div>
             </div>
@@ -473,7 +473,7 @@
             <div id="currentUnitSelected">
               <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
                 <div>
-                  <div style="font-size:13px;font-weight:700;color:var(--text);" id="currentUnitSelectedName"></div>
+                  <div class="txt-sm-bold" id="currentUnitSelectedName"></div>
                   <div style="font-size:11px;color:var(--muted);margin-top:2px;" id="currentUnitSelectedDetail"></div>
                 </div>
                 <button type="button" onclick="clearCurrentUnit()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0;line-height:1;flex-shrink:0;">✕</button>
@@ -481,7 +481,7 @@
             </div>
             <span style="font-size:11px;color:var(--muted);margin-top:4px;display:block;">This unit stays in inventory as-is until a new unit is assigned — then staff will be prompted to return it to Vacant.</span>
           </div>
-          <div class="f" style="margin-bottom:12px;">
+          <div class="f" class="mb-12">
             <label>Current Unit Status</label>
             <select id="currentUnitStatus" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:DM Sans,sans-serif;">
               <option value="">— Select —</option>
@@ -491,7 +491,7 @@
               <option value="reserved">Reserved — Moving out soon</option>
             </select>
           </div>
-          <div style="margin-top:4px;" class="fg c2">
+          <div class="mt-4" class="fg c2">
             <div class="f"><label>Home Condition <span class="r">*</span></label><select id="homeCondition"><option value="">Select condition</option><option value="Good">Good — well maintained</option><option value="Average">Average — minor wear</option><option value="Poor">Poor — major repairs needed</option></select></div>
             <div class="f"><label>Estimated Repair Cost ($) <span class="r">*</span></label><input type="text" id="renosCost" placeholder="e.g. $5,000" oninput="fmtCurrency(this);updateRenosHint();" inputmode="numeric"/></div>
           </div>
@@ -501,7 +501,7 @@
       <div class="card">
         <div class="ctitle">CLFN Arrears — Applicant</div>
         <div class="ftog"><label class="tsw"><input type="checkbox" id="arrToggle" onchange="var b=document.getElementById('arrBlk');if(b)b.style.display=this.checked?'block':'none';_saveToggleStates();if(typeof autoPopulateScore==='function'){autoPopulateScore();calcScore();}triggerV2Score();"/><span class="tsl"></span></label><label>Money Owed to CLFN</label></div>
-        <div id="arrBlk" style="display:none;">
+        <div id="arrBlk">
           <div class="divider"></div>
           <div class="fg c3">
             <div class="f"><label>Amount Owed ($) <span class="r">*</span></label><input type="text" id="arrBalAmt" placeholder="$0" oninput="fmtCurrency(this)" inputmode="numeric"/></div>
@@ -529,19 +529,19 @@
               <option value="eviction_risk">Eviction Risk from Current Landlord</option>
               <option value="separation">Separation or Divorce Requiring Housing</option>
             </select>
-            <span style="font-size:11px;color:var(--muted);margin-top:3px;">Documentation required for points above 0</span>
+            <span class="txt-sm-muted-mt">Documentation required for points above 0</span>
           </div>
           <div class="f">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-              <label style="margin:0;">Health &amp; Safety Risk in Current Home</label>
+              <label class="m-0">Health &amp; Safety Risk in Current Home</label>
               <div style="position:relative;display:inline-block;">
                 <button type="button" id="health_tip_btn" onclick="var t=document.getElementById('health_tip');t.style.display=t.style.display==='block'?'none':'block';" style="width:18px;height:18px;border-radius:50%;background:var(--border);border:none;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-family:DM Sans,sans-serif;">?</button>
                 <div id="health_tip" style="display:none;position:absolute;left:0;top:24px;width:300px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;z-index:200;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
                   <div style="font-size:11px;font-weight:700;color:var(--yellow);margin-bottom:8px;text-transform:uppercase;letter-spacing:.6px;">Health &amp; Safety Risk Levels</div>
                   <div style="font-size:11px;color:var(--text);line-height:1.6;">
-                    <div style="margin-bottom:6px;"><span style="font-weight:700;color:#f87171;">Severe / Imminent (15 pts)</span><br/>Immediate risk to life or health. Examples: active mould with respiratory symptoms, condemned structure, no heat in winter, raw sewage, electrical hazard causing injury risk. Requires public health order or signed inspection report.</div>
-                    <div style="margin-bottom:6px;"><span style="font-weight:700;color:#fcd34d;">Moderate (10 pts)</span><br/>Significant hazard requiring prompt attention. Examples: major mould without acute symptoms, failing heating system, significant water intrusion, rodent infestation, broken windows in cold weather. Requires documented inspection.</div>
-                    <div style="margin-bottom:6px;"><span style="font-weight:700;color:#93c5fd;">Minor (5 pts)</span><br/>Documented hazard that poses a risk but is not immediately dangerous. Examples: minor mould, small water leaks, aging electrical, pest evidence. Requires inspection documentation.</div>
+                    <div class="mb-6"><span style="font-weight:700;color:#f87171;">Severe / Imminent (15 pts)</span><br/>Immediate risk to life or health. Examples: active mould with respiratory symptoms, condemned structure, no heat in winter, raw sewage, electrical hazard causing injury risk. Requires public health order or signed inspection report.</div>
+                    <div class="mb-6"><span style="font-weight:700;color:#fcd34d;">Moderate (10 pts)</span><br/>Significant hazard requiring prompt attention. Examples: major mould without acute symptoms, failing heating system, significant water intrusion, rodent infestation, broken windows in cold weather. Requires documented inspection.</div>
+                    <div class="mb-6"><span style="font-weight:700;color:#93c5fd;">Minor (5 pts)</span><br/>Documented hazard that poses a risk but is not immediately dangerous. Examples: minor mould, small water leaks, aging electrical, pest evidence. Requires inspection documentation.</div>
                     <div><span style="font-weight:700;color:var(--muted);">None (0 pts)</span><br/>No documented health or safety hazard in the current dwelling.</div>
                   </div>
                   <button type="button" onclick="document.getElementById('health_tip').style.display='none'" style="margin-top:10px;font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;font-family:DM Sans,sans-serif;padding:0;">Close ✕</button>
@@ -554,13 +554,13 @@
               <option value="moderate">Moderate — significant hazard (10 pts)</option>
               <option value="severe">Severe / Imminent — immediate risk (15 pts)</option>
             </select>
-            <span style="font-size:11px;color:var(--muted);margin-top:3px;">Verified by inspection report or public health order. Tap <strong>?</strong> for details on each level.</span>
+            <span class="txt-sm-muted-mt">Verified by inspection report or public health order. Tap <strong>?</strong> for details on each level.</span>
           </div>
         </div>
         <div class="fg c2">
           <div class="f">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-              <label style="margin:0;">Persons Over Occupancy Standard <span style="font-size:10px;font-weight:600;background:#eff6ff;color:#1d4ed8;padding:2px 7px;border-radius:10px;letter-spacing:.3px;vertical-align:middle;">AUTO</span></label>
+              <label class="m-0">Persons Over Occupancy Standard <span style="font-size:10px;font-weight:600;background:#eff6ff;color:#1d4ed8;padding:2px 7px;border-radius:10px;letter-spacing:.3px;vertical-align:middle;">AUTO</span></label>
               <div style="position:relative;display:inline-block;">
                 <button type="button" onclick="var t=document.getElementById('occ_tip');t.style.display=t.style.display==='block'?'none':'block';" style="width:18px;height:18px;border-radius:50%;background:var(--border);border:none;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-family:DM Sans,sans-serif;">?</button>
                 <div id="occ_tip" style="display:none;position:absolute;left:0;top:24px;width:320px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;z-index:200;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
@@ -568,12 +568,12 @@
                   <div style="font-size:11px;color:var(--text);line-height:1.6;margin-bottom:10px;">The NOS defines the appropriate number of bedrooms for a household. A dwelling is considered overcrowded when the number of people exceeds what the NOS allows for that bedroom count.</div>
                   <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Bedroom Guide (NOS)</div>
                   <table style="width:100%;font-size:11px;border-collapse:collapse;">
-                    <tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">Bachelor / Studio</td><td style="padding:4px 6px;font-weight:600;">1 person</td></tr>
-                    <tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">1 Bedroom</td><td style="padding:4px 6px;font-weight:600;">1–2 persons</td></tr>
-                    <tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">2 Bedrooms</td><td style="padding:4px 6px;font-weight:600;">2–4 persons</td></tr>
-                    <tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">3 Bedrooms</td><td style="padding:4px 6px;font-weight:600;">4–6 persons</td></tr>
-                    <tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">4 Bedrooms</td><td style="padding:4px 6px;font-weight:600;">6–8 persons</td></tr>
-                    <tr><td style="padding:4px 6px;color:var(--muted);">5 Bedrooms</td><td style="padding:4px 6px;font-weight:600;">8–10 persons</td></tr>
+                    <tr class="row-divider"><td class="cell-pad txt-xs-muted">Bachelor / Studio</td><td class="cell-pad" style="font-weight:600;">1 person</td></tr>
+                    <tr class="row-divider"><td class="cell-pad txt-xs-muted">1 Bedroom</td><td class="cell-pad" style="font-weight:600;">1–2 persons</td></tr>
+                    <tr class="row-divider"><td class="cell-pad txt-xs-muted">2 Bedrooms</td><td class="cell-pad" style="font-weight:600;">2–4 persons</td></tr>
+                    <tr class="row-divider"><td class="cell-pad txt-xs-muted">3 Bedrooms</td><td class="cell-pad" style="font-weight:600;">4–6 persons</td></tr>
+                    <tr class="row-divider"><td class="cell-pad txt-xs-muted">4 Bedrooms</td><td class="cell-pad" style="font-weight:600;">6–8 persons</td></tr>
+                    <tr><td class="cell-pad txt-xs-muted">5 Bedrooms</td><td class="cell-pad" style="font-weight:600;">8–10 persons</td></tr>
                   </table>
                   <div style="font-size:10px;color:var(--muted);margin-top:10px;line-height:1.5;font-style:italic;">Example: A family of 7 in a 3-bedroom home has 1 person over the NOS standard. Enter 1 in this field.</div>
                   <button type="button" onclick="document.getElementById('occ_tip').style.display='none'" style="margin-top:10px;font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;font-family:DM Sans,sans-serif;padding:0;">Close ✕</button>
@@ -581,7 +581,7 @@
               </div>
             </div>
             <input type="number" id="persons_over_standard" min="0" max="20" placeholder="0" readonly style="background:var(--bg);cursor:default;color:var(--text);font-weight:600;" title="Auto-calculated from household size vs. NOS"/>
-            <span style="font-size:11px;color:var(--muted);margin-top:3px;"><span style="color:#1d4ed8;font-weight:600;">&#x21BA; Auto-calculated</span> &#8212; updates as members and co-applicant are added. Based on total household size vs. the NOS for your current home. 1 pt per person over the standard, max 10 pts. Tap <strong>?</strong> for the NOS table.</span>
+            <span class="txt-sm-muted-mt"><span style="color:#1d4ed8;font-weight:600;">&#x21BA; Auto-calculated</span> &#8212; updates as members and co-applicant are added. Based on total household size vs. the NOS for your current home. 1 pt per person over the standard, max 10 pts. Tap <strong>?</strong> for the NOS table.</span>
           </div>
           <div class="f">
             <label>Income Stability</label>
@@ -590,23 +590,23 @@
               <option value="irregular">Irregular Income (2 pts)</option>
               <option value="none">No Income (0 pts)</option>
             </select>
-            <span style="font-size:11px;color:var(--muted);margin-top:3px;">All stable sources treated equally — income amount is not considered</span>
+            <span class="txt-sm-muted-mt">All stable sources treated equally — income amount is not considered</span>
           </div>
         </div>
-        <div style="margin-top:12px;">
+        <div class="mt-12">
           <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">Household Composition</div>
           <div style="display:flex;flex-wrap:wrap;gap:12px;">
             <div class="ftog">
               <label class="tsw"><input type="checkbox" id="lone_parent" onchange="triggerV2Score()"/><span class="tsl"></span></label>
-              <label>Lone Parent <span style="font-size:11px;color:var(--muted);">(+3 pts)</span></label>
+              <label>Lone Parent <span class="txt-muted-xs">(+3 pts)</span></label>
             </div>
             <div class="ftog">
               <label class="tsw"><input type="checkbox" id="elder_in_household" onchange="triggerV2Score()"/><span class="tsl"></span></label>
-              <label>Elder in Household <span style="font-size:11px;color:var(--muted);">(+3 pts)</span></label>
+              <label>Elder in Household <span class="txt-muted-xs">(+3 pts)</span></label>
             </div>
             <div class="ftog">
               <label class="tsw"><input type="checkbox" id="household_disability" onchange="triggerV2Score()"/><span class="tsl"></span></label>
-              <label>Household Member with Disability <span style="font-size:11px;color:var(--muted);">(+2 pts)</span></label>
+              <label>Household Member with Disability <span class="txt-muted-xs">(+2 pts)</span></label>
             </div>
           </div>
         </div>
@@ -615,7 +615,7 @@
       <!-- ── V2: TENANCY HISTORY (HM/ED assessed fields) ── -->
       <div class="card" id="v2_tenancy_card" style="margin-top:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
-          <div class="ctitle" style="margin:0;">Tenancy History</div>
+          <div class="ctitle" class="m-0">Tenancy History</div>
           <div id="tenancy_hm_badge" style="display:none;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:rgba(248,228,26,0.12);color:var(--yellow);border:1px solid rgba(248,228,26,0.3);">⭐ HM / ED Assessment</div>
         </div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:16px;" id="tenancy_help_text">These fields are assessed by the Housing Manager based on your CLFN tenancy record. New applicants with no prior tenancy receive a neutral baseline score.</div>
@@ -631,7 +631,7 @@
         <div id="tenancy_history_fields" style="display:none;margin-top:12px;">
           <div class="fg c3">
             <div class="f">
-              <label>Rent Payment History <span style="font-size:11px;color:var(--muted);">(max 10 pts)</span></label>
+              <label>Rent Payment History <span class="txt-muted-xs">(max 10 pts)</span></label>
               <select id="rent_payment_history" onchange="triggerV2Score()" disabled class="field-hm-only">
                 <option value="no_history">— HM Assessment Required —</option>
                 <option value="excellent">Excellent — On time 12+ months (10 pts)</option>
@@ -641,7 +641,7 @@
               </select>
             </div>
             <div class="f">
-              <label>Unit Condition / No Damage <span style="font-size:11px;color:var(--muted);">(max 10 pts)</span></label>
+              <label>Unit Condition / No Damage <span class="txt-muted-xs">(max 10 pts)</span></label>
               <select id="unit_condition" onchange="triggerV2Score()" disabled class="field-hm-only">
                 <option value="no_history">— HM Assessment Required —</option>
                 <option value="excellent">Excellent — No damage (10 pts)</option>
@@ -651,7 +651,7 @@
               </select>
             </div>
             <div class="f">
-              <label>Tenancy Conduct <span style="font-size:11px;color:var(--muted);">(max 5 pts)</span></label>
+              <label>Tenancy Conduct <span class="txt-muted-xs">(max 5 pts)</span></label>
               <select id="tenancy_conduct" onchange="triggerV2Score()" disabled class="field-hm-only">
                 <option value="no_history">— HM Assessment Required —</option>
                 <option value="clean">No complaints / violations in 2 yrs (5 pts)</option>
@@ -672,8 +672,8 @@
       <div class="sec-hdr"><h1>Employment &amp; Income</h1><p>Add income records for the applicant and co-applicant.</p></div>
       <div id="step1_error_banner" class="step-error-banner"></div>
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-          <div class="ctitle" style="margin:0;">Income Records</div>
+        <div class="flex-sb mb-16">
+          <div class="ctitle" class="m-0">Income Records</div>
           <button class="btn btn-sec" onclick="addIncome()">+ Add Income Record</button>
         </div>
         <div id="incomeList"></div>
@@ -688,7 +688,7 @@
       <div class="card">
         <div class="ctitle">Co-Applicant Status</div>
         <div class="f"><label>Co-Applicant Status</label><select id="co_status" onchange="calcPersonsOverStandard();triggerV2Score();var b=document.getElementById('coBlk');if(b)b.style.display=this.value==='yes'?'block':'none';"><option value="no">No Co-Applicant</option><option value="yes">Yes — Add Co-Applicant</option></select></div>
-        <div id="coBlk" style="display:none;">
+        <div id="coBlk">
           <div class="divider"></div>
           <div class="fg c2">
             <div class="f"><label>First Name <span class="r">*</span></label><input type="text" id="co_fn"/></div>
@@ -711,8 +711,8 @@
       <div class="sec-hdr"><h1>Household Members</h1><p>List all people who will be living in the unit.</p></div>
       <div id="step3_error_banner" class="step-error-banner"></div>
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-          <div class="ctitle" style="margin:0;">Household Members</div>
+        <div class="flex-sb mb-16">
+          <div class="ctitle" class="m-0">Household Members</div>
           <button class="btn btn-sec" onclick="addHab()">+ Add Member</button>
         </div>
         <div id="habList"></div>
@@ -726,8 +726,8 @@
       <div class="sec-hdr"><h1>References</h1><p>Two references are required — personal, professional, or community.</p></div>
       <div id="step4_error_banner" class="step-error-banner"></div>
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-          <div class="ctitle" style="margin:0;">References</div>
+        <div class="flex-sb mb-16">
+          <div class="ctitle" class="m-0">References</div>
           <button class="btn btn-sec" onclick="addRef()">+ Add Reference</button>
         </div>
         <div id="refList"></div>
@@ -740,8 +740,8 @@
       <div class="sec-hdr"><h1>Pets</h1><p>List any pets that will be living in the unit.</p></div>
       <div id="step5_error_banner" class="step-error-banner"></div>
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-          <div class="ctitle" style="margin:0;">Pets</div>
+        <div class="flex-sb mb-16">
+          <div class="ctitle" class="m-0">Pets</div>
           <button class="btn btn-sec" onclick="addPet()">+ Add Pet</button>
         </div>
         <div id="petList"></div>
@@ -769,70 +769,70 @@
     </div>
 
     <!-- STEP 7: SCORING (hidden) -->
-    <div class="sp" id="step7" style="display:none;">
+    <div class="sp" id="step7">
       <input type="hidden" id="sc_reserve"/><input type="hidden" id="sc_band_count"/><input type="hidden" id="sc_income"/><input type="hidden" id="sc_rel"/><input type="hidden" id="sc_age"/><input type="hidden" id="sc_access" type="checkbox"/><input type="hidden" id="sc_movein"/><input type="hidden" id="sc_movein_v"/><input type="hidden" id="sc_homecond"/><input type="hidden" id="sc_renos"/><input type="hidden" id="sc_arrears"/><input type="hidden" id="sc_payment"/><input type="hidden" id="sc_appdate"/><input type="hidden" id="sc_size" value="1"/>
-      <input type="hidden" id="edAdjustment" value="0"/><input type="hidden" id="edAdjustReason" value=""/><textarea id="edNotes" style="display:none;"></textarea>
+      <input type="hidden" id="edAdjustment" value="0"/><input type="hidden" id="edAdjustReason" value=""/><textarea id="edNotes"></textarea>
     </div>
 
     <!-- STEP 8: REVIEW & SUBMIT -->
     <div class="sp" id="step8">
       <div class="sec-hdr"><h1>Review &amp; Submit</h1><p>Review your application before submitting. Once submitted, it will be sent to the Housing Manager for review.</p></div>
-      <div id="reviewContent" class="card" style="padding:0;overflow:hidden;">
-        <div style="padding:20px 24px;border-bottom:1px solid var(--border);"><div style="font-size:12px;color:var(--muted);">Complete application summary will appear here.</div></div>
+      <div id="reviewContent" class="card card-flush">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);"><div class="txt-muted-sm">Complete application summary will appear here.</div></div>
       </div>
       <div class="card"><div class="ctitle">Approval Status</div><div id="approvalFlow" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;"></div></div>
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div class="modal-hdr"><div class="ctitle" style="margin:0;">Disclosure &amp; Signatures</div></div>
+      <div class="card card-flush">
+        <div class="modal-hdr"><div class="ctitle" class="m-0">Disclosure &amp; Signatures</div></div>
         <div style="padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg);"><p style="font-size:12px;color:var(--muted);line-height:1.6;">By signing below, I declare that all information provided in this application is true and complete to the best of my knowledge.</p></div>
         <!-- Applicant -->
         <div style="padding:20px;border-bottom:1px solid var(--border);">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">1</div><div><div style="font-size:13px;font-weight:700;color:var(--text);">Applicant</div><div style="font-size:11px;color:var(--muted);">Primary applicant signature</div></div></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">1</div><div><div class="txt-sm-bold">Applicant</div><div class="txt-muted-xs">Primary applicant signature</div></div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;"><div class="f"><label>Full Name</label><input type="text" id="sig_name" placeholder="Print full name"/></div><div class="f"><label>Date</label><input type="date" id="sig_date"/></div></div>
-          <div style="border:1.5px solid var(--border);border-radius:8px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('sig_canvas_app','canvas')" id="sig_canvas_app_tab_canvas" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:11px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_app','type')" id="sig_canvas_app_tab_type" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_app','wet')" id="sig_canvas_app_tab_wet" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sig_canvas_app_panel_canvas" style="background:#fafaf8;"><canvas id="sig_canvas_app" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_app')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_app_panel_type" style="display:none;padding:16px 14px;background:#fafaf8;"><input type="text" id="sig_canvas_app_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_app_panel_wet" style="display:none;padding:16px 14px;background:#fafaf8;"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_app_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+          <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sig_canvas_app','canvas')" id="sig_canvas_app_tab_canvas" class="tab-item active">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_app','type')" id="sig_canvas_app_tab_type" class="tab-item">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_app','wet')" id="sig_canvas_app_tab_wet" class="tab-item">🖊 Wet / E-Sign</button></div><div id="sig_canvas_app_panel_canvas" class="bg-paper"><canvas id="sig_canvas_app" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_app')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_app_panel_type" class="sec-hidden"><input type="text" id="sig_canvas_app_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_app_panel_wet" class="sec-hidden"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_app_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
         </div>
         <!-- Co-Applicant -->
         <div id="sig_coapplicant_block" style="padding:20px;border-bottom:1px solid var(--border);display:none;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">2</div><div><div style="font-size:13px;font-weight:700;color:var(--text);">Co-Applicant</div></div></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">2</div><div><div class="txt-sm-bold">Co-Applicant</div></div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;"><div class="f"><label>Full Name</label><input type="text" id="sig_co_name" placeholder="Co-applicant full name"/></div><div class="f"><label>Date</label><input type="date" id="sig_co_date"/></div></div>
-          <div style="border:1.5px solid var(--border);border-radius:8px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('sig_canvas_co','canvas')" id="sig_canvas_co_tab_canvas" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:11px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_co','type')" id="sig_canvas_co_tab_type" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_co','wet')" id="sig_canvas_co_tab_wet" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sig_canvas_co_panel_canvas" style="background:#fafaf8;"><canvas id="sig_canvas_co" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_co')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_co_panel_type" style="display:none;padding:16px 14px;background:#fafaf8;"><input type="text" id="sig_canvas_co_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_co_panel_wet" style="display:none;padding:16px 14px;background:#fafaf8;"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_co_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+          <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sig_canvas_co','canvas')" id="sig_canvas_co_tab_canvas" class="tab-item active">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_co','type')" id="sig_canvas_co_tab_type" class="tab-item">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_co','wet')" id="sig_canvas_co_tab_wet" class="tab-item">🖊 Wet / E-Sign</button></div><div id="sig_canvas_co_panel_canvas" class="bg-paper"><canvas id="sig_canvas_co" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_co')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_co_panel_type" class="sec-hidden"><input type="text" id="sig_canvas_co_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_co_panel_wet" class="sec-hidden"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_co_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
         </div>
         <!-- Staff -->
-        <div style="padding:20px;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--surface);border:2px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">3</div><div><div style="font-size:13px;font-weight:700;color:var(--text);">Housing Staff</div><div style="font-size:11px;color:var(--muted);">Employee receiving this application</div></div></div>
+        <div class="sec-pad">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--surface);border:2px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">3</div><div><div class="txt-sm-bold">Housing Staff</div><div class="txt-muted-xs">Employee receiving this application</div></div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;"><div class="f"><label>Staff Full Name</label><input type="text" id="sig_staff" placeholder="Staff full name"/></div><div class="f"><label>Date Received</label><input type="date" id="sig_recv"/></div></div>
-          <div style="border:1.5px solid var(--border);border-radius:8px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('sig_canvas_staff','canvas')" id="sig_canvas_staff_tab_canvas" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:11px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_staff','type')" id="sig_canvas_staff_tab_type" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_staff','wet')" id="sig_canvas_staff_tab_wet" style="flex:1;padding:7px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sig_canvas_staff_panel_canvas" style="background:#fafaf8;"><canvas id="sig_canvas_staff" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_staff_panel_type" style="display:none;padding:16px 14px;background:#fafaf8;"><input type="text" id="sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_staff_panel_wet" style="display:none;padding:16px 14px;background:#fafaf8;"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+          <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sig_canvas_staff','canvas')" id="sig_canvas_staff_tab_canvas" class="tab-item active">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_staff','type')" id="sig_canvas_staff_tab_type" class="tab-item">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_staff','wet')" id="sig_canvas_staff_tab_wet" class="tab-item">🖊 Wet / E-Sign</button></div><div id="sig_canvas_staff_panel_canvas" class="bg-paper"><canvas id="sig_canvas_staff" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_staff_panel_type" class="sec-hidden"><input type="text" id="sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_staff_panel_wet" class="sec-hidden"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
         </div>
       </div>
       <!-- Internal Use -->
-      <div class="card" style="padding:0;overflow:hidden;border-color:var(--yellow);">
-        <div class="modal-hdr"><div class="ctitle" style="margin:0;">⭐ Internal Use Only</div><span style="font-size:11px;color:#888;font-weight:400;text-transform:none;letter-spacing:0;">— Housing Manager &amp; Executive Director</span></div>
+      <div class="card card-flush-gold">
+        <div class="modal-hdr"><div class="ctitle" class="m-0">⭐ Internal Use Only</div><span style="font-size:11px;color:#888;font-weight:400;text-transform:none;letter-spacing:0;">— Housing Manager &amp; Executive Director</span></div>
         <div style="padding:20px;border-bottom:1px solid var(--border);">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><div style="width:28px;height:28px;border-radius:50%;background:rgba(29,78,216,0.15);border:2px solid #1d4ed8;color:#1d4ed8;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">HM</div><div><div style="font-size:13px;font-weight:700;color:var(--text);">Housing Manager Approval</div><div style="font-size:11px;color:var(--muted);">Recorded automatically when the HM opens this application — no signature required</div></div></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><div style="width:28px;height:28px;border-radius:50%;background:rgba(29,78,216,0.15);border:2px solid #1d4ed8;color:#1d4ed8;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">HM</div><div><div class="txt-sm-bold">Housing Manager Approval</div><div class="txt-muted-xs">Recorded automatically when the HM opens this application — no signature required</div></div></div>
           <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:12px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
-              <div><div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Housing Manager</div><input type="text" id="sig_hm_name" placeholder="Auto-populated on review" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
-              <div><div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Date Reviewed</div><input type="date" id="sig_hm_date" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
+              <div><div class="lbl-muted mb-4">Housing Manager</div><input type="text" id="sig_hm_name" placeholder="Auto-populated on review" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
+              <div><div class="lbl-muted mb-4">Date Reviewed</div><input type="date" id="sig_hm_date" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-              <div><div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Decision</div><select id="sig_hm_decision" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;font-family:DM Sans,sans-serif;"><option value="">— Pending HM Review —</option><option>Recommended</option><option>Returned — More Info Required</option><option>Declined</option></select></div>
-              <div><div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Notes</div><input type="text" id="sig_hm_notes" placeholder="Optional review notes" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;"/></div>
+            <div class="form-row-2">
+              <div><div class="lbl-muted mb-4">Decision</div><select id="sig_hm_decision" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;font-family:DM Sans,sans-serif;"><option value="">— Pending HM Review —</option><option>Recommended</option><option>Returned — More Info Required</option><option>Declined</option></select></div>
+              <div><div class="lbl-muted mb-4">Notes</div><input type="text" id="sig_hm_notes" placeholder="Optional review notes" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;"/></div>
             </div>
           </div>
-          <div style="margin-top:8px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Signature</div><div style="border-bottom:1.5px solid var(--border);height:48px;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Housing Manager — sign on printed copy</div></div>
+          <div class="mt-8"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Signature</div><div style="border-bottom:1.5px solid var(--border);height:48px;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Housing Manager — sign on printed copy</div></div>
         </div>
-        <div style="padding:20px;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><div style="width:28px;height:28px;border-radius:50%;background:rgba(248,228,26,0.12);border:2px solid var(--yellow);color:var(--yellow);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">ED</div><div><div style="font-size:13px;font-weight:700;color:var(--text);">Executive Director Approval</div><div style="font-size:11px;color:var(--muted);">Final approval — recorded automatically when the ED opens this application</div></div></div>
+        <div class="sec-pad">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><div style="width:28px;height:28px;border-radius:50%;background:rgba(248,228,26,0.12);border:2px solid var(--yellow);color:var(--yellow);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">ED</div><div><div class="txt-sm-bold">Executive Director Approval</div><div class="txt-muted-xs">Final approval — recorded automatically when the ED opens this application</div></div></div>
           <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:12px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
-              <div><div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Executive Director</div><input type="text" id="sig_ed_name" placeholder="Auto-populated on review" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
-              <div><div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Date Reviewed</div><input type="date" id="sig_ed_date" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
+              <div><div class="lbl-muted mb-4">Executive Director</div><input type="text" id="sig_ed_name" placeholder="Auto-populated on review" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
+              <div><div class="lbl-muted mb-4">Date Reviewed</div><input type="date" id="sig_ed_date" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-              <div><div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Decision</div><select id="sig_ed_decision" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;font-family:DM Sans,sans-serif;"><option value="">— Pending ED Review —</option><option>Approved</option><option>Declined</option><option>Deferred</option></select></div>
-              <div><div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Notes</div><input type="text" id="sig_ed_notes_sig" placeholder="Optional notes" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;"/></div>
+            <div class="form-row-2">
+              <div><div class="lbl-muted mb-4">Decision</div><select id="sig_ed_decision" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;font-family:DM Sans,sans-serif;"><option value="">— Pending ED Review —</option><option>Approved</option><option>Declined</option><option>Deferred</option></select></div>
+              <div><div class="lbl-muted mb-4">Notes</div><input type="text" id="sig_ed_notes_sig" placeholder="Optional notes" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;"/></div>
             </div>
           </div>
-          <div style="margin-top:8px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Signature</div><div style="border-bottom:1.5px solid var(--border);height:48px;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Executive Director — sign on printed copy</div></div>
+          <div class="mt-8"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Signature</div><div style="border-bottom:1.5px solid var(--border);height:48px;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Executive Director — sign on printed copy</div></div>
         </div>
       </div>
       <div class="fnav sig-actions">
@@ -846,7 +846,7 @@
 </div><!-- end appLayout -->
 
 <!-- ═══ INDIVIDUAL SCORECARD VIEW ═══ -->
-<div id="scorecardView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
+<div id="scorecardView" class="dash-view">
   <div class="page-back-row">
     <button onclick="showDash()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -876,13 +876,13 @@
       <div>
         <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:4px;">Total Application Score</div>
         <div style="display:flex;align-items:baseline;gap:8px;">
-          <span id="sc_score_total" style="font-size:52px;font-weight:700;color:var(--yellow);line-height:1;">—</span><span id="totalScore" style="display:none;">—</span>
+          <span id="sc_score_total" style="font-size:52px;font-weight:700;color:var(--yellow);line-height:1;">—</span><span id="totalScore">—</span>
           <span style="font-size:14px;color:#666;">points</span>
         </div>
       </div>
       <div style="text-align:right;">
         <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:6px;">Priority Tier</div>
-        <div id="sc_score_tier" style="font-size:15px;font-weight:700;padding:8px 20px;border-radius:8px;background:#2a2a28;color:#aaa;">—</div><span id="priorityTier" style="display:none;">—</span>
+        <div id="sc_score_tier" style="font-size:15px;font-weight:700;padding:8px 20px;border-radius:8px;background:#2a2a28;color:#aaa;">—</div><span id="priorityTier">—</span>
       </div>
       <div style="flex:1;min-width:200px;">
         <div style="font-size:11px;color:#666;margin-bottom:6px;">Score bar</div>
@@ -897,21 +897,21 @@
     <div id="sc_info_strip" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 20px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:12px 28px;align-items:flex-start;"></div>
     <!-- ── APPROVAL ACTION BAR ── -->
     <div id="sc_action_bar" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:20px;display:none;">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:12px;">Approval Actions</div>
+      <div class="lbl-muted" style="margin-bottom:12px">Approval Actions</div>
       <div id="sc_action_buttons"></div>
     </div>
     <div class="card" style="border:2px solid var(--yellow);margin-bottom:20px;">
       <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="var b=document.getElementById('sc_ed_panel_body');b.style.display=b.style.display==='none'?'block':'none';">
-        <div class="ctitle" style="margin:0;">⭐ ED Adjustment Factor <span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">— Executive Director only</span></div>
+        <div class="ctitle" class="m-0">⭐ ED Adjustment Factor <span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">— Executive Director only</span></div>
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div id="sc_ed_panel_body">
         <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Apply a manual point adjustment. Changes are saved to this application record immediately.</div>
         <div class="fg c2">
-          <div class="f"><label>Adjustment Points</label><input type="number" id="sc_ed_adj_pts" placeholder="e.g. +5 or -3" step="1" min="-20" max="20"/><span style="font-size:11px;color:var(--muted);margin-top:3px;">Positive = higher priority · Negative = lower priority</span></div>
+          <div class="f"><label>Adjustment Points</label><input type="number" id="sc_ed_adj_pts" placeholder="e.g. +5 or -3" step="1" min="-20" max="20"/><span class="txt-sm-muted-mt">Positive = higher priority · Negative = lower priority</span></div>
           <div class="f"><label>Reason for Adjustment</label><input type="text" id="sc_ed_adj_reason" placeholder="Brief reason (visible to HM and ED)"/></div>
         </div>
-        <div class="f" style="margin-top:12px;"><label>ED Notes <span style="font-size:11px;font-weight:400;color:var(--muted);">— internal only</span></label><textarea id="sc_ed_adj_notes" rows="3" placeholder="Executive Director notes..."></textarea></div>
+        <div class="f" class="mt-12"><label>ED Notes <span style="font-size:11px;font-weight:400;color:var(--muted);">— internal only</span></label><textarea id="sc_ed_adj_notes" rows="3" placeholder="Executive Director notes..."></textarea></div>
         <div style="margin-top:14px;display:flex;gap:10px;">
           <button onclick="saveEdAdjustment()" class="btn btn-primary">Save Adjustment</button>
           <div id="sc_ed_save_msg" style="font-size:12px;color:#15803d;display:none;align-items:center;gap:4px;">✓ Saved</div>
@@ -965,7 +965,7 @@
   </div>
 
   <!-- Section nav tabs -->
-  <div class="tabs" style="margin-bottom:20px;">
+  <div class="tabs" class="mb-20">
     <button onclick="showSettingsSection('sec_users')" id="stab_users" class="settings-tab tab-btn active">👥 Users</button>
     <button onclick="showSettingsSection('sec_app_scoring')" id="stab_app_scoring" class="settings-tab tab-btn">⭐ Application Scoring</button>
     <button onclick="showSettingsSection('sec_unit_match')" id="stab_unit_match" class="settings-tab tab-btn">🏠 Unit Matching</button>
@@ -973,27 +973,27 @@
     <button onclick="showSettingsSection('sec_budget')" id="stab_budget" class="settings-tab tab-btn">💰 Reno Budget</button>
     <button onclick="showSettingsSection('sec_contacts')" id="stab_contacts" class="settings-tab tab-btn">📧 Contacts</button>
     <button onclick="showSettingsSection('sec_nation');renderNationPanel();" id="stab_nation" class="settings-tab tab-btn">🌐 Nation</button>
-    <button onclick="showSettingsSection('sec_approval_authority');renderApprovalAuthorityPanel();" id="stab_approval_authority" class="settings-tab tab-btn" style="display:none;">🔐 Approval Authority</button>
-    <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="settings-tab tab-btn" style="display:none;">📋 Audit Log</button>
-    <button onclick="showSettingsSection('sec_occupancy')" id="stab_occupancy" class="settings-tab tab-btn" style="display:none;">🏘 Occupancy</button>
+    <button onclick="showSettingsSection('sec_approval_authority');renderApprovalAuthorityPanel();" id="stab_approval_authority" class="settings-tab tab-btn">🔐 Approval Authority</button>
+    <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="settings-tab tab-btn">📋 Audit Log</button>
+    <button onclick="showSettingsSection('sec_occupancy')" id="stab_occupancy" class="settings-tab tab-btn">🏘 Occupancy</button>
   </div>
 
   <!-- ── USERS ── -->
   <div id="sec_users" class="settings-section">
     <div class="card">
-      <div class="ctitle" style="margin-bottom:4px;">Application Users</div>
+      <div class="ctitle" class="mb-4">Application Users</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Staff with access to the CLFN Housing Application. <span id="users_role_note" style="color:var(--yellow);font-weight:600;"></span></div>
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
         <input type="email" id="user_lookup_email" placeholder="Enter @clfn.on.ca email to search or add..." style="flex:1;min-width:200px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;font-family:DM Sans,sans-serif;" oninput="userLookupDebounce()" onkeydown="if(event.key==='Enter')lookupUser()"/>
         <button onclick="lookupUser()" class="btn btn-primary" style="white-space:nowrap;">Look Up</button>
       </div>
-      <div id="user_lookup_result" style="display:none;"></div>
+      <div id="user_lookup_result"></div>
       <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px;">
         <table style="width:100%;border-collapse:collapse;min-width:320px;">
           <thead><tr>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--yellow);">Name</th>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--yellow);">Email</th>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--yellow);">Housing Role</th>
+            <th class="lbl-muted" style="text-align:left;padding:8px 12px;border-bottom:1px solid var(--yellow)">Name</th>
+            <th class="lbl-muted" style="text-align:left;padding:8px 12px;border-bottom:1px solid var(--yellow)">Email</th>
+            <th class="lbl-muted" style="text-align:left;padding:8px 12px;border-bottom:1px solid var(--yellow)">Housing Role</th>
             <th style="padding:8px 12px;border-bottom:1px solid var(--yellow);"></th>
           </tr></thead>
           <tbody id="userTableBody"></tbody>
@@ -1003,23 +1003,23 @@
   </div>
 
   <!-- ── CONTACTS ── -->
-  <div id="sec_contacts" class="settings-section" style="display:none;">
+  <div id="sec_contacts" class="settings-section">
     <div class="card">
       <div class="ctitle">📧 Workflow Notification Contacts</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:20px;">Email addresses used for approval workflow notifications. Emails are sent automatically at each approval step.</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
         <div>
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border);">Housing Manager</div>
+          <div class="lbl-muted" style="margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)">Housing Manager</div>
           <div style="display:flex;flex-direction:column;gap:10px;">
-            <div class="f"><label>Full Name</label><input type="text" id="hm_name" placeholder="e.g. James Sutherland" style="background:var(--bg);"/></div>
-            <div class="f"><label>Email Address</label><input type="email" id="hm_email" placeholder="e.g. james.sutherland@clfn.on.ca" style="background:var(--bg);"/></div>
+            <div class="f"><label>Full Name</label><input type="text" id="hm_name" placeholder="e.g. James Sutherland" class="bg-bg"/></div>
+            <div class="f"><label>Email Address</label><input type="email" id="hm_email" placeholder="e.g. james.sutherland@clfn.on.ca" class="bg-bg"/></div>
           </div>
         </div>
         <div>
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border);">Executive Director</div>
+          <div class="lbl-muted" style="margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)">Executive Director</div>
           <div style="display:flex;flex-direction:column;gap:10px;">
-            <div class="f"><label>Full Name</label><input type="text" id="ed_name" placeholder="e.g. Kevin Proctor" style="background:var(--bg);"/></div>
-            <div class="f"><label>Email Address</label><input type="email" id="ed_email" placeholder="e.g. kevin.proctor@clfn.on.ca" style="background:var(--bg);"/></div>
+            <div class="f"><label>Full Name</label><input type="text" id="ed_name" placeholder="e.g. Kevin Proctor" class="bg-bg"/></div>
+            <div class="f"><label>Email Address</label><input type="email" id="ed_email" placeholder="e.g. kevin.proctor@clfn.on.ca" class="bg-bg"/></div>
           </div>
         </div>
       </div>
@@ -1042,38 +1042,38 @@
   </div>
 
   <!-- ── HOUSING APPLICATION SCORING ── -->
-  <div id="sec_app_scoring" class="settings-section" style="display:none;">
+  <div id="sec_app_scoring" class="settings-section">
     <div id="scoring_model_section">
-      <div class="card" style="padding:0;overflow:hidden;border-color:var(--yellow);">
+      <div class="card card-flush-gold">
         <div class="modal-hdr">
           <div>
-            <div class="ctitle" style="margin:0;">⭐ Housing Application Scoring Model — V2</div>
-            <div style="font-size:11px;color:#888;font-weight:400;margin-top:2px;">ED only — edit point values and priority tier thresholds. Changes apply on next rescore.</div>
+            <div class="ctitle" class="m-0">⭐ Housing Application Scoring Model — V2</div>
+            <div class="txt-sm-meta">ED only — edit point values and priority tier thresholds. Changes apply on next rescore.</div>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <div class="flex-gap8 flex-wrap">
             <button onclick="rescoreAndSave()" style="background:var(--yellow);border:none;color:#111;padding:6px 14px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">↻ Rescore All Applications</button>
             <button onclick="resetV2ScoringModelED()" style="background:none;border:1px solid #444;color:#888;padding:6px 12px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;">Reset All Defaults</button>
           </div>
         </div>
-        <div id="scoring_model_table_wrap" style="padding:20px;"></div>
+        <div id="scoring_model_table_wrap" class="sec-pad"></div>
       </div>
     </div>
   </div>
 
   <!-- ── UNIT MATCHING SCORING ── -->
-  <div id="sec_unit_match" class="settings-section" style="display:none;">
-    <div class="card" style="padding:0;overflow:hidden;">
+  <div id="sec_unit_match" class="settings-section">
+    <div class="card card-flush">
       <div class="modal-hdr">
-        <div><div class="ctitle" style="margin:0;">🏠 Unit Matching Scoring</div><div style="font-size:11px;color:#888;font-weight:400;margin-top:2px;">Point values used to score applicant-to-unit matches in the Match Scorecard</div></div>
+        <div><div class="ctitle" class="m-0">🏠 Unit Matching Scoring</div><div class="txt-sm-meta">Point values used to score applicant-to-unit matches in the Match Scorecard</div></div>
         <button type="button" id="settings_save_unit_btn" onclick="saveUnitScoreModelED()" style="background:var(--yellow);border:none;color:#111;padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save</button>
       </div>
       <div style="padding:20px;display:flex;flex-direction:column;gap:0;">
         <table style="width:100%;border-collapse:collapse;">
-          <thead><tr style="border-bottom:2px solid var(--border);">
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Factor</th>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Condition</th>
+          <thead><tr class="border-b2">
+            <th class="th-hdr">Factor</th>
+            <th class="th-hdr">Condition</th>
             <th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Points</th>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Notes</th>
+            <th class="th-hdr">Notes</th>
           </tr></thead>
           <tbody id="unit_score_tbody"></tbody>
         </table>
@@ -1083,25 +1083,25 @@
   </div>
 
   <!-- ── RENOVATION PRIORITY SCORING ── -->
-  <div id="sec_reno_score" class="settings-section" style="display:none;">
-    <div class="card" style="padding:0;overflow:hidden;border-color:var(--yellow);">
+  <div id="sec_reno_score" class="settings-section">
+    <div class="card card-flush-gold">
       <div class="modal-hdr">
         <div>
-          <div class="ctitle" style="margin:0;">🔨 Renovation Priority Scoring</div>
-          <div style="font-size:11px;color:#888;font-weight:400;margin-top:2px;">Points used to rank units for renovation — drawn from unit condition, SOW data, and tenant factors</div>
+          <div class="ctitle" class="m-0">🔨 Renovation Priority Scoring</div>
+          <div class="txt-sm-meta">Points used to rank units for renovation — drawn from unit condition, SOW data, and tenant factors</div>
         </div>
         <div style="display:flex;gap:8px;">
           <button type="button" id="settings_reset_reno_btn" onclick="resetRenoScoreModelED()" style="background:none;border:1px solid #444;color:#888;padding:6px 12px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;">Reset Defaults</button>
           <button type="button" id="settings_save_reno_btn" onclick="saveRenoScoreModelED()" style="background:var(--yellow);border:none;color:#111;padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save</button>
         </div>
       </div>
-      <div style="padding:20px;">
+      <div class="sec-pad">
         <table style="width:100%;border-collapse:collapse;">
-          <thead><tr style="border-bottom:2px solid var(--border);">
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Category</th>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Condition</th>
+          <thead><tr class="border-b2">
+            <th class="th-hdr">Category</th>
+            <th class="th-hdr">Condition</th>
             <th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Points</th>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Notes</th>
+            <th class="th-hdr">Notes</th>
           </tr></thead>
           <tbody id="reno_score_tbody"></tbody>
         </table>
@@ -1113,15 +1113,15 @@
   </div>
 
   <!-- ── RENOVATION BUDGET ── -->
-  <div id="sec_budget" class="settings-section" style="display:none;">
-    <div class="card" style="padding:0;overflow:hidden;">
+  <div id="sec_budget" class="settings-section">
+    <div class="card card-flush">
       <div class="modal-hdr">
-        <div><div class="ctitle" style="margin:0;">💰 Renovation Budget</div><div style="font-size:11px;color:#888;font-weight:400;margin-top:2px;">Enter annual funding allocations by source</div></div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div style="font-size:12px;color:var(--muted);">Fiscal Year: <input id="budget_fiscal_year" type="text" value="2025-2026" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--surface);color:var(--text);width:90px;"/></div>
+        <div><div class="ctitle" class="m-0">💰 Renovation Budget</div><div class="txt-sm-meta">Enter annual funding allocations by source</div></div>
+        <div class="flex-gap10">
+          <div class="txt-muted-sm">Fiscal Year: <input id="budget_fiscal_year" type="text" value="2025-2026" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--surface);color:var(--text);width:90px;"/></div>
           <div class="f" style="margin-bottom:14px;">
               <label style="font-size:12px;font-weight:600;color:var(--muted);">HM Budget Authority Limit</label>
-              <div style="display:flex;align-items:center;gap:8px;">
+              <div class="flex-gap8">
                 <span style="font-size:13px;color:var(--muted);">$</span>
                 <input type="number" id="settings_hm_budget_limit" min="0" step="1000"
                   style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--surface);color:var(--text);"
@@ -1132,12 +1132,12 @@
             <button type="button" id="settings_save_budget_btn" onclick="saveBudgetPoolsED()" style="background:var(--yellow);border:none;color:#111;padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save Budgets</button>
         </div>
       </div>
-      <div style="padding:20px;">
+      <div class="sec-pad">
         <table style="width:100%;border-collapse:collapse;">
-          <thead><tr style="border-bottom:2px solid var(--border);">
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Fund Source</th>
+          <thead><tr class="border-b2">
+            <th class="th-hdr">Fund Source</th>
             <th style="text-align:right;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Annual Allocation ($)</th>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Notes</th>
+            <th class="th-hdr">Notes</th>
           </tr></thead>
           <tbody id="budget_pools_tbody"></tbody>
           <tfoot><tr style="border-top:2px solid var(--border);background:var(--bg);">
@@ -1154,38 +1154,38 @@
   <!-- ── AUDIT LOG ── -->
 
   <!-- ── APPROVAL AUTHORITY ── -->
-  <div id="sec_approval_authority" class="settings-section" style="display:none;">
-    <div class="card" style="padding:0;overflow:hidden;border-color:var(--yellow);">
+  <div id="sec_approval_authority" class="settings-section">
+    <div class="card card-flush-gold">
       <div class="modal-hdr">
         <div>
-          <div class="ctitle" style="margin:0;">🔐 Approval Authority</div>
+          <div class="ctitle" class="m-0">🔐 Approval Authority</div>
           <div style="font-size:11px;color:#888;font-weight:400;margin-top:3px;">Controls which <strong>roles</strong> can perform each action. ED only.</div>
         </div>
         <button onclick="saveApprovalAuthoritySettings()" style="background:var(--yellow);border:none;color:#111;padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save Changes</button>
       </div>
-      <div style="padding:20px;" id="approval_authority_panel_body">
+      <div class="sec-pad" id="approval_authority_panel_body">
         <div style="padding:32px;text-align:center;color:var(--muted);font-size:13px;">Loading…</div>
       </div>
     </div>
   </div>
 
-  <div id="sec_audit" class="settings-section" style="display:none;">
-    <div class="card" style="padding:0;overflow:hidden;">
+  <div id="sec_audit" class="settings-section">
+    <div class="card card-flush">
       <div class="modal-hdr">
         <div>
-          <div class="ctitle" style="margin:0;">📋 Audit Log</div>
-          <div style="font-size:11px;color:#888;font-weight:400;margin-top:2px;">Full activity trail — applications, approvals, unit edits, SOW, and system changes</div>
+          <div class="ctitle" class="m-0">📋 Audit Log</div>
+          <div class="txt-sm-meta">Full activity trail — applications, approvals, unit edits, SOW, and system changes</div>
         </div>
         <button type="button" onclick="renderAuditLog()" style="background:none;border:1px solid #444;color:#888;padding:6px 12px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;">↻ Refresh</button>
       </div>
       <div style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;min-width:640px;">
           <thead><tr style="border-bottom:2px solid var(--border);background:var(--bg);">
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;white-space:nowrap;">Date / Time</th>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;white-space:nowrap;">ID / Ref</th>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;white-space:nowrap;">Event</th>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Detail</th>
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;white-space:nowrap;">By</th>
+            <th class="th-hdr">Date / Time</th>
+            <th class="th-hdr">ID / Ref</th>
+            <th class="th-hdr">Event</th>
+            <th class="th-hdr">Detail</th>
+            <th class="th-hdr">By</th>
           </tr></thead>
           <tbody id="audit_log_tbody"></tbody>
         </table>
@@ -1193,29 +1193,29 @@
     </div>
   </div>
   <!-- ── NATION / MODULES (read-only) ── -->
-  <div id="sec_nation" class="settings-section" style="display:none;">
-    <div class="card" style="padding:0;overflow:hidden;">
+  <div id="sec_nation" class="settings-section">
+    <div class="card card-flush">
       <div class="modal-hdr">
-        <div class="ctitle" style="margin:0;">🌐 Nation &amp; Modules</div>
-        <div style="font-size:11px;color:#888;font-weight:400;margin-top:2px;">Which nation this app is running for, and which optional modules your nation has licensed. Read-only — to change, contact your platform administrator.</div>
+        <div class="ctitle" class="m-0">🌐 Nation &amp; Modules</div>
+        <div class="txt-sm-meta">Which nation this app is running for, and which optional modules your nation has licensed. Read-only — to change, contact your platform administrator.</div>
       </div>
-      <div style="padding:20px;">
-        <div id="nation_panel_identity" style="margin-bottom:20px;"></div>
+      <div class="sec-pad">
+        <div id="nation_panel_identity" class="mb-20"></div>
         <div id="nation_panel_modules"></div>
       </div>
     </div>
   </div>
   <!-- ── OCCUPANCY STANDARDS SECTION ── -->
-  <div id="sec_occupancy" class="settings-section" style="display:none;">
-  <div class="card" style="padding:0;overflow:hidden;border-color:var(--yellow);">
+  <div id="sec_occupancy" class="settings-section">
+  <div class="card card-flush-gold">
     <div class="modal-hdr">
       <div>
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--yellow);">&#127968; National Occupancy Standard (NOS)</div>
+        <div class="lbl-yellow">&#127968; National Occupancy Standard (NOS)</div>
         <div style="font-size:11px;color:#888;font-weight:400;margin-top:3px;">ED only &#8212; maximum persons allowed per bedroom count. Used to auto-calculate overcrowding on applications.</div>
       </div>
       <button id="settings_save_nos_btn" onclick="saveNosTable()" style="background:var(--yellow);border:none;color:#111;padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save NOS Table</button>
     </div>
-    <div style="padding:20px;">
+    <div class="sec-pad">
       <div style="font-size:12px;color:var(--muted);margin-bottom:16px;padding:10px 14px;background:var(--bg);border-radius:8px;line-height:1.6;">
         The NOS defines the maximum number of people that can appropriately occupy a unit of a given bedroom count.
         A household is considered <strong>overcrowded</strong> when the total number of people exceeds the NOS maximum for their current home.
@@ -1223,18 +1223,18 @@
       </div>
       <table style="width:100%;border-collapse:collapse;max-width:480px;">
         <thead>
-          <tr style="border-bottom:2px solid var(--border);">
-            <th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Bedroom Count</th>
+          <tr class="border-b2">
+            <th class="th-hdr">Bedroom Count</th>
             <th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Max Persons (NOS)</th>
           </tr>
         </thead>
         <tbody id="nos_table_tbody">
-          <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 12px;font-size:13px;color:var(--text);">Studio / 0 bedrooms</td><td style="padding:10px 12px;text-align:center;"><input type="number" data-nos-beds="0" value="1" min="1" max="20" style="width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);"/><span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span></td></tr>
-          <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 12px;font-size:13px;color:var(--text);">1 bedroom</td><td style="padding:10px 12px;text-align:center;"><input type="number" data-nos-beds="1" value="2" min="1" max="20" style="width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);"/><span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span></td></tr>
-          <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 12px;font-size:13px;color:var(--text);">2 bedrooms</td><td style="padding:10px 12px;text-align:center;"><input type="number" data-nos-beds="2" value="4" min="1" max="20" style="width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);"/><span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span></td></tr>
-          <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 12px;font-size:13px;color:var(--text);">3 bedrooms</td><td style="padding:10px 12px;text-align:center;"><input type="number" data-nos-beds="3" value="6" min="1" max="20" style="width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);"/><span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span></td></tr>
-          <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 12px;font-size:13px;color:var(--text);">4 bedrooms</td><td style="padding:10px 12px;text-align:center;"><input type="number" data-nos-beds="4" value="8" min="1" max="20" style="width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);"/><span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span></td></tr>
-          <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px 12px;font-size:13px;color:var(--text);">5+ bedrooms</td><td style="padding:10px 12px;text-align:center;"><input type="number" data-nos-beds="5" value="10" min="1" max="20" style="width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);"/><span style="font-size:11px;color:var(--muted);margin-left:6px;">persons</span></td></tr>
+          <tr class="row-divider"><td class="cell-pad2">Studio / 0 bedrooms</td><td class="cell-ctr"><input type="number" data-nos-beds="0" value="1" min="1" max="20" class="score-input"/><span class="txt-sm-muted-ml">persons</span></td></tr>
+          <tr class="row-divider"><td class="cell-pad2">1 bedroom</td><td class="cell-ctr"><input type="number" data-nos-beds="1" value="2" min="1" max="20" class="score-input"/><span class="txt-sm-muted-ml">persons</span></td></tr>
+          <tr class="row-divider"><td class="cell-pad2">2 bedrooms</td><td class="cell-ctr"><input type="number" data-nos-beds="2" value="4" min="1" max="20" class="score-input"/><span class="txt-sm-muted-ml">persons</span></td></tr>
+          <tr class="row-divider"><td class="cell-pad2">3 bedrooms</td><td class="cell-ctr"><input type="number" data-nos-beds="3" value="6" min="1" max="20" class="score-input"/><span class="txt-sm-muted-ml">persons</span></td></tr>
+          <tr class="row-divider"><td class="cell-pad2">4 bedrooms</td><td class="cell-ctr"><input type="number" data-nos-beds="4" value="8" min="1" max="20" class="score-input"/><span class="txt-sm-muted-ml">persons</span></td></tr>
+          <tr class="row-divider"><td class="cell-pad2">5+ bedrooms</td><td class="cell-ctr"><input type="number" data-nos-beds="5" value="10" min="1" max="20" class="score-input"/><span class="txt-sm-muted-ml">persons</span></td></tr>
         </tbody>
       </table>
       <div style="margin-top:16px;padding:10px 14px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--muted);">
@@ -1258,9 +1258,9 @@
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Housing Inventory</div>
         <div style="font-size:16px;font-weight:700;color:#fff;">Find a Unit</div>
       </div>
-      <button type="button" onclick="closeUnitSearch()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+      <button type="button" onclick="closeUnitSearch()" class="btn-close-sm">✕</button>
     </div>
-    <div style="padding:20px 24px;">
+    <div class="sec-pad2">
       <div style="position:relative;margin-bottom:16px;">
         <input id="unit_search_input" type="text" placeholder="Search by address or street…"
           style="width:100%;box-sizing:border-box;padding:10px 14px 10px 36px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:DM Sans,sans-serif;background:var(--bg);color:var(--text);"
@@ -1275,7 +1275,7 @@
   </div>
 </div>
 
-<div id="inventoryView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
+<div id="inventoryView" class="dash-view">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -1328,7 +1328,7 @@
 </div></div><!-- end inventoryView -->
 
 <!-- ═══ MATCH VIEW ═══ -->
-<div id="matchView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
+<div id="matchView" class="dash-view">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -1358,7 +1358,7 @@
 </div></div><!-- end matchView -->
 
 <!-- ═══ TENANTS VIEW ═══ -->
-<div id="tenantsView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
+<div id="tenantsView" class="dash-view">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -1406,9 +1406,9 @@
     <div class="modal-hdr spacious">
       <div>
         <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Housing Match</div>
-        <div style="font-size:15px;font-weight:700;color:#fff;">Assign Unit to Applicant</div>
+        <div class="panel-title">Assign Unit to Applicant</div>
       </div>
-      <button onclick="closeAssignModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+      <button onclick="closeAssignModal()" class="btn-close-sm">✕</button>
     </div>
 
     <div style="padding:20px 24px;display:flex;flex-direction:column;gap:16px;">
@@ -1417,12 +1417,12 @@
       <div style="background:var(--bg);border-radius:10px;padding:14px 16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;border:1px solid var(--border);">
         <div>
           <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Applicant</div>
-          <div id="am_app_name" style="font-size:14px;font-weight:700;color:var(--text);"></div>
+          <div id="am_app_name" class="txt-md-bold"></div>
           <div id="am_app_id"   style="font-size:11px;color:var(--muted);margin-top:1px;"></div>
         </div>
         <div>
           <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Score</div>
-          <div id="am_app_score"  style="font-size:14px;font-weight:700;color:var(--text);"></div>
+          <div id="am_app_score"  class="txt-md-bold"></div>
           <div id="am_app_status" style="font-size:11px;font-weight:700;margin-top:1px;"></div>
         </div>
         <div>
@@ -1432,16 +1432,16 @@
       </div>
 
       <!-- Unit match list -->
-      <div class="card" style="padding:0;overflow:hidden;">
+      <div class="card card-flush">
         <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Available Units — Ranked by Match</div>
+          <div class="lbl-yellow">Available Units — Ranked by Match</div>
           <div id="am_role_badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,0.1);color:#ccc;"></div>
         </div>
         <div id="am_unit_list"></div>
       </div>
 
       <!-- Selection / Override notes -->
-      <div id="am_override_wrap" style="display:none;">
+      <div id="am_override_wrap">
         <div class="f">
           <label><span id="am_notes_label" style="font-weight:700;">Selection Notes</span> <span id="am_notes_req_star" style="color:#b91c1c;display:none;">*</span></label>
           <textarea id="am_override_notes" rows="2" placeholder="Notes…" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);resize:vertical;"></textarea>
@@ -1460,7 +1460,7 @@
     </div>
 
     <!-- Footer -->
-    <div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--bg);">
+    <div class="flex-sb" style="padding:14px 24px;border-top:1px solid var(--border);background:var(--bg)">
       <button onclick="closeAssignModal()" class="btn btn-ghost">Cancel</button>
       <button onclick="confirmAssignment()" id="am_confirm_btn" class="btn btn-primary" style="background:var(--yellow);color:#111;opacity:.45;cursor:not-allowed;" disabled>Select a unit above</button>
     </div>
@@ -1471,7 +1471,7 @@
 <div id="addUnitModal" class="modal-overlay modal-z-800">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:580px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
     <div class="modal-hdr spacious">
-      <div style="font-size:15px;font-weight:700;color:#fff;">Add New Unit</div>
+      <div class="panel-title">Add New Unit</div>
       <button onclick="closeAddUnitModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;">✕</button>
     </div>
     <div style="padding:24px;display:flex;flex-direction:column;gap:13px;">
@@ -1496,10 +1496,10 @@
         <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:8px;">Photos</label>
         <div id="au_photo_preview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;min-height:0;"></div>
         <div ondragover="photoDragOver(event,'au_drop_zone')" ondragleave="photoDragLeave('au_drop_zone')" ondrop="photoDrop(event,'add')"
-          id="au_drop_zone" class="upload-zone" style="padding:16px;"
+          id="au_drop_zone" class="upload-zone" class="p-16"
           onclick="document.getElementById('au_photo_input').click()">
           <div style="font-size:13px;color:var(--muted);">Drag photos or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
-          <input type="file" id="au_photo_input" accept="image/*" multiple style="display:none;" onchange="handleAddUnitPhotoUpload(this)"/>
+          <input type="file" id="au_photo_input" accept="image/*" multiple onchange="handleAddUnitPhotoUpload(this)"/>
         </div>
       </div>
     </div>
@@ -1517,7 +1517,7 @@
     <div class="modal-hdr">
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Tenant Files</div>
-        <div id="tfp_title" style="font-size:15px;font-weight:700;color:#fff;"></div>
+        <div id="tfp_title" class="panel-title"></div>
       </div>
       <button onclick="closeTenantFilesPanel()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;">✕</button>
     </div>
@@ -1533,26 +1533,26 @@
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.35);margin:auto;">
     <div class="modal-hdr sticky">
       <div>
-        <div id="udp_address" style="font-size:15px;font-weight:700;color:#fff;"></div>
+        <div id="udp_address" class="panel-title"></div>
         <div id="udp_type" style="font-size:11px;color:#888;margin-top:2px;"></div>
       </div>
       <button onclick="closeUnitDetail()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;">✕</button>
     </div>
     <div style="padding:20px;display:flex;flex-direction:column;gap:16px;">
       <div id="udp_status_row" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
-      <div id="udp_tenant_section" style="display:none;">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;">Tenant</div>
+      <div id="udp_tenant_section">
+        <div class="lbl-muted" style="margin-bottom:8px">Tenant</div>
         <div id="udp_tenant_info" style="font-size:13px;font-weight:600;"></div>
       </div>
       <div id="udp_details" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;"></div>
-      <div id="udp_notes_section" style="display:none;">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:6px;">Notes</div>
+      <div id="udp_notes_section">
+        <div class="lbl-muted" style="margin-bottom:6px">Notes</div>
         <div id="udp_notes" style="font-size:13px;color:var(--text);"></div>
       </div>
       <!-- Scopes of Work -->
       <div id="udp_sow_section">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Scopes of Work</div>
+          <div class="lbl-muted">Scopes of Work</div>
           <button onclick="udpNewSow()" style="background:var(--yellow);border:none;color:#111;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:4px;">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             New SOW
@@ -1561,14 +1561,14 @@
         <div id="udp_sow_table_wrap"></div>
       </div>
       <div><!-- Photos -->
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;">Photos</div>
+        <div class="lbl-muted" style="margin-bottom:8px">Photos</div>
         <div id="udp_photos"></div>
       </div>
       <!-- Tenant files — DocLibrary preview (read-only). Click "Manage"
            to open the full tenant-files modal with upload/delete. -->
       <div id="udp_files_section">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Tenant Files</div>
+        <div class="flex-sb" class="mb-12">
+          <div class="lbl-muted">Tenant Files</div>
           <button type="button" onclick="udpOpenFilesModal()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:var(--text);cursor:pointer;">Manage&nbsp;\u2197</button>
         </div>
         <div id="udp_files_mount"></div>
@@ -1599,7 +1599,7 @@
         <button id="sow_reopen_btn" type="button" onclick="reopenSow()" style="display:none;background:none;border:1px solid #fbbf24;color:#fbbf24;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;align-items:center;gap:5px;">↺ Reopen</button>
         <button type="button" onclick="printWorkOrder()" style="background:var(--yellow);border:none;color:#111;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;display:flex;align-items:center;gap:5px;">🏗 Work Order</button>
         <button type="button" onclick="printSOW()" style="background:none;border:1px solid #555;color:#ccc;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;">🖨 Full SOW</button>
-        <button type="button" onclick="closeSowModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+        <button type="button" onclick="closeSowModal()" class="btn-close-sm">✕</button>
       </div>
     </div>
     <!-- Read-only banner shown when SOW is completed and viewer cannot edit -->
@@ -1609,9 +1609,9 @@
     <div style="padding:24px;display:flex;flex-direction:column;gap:0;">
 
       <!-- ── UNIT INFORMATION ─────────────────────────────────────────────── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+      <div class="card card-flush-mb">
         <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Unit Information</div>
+          <div class="lbl-yellow">Unit Information</div>
         </div>
         <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="f"><label>Unit Address</label><input id="sow_address" type="text" placeholder="e.g. 11 Musko Road"/></div>
@@ -1629,9 +1629,9 @@
       </div>
 
       <!-- ── CONDITION ASSESSMENT ────────────────────────────────────────── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+      <div class="card card-flush-mb">
         <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Condition Assessment</div>
+          <div class="lbl-yellow">Condition Assessment</div>
         </div>
         <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="f"><label>Overall Condition</label>
@@ -1653,11 +1653,11 @@
       </div>
 
       <!-- ── SCOPE OF WORK ITEMS ─────────────────────────────────────────── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+      <div class="card card-flush-mb">
         <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Scope of Work Items</div>
+          <div class="lbl-yellow">Scope of Work Items</div>
         </div>
-        <div style="padding:16px;">
+        <div class="p-16">
           <div id="sow_items"></div>
           <button type="button" onclick="addSowItem()"
             style="background:none;border:1.5px dashed var(--border);color:var(--muted);padding:8px 16px;border-radius:8px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;width:100%;transition:all .15s;"
@@ -1667,35 +1667,35 @@
       </div>
 
       <!-- ── HEALTH & SAFETY ─────────────────────────────────────────────── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+      <div class="card card-flush-mb">
         <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Health &amp; Safety Concerns</div>
+          <div class="lbl-yellow">Health &amp; Safety Concerns</div>
         </div>
-        <div style="padding:16px;">
+        <div class="p-16">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sow_mold" style="width:15px;height:15px;"/> Mould / Mildew</label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sow_asbestos" style="width:15px;height:15px;"/> Asbestos Risk</label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sow_electrical" style="width:15px;height:15px;"/> Electrical Hazard</label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sow_structural" style="width:15px;height:15px;"/> Structural Concern</label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sow_plumbing" style="width:15px;height:15px;"/> Plumbing / Sewage</label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sow_fire" style="width:15px;height:15px;"/> Fire Safety</label>
+            <label class="check-row"><input type="checkbox" id="sow_mold" class="icon-sm"/> Mould / Mildew</label>
+            <label class="check-row"><input type="checkbox" id="sow_asbestos" class="icon-sm"/> Asbestos Risk</label>
+            <label class="check-row"><input type="checkbox" id="sow_electrical" class="icon-sm"/> Electrical Hazard</label>
+            <label class="check-row"><input type="checkbox" id="sow_structural" class="icon-sm"/> Structural Concern</label>
+            <label class="check-row"><input type="checkbox" id="sow_plumbing" class="icon-sm"/> Plumbing / Sewage</label>
+            <label class="check-row"><input type="checkbox" id="sow_fire" class="icon-sm"/> Fire Safety</label>
           </div>
         </div>
       </div>
 
       <!-- ── TENANT ACCOUNTABILITY ───────────────────────────────────────── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+      <div class="card card-flush-mb">
         <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Tenant Accountability</div>
+          <div class="lbl-yellow">Tenant Accountability</div>
         </div>
-        <div style="padding:16px;">
+        <div class="p-16">
           <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Record factors that affect renovation priority and tenant responsibility.</div>
           <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
-            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_rent_arrears"/><span class="tsl"></span></label><label for="sow_rent_arrears" style="cursor:pointer;font-size:13px;">Tenant has rent arrears</label></div>
-            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_tenant_damage"/><span class="tsl"></span></label><label for="sow_tenant_damage" style="cursor:pointer;font-size:13px;">Damage caused by tenant</label></div>
-            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_negligence"/><span class="tsl"></span></label><label for="sow_negligence" style="cursor:pointer;font-size:13px;">Negligence (failure to maintain / report issues)</label></div>
-            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_vandalism"/><span class="tsl"></span></label><label for="sow_vandalism" style="cursor:pointer;font-size:13px;">Vandalism</label></div>
-            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_police_report"/><span class="tsl"></span></label><label for="sow_police_report" style="cursor:pointer;font-size:13px;">Police report on file</label></div>
+            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_rent_arrears"/><span class="tsl"></span></label><label for="sow_rent_arrears" class="txt-sm-bold">Tenant has rent arrears</label></div>
+            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_tenant_damage"/><span class="tsl"></span></label><label for="sow_tenant_damage" class="txt-sm-bold">Damage caused by tenant</label></div>
+            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_negligence"/><span class="tsl"></span></label><label for="sow_negligence" class="txt-sm-bold">Negligence (failure to maintain / report issues)</label></div>
+            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_vandalism"/><span class="tsl"></span></label><label for="sow_vandalism" class="txt-sm-bold">Vandalism</label></div>
+            <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_police_report"/><span class="tsl"></span></label><label for="sow_police_report" class="txt-sm-bold">Police report on file</label></div>
           </div>
           <div class="f"><label>Accountability Notes</label>
             <textarea id="sow_accountability_notes" rows="2" placeholder="Details on tenant responsibility, incident dates, report numbers…"></textarea>
@@ -1704,11 +1704,11 @@
       </div>
 
       <!-- ── ADDITIONAL NOTES ────────────────────────────────────────────── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+      <div class="card card-flush-mb">
         <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Additional Notes</div>
+          <div class="lbl-yellow">Additional Notes</div>
         </div>
-        <div style="padding:16px;">
+        <div class="p-16">
           <div class="f"><label>Special Instructions / Access Requirements</label>
             <textarea id="sow_notes" rows="3" placeholder="Any additional context, access requirements, tenant considerations…"></textarea>
           </div>
@@ -1716,10 +1716,10 @@
       </div>
 
       <!-- ── TERMS & CONDITIONS ────────────────────────────────────────── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+      <div class="card card-flush-mb">
         <div class="modal-hdr compact"
           onclick="var b=document.getElementById('sow_terms_body');var c=document.getElementById('sow_terms_chevron');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Terms &amp; Conditions</div>
+          <div class="lbl-yellow">Terms &amp; Conditions</div>
           <svg id="sow_terms_chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
         <div id="sow_terms_body" style="display:none;padding:18px 20px;font-size:12px;color:var(--text);line-height:1.7;">
@@ -1729,34 +1729,34 @@
 
           <div style="display:flex;flex-direction:column;gap:12px;">
 
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">1. Prioritization of Requests</div>
-              <p style="font-size:12px;color:var(--muted);">Renovation requests are assessed and prioritized based on the urgency of need, health and safety risk to occupants, and the overall condition of the unit. Requests involving immediate hazards — including structural, electrical, plumbing, or fire safety concerns — are given priority consideration over general maintenance and cosmetic work.</p>
+            <div class="yellow-accent">
+              <div class="lbl-field">1. Prioritization of Requests</div>
+              <p class="txt-muted-sm">Renovation requests are assessed and prioritized based on the urgency of need, health and safety risk to occupants, and the overall condition of the unit. Requests involving immediate hazards — including structural, electrical, plumbing, or fire safety concerns — are given priority consideration over general maintenance and cosmetic work.</p>
             </div>
 
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">2. Funding Eligibility &amp; Unit Qualifying Criteria</div>
-              <p style="font-size:12px;color:var(--muted);">Approval is subject to available funding and the qualifying criteria of the unit under its applicable program (e.g. ISC, CMHC Section 95, CMHC Section 56.1, or Band-funded). Not all units qualify under all funding sources, and funding availability may affect the scope, cost ceiling, or timing of approved work. Requests will be assessed against the current budget allocation for the relevant funding pool.</p>
+            <div class="yellow-accent">
+              <div class="lbl-field">2. Funding Eligibility &amp; Unit Qualifying Criteria</div>
+              <p class="txt-muted-sm">Approval is subject to available funding and the qualifying criteria of the unit under its applicable program (e.g. ISC, CMHC Section 95, CMHC Section 56.1, or Band-funded). Not all units qualify under all funding sources, and funding availability may affect the scope, cost ceiling, or timing of approved work. Requests will be assessed against the current budget allocation for the relevant funding pool.</p>
             </div>
 
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">3. Budget Authority &amp; Approval Routing</div>
-              <p style="font-size:12px;color:var(--muted);">Renovation requests within the Housing Manager's approved budget authority may be approved by the Housing Manager. Any request exceeding that threshold — as established in the Housing Department's current budget policy — requires Executive Director approval before work may commence. No work is to be initiated until all required approvals have been obtained and documented.</p>
+            <div class="yellow-accent">
+              <div class="lbl-field">3. Budget Authority &amp; Approval Routing</div>
+              <p class="txt-muted-sm">Renovation requests within the Housing Manager's approved budget authority may be approved by the Housing Manager. Any request exceeding that threshold — as established in the Housing Department's current budget policy — requires Executive Director approval before work may commence. No work is to be initiated until all required approvals have been obtained and documented.</p>
             </div>
 
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">4. Tenant Responsibilities</div>
-              <p style="font-size:12px;color:var(--muted);">The tenant is required to provide timely and reasonable access to the unit for inspection, assessment, and the completion of approved work. Damage, negligence, or vandalism attributed to the tenant may reduce the priority of the request and may result in the tenant being held financially responsible for a portion of repair costs, as determined by the Housing Manager.</p>
+            <div class="yellow-accent">
+              <div class="lbl-field">4. Tenant Responsibilities</div>
+              <p class="txt-muted-sm">The tenant is required to provide timely and reasonable access to the unit for inspection, assessment, and the completion of approved work. Damage, negligence, or vandalism attributed to the tenant may reduce the priority of the request and may result in the tenant being held financially responsible for a portion of repair costs, as determined by the Housing Manager.</p>
             </div>
 
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">5. No Guarantee of Approval or Timeline</div>
-              <p style="font-size:12px;color:var(--muted);">Submission of this form does not guarantee approval or a specific completion date. The CLFN Housing Department will communicate decisions in writing. Priority and scheduling are subject to change based on available resources, contractor availability, and emerging urgent needs within the community.</p>
+            <div class="yellow-accent">
+              <div class="lbl-field">5. No Guarantee of Approval or Timeline</div>
+              <p class="txt-muted-sm">Submission of this form does not guarantee approval or a specific completion date. The CLFN Housing Department will communicate decisions in writing. Priority and scheduling are subject to change based on available resources, contractor availability, and emerging urgent needs within the community.</p>
             </div>
 
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">6. Accuracy of Information</div>
-              <p style="font-size:12px;color:var(--muted);">All information provided in this Scope of Work must be accurate and complete. Submitting false or misleading information may result in the request being cancelled, delayed, or referred for further review.</p>
+            <div class="yellow-accent">
+              <div class="lbl-field">6. Accuracy of Information</div>
+              <p class="txt-muted-sm">All information provided in this Scope of Work must be accurate and complete. Submitting false or misleading information may result in the request being cancelled, delayed, or referred for further review.</p>
             </div>
 
           </div>
@@ -1766,9 +1766,9 @@
       </div>
 
       <!-- ── SIGNATURES ──────────────────────────────────────────────────── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+      <div class="card card-flush-mb">
         <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Signatures &amp; Acknowledgement</div>
+          <div class="lbl-yellow">Signatures &amp; Acknowledgement</div>
         </div>
         <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
 
@@ -1778,14 +1778,14 @@
               <div style="width:26px;height:26px;border-radius:50%;background:var(--yellow);color:#111;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">T</div>
               <div>
                 <div style="font-size:12px;font-weight:700;">Tenant</div>
-                <div style="font-size:10px;color:var(--muted);">I acknowledge the scope of work and grant access to the unit</div>
+                <div class="txt-xs-muted">I acknowledge the scope of work and grant access to the unit</div>
               </div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
               <div class="f"><label>Printed Name</label><input type="text" id="sow_sig_tenant_name" placeholder="Tenant full name"/></div>
               <div class="f"><label>Date</label><input type="date" id="sow_sig_tenant_date"/></div>
             </div>
-            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','canvas')" id="sow_sig_canvas_tenant_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','type')" id="sow_sig_canvas_tenant_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','wet')" id="sow_sig_canvas_tenant_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sow_sig_canvas_tenant_panel_canvas" style="background:#fafaf8;"><canvas id="sow_sig_canvas_tenant" width="620" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('sow_sig_canvas_tenant')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sow_sig_canvas_tenant_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="sow_sig_canvas_tenant_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="sow_sig_canvas_tenant_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="sow_sig_canvas_tenant_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+            <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','canvas')" id="sow_sig_canvas_tenant_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','type')" id="sow_sig_canvas_tenant_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','wet')" id="sow_sig_canvas_tenant_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sow_sig_canvas_tenant_panel_canvas" class="bg-paper"><canvas id="sow_sig_canvas_tenant" width="620" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sow_sig_canvas_tenant')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sow_sig_canvas_tenant_panel_type" class="sec-hidden"><input type="text" id="sow_sig_canvas_tenant_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="sow_sig_canvas_tenant_panel_wet" class="sec-hidden"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="sow_sig_canvas_tenant_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
           </div>
 
           <!-- Employee signature -->
@@ -1794,14 +1794,14 @@
               <div style="width:26px;height:26px;border-radius:50%;background:var(--surface);border:2px solid var(--border);color:var(--muted);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">S</div>
               <div>
                 <div style="font-size:12px;font-weight:700;">Housing Staff</div>
-                <div style="font-size:10px;color:var(--muted);">Employee completing this scope of work</div>
+                <div class="txt-xs-muted">Employee completing this scope of work</div>
               </div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
               <div class="f"><label>Printed Name</label><input type="text" id="sow_sig_staff_name" placeholder="Staff full name"/></div>
               <div class="f"><label>Date</label><input type="date" id="sow_sig_staff_date"/></div>
             </div>
-            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','canvas')" id="sow_sig_canvas_staff_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','type')" id="sow_sig_canvas_staff_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','wet')" id="sow_sig_canvas_staff_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sow_sig_canvas_staff_panel_canvas" style="background:#fafaf8;"><canvas id="sow_sig_canvas_staff" width="620" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('sow_sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sow_sig_canvas_staff_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="sow_sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="sow_sig_canvas_staff_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="sow_sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+            <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','canvas')" id="sow_sig_canvas_staff_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','type')" id="sow_sig_canvas_staff_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','wet')" id="sow_sig_canvas_staff_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sow_sig_canvas_staff_panel_canvas" class="bg-paper"><canvas id="sow_sig_canvas_staff" width="620" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sow_sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sow_sig_canvas_staff_panel_type" class="sec-hidden"><input type="text" id="sow_sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="sow_sig_canvas_staff_panel_wet" class="sec-hidden"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="sow_sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
           </div>
 
         </div>
@@ -1810,7 +1810,7 @@
       <!-- ── APPROVALS ───────────────────────────────────────────────────── -->
       <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;border-color:var(--yellow);">
         <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Approvals</div>
+          <div class="lbl-yellow">Approvals</div>
           <span id="sow_budget_badge" style="display:none;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;background:#fffbeb;color:#7a5c00;"></span>
         </div>
         <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -1826,21 +1826,21 @@
       <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;">
         <div class="modal-hdr compact"
           onclick="var b=document.getElementById('sow_audit_body');var c=document.getElementById('sow_audit_chevron');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';if(!open&&typeof renderSowAuditLog==='function')renderSowAuditLog(window._sowUnitId);">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">📋 Audit Log</div>
+          <div class="flex-gap8">
+            <div class="lbl-yellow">📋 Audit Log</div>
             <span style="font-size:10px;color:#666;font-weight:400;text-transform:none;letter-spacing:0;">— internal use only, not printed</span>
           </div>
           <svg id="sow_audit_chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transform:rotate(-90deg);transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
-        <div id="sow_audit_body" style="display:none;">
+        <div id="sow_audit_body">
           <div style="padding:0 0 4px 0;">
             <table style="width:100%;border-collapse:collapse;font-size:12px;">
               <thead>
                 <tr style="background:var(--bg);border-bottom:1px solid var(--border);">
-                  <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);white-space:nowrap;">Time</th>
-                  <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Action</th>
-                  <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Detail</th>
-                  <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">By</th>
+                  <th class="lbl-muted" style="padding:8px 14px;text-align:left;white-space:nowrap">Time</th>
+                  <th class="lbl-muted" style="padding:8px 14px;text-align:left">Action</th>
+                  <th class="lbl-muted" style="padding:8px 14px;text-align:left">Detail</th>
+                  <th class="lbl-muted" style="padding:8px 14px;text-align:left">By</th>
                 </tr>
               </thead>
               <tbody id="sow_audit_tbody">
@@ -1854,8 +1854,8 @@
     </div><!-- /body -->
 
     <!-- Footer -->
-    <div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg);position:sticky;bottom:0;">
-      <div id="sow_saved_indicator" style="font-size:12px;color:var(--muted);"></div>
+    <div class="flex-sb" style="padding:14px 24px;border-top:1px solid var(--border);gap:10px;background:var(--bg);position:sticky;bottom:0">
+      <div id="sow_saved_indicator" class="txt-muted-sm"></div>
       <div style="display:flex;gap:10px;">
         <button type="button" onclick="closeSowModal()" class="btn btn-ghost">Cancel</button>
         <button id="sow_save_btn" type="button" onclick="saveSOW()" class="btn btn-primary">💾 Save Scope of Work</button>
@@ -1873,14 +1873,14 @@
         <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:3px;">Edit Unit</div>
         <div id="ue_modal_title" style="font-size:16px;font-weight:700;color:#fff;"></div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;">
+      <div class="flex-gap8">
         <button id="ue_sow_btn" onclick="ueOpenSow()" title="Scope of Work"
           style="background:none;border:1px solid #555;color:#ccc;border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;white-space:nowrap;"
           onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'"
           onmouseout="this.style.borderColor='#555';this.style.color='#ccc'">
           🔨 SOW
         </button>
-        <button onclick="closeUnitEditModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+        <button onclick="closeUnitEditModal()" class="btn-close-sm">✕</button>
       </div>
     </div>
     <!-- Body -->
@@ -1888,7 +1888,7 @@
 
       <!-- Address row -->
       <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Address</div>
+        <div class="lbl-muted" class="mb-12">Address</div>
         <div style="display:grid;grid-template-columns:80px 1fr;gap:10px;">
           <div class="f"><label>Number</label><input id="ue_num" type="text"/></div>
           <div class="f"><label>Street</label><input id="ue_street" type="text"/></div>
@@ -1897,7 +1897,7 @@
 
       <!-- Unit details -->
       <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Unit Details</div>
+        <div class="lbl-muted" class="mb-12">Unit Details</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
           <div class="f"><label>Bedrooms</label>
             <select id="ue_bedrooms">
@@ -1936,11 +1936,11 @@
       <div style="display:flex;gap:20px;">
         <div class="ftog">
           <label class="tsw"><input id="ue_accessible" type="checkbox"/><span class="tsl"></span></label>
-          <label for="ue_accessible" style="cursor:pointer;">Accessible Unit ♿</label>
+          <label for="ue_accessible">Accessible Unit ♿</label>
         </div>
         <div class="ftog">
           <label class="tsw"><input id="ue_isElders" type="checkbox"/><span class="tsl"></span></label>
-          <label for="ue_isElders" style="cursor:pointer;">Elders Unit</label>
+          <label for="ue_isElders">Elders Unit</label>
         </div>
       </div>
 
@@ -1969,14 +1969,14 @@
       <!-- Assignment (shown only for occupied/reserved) -->
       <div id="ue_assign_row">
         <!-- Section header -->
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Tenant Assignment — search approved applicants or start a new application</div>
+        <div class="lbl-muted">Tenant Assignment — search approved applicants or start a new application</div>
 
         <!-- Current tenant card (shown when already assigned) -->
         <div id="ue_current_tenant">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
             <div>
               <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Currently Assigned</div>
-              <div id="ue_current_tenant_name" style="font-size:14px;font-weight:700;color:var(--text);"></div>
+              <div id="ue_current_tenant_name" class="txt-md-bold"></div>
               <div id="ue_current_tenant_meta" style="font-size:11px;color:var(--muted);margin-top:2px;"></div>
             </div>
             <button type="button" onclick="ueRemoveTenant()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:#b91c1c;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;flex-shrink:0;">Remove</button>
@@ -1986,7 +1986,7 @@
         <!-- Applicant search -->
         <div>
           <label style="font-size:11.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;">Search Applicant <span style="color:#b91c1c;">*</span></label>
-          <div style="position:relative;">
+          <div class="pos-rel">
             <input type="text" id="ue_tenant_search"
               placeholder="Search by name or APP-ID…"
               autocomplete="off"
@@ -2022,19 +2022,19 @@
 
       <!-- Tenant -->
       <div id="ue_sig_section">
-        <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Tenant</div>
+        <div class="lbl-muted" style="margin-bottom:12px">Tenant</div>
         <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
             <div style="width:32px;height:32px;border-radius:50%;background:var(--yellow);color:#111;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">T</div>
             <div>
-              <div id="ue_tenant_display_name" style="font-size:14px;font-weight:700;color:var(--text);">Vacant</div>
+              <div id="ue_tenant_display_name" class="txt-md-bold">Vacant</div>
               <div id="ue_tenant_display_meta" style="font-size:11px;color:var(--muted);margin-top:1px;">No tenant assigned</div>
             </div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div class="f">
               <label>Tenant Name</label>
-              <input type="text" id="ue_sig_tenant_name" placeholder="Vacant" style="background:var(--bg);"/>
+              <input type="text" id="ue_sig_tenant_name" placeholder="Vacant" class="bg-bg"/>
             </div>
             <div class="f">
               <label>Move-in Date</label>
@@ -2046,11 +2046,11 @@
         <!-- HM approval signature (shown when SOW requires HM or ED approval) -->
         <div id="ue_sig_hm_block">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div style="display:flex;align-items:center;gap:8px;">
+            <div class="flex-gap8">
               <div style="width:24px;height:24px;border-radius:50%;background:#1d4ed8;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">HM</div>
               <div>
                 <div style="font-size:12px;font-weight:700;color:#1d4ed8;">Housing Manager Approval</div>
-                <div style="font-size:10px;color:var(--muted);">Required — renovation within HM budget authority</div>
+                <div class="txt-xs-muted">Required — renovation within HM budget authority</div>
               </div>
             </div>
             <span id="ue_sig_hm_badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#eff6ff;color:#1d4ed8;">Pending</span>
@@ -2073,11 +2073,11 @@
         <!-- ED approval signature (shown when SOW exceeds HM budget limit) -->
         <div id="ue_sig_ed_block">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div style="display:flex;align-items:center;gap:8px;">
+            <div class="flex-gap8">
               <div style="width:24px;height:24px;border-radius:50%;background:var(--yellow);color:#111;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">ED</div>
               <div>
                 <div style="font-size:12px;font-weight:700;color:#7a5c00;">Executive Director Approval</div>
-                <div style="font-size:10px;color:var(--muted);">Required — renovation exceeds HM budget authority</div>
+                <div class="txt-xs-muted">Required — renovation exceeds HM budget authority</div>
               </div>
             </div>
             <span id="ue_sig_ed_badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#fffbeb;color:#7a5c00;">Pending</span>
@@ -2110,14 +2110,14 @@
           onclick="document.getElementById('ue_photo_input').click()">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--muted);margin-bottom:6px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;">Drag photos here or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
-          <div style="font-size:11px;color:var(--muted);">JPG, PNG, WEBP — multiple files supported</div>
-          <input type="file" id="ue_photo_input" accept="image/*" multiple style="display:none;" onchange="handleEditUnitPhotoUpload(this)"/>
+          <div class="txt-muted-xs">JPG, PNG, WEBP — multiple files supported</div>
+          <input type="file" id="ue_photo_input" accept="image/*" multiple onchange="handleEditUnitPhotoUpload(this)"/>
         </div>
       </div>
 
     </div>
     <!-- Footer -->
-    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--bg);">
+    <div class="flex-sb" style="padding:16px 24px;border-top:1px solid var(--border);background:var(--bg)">
       <div id="ue_archive_btn_wrap"></div>
       <div style="display:flex;gap:10px;">
         <button onclick="closeUnitEditModal()" class="btn btn-ghost">Cancel</button>
@@ -2136,9 +2136,9 @@
     <div class="modal-hdr spacious">
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Tenant Management</div>
-        <div style="font-size:15px;font-weight:700;color:#fff;">Add / Assign a Tenant</div>
+        <div class="panel-title">Add / Assign a Tenant</div>
       </div>
-      <button type="button" onclick="closeAddTenantModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+      <button type="button" onclick="closeAddTenantModal()" class="btn-close-sm">✕</button>
     </div>
 
     <div style="padding:24px;display:flex;flex-direction:column;gap:0;">
@@ -2153,7 +2153,7 @@
       </div>
 
       <!-- Option 1: New application -->
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px;">Option 1 — New Tenant or Update Required</div>
+      <div class="lbl-muted" class="mb-12">Option 1 — New Tenant or Update Required</div>
       <button onclick="closeAddTenantModal();newApp();" style="width:100%;background:var(--yellow);border:none;color:#111;border-radius:10px;padding:14px 18px;cursor:pointer;font-family:DM Sans,sans-serif;text-align:left;display:flex;align-items:center;gap:14px;margin-bottom:20px;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
         <span style="font-size:26px;">📝</span>
         <div>
@@ -2164,15 +2164,15 @@
       </button>
 
       <!-- Option 2: Link existing approved application -->
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px;">Option 2 — Link Approved Application to a Unit</div>
+      <div class="lbl-muted" class="mb-12">Option 2 — Link Approved Application to a Unit</div>
       <div style="display:flex;flex-direction:column;gap:12px;">
         <div class="f">
           <label>Unit <span class="r">*</span></label>
-          <select id="at_unit" style="width:100%;">
+          <select id="at_unit" class="w-full">
             <option value="">— Select a unit —</option>
           </select>
         </div>
-        <div style="position:relative;">
+        <div class="pos-rel">
           <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Application ID <span class="r">*</span></label>
           <input type="text" id="at_appid" placeholder="Type name or APP-ID to search…" autocomplete="off"
             style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"
@@ -2197,7 +2197,7 @@
       </div>
 
     </div>
-    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg);">
+    <div class="flex-sb" style="padding:16px 24px;border-top:1px solid var(--border);gap:10px;background:var(--bg)">
       <button type="button" onclick="closeAddTenantModal()" class="btn btn-ghost">Cancel</button>
       <button type="button" onclick="saveAddTenant()" class="btn btn-primary">Assign to Unit</button>
     </div>

@@ -99,10 +99,10 @@ function renderV2ScoringEditor() {
 
   function optRow(label, inputHtml, note) {
     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:7px;margin-bottom:3px;background:var(--bg);">'
-      + '<div style="flex:1;"><span style="font-size:13px;color:var(--text);">' + label + '</span>'
+      + '<div style="flex:1;"><span class="js-txt-bold2" style="font-weight:400;">' + label + '</span>'
       + (note ? '<div style="font-size:10px;color:var(--muted);margin-top:1px;">' + note + '</div>' : '')
       + '</div>'
-      + '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">' + inputHtml + '<span style="font-size:11px;color:var(--muted);">pts</span></div>'
+      + '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">' + inputHtml + '<span class="js-lbl-sm">pts</span></div>'
       + '</div>';
   }
 
@@ -191,14 +191,14 @@ function renderV2ScoringEditor() {
     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:8px;margin-bottom:6px;background:var(--bg);border-left:3px solid ' + col + ';">'
       + '<div>'
       +   '<div style="font-size:13px;font-weight:700;color:var(--text);">' + label + '</div>'
-      +   '<div style="font-size:11px;color:var(--muted);" id="tier_range_' + key + '">' + rangeLabel + '</div>'
+      +   '<div class="js-lbl-sm" id="tier_range_' + key + '">' + rangeLabel + '</div>'
       + '</div>'
       + '<div style="display:flex;align-items:center;gap:6px;">'
-      +   '<span style="font-size:11px;color:var(--muted);">Score &ge;</span>'
+      +   '<span class="js-lbl-sm">Score &ge;</span>'
       +   '<input type="number" value="' + val + '" min="0" max="100" step="1" data-tier="' + key + '" '
       +   'style="width:64px;padding:4px 8px;border:1.5px solid ' + col + ';border-radius:6px;font-size:15px;font-weight:700;color:' + col + ';text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);" '
       +   'onchange="updateV2Tier(this)"/>'
-      +   '<span style="font-size:11px;color:var(--muted);">pts</span>'
+      +   '<span class="js-lbl-sm">pts</span>'
       + '</div>'
       + '</div>';
   }
@@ -215,7 +215,7 @@ function renderV2ScoringEditor() {
   html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:8px;margin-bottom:6px;background:var(--bg);border-left:3px solid #f87171;">'
     + '<div>'
     +   '<div style="font-size:13px;font-weight:700;color:var(--text);">Low Priority</div>'
-    +   '<div style="font-size:11px;color:var(--muted);" id="tier_range_low">' + lowR + '</div>'
+    +   '<div class="js-lbl-sm" id="tier_range_low">' + lowR + '</div>'
     + '</div>'
     + '<div style="font-size:11px;color:var(--muted);font-style:italic;">Anything below Medium</div>'
     + '</div>';
@@ -362,18 +362,18 @@ function renderNationPanel(){
     +   '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'
     +     '<div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Nation</div>'
     +     '<div style="font-size:16px;font-weight:700;color:var(--text);">'+(cfg.display_name||'—')+'</div>'
-    +     '<div style="font-size:11px;color:var(--muted);margin-top:2px;">ID: <code style="font-family:Consolas,Monaco,monospace;">'+(cfg.id||'—')+'</code></div>'
+    +     '<div class="js-lbl-sm" class="mt-4">ID: <code style="font-family:Consolas,Monaco,monospace;">'+(cfg.id||'—')+'</code></div>'
     +   '</div>'
     +   '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'
     +     '<div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Hosting</div>'
     +     '<div style="font-size:13px;font-weight:700;color:var(--text);font-family:Consolas,Monaco,monospace;word-break:break-all;">'+host+'</div>'
-    +     '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Subdomain-routed</div>'
+    +     '<div class="js-lbl-sm" class="mt-4">Subdomain-routed</div>'
     +   '</div>'
     + '</div>';
 
   // Modules list — core vs optional, each with status pill.
   if(!modApi){
-    modsEl.innerHTML = '<div style="color:var(--muted);font-size:12px;">Module registry not available.</div>';
+    modsEl.innerHTML = '<div class="js-txt-muted-sm">Module registry not available.</div>';
     return;
   }
   var pill = function(label, c, bg){
@@ -387,10 +387,10 @@ function renderNationPanel(){
     var kindPill = kind==='core'
       ? pill('Core','#1d4ed8','#eff6ff')
       : pill('Optional','#7a6000','#fef9ec');
-    return '<tr style="border-bottom:1px solid var(--border);">'
+    return '<tr class="row-divider">'
          +   '<td style="padding:10px 12px;font-size:13px;font-weight:600;color:var(--text);">'+humanName+'</td>'
-         +   '<td style="padding:10px 12px;">'+kindPill+'</td>'
-         +   '<td style="padding:10px 12px;">'+statusPill+'</td>'
+         +   '<td class="pad-12">'+kindPill+'</td>'
+         +   '<td class="pad-12">'+statusPill+'</td>'
          + '</tr>';
   };
   var coreRows = modApi.CORE.map(function(n){ return row(n, 'enabled', 'core'); }).join('');
@@ -399,8 +399,8 @@ function renderNationPanel(){
   }).join('');
   modsEl.innerHTML =
       '<div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Modules</div>'
-    + '<div style="overflow-x:auto;">'
-    + '<table style="width:100%;border-collapse:collapse;">'
+    + '<div class="overflow-x">'
+    + '<table class="std-tbl">'
     +   '<thead><tr style="background:var(--bg);border-bottom:2px solid var(--border);">'
     +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Module</th>'
     +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:100px;">Type</th>'
@@ -422,7 +422,7 @@ function renderScoringModelTable() {
     try { var m2 = window._appSettings['scoring_model_v2']; if(m2 && m2.length) model = m2; } catch(e){}
   }
   if(!model || !model.length) {
-    wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">No scoring model configured. Settings will appear here after they are saved.</div>';
+    wrap.innerHTML = '<div class="empty-state-ctr">No scoring model configured. Settings will appear here after they are saved.</div>';
     return;
   }
 
@@ -450,7 +450,7 @@ function renderScoringModelTable() {
       var ptsColor = r.pts > 0 ? '#15803d' : r.pts < 0 ? '#b91c1c' : '#888';
       var sign = r.pts > 0 ? '+' : '';
       var isAuto = (r.id === 'oc1' || r.id === 'wa1');
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:7px;margin-bottom:3px;background:var(--bg);">'        + '<span style="font-size:13px;color:var(--text);flex:1;">'+r.label+'</span>'        + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'        + (isAuto          ? '<span style="font-size:11px;color:var(--muted);font-style:italic;margin-right:4px;">auto-calculated</span>'            + '<input type="number" value="'+r.pts+'" step="1" min="0" max="10" '            +   'style="width:64px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';text-align:center;font-family:\'DM Sans\',sans-serif;background:var(--surface);" '            +   'data-smid="'+r.id+'" oninput="updateV2ScoreModel(this)"/>'            + '<span style="font-size:11px;color:var(--muted);">pts each</span>'          : '<input type="number" value="'+r.pts+'" step="1" min="-20" max="30" '            +   'style="width:64px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';text-align:center;font-family:\'DM Sans\',sans-serif;background:var(--surface);" '            +   'data-smid="'+r.id+'" oninput="updateV2ScoreModel(this)"/>'            + '<span style="font-size:11px;color:var(--muted);">pts</span>'        )        + '<button onclick="deleteV2ScoreCriteria(\''+r.id+'\')" title="Remove" style="background:none;border:none;color:#888;cursor:pointer;font-size:14px;padding:2px 4px;" onmouseover="this.style.color=\'#b91c1c\'" onmouseout="this.style.color=\'#888\'">✕</button>'        + '</div>'        + '</div>';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:7px;margin-bottom:3px;background:var(--bg);">'        + '<span style="font-size:13px;color:var(--text);flex:1;">'+r.label+'</span>'        + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'        + (isAuto          ? '<span style="font-size:11px;color:var(--muted);font-style:italic;margin-right:4px;">auto-calculated</span>'            + '<input type="number" value="'+r.pts+'" step="1" min="0" max="10" '            +   'style="width:64px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';text-align:center;font-family:\'DM Sans\',sans-serif;background:var(--surface);" '            +   'data-smid="'+r.id+'" oninput="updateV2ScoreModel(this)"/>'            + '<span class="js-lbl-sm">pts each</span>'          : '<input type="number" value="'+r.pts+'" step="1" min="-20" max="30" '            +   'style="width:64px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';text-align:center;font-family:\'DM Sans\',sans-serif;background:var(--surface);" '            +   'data-smid="'+r.id+'" oninput="updateV2ScoreModel(this)"/>'            + '<span class="js-lbl-sm">pts</span>'        )        + '<button onclick="deleteV2ScoreCriteria(\''+r.id+'\')" title="Remove" style="background:none;border:none;color:#888;cursor:pointer;font-size:14px;padding:2px 4px;" onmouseover="this.style.color=\'#b91c1c\'" onmouseout="this.style.color=\'#888\'">✕</button>'        + '</div>'        + '</div>';
     });
     html += '</div>';
   });
@@ -696,7 +696,7 @@ function renderNosTable() {
     var maxPeople = (nos[beds] !== undefined) ? nos[beds] : defaults[beds];
     var label = bedLabels[beds];
     var inputStyle = 'width:72px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:var(--text);text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);' + (isED ? '' : 'opacity:0.55;cursor:not-allowed;');
-    return '<tr style="border-bottom:1px solid var(--border);">'
+    return '<tr class="row-divider">'
       + '<td style="padding:10px 12px;font-size:13px;color:var(--text);">' + label + '</td>'
       + '<td style="padding:10px 12px;text-align:center;">'
       + '<input type="number" data-nos-beds="' + beds + '" value="' + maxPeople + '" min="1" max="20" step="1" ' + (isED ? '' : 'disabled ') + 'style="' + inputStyle + '"/>'
@@ -1015,7 +1015,7 @@ function autoPopulateScore(){
       var pts=calcAgeScore(p.dob);
       const col=pts>=3?'#15803d':pts>=2?'#1e3a5f':'#7a6000';
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg);border-radius:6px;font-size:12px;">'
-        +'<span style="color:var(--muted);">'+p.label+'</span>'
+        +'<span class="js-lbl-xs">'+p.label+'</span>'
         +'<span style="font-weight:700;color:'+col+';">+'+pts+' pts</span></div>';
     }).join('');
     if(scAge)scAge.value=people.reduce(function(s,p){return s+calcAgeScore(p.dob);},0);
@@ -1237,8 +1237,8 @@ function renderRubricTableV2(breakdown, targetEl) {
     return '<div style="padding:12px 18px;border-bottom:1px solid var(--border);">'
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
       +   '<div>'
-      +     '<div style="font-size:13px;font-weight:600;color:var(--text);">' + label + '</div>'
-      +     (value ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">→ ' + value + '</div>' : '')
+      +     '<div class="js-txt-bold">' + label + '</div>'
+      +     (value ? '<div class="js-lbl-sm" class="mt-4">→ ' + value + '</div>' : '')
       +     (note  ? '<div style="font-size:10px;color:var(--muted);margin-top:4px;font-style:italic;">' + note + '</div>' : '')
       +   '</div>'
       +   '<div style="flex-shrink:0;text-align:right;">'

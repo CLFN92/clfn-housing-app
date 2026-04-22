@@ -907,7 +907,7 @@ function amRenderUnitList(role, needsAccess) {
   var list = document.getElementById('am_unit_list');
   if(!list) return;
   if(!_amAllScored.length){
-    list.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">No vacant units available.</div>';
+    list.innerHTML='<div class="empty-state-ctr">No vacant units available.</div>';
     return;
   }
   list.innerHTML = _amAllScored.map(function(obj, i){
@@ -932,7 +932,7 @@ function amRenderUnitList(role, needsAccess) {
         +'</div>'
         +'<div style="text-align:right;flex-shrink:0;">'
           +'<div style="font-size:16px;font-weight:800;color:'+barColor+';">'+pct+'%</div>'
-          +'<div style="font-size:10px;color:var(--muted);">match</div>'
+          +'<div class="js-lbl-xs">match</div>'
         +'</div>'
       +'</div>'
       +'<div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:6px;">'
@@ -1241,9 +1241,9 @@ function renderRenoApprovalsView() {
       +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);white-space:nowrap;">'+u.bedrooms+'bd·'+(u.type&&u.type!=='0'&&u.type!=='nan'?u.type.replace(' unit','').replace('Detached','Det.').replace('Complex','Cplx'):'—')+'</td>'
       +'<td style="padding:10px 10px;white-space:nowrap;"><span style="font-size:14px;font-weight:800;color:var(--text);">'+rs.score+'</span> <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:'+tier.bg+';color:'+tier.c+';">'+tier.l+'</span></td>'
       +'<td style="padding:10px 10px;font-size:13px;font-weight:600;">'+costStr+(needsED&&r.cost>0?'<div style="font-size:9px;color:#1d4ed8;font-weight:700;">ED auth</div>':'')+'</td>'
-      +'<td style="padding:10px 10px;"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+appr.bg+';color:'+appr.c+';white-space:nowrap;">'+appr.label+'</span></td>'
+      +'<td class="pad-10"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+appr.bg+';color:'+appr.c+';white-space:nowrap;">'+appr.label+'</span></td>'
       +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(sow&&sow.contractor?sow.contractor:'—')+'</td>'
-      +'<td style="padding:10px 10px;"><div style="display:flex;align-items:center;gap:6px;"><div style="width:56px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'#15803d':'var(--yellow)')+';border-radius:2px;"></div></div><span style="font-size:11px;color:var(--muted);">'+pct+'%</span></div></td>'
+      +'<td class="pad-10"><div style="display:flex;align-items:center;gap:6px;"><div style="width:56px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'#15803d':'var(--yellow)')+';border-radius:2px;"></div></div><span class="js-lbl-sm">'+pct+'%</span></div></td>'
       +'<td style="padding:10px 14px;width:1%;white-space:nowrap;"><div style="display:flex;gap:5px;align-items:center;">'
         +approveBtn
         +'<button data-ra-sow="'+uid+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--muted);">SOW</button>'
@@ -1361,7 +1361,7 @@ function exportRenoApprovalsPDF() {
       +'<div style="text-align:right;font-size:9px;color:#aaa;">'+today+'<br/>'+relevant.length+' units<br/>Filter: '+(_raFilter||'All')+'</div>'
     +'</div>'
     +'<div style="background:#F8E41A;height:3px;margin-bottom:14px;"></div>'
-    +'<table style="width:100%;border-collapse:collapse;">'
+    +'<table class="std-tbl">'
       +'<thead><tr style="background:#111;">'
         +'<th style="padding:8px 10px;text-align:left;font-size:9px;color:#F8E41A;text-transform:uppercase;letter-spacing:.06em;">Address</th>'
         +'<th style="padding:8px 8px;text-align:center;font-size:9px;color:#F8E41A;text-transform:uppercase;letter-spacing:.06em;width:60px;">Score</th>'

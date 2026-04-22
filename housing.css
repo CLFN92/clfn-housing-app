@@ -676,3 +676,362 @@
   font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
   text-transform: uppercase; color: var(--muted); margin-bottom: 4px;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   UTILITY CLASSES — extracted from inline styles
+   ══════════════════════════════════════════════════════════════ */
+
+/* Table header cells */
+.th-hdr {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  color: #888;
+}
+
+/* Label variants */
+.lbl-yellow {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--yellow);
+}
+.lbl-muted {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.lbl-field {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.txt-muted-sm { font-size: 12px; color: var(--muted); }
+.txt-muted-xs { font-size: 11px; color: var(--muted); }
+
+/* Card modifiers */
+.card-flush       { padding: 0; overflow: hidden; }
+.card-flush-mb    { padding: 0; overflow: hidden; margin-bottom: 16px; }
+.card-flush-gold  { padding: 0; overflow: hidden; border-color: var(--yellow); }
+
+/* Section padding standard */
+.sec-pad  { padding: 20px; }
+.sec-pad2 { padding: 20px 24px; }
+
+/* Divider row */
+.row-divider { border-bottom: 1px solid var(--border); }
+
+/* Step progress bar buttons */
+.spb-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  opacity: .5;
+  transition: opacity .15s;
+  flex: 1;
+}
+.spb-btn.active { opacity: 1; }
+.spb-btn:hover  { opacity: .8; }
+
+.spb-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e5e5e5;
+  color: #999;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.spb-btn.active .spb-num {
+  background: var(--yellow);
+  color: #111;
+}
+
+/* Field row with icon */
+.field-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Yellow left-border accent block */
+.yellow-accent {
+  padding: 10px 14px;
+  background: var(--bg);
+  border-left: 3px solid var(--yellow);
+  border-radius: 0 8px 8px 0;
+  font-size: 12px;
+}
+
+/* Sig canvas wrapper */
+.sig-canvas-wrap {
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Flex utilities already in shared.css but repeated inline */
+.flex-col   { display: flex; flex-direction: column; }
+.flex-sb    { display: flex; justify-content: space-between; align-items: center; }
+.flex-end   { display: flex; justify-content: flex-end; gap: 8px; }
+.flex-gap4  { display: flex; gap: 4px; }
+.flex-gap6  { display: flex; gap: 6px; align-items: center; }
+.flex-gap8  { display: flex; gap: 8px; align-items: center; }
+.flex-gap10 { display: flex; gap: 10px; align-items: center; }
+.flex-gap12 { display: flex; gap: 12px; align-items: center; }
+.flex-wrap  { flex-wrap: wrap; }
+
+/* Margin utilities */
+.mb-4  { margin-bottom: 4px; }
+.mb-6  { margin-bottom: 6px; }
+.mb-8  { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-20 { margin-bottom: 20px; }
+.mt-4  { margin-top: 4px; }
+.mt-8  { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.m-0   { margin: 0; }
+
+/* Width utilities */
+.w-full { width: 100%; }
+
+
+/* ── Additional utility classes ── */
+.txt-xs-muted  { font-size: 10px; color: var(--muted); }
+.txt-xs-dim    { font-size: 10px; font-weight: 500; color: #aaa; }
+.txt-sm-bold   { font-size: 13px; font-weight: 700; color: var(--text); }
+.txt-sm-meta   { font-size: 11px; color: #888; font-weight: 400; margin-top: 2px; }
+.txt-sm-muted-ml { font-size: 11px; color: var(--muted); margin-left: 6px; }
+.txt-sm-muted-mt { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+/* Tab button (settings tabs, SOW tabs) */
+.tab-item {
+  flex: 1;
+  padding: 7px 4px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: color .15s, border-color .15s;
+}
+.tab-item.active { color: var(--text); border-bottom-color: var(--yellow); }
+.tab-item:hover  { color: var(--text); }
+
+/* Tab bar row */
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+/* Checkbox / radio row */
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.check-row-sm {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-weight: 400;
+  font-size: 13px;
+}
+
+/* Score input cell */
+.score-input {
+  width: 72px;
+  padding: 4px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--surface);
+}
+
+/* Cell padding variants */
+.cell-pad  { padding: 4px 6px; }
+.cell-pad2 { padding: 10px 12px; font-size: 13px; color: var(--text); }
+.cell-ctr  { padding: 10px 12px; text-align: center; }
+
+/* Close button (small X) */
+.btn-close-sm {
+  background: none;
+  border: 1px solid #444;
+  color: #aaa;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Panel title (white, modal header) */
+.panel-title { font-size: 15px; font-weight: 700; color: #fff; }
+
+/* Pad-16 */
+.p-16 { padding: 16px; }
+
+/* Bg variants */
+.bg-surface { background: var(--surface); }
+.bg-bg      { background: var(--bg); }
+.bg-paper   { background: #fafaf8; }
+
+/* Hidden section default */
+.sec-hidden { display: none; padding: 16px 14px; background: #fafaf8; }
+
+/* pos-rel already added above */
+.pos-rel { position: relative; }
+
+/* Icon size */
+.icon-sm { width: 15px; height: 15px; }
+
+
+/* ── Final utility classes ── */
+.border-b2     { border-bottom: 2px solid var(--border); }
+.txt-md-bold   { font-size: 14px; font-weight: 700; color: var(--text); }
+.input-underline {
+  width: 100%; background: transparent; border: none;
+  border-bottom: 1px solid var(--border); padding: 6px 2px;
+  font-size: 13px; color: var(--text); font-family: 'DM Sans', sans-serif; outline: none;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   JS-RENDERED HTML CLASSES
+   Used in dynamically generated HTML inside .js files
+   ══════════════════════════════════════════════════════════════ */
+
+/* Empty state in tables/lists */
+.empty-state-ctr {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+.empty-state-italic {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-style: italic;
+}
+.empty-icon-lg { font-size: 28px; margin-bottom: 8px; }
+.empty-title   { font-weight: 600; margin-bottom: 4px; }
+.empty-sub     { font-size: 12px; }
+
+/* Standard table */
+.std-tbl {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Standard form input (JS-rendered) */
+.js-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  font-family: 'DM Sans', sans-serif;
+  box-sizing: border-box;
+}
+
+/* JS label (section heading) */
+.js-lbl-muted {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .6px;
+}
+.js-lbl-sm { font-size: 11px; color: var(--muted); }
+.js-lbl-xs { font-size: 10px; color: var(--muted); }
+
+/* JS text variants */
+.js-txt-bold  { font-size: 13px; font-weight: 600; color: var(--text); }
+.js-txt-bold2 { font-size: 13px; font-weight: 700; color: var(--text); }
+.js-txt-muted { font-size: 13px; color: var(--muted); }
+.js-txt-muted-sm { font-size: 12px; color: var(--muted); }
+.js-txt-lg    { font-size: 15px; font-weight: 700; }
+
+/* Print/SOW section spacing */
+.print-sec   { break-inside: avoid; }
+.print-mb    { margin-bottom: 7px; }
+
+/* Pill/badge */
+.js-pill {
+  padding: 7px 10px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  border-radius: 6px;
+}
+
+/* Table header (JS) */
+.js-th {
+  padding: 9px 14px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: #888;
+}
+
+/* Scrollable wrap */
+.overflow-x { overflow-x: auto; }
+
+/* Sig block label */
+.sig-lbl {
+  font-size: 8px;
+  color: #999;
+  margin-bottom: 1px;
+}
+
+/* Flex-gap10 JS version */
+.flex-g10 { display: flex; align-items: center; gap: 10px; }
+.flex-g8  { display: flex; align-items: center; gap: 8px; }
+
+/* Pad variants */
+.pad-10  { padding: 10px 10px; }
+.pad-12  { padding: 10px 12px; }
+.mb-7    { margin-bottom: 7px; }
+
+.sig-line  { border-bottom: 1px solid #444; height: 16px; }
+.img-cover { width: 100%; height: 100%; object-fit: cover; }

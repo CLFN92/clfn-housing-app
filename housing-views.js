@@ -263,7 +263,7 @@ function renderInventoryView(){
       +'<td style="padding:9px 10px;text-align:center;font-size:14px;">'+(u.accessible?'<span title="Accessible">♿</span>':'<span style="color:#ccc;">—</span>')+'</td>'
       +'<td style="padding:9px 10px;font-size:12px;color:var(--muted);">'+funder+'</td>'
       +'<td style="padding:9px 14px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
-      +(u.assignedName?' <span style="font-size:11px;color:var(--muted);">→ '+u.assignedName+'</span>':'')+'</td>'
+      +(u.assignedName?' <span class="js-lbl-sm">→ '+u.assignedName+'</span>':'')+'</td>'
       +(ROLE.isManagement(window.currentRole) ? (function(){
         var _hasSow = !!getSowData(u.id);
         var _hasProg = !!(window._renoProgress && window._renoProgress[u.id]);
@@ -426,11 +426,11 @@ function renderMatchView(){
         +'<div style="font-weight:600;font-size:13px;color:var(--text);text-decoration:underline;text-underline-offset:2px;">'+(best.unit.num+' '+best.unit.street)+'</div>'
         +'<div style="display:flex;align-items:center;gap:8px;margin:3px 0;">'
         +'<div style="height:4px;width:80px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+matchPct+'%;background:'+tCol+';border-radius:3px;"></div></div>'
-        +'<span style="font-size:11px;color:var(--muted);">'+matchPct+'% match</span>'
+        +'<span class="js-lbl-sm">'+matchPct+'% match</span>'
         +'</div>'
-        +'<div style="font-size:11px;color:var(--muted);">'+best.unit.bedrooms+'bed · '+(best.unit.type||'—')+'</div>'
+        +'<div class="js-lbl-sm">'+best.unit.bedrooms+'bed · '+(best.unit.type||'—')+'</div>'
         +'</div>'
-      : '<span style="color:var(--muted);font-size:12px;">No suitable vacant units</span>';
+      : '<span class="js-txt-muted-sm">No suitable vacant units</span>';
 
     var reqs = [];
     if(needsAccess) reqs.push('<span style="font-size:10px;color:#1d4ed8;">Needs accessible unit</span>');
@@ -446,13 +446,13 @@ function renderMatchView(){
       ? '<div style="font-size:11px;font-weight:700;color:#15803d;">✓ '+(app.assignedAddress||'Assigned')+'</div>'
       : (canAssign
           ? '<button data-assign-app="'+app.id+'" data-assign-unit="'+(best?best.unit.id:'')+'" style="background:var(--yellow);border:none;color:#111;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>'
-          : '<span style="font-size:11px;color:var(--muted);">Awaiting approval</span>');
+          : '<span class="js-lbl-sm">Awaiting approval</span>');
 
     return '<tr style="border-bottom:1px solid var(--border);transition:background .12s;">'
       +'<td style="padding:12px 14px;color:var(--muted);font-size:12px;font-weight:600;width:32px;">'+(i+1)+'</td>'
       +'<td style="padding:12px 10px;cursor:pointer;" onclick="openAppFromMatch(\''+app.id+'\');">'
         +'<div style="font-weight:700;font-size:13px;color:var(--text);text-decoration:underline;text-underline-offset:2px;">'+name+'</div>'
-        +'<div style="font-size:11px;color:var(--muted);">'+app.id+'</div>'
+        +'<div class="js-lbl-sm">'+app.id+'</div>'
       +'</td>'
       +'<td style="padding:12px 10px;white-space:nowrap;">'
         +'<div style="font-size:18px;font-weight:800;color:'+tCol+';">'+(app.score||0)+'</div>'
@@ -718,8 +718,8 @@ function tenantSearchFilter(q) {
       + 'onmouseover="this.style.opacity=\'0.8\'" onmouseout="this.style.opacity=\'1\'">'
       + '<div style="width:36px;height:36px;border-radius:50%;background:var(--yellow);color:#111;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
       + (r.name ? r.name.charAt(0).toUpperCase() : '?') + '</div>'
-      + '<div><div style="font-size:13px;font-weight:600;">'+r.name+'</div>'
-      + '<div style="font-size:11px;color:var(--muted);">'+r.addr+'</div></div>'
+      + '<div><div class="js-txt-bold">'+r.name+'</div>'
+      + '<div class="js-lbl-sm">'+r.addr+'</div></div>'
       + '</div>';
   }).join('');
 }
@@ -775,7 +775,7 @@ function unitSearchFilter(q) {
       +'onmouseover="this.style.borderColor=\'var(--yellow)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
       +'<div>'
         +'<div style="font-weight:700;font-size:13px;">'+u.num+' '+u.street+'</div>'
-        +'<div style="font-size:11px;color:var(--muted);">'+u.bedrooms+'-bed · '+(u.type||'—')+'</div>'
+        +'<div class="js-lbl-sm">'+u.bedrooms+'-bed · '+(u.type||'—')+'</div>'
       +'</div>'
       +'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
       +'</div>';
@@ -889,7 +889,7 @@ function showEmployeeHome(){
     function makeStat(label, value, type) {
       var c = type==='alert'?'#b91c1c':type==='good'?'#15803d':type==='info'?'#1d4ed8':'var(--muted)';
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);">'
-        +'<span style="font-size:11px;color:var(--muted);">'+label+'</span>'
+        +'<span class="js-lbl-sm">'+label+'</span>'
         +'<span style="font-size:16px;font-weight:800;color:'+c+';">'+value+'</span>'
         +'</div>';
     }
@@ -897,7 +897,7 @@ function showEmployeeHome(){
       var hover = 'onmouseover="this.style.boxShadow=\'0 4px 20px rgba(0,0,0,0.1)\';this.style.borderColor=\'' + accentColor + '\'"';
       var out   = 'onmouseout="this.style.boxShadow=\'\';this.style.borderColor=\'var(--border)\'"';
       return '<div onclick="'+fn+'" style="background:var(--surface);border:1px solid var(--border);border-top:3px solid '+accentColor+';border-radius:12px;padding:18px 20px;cursor:pointer;transition:box-shadow .15s,border-color .15s;display:flex;flex-direction:column;gap:12px;" '+hover+' '+out+'>'
-        +'<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:22px;">'+icon+'</span>'
+        +'<div class="flex-g10"><span style="font-size:22px;">'+icon+'</span>'
         +'<span style="font-weight:700;font-size:15px;">'+label+'</span></div>'
         +'<div>'+statsHtml+'</div>'
         +'</div>';
@@ -1005,7 +1005,7 @@ function showEmployeeHome(){
         +' onmouseover="this.style.boxShadow=&quot;0 4px 20px rgba(0,0,0,0.1)&quot;" onmouseout="this.style.boxShadow=&quot;&quot;">'
         +'<div style="display:flex;align-items:center;gap:12px;"><span style="font-size:22px;">💰</span>'
         +'<div><div style="font-weight:700;font-size:14px;">Finance Module</div>'
-        +'<div style="font-size:12px;color:var(--muted);">Budgets, payments &amp; financial reporting</div></div></div>'
+        +'<div class="js-txt-muted-sm">Budgets, payments &amp; financial reporting</div></div></div>'
         +'</div>';
     }
 
@@ -1200,7 +1200,7 @@ async function renderRecentActivity(role) {
         + '<svg id="'+groupId+'_ch" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" style="flex-shrink:0;transition:transform .2s;transform:'+(isToday?'rotate(0deg)':'rotate(-90deg)')+'"><polyline points="6 9 12 15 18 9"/></svg>'
         + '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">'+dayLabel(key)+'</div>'
         + '<div style="flex:1;height:1px;background:var(--border);"></div>'
-        + '<div style="font-size:10px;color:var(--muted);">'+groups[key].length+' event'+(groups[key].length!==1?'s':'')+'</div>'
+        + '<div class="js-lbl-xs">'+groups[key].length+' event'+(groups[key].length!==1?'s':'')+'</div>'
       + '</div>'
       // Entries — today open by default, previous days collapsed
       + '<div id="'+groupId+'" style="display:'+(isToday?'block':'none')+';padding-left:12px;border-left:2px solid var(--border);">'

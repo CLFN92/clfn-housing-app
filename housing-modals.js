@@ -54,9 +54,9 @@ function contractorSearchFilter(q) {
 
   if(!filtered.length) {
     results.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);">'
-      +'<div style="font-size:28px;margin-bottom:8px;">🧰</div>'
-      +'<div style="font-weight:600;margin-bottom:4px;">'+(q.trim().length > 0 ? 'No contractors matching "'+q+'"' : 'No contractors added yet')+'</div>'
-      +'<div style="font-size:12px;">'+( q.trim().length > 0 ? 'Try a different search.' : 'Use the button above to add your first contractor.')+'</div>'
+      +'<div class="empty-icon-lg">🧰</div>'
+      +'<div class="empty-title">'+(q.trim().length > 0 ? 'No contractors matching "'+q+'"' : 'No contractors added yet')+'</div>'
+      +'<div class="empty-sub">'+( q.trim().length > 0 ? 'Try a different search.' : 'Use the button above to add your first contractor.')+'</div>'
       +'</div>';
     return;
   }
@@ -71,7 +71,7 @@ function contractorSearchFilter(q) {
       +'<div style="width:40px;height:40px;border-radius:10px;background:var(--dark);color:var(--yellow);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+initials+'</div>'
       +'<div style="flex:1;min-width:0;">'
         +'<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">'+( c.name||'Unknown')+'</div>'
-        +'<div style="font-size:11px;color:var(--muted);">'+(c.trade||'General')+(c.phone?' · '+c.phone:'')+'</div>'
+        +'<div class="js-lbl-sm">'+(c.trade||'General')+(c.phone?' · '+c.phone:'')+'</div>'
       +'</div>'
       +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>'
       +'</div>';
@@ -251,7 +251,7 @@ function ueUpdateBudgetRouting() {
       indicator.style.background = '#fffbeb';
       indicator.style.border = '1.5px solid #fde68a';
       indicator.style.color  = '#7a5c00';
-      indicator.innerHTML = '<div style="display:flex;align-items:center;gap:8px;">'
+      indicator.innerHTML = '<div class="flex-g8">'
         +'<span style="font-size:16px;">⚠️</span>'
         +'<div><strong>ED Approval Required</strong><br>'
         +'SOW total is <strong>'+fmtCost+'</strong> — exceeds the HM budget authority of '+fmtLimit+'.<br>'
@@ -261,7 +261,7 @@ function ueUpdateBudgetRouting() {
       indicator.style.background = '#f0fdf4';
       indicator.style.border = '1.5px solid #86efac';
       indicator.style.color  = '#15803d';
-      indicator.innerHTML = '<div style="display:flex;align-items:center;gap:8px;">'
+      indicator.innerHTML = '<div class="flex-g8">'
         +'<span style="font-size:16px;">✅</span>'
         +'<div><strong>HM Approval Sufficient</strong><br>'
         +'SOW total is <strong>'+fmtCost+'</strong> — within HM budget authority of '+fmtLimit+'.<br>'
@@ -418,8 +418,8 @@ function ueTenantSearch(q) {
       + ' style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;"'
       + ' onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'none\'">' 
       + '<div>'
-      + '<div style="font-size:13px;font-weight:600;">' + name + '</div>'
-      + '<div style="font-size:11px;color:var(--muted);">' + a.id
+      + '<div class="js-txt-bold">' + name + '</div>'
+      + '<div class="js-lbl-sm">' + a.id
         + (a.bedrooms ? ' · ' + a.bedrooms + ' bed needed' : '') + '</div>'
       + '</div>'
       + '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:' + statusBg + ';color:' + statusColor + ';white-space:nowrap;">' + statusLabel + '</span>'
@@ -486,9 +486,9 @@ function ueTenantSelect(appId, name, status) {
   sel.innerHTML = '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">'
     + '<div>'
     + '<div style="font-size:13px;font-weight:700;">' + name + '</div>'
-    + '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + appId + '</div>'
+    + '<div class="js-lbl-sm" class="mt-4">' + appId + '</div>'
     + '</div>'
-    + '<div style="display:flex;align-items:center;gap:8px;">'
+    + '<div class="flex-g8">'
     + '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:' + statusBg + ';color:' + statusColor + ';">' + statusLabel + '</span>'
     + '<button type="button" onclick="ueClearTenantSelection()" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">✕</button>'
     + '</div>'
@@ -772,7 +772,7 @@ function saveEdAdjustment(){
   var edCon = document.getElementById('sc_ed_content');
   if(edSec&&edCon&&(pts||notes)){
     edSec.style.display='block';
-    edCon.innerHTML = (pts?'<div style="font-size:13px;margin-bottom:6px;"><strong>'+(pts>0?'+':'')+pts+' pts</strong>'+(reason?' — '+reason:'')+'</div>':'')+(notes?'<div style="font-size:13px;color:var(--muted);">'+notes+'</div>':'');
+    edCon.innerHTML = (pts?'<div style="font-size:13px;margin-bottom:6px;"><strong>'+(pts>0?'+':'')+pts+' pts</strong>'+(reason?' — '+reason:'')+'</div>':'')+(notes?'<div class="js-txt-muted">'+notes+'</div>':'');
   }
   var msg=document.getElementById('sc_ed_save_msg');
   if(msg){msg.style.display='flex';setTimeout(function(){msg.style.display='none';},2000);}
@@ -838,7 +838,7 @@ function printScorecard(){
     +'<style>*{box-sizing:border-box;margin:0;padding:0;}@page{size:letter;margin:16mm 14mm;}body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;}.footer{position:fixed;bottom:8mm;left:0;right:0;padding:0 14mm;display:flex;justify-content:space-between;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:5px;}</style>'
     +'</head><body>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #F8E41A;padding-bottom:12px;margin-bottom:16px;">'
-    +'<div style="display:flex;align-items:center;gap:10px;">'+(logoSrc?'<img src="'+logoSrc+'" style="width:40px;height:40px;object-fit:contain;" alt="CLFN"/>':'')+'<div><div style="font-size:15px;font-weight:700;">CLFN Housing — Score Report</div><div style="font-size:10px;color:#888;">Constance Lake First Nation</div></div></div>'
+    +'<div class="flex-g10">'+(logoSrc?'<img src="'+logoSrc+'" style="width:40px;height:40px;object-fit:contain;" alt="CLFN"/>':'')+'<div><div class="js-txt-lg">CLFN Housing — Score Report</div><div style="font-size:10px;color:#888;">Constance Lake First Nation</div></div></div>'
     +'<div style="text-align:right;font-size:10px;color:#888;line-height:1.7;"><strong style="font-size:12px;color:#111;">'+name+'</strong><br/>'+app.id+'<br/>Generated: '+today+'</div></div>'
     +'<div style="display:flex;align-items:center;gap:24px;background:#111;border-radius:8px;padding:16px 20px;margin-bottom:16px;">'
     +'<div><div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:4px;">Total Score</div><div style="font-size:40px;font-weight:700;color:#F8E41A;line-height:1;">'+s+'</div></div>'
@@ -879,7 +879,7 @@ function previewFromDash(app){
       +'<div style="font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;'
       +'color:#555;border-bottom:2.5px solid #F8E41A;padding-bottom:3px;margin-bottom:0;">'
       +title+'</div>'
-      +'<table style="width:100%;border-collapse:collapse;">'+body+'</table>'
+      +'<table class="std-tbl">'+body+'</table>'
       +'</div>';
   }
   function yn(v) { return v ? 'Yes' : 'No'; }
@@ -887,13 +887,13 @@ function previewFromDash(app){
 
   // ── sig block (pen-on-paper for dash print — no canvas available) ──
   function sigBlock(label, pName, dt) {
-    return '<div style="break-inside:avoid;">'
+    return '<div class="print-sec">'
       +'<div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;'
       +'color:#555;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #ddd;">'+label+'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 90px;gap:8px;margin-bottom:6px;">'
-      +'<div><div style="font-size:8px;color:#999;margin-bottom:1px;">Full Name</div>'
+      +'<div><div class="sig-lbl">Full Name</div>'
       +'<div style="font-size:10.5px;font-weight:600;border-bottom:1px solid #bbb;padding-bottom:2px;min-height:15px;">'+(pName||'')+'</div></div>'
-      +'<div><div style="font-size:8px;color:#999;margin-bottom:1px;">Date</div>'
+      +'<div><div class="sig-lbl">Date</div>'
       +'<div style="font-size:10px;border-bottom:1px solid #bbb;padding-bottom:2px;min-height:15px;">'+(dt||'')+'</div></div>'
       +'</div>'
       +'<div style="width:100%;height:65px;border:1px solid #ddd;border-radius:3px;background:#fafaf8;'
@@ -902,18 +902,18 @@ function previewFromDash(app){
       +'</div>';
   }
   function internalSig(label) {
-    return '<div style="break-inside:avoid;">'
+    return '<div class="print-sec">'
       +'<div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;'
       +'color:#7a5c00;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #e8d87a;">'+label+'</div>'
-      +'<div style="font-size:9px;color:#888;margin-bottom:2px;">Name &amp; Title</div>'
+      +'<div class="sig-lbl">Name &amp; Title</div>'
       +'<div style="border-bottom:1px solid #444;height:16px;margin-bottom:8px;"></div>'
-      +'<div style="font-size:9px;color:#888;margin-bottom:2px;">Signature</div>'
+      +'<div class="sig-lbl">Signature</div>'
       +'<div style="border-bottom:1px solid #444;height:52px;margin-bottom:8px;"></div>'
       +'<div style="display:grid;grid-template-columns:1fr 90px;gap:10px;">'
-      +'<div><div style="font-size:9px;color:#888;margin-bottom:1px;">Date</div>'
-      +'<div style="border-bottom:1px solid #444;height:16px;"></div></div>'
-      +'<div><div style="font-size:9px;color:#888;margin-bottom:1px;">Decision</div>'
-      +'<div style="border-bottom:1px solid #444;height:16px;"></div></div>'
+      +'<div><div class="sig-lbl">Date</div>'
+      +'<div class="sig-line"></div></div>'
+      +'<div><div class="sig-lbl">Decision</div>'
+      +'<div class="sig-line"></div></div>'
       +'</div></div>';
   }
 
@@ -971,9 +971,9 @@ function previewFromDash(app){
 
     // Header
     +'<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #F8E41A;padding-bottom:10px;margin-bottom:14px;">'
-    +'<div style="display:flex;align-items:center;gap:10px;">'
+    +'<div class="flex-g10">'
     +(logoSrc?'<img src="'+logoSrc+'" style="width:40px;height:40px;object-fit:contain;" alt="CLFN"/>':'')
-    +'<div><div style="font-size:15px;font-weight:700;">CLFN Housing Application</div>'
+    +'<div><div class="js-txt-lg">CLFN Housing Application</div>'
     +'<div style="font-size:9.5px;color:#888;">Constance Lake First Nation</div></div></div>'
     +'<div style="text-align:right;font-size:9.5px;color:#888;line-height:1.9;">'
     +'<strong style="font-size:12px;color:#111;">'+name+'</strong><br/>'
@@ -1068,11 +1068,11 @@ function previewFromDash(app){
     +'<div><div style="color:#888;margin-bottom:2px;">Waitlist Position</div><div style="border-bottom:1px solid #555;height:16px;"></div></div>'
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;font-size:9.5px;">'
-    +'<div><div style="color:#888;margin-bottom:3px;">Application Complete?</div><div>☐ Yes &nbsp;&nbsp; ☐ No</div></div>'
-    +'<div><div style="color:#888;margin-bottom:3px;">Documents Verified?</div><div>☐ Yes &nbsp;&nbsp; ☐ No &nbsp;&nbsp; ☐ Pending</div></div>'
-    +'<div><div style="color:#888;margin-bottom:3px;">Site Visit Required?</div><div>☐ Yes &nbsp;&nbsp; ☐ No</div></div>'
+    +'<div><div class="sig-lbl">Application Complete?</div><div>☐ Yes &nbsp;&nbsp; ☐ No</div></div>'
+    +'<div><div class="sig-lbl">Documents Verified?</div><div>☐ Yes &nbsp;&nbsp; ☐ No &nbsp;&nbsp; ☐ Pending</div></div>'
+    +'<div><div class="sig-lbl">Site Visit Required?</div><div>☐ Yes &nbsp;&nbsp; ☐ No</div></div>'
     +'</div>'
-    +'<div style="margin-bottom:12px;font-size:9.5px;"><div style="color:#888;margin-bottom:3px;">Internal Notes</div>'
+    +'<div style="margin-bottom:12px;font-size:9.5px;"><div class="sig-lbl">Internal Notes</div>'
     +'<div style="border:1px solid #ddd;border-radius:3px;height:44px;background:#fff;"></div></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">'
     +internalSig('Housing Manager Approval')
@@ -1136,7 +1136,7 @@ function openMatchScorecard(appId, unitId) {
   var rows = breakdown.map(function(b){
     var col = b.pts > 0 ? '#15803d' : b.pts < 0 ? '#b91c1c' : '#888';
     var bar = Math.round(Math.max(0,b.pts)/b.max*100);
-    return '<tr style="border-bottom:1px solid var(--border);">'
+    return '<tr class="row-divider">'
       +'<td style="padding:10px 14px;font-size:13px;color:var(--text);">'+b.label+'</td>'
       +'<td style="padding:10px 14px;text-align:right;">'
         +'<div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;">'
@@ -1162,7 +1162,7 @@ function openMatchScorecard(appId, unitId) {
   if(!isElders && unit.isElders) flags.push('<span style="color:#b91c1c;font-size:12px;">⚠ Applicant not eligible for Elders unit</span>');
   if(unit.bedrooms < needsBeds)  flags.push('<span style="color:#d97706;font-size:12px;">⚠ Unit has fewer bedrooms than needed</span>');
   if(total >= 14)                flags.push('<span style="color:#15803d;font-size:12px;">✓ Strong match — recommended for assignment</span>');
-  document.getElementById('msc_flags').innerHTML = flags.join('<br>') || '<span style="color:var(--muted);font-size:12px;">No issues flagged</span>';
+  document.getElementById('msc_flags').innerHTML = flags.join('<br>') || '<span class="js-txt-muted-sm">No issues flagged</span>';
 
   modal.style.removeProperty('display');
   modal.style.setProperty('display','flex','important');
@@ -1526,7 +1526,7 @@ function udpRenderSowTable(unitId){
       +'</tr>';
   }).join('');
 
-  wrap.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-family:DM Sans,sans-serif;">'
+  wrap.innerHTML = '<div class="overflow-x"><table style="width:100%;border-collapse:collapse;font-family:DM Sans,sans-serif;">'
     +'<thead><tr style="background:var(--bg);"><th style="padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;">Date</th>'
     +'<th style="padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;">Status</th>'
     +'<th style="padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;">Amount</th>'
@@ -1760,10 +1760,10 @@ function openUnitDetail(unitId) {
   if(ts && ti){
     if(u.assignedName || u.status==='occupied' || u.status==='reserved'){
       ts.style.display = 'block';
-      ti.innerHTML = (u.assignedName?'<div style="font-weight:600;margin-bottom:4px;">'+u.assignedName+'</div>':'')
-        +(u.assignedTo?'<div style="color:var(--muted);font-size:12px;">App ID: '+u.assignedTo+'</div>':'')
-        +(u.assignedDate?'<div style="color:var(--muted);font-size:12px;">Move-in: '+u.assignedDate+'</div>':'')
-        +(!u.assignedName&&!u.assignedTo?'<span style="color:var(--muted);">No tenant assigned yet</span>':'');
+      ti.innerHTML = (u.assignedName?'<div class="empty-title">'+u.assignedName+'</div>':'')
+        +(u.assignedTo?'<div class="js-txt-muted-sm">App ID: '+u.assignedTo+'</div>':'')
+        +(u.assignedDate?'<div class="js-txt-muted-sm">Move-in: '+u.assignedDate+'</div>':'')
+        +(!u.assignedName&&!u.assignedTo?'<span class="js-lbl-xs">No tenant assigned yet</span>':'');
     } else {
       ts.style.display = 'none';
     }
@@ -1985,7 +1985,7 @@ function renoSearchFilter(q) {
       +'onmouseover="this.style.borderColor=\'var(--yellow)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
       +'<div style="min-width:0;flex:1;">'
         +'<div style="font-weight:700;font-size:13px;">'+u.num+' '+u.street+'</div>'
-        +'<div style="font-size:11px;color:var(--muted);">'+u.bedrooms+'-bed'+(u.type&&u.type!=='0'?' · '+u.type:'')+scoreBadge+'</div>'
+        +'<div class="js-lbl-sm">'+u.bedrooms+'-bed'+(u.type&&u.type!=='0'?' · '+u.type:'')+scoreBadge+'</div>'
       +'</div>'
       +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'
         +'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
@@ -2068,9 +2068,9 @@ function openRenoProgress(unitId) {
   var sumEl = document.getElementById('rp_sow_summary');
   if(sumEl) {
     if(sow && sow.items && sow.items.length) {
-      sumEl.innerHTML = '<div style="font-size:13px;color:var(--text);">SOW filed: '+sow.items.length+' items — <span style="color:var(--yellow);cursor:pointer;" data-opensow="1">View SOW →</span></div>';
+      sumEl.innerHTML = '<div class="js-txt-bold2" style="font-weight:400;">SOW filed: '+sow.items.length+' items — <span style="color:var(--yellow);cursor:pointer;" data-opensow="1">View SOW →</span></div>';
     } else {
-      sumEl.innerHTML = '<div style="font-size:13px;color:var(--muted);">No Scope of Work filed yet. <span style="color:var(--yellow);cursor:pointer;font-weight:700;" data-createsow="1">Create SOW →</span></div>';
+      sumEl.innerHTML = '<div class="js-txt-muted">No Scope of Work filed yet. <span style="color:var(--yellow);cursor:pointer;font-weight:700;" data-createsow="1">Create SOW →</span></div>';
     }
     // Wire SOW spans
     if(sumEl){
@@ -2115,7 +2115,7 @@ function openRenoProgress(unitId) {
     var storedPhotos = prog ? (prog.photos||[]) : [];
     photoPreview.innerHTML = storedPhotos.map(function(src, i) {
       return '<div style="position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1px solid var(--border);">'
-        +'<img src="'+src+'" style="width:100%;height:100%;object-fit:cover;"/>'
+        +'<img src="'+src+'" class="img-cover"/>'
         +'<button type="button" onclick="removeRenoPhoto('+i+')" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;">✕</button>'
         +'</div>';
     }).join('');
@@ -2133,9 +2133,9 @@ function openRenoProgress(unitId) {
         return '<div style="padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">'
           +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'
           +'<span style="font-size:11px;font-weight:700;color:var(--text);">'+u.status+' — '+u.pct+'%</span>'
-          +'<span style="font-size:10px;color:var(--muted);">'+u.date+'</span>'
+          +'<span class="js-lbl-xs">'+u.date+'</span>'
           +'</div>'
-          +(u.notes?'<div style="font-size:12px;color:var(--muted);">'+u.notes+'</div>':'')
+          +(u.notes?'<div class="js-txt-muted-sm">'+u.notes+'</div>':'')
           +(u.photos&&u.photos.length?'<div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;">'
             +u.photos.map(function(s){return '<img src="'+s+'" style="width:48px;height:48px;object-fit:cover;border-radius:5px;border:1px solid var(--border);"/>';}).join('')
             +'</div>':'')
@@ -2216,8 +2216,8 @@ function atSearchApps(q){
       +'style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;" '
       +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'none\'">'
       +'<div>'
-        +'<div style="font-size:13px;font-weight:600;">'+name+'</div>'
-        +'<div style="font-size:11px;color:var(--muted);">'+a.id+(a.bedrooms?' · '+a.bedrooms+' bed req\'d':'')+'</div>'
+        +'<div class="js-txt-bold">'+name+'</div>'
+        +'<div class="js-lbl-sm">'+a.id+(a.bedrooms?' · '+a.bedrooms+' bed req\'d':'')+'</div>'
       +'</div>'
       +'<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+statusBg+';color:'+statusCol+';">'+statusLabel+'</span>'
       +'</div>';
@@ -2243,7 +2243,7 @@ function atSelectApp(appId,name,status){
       +'<div style="font-size:12px;font-weight:700;">'+name+'</div>'
       +'<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;background:'+statusBg+';color:'+statusCol+';">'+statusLabel+'</span>'
       +'</div>'
-      +'<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+appId+'</div>'
+      +'<div class="js-lbl-sm" class="mt-4">'+appId+'</div>'
       +warn;
     sel.style.display='block';
   }
@@ -2358,11 +2358,11 @@ function openContractorDetail(idx) {
       peopleEl.innerHTML = validPeople.map(function(p){
         return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px 12px;background:var(--bg);border-radius:8px;">'
           +'<div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Name</div>'
-          +'<div style="font-size:13px;font-weight:600;color:var(--text);">'+(p.name||'—')+'</div></div>'
+          +'<div class="js-txt-bold">'+(p.name||'—')+'</div></div>'
           +'<div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Role</div>'
-          +'<div style="font-size:13px;color:var(--text);">'+(p.role||'—')+'</div></div>'
+          +'<div class="js-txt-bold2" style="font-weight:400;">'+(p.role||'—')+'</div></div>'
           +'<div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Phone</div>'
-          +'<div style="font-size:13px;color:var(--text);">'+(p.phone||'—')+'</div></div>'
+          +'<div class="js-txt-bold2" style="font-weight:400;">'+(p.phone||'—')+'</div></div>'
           +'</div>';
       }).join('');
     }
@@ -2715,7 +2715,7 @@ function sigBlock(label, pName, dt, imgSrc) {
   var sigHtml = imgSrc
     ? '<img src="'+imgSrc+'" style="max-height:55px;max-width:100%;object-fit:contain;"/>'
     : '<span style="font-size:9px;color:#ccc;">Sign here</span>';
-  return '<div style="break-inside:avoid;">'    +'<div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;'    +'color:#555;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #ddd;">'+label+'</div>'    +'<div style="display:grid;grid-template-columns:1fr 90px;gap:8px;margin-bottom:6px;">'    +'<div><div style="font-size:8px;color:#999;margin-bottom:1px;">Full Name</div>'    +'<div style="font-size:10.5px;font-weight:600;border-bottom:1px solid #bbb;padding-bottom:2px;min-height:15px;">'+(pName||'')+'</div></div>'    +'<div><div style="font-size:8px;color:#999;margin-bottom:1px;">Date</div>'    +'<div style="font-size:10px;border-bottom:1px solid #bbb;padding-bottom:2px;min-height:15px;">'+(dt||'')+'</div></div>'    +'</div>'    +'<div style="width:100%;height:65px;border:1px solid #ddd;border-radius:3px;background:#fafaf8;'    +'display:flex;align-items:center;justify-content:center;">'    +sigHtml+'</div>'    +'</div>';
+  return '<div class="print-sec">'    +'<div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;'    +'color:#555;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #ddd;">'+label+'</div>'    +'<div style="display:grid;grid-template-columns:1fr 90px;gap:8px;margin-bottom:6px;">'    +'<div><div class="sig-lbl">Full Name</div>'    +'<div style="font-size:10.5px;font-weight:600;border-bottom:1px solid #bbb;padding-bottom:2px;min-height:15px;">'+(pName||'')+'</div></div>'    +'<div><div class="sig-lbl">Date</div>'    +'<div style="font-size:10px;border-bottom:1px solid #bbb;padding-bottom:2px;min-height:15px;">'+(dt||'')+'</div></div>'    +'</div>'    +'<div style="width:100%;height:65px;border:1px solid #ddd;border-radius:3px;background:#fafaf8;'    +'display:flex;align-items:center;justify-content:center;">'    +sigHtml+'</div>'    +'</div>';
 }
 
 function printSOW(){
@@ -2757,7 +2757,7 @@ function printSOW(){
 
   // Helper: approval sig block (no canvas — printed blanks or filled names)
   function approvalBlock(role, name, date) {
-    return '<div style="break-inside:avoid;">'
+    return '<div class="print-sec">'
       +'<div style="font-size:8.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;color:#666;margin-bottom:4px;">'+role+'</div>'
       +'<div style="font-size:11px;font-weight:bold;color:#111;margin-bottom:6px;">'+(name||'_____________________________')+'</div>'
       +'<div style="height:40px;border-bottom:1px solid #555;margin-bottom:4px;"></div>'
@@ -2914,7 +2914,7 @@ function printSOW(){
       : '')
 
     /* Terms & Conditions */
-    +'<div class="section">'      +'<div class="section-title">Terms &amp; Conditions</div>'      +'<div class="section-body" style="font-size:9.5px;color:#444;line-height:1.65;">'        +'<p style="font-size:8.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:10px;">Constance Lake First Nation &mdash; Housing Department</p>'        +'<div style="margin-bottom:7px;"><strong>1. Prioritization of Requests.</strong> Renovation requests are assessed and prioritized based on urgency of need, health and safety risk to occupants, and overall unit condition. Immediate hazards &mdash; structural, electrical, plumbing, or fire safety &mdash; take priority over general maintenance and cosmetic work.</div>'        +'<div style="margin-bottom:7px;"><strong>2. Funding Eligibility &amp; Unit Qualifying Criteria.</strong> Approval is subject to available funding and the qualifying criteria of the unit under its applicable program (e.g. ISC, CMHC Sec. 95, CMHC Sec. 56.1, or Band-funded). Funding availability may affect the scope, cost ceiling, or timing of approved work.</div>'        +'<div style="margin-bottom:7px;"><strong>3. Budget Authority &amp; Approval Routing.</strong> Requests within the Housing Manager&rsquo;s approved budget authority may be approved by the HM. Requests exceeding that threshold require Executive Director approval before work commences. No work begins until all approvals are documented.</div>'        +'<div style="margin-bottom:7px;"><strong>4. Tenant Responsibilities.</strong> The tenant must provide timely access to the unit for inspection and work. Damage, negligence, or vandalism attributed to the tenant may reduce priority and may result in financial responsibility for a portion of repair costs.</div>'        +'<div style="margin-bottom:7px;"><strong>5. No Guarantee of Approval or Timeline.</strong> Submission does not guarantee approval or a specific completion date. Decisions will be communicated in writing. Priority and scheduling may change based on available resources and emerging urgent community needs.</div>'        +'<div><strong>6. Accuracy of Information.</strong> All information must be accurate and complete. False or misleading information may result in the request being cancelled, delayed, or referred for further review.</div>'      +'</div>'    +'</div>'
+    +'<div class="section">'      +'<div class="section-title">Terms &amp; Conditions</div>'      +'<div class="section-body" style="font-size:9.5px;color:#444;line-height:1.65;">'        +'<p style="font-size:8.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:10px;">Constance Lake First Nation &mdash; Housing Department</p>'        +'<div class="print-mb"><strong>1. Prioritization of Requests.</strong> Renovation requests are assessed and prioritized based on urgency of need, health and safety risk to occupants, and overall unit condition. Immediate hazards &mdash; structural, electrical, plumbing, or fire safety &mdash; take priority over general maintenance and cosmetic work.</div>'        +'<div class="print-mb"><strong>2. Funding Eligibility &amp; Unit Qualifying Criteria.</strong> Approval is subject to available funding and the qualifying criteria of the unit under its applicable program (e.g. ISC, CMHC Sec. 95, CMHC Sec. 56.1, or Band-funded). Funding availability may affect the scope, cost ceiling, or timing of approved work.</div>'        +'<div class="print-mb"><strong>3. Budget Authority &amp; Approval Routing.</strong> Requests within the Housing Manager&rsquo;s approved budget authority may be approved by the HM. Requests exceeding that threshold require Executive Director approval before work commences. No work begins until all approvals are documented.</div>'        +'<div class="print-mb"><strong>4. Tenant Responsibilities.</strong> The tenant must provide timely access to the unit for inspection and work. Damage, negligence, or vandalism attributed to the tenant may reduce priority and may result in financial responsibility for a portion of repair costs.</div>'        +'<div class="print-mb"><strong>5. No Guarantee of Approval or Timeline.</strong> Submission does not guarantee approval or a specific completion date. Decisions will be communicated in writing. Priority and scheduling may change based on available resources and emerging urgent community needs.</div>'        +'<div><strong>6. Accuracy of Information.</strong> All information must be accurate and complete. False or misleading information may result in the request being cancelled, delayed, or referred for further review.</div>'      +'</div>'    +'</div>'
     /* Acknowledgement & Signatures */
     +'<div class="section">'
       +'<div class="section-title">Signatures &amp; Acknowledgement</div>'

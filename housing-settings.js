@@ -21,7 +21,7 @@ function renderApprovalAuthorityPanel() {
     return;
   }
   if(!APPROVAL_AUTHORITY.can('editApprovalAuthority', window.currentRole)) {
-    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">Only the Executive Director can configure approval authorities.</div>';
+    el.innerHTML = '<div class="empty-state-ctr">Only the Executive Director can configure approval authorities.</div>';
     return;
   }
 
@@ -69,7 +69,7 @@ function renderApprovalAuthorityPanel() {
             + 'gap:16px;padding:10px 0;border-bottom:1px solid var(--border);">';
 
       // Label column
-      html += '<div style="font-size:13px;font-weight:600;color:var(--text);">'
+      html += '<div class="js-txt-bold">'
             + (labels[key] || key) + badgeHtml + '</div>';
 
       // Pills / threshold column
@@ -168,7 +168,7 @@ function showSettingsSection(section) {
       renderV2ScoringEditor();
     } else {
       var wrap = document.getElementById('scoring_model_table_wrap');
-      if(wrap) wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-style:italic;">Scoring model configuration is only available to the Executive Director.</div>';
+      if(wrap) wrap.innerHTML = '<div class="empty-state-italic">Scoring model configuration is only available to the Executive Director.</div>';
     }
   }
   if(section==='sec_unit_match'  && typeof renderUnitScoreTable==='function') renderUnitScoreTable();
@@ -215,7 +215,7 @@ function renderWlTable(apps, showScore, showReview) {
     var name = ((a.fn||'')+' '+(a.ln||'')).trim()||'—';
     var tier = a.tier||'';
     var tc = tier==='Critical Priority'?'#b91c1c':tier==='High Priority'?'#1d4ed8':tier==='Medium Priority'?'#7a6000':'#888';
-    return '<tr style="border-bottom:1px solid var(--border);">'
+    return '<tr class="row-divider">'
       + '<td style="padding:10px 14px;font-weight:600;font-size:13px;">'+name+'</td>'
       + '<td style="padding:10px 14px;font-size:12px;color:var(--muted);">'+a.id+'</td>'
       + '<td style="padding:10px 14px;font-size:12px;color:var(--muted);">'+(a.appDate||'—')+'</td>'
@@ -227,12 +227,12 @@ function renderWlTable(apps, showScore, showReview) {
       + '</tr>';
   }).join('');
 
-  return '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+  return '<div class="overflow-x"><table class="std-tbl">'
     + '<thead><tr style="background:var(--dark);">'
-    + '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Applicant</th>'
-    + '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">ID</th>'
-    + '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Date</th>'
-    + (showScore ? '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Score</th>' : '')
+    + '<th class="js-th">Applicant</th>'
+    + '<th class="js-th">ID</th>'
+    + '<th class="js-th">Date</th>'
+    + (showScore ? '<th class="js-th">Score</th>' : '')
     + '<th></th>'
     + '</tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
@@ -361,8 +361,8 @@ function transferTenantSearch(q) {
     var addr = a.assignedAddress || 'No unit assigned';
     var aid = (a.id||'').replace(/"/g,'');
     return '<div data-tid="' + aid + '" style="padding:7px 10px;border-radius:6px;cursor:pointer;font-size:12px;margin-bottom:3px;background:var(--bg);border:1px solid var(--border);">'
-      + '<strong>' + name + '</strong> <span style="color:var(--muted);">' + aid + '</span>'
-      + '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + addr + '</div></div>';
+      + '<strong>' + name + '</strong> <span class="js-lbl-xs">' + aid + '</span>'
+      + '<div class="js-lbl-sm" class="mt-4">' + addr + '</div></div>';
   }).join('');
   // Click delegation
   results.onclick = function(e) {
@@ -601,7 +601,7 @@ function saveBudgetPoolsED() {
 async function renderAuditLog() {
   var tbody = document.getElementById('audit_log_tbody');
   if(!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--muted);font-style:italic;">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" class="empty-state-italic">Loading…</td></tr>';
 
   // Load from Supabase (shared across all users)
   var log = [];
@@ -667,7 +667,7 @@ async function renderAuditLog() {
   };
 
   if(!log.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--muted);font-style:italic;">No audit entries yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state-italic">No audit entries yet.</td></tr>';
     return;
   }
 
