@@ -221,14 +221,9 @@ body {
   max-width: 880px; width: 100%; margin: 0 auto; box-sizing: border-box;
 }
 .dash-view {
-  display: flex; flex-direction: column;
+  display: flex; padding: 20px 16px; flex-direction: column;
   gap: 16px; width: 100%; box-sizing: border-box;
-}
-/* Inner page content wrapper — mirrors how .main centers inside appLayout */
-.page-wrap {
-  width: 100%; max-width: 1200px; margin: 0 auto;
-  padding: 20px 16px; box-sizing: border-box;
-  display: flex; flex-direction: column; gap: 16px;
+  max-width: 1200px; margin: 0 auto;
 }
 
 

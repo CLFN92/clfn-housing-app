@@ -85,7 +85,7 @@
   <div style="width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--yellow);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
   <div style="font-size:13px;color:var(--muted);">Loading...</div>
 </div>
-<div class="dash-view" id="renoApprovalsView" style="display:none;"><div class="page-wrap">
+<div class="dash-view" id="renoApprovalsView" style="display:none;">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -138,9 +138,9 @@
       </table>
     </div>
   </div>
-</div></div><!-- end renoApprovalsView -->
+</div><!-- end renoApprovalsView -->
 
-<div class="dash-view" id="renosView" style="display:none;"><div class="page-wrap">
+<div class="dash-view" id="renosView" style="display:none;">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -154,10 +154,10 @@
     </div>
   </div>
   <div id="renos_unified" style="width:100%;"></div>
-</div></div><!-- end renosView -->
+</div><!-- end renosView -->
 
 <!-- ═══ CONTRACTORS VIEW ═══ -->
-<div class="dash-view" id="contractorsView" style="display:none;"><div class="page-wrap">
+<div class="dash-view" id="contractorsView" style="display:none;">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -186,7 +186,7 @@
   </div>
 
   <div id="contractors_list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;"></div>
-</div></div><!-- end contractorsView -->
+</div><!-- end contractorsView -->
 
 <!-- ── Contractor Approval Panel (slide-in from right) ── -->
 <div id="ctApprovalPanel" style="display:none;position:fixed;inset:0;z-index:850;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:flex-end;" onclick="if(event.target===this)closeCtApprovalPanel()">
