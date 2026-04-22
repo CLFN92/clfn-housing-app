@@ -273,24 +273,26 @@
   </div>
 
   <!-- Table -->
-  <div class="dash-table-wrap">
-    <table class="dash-table">
-      <thead>
-        <tr>
-          <th>Applicant</th>
-          <th class="col-date col-hide-mobile">Date</th>
-          <th class="col-cls col-hide-mobile">Classification</th>
-          <th class="col-res col-hide-mobile">Reserve</th>
-          <th class="col-arr col-hide-mobile">Arrears</th>
-          <th>Status</th>
-          <th class="col-score">Score</th>
-          <th style="width:1%;white-space:nowrap;"></th>
-        </tr>
-      </thead>
-      <tbody id="dashTableBody">
-        <tr><td colspan="8" class="empty-state"><div class="empty-icon">📋</div><p>No applications yet. Submit one to see it here.</p></td></tr>
-      </tbody>
-    </table>
+  <div class="std-table-card">
+    <div class="doclib-table-wrap">
+      <table class="std-table" id="dashTable">
+        <thead>
+          <tr>
+            <th>Applicant</th>
+            <th class="col-date col-hide-mobile">Date</th>
+            <th class="col-cls col-hide-mobile">Classification</th>
+            <th class="col-res col-hide-mobile">Reserve</th>
+            <th class="col-arr col-hide-mobile">Arrears</th>
+            <th>Status</th>
+            <th class="col-score">Score</th>
+            <th style="width:1%;white-space:nowrap;"></th>
+          </tr>
+        </thead>
+        <tbody id="dashTableBody">
+          <tr><td colspan="8" class="empty-state"><div class="empty-icon">📋</div><p>No applications yet. Submit one to see it here.</p></td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div><!-- end dashView -->
 
@@ -2995,7 +2997,7 @@ function renderDashTable(){
 }
 
 function wireDashTable(){
-  var wrap=document.querySelector('.dash-table-wrap');
+  var wrap=document.querySelector('#dashTable')?.closest('.doclib-table-wrap') || document.querySelector('.doclib-table-wrap');
   if(!wrap) return;
   if(wrap._wired) return; // already delegated — event delegation handles new rows automatically
   wrap._wired=true;
