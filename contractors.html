@@ -83,7 +83,7 @@
 <div class="content-area" id="renosContentArea">
 <div id="contractorsView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
   <div class="page-back-row">
-    <button onclick="goBack()" class="back-btn-yellow">
+    <button onclick="showDash()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back
     </button>
@@ -485,6 +485,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // ══════════════════════════════════════════════════════════════
 
 window._contractors=[];window._sowCache={};window._renoProgress={};
+var _sigPads = {};  // signature pad state — referenced by _initSigPad in shared-data.js
 window._renoBudget={};window._unitPhotos={};window._appSettings={};
 var housingUnits=[];var applications=[];var auditLog=[];
 // ── Helpers ──
