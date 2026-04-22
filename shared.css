@@ -188,6 +188,13 @@ body {
 .app-wrapper  { display: flex; min-height: calc(100vh - 64px); background: var(--bg); }
 .content-area { flex: 1; display: flex; flex-direction: column; min-width: 0; align-items: stretch; overflow-y: scroll; scrollbar-gutter: stable; }
 
+/* Page-level view wrappers — direct children of .content-area.
+   .page-view caps width at 1100px and centres with auto margins.
+   .page-view-wide fills full width (data-dense pages like contractors).
+   Both handle responsive inset padding via clamp(). */
+.page-view      { width:100%;box-sizing:border-box;padding:clamp(16px,3vw,36px) clamp(14px,3vw,36px);max-width:1100px;align-self:center; }
+.page-view-wide { width:100%;box-sizing:border-box;padding:clamp(16px,3vw,36px) clamp(14px,3vw,36px); }
+
 #appLayout    { flex: 1; display: flex; flex-direction: column; min-width: 0; align-items: center; }
 
 /* Sidebar */
