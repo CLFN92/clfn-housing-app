@@ -1044,7 +1044,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── Overlay shells ── */
-.ct-panel-overlay   { display:none;position:fixed;inset:0;z-index:850;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:flex-end; }
+.ct-panel-overlay   { display:none;position:fixed;inset:0;z-index:850;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:flex-end;overflow:hidden; }
 .ct-modal-overlay   { display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto; }
 
 /* ── Panel (slide-in from right) ── */

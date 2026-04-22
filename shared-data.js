@@ -1019,7 +1019,8 @@ function closeAddContractorModal(){
 function closeCtApprovalPanel() {
   var panel = document.getElementById('ctApprovalPanel');
   if(panel) panel.style.display='none';
-  document.body.style.overflow = '';
+  var _ca = document.getElementById('renosContentArea') || document.querySelector('.content-area');
+  if(_ca) _ca.style.overflowY = '';
   _ctApprovalIdx = -1;
   _ctPendingAction = null;
 }
@@ -1513,10 +1514,12 @@ function openCtApprovalPanel(idx) {
   // Render audit trail
   _ctRenderAudit(ct.id);
 
-  // Show panel — lock body scroll so page doesn't shift when scrollbar disappears
-  document.body.style.overflow = 'hidden';
+  // Show panel
+  // Lock scroll on content-area (not body) so scrollbar-gutter:stable keeps its space
+  var _ca = document.getElementById('renosContentArea') || document.querySelector('.content-area');
+  if(_ca) _ca.style.overflowY = 'hidden';
   var panel = document.getElementById('ctApprovalPanel');
-  if(panel){ panel.style.removeProperty('display'); panel.style.setProperty('display','flex','important'); }
+  if(panel) panel.style.display = 'flex';
 }
 function populateSettings(){
   // Populate HM budget limit
