@@ -948,6 +948,18 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .ct-card-btn:hover       { border-color: var(--yellow); color: var(--yellow); }
 .ct-card-btn.muted       { color: var(--muted); font-weight: 400; }
 
+/* ── Utility classes used by contractor modal ───────────────────────────── */
+.flex-end   { display: flex; align-items: center; justify-content: flex-end; }
+.flex-col   { display: flex; flex-direction: column; }
+.flex-wrap  { display: flex; flex-wrap: wrap; }
+.gap-6      { gap: 6px; }
+.gap-8      { gap: 8px; }
+.gap-12     { gap: 12px; }
+.lbl-yellow { font-size: 10px; font-weight: 700; text-transform: uppercase;
+              letter-spacing: 1px; color: var(--yellow); }
+.lbl-sm     { font-size: 12px; font-weight: 600; color: var(--text); }
+
+
 /* Contractor status pills on card */
 .ct-status-pill                { align-self: flex-start; flex-shrink: 0; }
 .ct-status-pill.pending-review { background: #fffbeb; color: #92400e; }

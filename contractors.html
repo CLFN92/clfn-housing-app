@@ -180,28 +180,27 @@
     </div>
   </div>
 </div>
-<div id="addContractorModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
+<div id="addContractorModal" class="modal-overlay modal-z-800">
+  <div class="modal-body modal-body-md">
     <div class="modal-hdr spacious">
       <div>
-        <div class="modal-hdr-sub" style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Contractor Application</div>
-        <div id="ct_modal_title" class="modal-hdr-title">Edit Contractor</div>
+        <p class="modal-hdr-sub">Contractor Application</p>
+        <div id="ct_modal_title" class="panel-title">Edit Contractor</div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;">
+      <div class="flex-end gap-8">
         <button type="button" id="ct_header_print_btn" class="btn btn-ghost btn-sm" onclick="printContractorAgreement()">🖨 Print / Save PDF</button>
         <button type="button" id="ct_header_email_btn" class="btn btn-ghost btn-sm" onclick="emailContractorAgreement()">✉ Email to Contractor</button>
-        <button type="button" onclick="closeAddContractorModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;flex-shrink:0;">✕</button>
+        <button type="button" onclick="closeAddContractorModal()" class="btn-close-sm">✕</button>
       </div>
     </div>
-    <div style="padding:24px;display:flex;flex-direction:column;gap:0;">
 
-      <!-- ── Company Information ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Company Information</div>
-        </div>
-        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div class="f" style="grid-column:1/-1"><label>Company / Name <span class="r">*</span></label><input id="ct_name" type="text" placeholder="e.g. Northern Builds Ltd."/></div>
+    <div class="modal-body-pad" style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- Company Information -->
+      <div class="card card-flush">
+        <div class="modal-hdr compact"><div class="lbl-yellow">Company Information</div></div>
+        <div class="sec-pad edit-grid-2">
+          <div class="f s2"><label>Company / Name <span class="r">*</span></label><input id="ct_name" type="text" placeholder="e.g. Northern Builds Ltd."/></div>
           <div class="f"><label>Trade / Specialty</label>
             <select id="ct_trade">
               <option value="">— Select trade —</option>
@@ -219,87 +218,77 @@
         </div>
       </div>
 
-      <!-- ── Key People ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Key People</div>
-          <button type="button" onclick="ctAddPerson()" style="background:none;border:1px solid #555;color:#ccc;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:4px;">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Person
-          </button>
+      <!-- Key People -->
+      <div class="card card-flush">
+        <div class="modal-hdr compact flex-sb">
+          <div class="lbl-yellow">Key People</div>
+          <button type="button" onclick="ctAddPerson()" class="btn btn-ghost btn-sm">+ Add Person</button>
         </div>
-        <div style="padding:16px;">
-          <div id="ct_people_list" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <div class="sec-pad">
+          <div id="ct_people_list" class="flex-col gap-8"></div>
+          <div id="ct_people_empty" class="txt-sm-muted">No key contacts added yet.</div>
         </div>
       </div>
 
-      <!-- ── WSIB ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">WSIB Clearance Certificate</div>
-        </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <!-- WSIB -->
+      <div class="card card-flush">
+        <div class="modal-hdr compact"><div class="lbl-yellow">WSIB Clearance Certificate</div></div>
+        <div class="sec-pad" style="display:flex;flex-direction:column;gap:10px;">
+          <div class="edit-grid-2">
             <div class="f"><label>WSIB Account #</label><input id="ct_wsib_num" type="text" placeholder="1234567"/></div>
             <div class="f"><label>Expiry Date</label><input id="ct_wsib_expiry" type="date"/></div>
           </div>
-          <div id="ct_wsib_preview" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-          <div id="ct_wsib_drop" ondragover="ctFileDragOver(event,'ct_wsib_drop')" ondragleave="ctFileDragLeave('ct_wsib_drop')" ondrop="ctFileDrop(event,'wsib')" class="upload-zone" style="padding:12px;" onclick="document.getElementById('ct_wsib_input').click()">
-            <div style="font-size:12px;font-weight:600;color:var(--text);">📎 Upload WSIB Certificate &nbsp;<span style="color:var(--yellow);">browse</span></div>
-            <input type="file" id="ct_wsib_input" accept=".pdf,image/*" style="display:none;" onchange="ctFileUpload(this,'wsib')"/>
+          <div id="ct_wsib_preview" class="flex-wrap gap-6"></div>
+          <div id="ct_wsib_drop" ondragover="ctFileDragOver(event,'ct_wsib_drop')" ondragleave="ctFileDragLeave('ct_wsib_drop')" ondrop="ctFileDrop(event,'wsib')" class="upload-zone" onclick="document.getElementById('ct_wsib_input').click()">
+            <div class="lbl-sm">📎 Upload WSIB Certificate &nbsp;<span class="lbl-yellow">browse</span></div>
           </div>
+          <input type="file" id="ct_wsib_input" accept=".pdf,image/*" style="display:none;" onchange="ctFileUpload(this,'wsib')"/>
         </div>
       </div>
 
-      <!-- ── Liability Insurance ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Liability Insurance</div>
-        </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="f"><label>Provider</label><input id="ct_ins_provider" type="text" placeholder="e.g. Intact Insurance"/></div>
+      <!-- Liability Insurance -->
+      <div class="card card-flush">
+        <div class="modal-hdr compact"><div class="lbl-yellow">Liability Insurance</div></div>
+        <div class="sec-pad" style="display:flex;flex-direction:column;gap:10px;">
+          <div class="edit-grid-2">
             <div class="f"><label>Policy #</label><input id="ct_ins_policy" type="text" placeholder="Policy number"/></div>
-            <div class="f"><label>Coverage Amount</label><input id="ct_ins_amount" type="text" placeholder="e.g. $2,000,000"/></div>
             <div class="f"><label>Expiry Date</label><input id="ct_ins_expiry" type="date"/></div>
           </div>
-          <div id="ct_ins_preview" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-          <div id="ct_ins_drop" ondragover="ctFileDragOver(event,'ct_ins_drop')" ondragleave="ctFileDragLeave('ct_ins_drop')" ondrop="ctFileDrop(event,'insurance')" class="upload-zone" style="padding:12px;" onclick="document.getElementById('ct_ins_input').click()">
-            <div style="font-size:12px;font-weight:600;color:var(--text);">📎 Upload Insurance Certificate &nbsp;<span style="color:var(--yellow);">browse</span></div>
-            <input type="file" id="ct_ins_input" accept=".pdf,image/*" style="display:none;" onchange="ctFileUpload(this,'insurance')"/>
+          <div id="ct_ins_preview" class="flex-wrap gap-6"></div>
+          <div id="ct_ins_drop" ondragover="ctFileDragOver(event,'ct_ins_drop')" ondragleave="ctFileDragLeave('ct_ins_drop')" ondrop="ctFileDrop(event,'insurance')" class="upload-zone" onclick="document.getElementById('ct_ins_input').click()">
+            <div class="lbl-sm">📎 Upload Insurance Certificate &nbsp;<span class="lbl-yellow">browse</span></div>
           </div>
+          <input type="file" id="ct_ins_input" accept=".pdf,image/*" style="display:none;" onchange="ctFileUpload(this,'insurance')"/>
         </div>
       </div>
 
-      <!-- ── Other Documents ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Other Documents</div>
-        </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
-          <div id="ct_other_preview" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-          <div id="ct_other_drop" ondragover="ctFileDragOver(event,'ct_other_drop')" ondragleave="ctFileDragLeave('ct_other_drop')" ondrop="ctFileDrop(event,'other')" class="upload-zone" style="padding:12px;" onclick="document.getElementById('ct_other_input').click()">
-            <div style="font-size:12px;font-weight:600;color:var(--text);">📎 Upload Other Documents &nbsp;<span style="color:var(--yellow);">browse</span></div>
-            <input type="file" id="ct_other_input" multiple accept=".pdf,image/*,.doc,.docx" style="display:none;" onchange="ctFileUpload(this,'other')"/>
+      <!-- Other Documents -->
+      <div class="card card-flush">
+        <div class="modal-hdr compact"><div class="lbl-yellow">Other Documents</div></div>
+        <div class="sec-pad" style="display:flex;flex-direction:column;gap:10px;">
+          <div id="ct_other_preview" class="flex-wrap gap-6"></div>
+          <div id="ct_other_drop" ondragover="ctFileDragOver(event,'ct_other_drop')" ondragleave="ctFileDragLeave('ct_other_drop')" ondrop="ctFileDrop(event,'other')" class="upload-zone" onclick="document.getElementById('ct_other_input').click()">
+            <div class="lbl-sm">📎 Upload Other Documents &nbsp;<span class="lbl-yellow">browse</span></div>
           </div>
+          <input type="file" id="ct_other_input" multiple accept=".pdf,image/*,.doc,.docx" style="display:none;" onchange="ctFileUpload(this,'other')"/>
         </div>
       </div>
 
-      <!-- ── Notes ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+<div class="card card-flush">
         <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Notes</div>
+          <div class="lbl-yellow">Notes</div>
         </div>
-        <div style="padding:16px;">
+        <div class="sec-pad">
           <textarea id="ct_notes" rows="3" placeholder="Rates, availability, past work, special conditions…" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);resize:vertical;"></textarea>
         </div>
       </div>
 
       <!-- ── Business Classification ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+      <div class="card card-flush">
         <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Business Classification</div>
+          <div class="lbl-yellow">Business Classification</div>
         </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+        <div class="sec-pad" style="display:flex;flex-direction:column;gap:12px;">
           <div style="font-size:12px;color:var(--muted);line-height:1.5;">Select all that apply. Indigenous-owned businesses receive procurement preference in accordance with CLFN purchasing policy.</div>
           <div style="display:flex;flex-direction:column;gap:8px;">
             <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);transition:border-color .15s;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="ctUpdateClassBorder(this)">
@@ -332,10 +321,10 @@
       </div>
 
       <!-- ── Terms of Reference ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+      <div class="card card-flush">
         <div class="modal-hdr compact"
           onclick="var b=document.getElementById('ct_tor_body');var c=document.getElementById('ct_tor_chev');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Terms of Reference</div>
+          <div class="lbl-yellow">Terms of Reference</div>
           <svg id="ct_tor_chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
         <div id="ct_tor_body" style="display:none;padding:18px 20px;font-size:12px;color:var(--text);line-height:1.7;">
@@ -380,9 +369,9 @@
       </div>
 
       <!-- ── Signatures ── -->
-      <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;">
+      <div class="card card-flush">
         <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Signatures</div>
+          <div class="lbl-yellow">Signatures</div>
         </div>
         <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
           <div style="font-size:12px;color:var(--muted);">By signing below, both parties acknowledge the accuracy of the information provided and agreement to the Terms of Reference above.</div>
@@ -425,17 +414,17 @@
 
     </div>
     <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);">
-      <div style="display:flex;gap:8px;">
+      <div class="flex-end gap-8">
         <button type="button" id="ct_print_btn" onclick="printContractorAgreement()" style="display:none;background:none;border:1.5px solid var(--border);color:var(--text);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">🖨 Print / Save PDF</button>
         <button type="button" id="ct_email_btn" onclick="emailContractorAgreement()" style="display:none;background:none;border:1.5px solid var(--border);color:var(--text);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">✉ Email to Contractor</button>
       </div>
-      <div style="display:flex;gap:10px;">
+          </div>
+<div style="display:flex;gap:10px;">
         <button type="button" onclick="closeAddContractorModal()" class="btn btn-ghost">Cancel</button>
         <button type="button" id="ct_save_btn" onclick="saveContractorAndFinalize()" class="btn btn-primary">Save &amp; Finalize</button>
       </div>
     </div>
   </div>
-</div>
 </div><!-- end content-area -->
 </div><!-- end app-wrapper -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>

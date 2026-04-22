@@ -480,6 +480,7 @@
   box-shadow: 0 8px 40px rgba(0,0,0,0.4);
   overflow: hidden;
 }
+.modal-body-md  { max-width: 620px; }
 .modal-body-lg  { max-width: 820px; }
 .modal-body-xl  { max-width: 960px; }
 .modal-body-sm  { max-width: 480px; }
