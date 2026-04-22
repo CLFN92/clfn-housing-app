@@ -1786,15 +1786,17 @@ function printApplicationPreview() {
 window._navStack = [];
 
 // ── Page nav map (used by shared-ui.js goBack) ─────────────────────────────
+// Uses lazy lookups so this file can load before housing-init.js (which
+// defines showDashboard). Functions are resolved at call time, not parse time.
 window._navMap = {
-  'home': showEmployeeHome,
-  'dashboard': showDashboard,
-  'inventory': showInventory,
-  'match': showMatch,
-  'tenants': showTenants,
-  'renos': showRenos,
-  'contractors': showContractors,
-  'settings': showSettings
+  'home':        function(){ return showEmployeeHome.apply(this, arguments); },
+  'dashboard':   function(){ return showDashboard.apply(this, arguments); },
+  'inventory':   function(){ return showInventory.apply(this, arguments); },
+  'match':       function(){ return showMatch.apply(this, arguments); },
+  'tenants':     function(){ return showTenants.apply(this, arguments); },
+  'renos':       function(){ return showRenos.apply(this, arguments); },
+  'contractors': function(){ return showContractors.apply(this, arguments); },
+  'settings':    function(){ return showSettings.apply(this, arguments); }
 };
 
 
