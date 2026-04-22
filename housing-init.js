@@ -40,6 +40,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 function showDashboard(){
+  // If we're on a sub-page (inventory.html, etc.), the dashView DOM element
+  // doesn't exist here — navigate back to housing.html instead of trying to
+  // render into a non-existent element (which would leave the page blank).
+  if (!document.getElementById('dashView')) {
+    if (!window.location.pathname.includes('housing.html') &&
+        !window.location.pathname.endsWith('/') &&
+        window.location.pathname !== '/') {
+      window.location.href = 'housing.html';
+      return;
+    }
+  }
   // The actual applications dashboard — HM and ED only
   var role = window.currentRole || 'housing_employee_l1';
   if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) { showToast('Dashboard access requires Housing Manager or Executive Director role.'); return; }
@@ -2049,36 +2060,61 @@ function initHousingPage() {
   else                          { if(typeof showDashboard==='function') showDashboard(); else if(true) showWorklist(); }
 }
 
-(async function initHousing() {
-  var token=null, savedRole=null, savedName=null, savedEmail=null;
-  try {
-    token      = sessionStorage.getItem('clfn_housing_token');
-    savedRole  = sessionStorage.getItem('clfn_housing_role') || 'housing_employee_l1';
-    savedName  = sessionStorage.getItem('clfn_housing_name') || '';
-    savedEmail = sessionStorage.getItem('clfn_housing_email_session') || '';
-  } catch(e) {}
-  if(!token) { window.location.href='index.html'; return; }
-  HOUSING_HEADERS['Authorization'] = 'Bearer '+token;
-  HOUSING_SESSION.accessToken=token; HOUSING_SESSION.role=savedRole;
-  HOUSING_SESSION.name=savedName; HOUSING_SESSION.email=savedEmail;
-  window.currentRole=savedRole;
-  window.CLFN_AUTH = window.CLFN_AUTH||{};
-  window.CLFN_AUTH.isAuthenticated=true; window.CLFN_AUTH.currentRole=savedRole;
-  try {
-    // Resolve the CURRENT role from the staff table before rendering anything.
-    // The sessionStorage cache above is stale on every housing.html page load
-    // because nothing writes to clfn_housing_role — it will always default to
-    // 'employee', which renders the wrong tile grid and causes the Finance
-    // tile to be hidden from ED/HM users on first load. This call queries
-    // Supabase for the real role based on email, then updates
-    // HOUSING_SESSION.role, window.currentRole, and window._realRole to match.
-    if(HOUSING_SESSION.email && typeof resolveHousingRole === 'function') {
-      await resolveHousingRole();
-      console.log('[housing] initHousing: resolved role =', HOUSING_SESSION.role);
-    }
-    await loadHousingData();
-    initHousingPage();
-  } catch(e) {
-    console.error('[HOUSING] init failed:', e.message, e.stack);
+// ══════════════════════════════════════════════════════
+// PAGE BOOT — only on housing.html
+// ══════════════════════════════════════════════════════
+// housing-init.js is loaded by multiple pages in the suite (housing.html,
+// inventory.html, etc.) because they share helpers like showDashboard,
+// newApp, resolveHousingRole, etc. But only housing.html should run this
+// page-level boot. On inventory.html (and other sub-pages), the page's
+// own inline init block handles view dispatch against its own DOM —
+// letting this IIFE run there would call initHousingPage(), which reads
+// ?view= from the sub-page's URL and tries to render housing.html views
+// (dashView, employeeHomeView) on a DOM that doesn't contain them. That
+// either shows the wrong thing or, more commonly, a blank screen.
+(function () {
+  var path = window.location.pathname;
+  var isHousingHome =
+    path.endsWith('/housing.html') ||
+    path === '/housing.html' ||
+    path.endsWith('/') ||
+    path === '';
+  if (!isHousingHome) {
+    console.log('[housing-init] Page boot skipped — not on housing.html (path=' + path + ')');
+    return;
   }
+
+  (async function initHousing() {
+    var token=null, savedRole=null, savedName=null, savedEmail=null;
+    try {
+      token      = sessionStorage.getItem('clfn_housing_token');
+      savedRole  = sessionStorage.getItem('clfn_housing_role') || 'housing_employee_l1';
+      savedName  = sessionStorage.getItem('clfn_housing_name') || '';
+      savedEmail = sessionStorage.getItem('clfn_housing_email_session') || '';
+    } catch(e) {}
+    if(!token) { window.location.href='index.html'; return; }
+    HOUSING_HEADERS['Authorization'] = 'Bearer '+token;
+    HOUSING_SESSION.accessToken=token; HOUSING_SESSION.role=savedRole;
+    HOUSING_SESSION.name=savedName; HOUSING_SESSION.email=savedEmail;
+    window.currentRole=savedRole;
+    window.CLFN_AUTH = window.CLFN_AUTH||{};
+    window.CLFN_AUTH.isAuthenticated=true; window.CLFN_AUTH.currentRole=savedRole;
+    try {
+      // Resolve the CURRENT role from the staff table before rendering anything.
+      // The sessionStorage cache above is stale on every housing.html page load
+      // because nothing writes to clfn_housing_role — it will always default to
+      // 'employee', which renders the wrong tile grid and causes the Finance
+      // tile to be hidden from ED/HM users on first load. This call queries
+      // Supabase for the real role based on email, then updates
+      // HOUSING_SESSION.role, window.currentRole, and window._realRole to match.
+      if(HOUSING_SESSION.email && typeof resolveHousingRole === 'function') {
+        await resolveHousingRole();
+        console.log('[housing] initHousing: resolved role =', HOUSING_SESSION.role);
+      }
+      await loadHousingData();
+      initHousingPage();
+    } catch(e) {
+      console.error('[HOUSING] init failed:', e.message, e.stack);
+    }
+  }());
 }());
