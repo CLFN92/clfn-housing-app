@@ -356,7 +356,7 @@
 
 <div class="layout" id="appLayout" style="display:none;flex-direction:column;">
   <!-- Context bar — shows applicant name + editing badge when editing an existing app -->
-  <div id="appLayout_ctx_bar" style="display:none;padding:8px 20px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">
+  <div id="appLayout_ctx_bar" style="display:none;padding:8px 20px;background:var(--surface);border-bottom:1px solid var(--border);align-items:center;gap:10px;">
     <span id="appLayout_title" style="font-size:13px;font-weight:700;color:var(--text);"></span>
     <span id="appLayout_subtitle" style="font-size:12px;color:var(--muted);"></span>
   </div>
@@ -2221,6 +2221,50 @@
         <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
         <button class="btn btn-primary" onclick="finalSubmit()">Confirm Submit →</button>
       </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ MATCH SCORECARD MODAL ═══ -->
+<div id="matchScorecardModal" class="modal-overlay modal-overlay-centered modal-z-900" style="display:none;" onclick="if(event.target===this)closeMatchScorecard()">
+  <div class="modal-body modal-body-sm" style="max-width:560px;">
+    <div class="modal-hdr">
+      <div>
+        <div id="msc_title" class="panel-title">Match Scorecard</div>
+        <div id="msc_app" class="txt-xs-dim" style="margin-top:2px;"></div>
+      </div>
+      <button onclick="closeMatchScorecard()" class="btn-close-sm">✕</button>
+    </div>
+    <div style="padding:20px;">
+      <!-- Unit + Score summary -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div class="lbl-muted" style="margin-bottom:3px;">Unit</div>
+          <div id="msc_unit" class="txt-sm-bold"></div>
+        </div>
+        <div style="text-align:right;">
+          <div id="msc_score" style="font-size:32px;font-weight:800;color:var(--yellow);line-height:1;"></div>
+          <div id="msc_pct" class="txt-xs-dim" style="margin-top:2px;"></div>
+        </div>
+      </div>
+      <!-- Score bar -->
+      <div style="height:6px;background:var(--border);border-radius:3px;margin-bottom:16px;overflow:hidden;">
+        <div id="msc_bar_fill" style="height:100%;width:0%;background:var(--yellow);border-radius:3px;transition:width .3s;"></div>
+      </div>
+      <!-- Breakdown table -->
+      <table class="std-tbl" style="margin-bottom:14px;">
+        <thead>
+          <tr style="background:var(--bg);">
+            <th class="js-th">Factor</th>
+            <th class="js-th" style="text-align:right;width:60px;">Score</th>
+            <th class="js-th" style="text-align:right;width:60px;">Max</th>
+          </tr>
+        </thead>
+        <tbody id="msc_rows"></tbody>
+      </table>
+      <!-- Flags -->
+      <div id="msc_flags" class="txt-xs-muted" style="line-height:1.7;"></div>
     </div>
   </div>
 </div>

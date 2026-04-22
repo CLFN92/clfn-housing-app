@@ -3364,7 +3364,7 @@ function showScorecard(app){
   window._currentScorecardApp=app;
   hideAllViews('scorecardView');
   var _scv=document.getElementById('scorecardView');if(!_scv)return;
-  _scv.style.display='block';
+  _scv.style.display='flex';
   setNavActive('tab_dash');
   setText('sc_back_name',((app.fn||'')+' '+(app.ln||'')).trim());
   setText('sc_back_id',app.id+' · '+(app.appDate||''));
