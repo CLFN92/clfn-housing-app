@@ -3339,13 +3339,46 @@ function showMatch(){
   }
 }
 
+// ── rpContractorSearch — used by renoProgressModal to assign contractor ────────
+// Lives here (shared) so both renos.html and contractors.html can call it.
+function rpContractorSearch(q) {
+  var dd = document.getElementById('rp_ct_dropdown');
+  if(!dd) return;
+  var contractors = [];
+  var contractors = window._contractors || [];
+  var term = (q||'').toLowerCase().trim();
+  var matches = term
+    ? contractors.filter(function(c){ return (c.name||'').toLowerCase().includes(term) || (c.trade||'').toLowerCase().includes(term); })
+    : contractors;
+
+  var rows = matches.map(function(c) {
+    return '<div data-ct-name="'+c.name+'" data-ct-id="'+(c.id||'')+'" style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" '
+      +'onmousedown="rpSelectContractor(this)" '
+      +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
+      +'<div style="font-weight:600;">'+c.name+'</div>'
+      +(c.trade?'<div style="font-size:11px;color:var(--muted);">'+c.trade+'</div>':'')
+      +'</div>';
+  });
+
+  // Always show "Add new contractor" option
+  rows.push('<div onmousedown="rpAddNewContractor()" style="padding:9px 14px;cursor:pointer;font-size:12px;font-weight:700;color:var(--yellow);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;" '
+    +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
+    +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+    +(term && !matches.length ? 'Add "'+q+'" as new contractor' : 'Add new contractor')
+    +'</div>');
+
+  dd.innerHTML = rows.join('');
+  dd.style.display = 'block';
+}
+
+
 function showContractors(){
   if(window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('contractors')){
     showToast('Contractors module is not enabled for this nation.');
     return;
   }
-  // contractorsView markup lives in renos.html — navigate cross-page
-  window.location.href = 'renos.html?view=contractors';
+  // contractorsView markup lives in contractors.html
+  window.location.href = 'contractors.html';
 }
 
 function showRenos(){
@@ -3353,7 +3386,7 @@ function showRenos(){
     showToast('Renovations module is not enabled for this nation.');
     return;
   }
-  // The renoApprovalsView/renosView markup lives in renos.html, not housing.html —
+  // The renoApprovalsView/renosView markup lives in renos.html —
   // always navigate cross-page so the correct page loads with its own init.
   var role = window.currentRole || 'housing_employee_l1';
   if(ROLE.isManagement(role)) {

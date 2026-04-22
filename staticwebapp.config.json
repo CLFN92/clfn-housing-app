@@ -34,11 +34,23 @@
       "route": "/finance.html",
       "serve": "/finance.html",
       "statusCode": 200
+    },
+    {
+      "route": "/contractors.html",
+      "serve": "/contractors.html",
+      "statusCode": 200
     }
   ],
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["*.css", "*.js", "*.png", "*.jpg", "*.json", "*.html"]
+    "exclude": [
+      "*.css",
+      "*.js",
+      "*.png",
+      "*.jpg",
+      "*.json",
+      "*.html"
+    ]
   },
   "mimeTypes": {
     ".html": "text/html",

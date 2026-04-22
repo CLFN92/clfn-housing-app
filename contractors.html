@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>CLFN Housing — Renovations &amp; Contractors</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="shared.css"/>
+<link rel="stylesheet" href="housing.css"/>
+<link rel="stylesheet" href="renos.css"/>
+<script src="shared.js"></script>
+<script src="shared-config.js"></script>
+<script src="shared-auth.js"></script>
+<script src="shared-ui.js"></script>
+<script src="approval-authority.js"></script>
+<script src="shared-data.js"></script>
+
+
+
+</head>
+<body>
+<!-- HEADER -->
+<header class="app-header">
+  
+  <div class="hbrand" onclick="showDash()" style="cursor:pointer;" title="Return to Home">
+    <img src="data:image/png;base64,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" alt="CLFN" class="hlogo"/>
+    <div>
+      <strong style="display:block;font-size:14px;font-weight:700;color:#fff;letter-spacing:-.2px;">Housing Application</strong>
+      <span style="font-size:11px;color:#888;">Constance Lake First Nation</span>
+    </div>
+  </div>
+  <!-- User info bar -->
+  <div id="header_user_bar" style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+    <div id="roleSwitcher" style="display:none;align-items:center;gap:6px;">
+      <!-- Options populated dynamically from CLFN_PERMS.ROLE_LABELS at login time -->
+      <select id="rb_select" onchange="switchRole(this.value)" style="padding:5px 10px;border:1px solid #444;border-radius:8px;font-size:12px;font-weight:600;font-family:DM Sans,sans-serif;background:#1a1a18;color:#ccc;cursor:pointer;outline:none;">
+        <option value="ed">Executive Director</option>
+        <option value="housing_manager">Housing Manager</option>
+        <option value="housing_employee_l2">Housing Employee L2</option>
+        <option value="housing_employee_l1">Housing Employee L1</option>
+        <option value="cfo">CFO</option>
+        <option value="finance_l1">Finance Clerk L1</option>
+      </select>
+    </div>
+    <div id="header_user_pill" style="display:flex;align-items:center;gap:8px;background:#1a1a18;border:1px solid #333;border-radius:20px;padding:5px 12px 5px 6px;">
+      <div id="header_avatar" style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">—</div>
+      <span id="header_user_name" style="font-size:12px;font-weight:600;color:#fff;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Guest</span><span id="header_user_display" style="display:none;"></span>
+      <span id="header_role_badge" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:#333;color:#aaa;"></span>
+      <button onclick="headerSignOut()" style="background:none;border:none;color:#666;font-size:11px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;padding:0 0 0 4px;" onmouseover="this.style.color='#ccc'" onmouseout="this.style.color='#666'">sign out</button>
+    </div>
+    <!-- Global export button — shown when on an exportable view -->
+    <div id="header_export_wrap" style="position:relative;display:none;">
+      <button type="button" onclick="toggleHeaderExportMenu()" style="background:none;border:1px solid #444;color:#ccc;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='#444';this.style.color='#ccc'">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div id="header_export_menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:9999;min-width:160px;overflow:hidden;">
+        <button onclick="headerExport('csv')" style="width:100%;background:none;border:none;padding:10px 16px;text-align:left;font-size:13px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
+          <span style="font-size:16px;">📄</span> CSV
+        </button>
+        <button onclick="headerExport('excel')" style="width:100%;background:none;border:none;padding:10px 16px;text-align:left;font-size:13px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
+          <span style="font-size:16px;">📊</span> Excel (.xlsx)
+        </button>
+        <button onclick="headerExport('pdf')" style="width:100%;background:none;border:none;padding:10px 16px;text-align:left;font-size:13px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:10px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
+          <span style="font-size:16px;">📑</span> PDF
+        </button>
+      </div>
+    </div>
+    <button onclick="showAddHousingStaff()" id="header_addstaff_btn" style="background:none;border:1px solid #444;color:#ccc;border-radius:8px;padding:6px 14px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:none;align-items:center;gap:6px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='#444';this.style.color='#ccc'">
+      + Staff
+    </button>
+    <!-- Role view toggle — header level, ED/HM only -->
+    
+    <button onclick="showSettings()" id="header_settings_btn" style="background:none;border:1px solid #444;color:#ccc;border-radius:8px;padding:6px 14px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:none;align-items:center;gap:6px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='#444';this.style.color='#ccc'">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </button>
+  </div>
+</header>
+
+<div class="app-wrapper" id="appWrapper">
+<div class="content-area" id="renosContentArea">
+<div id="contractorsView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
+  <div class="page-back-row">
+    <button onclick="goBack()" class="back-btn-yellow">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </button>
+  </div>
+  <div class="page-header-bar">
+    <div class="phb-title">
+      <h1>Contractors</h1>
+      <p>Manage contractor directory and approval workflow</p>
+    </div>
+    <div class="phb-actions">
+      <button onclick="openAddContractorModal()" style="background:var(--yellow);border:none;color:#111;padding:8px 18px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Contractor
+      </button>
+    </div>
+  </div>
+
+  <!-- Status filter tabs -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;" id="ct_filter_tabs">
+    <button onclick="ctSetFilter('')" id="ct_tab_all" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">All</button>
+    <button onclick="ctSetFilter('pending_review')" id="ct_tab_pending" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">⏳ Pending Review</button>
+    <button onclick="ctSetFilter('hm_recommended')" id="ct_tab_hm" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">📋 Awaiting ED</button>
+    <button onclick="ctSetFilter('approved')" id="ct_tab_approved" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">✅ Approved</button>
+    <button onclick="ctSetFilter('declined')" id="ct_tab_declined" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">❌ Declined</button>
+  </div>
+
+  <div id="contractors_list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;"></div>
+</div><!-- end contractorsView -->
+
+<!-- ── Contractor Approval Panel (slide-in from right) ── -->
+<div id="ctApprovalPanel" style="display:none;position:fixed;inset:0;z-index:850;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:flex-end;" onclick="if(event.target===this)closeCtApprovalPanel()">
+  <div style="background:var(--surface);width:100%;max-width:480px;height:100%;overflow-y:auto;box-shadow:-8px 0 40px rgba(0,0,0,0.3);display:flex;flex-direction:column;">
+    <!-- Panel header -->
+    <div class="modal-hdr sticky">
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Contractor Application</div>
+        <div id="ctap_name" style="font-size:15px;font-weight:700;color:#fff;"></div>
+        <div id="ctap_trade" style="font-size:11px;color:#888;margin-top:1px;"></div>
+      </div>
+      <button onclick="closeCtApprovalPanel()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+    </div>
+
+    <!-- Status banner -->
+    <div id="ctap_status_banner" style="padding:10px 20px;font-size:12px;font-weight:700;text-align:center;"></div>
+
+    <!-- Panel body -->
+    <div style="padding:20px;flex:1;display:flex;flex-direction:column;gap:16px;">
+
+      <!-- Info summary -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="modal-hdr compact">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Application Summary</div>
+        </div>
+        <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">
+          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Phone</div><div id="ctap_phone" style="color:var(--text);"></div></div>
+          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Email</div><div id="ctap_email" style="color:var(--text);word-break:break-all;"></div></div>
+          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Classification</div><div id="ctap_class" style="color:var(--text);"></div></div>
+          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">HST #</div><div id="ctap_hst" style="color:var(--text);"></div></div>
+          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">WSIB</div><div id="ctap_wsib" style="color:var(--text);"></div></div>
+          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Insurance Expiry</div><div id="ctap_ins" style="color:var(--text);"></div></div>
+          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">TOR Agreed</div><div id="ctap_tor" style="color:var(--text);"></div></div>
+          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Submitted</div><div id="ctap_submitted" style="color:var(--text);"></div></div>
+        </div>
+      </div>
+
+      <!-- Approval flow diagram -->
+      <div class="card" style="padding:14px;">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px;">Approval Flow</div>
+        <div id="ctap_flow" style="display:flex;align-items:center;gap:0;"></div>
+      </div>
+
+      <!-- Action buttons (role-gated) -->
+      <div id="ctap_actions" style="display:flex;flex-direction:column;gap:10px;"></div>
+
+      <!-- Notes input (shown when action needs notes) -->
+      <div id="ctap_notes_wrap" style="display:none;">
+        <div class="f">
+          <label>Notes / Reason <span id="ctap_notes_req" style="color:#b91c1c;"></span></label>
+          <textarea id="ctap_notes" rows="3" placeholder="Add notes explaining this decision…" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);resize:vertical;"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button id="ctap_confirm_btn" onclick="confirmCtAction()" class="btn btn-primary" style="flex:1;"></button>
+          <button onclick="cancelCtAction()" class="btn btn-ghost">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Audit trail -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="modal-hdr compact">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Audit Trail</div>
+        </div>
+        <div id="ctap_audit" style="padding:14px;display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<div id="addContractorModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
+  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
+    <div class="modal-hdr">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">
+        <div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Constance Lake First Nation — Housing</div>
+          <div id="ct_modal_title" style="font-size:15px;font-weight:700;color:#fff;">Contractor Application</div>
+        </div>
+        <button type="button" onclick="closeAddContractorModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;flex-shrink:0;margin-left:12px;">✕</button>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" id="ct_header_print_btn" onclick="printContractorAgreement()" style="background:none;border:1px solid #555;color:#ccc;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">🖨 Print / Save PDF</button>
+        <button type="button" id="ct_header_email_btn" onclick="emailContractorAgreement()" style="background:none;border:1px solid #555;color:#ccc;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">✉ Email to Contractor</button>
+      </div>
+    </div>
+    <div style="padding:24px;display:flex;flex-direction:column;gap:0;">
+
+      <!-- ── Company Information ── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div class="modal-hdr compact">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Company Information</div>
+        </div>
+        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="f" style="grid-column:1/-1"><label>Company / Name <span class="r">*</span></label><input id="ct_name" type="text" placeholder="e.g. Northern Builds Ltd."/></div>
+          <div class="f"><label>Trade / Specialty</label>
+            <select id="ct_trade">
+              <option value="">— Select trade —</option>
+              <optgroup label="General Construction"><option>General Contractor</option><option>Carpentry / Framing</option><option>Concrete &amp; Foundations</option><option>Demolition</option><option>Insulation</option><option>Roofing</option><option>Flooring</option><option>Drywall / Plastering</option><option>Painting &amp; Finishing</option><option>Windows &amp; Doors</option></optgroup>
+              <optgroup label="Mechanical &amp; Utilities"><option>Plumbing</option><option>Electrical</option><option>HVAC / Heating &amp; Cooling</option><option>Mechanical</option><option>Gas Fitting</option><option>Sprinkler / Fire Suppression</option></optgroup>
+              <optgroup label="Exterior &amp; Site Work"><option>Excavation &amp; Grading</option><option>Civil Works</option><option>Landscaping</option><option>Septic &amp; Drainage</option><option>Siding &amp; Cladding</option></optgroup>
+              <optgroup label="Professional Services"><option>Architecture</option><option>Structural Engineering</option><option>Civil Engineering</option><option>Project Management</option><option>Building Inspection</option><option>Environmental Consulting</option><option>Interior Design</option></optgroup>
+              <optgroup label="Accessibility &amp; Specialty"><option>Accessibility Modifications</option><option>Mould Remediation</option><option>Asbestos Abatement</option><option>Energy Efficiency / Retrofits</option></optgroup>
+            </select>
+          </div>
+          <div class="f"><label>Phone</label><input id="ct_phone" type="tel" placeholder="705-000-0000"/></div>
+          <div class="f"><label>Email</label><input id="ct_email" type="email" placeholder="contact@company.com"/></div>
+          <div class="f"><label>Address</label><input id="ct_address" type="text" placeholder="Company address"/></div>
+          <div class="f"><label>HST / Business #</label><input id="ct_hst" type="text" placeholder="123456789 RT0001"/></div>
+        </div>
+      </div>
+
+      <!-- ── Key People ── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div class="modal-hdr compact">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Key People</div>
+          <button type="button" onclick="ctAddPerson()" style="background:none;border:1px solid #555;color:#ccc;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:4px;">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Person
+          </button>
+        </div>
+        <div style="padding:16px;">
+          <div id="ct_people_list" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+      </div>
+
+      <!-- ── WSIB ── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div class="modal-hdr compact">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">WSIB Clearance Certificate</div>
+        </div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="f"><label>WSIB Account #</label><input id="ct_wsib_num" type="text" placeholder="1234567"/></div>
+            <div class="f"><label>Expiry Date</label><input id="ct_wsib_expiry" type="date"/></div>
+          </div>
+          <div id="ct_wsib_preview" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+          <div id="ct_wsib_drop" ondragover="ctFileDragOver(event,'ct_wsib_drop')" ondragleave="ctFileDragLeave('ct_wsib_drop')" ondrop="ctFileDrop(event,'wsib')" class="upload-zone" style="padding:12px;" onclick="document.getElementById('ct_wsib_input').click()">
+            <div style="font-size:12px;font-weight:600;color:var(--text);">📎 Upload WSIB Certificate &nbsp;<span style="color:var(--yellow);">browse</span></div>
+            <input type="file" id="ct_wsib_input" accept=".pdf,image/*" style="display:none;" onchange="ctFileUpload(this,'wsib')"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Liability Insurance ── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div class="modal-hdr compact">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Liability Insurance</div>
+        </div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="f"><label>Provider</label><input id="ct_ins_provider" type="text" placeholder="e.g. Intact Insurance"/></div>
+            <div class="f"><label>Policy #</label><input id="ct_ins_policy" type="text" placeholder="Policy number"/></div>
+            <div class="f"><label>Coverage Amount</label><input id="ct_ins_amount" type="text" placeholder="e.g. $2,000,000"/></div>
+            <div class="f"><label>Expiry Date</label><input id="ct_ins_expiry" type="date"/></div>
+          </div>
+          <div id="ct_ins_preview" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+          <div id="ct_ins_drop" ondragover="ctFileDragOver(event,'ct_ins_drop')" ondragleave="ctFileDragLeave('ct_ins_drop')" ondrop="ctFileDrop(event,'insurance')" class="upload-zone" style="padding:12px;" onclick="document.getElementById('ct_ins_input').click()">
+            <div style="font-size:12px;font-weight:600;color:var(--text);">📎 Upload Insurance Certificate &nbsp;<span style="color:var(--yellow);">browse</span></div>
+            <input type="file" id="ct_ins_input" accept=".pdf,image/*" style="display:none;" onchange="ctFileUpload(this,'insurance')"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Other Documents ── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div class="modal-hdr compact">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Other Documents</div>
+        </div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+          <div id="ct_other_preview" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+          <div id="ct_other_drop" ondragover="ctFileDragOver(event,'ct_other_drop')" ondragleave="ctFileDragLeave('ct_other_drop')" ondrop="ctFileDrop(event,'other')" class="upload-zone" style="padding:12px;" onclick="document.getElementById('ct_other_input').click()">
+            <div style="font-size:12px;font-weight:600;color:var(--text);">📎 Upload Other Documents &nbsp;<span style="color:var(--yellow);">browse</span></div>
+            <input type="file" id="ct_other_input" multiple accept=".pdf,image/*,.doc,.docx" style="display:none;" onchange="ctFileUpload(this,'other')"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Notes ── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div class="modal-hdr compact">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Notes</div>
+        </div>
+        <div style="padding:16px;">
+          <textarea id="ct_notes" rows="3" placeholder="Rates, availability, past work, special conditions…" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);resize:vertical;"></textarea>
+        </div>
+      </div>
+
+      <!-- ── Business Classification ── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div class="modal-hdr compact">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Business Classification</div>
+        </div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+          <div style="font-size:12px;color:var(--muted);line-height:1.5;">Select all that apply. Indigenous-owned businesses receive procurement preference in accordance with CLFN purchasing policy.</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);transition:border-color .15s;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="ctUpdateClassBorder(this)">
+              <input type="radio" id="ct_class_internal" name="ct_classification" value="internal_indigenous" style="margin-top:2px;flex-shrink:0;" onchange="ctUpdateClassBorders()"/>
+              <div>
+                <div style="font-size:13px;font-weight:700;color:var(--text);">Internal — Indigenous</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px;">Band-owned enterprise or business majority-owned by a CLFN band member</div>
+              </div>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);transition:border-color .15s;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="ctUpdateClassBorder(this)">
+              <input type="radio" id="ct_class_external_indigenous" name="ct_classification" value="external_indigenous" style="margin-top:2px;flex-shrink:0;" onchange="ctUpdateClassBorders()"/>
+              <div>
+                <div style="font-size:13px;font-weight:700;color:var(--text);">External — Indigenous</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px;">Indigenous-owned business not affiliated with CLFN</div>
+              </div>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);transition:border-color .15s;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="ctUpdateClassBorder(this)">
+              <input type="radio" id="ct_class_external" name="ct_classification" value="external_non_indigenous" style="margin-top:2px;flex-shrink:0;" onchange="ctUpdateClassBorders()"/>
+              <div>
+                <div style="font-size:13px;font-weight:700;color:var(--text);">External — Non-Indigenous</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px;">Business with no Indigenous ownership</div>
+              </div>
+            </label>
+          </div>
+          <div class="f" id="ct_class_proof_row" style="display:none;">
+            <label>Proof of Indigenous Ownership <span style="font-size:10px;color:var(--muted);">(optional — band registry, status card, or statutory declaration)</span></label>
+            <input type="text" id="ct_class_proof" placeholder="Document reference or attach via Other Documents"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Terms of Reference ── -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
+        <div class="modal-hdr compact"
+          onclick="var b=document.getElementById('ct_tor_body');var c=document.getElementById('ct_tor_chev');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Terms of Reference</div>
+          <svg id="ct_tor_chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div id="ct_tor_body" style="display:none;padding:18px 20px;font-size:12px;color:var(--text);line-height:1.7;">
+          <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;">Constance Lake First Nation — Housing Department</p>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">1. Scope of Engagement</div>
+              <p style="font-size:12px;color:var(--muted);">The contractor agrees to perform only the work described in the approved Scope of Work (SOW) issued by the CLFN Housing Department. No work beyond the approved SOW may commence without written amendment signed by the Housing Manager or Executive Director.</p>
+            </div>
+            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">2. Licensing &amp; Insurance</div>
+              <p style="font-size:12px;color:var(--muted);">The contractor warrants that it holds all required trade licences, WSIB clearance, and liability insurance in force for the duration of the work. Expiry of any required coverage automatically suspends the right to work on CLFN property until coverage is reinstated and verified.</p>
+            </div>
+            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">3. Invoicing &amp; Payment</div>
+              <p style="font-size:12px;color:var(--muted);">Invoices must reference the SOW number, unit address, and work completed. Payment is subject to satisfactory inspection by the Housing Manager. CLFN's standard payment terms are Net 30 days from invoice approval. Holdback provisions apply as per the Construction Act (Ontario).</p>
+            </div>
+            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">4. On-Reserve Conduct</div>
+              <p style="font-size:12px;color:var(--muted);">The contractor and all workers must conduct themselves respectfully on reserve lands. CLFN reserves the right to remove any individual from the reserve for misconduct. Alcohol, drugs, and firearms are prohibited on all work sites. All workers must check in with the Housing Department on first arrival.</p>
+            </div>
+            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">5. Deficiency &amp; Warranty</div>
+              <p style="font-size:12px;color:var(--muted);">The contractor guarantees all labour and materials for a minimum of one (1) year from the date of completion. Any deficiencies identified during inspection must be rectified within 30 days at no additional cost to CLFN.</p>
+            </div>
+            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">6. Indigenous Procurement Priority</div>
+              <p style="font-size:12px;color:var(--muted);">CLFN is committed to economic reconciliation. Where qualified, Indigenous-owned businesses are given preference in contract awards. Classification provided on this form is subject to verification and must be accurate. Misrepresentation of Indigenous status may result in termination of the engagement and removal from the approved contractor list.</p>
+            </div>
+            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">7. Termination</div>
+              <p style="font-size:12px;color:var(--muted);">CLFN may terminate the engagement with 5 days written notice for convenience, or immediately for cause (including safety violations, misconduct, or material breach of these terms). The contractor is entitled to payment only for work satisfactorily completed to the date of termination.</p>
+            </div>
+          </div>
+          <div style="margin-top:16px;padding:10px 14px;background:rgba(248,228,26,0.07);border:1px solid var(--yellow);border-radius:8px;">
+            <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+              <input type="checkbox" id="ct_tor_agreed" style="margin-top:2px;flex-shrink:0;"/>
+              <span style="font-size:12px;color:var(--text);">I have read, understood, and agree to these Terms of Reference on behalf of the contractor named above.</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Signatures ── -->
+      <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;">
+        <div class="modal-hdr compact">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Signatures</div>
+        </div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-size:12px;color:var(--muted);">By signing below, both parties acknowledge the accuracy of the information provided and agreement to the Terms of Reference above.</div>
+
+          <!-- CLFN Employee signature -->
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:26px;height:26px;border-radius:50%;background:#1d4ed8;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">HM</div>
+              <div>
+                <div style="font-size:13px;font-weight:700;color:var(--text);">CLFN Housing Staff</div>
+                <div style="font-size:10px;color:var(--muted);">Employee taking this application</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div class="f"><label>Printed Name</label><input type="text" id="ct_sig_staff_name" placeholder="Full name"/></div>
+              <div class="f"><label>Date</label><input type="date" id="ct_sig_staff_date"/></div>
+            </div>
+            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','canvas')" id="ct_sig_canvas_staff_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','type')" id="ct_sig_canvas_staff_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','wet')" id="ct_sig_canvas_staff_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="ct_sig_canvas_staff_panel_canvas" style="background:#fafaf8;"><canvas id="ct_sig_canvas_staff" width="560" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;border-radius:0;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('ct_sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="ct_sig_canvas_staff_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="ct_sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="ct_sig_canvas_staff_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="ct_sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+          </div>
+
+          <!-- Contractor signature -->
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:26px;height:26px;border-radius:50%;background:var(--yellow);color:#111;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">CT</div>
+              <div>
+                <div style="font-size:13px;font-weight:700;color:var(--text);">Contractor Representative</div>
+                <div style="font-size:10px;color:var(--muted);">Authorized signatory for the contracting business</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div class="f"><label>Printed Name</label><input type="text" id="ct_sig_ct_name" placeholder="Full name"/></div>
+              <div class="f"><label>Title / Role</label><input type="text" id="ct_sig_ct_title" placeholder="e.g. Owner, Project Manager"/></div>
+              <div class="f"><label>Date</label><input type="date" id="ct_sig_ct_date"/></div>
+            </div>
+            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','canvas')" id="ct_sig_canvas_ct_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','type')" id="ct_sig_canvas_ct_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','wet')" id="ct_sig_canvas_ct_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="ct_sig_canvas_ct_panel_canvas" style="background:#fafaf8;"><canvas id="ct_sig_canvas_ct" width="560" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;border-radius:0;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('ct_sig_canvas_ct')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="ct_sig_canvas_ct_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="ct_sig_canvas_ct_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="ct_sig_canvas_ct_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="ct_sig_canvas_ct_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);">
+      <div style="display:flex;gap:8px;">
+        <button type="button" id="ct_print_btn" onclick="printContractorAgreement()" style="display:none;background:none;border:1.5px solid var(--border);color:var(--text);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">🖨 Print / Save PDF</button>
+        <button type="button" id="ct_email_btn" onclick="emailContractorAgreement()" style="display:none;background:none;border:1.5px solid var(--border);color:var(--text);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">✉ Email to Contractor</button>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button type="button" onclick="closeAddContractorModal()" class="btn btn-ghost">Cancel</button>
+        <button type="button" id="ct_save_btn" onclick="saveContractorAndFinalize()" class="btn btn-primary">Save &amp; Finalize</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div><!-- end content-area -->
+</div><!-- end app-wrapper -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/emailjs-com/3.2.0/email.min.js"></script>
+<script>
+// ── contractors.html page init ───────────────────────────────────────────────
+// ── ROLE safety fallback — in case shared-config.js fails to load ────────────
+if(typeof ROLE === 'undefined') {
+  window.ROLE = {
+    ED:              'ed',
+    HOUSING_MANAGER: 'housing_manager',
+    HE_L2:           'housing_employee_l2',
+    HE_L1:           'housing_employee_l1',
+    isManagement: function(r) { return r==='ed'||r==='housing_manager'; }
+  };
+  console.warn('[CLFN] ROLE fallback — shared-config.js may not have loaded');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NATION CONFIG (multi-tenant foundation) — mirrored from housing.html
+// ═══════════════════════════════════════════════════════════════════════════
+// Each page is self-contained for now; Phase C will extract this to shared.js.
+
+// ── Supabase Storage helpers ──────────────────────────────────────────────
+// Moved to /shared.js (Turn 3, Phase C dedup). Same behavior, same call
+// sites — just loaded from the shared file now.
+
+window._sb = null;
+if(typeof _raFilter === "undefined") var _raFilter = "";
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    if(window.supabase && window.supabase.createClient) {
+      window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+      console.log('[CLFN] Supabase client ready');
+    }
+  } catch(e) { console.log('[CLFN] Supabase init failed:', e.message); }
+});
+
+// ══════════════════════════════════════════════════════════════
+// SUPABASE DATA LAYER
+// All localStorage reads/writes have Supabase equivalents here.
+// The app falls back to localStorage if Supabase is unavailable.
+// ══════════════════════════════════════════════════════════════
+
+window._contractors=[];window._sowCache={};window._renoProgress={};
+window._renoBudget={};window._unitPhotos={};window._appSettings={};
+var housingUnits=[];var applications=[];var auditLog=[];
+// ── Helpers ──
+
+
+
+
+
+function showDash() {
+  window.location.href = '/housing.html?view=home';
+}
+
+window._navStack = window._navStack || [];
+window._navMap = {
+  'contractors': function(){ showContractors(); },
+};
+
+// ── Contractor functions ─────────────────────────────────────────────────────
+function showContractors() {
+  hideAllViews('contractorsView');
+  setRenosNav('contractors');
+  var v = document.getElementById('contractorsView');
+  if (v) { v.style.display = 'flex'; v.style.flexDirection = 'column'; }
+  if (typeof renderContractorsView === 'function') renderContractorsView();
+}
+
+function ctUpdateClassBorder(label) {
+  var radio = label.querySelector('input[name="ct_classification"]');
+  if(radio && !radio.checked) label.style.borderColor = 'var(--border)';
+}
+
+function ctFileDragOver(e,zoneId){e.preventDefault();var z=document.getElementById(zoneId);if(z){z.style.borderColor='var(--yellow)';z.style.background='rgba(248,228,26,0.06)';}}
+
+function ctFileDrop(e,bucket){e.preventDefault();ctFileDragLeave('ct_'+bucket+'_drop');ctFileUpload({files:e.dataTransfer.files,value:''},bucket);}
+
+function sortScores(key) {
+  if(key===_scoresSortKey) _scoresSortDir*=-1; else _scoresSortDir=-1;
+  _scoresSortKey=key;
+  renderScoresTable();
+}
+
+function scViewFile(path) {
+  showToast('Opening file…');
+  var fileName = path.split('/').pop();
+  var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
+  var fetchUrl = SUPABASE_URL + '/storage/v1/object/authenticated/' + STORAGE_BUCKET + '/' + encodedPath;
+  fetch(fetchUrl, { headers: sbStorageHeaders() })
+    .then(function(res){
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      return res.blob();
+    })
+    .then(function(blob){
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;  // sets correct filename + extension
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
+    })
+    .catch(function(e){
+      showToast('Could not open file: ' + (e.message||e));
+    });
+}
+
+async function scLoadDocs(app) {
+  var list  = document.getElementById('sc_docs_list');
+  var empty = document.getElementById('sc_docs_empty');
+  if(!list) return;
+  list.innerHTML = '<div style="padding:10px;text-align:center;color:var(--muted);font-size:12px;">Loading\u2026</div>';
+
+  var appId = app.id || '';
+  var allFiles = [];
+
+  // Primary source: app_documents table (accurate, manually assigned)
+  try {
+    var r = await fetch(
+      SUPABASE_URL + '/rest/v1/app_documents?app_id=eq.' + encodeURIComponent(appId) + '&order=added_at.asc',
+      { headers: HOUSING_HEADERS }
+    );
+    if(r.ok) {
+      var rows = await r.json();
+      rows.forEach(function(row){
+        allFiles.push({ name: row.file_name, path: row.file_path,
+          size: row.file_size||0, type: row.file_type||'', docId: row.id });
+      });
+    }
+  } catch(e) { console.warn('app_documents load error:', e); }
+
+  // Secondary source: files uploaded directly via the app (per-app folder)
+  try {
+    var appFiles = await sbListFiles('applications/'+appId+'/');
+    if(appFiles && appFiles.length) {
+      appFiles.forEach(function(f){
+        if(!f.name || f.name === '.emptyFolderPlaceholder') return;
+        var fpath = 'applications/'+appId+'/'+f.name;
+        if(!allFiles.find(function(x){ return x.path === fpath; })) {
+          allFiles.push({ name: f.name, path: fpath,
+            size: f.metadata ? f.metadata.size : 0,
+            type: f.metadata ? f.metadata.mimetype : '' });
+        }
+      });
+    }
+  } catch(e) { /* folder may not exist */ }
+
+  if(!allFiles.length) {
+    list.innerHTML = '';
+    if(empty) empty.style.display = 'block';
+    return;
+  }
+  if(empty) empty.style.display = 'none';
+
+  // Build rows using DOM nodes so paths with spaces/special chars don't break onclick
+  list.innerHTML = '';
+  allFiles.forEach(function(f) {
+    var isPdf = (f.type||f.name||'').includes('pdf') || (f.name||'').toLowerCase().endsWith('.pdf');
+    var isImg = (f.type||'').startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(f.name||'');
+    var icon  = isPdf ? '📄' : isImg ? '🖼️' : '📎';
+    var size  = f.size > 1048576 ? (f.size/1048576).toFixed(1)+'MB' : f.size > 1024 ? Math.round(f.size/1024)+'KB' : '';
+
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;';
+
+    var icEl = document.createElement('span');
+    icEl.style.fontSize = '18px'; icEl.style.flexShrink = '0';
+    icEl.textContent = icon;
+    row.appendChild(icEl);
+
+    var meta = document.createElement('div');
+    meta.style.cssText = 'flex:1;min-width:0;';
+    var nm = document.createElement('div');
+    nm.style.cssText = 'font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+    nm.textContent = f.name;
+    meta.appendChild(nm);
+    if(size) {
+      var sz = document.createElement('div');
+      sz.style.cssText = 'font-size:10px;color:var(--muted);';
+      sz.textContent = size;
+      meta.appendChild(sz);
+    }
+    row.appendChild(meta);
+
+    var btn = document.createElement('button');
+    btn.textContent = 'View';
+    btn.style.cssText = 'background:none;border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;';
+    (function(fp){ btn.addEventListener('click', function(){ scViewFile(fp); }); })(f.path||'');
+    row.appendChild(btn);
+
+    // Delete button — ED and HM only
+    var canDelete = (ROLE.isManagement(window.currentRole));
+    if(canDelete) {
+      var delBtn = document.createElement('button');
+      delBtn.textContent = '✕';
+      delBtn.title = 'Remove file';
+      delBtn.style.cssText = 'background:none;border:1px solid #fecaca;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;color:#b91c1c;cursor:pointer;white-space:nowrap;';
+      (function(fp, docId){ delBtn.addEventListener('click', function(){ scDeleteDoc(fp, docId); }); })(f.path||'', f.docId||null);
+      row.appendChild(delBtn);
+    }
+
+    list.appendChild(row);
+  });
+}
+
+async function scUploadFiles(input) {
+  var app = window._currentScorecardApp;
+  if(!app || !input.files || !input.files.length) return;
+  var files = Array.from(input.files);
+  var appId = app.id || '';
+  var list  = document.getElementById('sc_docs_list');
+  if(list) list.innerHTML = '<div style="padding:10px;text-align:center;color:var(--muted);font-size:12px;">Uploading '+files.length+' file'+(files.length>1?'s':'')+'\u2026</div>';
+  try {
+    for(var i=0; i<files.length; i++) {
+      await sbUploadAndSave('application', appId, files[i], 'applications/'+appId);
+    }
+    showToast('\u2713 '+files.length+' file'+(files.length>1?'s':'')+' uploaded');
+  } catch(e) { showToast('Upload failed: '+e.message); }
+  input.value = '';
+  scLoadDocs(app);
+}
+
+async function scDeleteDoc(filePath, docId) {
+  if(!confirm('Remove this file from the application? The file will not be deleted from storage.')) return;
+  var app = window._currentScorecardApp;
+  try {
+    if(docId) {
+      // Remove from app_documents table
+      await fetch(SUPABASE_URL+'/rest/v1/app_documents?id=eq.'+docId, { method:'DELETE', headers:HOUSING_HEADERS });
+    } else {
+      // Remove from audit log (app-uploaded files)
+      await fetch(
+        SUPABASE_URL+'/rest/v1/housing_audit_log?entity_type=eq.application&entity_id=eq.'+encodeURIComponent(app.id||'')+'&action=eq.file_uploaded',
+        { method:'DELETE', headers:HOUSING_HEADERS }
+      );
+    }
+    showToast('File removed from application');
+    if(app) scLoadDocs(app);
+  } catch(e) { showToast('Error removing file: '+(e.message||e)); }
+}
+
+function scFileDrop(e) {
+  e.preventDefault();
+  var zone = document.getElementById('sc_docs_drop_zone');
+  if(zone){ zone.style.background=''; zone.style.borderColor=''; }
+  var app = window._currentScorecardApp;
+  if(!app) return;
+  var files = Array.from(e.dataTransfer.files||[]);
+  if(!files.length) return;
+  var fakeInput = { files: files, value: '' };
+  scUploadFiles(fakeInput);
+}
+
+function rpContractorSearch(q) {
+  var dd = document.getElementById('rp_ct_dropdown');
+  if(!dd) return;
+  var contractors = [];
+  var contractors = window._contractors || [];
+  var term = (q||'').toLowerCase().trim();
+  var matches = term
+    ? contractors.filter(function(c){ return (c.name||'').toLowerCase().includes(term) || (c.trade||'').toLowerCase().includes(term); })
+    : contractors;
+
+  var rows = matches.map(function(c) {
+    return '<div data-ct-name="'+c.name+'" data-ct-id="'+(c.id||'')+'" style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" '
+      +'onmousedown="rpSelectContractor(this)" '
+      +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
+      +'<div style="font-weight:600;">'+c.name+'</div>'
+      +(c.trade?'<div style="font-size:11px;color:var(--muted);">'+c.trade+'</div>':'')
+      +'</div>';
+  });
+
+  // Always show "Add new contractor" option
+  rows.push('<div onmousedown="rpAddNewContractor()" style="padding:9px 14px;cursor:pointer;font-size:12px;font-weight:700;color:var(--yellow);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;" '
+    +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
+    +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+    +(term && !matches.length ? 'Add "'+q+'" as new contractor' : 'Add new contractor')
+    +'</div>');
+
+  dd.innerHTML = rows.join('');
+  dd.style.display = 'block';
+}
+
+
+// ── Page boot ────────────────────────────────────────────────────────────────
+(async function initContractorsPage() {
+  var token = sessionStorage.getItem('clfn_housing_token');
+  if (!token) { window.location.href = 'index.html'; return; }
+  if (window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('contractors')) {
+    window.location.href = '/housing.html?view=home'; return;
+  }
+  var savedRole  = sessionStorage.getItem('clfn_housing_role') || 'housing_employee_l1';
+  var savedName  = sessionStorage.getItem('clfn_housing_name') || '';
+  var savedEmail = sessionStorage.getItem('clfn_housing_email_session') || '';
+  if (typeof HOUSING_HEADERS !== 'undefined') HOUSING_HEADERS['Authorization'] = 'Bearer ' + token;
+  if (typeof HOUSING_SESSION !== 'undefined') {
+    HOUSING_SESSION.accessToken = token; HOUSING_SESSION.role = savedRole;
+    HOUSING_SESSION.name = savedName; HOUSING_SESSION.email = savedEmail;
+  }
+  window.currentRole = savedRole; window._realRole = savedRole;
+  if (HOUSING_SESSION.email && typeof resolveHousingRole === 'function') {
+    try { await resolveHousingRole(); } catch(e) { console.warn('[contractors] role resolve:', e); }
+  }
+  var role = HOUSING_SESSION.role || savedRole;
+  window.currentRole = role; window._realRole = role;
+  if (typeof updateHeaderUser === 'function') updateHeaderUser(role);
+  if (typeof updateRoleSwitcherVisibility === 'function') updateRoleSwitcherVisibility();
+  if (typeof loadRenosData === 'function') {
+    try { await loadRenosData(); } catch(e) { console.warn('[contractors] data load error:', e); }
+  }
+  showContractors();
+  console.log('[contractors] loaded', (window._contractors||[]).length, 'contractors');
+}());
+</script>
+</body>
+</html>

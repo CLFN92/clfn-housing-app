@@ -157,363 +157,7 @@
 </div><!-- end renosView -->
 
 <!-- ═══ CONTRACTORS VIEW ═══ -->
-<div id="contractorsView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
-  <div class="page-back-row">
-    <button onclick="goBack()" class="back-btn-yellow">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-      Back
-    </button>
-  </div>
-  <div class="page-header-bar">
-    <div class="phb-title">
-      <h1>Contractors</h1>
-      <p>Manage contractor directory and approval workflow</p>
-    </div>
-    <div class="phb-actions">
-      <button onclick="openAddContractorModal()" style="background:var(--yellow);border:none;color:#111;padding:8px 18px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Contractor
-      </button>
-    </div>
-  </div>
-
-  <!-- Status filter tabs -->
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;" id="ct_filter_tabs">
-    <button onclick="ctSetFilter('')" id="ct_tab_all" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">All</button>
-    <button onclick="ctSetFilter('pending_review')" id="ct_tab_pending" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">⏳ Pending Review</button>
-    <button onclick="ctSetFilter('hm_recommended')" id="ct_tab_hm" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">📋 Awaiting ED</button>
-    <button onclick="ctSetFilter('approved')" id="ct_tab_approved" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">✅ Approved</button>
-    <button onclick="ctSetFilter('declined')" id="ct_tab_declined" class="btn btn-ghost" style="font-size:11px;padding:4px 12px;border-radius:20px;">❌ Declined</button>
-  </div>
-
-  <div id="contractors_list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;"></div>
-</div><!-- end contractorsView -->
-
-<!-- ── Contractor Approval Panel (slide-in from right) ── -->
-<div id="ctApprovalPanel" style="display:none;position:fixed;inset:0;z-index:850;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:flex-end;" onclick="if(event.target===this)closeCtApprovalPanel()">
-  <div style="background:var(--surface);width:100%;max-width:480px;height:100%;overflow-y:auto;box-shadow:-8px 0 40px rgba(0,0,0,0.3);display:flex;flex-direction:column;">
-    <!-- Panel header -->
-    <div class="modal-hdr sticky">
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Contractor Application</div>
-        <div id="ctap_name" style="font-size:15px;font-weight:700;color:#fff;"></div>
-        <div id="ctap_trade" style="font-size:11px;color:#888;margin-top:1px;"></div>
-      </div>
-      <button onclick="closeCtApprovalPanel()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
-    </div>
-
-    <!-- Status banner -->
-    <div id="ctap_status_banner" style="padding:10px 20px;font-size:12px;font-weight:700;text-align:center;"></div>
-
-    <!-- Panel body -->
-    <div style="padding:20px;flex:1;display:flex;flex-direction:column;gap:16px;">
-
-      <!-- Info summary -->
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Application Summary</div>
-        </div>
-        <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Phone</div><div id="ctap_phone" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Email</div><div id="ctap_email" style="color:var(--text);word-break:break-all;"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Classification</div><div id="ctap_class" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">HST #</div><div id="ctap_hst" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">WSIB</div><div id="ctap_wsib" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Insurance Expiry</div><div id="ctap_ins" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">TOR Agreed</div><div id="ctap_tor" style="color:var(--text);"></div></div>
-          <div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Submitted</div><div id="ctap_submitted" style="color:var(--text);"></div></div>
-        </div>
-      </div>
-
-      <!-- Approval flow diagram -->
-      <div class="card" style="padding:14px;">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px;">Approval Flow</div>
-        <div id="ctap_flow" style="display:flex;align-items:center;gap:0;"></div>
-      </div>
-
-      <!-- Action buttons (role-gated) -->
-      <div id="ctap_actions" style="display:flex;flex-direction:column;gap:10px;"></div>
-
-      <!-- Notes input (shown when action needs notes) -->
-      <div id="ctap_notes_wrap" style="display:none;">
-        <div class="f">
-          <label>Notes / Reason <span id="ctap_notes_req" style="color:#b91c1c;"></span></label>
-          <textarea id="ctap_notes" rows="3" placeholder="Add notes explaining this decision…" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);resize:vertical;"></textarea>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <button id="ctap_confirm_btn" onclick="confirmCtAction()" class="btn btn-primary" style="flex:1;"></button>
-          <button onclick="cancelCtAction()" class="btn btn-ghost">Cancel</button>
-        </div>
-      </div>
-
-      <!-- Audit trail -->
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Audit Trail</div>
-        </div>
-        <div id="ctap_audit" style="padding:14px;display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;"></div>
-      </div>
-
-    </div>
-  </div>
-</div>
-<div id="addContractorModal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-    <div class="modal-hdr">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">
-        <div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Constance Lake First Nation — Housing</div>
-          <div id="ct_modal_title" style="font-size:15px;font-weight:700;color:#fff;">Contractor Application</div>
-        </div>
-        <button type="button" onclick="closeAddContractorModal()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;flex-shrink:0;margin-left:12px;">✕</button>
-      </div>
-      <div style="display:flex;gap:8px;">
-        <button type="button" id="ct_header_print_btn" onclick="printContractorAgreement()" style="background:none;border:1px solid #555;color:#ccc;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">🖨 Print / Save PDF</button>
-        <button type="button" id="ct_header_email_btn" onclick="emailContractorAgreement()" style="background:none;border:1px solid #555;color:#ccc;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">✉ Email to Contractor</button>
-      </div>
-    </div>
-    <div style="padding:24px;display:flex;flex-direction:column;gap:0;">
-
-      <!-- ── Company Information ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Company Information</div>
-        </div>
-        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div class="f" style="grid-column:1/-1"><label>Company / Name <span class="r">*</span></label><input id="ct_name" type="text" placeholder="e.g. Northern Builds Ltd."/></div>
-          <div class="f"><label>Trade / Specialty</label>
-            <select id="ct_trade">
-              <option value="">— Select trade —</option>
-              <optgroup label="General Construction"><option>General Contractor</option><option>Carpentry / Framing</option><option>Concrete &amp; Foundations</option><option>Demolition</option><option>Insulation</option><option>Roofing</option><option>Flooring</option><option>Drywall / Plastering</option><option>Painting &amp; Finishing</option><option>Windows &amp; Doors</option></optgroup>
-              <optgroup label="Mechanical &amp; Utilities"><option>Plumbing</option><option>Electrical</option><option>HVAC / Heating &amp; Cooling</option><option>Mechanical</option><option>Gas Fitting</option><option>Sprinkler / Fire Suppression</option></optgroup>
-              <optgroup label="Exterior &amp; Site Work"><option>Excavation &amp; Grading</option><option>Civil Works</option><option>Landscaping</option><option>Septic &amp; Drainage</option><option>Siding &amp; Cladding</option></optgroup>
-              <optgroup label="Professional Services"><option>Architecture</option><option>Structural Engineering</option><option>Civil Engineering</option><option>Project Management</option><option>Building Inspection</option><option>Environmental Consulting</option><option>Interior Design</option></optgroup>
-              <optgroup label="Accessibility &amp; Specialty"><option>Accessibility Modifications</option><option>Mould Remediation</option><option>Asbestos Abatement</option><option>Energy Efficiency / Retrofits</option></optgroup>
-            </select>
-          </div>
-          <div class="f"><label>Phone</label><input id="ct_phone" type="tel" placeholder="705-000-0000"/></div>
-          <div class="f"><label>Email</label><input id="ct_email" type="email" placeholder="contact@company.com"/></div>
-          <div class="f"><label>Address</label><input id="ct_address" type="text" placeholder="Company address"/></div>
-          <div class="f"><label>HST / Business #</label><input id="ct_hst" type="text" placeholder="123456789 RT0001"/></div>
-        </div>
-      </div>
-
-      <!-- ── Key People ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Key People</div>
-          <button type="button" onclick="ctAddPerson()" style="background:none;border:1px solid #555;color:#ccc;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:4px;">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Person
-          </button>
-        </div>
-        <div style="padding:16px;">
-          <div id="ct_people_list" style="display:flex;flex-direction:column;gap:8px;"></div>
-        </div>
-      </div>
-
-      <!-- ── WSIB ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">WSIB Clearance Certificate</div>
-        </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="f"><label>WSIB Account #</label><input id="ct_wsib_num" type="text" placeholder="1234567"/></div>
-            <div class="f"><label>Expiry Date</label><input id="ct_wsib_expiry" type="date"/></div>
-          </div>
-          <div id="ct_wsib_preview" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-          <div id="ct_wsib_drop" ondragover="ctFileDragOver(event,'ct_wsib_drop')" ondragleave="ctFileDragLeave('ct_wsib_drop')" ondrop="ctFileDrop(event,'wsib')" class="upload-zone" style="padding:12px;" onclick="document.getElementById('ct_wsib_input').click()">
-            <div style="font-size:12px;font-weight:600;color:var(--text);">📎 Upload WSIB Certificate &nbsp;<span style="color:var(--yellow);">browse</span></div>
-            <input type="file" id="ct_wsib_input" accept=".pdf,image/*" style="display:none;" onchange="ctFileUpload(this,'wsib')"/>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Liability Insurance ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Liability Insurance</div>
-        </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="f"><label>Provider</label><input id="ct_ins_provider" type="text" placeholder="e.g. Intact Insurance"/></div>
-            <div class="f"><label>Policy #</label><input id="ct_ins_policy" type="text" placeholder="Policy number"/></div>
-            <div class="f"><label>Coverage Amount</label><input id="ct_ins_amount" type="text" placeholder="e.g. $2,000,000"/></div>
-            <div class="f"><label>Expiry Date</label><input id="ct_ins_expiry" type="date"/></div>
-          </div>
-          <div id="ct_ins_preview" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-          <div id="ct_ins_drop" ondragover="ctFileDragOver(event,'ct_ins_drop')" ondragleave="ctFileDragLeave('ct_ins_drop')" ondrop="ctFileDrop(event,'insurance')" class="upload-zone" style="padding:12px;" onclick="document.getElementById('ct_ins_input').click()">
-            <div style="font-size:12px;font-weight:600;color:var(--text);">📎 Upload Insurance Certificate &nbsp;<span style="color:var(--yellow);">browse</span></div>
-            <input type="file" id="ct_ins_input" accept=".pdf,image/*" style="display:none;" onchange="ctFileUpload(this,'insurance')"/>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Other Documents ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Other Documents</div>
-        </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
-          <div id="ct_other_preview" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-          <div id="ct_other_drop" ondragover="ctFileDragOver(event,'ct_other_drop')" ondragleave="ctFileDragLeave('ct_other_drop')" ondrop="ctFileDrop(event,'other')" class="upload-zone" style="padding:12px;" onclick="document.getElementById('ct_other_input').click()">
-            <div style="font-size:12px;font-weight:600;color:var(--text);">📎 Upload Other Documents &nbsp;<span style="color:var(--yellow);">browse</span></div>
-            <input type="file" id="ct_other_input" multiple accept=".pdf,image/*,.doc,.docx" style="display:none;" onchange="ctFileUpload(this,'other')"/>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Notes ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Notes</div>
-        </div>
-        <div style="padding:16px;">
-          <textarea id="ct_notes" rows="3" placeholder="Rates, availability, past work, special conditions…" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);resize:vertical;"></textarea>
-        </div>
-      </div>
-
-      <!-- ── Business Classification ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Business Classification</div>
-        </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
-          <div style="font-size:12px;color:var(--muted);line-height:1.5;">Select all that apply. Indigenous-owned businesses receive procurement preference in accordance with CLFN purchasing policy.</div>
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);transition:border-color .15s;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="ctUpdateClassBorder(this)">
-              <input type="radio" id="ct_class_internal" name="ct_classification" value="internal_indigenous" style="margin-top:2px;flex-shrink:0;" onchange="ctUpdateClassBorders()"/>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">Internal — Indigenous</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px;">Band-owned enterprise or business majority-owned by a CLFN band member</div>
-              </div>
-            </label>
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);transition:border-color .15s;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="ctUpdateClassBorder(this)">
-              <input type="radio" id="ct_class_external_indigenous" name="ct_classification" value="external_indigenous" style="margin-top:2px;flex-shrink:0;" onchange="ctUpdateClassBorders()"/>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">External — Indigenous</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px;">Indigenous-owned business not affiliated with CLFN</div>
-              </div>
-            </label>
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);transition:border-color .15s;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="ctUpdateClassBorder(this)">
-              <input type="radio" id="ct_class_external" name="ct_classification" value="external_non_indigenous" style="margin-top:2px;flex-shrink:0;" onchange="ctUpdateClassBorders()"/>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">External — Non-Indigenous</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px;">Business with no Indigenous ownership</div>
-              </div>
-            </label>
-          </div>
-          <div class="f" id="ct_class_proof_row" style="display:none;">
-            <label>Proof of Indigenous Ownership <span style="font-size:10px;color:var(--muted);">(optional — band registry, status card, or statutory declaration)</span></label>
-            <input type="text" id="ct_class_proof" placeholder="Document reference or attach via Other Documents"/>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Terms of Reference ── -->
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact"
-          onclick="var b=document.getElementById('ct_tor_body');var c=document.getElementById('ct_tor_chev');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Terms of Reference</div>
-          <svg id="ct_tor_chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div id="ct_tor_body" style="display:none;padding:18px 20px;font-size:12px;color:var(--text);line-height:1.7;">
-          <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;">Constance Lake First Nation — Housing Department</p>
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">1. Scope of Engagement</div>
-              <p style="font-size:12px;color:var(--muted);">The contractor agrees to perform only the work described in the approved Scope of Work (SOW) issued by the CLFN Housing Department. No work beyond the approved SOW may commence without written amendment signed by the Housing Manager or Executive Director.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">2. Licensing &amp; Insurance</div>
-              <p style="font-size:12px;color:var(--muted);">The contractor warrants that it holds all required trade licences, WSIB clearance, and liability insurance in force for the duration of the work. Expiry of any required coverage automatically suspends the right to work on CLFN property until coverage is reinstated and verified.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">3. Invoicing &amp; Payment</div>
-              <p style="font-size:12px;color:var(--muted);">Invoices must reference the SOW number, unit address, and work completed. Payment is subject to satisfactory inspection by the Housing Manager. CLFN's standard payment terms are Net 30 days from invoice approval. Holdback provisions apply as per the Construction Act (Ontario).</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">4. On-Reserve Conduct</div>
-              <p style="font-size:12px;color:var(--muted);">The contractor and all workers must conduct themselves respectfully on reserve lands. CLFN reserves the right to remove any individual from the reserve for misconduct. Alcohol, drugs, and firearms are prohibited on all work sites. All workers must check in with the Housing Department on first arrival.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">5. Deficiency &amp; Warranty</div>
-              <p style="font-size:12px;color:var(--muted);">The contractor guarantees all labour and materials for a minimum of one (1) year from the date of completion. Any deficiencies identified during inspection must be rectified within 30 days at no additional cost to CLFN.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">6. Indigenous Procurement Priority</div>
-              <p style="font-size:12px;color:var(--muted);">CLFN is committed to economic reconciliation. Where qualified, Indigenous-owned businesses are given preference in contract awards. Classification provided on this form is subject to verification and must be accurate. Misrepresentation of Indigenous status may result in termination of the engagement and removal from the approved contractor list.</p>
-            </div>
-            <div style="padding:10px 14px;background:var(--bg);border-left:3px solid var(--yellow);border-radius:0 6px 6px 0;">
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">7. Termination</div>
-              <p style="font-size:12px;color:var(--muted);">CLFN may terminate the engagement with 5 days written notice for convenience, or immediately for cause (including safety violations, misconduct, or material breach of these terms). The contractor is entitled to payment only for work satisfactorily completed to the date of termination.</p>
-            </div>
-          </div>
-          <div style="margin-top:16px;padding:10px 14px;background:rgba(248,228,26,0.07);border:1px solid var(--yellow);border-radius:8px;">
-            <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
-              <input type="checkbox" id="ct_tor_agreed" style="margin-top:2px;flex-shrink:0;"/>
-              <span style="font-size:12px;color:var(--text);">I have read, understood, and agree to these Terms of Reference on behalf of the contractor named above.</span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Signatures ── -->
-      <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Signatures</div>
-        </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
-          <div style="font-size:12px;color:var(--muted);">By signing below, both parties acknowledge the accuracy of the information provided and agreement to the Terms of Reference above.</div>
-
-          <!-- CLFN Employee signature -->
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-              <div style="width:26px;height:26px;border-radius:50%;background:#1d4ed8;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">HM</div>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">CLFN Housing Staff</div>
-                <div style="font-size:10px;color:var(--muted);">Employee taking this application</div>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-              <div class="f"><label>Printed Name</label><input type="text" id="ct_sig_staff_name" placeholder="Full name"/></div>
-              <div class="f"><label>Date</label><input type="date" id="ct_sig_staff_date"/></div>
-            </div>
-            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','canvas')" id="ct_sig_canvas_staff_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','type')" id="ct_sig_canvas_staff_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('ct_sig_canvas_staff','wet')" id="ct_sig_canvas_staff_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="ct_sig_canvas_staff_panel_canvas" style="background:#fafaf8;"><canvas id="ct_sig_canvas_staff" width="560" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;border-radius:0;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('ct_sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="ct_sig_canvas_staff_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="ct_sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="ct_sig_canvas_staff_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="ct_sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
-          </div>
-
-          <!-- Contractor signature -->
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-              <div style="width:26px;height:26px;border-radius:50%;background:var(--yellow);color:#111;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">CT</div>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);">Contractor Representative</div>
-                <div style="font-size:10px;color:var(--muted);">Authorized signatory for the contracting business</div>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-              <div class="f"><label>Printed Name</label><input type="text" id="ct_sig_ct_name" placeholder="Full name"/></div>
-              <div class="f"><label>Title / Role</label><input type="text" id="ct_sig_ct_title" placeholder="e.g. Owner, Project Manager"/></div>
-              <div class="f"><label>Date</label><input type="date" id="ct_sig_ct_date"/></div>
-            </div>
-            <div style="border:1.5px solid var(--border);border-radius:7px;overflow:hidden;"><div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);"><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','canvas')" id="ct_sig_canvas_ct_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','type')" id="ct_sig_canvas_ct_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('ct_sig_canvas_ct','wet')" id="ct_sig_canvas_ct_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="ct_sig_canvas_ct_panel_canvas" style="background:#fafaf8;"><canvas id="ct_sig_canvas_ct" width="560" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;border-radius:0;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span style="font-size:10px;color:var(--muted);">Sign with finger or mouse</span><button type="button" onclick="clearSig('ct_sig_canvas_ct')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="ct_sig_canvas_ct_panel_type" style="display:none;padding:14px 12px;background:#fafaf8;"><input type="text" id="ct_sig_canvas_ct_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="ct_sig_canvas_ct_panel_wet" style="display:none;padding:14px 12px;background:#fafaf8;"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="ct_sig_canvas_ct_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
-          </div>
-
-        </div>
-      </div>
-
-    </div>
-    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);">
-      <div style="display:flex;gap:8px;">
-        <button type="button" id="ct_print_btn" onclick="printContractorAgreement()" style="display:none;background:none;border:1.5px solid var(--border);color:var(--text);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">🖨 Print / Save PDF</button>
-        <button type="button" id="ct_email_btn" onclick="emailContractorAgreement()" style="display:none;background:none;border:1.5px solid var(--border);color:var(--text);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">✉ Email to Contractor</button>
-      </div>
-      <div style="display:flex;gap:10px;">
-        <button type="button" onclick="closeAddContractorModal()" class="btn btn-ghost">Cancel</button>
-        <button type="button" id="ct_save_btn" onclick="saveContractorAndFinalize()" class="btn btn-primary">Save &amp; Finalize</button>
-      </div>
-    </div>
-  </div>
-</div>
+<!-- contractorsView, ctApprovalPanel, addContractorModal moved to contractors.html -->
 <div id="renoBudgetModal" style="display:none;position:fixed;inset:0;z-index:850;background:rgba(0,0,0,0.65);align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto;">
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:720px;box-shadow:0 24px 60px rgba(0,0,0,0.5);overflow:hidden;margin:auto;">
     <!-- Header -->
@@ -1124,7 +768,7 @@ window._onLogout = function() {
 window._navMap = {
   'renos':       function(){ if(true) showRenos(); },
   'approvals':   function(){ if(typeof showRenoApprovals==='function') showRenoApprovals(); },
-  'contractors': function(){ if(true) showContractors(); },
+  'contractors': function(){ window.location.href = \'contractors.html\'; },
 };
 
 // ── Navigation stack ─────────────────────────────────────────────────────────
@@ -1488,7 +1132,7 @@ async function loadRenosData() {
     if(cR) window._contractors = cR;
     // Re-render contractors view if it's already visible (timing fix)
     var _ctv = document.getElementById('contractorsView');
-    if(_ctv && _ctv.style.display !== 'none' && typeof renderContractorsView === 'function') renderContractorsView();
+    if(_ctv && _ctv.style.display !== 'none' && true) { /* contractors now on contractors.html */ }
     if(sowR && sowR.ok){var sd2=await sowR.json();sd2.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
     if(rpR && rpR.ok){var rpd=await rpR.json();rpd.forEach(function(r){window._renoProgress[r.unit_id]=r.data;});}
     if(stR && stR.ok){var stD=await stR.json();window._appSettings={};stD.forEach(function(r){window._appSettings[r.key]=r.value;});}
@@ -1538,14 +1182,6 @@ function showRenosSimple(){
 // ── Contractors view ──
 // Override shared-data.js showContractors() — on renos.html we switch the
 // view directly instead of navigating (which would cause an infinite redirect).
-function showContractors() {
-  hideAllViews('contractorsView');
-  setRenosNav('contractors');
-  var v = document.getElementById('contractorsView');
-  if (v) { v.style.display = 'flex'; v.style.flexDirection = 'column'; }
-  if (typeof renderContractorsView === 'function') renderContractorsView();
-}
-
 // Override shared-data.js showRenos() — same redirect-loop fix as showContractors.
 function showRenos() {
   hideAllViews('renosView');
@@ -1565,15 +1201,6 @@ function showRenos() {
 
 
 
-function ctUpdateClassBorder(label) {
-  var radio = label.querySelector('input[name="ct_classification"]');
-  if(radio && !radio.checked) label.style.borderColor = 'var(--border)';
-}
-
-
-function ctFileDragOver(e,zoneId){e.preventDefault();var z=document.getElementById(zoneId);if(z){z.style.borderColor='var(--yellow)';z.style.background='rgba(248,228,26,0.06)';}}
-
-function ctFileDrop(e,bucket){e.preventDefault();ctFileDragLeave('ct_'+bucket+'_drop');ctFileUpload({files:e.dataTransfer.files,value:''},bucket);}
 
 
 
@@ -1585,12 +1212,6 @@ function ctFileDrop(e,bucket){e.preventDefault();ctFileDragLeave('ct_'+bucket+'_
 // (showScores removed — was calling getElementById with a missing argument and had zero callers. Dead code from an earlier scoring view design.)
 
 var _scoresSortKey='score', _scoresSortDir=-1;
-function sortScores(key) {
-  if(key===_scoresSortKey) _scoresSortDir*=-1; else _scoresSortDir=-1;
-  _scoresSortKey=key;
-  renderScoresTable();
-}
-
 
 
 
@@ -1599,182 +1220,13 @@ function sortScores(key) {
 
 // ── Scorecard document functions ──────────────────────────────────────────────
 
-function scViewFile(path) {
-  showToast('Opening file…');
-  var fileName = path.split('/').pop();
-  var encodedPath = path.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
-  var fetchUrl = SUPABASE_URL + '/storage/v1/object/authenticated/' + STORAGE_BUCKET + '/' + encodedPath;
-  fetch(fetchUrl, { headers: sbStorageHeaders() })
-    .then(function(res){
-      if(!res.ok) throw new Error('HTTP ' + res.status);
-      return res.blob();
-    })
-    .then(function(blob){
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;  // sets correct filename + extension
-      document.body.appendChild(a); a.click();
-      document.body.removeChild(a);
-      setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
-    })
-    .catch(function(e){
-      showToast('Could not open file: ' + (e.message||e));
-    });
-}
-
-async function scLoadDocs(app) {
-  var list  = document.getElementById('sc_docs_list');
-  var empty = document.getElementById('sc_docs_empty');
-  if(!list) return;
-  list.innerHTML = '<div style="padding:10px;text-align:center;color:var(--muted);font-size:12px;">Loading\u2026</div>';
-
-  var appId = app.id || '';
-  var allFiles = [];
-
-  // Primary source: app_documents table (accurate, manually assigned)
-  try {
-    var r = await fetch(
-      SUPABASE_URL + '/rest/v1/app_documents?app_id=eq.' + encodeURIComponent(appId) + '&order=added_at.asc',
-      { headers: HOUSING_HEADERS }
-    );
-    if(r.ok) {
-      var rows = await r.json();
-      rows.forEach(function(row){
-        allFiles.push({ name: row.file_name, path: row.file_path,
-          size: row.file_size||0, type: row.file_type||'', docId: row.id });
-      });
-    }
-  } catch(e) { console.warn('app_documents load error:', e); }
-
-  // Secondary source: files uploaded directly via the app (per-app folder)
-  try {
-    var appFiles = await sbListFiles('applications/'+appId+'/');
-    if(appFiles && appFiles.length) {
-      appFiles.forEach(function(f){
-        if(!f.name || f.name === '.emptyFolderPlaceholder') return;
-        var fpath = 'applications/'+appId+'/'+f.name;
-        if(!allFiles.find(function(x){ return x.path === fpath; })) {
-          allFiles.push({ name: f.name, path: fpath,
-            size: f.metadata ? f.metadata.size : 0,
-            type: f.metadata ? f.metadata.mimetype : '' });
-        }
-      });
-    }
-  } catch(e) { /* folder may not exist */ }
-
-  if(!allFiles.length) {
-    list.innerHTML = '';
-    if(empty) empty.style.display = 'block';
-    return;
-  }
-  if(empty) empty.style.display = 'none';
-
-  // Build rows using DOM nodes so paths with spaces/special chars don't break onclick
-  list.innerHTML = '';
-  allFiles.forEach(function(f) {
-    var isPdf = (f.type||f.name||'').includes('pdf') || (f.name||'').toLowerCase().endsWith('.pdf');
-    var isImg = (f.type||'').startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(f.name||'');
-    var icon  = isPdf ? '📄' : isImg ? '🖼️' : '📎';
-    var size  = f.size > 1048576 ? (f.size/1048576).toFixed(1)+'MB' : f.size > 1024 ? Math.round(f.size/1024)+'KB' : '';
-
-    var row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;';
-
-    var icEl = document.createElement('span');
-    icEl.style.fontSize = '18px'; icEl.style.flexShrink = '0';
-    icEl.textContent = icon;
-    row.appendChild(icEl);
-
-    var meta = document.createElement('div');
-    meta.style.cssText = 'flex:1;min-width:0;';
-    var nm = document.createElement('div');
-    nm.style.cssText = 'font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-    nm.textContent = f.name;
-    meta.appendChild(nm);
-    if(size) {
-      var sz = document.createElement('div');
-      sz.style.cssText = 'font-size:10px;color:var(--muted);';
-      sz.textContent = size;
-      meta.appendChild(sz);
-    }
-    row.appendChild(meta);
-
-    var btn = document.createElement('button');
-    btn.textContent = 'View';
-    btn.style.cssText = 'background:none;border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;';
-    (function(fp){ btn.addEventListener('click', function(){ scViewFile(fp); }); })(f.path||'');
-    row.appendChild(btn);
-
-    // Delete button — ED and HM only
-    var canDelete = (ROLE.isManagement(window.currentRole));
-    if(canDelete) {
-      var delBtn = document.createElement('button');
-      delBtn.textContent = '✕';
-      delBtn.title = 'Remove file';
-      delBtn.style.cssText = 'background:none;border:1px solid #fecaca;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;color:#b91c1c;cursor:pointer;white-space:nowrap;';
-      (function(fp, docId){ delBtn.addEventListener('click', function(){ scDeleteDoc(fp, docId); }); })(f.path||'', f.docId||null);
-      row.appendChild(delBtn);
-    }
-
-    list.appendChild(row);
-  });
-}
-async function scUploadFiles(input) {
-  var app = window._currentScorecardApp;
-  if(!app || !input.files || !input.files.length) return;
-  var files = Array.from(input.files);
-  var appId = app.id || '';
-  var list  = document.getElementById('sc_docs_list');
-  if(list) list.innerHTML = '<div style="padding:10px;text-align:center;color:var(--muted);font-size:12px;">Uploading '+files.length+' file'+(files.length>1?'s':'')+'\u2026</div>';
-  try {
-    for(var i=0; i<files.length; i++) {
-      await sbUploadAndSave('application', appId, files[i], 'applications/'+appId);
-    }
-    showToast('\u2713 '+files.length+' file'+(files.length>1?'s':'')+' uploaded');
-  } catch(e) { showToast('Upload failed: '+e.message); }
-  input.value = '';
-  scLoadDocs(app);
-}
-
 // ── Document assignment (links APP- migrated files to a specific application) ──
 
-async function scDeleteDoc(filePath, docId) {
-  if(!confirm('Remove this file from the application? The file will not be deleted from storage.')) return;
-  var app = window._currentScorecardApp;
-  try {
-    if(docId) {
-      // Remove from app_documents table
-      await fetch(SUPABASE_URL+'/rest/v1/app_documents?id=eq.'+docId, { method:'DELETE', headers:HOUSING_HEADERS });
-    } else {
-      // Remove from audit log (app-uploaded files)
-      await fetch(
-        SUPABASE_URL+'/rest/v1/housing_audit_log?entity_type=eq.application&entity_id=eq.'+encodeURIComponent(app.id||'')+'&action=eq.file_uploaded',
-        { method:'DELETE', headers:HOUSING_HEADERS }
-      );
-    }
-    showToast('File removed from application');
-    if(app) scLoadDocs(app);
-  } catch(e) { showToast('Error removing file: '+(e.message||e)); }
-}
 
 
 
 
 
-
-
-function scFileDrop(e) {
-  e.preventDefault();
-  var zone = document.getElementById('sc_docs_drop_zone');
-  if(zone){ zone.style.background=''; zone.style.borderColor=''; }
-  var app = window._currentScorecardApp;
-  if(!app) return;
-  var files = Array.from(e.dataTransfer.files||[]);
-  if(!files.length) return;
-  var fakeInput = { files: files, value: '' };
-  scUploadFiles(fakeInput);
-}
 
 
 
@@ -2053,36 +1505,6 @@ function saveRenoProgress() {
 
 
 
-
-function rpContractorSearch(q) {
-  var dd = document.getElementById('rp_ct_dropdown');
-  if(!dd) return;
-  var contractors = [];
-  var contractors = window._contractors || [];
-  var term = (q||'').toLowerCase().trim();
-  var matches = term
-    ? contractors.filter(function(c){ return (c.name||'').toLowerCase().includes(term) || (c.trade||'').toLowerCase().includes(term); })
-    : contractors;
-
-  var rows = matches.map(function(c) {
-    return '<div data-ct-name="'+c.name+'" data-ct-id="'+(c.id||'')+'" style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" '
-      +'onmousedown="rpSelectContractor(this)" '
-      +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-      +'<div style="font-weight:600;">'+c.name+'</div>'
-      +(c.trade?'<div style="font-size:11px;color:var(--muted);">'+c.trade+'</div>':'')
-      +'</div>';
-  });
-
-  // Always show "Add new contractor" option
-  rows.push('<div onmousedown="rpAddNewContractor()" style="padding:9px 14px;cursor:pointer;font-size:12px;font-weight:700;color:var(--yellow);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;" '
-    +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-    +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
-    +(term && !matches.length ? 'Add "'+q+'" as new contractor' : 'Add new contractor')
-    +'</div>');
-
-  dd.innerHTML = rows.join('');
-  dd.style.display = 'block';
-}
 
 
 
