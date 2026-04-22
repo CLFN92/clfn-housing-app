@@ -294,8 +294,10 @@ function newApp(){
   // Update page header
   var t = document.getElementById('appLayout_title');
   var s = document.getElementById('appLayout_subtitle');
-  if(t) t.textContent = 'New Application';
-  if(s) s.textContent = 'Complete all steps to submit a housing application';
+  var ctx = document.getElementById('appLayout_ctx_bar');
+  if(t) t.textContent = '';
+  if(s) s.textContent = '';
+  if(ctx) ctx.style.display = 'none';
 
   // Show the form at step 0
   showApp();

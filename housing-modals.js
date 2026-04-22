@@ -2642,8 +2642,10 @@ window.openEditModal = function(appId) {
   var _name = ((app.fn||'')+' '+(app.ln||'')).trim();
   var _t = document.getElementById('appLayout_title');
   var _s = document.getElementById('appLayout_subtitle');
+  var _ctx = document.getElementById('appLayout_ctx_bar');
   if(_t) _t.textContent = _name || 'Edit Application';
   if(_s) _s.innerHTML = '<span style="background:var(--yellow);color:#111;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;margin-right:6px;">Editing</span>' + app.id;
+  if(_ctx) _ctx.style.display = 'flex';
 
   // ── Restore saved signature fields ──────────────────────────────────────
   function _setSigF(id, val){ var e=document.getElementById(id); if(e&&val) e.value=val; }

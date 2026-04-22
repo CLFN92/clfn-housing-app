@@ -355,9 +355,11 @@
 </div>
 
 <div class="layout" id="appLayout" style="display:none;flex-direction:column;">
-  <!-- Hidden metadata spans used by JS to update header context when editing -->
-  <span id="appLayout_title"></span>
-  <span id="appLayout_subtitle"></span>
+  <!-- Context bar — shows applicant name + editing badge when editing an existing app -->
+  <div id="appLayout_ctx_bar" style="display:none;padding:8px 20px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">
+    <span id="appLayout_title" style="font-size:13px;font-weight:700;color:var(--text);"></span>
+    <span id="appLayout_subtitle" style="font-size:12px;color:var(--muted);"></span>
+  </div>
   <main class="main">
 
     <!-- STEP 0: APPLICANT INFO -->
@@ -846,7 +848,7 @@
 </div><!-- end appLayout -->
 
 <!-- ═══ INDIVIDUAL SCORECARD VIEW ═══ -->
-<div id="scorecardView" class="dash-view">
+<div id="scorecardView" class="dash-view" style="display:none;">
   <div class="page-back-row">
     <button onclick="showDash()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -1275,7 +1277,7 @@
   </div>
 </div>
 
-<div id="inventoryView" class="dash-view">
+<div id="inventoryView" class="dash-view" style="display:none;">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -1328,7 +1330,7 @@
 </div></div><!-- end inventoryView -->
 
 <!-- ═══ MATCH VIEW ═══ -->
-<div id="matchView" class="dash-view">
+<div id="matchView" class="dash-view" style="display:none;">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -1358,7 +1360,7 @@
 </div></div><!-- end matchView -->
 
 <!-- ═══ TENANTS VIEW ═══ -->
-<div id="tenantsView" class="dash-view">
+<div id="tenantsView" class="dash-view" style="display:none;">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
