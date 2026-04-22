@@ -181,20 +181,20 @@
   </div>
 </div>
 <div id="addContractorModal" class="modal-overlay modal-z-800">
-  <div class="modal-body modal-body-md">
+  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
     <div class="modal-hdr spacious">
       <div>
         <p class="modal-hdr-sub">Contractor Application</p>
         <div id="ct_modal_title" class="panel-title">Edit Contractor</div>
       </div>
       <div class="flex-end gap-8">
-        <button type="button" id="ct_header_print_btn" class="btn btn-ghost btn-sm" onclick="printContractorAgreement()">🖨 Print / Save PDF</button>
-        <button type="button" id="ct_header_email_btn" class="btn btn-ghost btn-sm" onclick="emailContractorAgreement()">✉ Email to Contractor</button>
+        <button type="button" id="ct_header_print_btn" class="btn btn-ghost-dark btn-sm" onclick="printContractorAgreement()">🖨 Print / Save PDF</button>
+        <button type="button" id="ct_header_email_btn" class="btn btn-ghost-dark btn-sm" onclick="emailContractorAgreement()">✉ Email to Contractor</button>
         <button type="button" onclick="closeAddContractorModal()" class="btn-close-sm">✕</button>
       </div>
     </div>
 
-    <div class="modal-body-pad" style="display:flex;flex-direction:column;gap:16px;">
+    <div class="modal-body-pad ct-modal-form">
 
       <!-- Company Information -->
       <div class="card card-flush">

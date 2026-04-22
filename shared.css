@@ -490,6 +490,9 @@ input:focus, select:focus, textarea:focus {
 .btn-primary:hover { background: #e8d418; }
 .btn-ghost   { background: transparent;     color: var(--text); border-color: var(--border); }
 .btn-ghost:hover   { background: var(--bg); border-color: var(--muted); }
+.btn-ghost-dark { background: transparent; color: #ccc; border-color: #555; }
+.btn-ghost-dark:hover { background: rgba(255,255,255,0.08); border-color: #888; color: #fff; }
+
 .btn-sm            { padding: 5px 12px; font-size: 11px; }
 .btn-full          { flex: 1; justify-content: center; }
 .btn-dark    { background: var(--dark);     color: #fff;  border-color: var(--dark); }
@@ -1010,3 +1013,5 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .sigw-presence-btns { display: flex; gap: 8px; }
 .sigw-presence-btn  { padding: 7px 20px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--bg); cursor: pointer; font-family: var(--sans); font-size: 13px; font-weight: 600; transition: var(--tr); min-width: 80px; }
 .sigw-presence-btn.active { background: var(--yellow); border-color: var(--yellow); color: #111; }
+
+.ct-modal-form { display: flex; flex-direction: column; gap: 16px; }
