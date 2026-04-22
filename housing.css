@@ -1057,8 +1057,13 @@
 
 /* ── Overlay shells ── */
 .ct-panel-overlay   { display:none;position:fixed;inset:0;z-index:850;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:flex-end;overflow:hidden; }
-/* ct-modal-overlay: flex column so ct-modal-body can fill and scroll internally */
-.ct-modal-overlay   { display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;padding:20px 16px;overflow-y:auto;box-sizing:border-box; }
+/* ct-modal-overlay: the overlay itself scrolls — this lets the modal body grow
+   to its natural content height without any clipping or flex gymnastics.
+   align-items:flex-start keeps the modal anchored at the top so on short
+   viewports the user can scroll down to reach the footer. */
+.ct-modal-overlay   { display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);
+                      align-items:flex-start;justify-content:center;
+                      padding:20px 16px;overflow-y:auto;box-sizing:border-box; }
 
 /* ── Panel (slide-in from right) ── */
 .ct-panel-body      { background:var(--surface);width:100%;max-width:480px;height:100%;overflow-y:auto;box-shadow:-8px 0 40px rgba(0,0,0,0.3);display:flex;flex-direction:column; }
@@ -1067,18 +1072,16 @@
 .ct-status-banner   { padding:10px 20px;font-size:12px;font-weight:700;text-align:center; }
 
 /* ── Modal (centred form) ── */
-/* ct-modal-body: flex column with bounded height so header/footer stay fixed
-   and ct-modal-form-body can scroll. overflow:hidden on the outer shell gives
-   clean rounded-corner clipping. */
+/* ct-modal-body: simple block — the overlay scrolls, so this can grow freely.
+   border-radius + overflow:hidden gives clean corner clipping on the shell.
+   No flex/max-height needed: content height drives the modal height naturally. */
 .ct-modal-body      { background:var(--surface);border-radius:14px;width:100%;max-width:620px;
-                      max-height:calc(100vh - 40px);box-shadow:0 24px 60px rgba(0,0,0,0.4);
-                      overflow:hidden;margin:auto;display:flex;flex-direction:column; }
+                      box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto; }
 .ct-modal-hdr-row   { display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px; }
 .ct-modal-actions   { display:flex;gap:8px; }
-/* ct-modal-form-body: the scrollable body — flex:1 + min-height:0 so it shrinks
-   inside the flex column and scrolls rather than overflowing the modal */
-.ct-modal-form-body { padding:24px;display:flex;flex-direction:column;gap:0;overflow-y:auto;flex:1;min-height:0; }
-.ct-modal-footer    { padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);flex-shrink:0; }
+/* ct-modal-form-body: plain block — no flex, no overflow — just padding around sections */
+.ct-modal-form-body { padding:24px;display:flex;flex-direction:column;gap:0; }
+.ct-modal-footer    { padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg); }
 
 /* ── Section cards inside modal ── */
 .ct-sec             { margin-bottom:16px;padding:0;overflow:hidden; }
