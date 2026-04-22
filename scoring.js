@@ -583,6 +583,15 @@ function buildV2FormSelects() {
     }
   }
 
+  // Defensive: if neither liveScoreModel nor _appSettings provided a model,
+  // bail out gracefully. This can happen on first load before settings
+  // fetch completes, or if the scoring_model_v2 key is missing in Supabase.
+  // The form will render with its static default <option>s from the HTML.
+  if(!model || !model.length) {
+    console.warn('[scoring] buildV2FormSelects: no scoring model available yet — leaving form defaults in place');
+    return;
+  }
+
   // Helper: get rows for a category
   function catRows(cat) {
     return model.filter(function(r) { return r.cat === cat; });
