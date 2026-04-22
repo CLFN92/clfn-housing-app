@@ -2710,6 +2710,14 @@ window.openEditModal = function(appId) {
 
 
 
+// ── sigBlock — top-level helper for printSOW (also used locally in previewFromDash) ──
+function sigBlock(label, pName, dt, imgSrc) {
+  var sigHtml = imgSrc
+    ? '<img src="'+imgSrc+'" style="max-height:55px;max-width:100%;object-fit:contain;"/>'
+    : '<span style="font-size:9px;color:#ccc;">Sign here</span>';
+  return '<div style="break-inside:avoid;">'    +'<div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;'    +'color:#555;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #ddd;">'+label+'</div>'    +'<div style="display:grid;grid-template-columns:1fr 90px;gap:8px;margin-bottom:6px;">'    +'<div><div style="font-size:8px;color:#999;margin-bottom:1px;">Full Name</div>'    +'<div style="font-size:10.5px;font-weight:600;border-bottom:1px solid #bbb;padding-bottom:2px;min-height:15px;">'+(pName||'')+'</div></div>'    +'<div><div style="font-size:8px;color:#999;margin-bottom:1px;">Date</div>'    +'<div style="font-size:10px;border-bottom:1px solid #bbb;padding-bottom:2px;min-height:15px;">'+(dt||'')+'</div></div>'    +'</div>'    +'<div style="width:100%;height:65px;border:1px solid #ddd;border-radius:3px;background:#fafaf8;'    +'display:flex;align-items:center;justify-content:center;">'    +sigHtml+'</div>'    +'</div>';
+}
+
 function printSOW(){
   saveSOW();
   var get = function(id){ var el=document.getElementById(id); return el ? el.value.trim() : ''; };
