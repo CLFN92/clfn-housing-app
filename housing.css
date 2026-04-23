@@ -271,6 +271,38 @@
 
 /* Settings view layout */
 
+/* ── Settings tab underline fix ──────────────────────────────────────────
+   .tabs uses overflow-x:auto which clips the margin-bottom:-2px trick.
+   This restores the yellow active underline for the settings tab bar. */
+#settingsView .tabs {
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-bottom: 0;
+  margin-bottom: 20px;
+}
+#settingsView .tab-btn {
+  margin-bottom: -2px;
+  padding-bottom: 12px;
+}
+#settingsView .tab-btn.active {
+  border-bottom: 3px solid var(--yellow);
+  color: var(--text);
+}
+
+/* ── Settings sections — consistent std-table across all scoring tables ──*/
+#settingsView table { width: 100%; border-collapse: collapse; }
+#settingsView thead th {
+  padding: 9px 14px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .6px; color: #888;
+  text-align: left;
+  background: var(--dark2);
+  border-bottom: 1px solid var(--border);
+}
+#settingsView tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+#settingsView tbody tr:last-child td { border-bottom: none; }
+#settingsView .settings-section { padding: 0; }
+
 /* dashView stats is 5-col on desktop (overrides shared.css 4-col default) */
 #dashView .dash-stats { grid-template-columns: repeat(5,1fr); }
 /* 4-column grid utility used in dashView match stats */

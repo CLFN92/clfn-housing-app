@@ -59,7 +59,7 @@ function showSettings(){
   hideAllViews('settingsView');
   setNavActive('tab_settings');
   var sv=document.getElementById('settingsView');
-  if(sv){sv.style.display='flex';sv.style.flexDirection='column';sv.style.flex='1';}
+  if(sv){sv.style.display='flex';sv.style.flexDirection='column';}
   populateSettings();
   showSettingsSection('sec_users');
   renderScoringModelTable();

@@ -951,7 +951,7 @@
 </div></div><!-- end scorecardView -->
 
 <!-- ═══ SETTINGS VIEW ═══ -->
-<div id="settingsView" style="display:none;flex-direction:column;width:100%;max-width:1200px;padding:clamp(16px,4vw,40px) clamp(14px,3vw,40px);box-sizing:border-box;align-self:center;">
+<div id="settingsView" style="display:none;flex-direction:column;width:100%;max-width:1100px;padding:clamp(16px,4vw,40px) clamp(14px,3vw,40px);box-sizing:border-box;margin:0 auto;">
 <div style="display:flex;flex-direction:column;gap:0;">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
@@ -1067,7 +1067,7 @@
     <div class="card card-flush">
       <div class="modal-hdr">
         <div><div class="ctitle" class="m-0">🏠 Unit Matching Scoring</div><div class="txt-sm-meta">Point values used to score applicant-to-unit matches in the Match Scorecard</div></div>
-        <button type="button" id="settings_save_unit_btn" onclick="saveUnitScoreModelED()" style="background:var(--yellow);border:none;color:#111;padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save</button>
+        <button type="button" id="settings_save_unit_btn" onclick="saveUnitScoreModelED()" class="btn btn-primary">Save</button>
       </div>
       <div style="padding:20px;display:flex;flex-direction:column;gap:0;">
         <table style="width:100%;border-collapse:collapse;">
@@ -1093,8 +1093,8 @@
           <div class="txt-sm-meta">Points used to rank units for renovation — drawn from unit condition, SOW data, and tenant factors</div>
         </div>
         <div style="display:flex;gap:8px;">
-          <button type="button" id="settings_reset_reno_btn" onclick="resetRenoScoreModelED()" style="background:none;border:1px solid #444;color:#888;padding:6px 12px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;">Reset Defaults</button>
-          <button type="button" id="settings_save_reno_btn" onclick="saveRenoScoreModelED()" style="background:var(--yellow);border:none;color:#111;padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save</button>
+          <button type="button" id="settings_reset_reno_btn" onclick="resetRenoScoreModelED()" class="btn btn-ghost">Reset Defaults</button>
+          <button type="button" id="settings_save_reno_btn" onclick="saveRenoScoreModelED()" class="btn btn-primary">Save</button>
         </div>
       </div>
       <div class="sec-pad">
