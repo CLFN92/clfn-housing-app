@@ -926,8 +926,8 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
                            border-top: 3px solid var(--yellow) !important;
                            transition: box-shadow .15s, border-color .15s; }
 .ct-card:hover           { box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
-.ct-card-head            { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.ct-card-icon            { width: 42px; height: 42px; border-radius: 10px;
+.ct-card-head            { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.ct-card-icon            { width: 42px; height: 42px; border-radius: 50%;
                            background: var(--dark); border: 1.5px solid var(--yellow);
                            color: var(--yellow); font-size: 13px; font-weight: 800;
                            letter-spacing: .5px;
@@ -939,12 +939,12 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
                            white-space: nowrap; }
 .ct-card-trade           { font-size: 12px; color: var(--muted); margin-top: 2px;
                            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ct-card-status          { margin-top: 6px; }
 .ct-card-info            { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
-.ct-card-tags            { display: flex; flex-wrap: wrap; gap: 5px;
-                           margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.ct-card-tags            { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .ct-card-tag             { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 8px; }
 .ct-card-actions         { display: flex; gap: 6px; margin-top: 10px;
-                           padding-top: 8px; border-top: 1px solid var(--border); }
+                           padding-top: 10px; border-top: 1px solid var(--border); }
 .ct-card-btn             { flex: 1; background: none; border: 1px solid var(--border);
                            color: var(--text); padding: 5px 0; border-radius: 6px;
                            cursor: pointer; font-size: 11px; font-weight: 700;

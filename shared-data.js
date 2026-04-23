@@ -1827,8 +1827,8 @@ function renderContractorsView(){
         +'<div class="ct-card-body">'
           +'<div class="ct-card-name">'+ct.name+'</div>'
           +'<div class="ct-card-trade">'+(ct.trade||'General Contractor')+'</div>'
+          +'<div class="ct-card-status"><span class="std-pill ct-status-pill '+ss.cls+'">'+ss.label+'</span></div>'
         +'</div>'
-        +'<span class="std-pill ct-status-pill '+ss.cls+'">'+ss.label+'</span>'
       +'</div>'
       +(ct.phone?'<div class="ct-card-info">📞 '+ct.phone+'</div>':'')
       +(ct.email?'<div class="ct-card-info">✉ '+ct.email+'</div>':'')
