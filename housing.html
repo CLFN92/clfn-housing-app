@@ -951,307 +951,262 @@
 </div></div><!-- end scorecardView -->
 
 <!-- ═══ SETTINGS VIEW ═══ -->
-<div id="settingsView" style="display:none;flex-direction:column;width:100%;max-width:1100px;padding:clamp(16px,4vw,40px) clamp(14px,3vw,40px);box-sizing:border-box;margin:0 auto;">
-<div style="display:flex;flex-direction:column;gap:0;">
-  <div class="page-back-row">
-    <button onclick="goBack()" class="back-btn-yellow">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-      Back
-    </button>
+<div id="settingsView" style="display:none;">
+<div class="page-back-row">
+  <button onclick="goBack()" class="back-btn-yellow">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </button>
+</div>
+<div class="page-header-bar">
+  <div class="phb-title">
+    <h1>Settings</h1>
+    <p>Manage CLFN Housing Application configuration and scoring models.</p>
   </div>
-  <div class="page-header-bar">
-    <div class="phb-title">
-      <h1>Settings</h1>
-      <p>Manage CLFN Housing Application configuration and scoring models.</p>
+</div>
+
+<!-- Section nav tabs -->
+<div class="tabs">
+  <button onclick="showSettingsSection('sec_users')" id="stab_users" class="tab-btn active">&#128101; Users</button>
+  <button onclick="showSettingsSection('sec_app_scoring')" id="stab_app_scoring" class="tab-btn">&#11088; Application Scoring</button>
+  <button onclick="showSettingsSection('sec_unit_match')" id="stab_unit_match" class="tab-btn">&#127968; Unit Matching</button>
+  <button onclick="showSettingsSection('sec_reno_score')" id="stab_reno_score" class="tab-btn">&#128296; Reno Priority</button>
+  <button onclick="showSettingsSection('sec_budget')" id="stab_budget" class="tab-btn">&#128176; Reno Budget</button>
+  <button onclick="showSettingsSection('sec_nation');renderNationPanel();" id="stab_nation" class="tab-btn">&#127760; Nation</button>
+  <button onclick="showSettingsSection('sec_approval_authority');renderApprovalAuthorityPanel();" id="stab_approval_authority" class="tab-btn">&#128274; Approval Authority</button>
+  <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="tab-btn">&#128203; Audit Log</button>
+  <button onclick="showSettingsSection('sec_occupancy')" id="stab_occupancy" class="tab-btn">&#127960; Occupancy</button>
+</div>
+
+<!-- USERS -->
+<div id="sec_users" class="settings-section">
+  <div class="card">
+    <div class="ctitle mb-4">Application Users</div>
+    <div class="stg-sub">Staff with access to the CLFN Housing Application. <span id="users_role_note" class="txt-yellow-bold"></span></div>
+    <div class="stg-lookup-row">
+      <input type="email" id="user_lookup_email" placeholder="Enter @clfn.on.ca email to search or add..." class="stg-lookup-input" oninput="userLookupDebounce()" onkeydown="if(event.key==='Enter')lookupUser()"/>
+      <button onclick="lookupUser()" class="btn btn-primary">Look Up</button>
+    </div>
+    <div id="user_lookup_result"></div>
+    <div class="stg-table-wrap">
+      <table class="std-table">
+        <thead><tr>
+          <th class="td-col-w"></th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Housing Role</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="userTableBody"></tbody>
+      </table>
     </div>
   </div>
+</div>
 
-  <!-- Section nav tabs -->
-  <div class="tabs">
-    <button onclick="showSettingsSection('sec_users')" id="stab_users" class="tab-btn active">👥 Users</button>
-    <button onclick="showSettingsSection('sec_app_scoring')" id="stab_app_scoring" class="tab-btn">⭐ Application Scoring</button>
-    <button onclick="showSettingsSection('sec_unit_match')" id="stab_unit_match" class="tab-btn">🏠 Unit Matching</button>
-    <button onclick="showSettingsSection('sec_reno_score')" id="stab_reno_score" class="tab-btn">🔨 Reno Priority</button>
-    <button onclick="showSettingsSection('sec_budget')" id="stab_budget" class="tab-btn">💰 Reno Budget</button>
-    <button onclick="showSettingsSection('sec_nation');renderNationPanel();" id="stab_nation" class="tab-btn">🌐 Nation</button>
-    <button onclick="showSettingsSection('sec_approval_authority');renderApprovalAuthorityPanel();" id="stab_approval_authority" class="tab-btn">🔐 Approval Authority</button>
-    <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="tab-btn">📋 Audit Log</button>
-    <button onclick="showSettingsSection('sec_occupancy')" id="stab_occupancy" class="tab-btn">🏘 Occupancy</button>
-  </div>
+<!-- CONTACTS hidden -->
+<div id="sec_contacts" class="settings-section"></div>
 
-  <!-- ── USERS ── -->
-  <div id="sec_users" class="settings-section">
-    <div class="card">
-      <div class="ctitle" class="mb-4">Application Users</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Staff with access to the CLFN Housing Application. <span id="users_role_note" style="color:var(--yellow);font-weight:600;"></span></div>
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-        <input type="email" id="user_lookup_email" placeholder="Enter @clfn.on.ca email to search or add..." style="flex:1;min-width:200px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;font-family:DM Sans,sans-serif;" oninput="userLookupDebounce()" onkeydown="if(event.key==='Enter')lookupUser()"/>
-        <button onclick="lookupUser()" class="btn btn-primary" style="white-space:nowrap;">Look Up</button>
-      </div>
-      <div id="user_lookup_result"></div>
-      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px;">
-        <table class="std-table" style="min-width:320px;">
-          <thead><tr>
-            <th style="width:36px;padding:9px 6px 9px 14px;"></th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Housing Role</th>
-            <th></th>
-          </tr></thead>
-          <tbody id="userTableBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── CONTACTS ── -->
-  <div id="sec_contacts" class="settings-section">
-    <div class="card">
-      <div class="ctitle">📧 Workflow Notification Contacts</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:20px;">Email addresses used for approval workflow notifications. Emails are sent automatically at each approval step.</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
-        <div>
-          <div class="lbl-muted" style="margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)">Housing Manager</div>
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <div class="f"><label>Full Name</label><input type="text" id="hm_name" placeholder="e.g. James Sutherland" class="bg-bg"/></div>
-            <div class="f"><label>Email Address</label><input type="email" id="hm_email" placeholder="e.g. james.sutherland@clfn.on.ca" class="bg-bg"/></div>
-          </div>
-        </div>
-        <div>
-          <div class="lbl-muted" style="margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)">Executive Director</div>
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <div class="f"><label>Full Name</label><input type="text" id="ed_name" placeholder="e.g. Kevin Proctor" class="bg-bg"/></div>
-            <div class="f"><label>Email Address</label><input type="email" id="ed_email" placeholder="e.g. kevin.proctor@clfn.on.ca" class="bg-bg"/></div>
-          </div>
-        </div>
-      </div>
-      <div style="background:var(--yellow-light);border:1px solid var(--yellow-mid);border-radius:8px;padding:12px 16px;font-size:12px;color:#7a6000;margin-bottom:16px;">
-        <strong>Automatic workflow emails:</strong>
-        <div style="margin-top:8px;line-height:2;">
-          📩 <strong>New Application Submitted</strong> → HM notified to review and recommend<br>
-          📩 <strong>HM Recommends to ED</strong> → ED notified for final approval<br>
-          📩 <strong>ED Final Approval</strong> → HM notified of decision<br>
-          📩 <strong>File Update Submitted</strong> → HM notified to review and approve<br>
-          📩 <strong>Application Returned</strong> → HM notified with notes
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-        <button onclick="saveContactSettings()" class="btn btn-primary">Save Contacts</button>
-        <button onclick="sendTestEmail()" class="btn btn-ghost" style="font-size:12px;">📨 Send Test Email to HM</button>
-        <span id="contacts_save_msg" style="font-size:12px;color:#15803d;display:none;">✓ Saved</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── HOUSING APPLICATION SCORING ── -->
-  <div id="sec_app_scoring" class="settings-section">
-    <div id="scoring_model_section">
-      <div class="card card-flush-gold">
-        <div class="modal-hdr">
-          <div>
-            <div class="ctitle" class="m-0">⭐ Housing Application Scoring Model — V2</div>
-            <div class="txt-sm-meta">ED only — edit point values and priority tier thresholds. Changes apply on next rescore.</div>
-          </div>
-          <div class="flex-gap8 flex-wrap">
-            <button onclick="rescoreAndSave()" style="background:var(--yellow);border:none;color:#111;padding:6px 14px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">↻ Rescore All Applications</button>
-            <button onclick="resetV2ScoringModelED()" style="background:none;border:1px solid #444;color:#888;padding:6px 12px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;">Reset All Defaults</button>
-          </div>
-        </div>
-        <div id="scoring_model_table_wrap" class="sec-pad"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── UNIT MATCHING SCORING ── -->
-  <div id="sec_unit_match" class="settings-section">
-    <div class="card card-flush">
-      <div class="modal-hdr">
-        <div><div class="ctitle" class="m-0">🏠 Unit Matching Scoring</div><div class="txt-sm-meta">Point values used to score applicant-to-unit matches in the Match Scorecard</div></div>
-        <button type="button" id="settings_save_unit_btn" onclick="saveUnitScoreModelED()" class="btn btn-primary">Save</button>
-      </div>
-      <div style="padding:20px;display:flex;flex-direction:column;gap:0;">
-        <table style="width:100%;border-collapse:collapse;">
-          <thead><tr class="border-b2">
-            <th class="th-hdr">Factor</th>
-            <th class="th-hdr">Condition</th>
-            <th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Points</th>
-            <th class="th-hdr">Notes</th>
-          </tr></thead>
-          <tbody id="unit_score_tbody"></tbody>
-        </table>
-        <div style="margin-top:12px;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--muted);"><strong style="color:var(--text);">Max match score: <span id="unit_score_max">24</span> pts.</strong> &nbsp;The match % shown in scorecards is calculated as <em>(points earned ÷ max score) × 100</em>.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── RENOVATION PRIORITY SCORING ── -->
-  <div id="sec_reno_score" class="settings-section">
+<!-- APPLICATION SCORING -->
+<div id="sec_app_scoring" class="settings-section">
+  <div id="scoring_model_section">
     <div class="card card-flush-gold">
       <div class="modal-hdr">
         <div>
-          <div class="ctitle" class="m-0">🔨 Renovation Priority Scoring</div>
-          <div class="txt-sm-meta">Points used to rank units for renovation — drawn from unit condition, SOW data, and tenant factors</div>
+          <div class="lbl-yellow">&#11088; Housing Application Scoring Model &mdash; V2</div>
+          <div class="txt-sm-meta">ED only &mdash; edit point values and priority tier thresholds. Changes apply on next rescore.</div>
         </div>
-        <div style="display:flex;gap:8px;">
-          <button type="button" id="settings_reset_reno_btn" onclick="resetRenoScoreModelED()" class="btn btn-ghost">Reset Defaults</button>
-          <button type="button" id="settings_save_reno_btn" onclick="saveRenoScoreModelED()" class="btn btn-primary">Save</button>
-        </div>
-      </div>
-      <div class="sec-pad">
-        <table style="width:100%;border-collapse:collapse;">
-          <thead><tr class="border-b2">
-            <th class="th-hdr">Category</th>
-            <th class="th-hdr">Condition</th>
-            <th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Points</th>
-            <th class="th-hdr">Notes</th>
-          </tr></thead>
-          <tbody id="reno_score_tbody"></tbody>
-        </table>
-        <div style="margin-top:12px;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--muted);">
-          <strong style="color:var(--text);">Renovation Priority Score</strong> is calculated per unit from its SOW and condition data. Higher scores = higher renovation priority. Scores are shown in the Renovations tab.
+        <div class="flex-gap8 flex-wrap">
+          <button onclick="rescoreAndSave()" class="btn btn-primary">&#8635; Rescore All Applications</button>
+          <button onclick="resetV2ScoringModelED()" class="btn btn-ghost">Reset All Defaults</button>
         </div>
       </div>
+      <div id="scoring_model_table_wrap" class="sec-pad"></div>
     </div>
   </div>
+</div>
 
-  <!-- ── RENOVATION BUDGET ── -->
-  <div id="sec_budget" class="settings-section">
-    <div class="card card-flush">
-      <div class="modal-hdr">
-        <div>
-          <div class="lbl-yellow">💰 Renovation Budget</div>
-          <div class="txt-sm-meta">Enter annual funding allocations by source</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:12px;color:var(--muted);white-space:nowrap;">Fiscal Year</span>
-            <input id="budget_fiscal_year" type="text" value="2025-2026" style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--surface);color:var(--text);width:90px;"/>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:12px;color:var(--muted);white-space:nowrap;">HM Limit</span>
-            <span style="font-size:13px;color:var(--muted);">$</span>
-            <input type="number" id="settings_hm_budget_limit" min="0" step="1000" placeholder="25000"
-              style="width:110px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text);"/>
-            <span style="font-size:11px;color:var(--muted);white-space:nowrap;">then ED approval</span>
-          </div>
-          <button type="button" id="settings_save_budget_btn" onclick="saveBudgetPoolsED()" class="btn btn-primary">Save Budgets</button>
-        </div>
+<!-- UNIT MATCHING -->
+<div id="sec_unit_match" class="settings-section">
+  <div class="card card-flush">
+    <div class="modal-hdr">
+      <div>
+        <div class="lbl-yellow">&#127968; Unit Matching Scoring</div>
+        <div class="txt-sm-meta">Point values used to score applicant-to-unit matches in the Match Scorecard</div>
       </div>
-      <div class="sec-pad">
-        <table class="std-table">
-          <thead><tr>
-            <th>Fund Source</th>
-            <th style="text-align:right;">Annual Allocation ($)</th>
-            <th>Notes</th>
-          </tr></thead>
-          <tbody id="budget_pools_tbody"></tbody>
-          <tfoot><tr style="border-top:2px solid var(--border);background:var(--bg);">
-            <td style="padding:10px 14px;font-size:13px;font-weight:700;">Total</td>
-            <td style="padding:10px 14px;text-align:right;font-size:15px;font-weight:800;color:var(--yellow);" id="budget_grand_total">$0</td>
-            <td></td>
-          </tr></tfoot>
-        </table>
-      </div>
+      <button type="button" id="settings_save_unit_btn" onclick="saveUnitScoreModelED()" class="btn btn-primary">Save</button>
+    </div>
+    <div class="sec-pad">
+      <table>
+        <thead><tr>
+          <th>Factor</th><th>Condition</th><th class="th-center">Points</th><th>Notes</th>
+        </tr></thead>
+        <tbody id="unit_score_tbody"></tbody>
+      </table>
+      <div class="stg-footer-note"><strong>Max match score: <span id="unit_score_max">24</span> pts.</strong> &nbsp;The match % shown in scorecards is calculated as <em>(points earned &divide; max score) &times; 100</em>.</div>
     </div>
   </div>
+</div>
 
-
-  <!-- ── AUDIT LOG ── -->
-
-  <!-- ── APPROVAL AUTHORITY ── -->
-  <div id="sec_approval_authority" class="settings-section">
-    <div class="card card-flush-gold">
-      <div class="modal-hdr">
-        <div>
-          <div class="ctitle" class="m-0">🔐 Approval Authority</div>
-          <div style="font-size:11px;color:#888;font-weight:400;margin-top:3px;">Controls which <strong>roles</strong> can perform each action. ED only.</div>
-        </div>
-        <button onclick="saveApprovalAuthoritySettings()" style="background:var(--yellow);border:none;color:#111;padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save Changes</button>
-      </div>
-      <div class="sec-pad" id="approval_authority_panel_body">
-        <div style="padding:32px;text-align:center;color:var(--muted);font-size:13px;">Loading…</div>
-      </div>
-    </div>
-  </div>
-
-  <div id="sec_audit" class="settings-section">
-    <div class="card card-flush">
-      <div class="modal-hdr">
-        <div>
-          <div class="ctitle" class="m-0">📋 Audit Log</div>
-          <div class="txt-sm-meta">Full activity trail — applications, approvals, unit edits, SOW, and system changes</div>
-        </div>
-        <button type="button" onclick="renderAuditLog()" style="background:none;border:1px solid #444;color:#888;padding:6px 12px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;">↻ Refresh</button>
-      </div>
-      <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;min-width:640px;">
-          <thead><tr style="border-bottom:2px solid var(--border);background:var(--bg);">
-            <th class="th-hdr">Date / Time</th>
-            <th class="th-hdr">ID / Ref</th>
-            <th class="th-hdr">Event</th>
-            <th class="th-hdr">Detail</th>
-            <th class="th-hdr">By</th>
-          </tr></thead>
-          <tbody id="audit_log_tbody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-  <!-- ── NATION / MODULES (read-only) ── -->
-  <div id="sec_nation" class="settings-section">
-    <div class="card card-flush">
-      <div class="modal-hdr">
-        <div class="ctitle" class="m-0">🌐 Nation &amp; Modules</div>
-        <div class="txt-sm-meta">Which nation this app is running for, and which optional modules your nation has licensed. Read-only — to change, contact your platform administrator.</div>
-      </div>
-      <div class="sec-pad">
-        <div id="nation_panel_identity" class="mb-20"></div>
-        <div id="nation_panel_modules"></div>
-      </div>
-    </div>
-  </div>
-  <!-- ── OCCUPANCY STANDARDS SECTION ── -->
-  <div id="sec_occupancy" class="settings-section">
+<!-- RENO PRIORITY -->
+<div id="sec_reno_score" class="settings-section">
   <div class="card card-flush-gold">
     <div class="modal-hdr">
       <div>
-        <div class="lbl-yellow">&#127968; National Occupancy Standard (NOS)</div>
-        <div style="font-size:11px;color:#888;font-weight:400;margin-top:3px;">ED only &#8212; maximum persons allowed per bedroom count. Used to auto-calculate overcrowding on applications.</div>
+        <div class="lbl-yellow">&#128296; Renovation Priority Scoring</div>
+        <div class="txt-sm-meta">Points used to rank units for renovation &mdash; drawn from unit condition, SOW data, and tenant factors</div>
       </div>
-      <button id="settings_save_nos_btn" onclick="saveNosTable()" style="background:var(--yellow);border:none;color:#111;padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save NOS Table</button>
+      <div class="flex-gap8">
+        <button type="button" id="settings_reset_reno_btn" onclick="resetRenoScoreModelED()" class="btn btn-ghost">Reset Defaults</button>
+        <button type="button" id="settings_save_reno_btn" onclick="saveRenoScoreModelED()" class="btn btn-primary">Save</button>
+      </div>
     </div>
     <div class="sec-pad">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:16px;padding:10px 14px;background:var(--bg);border-radius:8px;line-height:1.6;">
-        The NOS defines the maximum number of people that can appropriately occupy a unit of a given bedroom count.
-        A household is considered <strong>overcrowded</strong> when the total number of people exceeds the NOS maximum for their current home.
-        Each person over the standard earns 1 point (up to 10 pts) on their application score.
-      </div>
-      <table style="width:100%;border-collapse:collapse;max-width:480px;">
-        <thead>
-          <tr class="border-b2">
-            <th class="th-hdr">Bedroom Count</th>
-            <th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Max Persons (NOS)</th>
-          </tr>
-        </thead>
-        <tbody id="nos_table_tbody">
-          <tr class="row-divider"><td class="cell-pad2">Studio / 0 bedrooms</td><td class="cell-ctr"><input type="number" data-nos-beds="0" value="1" min="1" max="20" class="score-input"/><span class="txt-sm-muted-ml">persons</span></td></tr>
-          <tr class="row-divider"><td class="cell-pad2">1 bedroom</td><td class="cell-ctr"><input type="number" data-nos-beds="1" value="2" min="1" max="20" class="score-input"/><span class="txt-sm-muted-ml">persons</span></td></tr>
-          <tr class="row-divider"><td class="cell-pad2">2 bedrooms</td><td class="cell-ctr"><input type="number" data-nos-beds="2" value="4" min="1" max="20" class="score-input"/><span class="txt-sm-muted-ml">persons</span></td></tr>
-          <tr class="row-divider"><td class="cell-pad2">3 bedrooms</td><td class="cell-ctr"><input type="number" data-nos-beds="3" value="6" min="1" max="20" class="score-input"/><span class="txt-sm-muted-ml">persons</span></td></tr>
-          <tr class="row-divider"><td class="cell-pad2">4 bedrooms</td><td class="cell-ctr"><input type="number" data-nos-beds="4" value="8" min="1" max="20" class="score-input"/><span class="txt-sm-muted-ml">persons</span></td></tr>
-          <tr class="row-divider"><td class="cell-pad2">5+ bedrooms</td><td class="cell-ctr"><input type="number" data-nos-beds="5" value="10" min="1" max="20" class="score-input"/><span class="txt-sm-muted-ml">persons</span></td></tr>
-        </tbody>
+      <table>
+        <thead><tr>
+          <th>Category</th><th>Condition</th><th class="th-center">Points</th><th>Notes</th>
+        </tr></thead>
+        <tbody id="reno_score_tbody"></tbody>
       </table>
-      <div style="margin-top:16px;padding:10px 14px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--muted);">
-        <strong style="color:var(--text);">Note:</strong> Changes take effect immediately on the next application score calculation. Existing stored scores are not affected until the next rescore.
-      </div>
+      <div class="stg-footer-note"><strong>Renovation Priority Score</strong> is calculated per unit from SOW and condition data. Higher scores = higher renovation priority.</div>
     </div>
   </div>
 </div>
 
+<!-- BUDGET -->
+<div id="sec_budget" class="settings-section">
+  <div class="card card-flush">
+    <div class="modal-hdr">
+      <div>
+        <div class="lbl-yellow">&#128176; Renovation Budget</div>
+        <div class="txt-sm-meta">Enter annual funding allocations by source</div>
+      </div>
+      <div class="stg-budget-controls">
+        <div class="stg-budget-field">
+          <label>Fiscal Year</label>
+          <input id="budget_fiscal_year" type="text" value="2025-2026" class="stg-fiscal-input"/>
+        </div>
+        <div class="stg-budget-field">
+          <label>HM Limit</label>
+          <span class="stg-dollar">$</span>
+          <input type="number" id="settings_hm_budget_limit" min="0" step="1000" placeholder="25000" class="stg-limit-input"/>
+          <span class="stg-note">then ED approval</span>
+        </div>
+        <button type="button" id="settings_save_budget_btn" onclick="saveBudgetPoolsED()" class="btn btn-primary">Save Budgets</button>
+      </div>
+    </div>
+    <div class="sec-pad">
+      <table>
+        <thead><tr>
+          <th>Fund Source</th>
+          <th class="th-right">Annual Allocation ($)</th>
+          <th>Notes</th>
+        </tr></thead>
+        <tbody id="budget_pools_tbody"></tbody>
+        <tfoot><tr>
+          <td>Total</td>
+          <td class="td-right td-total" id="budget_grand_total">$0</td>
+          <td></td>
+        </tr></tfoot>
+      </table>
+    </div>
   </div>
-
 </div>
+
+<!-- NATION -->
+<div id="sec_nation" class="settings-section">
+  <div class="card card-flush">
+    <div class="modal-hdr">
+      <div>
+        <div class="lbl-yellow">&#127760; Nation &amp; Modules</div>
+        <div class="txt-sm-meta">Which nation this app is running for, and which optional modules your nation has licensed. Read-only.</div>
+      </div>
+    </div>
+    <div class="sec-pad">
+      <div id="nation_panel_identity" class="mb-20"></div>
+      <div id="nation_panel_modules"></div>
+    </div>
+  </div>
+</div>
+
+<!-- APPROVAL AUTHORITY -->
+<div id="sec_approval_authority" class="settings-section">
+  <div class="card card-flush-gold">
+    <div class="modal-hdr">
+      <div>
+        <div class="lbl-yellow">&#128274; Approval Authority</div>
+        <div class="txt-sm-meta">Controls which <strong>roles</strong> can perform each action. ED only.</div>
+      </div>
+      <button onclick="saveApprovalAuthoritySettings()" class="btn btn-primary">Save Changes</button>
+    </div>
+    <div class="sec-pad" id="approval_authority_panel_body">
+      <div class="empty-state-ctr">Loading&hellip;</div>
+    </div>
+  </div>
+</div>
+
+<!-- AUDIT LOG -->
+<div id="sec_audit" class="settings-section">
+  <div class="card card-flush">
+    <div class="modal-hdr">
+      <div>
+        <div class="lbl-yellow">&#128203; Audit Log</div>
+        <div class="txt-sm-meta">Full activity trail &mdash; applications, approvals, unit edits, SOW, and system changes</div>
+      </div>
+      <button type="button" onclick="renderAuditLog()" class="btn btn-ghost">&#8635; Refresh</button>
+    </div>
+    <div class="doclib-table-wrap">
+      <table class="std-table">
+        <colgroup>
+          <col class="audit-col-date">
+          <col class="audit-col-ref">
+          <col class="audit-col-event">
+          <col>
+          <col class="audit-col-by">
+        </colgroup>
+        <thead><tr>
+          <th>Date / Time</th>
+          <th>ID / Ref</th>
+          <th>Event</th>
+          <th>Detail</th>
+          <th>By</th>
+        </tr></thead>
+        <tbody id="audit_log_tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- OCCUPANCY -->
+<div id="sec_occupancy" class="settings-section">
+  <div class="card card-flush-gold">
+    <div class="modal-hdr">
+      <div>
+        <div class="lbl-yellow">&#127960; National Occupancy Standard (NOS)</div>
+        <div class="txt-sm-meta">ED only &mdash; maximum persons allowed per bedroom count. Used to auto-calculate overcrowding on applications.</div>
+      </div>
+      <button id="settings_save_nos_btn" onclick="saveNosTable()" class="btn btn-primary">Save NOS Table</button>
+    </div>
+    <div class="sec-pad">
+      <div class="stg-info-box">The NOS defines the maximum number of people that can appropriately occupy a unit of a given bedroom count. A household is considered <strong>overcrowded</strong> when the total number of people exceeds the NOS maximum for their current home. Each person over the standard earns 1 point (up to 10 pts) on their application score.</div>
+      <table class="stg-nos-table">
+        <thead><tr>
+          <th>Bedroom Count</th>
+          <th class="th-center">Max Persons (NOS)</th>
+        </tr></thead>
+        <tbody id="nos_table_tbody">
+          <tr><td>Studio / 0 bedrooms</td><td class="td-center"><input type="number" data-nos-beds="0" value="1" min="1" max="20" class="score-input"/> <span class="txt-sm-muted-ml">persons</span></td></tr>
+          <tr><td>1 bedroom</td><td class="td-center"><input type="number" data-nos-beds="1" value="2" min="1" max="20" class="score-input"/> <span class="txt-sm-muted-ml">persons</span></td></tr>
+          <tr><td>2 bedrooms</td><td class="td-center"><input type="number" data-nos-beds="2" value="4" min="1" max="20" class="score-input"/> <span class="txt-sm-muted-ml">persons</span></td></tr>
+          <tr><td>3 bedrooms</td><td class="td-center"><input type="number" data-nos-beds="3" value="6" min="1" max="20" class="score-input"/> <span class="txt-sm-muted-ml">persons</span></td></tr>
+          <tr><td>4 bedrooms</td><td class="td-center"><input type="number" data-nos-beds="4" value="8" min="1" max="20" class="score-input"/> <span class="txt-sm-muted-ml">persons</span></td></tr>
+          <tr><td>5+ bedrooms</td><td class="td-center"><input type="number" data-nos-beds="5" value="10" min="1" max="20" class="score-input"/> <span class="txt-sm-muted-ml">persons</span></td></tr>
+        </tbody>
+      </table>
+      <div class="stg-footer-note"><strong>Note:</strong> Changes take effect immediately on the next application score calculation. Existing stored scores are not affected until the next rescore.</div>
+    </div>
+  </div>
+</div>
+
 </div><!-- end settingsView -->
 
 

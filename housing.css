@@ -69,34 +69,7 @@
 #role_queue_banner:empty { display: none; }
 
 
-/* ── 15. SETTINGS ───────────────────────────────────────────────────────── */
-
-.settings-view { padding: clamp(16px,3vw,36px) clamp(14px,3vw,44px); max-width: 1100px; width: 100%; box-sizing: border-box; align-self: center; }
-.settings-header { margin-bottom: 24px; }
-.settings-header h1 { font-family: var(--serif); font-size: 26px; font-weight: 400; }
-.settings-header p  { font-size: 13px; color: var(--muted); margin-top: 4px; }
-.settings-section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: var(--muted); padding: 20px 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
-.settings-form     { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.settings-form-row { grid-column: span 2; }
-.settings-save-btn { margin-top: 20px; }
-
-/* User table column sizing — prevents avatar+name from crowding email/role */
-#userTableBody td:nth-child(1) { width: 28%; min-width: 180px; white-space: nowrap; }
-#userTableBody td:nth-child(2) { width: 32%; min-width: 180px; }
-#userTableBody td:nth-child(3) { width: 22%; }
-#userTableBody td:nth-child(4) { width: 18%; text-align: right; white-space: nowrap; }
-
-/* User management table */
-.user-table  { width: 100%; border-collapse: collapse; font-size: 13px; }
-.user-table th { background: var(--dark); color: #fff; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
-.user-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-.user-table tr:hover td { background: var(--bg); }
-.user-role-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; background: var(--dark2); color: #ccc; }
-.user-actions    { display: flex; gap: 6px; }
-.add-user-row    { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-top: 16px; }
-.btn-edit-user, .btn-del-user { padding: 4px 10px; font-size: 11px; border-radius: 5px; border: none; cursor: pointer; font-family: var(--sans); font-weight: 600; }
-.btn-edit-user { background: var(--yellow-light); color: #7a6000; }
-.btn-del-user  { background: #fef2f2; color: var(--danger); }
+/* ── 15. SETTINGS — see canonical block further below ──────────────────── */
 
 
 /* ── 16. APPLICATION FORM ───────────────────────────────────────────────── */
@@ -269,39 +242,79 @@
 /* Finance info boxes and table wrappers */
 
 
-/* Settings view layout */
+/* ═══════════════════════════════════════════════════════════════
+   SETTINGS PAGE — all layout via named classes, zero inline styles
+   ═══════════════════════════════════════════════════════════════ */
 
-/* ── Settings tab underline fix ──────────────────────────────────────────
-   .tabs uses overflow-x:auto which clips the margin-bottom:-2px trick.
-   This restores the yellow active underline for the settings tab bar. */
-#settingsView .tabs {
-  overflow-x: auto;
-  overflow-y: visible;
-  padding-bottom: 0;
-  margin-bottom: 20px;
-}
-#settingsView .tab-btn {
-  margin-bottom: -2px;
-  padding-bottom: 12px;
-}
-#settingsView .tab-btn.active {
-  border-bottom: 3px solid var(--yellow);
-  color: var(--text);
+/* Wrapper — centred, max-width, padding */
+#settingsView {
+  width: 100%; max-width: 1100px; box-sizing: border-box;
+  padding: clamp(16px,4vw,40px) clamp(14px,3vw,40px);
+  margin: 0 auto;
+  flex-direction: column;
 }
 
-/* ── Settings sections — consistent std-table across all scoring tables ──*/
+/* ── Tab bar ── */
+#settingsView .tabs { overflow-x: auto; overflow-y: visible; margin-bottom: 20px; }
+#settingsView .tab-btn { margin-bottom: -2px; padding-bottom: 12px; }
+#settingsView .tab-btn.active { border-bottom: 3px solid var(--yellow); color: var(--text); }
+
+/* ── Sections ── */
+#settingsView .settings-section { padding: 0; display: none; }
+#settingsView .settings-section.active { display: block; }
+
+/* ── All tables consistent with std-table ── */
 #settingsView table { width: 100%; border-collapse: collapse; }
 #settingsView thead th {
-  padding: 9px 14px;
+  padding: 9px 14px; text-align: left;
   font-size: 10px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .6px; color: #888;
-  text-align: left;
-  background: var(--dark2);
-  border-bottom: 1px solid var(--border);
+  background: var(--dark2); border-bottom: 1px solid var(--border);
 }
-#settingsView tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+#settingsView thead th.th-right { text-align: right; }
+#settingsView thead th.th-center { text-align: center; }
+#settingsView tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 13px; }
 #settingsView tbody tr:last-child td { border-bottom: none; }
-#settingsView .settings-section { padding: 0; }
+#settingsView tfoot td { padding: 10px 14px; font-size: 13px; font-weight: 700; border-top: 2px solid var(--border); background: var(--bg); }
+#settingsView .td-right { text-align: right; }
+#settingsView .td-center { text-align: center; }
+#settingsView .td-total { font-size: 15px; font-weight: 800; color: var(--yellow); }
+#settingsView .td-col-w { width: 36px; padding: 9px 6px 9px 14px; }
+
+/* ── Users section ── */
+.stg-lookup-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.stg-lookup-input { flex: 1; min-width: 200px; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: 13px; font-family: var(--sans); }
+.stg-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 8px; }
+
+/* ── Budget header controls ── */
+.stg-budget-controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.stg-budget-field { display: flex; align-items: center; gap: 8px; }
+.stg-budget-field label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.stg-budget-field .stg-dollar { font-size: 13px; color: var(--muted); }
+.stg-budget-field .stg-note { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.stg-fiscal-input { padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--surface); color: var(--text); width: 90px; font-family: var(--sans); }
+.stg-limit-input { width: 110px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--surface); color: var(--text); font-family: var(--sans); }
+
+/* ── Info / note boxes ── */
+.stg-info-box { font-size: 12px; color: var(--muted); padding: 10px 14px; background: var(--bg); border-radius: 8px; line-height: 1.6; margin-bottom: 16px; }
+.stg-sub { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+.stg-footer-note { margin-top: 12px; padding: 10px 12px; background: var(--bg); border-radius: 8px; font-size: 12px; color: var(--muted); }
+
+/* ── Audit log row colour coding ── */
+#settingsView .audit-row-submit   td { background: #f0fdf4; }
+#settingsView .audit-row-status   td { background: #eff6ff; }
+#settingsView .audit-row-declined td { background: #fef2f2; }
+#settingsView .audit-row-sow      td { background: #fffbeb; }
+
+/* ── Audit log column widths ── */
+#sec_audit .std-table     { min-width: 640px; }
+.audit-col-date           { width: 140px; }
+.audit-col-ref            { width: 130px; }
+.audit-col-event          { width: 200px; }
+.audit-col-by             { width: 80px; }
+
+/* ── NOS table ── */
+.stg-nos-table { max-width: 480px; }
 
 /* dashView stats is 5-col on desktop (overrides shared.css 4-col default) */
 #dashView .dash-stats { grid-template-columns: repeat(5,1fr); }
@@ -840,7 +853,7 @@
 .flex-wrap  { flex-wrap: wrap; }
 
 /* Margin utilities */
-.mb-4  { margin-bottom: 4px; }
+.txt-yellow-bold  { color: var(--yellow); font-weight: 600; }
 .mb-6  { margin-bottom: 6px; }
 .mb-8  { margin-bottom: 8px; }
 .mb-12 { margin-bottom: 12px; }
