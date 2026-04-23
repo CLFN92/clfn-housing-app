@@ -269,8 +269,7 @@
 /* Finance info boxes and table wrappers */
 
 
-/* Settings tabs — extend shared .tab-btn with settings-specific alias */
-.settings-tab { /* inherits from .tab-btn via shared.css */ }
+/* Settings view layout */
 
 /* dashView stats is 5-col on desktop (overrides shared.css 4-col default) */
 #dashView .dash-stats { grid-template-columns: repeat(5,1fr); }

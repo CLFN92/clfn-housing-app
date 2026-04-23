@@ -155,7 +155,7 @@ function showSettingsSection(section) {
     var el=document.getElementById(id);
     if(el) el.style.display=(id===section)?'block':'none';
   });
-  document.querySelectorAll('.settings-tab').forEach(function(t){
+  document.querySelectorAll('.tabs .tab-btn').forEach(function(t){
     var tabSec='sec_'+t.id.replace('stab_','');
     t.classList.toggle('active', tabSec===section);
   });

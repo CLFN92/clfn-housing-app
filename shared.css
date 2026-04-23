@@ -346,15 +346,7 @@ body {
 /* Signature step action bar */
 .sig-actions           { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-/* Settings tabs + sections */
-.settings-tab {
-  padding: 8px 16px; border: none; background: none;
-  border-bottom: 2px solid transparent; font-size: 13px; font-weight: 600;
-  color: var(--muted); cursor: pointer; font-family: var(--sans);
-  transition: color 0.15s, border-color 0.15s;
-}
-.settings-tab.active, .settings-tab:hover { color: var(--text); }
-.settings-tab.active   { border-bottom-color: var(--yellow); color: #fff; }
+/* Settings sections */
 .settings-section      { padding: 16px 0; }
 
 /* Dashboard table — matches std-table pattern from finance module */
