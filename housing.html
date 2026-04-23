@@ -973,7 +973,6 @@
     <button onclick="showSettingsSection('sec_unit_match')" id="stab_unit_match" class="settings-tab tab-btn">🏠 Unit Matching</button>
     <button onclick="showSettingsSection('sec_reno_score')" id="stab_reno_score" class="settings-tab tab-btn">🔨 Reno Priority</button>
     <button onclick="showSettingsSection('sec_budget')" id="stab_budget" class="settings-tab tab-btn">💰 Reno Budget</button>
-    <button onclick="showSettingsSection('sec_contacts')" id="stab_contacts" class="settings-tab tab-btn">📧 Contacts</button>
     <button onclick="showSettingsSection('sec_nation');renderNationPanel();" id="stab_nation" class="settings-tab tab-btn">🌐 Nation</button>
     <button onclick="showSettingsSection('sec_approval_authority');renderApprovalAuthorityPanel();" id="stab_approval_authority" class="settings-tab tab-btn">🔐 Approval Authority</button>
     <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="settings-tab tab-btn">📋 Audit Log</button>
@@ -991,12 +990,13 @@
       </div>
       <div id="user_lookup_result"></div>
       <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px;">
-        <table style="width:100%;border-collapse:collapse;min-width:320px;">
+        <table class="std-table" style="min-width:320px;">
           <thead><tr>
-            <th class="lbl-muted" style="text-align:left;padding:8px 12px;border-bottom:1px solid var(--yellow)">Name</th>
-            <th class="lbl-muted" style="text-align:left;padding:8px 12px;border-bottom:1px solid var(--yellow)">Email</th>
-            <th class="lbl-muted" style="text-align:left;padding:8px 12px;border-bottom:1px solid var(--yellow)">Housing Role</th>
-            <th style="padding:8px 12px;border-bottom:1px solid var(--yellow);"></th>
+            <th style="width:36px;padding:9px 6px 9px 14px;"></th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Housing Role</th>
+            <th></th>
           </tr></thead>
           <tbody id="userTableBody"></tbody>
         </table>

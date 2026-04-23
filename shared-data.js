@@ -1867,22 +1867,22 @@ function renderCtFilePreview(bucket){
 async function renderHousingUserTable(){
   var tbody = document.getElementById('userTableBody');
   if(!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;">Loading…</td></tr>';
   try {
     var r = await fetch(SUPABASE_URL+'/rest/v1/staff?select=*&is_active=eq.true&order=name',{headers:HOUSING_HEADERS});
     var staff = await r.json();
     if(!staff||!staff.length){
-      tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;">No staff found.</td></tr>';
+      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;">No staff found.</td></tr>';
       return;
     }
     var roleColors = {
-      ed:              {bg:'#f0fdf4', c:'#15803d'},
-      housing_manager: {bg:'#eff6ff', c:'#1d4ed8'},
+      ed:                  {bg:'#f0fdf4', c:'#15803d'},
+      housing_manager:     {bg:'#eff6ff', c:'#1d4ed8'},
       housing_employee_l2: {bg:'#faf5ff', c:'#7c3aed'},
-      housing_employee_l1: {bg:'#f4f4f0', c:'#666'},
-      employee:        {bg:'#f4f4f0', c:'#666'},
-      cfo:             {bg:'#fff7ed', c:'#c2410c'},
-      finance_l1:      {bg:'#fff7ed', c:'#c2410c'}
+      housing_employee_l1: {bg:'#f4f4f0', c:'#555'},
+      employee:            {bg:'#f4f4f0', c:'#555'},
+      cfo:                 {bg:'#fff7ed', c:'#c2410c'},
+      finance_l1:          {bg:'#fff7ed', c:'#c2410c'}
     };
     var roleLabels = {
       ed:                  'Executive Director',
@@ -1896,29 +1896,22 @@ async function renderHousingUserTable(){
     window._staffCache = {};
     staff.forEach(function(u){ window._staffCache[u.id] = u; });
     tbody.innerHTML = staff.map(function(u){
-      var hr  = sbMapRole(u);
-      var rc  = roleColors[hr]  || {bg:'#f4f4f0', c:'#666'};
-      var rl  = roleLabels[hr]  || hr;
-      var isMe = HOUSING_SESSION.email === (u.email||'').toLowerCase();
-      // Initials avatar
+      var hr    = sbMapRole(u);
+      var rc    = roleColors[hr] || {bg:'#f4f4f0', c:'#555'};
+      var rl    = roleLabels[hr] || hr;
+      var isMe  = HOUSING_SESSION.email === (u.email||'').toLowerCase();
       var words = (u.name||'').trim().split(/\s+/);
       var initials = words.length >= 2
         ? words[0][0].toUpperCase() + words[words.length-1][0].toUpperCase()
         : (u.name||'??').slice(0,2).toUpperCase();
       return '<tr>'
-        +'<td>'
-          +'<div style="display:flex;align-items:center;gap:10px;">'
-            +'<div class="std-row-avatar">'+initials+'</div>'
-            +'<span style="font-weight:600;">'+u.name+'</span>'
-          +'</div>'
-        +'</td>'
+        +'<td class="std-row-avatar-cell"><div class="std-row-avatar">'+initials+'</div></td>'
+        +'<td style="font-weight:600;">'+u.name+'</td>'
         +'<td style="color:var(--muted);font-size:12px;">'+u.email+'</td>'
-        +'<td>'
-          +'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+rc.bg+';color:'+rc.c+';">'+rl+'</span>'
-        +'</td>'
+        +'<td><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+rc.bg+';color:'+rc.c+';">'+rl+'</span></td>'
         +'<td class="std-cell-right">'
           +(isMe
-            ? '<span class="lbl-muted">You</span>'
+            ? '<span style="font-size:11px;color:var(--muted);">You</span>'
             : (window.currentRole === ROLE.ED
               ? '<div class="flex-end gap-8">'
                   +'<button onclick="_sbEditStaffModal('+u.id+')" class="btn btn-ghost btn-sm">Edit</button>'
@@ -1929,7 +1922,7 @@ async function renderHousingUserTable(){
         +'</tr>';
     }).join('');
   } catch(e){
-    tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:#b91c1c;font-size:12px;">Error loading staff: '+e.message+'</td></tr>';
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#b91c1c;font-size:12px;">Error loading staff: '+e.message+'</td></tr>';
   }
 }
 function renderRenoScoreBadge(unitId) {

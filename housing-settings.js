@@ -150,7 +150,7 @@ function saveApprovalAuthoritySettings() {
 }
 
 function showSettingsSection(section) {
-  var sections = ['sec_users','sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget','sec_contacts','sec_nation','sec_approval_authority','sec_audit','sec_occupancy'];
+  var sections = ['sec_users','sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget','sec_nation','sec_approval_authority','sec_audit','sec_occupancy'];
   sections.forEach(function(id){
     var el=document.getElementById(id);
     if(el) el.style.display=(id===section)?'block':'none';
@@ -162,8 +162,6 @@ function showSettingsSection(section) {
   if(section==='sec_users'       && typeof renderHousingUserTable==='function') renderHousingUserTable();
   if(section==='sec_nation'      && typeof renderNationPanel==='function') renderNationPanel();
   if(section==='sec_app_scoring') {
-    // ED sees the V2 editor (object-based model with tier threshold controls).
-    // Other roles see a read-only message (populateSettings handles that on initial load).
     if(window.currentRole === ROLE.ED && typeof renderV2ScoringEditor === 'function') {
       renderV2ScoringEditor();
     } else {
@@ -174,7 +172,6 @@ function showSettingsSection(section) {
   if(section==='sec_unit_match'  && typeof renderUnitScoreTable==='function') renderUnitScoreTable();
   if(section==='sec_reno_score'  && typeof renderRenoScoreTable==='function') renderRenoScoreTable();
   if(section==='sec_budget'      && typeof renderBudgetPools==='function') renderBudgetPools();
-  if(section==='sec_contacts'    && typeof populateContactSettings==='function') populateContactSettings();
   if(section==='sec_audit'       && typeof renderAuditLog==='function') renderAuditLog();
   if(section==='sec_occupancy'   && typeof renderNosTable==='function') renderNosTable();
   if(section==='sec_approval_authority' && typeof renderApprovalAuthorityPanel==='function') renderApprovalAuthorityPanel();

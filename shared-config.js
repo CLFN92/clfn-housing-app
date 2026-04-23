@@ -45,14 +45,21 @@ window.APP_STATUS = {
 
 // ── Module feature flags ──────────────────────────────────────────────────────
 window.CLFN_MODULES = {
+  CORE: ['applications', 'inventory', 'tenants', 'worklist'],
   _enabled: { finance: true, match: true, contractors: true, renos: true },
-  isEnabled: function(mod) { return !!this._enabled[mod]; },
-  enable:    function(mod) { this._enabled[mod] = true; },
-  disable:   function(mod) { this._enabled[mod] = false; }
+  isEnabled: function(mod) {
+    if(this.CORE.indexOf(mod) !== -1) return true;
+    return !!this._enabled[mod];
+  },
+  enable:       function(mod) { this._enabled[mod] = true; },
+  disable:      function(mod) { this._enabled[mod] = false; },
+  listOptional: function() { return Object.keys(this._enabled); }
 };
 
 // ── Nation config ─────────────────────────────────────────────────────────────
 window.NATION_CONFIG = window.NATION_CONFIG || {
-  name:  'Constance Lake First Nation',
-  short: 'CLFN'
+  id:           'clfn',
+  name:         'Constance Lake First Nation',
+  display_name: 'Constance Lake First Nation',
+  short:        'CLFN'
 };
