@@ -1531,9 +1531,6 @@ function populateSettings(){
     limitEl.value = s.hmBudgetLimit || 25000;
   }
   var settings = window._appSettings || {};
-  // Also populate contact fields
-  if(typeof populateContactSettings === 'function') populateContactSettings();
-  ['hm_name','hm_email','hm_title','hm_phone','ed_name','ed_email','ed_title','ed_phone'].forEach(function(id){var el=document.getElementById(id);if(el&&settings[id])el.value=settings[id];});
   // Load user table from Supabase
   renderHousingUserTable();
   // Show and render the scoring model section
@@ -1870,40 +1867,69 @@ function renderCtFilePreview(bucket){
 async function renderHousingUserTable(){
   var tbody = document.getElementById('userTableBody');
   if(!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="4" style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;">Loading…</td></tr>';
   try {
     var r = await fetch(SUPABASE_URL+'/rest/v1/staff?select=*&is_active=eq.true&order=name',{headers:HOUSING_HEADERS});
     var staff = await r.json();
     if(!staff||!staff.length){
-      tbody.innerHTML='<tr><td colspan="4" style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">No staff found.</td></tr>';
+      tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;">No staff found.</td></tr>';
       return;
     }
-    var roleColors = {ed:'#15803d', housing_manager:'#1d4ed8', employee:'#888'};
-    var roleLabels = {ed:'Executive Director', housing_manager:'Housing Manager', employee:'Employee'};
+    var roleColors = {
+      ed:              {bg:'#f0fdf4', c:'#15803d'},
+      housing_manager: {bg:'#eff6ff', c:'#1d4ed8'},
+      housing_employee_l2: {bg:'#faf5ff', c:'#7c3aed'},
+      housing_employee_l1: {bg:'#f4f4f0', c:'#666'},
+      employee:        {bg:'#f4f4f0', c:'#666'},
+      cfo:             {bg:'#fff7ed', c:'#c2410c'},
+      finance_l1:      {bg:'#fff7ed', c:'#c2410c'}
+    };
+    var roleLabels = {
+      ed:                  'Executive Director',
+      housing_manager:     'Housing Manager',
+      housing_employee_l2: 'Housing Staff L2',
+      housing_employee_l1: 'Housing Staff',
+      employee:            'Employee',
+      cfo:                 'CFO',
+      finance_l1:          'Finance'
+    };
     window._staffCache = {};
     staff.forEach(function(u){ window._staffCache[u.id] = u; });
     tbody.innerHTML = staff.map(function(u){
-      var hr = sbMapRole(u);
-      var rc = roleColors[hr]||'#888';
-      var rl = roleLabels[hr]||hr;
-      var isMe = HOUSING_SESSION.email === u.email.toLowerCase();
-      return '<tr class="row-divider">'
-        +'<td style="padding:10px 12px;font-weight:600;font-size:13px;">'+u.name+'</td>'
-        +'<td style="padding:10px 12px;color:var(--muted);font-size:12px;">'+u.email+'</td>'
-        +'<td class="pad-12"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+rc+'22;color:'+rc+';">'+rl+'</span></td>'
-        +'<td style="padding:10px 12px;text-align:right;">'
-        +(isMe ? '<span class="js-lbl-sm">You</span>'
-          : (window.currentRole=== ROLE.ED
-            ? '<div style="display:flex;gap:6px;justify-content:flex-end;">'
-              +'<button onclick="_sbEditStaffModal('+u.id+')" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;">Edit</button>'
-              +'<button onclick="deactivateStaff('+u.id+',this)" style="background:none;border:1px solid #fecaca;color:#b91c1c;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:DM Sans,sans-serif;">Deactivate</button>'
-              +'</div>'
-            : ''))
+      var hr  = sbMapRole(u);
+      var rc  = roleColors[hr]  || {bg:'#f4f4f0', c:'#666'};
+      var rl  = roleLabels[hr]  || hr;
+      var isMe = HOUSING_SESSION.email === (u.email||'').toLowerCase();
+      // Initials avatar
+      var words = (u.name||'').trim().split(/\s+/);
+      var initials = words.length >= 2
+        ? words[0][0].toUpperCase() + words[words.length-1][0].toUpperCase()
+        : (u.name||'??').slice(0,2).toUpperCase();
+      return '<tr>'
+        +'<td>'
+          +'<div style="display:flex;align-items:center;gap:10px;">'
+            +'<div class="std-row-avatar">'+initials+'</div>'
+            +'<span style="font-weight:600;">'+u.name+'</span>'
+          +'</div>'
+        +'</td>'
+        +'<td style="color:var(--muted);font-size:12px;">'+u.email+'</td>'
+        +'<td>'
+          +'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+rc.bg+';color:'+rc.c+';">'+rl+'</span>'
+        +'</td>'
+        +'<td class="std-cell-right">'
+          +(isMe
+            ? '<span class="lbl-muted">You</span>'
+            : (window.currentRole === ROLE.ED
+              ? '<div class="flex-end gap-8">'
+                  +'<button onclick="_sbEditStaffModal('+u.id+')" class="btn btn-ghost btn-sm">Edit</button>'
+                  +'<button onclick="deactivateStaff('+u.id+',this)" class="btn btn-sm" style="border-color:#fecaca;color:#b91c1c;">Deactivate</button>'
+                +'</div>'
+              : ''))
         +'</td>'
         +'</tr>';
     }).join('');
   } catch(e){
-    tbody.innerHTML='<tr><td colspan="4" style="padding:16px;text-align:center;color:#b91c1c;font-size:12px;">Error loading staff: '+e.message+'</td></tr>';
+    tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:#b91c1c;font-size:12px;">Error loading staff: '+e.message+'</td></tr>';
   }
 }
 function renderRenoScoreBadge(unitId) {
