@@ -71,7 +71,7 @@
 
 /* ── 15. SETTINGS ───────────────────────────────────────────────────────── */
 
-.settings-view { padding: clamp(16px,3vw,36px) clamp(14px,3vw,44px); max-width: 780px; width: 100%; box-sizing: border-box; }
+.settings-view { padding: clamp(16px,3vw,36px) clamp(14px,3vw,44px); max-width: 1100px; width: 100%; box-sizing: border-box; align-self: center; }
 .settings-header { margin-bottom: 24px; }
 .settings-header h1 { font-family: var(--serif); font-size: 26px; font-weight: 400; }
 .settings-header p  { font-size: 13px; color: var(--muted); margin-top: 4px; }
@@ -79,6 +79,12 @@
 .settings-form     { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .settings-form-row { grid-column: span 2; }
 .settings-save-btn { margin-top: 20px; }
+
+/* User table column sizing — prevents avatar+name from crowding email/role */
+#userTableBody td:nth-child(1) { width: 28%; min-width: 180px; white-space: nowrap; }
+#userTableBody td:nth-child(2) { width: 32%; min-width: 180px; }
+#userTableBody td:nth-child(3) { width: 22%; }
+#userTableBody td:nth-child(4) { width: 18%; text-align: right; white-space: nowrap; }
 
 /* User management table */
 .user-table  { width: 100%; border-collapse: collapse; font-size: 13px; }

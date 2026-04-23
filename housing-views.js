@@ -66,6 +66,8 @@ function showSettings(){
   renderUnitScoreTable();
   renderRenoScoreTable();
   setTimeout(renderBudgetPools, 50);
+  // Render nation panel eagerly so it's ready when the tab is clicked
+  setTimeout(function(){ if(typeof renderNationPanel==='function') renderNationPanel(); }, 100);
   // Apply role-based locks after render
   setTimeout(applySettingsRoleLocks, 200);
 }
@@ -1259,4 +1261,32 @@ var _HOUSING_TENANT_DOC_CATEGORIES = [
 async function getTenantFiles(unitId){
   return await sbLoadFileMeta('tenant', unitId);
 }
+
+// ── Settings page patches ─────────────────────────────────────────────────
+// Runs once after DOMContentLoaded so that housing.html's inline
+// showSettingsSection has already been defined.
+document.addEventListener('DOMContentLoaded', function(){
+
+  // 1. Remove the Contacts tab — workflow emails are driven by the staff
+  //    table; the manual contacts config is redundant and removed.
+  var tabs = document.querySelectorAll('.settings-tab,[data-sec="sec_contacts"]');
+  tabs.forEach(function(t){
+    if(t.textContent && t.textContent.trim().toLowerCase().indexOf('contact') !== -1){
+      t.style.display = 'none';
+    }
+  });
+  // Also hide the contacts section itself in case it's already visible
+  var secContacts = document.getElementById('sec_contacts');
+  if(secContacts) secContacts.style.display = 'none';
+
+  // 2. Patch showSettingsSection so switching to Nation tab calls
+  //    renderNationPanel() automatically, without touching housing.html.
+  var _origSSS = window.showSettingsSection;
+  window.showSettingsSection = function(secId){
+    if(typeof _origSSS === 'function') _origSSS(secId);
+    if(secId === 'sec_nation' && typeof renderNationPanel === 'function'){
+      renderNationPanel();
+    }
+  };
+});
 
