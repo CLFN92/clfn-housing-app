@@ -929,9 +929,10 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .ct-card-head            { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .ct-card-icon            { width: 42px; height: 42px; border-radius: 10px;
                            background: var(--dark); border: 1.5px solid var(--yellow);
-                           color: var(--yellow); font-size: 20px;
+                           color: var(--yellow); font-size: 13px; font-weight: 800;
+                           letter-spacing: .5px;
                            display: flex; align-items: center; justify-content: center;
-                           flex-shrink: 0; }
+                           flex-shrink: 0; font-family: var(--sans); }
 .ct-card-body            { flex: 1; min-width: 0; }
 .ct-card-name            { font-weight: 700; font-size: 14px;
                            overflow: hidden; text-overflow: ellipsis;

@@ -1821,7 +1821,27 @@ function renderContractorsView(){
     var totalFiles=wsibFiles.length+insFiles.length+otherFiles.length;
     var ss = ctStatusStyle[ct.status||'pending_review'] || {cls:'', label:ct.status||'Unknown'};
     var classLabels = {internal_indigenous:'Internal — Indigenous',external_indigenous:'External — Indigenous',external_non_indigenous:'External — Non-Indigenous'};
-    return '<div class="card ct-card" onclick="openCtApprovalPanel('+i+')" title="View application">'      +'<div class="ct-card-head">'        +'<div class="ct-card-icon">🧰</div>'        +'<div class="ct-card-body">'          +'<div class="ct-card-name">'+ct.name+'</div>'          +'<div class="ct-card-trade">'+(ct.trade||'General Contractor')+'</div>'        +'</div>'        +'<span class="std-pill ct-status-pill '+ss.cls+'">'+ss.label+'</span>'      +'</div>'      +(ct.phone?'<div class="ct-card-info">📞 '+ct.phone+'</div>':'')      +(ct.email?'<div class="ct-card-info">✉ '+ct.email+'</div>':'')      +(ct.classification?'<div class="ct-card-info">🏷 '+(classLabels[ct.classification]||ct.classification)+'</div>':'')      +'<div class="ct-card-tags">'        +(function(dateStr,label){            if(!dateStr) return '';            var days=Math.round((new Date(dateStr)-new Date())/(1000*60*60*24));            var cls=days<0?'ct-tag-expired':days<30?'ct-tag-expiring':'ct-tag-valid';            return '<span class="ct-card-tag '+cls+'">'+label+': '+(days<0?'Expired':days<30?'Expiring soon':'Valid')+'</span>';          })(ct.wsibExpiry,'WSIB')        +(function(dateStr,label){            if(!dateStr) return '';            var days=Math.round((new Date(dateStr)-new Date())/(1000*60*60*24));            var cls=days<0?'ct-tag-expired':days<30?'ct-tag-expiring':'ct-tag-valid';            return '<span class="ct-card-tag '+cls+'">'+label+': '+(days<0?'Expired':days<30?'Expiring soon':'Valid')+'</span>';          })(ct.insExpiry,'Insurance')      +'</div>'      +'<div class="ct-card-actions">'        +(ROLE.isManagement(role)          ?'<button type="button" class="btn btn-ghost btn-sm btn-full" onclick="event.stopPropagation();openCtApprovalPanel('+i+')">Review</button>'          :'')        +'<button type="button" class="btn btn-ghost btn-sm btn-full" onclick="event.stopPropagation();openAddContractorModal('+i+')">Edit</button>'      +'</div>'      +'</div>';
+    return '<div class="card ct-card" onclick="openCtApprovalPanel('+i+')" title="View application">'
+      +'<div class="ct-card-head">'
+        +'<div class="ct-card-icon">'+(function(n){var w=n.trim().split(/\s+/);return w.length>=2?w[0][0].toUpperCase()+w[w.length-1][0].toUpperCase():n.slice(0,2).toUpperCase();})(ct.name||'??')+'</div>'
+        +'<div class="ct-card-body">'
+          +'<div class="ct-card-name">'+ct.name+'</div>'
+          +'<div class="ct-card-trade">'+(ct.trade||'General Contractor')+'</div>'
+        +'</div>'
+        +'<span class="std-pill ct-status-pill '+ss.cls+'">'+ss.label+'</span>'
+      +'</div>'
+      +(ct.phone?'<div class="ct-card-info">📞 '+ct.phone+'</div>':'')
+      +(ct.email?'<div class="ct-card-info">✉ '+ct.email+'</div>':'')
+      +(ct.classification?'<div class="ct-card-info">🏷 '+(classLabels[ct.classification]||ct.classification)+'</div>':'')
+      +'<div class="ct-card-tags">'
+        +(function(dateStr,label){ if(!dateStr) return ''; var days=Math.round((new Date(dateStr)-new Date())/(1000*60*60*24)); var cls=days<0?'ct-tag-expired':days<30?'ct-tag-expiring':'ct-tag-valid'; return '<span class="ct-card-tag '+cls+'">'+label+': '+(days<0?'Expired':days<30?'Expiring soon':'Valid')+'</span>'; })(ct.wsibExpiry,'WSIB')
+        +(function(dateStr,label){ if(!dateStr) return ''; var days=Math.round((new Date(dateStr)-new Date())/(1000*60*60*24)); var cls=days<0?'ct-tag-expired':days<30?'ct-tag-expiring':'ct-tag-valid'; return '<span class="ct-card-tag '+cls+'">'+label+': '+(days<0?'Expired':days<30?'Expiring soon':'Valid')+'</span>'; })(ct.insExpiry,'Insurance')
+      +'</div>'
+      +'<div class="ct-card-actions">'
+        +(ROLE.isManagement(role)?'<button type="button" class="btn btn-ghost btn-sm btn-full" onclick="event.stopPropagation();openCtApprovalPanel('+i+')">Review</button>':'')
+        +'<button type="button" class="btn btn-ghost btn-sm btn-full" onclick="event.stopPropagation();openAddContractorModal('+i+')">Edit</button>'
+      +'</div>'
+      +'</div>';
   }).join('');
   // Update tab active states
   ['all','pending','hm','approved','declined'].forEach(function(k){
