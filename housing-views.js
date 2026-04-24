@@ -39,9 +39,11 @@ function showDash(){
   showEmployeeHome();
 }
 function showApp(){
+  var _al=document.getElementById('appLayout');
+  if(_al){ _al.style.display='flex'; _al.style.width='100%'; }
   hideAllViews('appLayout');
   setNavActive('tab_app');
-  var _al=document.getElementById('appLayout');if(_al)_al.style.display='flex';
+  if(_al){ _al.style.display='flex'; _al.style.width='100%'; }
   var spb=document.getElementById('stepProgressBar');if(spb)spb.style.display='block';
   var apf=document.getElementById('appProgressFoot');if(apf)apf.style.display='block';
   var ta=document.getElementById('tab_app');if(ta)ta.classList.add('active');
@@ -821,7 +823,10 @@ function showEmployeeHome(){
   }
   if(!window._navSkipPush) pushNav('home');
   setExportView(null);
+  var _ehv = document.getElementById('employeeHomeView');
+  if(_ehv){ _ehv.style.display='flex'; _ehv.style.width='100%'; }
   hideAllViews('employeeHomeView');
+  if(_ehv){ _ehv.style.display='flex'; _ehv.style.width='100%'; }
   setNavActive('tab_dash');
   // Authoritative role resolution. HOUSING_SESSION.role is set by
   // resolveHousingRole() at login and is the canonical source. Fall back to

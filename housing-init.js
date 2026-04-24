@@ -55,7 +55,10 @@ function showDashboard(){
   var role = window.currentRole || 'housing_employee_l1';
   if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) { showToast('Dashboard access requires Housing Manager or Executive Director role.'); return; }
   if(!window._navSkipPush) pushNav('dashboard');
+  var _dv = document.getElementById('dashView');
+  if(_dv){ _dv.style.display='flex'; _dv.style.width='100%'; }
   hideAllViews('dashView');
+  if(_dv){ _dv.style.display='flex'; _dv.style.width='100%'; }
   setNavActive('tab_dash');
   window._userSetDashFilter = false;
   var fs = document.getElementById('dashFilterStatus');
