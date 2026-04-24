@@ -346,9 +346,6 @@ body {
 /* Signature step action bar */
 .sig-actions           { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-/* Settings sections */
-.settings-section      { padding: 16px 0; }
-
 /* Dashboard table — matches std-table pattern from finance module */
 .dash-table            { width: 100%; border-collapse: collapse; font-size: 13px; }
 .dash-table th         { padding: 9px 14px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #888; background: var(--dark2); }

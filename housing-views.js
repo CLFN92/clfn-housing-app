@@ -56,20 +56,13 @@ function showSettings(){
     return;
   }
   if(!window._navSkipPush) pushNav('settings');
-  hideAllViews('settingsView');
+  _showView('settingsView');
   setNavActive('tab_settings');
-  var sv=document.getElementById('settingsView');
-  if(sv){sv.style.display='flex';}
   populateSettings();
+  // Show Users tab first — each tab renders lazily when clicked via showSettingsSection
   showSettingsSection('sec_users');
-  renderScoringModelTable();
-  renderUnitScoreTable();
-  renderRenoScoreTable();
-  setTimeout(renderBudgetPools, 50);
-  // Render nation panel eagerly so it's ready when the tab is clicked
-  setTimeout(function(){ if(typeof renderNationPanel==='function') renderNationPanel(); }, 100);
-  // Apply role-based locks after render
-  setTimeout(applySettingsRoleLocks, 200);
+  // Apply role-based locks after the Users tab has rendered
+  setTimeout(applySettingsRoleLocks, 100);
 }
 
 // ── Finance Module ────────────────────────────────────────────────────────

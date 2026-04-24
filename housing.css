@@ -246,10 +246,11 @@
    SETTINGS PAGE — all layout via named classes, zero inline styles
    ═══════════════════════════════════════════════════════════════ */
 
+/* ── Settings view layout ── */
+#settingsView { flex-direction: column; }
+
 /* ── Tab bar ── */
 #settingsView .tabs { overflow-x: auto; overflow-y: visible; margin-bottom: 20px; }
-#settingsView .tab-btn { margin-bottom: -2px; padding-bottom: 12px; }
-#settingsView .tab-btn.active { border-bottom: 3px solid var(--yellow); color: var(--text); }
 
 /* ── Sections ── */
 #settingsView .settings-section { padding: 0; display: none; }

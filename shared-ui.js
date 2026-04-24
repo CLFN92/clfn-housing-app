@@ -136,7 +136,7 @@ function hideAllViews(keepId) {
 // Show target view first (before hiding others) so there's never a blank frame.
 function _showView(id, renderFn) {
   var el = document.getElementById(id);
-  // All views use flex layout (flex-direction:column is in their inline style)
+  // Views use flex layout; flex-direction is set per-view in CSS (e.g. housing.css #settingsView)
   if (el) { el.style.display = 'flex'; }
   hideAllViews(id);
   if (el) { el.style.display = 'flex'; }
