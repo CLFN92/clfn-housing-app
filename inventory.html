@@ -21,6 +21,7 @@
 <script src="housing-app.js"></script>
 <script src="housing-init.js"></script>
 
+<style>body{opacity:0;transition:opacity .15s ease;}</style>
 </head><body>
 <!-- ─── APPROVAL ACTION MODAL ─── -->
 <div id="approvalModal" class="modal-overlay modal-overlay-centered modal-z-800">
@@ -890,6 +891,7 @@
     try { await loadHousingData(); } catch(e) { console.warn('[inventory] data load error:', e); }
   }
   if (typeof showInventory === 'function') showInventory();
+  document.body.style.opacity = '1';
 }());
 </script>
 </div><!-- end app-wrapper -->

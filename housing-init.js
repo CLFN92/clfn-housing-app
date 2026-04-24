@@ -1976,8 +1976,10 @@ function initHousingPage() {
       }
       await loadHousingData();
       initHousingPage();
+      document.body.style.opacity = '1';
     } catch(e) {
       console.error('[HOUSING] init failed:', e.message, e.stack);
+      document.body.style.opacity = '1';
     }
   }());
 }());
