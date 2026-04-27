@@ -50,11 +50,11 @@ window._applyTheme = function(theme) {
     if (val) root.style.setProperty('--' + k, val);
     else     root.style.removeProperty('--' + k);
   });
-  if (theme.logo) {
-    document.querySelectorAll('img.hlogo, #login-logo').forEach(function(img){
-      img.src = theme.logo;
-    });
-  }
+  // Logo src + transparency — also covers the Themes panel preview thumbnail.
+  document.querySelectorAll('img.hlogo, #login-logo, #theme_logo_preview').forEach(function(img){
+    if (theme.logo) img.src = theme.logo;
+    img.classList.toggle('logo-transparent', !!theme.logoTransparent);
+  });
 };
 
 // ═══════════════════════════════════════════════════════════════════════

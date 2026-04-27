@@ -826,12 +826,19 @@ function renderThemesPanel() {
     +   '<input type="file" id="theme_logo_file" accept="image/*" onchange="_themeOnLogoFile(this)"/>'
     + '</div>'
     + '<div id="theme_logo_msg" class="txt-fineprint"></div>'
+    + '<label class="flex-row-mb" style="margin-top:10px;cursor:pointer;">'
+    +   '<input type="checkbox" id="theme_logo_transparent"' + (theme.logoTransparent?' checked':'') + ' onchange="_themeOnTransparentChange()"/>'
+    +   '<span class="txt-help m-0">Drop white background &mdash; useful when the logo image isn&rsquo;t saved with a transparent background. Best for clean white-on-dark logos.</span>'
+    + '</label>'
     + '<div class="flex-end-10" style="margin-top:18px;">'
     +   '<button type="button" onclick="resetThemeSettings()" class="btn btn-ghost">Reset to Defaults</button>'
     +   '<button type="button" onclick="saveThemeSettings()" class="btn btn-primary">Save &amp; Apply</button>'
     + '</div>';
   // Stash a working copy for the file picker to write into
   window._themeDraftLogo = theme.logo || '';
+  // Sync preview's transparency state with the saved setting (the just-rendered
+  // <img> doesn't have the class yet — _applyTheme ran before the panel existed)
+  _themeOnTransparentChange();
 }
 
 // Sync hex input → color picker, and apply preview live
@@ -886,6 +893,12 @@ function _themeOnLogoDrop(e) {
   var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
   _themeApplyLogoFile(f);
 }
+function _themeOnTransparentChange() {
+  var on = !!(document.getElementById('theme_logo_transparent')||{}).checked;
+  document.querySelectorAll('img.hlogo, #login-logo, #theme_logo_preview').forEach(function(img){
+    img.classList.toggle('logo-transparent', on);
+  });
+}
 function _themeClearLogo() {
   window._themeDraftLogo = '';
   var img   = document.getElementById('theme_logo_preview');
@@ -900,11 +913,13 @@ function _themeClearLogo() {
 
 function _readThemeFromForm() {
   function v(id){ var el=document.getElementById(id); return el ? (el.value||'').trim() : ''; }
+  function cb(id){ var el=document.getElementById(id); return !!(el && el.checked); }
   return {
-    yellow: v('theme_yellow_hex') || v('theme_yellow'),
-    dark:   v('theme_dark_hex')   || v('theme_dark'),
-    text:   v('theme_text_hex')   || v('theme_text'),
-    logo:   window._themeDraftLogo || ''
+    yellow:           v('theme_yellow_hex') || v('theme_yellow'),
+    dark:             v('theme_dark_hex')   || v('theme_dark'),
+    text:             v('theme_text_hex')   || v('theme_text'),
+    logo:             window._themeDraftLogo || '',
+    logoTransparent:  cb('theme_logo_transparent')
   };
 }
 

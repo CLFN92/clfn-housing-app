@@ -1229,6 +1229,10 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 }
 .theme-logo-preview img { max-width: 76px; max-height: 76px; object-fit: contain; }
 
+/* Drop a logo's white background against dark surfaces (header, print banners).
+   Toggled by Settings → Admin → Themes → "Drop white background". */
+.logo-transparent { mix-blend-mode: screen; }
+
 /* Floating circular X button overlay on photo thumbnails */
 .btn-photo-remove {
   background: rgba(0,0,0,0.6); border: none; color: #fff;
