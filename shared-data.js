@@ -462,6 +462,25 @@ function auditEntry(appId, action, detail, user) {
  *  J. Photos + Files         — removeRenoPhoto, scLoadDocs
  *  K. Miscellaneous          — _rsm, _realRoleForPermissions, sig helpers
  * ════════════════════════════════════════════════════════════════════════════ */
+// Signature block helper for printable agreements / SOWs.
+// Lives here (rather than in housing-modals.js) so that contractor pages
+// — which only load shared-data.js — can also call it via printContractorAgreement.
+function sigBlock(label, pName, dt, imgSrc) {
+  var sigHtml = imgSrc
+    ? '<img src="'+imgSrc+'" style="max-height:55px;max-width:100%;object-fit:contain;"/>'
+    : '<span style="font-size:9px;color:var(--txt-on-dark);">Sign here</span>';
+  return '<div class="print-sec">'
+    +'<div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid var(--border);">'+label+'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 90px;gap:8px;margin-bottom:6px;">'
+      +'<div><div class="sig-lbl">Full Name</div>'
+        +'<div style="font-size:10.5px;font-weight:600;border-bottom:1px solid var(--border);padding-bottom:2px;min-height:15px;">'+(pName||'')+'</div></div>'
+      +'<div><div class="sig-lbl">Date</div>'
+        +'<div style="font-size:10px;border-bottom:1px solid var(--border);padding-bottom:2px;min-height:15px;">'+(dt||'')+'</div></div>'
+    +'</div>'
+    +'<div style="width:100%;height:65px;border:1px solid var(--border);border-radius:3px;background:var(--bg);display:flex;align-items:center;justify-content:center;">'+sigHtml+'</div>'
+    +'</div>';
+}
+
 function _buildContractorAgreementHTML(ct) {
   var today = new Date().toLocaleDateString('en-CA');
   var logoSrc = (document.querySelector('.app-logo img')||{}).src || '';
@@ -479,33 +498,34 @@ function _buildContractorAgreementHTML(ct) {
     +'<meta charset="UTF-8"/>'
     +'<title>Contractor Agreement — CLFN Housing</title>'
     +'<style>'
+    +_printThemeStyles()
     +'*{box-sizing:border-box;margin:0;padding:0;}'
-    +'body{font-family:Georgia,serif;font-size:11px;color:#111;background:#fff;}'
+    +'body{font-family:Georgia,serif;font-size:11px;color:var(--text);background:var(--surface);}'
     +'@page{size:letter portrait;margin:15mm 15mm 18mm 15mm;}'
     +'@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.no-print{display:none!important;}}'
-    +'.header{background:#000;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;}'
-    +'.org{font-size:13px;font-weight:bold;color:#F8E41A;letter-spacing:.04em;}'
-    +'.dept{font-size:10px;color:#ccc;margin-top:2px;}'
-    +'.doc-type{font-size:16px;font-weight:bold;color:#F8E41A;letter-spacing:.05em;text-align:right;}'
-    +'.doc-date{font-size:9px;color:#aaa;margin-top:3px;text-align:right;}'
+    +'.header{background:var(--dark);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;}'
+    +'.org{font-size:13px;font-weight:bold;color:var(--yellow);letter-spacing:.04em;}'
+    +'.dept{font-size:10px;color:var(--txt-on-dark);margin-top:2px;}'
+    +'.doc-type{font-size:16px;font-weight:bold;color:var(--yellow);letter-spacing:.05em;text-align:right;}'
+    +'.doc-date{font-size:9px;color:var(--muted);margin-top:3px;text-align:right;}'
     +'.yellow-bar{background:#F8E41A;height:4px;}'
     +'.body{padding:18px 0 0;}'
     +'.section{margin-bottom:18px;}'
-    +'.section-title{font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#fff;background:#000;padding:5px 10px;}'
-    +'.section-body{border:1px solid #ddd;border-top:none;padding:12px 14px;}'
+    +'.section-title{font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#fff;background:var(--dark);padding:5px 10px;}'
+    +'.section-body{border:1px solid var(--border);border-top:none;padding:12px 14px;}'
     +'.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;}'
     +'.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px 18px;}'
     +'.field label{display:block;font-size:8.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;color:#666;margin-bottom:3px;}'
-    +'.field span{display:block;font-size:11px;color:#111;min-height:14px;border-bottom:1px solid #e0e0e0;padding-bottom:3px;}'
+    +'.field span{display:block;font-size:11px;color:var(--text);min-height:14px;border-bottom:1px solid #e0e0e0;padding-bottom:3px;}'
     +'.class-badge{display:inline-block;background:#F8E41A;color:#000;font-size:9px;font-weight:bold;padding:3px 10px;border-radius:3px;margin-top:4px;}'
     +'table{width:100%;border-collapse:collapse;}'
-    +'th{background:#000;color:#F8E41A;padding:6px 10px;text-align:left;font-size:9px;font-weight:bold;text-transform:uppercase;}'
+    +'th{background:var(--dark);color:var(--yellow);padding:6px 10px;text-align:left;font-size:9px;font-weight:bold;text-transform:uppercase;}'
     +'td{padding:6px 10px;font-size:10px;border-bottom:1px solid #eee;}'
-    +'.tor-clause{margin-bottom:8px;padding:8px 12px;background:#f9f9f7;border-left:3px solid #F8E41A;font-size:9.5px;color:#333;line-height:1.6;}'
+    +'.tor-clause{margin-bottom:8px;padding:8px 12px;background:var(--bg);border-left:3px solid #F8E41A;font-size:9.5px;color:#333;line-height:1.6;}'
     +'.tor-clause strong{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#000;margin-bottom:3px;}'
     +'.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:4px;}'
     +'.footer{margin-top:20px;border-top:3px solid #F8E41A;padding-top:8px;display:flex;justify-content:space-between;}'
-    +'.footer span{font-size:8px;color:#888;}'
+    +'.footer span{font-size:8px;color:var(--muted);}'
     +'</style></head><body>'
 
     /* HEADER */
@@ -561,13 +581,13 @@ function _buildContractorAgreementHTML(ct) {
       +'<div class="tor-clause"><strong>5. Deficiency &amp; Warranty</strong>The contractor guarantees all labour and materials for a minimum of one (1) year from the date of completion. Deficiencies must be rectified within 30 days at no additional cost to CLFN.</div>'
       +'<div class="tor-clause"><strong>6. Indigenous Procurement Priority</strong>CLFN is committed to economic reconciliation. Classification provided is subject to verification. Misrepresentation of Indigenous status may result in termination and removal from the approved contractor list.</div>'
       +'<div class="tor-clause"><strong>7. Termination</strong>CLFN may terminate with 5 days written notice for convenience, or immediately for cause. The contractor is entitled to payment only for work satisfactorily completed to the date of termination.</div>'
-      +(ct.torAgreed ? '<div style="margin-top:10px;padding:6px 12px;background:#f0fdf4;border:1px solid #86efac;border-radius:4px;font-size:9px;color:#15803d;font-weight:bold;">✓ Terms agreed by contractor representative — '+( ct.torAgreedAt||today)+'</div>' : '')
+      +(ct.torAgreed ? '<div style="margin-top:10px;padding:6px 12px;background:var(--success-bg);border:1px solid var(--success-border);border-radius:4px;font-size:9px;color:var(--success);font-weight:bold;">✓ Terms agreed by contractor representative — '+( ct.torAgreedAt||today)+'</div>' : '')
     +'</div></div>'
 
     /* Signatures */
     +'<div class="section"><div class="section-title">Signatures &amp; Acknowledgement</div>'
     +'<div class="section-body">'
-      +'<div style="font-size:9.5px;color:#444;line-height:1.6;margin-bottom:14px;padding:10px 12px;background:#f9f9f7;border-left:3px solid #F8E41A;">'
+      +'<div style="font-size:9.5px;color:var(--text);line-height:1.6;margin-bottom:14px;padding:10px 12px;background:var(--bg);border-left:3px solid var(--yellow);">'
         +'By signing below, the contractor representative confirms that all information provided is accurate and complete, and that they have read and agree to the Terms of Reference above. The CLFN Housing staff member confirms this registration is authorized.'
       +'</div>'
       +'<div class="sig-grid">'
@@ -590,57 +610,114 @@ function _ctRenderActions(ct) {
 
   if(role === ROLE.HOUSING_MANAGER) {
     if(status === 'pending_review' || status === 'returned') {
-      actions.push({label:'✅ Recommend to ED', cls:'btn-primary', action:'hm_recommended', needsNotes:false});
-      actions.push({label:'↩ Return for Info',  cls:'btn-ghost',   action:'returned',       needsNotes:true});
-      actions.push({label:'❌ Decline',           cls:'btn-ghost',   action:'declined',       needsNotes:true, danger:true});
+      actions.push({label:'✅ Recommend to ED', cls:'btn-primary',      action:'hm_recommended', needsNotes:false});
+      actions.push({label:'↩ Return for Info',  cls:'btn-ghost',        action:'returned',       needsNotes:true});
+      actions.push({label:'❌ Decline',           cls:'btn-danger-ghost', action:'declined',       needsNotes:true});
     }
   }
   if(role === ROLE.ED) {
     if(status === 'hm_recommended' || status === 'pending_review') {
-      actions.push({label:'✅ Final Approval',  cls:'btn-primary', action:'approved',  needsNotes:false});
-      actions.push({label:'↩ Return to HM',    cls:'btn-ghost',   action:'returned',  needsNotes:true});
-      actions.push({label:'❌ Decline',          cls:'btn-ghost',   action:'declined',  needsNotes:true, danger:true});
+      actions.push({label:'✅ Final Approval',  cls:'btn-primary',      action:'approved', needsNotes:false});
+      actions.push({label:'↩ Return to HM',    cls:'btn-ghost',        action:'returned', needsNotes:true});
+      actions.push({label:'❌ Decline',          cls:'btn-danger-ghost', action:'declined', needsNotes:true});
     }
     if(status === 'approved') {
-      actions.push({label:'⛔ Revoke Approval', cls:'btn-ghost',  action:'declined',  needsNotes:true, danger:true});
+      actions.push({label:'⛔ Revoke Approval', cls:'btn-danger-ghost', action:'declined', needsNotes:true});
     }
   }
 
   if(!actions.length) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:10px;">No actions available for your role at this stage.</div>';
+    el.innerHTML = '<div class="empty-state-ctr">No actions available for your role at this stage.</div>';
     return;
   }
-  el.innerHTML = actions.map(function(a){
-    var style = a.danger ? 'background:none;border:1.5px solid #b91c1c;color:#b91c1c;' : '';
-    return '<button class="btn '+a.cls+'" style="width:100%;'+style+'" data-act="'+a.action+'" data-notes="'+(a.needsNotes?'1':'0')+'">'+a.label+'</button>';
-  }).join('');
+  el.innerHTML = '<div class="action-pills-center">' + actions.map(function(a){
+    return '<button class="btn btn-sm ' + a.cls + '" data-act="' + a.action + '" data-notes="' + (a.needsNotes?'1':'0') + '">' + a.label + '</button>';
+  }).join('') + '</div>';
   el.querySelectorAll('[data-act]').forEach(function(b){
     b.addEventListener('click',function(){initCtAction(b.getAttribute('data-act'),b.getAttribute('data-notes')==='1');});
   });
 }
-function _ctRenderAudit(ctId) {
-  var el = document.getElementById('ctap_audit');
-  if(!el) return;
-  var log = [];
-  // audit log loaded from Supabase
-  var prefix = 'CT:' + ctId;
-  var entries = log.filter(function(e){ return e.appId === prefix || (e.appId||'').startsWith(prefix); });
-  if(!entries.length) {
-    el.innerHTML = '<div style="font-size:11px;color:var(--muted);font-style:italic;">No audit entries yet.</div>';
+// Click handler for a row in the contractor card's Forms & SOWs list.
+// If the SOW modal is loaded on the current page (housing/inventory/match/tenants),
+// open it directly. Otherwise — most importantly when called from contractors.html —
+// hand off to inventory.html with URL params it can pick up on init, and stash a
+// return marker so closing the SOW comes back to this same contractor card.
+function _ctOpenSowFromList(unitId, projectNumber, ctId) {
+  if (typeof openSowModal === 'function') {
+    openSowModal(unitId, projectNumber);
     return;
   }
-  el.innerHTML = entries.map(function(e){
-    var actionColors = {ct_submitted:'#15803d',hm_recommended:'#1d4ed8',approved:'#15803d',declined:'#b91c1c',returned:'#7c3aed',ct_updated:'#888'};
-    var col = actionColors[e.action]||'#888';
-    return '<div style="padding:8px 10px;background:var(--bg);border-radius:7px;border-left:3px solid '+col+';">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">'
-        +'<span style="font-size:11px;font-weight:700;color:'+col+';">'+e.action.replace(/_/g,' ').replace(/ct /i,'')+'</span>'
-        +'<span class="js-lbl-xs">'+(e.ts?e.ts.slice(0,10):'—')+'</span>'
-      +'</div>'
-      +'<div class="js-lbl-sm">'+e.detail+'</div>'
-      +'<div style="font-size:10px;color:var(--muted);margin-top:2px;">by '+e.user+'</div>'
-      +'</div>';
-  }).join('');
+  try {
+    sessionStorage.setItem('clfn_sow_return', JSON.stringify({ page: 'contractors', ctId: ctId || '' }));
+  } catch (e) { /* sessionStorage not critical */ }
+  var url = 'inventory.html?openSow=' + encodeURIComponent(unitId)
+          + '&pn='     + encodeURIComponent(projectNumber);
+  window.location.href = url;
+}
+
+// Returns all SOWs across the entire unit cache that reference this contractor.
+// Each entry: { unitId, sow }.
+function getAllSowsForContractor(contractorId) {
+  var cache = window._sowCache || {};
+  var out = [];
+  Object.keys(cache).forEach(function(unitId){
+    var raw = cache[unitId];
+    if (!raw) return;
+    var sows = Array.isArray(raw.sows) ? raw.sows : [raw];
+    sows.forEach(function(sow){
+      if (sow && sow.contractorId === contractorId) {
+        out.push({ unitId: unitId, sow: sow });
+      }
+    });
+  });
+  return out;
+}
+
+// Renders the contractor's Forms & SOWs in the contractor detail card.
+// Audit entries themselves continue to be written via auditEntry() and shown
+// on the master Audit Log (Settings → Audit Log) — they no longer surface here.
+function _ctRenderFormsSows(ctId) {
+  var el = document.getElementById('ctap_forms_sows');
+  if (!el) return;
+  var rows = getAllSowsForContractor(ctId);
+  if (!rows.length) {
+    el.innerHTML = '<div class="empty-state-italic">No forms or SOWs filed for this contractor yet.</div>';
+    return;
+  }
+  // Sort newest first by created_at
+  rows.sort(function(a, b){ return (b.sow.created_at || '').localeCompare(a.sow.created_at || ''); });
+
+  var statusLabels = {
+    draft:'Draft', signed:'Signed', hm_approved:'HM Approved',
+    ed_approved:'ED Approved', completed:'Completed'
+  };
+  var fmtMoney = function(n){
+    var v = Number(n) || 0;
+    return '$' + v.toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:0});
+  };
+
+  el.innerHTML = '<div class="ct-sow-list">' + rows.map(function(r){
+    var s = r.sow;
+    var addr = s.address || '—';
+    var pn   = s.project_number || '—';
+    var stat = statusLabels[s.approval_status] || s.approval_status || '—';
+    var date = s.created_at || s.date || '—';
+    var amt  = fmtMoney(s.amount || s.totalCost);
+    var uid  = String(r.unitId).replace(/'/g, "\\'");
+    var pnEsc = String(pn).replace(/'/g, "\\'");
+    var ctIdEsc = String(ctId || '').replace(/'/g, "\\'");
+    return '<div class="ct-sow-row" onclick="_ctOpenSowFromList(\'' + uid + '\', \'' + pnEsc + '\', \'' + ctIdEsc + '\')">'
+      + '<div class="ct-sow-row-main">'
+        + '<div class="ct-sow-row-pn">' + pn + '</div>'
+        + '<div class="ct-sow-row-addr">' + addr + '</div>'
+      + '</div>'
+      + '<div class="ct-sow-row-meta">'
+        + '<span class="ct-sow-status">' + stat + '</span>'
+        + '<span class="ct-sow-date">' + date + '</span>'
+        + '<span class="ct-sow-amt">' + amt + '</span>'
+      + '</div>'
+      + '</div>';
+  }).join('') + '</div>';
 }
 function _ctRenderFlow(status, ct) {
   var flow = document.getElementById('ctap_flow');
@@ -668,7 +745,7 @@ function _ctRenderFlow(status, ct) {
     var col = done?'#fff':active?'#111':'#888';
     var note = i===1&&hmAt?hmAt:i===2&&edAt?edAt:'';
     return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;">'
-      +(i>0?'<div style="position:absolute;left:-50%;top:18px;width:100%;height:2px;background:'+(done?'#15803d':'var(--border)')+'"></div>':'')
+      +(i>0?'<div style="position:absolute;left:-50%;top:18px;width:100%;height:2px;background:'+(done?'var(--success)':'var(--border)')+'"></div>':'')
       +'<div style="width:36px;height:36px;border-radius:50%;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:14px;z-index:1;">'+step.icon+'</div>'
       +'<div style="font-size:9px;font-weight:700;text-align:center;color:'+(done||active?'var(--text)':'var(--muted)')+';white-space:pre-line;line-height:1.3;">'+step.label+'</div>'
       +(note?'<div style="font-size:9px;color:var(--muted);">'+note+'</div>':'')
@@ -676,9 +753,9 @@ function _ctRenderFlow(status, ct) {
   }).join('');
 
   if(declined) {
-    flow.innerHTML += '<div style="margin-left:12px;padding:4px 10px;background:#fef2f2;border-radius:6px;font-size:10px;font-weight:700;color:#b91c1c;">Declined'+(ct.declinedAt?' '+ct.declinedAt.slice(0,10):'')+'</div>';
+    flow.innerHTML += '<div style="margin-left:12px;padding:4px 10px;background:var(--danger-bg);border-radius:6px;font-size:10px;font-weight:700;color:var(--danger);">Declined'+(ct.declinedAt?' '+ct.declinedAt.slice(0,10):'')+'</div>';
   } else if(returned) {
-    flow.innerHTML += '<div style="margin-left:12px;padding:4px 10px;background:#faf5ff;border-radius:6px;font-size:10px;font-weight:700;color:#7c3aed;">Returned'+(ct.returnedAt?' '+ct.returnedAt.slice(0,10):'')+'</div>';
+    flow.innerHTML += '<div style="margin-left:12px;padding:4px 10px;background:var(--info-blue-bg);border-radius:6px;font-size:10px;font-weight:700;color:var(--info-blue);">Returned'+(ct.returnedAt?' '+ct.returnedAt.slice(0,10):'')+'</div>';
   }
 }
 function _doExport(format, headers, data, filename, colWidths, pdfLandscape) {
@@ -860,13 +937,13 @@ function _renderRpPendingPhotos() {
   var stored  = (window._rpStoredPhotos||[]).map(function(src, i) {
     return '<div style="position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1px solid var(--border);">'
       +'<img src="'+src+'" class="img-cover"/>'
-      +'<button type="button" onclick="removeRenoPhoto('+i+')" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;">✕</button>'
+      +'<button type="button" onclick="removeRenoPhoto('+i+')" class="btn-photo-remove" style="position:absolute;top:3px;right:3px;">✕</button>'
       +'</div>';
   });
   var pending = (window._rpPendingPhotos||[]).map(function(src) {
     return '<div style="position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;border:2px solid var(--yellow);" title="New — not yet saved">'
       +'<img src="'+src+'" class="img-cover"/>'
-      +'<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(248,228,26,0.85);font-size:8px;font-weight:700;text-align:center;padding:2px;color:#111;">NEW</div>'
+      +'<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(248,228,26,0.85);font-size:8px;font-weight:700;text-align:center;padding:2px;color:var(--dark);">NEW</div>'
       +'</div>';
   });
   preview.innerHTML = stored.concat(pending).join('');
@@ -947,16 +1024,16 @@ function _updateRbaAllocSummary(totalCost, eligiblePools, budgetData) {
 
   if(overBudget) {
     summaryEl.style.background='#fef2f2'; summaryEl.style.border='1px solid #b91c1c';
-    summaryEl.innerHTML = '<div style="color:#b91c1c;font-weight:700;margin-bottom:4px;">⚠️ Over Budget</div>'
-      +'<div style="font-size:11px;color:#b91c1c;">'+poolWarnings.join('<br/>')+'</div>';
+    summaryEl.innerHTML = '<div style="color:var(--danger);font-weight:700;margin-bottom:4px;">⚠️ Over Budget</div>'
+      +'<div style="font-size:11px;color:var(--danger);">'+poolWarnings.join('<br/>')+'</div>';
     overBudgetSection.style.display='block';
     var msg = document.getElementById('rba_over_budget_msg');
     if(msg) msg.textContent = 'The allocated amounts exceed available pool balances. Executive Director approval and written justification are required.';
     statusBadge.textContent='Over Budget — ED Approval Required'; statusBadge.style.background='#fef2f2'; statusBadge.style.color='#b91c1c';
   } else {
     summaryEl.style.background='#f0fdf4'; summaryEl.style.border='1px solid #bbf7d0';
-    summaryEl.innerHTML = '<div style="color:#15803d;font-weight:700;">✓ Within Budget</div>'
-      +'<div style="font-size:11px;color:#15803d;">Total allocated: $'+Math.round(totalAlloc).toLocaleString()+' of $'+Math.round(totalCost).toLocaleString()+' SOW cost</div>';
+    summaryEl.innerHTML = '<div style="color:var(--success);font-weight:700;">✓ Within Budget</div>'
+      +'<div style="font-size:11px;color:var(--success);">Total allocated: $'+Math.round(totalAlloc).toLocaleString()+' of $'+Math.round(totalCost).toLocaleString()+' SOW cost</div>';
     overBudgetSection.style.display='none';
     statusBadge.textContent='Pending Approval'; statusBadge.style.background='var(--bg)'; statusBadge.style.color='var(--muted)';
   }
@@ -989,10 +1066,10 @@ function addSowItem(data){
     +'<input data-sow="description" type="text" placeholder="Describe the work required…" value="'+(data&&data.description?data.description.replace(/"/g,'&quot;'):'')+'" style="font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);"/>'
     +'<div style="display:flex;flex-direction:column;gap:3px;">'
     +'<input data-sow="cost" type="number" placeholder="Est. $" min="0" step="100" value="'+(data&&data.cost?parseFloat((data.cost||'').replace(/[^0-9.]/g,''))||'':'')+'" style="font-size:11px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);" oninput="recalcSowTotal()" title="Internal estimate (not shown on work order)"/>'
-    +'<input data-sow="quote" type="number" placeholder="Quote $" min="0" step="100" value="'+(data&&data.quote?parseFloat((data.quote||'').replace(/[^0-9.]/g,''))||'':'')+'" style="font-size:11px;padding:5px 6px;border:1px solid #1d4ed833;border-radius:6px;background:#eff6ff;color:var(--text);" title="Contractor quoted price (shown on work order)"/>'
+    +'<input data-sow="quote" type="number" placeholder="Quote $" min="0" step="100" value="'+(data&&data.quote?parseFloat((data.quote||'').replace(/[^0-9.]/g,''))||'':'')+'" style="font-size:11px;padding:5px 6px;border:1px solid var(--info-blue);border-radius:6px;background:var(--info-blue-bg);color:var(--text);" title="Contractor quoted price (shown on work order)"/>'
     +'<div style="font-size:9px;color:var(--muted);text-align:center;line-height:1.2;">Est / Quote</div>'
     +'</div>'
-    +'<button type="button" data-sow-del="'+idx+'" style="background:none;border:1px solid #b91c1c33;color:#b91c1c;border-radius:6px;padding:6px 8px;cursor:pointer;font-size:12px;">✕</button>';
+    +'<button type="button" data-sow-del="'+idx+'" style="background:none;border:1px solid var(--danger-border);color:var(--danger);border-radius:6px;padding:6px 8px;cursor:pointer;font-size:12px;">✕</button>';
   cont.appendChild(div);
   div.querySelector('[data-sow-del]').addEventListener('click',function(){
     var el=document.getElementById('sow_item_'+idx);if(el)el.remove();
@@ -1041,6 +1118,18 @@ function closeRenoProgress() {
 function closeSowModal() {
   var modal = document.getElementById('sowModal');
   if(modal) modal.style.display = 'none';
+  // Cross-page handoff back: if we arrived via _ctOpenSowFromList from
+  // contractors.html, return to that contractor card.
+  try {
+    var ret = sessionStorage.getItem('clfn_sow_return');
+    if (ret) {
+      sessionStorage.removeItem('clfn_sow_return');
+      var data = JSON.parse(ret);
+      if (data && data.page === 'contractors') {
+        window.location.href = 'contractors.html?openContractor=' + encodeURIComponent(data.ctId || '');
+      }
+    }
+  } catch (e) { /* harmless */ }
 }
 function collectSowItems(){
   var items=[];
@@ -1141,7 +1230,7 @@ function ctRenderPeople(people) {
       +'<input type="text"  class="ct-person-name"  data-pi="'+i+'" value="'+(p.name||'')+'"  placeholder="Full name"  style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
       +'<input type="tel"   class="ct-person-phone" data-pi="'+i+'" value="'+(p.phone||'')+'" placeholder="Phone"      style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
       +'<input type="email" class="ct-person-email" data-pi="'+i+'" value="'+(p.email||'')+'" placeholder="Email"      style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
-      +'<button type="button" onclick="ctRemovePerson('+i+')" style="background:none;border:none;color:#b91c1c;cursor:pointer;font-size:16px;padding:2px 6px;line-height:1;" title="Remove">✕</button>'
+      +'<button type="button" onclick="ctRemovePerson('+i+')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:2px 6px;line-height:1;" title="Remove">✕</button>'
       +'</div>';
   }).join('');
 }
@@ -1199,37 +1288,37 @@ async function _sbEditStaffModal(id) {
   if(!modal) {
     modal = document.createElement('div');
     modal.id = 'editStaffModal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    modal.className = 'modal-overlay modal-overlay-centered modal-z-1100';
     document.body.appendChild(modal);
   }
 
-  modal.innerHTML = '<div style="background:var(--surface);border-radius:12px;padding:28px;max-width:460px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.3);">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">'
-    +'<div class="js-txt-lg">Edit Staff Member</div>'
-    +'<button id="editStaffClose" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">&times;</button>'
-    +'</div>'
-    +'<div style="display:flex;flex-direction:column;gap:14px;">'
-    +'<div class="f"><label>Full Name</label><input type="text" id="edit_staff_name" value="'+u.name.replace(/"/g,'&quot;')+'" style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);width:100%;box-sizing:border-box;"/></div>'
-    +'<div class="f"><label>Email</label><input type="text" value="'+u.email+'" disabled style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--bg);color:var(--muted);width:100%;box-sizing:border-box;" title="Email cannot be changed"/></div>'
-    +'<div class="f"><label>Housing Role</label>'
-    +'<select id="edit_staff_role" style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);width:100%;">'
-    + (function(){
-        var perms = window.CLFN_PERMS;
-        if(!perms) return '<option value="housing_employee_l1">Housing Employee L1</option>';
-        return Object.keys(perms.ROLE_LABELS).map(function(k){
-          return '<option value="'+k+'"'+(currentHrole===k?' selected':'')+'>'+perms.roleLabel(k)+'</option>';
-        }).join('');
-      })()
-    +'</select></div>'
-    +'<div style="font-size:11px;color:var(--muted);background:var(--bg);border-radius:6px;padding:8px 10px;">Changing the role takes effect the next time this staff member signs in.</div>'
-    +'</div>'
-    +'<div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">'
-    +'<button id="editStaffCancel" style="background:none;border:1px solid var(--border);color:var(--muted);padding:8px 18px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;">Cancel</button>'
-    +'<button id="editStaffSave" style="background:var(--yellow);border:none;color:#111;padding:8px 20px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Save Changes</button>'
-    +'</div>'
+  modal.innerHTML = '<div class="modal-body modal-body-sm">'
+      +'<div class="modal-hdr">'
+        +'<div class="modal-hdr-title">Edit Staff Member</div>'
+        +'<button id="editStaffClose" class="btn-close-dark-30">&times;</button>'
+      +'</div>'
+      +'<div class="modal-body-stack">'
+        +'<div class="f"><label>Full Name</label><input type="text" id="edit_staff_name" value="'+u.name.replace(/"/g,'&quot;')+'"/></div>'
+        +'<div class="f"><label>Email</label><input type="text" value="'+u.email+'" disabled title="Email cannot be changed"/></div>'
+        +'<div class="f"><label>Housing Role</label>'
+          +'<select id="edit_staff_role">'
+          + (function(){
+              var perms = window.CLFN_PERMS;
+              if(!perms) return '<option value="housing_employee_l1">Housing Employee L1</option>';
+              return Object.keys(perms.ROLE_LABELS).map(function(k){
+                return '<option value="'+k+'"'+(currentHrole===k?' selected':'')+'>'+perms.roleLabel(k)+'</option>';
+              }).join('');
+            })()
+          +'</select></div>'
+        +'<div class="box-bg-card txt-help">Changing the role takes effect the next time this staff member signs in.</div>'
+      +'</div>'
+      +'<div class="modal-footer">'
+        +'<button id="editStaffCancel" class="btn btn-ghost">Cancel</button>'
+        +'<button id="editStaffSave" class="btn btn-primary">Save Changes</button>'
+      +'</div>'
     +'</div>';
 
-  modal.style.display = 'flex';
+  modal.classList.add('is-open');
   document.getElementById('editStaffClose').addEventListener('click', function(){ modal.remove(); });
   document.getElementById('editStaffCancel').addEventListener('click', function(){ modal.remove(); });
   document.getElementById('editStaffSave').addEventListener('click', function(){ saveStaffEdit(id, u, modal); });
@@ -1378,7 +1467,7 @@ async function lookupUser(){
   if(!email){ resultEl.style.display='none'; return; }
   if(!email.endsWith('@clfn.on.ca')){
     resultEl.style.display='block';
-    resultEl.innerHTML='<div style="padding:10px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:12px;color:#b91c1c;">Only @clfn.on.ca email addresses can be added.</div>';
+    resultEl.innerHTML='<div style="padding:10px 14px;background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:8px;font-size:12px;color:var(--danger);">Only @clfn.on.ca email addresses can be added.</div>';
     return;
   }
   resultEl.innerHTML='<div style="padding:10px;font-size:12px;color:var(--muted);">Searching…</div>';
@@ -1389,10 +1478,10 @@ async function lookupUser(){
     if(rows&&rows.length){
       var u=rows[0];
       var housingRole=sbMapRole(u);
-      resultEl.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#fef9ec;border:1px solid var(--yellow-mid);border-radius:8px;">'
+      resultEl.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--warn-amber-bg);border:1px solid var(--yellow-mid);border-radius:8px;">'
         +'<div><div class="js-txt-bold">'+u.name+'</div>'
         +'<div class="js-lbl-sm">'+email+' &middot; '+u.department+' &middot; <strong>'+housingRole+'</strong></div></div>'
-        +'<span style="font-size:11px;color:#7a6000;font-weight:600;">Already registered</span>'
+        +'<span style="font-size:11px;color:var(--warn-amber);font-weight:600;">Already registered</span>'
         +'</div>';
     } else {
       window._pendingLookupUser = {email:email};
@@ -1402,7 +1491,7 @@ async function lookupUser(){
         +'</div>';
     }
   } catch(e){
-    resultEl.innerHTML='<div style="padding:10px;font-size:12px;color:#b91c1c;">Error: '+e.message+'</div>';
+    resultEl.innerHTML='<div style="padding:10px;font-size:12px;color:var(--danger);">Error: '+e.message+'</div>';
   }
 }
 function openAddContractorModal(editIdx){
@@ -1476,6 +1565,9 @@ function openCtApprovalPanel(idx) {
   var ct = contractors[idx];
   if(!ct) return;
   _ctApprovalIdx = idx;
+  // Make this contractor the "current" one so printContractorAgreement() and
+  // any other shared helpers that fall back to _ctLastSaved get the right data.
+  window._ctLastSaved = ct;
 
   var classLabels = {internal_indigenous:'Internal — Indigenous',external_indigenous:'External — Indigenous',external_non_indigenous:'External — Non-Indigenous'};
   var setT = function(id,v){ var el=document.getElementById(id); if(el) el.textContent=v||'—'; };
@@ -1517,7 +1609,7 @@ function openCtApprovalPanel(idx) {
   _ctPendingAction = null;
 
   // Render audit trail
-  _ctRenderAudit(ct.id);
+  _ctRenderFormsSows(ct.id);
 
   // Show panel
   var panel = document.getElementById('ctApprovalPanel');
@@ -1565,6 +1657,9 @@ function populateSow(data){
     set('sow_sig_staff_date', data.staffSig.date);
     setTimeout(function(){ _restoreSigCanvas('sow_sig_canvas_staff', data.staffSig.image); }, 150);
   }
+  // Restore attached files — render via housing-modals.js helper
+  window._sowFiles = (data.files || []).slice();
+  if (typeof renderSowFiles === 'function') renderSowFiles();
   var chk=function(id,v){ var el=document.getElementById(id); if(el) el.checked=!!v; };
   chk('sow_mold',data.mold); chk('sow_asbestos',data.asbestos);
   chk('sow_electrical',data.electrical); chk('sow_structural',data.structural);
@@ -1620,46 +1715,47 @@ function printWorkOrder(){
   var itemRows = items.map(function(it, i){
     var quote = (it.quote && parseFloat(it.quote) > 0)
       ? '$'+parseFloat(it.quote).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})
-      : '<span style="color:#aaa;">Pending</span>';
-    return '<tr style="'+(i%2===1?'background:#f8f8f8;':'')+'">'
-      +'<td style="padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:10px;color:#444;width:140px;">'+( it.category||'—')+'</td>'
-      +'<td style="padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:10px;color:#222;">'+(it.description||'—')+'</td>'
-      +'<td style="padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:11px;text-align:right;font-weight:600;color:#222;width:110px;">'+quote+'</td>'
+      : '<span style="color:var(--muted);">Pending</span>';
+    return '<tr style="'+(i%2===1?'background:var(--bg);':'')+'">'
+      +'<td style="padding:8px 10px;border-bottom:1px solid var(--border);font-size:10px;color:var(--text);width:140px;">'+( it.category||'—')+'</td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid var(--border);font-size:10px;color:var(--text);">'+(it.description||'—')+'</td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid var(--border);font-size:11px;text-align:right;font-weight:600;color:var(--text);width:110px;">'+quote+'</td>'
       +'</tr>';
   }).join('');
 
   var totalRow = hasQuotes
     ? '<tr class="total-row"><td colspan="2" style="text-align:right;padding:9px 10px;font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.04em;">Total Quoted Amount</td><td style="text-align:right;padding:9px 10px;font-size:12px;font-weight:bold;">$'+quoteTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</td></tr>'
-    : '<tr><td colspan="3" style="padding:9px 10px;font-size:10px;color:#888;font-style:italic;">Pricing to be confirmed by contractor</td></tr>';
+    : '<tr><td colspan="3" style="padding:9px 10px;font-size:10px;color:var(--muted);font-style:italic;">Pricing to be confirmed by contractor</td></tr>';
 
   var html = '<!DOCTYPE html><html lang="en"><head>'
     +'<meta charset="UTF-8"/>'
     +'<title>Work Order — CLFN Housing</title>'
     +'<style>'
+    +_printThemeStyles()
     +'*{box-sizing:border-box;margin:0;padding:0;}'
-    +'body{font-family:Georgia,serif;font-size:11px;color:#111;background:#fff;}'
+    +'body{font-family:Georgia,serif;font-size:11px;color:var(--text);background:var(--surface);}'
     +'@page{size:letter portrait;margin:15mm 15mm 18mm 15mm;}'
     +'@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.no-print{display:none!important;}}'
-    +'.header{background:#000;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;}'
-    +'.org{font-size:13px;font-weight:bold;color:#F8E41A;}'
-    +'.dept{font-size:10px;color:#ccc;margin-top:2px;}'
-    +'.doc-type{font-size:18px;font-weight:bold;color:#F8E41A;letter-spacing:.05em;}'
-    +'.doc-sub{font-size:9px;color:#aaa;margin-top:3px;}'
+    +'.header{background:var(--dark);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;}'
+    +'.org{font-size:13px;font-weight:bold;color:var(--yellow);}'
+    +'.dept{font-size:10px;color:var(--txt-on-dark);margin-top:2px;}'
+    +'.doc-type{font-size:18px;font-weight:bold;color:var(--yellow);letter-spacing:.05em;}'
+    +'.doc-sub{font-size:9px;color:var(--muted);margin-top:3px;}'
     +'.yellow-bar{background:#F8E41A;height:4px;}'
-    +'.section-title{font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#fff;background:#000;padding:5px 10px;}'
-    +'.section-body{border:1px solid #ddd;border-top:none;padding:12px 14px;}'
+    +'.section-title{font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#fff;background:var(--dark);padding:5px 10px;}'
+    +'.section-body{border:1px solid var(--border);border-top:none;padding:12px 14px;}'
     +'.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;}'
     +'.field label{display:block;font-size:8px;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;color:#666;margin-bottom:3px;}'
-    +'.field span{display:block;font-size:11px;color:#111;border-bottom:1px solid #e0e0e0;padding-bottom:3px;min-height:15px;}'
+    +'.field span{display:block;font-size:11px;color:var(--text);border-bottom:1px solid #e0e0e0;padding-bottom:3px;min-height:15px;}'
     +'table{width:100%;border-collapse:collapse;}'
-    +'th{background:#000;color:#F8E41A;padding:7px 10px;text-align:left;font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;}'
+    +'th{background:var(--dark);color:var(--yellow);padding:7px 10px;text-align:left;font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;}'
     +'th.r{text-align:right;}'
     +'.total-row td{background:#F8E41A;color:#000;font-weight:bold;padding:9px 10px;}'
     +'.notice{background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:10px 14px;font-size:10px;color:#7a6000;margin-top:16px;line-height:1.6;}'
     +'.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:8px;}'
     +'.sig-box .role{font-size:8px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;color:#666;margin-bottom:6px;}'
     +'.sig-box .sig-line{height:48px;border-bottom:1.5px solid #333;margin-bottom:5px;}'
-    +'.sig-box .sig-label{font-size:9px;color:#555;}'
+    +'.sig-box .sig-label{font-size:9px;color:var(--muted);}'
     +'.footer{margin-top:20px;border-top:3px solid #F8E41A;padding-top:8px;display:flex;justify-content:space-between;font-size:8.5px;color:#666;}'
     +'</style></head><body>'
     // Header
@@ -1705,8 +1801,8 @@ function printWorkOrder(){
     +'<div class="section-title">Authorization</div>'
     +'<div class="section-body">'
       +'<div class="sig-grid">'
-        +'<div class="sig-box"><div class="role">Contractor Representative</div><div class="sig-line"></div><div class="sig-label">Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date: ____________</div><div style="margin-top:8px;font-size:9px;color:#555;">Print name: ____________________________</div></div>'
-        +'<div class="sig-box"><div class="role">CLFN Housing — Authorized Signatory</div><div class="sig-line"></div><div class="sig-label">Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date: ____________</div><div style="margin-top:8px;font-size:9px;color:#555;">Print name: ____________________________</div></div>'
+        +'<div class="sig-box"><div class="role">Contractor Representative</div><div class="sig-line"></div><div class="sig-label">Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date: ____________</div><div style="margin-top:8px;font-size:9px;color:var(--muted);">Print name: ____________________________</div></div>'
+        +'<div class="sig-box"><div class="role">CLFN Housing — Authorized Signatory</div><div class="sig-line"></div><div class="sig-label">Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date: ____________</div><div style="margin-top:8px;font-size:9px;color:var(--muted);">Print name: ____________________________</div></div>'
       +'</div>'
     +'</div></div>'
     +'<div class="footer"><span>CLFN Housing Department · Work Order</span><span>Generated: '+today+'</span></div>'
@@ -1740,7 +1836,7 @@ function removeRenoPhoto(idx) {
     preview.innerHTML = window._rpStoredPhotos.map(function(src, i) {
       return '<div style="position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1px solid var(--border);">'
         +'<img src="'+src+'" class="img-cover"/>'
-        +'<button type="button" onclick="removeRenoPhoto('+i+')" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;">✕</button>'
+        +'<button type="button" onclick="removeRenoPhoto('+i+')" class="btn-photo-remove" style="position:absolute;top:3px;right:3px;">✕</button>'
         +'</div>';
     }).join('');
     _renderRpPendingPhotos();
@@ -1858,7 +1954,7 @@ function renderCtFilePreview(bucket){
   container.innerHTML=files.map(function(f,i){
     return '<div style="display:flex;align-items:center;gap:5px;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;">'
       +(f.type&&f.type.includes('pdf')?'📄':'📎')+' <span style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+f.name+'</span>'
-      +'<button type="button" data-bucket="'+bucket+'" data-idx="'+i+'" style="background:none;border:none;color:#b91c1c;cursor:pointer;font-size:12px;padding:0 2px;">✕</button></div>';
+      +'<button type="button" data-bucket="'+bucket+'" data-idx="'+i+'" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:0 2px;">✕</button></div>';
   }).join('');
   container.querySelectorAll('button[data-bucket]').forEach(function(btn){
     btn.onclick=function(){window._ctFiles[btn.getAttribute('data-bucket')].splice(parseInt(btn.getAttribute('data-idx')),1);renderCtFilePreview(btn.getAttribute('data-bucket'));};
@@ -1915,14 +2011,14 @@ async function renderHousingUserTable(){
             : (window.currentRole === ROLE.ED
               ? '<div class="flex-end gap-8">'
                   +'<button onclick="_sbEditStaffModal('+u.id+')" class="btn btn-ghost btn-sm">Edit</button>'
-                  +'<button onclick="deactivateStaff('+u.id+',this)" class="btn btn-sm" style="border-color:#fecaca;color:#b91c1c;">Deactivate</button>'
+                  +'<button onclick="deactivateStaff('+u.id+',this)" class="btn btn-sm" style="border-color:var(--danger-border);color:var(--danger);">Deactivate</button>'
                 +'</div>'
               : ''))
         +'</td>'
         +'</tr>';
     }).join('');
   } catch(e){
-    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#b91c1c;font-size:12px;">Error loading staff: '+e.message+'</td></tr>';
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--danger);font-size:12px;">Error loading staff: '+e.message+'</td></tr>';
   }
 }
 function renderRenoScoreBadge(unitId) {
@@ -1950,7 +2046,7 @@ function renderRenoScoreBadge(unitId) {
     +result.breakdown.map(function(b){
       return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border);">'
         +'<span class="js-lbl-xs">'+b.label+'</span>'
-        +'<span style="font-weight:700;color:#15803d;">+'+b.pts+'</span>'
+        +'<span style="font-weight:700;color:var(--success);">+'+b.pts+'</span>'
         +'</div>';
     }).join('')
     +'</div>';
@@ -2012,7 +2108,7 @@ function renderRenosView(){
     var active = activeFilter === def.key;
     return '<button onclick="window._renoViewFilter=\''+def.key+'\';renderRenosView();" style="'
       +'display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;border:1.5px solid '
-      +(active ? 'var(--yellow);background:var(--yellow);color:#111;font-weight:700;' : 'var(--border);background:none;color:var(--muted);font-weight:600;')
+      +(active ? 'var(--yellow);background:var(--yellow);color:var(--text);font-weight:700;' : 'var(--border);background:none;color:var(--muted);font-weight:600;')
       +'font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .15s;">'
       +def.label
       +' <span style="font-size:11px;font-weight:800;padding:1px 7px;border-radius:10px;background:'+(active?'rgba(0,0,0,.15)':'var(--surface)')+';">'+def.count+'</span>'
@@ -2032,8 +2128,8 @@ function renderRenosView(){
     +'</colgroup>';
 
   var thead = '<thead><tr style="background:var(--dark2);border-bottom:2px solid var(--yellow);">'
-    +'<th style="text-align:left;padding:9px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Address</th>'
-    +'<th style="text-align:center;padding:9px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Beds</th>'
+    +'<th style="text-align:left;padding:9px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Address</th>'
+    +'<th style="text-align:center;padding:9px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Beds</th>'
     +'<th class="js-th">Status</th>'
     +'<th class="js-th">Progress</th>'
     +'<th class="js-th">Contractor</th>'
@@ -2044,18 +2140,18 @@ function renderRenosView(){
   var rows = filtered.length ? filtered.map(function(u){
     var isCondemned = u.status === 'condemned';
     var statusPill = isCondemned
-      ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:#fef2f2;color:#b91c1c;">🚫 Condemned</span>'
-      : '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:#fffbeb;color:#92400e;">🔨 Under Repair</span>';
+      ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:var(--danger-bg);color:var(--danger);">🚫 Condemned</span>'
+      : '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:var(--warn-amber-bg);color:var(--warn-amber);">🔨 Under Repair</span>';
     var sow=getSowData(u.id);
     var prog=getRenoProgress(u.id);
     var pct=prog.overallPct||0;
     var progressCell=sow
       ?'<div style="font-size:12px;font-weight:600;margin-bottom:3px;">'+(prog.status||'No updates yet')+(pct?' — '+pct+'%':'')+'</div>'
-        +'<div style="height:4px;width:100px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'#15803d':'var(--yellow)')+';border-radius:2px;"></div></div>'
+        +'<div style="height:4px;width:100px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'var(--success)':'var(--yellow)')+';border-radius:2px;"></div></div>'
       :'<span class="js-lbl-sm">No SOW filed</span>';
     var ctName=sow&&sow.contractor?sow.contractor:'—';
     return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-rpid="'+u.id+'">'
-      +'<td style="padding:10px 14px;font-weight:600;font-size:13px;'+(isCondemned?'color:#b91c1c;':'')+'">'+u.num+' '+u.street+'</td>'
+      +'<td style="padding:10px 14px;font-weight:600;font-size:13px;'+(isCondemned?'color:var(--danger);':'')+'">'+u.num+' '+u.street+'</td>'
       +'<td style="padding:10px 10px;text-align:center;font-weight:700;">'+u.bedrooms+'</td>'
       +'<td class="pad-10">'+statusPill+'</td>'
       +'<td class="pad-10">'+progressCell+'</td>'
@@ -2064,7 +2160,7 @@ function renderRenosView(){
       +'<td style="padding:10px 14px;text-align:right;white-space:nowrap;">'
         +'<div style="display:flex;gap:5px;justify-content:flex-end;">'
         +'<button type="button" data-sow-rpid="'+u.id+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;color:var(--muted);">🔨 SOW</button>'
-        +'<button type="button" data-rp-rpid="'+u.id+'" style="background:var(--yellow);border:1px solid var(--yellow);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;color:#111;">📊 Progress</button>'
+        +'<button type="button" data-rp-rpid="'+u.id+'" style="background:var(--yellow);border:1px solid var(--yellow);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;color:var(--dark);">📊 Progress</button>'
         +'</div>'
       +'</td></tr>';
   }).join('')
@@ -2347,11 +2443,11 @@ function renderWorklist() {
     // Branch: what action button to show per status per role
     var actionBtn = '';
     if(a.status==='returned') {
-      actionBtn = '<button data-wl-edit="'+a.id+'" onclick="event.stopPropagation();wlEditApp(this)" style="background:var(--yellow);border:none;color:#111;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Update →</button>';
+      actionBtn = '<button data-wl-edit="'+a.id+'" onclick="event.stopPropagation();wlEditApp(this)" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Update →</button>';
     } else if((role=== ROLE.HOUSING_MANAGER&&(a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)) || (role=== ROLE.ED&&a.status===APP_STATUS.MGR_APPROVED)) {
-      actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:#1d4ed8;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Review →</button>';
+      actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:var(--info-blue);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Review →</button>';
     } else if((ROLE.isManagement(role))&&(a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit) {
-      actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:#15803d;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
+      actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:var(--success);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
     }
     return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-wl-id="'+a.id+'" onclick="wlOpenApp(this)">'
       + '<td style="padding:11px 14px;font-weight:600;font-size:13px;">'+name+'</td>'
@@ -2383,7 +2479,7 @@ function renderWorklist() {
           + '<th class="js-th">ID</th>'
           + '<th class="js-th">Date</th>'
           + '<th class="js-th">Status</th>'
-          + (showScore ? '<th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;">Score</th>' : '')
+          + (showScore ? '<th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Score</th>' : '')
           + '<th></th>'
           + '</tr></thead><tbody>'+rows+'</tbody></table></div>')
     + '</div>';
@@ -2420,6 +2516,9 @@ function resetSow(){
   var items=document.getElementById('sow_items'); if(items) items.innerHTML='';
   _sowItemIdx=0;
   addSowItem();
+  // Clear attached files
+  window._sowFiles = [];
+  if (typeof renderSowFiles === 'function') renderSowFiles();
 }
 function rpAddNewContractor() {
   var dd = document.getElementById('rp_ct_dropdown');
@@ -2668,7 +2767,7 @@ async function scShowAssignDocs(app) {
 
   var saveBtn = document.createElement('button');
   saveBtn.textContent = 'Save Assignments';
-  saveBtn.style.cssText = 'margin-top:16px;background:var(--yellow);border:none;color:#111;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;width:100%;';
+  saveBtn.style.cssText = 'margin-top:16px;background:var(--yellow);border:none;color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;width:100%;';
   saveBtn.addEventListener('click', function(){ scSaveAssignedDocs(app, assigned); });
   listEl.appendChild(saveBtn);
 }
@@ -2858,7 +2957,7 @@ function wlOpenApp(el) {
   }
 }
 function wlSection(title, count, content) {
-  var badge = count !== null ? ' <span style="font-size:12px;font-weight:700;background:var(--yellow);color:#111;padding:1px 8px;border-radius:10px;margin-left:6px;">'+(count||0)+'</span>' : '';
+  var badge = count !== null ? ' <span style="font-size:12px;font-weight:700;background:var(--yellow);color:var(--dark);padding:1px 8px;border-radius:10px;margin-left:6px;">'+(count||0)+'</span>' : '';
   return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;">'
     + '<div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;">'
     + '<span style="font-size:13px;font-weight:700;">'+title+'</span>'+badge
@@ -3329,7 +3428,7 @@ function showPrintPanel(docHtml, title) {
   }
 
   body.innerHTML = inlineStyle
-    + '<div style="background:#fff;border-radius:8px;padding:32px 36px;'
+    + '<div style="background:var(--surface);border-radius:8px;padding:32px 36px;'
     + 'box-shadow:0 2px 20px rgba(0,0,0,0.08);">'
     + content
     + '</div>';
@@ -3561,5 +3660,8 @@ function closeTenantFilesPanel(){
 
 function closeUnitDetail() {
   var p = document.getElementById('unitDetailPanel');
-  if (p) p.style.display = 'none';
+  if (p) {
+    p.style.display = 'none';
+    p.classList.remove('is-open');
+  }
 }

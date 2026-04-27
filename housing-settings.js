@@ -17,7 +17,7 @@ function renderApprovalAuthorityPanel() {
   var el = document.getElementById('approval_authority_panel_body');
   if(!el) return;
   if(typeof APPROVAL_AUTHORITY === 'undefined') {
-    el.innerHTML = '<div style="padding:24px;text-align:center;color:#b91c1c;font-size:13px;">approval-authority.js not loaded.</div>';
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--danger);font-size:13px;">approval-authority.js not loaded.</div>';
     return;
   }
   if(!APPROVAL_AUTHORITY.can('editApprovalAuthority', window.currentRole)) {
@@ -149,13 +149,65 @@ function saveApprovalAuthoritySettings() {
   });
 }
 
+// Map each section ID to its parent group, used by showSettingsSection to
+// keep the top-tier group buttons + sub-tab row in sync when a section is
+// opened programmatically.
+var SETTINGS_SECTION_GROUPS = {
+  sec_users:               'admin',
+  sec_nation:              'admin',
+  sec_themes:              'admin',
+  sec_audit:               'admin',
+  sec_approval_authority:  'admin',
+  sec_app_scoring:         'app',
+  sec_unit_match:          'app',
+  sec_reno_score:          'app',
+  sec_budget:              'app',
+  sec_occupancy:           'app'
+};
+
+// First section opened when each group is activated by clicking the group pill.
+var SETTINGS_GROUP_DEFAULT_SECTION = {
+  admin: 'sec_users',
+  app:   'sec_app_scoring'
+};
+
+function showSettingsGroup(groupId) {
+  // Toggle group-bar pill state
+  ['admin','app'].forEach(function(g){
+    var btn = document.getElementById('sgroup_' + g);
+    if (btn) btn.classList.toggle('active', g === groupId);
+    var row = document.getElementById('settings_subtabs_' + g);
+    if (row) row.classList.toggle('active', g === groupId);
+  });
+  // If the section currently visible doesn't belong to the new group, jump
+  // to that group's first tab. Direct calls from showSettingsSection (after
+  // the section was already chosen) skip this — guarded by _settingsSectionLock.
+  if (window._settingsSectionLock) return;
+  var defaultSec = SETTINGS_GROUP_DEFAULT_SECTION[groupId];
+  if (!defaultSec) return;
+  var current = document.querySelector('.settings-section[style*="block"]');
+  var currentId = current ? current.id : null;
+  if (!currentId || SETTINGS_SECTION_GROUPS[currentId] !== groupId) {
+    showSettingsSection(defaultSec);
+  }
+}
+
 function showSettingsSection(section) {
-  var sections = ['sec_users','sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget','sec_nation','sec_approval_authority','sec_audit','sec_occupancy'];
+  var sections = ['sec_users','sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget','sec_nation','sec_themes','sec_approval_authority','sec_audit','sec_occupancy'];
   sections.forEach(function(id){
     var el=document.getElementById(id);
     if(el) el.style.display=(id===section)?'block':'none';
   });
-  document.querySelectorAll('.tabs .tab-btn').forEach(function(t){
+  // Activate the parent group so the right sub-tab row is visible.
+  // Lock prevents showSettingsGroup from re-routing back to its default section.
+  var parentGroup = SETTINGS_SECTION_GROUPS[section];
+  if (parentGroup) {
+    window._settingsSectionLock = true;
+    try { showSettingsGroup(parentGroup); } finally { window._settingsSectionLock = false; }
+  }
+  // Sub-tab active state — scope to .settings-subtabs so the group buttons
+  // (which carry their own active class) aren't toggled here.
+  document.querySelectorAll('.settings-subtabs .tab-btn').forEach(function(t){
     var tabSec='sec_'+t.id.replace('stab_','');
     t.classList.toggle('active', tabSec===section);
   });
@@ -219,7 +271,7 @@ function renderWlTable(apps, showScore, showReview) {
       + (showScore ? '<td style="padding:10px 14px;"><span style="font-size:18px;font-weight:800;color:var(--text);">'+(typeof a.score==='number'?a.score:'—')+'</span>'
           +(tier?'<span style="font-size:10px;font-weight:700;margin-left:6px;color:'+tc+';">'+tier.replace(' Priority','')+'</span>':'')+'</td>' : '')
       + '<td style="padding:10px 14px;text-align:right;">'
-      + (showReview ? '<button data-wl-id="'+a.id+'" onclick="wlOpenApp(this)" style="background:#1d4ed8;border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Review →</button>' : '')
+      + (showReview ? '<button data-wl-id="'+a.id+'" onclick="wlOpenApp(this)" style="background:var(--info-blue);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Review →</button>' : '')
       + '</td>'
       + '</tr>';
   }).join('');
@@ -485,7 +537,7 @@ function applySettingsRoleLocks() {
 
   // Show lock banner on locked sections
   var lockMsg = locked ?
-    '<div id="settings_lock_banner" style="display:flex;align-items:center;gap:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:14px;">'+
+    '<div id="settings_lock_banner" style="display:flex;align-items:center;gap:8px;background:var(--warn-amber-bg);border:1px solid var(--warn-amber-border);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--warn-amber);margin-bottom:14px;">'+
     '<span style="font-size:16px;">🔒</span> These values are managed by the <strong>Executive Director</strong> only. You can view but not edit them.</div>' : '';
 
   ['sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget'].forEach(function(secId) {
@@ -680,8 +732,8 @@ async function renderAuditLog() {
     else if(e.action.startsWith('sow_')) rowBg='background:#fffbeb;';
     // Friendly appId display
     var appDisplay = e.appId || '—';
-    if(appDisplay.startsWith('SOW:')) appDisplay = '<span style="font-size:10px;background:#fffbeb;color:#7a5c00;padding:1px 6px;border-radius:4px;font-weight:700;">SOW</span> ' + appDisplay.slice(4);
-    else if(appDisplay === 'SETTINGS') appDisplay = '<span style="font-size:10px;background:#f0f0ec;color:#666;padding:1px 6px;border-radius:4px;font-weight:700;">SYS</span>';
+    if(appDisplay.startsWith('SOW:')) appDisplay = '<span style="font-size:10px;background:var(--warn-amber-bg);color:var(--warn-amber);padding:1px 6px;border-radius:4px;font-weight:700;">SOW</span> ' + appDisplay.slice(4);
+    else if(appDisplay === 'SETTINGS') appDisplay = '<span style="font-size:10px;background:var(--bg);color:var(--muted);padding:1px 6px;border-radius:4px;font-weight:700;">SYS</span>';
     return '<tr style="border-bottom:1px solid var(--border);'+rowBg+'">'
       +'<td style="padding:8px 12px;font-size:11px;color:var(--muted);white-space:nowrap;">'+ds+'</td>'
       +'<td style="padding:8px 12px;font-size:11px;white-space:nowrap;">'+appDisplay+'</td>'
@@ -722,6 +774,177 @@ function populateContactSettings() {
   ['hm_name','hm_email','ed_name','ed_email'].forEach(function(id) {
     var el = document.getElementById(id);
     if(el && s[id]) el.value = s[id];
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// THEMES — brand color + logo customization (ED only)
+// Persisted to housing_settings.theme as { yellow, dark, text, logo }
+// Applied live via _applyTheme() (defined in shared.js)
+// ══════════════════════════════════════════════════════════════
+function _themeFieldRow(key, label, desc, currentVal, defaultVal) {
+  var val = currentVal || defaultVal;
+  return '<div class="theme-row">'
+    + '<label for="theme_'+key+'">'+label+'</label>'
+    + '<input type="color" id="theme_'+key+'" value="'+val+'" oninput="_themeOnPickerChange(\''+key+'\')"/>'
+    + '<input type="text" class="theme-hex" id="theme_'+key+'_hex" value="'+val+'" oninput="_themeOnHexChange(\''+key+'\')" maxlength="7"/>'
+    + '<span class="theme-desc">'+desc+'</span>'
+    + '</div>';
+}
+
+function renderThemesPanel() {
+  var body = document.getElementById('themes_panel_body');
+  if(!body) return;
+  var role = window.currentRole || 'housing_employee_l1';
+  var isED = (role === ROLE.ED);
+  if(!isED){
+    body.innerHTML = '<div class="empty-state-ctr">Theme customization is restricted to the Executive Director.</div>';
+    return;
+  }
+  var theme = (window._appSettings && window._appSettings.theme) || {};
+  var defaults = window.THEME_DEFAULTS || { yellow:'#F8E41A', dark:'#111110', text:'#111110' };
+  var hasLogo = !!theme.logo;
+  body.innerHTML =
+      _themeFieldRow('yellow', 'Brand Accent', 'Primary highlight — buttons, badges, links', theme.yellow, defaults.yellow)
+    + _themeFieldRow('dark',   'Header / Dark Surface', 'App header, modal headers, print banners', theme.dark, defaults.dark)
+    + _themeFieldRow('text',   'Body Text', 'Default text color across the app', theme.text, defaults.text)
+    + '<div class="theme-logo-zone upload-zone p-16"'
+    +   ' id="theme_logo_zone"'
+    +   ' ondragover="photoDragOver(event,\'theme_logo_zone\')"'
+    +   ' ondragleave="photoDragLeave(\'theme_logo_zone\')"'
+    +   ' ondrop="_themeOnLogoDrop(event)"'
+    +   ' onclick="if(event.target.tagName!==\'BUTTON\')document.getElementById(\'theme_logo_file\').click()">'
+    +   '<div id="theme_logo_preview_wrap" class="theme-logo-preview-wrap"' + (hasLogo ? '' : ' style="display:none;"') + '>'
+    +     '<div class="theme-logo-preview"><img id="theme_logo_preview" src="'+(theme.logo||'')+'" alt="Logo"/></div>'
+    +     '<button type="button" onclick="event.stopPropagation();_themeClearLogo()" class="btn btn-ghost btn-sm">Remove logo</button>'
+    +   '</div>'
+    +   '<div id="theme_logo_empty"' + (hasLogo ? ' style="display:none;"' : '') + '>'
+    +     '<svg class="upload-zone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
+    +     '<div class="upload-zone-title">Drag a logo here or <span class="link-yellow">browse</span></div>'
+    +     '<div class="txt-muted-xs">PNG or SVG · transparent background recommended · max 200 KB</div>'
+    +   '</div>'
+    +   '<input type="file" id="theme_logo_file" accept="image/*" onchange="_themeOnLogoFile(this)"/>'
+    + '</div>'
+    + '<div id="theme_logo_msg" class="txt-fineprint"></div>'
+    + '<div class="flex-end-10" style="margin-top:18px;">'
+    +   '<button type="button" onclick="resetThemeSettings()" class="btn btn-ghost">Reset to Defaults</button>'
+    +   '<button type="button" onclick="saveThemeSettings()" class="btn btn-primary">Save &amp; Apply</button>'
+    + '</div>';
+  // Stash a working copy for the file picker to write into
+  window._themeDraftLogo = theme.logo || '';
+}
+
+// Sync hex input → color picker, and apply preview live
+function _themeOnPickerChange(key) {
+  var picker = document.getElementById('theme_'+key);
+  var hex    = document.getElementById('theme_'+key+'_hex');
+  if(picker && hex) hex.value = picker.value;
+  document.documentElement.style.setProperty('--'+key, picker.value);
+}
+function _themeOnHexChange(key) {
+  var hex    = document.getElementById('theme_'+key+'_hex');
+  var picker = document.getElementById('theme_'+key);
+  if(!hex) return;
+  var v = (hex.value||'').trim();
+  if(!/^#[0-9a-fA-F]{6}$/.test(v)) return;       // wait for a valid hex
+  if(picker) picker.value = v;
+  document.documentElement.style.setProperty('--'+key, v);
+}
+function _themeApplyLogoFile(f) {
+  var msg = document.getElementById('theme_logo_msg');
+  if(!f) return;
+  if(!/^image\//.test(f.type)) {
+    if(msg) msg.textContent = 'That file type is not supported — pick an image.';
+    return;
+  }
+  if(f.size > 200 * 1024) {
+    if(msg) msg.textContent = 'File too large — keep logos under 200 KB.';
+    return;
+  }
+  var rdr = new FileReader();
+  rdr.onload = function(e){
+    var dataUrl = e.target.result;
+    window._themeDraftLogo = dataUrl;
+    var img   = document.getElementById('theme_logo_preview');
+    var wrap  = document.getElementById('theme_logo_preview_wrap');
+    var empty = document.getElementById('theme_logo_empty');
+    if(img)   img.src = dataUrl;
+    if(wrap)  wrap.style.display  = '';
+    if(empty) empty.style.display = 'none';
+    if(msg) msg.textContent = 'Logo ready — click Save & Apply to publish.';
+  };
+  rdr.readAsDataURL(f);
+}
+function _themeOnLogoFile(input) {
+  var f = input.files && input.files[0];
+  _themeApplyLogoFile(f);
+  input.value = '';  // allow re-selecting the same file
+}
+function _themeOnLogoDrop(e) {
+  e.preventDefault();
+  photoDragLeave('theme_logo_zone');
+  var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  _themeApplyLogoFile(f);
+}
+function _themeClearLogo() {
+  window._themeDraftLogo = '';
+  var img   = document.getElementById('theme_logo_preview');
+  var wrap  = document.getElementById('theme_logo_preview_wrap');
+  var empty = document.getElementById('theme_logo_empty');
+  var msg   = document.getElementById('theme_logo_msg');
+  if(img)   img.src = '';
+  if(wrap)  wrap.style.display  = 'none';
+  if(empty) empty.style.display = '';
+  if(msg) msg.textContent = 'Logo cleared — click Save & Apply to publish.';
+}
+
+function _readThemeFromForm() {
+  function v(id){ var el=document.getElementById(id); return el ? (el.value||'').trim() : ''; }
+  return {
+    yellow: v('theme_yellow_hex') || v('theme_yellow'),
+    dark:   v('theme_dark_hex')   || v('theme_dark'),
+    text:   v('theme_text_hex')   || v('theme_text'),
+    logo:   window._themeDraftLogo || ''
+  };
+}
+
+function saveThemeSettings() {
+  if((window.currentRole||'') !== ROLE.ED) { showToast('Only the Executive Director can change the theme.'); return; }
+  var theme = _readThemeFromForm();
+  if(typeof _applyTheme === 'function') _applyTheme(theme);
+  if(!window._appSettings) window._appSettings = {};
+  window._appSettings.theme = theme;
+  sbSaveSetting('theme', theme).then(function(ok){
+    if(ok){
+      showToast('Theme saved and applied');
+      if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'theme_updated', 'Brand theme updated', window.currentRole||'staff');
+    } else {
+      showToast('Theme save failed — applied locally only');
+    }
+  });
+}
+
+function resetThemeSettings() {
+  if((window.currentRole||'') !== ROLE.ED) { showToast('Only the Executive Director can change the theme.'); return; }
+  showConfirm({
+    title:       'Reset brand theme?',
+    message:     'This clears any saved colors and logo and restores the default brand. This cannot be undone.',
+    confirmText: 'Reset to Defaults',
+    danger:      true
+  }).then(function(ok){
+    if(!ok) return;
+    var empty = {};
+    if(typeof _applyTheme === 'function') _applyTheme(empty);
+    if(!window._appSettings) window._appSettings = {};
+    window._appSettings.theme = empty;
+    window._themeDraftLogo = '';
+    sbSaveSetting('theme', empty).then(function(saved){
+      if(saved){
+        showToast('Theme reset to defaults');
+        if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'theme_reset', 'Brand theme reset to defaults', window.currentRole||'staff');
+      }
+      renderThemesPanel();
+    });
   });
 }
 

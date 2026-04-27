@@ -54,6 +54,13 @@ function showSettings(){
     showToast('Settings are only accessible to the Housing Manager and Executive Director.');
     return;
   }
+  // Settings view lives in housing.html — if we're on a sub-page (inventory,
+  // tenants, match, renos, contractors), hand off so housing.html's ?view=
+  // dispatcher can open it.
+  if (!document.getElementById('settingsView')) {
+    window.location.href = 'housing.html?view=settings';
+    return;
+  }
   if(!window._navSkipPush) pushNav('settings');
   _showView('settingsView');
   setNavActive('tab_settings');
@@ -229,8 +236,8 @@ function renderInventoryView(){
     }).join('');
     if(archivedCount) {
       chipsHtml += '<div style="display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;" onclick="document.getElementById(\'inv_filter_status\').value=\'archived\';renderInventoryView();">'
-        +'<span style="width:7px;height:7px;border-radius:50%;background:#888;flex-shrink:0;"></span>'
-        +'Archived <span style="color:#888;">'+archivedCount+'</span></div>';
+        +'<span style="width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;"></span>'
+        +'Archived <span style="color:var(--muted);">'+archivedCount+'</span></div>';
     }
     chips.innerHTML = chipsHtml;
   }
@@ -258,14 +265,14 @@ function renderInventoryView(){
     var uid = u.id.replace(/'/g,"\\'");
     return '<tr style="border-bottom:1px solid var(--border);transition:background .12s;" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
       +'<td style="padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="openUnitDetail(\''+uid+'\')">'+'<span style="text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;">'+addr+'</span>'
-      +(u.isElders?' <span style="font-size:9px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>':'')
+      +(u.isElders?' <span style="font-size:9px;background:var(--warn-amber-bg);color:var(--warn-amber);border:1px solid var(--warn-amber-border);padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>':'')
       +'</td>'
       +'<td style="padding:9px 10px;text-align:center;font-size:13px;font-weight:700;color:var(--text);">'+u.bedrooms+'</td>'
       +'<td style="padding:9px 10px;text-align:center;font-size:12px;color:var(--muted);">'+bath+'</td>'
       +'<td style="padding:9px 10px;font-size:12px;color:var(--muted);text-transform:capitalize;">'+type+'</td>'
-      +'<td style="padding:9px 10px;font-size:12px;color:var(--muted);text-transform:capitalize;">'+fnd+'</td>'
-      +'<td style="padding:9px 10px;text-align:center;font-size:14px;">'+(u.accessible?'<span title="Accessible">♿</span>':'<span style="color:#ccc;">—</span>')+'</td>'
-      +'<td style="padding:9px 10px;font-size:12px;color:var(--muted);">'+funder+'</td>'
+      +'<td class="col-hide-tablet" style="padding:9px 10px;font-size:12px;color:var(--muted);text-transform:capitalize;">'+fnd+'</td>'
+      +'<td style="padding:9px 10px;text-align:center;font-size:14px;">'+(u.accessible?'<span title="Accessible">♿</span>':'<span style="color:var(--border);">—</span>')+'</td>'
+      +'<td class="col-hide-tablet" style="padding:9px 10px;font-size:12px;color:var(--muted);">'+funder+'</td>'
       +'<td style="padding:9px 14px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
       +(u.assignedName?' <span class="js-lbl-sm">→ '+u.assignedName+'</span>':'')+'</td>'
       +(ROLE.isManagement(window.currentRole) ? (function(){
@@ -437,9 +444,9 @@ function renderMatchView(){
       : '<span class="js-txt-muted-sm">No suitable vacant units</span>';
 
     var reqs = [];
-    if(needsAccess) reqs.push('<span style="font-size:10px;color:#1d4ed8;">Needs accessible unit</span>');
+    if(needsAccess) reqs.push('<span style="font-size:10px;color:var(--info-blue);">Needs accessible unit</span>');
     var age = app.dob ? Math.floor((new Date()-new Date(app.dob))/(365.25*24*3600*1000)) : 0;
-    if(age>=55) reqs.push('<span style="font-size:10px;color:#92400e;">Elders eligible</span>');
+    if(age>=55) reqs.push('<span style="font-size:10px;color:var(--warn-amber);">Elders eligible</span>');
 
     var sl = statusLabel[app.status] || app.status || '';
     var appDateStr = app.appDate ? 'Applied '+app.appDate : '';
@@ -447,9 +454,9 @@ function renderMatchView(){
     var canAssign = app.status===APP_STATUS.ED_APPROVED||app.status===APP_STATUS.MGR_APPROVED;
     var isAssigned = app.status==='assigned';
     var assignCell = isAssigned
-      ? '<div style="font-size:11px;font-weight:700;color:#15803d;">✓ '+(app.assignedAddress||'Assigned')+'</div>'
+      ? '<div style="font-size:11px;font-weight:700;color:var(--success);">✓ '+(app.assignedAddress||'Assigned')+'</div>'
       : (canAssign
-          ? '<button data-assign-app="'+app.id+'" data-assign-unit="'+(best?best.unit.id:'')+'" style="background:var(--yellow);border:none;color:#111;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>'
+          ? '<button data-assign-app="'+app.id+'" data-assign-unit="'+(best?best.unit.id:'')+'" style="background:var(--yellow);border:none;color:var(--dark);padding:6px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>'
           : '<span class="js-lbl-sm">Awaiting approval</span>');
 
     return '<tr style="border-bottom:1px solid var(--border);transition:background .12s;">'
@@ -545,14 +552,14 @@ function renderTenantsView(){
     }
     // fileCount already set above
     return '<tr class="clickable" data-tuid="'+u.id+'">'
-      +'<td><div class="std-cell-primary">'+u.num+' '+u.street+(u.isElders?' <span style="font-size:9px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>':'')+'</div><div class="tbl-sub">'+u.bedrooms+'-bed'+(u.accessible?' · Accessible':'')+'</div></td>'
+      +'<td><div class="std-cell-primary">'+u.num+' '+u.street+(u.isElders?' <span style="font-size:9px;background:var(--warn-amber-bg);color:var(--warn-amber);border:1px solid var(--warn-amber-border);padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>':'')+'</div><div class="tbl-sub">'+u.bedrooms+'-bed'+(u.accessible?' · Accessible':'')+'</div></td>'
       +'<td class="std-cell-primary">'+name+'</td>'
       +'<td class="std-cell-dash">'+date+'</td>'
       +'<td><span class="std-pill std-pill-info">'+(u.status==='reserved'?'Reserved':'Occupied')+'</span></td>'
       +(_showRenoScore?'<td>'+renoCell+'</td>':'')
       +'<td>'
         +'<button type="button" data-files-uid="'+u.id+'" title="Tenant Files" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;color:var(--muted);font-size:12px;font-weight:600;padding:3px 6px;border-radius:5px;">'
-          +'\uD83D\uDCCE '+(fileCount>0?'<span style="background:var(--yellow);color:#111;font-size:10px;font-weight:800;padding:1px 5px;border-radius:8px;">'+fileCount+'</span>':'<span style="color:var(--border);font-size:11px;">—</span>')
+          +'\uD83D\uDCCE '+(fileCount>0?'<span style="background:var(--yellow);color:var(--dark);font-size:10px;font-weight:800;padding:1px 5px;border-radius:8px;">'+fileCount+'</span>':'<span style="color:var(--border);font-size:11px;">—</span>')
         +'</button>'
       +'</td>'
       +'<td style="padding:10px 10px;text-align:right;white-space:nowrap;">'
@@ -720,7 +727,7 @@ function tenantSearchFilter(q) {
     return '<div onclick="selectTenantRecord('+JSON.stringify({id:r.id,name:r.name,addr:r.addr,appId:r.appId}).replace(/"/g,"'")+')" '
       + 'style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:7px;cursor:pointer;background:'+bg+';margin-bottom:6px;transition:opacity .1s;" '
       + 'onmouseover="this.style.opacity=\'0.8\'" onmouseout="this.style.opacity=\'1\'">'
-      + '<div style="width:36px;height:36px;border-radius:50%;background:var(--yellow);color:#111;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
+      + '<div style="width:36px;height:36px;border-radius:50%;background:var(--yellow);color:var(--dark);font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
       + (r.name ? r.name.charAt(0).toUpperCase() : '?') + '</div>'
       + '<div><div class="js-txt-bold">'+r.name+'</div>'
       + '<div class="js-lbl-sm">'+r.addr+'</div></div>'
@@ -929,7 +936,7 @@ function showEmployeeHome(){
       +' onmouseover="this.style.background=&quot;#1c1c1a&quot;" onmouseout="this.style.background=&quot;var(--dark)&quot;">'
       +'<span style="font-size:26px;">📝</span>'
       +'<span style="font-weight:700;font-size:15px;color:var(--yellow);">New Application</span>'
-      +'<span style="font-size:12px;color:#888;">Enter a housing application for a community member</span>'
+      +'<span style="font-size:12px;color:var(--muted);">Enter a housing application for a community member</span>'
       +'</div>';
 
     var _wlActionCount = role=== ROLE.HOUSING_MANAGER
@@ -1022,7 +1029,7 @@ function showEmployeeHome(){
     // finance access (ED, HM, HE-L2, CFO, Finance L1 — actual check comes in Phase A).
     var financeTile = '';
     if(mods && mods.isEnabled('finance')){
-      financeTile = '<div onclick="showFinance()" style="background:var(--surface);border:1px solid var(--border);border-top:3px solid #1d4ed8;border-radius:12px;padding:18px 20px;cursor:pointer;transition:box-shadow .15s;"'
+      financeTile = '<div onclick="showFinance()" style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--info-blue);border-radius:12px;padding:18px 20px;cursor:pointer;transition:box-shadow .15s;"'
         +' onmouseover="this.style.boxShadow=&quot;0 4px 20px rgba(0,0,0,0.1)&quot;" onmouseout="this.style.boxShadow=&quot;&quot;">'
         +'<div style="display:flex;align-items:center;gap:12px;"><span style="font-size:22px;">💰</span>'
         +'<div><div style="font-weight:700;font-size:14px;">Finance Module</div>'
@@ -1283,6 +1290,9 @@ document.addEventListener('DOMContentLoaded', function(){
     if(typeof _origSSS === 'function') _origSSS(secId);
     if(secId === 'sec_nation' && typeof renderNationPanel === 'function'){
       renderNationPanel();
+    }
+    if(secId === 'sec_themes' && typeof renderThemesPanel === 'function'){
+      renderThemesPanel();
     }
   };
 });

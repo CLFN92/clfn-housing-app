@@ -67,6 +67,30 @@
   --dark3:        #2a2a28;
   --danger:       #b91c1c;
   --success:      #15803d;
+  /* Dark-modal accents (used inside .modal-hdr-style headers) */
+  --dark-border:  #444;
+  --txt-on-dark:  #ccc;
+  /* Status accents — used by info / warn pills and matching text */
+  --info-blue:     #1d4ed8;
+  --info-blue-bg:  #eff6ff;
+  --warn-amber:    #7a5c00;
+  --warn-amber-bg: #fffbeb;
+  --warn-amber-border: #fde68a;
+  --success-bg:    #f0fdf4;
+  --success-border:#bbf7d0;
+  --danger-bg:     #fef2f2;
+  --danger-border: #fecaca;
+  /* Login screen palette — dark overlay + error accents */
+  --login-bg:      #0f0f0e;
+  --err-bg:        #3b0a0a;
+  --err-border:    #7f1d1d;
+  --err-text:      #fca5a5;
+  /* Dashboard tile accent palette — one color per module tile */
+  --tile-applications: #3b82f6;
+  --tile-inventory:    #7c3aed;
+  --tile-tenants:      #0ea5e9;
+  --tile-renos:        #d97706;
+  --tile-contractors:  #6b7280;
   /* Typography */
   --serif: 'DM Serif Display', serif;
   --sans:  'DM Sans', sans-serif;
@@ -122,19 +146,40 @@ body {
 .htitles small { font-size: 11px; color: #888; display: block; }
 .hright { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 
-/* Avatar */
+/* Brand block — yellow logo + title/subtitle stack */
+.hbrand-title { display: block; font-size: 14px; font-weight: 700; color: #fff; letter-spacing: -.2px; }
+.hbrand-sub   { font-size: 11px; color: #888; }
+
+/* Right-side user bar — flex container for pill + action buttons */
+.header-user-bar { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+
+/* User pill (avatar + name + role badge + sign-out) */
+.header-user-pill {
+  display: flex; align-items: center; gap: 8px;
+  background: #1a1a18; border: 1px solid #333;
+  border-radius: 20px; padding: 5px 12px 5px 6px;
+}
 .header-avatar {
-  width: 32px; height: 32px; border-radius: 50%;
+  width: 28px; height: 28px; border-radius: 50%;
   background: var(--yellow); color: #111;
-  font-size: 12px; font-weight: 700;
+  font-size: 11px; font-weight: 800;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.header-user-name  { font-size: 12px; font-weight: 600; color: #fff; }
-.header-role-badge {
-  font-size: 10px; background: var(--yellow); color: #111;
-  font-weight: 700; padding: 1px 6px; border-radius: 4px;
+.header-user-name {
+  font-size: 12px; font-weight: 600; color: #fff;
+  max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.header-role-badge {
+  font-size: 10px; background: #333; color: #aaa;
+  font-weight: 700; padding: 2px 7px; border-radius: 8px;
+}
+.header-signout-btn {
+  background: none; border: none; color: #666;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  font-family: var(--sans); padding: 0 0 0 4px; transition: var(--tr);
+}
+.header-signout-btn:hover { color: #ccc; }
 
 /* Header badges (role status indicator next to name) */
 .badge-name {
@@ -158,28 +203,45 @@ body {
 .hnav-btn:hover  { background: rgba(255,255,255,0.08); color: #fff; }
 .hnav-btn.active { color: var(--yellow); }
 
-/* Role switcher */
-#roleSwitcher { display: flex; align-items: center; gap: 6px; }
+/* Ghost-style header button (Export, +Staff, Settings).
+   `display:none` on the JS-toggled ones is set inline in the markup. */
+.btn-header-ghost {
+  background: none; border: 1px solid #444; color: #ccc;
+  border-radius: 8px; padding: 6px 14px; cursor: pointer;
+  font-family: var(--sans); font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; gap: 6px; transition: var(--tr);
+}
+.btn-header-ghost:hover { border-color: var(--yellow); color: var(--yellow); }
+
+/* Role switcher (ED view-as toggle).
+   Hidden by default; setupHeaderRoleToggle() sets style.display='flex' for ED. */
+#roleSwitcher { display: none; align-items: center; gap: 6px; }
 #rb_select {
-  background: var(--dark2); border: 1px solid #333; color: #ccc;
-  padding: 4px 8px; border-radius: 6px; font-size: 12px; font-family: var(--sans);
+  padding: 5px 10px; border: 1px solid #444; border-radius: 8px;
+  font-size: 12px; font-weight: 600; font-family: var(--sans);
+  background: #1a1a18; color: #ccc; cursor: pointer; outline: none;
 }
 
-/* Export dropdown */
-.header-export-wrap  { position: relative; }
-.header-export-menu  {
-  display: none; position: absolute; top: 100%; right: 0;
+/* Export dropdown.
+   Wrap is hidden by default; setExportView() shows it on exportable views. */
+.header-export-wrap { position: relative; display: none; }
+.header-export-menu {
+  display: none; position: absolute; top: calc(100% + 6px); right: 0;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow);
-  z-index: 200; min-width: 160px; overflow: hidden;
+  border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  z-index: 9999; min-width: 160px; overflow: hidden;
 }
-.header-export-menu.on { display: block; }
-.header-export-menu button {
-  display: block; width: 100%; padding: 10px 14px; text-align: left;
-  background: none; border: none; font-size: 13px;
-  font-family: var(--sans); cursor: pointer;
+.header-export-item {
+  width: 100%; background: none; border: none;
+  padding: 10px 16px; text-align: left;
+  font-size: 13px; font-weight: 600; font-family: var(--sans);
+  color: var(--text); cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid var(--border);
 }
-.header-export-menu button:hover { background: var(--bg); }
+.header-export-item:last-child { border-bottom: none; }
+.header-export-item:hover { background: var(--bg); }
+.header-export-icon { font-size: 16px; }
 
 
 /* ── 5. LAYOUT ──────────────────────────────────────────────────────────── */
@@ -189,11 +251,12 @@ body {
 .content-area { flex: 1; display: flex; flex-direction: column; min-width: 0; align-items: stretch; overflow-y: scroll; scrollbar-gutter: stable; }
 
 /* Page-level view wrappers — direct children of .content-area.
-   .page-view caps width at 1100px and centres with auto margins.
+   .page-view caps width at 1200px and centres with auto margins.
    .page-view-wide fills full width (data-dense pages like contractors).
-   Both handle responsive inset padding via clamp(). */
-.page-view      { width:100%;box-sizing:border-box;padding:clamp(16px,3vw,36px) clamp(14px,3vw,36px);max-width:1100px;align-self:center; }
-.page-view-wide { width:100%;box-sizing:border-box;padding:clamp(16px,3vw,36px) clamp(14px,3vw,36px); }
+   Both handle responsive inset padding via clamp().
+   `display:none` is the hidden default; _showView() flips to flex when active. */
+.page-view      { display:none;flex-direction:column;width:100%;box-sizing:border-box;padding:clamp(16px,3vw,36px) clamp(14px,3vw,36px);max-width:1200px;margin:0 auto; }
+.page-view-wide { display:none;flex-direction:column;width:100%;box-sizing:border-box;padding:clamp(16px,3vw,36px) clamp(14px,3vw,36px); }
 
 #appLayout    { flex: 1; display: flex; flex-direction: column; min-width: 0; align-items: center; }
 
@@ -258,8 +321,7 @@ body {
    page-header-bar provides vertical breathing room below the back button. */
 #worklistView, #dashView, .dash-view, #settingsView, .settings-view,
 #inventoryView, #matchView, #tenantsView, #renoApprovalsView,
-#renosView, #contractorsView, #scorecardView,
-#employeeHomeView, #renoApprovalsView { padding-top: 0 !important; }
+#renosView, #contractorsView, #scorecardView { padding-top: 0 !important; }
 .back-link {
   color: var(--yellow); font-size: 12px; font-weight: 600;
   text-decoration: none; border: 1px solid rgba(248,228,26,.3);
@@ -328,6 +390,17 @@ body {
 .dash-filters select, .filter-bar select { min-width: 120px; cursor: pointer; }
 .dash-filters select:focus, .dash-filters input:focus,
 .filter-bar select:focus,   .filter-bar input:focus { border-color: var(--yellow); outline: none; }
+
+/* Single-input search row — full-width input with horizontal padding,
+   used inside a card-flush above a JS-rendered list (e.g. assign-unit modal). */
+.search-row { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.search-row input {
+  width: 100%; box-sizing: border-box;
+  border: 1.5px solid var(--border); border-radius: 7px;
+  padding: 8px 12px; font-size: 13px;
+  font-family: var(--sans); background: var(--bg); color: var(--text);
+}
+.search-row input:focus { border-color: var(--yellow); outline: none; }
 
 /* matchView bare filter div — selects and inputs inside any flex filter row */
 #matchView > div > select,
@@ -442,6 +515,10 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px rgba(248,228,26,0.15);
 }
 .f textarea { resize: vertical; min-height: 80px; }
+.f input:disabled, .f select:disabled, .f textarea:disabled,
+input:disabled, select:disabled, textarea:disabled {
+  background: var(--bg); color: var(--muted); cursor: not-allowed;
+}
 .field-error { border-color: var(--danger) !important; }
 
 /* Toggle switch */
@@ -450,6 +527,7 @@ input:focus, select:focus, textarea:focus {
   position: relative; width: 44px; height: 24px;
   flex-shrink: 0; display: inline-block; cursor: pointer;
 }
+.tsw input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
 .tsl  {
   position: absolute; inset: 0; background: var(--border);
   border-radius: 12px; transition: var(--tr); cursor: pointer; pointer-events: none;
@@ -495,6 +573,16 @@ input:focus, select:focus, textarea:focus {
 .btn-dark:hover    { background: var(--dark2); }
 .btn-danger  { background: var(--danger);   color: #fff;  border-color: var(--danger); }
 .btn-danger:hover  { background: #991b1b; }
+.btn-danger-ghost  { background: none; color: #b91c1c; border-color: #b91c1c; }
+.btn-danger-ghost:hover { background: rgba(185,28,28,0.06); }
+
+/* Horizontal pill row for action buttons (e.g. contractor approve / decline) */
+.action-pills          { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; }
+/* Full-width variant — buttons share the row equally, left-to-right.
+   Used at the top of the contractor approval panel under the dark header. */
+.action-pills-center   { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px;
+                         background: var(--surface); border-bottom: 1px solid var(--border); }
+.action-pills-center .btn { flex: 1; justify-content: center; }
 .btn-green   { background: var(--success);  color: #fff;  border-color: var(--success); }
 .btn-sec     { background: rgba(248,228,26,0.1); color: var(--yellow); border-color: rgba(248,228,26,0.35); }
 .btn-sec:hover { background: rgba(248,228,26,0.18); }
@@ -634,6 +722,24 @@ input:focus, select:focus, textarea:focus {
 .tab-panel      { display: none; }
 .tab-panel.on   { display: block; }
 
+/* Pill tabs — segmented-control style (Admin / App Settings, etc.).
+   Reusable on any page that needs a small grouping control. */
+.pill-tabs {
+  display: flex; gap: 4px; padding: 4px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+  width: fit-content; margin-bottom: 16px;
+}
+.pill-tab {
+  background: none; border: none; padding: 8px 18px;
+  font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer;
+  font-family: var(--sans); border-radius: 7px; transition: var(--tr);
+}
+.pill-tab:hover  { color: var(--text); }
+.pill-tab.active {
+  background: var(--surface); color: var(--text);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
 /* Sidebar nav */
 .nav-tabs { display: flex; flex-direction: column; gap: 4px; }
 .nav-tab  {
@@ -683,6 +789,8 @@ input:focus, select:focus, textarea:focus {
   /* Finance grids */
   .action-panel, .action-grid { grid-template-columns: repeat(3,1fr); }
   .stats-grid, .aging-grid    { grid-template-columns: repeat(2,1fr); }
+  /* Table columns marked low-priority hide at tablet width */
+  .col-hide-tablet            { display: none; }
 }
 
 /* ── ≤700px Mobile ── */
@@ -868,6 +976,32 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .upload-zone  { border: 2px dashed var(--border); border-radius: 10px; padding: 28px 20px; text-align: center; cursor: pointer; transition: var(--tr); }
 .upload-zone:hover,
 .upload-zone.is-drag  { border-color: var(--yellow); background: var(--yellow-light); }
+/* Hide the native file input — drop-zone onclick triggers it programmatically */
+.upload-zone input[type="file"] { display: none; }
+.upload-zone-icon  { color: var(--muted); margin-bottom: 6px; }
+.upload-zone-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.link-yellow       { color: var(--yellow); text-decoration: underline; }
+
+/* Generic file list (used under upload widgets — SOW attachments etc.) */
+.file-list         { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.file-list-empty   { font-size: 12px; color: var(--muted); font-style: italic; padding: 8px 0; text-align: center; }
+.file-row          { display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+                     background: var(--surface); border: 1px solid var(--border); border-radius: 7px;
+                     font-size: 12px; }
+.file-icon         { font-size: 18px; flex-shrink: 0; }
+.file-name         { flex: 1; min-width: 0; font-weight: 600; color: var(--text);
+                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-meta         { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.file-actions      { display: flex; gap: 4px; flex-shrink: 0; }
+.file-actions a, .file-actions button {
+  background: none; border: 1px solid var(--border); border-radius: 5px;
+  padding: 3px 8px; font-size: 11px; color: var(--muted); cursor: pointer;
+  text-decoration: none; font-family: var(--sans);
+}
+.file-actions a:hover, .file-actions button:hover { border-color: var(--yellow); color: var(--text); }
+.file-actions .file-delete:hover { border-color: #b91c1c; color: #b91c1c; }
+.file-list-meta    { font-size: 11px; color: var(--muted); }
+.file-list-meta.is-warn { color: #b91c1c; font-weight: 600; }
 
 /* ── Filter rows + filter chips (DocLibrary + finance views) ─────────────────
    Used by DocLibrary widget and finance module filter bars.                */
@@ -951,6 +1085,200 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .lbl-yellow { font-size: 10px; font-weight: 700; text-transform: uppercase;
               letter-spacing: 1px; color: var(--yellow); }
 .lbl-sm     { font-size: 12px; font-weight: 600; color: var(--text); }
+
+/* High-frequency utilities pulled from inline-style refactor */
+.txt-hdr-white     { font-size: 16px; font-weight: 700; color: #fff; }
+.txt-required      { color: #b91c1c; }
+.box-bg-card       { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+.lbl-uppercase-sm  { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                     letter-spacing: .8px; color: #888; margin-bottom: 2px; }
+.txt-help          { font-size: 11px; color: var(--muted); line-height: 1.6; margin-bottom: 8px; }
+.txt-fineprint     { font-size: 10px; color: var(--muted); margin-top: 6px; }
+.fw-bold-sm        { font-size: 12px; font-weight: 700; }
+
+/* Common form grids — variants by gap and bottom margin */
+.grid-c2-pad       { display: grid; grid-template-columns: 1fr 1fr;     gap: 12px; padding: 16px; }
+.grid-c2-10        { display: grid; grid-template-columns: 1fr 1fr;     gap: 10px; }
+.grid-c3-tight     { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.grid-c2-tight-mb  { display: grid; grid-template-columns: 1fr 1fr;     gap: 8px;  margin-bottom: 8px; }
+.grid-c3-tight-mb  { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;  margin-bottom: 8px; }
+
+/* Padding utilities */
+.p-24              { padding: 24px; }
+
+/* Small bold label with bottom margin (used inside info cards) */
+.lbl-bold-xs       { font-size: 11px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+
+/* Small inline icon (typical for inline SVG buttons) */
+.icon-sm-15        { width: 15px; height: 15px; }
+
+/* Clickable flex row (used in dropdown items, search-result rows, etc.) */
+.flex-row-pointer  { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+
+/* Right-aligned button row (e.g. modal footer with Cancel/Confirm) */
+.flex-end-10       { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* Modal body container that stacks cards vertically with no gap */
+.modal-body-stack  { padding: 24px; display: flex; flex-direction: column; gap: 0; }
+
+/* Serif heading inside modal-hdr (serves as primary modal title) */
+.modal-hdr-title   { font-family: var(--serif); font-size: 18px; color: #fff; }
+
+/* Small meta text (slightly darker than --muted, used in subtitle rows) */
+.txt-sm-666        { font-size: 12px; color: #666; margin-top: 2px; }
+
+/* Generic font-weight utility (used as add-on to existing classes) */
+.fw-600            { font-weight: 600; }
+
+/* Block-style label spacer (used on <label> with .lbl-muted) */
+.lbl-block-mb      { display: block; margin-bottom: 6px; }
+
+/* Pill-style filter chip — applied to .btn .btn-ghost as a size variant */
+.btn-chip          { font-size: 11px; padding: 4px 12px; border-radius: 20px; }
+
+/* Dark-modal close button (✕). Sits inside .modal-hdr against a dark bg. */
+.btn-close-dark-30 { background: none; border: 1px solid var(--dark-border);
+                     color: var(--txt-on-dark); width: 30px; height: 30px;
+                     border-radius: 7px; cursor: pointer; font-size: 16px; }
+
+/* 24px circular avatars — used as role/status badges next to text labels.
+   Yellow = ED / primary action, Blue = HM / informational. */
+.avatar-circle-24-yellow {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--yellow); color: #111;
+  font-size: 10px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.avatar-circle-24-blue {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--info-blue); color: #fff;
+  font-size: 10px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Status pills — semantic shorthand for info (blue) and warn (amber). */
+.pill-info {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 10px;
+  background: var(--info-blue-bg); color: var(--info-blue);
+}
+.pill-warn {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 10px;
+  background: var(--warn-amber-bg); color: var(--warn-amber);
+}
+
+/* Inline color-only utilities — used in JS-built table cells */
+.txt-info-bold     { color: var(--info-blue); font-weight: 700; }
+.txt-success-bold  { color: var(--success);   font-weight: 700; }
+.txt-danger-bold   { color: var(--danger);    font-weight: 700; }
+
+/* Banner cards — block-level callouts inside modal forms.
+   Use .banner-card-eyebrow for the small uppercase header inside them. */
+.banner-card-warn {
+  background: var(--warn-amber-bg);
+  border: 1px solid var(--warn-amber-border);
+  border-radius: 10px; padding: 14px 18px;
+}
+.banner-card-warn .banner-card-eyebrow,
+.banner-card-warn .banner-card-body { color: var(--warn-amber); }
+.banner-card-danger {
+  background: var(--danger-bg);
+  border: 1.5px solid var(--danger);
+  border-radius: 10px; padding: 14px 18px;
+}
+.banner-card-danger .banner-card-eyebrow,
+.banner-card-danger .banner-card-body { color: var(--danger); }
+.banner-card-eyebrow {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .7px;
+  margin-bottom: 8px;
+}
+.banner-card-body { font-size: 12px; margin-bottom: 10px; }
+
+/* Themes panel — color picker rows + logo preview */
+.theme-row {
+  display: grid; grid-template-columns: 140px 60px 110px 1fr;
+  align-items: center; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.theme-row:last-of-type { border-bottom: none; }
+.theme-row label { font-size: 13px; font-weight: 600; color: var(--text); }
+.theme-row input[type="color"] {
+  width: 50px; height: 32px; padding: 0;
+  border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+  background: var(--surface);
+}
+.theme-row .theme-hex {
+  font-family: ui-monospace, Menlo, Monaco, 'Courier New', monospace;
+  font-size: 12px; color: var(--muted);
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); width: 100%; box-sizing: border-box;
+}
+.theme-row .theme-desc { font-size: 11px; color: var(--muted); }
+.theme-logo-zone { margin-top: 14px; }
+.theme-logo-preview-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.theme-logo-preview {
+  width: 96px; height: 96px; border-radius: 12px;
+  background: var(--dark); display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); flex-shrink: 0;
+}
+.theme-logo-preview img { max-width: 76px; max-height: 76px; object-fit: contain; }
+
+/* Floating circular X button overlay on photo thumbnails */
+.btn-photo-remove {
+  background: rgba(0,0,0,0.6); border: none; color: #fff;
+  border-radius: 50%; width: 18px; height: 18px;
+  font-size: 11px; cursor: pointer; line-height: 1;
+}
+
+/* Full-width status strip (used as in-modal status banner) */
+.banner-strip-success {
+  background: var(--success-bg);
+  border-bottom: 2px solid var(--success);
+  padding: 10px 24px;
+  font-size: 12px; color: var(--success); font-weight: 600;
+}
+
+/* Common flex rows / columns — no align override unless named otherwise */
+.flex-row-10       { display: flex; gap: 10px; }
+.flex-row-mb       { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.flex-sb-mb        { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.flex-col-12       { display: flex; flex-direction: column; gap: 12px; }
+
+/* Yellow-accent info box (left-bar treatment for callout text) */
+.box-yellow-accent { padding: 10px 14px; background: var(--bg);
+                     border-left: 3px solid var(--yellow); border-radius: 0 6px 6px 0; }
+
+/* Table-cell padding utility */
+.th-left-pad       { padding: 8px 14px; text-align: left; }
+
+/* Signature widget — Draw/Type/Wet tabs and their associated input atoms.
+   setSigMethod() swaps which sub-panel is visible.                                  */
+.ct-sig-tab        { flex: 1; padding: 6px 4px; background: none; border: none;
+                     border-bottom: 2px solid transparent;
+                     font-size: 10px; font-weight: 600; color: var(--muted);
+                     cursor: pointer; font-family: var(--sans); }
+.ct-sig-tab.active { border-bottom-color: var(--yellow); font-weight: 700; color: var(--text); }
+.sig-canvas        { width: 100%; height: 90px; display: block; touch-action: none; cursor: crosshair; }
+.sig-typed-input   { width: 100%; border: none; border-bottom: 2px solid var(--dark);
+                     background: transparent;
+                     font-size: 16px; font-family: Georgia, serif; font-style: italic;
+                     color: var(--text); outline: none;
+                     padding: 4px 0; box-sizing: border-box; }
+.sig-footer-row    { display: flex; align-items: center; justify-content: space-between;
+                     padding: 4px 10px; border-top: 1px solid var(--border); }
+.sig-clear-btn     { background: none; border: 1px solid var(--border); border-radius: 4px;
+                     padding: 2px 8px; font-size: 10px; color: var(--muted);
+                     cursor: pointer; font-family: var(--sans); }
+.sig-wet-input     { width: 100%; padding: 6px 10px;
+                     border: 1px solid var(--border); border-radius: 6px;
+                     font-size: 11px; font-family: var(--sans);
+                     background: var(--surface); color: var(--text); box-sizing: border-box; }
 
 
 /* Contractor status pills on card */

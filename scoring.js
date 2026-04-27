@@ -91,9 +91,9 @@ function renderV2ScoringEditor() {
   }
 
   function sectionHdr(label, maxScore) {
-    return '<div style="padding:10px 16px;background:#1c1c1a;border-bottom:2px solid var(--yellow);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;margin:16px -20px 12px;">'
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#888;">' + label + '</div>'
-      + (maxScore ? '<div style="font-size:11px;color:#555;">max ' + maxScore + ' pts</div>' : '')
+    return '<div style="padding:10px 16px;background:var(--dark2);border-bottom:2px solid var(--yellow);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;margin:16px -20px 12px;">'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);">' + label + '</div>'
+      + (maxScore ? '<div style="font-size:11px;color:var(--muted);">max ' + maxScore + ' pts</div>' : '')
       + '</div>';
   }
 
@@ -212,7 +212,7 @@ function renderV2ScoringEditor() {
   html += tierRow('Critical Priority', 'critical', '#4ade80', critR);
   html += tierRow('High Priority',     'high',     '#93c5fd', highR);
   html += tierRow('Medium Priority',   'medium',   '#fcd34d', medR);
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:8px;margin-bottom:6px;background:var(--bg);border-left:3px solid #f87171;">'
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:8px;margin-bottom:6px;background:var(--bg);border-left:3px solid var(--danger);">'
     + '<div>'
     +   '<div style="font-size:13px;font-weight:700;color:var(--text);">Low Priority</div>'
     +   '<div class="js-lbl-sm" id="tier_range_low">' + lowR + '</div>'
@@ -221,9 +221,9 @@ function renderV2ScoringEditor() {
     + '</div>';
 
   html += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">'
-    + '<button onclick="saveV2TiersED()" style="background:var(--yellow);border:none;color:#111;padding:7px 18px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save Tier Thresholds</button>'
+    + '<button onclick="saveV2TiersED()" style="background:var(--yellow);border:none;color:var(--dark);padding:7px 18px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save Tier Thresholds</button>'
     + '<button onclick="saveV2TiersAndRescoreED()" style="background:none;border:1.5px solid var(--yellow);color:var(--yellow);padding:7px 14px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save &amp; Rescore All</button>'
-    + '<button onclick="resetV2TiersED()" style="background:none;border:1px solid #444;color:#888;padding:7px 14px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;">Reset Defaults</button>'
+    + '<button onclick="resetV2TiersED()" style="background:none;border:1px solid var(--dark-border);color:var(--muted);padding:7px 14px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;">Reset Defaults</button>'
     + '</div>';
 
   html += '</div>';
@@ -360,12 +360,12 @@ function renderNationPanel(){
   identEl.innerHTML =
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;">'
     +   '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'
-    +     '<div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Nation</div>'
+    +     '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Nation</div>'
     +     '<div style="font-size:16px;font-weight:700;color:var(--text);">'+(cfg.display_name||'—')+'</div>'
     +     '<div class="js-lbl-sm" class="mt-4">ID: <code style="font-family:Consolas,Monaco,monospace;">'+(cfg.id||'—')+'</code></div>'
     +   '</div>'
     +   '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'
-    +     '<div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Hosting</div>'
+    +     '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Hosting</div>'
     +     '<div style="font-size:13px;font-weight:700;color:var(--text);font-family:Consolas,Monaco,monospace;word-break:break-all;">'+host+'</div>'
     +     '<div class="js-lbl-sm" class="mt-4">Subdomain-routed</div>'
     +   '</div>'
@@ -398,13 +398,13 @@ function renderNationPanel(){
     return row(n, modApi.isEnabled(n) ? 'enabled' : 'disabled', 'optional');
   }).join('');
   modsEl.innerHTML =
-      '<div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Modules</div>'
+      '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Modules</div>'
     + '<div class="overflow-x">'
     + '<table class="std-tbl">'
     +   '<thead><tr style="background:var(--bg);border-bottom:2px solid var(--border);">'
-    +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;">Module</th>'
-    +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:100px;">Type</th>'
-    +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#888;width:110px;">Status</th>'
+    +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);">Module</th>'
+    +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);width:100px;">Type</th>'
+    +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);width:110px;">Status</th>'
     +   '</tr></thead>'
     +   '<tbody>'+coreRows+optRows+'</tbody>'
     + '</table>'
@@ -1230,9 +1230,9 @@ function renderRubricTableV2(breakdown, targetEl) {
 
   function sectionHeader(label, total, maxPts) {
     var pct = maxPts > 0 ? Math.round((total / maxPts) * 100) : 0;
-    return '<div style="padding:10px 18px;background:#1c1c1a;border-bottom:2px solid var(--yellow);display:flex;align-items:center;justify-content:space-between;">'
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#888;">' + label + '</div>'
-      + '<div style="font-size:13px;font-weight:700;color:var(--yellow);">' + total + ' <span style="font-size:10px;color:#666;">/ ' + maxPts + ' pts</span></div>'
+    return '<div style="padding:10px 18px;background:var(--dark2);border-bottom:2px solid var(--yellow);display:flex;align-items:center;justify-content:space-between;">'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);">' + label + '</div>'
+      + '<div style="font-size:13px;font-weight:700;color:var(--yellow);">' + total + ' <span style="font-size:10px;color:var(--muted);">/ ' + maxPts + ' pts</span></div>'
       + '</div>';
   }
 
@@ -1252,7 +1252,7 @@ function renderRubricTableV2(breakdown, targetEl) {
       +   '</div>'
       +   '<div style="flex-shrink:0;text-align:right;">'
       +     '<span style="display:inline-block;min-width:46px;text-align:center;font-size:18px;font-weight:700;padding:4px 10px;border-radius:7px;background:' + bg + ';color:' + col + ';">' + sign + pts + '</span>'
-      +     (maxPts ? '<div style="font-size:10px;color:#555;margin-top:2px;">max ' + maxPts + '</div>' : '')
+      +     (maxPts ? '<div style="font-size:10px;color:var(--muted);margin-top:2px;">max ' + maxPts + '</div>' : '')
       +   '</div>'
       + '</div>'
       + '</div>';

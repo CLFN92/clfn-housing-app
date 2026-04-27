@@ -78,6 +78,9 @@ window.CLFN_AUTH = {
     if (switcher) switcher.style.display = 'none';
 
     console.log('[CLFN] Session set — ' + this.currentUser.name + ' (' + this.currentRole + ')');
+
+    // Start idle-logout watcher now that a session exists
+    if (typeof startIdleTimer === 'function') startIdleTimer();
   },
 
   // ── Called on logout ────────────────────────────────────────────────────
@@ -136,6 +139,9 @@ async function resolveHousingRole() {
         addStaffBtn.style.display =
           (housingRole === 'ed' || housingRole === 'housing_manager') ? 'flex' : 'none';
       }
+
+      // Session is real — start the idle-logout watcher
+      if (typeof startIdleTimer === 'function') startIdleTimer();
     } else {
       HOUSING_SESSION.role = 'housing_employee_l1';
       window.currentRole   = 'housing_employee_l1';
@@ -186,6 +192,7 @@ function _clearLocalClientState() {
 // then calls window._onLogout() if registered (page-specific: show login screen,
 // clear data arrays, etc.).
 async function doLogout() {
+  stopIdleTimer();
   try {
     await fetch(SUPABASE_URL + '/auth/v1/logout', { method: 'POST', headers: HOUSING_HEADERS });
   } catch(e) {}
@@ -200,5 +207,59 @@ async function doLogout() {
   // page-specific teardown (show login screen, clear data arrays, etc.)
   if (typeof window._onLogout === 'function') {
     try { window._onLogout(); } catch(e) { console.warn('[auth] _onLogout error:', e); }
+  }
+}
+
+// ── Idle timeout ─────────────────────────────────────────────────────────────
+// Auto-logout after IDLE_TIMEOUT_MS of no user activity.
+// startIdleTimer() is called automatically by setSession() and resolveHousingRole();
+// stopIdleTimer() runs in doLogout(). Pages don't need to wire anything up.
+//
+// To customise per nation later, override window.IDLE_TIMEOUT_MS before
+// shared-auth.js loads — or set it from NATION_CONFIG at boot.
+window.IDLE_TIMEOUT_MS = window.IDLE_TIMEOUT_MS || 15 * 60 * 1000; // 15 min
+var _idleTimer = null;
+var _idleListenersAttached = false;
+var _IDLE_EVENTS = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+
+function _resetIdleTimer() {
+  // Don't run the timer if nobody's logged in
+  if (!HOUSING_SESSION || !HOUSING_SESSION.email) return;
+  if (_idleTimer) clearTimeout(_idleTimer);
+  _idleTimer = setTimeout(_idleLogout, window.IDLE_TIMEOUT_MS);
+}
+
+function _idleLogout() {
+  console.log('[CLFN] Idle timeout — signing out');
+  if (typeof showToast === 'function') {
+    try { showToast('You have been signed out due to inactivity.'); } catch(e) {}
+  }
+  // doLogout() is async — chain a redirect so the user lands on the login screen
+  // even when the page has no _onLogout handler that surfaces one.
+  Promise.resolve(doLogout()).then(function() {
+    var path = window.location.pathname;
+    var onLogin = /(?:^|\/)index\.html$/.test(path) || path === '/' || path === '';
+    if (!onLogin) window.location.href = 'index.html';
+  });
+}
+
+function startIdleTimer() {
+  if (!HOUSING_SESSION || !HOUSING_SESSION.email) return;
+  if (!_idleListenersAttached) {
+    _IDLE_EVENTS.forEach(function(evt) {
+      document.addEventListener(evt, _resetIdleTimer, { passive: true });
+    });
+    _idleListenersAttached = true;
+  }
+  _resetIdleTimer();
+}
+
+function stopIdleTimer() {
+  if (_idleTimer) { clearTimeout(_idleTimer); _idleTimer = null; }
+  if (_idleListenersAttached) {
+    _IDLE_EVENTS.forEach(function(evt) {
+      document.removeEventListener(evt, _resetIdleTimer);
+    });
+    _idleListenersAttached = false;
   }
 }

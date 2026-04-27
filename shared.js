@@ -15,6 +15,91 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 // ═══════════════════════════════════════════════════════════════════════
+// _printThemeStyles — emit current theme tokens as a <style>:root{...}</style>
+// block for print/preview documents opened via window.open(). Those documents
+// don't inherit the parent's CSS variables, so we read computed values once
+// and inject them so the same var(--*) tokens resolve correctly in the
+// detached print HTML.
+// ═══════════════════════════════════════════════════════════════════════
+window._printThemeStyles = function() {
+  var s = getComputedStyle(document.documentElement);
+  var keys = ['--yellow','--dark','--dark2','--text','--muted','--border',
+              '--surface','--bg','--success','--success-bg','--success-border',
+              '--danger','--danger-bg','--danger-border',
+              '--info-blue','--info-blue-bg',
+              '--warn-amber','--warn-amber-bg','--warn-amber-border'];
+  return ':root{' + keys.map(function(k){
+    return k + ':' + s.getPropertyValue(k).trim() + ';';
+  }).join('') + '}';
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// _applyTheme — apply a saved brand theme to the live document.
+// Theme shape: { yellow: '#...', dark: '#...', text: '#...', logo: 'data:image/...' }
+// Any field may be missing/empty — that token then keeps its CSS default.
+// Logo data URL is applied to all <img class="hlogo"> + #login-logo elements.
+// ═══════════════════════════════════════════════════════════════════════
+window.THEME_KEYS = ['yellow','dark','text'];
+window.THEME_DEFAULTS = { yellow: '#F8E41A', dark: '#111110', text: '#111110' };
+
+window._applyTheme = function(theme) {
+  theme = theme || {};
+  var root = document.documentElement;
+  window.THEME_KEYS.forEach(function(k){
+    var val = theme[k];
+    if (val) root.style.setProperty('--' + k, val);
+    else     root.style.removeProperty('--' + k);
+  });
+  if (theme.logo) {
+    document.querySelectorAll('img.hlogo, #login-logo').forEach(function(img){
+      img.src = theme.logo;
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// showConfirm — branded replacement for native window.confirm().
+// Renders a centered modal using the standard .modal-hdr / .modal-body
+// pattern, returns a Promise<boolean>. Pass `danger: true` for destructive
+// actions (red confirm button instead of yellow primary).
+//
+//   showConfirm({
+//     title: 'Reset theme?',
+//     message: 'This clears any saved colors.',
+//     confirmText: 'Reset',           // optional, default 'Confirm'
+//     cancelText:  'Cancel',          // optional
+//     danger:      true               // optional, red confirm button
+//   }).then(function(ok){ if (ok) ... });
+// ═══════════════════════════════════════════════════════════════════════
+window.showConfirm = function(opts) {
+  opts = opts || {};
+  return new Promise(function(resolve){
+    var ov = document.createElement('div');
+    ov.className = 'modal-overlay modal-overlay-centered modal-z-1100 is-open';
+    var btnClass = opts.danger ? 'btn btn-danger' : 'btn btn-primary';
+    ov.innerHTML =
+      '<div class="modal-body modal-body-sm">' +
+        '<div class="modal-hdr">' +
+          '<div class="modal-hdr-title">' + (opts.title || 'Confirm') + '</div>' +
+          '<button type="button" class="btn-close-dark-30" data-cn-cancel>&times;</button>' +
+        '</div>' +
+        '<div class="modal-body-stack">' +
+          '<p class="txt-help m-0">' + (opts.message || 'Are you sure?') + '</p>' +
+        '</div>' +
+        '<div class="modal-footer">' +
+          '<button type="button" class="btn btn-ghost" data-cn-cancel>' + (opts.cancelText || 'Cancel') + '</button>' +
+          '<button type="button" class="' + btnClass + '" data-cn-confirm>' + (opts.confirmText || 'Confirm') + '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    function close(result){ if (ov.parentNode) ov.parentNode.removeChild(ov); resolve(result); }
+    ov.querySelectorAll('[data-cn-cancel]').forEach(function(b){ b.onclick = function(){ close(false); }; });
+    ov.querySelector('[data-cn-confirm]').onclick = function(){ close(true); };
+    ov.addEventListener('click', function(e){ if (e.target === ov) close(false); });
+  });
+};
+
+// ═══════════════════════════════════════════════════════════════════════
 // CLFN_PERMS — Authoritative role definitions and capability checks
 // Single source of truth for all four app pages.
 // Previously duplicated in housing.html, renos.html, finance.html,

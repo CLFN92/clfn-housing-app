@@ -676,11 +676,14 @@ function renderDashTable(){
     var statusMap={draft:['Draft','pill-draft'],submitted:['Awaiting HM Review','pill-submitted'],file_update:['File Update — Awaiting HM','pill-submitted'],mgr_approved:['Awaiting ED Approval','pill-mgr'],hm_recommended:['HM Recommended','pill-mgr'],hm_approved:['File Update Approved','pill-approved'],ed_approved:['ED Approved','pill-approved'],declined:['Declined','pill-declined'],returned:['Returned for Info','pill-returned'],housed:['Housed','pill-approved'],assigned:['Assigned','pill-assigned']};
     var sp=statusMap[a.status]||['—','pill-draft'];
     var role=window.currentRole||'housing_employee_l1';
-    var canAssignFromDash = (ROLE.isManagement(role))
-      && (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)
-      && !a.assignedUnit && !a.archived;
     var canReviewFromDash = (role=== ROLE.HOUSING_MANAGER && (a.status===APP_STATUS.SUBMITTED||a.status==='returned'||a.status===APP_STATUS.FILE_UPDATE))
       || (role=== ROLE.ED && (a.status===APP_STATUS.MGR_APPROVED||a.status===APP_STATUS.SUBMITTED));
+    // Assign is suppressed when Review is also available so a single row
+    // never shows both — the application must be reviewed/approved first.
+    var canAssignFromDash = (ROLE.isManagement(role))
+      && (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)
+      && !a.assignedUnit && !a.archived
+      && !canReviewFromDash;
     return '<tr>'
       +'<td style="cursor:pointer;" data-sc-id="'+a.id+'">'
       +'<div class="appl-name" style="text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;">'+(a.fn||'—')+' '+(a.ln||'')+'</div>'
@@ -688,9 +691,9 @@ function renderDashTable(){
       +'<td class="col-date col-hide-mobile" class="js-txt-muted-sm">'+(a.appDate||'—')+'</td>'
       +'<td class="col-cls col-hide-mobile"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:'+clsBg+';color:'+clsColor+';white-space:nowrap;">'+(a.classification||'—').replace(' Housing','')+'</span></td>'
       +'<td class="col-res col-hide-mobile" class="empty-sub">'+(a.reserve||'—')+'</td>'
-      +'<td class="col-arr col-hide-mobile" style="font-size:12px;color:'+(a.hasArrears?'#b91c1c':'var(--muted)')+';font-weight:600;">'+(a.hasArrears?'Yes':'—')+'</td>'
+      +'<td class="col-arr col-hide-mobile" style="font-size:12px;color:'+(a.hasArrears?'var(--danger)':'var(--muted)')+';font-weight:600;">'+(a.hasArrears?'Yes':'—')+'</td>'
       +'<td><span class="pill '+sp[1]+'"><span class="pill-dot"></span>'+sp[0]+'</span></td>'
-      +'<td class="col-score">'+(a.appType==='existing_tenant'?'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;background:#f4f4f0;color:#888;white-space:nowrap;">File Update</span>':(hasScore?'<button class="score-cell-btn" data-score-id="'+a.id+'" onclick="window._openScoreByEl(this)" title="Click to see score breakdown"><span class="score-num">'+a.score+'</span><div class="score-right"><span class="score-tier-badge" style="background:'+tc.bg+';color:'+tc.c+';font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;">'+(a.tier||'').replace(' Priority','')+'</span>'+scoreMiniBar(a.score)+'</div></button>':'<span class="js-txt-muted-sm">—</span>'))+'</td>'
+      +'<td class="col-score">'+(a.appType==='existing_tenant'?'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--bg);color:var(--muted);white-space:nowrap;">File Update</span>':(hasScore?'<button class="score-cell-btn" data-score-id="'+a.id+'" onclick="window._openScoreByEl(this)" title="Click to see score breakdown"><span class="score-num">'+a.score+'</span><div class="score-right"><span class="score-tier-badge" style="background:'+tc.bg+';color:'+tc.c+';font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;">'+(a.tier||'').replace(' Priority','')+'</span>'+scoreMiniBar(a.score)+'</div></button>':'<span class="js-txt-muted-sm">—</span>'))+'</td>'
       +'<td style="white-space:nowrap;"><div style="display:flex;gap:4px;align-items:center;">'
       +'<button class="dash-action-btn edit-app-btn" data-id="'+a.id+'" title="Edit" style="padding:5px 8px;">'
       +'<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7\"/><path d=\"M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z\"/></svg>'
@@ -699,8 +702,8 @@ function renderDashTable(){
       +'<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"6 9 6 2 18 2 18 9\"/><path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"/><rect x=\"6\" y=\"14\" width=\"12\" height=\"8\"/></svg>'
       +'</button>'
       +'<button class="dash-action-btn app-menu-btn" data-id="'+a.id+'" title="More options" style="padding:5px 7px;font-size:14px;line-height:1;">⋮</button>'
-      +(canReviewFromDash?'<button class="dash-action-btn review-app-btn" data-id="'+a.id+'" style="padding:4px 10px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;margin-left:2px;">Review →</button>':'')
-      +(canAssignFromDash?'<button class="dash-action-btn assign-app-btn" data-id="'+a.id+'" title="Assign Unit" style="padding:4px 10px;background:var(--yellow);color:#111;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;margin-left:2px;">Assign →</button>':'')
+      +(canReviewFromDash?'<button class="dash-action-btn review-app-btn" data-id="'+a.id+'" style="padding:4px 10px;background:var(--info-blue);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;margin-left:2px;">Review →</button>':'')
+      +(canAssignFromDash?'<button class="dash-action-btn assign-app-btn" data-id="'+a.id+'" title="Assign Unit" style="padding:4px 10px;background:var(--yellow);color:var(--dark);border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;margin-left:2px;">Assign →</button>':'')
       +'</div></td>'
       +'</tr>';
   }).join('');
@@ -838,7 +841,7 @@ window.openAppMenu = function(e, appId) {
   var appName = ((app.fn||'') + ' ' + (app.ln||'')).trim() || app.id;
   var header = document.createElement('div');
   header.style.cssText = 'padding:10px 14px;background:var(--dark);border-bottom:1px solid var(--border);';
-  header.innerHTML = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#666;">'
+  header.innerHTML = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);">'
     + app.id + '</div>'
     + '<div style="font-size:13px;font-weight:700;color:#fff;margin-top:1px;">' + appName + '</div>';
   menu.appendChild(header);
@@ -1230,7 +1233,7 @@ function renderApprovalFlow(){
     : [{label:'Employee',icon:'📝',done:true},{label:'Housing Manager',icon:'🔍',done:false},{label:'Exec. Director',icon:'✅',done:false}];
   el.innerHTML = steps.map(function(s,i){
     var circleStyle = s.done
-      ? 'background:var(--yellow);color:#111;border:2px solid var(--yellow);'
+      ? 'background:var(--yellow);color:var(--text);border:2px solid var(--yellow);'
       : 'background:var(--surface);color:var(--muted);border:2px solid var(--border);';
     var html = '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">'
       +'<div style="width:36px;height:36px;border-radius:50%;'+circleStyle+'display:flex;align-items:center;justify-content:center;font-size:14px;">'+s.icon+'</div>'
@@ -1274,7 +1277,7 @@ function popReview(){
   html += '<div style="padding:14px 20px;background:var(--dark);border-bottom:2px solid var(--yellow);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">'
     +'<div>'
     +'<div style="font-size:16px;font-weight:700;color:#fff;">'+name+'</div>'
-    +'<div style="font-size:11px;color:#888;margin-top:2px;">'+appId+'  ·  '+(isFileUpdate?'File Update':'New Housing Application')+'</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+appId+'  ·  '+(isFileUpdate?'File Update':'New Housing Application')+'</div>'
     +'</div>';
   // Score badge (if calculated)
   var scoreEl = document.getElementById('totalScore');
@@ -1284,7 +1287,7 @@ function popReview(){
     var tier = tierEl ? tierEl.textContent : '';
     html += '<div style="text-align:right;">'
       +'<div style="font-size:22px;font-weight:800;color:var(--yellow);">'+score+'</div>'
-      +'<div style="font-size:10px;color:#888;">'+tier+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);">'+tier+'</div>'
       +'</div>';
   }
   html += '</div>';
@@ -1442,10 +1445,10 @@ function showSubmissionConfirmation(appId, isFileUpdate) {
 
   overlay.innerHTML = '<div style="background:var(--surface);border-radius:16px;max-width:520px;width:100%;padding:0;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.5);">'
     // Header bar
-    + '<div style="background:#000;padding:20px 28px;border-bottom:3px solid var(--yellow);text-align:center;">'
+    + '<div style="background:var(--dark);padding:20px 28px;border-bottom:3px solid var(--yellow);text-align:center;">'
     +   '<div style="font-size:36px;margin-bottom:8px;">✓</div>'
     +   '<div style="font-size:18px;font-weight:700;color:var(--yellow);">' + (isFileUpdate ? 'File Update Submitted' : 'Application Submitted') + '</div>'
-    +   '<div style="font-size:12px;color:#aaa;margin-top:4px;">' + appId + '</div>'
+    +   '<div style="font-size:12px;color:var(--txt-on-dark);margin-top:4px;">' + appId + '</div>'
     + '</div>'
     // Body
     + '<div style="padding:24px 28px;">'
@@ -1455,14 +1458,14 @@ function showSubmissionConfirmation(appId, isFileUpdate) {
     +     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">'
     +       '<div><div class="js-lbl-xs mb-4">Application ID</div><div style="font-weight:700;color:var(--yellow);">' + appId + '</div></div>'
     +       '<div><div class="js-lbl-xs mb-4">Date Submitted</div><div style="font-weight:600;">' + today + '</div></div>'
-    +       '<div><div class="js-lbl-xs mb-4">Status</div><div style="font-weight:600;color:#4ade80;">Submitted — Awaiting HM Review</div></div>'
+    +       '<div><div class="js-lbl-xs mb-4">Status</div><div style="font-weight:600;color:var(--success);">Submitted — Awaiting HM Review</div></div>'
     +       '<div><div class="js-lbl-xs mb-4">Next Step</div><div style="font-weight:600;">Housing Manager review</div></div>'
     +     '</div>'
     +   '</div>'
     +   '<div style="font-size:12px;color:var(--muted);margin-bottom:20px;line-height:1.6;">The Housing Manager will review your application and contact you if additional information is required. Please keep your application ID for your records.</div>'
     +   '<div style="display:flex;gap:10px;justify-content:flex-end;">'
     +     '<button onclick="closeSubmissionConfirmation(true);" style="padding:10px 20px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;">Return Home</button>'
-    +     '<button onclick="closeSubmissionConfirmation(false);" style="padding:10px 24px;border-radius:8px;border:none;background:var(--yellow);color:#111;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;">Done</button>'
+    +     '<button onclick="closeSubmissionConfirmation(false);" style="padding:10px 24px;border-radius:8px;border:none;background:var(--yellow);color:var(--dark);cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;">Done</button>'
     +   '</div>'
     + '</div>'
     + '</div>';
@@ -1527,15 +1530,15 @@ function printApplicationPreview() {
   function row(k, v) {
     var val = (v !== null && v !== undefined && v !== '') ? v : '—';
     return '<tr>'
-      +'<td style="padding:4px 10px;color:#555;font-size:10px;font-weight:600;width:34%;'
-      +'border-bottom:1px solid #f2f2f0;vertical-align:top;">'+k+'</td>'
-      +'<td style="padding:4px 10px;font-size:10px;border-bottom:1px solid #f2f2f0;">'+val+'</td>'
+      +'<td style="padding:4px 10px;color:var(--muted);font-size:10px;font-weight:600;width:34%;'
+      +'border-bottom:1px solid var(--border);vertical-align:top;">'+k+'</td>'
+      +'<td style="padding:4px 10px;font-size:10px;border-bottom:1px solid var(--border);">'+val+'</td>'
       +'</tr>';
   }
   function section(title, body) {
     return '<div style="margin-bottom:12px;page-break-inside:avoid;">'
       +'<div style="font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;'
-      +'color:#555;border-bottom:2.5px solid #F8E41A;padding-bottom:3px;margin-bottom:0;">'
+      +'color:var(--muted);border-bottom:2.5px solid #F8E41A;padding-bottom:3px;margin-bottom:0;">'
       +title+'</div>'
       +'<table class="std-tbl">'+body+'</table>'
       +'</div>';
@@ -1610,18 +1613,18 @@ function printApplicationPreview() {
   function sigBlock(label, pName, dt, imgSrc) {
     return '<div class="print-sec">'
       +'<div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;'
-      +     'color:#555;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #ddd;">'+label+'</div>'
+      +     'color:var(--muted);margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #ddd;">'+label+'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 90px;gap:8px;margin-bottom:6px;">'
       +  '<div><div class="sig-lbl">Full Name</div>'
-      +       '<div style="font-size:10.5px;font-weight:600;border-bottom:1px solid #bbb;padding-bottom:2px;min-height:15px;">'+pName+'</div></div>'
+      +       '<div style="font-size:10.5px;font-weight:600;border-bottom:1px solid var(--border);padding-bottom:2px;min-height:15px;">'+pName+'</div></div>'
       +  '<div><div class="sig-lbl">Date</div>'
-      +       '<div style="font-size:10px;border-bottom:1px solid #bbb;padding-bottom:2px;min-height:15px;">'+dt+'</div></div>'
+      +       '<div style="font-size:10px;border-bottom:1px solid var(--border);padding-bottom:2px;min-height:15px;">'+dt+'</div></div>'
       +'</div>'
       +(imgSrc
-        ? '<img src="'+imgSrc+'" style="width:100%;height:65px;border:1px solid #ddd;border-radius:3px;object-fit:contain;background:#fafaf8;display:block;"/>'
-        : '<div style="width:100%;height:65px;border:1px solid #ddd;border-radius:3px;background:#fafaf8;'
+        ? '<img src="'+imgSrc+'" style="width:100%;height:65px;border:1px solid var(--border);border-radius:3px;object-fit:contain;background:var(--bg);display:block;"/>'
+        : '<div style="width:100%;height:65px;border:1px solid var(--border);border-radius:3px;background:var(--bg);'
         +      'display:flex;align-items:center;justify-content:center;">'
-        +   '<span style="font-size:9px;color:#ccc;">Sign here</span></div>')
+        +   '<span style="font-size:9px;color:var(--border);">Sign here</span></div>')
       +'</div>';
   }
 
@@ -1631,9 +1634,9 @@ function printApplicationPreview() {
       +'<div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;'
       +     'color:#7a5c00;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #e8d87a;">'+label+'</div>'
       +'<div class="sig-lbl">Name &amp; Title</div>'
-      +'<div style="border-bottom:1px solid #444;height:16px;margin-bottom:8px;"></div>'
+      +'<div style="border-bottom:1px solid var(--dark-border);height:16px;margin-bottom:8px;"></div>'
       +'<div class="sig-lbl">Signature</div>'
-      +'<div style="border-bottom:1px solid #444;height:52px;margin-bottom:8px;"></div>'
+      +'<div style="border-bottom:1px solid var(--dark-border);height:52px;margin-bottom:8px;"></div>'
       +'<div style="display:grid;grid-template-columns:1fr 90px;gap:10px;">'
       +  '<div><div class="sig-lbl">Date</div>'
       +       '<div class="sig-line"></div></div>'
@@ -1650,14 +1653,15 @@ function printApplicationPreview() {
   var doc = '<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
     +'<title>CLFN — '+name+'</title>'
     +'<style>'
+    +_printThemeStyles()
     +'*{box-sizing:border-box;margin:0;padding:0;}'
     +'@page{size:letter;margin:14mm 13mm 22mm 13mm;}'
-    +'body{font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#111;background:#fff;line-height:1.4;counter-reset:page;}'
-    +'@page{@bottom-right{content:"Page " counter(page) " of " counter(pages);font-family:Arial,sans-serif;font-size:8.5px;color:#aaa;}}'
+    +'body{font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:var(--text);background:var(--surface);line-height:1.4;counter-reset:page;}'
+    +'@page{@bottom-right{content:"Page " counter(page) " of " counter(pages);font-family:Arial,sans-serif;font-size:8.5px;color:var(--muted);}}'
     +'.footer{position:fixed;bottom:7mm;left:0;right:0;padding:0 13mm;'
-    +'display:flex;justify-content:space-between;font-size:8.5px;color:#aaa;'
+    +'display:flex;justify-content:space-between;font-size:8.5px;color:var(--muted);'
     +'border-top:1px solid #eee;padding-top:4px;}'
-    +'.page-num{position:fixed;bottom:7mm;right:13mm;font-size:8.5px;color:#aaa;'
+    +'.page-num{position:fixed;bottom:7mm;right:13mm;font-size:8.5px;color:var(--muted);'
     +'font-family:Arial,sans-serif;}'
     +'</style>'
     +'</head><body>'
@@ -1668,10 +1672,10 @@ function printApplicationPreview() {
     +  '<div class="flex-g10">'
     +    (logoSrc?'<img src="'+logoSrc+'" style="width:40px;height:40px;object-fit:contain;" alt="CLFN"/>'     :'')
     +    '<div><div class="js-txt-lg">CLFN Housing Application</div>'
-    +         '<div style="font-size:9.5px;color:#888;">Constance Lake First Nation</div></div>'
+    +         '<div style="font-size:9.5px;color:var(--muted);">Constance Lake First Nation</div></div>'
     +  '</div>'
-    +  '<div style="text-align:right;font-size:9.5px;color:#888;line-height:1.9;">'
-    +    '<strong style="font-size:12px;color:#111;">'+name+'</strong><br/>'
+    +  '<div style="text-align:right;font-size:9.5px;color:var(--muted);line-height:1.9;">'
+    +    '<strong style="font-size:12px;color:var(--text);">'+name+'</strong><br/>'
     +    appId+'<br/>Date: '+today
     +  '</div>'
     +'</div>'
@@ -1741,15 +1745,15 @@ function printApplicationPreview() {
     +section('Supporting Documents Submitted', docsBody)
 
     // TERMS & CONDITIONS
-    +'<div style="margin-top:14px;padding:10px 12px;border:1px solid #ddd;border-radius:4px;'
-    +     'background:#fafaf8;page-break-inside:avoid;">'
+    +'<div style="margin-top:14px;padding:10px 12px;border:1px solid var(--border);border-radius:4px;'
+    +     'background:var(--bg);page-break-inside:avoid;">'
     +'<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;'
-    +     'color:#555;margin-bottom:7px;padding-bottom:4px;border-bottom:1.5px solid #F8E41A;">'
+    +     'color:var(--muted);margin-bottom:7px;padding-bottom:4px;border-bottom:1.5px solid #F8E41A;">'
     +'Terms &amp; Conditions — Applicant Declaration</div>'
-    +'<p style="font-size:9.5px;color:#444;line-height:1.6;margin-bottom:5px;">'
+    +'<p style="font-size:9.5px;color:var(--text);line-height:1.6;margin-bottom:5px;">'
     +'By signing below, I hereby apply for housing assistance from the Constance Lake First Nation '
     +'(CLFN) Housing Program and declare the following:</p>'
-    +'<ol style="font-size:9.5px;color:#444;line-height:1.7;padding-left:14px;">'
+    +'<ol style="font-size:9.5px;color:var(--text);line-height:1.7;padding-left:14px;">'
     +'<li>All information provided in this application is true, accurate, and complete to the best of my knowledge.</li>'
     +'<li>I understand that providing false or misleading information may result in immediate disqualification and removal from the housing waitlist.</li>'
     +'<li>I consent to CLFN collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation.</li>'
@@ -1764,7 +1768,7 @@ function printApplicationPreview() {
     // SIGNATURES
     +'<div style="margin-top:14px;page-break-inside:avoid;">'
     +'<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;'
-    +     'color:#555;border-bottom:2.5px solid #F8E41A;padding-bottom:3px;margin-bottom:10px;">Signatures</div>'
+    +     'color:var(--muted);border-bottom:2.5px solid #F8E41A;padding-bottom:3px;margin-bottom:10px;">Signatures</div>'
     +'<div style="display:grid;grid-template-columns:'+sigCols+';gap:12px;">'
     +sigBlock('Applicant', sigName, sigDate, sigApp)
     +sigBlock('Co-Applicant', coSigName, sigDate, sigCo)

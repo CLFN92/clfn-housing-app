@@ -28,22 +28,22 @@
   <div style="background:var(--surface);border-radius:12px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.4);">
     <div id="approvalModal_header" class="modal-hdr spacious">
       <div>
-        <div id="approvalModal_title" style="font-family:'DM Serif Display',serif;font-size:18px;color:#fff;"></div>
-        <div id="approvalModal_sub"   style="font-size:12px;color:#666;margin-top:2px;"></div>
+        <div id="approvalModal_title" class="modal-hdr-title"></div>
+        <div id="approvalModal_sub"   class="txt-sm-666"></div>
       </div>
-      <button onclick="closeApprovalModal()" style="background:none;border:1px solid #444;color:#ccc;width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:16px;">✕</button>
+      <button onclick="closeApprovalModal()" class="btn-close-dark-30">✕</button>
     </div>
-    <div style="padding:24px;">
+    <div class="p-24">
       <div id="approvalModal_unit_row" style="display:none;margin-bottom:16px;">
-        <label class="lbl-muted" style="display:block;margin-bottom:6px">Recommended Unit</label>
+        <label class="lbl-muted lbl-block-mb">Recommended Unit</label>
         <div id="approvalModal_unit_display" style="padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:7px;font-size:13px;font-weight:600;color:var(--text);"></div>
       </div>
       <div class="mb-16">
-        <label class="lbl-muted" style="display:block;margin-bottom:6px">Notes <span id="approvalModal_notes_req" style="color:#b91c1c;"></span></label>
+        <label class="lbl-muted lbl-block-mb">Notes <span id="approvalModal_notes_req" class="txt-required"></span></label>
         <textarea id="approvalModal_notes" rows="4" placeholder="Add notes visible to the applicant and staff..."
           style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;font-family:DM Sans,sans-serif;resize:vertical;"></textarea>
       </div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <div class="flex-end-10">
         <button onclick="closeApprovalModal()" class="btn btn-ghost">Cancel</button>
         <button id="approvalModal_confirm" class="btn btn-primary" onclick="confirmApprovalAction()">Confirm</button>
       </div>
@@ -57,16 +57,16 @@
   <div class="hbrand" onclick="showDash()" title="Return to Home">
     <img src="data:image/png;base64,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" alt="CLFN" class="hlogo"/>
     <div>
-      <strong style="display:block;font-size:14px;font-weight:700;color:#fff;letter-spacing:-.2px;">Housing Application</strong>
-      <span style="font-size:11px;color:#888;">Constance Lake First Nation</span>
+      <strong class="hbrand-title">Housing Application</strong>
+      <span class="hbrand-sub">Constance Lake First Nation</span>
     </div>
   </div>
   <!-- User info bar -->
-  <div id="header_user_bar" style="display:flex;align-items:center;gap:10px;margin-left:auto;">
-    <div id="roleSwitcher" style="display:none;align-items:center;gap:6px;">
+  <div id="header_user_bar" class="header-user-bar">
+    <div id="roleSwitcher">
       <!-- Options populated dynamically from CLFN_PERMS.ROLE_LABELS at login time -->
       <!-- (see populateRoleSwitcher). Fallback options below if JS fails. -->
-      <select id="rb_select" onchange="switchRole(this.value)" style="padding:5px 10px;border:1px solid #444;border-radius:8px;font-size:12px;font-weight:600;font-family:DM Sans,sans-serif;background:#1a1a18;color:#ccc;cursor:pointer;outline:none;">
+      <select id="rb_select" onchange="switchRole(this.value)">
         <option value="ed">Executive Director</option>
         <option value="housing_manager">Housing Manager</option>
         <option value="housing_employee_l2">Housing Employee L2</option>
@@ -75,37 +75,37 @@
         <option value="finance_l1">Finance Clerk L1</option>
       </select>
     </div>
-    <div id="header_user_pill" style="display:flex;align-items:center;gap:8px;background:#1a1a18;border:1px solid #333;border-radius:20px;padding:5px 12px 5px 6px;">
-      <div id="header_avatar" style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">—</div>
-      <span id="header_user_name" style="font-size:12px;font-weight:600;color:#fff;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span><span id="header_user_display"></span>
-      <span id="header_role_badge" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:#333;color:#aaa;"></span>
-        <button onclick="headerSignOut()" style="background:none;border:none;color:#666;font-size:11px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;padding:0 0 0 4px;" onmouseover="this.style.color='#ccc'" onmouseout="this.style.color='#666'">sign out</button>
+    <div id="header_user_pill" class="header-user-pill">
+      <div id="header_avatar" class="header-avatar">&mdash;</div>
+      <span id="header_user_name" class="header-user-name"></span><span id="header_user_display"></span>
+      <span id="header_role_badge" class="header-role-badge"></span>
+      <button onclick="headerSignOut()" class="header-signout-btn">sign out</button>
     </div>
     <!-- Global export button — shown when on an exportable view -->
-    <div id="header_export_wrap" style="position:relative;display:none;">
-      <button type="button" onclick="toggleHeaderExportMenu()" style="background:none;border:1px solid #444;color:#ccc;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='#444';this.style.color='#ccc'">
+    <div id="header_export_wrap" class="header-export-wrap">
+      <button type="button" onclick="toggleHeaderExportMenu()" class="btn-header-ghost">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Export
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
-      <div id="header_export_menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:9999;min-width:160px;overflow:hidden;">
-        <button onclick="headerExport('csv')" style="width:100%;background:none;border:none;padding:10px 16px;text-align:left;font-size:13px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
-          <span style="font-size:16px;">📄</span> CSV
+      <div id="header_export_menu" class="header-export-menu">
+        <button onclick="headerExport('csv')" class="header-export-item">
+          <span class="header-export-icon">&#128196;</span> CSV
         </button>
-        <button onclick="headerExport('excel')" style="width:100%;background:none;border:none;padding:10px 16px;text-align:left;font-size:13px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
-          <span style="font-size:16px;">📊</span> Excel (.xlsx)
+        <button onclick="headerExport('excel')" class="header-export-item">
+          <span class="header-export-icon">&#128202;</span> Excel (.xlsx)
         </button>
-        <button onclick="headerExport('pdf')" style="width:100%;background:none;border:none;padding:10px 16px;text-align:left;font-size:13px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:10px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
-          <span style="font-size:16px;">📑</span> PDF
+        <button onclick="headerExport('pdf')" class="header-export-item">
+          <span class="header-export-icon">&#128209;</span> PDF
         </button>
       </div>
     </div>
-    <button onclick="showAddHousingStaff()" id="header_addstaff_btn" style="background:none;border:1px solid #444;color:#ccc;border-radius:8px;padding:6px 14px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:none;align-items:center;gap:6px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='#444';this.style.color='#ccc'">
+    <button onclick="showAddHousingStaff()" id="header_addstaff_btn" class="btn-header-ghost" style="display:none;">
       + Staff
     </button>
     <!-- Role view toggle — header level, ED/HM only -->
-    
-    <button onclick="showSettings()" id="header_settings_btn" style="background:none;border:1px solid #444;color:#ccc;border-radius:8px;padding:6px 14px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:none;align-items:center;gap:6px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='#444';this.style.color='#ccc'">
+
+    <button onclick="showSettings()" id="header_settings_btn" class="btn-header-ghost" style="display:none;">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       Settings
     </button>
@@ -120,8 +120,8 @@
   <div style="background:var(--surface);border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
     <div class="modal-hdr spacious">
       <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Housing Inventory</div>
-        <div style="font-size:16px;font-weight:700;color:#fff;">Find a Unit</div>
+        <div class="lbl-uppercase-sm">Housing Inventory</div>
+        <div class="txt-hdr-white">Find a Unit</div>
       </div>
       <button type="button" onclick="closeUnitSearch()" class="btn-close-sm">✕</button>
     </div>
@@ -135,7 +135,7 @@
       <div id="unit_search_results"></div>
     </div>
     <div style="padding:12px 24px 20px;display:flex;gap:10px;">
-      <button type="button" onclick="openAddUnitModal()" style="flex:1;background:var(--yellow);border:none;color:#111;padding:10px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;">+ Add New Unit</button>
+      <button type="button" onclick="openAddUnitModal()" style="flex:1;background:var(--yellow);border:none;color:var(--dark);padding:10px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;">+ Add New Unit</button>
     </div>
   </div>
 </div>
@@ -176,7 +176,7 @@
     <!-- Header -->
     <div class="modal-hdr spacious">
       <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:2px;">Housing Match</div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:2px;">Housing Match</div>
         <div class="panel-title">Assign Unit to Applicant</div>
       </div>
       <button onclick="closeAssignModal()" class="btn-close-sm">✕</button>
@@ -206,7 +206,11 @@
       <div class="card card-flush">
         <div class="modal-hdr compact">
           <div class="lbl-yellow">Available Units — Ranked by Match</div>
-          <div id="am_role_badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,0.1);color:#ccc;"></div>
+          <div id="am_role_badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,0.1);color:var(--txt-on-dark);"></div>
+        </div>
+        <div class="search-row">
+          <input type="text" id="am_search_input" oninput="amFilterUnits(this.value)"
+            placeholder="&#128269; Search by address or street&hellip;" autocomplete="off"/>
         </div>
         <div id="am_unit_list"></div>
       </div>
@@ -214,7 +218,7 @@
       <!-- Selection / Override notes -->
       <div id="am_override_wrap">
         <div class="f">
-          <label><span id="am_notes_label" style="font-weight:700;">Selection Notes</span> <span id="am_notes_req_star" style="color:#b91c1c;display:none;">*</span></label>
+          <label><span id="am_notes_label" style="font-weight:700;">Selection Notes</span> <span id="am_notes_req_star" style="color:var(--danger);display:none;">*</span></label>
           <textarea id="am_override_notes" rows="2" placeholder="Notes…" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);resize:vertical;"></textarea>
         </div>
       </div>
@@ -233,7 +237,7 @@
     <!-- Footer -->
     <div class="flex-sb" style="padding:14px 24px;border-top:1px solid var(--border);background:var(--bg)">
       <button onclick="closeAssignModal()" class="btn btn-ghost">Cancel</button>
-      <button onclick="confirmAssignment()" id="am_confirm_btn" class="btn btn-primary" style="background:var(--yellow);color:#111;opacity:.45;cursor:not-allowed;" disabled>Select a unit above</button>
+      <button onclick="confirmAssignment()" id="am_confirm_btn" class="btn btn-primary" style="background:var(--yellow);color:var(--dark);opacity:.45;cursor:not-allowed;" disabled>Select a unit above</button>
     </div>
   </div>
 </div>
@@ -244,10 +248,10 @@
     <!-- Header — sticky inside the flex column -->
     <div class="modal-hdr">
       <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-bottom:2px;">Tenant Files</div>
+        <div class="lbl-uppercase-sm">Tenant Files</div>
         <div id="tfp_title" class="panel-title"></div>
       </div>
-      <button onclick="closeTenantFilesPanel()" style="background:none;border:1px solid #444;color:#aaa;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;">✕</button>
+      <button onclick="closeTenantFilesPanel()" class="btn-close-dark-30">✕</button>
     </div>
     <!-- Scrollable body — DocLibrary renders into #tfp_mount -->
     <div style="padding:20px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;">
@@ -263,31 +267,31 @@
     <!-- Header -->
     <div class="modal-hdr spacious sticky">
       <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:3px;">Constance Lake First Nation — Housing</div>
-        <div style="font-size:16px;font-weight:700;color:#fff;">Renovation Scope of Work</div>
-        <div id="sow_unit_label" style="font-size:11px;color:#888;margin-top:2px;"></div>
-        <div style="margin-top:4px;display:flex;align-items:center;gap:6px;"><span style="font-size:9px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#888;">Project #</span><span id="sow_project_number_label" style="font-size:11px;font-weight:700;color:var(--yellow);font-family:ui-monospace,Menlo,Monaco,'Courier New',monospace;"></span></div>
+        <div class="lbl-uppercase-sm">Constance Lake First Nation — Housing</div>
+        <div class="txt-hdr-white">Renovation Scope of Work</div>
+        <div id="sow_unit_label" class="txt-sm-meta"></div>
+        <div style="margin-top:4px;display:flex;align-items:center;gap:6px;"><span style="font-size:9px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);">Project #</span><span id="sow_project_number_label" style="font-size:11px;font-weight:700;color:var(--yellow);font-family:ui-monospace,Menlo,Monaco,'Courier New',monospace;"></span></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-        <button id="sow_mark_complete_btn" type="button" onclick="markSowComplete()" style="display:none;background:#15803d;border:none;color:#fff;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;align-items:center;gap:5px;">✓ Mark Complete</button>
-        <button id="sow_reopen_btn" type="button" onclick="reopenSow()" style="display:none;background:none;border:1px solid #fbbf24;color:#fbbf24;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;align-items:center;gap:5px;">↺ Reopen</button>
-        <button type="button" onclick="printWorkOrder()" style="background:var(--yellow);border:none;color:#111;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;display:flex;align-items:center;gap:5px;">🏗 Work Order</button>
-        <button type="button" onclick="printSOW()" style="background:none;border:1px solid #555;color:#ccc;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;">🖨 Full SOW</button>
+        <button id="sow_mark_complete_btn" type="button" onclick="markSowComplete()" style="display:none;background:var(--success);border:none;color:#fff;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;align-items:center;gap:5px;">✓ Mark Complete</button>
+        <button id="sow_reopen_btn" type="button" onclick="reopenSow()" style="display:none;background:none;border:1px solid var(--warn-amber-border);color:var(--warn-amber);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;align-items:center;gap:5px;">↺ Reopen</button>
+        <button type="button" onclick="printWorkOrder()" style="background:var(--yellow);border:none;color:var(--dark);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;display:flex;align-items:center;gap:5px;">🏗 Work Order</button>
+        <button type="button" onclick="printSOW()" style="background:none;border:1px solid var(--dark-border);color:var(--txt-on-dark);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;">🖨 Full SOW</button>
         <button type="button" onclick="closeSowModal()" class="btn-close-sm">✕</button>
       </div>
     </div>
     <!-- Read-only banner shown when SOW is completed and viewer cannot edit -->
-    <div id="sow_readonly_banner" style="display:none;background:#f0fdf4;border-bottom:2px solid #15803d;padding:10px 24px;font-size:12px;color:#15803d;font-weight:600;"><span style="font-size:14px;margin-right:6px;">🔒</span>This Scope of Work is marked Completed and is read-only. Only the Executive Director can reopen or modify a completed SOW.</div>
+    <div id="sow_readonly_banner" class="banner-strip-success" style="display:none;"><span style="font-size:14px;margin-right:6px;">🔒</span>This Scope of Work is marked Completed and is read-only. Only the Executive Director can reopen or modify a completed SOW.</div>
 
     <!-- Body -->
-    <div style="padding:24px;display:flex;flex-direction:column;gap:0;">
+    <div class="modal-body-stack">
 
       <!-- ── UNIT INFORMATION ─────────────────────────────────────────────── -->
-      <div class="card card-flush-mb">
+      <div class="card card-flush-mb-overflow">
         <div class="modal-hdr compact">
           <div class="lbl-yellow">Unit Information</div>
         </div>
-        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="grid-c2-pad">
           <div class="f"><label>Unit Address</label><input id="sow_address" type="text" placeholder="e.g. 11 Musko Road"/></div>
           <div class="f"><label>Date Prepared</label><input id="sow_date" type="date"/></div>
           <div class="f"><label>Current Tenant Name</label><input id="sow_tenant_name" type="text" placeholder="Full name of tenant"/></div>
@@ -307,7 +311,7 @@
         <div class="modal-hdr compact">
           <div class="lbl-yellow">Condition Assessment</div>
         </div>
-        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="grid-c2-pad">
           <div class="f"><label>Overall Condition</label>
             <select id="sow_condition">
               <option value="">— Select —</option>
@@ -346,7 +350,7 @@
           <div class="lbl-yellow">Health &amp; Safety Concerns</div>
         </div>
         <div class="p-16">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div class="grid-c3-tight">
             <label class="check-row"><input type="checkbox" id="sow_mold" class="icon-sm"/> Mould / Mildew</label>
             <label class="check-row"><input type="checkbox" id="sow_asbestos" class="icon-sm"/> Asbestos Risk</label>
             <label class="check-row"><input type="checkbox" id="sow_electrical" class="icon-sm"/> Electrical Hazard</label>
@@ -389,6 +393,29 @@
         </div>
       </div>
 
+      <!-- ── PHOTOS & DOCUMENTS ──────────────────────────────────────────── -->
+      <div class="card card-flush-mb">
+        <div class="modal-hdr compact">
+          <div class="lbl-yellow">Photos &amp; Documents</div>
+          <div id="sow_files_size" class="file-list-meta"></div>
+        </div>
+        <div class="p-16">
+          <div id="sow_drop_zone" class="upload-zone"
+            ondragover="photoDragOver(event,'sow_drop_zone')"
+            ondragleave="photoDragLeave('sow_drop_zone')"
+            ondrop="sowFileDrop(event)"
+            onclick="document.getElementById('sow_files_input').click()">
+            <svg class="upload-zone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div class="upload-zone-title">Drag files here or <span class="link-yellow">browse</span></div>
+            <div class="txt-muted-xs">Photos &middot; PDF &middot; DOC/DOCX &middot; XLS/XLSX &middot; CSV &middot; TXT &mdash; up to 50 MB total</div>
+            <input type="file" id="sow_files_input"
+              accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+              multiple onchange="handleSowFileUpload(this)"/>
+          </div>
+          <div id="sow_files_list" class="file-list"></div>
+        </div>
+      </div>
+
       <!-- ── TERMS & CONDITIONS ────────────────────────────────────────── -->
       <div class="card card-flush-mb">
         <div class="modal-hdr compact"
@@ -401,7 +428,7 @@
 
           <p style="margin-bottom:14px;color:var(--muted);">By completing and submitting this Scope of Work, the submitting party acknowledges and agrees to the following terms.</p>
 
-          <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="flex-col-12">
 
             <div class="yellow-accent">
               <div class="lbl-field">1. Prioritization of Requests</div>
@@ -439,43 +466,45 @@
         </div>
       </div>
 
-      <!-- ── SIGNATURES ──────────────────────────────────────────────────── -->
+      <!-- ── SIGNATURES (collapsible) ──────────────────────────────────── -->
       <div class="card card-flush-mb">
-        <div class="modal-hdr compact">
+        <div class="modal-hdr compact"
+          onclick="var b=document.getElementById('sow_sig_body');var c=document.getElementById('sow_sig_chevron');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';">
           <div class="lbl-yellow">Signatures &amp; Acknowledgement</div>
+          <svg id="sow_sig_chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transform:rotate(-90deg);transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
+        <div id="sow_sig_body" style="display:none;padding:16px;flex-direction:column;gap:14px;">
 
           <!-- Tenant signature -->
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-              <div style="width:26px;height:26px;border-radius:50%;background:var(--yellow);color:#111;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">T</div>
+          <div class="box-bg-card">
+            <div class="flex-row-mb">
+              <div style="width:26px;height:26px;border-radius:50%;background:var(--yellow);color:var(--dark);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">T</div>
               <div>
-                <div style="font-size:12px;font-weight:700;">Tenant</div>
+                <div class="fw-bold-sm">Tenant</div>
                 <div class="txt-xs-muted">I acknowledge the scope of work and grant access to the unit</div>
               </div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div class="grid-c2-tight-mb">
               <div class="f"><label>Printed Name</label><input type="text" id="sow_sig_tenant_name" placeholder="Tenant full name"/></div>
               <div class="f"><label>Date</label><input type="date" id="sow_sig_tenant_date"/></div>
             </div>
-            <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','canvas')" id="sow_sig_canvas_tenant_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','type')" id="sow_sig_canvas_tenant_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','wet')" id="sow_sig_canvas_tenant_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sow_sig_canvas_tenant_panel_canvas" class="bg-paper"><canvas id="sow_sig_canvas_tenant" width="620" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sow_sig_canvas_tenant')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sow_sig_canvas_tenant_panel_type" class="sec-hidden"><input type="text" id="sow_sig_canvas_tenant_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="sow_sig_canvas_tenant_panel_wet" class="sec-hidden"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="sow_sig_canvas_tenant_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+            <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','canvas')" id="sow_sig_canvas_tenant_tab_canvas" class="ct-sig-tab active">✏️ Draw</button><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','type')" id="sow_sig_canvas_tenant_tab_type" class="ct-sig-tab">⌨️ Type</button><button type="button" onclick="setSigMethod('sow_sig_canvas_tenant','wet')" id="sow_sig_canvas_tenant_tab_wet" class="ct-sig-tab">🖊 Wet / E-Sign</button></div><div id="sow_sig_canvas_tenant_panel_canvas" class="bg-paper"><canvas id="sow_sig_canvas_tenant" width="620" height="90" class="sig-canvas"></canvas><div class="sig-footer-row"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sow_sig_canvas_tenant')" class="sig-clear-btn">Clear</button></div></div><div id="sow_sig_canvas_tenant_panel_type" class="sec-hidden"><input type="text" id="sow_sig_canvas_tenant_typed" placeholder="Type full legal name" class="sig-typed-input" /><div class="txt-fineprint">Typing your name constitutes a legal electronic signature</div></div><div id="sow_sig_canvas_tenant_panel_wet" class="sec-hidden"><div class="txt-help">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="sow_sig_canvas_tenant_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" class="sig-wet-input" /></div></div>
           </div>
 
           <!-- Employee signature -->
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <div class="box-bg-card">
+            <div class="flex-row-mb">
               <div style="width:26px;height:26px;border-radius:50%;background:var(--surface);border:2px solid var(--border);color:var(--muted);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">S</div>
               <div>
-                <div style="font-size:12px;font-weight:700;">Housing Staff</div>
+                <div class="fw-bold-sm">Housing Staff</div>
                 <div class="txt-xs-muted">Employee completing this scope of work</div>
               </div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div class="grid-c2-tight-mb">
               <div class="f"><label>Printed Name</label><input type="text" id="sow_sig_staff_name" placeholder="Staff full name"/></div>
               <div class="f"><label>Date</label><input type="date" id="sow_sig_staff_date"/></div>
             </div>
-            <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','canvas')" id="sow_sig_canvas_staff_tab_canvas" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid var(--yellow);background:none;font-size:10px;font-weight:700;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;">✏️ Draw</button><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','type')" id="sow_sig_canvas_staff_tab_type" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">⌨️ Type</button><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','wet')" id="sow_sig_canvas_staff_tab_wet" style="flex:1;padding:6px 4px;border:none;border-bottom:2px solid transparent;background:none;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">🖊 Wet / E-Sign</button></div><div id="sow_sig_canvas_staff_panel_canvas" class="bg-paper"><canvas id="sow_sig_canvas_staff" width="620" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sow_sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sow_sig_canvas_staff_panel_type" class="sec-hidden"><input type="text" id="sow_sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div><div id="sow_sig_canvas_staff_panel_wet" class="sec-hidden"><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="sow_sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+            <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','canvas')" id="sow_sig_canvas_staff_tab_canvas" class="ct-sig-tab active">✏️ Draw</button><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','type')" id="sow_sig_canvas_staff_tab_type" class="ct-sig-tab">⌨️ Type</button><button type="button" onclick="setSigMethod('sow_sig_canvas_staff','wet')" id="sow_sig_canvas_staff_tab_wet" class="ct-sig-tab">🖊 Wet / E-Sign</button></div><div id="sow_sig_canvas_staff_panel_canvas" class="bg-paper"><canvas id="sow_sig_canvas_staff" width="620" height="90" class="sig-canvas"></canvas><div class="sig-footer-row"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sow_sig_canvas_staff')" class="sig-clear-btn">Clear</button></div></div><div id="sow_sig_canvas_staff_panel_type" class="sec-hidden"><input type="text" id="sow_sig_canvas_staff_typed" placeholder="Type full legal name" class="sig-typed-input" /><div class="txt-fineprint">Typing your name constitutes a legal electronic signature</div></div><div id="sow_sig_canvas_staff_panel_wet" class="sec-hidden"><div class="txt-help">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="sow_sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" class="sig-wet-input" /></div></div>
           </div>
 
         </div>
@@ -485,9 +514,9 @@
       <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;border-color:var(--yellow);">
         <div class="modal-hdr compact">
           <div class="lbl-yellow">Approvals</div>
-          <span id="sow_budget_badge" style="display:none;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;background:#fffbeb;color:#7a5c00;"></span>
+          <span id="sow_budget_badge" class="pill-warn" style="display:none;"></span>
         </div>
-        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="grid-c2-pad">
           <div class="f"><label>Housing Manager Name</label><input id="sow_hm_name" type="text" placeholder="Full name"/></div>
           <div class="f"><label>HM Approval Date</label><input id="sow_hm_date" type="date"/></div>
           <div class="f"><label>Executive Director Name</label><input id="sow_ed_name" type="text" placeholder="Full name — required if over budget"/></div>
@@ -495,41 +524,14 @@
         </div>
       </div>
 
-      <!-- ── AUDIT LOG (internal, not printed) ──────────────────────────── -->
-      <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact"
-          onclick="var b=document.getElementById('sow_audit_body');var c=document.getElementById('sow_audit_chevron');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';if(!open&&typeof renderSowAuditLog==='function')renderSowAuditLog(window._sowUnitId);">
-          <div class="flex-gap8">
-            <div class="lbl-yellow">📋 Audit Log</div>
-            <span style="font-size:10px;color:#666;font-weight:400;text-transform:none;letter-spacing:0;">— internal use only, not printed</span>
-          </div>
-          <svg id="sow_audit_chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transform:rotate(-90deg);transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div id="sow_audit_body">
-          <div style="padding:0 0 4px 0;">
-            <table style="width:100%;border-collapse:collapse;font-size:12px;">
-              <thead>
-                <tr style="background:var(--bg);border-bottom:1px solid var(--border);">
-                  <th class="lbl-muted" style="padding:8px 14px;text-align:left;white-space:nowrap">Time</th>
-                  <th class="lbl-muted" style="padding:8px 14px;text-align:left">Action</th>
-                  <th class="lbl-muted" style="padding:8px 14px;text-align:left">Detail</th>
-                  <th class="lbl-muted" style="padding:8px 14px;text-align:left">By</th>
-                </tr>
-              </thead>
-              <tbody id="sow_audit_tbody">
-                <tr><td colspan="4" style="padding:16px 14px;color:var(--muted);font-style:italic;font-size:12px;">Save the SOW to generate audit entries.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+      <!-- (Audit log card removed — auditEntry() writes still go to the master Audit Log) -->
 
     </div><!-- /body -->
 
     <!-- Footer -->
     <div class="flex-sb" style="padding:14px 24px;border-top:1px solid var(--border);gap:10px;background:var(--bg);position:sticky;bottom:0">
       <div id="sow_saved_indicator" class="txt-muted-sm"></div>
-      <div style="display:flex;gap:10px;">
+      <div class="flex-row-10">
         <button type="button" onclick="closeSowModal()" class="btn btn-ghost">Cancel</button>
         <button id="sow_save_btn" type="button" onclick="saveSOW()" class="btn btn-primary">💾 Save Scope of Work</button>
       </div>
@@ -543,12 +545,12 @@
     <!-- Header -->
     <div class="modal-hdr spacious">
       <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:3px;">Edit Unit</div>
-        <div id="ue_modal_title" style="font-size:16px;font-weight:700;color:#fff;"></div>
+        <div class="lbl-uppercase-sm">Edit Unit</div>
+        <div id="ue_modal_title" class="txt-hdr-white"></div>
       </div>
       <div class="flex-gap8">
         <button id="ue_sow_btn" onclick="ueOpenSow()" title="Scope of Work"
-          style="background:none;border:1px solid #555;color:#ccc;border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;white-space:nowrap;"
+          style="background:none;border:1px solid var(--dark-border);color:var(--txt-on-dark);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;white-space:nowrap;"
           onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'"
           onmouseout="this.style.borderColor='#555';this.style.color='#ccc'">
           🔨 SOW
@@ -571,7 +573,7 @@
       <!-- Unit details -->
       <div>
         <div class="lbl-muted" class="mb-12">Unit Details</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <div class="grid-c3-tight">
           <div class="f"><label>Bedrooms</label>
             <select id="ue_bedrooms">
               <option value="1">1</option><option value="2">2</option><option value="3">3</option>
@@ -618,7 +620,7 @@
       </div>
 
       <!-- Funder -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="grid-c2-10">
         <div class="f"><label>Funder / Program</label>
           <select id="ue_funder">
             <option value="">None / Band</option>
@@ -650,15 +652,15 @@
             <div>
               <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Currently Assigned</div>
               <div id="ue_current_tenant_name" class="txt-md-bold"></div>
-              <div id="ue_current_tenant_meta" style="font-size:11px;color:var(--muted);margin-top:2px;"></div>
+              <div id="ue_current_tenant_meta" class="txt-sm-meta"></div>
             </div>
-            <button type="button" onclick="ueRemoveTenant()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:#b91c1c;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;flex-shrink:0;">Remove</button>
+            <button type="button" onclick="ueRemoveTenant()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:var(--danger);cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;flex-shrink:0;">Remove</button>
           </div>
         </div>
 
         <!-- Applicant search -->
         <div>
-          <label style="font-size:11.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;">Search Applicant <span style="color:#b91c1c;">*</span></label>
+          <label style="font-size:11.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;">Search Applicant <span class="txt-required">*</span></label>
           <div class="pos-rel">
             <input type="text" id="ue_tenant_search"
               placeholder="Search by name or APP-ID…"
@@ -678,14 +680,14 @@
 
         <!-- Not found — prompt new application -->
         <div id="ue_tenant_notfound">
-          <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:6px;">No approved application found</div>
-          <div style="font-size:12px;color:#7a6000;margin-bottom:10px;">The applicant needs an approved housing application before being assigned to a unit.</div>
+          <div style="font-size:12px;font-weight:700;color:var(--warn-amber);margin-bottom:6px;">No approved application found</div>
+          <div style="font-size:12px;color:var(--warn-amber);margin-bottom:10px;">The applicant needs an approved housing application before being assigned to a unit.</div>
           <button type="button" onclick="closeUnitEditModal();newApp();" class="btn btn-primary" style="font-size:12px;padding:7px 16px;">📝 Start New Application</button>
         </div>
 
         <!-- Move-in date -->
         <div class="f">
-          <label>Move-in Date <span style="color:#b91c1c;">*</span></label>
+          <label>Move-in Date <span class="txt-required">*</span></label>
           <input type="date" id="ue_assignedDate"/>
         </div>
       </div>
@@ -693,42 +695,23 @@
       <!-- Budget Approval Indicator (shown when SOW cost exists) -->
       <div id="ue_budget_indicator"></div>
 
-      <!-- Tenant -->
+      <!-- Approvals (HM / ED signatures for SOW workflow) -->
       <div id="ue_sig_section">
-        <div class="lbl-muted" style="margin-bottom:12px">Tenant</div>
-        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-            <div style="width:32px;height:32px;border-radius:50%;background:var(--yellow);color:#111;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">T</div>
-            <div>
-              <div id="ue_tenant_display_name" class="txt-md-bold">Vacant</div>
-              <div id="ue_tenant_display_meta" style="font-size:11px;color:var(--muted);margin-top:1px;">No tenant assigned</div>
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="f">
-              <label>Tenant Name</label>
-              <input type="text" id="ue_sig_tenant_name" placeholder="Vacant" class="bg-bg"/>
-            </div>
-            <div class="f">
-              <label>Move-in Date</label>
-              <input type="date" id="ue_sig_tenant_date"/>
-            </div>
-          </div>
-        </div>
+        <div class="lbl-muted" style="margin-bottom:12px">Approvals</div>
 
         <!-- HM approval signature (shown when SOW requires HM or ED approval) -->
         <div id="ue_sig_hm_block">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div class="flex-sb-mb">
             <div class="flex-gap8">
-              <div style="width:24px;height:24px;border-radius:50%;background:#1d4ed8;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">HM</div>
+              <div class="avatar-circle-24-blue">HM</div>
               <div>
-                <div style="font-size:12px;font-weight:700;color:#1d4ed8;">Housing Manager Approval</div>
+                <div style="font-size:12px;font-weight:700;color:var(--info-blue);">Housing Manager Approval</div>
                 <div class="txt-xs-muted">Required — renovation within HM budget authority</div>
               </div>
             </div>
-            <span id="ue_sig_hm_badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#eff6ff;color:#1d4ed8;">Pending</span>
+            <span id="ue_sig_hm_badge" class="pill-info">Pending</span>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div class="grid-c3-tight-mb">
             <div class="f"><label>HM Name</label><input type="text" id="ue_sig_hm_name" placeholder="Full name"/></div>
             <div class="f"><label>Date</label><input type="date" id="ue_sig_hm_date"/></div>
             <div class="f"><label>Decision</label>
@@ -745,17 +728,17 @@
 
         <!-- ED approval signature (shown when SOW exceeds HM budget limit) -->
         <div id="ue_sig_ed_block">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div class="flex-sb-mb">
             <div class="flex-gap8">
-              <div style="width:24px;height:24px;border-radius:50%;background:var(--yellow);color:#111;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">ED</div>
+              <div class="avatar-circle-24-yellow">ED</div>
               <div>
-                <div style="font-size:12px;font-weight:700;color:#7a5c00;">Executive Director Approval</div>
+                <div style="font-size:12px;font-weight:700;color:var(--warn-amber);">Executive Director Approval</div>
                 <div class="txt-xs-muted">Required — renovation exceeds HM budget authority</div>
               </div>
             </div>
-            <span id="ue_sig_ed_badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#fffbeb;color:#7a5c00;">Pending</span>
+            <span id="ue_sig_ed_badge" class="pill-warn">Pending</span>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div class="grid-c3-tight-mb">
             <div class="f"><label>ED Name</label><input type="text" id="ue_sig_ed_name" placeholder="Full name"/></div>
             <div class="f"><label>Date</label><input type="date" id="ue_sig_ed_date"/></div>
             <div class="f"><label>Decision</label>
@@ -792,7 +775,7 @@
     <!-- Footer -->
     <div class="flex-sb" style="padding:16px 24px;border-top:1px solid var(--border);background:var(--bg)">
       <div id="ue_archive_btn_wrap"></div>
-      <div style="display:flex;gap:10px;">
+      <div class="flex-row-10">
         <button onclick="closeUnitEditModal()" class="btn btn-ghost">Cancel</button>
         <button onclick="saveUnitEdit()" class="btn btn-primary">Save Changes</button>
       </div>
@@ -867,8 +850,8 @@
   <div class="modal-hdr sticky">
     <span id="printPanelTitle" style="color:#fff;font-weight:700;font-size:14px;">Document Preview</span>
     <div style="display:flex;gap:8px;">
-      <button onclick="triggerPrint()" style="background:var(--yellow);border:none;color:#111;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;">🖨 Print</button>
-      <button onclick="closePrintPanel()" style="background:none;border:1px solid #555;color:#ccc;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;">✕ Close</button>
+      <button onclick="triggerPrint()" style="background:var(--yellow);border:none;color:var(--dark);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;">🖨 Print</button>
+      <button onclick="closePrintPanel()" style="background:none;border:1px solid var(--dark-border);color:var(--txt-on-dark);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;">✕ Close</button>
     </div>
   </div>
   <div id="printPanelBody"></div>

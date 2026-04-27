@@ -6,8 +6,11 @@
  * ============================================================ */
 
 // ── Supabase connection ───────────────────────────────────────────────────────
-window.SUPABASE_URL  = 'https://fkhzrbalumzeripzolph.supabase.co';
-window.SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo';
+window.SUPABASE_URL    = 'https://fkhzrbalumzeripzolph.supabase.co';
+window.SUPABASE_ANON   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo';
+// Storage bucket for tenant files, photos, contractor docs, SOW attachments.
+// Required by SbStorage helpers and the DocLibrary factory.
+window.STORAGE_BUCKET  = 'housing-files';
 
 // Sentinel checked by shared-auth.js to confirm this file loaded
 window.CLFN_CONFIG_LOADED = true;

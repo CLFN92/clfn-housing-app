@@ -201,16 +201,16 @@ function searchCurrentUnit(q){
     return (u.num+' '+u.street).toLowerCase().includes(q.toLowerCase());
   }).slice(0,8);
   if(!matches.length){
-    dd.innerHTML='<div style="padding:8px 12px;color:#696960;font-size:13px;">No units found</div>';
+    dd.innerHTML='<div style="padding:8px 12px;color:var(--muted);font-size:13px;">No units found</div>';
     dd.style.display='block'; return;
   }
   dd.innerHTML = matches.map(function(u){
     var addr = u.num+' '+u.street;
     var statusLabel = {occupied:'Occupied',vacant:'Vacant',under_repair:'Under Repair',condemned:'Condemned',reserved:'Reserved'}[u.status]||u.status;
-    return '<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #e8e6df;font-size:13px;" '
+    return '<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;" '
       +'data-uid="'+u.id+'" data-label="'+addr+'" onmousedown="selectCurrentUnit(this)">'
       +'<span style="font-weight:600;">'+addr+'</span>'
-      +' <span style="font-size:11px;color:#696960;">('+u.bedrooms+'-bed · '+statusLabel+')</span>'
+      +' <span style="font-size:11px;color:var(--muted);">('+u.bedrooms+'-bed · '+statusLabel+')</span>'
       +'</div>';
   }).join('');
   dd.style.display='block';
@@ -402,7 +402,7 @@ function renderAddUnitPhotoPreview() {
   el.innerHTML = photos.map(function(p, i) {
     return '<div style="position:relative;flex-shrink:0;">'
       + '<img src="' + p.data + '" style="width:70px;height:55px;object-fit:cover;border-radius:6px;border:1px solid var(--border);"/>'
-      + '<button type="button" onclick="(function(){window._auStagedPhotos.splice(' + i + ',1);renderAddUnitPhotoPreview();})()" style="position:absolute;top:-5px;right:-5px;background:#b91c1c;border:none;color:#fff;width:16px;height:16px;border-radius:50%;cursor:pointer;font-size:9px;">✕</button>'
+      + '<button type="button" onclick="(function(){window._auStagedPhotos.splice(' + i + ',1);renderAddUnitPhotoPreview();})()" style="position:absolute;top:-5px;right:-5px;background:var(--danger);border:none;color:#fff;width:16px;height:16px;border-radius:50%;cursor:pointer;font-size:9px;">✕</button>'
       + '</div>';
   }).join('');
 }
@@ -700,6 +700,11 @@ var _amAppId = null;
 var _amBestUnitId = null;
 var _amSelectedUnitId = null;
 var _amAllScored = [];
+// Search/filter state for the assign-unit modal — kept module-level so
+// amFilterUnits() can re-render with the captured role/needsAccess context.
+var _amSearchQuery = '';
+var _amCurrentRole = '';
+var _amCurrentNeedsAccess = false;
 
 function _scoreUnit(u, needsBeds, needsAccess, isElders) {
   var sc = 0;
@@ -755,6 +760,13 @@ function openAssignModal(appId, suggestedUnitId) {
     return { unit:u, score:_scoreUnit(u, needsBeds, needsAccess, isElders), maxPossible:24 };
   }).sort(function(a,b){ return b.score-a.score; });
 
+  // Capture context for filter re-renders + reset search input
+  _amCurrentRole = role;
+  _amCurrentNeedsAccess = needsAccess;
+  _amSearchQuery = '';
+  var searchEl = document.getElementById('am_search_input');
+  if(searchEl) searchEl.value = '';
+
   // Render the unit card list
   amRenderUnitList(role, needsAccess);
 
@@ -775,6 +787,13 @@ function openAssignModal(appId, suggestedUnitId) {
   if(modal){ modal.style.removeProperty('display'); modal.style.setProperty('display','flex','important'); }
 }
 
+// Filter the visible units in the assign-unit modal by address/street.
+// Re-renders with captured role/needsAccess context.
+function amFilterUnits(q) {
+  _amSearchQuery = (q || '').toLowerCase();
+  amRenderUnitList(_amCurrentRole, _amCurrentNeedsAccess);
+}
+
 function amRenderUnitList(role, needsAccess) {
   var list = document.getElementById('am_unit_list');
   if(!list) return;
@@ -782,20 +801,35 @@ function amRenderUnitList(role, needsAccess) {
     list.innerHTML='<div class="empty-state-ctr">No vacant units available.</div>';
     return;
   }
-  list.innerHTML = _amAllScored.map(function(obj, i){
+  // Determine recommendation context from the FULL ranked list so badges
+  // attach to the absolute-top units regardless of what's filtered out.
+  var topUnitId = _amAllScored[0].unit.id;
+  var topScore  = _amAllScored[0].score;
+  // Filter view by search query (matches num + street)
+  var q = _amSearchQuery;
+  var visible = q
+    ? _amAllScored.filter(function(obj){
+        var hay = (obj.unit.num + ' ' + obj.unit.street).toLowerCase();
+        return hay.indexOf(q) !== -1;
+      })
+    : _amAllScored;
+  if(!visible.length){
+    list.innerHTML='<div class="empty-state-ctr">No units match your search.</div>';
+    return;
+  }
+  list.innerHTML = visible.map(function(obj){
     var u = obj.unit;
     var pct = Math.round(Math.max(0, obj.score) / obj.maxPossible * 100);
-    var isTop = i === 0;
+    var isTop = u.id === topUnitId;
     var isAccMismatch = needsAccess && !u.accessible;
-    var barColor = isAccMismatch ? '#b91c1c' : pct >= 70 ? '#15803d' : pct >= 40 ? '#d97706' : '#888';
+    var barColor = isAccMismatch ? 'var(--danger)' : pct >= 70 ? 'var(--success)' : pct >= 40 ? 'var(--warn-amber)' : 'var(--muted)';
     var badges = [];
-    var topScore = _amAllScored.length > 0 ? _amAllScored[0].score : 0;
     var isTiedUnit = obj.score >= topScore - 1;
-    if(isTop) badges.push('<span style="font-size:9px;font-weight:800;padding:1px 7px;border-radius:10px;background:var(--yellow);color:#111;">★ RECOMMENDED</span>');
-    else if(isTiedUnit) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:rgba(248,228,26,0.15);color:#7a6000;border:1px solid var(--yellow);">≈ TIED MATCH</span>');
-    if(isAccMismatch) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:#fef2f2;color:#b91c1c;">⚠ Not accessible</span>');
-    if(u.accessible && !isAccMismatch) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:#eff6ff;color:#1d4ed8;">♿ Accessible</span>');
-    if(u.isElders) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:#fffbeb;color:#92400e;">Elders Unit</span>');
+    if(isTop) badges.push('<span style="font-size:9px;font-weight:800;padding:1px 7px;border-radius:10px;background:var(--yellow);color:var(--dark);">★ RECOMMENDED</span>');
+    else if(isTiedUnit) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:rgba(248,228,26,0.15);color:var(--warn-amber);border:1px solid var(--yellow);">≈ TIED MATCH</span>');
+    if(isAccMismatch) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:var(--danger-bg);color:var(--danger);">⚠ Not accessible</span>');
+    if(u.accessible && !isAccMismatch) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:var(--info-blue-bg);color:var(--info-blue);">♿ Accessible</span>');
+    if(u.isElders) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:var(--warn-amber-bg);color:var(--warn-amber);">Elders Unit</span>');
     return '<div data-unit-id="'+u.id+'" style="padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;">'
       +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;">'
         +'<div>'
@@ -1101,21 +1135,21 @@ function renderRenoApprovalsView() {
     // Inline approve button — role gated
     var approveBtn = '';
     if(role=== ROLE.HOUSING_MANAGER && appr.key==='pending_hm')
-      approveBtn = '<button data-ra-approve="'+uid+'" data-ra-role="hm" style="background:var(--yellow);border:none;color:#111;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">✓ Approve</button>';
+      approveBtn = '<button data-ra-approve="'+uid+'" data-ra-role="hm" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">✓ Approve</button>';
     else if(role=== ROLE.ED && (appr.key==='pending_ed'||appr.key==='pending_hm'))
-      approveBtn = '<button data-ra-approve="'+uid+'" data-ra-role="ed" style="background:var(--yellow);border:none;color:#111;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'+(appr.key==='pending_hm'?'Override →':'✓ Approve')+'</button>';
+      approveBtn = '<button data-ra-approve="'+uid+'" data-ra-role="ed" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'+(appr.key==='pending_hm'?'Override →':'✓ Approve')+'</button>';
 
     return '<tr data-ra-uid="'+uid+'" style="border-bottom:1px solid var(--border);cursor:pointer;">'
       +'<td style="padding:10px 14px;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
         +u.num+' '+u.street
-        +(u.status==='condemned'?' <span style="font-size:9px;background:#fef2f2;color:#b91c1c;padding:1px 6px;border-radius:6px;font-weight:700;">CONDEMNED</span>':'')
+        +(u.status==='condemned'?' <span style="font-size:9px;background:var(--danger-bg);color:var(--danger);padding:1px 6px;border-radius:6px;font-weight:700;">CONDEMNED</span>':'')
       +'</td>'
       +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);white-space:nowrap;">'+u.bedrooms+'bd·'+(u.type&&u.type!=='0'&&u.type!=='nan'?u.type.replace(' unit','').replace('Detached','Det.').replace('Complex','Cplx'):'—')+'</td>'
       +'<td style="padding:10px 10px;white-space:nowrap;"><span style="font-size:14px;font-weight:800;color:var(--text);">'+rs.score+'</span> <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:'+tier.bg+';color:'+tier.c+';">'+tier.l+'</span></td>'
-      +'<td style="padding:10px 10px;font-size:13px;font-weight:600;">'+costStr+(needsED&&r.cost>0?'<div style="font-size:9px;color:#1d4ed8;font-weight:700;">ED auth</div>':'')+'</td>'
+      +'<td style="padding:10px 10px;font-size:13px;font-weight:600;">'+costStr+(needsED&&r.cost>0?'<div class="txt-info-bold" style="font-size:9px;">ED auth</div>':'')+'</td>'
       +'<td class="pad-10"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+appr.bg+';color:'+appr.c+';white-space:nowrap;">'+appr.label+'</span></td>'
       +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(sow&&sow.contractor?sow.contractor:'—')+'</td>'
-      +'<td class="pad-10"><div style="display:flex;align-items:center;gap:6px;"><div style="width:56px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'#15803d':'var(--yellow)')+';border-radius:2px;"></div></div><span class="js-lbl-sm">'+pct+'%</span></div></td>'
+      +'<td class="pad-10"><div style="display:flex;align-items:center;gap:6px;"><div style="width:56px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'var(--success)':'var(--yellow)')+';border-radius:2px;"></div></div><span class="js-lbl-sm">'+pct+'%</span></div></td>'
       +'<td style="padding:10px 14px;width:1%;white-space:nowrap;"><div style="display:flex;gap:5px;align-items:center;">'
         +approveBtn
         +'<button data-ra-sow="'+uid+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--muted);">SOW</button>'
@@ -1209,44 +1243,44 @@ function exportRenoApprovalsPDF() {
     var cost=sow?(parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))||0):0;
     var pct=prog?(prog.overallPct||0):0;
     var bg=i%2===0?'#fff':'#f9f9f7';
-    return '<tr style="background:'+bg+';border-bottom:1px solid #eee;">'
-      +'<td style="padding:7px 10px;font-size:11px;font-weight:600;">'+u.num+' '+u.street+(u.status==='condemned'?' <span style="font-size:9px;color:#b91c1c;">[CONDEMNED]</span>':'')+'</td>'
+    return '<tr style="background:'+bg+';border-bottom:1px solid var(--border);">'
+      +'<td style="padding:7px 10px;font-size:11px;font-weight:600;">'+u.num+' '+u.street+(u.status==='condemned'?' <span class="txt-danger-bold" style="font-size:9px;">[CONDEMNED]</span>':'')+'</td>'
       +'<td style="padding:7px 8px;font-size:11px;text-align:center;font-weight:800;color:'+tier.c+';">'+rs.score+'<br/><span style="font-size:9px;font-weight:700;">'+tier.l+'</span></td>'
-      +'<td style="padding:7px 8px;font-size:11px;">'+(cost>0?'$'+cost.toLocaleString():'—')+(cost>hmLimit?' <span style="font-size:9px;color:#1d4ed8;">ED</span>':'')+'</td>'
+      +'<td style="padding:7px 8px;font-size:11px;">'+(cost>0?'$'+cost.toLocaleString():'—')+(cost>hmLimit?' <span style="font-size:9px;color:var(--info-blue);">ED</span>':'')+'</td>'
       +'<td style="padding:7px 8px;font-size:10px;font-weight:700;color:'+appr.c+';">'+appr.label+'</td>'
-      +'<td style="padding:7px 8px;font-size:10px;color:#333;">'+(u.unitHmSig&&u.unitHmSig.decision?u.unitHmSig.decision+(u.unitHmSig.date?' ('+u.unitHmSig.date+')':''):'—')+'</td>'
-      +'<td style="padding:7px 8px;font-size:10px;color:#333;">'+(u.unitEdSig&&u.unitEdSig.decision?u.unitEdSig.decision+(u.unitEdSig.date?' ('+u.unitEdSig.date+')':''):'—')+'</td>'
-      +'<td style="padding:7px 8px;font-size:11px;color:#555;">'+(sow&&sow.contractor?sow.contractor:'—')+'</td>'
+      +'<td style="padding:7px 8px;font-size:10px;color:var(--text);">'+(u.unitHmSig&&u.unitHmSig.decision?u.unitHmSig.decision+(u.unitHmSig.date?' ('+u.unitHmSig.date+')':''):'—')+'</td>'
+      +'<td style="padding:7px 8px;font-size:10px;color:var(--text);">'+(u.unitEdSig&&u.unitEdSig.decision?u.unitEdSig.decision+(u.unitEdSig.date?' ('+u.unitEdSig.date+')':''):'—')+'</td>'
+      +'<td style="padding:7px 8px;font-size:11px;color:var(--muted);">'+(sow&&sow.contractor?sow.contractor:'—')+'</td>'
       +'<td style="padding:7px 8px;font-size:11px;text-align:center;">'+pct+'%</td>'
       +'</tr>';
   }).join('');
 
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Reno Approvals — CLFN</title>'
-    +'<style>*{box-sizing:border-box;margin:0;padding:0;}@page{size:letter landscape;margin:12mm 14mm;}body{font-family:Arial,sans-serif;font-size:11px;color:#111;}</style>'
+    +'<style>'+_printThemeStyles()+'*{box-sizing:border-box;margin:0;padding:0;}@page{size:letter landscape;margin:12mm 14mm;}body{font-family:Arial,sans-serif;font-size:11px;color:var(--text);}</style>'
     +'</head><body>'
-    +'<div style="background:#000;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;">'
-      +(logoSrc?'<img src="'+logoSrc+'" style="height:34px;" alt="CLFN"/>':'<span style="color:#F8E41A;font-weight:700;font-size:14px;">CLFN</span>')
+    +'<div style="background:var(--dark);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;">'
+      +(logoSrc?'<img src="'+logoSrc+'" style="height:34px;" alt="CLFN"/>':'<span style="color:var(--yellow);font-weight:700;font-size:14px;">CLFN</span>')
       +'<div style="text-align:center;">'
-        +'<div style="font-size:8px;color:#F8E41A;font-weight:700;letter-spacing:.1em;text-transform:uppercase;">Constance Lake First Nation — Housing</div>'
+        +'<div style="font-size:8px;color:var(--yellow);font-weight:700;letter-spacing:.1em;text-transform:uppercase;">Constance Lake First Nation — Housing</div>'
         +'<div style="font-size:15px;font-weight:700;color:#fff;margin-top:2px;">Renovation Approvals Report</div>'
       +'</div>'
-      +'<div style="text-align:right;font-size:9px;color:#aaa;">'+today+'<br/>'+relevant.length+' units<br/>Filter: '+(_raFilter||'All')+'</div>'
+      +'<div style="text-align:right;font-size:9px;color:var(--muted);">'+today+'<br/>'+relevant.length+' units<br/>Filter: '+(_raFilter||'All')+'</div>'
     +'</div>'
-    +'<div style="background:#F8E41A;height:3px;margin-bottom:14px;"></div>'
+    +'<div style="background:var(--yellow);height:3px;margin-bottom:14px;"></div>'
     +'<table class="std-tbl">'
-      +'<thead><tr style="background:#111;">'
-        +'<th style="padding:8px 10px;text-align:left;font-size:9px;color:#F8E41A;text-transform:uppercase;letter-spacing:.06em;">Address</th>'
-        +'<th style="padding:8px 8px;text-align:center;font-size:9px;color:#F8E41A;text-transform:uppercase;letter-spacing:.06em;width:60px;">Score</th>'
-        +'<th style="padding:8px 8px;font-size:9px;color:#F8E41A;text-transform:uppercase;letter-spacing:.06em;width:80px;">SOW Cost</th>'
-        +'<th style="padding:8px 8px;font-size:9px;color:#F8E41A;text-transform:uppercase;letter-spacing:.06em;width:100px;">Status</th>'
-        +'<th style="padding:8px 8px;font-size:9px;color:#F8E41A;text-transform:uppercase;letter-spacing:.06em;width:110px;">HM Decision</th>'
-        +'<th style="padding:8px 8px;font-size:9px;color:#F8E41A;text-transform:uppercase;letter-spacing:.06em;width:110px;">ED Decision</th>'
-        +'<th style="padding:8px 8px;font-size:9px;color:#F8E41A;text-transform:uppercase;letter-spacing:.06em;">Contractor</th>'
-        +'<th style="padding:8px 8px;text-align:center;font-size:9px;color:#F8E41A;text-transform:uppercase;letter-spacing:.06em;width:55px;">Progress</th>'
+      +'<thead><tr style="background:var(--dark);">'
+        +'<th style="padding:8px 10px;text-align:left;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;">Address</th>'
+        +'<th style="padding:8px 8px;text-align:center;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:60px;">Score</th>'
+        +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:80px;">SOW Cost</th>'
+        +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:100px;">Status</th>'
+        +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:110px;">HM Decision</th>'
+        +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:110px;">ED Decision</th>'
+        +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;">Contractor</th>'
+        +'<th style="padding:8px 8px;text-align:center;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:55px;">Progress</th>'
       +'</tr></thead>'
       +'<tbody>'+tableRows+'</tbody>'
     +'</table>'
-    +'<div style="margin-top:16px;border-top:2px solid #F8E41A;padding-top:6px;display:flex;justify-content:space-between;font-size:8px;color:#888;">'
+    +'<div style="margin-top:16px;border-top:2px solid var(--yellow);padding-top:6px;display:flex;justify-content:space-between;font-size:8px;color:var(--muted);">'
       +'<span>Constance Lake First Nation — Housing Department — Confidential</span>'
       +'<span>Printed: '+today+'</span>'
     +'</div>'
@@ -1510,6 +1544,8 @@ async function loadAppDataFromSupabase() {
       var setData=await setR.json();
       setData.forEach(function(row){ if(!window._appSettings) window._appSettings={}; window._appSettings[row.key]=row.value; });
     }
+    // Apply saved brand theme (Settings → Admin → Themes)
+    if (typeof _applyTheme === 'function') _applyTheme((window._appSettings||{}).theme || {});
 
     // Load contractors
     try {
@@ -1541,6 +1577,8 @@ async function loadAppDataFromSupabase() {
       var asR=await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=key,value',{headers:HOUSING_HEADERS});
       if(asR.ok){var asd=await asR.json();window._appSettings={};asd.forEach(function(r){window._appSettings[r.key]=r.value;});}
     } catch(e){console.warn('Settings:',e);}
+    // Apply saved brand theme (Settings → Admin → Themes)
+    if (typeof _applyTheme === 'function') _applyTheme((window._appSettings||{}).theme || {});
     // Load contacts
     try {
       var conR=await fetch(SUPABASE_URL+'/rest/v1/housing_contacts?select=*&limit=1',{headers:HOUSING_HEADERS});
@@ -1626,7 +1664,7 @@ function showAddHousingStaff() {
   overlay.innerHTML = '<div style="background:var(--surface);border-radius:14px;width:100%;max-width:520px;box-shadow:0 24px 60px rgba(0,0,0,.5);overflow:hidden;">'
     + '<div style="background:var(--dark);border-bottom:3px solid var(--yellow);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">'
     + '<span style="font-size:15px;font-weight:700;color:#fff;">'+(isED?'Add Staff Member — ED':'Add Staff Member')+'</span>'
-    + '<button onclick="closeStaffModal()" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;line-height:1;">&times;</button>'
+    + '<button onclick="closeStaffModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;">&times;</button>'
     + '</div>'
     + '<div style="padding:22px;display:flex;flex-direction:column;gap:12px;">'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
@@ -1634,7 +1672,7 @@ function showAddHousingStaff() {
     + '<input id="hs-name" placeholder="e.g. Edith Moore" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;"></div>'
     + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Work Email</label>'
     + '<input id="hs-email" type="email" placeholder="edith.moore@clfn.on.ca" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'
-    + '<div id="hs-email-hint" style="display:none;font-size:11px;color:#b91c1c;margin-top:3px;">&#9888; Must be a @clfn.on.ca address</div></div>'
+    + '<div id="hs-email-hint" style="display:none;font-size:11px;color:var(--danger);margin-top:3px;">&#9888; Must be a @clfn.on.ca address</div></div>'
     + '</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
     + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Department</label>'
@@ -1642,7 +1680,7 @@ function showAddHousingStaff() {
     + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Role</label>'
     + '<select id="hs-role" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'+roleOptions+'</select></div>'
     + '</div>'
-    + '<div style="background:#f8f8f6;border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);">'
+    + '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);">'
     + '&#128274; A login account is created automatically. Default password: <strong>CLFN + FirstName + 2026!</strong>'
     + '</div>'
     + '<div id="hs-result" style="display:none;border-radius:8px;padding:10px 14px;font-size:12px;"></div>'
@@ -1688,7 +1726,7 @@ function editStaff(idOrObj) {
   overlay.innerHTML = '<div style="background:var(--surface);border-radius:14px;width:100%;max-width:480px;box-shadow:0 24px 60px rgba(0,0,0,.5);overflow:hidden;">'
     + '<div style="background:var(--dark);border-bottom:3px solid var(--yellow);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">'
     + '<span style="font-size:15px;font-weight:700;color:#fff;">Edit Staff Member</span>'
-    + '<button onclick="closeStaffModal()" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;line-height:1;">&times;</button>'
+    + '<button onclick="closeStaffModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;">&times;</button>'
     + '</div>'
     + '<div style="padding:22px;display:flex;flex-direction:column;gap:14px;">'
     // Name
@@ -1833,10 +1871,10 @@ async function submitAddHousingStaff() {
 
     // Both succeeded
     if(res){
-      res.style.background='#f0fdf4'; res.style.border='1px solid #86efac'; res.style.color='#166534';
+      res.style.background='var(--success-bg)'; res.style.border='1px solid var(--success-border)'; res.style.color='var(--success)';
       res.innerHTML = '<strong>&#10003; '+name+' added successfully!</strong><br>'
-        + 'Email: <code style="background:#dcfce7;padding:2px 6px;border-radius:4px;">'+email+'</code><br>'
-        + 'Password: <code style="background:#dcfce7;padding:2px 6px;border-radius:4px;font-weight:700;">'+defaultPassword+'</code><br>'
+        + 'Email: <code style="background:var(--success-border);padding:2px 6px;border-radius:4px;">'+email+'</code><br>'
+        + 'Password: <code style="background:var(--success-border);padding:2px 6px;border-radius:4px;font-weight:700;">'+defaultPassword+'</code><br>'
         + '<span style="font-size:11px;opacity:.8;">Share these credentials directly. They can change their password after signing in.</span>';
       res.style.display='block';
       showToast('\u2713 '+name+' added successfully');
@@ -1911,6 +1949,12 @@ function initHousingPage() {
 
   // Navigate to requested view from URL param
   var params = new URLSearchParams(window.location.search);
+  // ?openApp=APP_ID — cross-page handoff (e.g. from match.html applicant click)
+  var openAppId = params.get('openApp');
+  if(openAppId && typeof window.openEditModal === 'function'){
+    window.openEditModal(openAppId);
+    return;
+  }
   var view = params.get('view') || 'dashboard';
   if(view==='home')             { if(typeof showEmployeeHome==='function') showEmployeeHome(); }
   else if(view==='newapp')      { if(typeof newApp==='function') newApp(); }
