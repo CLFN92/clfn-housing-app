@@ -79,19 +79,26 @@ function showStepErrors(step, errs, bannerId) {
   b.style.animation = 'none';
   b.offsetHeight; // reflow
   b.style.animation = 'shake .35s ease';
-  // Highlight invalid fields — match error messages to field IDs
+  // Highlight invalid fields — match error messages to field IDs.
+  // Only matches static field errors; dynamic-row errors (Reference 1: …,
+  // Household member 2: …, Pet 3: …, Income record 1: …) are skipped so
+  // their inner phrasing doesn't accidentally highlight a same-named static
+  // field on a different step.
   var fieldMap = {
     'First name': 'fn', 'Last name': 'ln', 'Date of birth': 'dob',
     'On Reserve': 'reserve', 'Marital status': 'marital', 'Marital Status': 'marital',
     'Cell phone': 'phone', 'Phone': 'phone', 'Email': 'email',
-    'City': 'city', 'Province': 'prov', 'Postal': 'postal',
+    'Classification': 'classification', 'Housing Classification': 'classification',
+    'Street': 'street', 'City': 'city', 'Province': 'prov', 'Postal': 'postal',
     'Expected occupancy': 'occDate', 'Arrears amount': 'arrBalAmt',
     'Home condition': 'homeCondition',
     'Co-applicant first': 'co_fn', 'Co-applicant last': 'co_ln',
     'Co-applicant date': 'co_dob', 'Co-applicant reserve': 'co_reserve',
     'Co-applicant cell': 'co_cell', 'Co-applicant email': 'co_email'
   };
+  var ROW_PREFIX_RE = /^(Reference |Household member |Pet |Income record |Row )/i;
   errs.forEach(function(err) {
+    if (ROW_PREFIX_RE.test(err)) return; // dynamic-row error — handled at the row level
     Object.keys(fieldMap).forEach(function(key) {
       if (err.toLowerCase().includes(key.toLowerCase())) {
         var el = document.getElementById(fieldMap[key]);

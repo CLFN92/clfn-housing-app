@@ -692,15 +692,15 @@
         <div id="coBlk">
           <div class="divider"></div>
           <div class="fg c2">
-            <div class="f"><label>First Name <span class="r">*</span></label><input type="text" id="co_fn"/></div>
-            <div class="f"><label>Last Name <span class="r">*</span></label><input type="text" id="co_ln"/></div>
-            <div class="f"><label>Date of Birth <span class="r">*</span></label><input type="date" id="co_dob"/></div>
+            <div class="f" data-req="co_fn"><label>First Name <span class="r">*</span></label><input type="text" id="co_fn"/></div>
+            <div class="f" data-req="co_ln"><label>Last Name <span class="r">*</span></label><input type="text" id="co_ln"/></div>
+            <div class="f" data-req="co_dob"><label>Date of Birth <span class="r">*</span></label><input type="date" id="co_dob"/></div>
             <div class="f"><label>Band Number</label><input type="number" id="co_band"/></div>
-            <div class="f"><label>On Reserve Status <span class="r">*</span></label><select id="co_reserve"><option value="">Select</option><option>On Reserve</option><option>Off Reserve</option></select></div>
-            <div class="f"><label>Cell Phone <span class="r">*</span></label><input type="tel" id="co_cell" oninput="fmtPhone(this)"/></div>
+            <div class="f" data-req="co_reserve"><label>On Reserve Status <span class="r">*</span></label><select id="co_reserve"><option value="">Select</option><option>On Reserve</option><option>Off Reserve</option></select></div>
+            <div class="f" data-req="co_cell"><label>Cell Phone <span class="r">*</span></label><input type="tel" id="co_cell" oninput="fmtPhone(this)"/></div>
             <div class="f"><label>Home Phone</label><input type="tel" id="co_home" oninput="fmtPhone(this)"/></div>
-            <div class="f"><label>Email <span class="r">*</span></label><input type="email" id="co_email"/></div>
-            <div class="f"><label>Occupancy Start Date <span class="r">*</span></label><input type="date" id="coOccDate"/></div>
+            <div class="f" data-req="co_email"><label>Email <span class="r">*</span></label><input type="email" id="co_email"/></div>
+            <div class="f" data-req="coOccDate"><label>Occupancy Start Date <span class="r">*</span></label><input type="date" id="coOccDate"/></div>
           </div>
         </div>
       </div>
