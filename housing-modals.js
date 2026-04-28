@@ -1259,7 +1259,13 @@ function sowFileDrop(e) {
 }
 async function removeSowFile(path) {
   if (!path) return;
-  if (!confirm('Remove this file from the SOW?')) return;
+  var ok = await showConfirm({
+    title:       'Remove this file?',
+    message:     'The file will be deleted from this SOW. This cannot be undone.',
+    confirmText: 'Remove',
+    danger:      true
+  });
+  if (!ok) return;
   try {
     if (typeof sbDeleteFile === 'function') await sbDeleteFile(path);
   } catch (e) { console.warn('[SOW FILE] delete failed:', e); }
@@ -1423,17 +1429,22 @@ function markSowComplete(){
     return;
   }
   var pn = window._sowEditingProjectNumber;
-  if(!confirm('Mark SOW ' + pn + ' as Completed?\n\nThis locks the SOW, work order, and progress reports from further edits. Only the Executive Director can reopen it.')) return;
-  var sow = getSowByProjectNumber(_sowUnitId, pn);
-  if(!sow){ showToast('SOW not found'); return; }
-  sow.approval_status = 'completed';
-  sow.completed_at = new Date().toISOString();
-  sow.completed_by = window.currentUserName || _realRoleForPermissions();
-  upsertSowInList(_sowUnitId, sow);
-  auditEntry('SOW:'+_sowUnitId, 'sow_completed', 'SOW '+pn+' marked Completed', _realRoleForPermissions());
-  showToast('✓ SOW marked Completed');
-  // Re-apply lock immediately so the modal flips to read-only for non-ED users.
-  _applySowModalLock(sow);
+  showConfirm({
+    title:       'Mark SOW ' + pn + ' as Completed?',
+    message:     'This locks the SOW, work order, and progress reports from further edits. Only the Executive Director can reopen it.',
+    confirmText: 'Mark Complete'
+  }).then(function(ok){
+    if (!ok) return;
+    var sow = getSowByProjectNumber(_sowUnitId, pn);
+    if(!sow){ showToast('SOW not found'); return; }
+    sow.approval_status = 'completed';
+    sow.completed_at = new Date().toISOString();
+    sow.completed_by = window.currentUserName || _realRoleForPermissions();
+    upsertSowInList(_sowUnitId, sow);
+    auditEntry('SOW:'+_sowUnitId, 'sow_completed', 'SOW '+pn+' marked Completed', _realRoleForPermissions());
+    showToast('✓ SOW marked Completed');
+    _applySowModalLock(sow);
+  });
 }
 
 function reopenSow(){
@@ -1443,20 +1454,25 @@ function reopenSow(){
     return;
   }
   var pn = window._sowEditingProjectNumber;
-  if(!confirm('Reopen SOW ' + pn + ' for editing?\n\nThis returns the SOW to its prior approval state so it can be modified.')) return;
-  var sow = getSowByProjectNumber(_sowUnitId, pn);
-  if(!sow){ showToast('SOW not found'); return; }
-  // Restore to the prior status based on available signatures, falling back to draft.
-  if(sow.edName && sow.edDate) sow.approval_status = 'ed_approved';
-  else if(sow.hmName && sow.hmDate) sow.approval_status = 'hm_approved';
-  else if((sow.tenantSig && sow.tenantSig.image) || (sow.staffSig && sow.staffSig.image)) sow.approval_status = 'signed';
-  else sow.approval_status = 'draft';
-  sow.reopened_at = new Date().toISOString();
-  sow.reopened_by = window.currentUserName || _realRoleForPermissions();
-  upsertSowInList(_sowUnitId, sow);
-  auditEntry('SOW:'+_sowUnitId, 'sow_reopened', 'SOW '+pn+' reopened for editing', _realRoleForPermissions());
-  showToast('SOW reopened');
-  _applySowModalLock(sow);
+  showConfirm({
+    title:       'Reopen SOW ' + pn + ' for editing?',
+    message:     'This returns the SOW to its prior approval state so it can be modified.',
+    confirmText: 'Reopen'
+  }).then(function(ok){
+    if (!ok) return;
+    var sow = getSowByProjectNumber(_sowUnitId, pn);
+    if(!sow){ showToast('SOW not found'); return; }
+    if(sow.edName && sow.edDate) sow.approval_status = 'ed_approved';
+    else if(sow.hmName && sow.hmDate) sow.approval_status = 'hm_approved';
+    else if((sow.tenantSig && sow.tenantSig.image) || (sow.staffSig && sow.staffSig.image)) sow.approval_status = 'signed';
+    else sow.approval_status = 'draft';
+    sow.reopened_at = new Date().toISOString();
+    sow.reopened_by = window.currentUserName || _realRoleForPermissions();
+    upsertSowInList(_sowUnitId, sow);
+    auditEntry('SOW:'+_sowUnitId, 'sow_reopened', 'SOW '+pn+' reopened for editing', _realRoleForPermissions());
+    showToast('SOW reopened');
+    _applySowModalLock(sow);
+  });
 }
 
 

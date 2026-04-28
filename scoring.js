@@ -460,18 +460,30 @@ function renderScoringModelTable() {
 }
 
 function confirmResetScoringModel() {
-  if(confirm('Reset the scoring model to defaults? This cannot be undone.')) {
+  showConfirm({
+    title:       'Reset scoring model?',
+    message:     'All custom criteria will be replaced by the defaults. This cannot be undone.',
+    confirmText: 'Reset to Defaults',
+    danger:      true
+  }).then(function(ok){
+    if (!ok) return;
     resetScoringModel();
     renderScoringModelTable();
     showToast('Scoring model reset to defaults');
-  }
+  });
 }
 
 // Called by the ✕ button in renderScoringModelTable rows.
 // Removes the criterion with the given id from the active scoring model and persists.
 function deleteV2ScoreCriteria(id) {
   if (!id) return;
-  if (!confirm('Remove this scoring criterion?')) return;
+  showConfirm({
+    title:       'Remove this scoring criterion?',
+    message:     'It will be removed from the model and applications will be re-scored.',
+    confirmText: 'Remove',
+    danger:      true
+  }).then(function(ok){
+    if (!ok) return;
 
   // liveScoreModel may be the V2 model loaded from settings — mutate in place
   var idx = liveScoreModel.findIndex(function(r) { return r.id === id; });
@@ -485,8 +497,9 @@ function deleteV2ScoreCriteria(id) {
   // Refresh the editor table
   renderScoringModelTable();
   // Re-score all applications so points reflect the change
-  if (typeof rescoreAllApplications === 'function') rescoreAllApplications();
-  showToast('Criterion \u201c' + (removed.label || removed.id) + '\u201d removed');
+    if (typeof rescoreAllApplications === 'function') rescoreAllApplications();
+    showToast('Criterion \u201c' + (removed.label || removed.id) + '\u201d removed');
+  });
 }
 
 // Called oninput on the pts number input in each renderScoringModelTable row.
@@ -1400,39 +1413,45 @@ function archiveUnit(unitId) {
   if(!u) { showToast('Unit not found'); return; }
   var role = window.currentRole || 'staff';
   var addr = u.num + ' ' + u.street;
-  if(!confirm('Archive ' + addr + '?\n\nThis marks the unit as demolished. All documentation (SOW, renovation progress, tenant files, photos) will be preserved in the archive record. The unit will be hidden from active inventory.')) return;
-  u.unitArchive = {
-    archivedAt: new Date().toISOString(),
-    archivedBy: role,
-    reason: 'Demolished / Removed from active inventory',
-    docs: _bundleUnitDocs(unitId)
-  };
-  u.archived   = true;
-  u.archivedAt = new Date().toISOString().split('T')[0];
-  u.archivedBy = role;
-  u.status     = APP_STATUS.ARCHIVED;
-  // Also archive any linked applications
-  applications.forEach(function(a, ai) {
-    if((a.assignedUnit === unitId || a.assignedUnitId === unitId) && !a.archived) {
-      applications[ai].archived       = true;
-      applications[ai].archivedAt     = u.archivedAt;
-      applications[ai].archivedBy     = role;
-      applications[ai].archivedReason = 'Unit ' + addr + ' archived (demolished)';
-      auditEntry(a.id, 'archived', 'Auto-archived — linked unit ' + addr + ' demolished', role);
-    }
+  showConfirm({
+    title:       'Archive ' + addr + '?',
+    message:     'This marks the unit as demolished. All documentation (SOW, renovation progress, tenant files, photos) will be preserved in the archive record. The unit will be hidden from active inventory.',
+    confirmText: 'Archive Unit',
+    danger:      true
+  }).then(function(ok){
+    if (!ok) return;
+    u.unitArchive = {
+      archivedAt: new Date().toISOString(),
+      archivedBy: role,
+      reason: 'Demolished / Removed from active inventory',
+      docs: _bundleUnitDocs(unitId)
+    };
+    u.archived   = true;
+    u.archivedAt = new Date().toISOString().split('T')[0];
+    u.archivedBy = role;
+    u.status     = APP_STATUS.ARCHIVED;
+    applications.forEach(function(a, ai) {
+      if((a.assignedUnit === unitId || a.assignedUnitId === unitId) && !a.archived) {
+        applications[ai].archived       = true;
+        applications[ai].archivedAt     = u.archivedAt;
+        applications[ai].archivedBy     = role;
+        applications[ai].archivedReason = 'Unit ' + addr + ' archived (demolished)';
+        auditEntry(a.id, 'archived', 'Auto-archived — linked unit ' + addr + ' demolished', role);
+      }
+    });
+    sbSaveUnit(u).catch(function(e){ console.warn('Unit archive save failed:',e); });
+    applications.forEach(function(a){
+      if(a.archived && (a.assignedUnit===unitId||a.assignedUnitId===unitId)){
+        sbSaveApplication(a).catch(function(e){ console.warn('Linked app archive save failed:',e); });
+      }
+    });
+    auditEntry('UNIT:' + unitId, 'unit_archived',
+      addr + ' archived — ' + Object.keys(u.unitArchive.docs).length + ' document(s) preserved', role);
+    closeUnitEditModal();
+    renderInventoryView();
+    if(typeof updateDashStats === 'function') updateDashStats();
+    showToast('Unit archived — all documents preserved');
   });
-  sbSaveUnit(u).catch(function(e){ console.warn('Unit archive save failed:',e); });
-  applications.forEach(function(a){
-    if(a.archived && (a.assignedUnit===unitId||a.assignedUnitId===unitId)){
-      sbSaveApplication(a).catch(function(e){ console.warn('Linked app archive save failed:',e); });
-    }
-  });
-  auditEntry('UNIT:' + unitId, 'unit_archived',
-    addr + ' archived — ' + Object.keys(u.unitArchive.docs).length + ' document(s) preserved', role);
-  closeUnitEditModal();
-  renderInventoryView();
-  if(typeof updateDashStats === 'function') updateDashStats();
-  showToast('Unit archived — all documents preserved');
 }
 
 // Restore a UNIT from archive
@@ -1442,17 +1461,23 @@ function unarchiveUnit(unitId) {
   if(!u) { showToast('Unit not found'); return; }
   var role = window.currentRole || 'staff';
   var addr = u.num + ' ' + u.street;
-  if(!confirm('Restore ' + addr + ' from archive?\n\nThe unit will return to active inventory with status Vacant. Archived documents remain attached to the unit record.')) return;
-  u.archived   = false;
-  u.archivedAt = null;
-  u.archivedBy = null;
-  u.status     = 'vacant';
-  u.assignedTo = null; u.assignedName = null; u.assignedDate = null;
-  sbSaveUnit(u).catch(function(e){ console.warn('Unarchive unit save failed:',e); });
-  auditEntry('UNIT:' + unitId, 'unit_unarchived', addr + ' restored from archive to Vacant', role);
-  closeUnitEditModal();
-  renderInventoryView();
-  showToast(addr + ' restored to active inventory');
+  showConfirm({
+    title:       'Restore ' + addr + ' from archive?',
+    message:     'The unit will return to active inventory with status Vacant. Archived documents remain attached to the unit record.',
+    confirmText: 'Restore Unit'
+  }).then(function(ok){
+    if (!ok) return;
+    u.archived   = false;
+    u.archivedAt = null;
+    u.archivedBy = null;
+    u.status     = 'vacant';
+    u.assignedTo = null; u.assignedName = null; u.assignedDate = null;
+    sbSaveUnit(u).catch(function(e){ console.warn('Unarchive unit save failed:',e); });
+    auditEntry('UNIT:' + unitId, 'unit_unarchived', addr + ' restored from archive to Vacant', role);
+    closeUnitEditModal();
+    renderInventoryView();
+    showToast(addr + ' restored to active inventory');
+  });
 }
 
 

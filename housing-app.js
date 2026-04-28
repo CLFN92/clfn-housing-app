@@ -657,7 +657,10 @@ function updateDashStats(){
 }
 
 function renderDashTable(){
-  if(!window._userSetDashFilter){var _f=document.getElementById('dashFilterStatus');if(_f)_f.value='';}
+  // showDashboard() resets the filter when the user navigates to the dashboard.
+  // Once they're on it, render off whatever the dropdown currently holds —
+  // the previous reset-on-every-render logic wiped the value before reading
+  // it, so the status filter never had any effect.
   var search=(document.getElementById('dashSearch')?document.getElementById('dashSearch').value:'').toLowerCase();
   var fStatus=document.getElementById('dashFilterStatus')?document.getElementById('dashFilterStatus').value:'';
   var fReserve=document.getElementById('dashFilterReserve')?document.getElementById('dashFilterReserve').value:'';
@@ -916,8 +919,12 @@ function _handleAppMenuAction(action, appId) {
   var role = window.currentRole || 'housing_employee_l1';
 
   if (action === 'archive') {
-    if (!confirm('Archive this application? It will be hidden from the main list.\n\nAll supporting documents will be preserved in the archive record.')) return;
-    archiveApplication(appId);
+    showConfirm({
+      title:       'Archive this application?',
+      message:     'It will be hidden from the main list. All supporting documents will be preserved in the archive record.',
+      confirmText: 'Archive',
+      danger:      true
+    }).then(function(ok){ if (ok) archiveApplication(appId); });
 
   } else if (action === 'unarchive') {
     applications[idx].archived = false;

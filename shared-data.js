@@ -1316,7 +1316,13 @@ function ctUpdateClassBorders() {
   });
 }
 async function deactivateStaff(id, btn){
-  if(!confirm('Deactivate this staff member? They will lose access to the app.')) return;
+  var ok = await showConfirm({
+    title:       'Deactivate this staff member?',
+    message:     'They will lose access to the app immediately. Their account record is preserved.',
+    confirmText: 'Deactivate',
+    danger:      true
+  });
+  if (!ok) return;
   if(btn){btn.disabled=true;btn.textContent='...';}
   try {
     var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id,{
@@ -2551,11 +2557,17 @@ function renderWorklist() {
   if(search) { var si=document.getElementById('wl_search_input'); if(si){ var l=si.value.length; si.focus(); si.setSelectionRange(l,l); } }
 }
 function resetRenoScoreModel() {
-  if(confirm('Reset renovation scoring to defaults?')) {
+  showConfirm({
+    title:       'Reset renovation scoring?',
+    message:     'All custom criteria will be replaced by the defaults.',
+    confirmText: 'Reset to Defaults',
+    danger:      true
+  }).then(function(ok){
+    if (!ok) return;
     if(window._appSettings) delete window._appSettings['reno_score_model'];
     renderRenoScoreTable();
     showToast('Renovation scoring reset');
-  }
+  });
 }
 function resetSow(){
   ['sow_address','sow_tenant_name','sow_prepared_by','sow_contractor','sow_total_cost',

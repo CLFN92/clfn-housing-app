@@ -191,7 +191,11 @@ function updateHeaderUser(role) {
 // ── headerSignOut ─────────────────────────────────────────────────────────────
 function headerSignOut() {
   if (HOUSING_SESSION && HOUSING_SESSION.accessToken) {
-    if (confirm('Sign out of CLFN Housing?')) doLogout();
+    showConfirm({
+      title:       'Sign out?',
+      message:     'You will be returned to the sign-in screen.',
+      confirmText: 'Sign Out'
+    }).then(function(ok){ if (ok) doLogout(); });
   } else {
     switchRole('housing_employee_l1');
     showToast('Signed out.');

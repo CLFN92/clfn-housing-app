@@ -79,7 +79,13 @@ async function deleteTenantFile(path){
   // Still present because Turn 3 Item 2's authorized scope was tenantFiles*
   // + udp* wrappers only. This one has no external callers in housing.html
   // today but it's left for a future cleanup pass to delete explicitly.
-  if(!confirm('Remove this file?')) return;
+  var ok = await showConfirm({
+    title:       'Remove this file?',
+    message:     'The file will be deleted from storage. This cannot be undone.',
+    confirmText: 'Remove',
+    danger:      true
+  });
+  if (!ok) return;
   var entityId = _tenantFilesUnitId || (typeof _currentDetailUnitId !== 'undefined' ? _currentDetailUnitId : '');
   try {
     await sbDeleteFile(path);
@@ -1180,20 +1186,25 @@ function raQuickApprove(unitId, approver) {
   var u=units[idx]; var role=window.currentRole||'staff'; var today=new Date().toISOString().split('T')[0];
   var addr=u.num+' '+u.street;
   var label=approver==='hm'?'Housing Manager':'Executive Director';
-  if(!confirm('Approve SOW for '+addr+' — '+label+'?')) return;
-  if(approver==='hm') {
-    u.unitHmSig={name:role,date:today,decision:'approved',savedAt:today};
-    auditEntry('UNIT:'+unitId,'sow_hm_approval',addr+' SOW approved by Housing Manager',role);
-  } else {
-    u.unitEdSig={name:role,date:today,decision:'approved',savedAt:today};
-    auditEntry('UNIT:'+unitId,'sow_ed_approval',addr+' SOW approved by Executive Director',role);
-  }
-  units[idx]=u;
-  sbSaveUnit(u).catch(function(e){ console.warn('SOW approval unit save:',e); });
-  // Sync in-memory array
-  if(typeof housingUnits!=='undefined') housingUnits.splice(0,housingUnits.length,...units);
-  showToast('✓ '+addr+' SOW approved');
-  renderRenoApprovalsView();
+  showConfirm({
+    title:       'Approve SOW?',
+    message:     addr + ' &mdash; <strong>' + label + '</strong> approval',
+    confirmText: 'Approve'
+  }).then(function(ok){
+    if (!ok) return;
+    if(approver==='hm') {
+      u.unitHmSig={name:role,date:today,decision:'approved',savedAt:today};
+      auditEntry('UNIT:'+unitId,'sow_hm_approval',addr+' SOW approved by Housing Manager',role);
+    } else {
+      u.unitEdSig={name:role,date:today,decision:'approved',savedAt:today};
+      auditEntry('UNIT:'+unitId,'sow_ed_approval',addr+' SOW approved by Executive Director',role);
+    }
+    units[idx]=u;
+    sbSaveUnit(u).catch(function(e){ console.warn('SOW approval unit save:',e); });
+    if(typeof housingUnits!=='undefined') housingUnits.splice(0,housingUnits.length,...units);
+    showToast('✓ '+addr+' SOW approved');
+    renderRenoApprovalsView();
+  });
 }
 
 function exportRenoApprovalsCSV() {
@@ -1294,159 +1305,19 @@ function exportRenoApprovalsPDF() {
 
 
 // ══════════════════════════════════════════════════════════════
-// LOGIN — matches expense claims app auth pattern exactly
-// Uses fetch() to Supabase Auth REST API
+// LOGIN — auth flow now lives in auth-login.js (loaded only by
+// index.html). Other pages restore the session from sessionStorage
+// via shared-auth.js; if that fails, _onLogout sends them back to
+// index.html where the real sign-in screen lives.
 // ══════════════════════════════════════════════════════════════
 
-
-// ── Panel helpers ──────────────────────────────────────────────────────────
-function showSignInPanel() {
-  document.getElementById('signin-panel').style.display = '';
-  document.getElementById('verify-panel').style.display = 'none';
-  document.getElementById('forgot-panel').style.display = 'none';
-}
-function showForgotPassword() {
-  var email = (document.getElementById('signin-email')||{}).value||'';
-  if(email) { var fe=document.getElementById('forgot-email'); if(fe) fe.value=email.trim(); }
-  document.getElementById('signin-panel').style.display = 'none';
-  document.getElementById('forgot-panel').style.display = '';
-  document.getElementById('verify-panel').style.display = 'none';
-}
-
-// ── Remember me ────────────────────────────────────────────────────────────
-var HOUSING_REMEMBER_KEY = 'clfn_housing_email';
-function hSetCookie(name,value,days){try{var exp=new Date(Date.now()+days*864e5).toUTCString();document.cookie=name+'='+encodeURIComponent(value)+';expires='+exp+';path=/;SameSite=Lax';}catch(e){}}
-function hGetCookie(name){try{var m=document.cookie.match(new RegExp('(?:^|; )'+name+'=([^;]*)'));return m?decodeURIComponent(m[1]):null;}catch(e){return null;}}
-function hDeleteCookie(name){try{document.cookie=name+'=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';}catch(e){}}
-function loadRememberedEmail(){
-  try{
-    var saved=null;
-    try{saved=localStorage.getItem(HOUSING_REMEMBER_KEY);}catch(e){}
-    if(!saved) saved=hGetCookie(HOUSING_REMEMBER_KEY);
-    if(saved){
-      var emailEl=document.getElementById('signin-email');
-      var remEl=document.getElementById('remember-me');
-      if(emailEl) emailEl.value=saved;
-      if(remEl) remEl.checked=true;
-      setTimeout(function(){var p=document.getElementById('signin-password');if(p)p.focus();},150);
-    }
-  }catch(e){}
-}
-function saveRememberedEmail(email,remember){
-  try{
-    if(remember){
-      try{localStorage.setItem(HOUSING_REMEMBER_KEY,email);}catch(e){}
-      hSetCookie(HOUSING_REMEMBER_KEY,email,365);
-    }else{
-      try{localStorage.removeItem(HOUSING_REMEMBER_KEY);}catch(e){}
-      hDeleteCookie(HOUSING_REMEMBER_KEY);
-    }
-  }catch(e){}
-}
-
-// ── Forgot password ────────────────────────────────────────────────────────
-async function sendPasswordReset() {
-  var email = ((document.getElementById('forgot-email')||{}).value||'').trim().toLowerCase();
-  var msgEl = document.getElementById('forgot-msg');
-  if(!email || !email.endsWith('@clfn.on.ca')) {
-    if(msgEl){msgEl.textContent='Please enter your @clfn.on.ca email address.';msgEl.style.background='#3b0a0a';msgEl.style.color='#fca5a5';msgEl.style.display='block';}
-    return;
-  }
-  try {
-    await fetch(SUPABASE_URL+'/auth/v1/recover',{method:'POST',headers:HOUSING_HEADERS,body:JSON.stringify({email:email})});
-    if(msgEl){msgEl.textContent='Password reset link sent to '+email+'. Check your inbox.';msgEl.style.background='#052e16';msgEl.style.color='#86efac';msgEl.style.display='block';}
-  } catch(e) {
-    if(msgEl){msgEl.textContent='Could not send reset email: '+e.message;msgEl.style.background='#3b0a0a';msgEl.style.color='#fca5a5';msgEl.style.display='block';}
-  }
-}
-
-// ── Resend verification ────────────────────────────────────────────────────
-async function resendVerification() {
-  var email = (document.getElementById('verify-email-display')||{}).textContent||'';
-  var msgEl = document.getElementById('verify-msg');
-  try {
-    await fetch(SUPABASE_URL+'/auth/v1/resend',{method:'POST',headers:HOUSING_HEADERS,body:JSON.stringify({type:'signup',email:email})});
-    if(msgEl){msgEl.textContent='Verification email resent to '+email;msgEl.style.color='#86efac';msgEl.style.display='block';}
-  } catch(e) {
-    if(msgEl){msgEl.textContent='Could not resend: '+e.message;msgEl.style.color='#fca5a5';msgEl.style.display='block';}
-  }
-}
-
-// ── Sign in ────────────────────────────────────────────────────────────────
-async function startSignIn() {
-  var email    = ((document.getElementById('signin-email')||{}).value||'').trim().toLowerCase();
-  var password = (document.getElementById('signin-password')||{}).value||'';
-  var remember = (document.getElementById('remember-me')||{}).checked||false;
-  var errEl    = document.getElementById('signin-error');
-  var btn      = document.getElementById('signin-btn');
-
-  if(errEl) errEl.style.display='none';
-
-  if(!email||!password){
-    if(errEl){errEl.textContent='Please enter your email and password.';errEl.style.display='block';}
-    return;
-  }
-  if(!email.endsWith('@clfn.on.ca')){
-    if(errEl){errEl.textContent='Only @clfn.on.ca email addresses are permitted to sign in.';errEl.style.display='block';}
-    return;
-  }
-
-  if(btn){btn.disabled=true;btn.textContent='Signing in…';}
-  try {
-    var r = await fetch(SUPABASE_URL+'/auth/v1/token?grant_type=password',{
-      method:'POST', headers:HOUSING_HEADERS, body:JSON.stringify({email:email,password:password})
-    });
-    var data = await r.json();
-    if(!r.ok) throw new Error(data.error_description||data.msg||'Sign-in failed');
-
-    // Check email verification
-    var emailConfirmed = data.user.email_confirmed_at||data.user.confirmed_at;
-    if(!emailConfirmed){
-      var dispEl=document.getElementById('verify-email-display');
-      if(dispEl) dispEl.textContent=email;
-      document.getElementById('signin-panel').style.display='none';
-      document.getElementById('verify-panel').style.display='';
-      if(btn){btn.disabled=false;btn.textContent='Sign in';}
-      return;
-    }
-
-    // Save token and session
-    saveRememberedEmail(email, remember);
-    HOUSING_SESSION.email = email;
-    HOUSING_SESSION.name  = (data.user.user_metadata&&data.user.user_metadata.full_name)||email;
-    HOUSING_SESSION.accessToken = data.access_token;
-    HOUSING_HEADERS['Authorization'] = 'Bearer '+data.access_token;
-    try{sessionStorage.setItem('clfn_housing_token',data.access_token);}catch(e){}
-
-    // Resolve housing role from staff table
-    await resolveHousingRole();
-
-    // Load data and launch app
-    await loadAppDataFromSupabase();
-    hidLoginScreen();
-    showEmployeeHome();
-    console.log('[CLFN] Welcome, '+HOUSING_SESSION.name+' ('+HOUSING_SESSION.role+')');
-
-  } catch(e) {
-    console.error('[HOUSING LOGIN]', e);
-    if(errEl){errEl.textContent=e.message;errEl.style.display='block';}
-  } finally {
-    if(btn){btn.disabled=false;btn.textContent='Sign in';}
-  }
-}
-
+// On non-index pages an expired session should send the user back to the
+// login page rather than try to reuse local sign-in markup that doesn't
+// exist here.
 function showLoginScreen() {
-  var ls=document.getElementById('loginScreen');
-  if(ls){ls.style.display='flex';}
-  showSignInPanel();
-  var p=document.getElementById('signin-password'); if(p) p.value='';
-  var e=document.getElementById('signin-error'); if(e) e.style.display='none';
+  try { window.location.href = 'index.html'; } catch(e) {}
 }
-function hidLoginScreen() {
-  var ls=document.getElementById('loginScreen');
-  if(ls) ls.style.display='none';
-  /* roleSwitcher managed by updateHeaderUser */
-}
+function hidLoginScreen() { /* no-op on module pages — no login screen present */ }
 
 // ── Global in-memory caches for Supabase data ───────────────────────────────
 window._contractors   = window._contractors   || [];
@@ -1703,96 +1574,6 @@ function showAddHousingStaff() {
     if(h) h.style.display = (this.value && !this.value.endsWith('@clfn.on.ca')) ? 'block' : 'none';
   });
 }
-
-function editStaff(idOrObj) {
-  var u = (typeof idOrObj === 'object') ? idOrObj : (window._staffCache && window._staffCache[idOrObj]);
-  if(!u) { showToast('Staff record not found'); return; }
-  var existing = document.getElementById('staffModal');
-  if(existing) existing.remove();
-
-  var depts = ['Housing','Administration','Capital Projects & Infrastructure','Human Resources','Finance','Wellness','Medical Services','Choose Life','Ontario Works','Eagles Earth','Water Treatment Plant','Lands & Resources','Chief & Council','Band Reps'];
-  var currentRole = sbMapRole(u);
-  var deptOptions = depts.map(function(d){ return '<option value="'+d+'"'+(u.department===d?' selected':'')+'>'+d+'</option>'; }).join('');
-  var roleOptions = (function(){
-    var perms = window.CLFN_PERMS;
-    if(!perms){
-      return '<option value="housing_employee_l1">Housing Employee L1</option>';
-    }
-    return Object.keys(perms.ROLE_LABELS).map(function(k){
-      var selected = (currentRole === k) ? ' selected' : '';
-      return '<option value="'+k+'"'+selected+'>'+perms.roleLabel(k)+'</option>';
-    }).join('');
-  })();
-
-  var overlay = document.createElement('div');
-  overlay.id = 'staffModal';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px;';
-  overlay.innerHTML = '<div style="background:var(--surface);border-radius:14px;width:100%;max-width:480px;box-shadow:0 24px 60px rgba(0,0,0,.5);overflow:hidden;">'
-    + '<div style="background:var(--dark);border-bottom:3px solid var(--yellow);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">'
-    + '<span style="font-size:15px;font-weight:700;color:#fff;">Edit Staff Member</span>'
-    + '<button onclick="closeStaffModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;">&times;</button>'
-    + '</div>'
-    + '<div style="padding:22px;display:flex;flex-direction:column;gap:14px;">'
-    // Name
-    + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Full Name</label>'
-    + '<input id="es-name" value="'+u.name+'" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;"></div>'
-    // Email (read-only)
-    + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Email (cannot change)</label>'
-    + '<input value="'+u.email+'" readonly style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;background:var(--bg);color:var(--muted);"></div>'
-    // Department + Role
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
-    + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Department</label>'
-    + '<select id="es-dept" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'+deptOptions+'</select></div>'
-    + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Housing Role</label>'
-    + '<select id="es-role" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'+roleOptions+'</select></div>'
-    + '</div>'
-    + '<div id="es-result" style="display:none;border-radius:8px;padding:10px 14px;font-size:12px;"></div>'
-    + '<div style="display:flex;gap:8px;justify-content:flex-end;">'
-    + '<button onclick="closeStaffModal()" style="padding:8px 18px;border:1px solid var(--border);border-radius:7px;background:none;font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;">Cancel</button>'
-    + '<button id="es-submit-btn" onclick="submitEditStaff('+u.id+')" style="padding:8px 18px;background:var(--yellow);border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Save Changes</button>'
-    + '</div>'
-    + '</div></div>';
-  document.body.appendChild(overlay);
-}
-
-async function submitEditStaff(id) {
-  var name = ((document.getElementById('es-name')||{}).value||'').trim();
-  var dept = (document.getElementById('es-dept')||{}).value||'';
-  var role = (document.getElementById('es-role')||{}).value||'housing_employee_l1';
-  var btn  = document.getElementById('es-submit-btn');
-  var res  = document.getElementById('es-result');
-
-  if(!name) { showToast('Please enter a name'); return; }
-  if(btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-
-  // Role now stores canonical CLFN_PERMS value directly (no legacy re-mapping).
-  var staffRole = role;
-  // Housing Manager is always in Housing department — enforce it so it lines up
-  // with what sbMapRole expects on read. Other roles keep the user's chosen dept.
-  var staffDept = (role === ROLE.HOUSING_MANAGER) ? 'Housing' : dept;
-
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id, {
-      method: 'PATCH',
-      headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'return=minimal'}),
-      body: JSON.stringify({ name: name, department: staffDept, role: staffRole })
-    });
-    if(r.ok) {
-      auditEntry('SETTINGS', 'settings_user_edit', 'Staff updated: '+name+' — Role: '+staffRole, window.currentUser||'ed');
-      closeStaffModal();
-      showToast('✓ Staff member updated');
-      renderHousingUserTable();
-    } else {
-      var err = await r.text();
-      if(res){ res.style.display='block'; res.style.background='#fef2f2'; res.style.color='#b91c1c'; res.textContent='Error: '+err; }
-      if(btn){ btn.disabled=false; btn.textContent='Save Changes'; }
-    }
-  } catch(e) {
-    showToast('Error: '+e.message);
-    if(btn){ btn.disabled=false; btn.textContent='Save Changes'; }
-  }
-}
-
 
 function closeStaffModal() {
   var m = document.getElementById('staffModal');
