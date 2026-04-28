@@ -124,10 +124,16 @@ function validateStep0() {
   function fld(id){ var e=document.getElementById(id); return e?e.value.trim():''; }
   // Drive required-field checks off the configurable registry so the ED's
   // Settings → App Settings → Required Fields choices are respected.
-  (window.APP_REQ_FIELDS || []).forEach(function(f){
-    if (typeof isFieldRequired === 'function' && !isFieldRequired(f.id)) return;
-    if (!fld(f.id)) errs.push(f.errorLabel || (f.label + ' is required.'));
-  });
+  // SCOPE: only step-0 static fields. Other steps have their own validators
+  // (validateStep1/2/3/4/5) — pulling them in here would treat dynamic-row
+  // fields as static IDs (they aren't) and step-2 co-applicant fields as
+  // unconditional (they're gated by the co_status toggle).
+  (window.APP_REQ_FIELDS || [])
+    .filter(function(f){ return f.step === 0 && !f.rowOf; })
+    .forEach(function(f){
+      if (typeof isFieldRequired === 'function' && !isFieldRequired(f.id)) return;
+      if (!fld(f.id)) errs.push(f.errorLabel || (f.label + ' is required.'));
+    });
   // Conditional fields — always required when their toggle is on, regardless
   // of the global config.
   var arrTog = document.getElementById('arrToggle');
@@ -1436,9 +1442,25 @@ function popReview(){
   renderApprovalFlow();
 }
 
-function openSubmitModal(){popReview();var m=document.getElementById('submitModal');if(m)m.classList.add('on');}
+// Confirm before submitting. Uses the branded showConfirm() helper from
+// shared.js so we don't depend on per-page submitModal markup (which only
+// existed on match.html — that's why the Submit button on housing.html
+// silently did nothing before this fix).
+function openSubmitModal(){
+  popReview();
+  var appType = (typeof getAppType==='function') ? getAppType() : 'new_housing';
+  var isFileUpdate = (appType === 'existing_tenant');
+  showConfirm({
+    title:       isFileUpdate ? 'Submit file update?' : 'Submit application?',
+    message:     'This will send the application to the Housing Manager for review. You will not be able to edit it after submission.',
+    confirmText: 'Confirm Submit'
+  }).then(function(ok){
+    if (ok) finalSubmit();
+  });
+}
 
-function closeModal(){var m=document.getElementById('submitModal');if(m)m.classList.remove('on');}
+// Legacy no-op kept for any orphan markup that still references it.
+function closeModal(){}
 
 function finalSubmit(){
   var appType = (typeof getAppType==='function') ? getAppType() : 'new_housing';
@@ -1448,7 +1470,7 @@ function finalSubmit(){
     ? 'File update submitted by applicant — awaiting Housing Manager review'
     : 'New housing application submitted by applicant — awaiting Housing Manager review';
   auditEntry(currentAppId||'new', actionLabel, detail, 'Applicant');
-  closeModal();approvalState='submitted';renderApprovalFlow();
+  approvalState='submitted';renderApprovalFlow();
   triggerV2Score();
   var id=saveApplicationRecord();
   var submittedApp = applications.find(function(a){ return a.id === id; }) || null;
