@@ -560,12 +560,12 @@ input:disabled, select:disabled, textarea:disabled {
   font-family: var(--sans); cursor: pointer; border: 1.5px solid transparent;
   transition: var(--tr); text-decoration: none; white-space: nowrap;
 }
-.btn-primary { background: var(--yellow);   color: #111;  border-color: var(--yellow); }
+.btn-primary { background: var(--yellow);   color: var(--dark);  border-color: var(--yellow); }
 .btn-primary:hover { background: #e8d418; }
 .btn-ghost   { background: transparent;     color: var(--text); border-color: var(--border); }
 .btn-ghost:hover   { background: var(--bg); border-color: var(--muted); }
-.btn-ghost-dark { background: transparent; color: #ccc; border-color: #555; }
-.btn-ghost-dark:hover { background: rgba(255,255,255,0.08); border-color: #888; color: #fff; }
+.btn-ghost-dark { background: transparent; color: var(--txt-on-dark); border-color: var(--muted); }
+.btn-ghost-dark:hover { background: rgba(255,255,255,0.08); border-color: var(--txt-on-dark); color: #fff; }
 
 .btn-sm            { padding: 5px 12px; font-size: 11px; }
 .btn-full          { flex: 1; justify-content: center; }
@@ -1198,6 +1198,30 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 }
 .banner-card-body { font-size: 12px; margin-bottom: 10px; }
 
+/* Required-fields panel — sub-tabs per form step + checkbox list */
+.rf-tabs  { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--border);
+            margin-bottom: 16px; padding-bottom: 0; }
+.rf-tab   { background: none; border: none; border-bottom: 2px solid transparent;
+            padding: 8px 14px; font-size: 12px; font-weight: 600; color: var(--muted);
+            cursor: pointer; font-family: var(--sans);
+            margin-bottom: -1px; transition: var(--tr); }
+.rf-tab:hover     { color: var(--text); }
+.rf-tab.active    { color: var(--text); border-bottom-color: var(--yellow); }
+.rf-stage         { padding: 4px 0 8px; }
+.rf-section-row   { margin-bottom: 18px; padding: 12px 14px; border-radius: 10px;
+                    background: var(--bg); border: 1px solid var(--border); }
+.rf-row.rf-section { background: transparent; border: none; padding: 0; }
+.rf-row.rf-section:hover { border-color: transparent; }
+.rf-rows  { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 14px; }
+.rf-row   { display: flex; align-items: center; gap: 8px;
+            padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
+            background: var(--surface); cursor: pointer; }
+.rf-row:hover { border-color: var(--yellow); }
+.rf-row input[type="checkbox"] { accent-color: var(--yellow); flex-shrink: 0; }
+.rf-row .rf-label { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+.rf-row .rf-id    { font-family: ui-monospace, Menlo, Monaco, 'Courier New', monospace;
+                    font-size: 10px; color: var(--muted); }
+
 /* Themes panel — color picker rows + logo preview */
 .theme-row {
   display: grid; grid-template-columns: 140px 60px 110px 1fr;
@@ -1232,6 +1256,22 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 /* Drop a logo's white background against dark surfaces (header, print banners).
    Toggled by Settings → Admin → Themes → "Drop white background". */
 .logo-transparent { mix-blend-mode: screen; }
+
+/* Generic hide utility — used by applyRequiredFields() to toggle .r markers
+   and any future show/hide work that doesn't need its own named class. */
+.hidden { display: none !important; }
+
+/* Full-screen print/PDF preview panel — injected on first use by shared-data.js.
+   See _ensurePrintPanel() / showPrintPanel(). Header reuses .modal-hdr.sticky. */
+.print-panel         { display: none; position: fixed; inset: 0; z-index: 1100; overflow: auto; background: var(--bg); }
+.print-panel.is-open { display: block; }
+.print-panel-title   { color: #fff; font-weight: 700; font-size: 14px; }
+.print-panel-actions { display: flex; gap: 8px; }
+.print-panel-doc {
+  background: var(--surface); border-radius: 8px;
+  padding: 32px 36px; box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+  margin: 16px;
+}
 
 /* Floating circular X button overlay on photo thumbnails */
 .btn-photo-remove {

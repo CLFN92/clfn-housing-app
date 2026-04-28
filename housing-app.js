@@ -115,22 +115,18 @@ function clearStep0Errors() { clearStepErrors('step0', 'step0_error_banner'); }
 function validateStep0() {
   var errs = [];
   function fld(id){ var e=document.getElementById(id); return e?e.value.trim():''; }
-  if(!fld('fn'))       errs.push('First name is required.');
-  if(!fld('ln'))       errs.push('Last name is required.');
-  if(!fld('dob'))      errs.push('Date of birth is required.');
-  if(!fld('reserve'))  errs.push('On Reserve status is required.');
-  if(!fld('marital'))  errs.push('Marital status is required.');
-  if(!fld('phone'))    errs.push('Cell phone number is required.');
-  if(!fld('email'))    errs.push('Email address is required.');
-  if(!fld('city'))     errs.push('City is required.');
-  if(!fld('prov'))     errs.push('Province is required.');
-  if(!fld('occDate'))  errs.push('Expected occupancy date is required.');
-  // Arrears validation
+  // Drive required-field checks off the configurable registry so the ED's
+  // Settings → App Settings → Required Fields choices are respected.
+  (window.APP_REQ_FIELDS || []).forEach(function(f){
+    if (typeof isFieldRequired === 'function' && !isFieldRequired(f.id)) return;
+    if (!fld(f.id)) errs.push(f.errorLabel || (f.label + ' is required.'));
+  });
+  // Conditional fields — always required when their toggle is on, regardless
+  // of the global config.
   var arrTog = document.getElementById('arrToggle');
   if(arrTog && arrTog.checked) {
     if(!fld('arrBalAmt')) errs.push('Arrears amount is required when arrears are selected.');
   }
-  // Home condition validation
   var houseTog = document.getElementById('hasHouseToggle');
   if(houseTog && houseTog.checked) {
     if(!fld('homeCondition')) errs.push('Home condition is required when a current unit is selected.');
@@ -140,53 +136,59 @@ function validateStep0() {
 function validateStep2() {
   var errs = [];
   var coSel = document.getElementById('co_status');
-  if(coSel && coSel.value === 'yes') {
-    function fld(id){ var e=document.getElementById(id); return e?e.value.trim():''; }
-    if(!fld('co_fn'))      errs.push('Co-applicant first name is required.');
-    if(!fld('co_ln'))      errs.push('Co-applicant last name is required.');
-    if(!fld('co_dob'))     errs.push('Co-applicant date of birth is required.');
-    if(!fld('co_reserve')) errs.push('Co-applicant reserve status is required.');
-    if(!fld('co_cell'))    errs.push('Co-applicant cell phone is required.');
-    if(!fld('co_email'))   errs.push('Co-applicant email is required.');
+  if(!coSel || coSel.value !== 'yes') return errs;
+  function fld(id){ var e=document.getElementById(id); return e?e.value.trim():''; }
+  (window.APP_REQ_FIELDS || []).filter(function(f){ return f.step === 2; }).forEach(function(f){
+    if (typeof isFieldRequired === 'function' && !isFieldRequired(f.id)) return;
+    if (!fld(f.id)) errs.push(f.errorLabel || (f.label + ' is required.'));
+  });
+  return errs;
+}
+// Generic dynamic-row validator — used by steps 1, 3, 4, 5. A row counts as
+// "started" when ANY tracked field has a value; only started rows are
+// validated, plus the section-required toggle blocks empty sections.
+function _validateDynamicStep(stepNum, sectionId) {
+  var errs = [];
+  var fields = (window.APP_REQ_FIELDS || []).filter(function(f){ return f.step === stepNum && f.rowOf; });
+  if (!fields.length) return errs;
+  var container = document.querySelector(fields[0].rowOf);
+  var rows = container ? container.querySelectorAll('.rrow') : [];
+  var startedRows = 0;
+  rows.forEach(function(row, i){
+    // A row is "started" if any tracked field is filled
+    var anyFilled = fields.some(function(f){
+      var input = row.querySelector('[data-role="' + f.dataRole + '"]');
+      return input && (input.value || '').trim();
+    });
+    if (!anyFilled) return;
+    startedRows++;
+    fields.forEach(function(f){
+      if (typeof isFieldRequired === 'function' && !isFieldRequired(f.id)) return;
+      var input = row.querySelector('[data-role="' + f.dataRole + '"]');
+      var v = input ? (input.value || '').trim() : '';
+      if (!v) errs.push(_rowErrorLabel(f, i + 1));
+    });
+  });
+  if (sectionId && typeof isSectionRequired === 'function' && isSectionRequired(sectionId) && startedRows === 0) {
+    var sec = (window.APP_REQ_SECTIONS || []).find(function(s){ return s.id === sectionId; });
+    errs.unshift((sec && sec.errorLabel) || 'At least one entry is required.');
   }
   return errs;
 }
-function validateStep3() {
-  // Household members: if any row exists, name and relationship are required
-  var errs = [];
-  document.querySelectorAll('#habList .rrow').forEach(function(r, i) {
-    var txts = r.querySelectorAll('input[type="text"]');
-    var sel  = r.querySelector('select');
-    var fn = txts[0] ? txts[0].value.trim() : '';
-    var ln = txts[1] ? txts[1].value.trim() : '';
-    if(!fn && !ln) return; // empty row is OK
-    if(!sel || !sel.value) errs.push('Household member '+(i+1)+': relationship is required.');
-  });
-  return errs;
+function _rowErrorLabel(field, rowIdx) {
+  // Customize the row prefix per step for clearer messages
+  var prefix = field.rowOf === '#habList' ? 'Household member ' + rowIdx
+            : field.rowOf === '#refList' ? 'Reference ' + rowIdx
+            : field.rowOf === '#petList' ? 'Pet ' + rowIdx
+            : field.rowOf === '#incomeList' ? 'Income record ' + rowIdx
+            : 'Row ' + rowIdx;
+  return prefix + ': ' + field.label.replace(/^Pet\s+|^Reference:\s*|^Household.*?:\s*|^Income.*?:\s*/i, '').toLowerCase() + ' is required.';
 }
-function validateStep4() {
-  // References: at least one required, name and phone needed
-  var errs = [];
-  var rows = document.querySelectorAll('#refList .rrow');
-  if(!rows.length) { errs.push('At least one reference is required.'); return errs; }
-  var hasValid = false;
-  rows.forEach(function(r, i) {
-    var txts = r.querySelectorAll('input[type="text"]');
-    var tels = r.querySelectorAll('input[type="tel"]');
-    var fn = txts[0] ? txts[0].value.trim() : '';
-    var ln = txts[1] ? txts[1].value.trim() : '';
-    var ph = tels[0] ? tels[0].value.trim() : '';
-    if(fn || ln) {
-      if(!ph) errs.push('Reference '+(i+1)+': phone number is required.');
-      else hasValid = true;
-    }
-  });
-  if(!hasValid && !errs.length) errs.push('At least one reference with a name and phone number is required.');
-  return errs;
-}
+function validateStep1() { return _validateDynamicStep(1, 'sec_step1'); }
+function validateStep3() { return _validateDynamicStep(3, 'sec_step3'); }
+function validateStep4() { return _validateDynamicStep(4, 'sec_step4'); }
 function validateStep5() {
-  // Pets: if any row has a type/size, name is helpful but not blocking
-  return [];
+  return _validateDynamicStep(5, 'sec_step5');
 }
 // setNavActive defined below (comprehensive version handles all tabs)
 
@@ -199,6 +201,11 @@ function goTo(s){
     var errs=validateStep0 ? validateStep0() : [];
     if(errs.length){ showStep0Errors(errs); return; }
     clearStepErrors('step0', 'step0_error_banner');
+  }
+  if(cur===1 && s>1){
+    var incErrs=validateStep1 ? validateStep1() : [];
+    if(incErrs.length){ showStepErrors('step1',incErrs,'step1_error_banner'); return; }
+    clearStepErrors('step1','step1_error_banner');
   }
   if(cur===2 && s>2){
     var coErrs=validateStep2 ? validateStep2() : [];
@@ -424,6 +431,7 @@ function addIncome(){
     +'<textarea rows="2" placeholder="Notes..." style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;resize:vertical;"></textarea>'
     +'</div></div>';
   list.appendChild(div);
+  if (typeof applyRequiredFields === 'function') applyRequiredFields();
 }
 
 function onIncomePersonChange(sel) {
@@ -499,6 +507,7 @@ function addHab(){
     +'</select></div>'
     +'</div>';
   list.appendChild(div);
+  if (typeof applyRequiredFields === 'function') applyRequiredFields();
   if(typeof calcPersonsOverStandard === "function") calcPersonsOverStandard();
   if(typeof triggerV2Score === "function") triggerV2Score();
 }
@@ -521,9 +530,10 @@ function addRef(){
     +'<option value="Other">Other</option>'
     +'</select></div>'
     +'<div class="f"><label>Phone <span class="r">*</span></label><input type="tel" data-role="refPhone" oninput="fmtPhone(this)"/></div>'
-    +'<div class="f"><label>Email</label><input type="email" data-role="refEmail"/></div>'
+    +'<div class="f"><label>Email <span class="r hidden">*</span></label><input type="email" data-role="refEmail"/></div>'
     +'</div>';
   list.appendChild(div);
+  if (typeof applyRequiredFields === 'function') applyRequiredFields();
 }
 function addPet(){
   var list=document.getElementById('petList');
@@ -553,6 +563,7 @@ function addPet(){
     +'<div class="f s3"><label>Description</label><textarea rows="2" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;resize:vertical;"></textarea></div>'
     +'</div>';
   list.appendChild(div);
+  if (typeof applyRequiredFields === 'function') applyRequiredFields();
 }
 function rmRow(btn){const row=btn.closest('.rrow');if(row)row.remove();}
 
@@ -715,11 +726,12 @@ function wireDashTable(){
   if(wrap._wired) return; // already delegated — event delegation handles new rows automatically
   wrap._wired=true;
   wrap.addEventListener('click',function(e){
-    // Scorecard td click
+    // Applicant name td click — opens the application form for editing.
+    // (Score breakdown lives on the score cell itself via _openScoreByEl.)
     var scTd=e.target.closest('[data-sc-id]');
     if(scTd && !e.target.closest('button')){
-      var scApp=(typeof applications!=='undefined'?applications:[]).find(function(a){return a.id===scTd.getAttribute('data-sc-id');});
-      if(scApp) showScorecard(scApp);
+      var scId=scTd.getAttribute('data-sc-id');
+      if(scId && typeof window.openEditModal === 'function') window.openEditModal(scId);
       return;
     }
     // Preview button
@@ -1295,7 +1307,7 @@ function popReview(){
   // ── Personal Information ──────────────────────────────────────────────────
   var band = fld('band');
   var access = fld('accessibility') || (chk('acc_wheelchair')?'Wheelchair':chk('acc_visual')?'Visual':chk('acc_hearing')?'Hearing':'None');
-  html += section('Personal Information', '👤',
+  html += section('Personal Information',
     row('Full Name', name) +
     row('Date of Birth', fld('dob')) +
     row('Band Number', band!=='—'?band:'') +

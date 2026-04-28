@@ -1546,6 +1546,8 @@ async function loadAppDataFromSupabase() {
     }
     // Apply saved brand theme (Settings → Admin → Themes)
     if (typeof _applyTheme === 'function') _applyTheme((window._appSettings||{}).theme || {});
+    // Apply saved required-field config (Settings → App Settings → Required Fields)
+    if (typeof applyRequiredFields === 'function') applyRequiredFields();
 
     // Load contractors
     try {
@@ -1579,6 +1581,8 @@ async function loadAppDataFromSupabase() {
     } catch(e){console.warn('Settings:',e);}
     // Apply saved brand theme (Settings → Admin → Themes)
     if (typeof _applyTheme === 'function') _applyTheme((window._appSettings||{}).theme || {});
+    // Apply saved required-field config (Settings → App Settings → Required Fields)
+    if (typeof applyRequiredFields === 'function') applyRequiredFields();
     // Load contacts
     try {
       var conR=await fetch(SUPABASE_URL+'/rest/v1/housing_contacts?select=*&limit=1',{headers:HOUSING_HEADERS});

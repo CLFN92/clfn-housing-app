@@ -159,6 +159,7 @@ var SETTINGS_SECTION_GROUPS = {
   sec_audit:               'admin',
   sec_approval_authority:  'admin',
   sec_app_scoring:         'app',
+  sec_required_fields:     'app',
   sec_unit_match:          'app',
   sec_reno_score:          'app',
   sec_budget:              'app',
@@ -193,7 +194,7 @@ function showSettingsGroup(groupId) {
 }
 
 function showSettingsSection(section) {
-  var sections = ['sec_users','sec_app_scoring','sec_unit_match','sec_reno_score','sec_budget','sec_nation','sec_themes','sec_approval_authority','sec_audit','sec_occupancy'];
+  var sections = ['sec_users','sec_app_scoring','sec_required_fields','sec_unit_match','sec_reno_score','sec_budget','sec_nation','sec_themes','sec_approval_authority','sec_audit','sec_occupancy'];
   sections.forEach(function(id){
     var el=document.getElementById(id);
     if(el) el.style.display=(id===section)?'block':'none';
@@ -959,6 +960,164 @@ function resetThemeSettings() {
         if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'theme_reset', 'Brand theme reset to defaults', window.currentRole||'staff');
       }
       renderThemesPanel();
+    });
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// REQUIRED FIELDS — ED-only configuration of which application
+// fields show a red * and block submission when blank.
+// Persisted to housing_settings.required_fields = { fieldId: bool }.
+// Drives applyRequiredFields() (form markers) + isFieldRequired()
+// (validators). Registry lives in shared-config.js APP_REQ_FIELDS.
+// ══════════════════════════════════════════════════════════════
+function renderRequiredFieldsPanel() {
+  var body = document.getElementById('required_fields_panel_body');
+  if(!body) return;
+  var role = window.currentRole || 'housing_employee_l1';
+  var isED = (role === ROLE.ED);
+  if(!isED){
+    body.innerHTML = '<div class="empty-state-ctr">Required-field configuration is restricted to the Executive Director.</div>';
+    return;
+  }
+  var registry = window.APP_REQ_FIELDS    || [];
+  var sections = window.APP_REQ_SECTIONS  || [];
+  var steps    = window.APP_REQ_STEPS     || [];
+  var cfg      = (typeof getRequiredFieldsConfig === 'function') ? getRequiredFieldsConfig() : {};
+  var activeStep = (typeof window._rfActiveStep === 'number') ? window._rfActiveStep : steps[0].step;
+
+  // Sub-tab strip — one per step
+  var tabsHtml = '<div class="rf-tabs">';
+  steps.forEach(function(s){
+    tabsHtml += '<button type="button" class="rf-tab' + (s.step === activeStep ? ' active' : '') + '" onclick="_rfShowStep(' + s.step + ')">' + s.label + '</button>';
+  });
+  tabsHtml += '</div>';
+
+  // Active step's content
+  var stepFields   = registry.filter(function(f){ return f.step === activeStep; });
+  var stepSections = sections.filter(function(s){ return s.step === activeStep; });
+  var stepDef      = steps.find(function(s){ return s.step === activeStep; });
+
+  var html = tabsHtml + '<div class="rf-stage">';
+
+  // Co-applicant note
+  if (activeStep === 2) {
+    html += '<div class="txt-help m-0" style="margin-bottom:12px;">These fields are only validated when the applicant adds a co-applicant on the form.</div>';
+  }
+
+  // Section toggle (for dynamic-row steps)
+  if (stepSections.length) {
+    html += '<div class="rf-section-row">';
+    stepSections.forEach(function(s){
+      var on = cfg[s.id] === true;
+      html += '<label class="rf-row rf-section">'
+        + '<input type="checkbox" data-rf-key="' + s.id + '"' + (on ? ' checked' : '') + ' onchange="_rfOnChange()"/>'
+        + '<span class="rf-label">' + s.label + '</span>'
+        + '</label>';
+    });
+    html += '</div>';
+  }
+
+  // Field list
+  if (stepFields.length) {
+    html += '<div class="lbl-uppercase-sm" style="margin-bottom:8px;">' +
+      (stepDef && stepDef.step !== 0 && (stepFields[0].rowOf) ? 'Per-Row Required Fields' : 'Required Fields') +
+      '</div><div class="rf-rows">';
+    stepFields.forEach(function(f){
+      var checked = cfg[f.id] !== false;
+      html += '<label class="rf-row">'
+        + '<input type="checkbox" data-rf-key="' + f.id + '"' + (checked ? ' checked' : '') + ' onchange="_rfOnChange()"/>'
+        + '<span class="rf-label">' + f.label + '</span>'
+        + '<span class="rf-id">' + f.id + '</span>'
+        + '</label>';
+    });
+    html += '</div>';
+    if (stepFields[0] && stepFields[0].rowOf) {
+      html += '<div class="txt-fineprint" style="margin-top:8px;">Row-level fields are only enforced when the applicant has started filling that row.</div>';
+    }
+  } else {
+    html += '<div class="empty-state-ctr">No configurable fields on this page.</div>';
+  }
+
+  html += '</div>'; // /rf-stage
+
+  html += '<div class="flex-end-10" style="margin-top:18px;">'
+    + '<button type="button" onclick="resetRequiredFieldsSettings()" class="btn btn-ghost">Reset to Defaults</button>'
+    + '<button type="button" onclick="saveRequiredFieldsSettings()" class="btn btn-primary">Save &amp; Apply</button>'
+    + '</div>';
+  body.innerHTML = html;
+}
+
+// Switch the active step sub-tab — preserves any unsaved checkbox edits
+// by merging the current form state into _appSettings before re-rendering.
+function _rfShowStep(stepNum) {
+  // Stash current form state so the user's unsaved edits persist across tabs
+  var cfg = _rfReadFromForm();
+  if (!window._appSettings) window._appSettings = {};
+  // Merge — only overwrite keys present on the current sub-tab
+  var merged = Object.assign({}, window._appSettings.required_fields || {}, cfg);
+  window._appSettings.required_fields = merged;
+  window._rfActiveStep = stepNum;
+  renderRequiredFieldsPanel();
+  if (typeof applyRequiredFields === 'function') applyRequiredFields();
+}
+
+// Live-toggle the form's red * markers as the ED ticks each checkbox.
+// Merges the visible tab's edits with whatever's already stored so that
+// switching sub-tabs doesn't lose state for the hidden fields.
+function _rfOnChange() {
+  var visible = _rfReadFromForm();
+  if(!window._appSettings) window._appSettings = {};
+  var merged = Object.assign({}, window._appSettings.required_fields || {}, visible);
+  window._appSettings.required_fields = merged;
+  if(typeof applyRequiredFields === 'function') applyRequiredFields();
+}
+
+// Reads only the checkboxes currently in the DOM (one sub-tab at a time).
+function _rfReadFromForm() {
+  var cfg = {};
+  document.querySelectorAll('[data-rf-key]').forEach(function(el){
+    cfg[el.getAttribute('data-rf-key')] = !!el.checked;
+  });
+  return cfg;
+}
+
+function saveRequiredFieldsSettings() {
+  if((window.currentRole||'') !== ROLE.ED) { showToast('Only the Executive Director can change required fields.'); return; }
+  // Merge visible-tab edits with stored config so we save the full picture
+  var visible = _rfReadFromForm();
+  if(!window._appSettings) window._appSettings = {};
+  var cfg = Object.assign({}, window._appSettings.required_fields || {}, visible);
+  window._appSettings.required_fields = cfg;
+  if(typeof applyRequiredFields === 'function') applyRequiredFields();
+  sbSaveSetting('required_fields', cfg).then(function(ok){
+    if(ok){
+      showToast('Required fields saved');
+      if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'required_fields_updated', 'Application required-field config updated', window.currentRole||'staff');
+    } else {
+      showToast('Save failed — applied locally only');
+    }
+  });
+}
+
+function resetRequiredFieldsSettings() {
+  if((window.currentRole||'') !== ROLE.ED) { showToast('Only the Executive Director can change required fields.'); return; }
+  showConfirm({
+    title:       'Reset required fields?',
+    message:     'This clears any saved overrides and restores the default required fields.',
+    confirmText: 'Reset to Defaults',
+    danger:      true
+  }).then(function(ok){
+    if(!ok) return;
+    if(!window._appSettings) window._appSettings = {};
+    window._appSettings.required_fields = {};
+    if(typeof applyRequiredFields === 'function') applyRequiredFields();
+    sbSaveSetting('required_fields', {}).then(function(saved){
+      if(saved){
+        showToast('Required fields reset to defaults');
+        if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'required_fields_reset', 'Required fields reset to defaults', window.currentRole||'staff');
+      }
+      renderRequiredFieldsPanel();
     });
   });
 }

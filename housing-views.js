@@ -1294,6 +1294,9 @@ document.addEventListener('DOMContentLoaded', function(){
     if(secId === 'sec_themes' && typeof renderThemesPanel === 'function'){
       renderThemesPanel();
     }
+    if(secId === 'sec_required_fields' && typeof renderRequiredFieldsPanel === 'function'){
+      renderRequiredFieldsPanel();
+    }
   };
 });
 

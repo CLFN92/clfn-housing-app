@@ -337,6 +337,69 @@ async function sbLoadAuditLog(limit) {
   }
 }
 
+// ── Required-field helpers ────────────────────────────────────────────────────
+// Drive both the application form's red * markers AND validation off a single
+// settings key (housing_settings.required_fields). ED-only edit; everyone else
+// just observes whatever the saved config says.
+function getRequiredFieldsConfig() {
+  var cfg = ((window._appSettings || {}).required_fields) || {};
+  var out = {};
+  (window.APP_REQ_FIELDS || []).forEach(function(f){
+    out[f.id] = (cfg[f.id] === undefined) ? !!f.defaultRequired : !!cfg[f.id];
+  });
+  (window.APP_REQ_SECTIONS || []).forEach(function(s){
+    out[s.id] = (cfg[s.id] === undefined) ? !!s.defaultRequired : !!cfg[s.id];
+  });
+  return out;
+}
+function isFieldRequired(fieldId) {
+  var cfg = getRequiredFieldsConfig();
+  return cfg[fieldId] !== false;
+}
+function isSectionRequired(sectionId) {
+  var cfg = getRequiredFieldsConfig();
+  return cfg[sectionId] === true;
+}
+// Toggle the red * marker on every wrapper to match the saved config.
+// Two passes:
+//   1. Static  — `.f[data-req="<id>"]` wrappers in housing.html
+//   2. Dynamic — for each registry entry with rowOf+dataRole, walk every
+//                .rrow in that container and find the .f wrapping the
+//                input[data-role="<dataRole>"], then toggle the .r marker.
+//                Called by add* row builders so newly-added rows pick up
+//                the saved config without page reload.
+// Hidden via the .hidden utility class — no inline styles touched.
+function applyRequiredFields() {
+  var cfg = getRequiredFieldsConfig();
+  // Pass 1: static fields
+  document.querySelectorAll('.f[data-req]').forEach(function(wrap){
+    var key = wrap.getAttribute('data-req');
+    var star = wrap.querySelector('.r');
+    if (!star) return;
+    star.classList.toggle('hidden', cfg[key] === false);
+  });
+  // Pass 2: dynamic-row fields
+  (window.APP_REQ_FIELDS || []).forEach(function(f){
+    if (!f.rowOf || !f.dataRole) return;
+    var container = document.querySelector(f.rowOf);
+    if (!container) return;
+    container.querySelectorAll('.rrow').forEach(function(row){
+      var input = row.querySelector('[data-role="' + f.dataRole + '"]');
+      if (!input) return;
+      var wrap = input.closest('.f');
+      if (!wrap) return;
+      // Stamp data-req for symmetry with static fields (handy for selectors)
+      if (!wrap.hasAttribute('data-req')) wrap.setAttribute('data-req', f.id);
+      // Row templates pre-include <span class="r"> (visible or .hidden) for
+      // every configurable field — we only toggle, never create. Income type
+      // and employment status get their markers managed dynamically by
+      // onIncomePersonChange so we don't fight that logic.
+      var star = wrap.querySelector('.r');
+      if (star) star.classList.toggle('hidden', cfg[f.id] === false);
+    });
+  });
+}
+
 // ── sbSaveSetting ─────────────────────────────────────────────────────────────
 async function sbSaveSetting(key, value) {
   try {
@@ -1101,7 +1164,7 @@ function closeCtApprovalPanel() {
 }
 function closePrintPanel() {
   var panel = document.getElementById('printPanel');
-  if(panel) panel.style.display = 'none';
+  if(panel) panel.classList.remove('is-open');
   document.body.style.overflow = '';
   _printPanelDoc = '';
 }
@@ -3319,19 +3382,26 @@ function clearSig(canvasId) {
 
 
 function getSigDataURL(canvasId) {
-  // Typed tab takes priority
+  // Read the *computed* display so panels hidden via the .sec-hidden class
+  // (no inline style) are correctly treated as not visible. Reading
+  // panel.style.display alone returns '' on first render and falsely
+  // reports the panel as visible — which made canvas drawings get dropped.
+  function _visible(el) {
+    if (!el) return false;
+    var d = getComputedStyle(el).display;
+    return d && d !== 'none';
+  }
   var typePanel = document.getElementById(canvasId + '_panel_type');
-  if (typePanel && typePanel.style.display !== 'none') {
+  if (_visible(typePanel)) {
     var typed = document.getElementById(canvasId + '_typed');
     return (typed && typed.value.trim()) ? 'typed:' + typed.value.trim() : '';
   }
-  // Wet/e-sign tab
   var wetPanel = document.getElementById(canvasId + '_panel_wet');
-  if (wetPanel && wetPanel.style.display !== 'none') {
+  if (_visible(wetPanel)) {
     var ref = document.getElementById(canvasId + '_wet_ref');
     return (ref && ref.value.trim()) ? 'wet:' + ref.value.trim() : 'wet:pending';
   }
-  // Canvas draw mode
+  // Canvas draw mode — capture only if at least one pixel was drawn
   var canvas = document.getElementById(canvasId);
   if (!canvas) return '';
   var ctx = canvas.getContext('2d');
@@ -3384,8 +3454,28 @@ function updateUnitScorePts(id,val){
   if(maxEl)maxEl.textContent=maxScore;
 }
 
+// Inject the print-panel DOM on first use so every page gets it for free —
+// avoids duplicating the markup in housing/inventory/match/tenants/etc.
+function _ensurePrintPanel() {
+  if (document.getElementById('printPanel')) return;
+  var panel = document.createElement('div');
+  panel.id = 'printPanel';
+  panel.className = 'print-panel';
+  panel.innerHTML =
+      '<div class="modal-hdr sticky">'
+    +   '<span id="printPanelTitle" class="print-panel-title">Document Preview</span>'
+    +   '<div class="print-panel-actions">'
+    +     '<button onclick="triggerPrint()" class="btn btn-primary btn-sm">🖨 Print</button>'
+    +     '<button onclick="closePrintPanel()" class="btn btn-ghost-dark btn-sm">✕ Close</button>'
+    +   '</div>'
+    + '</div>'
+    + '<div id="printPanelBody"></div>';
+  document.body.appendChild(panel);
+}
+
 function showPrintPanel(docHtml, title) {
   try {
+  _ensurePrintPanel();
   _printPanelDoc = docHtml;
   var panel  = document.getElementById('printPanel');
   var body   = document.getElementById('printPanelBody');
@@ -3428,12 +3518,11 @@ function showPrintPanel(docHtml, title) {
   }
 
   body.innerHTML = inlineStyle
-    + '<div style="background:var(--surface);border-radius:8px;padding:32px 36px;'
-    + 'box-shadow:0 2px 20px rgba(0,0,0,0.08);">'
+    + '<div class="print-panel-doc">'
     + content
     + '</div>';
 
-  panel.style.display = 'block';
+  panel.classList.add('is-open');
   panel.scrollTop = 0;
   document.body.style.overflow = 'hidden';
   } catch(err) { console.error('showPrintPanel error:', err); }

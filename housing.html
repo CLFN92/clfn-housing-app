@@ -425,25 +425,25 @@
       <div class="card">
         <div class="ctitle">Personal Information</div>
         <div class="fg c2">
-          <div class="f"><label>First Name <span class="r">*</span></label><input type="text" id="fn" placeholder="First name" oninput="liveSync()"/></div>
-          <div class="f"><label>Last Name <span class="r">*</span></label><input type="text" id="ln" placeholder="Last name" oninput="liveSync()"/></div>
-          <div class="f"><label>Date of Birth <span class="r">*</span></label><input type="date" id="dob"/></div>
+          <div class="f" data-req="fn"><label>First Name <span class="r">*</span></label><input type="text" id="fn" placeholder="First name" oninput="liveSync()"/></div>
+          <div class="f" data-req="ln"><label>Last Name <span class="r">*</span></label><input type="text" id="ln" placeholder="Last name" oninput="liveSync()"/></div>
+          <div class="f" data-req="dob"><label>Date of Birth <span class="r">*</span></label><input type="date" id="dob"/></div>
           <div class="f"><label>Band Number</label><input type="number" id="band" placeholder="Band number"/></div>
-          <div class="f"><label>On Reserve Status <span class="r">*</span></label><select id="reserve"><option value="">Select</option><option>On Reserve</option><option>Off Reserve</option></select></div>
-          <div class="f"><label>Marital Status <span class="r">*</span></label><select id="marital"><option value="">Select</option><option>Single</option><option>Married</option><option>Common-Law</option><option>Divorced</option><option>Separated</option><option>Widowed</option></select></div>
-          <div class="f"><label>Housing Classification <span class="r">*</span></label><select id="classification" onchange="liveSync()"><option value="">Select</option><option>Section 95 — Social Housing</option><option>Section 95 — Rent to Own</option><option>Section 10</option><option>Social Housing</option><option>Non-Social Housing</option><option>Rent to Own</option><option>Band House</option><option>Employee Housing</option><option>Owned</option><option>Rental</option></select></div>
-          <div class="f"><label>Cell Phone <span class="r">*</span></label><input type="tel" id="phone" placeholder="(705)-000-0000" oninput="fmtPhone(this)"/></div>
-          <div class="f"><label>Email <span class="r">*</span></label><input type="email" id="email" placeholder="email@example.com"/></div>
+          <div class="f" data-req="reserve"><label>On Reserve Status <span class="r">*</span></label><select id="reserve"><option value="">Select</option><option>On Reserve</option><option>Off Reserve</option></select></div>
+          <div class="f" data-req="marital"><label>Marital Status <span class="r">*</span></label><select id="marital"><option value="">Select</option><option>Single</option><option>Married</option><option>Common-Law</option><option>Divorced</option><option>Separated</option><option>Widowed</option></select></div>
+          <div class="f" data-req="classification"><label>Housing Classification <span class="r">*</span></label><select id="classification" onchange="liveSync()"><option value="">Select</option><option>Section 95 — Social Housing</option><option>Section 95 — Rent to Own</option><option>Section 10</option><option>Social Housing</option><option>Non-Social Housing</option><option>Rent to Own</option><option>Band House</option><option>Employee Housing</option><option>Owned</option><option>Rental</option></select></div>
+          <div class="f" data-req="phone"><label>Cell Phone <span class="r">*</span></label><input type="tel" id="phone" placeholder="(705)-000-0000" oninput="fmtPhone(this)"/></div>
+          <div class="f" data-req="email"><label>Email <span class="r">*</span></label><input type="email" id="email" placeholder="email@example.com"/></div>
         </div>
       </div>
       <div class="card">
         <div class="ctitle">Current Address</div>
         <div class="fg c2">
-          <div class="f s2"><label>Street Address <span class="r">*</span></label><input type="text" id="street" placeholder="Street address"/></div>
-          <div class="f"><label>City <span class="r">*</span></label><input type="text" id="city" placeholder="City"/></div>
-          <div class="f"><label>Province <span class="r">*</span></label><select id="prov"><option value="">Select</option><option>ON</option><option>QC</option><option>BC</option><option>AB</option><option>MB</option><option>SK</option><option>NS</option><option>NB</option><option>NL</option><option>PE</option><option>NT</option><option>YT</option><option>NU</option></select></div>
-          <div class="f"><label>Postal Code <span class="r">*</span></label><input type="text" id="postal" placeholder="P0A 0A0"/></div>
-          <div class="f"><label>Expected Occupancy Date <span class="r">*</span></label><input type="date" id="occDate"/></div>
+          <div class="f s2" data-req="street"><label>Street Address <span class="r">*</span></label><input type="text" id="street" placeholder="Street address"/></div>
+          <div class="f" data-req="city"><label>City <span class="r">*</span></label><input type="text" id="city" placeholder="City"/></div>
+          <div class="f" data-req="prov"><label>Province <span class="r">*</span></label><select id="prov"><option value="">Select</option><option>ON</option><option>QC</option><option>BC</option><option>AB</option><option>MB</option><option>SK</option><option>NS</option><option>NB</option><option>NL</option><option>PE</option><option>NT</option><option>YT</option><option>NU</option></select></div>
+          <div class="f" data-req="postal"><label>Postal Code <span class="r">*</span></label><input type="text" id="postal" placeholder="P0A 0A0"/></div>
+          <div class="f" data-req="occDate"><label>Expected Occupancy Date <span class="r">*</span></label><input type="date" id="occDate"/></div>
           <div class="f"><label>Application Date</label><input type="date" id="appDate"/></div>
         </div>
       </div>
@@ -982,6 +982,7 @@
 <!-- App Settings sub-tabs -->
 <div class="settings-subtabs" id="settings_subtabs_app">
   <button onclick="showSettingsSection('sec_app_scoring')" id="stab_app_scoring" class="tab-btn">&#11088; Application Scoring</button>
+  <button onclick="showSettingsSection('sec_required_fields');renderRequiredFieldsPanel();" id="stab_required_fields" class="tab-btn">&#128221; Required Fields</button>
   <button onclick="showSettingsSection('sec_unit_match')" id="stab_unit_match" class="tab-btn">&#127968; Unit Matching</button>
   <button onclick="showSettingsSection('sec_reno_score')" id="stab_reno_score" class="tab-btn">&#128296; Reno Priority</button>
   <button onclick="showSettingsSection('sec_budget')" id="stab_budget" class="tab-btn">&#128176; Reno Budget</button>
@@ -1037,6 +1038,21 @@
         </div>
       </div>
       <div id="scoring_model_table_wrap"></div>
+    </div>
+  </div>
+</div>
+
+<!-- REQUIRED FIELDS -->
+<div id="sec_required_fields" class="settings-section">
+  <div class="card card-flush">
+    <div class="modal-hdr">
+      <div>
+        <div class="lbl-yellow">&#128221; Required Application Fields</div>
+        <div class="txt-sm-meta">Choose which fields show a red <span class="r">*</span> and block submission when blank</div>
+      </div>
+    </div>
+    <div class="sec-pad" id="required_fields_panel_body">
+      <div class="empty-state-ctr">Loading&hellip;</div>
     </div>
   </div>
 </div>
