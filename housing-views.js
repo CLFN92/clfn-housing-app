@@ -563,17 +563,25 @@ function renderTenantsView(){
         +'</button>'
       +'</td>'
       +'<td style="padding:10px 10px;text-align:right;white-space:nowrap;">'
+        +'<button type="button" data-tic-uid="'+u.id+'" title="Tenant Information Card" class="tic-tenant-card-btn">🪪</button>'
         +'<button type="button" data-sow-uid="'+u.id+'" title="Scope of Work" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;">🔨</button>'
       +'</td>'
       +'</tr>';
   }).join('');
   tbody.querySelectorAll('[data-tuid]').forEach(function(row){
     row.addEventListener('click',function(e){
-      if(!e.target.closest('[data-sow-uid]')) openUnitEditModal(row.getAttribute('data-tuid'));
+      if(e.target.closest('[data-sow-uid]') || e.target.closest('[data-tic-uid]')) return;
+      openUnitEditModal(row.getAttribute('data-tuid'));
     });
   });
   tbody.querySelectorAll('[data-sow-uid]').forEach(function(btn){
     btn.addEventListener('click',function(e){e.stopPropagation();openSowModal(btn.getAttribute('data-sow-uid'));});
+  });
+  tbody.querySelectorAll('[data-tic-uid]').forEach(function(btn){
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      if(typeof openTenantCard === 'function') openTenantCard(btn.getAttribute('data-tic-uid'));
+    });
   });
   tbody.querySelectorAll('[data-reno-sow]').forEach(function(cell){
     cell.addEventListener('click',function(e){e.stopPropagation();openSowModal(cell.getAttribute('data-reno-sow'));});

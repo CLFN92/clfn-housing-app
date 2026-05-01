@@ -207,8 +207,23 @@ function validateStep5() {
 
 document.addEventListener('DOMContentLoaded',initAppId);
 
+// ── Role-aware step nav for the staff-only steps 9 (Housing Needs) and
+//    10 (Tenancy History). They sit between Pets (5) and Documents (6) in
+//    the visible flow for HM/ED, but applicants skip them entirely.
+function _isHmOrEdRole(){
+  var r = window.currentRole || '';
+  return r === ROLE.HOUSING_MANAGER || r === ROLE.ED;
+}
+function _goAfterPets(){ goTo(_isHmOrEdRole() ? 9 : 6); }
+function _goBeforeDocuments(){ goTo(_isHmOrEdRole() ? 10 : 5); }
+
 // ── Step navigation ──
 function goTo(s){
+  // Applicants never visit the staff-only steps. If they somehow target one
+  // (saved-state restore, deep link, programmatic), forward them to the next
+  // visible step in the flow.
+  if((s === 9 || s === 10) && !_isHmOrEdRole()) { return goTo(6); }
+
   // ── Run validation BEFORE any DOM changes ──
   if(cur===0 && s>0){
     var errs=validateStep0 ? validateStep0() : [];
@@ -529,7 +544,7 @@ function addRef(){
   var n=list.querySelectorAll('.rrow').length+1;
   var div=document.createElement('div');div.className='rrow';
   div.innerHTML=''
-    +'<div class="rhdr"><span class="rlbl">Reference '+n+'</span><button class="btn-rm" onclick="rmRow(this)">Remove</button></div>'
+    +'<div class="rhdr"><span class="rlbl">Emergency Contact '+n+'</span><button class="btn-rm" onclick="rmRow(this)">Remove</button></div>'
     +'<div class="fg c3">'
     +'<div class="f"><label>First Name <span class="r">*</span></label><input type="text" data-role="refFn"/></div>'
     +'<div class="f"><label>Last Name <span class="r">*</span></label><input type="text" data-role="refLn"/></div>'
@@ -679,12 +694,17 @@ function renderDashTable(){
   var fReserve=document.getElementById('dashFilterReserve')?document.getElementById('dashFilterReserve').value:'';
   var fTier=document.getElementById('dashFilterTier')?document.getElementById('dashFilterTier').value:'';
   var sortBy=document.getElementById('dashSortBy')?document.getElementById('dashSortBy').value:'date';
+  // "Archived" is a flag (a.archived), not a status value. So the filter is:
+  //   - showArchived = true  → only archived rows; ignore status equality
+  //   - showArchived = false → only non-archived rows; status filter applies normally
   var showArchived = fStatus === APP_STATUS.ARCHIVED;
   var filtered=applications.filter(function(a){
-    if(a.archived && !showArchived) return false;
+    if (showArchived ? !a.archived : a.archived) return false;
     var name=((a.fn||'')+' '+(a.ln||'')).toLowerCase();
     return(!search||name.includes(search)||(a.id||'').toLowerCase().includes(search))
-      &&(!fStatus||a.status===fStatus)&&(!fReserve||a.reserve===fReserve)&&(!fTier||a.tier===fTier);
+      &&(showArchived||!fStatus||a.status===fStatus)
+      &&(!fReserve||a.reserve===fReserve)
+      &&(!fTier||a.tier===fTier);
   });
   filtered.sort(function(a,b){
     if(sortBy==='score_desc')return(b.score||0)-(a.score||0);

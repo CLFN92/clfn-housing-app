@@ -475,7 +475,18 @@ async function sbSaveContractor(ct) {
 //   anything else   → 'application'
 function auditEntry(appId, action, detail, user) {
   var actor = user || window.currentRole || 'Staff';
-  var entry = { ts: new Date().toISOString(), appId: appId, action: action, detail: detail, user: actor };
+  var actorName = (window.HOUSING_SESSION && window.HOUSING_SESSION.name) || '';
+  // Applicant submissions on housing.html happen before HOUSING_SESSION.name
+  // is populated for them — fall back to whatever the applicant typed into the
+  // primary-applicant fn/ln fields so the audit "By" column isn't blank.
+  if (!actorName && typeof document !== 'undefined') {
+    var fnEl = document.getElementById('fn');
+    var lnEl = document.getElementById('ln');
+    var fn = (fnEl && fnEl.value || '').trim();
+    var ln = (lnEl && lnEl.value || '').trim();
+    actorName = (fn + ' ' + ln).trim();
+  }
+  var entry = { ts: new Date().toISOString(), appId: appId, action: action, detail: detail, user: actor, name: actorName };
 
   // In-memory log (page-scoped array, may not exist on all pages)
   if (typeof auditLog !== 'undefined') {
@@ -491,7 +502,9 @@ function auditEntry(appId, action, detail, user) {
             : sid === 'SETTINGS'      ? 'settings'
             : 'application';
 
-  // Persist to Supabase (fire-and-forget)
+  // Persist to Supabase (fire-and-forget). Stash actor's display name inside
+  // the detail JSON blob so the audit log "By" column can show a real name —
+  // the actor column only carries the role string.
   fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
     method:  'POST',
     headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
@@ -499,7 +512,7 @@ function auditEntry(appId, action, detail, user) {
       entity_type: etype,
       entity_id:   sid,
       action:      action,
-      detail:      JSON.stringify({ detail: detail }),
+      detail:      JSON.stringify({ detail: detail, name: actorName }),
       actor:       actor,
       created_at:  new Date().toISOString()
     })
@@ -821,6 +834,28 @@ function _ctRenderFlow(status, ct) {
     flow.innerHTML += '<div style="margin-left:12px;padding:4px 10px;background:var(--info-blue-bg);border-radius:6px;font-size:10px;font-weight:700;color:var(--info-blue);">Returned'+(ct.returnedAt?' '+ct.returnedAt.slice(0,10):'')+'</div>';
   }
 }
+// Inline Export dropdown toggle — pair with .export-dropdown markup
+// (see shared.css). Pass `this` from the button onclick. Closes on
+// outside-click and auto-closes any other open inline dropdowns.
+function toggleExportMenu(btnEl) {
+  var wrap = btnEl && btnEl.closest ? btnEl.closest('.export-dropdown') : null;
+  if (!wrap) return;
+  document.querySelectorAll('.export-dropdown.open').forEach(function(w) {
+    if (w !== wrap) w.classList.remove('open');
+  });
+  var isOpen = wrap.classList.toggle('open');
+  if (isOpen) {
+    setTimeout(function() {
+      document.addEventListener('click', _exportMenuOutsideClick, { once: true });
+    }, 0);
+  }
+}
+function _exportMenuOutsideClick(ev) {
+  document.querySelectorAll('.export-dropdown.open').forEach(function(wrap) {
+    if (!wrap.contains(ev.target)) wrap.classList.remove('open');
+  });
+}
+
 function _doExport(format, headers, data, filename, colWidths, pdfLandscape) {
   if(format==='csv') {
     var csv = [headers].concat(data).map(function(r){

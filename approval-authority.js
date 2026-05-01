@@ -52,6 +52,8 @@ var APPROVAL_AUTHORITY = (function() {
     overrideMatch:            ['ed'],
     // Who can assign within the tied score band (notes required)
     assignTiedBand:           ['housing_manager', 'ed'],
+    // Who can set / edit a unit's monthly rent amount on the Inventory forms
+    assignRentAmount:         ['housing_manager', 'ed'],
 
     // ── SOW / Renovation Budget ───────────────────────────────────────────
     // Dollar threshold — above this, ED approval required
@@ -232,6 +234,7 @@ var APPROVAL_AUTHORITY = (function() {
       assignUnit:               'Assign unit to applicant',
       overrideMatch:            'Override top match recommendation',
       assignTiedBand:           'Assign within tied score band',
+      assignRentAmount:         'Set / edit unit rent amount',
       sowEdThreshold:           'SOW dollar threshold for ED approval ($)',
       approveSowUnderThreshold: 'Approve SOW under threshold',
       approveSowOverThreshold:  'Approve SOW over threshold',
@@ -250,7 +253,7 @@ var APPROVAL_AUTHORITY = (function() {
     groups: {
       'Housing Application':  ['reviewApplication','finalApproveApp','declineApplication','returnApplication'],
       'File Update':          ['reviewFileUpdate','approveFileUpdate'],
-      'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand'],
+      'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand','assignRentAmount'],
       'SOW & Renovation':     ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow'],
       'Contractors':          ['recommendContractor','approveContractor','declineContractor'],
       'Scoring':              ['editScoreModel','applyScoreAdjustment'],

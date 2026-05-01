@@ -18,6 +18,7 @@
 <script src="housing-views.js"></script>
 <script src="housing-settings.js"></script>
 <script src="housing-modals.js"></script>
+<script src="housing-modals-sow.js"></script>
 <script src="housing-app.js"></script>
 <script src="housing-init.js"></script>
 
@@ -328,11 +329,19 @@
     </button>
     <button onclick="goTo(4)" id="spb_4" class="spb-btn">
       <span id="spb_num_4" class="spb-num">5</span>
-      <span id="spb_lbl_4" class="txt-xs-dim">References</span>
+      <span id="spb_lbl_4" class="txt-xs-dim">Emergency Contacts</span>
     </button>
     <button onclick="goTo(5)" id="spb_5" class="spb-btn">
       <span id="spb_num_5" class="spb-num">6</span>
       <span id="spb_lbl_5" class="txt-xs-dim">Pets</span>
+    </button>
+    <button onclick="goTo(9)" id="spb_9" class="spb-btn hm-ed-only">
+      <span id="spb_num_9" class="spb-num">7</span>
+      <span id="spb_lbl_9" class="txt-xs-dim">Housing Needs</span>
+    </button>
+    <button onclick="goTo(10)" id="spb_10" class="spb-btn hm-ed-only">
+      <span id="spb_num_10" class="spb-num">8</span>
+      <span id="spb_lbl_10" class="txt-xs-dim">Tenancy History</span>
     </button>
     <button onclick="goTo(6)" id="spb_6" class="spb-btn">
       <span id="spb_num_6" class="spb-num">7</span>
@@ -515,10 +524,197 @@
         </div>
       </div>
 
-      <!-- ── V2: HOUSING NEED ASSESSMENT ── -->
-      <div class="card" id="v2_housing_need_card" style="margin-top:16px;">
+      <!-- Housing Need Assessment + Tenancy History moved to Steps 9 + 10
+           (HM/ED only). They now live after step 8 below and are visited
+           between Pets (step 5) and Documents (step 6) in the navigation
+           flow for HM/ED users. Applicants skip them entirely. -->
+
+      <div class="fnav"><button class="btn btn-primary" onclick="goTo(1)">Next: Employment &amp; Income →</button></div>
+    </div>
+
+    <!-- STEP 1: EMPLOYMENT & INCOME -->
+    <div class="sp" id="step1">
+      <div class="sec-hdr"><h1>Employment &amp; Income</h1><p>Add income records for the applicant and co-applicant.</p></div>
+      <div id="step1_error_banner" class="step-error-banner"></div>
+      <div class="card">
+        <div class="flex-sb mb-16">
+          <div class="ctitle" class="m-0">Income Records</div>
+          <button class="btn btn-sec" onclick="addIncome()">+ Add Income Record</button>
+        </div>
+        <div id="incomeList"></div>
+      </div>
+      <div class="fnav"><button class="btn btn-ghost" onclick="goTo(0)">← Back</button><button class="btn btn-primary" onclick="goTo(2)">Next: Co-Applicant →</button></div>
+    </div>
+
+    <!-- STEP 2: CO-APPLICANT -->
+    <div class="sp" id="step2">
+      <div class="sec-hdr"><h1>Co-Applicant</h1><p>Add a co-applicant if applicable.</p></div>
+      <div id="step2_error_banner" class="step-error-banner"></div>
+      <div class="card">
+        <div class="ctitle">Co-Applicant Status</div>
+        <div class="f"><label>Co-Applicant Status</label><select id="co_status" onchange="calcPersonsOverStandard();triggerV2Score();var b=document.getElementById('coBlk');if(b)b.style.display=this.value==='yes'?'block':'none';"><option value="no">No Co-Applicant</option><option value="yes">Yes — Add Co-Applicant</option></select></div>
+        <div id="coBlk">
+          <div class="divider"></div>
+          <div class="fg c2">
+            <div class="f" data-req="co_fn"><label>First Name <span class="r">*</span></label><input type="text" id="co_fn"/></div>
+            <div class="f" data-req="co_ln"><label>Last Name <span class="r">*</span></label><input type="text" id="co_ln"/></div>
+            <div class="f" data-req="co_dob"><label>Date of Birth <span class="r">*</span></label><input type="date" id="co_dob"/></div>
+            <div class="f"><label>Band Number</label><input type="number" id="co_band"/></div>
+            <div class="f" data-req="co_reserve"><label>On Reserve Status <span class="r">*</span></label><select id="co_reserve"><option value="">Select</option><option>On Reserve</option><option>Off Reserve</option></select></div>
+            <div class="f" data-req="co_cell"><label>Cell Phone <span class="r">*</span></label><input type="tel" id="co_cell" oninput="fmtPhone(this)"/></div>
+            <div class="f"><label>Home Phone</label><input type="tel" id="co_home" oninput="fmtPhone(this)"/></div>
+            <div class="f" data-req="co_email"><label>Email <span class="r">*</span></label><input type="email" id="co_email"/></div>
+            <div class="f" data-req="coOccDate"><label>Occupancy Start Date <span class="r">*</span></label><input type="date" id="coOccDate"/></div>
+          </div>
+        </div>
+      </div>
+      <div class="fnav"><button class="btn btn-ghost" onclick="goTo(1)">← Back</button><button class="btn btn-primary" onclick="goTo(3)">Next: Household Members →</button></div>
+    </div>
+
+    <!-- STEP 3: HOUSEHOLD MEMBERS -->
+    <div class="sp" id="step3">
+      <div class="sec-hdr"><h1>Household Members</h1><p>List all people who will be living in the unit.</p></div>
+      <div id="step3_error_banner" class="step-error-banner"></div>
+      <div class="card">
+        <div class="flex-sb mb-16">
+          <div class="ctitle" class="m-0">Household Members</div>
+          <button class="btn btn-sec" onclick="addHab()">+ Add Member</button>
+        </div>
+        <div id="habList"></div>
+        <div id="habEmpty" style="font-size:13px;color:var(--muted);padding:20px 0;">No household members added. Click "+ Add Member" to begin.</div>
+      </div>
+      <div class="fnav"><button class="btn btn-ghost" onclick="goTo(2)">← Back</button><button class="btn btn-primary" onclick="goTo(4)">Next: Emergency Contacts →</button></div>
+    </div>
+
+    <!-- STEP 4: EMERGENCY CONTACTS (formerly References) -->
+    <div class="sp" id="step4">
+      <div class="sec-hdr"><h1>Emergency Contacts</h1><p>Two emergency contacts are required — personal, professional, or community.</p></div>
+      <div id="step4_error_banner" class="step-error-banner"></div>
+      <div class="card">
+        <div class="flex-sb mb-16">
+          <div class="ctitle" class="m-0">Emergency Contacts</div>
+          <button class="btn btn-sec" onclick="addRef()">+ Add Emergency Contact</button>
+        </div>
+        <div id="refList"></div>
+      </div>
+      <div class="fnav"><button class="btn btn-ghost" onclick="goTo(3)">← Back</button><button class="btn btn-primary" onclick="goTo(5)">Next: Pets →</button></div>
+    </div>
+
+    <!-- STEP 5: PETS -->
+    <div class="sp" id="step5">
+      <div class="sec-hdr"><h1>Pets</h1><p>List any pets that will be living in the unit.</p></div>
+      <div id="step5_error_banner" class="step-error-banner"></div>
+      <div class="card">
+        <div class="flex-sb mb-16">
+          <div class="ctitle" class="m-0">Pets</div>
+          <button class="btn btn-sec" onclick="addPet()">+ Add Pet</button>
+        </div>
+        <div id="petList"></div>
+      </div>
+      <div class="fnav"><button class="btn btn-ghost" onclick="goTo(4)">← Back</button><button class="btn btn-primary" onclick="_goAfterPets()">Next →</button></div>
+    </div>
+
+    <!-- STEP 6: DOCUMENTS -->
+    <div class="sp" id="step6">
+      <div class="sec-hdr"><h1>Documents</h1><p>Upload required supporting documents.</p></div>
+      <div id="step6_error_banner" class="step-error-banner"></div>
+      <div class="card">
+        <div class="ctitle">Required Documents</div>
+        <div class="flex-col-12">
+          <div class="ftog"><label class="tsw"><input type="checkbox"/><span class="tsl"></span></label><label>Government Issued Photo ID</label></div>
+          <div class="ftog"><label class="tsw"><input type="checkbox"/><span class="tsl"></span></label><label>Proof of Band Membership</label></div>
+          <div class="ftog"><label class="tsw"><input type="checkbox"/><span class="tsl"></span></label><label>Income / Employment Letter</label></div>
+          <div class="ftog"><label class="tsw"><input type="checkbox"/><span class="tsl"></span></label><label>Last 2 Pay Stubs</label></div>
+          <div class="ftog"><label class="tsw"><input type="checkbox"/><span class="tsl"></span></label><label>Utility Bills (if applicable)</label></div>
+          <div class="ftog"><label class="tsw"><input type="checkbox"/><span class="tsl"></span></label><label>Arrears Payment Agreement (if applicable)</label></div>
+        </div>
+      </div>
+      <div id="step6_doclib_mount"></div>
+      <div class="fnav"><button class="btn btn-ghost" onclick="_goBeforeDocuments()">← Back</button><button class="btn btn-primary" onclick="goTo(8)">Review Application →</button></div>
+    </div>
+
+    <!-- STEP 7: SCORING (hidden) -->
+    <div class="sp" id="step7">
+      <input type="hidden" id="sc_reserve"/><input type="hidden" id="sc_band_count"/><input type="hidden" id="sc_income"/><input type="hidden" id="sc_rel"/><input type="hidden" id="sc_age"/><input type="hidden" id="sc_access" type="checkbox"/><input type="hidden" id="sc_movein"/><input type="hidden" id="sc_movein_v"/><input type="hidden" id="sc_homecond"/><input type="hidden" id="sc_renos"/><input type="hidden" id="sc_arrears"/><input type="hidden" id="sc_payment"/><input type="hidden" id="sc_appdate"/><input type="hidden" id="sc_size" value="1"/>
+      <input type="hidden" id="edAdjustment" value="0"/><input type="hidden" id="edAdjustReason" value=""/><textarea id="edNotes"></textarea>
+    </div>
+
+    <!-- STEP 8: REVIEW & SUBMIT -->
+    <div class="sp" id="step8">
+      <div class="sec-hdr"><h1>Review &amp; Submit</h1><p>Review your application before submitting. Once submitted, it will be sent to the Housing Manager for review.</p></div>
+      <div id="reviewContent" class="card card-flush">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);"><div class="txt-muted-sm">Complete application summary will appear here.</div></div>
+      </div>
+      <div class="card"><div class="ctitle">Approval Status</div><div id="approvalFlow" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;"></div></div>
+      <div class="card card-flush">
+        <div class="modal-hdr"><div class="ctitle" class="m-0">Disclosure &amp; Signatures</div></div>
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg);"><p style="font-size:12px;color:var(--muted);line-height:1.6;">By signing below, I declare that all information provided in this application is true and complete to the best of my knowledge.</p></div>
+        <!-- Applicant -->
+        <div style="padding:20px;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:var(--dark);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">1</div><div><div class="txt-sm-bold">Applicant</div><div class="txt-muted-xs">Primary applicant signature</div></div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;"><div class="f"><label>Full Name</label><input type="text" id="sig_name" placeholder="Print full name"/></div><div class="f"><label>Date</label><input type="date" id="sig_date"/></div></div>
+          <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sig_canvas_app','canvas')" id="sig_canvas_app_tab_canvas" class="tab-item active">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_app','type')" id="sig_canvas_app_tab_type" class="tab-item">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_app','wet')" id="sig_canvas_app_tab_wet" class="tab-item">🖊 Wet / E-Sign</button></div><div id="sig_canvas_app_panel_canvas" class="bg-paper"><canvas id="sig_canvas_app" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_app')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_app_panel_type" class="sec-hidden"><input type="text" id="sig_canvas_app_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_app_panel_wet" class="sec-hidden"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_app_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+        </div>
+        <!-- Co-Applicant -->
+        <div id="sig_coapplicant_block" style="padding:20px;border-bottom:1px solid var(--border);display:none;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:var(--dark);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">2</div><div><div class="txt-sm-bold">Co-Applicant</div></div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;"><div class="f"><label>Full Name</label><input type="text" id="sig_co_name" placeholder="Co-applicant full name"/></div><div class="f"><label>Date</label><input type="date" id="sig_co_date"/></div></div>
+          <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sig_canvas_co','canvas')" id="sig_canvas_co_tab_canvas" class="tab-item active">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_co','type')" id="sig_canvas_co_tab_type" class="tab-item">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_co','wet')" id="sig_canvas_co_tab_wet" class="tab-item">🖊 Wet / E-Sign</button></div><div id="sig_canvas_co_panel_canvas" class="bg-paper"><canvas id="sig_canvas_co" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_co')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_co_panel_type" class="sec-hidden"><input type="text" id="sig_canvas_co_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_co_panel_wet" class="sec-hidden"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_co_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+        </div>
+        <!-- Staff -->
+        <div class="sec-pad">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--surface);border:2px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">3</div><div><div class="txt-sm-bold">Housing Staff</div><div class="txt-muted-xs">Employee receiving this application</div></div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;"><div class="f"><label>Staff Full Name</label><input type="text" id="sig_staff" placeholder="Staff full name"/></div><div class="f"><label>Date Received</label><input type="date" id="sig_recv"/></div></div>
+          <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sig_canvas_staff','canvas')" id="sig_canvas_staff_tab_canvas" class="tab-item active">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_staff','type')" id="sig_canvas_staff_tab_type" class="tab-item">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_staff','wet')" id="sig_canvas_staff_tab_wet" class="tab-item">🖊 Wet / E-Sign</button></div><div id="sig_canvas_staff_panel_canvas" class="bg-paper"><canvas id="sig_canvas_staff" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_staff_panel_type" class="sec-hidden"><input type="text" id="sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_staff_panel_wet" class="sec-hidden"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
+        </div>
+      </div>
+      <!-- Internal Use -->
+      <div class="card card-flush-gold">
+        <div class="modal-hdr"><div class="ctitle" class="m-0">⭐ Internal Use Only</div><span style="font-size:11px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;">— Housing Manager &amp; Executive Director</span></div>
+        <div style="padding:20px;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><div style="width:28px;height:28px;border-radius:50%;background:rgba(29,78,216,0.15);border:2px solid #1d4ed8;color:#1d4ed8;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">HM</div><div><div class="txt-sm-bold">Housing Manager Approval</div><div class="txt-muted-xs">Recorded automatically when the HM opens this application — no signature required</div></div></div>
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:12px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+              <div><div class="lbl-muted mb-4">Housing Manager</div><input type="text" id="sig_hm_name" placeholder="Auto-populated on review" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
+              <div><div class="lbl-muted mb-4">Date Reviewed</div><input type="date" id="sig_hm_date" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
+            </div>
+            <div class="form-row-2">
+              <div><div class="lbl-muted mb-4">Decision</div><select id="sig_hm_decision" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;font-family:DM Sans,sans-serif;"><option value="">— Pending HM Review —</option><option>Recommended</option><option>Returned — More Info Required</option><option>Declined</option></select></div>
+              <div><div class="lbl-muted mb-4">Notes</div><input type="text" id="sig_hm_notes" placeholder="Optional review notes" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;"/></div>
+            </div>
+          </div>
+          <div class="mt-8"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Signature</div><div style="border-bottom:1.5px solid var(--border);height:48px;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Housing Manager — sign on printed copy</div></div>
+        </div>
+        <div class="sec-pad">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><div style="width:28px;height:28px;border-radius:50%;background:rgba(248,228,26,0.12);border:2px solid var(--yellow);color:var(--yellow);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">ED</div><div><div class="txt-sm-bold">Executive Director Approval</div><div class="txt-muted-xs">Final approval — recorded automatically when the ED opens this application</div></div></div>
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:12px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+              <div><div class="lbl-muted mb-4">Executive Director</div><input type="text" id="sig_ed_name" placeholder="Auto-populated on review" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
+              <div><div class="lbl-muted mb-4">Date Reviewed</div><input type="date" id="sig_ed_date" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
+            </div>
+            <div class="form-row-2">
+              <div><div class="lbl-muted mb-4">Decision</div><select id="sig_ed_decision" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;font-family:DM Sans,sans-serif;"><option value="">— Pending ED Review —</option><option>Approved</option><option>Declined</option><option>Deferred</option></select></div>
+              <div><div class="lbl-muted mb-4">Notes</div><input type="text" id="sig_ed_notes_sig" placeholder="Optional notes" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;"/></div>
+            </div>
+          </div>
+          <div class="mt-8"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Signature</div><div style="border-bottom:1.5px solid var(--border);height:48px;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Executive Director — sign on printed copy</div></div>
+        </div>
+      </div>
+      <div class="fnav sig-actions">
+        <button class="btn btn-ghost" onclick="goTo(6)">← Back</button>
+        <button class="btn btn-sec" onclick="printApplicationPreview()" style="display:flex;align-items:center;gap:6px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print / Save PDF</button>
+        <button class="btn btn-primary" id="btn_submit_app" onclick="openSubmitModal()">Submit Application →</button>
+      </div>
+    </div><!-- end step8 -->
+
+    <!-- STEP 9: HOUSING NEEDS — HM/ED only. In the navigation flow this
+         appears between Pets (5) and Documents (6). Applicants never see it. -->
+    <div class="sp hm-ed-only" id="step9">
+      <div class="sec-hdr"><h1>Housing Needs</h1><p>Staff assessment of the applicant's housing need. Drives the priority score under the V2 model.</p></div>
+      <div id="step9_error_banner" class="step-error-banner"></div>
+      <div class="card" id="v2_housing_need_card">
         <div class="ctitle">Housing Need Assessment</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">These fields are used to calculate your application priority score under the revised scoring model.</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Completed by Housing Manager / Executive Director during application review.</div>
         <div class="fg c2">
           <div class="f">
             <label>Urgent Need / Displacement <span class="r">*</span></label>
@@ -612,14 +808,19 @@
           </div>
         </div>
       </div>
+      <div class="fnav"><button class="btn btn-ghost" onclick="goTo(5)">← Back</button><button class="btn btn-primary" onclick="goTo(10)">Next: Tenancy History →</button></div>
+    </div><!-- end step9 -->
 
-      <!-- ── V2: TENANCY HISTORY (HM/ED assessed fields) ── -->
-      <div class="card" id="v2_tenancy_card" style="margin-top:16px;">
+    <!-- STEP 10: TENANCY HISTORY — HM/ED only. -->
+    <div class="sp hm-ed-only" id="step10">
+      <div class="sec-hdr"><h1>Tenancy History</h1><p>Staff assessment of the applicant's prior CLFN tenancy.</p></div>
+      <div id="step10_error_banner" class="step-error-banner"></div>
+      <div class="card" id="v2_tenancy_card">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
           <div class="ctitle" class="m-0">Tenancy History</div>
           <div id="tenancy_hm_badge" style="display:none;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:rgba(248,228,26,0.12);color:var(--yellow);border:1px solid rgba(248,228,26,0.3);">⭐ HM / ED Assessment</div>
         </div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;" id="tenancy_help_text">These fields are assessed by the Housing Manager based on your CLFN tenancy record. New applicants with no prior tenancy receive a neutral baseline score.</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;" id="tenancy_help_text">Assessed by Housing Manager / Executive Director based on the applicant's CLFN tenancy record. New applicants with no prior tenancy receive a neutral baseline score.</div>
         <div class="fg c2">
           <div class="f">
             <label>Prior CLFN Tenancy</label>
@@ -664,184 +865,8 @@
           <div id="tenancy_locked_msg" style="font-size:11px;color:var(--muted);margin-top:8px;font-style:italic;">These fields are locked for employees. The Housing Manager will complete this assessment after submission.</div>
         </div>
       </div>
-
-      <div class="fnav"><button class="btn btn-primary" onclick="goTo(1)">Next: Employment &amp; Income →</button></div>
-    </div>
-
-    <!-- STEP 1: EMPLOYMENT & INCOME -->
-    <div class="sp" id="step1">
-      <div class="sec-hdr"><h1>Employment &amp; Income</h1><p>Add income records for the applicant and co-applicant.</p></div>
-      <div id="step1_error_banner" class="step-error-banner"></div>
-      <div class="card">
-        <div class="flex-sb mb-16">
-          <div class="ctitle" class="m-0">Income Records</div>
-          <button class="btn btn-sec" onclick="addIncome()">+ Add Income Record</button>
-        </div>
-        <div id="incomeList"></div>
-      </div>
-      <div class="fnav"><button class="btn btn-ghost" onclick="goTo(0)">← Back</button><button class="btn btn-primary" onclick="goTo(2)">Next: Co-Applicant →</button></div>
-    </div>
-
-    <!-- STEP 2: CO-APPLICANT -->
-    <div class="sp" id="step2">
-      <div class="sec-hdr"><h1>Co-Applicant</h1><p>Add a co-applicant if applicable.</p></div>
-      <div id="step2_error_banner" class="step-error-banner"></div>
-      <div class="card">
-        <div class="ctitle">Co-Applicant Status</div>
-        <div class="f"><label>Co-Applicant Status</label><select id="co_status" onchange="calcPersonsOverStandard();triggerV2Score();var b=document.getElementById('coBlk');if(b)b.style.display=this.value==='yes'?'block':'none';"><option value="no">No Co-Applicant</option><option value="yes">Yes — Add Co-Applicant</option></select></div>
-        <div id="coBlk">
-          <div class="divider"></div>
-          <div class="fg c2">
-            <div class="f" data-req="co_fn"><label>First Name <span class="r">*</span></label><input type="text" id="co_fn"/></div>
-            <div class="f" data-req="co_ln"><label>Last Name <span class="r">*</span></label><input type="text" id="co_ln"/></div>
-            <div class="f" data-req="co_dob"><label>Date of Birth <span class="r">*</span></label><input type="date" id="co_dob"/></div>
-            <div class="f"><label>Band Number</label><input type="number" id="co_band"/></div>
-            <div class="f" data-req="co_reserve"><label>On Reserve Status <span class="r">*</span></label><select id="co_reserve"><option value="">Select</option><option>On Reserve</option><option>Off Reserve</option></select></div>
-            <div class="f" data-req="co_cell"><label>Cell Phone <span class="r">*</span></label><input type="tel" id="co_cell" oninput="fmtPhone(this)"/></div>
-            <div class="f"><label>Home Phone</label><input type="tel" id="co_home" oninput="fmtPhone(this)"/></div>
-            <div class="f" data-req="co_email"><label>Email <span class="r">*</span></label><input type="email" id="co_email"/></div>
-            <div class="f" data-req="coOccDate"><label>Occupancy Start Date <span class="r">*</span></label><input type="date" id="coOccDate"/></div>
-          </div>
-        </div>
-      </div>
-      <div class="fnav"><button class="btn btn-ghost" onclick="goTo(1)">← Back</button><button class="btn btn-primary" onclick="goTo(3)">Next: Household Members →</button></div>
-    </div>
-
-    <!-- STEP 3: HOUSEHOLD MEMBERS -->
-    <div class="sp" id="step3">
-      <div class="sec-hdr"><h1>Household Members</h1><p>List all people who will be living in the unit.</p></div>
-      <div id="step3_error_banner" class="step-error-banner"></div>
-      <div class="card">
-        <div class="flex-sb mb-16">
-          <div class="ctitle" class="m-0">Household Members</div>
-          <button class="btn btn-sec" onclick="addHab()">+ Add Member</button>
-        </div>
-        <div id="habList"></div>
-        <div id="habEmpty" style="font-size:13px;color:var(--muted);padding:20px 0;">No household members added. Click "+ Add Member" to begin.</div>
-      </div>
-      <div class="fnav"><button class="btn btn-ghost" onclick="goTo(2)">← Back</button><button class="btn btn-primary" onclick="goTo(4)">Next: References →</button></div>
-    </div>
-
-    <!-- STEP 4: REFERENCES -->
-    <div class="sp" id="step4">
-      <div class="sec-hdr"><h1>References</h1><p>Two references are required — personal, professional, or community.</p></div>
-      <div id="step4_error_banner" class="step-error-banner"></div>
-      <div class="card">
-        <div class="flex-sb mb-16">
-          <div class="ctitle" class="m-0">References</div>
-          <button class="btn btn-sec" onclick="addRef()">+ Add Reference</button>
-        </div>
-        <div id="refList"></div>
-      </div>
-      <div class="fnav"><button class="btn btn-ghost" onclick="goTo(3)">← Back</button><button class="btn btn-primary" onclick="goTo(5)">Next: Pets →</button></div>
-    </div>
-
-    <!-- STEP 5: PETS -->
-    <div class="sp" id="step5">
-      <div class="sec-hdr"><h1>Pets</h1><p>List any pets that will be living in the unit.</p></div>
-      <div id="step5_error_banner" class="step-error-banner"></div>
-      <div class="card">
-        <div class="flex-sb mb-16">
-          <div class="ctitle" class="m-0">Pets</div>
-          <button class="btn btn-sec" onclick="addPet()">+ Add Pet</button>
-        </div>
-        <div id="petList"></div>
-      </div>
-      <div class="fnav"><button class="btn btn-ghost" onclick="goTo(4)">← Back</button><button class="btn btn-primary" onclick="goTo(6)">Next: Documents →</button></div>
-    </div>
-
-    <!-- STEP 6: DOCUMENTS -->
-    <div class="sp" id="step6">
-      <div class="sec-hdr"><h1>Documents</h1><p>Upload required supporting documents.</p></div>
-      <div id="step6_error_banner" class="step-error-banner"></div>
-      <div class="card">
-        <div class="ctitle">Required Documents</div>
-        <div class="flex-col-12">
-          <div class="ftog"><label class="tsw"><input type="checkbox"/><span class="tsl"></span></label><label>Government Issued Photo ID</label></div>
-          <div class="ftog"><label class="tsw"><input type="checkbox"/><span class="tsl"></span></label><label>Proof of Band Membership</label></div>
-          <div class="ftog"><label class="tsw"><input type="checkbox"/><span class="tsl"></span></label><label>Income / Employment Letter</label></div>
-          <div class="ftog"><label class="tsw"><input type="checkbox"/><span class="tsl"></span></label><label>Last 2 Pay Stubs</label></div>
-          <div class="ftog"><label class="tsw"><input type="checkbox"/><span class="tsl"></span></label><label>Utility Bills (if applicable)</label></div>
-          <div class="ftog"><label class="tsw"><input type="checkbox"/><span class="tsl"></span></label><label>Arrears Payment Agreement (if applicable)</label></div>
-        </div>
-      </div>
-      <div id="step6_doclib_mount"></div>
-      <div class="fnav"><button class="btn btn-ghost" onclick="goTo(5)">← Back</button><button class="btn btn-primary" onclick="goTo(8)">Review Application →</button></div>
-    </div>
-
-    <!-- STEP 7: SCORING (hidden) -->
-    <div class="sp" id="step7">
-      <input type="hidden" id="sc_reserve"/><input type="hidden" id="sc_band_count"/><input type="hidden" id="sc_income"/><input type="hidden" id="sc_rel"/><input type="hidden" id="sc_age"/><input type="hidden" id="sc_access" type="checkbox"/><input type="hidden" id="sc_movein"/><input type="hidden" id="sc_movein_v"/><input type="hidden" id="sc_homecond"/><input type="hidden" id="sc_renos"/><input type="hidden" id="sc_arrears"/><input type="hidden" id="sc_payment"/><input type="hidden" id="sc_appdate"/><input type="hidden" id="sc_size" value="1"/>
-      <input type="hidden" id="edAdjustment" value="0"/><input type="hidden" id="edAdjustReason" value=""/><textarea id="edNotes"></textarea>
-    </div>
-
-    <!-- STEP 8: REVIEW & SUBMIT -->
-    <div class="sp" id="step8">
-      <div class="sec-hdr"><h1>Review &amp; Submit</h1><p>Review your application before submitting. Once submitted, it will be sent to the Housing Manager for review.</p></div>
-      <div id="reviewContent" class="card card-flush">
-        <div style="padding:20px 24px;border-bottom:1px solid var(--border);"><div class="txt-muted-sm">Complete application summary will appear here.</div></div>
-      </div>
-      <div class="card"><div class="ctitle">Approval Status</div><div id="approvalFlow" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;"></div></div>
-      <div class="card card-flush">
-        <div class="modal-hdr"><div class="ctitle" class="m-0">Disclosure &amp; Signatures</div></div>
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg);"><p style="font-size:12px;color:var(--muted);line-height:1.6;">By signing below, I declare that all information provided in this application is true and complete to the best of my knowledge.</p></div>
-        <!-- Applicant -->
-        <div style="padding:20px;border-bottom:1px solid var(--border);">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:var(--dark);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">1</div><div><div class="txt-sm-bold">Applicant</div><div class="txt-muted-xs">Primary applicant signature</div></div></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;"><div class="f"><label>Full Name</label><input type="text" id="sig_name" placeholder="Print full name"/></div><div class="f"><label>Date</label><input type="date" id="sig_date"/></div></div>
-          <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sig_canvas_app','canvas')" id="sig_canvas_app_tab_canvas" class="tab-item active">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_app','type')" id="sig_canvas_app_tab_type" class="tab-item">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_app','wet')" id="sig_canvas_app_tab_wet" class="tab-item">🖊 Wet / E-Sign</button></div><div id="sig_canvas_app_panel_canvas" class="bg-paper"><canvas id="sig_canvas_app" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_app')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_app_panel_type" class="sec-hidden"><input type="text" id="sig_canvas_app_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_app_panel_wet" class="sec-hidden"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_app_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
-        </div>
-        <!-- Co-Applicant -->
-        <div id="sig_coapplicant_block" style="padding:20px;border-bottom:1px solid var(--border);display:none;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:var(--dark);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">2</div><div><div class="txt-sm-bold">Co-Applicant</div></div></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;"><div class="f"><label>Full Name</label><input type="text" id="sig_co_name" placeholder="Co-applicant full name"/></div><div class="f"><label>Date</label><input type="date" id="sig_co_date"/></div></div>
-          <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sig_canvas_co','canvas')" id="sig_canvas_co_tab_canvas" class="tab-item active">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_co','type')" id="sig_canvas_co_tab_type" class="tab-item">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_co','wet')" id="sig_canvas_co_tab_wet" class="tab-item">🖊 Wet / E-Sign</button></div><div id="sig_canvas_co_panel_canvas" class="bg-paper"><canvas id="sig_canvas_co" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_co')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_co_panel_type" class="sec-hidden"><input type="text" id="sig_canvas_co_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_co_panel_wet" class="sec-hidden"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_co_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
-        </div>
-        <!-- Staff -->
-        <div class="sec-pad">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--surface);border:2px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">3</div><div><div class="txt-sm-bold">Housing Staff</div><div class="txt-muted-xs">Employee receiving this application</div></div></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;"><div class="f"><label>Staff Full Name</label><input type="text" id="sig_staff" placeholder="Staff full name"/></div><div class="f"><label>Date Received</label><input type="date" id="sig_recv"/></div></div>
-          <div class="sig-canvas-wrap"><div class="tab-bar"><button type="button" onclick="setSigMethod('sig_canvas_staff','canvas')" id="sig_canvas_staff_tab_canvas" class="tab-item active">✏️ Draw</button><button type="button" onclick="setSigMethod('sig_canvas_staff','type')" id="sig_canvas_staff_tab_type" class="tab-item">⌨️ Type</button><button type="button" onclick="setSigMethod('sig_canvas_staff','wet')" id="sig_canvas_staff_tab_wet" class="tab-item">🖊 Wet / E-Sign</button></div><div id="sig_canvas_staff_panel_canvas" class="bg-paper"><canvas id="sig_canvas_staff" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas><div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig('sig_canvas_staff')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button></div></div><div id="sig_canvas_staff_panel_type" class="sec-hidden"><input type="text" id="sig_canvas_staff_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;" /><div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div></div><div id="sig_canvas_staff_panel_wet" class="sec-hidden"><div style="font-size:12px;color:var(--text);font-weight:600;margin-bottom:8px;">Print or email for signature</div><div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service (DocuSign, Adobe Sign, etc.) and attach the signed copy to this application file.</div><input type="text" id="sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" /></div></div>
-        </div>
-      </div>
-      <!-- Internal Use -->
-      <div class="card card-flush-gold">
-        <div class="modal-hdr"><div class="ctitle" class="m-0">⭐ Internal Use Only</div><span style="font-size:11px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;">— Housing Manager &amp; Executive Director</span></div>
-        <div style="padding:20px;border-bottom:1px solid var(--border);">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><div style="width:28px;height:28px;border-radius:50%;background:rgba(29,78,216,0.15);border:2px solid #1d4ed8;color:#1d4ed8;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">HM</div><div><div class="txt-sm-bold">Housing Manager Approval</div><div class="txt-muted-xs">Recorded automatically when the HM opens this application — no signature required</div></div></div>
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:12px;">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
-              <div><div class="lbl-muted mb-4">Housing Manager</div><input type="text" id="sig_hm_name" placeholder="Auto-populated on review" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
-              <div><div class="lbl-muted mb-4">Date Reviewed</div><input type="date" id="sig_hm_date" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
-            </div>
-            <div class="form-row-2">
-              <div><div class="lbl-muted mb-4">Decision</div><select id="sig_hm_decision" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;font-family:DM Sans,sans-serif;"><option value="">— Pending HM Review —</option><option>Recommended</option><option>Returned — More Info Required</option><option>Declined</option></select></div>
-              <div><div class="lbl-muted mb-4">Notes</div><input type="text" id="sig_hm_notes" placeholder="Optional review notes" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;"/></div>
-            </div>
-          </div>
-          <div class="mt-8"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Signature</div><div style="border-bottom:1.5px solid var(--border);height:48px;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Housing Manager — sign on printed copy</div></div>
-        </div>
-        <div class="sec-pad">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><div style="width:28px;height:28px;border-radius:50%;background:rgba(248,228,26,0.12);border:2px solid var(--yellow);color:var(--yellow);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">ED</div><div><div class="txt-sm-bold">Executive Director Approval</div><div class="txt-muted-xs">Final approval — recorded automatically when the ED opens this application</div></div></div>
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:12px;">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
-              <div><div class="lbl-muted mb-4">Executive Director</div><input type="text" id="sig_ed_name" placeholder="Auto-populated on review" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
-              <div><div class="lbl-muted mb-4">Date Reviewed</div><input type="date" id="sig_ed_date" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;" readonly/></div>
-            </div>
-            <div class="form-row-2">
-              <div><div class="lbl-muted mb-4">Decision</div><select id="sig_ed_decision" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;font-family:DM Sans,sans-serif;"><option value="">— Pending ED Review —</option><option>Approved</option><option>Declined</option><option>Deferred</option></select></div>
-              <div><div class="lbl-muted mb-4">Notes</div><input type="text" id="sig_ed_notes_sig" placeholder="Optional notes" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;padding:4px 0;outline:none;font-family:DM Sans,sans-serif;"/></div>
-            </div>
-          </div>
-          <div class="mt-8"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Signature</div><div style="border-bottom:1.5px solid var(--border);height:48px;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Executive Director — sign on printed copy</div></div>
-        </div>
-      </div>
-      <div class="fnav sig-actions">
-        <button class="btn btn-ghost" onclick="goTo(6)">← Back</button>
-        <button class="btn btn-sec" onclick="printApplicationPreview()" style="display:flex;align-items:center;gap:6px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print / Save PDF</button>
-        <button class="btn btn-primary" id="btn_submit_app" onclick="openSubmitModal()">Submit Application →</button>
-      </div>
-    </div><!-- end step8 -->
+      <div class="fnav"><button class="btn btn-ghost" onclick="goTo(9)">← Back</button><button class="btn btn-primary" onclick="goTo(6)">Next: Documents →</button></div>
+    </div><!-- end step10 -->
 
   </main>
 </div><!-- end appLayout -->
@@ -1202,7 +1227,20 @@
         <div class="lbl-yellow">&#128203; Audit Log</div>
         <div class="txt-sm-meta">Full activity trail &mdash; applications, approvals, unit edits, SOW, and system changes</div>
       </div>
-      <button type="button" onclick="renderAuditLog()" class="btn btn-primary">&#8635; Refresh</button>
+      <div class="flex-gap8 flex-wrap">
+        <div class="export-dropdown">
+          <button type="button" onclick="toggleExportMenu(this)" class="btn btn-primary">&#128228; Export</button>
+          <div class="header-export-menu">
+            <button type="button" onclick="exportAudit('csv')" class="header-export-item">
+              <span class="header-export-icon">&#128196;</span> CSV
+            </button>
+            <button type="button" onclick="exportAudit('excel')" class="header-export-item">
+              <span class="header-export-icon">&#128202;</span> Excel (.xlsx)
+            </button>
+          </div>
+        </div>
+        <button type="button" onclick="renderAuditLog()" class="btn btn-primary">&#8635; Refresh</button>
+      </div>
     </div>
     <div class="doclib-table-wrap">
       <table class="std-table">

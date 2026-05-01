@@ -18,6 +18,7 @@
 <script src="housing-views.js"></script>
 <script src="housing-settings.js"></script>
 <script src="housing-modals.js"></script>
+<script src="housing-modals-sow.js"></script>
 <script src="housing-app.js"></script>
 <script src="housing-init.js"></script>
 
@@ -210,6 +211,7 @@
         <div class="f"><label>Funder / Program</label><select id="au_funder"><option value="">None / Band</option><option value="ISC">ISC</option><option value="CMHC_95">CMHC Sec. 95</option><option value="CMHC_56">CMHC Sec. 56.1</option><option value="Other">Other</option></select></div>
         <div class="f"><label>Phase</label><input type="text" id="au_phase" placeholder="e.g. 15"/></div>
         <div class="f"><label>Year Built</label><input type="text" id="au_year" placeholder="e.g. 1998"/></div>
+        <div class="f"><label>Monthly Rent (CAD)</label><input type="number" id="au_rent" min="0" step="any" placeholder="e.g. 750"/></div>
       </div>
       <div style="display:flex;gap:20px;">
         <div class="ftog"><label class="tsw"><input type="checkbox" id="au_accessible"/><span class="tsl"></span></label><label for="au_accessible">Accessible ♿</label></div>
@@ -628,6 +630,7 @@
           </div>
           <div class="f"><label>Bathrooms</label><input id="ue_bathrooms" type="text" placeholder="e.g. 1"/></div>
           <div class="f"><label>Year Built</label><input id="ue_year" type="text" placeholder="e.g. 1998"/></div>
+          <div class="f"><label>Monthly Rent (CAD)</label><input id="ue_rent" type="number" min="0" step="any" placeholder="e.g. 750"/></div>
           <div class="f"><label>Type</label>
             <select id="ue_type">
               <option value="">— Select —</option>

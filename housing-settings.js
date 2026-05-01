@@ -648,12 +648,57 @@ function saveBudgetPoolsED() {
 }
 
 // ── Audit log viewer ──
+// Action label map — shared by renderer and CSV export.
+var AUDIT_ACTION_LABELS = {
+  'application_submitted':    '📨 Submitted',
+  'file_update_submitted':    '📨 File Update Submitted',
+  'application_opened':       '📂 Opened for Edit',
+  'draft_saved':              '💾 Draft Saved',
+  'status_change':            '🔄 Status Changed',
+  'status':                   '🔄 Status Changed',
+  'signature_captured':       '✍️ Signature Captured',
+  'archived':                 '📦 Archived',
+  'unarchived':               '📤 Unarchived',
+  'declined':                 '✕ Declined',
+  'ed_adjustment':            '⭐ ED Score Adjustment',
+  'unit_edit':                '🏠 Unit Saved',
+  'sow_created':              '🔨 SOW Created',
+  'sow_updated':              '🔨 SOW Updated',
+  'sow_tenant_signed':        '✍️ Tenant Signed SOW',
+  'sow_staff_signed':         '✍️ Staff Signed SOW',
+  'sow_hm_approval':          '✅ HM Approved SOW',
+  'sow_ed_approval':          '✅ ED Approved SOW',
+  'sow_accountability':       '⚠️ Accountability Flagged',
+  'settings_scoring_change':  '⚙️ Rubric Value Changed',
+  'settings_scoring_add':     '⚙️ Rubric Criteria Added',
+  'settings_scoring_delete':  '⚙️ Rubric Criteria Removed',
+  'settings_scoring_reset':   '⚙️ Scoring Model Reset',
+  'settings_unit_score_save': '⚙️ Unit Scoring Saved',
+  'settings_reno_score_save': '⚙️ Reno Scoring Saved',
+  'settings_budget_save':     '💰 Budget Saved',
+  'settings_user_add':        '👤 User Added',
+  'settings_user_remove':     '👤 User Removed',
+  'settings_saved':           '⚙️ Settings Saved'
+};
+
+// Map an audit row's action to a row-tint class. Empty string = no tint.
+function _auditRowClass(action) {
+  if (action === 'application_submitted' || action === 'file_update_submitted') return 'audit-row-submit';
+  if (action === 'status_change' || action === 'status')                         return 'audit-row-status';
+  if (action === 'declined')                                                     return 'audit-row-declined';
+  if (action && action.indexOf('sow_') === 0)                                    return 'audit-row-sow';
+  return '';
+}
+
 async function renderAuditLog() {
   var tbody = document.getElementById('audit_log_tbody');
   if(!tbody) return;
   tbody.innerHTML = '<tr><td colspan="5" class="empty-state-italic">Loading…</td></tr>';
 
-  // Load from Supabase (shared across all users)
+  // Load from Supabase (shared across all users). The DB column is `detail`
+  // (singular) and stores JSON like {"detail":"...","name":"..."}; we parse
+  // it here so the table can show plain text in the Detail column and the
+  // user's full name in the By column.
   var log = [];
   try {
     var r = await fetch(
@@ -663,58 +708,29 @@ async function renderAuditLog() {
     if(r.ok) {
       var rows = await r.json();
       log = rows.map(function(row) {
-        // Handle both new columns and legacy column names
-        var detailsStr = row.details || '';
-        var d = {};
-        try { d = JSON.parse(detailsStr); } catch(e) {}
+        var raw = row.detail || row.details || '';
+        var parsed = null;
+        if (typeof raw === 'string' && raw.length && raw.charAt(0) === '{') {
+          try { parsed = JSON.parse(raw); } catch(e) { parsed = null; }
+        } else if (raw && typeof raw === 'object') {
+          parsed = raw;
+        }
+        var detailText = (parsed && parsed.detail) || (typeof raw === 'string' ? raw : '') || '';
+        var name       = (parsed && parsed.name)   || row.actor_name || '';
         return {
           ts:     row.created_at || row.ts || '',
           appId:  row.entity_id  || row.app_id || '',
           action: row.action     || '',
-          detail: d.detail       || row.detail || detailsStr || '',
-          user:   row.actor      || row.user_role || 'Staff'
+          detail: detailText,
+          role:   row.actor      || row.user_role || 'Staff',
+          name:   name
         };
       });
     }
   } catch(e) { console.warn('Audit log load failed:', e); }
 
-  // Fall back to localStorage if Supabase is empty
-  if(!log.length) {
-    // audit log loaded from Supabase
-  }
-
-  // Action label map
-  var actionLabels = {
-    'application_submitted':    '📨 Submitted',
-    'file_update_submitted':    '📨 File Update Submitted',
-    'application_opened':       '📂 Opened for Edit',
-    'draft_saved':              '💾 Draft Saved',
-    'status_change':            '🔄 Status Changed',
-    'status':                   '🔄 Status Changed',
-    'signature_captured':       '✍️ Signature Captured',
-    'archived':                 '📦 Archived',
-    'unarchived':               '📤 Unarchived',
-    'declined':                 '✕ Declined',
-    'ed_adjustment':            '⭐ ED Score Adjustment',
-    'unit_edit':                '🏠 Unit Saved',
-    'sow_created':              '🔨 SOW Created',
-    'sow_updated':              '🔨 SOW Updated',
-    'sow_tenant_signed':        '✍️ Tenant Signed SOW',
-    'sow_staff_signed':         '✍️ Staff Signed SOW',
-    'sow_hm_approval':          '✅ HM Approved SOW',
-    'sow_ed_approval':          '✅ ED Approved SOW',
-    'sow_accountability':       '⚠️ Accountability Flagged',
-    'settings_scoring_change':  '⚙️ Rubric Value Changed',
-    'settings_scoring_add':     '⚙️ Rubric Criteria Added',
-    'settings_scoring_delete':  '⚙️ Rubric Criteria Removed',
-    'settings_scoring_reset':   '⚙️ Scoring Model Reset',
-    'settings_unit_score_save': '⚙️ Unit Scoring Saved',
-    'settings_reno_score_save': '⚙️ Reno Scoring Saved',
-    'settings_budget_save':     '💰 Budget Saved',
-    'settings_user_add':        '👤 User Added',
-    'settings_user_remove':     '👤 User Removed',
-    'settings_saved':           '⚙️ Settings Saved'
-  };
+  // Cache for CSV export — built from whatever we just rendered.
+  window._auditRows = log;
 
   if(!log.length) {
     tbody.innerHTML = '<tr><td colspan="5" class="empty-state-italic">No audit entries yet.</td></tr>';
@@ -724,25 +740,53 @@ async function renderAuditLog() {
   tbody.innerHTML = log.slice(0,300).map(function(e) {
     var d  = new Date(e.ts);
     var ds = d.toLocaleDateString('en-CA')+' '+d.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit'});
-    var lbl = actionLabels[e.action] || e.action.replace(/_/g,' ');
-    // Colour-code by category
-    var rowBg = '';
-    if(e.action==='application_submitted'||e.action==='file_update_submitted') rowBg='background:#f0fdf4;';
-    else if(e.action==='status_change'||e.action==='status') rowBg='background:#eff6ff;';
-    else if(e.action==='declined') rowBg='background:#fef2f2;';
-    else if(e.action.startsWith('sow_')) rowBg='background:#fffbeb;';
-    // Friendly appId display
+    var lbl = AUDIT_ACTION_LABELS[e.action] || (e.action || '').replace(/_/g,' ');
+    var rowCls = _auditRowClass(e.action);
+
+    // Friendly appId display: surface SOW: / SETTINGS prefixes as compact pills.
     var appDisplay = e.appId || '—';
-    if(appDisplay.startsWith('SOW:')) appDisplay = '<span style="font-size:10px;background:var(--warn-amber-bg);color:var(--warn-amber);padding:1px 6px;border-radius:4px;font-weight:700;">SOW</span> ' + appDisplay.slice(4);
-    else if(appDisplay === 'SETTINGS') appDisplay = '<span style="font-size:10px;background:var(--bg);color:var(--muted);padding:1px 6px;border-radius:4px;font-weight:700;">SYS</span>';
-    return '<tr style="border-bottom:1px solid var(--border);'+rowBg+'">'
-      +'<td style="padding:8px 12px;font-size:11px;color:var(--muted);white-space:nowrap;">'+ds+'</td>'
-      +'<td style="padding:8px 12px;font-size:11px;white-space:nowrap;">'+appDisplay+'</td>'
-      +'<td style="padding:8px 12px;font-size:12px;font-weight:600;white-space:nowrap;">'+lbl+'</td>'
-      +'<td style="padding:8px 12px;font-size:12px;color:var(--muted);">'+( e.detail||'—')+'</td>'
-      +'<td style="padding:8px 12px;font-size:11px;color:var(--muted);white-space:nowrap;">'+( e.user||'—')+'</td>'
+    if (appDisplay.indexOf('SOW:') === 0) {
+      appDisplay = '<span class="audit-pill audit-pill-sow">SOW</span> ' + appDisplay.slice(4);
+    } else if (appDisplay === 'SETTINGS') {
+      appDisplay = '<span class="audit-pill audit-pill-sys">SYS</span>';
+    }
+
+    // By column: prefer full name; fall back to role for legacy rows that
+    // were written before auditEntry started capturing the name.
+    var byHtml = e.name
+      ? '<span class="audit-by-name">'+e.name+'</span><span class="audit-by-role">'+(e.role||'')+'</span>'
+      : '<span class="audit-by-name">'+(e.role||'—')+'</span>';
+
+    return '<tr'+(rowCls?' class="'+rowCls+'"':'')+'>'
+      +'<td class="audit-cell-date">'+ds+'</td>'
+      +'<td class="audit-cell-ref">'+appDisplay+'</td>'
+      +'<td class="audit-cell-event">'+lbl+'</td>'
+      +'<td class="audit-cell-detail">'+(e.detail || '—')+'</td>'
+      +'<td class="audit-cell-by">'+byHtml+'</td>'
       +'</tr>';
   }).join('');
+}
+
+// Export the currently-loaded audit rows. Dispatched from headerExport()
+// when _currentExportView === 'audit_log'. Reuses the shared _doExport
+// helper so download / toast / xlsx behaviour matches inventory + reno.
+function exportAudit(format) {
+  var rows = Array.isArray(window._auditRows) ? window._auditRows : [];
+  if (!rows.length) {
+    if (typeof showToast === 'function') showToast('No audit entries to export.');
+    return;
+  }
+  var headers = ['Date / Time', 'ID / Ref', 'Event', 'Detail', 'Name', 'Role'];
+  var data = rows.map(function(e) {
+    var d  = new Date(e.ts);
+    var ds = isNaN(d.getTime()) ? (e.ts || '') : (d.toLocaleDateString('en-CA')+' '+d.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit'}));
+    var lbl = AUDIT_ACTION_LABELS[e.action] || (e.action || '').replace(/_/g,' ');
+    return [ds, e.appId || '', lbl, e.detail || '', e.name || '', e.role || ''];
+  });
+  var stamp = new Date().toISOString().slice(0,10);
+  if (typeof _doExport === 'function') {
+    _doExport(format || 'csv', headers, data, 'audit-log-'+stamp, [20, 18, 26, 60, 24, 18]);
+  }
 }
 
 function showRenosForRole() {

@@ -18,6 +18,8 @@
 <script src="housing-views.js"></script>
 <script src="housing-settings.js"></script>
 <script src="housing-modals.js"></script>
+<script src="housing-modals-sow.js"></script>
+<script src="housing-tic.js"></script>
 <script src="housing-app.js"></script>
 <script src="housing-init.js"></script>
 
@@ -522,6 +524,7 @@
           </div>
           <div class="f"><label>Bathrooms</label><input id="ue_bathrooms" type="text" placeholder="e.g. 1"/></div>
           <div class="f"><label>Year Built</label><input id="ue_year" type="text" placeholder="e.g. 1998"/></div>
+          <div class="f"><label>Monthly Rent (CAD)</label><input id="ue_rent" type="number" min="0" step="any" placeholder="e.g. 750"/></div>
           <div class="f"><label>Type</label>
             <select id="ue_type">
               <option value="">— Select —</option>
@@ -796,6 +799,68 @@
       <button type="button" onclick="closeAddTenantModal()" class="btn btn-ghost">Cancel</button>
       <button type="button" onclick="saveAddTenant()" class="btn btn-primary">Assign to Unit</button>
     </div>
+  </div>
+</div>
+
+<!-- ══ TENANT INFORMATION CARD MODAL ══════════════════════════════════════ -->
+<div id="ticModal" class="tic-overlay" role="dialog" aria-modal="true" aria-labelledby="tic_name">
+  <div class="tic-shell">
+
+    <!-- Hero -->
+    <div class="tic-hero">
+      <div id="tic_avatar" class="tic-avatar">—</div>
+      <div class="tic-hero-main">
+        <h2 id="tic_name" class="tic-name">—</h2>
+        <div id="tic_hero_sub" class="tic-hero-sub"></div>
+        <div id="tic_hero_badges" class="tic-hero-badges"></div>
+      </div>
+      <button id="tic_close_btn" type="button" class="tic-close-btn" aria-label="Close">✕</button>
+    </div>
+
+    <!-- Info strip -->
+    <div class="tic-strip">
+      <div class="tic-strip-tile"><div class="tic-strip-lbl">Monthly Rent</div><div id="tic_strip_rent" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><div class="tic-strip-lbl">Arrears</div><div id="tic_strip_arrears" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><div class="tic-strip-lbl">Move-In Date</div><div id="tic_strip_movein" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><div class="tic-strip-lbl">Lease Type</div><div id="tic_strip_lease" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><div class="tic-strip-lbl">Tenancy Status</div><div id="tic_strip_status" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><div class="tic-strip-lbl">Scoring Points</div><div id="tic_strip_score" class="tic-strip-val">—</div></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tic-tabs" role="tablist">
+      <button type="button" class="tic-tab tic-active" data-tic-tab="overview"  role="tab">Overview</button>
+      <button type="button" class="tic-tab"            data-tic-tab="occupants" role="tab">Occupants</button>
+      <button type="button" class="tic-tab"            data-tic-tab="contact"   role="tab">Contact</button>
+      <button type="button" class="tic-tab"            data-tic-tab="emergency" role="tab">Emergency Contacts</button>
+      <button type="button" class="tic-tab"            data-tic-tab="pets"      role="tab">Pets</button>
+      <button type="button" class="tic-tab"            data-tic-tab="documents" role="tab">Documents</button>
+      <button type="button" class="tic-tab"            data-tic-tab="notes"     role="tab">Notes &amp; History</button>
+    </div>
+
+    <!-- Body -->
+    <div class="tic-body">
+      <div id="tic_loading" class="tic-loading">Loading tenant information…</div>
+
+      <div id="tic_panel_overview"  class="tic-panel tic-active"></div>
+      <div id="tic_panel_occupants" class="tic-panel"></div>
+      <div id="tic_panel_contact"   class="tic-panel"></div>
+      <div id="tic_panel_emergency"  class="tic-panel"></div>
+      <div id="tic_panel_pets"       class="tic-panel"></div>
+      <div id="tic_panel_documents" class="tic-panel"></div>
+      <div id="tic_panel_notes"     class="tic-panel"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="tic-footer">
+      <button id="tic_act_view_app"  type="button" class="btn btn-ghost">View Application</button>
+      <button id="tic_act_new_wo"    type="button" class="btn btn-ghost">New Work Order</button>
+      <button id="tic_act_ledger"    type="button" class="btn btn-ghost">Rent Ledger</button>
+      <button id="tic_act_letter"    type="button" class="btn btn-ghost">Generate Letter</button>
+      <span class="tic-footer-spacer"></span>
+      <button id="tic_act_flag"      type="button" class="btn btn-primary">Flag for Review</button>
+    </div>
+
   </div>
 </div>
 

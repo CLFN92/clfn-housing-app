@@ -86,3 +86,40 @@ Canonical roles (see `shared-config.js` `ROLE` and the role matrix in `PLAN.md` 
 - **Refactor moves to `shared.js` are deferred to Phase C** (`PLAN.md`). Don't preemptively hoist things; snapshot files first as documented.
 - **`finance.html` is ~12 MB** because it bundles a large base64 logo and a lot of inline UI. Read it with `offset`/`limit` rather than wholesale.
 - **`housing_1.html` is a pre-refactor snapshot** kept around for reference. Don't edit it.
+
+### Buttons & Export dropdowns (shared design — do not re-derive)
+
+Always pair `.btn` (the size/family base) with one variant. Don't mix the `.btn-*` family with the legacy `.btn-header-ghost` (page-top header only) — their padding and font-size differ and the buttons will look mismatched side-by-side.
+
+| Class                         | Surface                | Visual                                      | Use for                              |
+| ----------------------------- | ---------------------- | ------------------------------------------- | ------------------------------------ |
+| `.btn .btn-primary`           | any                    | yellow fill, dark text                      | the primary action in a row          |
+| `.btn .btn-ghost`             | light cards            | transparent, text-coloured border           | secondary on light surfaces          |
+| `.btn .btn-ghost-dark`        | dark `.modal-hdr`      | transparent until hover (rgba white tint)   | secondary on dark card headers       |
+| `.btn-header-ghost`           | page-top dark header   | grey border, yellow on hover                | only the top header strip            |
+
+Multiple buttons in a `.modal-hdr` use the existing flex row — don't invent a new wrapper:
+```
+<div class="flex-gap8 flex-wrap">
+  <button class="btn btn-ghost-dark">Secondary</button>
+  <button class="btn btn-primary">Primary</button>
+</div>
+```
+
+**Inline Export dropdown.** When a card needs its own Export button (audit log, future panels), reuse the shared `.export-dropdown` wrap with the existing `.header-export-menu` / `.header-export-item` styling. Toggle helper is `toggleExportMenu(this)` in `shared-data.js`. Export logic flows through `_doExport(format, headers, data, filename, colWidths)` — also shared. Page-level Export (Inventory, Match, Renos, Contractors) uses `setExportView(name)` + `headerExport(format)`; don't wire new views into that unless they're top-level page views.
+
+When two action buttons sit side-by-side in a `.modal-hdr`, **both should use `.btn .btn-primary`** (yellow) — mixing primary + ghost reads as visual noise on the dark card header.
+
+Reference markup (audit log, `housing.html` `#sec_audit`):
+```
+<div class="flex-gap8 flex-wrap">
+  <div class="export-dropdown">
+    <button onclick="toggleExportMenu(this)" class="btn btn-primary">📤 Export</button>
+    <div class="header-export-menu">
+      <button onclick="exportAudit('csv')"   class="header-export-item">CSV</button>
+      <button onclick="exportAudit('excel')" class="header-export-item">Excel</button>
+    </div>
+  </div>
+  <button onclick="renderAuditLog()" class="btn btn-primary">↻ Refresh</button>
+</div>
+```

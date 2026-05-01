@@ -1738,3 +1738,25 @@ if (!window.liveScoreModel || !window.liveScoreModel.length) {
     {id:'oc1', cat:'occupancy',        label:'Per person over NOS',         pts: (_v2.household||{}).per_dependent_u18  || 2},
   ];
 }
+
+// ── Stubs for autoPopulateScore() ────────────────────────────────────────────
+// `livePoints(key)` and `liveAgePoints(age)` are referenced inside
+// autoPopulateScore() but were never defined. Without them, opening any
+// application form throws a ReferenceError and aborts modal init.
+// These stubs unblock the modal by looking the key up in liveScoreModel and
+// returning 0 if no match. Replace with real V2 lookups when the scoring math
+// is finalised.
+if (typeof window.livePoints !== 'function') {
+  window.livePoints = function(key) {
+    var rows = window.liveScoreModel || [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i] && (rows[i].id === key || rows[i].key === key)) {
+        return Number(rows[i].pts || rows[i].points || 0);
+      }
+    }
+    return 0;
+  };
+}
+if (typeof window.liveAgePoints !== 'function') {
+  window.liveAgePoints = function(_age) { return 0; };
+}

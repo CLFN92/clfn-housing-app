@@ -1727,6 +1727,17 @@ function initHousingPage() {
   document.querySelectorAll('.ed-only').forEach(function(e){
     e.style.display=(role=== ROLE.ED)?'':'none';
   });
+  // Step-progress numbering. HM/ED see steps 9 (Housing Needs) and 10
+  // (Tenancy History) inserted between Pets (6) and Documents — so the
+  // visible sequence becomes 1..10. Applicants skip 9/10 and the numbers
+  // 7,8 (Documents, Review) stay as the HTML defaults.
+  (function _renumberProgressBar(){
+    var docNum  = document.getElementById('spb_num_6');
+    var revNum  = document.getElementById('spb_num_7');
+    if (!docNum || !revNum) return;
+    if (ROLE.isManagement(role)) { docNum.textContent='9'; revNum.textContent='10'; }
+    else                          { docNum.textContent='7'; revNum.textContent='8';  }
+  })();
 
   // Update header
   if(true) updateHeaderUser(role);

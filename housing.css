@@ -347,7 +347,22 @@
 .audit-col-date           { width: 140px; }
 .audit-col-ref            { width: 130px; }
 .audit-col-event          { width: 200px; }
-.audit-col-by             { width: 80px; }
+.audit-col-by             { width: 130px; }
+
+/* ── Audit log cell typography + pills (rendered by renderAuditLog) ── */
+#sec_audit .std-table tbody tr      { border-bottom: 1px solid var(--border); }
+#sec_audit .std-table tbody td      { padding: 8px 12px; vertical-align: top; }
+#sec_audit .audit-cell-date         { font-size: 11px; color: var(--muted); white-space: nowrap; }
+#sec_audit .audit-cell-ref          { font-size: 11px; white-space: nowrap; }
+#sec_audit .audit-cell-event        { font-size: 12px; font-weight: 600; white-space: nowrap; }
+#sec_audit .audit-cell-detail       { font-size: 12px; color: var(--muted); }
+#sec_audit .audit-cell-by           { font-size: 11px; color: var(--muted); white-space: nowrap; line-height: 1.4; }
+#sec_audit .audit-by-name           { display: block; font-weight: 600; color: var(--text); }
+#sec_audit .audit-by-role           { display: block; font-size: 10px; color: var(--muted); text-transform: capitalize; }
+.audit-pill                          { font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 700; }
+.audit-pill-sow                      { background: var(--warn-amber-bg); color: var(--warn-amber); }
+.audit-pill-sys                      { background: var(--bg); color: var(--muted); }
+
 
 /* dashView stats is 5-col on desktop (overrides shared.css 4-col default) */
 #dashView .dash-stats { grid-template-columns: repeat(5,1fr); }
@@ -1361,3 +1376,116 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 
 .ct-tor-toggle  { cursor: pointer; }
 .ct-tor-arrow   { transition: transform .2s; flex-shrink: 0; }
+
+/* ============================================================
+ * TENANT INFORMATION CARD (TIC) — full-screen modal
+ * All rules use shared design tokens; no hex literals.
+ * ============================================================ */
+.tic-overlay              { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 900; display: none; align-items: stretch; justify-content: center; padding: 24px; box-sizing: border-box; }
+.tic-overlay.tic-open     { display: flex; }
+.tic-shell                { background: var(--surface); border-radius: 14px; width: 100%; max-width: 1100px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; box-shadow: 0 24px 60px rgba(0,0,0,0.4); overflow: hidden; }
+
+.tic-hero                 { display: flex; gap: 18px; align-items: center; padding: 22px 28px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.tic-avatar               { width: 64px; height: 64px; border-radius: 50%; background: var(--yellow); color: var(--dark); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; font-family: var(--sans); flex-shrink: 0; }
+.tic-hero-main            { flex: 1; min-width: 0; }
+.tic-name                 { font-family: var(--serif); font-size: 26px; font-weight: 400; color: var(--text); line-height: 1.15; margin: 0; }
+.tic-hero-sub             { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.tic-hero-badges          { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.tic-close-btn            { background: none; border: 1px solid var(--border); color: var(--muted); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; line-height: 1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.tic-close-btn:hover      { color: var(--text); border-color: var(--text); }
+
+.tic-strip                { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+.tic-strip-tile           { background: var(--surface); padding: 12px 14px; }
+.tic-strip-lbl            { font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.tic-strip-val            { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.2; }
+.tic-strip-val.tic-arrears-bad   { color: var(--danger); }
+.tic-strip-val.tic-arrears-good  { color: var(--success); }
+@media (max-width: 900px) { .tic-strip { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 520px) { .tic-strip { grid-template-columns: repeat(2, 1fr); } }
+
+.tic-tabs                 { display: flex; gap: 0; border-bottom: 1px solid var(--border); padding: 0 20px; background: var(--surface); overflow-x: auto; flex-shrink: 0; }
+.tic-tab                  { background: none; border: none; padding: 12px 16px; cursor: pointer; font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tic-tab:hover            { color: var(--text); }
+.tic-tab.tic-active       { color: var(--text); border-bottom-color: var(--yellow); }
+
+.tic-body                 { flex: 1; overflow-y: auto; padding: 22px 28px; background: var(--bg, var(--surface)); }
+.tic-panel                { display: none; }
+.tic-panel.tic-active     { display: block; }
+
+.tic-section              { margin-bottom: 22px; }
+.tic-section-h            { font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.tic-grid-2               { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; }
+.tic-grid-3               { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 18px; }
+@media (max-width: 700px) { .tic-grid-2, .tic-grid-3 { grid-template-columns: 1fr; } }
+.tic-field                { display: flex; flex-direction: column; gap: 4px; }
+.tic-field-lbl            { font-size: 10px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); }
+.tic-field-val            { font-size: 13px; font-weight: 600; color: var(--text); }
+.tic-field-val.tic-empty  { color: var(--muted); font-style: italic; font-weight: 400; }
+
+.tic-score-bar-wrap       { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.tic-score-bar-track      { height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; margin-top: 8px; }
+.tic-score-bar-fill       { height: 100%; background: var(--yellow); border-radius: 5px; transition: width .3s ease; }
+.tic-score-num            { font-size: 22px; font-weight: 700; color: var(--text); }
+.tic-score-cap            { font-size: 12px; color: var(--muted); }
+
+.tic-table                { width: 100%; border-collapse: collapse; }
+.tic-table th             { font-size: 10px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.tic-table td             { font-size: 13px; color: var(--text); padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.tic-table tr:last-child td { border-bottom: none; }
+
+.tic-row                  { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.tic-row:last-child       { border-bottom: none; }
+.tic-row-lbl              { width: 160px; font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); flex-shrink: 0; }
+.tic-row-val              { flex: 1; font-size: 13px; color: var(--text); }
+.tic-row-actions          { display: flex; gap: 6px; }
+
+.tic-input                { width: 100%; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: 13px; font-family: var(--sans); box-sizing: border-box; }
+.tic-input:focus          { outline: none; border-color: var(--yellow); }
+.tic-textarea             { width: 100%; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: 13px; font-family: var(--sans); resize: vertical; min-height: 70px; box-sizing: border-box; }
+.tic-textarea:focus       { outline: none; border-color: var(--yellow); }
+.tic-input-error          { border-color: var(--danger); }
+
+.tic-pet-grid             { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.tic-pet-card             { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; gap: 12px; align-items: flex-start; }
+.tic-pet-icon             { font-size: 28px; flex-shrink: 0; }
+.tic-pet-name             { font-size: 14px; font-weight: 700; color: var(--text); }
+.tic-pet-meta             { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.tic-pet-status           { margin-top: 6px; }
+.tic-pet-body             { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.tic-pet-actions          { display: flex; gap: 6px; margin-top: 8px; }
+.tic-section-spaced       { margin-top: 18px; }
+.tic-rows                 { display: flex; flex-direction: column; }
+.tic-row-edit             { align-items: center; }
+.tic-row-readonly         { align-items: center; }
+.tic-row-edit .tic-row-val { padding: 0; }
+.tic-saving               { background: var(--yellow-light); border-color: var(--yellow); }
+.tic-readonly-input       { background: var(--bg, var(--surface)); color: var(--muted); cursor: not-allowed; }
+.tic-grid-span-2          { grid-column: span 2; }
+.tic-vuln-grid            { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px 14px; padding: 4px 0; }
+.tic-chk                  { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text); cursor: pointer; user-select: none; }
+.tic-chk input            { margin: 0; cursor: pointer; }
+.tic-subbadge             { display: inline-block; padding: 1px 6px; margin-left: 6px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; vertical-align: middle; }
+@media (max-width: 700px) { .tic-grid-span-2 { grid-column: span 1; } }
+
+.tic-note                 { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.tic-note:last-child      { border-bottom: none; }
+.tic-note-meta            { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.tic-note-body            { font-size: 13px; color: var(--text); white-space: pre-wrap; line-height: 1.5; }
+.tic-note-author          { font-weight: 700; color: var(--text); }
+
+.tic-add-form             { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 12px; display: none; }
+.tic-add-form.tic-open    { display: block; }
+.tic-form-actions         { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+
+.tic-loading              { padding: 60px 20px; text-align: center; color: var(--muted); font-size: 13px; }
+.tic-empty                { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; font-style: italic; }
+.tic-error-inline         { padding: 14px 16px; background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: 8px; color: var(--danger); font-size: 12px; }
+.tic-pending-inline       { padding: 14px 16px; background: var(--warn-amber-bg); border: 1px solid var(--warn-amber-border); border-radius: 8px; color: var(--warn-amber); font-size: 12px; }
+
+.tic-footer               { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 28px; border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+.tic-footer-spacer        { flex: 1; }
+
+.tic-tenant-card-btn      { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 14px; padding: 3px 6px; border-radius: 5px; }
+.tic-tenant-card-btn:hover { color: var(--text); background: var(--yellow-light); }
+
+body.tic-modal-open       { overflow: hidden; }

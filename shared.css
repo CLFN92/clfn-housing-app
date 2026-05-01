@@ -120,7 +120,8 @@ body {
 .hm-ed-only   { display: none; }
 .ed-only      { display: none; }
 .hm-only      { display: none; }
-.field-hm-only{ display: none; }
+/* .field-hm-only is NOT hidden by default — applyTenancyFieldRoles() locks it
+   visually via opacity + disabled so employees see it greyed-out, not gone. */
 
 
 /* ── 4. HEADER ──────────────────────────────────────────────────────────── */
@@ -242,6 +243,21 @@ body {
 .header-export-item:last-child { border-bottom: none; }
 .header-export-item:hover { background: var(--bg); }
 .header-export-icon { font-size: 16px; }
+
+/* Inline export dropdown — same look as the page-header export, but always
+   visible (no setExportView gating). Use anywhere a card needs an Export
+   button next to its other actions (audit log, scorecards, etc).
+   Markup:
+     <div class="export-dropdown">
+       <button onclick="toggleExportMenu(this)" class="btn btn-ghost">Export</button>
+       <div class="header-export-menu">
+         <button onclick="exportFoo('csv')"   class="header-export-item">CSV</button>
+         <button onclick="exportFoo('excel')" class="header-export-item">Excel</button>
+       </div>
+     </div>
+   Toggle helper lives in shared-data.js next to _doExport. */
+.export-dropdown                          { position: relative; display: inline-block; }
+.export-dropdown.open .header-export-menu { display: block; }
 
 
 /* ── 5. LAYOUT ──────────────────────────────────────────────────────────── */
@@ -461,6 +477,10 @@ body {
 .fg.c3  { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
 .c2     { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .c3     { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+/* Span helpers for .fg/.c2/.c3 grid items — .s2 spans 2 columns, .s3 spans
+   the full row regardless of column count. */
+.s2     { grid-column: span 2; }
+.s3     { grid-column: 1 / -1; }
 
 .dash-stats {
   display: grid; grid-template-columns: repeat(4,1fr);
