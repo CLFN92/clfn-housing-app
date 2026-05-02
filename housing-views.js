@@ -50,7 +50,7 @@ function showApp(){
 
 function showSettings(){
   var role = window.currentRole || 'housing_employee_l1';
-  if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) {
+  if(!APPROVAL_AUTHORITY.can('accessSettings', role)) {
     showToast('Settings are only accessible to the Housing Manager and Executive Director.');
     return;
   }
@@ -76,14 +76,6 @@ function showSettings(){
 // into sessionStorage so finance.html (a separate single-file app) can read
 // it, then navigates over.
 function showFinance(){
-  console.log('[housing] showFinance called');
-  console.log('  window._realRole:', window._realRole);
-  console.log('  window._viewAsRole:', window._viewAsRole);
-  console.log('  HOUSING_SESSION.role:', typeof HOUSING_SESSION !== 'undefined' ? HOUSING_SESSION.role : 'undefined');
-  console.log('  window.currentRole:', window.currentRole);
-  console.log('  CLFN_MODULES exists:', !!window.CLFN_MODULES);
-  console.log('  CLFN_PERMS exists:', !!window.CLFN_PERMS);
-
   if(!(window.CLFN_MODULES && window.CLFN_MODULES.isEnabled('finance'))){
     console.warn('[housing] showFinance: finance module not enabled');
     showToast('Finance module is not enabled for this nation.');
@@ -97,10 +89,7 @@ function showFinance(){
               || window._realRole
               || window.currentRole
               || 'housing_employee_l1';
-  console.log('[housing] showFinance: checking hasFinanceAccess("'+gateRole+'")');
   var canAccess = window.CLFN_PERMS.hasFinanceAccess(gateRole);
-  console.log('[housing] showFinance: result =', canAccess);
-
   if(!canAccess){
     console.warn('[housing] showFinance: role "'+gateRole+'" blocked from finance module');
     showToast('Your role does not have access to the Finance module.');
@@ -112,7 +101,6 @@ function showFinance(){
     // stashHousingSession already alerted the user; don't navigate.
     return;
   }
-  console.log('[housing] showFinance: navigating to finance.html');
   window.location.href = 'finance.html';
 }
 
@@ -130,18 +118,6 @@ function showFinance(){
 //   - window._realRole              — also set by resolveHousingRole()
 function stashHousingSession(){
   try {
-    // Diagnostic: log everything we're seeing. This helps debug handoff
-    // failures when the user clicks Finance and gets redirected back.
-    console.log('[housing] stashHousingSession: reading session state');
-    console.log('  typeof HOUSING_SESSION:', typeof HOUSING_SESSION);
-    if (typeof HOUSING_SESSION !== 'undefined') {
-      console.log('  HOUSING_SESSION.accessToken length:', (HOUSING_SESSION.accessToken||'').length);
-      console.log('  HOUSING_SESSION.name:', HOUSING_SESSION.name);
-      console.log('  HOUSING_SESSION.email:', HOUSING_SESSION.email);
-      console.log('  HOUSING_SESSION.role:', HOUSING_SESSION.role);
-    }
-    console.log('  window._realRole:', window._realRole);
-
     var token = '';
     var name  = '';
     var email = '';
@@ -174,9 +150,6 @@ function stashHousingSession(){
       email:       email
     };
     sessionStorage.setItem('HOUSING_SESSION', JSON.stringify(sess));
-    console.log('[housing] stashHousingSession: wrote session OK', {
-      role: sess.role, name: sess.name, tokenLen: sess.accessToken.length
-    });
   } catch(e) {
     console.warn('[housing] stashHousingSession failed:', e);
     throw e;  // re-throw so showFinance() can abort navigation
@@ -551,9 +524,9 @@ function renderTenantsView(){
       renoCell='<span style="font-size:11px;color:var(--border);">—</span>';
     }
     // fileCount already set above
-    return '<tr class="clickable" data-tuid="'+u.id+'">'
-      +'<td><div class="std-cell-primary">'+u.num+' '+u.street+(u.isElders?' <span style="font-size:9px;background:var(--warn-amber-bg);color:var(--warn-amber);border:1px solid var(--warn-amber-border);padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>':'')+'</div><div class="tbl-sub">'+u.bedrooms+'-bed'+(u.accessible?' · Accessible':'')+'</div></td>'
-      +'<td class="std-cell-primary">'+name+'</td>'
+    return '<tr class="clickable" data-tuid="'+escapeHtml(u.id)+'">'
+      +'<td><div class="std-cell-primary">'+escapeHtml(u.num)+' '+escapeHtml(u.street)+(u.isElders?' <span style="font-size:9px;background:var(--warn-amber-bg);color:var(--warn-amber);border:1px solid var(--warn-amber-border);padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>':'')+'</div><div class="tbl-sub">'+escapeHtml(String(u.bedrooms||''))+'-bed'+(u.accessible?' · Accessible':'')+'</div></td>'
+      +'<td class="std-cell-primary">'+escapeHtml(name)+'</td>'
       +'<td class="std-cell-dash">'+date+'</td>'
       +'<td><span class="std-pill std-pill-info">'+(u.status==='reserved'?'Reserved':'Occupied')+'</span></td>'
       +(_showRenoScore?'<td>'+renoCell+'</td>':'')
@@ -783,7 +756,7 @@ function unitSearchFilter(q) {
   if(!container) return;
 
   if(!filtered.length) {
-    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;font-style:italic;">No units found matching "'+q+'"</div>';
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;font-style:italic;">No units found matching "'+escapeHtml(q)+'"</div>';
     return;
   }
 
@@ -793,10 +766,10 @@ function unitSearchFilter(q) {
       +'style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg);transition:border-color .12s;" '
       +'onmouseover="this.style.borderColor=\'var(--yellow)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
       +'<div>'
-        +'<div style="font-weight:700;font-size:13px;">'+u.num+' '+u.street+'</div>'
-        +'<div class="js-lbl-sm">'+u.bedrooms+'-bed · '+(u.type||'—')+'</div>'
+        +'<div style="font-weight:700;font-size:13px;">'+escapeHtml(u.num)+' '+escapeHtml(u.street)+'</div>'
+        +'<div class="js-lbl-sm">'+escapeHtml(String(u.bedrooms||''))+'-bed · '+escapeHtml(u.type||'—')+'</div>'
       +'</div>'
-      +'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
+      +'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+ss.bg+';color:'+ss.c+';">'+escapeHtml(ss.label)+'</span>'
       +'</div>';
   }).join('');
 }
@@ -851,18 +824,16 @@ function showEmployeeHome(){
           || window._realRole
           || window.currentRole
           || 'housing_employee_l1';
-  console.log('[housing] showEmployeeHome: role=' + role
-    + ' (HOUSING_SESSION.role=' + (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.role : 'n/a')
-    + ', _realRole=' + window._realRole
-    + ', currentRole=' + window.currentRole + ')');
+  // Role-key → display label. Source of truth is CLFN_PERMS.roleLabel(); the
+  // HE_L1/HE_L2 keys collapse to a generic "Staff" string for the Home greeting.
   var roleLabels = {
-    employee: 'Staff',
+    employee:            'Staff',
     housing_employee_l1: 'Staff',
     housing_employee_l2: 'Staff',
-    housing_manager: 'Housing Manager',
-    ed: 'Executive Director',
-    cfo: 'CFO',
-    finance_l1: 'Finance'
+    housing_manager:     CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER),
+    ed:                  CLFN_PERMS.roleLabel(ROLE.ED),
+    cfo:                 CLFN_PERMS.roleLabel(ROLE.CFO),
+    finance_l1:          CLFN_PERMS.roleLabel(ROLE.FINANCE_L1)
   };
   var subtitles = {
     employee: 'Select a tile below to get started.',
@@ -947,17 +918,19 @@ function showEmployeeHome(){
       +'<span style="font-size:12px;color:var(--muted);">Enter a housing application for a community member</span>'
       +'</div>';
 
-    var _wlActionCount = role=== ROLE.HOUSING_MANAGER
+    var _canFinalApprove = APPROVAL_AUTHORITY.can('finalApproveApp', role);
+    var _canReviewApp    = APPROVAL_AUTHORITY.can('reviewApplication', role);
+    var _wlActionCount = (_canReviewApp && !_canFinalApprove)
       ? apps.filter(function(a){return (a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)&&!a.archived;}).length
       : apps.filter(function(a){return a.status===APP_STATUS.MGR_APPROVED&&!a.archived;}).length;
     var _wlReturnCount = apps.filter(function(a){return a.status==='returned'&&!a.archived;}).length;
     var worklistTile = tile('📋','My Worklist','showWorklist()','#F8E41A',
-      makeStat(role=== ROLE.ED?'Awaiting Final Approval':'Awaiting Your Review', _wlActionCount, _wlActionCount>0?'alert':'neutral') +
+      makeStat(_canFinalApprove?'Awaiting Final Approval':'Awaiting Your Review', _wlActionCount, _wlActionCount>0?'alert':'neutral') +
       makeStat('Returned for Info', _wlReturnCount, _wlReturnCount>0?'alert':'neutral') +
       makeStat('Total Active', totalApps, 'neutral'));
     var appTile = tile('📋','Applications','showDashboard()','#3b82f6',
       makeStat('Awaiting HM Review', pending,   pending>0?'alert':'info') +
-      makeStat('Awaiting ED Approval', awaitingED, (awaitingED>0&&role=== ROLE.ED)?'alert':'info') +
+      makeStat('Awaiting ED Approval', awaitingED, (awaitingED>0&&_canFinalApprove)?'alert':'info') +
       makeStat('Critical Priority',    critical,    critical>0?'alert':'info') +
       makeStat('Total Active',       totalApps, 'neutral'));
 
@@ -999,8 +972,8 @@ function showEmployeeHome(){
     var renoTile = tile('🔨','Renovations','showRenos()','#d97706',
       makeStat('Under Repair', underRepair, underRepair>0?'alert':'good') +
       makeStat('Condemned',    condemned,   condemned>0?'alert':'good') +
-      makeStat('Pending HM Approval',  sowPendingHM,  sowPendingHM>0?(role=== ROLE.HOUSING_MANAGER?'alert':'info'):'neutral') +
-      makeStat('Pending ED Approval',  sowPendingED,  sowPendingED>0?(role=== ROLE.ED?'alert':'info'):'neutral') +
+      makeStat('Pending HM Approval',  sowPendingHM,  sowPendingHM>0?(APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role)?'alert':'info'):'neutral') +
+      makeStat('Pending ED Approval',  sowPendingED,  sowPendingED>0?(APPROVAL_AUTHORITY.can('approveSowOverThreshold', role)?'alert':'info'):'neutral') +
       makeStat('SOW Approved',         sowApproved,   sowApproved>0?'good':'neutral') +
       makeStat('In Progress',          sowInProgress, sowInProgress>0?'good':'neutral'));
 
@@ -1015,8 +988,8 @@ function showEmployeeHome(){
     } catch(e){}
 
     var ctTile = tile('🧰','Contractors','showContractorsForRole()','#6b7280',
-      makeStat('Pending HM Review',  ctPending,    ctPending>0?(role=== ROLE.HOUSING_MANAGER?'alert':'info'):'neutral') +
-      makeStat('Awaiting ED Approval', ctAwaitingED, ctAwaitingED>0?(role=== ROLE.ED?'alert':'info'):'neutral') +
+      makeStat('Pending HM Review',  ctPending,    ctPending>0?(APPROVAL_AUTHORITY.can('recommendContractor', role)?'alert':'info'):'neutral') +
+      makeStat('Awaiting ED Approval', ctAwaitingED, ctAwaitingED>0?(APPROVAL_AUTHORITY.can('approveContractor', role)?'alert':'info'):'neutral') +
       makeStat('Approved',           ctApproved,   ctApproved>0?'good':'neutral') +
       (ctDeclined>0?makeStat('Declined', ctDeclined, 'alert'):''));
 

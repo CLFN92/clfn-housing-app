@@ -34,6 +34,56 @@ var _raFilter        = '';   // reno approvals active filter key
 var _scoresSortKey   = 'score';
 var _scoresSortDir   = -1;
 
+// ── _sbValidateSaveInput ──────────────────────────────────────────────────────
+// Defensive guard for the sb*Save* family. Catches malformed records before
+// they get serialized + sent to Supabase. Returns true if the input is valid;
+// returns false (and logs a warn / shows an error toast) otherwise so the
+// caller can early-out without the network round-trip.
+//
+// opts:
+//   requireId   — boolean; when true, obj.id must be a non-empty string
+//   maxBytes    — soft cap on JSON.stringify(obj).length, in bytes
+//   keyMaxLen   — when provided, validates obj.key as a 1..keyMaxLen string
+//   valueField  — when provided, validates obj[valueField] up to maxBytes bytes
+function _sbValidateSaveInput(obj, opts) {
+  opts = opts || {};
+  if (!obj || typeof obj !== 'object') {
+    console.warn('[sbValidate] rejected: not an object', obj);
+    if (typeof showToast === 'function') showToast('Save aborted — invalid input', { type: 'error' });
+    return false;
+  }
+  if (opts.requireId) {
+    if (typeof obj.id !== 'string' || !obj.id.trim()) {
+      console.warn('[sbValidate] rejected: missing/empty id', obj);
+      if (typeof showToast === 'function') showToast('Save aborted — record has no id', { type: 'error' });
+      return false;
+    }
+  }
+  if (opts.keyMaxLen) {
+    if (typeof obj.key !== 'string' || obj.key.length < 1 || obj.key.length > opts.keyMaxLen) {
+      console.warn('[sbValidate] rejected: key must be 1..' + opts.keyMaxLen + ' chars', obj.key);
+      if (typeof showToast === 'function') showToast('Save aborted — invalid setting key', { type: 'error' });
+      return false;
+    }
+  }
+  if (opts.maxBytes) {
+    var sample;
+    if (opts.valueField) {
+      try { sample = (obj[opts.valueField] === undefined) ? '' : JSON.stringify(obj[opts.valueField]); }
+      catch (e) { sample = ''; }
+    } else {
+      try { sample = JSON.stringify(obj); }
+      catch (e) { sample = ''; }
+    }
+    if (sample.length > opts.maxBytes) {
+      console.warn('[sbValidate] rejected: payload ' + sample.length + 'B > limit ' + opts.maxBytes + 'B');
+      if (typeof showToast === 'function') showToast('Save aborted — payload too large', { type: 'error' });
+      return false;
+    }
+  }
+  return true;
+}
+
 // ── sbMapRole ─────────────────────────────────────────────────────────────────
 // Maps a staff table row to a canonical role string.
 // Uses CLFN_PERMS.normalizeRole() to handle legacy aliases.
@@ -116,6 +166,9 @@ async function sbLoadApplications() {
 // Columns data, archived, no_prior_tenancy, sp_id require a migration before
 // being re-enabled (see CLFN Supabase migration notes).
 async function sbSaveApplication(app) {
+  if (!_sbValidateSaveInput(app, { requireId: true, maxBytes: 1024 * 1024 })) {
+    return Promise.reject(new Error('sbSaveApplication: invalid input'));
+  }
   var row = {
     id:               app.id,
     status:           app.status || 'draft',
@@ -244,6 +297,9 @@ async function sbLoadUnits() {
 
 // ── sbSaveUnit ────────────────────────────────────────────────────────────────
 async function sbSaveUnit(u) {
+  if (!_sbValidateSaveInput(u, { requireId: true, maxBytes: 512 * 1024 })) {
+    return Promise.reject(new Error('sbSaveUnit: invalid input'));
+  }
   var row = {
     id:            u.id,
     num:           u.num           || null,
@@ -402,6 +458,13 @@ function applyRequiredFields() {
 
 // ── sbSaveSetting ─────────────────────────────────────────────────────────────
 async function sbSaveSetting(key, value) {
+  if (!_sbValidateSaveInput({ key: key, value: value }, {
+    keyMaxLen: 100,
+    maxBytes:  512 * 1024,
+    valueField:'value'
+  })) {
+    return false;
+  }
   try {
     var r = await fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
       method:  'POST',
@@ -441,6 +504,9 @@ async function sbLoadContractors() {
 
 // ── sbSaveContractor ──────────────────────────────────────────────────────────
 async function sbSaveContractor(ct) {
+  if (!_sbValidateSaveInput(ct, { requireId: true, maxBytes: 512 * 1024 })) {
+    return Promise.reject(new Error('sbSaveContractor: invalid input'));
+  }
   try {
     var r = await fetch(SUPABASE_URL + '/rest/v1/housing_contractors', {
       method:  'POST',
@@ -560,6 +626,8 @@ function sigBlock(label, pName, dt, imgSrc) {
 function _buildContractorAgreementHTML(ct) {
   var today = new Date().toLocaleDateString('en-CA');
   var logoSrc = (document.querySelector('.app-logo img')||{}).src || '';
+  var _natDisp  = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
+  var _natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
 
   var classLabels = {
     internal_indigenous:     'Internal — Indigenous',
@@ -568,11 +636,11 @@ function _buildContractorAgreementHTML(ct) {
   };
   var classLabel = classLabels[ct.classification] || '—';
 
-  
+
 
   return '<!DOCTYPE html><html lang="en"><head>'
     +'<meta charset="UTF-8"/>'
-    +'<title>Contractor Agreement — CLFN Housing</title>'
+    +'<title>Contractor Agreement — '+_natShort+' Housing</title>'
     +'<style>'
     +_printThemeStyles()
     +'*{box-sizing:border-box;margin:0;padding:0;}'
@@ -607,8 +675,8 @@ function _buildContractorAgreementHTML(ct) {
     /* HEADER */
     +'<div class="header">'
       +'<div style="display:flex;align-items:center;gap:14px;">'
-        +(logoSrc ? '<img src="'+logoSrc+'" style="height:48px;width:auto;" alt="CLFN"/>' : '')
-        +'<div><div class="org">Constance Lake First Nation</div><div class="dept">Housing Department — Contractor Registry</div></div>'
+        +(logoSrc ? '<img src="'+logoSrc+'" style="height:48px;width:auto;" alt="'+_natShort+'"/>' : '')
+        +'<div><div class="org">'+_natDisp+'</div><div class="dept">Housing Department — Contractor Registry</div></div>'
       +'</div>'
       +'<div><div class="doc-type">CONTRACTOR AGREEMENT</div><div class="doc-date">Generated: '+today+'</div></div>'
     +'</div>'
@@ -651,12 +719,12 @@ function _buildContractorAgreementHTML(ct) {
     +'<div class="section"><div class="section-title">Terms of Reference</div>'
     +'<div class="section-body">'
       +'<div class="tor-clause"><strong>1. Scope of Engagement</strong>The contractor agrees to perform only the work described in the approved SOW. No work beyond the approved scope may commence without written amendment signed by the Housing Manager or Executive Director.</div>'
-      +'<div class="tor-clause"><strong>2. Licensing &amp; Insurance</strong>The contractor warrants that it holds all required trade licences, WSIB clearance, and liability insurance in force for the duration of the work. Expiry of any required coverage automatically suspends the right to work on CLFN property.</div>'
+      +'<div class="tor-clause"><strong>2. Licensing &amp; Insurance</strong>The contractor warrants that it holds all required trade licences, WSIB clearance, and liability insurance in force for the duration of the work. Expiry of any required coverage automatically suspends the right to work on '+_natShort+' property.</div>'
       +'<div class="tor-clause"><strong>3. Invoicing &amp; Payment</strong>Invoices must reference the SOW number, unit address, and work completed. Payment is subject to satisfactory inspection. Standard payment terms are Net 30 days from invoice approval. Holdback provisions apply per the Construction Act (Ontario).</div>'
       +'<div class="tor-clause"><strong>4. On-Reserve Conduct</strong>The contractor and all workers must conduct themselves respectfully on reserve lands. Alcohol, drugs, and firearms are prohibited on all work sites. All workers must check in with the Housing Department on first arrival.</div>'
-      +'<div class="tor-clause"><strong>5. Deficiency &amp; Warranty</strong>The contractor guarantees all labour and materials for a minimum of one (1) year from the date of completion. Deficiencies must be rectified within 30 days at no additional cost to CLFN.</div>'
-      +'<div class="tor-clause"><strong>6. Indigenous Procurement Priority</strong>CLFN is committed to economic reconciliation. Classification provided is subject to verification. Misrepresentation of Indigenous status may result in termination and removal from the approved contractor list.</div>'
-      +'<div class="tor-clause"><strong>7. Termination</strong>CLFN may terminate with 5 days written notice for convenience, or immediately for cause. The contractor is entitled to payment only for work satisfactorily completed to the date of termination.</div>'
+      +'<div class="tor-clause"><strong>5. Deficiency &amp; Warranty</strong>The contractor guarantees all labour and materials for a minimum of one (1) year from the date of completion. Deficiencies must be rectified within 30 days at no additional cost to '+_natShort+'.</div>'
+      +'<div class="tor-clause"><strong>6. Indigenous Procurement Priority</strong>'+_natShort+' is committed to economic reconciliation. Classification provided is subject to verification. Misrepresentation of Indigenous status may result in termination and removal from the approved contractor list.</div>'
+      +'<div class="tor-clause"><strong>7. Termination</strong>'+_natShort+' may terminate with 5 days written notice for convenience, or immediately for cause. The contractor is entitled to payment only for work satisfactorily completed to the date of termination.</div>'
       +(ct.torAgreed ? '<div style="margin-top:10px;padding:6px 12px;background:var(--success-bg);border:1px solid var(--success-border);border-radius:4px;font-size:9px;color:var(--success);font-weight:bold;">✓ Terms agreed by contractor representative — '+( ct.torAgreedAt||today)+'</div>' : '')
     +'</div></div>'
 
@@ -664,17 +732,17 @@ function _buildContractorAgreementHTML(ct) {
     +'<div class="section"><div class="section-title">Signatures &amp; Acknowledgement</div>'
     +'<div class="section-body">'
       +'<div style="font-size:9.5px;color:var(--text);line-height:1.6;margin-bottom:14px;padding:10px 12px;background:var(--bg);border-left:3px solid var(--yellow);">'
-        +'By signing below, the contractor representative confirms that all information provided is accurate and complete, and that they have read and agree to the Terms of Reference above. The CLFN Housing staff member confirms this registration is authorized.'
+        +'By signing below, the contractor representative confirms that all information provided is accurate and complete, and that they have read and agree to the Terms of Reference above. The '+_natShort+' Housing staff member confirms this registration is authorized.'
       +'</div>'
       +'<div class="sig-grid">'
-        +sigBlock('CLFN Housing Staff', ct.sigStaff && ct.sigStaff.name, '', ct.sigStaff && ct.sigStaff.date, ct.sigStaff && ct.sigStaff.image)
+        +sigBlock(_natShort+' Housing Staff', ct.sigStaff && ct.sigStaff.name, '', ct.sigStaff && ct.sigStaff.date, ct.sigStaff && ct.sigStaff.image)
         +sigBlock('Contractor Representative', ct.sigCt && ct.sigCt.name, ct.sigCt && ct.sigCt.title, ct.sigCt && ct.sigCt.date, ct.sigCt && ct.sigCt.image)
       +'</div>'
     +'</div></div>'
 
     +'</div>' /* end body */
 
-    +'<div class="footer"><span>Constance Lake First Nation — Housing Department · Contractor Registry</span><span>Generated '+today+' · CONFIDENTIAL</span></div>'
+    +'<div class="footer"><span>'+escapeHtml(buildNationFooterStrip({ suffix: "Contractor Registry", includeConfidential: false }))+'</span><span>Generated '+today+' · CONFIDENTIAL</span></div>'
     +'</body></html>';
 }
 function _ctRenderActions(ct) {
@@ -684,14 +752,14 @@ function _ctRenderActions(ct) {
   var status = ct.status || 'pending_review';
   var actions = [];
 
-  if(role === ROLE.HOUSING_MANAGER) {
+  if(APPROVAL_AUTHORITY.can('recommendContractor', role)) {
     if(status === 'pending_review' || status === 'returned') {
       actions.push({label:'✅ Recommend to ED', cls:'btn-primary',      action:'hm_recommended', needsNotes:false});
       actions.push({label:'↩ Return for Info',  cls:'btn-ghost',        action:'returned',       needsNotes:true});
       actions.push({label:'❌ Decline',           cls:'btn-danger-ghost', action:'declined',       needsNotes:true});
     }
   }
-  if(role === ROLE.ED) {
+  if(APPROVAL_AUTHORITY.can('approveContractor', role)) {
     if(status === 'hm_recommended' || status === 'pending_review') {
       actions.push({label:'✅ Final Approval',  cls:'btn-primary',      action:'approved', needsNotes:false});
       actions.push({label:'↩ Return to HM',    cls:'btn-ghost',        action:'returned', needsNotes:true});
@@ -1065,21 +1133,24 @@ function _rsm(model, id) {
 function _sendCtWorkflowEmail(event, ct) {
   if(!window.emailjs) return;
   var contacts = getContactSettings();
-  var hmName  = contacts.hm_name  || 'Housing Manager';
+  var hmName  = contacts.hm_name  || CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER);
   var hmEmail = contacts.hm_email || '';
-  var edName  = contacts.ed_name  || 'Executive Director';
+  var edName  = contacts.ed_name  || CLFN_PERMS.roleLabel(ROLE.ED);
   var edEmail = contacts.ed_email || '';
 
+  var _appName = (window.NATION_CONFIG && NATION_CONFIG.short || '') + ' Housing';
+  var _hmLbl = CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER);
+  var _edLbl = CLFN_PERMS.roleLabel(ROLE.ED);
   var configs = {
-    hm_recommended: { to_name: edName,  to_email: edEmail,  subject: 'CLFN Housing — Contractor Application Recommended: '+ct.name, message: 'The Housing Manager has reviewed and recommended the contractor application for '+ct.name+' ('+ct.trade+'). Your final approval is required.' },
-    approved:       { to_name: hmName,  to_email: hmEmail,  subject: 'CLFN Housing — Contractor Approved: '+ct.name,                 message: 'The Executive Director has granted final approval for '+ct.name+'. They are now listed as an approved contractor.' },
-    declined:       { to_name: hmName,  to_email: hmEmail,  subject: 'CLFN Housing — Contractor Application Declined: '+ct.name,      message: 'The application for '+ct.name+' has been declined.'+(ct.declinedReason?' Reason: '+ct.declinedReason:'') },
-    returned:       { to_name: hmName,  to_email: hmEmail,  subject: 'CLFN Housing — Contractor Application Returned: '+ct.name,      message: 'The application for '+ct.name+' has been returned for more information.'+(ct.returnedNotes?' Notes: '+ct.returnedNotes:'') }
+    hm_recommended: { to_name: edName,  to_email: edEmail,  subject: _appName + ' — Contractor Application Recommended: '+ct.name, message: 'The ' + _hmLbl + ' has reviewed and recommended the contractor application for '+ct.name+' ('+ct.trade+'). Your final approval is required.' },
+    approved:       { to_name: hmName,  to_email: hmEmail,  subject: _appName + ' — Contractor Approved: '+ct.name,                 message: 'The ' + _edLbl + ' has granted final approval for '+ct.name+'. They are now listed as an approved contractor.' },
+    declined:       { to_name: hmName,  to_email: hmEmail,  subject: _appName + ' — Contractor Application Declined: '+ct.name,      message: 'The application for '+ct.name+' has been declined.'+(ct.declinedReason?' Reason: '+ct.declinedReason:'') },
+    returned:       { to_name: hmName,  to_email: hmEmail,  subject: _appName + ' — Contractor Application Returned: '+ct.name,      message: 'The application for '+ct.name+' has been returned for more information.'+(ct.returnedNotes?' Notes: '+ct.returnedNotes:'') }
   };
   var cfg = configs[event];
   if(!cfg || !cfg.to_email) return;
   emailjs.send('service_35sybq2','template_d0wynda',{
-    to_name:cfg.to_name, to_email:cfg.to_email, from_name:'CLFN Housing App',
+    to_name:cfg.to_name, to_email:cfg.to_email, from_name: _appName + ' App',
     subject:cfg.subject, message:cfg.message,
     app_name:ct.name, app_id:ct.id||'—', app_score:'—', app_tier:'—', notes:'', action_url:window.location.href
   }).then(function(){console.log('CT email sent:',event);}).catch(function(e){console.error(e);});
@@ -1402,15 +1473,15 @@ async function _sbEditStaffModal(id) {
         +'<button id="editStaffClose" class="btn-close-dark-30">&times;</button>'
       +'</div>'
       +'<div class="modal-body-stack">'
-        +'<div class="f"><label>Full Name</label><input type="text" id="edit_staff_name" value="'+u.name.replace(/"/g,'&quot;')+'"/></div>'
-        +'<div class="f"><label>Email</label><input type="text" value="'+u.email+'" disabled title="Email cannot be changed"/></div>'
+        +'<div class="f"><label>Full Name</label><input type="text" id="edit_staff_name" value="'+escapeHtml(u.name)+'"/></div>'
+        +'<div class="f"><label>Email</label><input type="text" value="'+escapeHtml(u.email)+'" disabled title="Email cannot be changed"/></div>'
         +'<div class="f"><label>Housing Role</label>'
           +'<select id="edit_staff_role">'
           + (function(){
               var perms = window.CLFN_PERMS;
               if(!perms) return '<option value="housing_employee_l1">Housing Employee L1</option>';
               return Object.keys(perms.ROLE_LABELS).map(function(k){
-                return '<option value="'+k+'"'+(currentHrole===k?' selected':'')+'>'+perms.roleLabel(k)+'</option>';
+                return '<option value="'+escapeHtml(k)+'"'+(currentHrole===k?' selected':'')+'>'+escapeHtml(perms.roleLabel(k))+'</option>';
               }).join('');
             })()
           +'</select></div>'
@@ -1439,12 +1510,13 @@ function emailContractorAgreement() {
     external_non_indigenous: 'External — Non-Indigenous'
   };
 
+  var _appName = (window.NATION_CONFIG && NATION_CONFIG.short || '') + ' Housing';
   var params = {
     to_name:    ct.name,
     to_email:   ct.email,
-    from_name:  'CLFN Housing Department',
-    subject:    'CLFN Housing — Contractor Agreement Confirmation: ' + ct.name,
-    message:    'Please find below a summary of your contractor registration with CLFN Housing, completed on ' + today + '. Contractor: ' + ct.name + '. Trade: ' + (ct.trade||'--') + '. Classification: ' + (classLabels[ct.classification]||'--') + '. WSIB: ' + (ct.wsibNum||'--') + ' (Expiry: ' + (ct.wsibExpiry||'--') + '). Insurance: ' + (ct.insProvider||'--') + ' ' + (ct.insAmount||'--') + ' (Expiry: ' + (ct.insExpiry||'--') + '). Terms of Reference: ' + (ct.torAgreed ? 'Agreed on ' + (ct.torAgreedAt||today) : 'Not yet agreed') + '. A signed copy has been retained on file by CLFN Housing.',
+    from_name:  _appName + ' Department',
+    subject:    _appName + ' — Contractor Agreement Confirmation: ' + ct.name,
+    message:    'Please find below a summary of your contractor registration with ' + _appName + ', completed on ' + today + '. Contractor: ' + ct.name + '. Trade: ' + (ct.trade||'--') + '. Classification: ' + (classLabels[ct.classification]||'--') + '. WSIB: ' + (ct.wsibNum||'--') + ' (Expiry: ' + (ct.wsibExpiry||'--') + '). Insurance: ' + (ct.insProvider||'--') + ' ' + (ct.insAmount||'--') + ' (Expiry: ' + (ct.insExpiry||'--') + '). Terms of Reference: ' + (ct.torAgreed ? 'Agreed on ' + (ct.torAgreedAt||today) : 'Not yet agreed') + '. A signed copy has been retained on file by ' + _appName + '.',
     app_name:   ct.name,
     app_id:     ct.id || '—',
     app_score:  '—',
@@ -1461,7 +1533,14 @@ function emailContractorAgreement() {
       try {
         var contractors = (window._contractors || []).slice();
         var idx = contractors.findIndex(function(c){ return c.id === ct.id; });
-        if(idx >= 0) { contractors[idx].agreementEmailedAt = new Date().toISOString().split('T')[0]; window._contractors = contractors; sbSaveContractor(contractors[idx]).catch(function(){}); }
+        if(idx >= 0) {
+          contractors[idx].agreementEmailedAt = new Date().toISOString().split('T')[0];
+          window._contractors = contractors;
+          sbSaveContractor(contractors[idx]).catch(function(e){
+            console.warn('[contractor agreement emailed] sbSaveContractor failed:', e);
+            showToast('Could not record agreement-emailed timestamp', { type:'error' });
+          });
+        }
       } catch(e) {}
     })
     .catch(function(err){ showToast('Email failed — check EmailJS config'); console.error(err); });
@@ -1732,8 +1811,8 @@ function populateSettings(){
   // Show and render the scoring model section
   var sms = document.getElementById('scoring_model_section');
   if(sms) sms.style.display = 'block';
-  // V2 scoring editor — ED only
-  if (window.currentRole === ROLE.ED) {
+  // V2 scoring editor — gated by editScoreModel authority
+  if (APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole)) {
     renderV2ScoringEditor();
   } else {
     var wrap = document.getElementById('scoring_model_table_wrap');
@@ -1798,6 +1877,8 @@ function printWorkOrder(){
   var endDate    = get('sow_end_date');
   var preparedBy = get('sow_prepared_by');
   var tenantName = get('sow_tenant_name');
+  var _natDisp  = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
+  var _natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
 
   // Quote total — use contractor quote if available, else blank
   var quoteTotal = 0;
@@ -1833,7 +1914,7 @@ function printWorkOrder(){
 
   var html = '<!DOCTYPE html><html lang="en"><head>'
     +'<meta charset="UTF-8"/>'
-    +'<title>Work Order — CLFN Housing</title>'
+    +'<title>Work Order — '+_natShort+' Housing</title>'
     +'<style>'
     +_printThemeStyles()
     +'*{box-sizing:border-box;margin:0;padding:0;}'
@@ -1865,8 +1946,8 @@ function printWorkOrder(){
     // Header
     +'<div class="header">'
       +'<div style="display:flex;align-items:center;gap:14px;">'
-        +(logoSrc?'<img src="'+logoSrc+'" style="height:44px;width:auto;" alt="CLFN"/>':'')
-        +'<div><div class="org">Constance Lake First Nation</div><div class="dept">Housing Department</div></div>'
+        +(logoSrc?'<img src="'+logoSrc+'" style="height:44px;width:auto;" alt="'+_natShort+'"/>':'')
+        +'<div><div class="org">'+_natDisp+'</div><div class="dept">Housing Department</div></div>'
       +'</div>'
       +'<div style="text-align:right;"><div class="doc-type">WORK ORDER</div><div class="doc-sub">Date: '+today+'</div></div>'
     +'</div>'
@@ -1897,7 +1978,7 @@ function printWorkOrder(){
     // Terms notice
     +'<div class="notice">'
       +'<strong>Work Authorization:</strong> The contractor is authorized to perform only the work described above. '
-      +'Any additional work or changes to scope must be approved in writing by the CLFN Housing Manager or Executive Director before work commences. '
+      +'Any additional work or changes to scope must be approved in writing by the '+_natShort+' '+CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER)+' or '+CLFN_PERMS.roleLabel(ROLE.ED)+' before work commences. '
       +'Invoices must reference this work order and unit address. Payment is subject to satisfactory completion and inspection.'
     +'</div>'
     // Signatures
@@ -1906,10 +1987,10 @@ function printWorkOrder(){
     +'<div class="section-body">'
       +'<div class="sig-grid">'
         +'<div class="sig-box"><div class="role">Contractor Representative</div><div class="sig-line"></div><div class="sig-label">Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date: ____________</div><div style="margin-top:8px;font-size:9px;color:var(--muted);">Print name: ____________________________</div></div>'
-        +'<div class="sig-box"><div class="role">CLFN Housing — Authorized Signatory</div><div class="sig-line"></div><div class="sig-label">Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date: ____________</div><div style="margin-top:8px;font-size:9px;color:var(--muted);">Print name: ____________________________</div></div>'
+        +'<div class="sig-box"><div class="role">'+_natShort+' Housing — Authorized Signatory</div><div class="sig-line"></div><div class="sig-label">Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date: ____________</div><div style="margin-top:8px;font-size:9px;color:var(--muted);">Print name: ____________________________</div></div>'
       +'</div>'
     +'</div></div>'
-    +'<div class="footer"><span>CLFN Housing Department · Work Order</span><span>Generated: '+today+'</span></div>'
+    +'<div class="footer"><span>'+escapeHtml(buildNationFooterStrip({ suffix: "Work Order", includeConfidential: false }))+'</span><span>Generated: '+today+'</span></div>'
     +'</body></html>';
 
   var w = window.open('','_blank');
@@ -2020,16 +2101,16 @@ function renderContractorsView(){
     var classLabels = {internal_indigenous:'Internal — Indigenous',external_indigenous:'External — Indigenous',external_non_indigenous:'External — Non-Indigenous'};
     return '<div class="card ct-card" onclick="openCtApprovalPanel('+i+')" title="View application">'
       +'<div class="ct-card-head">'
-        +'<div class="ct-card-icon">'+(function(n){var w=n.trim().split(/\s+/);return w.length>=2?w[0][0].toUpperCase()+w[w.length-1][0].toUpperCase():n.slice(0,2).toUpperCase();})(ct.name||'??')+'</div>'
+        +'<div class="ct-card-icon">'+escapeHtml((function(n){var w=n.trim().split(/\s+/);return w.length>=2?w[0][0].toUpperCase()+w[w.length-1][0].toUpperCase():n.slice(0,2).toUpperCase();})(ct.name||'??'))+'</div>'
         +'<div class="ct-card-body">'
-          +'<div class="ct-card-name">'+ct.name+'</div>'
-          +'<div class="ct-card-trade">'+(ct.trade||'General Contractor')+'</div>'
-          +'<div class="ct-card-status"><span class="std-pill ct-status-pill '+ss.cls+'">'+ss.label+'</span></div>'
+          +'<div class="ct-card-name">'+escapeHtml(ct.name)+'</div>'
+          +'<div class="ct-card-trade">'+escapeHtml(ct.trade||'General Contractor')+'</div>'
+          +'<div class="ct-card-status"><span class="std-pill ct-status-pill '+ss.cls+'">'+escapeHtml(ss.label)+'</span></div>'
         +'</div>'
       +'</div>'
-      +(ct.phone?'<div class="ct-card-info">📞 '+ct.phone+'</div>':'')
-      +(ct.email?'<div class="ct-card-info">✉ '+ct.email+'</div>':'')
-      +(ct.classification?'<div class="ct-card-info">🏷 '+(classLabels[ct.classification]||ct.classification)+'</div>':'')
+      +(ct.phone?'<div class="ct-card-info">📞 '+escapeHtml(ct.phone)+'</div>':'')
+      +(ct.email?'<div class="ct-card-info">✉ '+escapeHtml(ct.email)+'</div>':'')
+      +(ct.classification?'<div class="ct-card-info">🏷 '+escapeHtml(classLabels[ct.classification]||ct.classification)+'</div>':'')
       +'<div class="ct-card-tags">'
         +(function(dateStr,label){ if(!dateStr) return ''; var days=Math.round((new Date(dateStr)-new Date())/(1000*60*60*24)); var cls=days<0?'ct-tag-expired':days<30?'ct-tag-expiring':'ct-tag-valid'; return '<span class="ct-card-tag '+cls+'">'+label+': '+(days<0?'Expired':days<30?'Expiring soon':'Valid')+'</span>'; })(ct.wsibExpiry,'WSIB')
         +(function(dateStr,label){ if(!dateStr) return ''; var days=Math.round((new Date(dateStr)-new Date())/(1000*60*60*24)); var cls=days<0?'ct-tag-expired':days<30?'ct-tag-expiring':'ct-tag-valid'; return '<span class="ct-card-tag '+cls+'">'+label+': '+(days<0?'Expired':days<30?'Expiring soon':'Valid')+'</span>'; })(ct.insExpiry,'Insurance')
@@ -2057,8 +2138,8 @@ function renderCtFilePreview(bucket){
   var files=(window._ctFiles||{})[bucket]||[];
   container.innerHTML=files.map(function(f,i){
     return '<div style="display:flex;align-items:center;gap:5px;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;">'
-      +(f.type&&f.type.includes('pdf')?'📄':'📎')+' <span style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+f.name+'</span>'
-      +'<button type="button" data-bucket="'+bucket+'" data-idx="'+i+'" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:0 2px;">✕</button></div>';
+      +(f.type&&f.type.includes('pdf')?'📄':'📎')+' <span style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escapeHtml(f.name)+'</span>'
+      +'<button type="button" data-bucket="'+escapeHtml(bucket)+'" data-idx="'+i+'" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:0 2px;">✕</button></div>';
   }).join('');
   container.querySelectorAll('button[data-bucket]').forEach(function(btn){
     btn.onclick=function(){window._ctFiles[btn.getAttribute('data-bucket')].splice(parseInt(btn.getAttribute('data-idx')),1);renderCtFilePreview(btn.getAttribute('data-bucket'));};
@@ -2084,14 +2165,16 @@ async function renderHousingUserTable(){
       cfo:                 {bg:'#fff7ed', c:'#c2410c'},
       finance_l1:          {bg:'#fff7ed', c:'#c2410c'}
     };
+    // Source labels from CLFN_PERMS so display titles stay nation-configurable.
+    // Legacy 'employee' key is kept for old DB rows that haven't been normalized.
     var roleLabels = {
-      ed:                  'Executive Director',
-      housing_manager:     'Housing Manager',
-      housing_employee_l2: 'Housing Staff L2',
-      housing_employee_l1: 'Housing Staff',
+      ed:                  CLFN_PERMS.roleLabel(ROLE.ED),
+      housing_manager:     CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER),
+      housing_employee_l2: CLFN_PERMS.roleLabel(ROLE.HE_L2),
+      housing_employee_l1: CLFN_PERMS.roleLabel(ROLE.HE_L1),
       employee:            'Employee',
-      cfo:                 'CFO',
-      finance_l1:          'Finance'
+      cfo:                 CLFN_PERMS.roleLabel(ROLE.CFO),
+      finance_l1:          CLFN_PERMS.roleLabel(ROLE.FINANCE_L1)
     };
     window._staffCache = {};
     staff.forEach(function(u){ window._staffCache[u.id] = u; });
@@ -2105,14 +2188,14 @@ async function renderHousingUserTable(){
         ? words[0][0].toUpperCase() + words[words.length-1][0].toUpperCase()
         : (u.name||'??').slice(0,2).toUpperCase();
       return '<tr>'
-        +'<td class="std-row-avatar-cell"><div class="std-row-avatar">'+initials+'</div></td>'
-        +'<td style="font-weight:600;">'+u.name+'</td>'
-        +'<td style="color:var(--muted);font-size:12px;">'+u.email+'</td>'
-        +'<td><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+rc.bg+';color:'+rc.c+';">'+rl+'</span></td>'
+        +'<td class="std-row-avatar-cell"><div class="std-row-avatar">'+escapeHtml(initials)+'</div></td>'
+        +'<td style="font-weight:600;">'+escapeHtml(u.name)+'</td>'
+        +'<td style="color:var(--muted);font-size:12px;">'+escapeHtml(u.email)+'</td>'
+        +'<td><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+rc.bg+';color:'+rc.c+';">'+escapeHtml(rl)+'</span></td>'
         +'<td class="std-cell-right">'
           +(isMe
             ? '<span style="font-size:11px;color:var(--muted);">You</span>'
-            : (window.currentRole === ROLE.ED
+            : (APPROVAL_AUTHORITY.can('manageStaffRecord', window.currentRole)
               ? '<div class="flex-end gap-8">'
                   +'<button onclick="_sbEditStaffModal('+u.id+')" class="btn btn-ghost btn-sm">Edit</button>'
                   +'<button onclick="deactivateStaff('+u.id+',this)" class="btn btn-sm" style="border-color:var(--danger-border);color:var(--danger);">Deactivate</button>'
@@ -2122,7 +2205,7 @@ async function renderHousingUserTable(){
         +'</tr>';
     }).join('');
   } catch(e){
-    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--danger);font-size:12px;">Error loading staff: '+e.message+'</td></tr>';
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--danger);font-size:12px;">Error loading staff: '+escapeHtml(e.message)+'</td></tr>';
   }
 }
 function renderRenoScoreBadge(unitId) {
@@ -2333,10 +2416,10 @@ function renderScoresTable() {
     var bd  = a.scoreBreakdown || {};
     var barW = Math.min(100, Math.round(((a.score||0)/25)*100));
     var barC = !a.score ? '#ccc' : a.score<=5 ? '#b91c1c' : a.score<=10 ? '#d97706' : a.score<=15 ? '#3b82f6' : '#15803d';
-    return '<tr class="sc-tr" style="cursor:pointer;" data-sc-id="'+a.id+'">'
+    return '<tr class="sc-tr" style="cursor:pointer;" data-sc-id="'+escapeHtml(a.id)+'">'
       + '<td class="sc-td" style="padding:10px 16px;">'
-      +   '<div style="font-weight:600;font-size:13px;">'+((a.fn||'')+' '+(a.ln||'')).trim()+'</div>'
-      +   '<div class="js-lbl-sm">'+a.id+'</div>'
+      +   '<div style="font-weight:600;font-size:13px;">'+escapeHtml(((a.fn||'')+' '+(a.ln||'')).trim())+'</div>'
+      +   '<div class="js-lbl-sm">'+escapeHtml(a.id)+'</div>'
       + '</td>'
       + '<td class="sc-td" style="text-align:center;padding:10px 16px;">'
       +   '<div style="font-size:20px;font-weight:700;color:var(--text);line-height:1;">'+(a.score!==null&&a.score!==undefined?a.score:'—')+'</div>'
@@ -2473,8 +2556,14 @@ function renderWorklist() {
   if(sub) sub.textContent = subtitles[role] || '';
 
   // ── Chip filter definitions ───────────────────────────────────────────────
+  // Tiered by review/final-approval authority:
+  //   no reviewApplication → submitter view (HE_L1)
+  //   reviewApplication only (no finalApproveApp) → HM view
+  //   finalApproveApp → ED view
   var chipDefs;
-  if(role === ROLE.HE_L1) {
+  var canReviewApp    = APPROVAL_AUTHORITY.can('reviewApplication', role);
+  var canFinalApprove = APPROVAL_AUTHORITY.can('finalApproveApp', role);
+  if(!canReviewApp && !canFinalApprove) {
     chipDefs = [
       {key:'',          label:'All',            filter: function(a){ return !a.archived; }},
       {key:'action',    label:'Action Needed',  filter: function(a){ return a.status==='returned'; }, alert:true},
@@ -2483,7 +2572,7 @@ function renderWorklist() {
       {key:'draft',     label:'Draft',          filter: function(a){ return a.status===APP_STATUS.DRAFT; }},
       {key:'declined',  label:'Declined',       filter: function(a){ return a.status==='declined'; }}
     ];
-  } else if(role === ROLE.HOUSING_MANAGER) {
+  } else if(canReviewApp && !canFinalApprove) {
     chipDefs = [
       {key:'',          label:'All Active',     filter: function(a){ return !a.archived; }},
       {key:'action',    label:'Needs Review',   filter: function(a){ return ['submitted','file_update'].indexOf(a.status)!==-1; }, alert:true},
@@ -2518,7 +2607,7 @@ function renderWorklist() {
       return name.includes(search) || (a.id||'').toLowerCase().includes(search);
     });
   }
-  var showScore = (role !== ROLE.HE_L1);
+  var showScore = APPROVAL_AUTHORITY.can('viewApplicationScore', role);
 
   // ── Chip counts ───────────────────────────────────────────────────────────
   var chipsHtml = chipDefs.map(function(c){
@@ -2546,29 +2635,30 @@ function renderWorklist() {
     var tc = tier==='Critical Priority'?'#b91c1c':tier==='High Priority'?'#1d4ed8':tier==='Medium Priority'?'#7a6000':'#888';
     // Branch: what action button to show per status per role
     var actionBtn = '';
+    var _aIdEsc = escapeHtml(a.id);
     if(a.status==='returned') {
-      actionBtn = '<button data-wl-edit="'+a.id+'" onclick="event.stopPropagation();wlEditApp(this)" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Update →</button>';
-    } else if((role=== ROLE.HOUSING_MANAGER&&(a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)) || (role=== ROLE.ED&&a.status===APP_STATUS.MGR_APPROVED)) {
-      actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:var(--info-blue);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Review →</button>';
+      actionBtn = '<button data-wl-edit="'+_aIdEsc+'" onclick="event.stopPropagation();wlEditApp(this)" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Update →</button>';
+    } else if((APPROVAL_AUTHORITY.can('reviewApplication', role)&&(a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)) || (APPROVAL_AUTHORITY.can('finalApproveApp', role)&&a.status===APP_STATUS.MGR_APPROVED)) {
+      actionBtn = '<button data-wl-id="'+_aIdEsc+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:var(--info-blue);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Review →</button>';
     } else if((ROLE.isManagement(role))&&(a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit) {
-      actionBtn = '<button data-wl-id="'+a.id+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:var(--success);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
+      actionBtn = '<button data-wl-id="'+_aIdEsc+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:var(--success);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
     }
-    return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-wl-id="'+a.id+'" onclick="wlOpenApp(this)">'
-      + '<td style="padding:11px 14px;font-weight:600;font-size:13px;">'+name+'</td>'
-      + '<td style="padding:11px 14px;font-size:12px;color:var(--muted);">'+a.id+'</td>'
-      + '<td style="padding:11px 14px;font-size:12px;color:var(--muted);">'+(a.appDate||'—')+'</td>'
+    return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-wl-id="'+_aIdEsc+'" onclick="wlOpenApp(this)">'
+      + '<td style="padding:11px 14px;font-weight:600;font-size:13px;">'+escapeHtml(name)+'</td>'
+      + '<td style="padding:11px 14px;font-size:12px;color:var(--muted);">'+_aIdEsc+'</td>'
+      + '<td style="padding:11px 14px;font-size:12px;color:var(--muted);">'+escapeHtml(a.appDate||'—')+'</td>'
       + '<td style="padding:11px 14px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+sm.bg+';color:'+sm.c+';">'+sm.label+'</span></td>'
       + (showScore ? '<td style="padding:11px 14px;text-align:center;"><span style="font-size:16px;font-weight:800;color:var(--text);">'+(typeof a.score==='number'?a.score:'—')+'</span>'+(tier?'<div style="font-size:9px;color:'+tc+';font-weight:700;margin-top:1px;">'+tier.replace(' Priority','')+'</div>':'')+'</td>' : '')
       + '<td style="padding:11px 14px;text-align:right;white-space:nowrap;">'+actionBtn+'</td>'
       + '</tr>';
   }).join('');
 
-  var emptyMsg = search ? 'No results for "'+search+'"' : 'No applications in this category.';
+  var emptyMsg = search ? 'No results for "'+escapeHtml(search)+'"' : 'No applications in this category.';
 
   body.innerHTML =
     // Search + chips bar
     '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">'
-    + '<input id="wl_search_input" type="text" placeholder="🔍  Search by name or ID…" value="'+(window._wlSearch||'')+'" '
+    + '<input id="wl_search_input" type="text" placeholder="🔍  Search by name or ID…" value="'+escapeHtml(window._wlSearch||'')+'" '
     + 'oninput="window._wlSearch=this.value;clearTimeout(window._wlST);window._wlST=setTimeout(renderWorklist,200)" '
     + 'style="width:100%;padding:9px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" />'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+chipsHtml+'</div>'
@@ -3380,7 +3470,7 @@ async function saveStaffEdit(id, original, modal) {
 
   // Store canonical CLFN_PERMS role value directly (Phase A0 migrated DB to canonical).
   var patch = { name: name.trim(), role: hrole };
-  patch.department = (hrole === ROLE.HOUSING_MANAGER) ? 'Housing' : (original.department || 'Housing');
+  patch.department = ROLE_FORCED_DEPT[hrole] || original.department || 'Housing';
 
   try {
     var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id, {

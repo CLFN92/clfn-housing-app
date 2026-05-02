@@ -53,7 +53,7 @@ function showDashboard(){
   }
   // The actual applications dashboard — HM and ED only
   var role = window.currentRole || 'housing_employee_l1';
-  if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) { showToast('Dashboard access requires Housing Manager or Executive Director role.'); return; }
+  if(!APPROVAL_AUTHORITY.can('accessDashboard', role)) { showToast('Dashboard access requires Housing Manager or Executive Director role.'); return; }
   if(!window._navSkipPush) pushNav('dashboard');
   var _dv = document.getElementById('dashView');
   if(_dv){ _dv.style.display='flex'; _dv.style.width='100%'; }
@@ -299,7 +299,7 @@ function newApp(){
 
   // Clear the editing banner
   var secHdr = document.querySelector('#step0 .sec-hdr p');
-  if(secHdr) secHdr.textContent = 'Primary applicant\'s personal details, contact, address, utilities, and CLFN arrears.';
+  if(secHdr) secHdr.textContent = 'Primary applicant\'s personal details, contact, address, utilities, and ' + (window.NATION_CONFIG && NATION_CONFIG.short || '') + ' arrears.';
 
   // Reset appType toggle to New Housing
   var newRadio = document.getElementById('apptype_new');
@@ -503,7 +503,7 @@ function renderScorecardActions(app) {
   var actions = [];
 
   // ── Housing Manager actions ──
-  if(role === ROLE.HOUSING_MANAGER) {
+  if(APPROVAL_AUTHORITY.can('reviewApplication', role)) {
     if(status === APP_STATUS.SUBMITTED) {
       // New housing app — HM recommends to ED
       actions.push({ label: '✅ Recommend to ED', cls: 'btn-green',   action: 'mgr_approved',  confirmLabel: 'Recommend to Executive Director' });
@@ -521,7 +521,7 @@ function renderScorecardActions(app) {
   }
 
   // ── Executive Director actions ──
-  if(role === ROLE.ED) {
+  if(APPROVAL_AUTHORITY.can('finalApproveApp', role)) {
     if(status === APP_STATUS.MGR_APPROVED) {
       actions.push({ label: '✅ Final Approval',  cls: 'btn-green',  action: 'ed_approved', confirmLabel: 'Grant Final Approval' });
       actions.push({ label: '↩️ Return to HM',    cls: 'btn-sec',    action: 'returned',    confirmLabel: 'Return to Housing Manager' });
@@ -550,9 +550,9 @@ function sendWorkflowEmail(event, app) {
   if(!window.emailjs) { console.warn('EmailJS not loaded'); return; }
 
   var contacts = getContactSettings();
-  var hmName   = contacts.hm_name  || 'Housing Manager';
+  var hmName   = contacts.hm_name  || CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER);
   var hmEmail  = contacts.hm_email || '';
-  var edName   = contacts.ed_name  || 'Executive Director';
+  var edName   = contacts.ed_name  || CLFN_PERMS.roleLabel(ROLE.ED);
   var edEmail  = contacts.ed_email || '';
 
   if(!hmEmail && !edEmail) {
@@ -568,45 +568,49 @@ function sendWorkflowEmail(event, app) {
   var isFileUpdate = app && app.appType === 'existing_tenant';
 
   // Configure each workflow event: who gets notified and what message
+  var _natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
+  var _hmLbl = CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER);
+  var _edLbl = CLFN_PERMS.roleLabel(ROLE.ED);
+  var _appName = _natShort + ' Housing';
   var configs = {
     submit: {
       to_name:  hmName,
       to_email: hmEmail,
       subject:  isFileUpdate
-        ? 'CLFN Housing — File Update Requires Your Review: ' + appName
-        : 'CLFN Housing — New Application Submitted: ' + appName,
+        ? _appName + ' — File Update Requires Your Review: ' + appName
+        : _appName + ' — New Application Submitted: ' + appName,
       message:  isFileUpdate
-        ? 'A file update has been submitted for ' + appName + ' (' + appId + ') and requires your review and approval in the CLFN Housing App.'
-        : 'A new housing application has been submitted by ' + appName + ' (' + appId + ', Score: ' + appScore + ', ' + appTier + '). Please log in to the CLFN Housing App to review and recommend to the Executive Director.'
+        ? 'A file update has been submitted for ' + appName + ' (' + appId + ') and requires your review and approval in the ' + _appName + ' App.'
+        : 'A new housing application has been submitted by ' + appName + ' (' + appId + ', Score: ' + appScore + ', ' + appTier + '). Please log in to the ' + _appName + ' App to review and recommend to the ' + _edLbl + '.'
     },
     mgr_approved: {
       to_name:  edName,
       to_email: edEmail,
-      subject:  'CLFN Housing — Application Recommended for Final Approval: ' + appName,
-      message:  'The Housing Manager has reviewed and recommended the application for ' + appName + ' (' + appId + ', Score: ' + appScore + ', ' + appTier + '). Your final approval is required. Please log in to the CLFN Housing App.'
+      subject:  _appName + ' — Application Recommended for Final Approval: ' + appName,
+      message:  'The ' + _hmLbl + ' has reviewed and recommended the application for ' + appName + ' (' + appId + ', Score: ' + appScore + ', ' + appTier + '). Your final approval is required. Please log in to the ' + _appName + ' App.'
     },
     hm_approved: {
       to_name:  hmName,
       to_email: hmEmail,
-      subject:  'CLFN Housing — File Update Approved: ' + appName,
-      message:  'The file update for ' + appName + ' (' + appId + ') has been approved by the Housing Manager.' + (notes ? ' Notes: ' + notes : '')
+      subject:  _appName + ' — File Update Approved: ' + appName,
+      message:  'The file update for ' + appName + ' (' + appId + ') has been approved by the ' + _hmLbl + '.' + (notes ? ' Notes: ' + notes : '')
     },
     ed_approved: {
       to_name:  hmName,
       to_email: hmEmail,
-      subject:  'CLFN Housing — Final Approval Granted: ' + appName,
-      message:  'Executive Director has granted final approval for ' + appName + ' (' + appId + '). The application is now fully approved. ' + (notes ? 'Notes: ' + notes : '')
+      subject:  _appName + ' — Final Approval Granted: ' + appName,
+      message:  _edLbl + ' has granted final approval for ' + appName + ' (' + appId + '). The application is now fully approved. ' + (notes ? 'Notes: ' + notes : '')
     },
     declined: {
       to_name:  hmName,
       to_email: hmEmail,
-      subject:  'CLFN Housing — Application Declined: ' + appName,
+      subject:  _appName + ' — Application Declined: ' + appName,
       message:  'The application for ' + appName + ' (' + appId + ') has been declined.' + (notes ? ' Reason: ' + notes : '')
     },
     returned: {
       to_name:  hmName,
       to_email: hmEmail,
-      subject:  'CLFN Housing — Application Returned for More Information: ' + appName,
+      subject:  _appName + ' — Application Returned for More Information: ' + appName,
       message:  'The application for ' + appName + ' (' + appId + ') has been returned and requires additional information before it can proceed.' + (notes ? ' Notes: ' + notes : '')
     }
   };
@@ -620,7 +624,7 @@ function sendWorkflowEmail(event, app) {
   var templateParams = {
     to_name:    cfg.to_name,
     to_email:   cfg.to_email,
-    from_name:  'CLFN Housing App',
+    from_name:  _appName + ' App',
     subject:    cfg.subject,
     message:    cfg.message,
     app_name:   appName,
@@ -641,12 +645,13 @@ function sendTestEmail() {
   var contacts = getContactSettings();
   if(!contacts.hm_email) { showToast('Enter HM email first and save'); return; }
   if(!window.emailjs) { showToast('EmailJS not loaded'); return; }
+  var _short = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
   var params = {
-    to_name: contacts.hm_name || 'Housing Manager',
+    to_name: contacts.hm_name || CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER),
     to_email: contacts.hm_email,
-    from_name: 'CLFN Housing App',
-    subject: 'CLFN Housing — Email Test',
-    message: 'This is a test notification from the CLFN Housing Application. Workflow email notifications are configured correctly.',
+    from_name: _short + ' Housing App',
+    subject: _short + ' Housing — Email Test',
+    message: 'This is a test notification from the ' + (window.NATION_CONFIG ? NATION_CONFIG.display_name : '') + ' Housing Application. Workflow email notifications are configured correctly.',
     app_name: 'Test', app_id: 'TEST-001', app_score: '—', app_tier: '—', notes: '', action_url: window.location.href
   };
   emailjs.send('service_35sybq2', 'template_d0wynda', params)
@@ -872,7 +877,9 @@ function amSelectUnit(unitId) {
   var selectedObj = _amAllScored.find(function(o){ return o.unit.id === unitId; });
   var selectedScore = selectedObj ? selectedObj.score : 0;
   var isTied = selectedScore >= topScore - 1; // within 1 pt of top = tied/recommended
-  var isEdOverride = role === ROLE.ED && !isTied; // ED picking below the tied band
+  var canOverride  = APPROVAL_AUTHORITY.can('overrideMatch', role);
+  var canAssignTie = APPROVAL_AUTHORITY.can('assignTiedBand', role);
+  var isEdOverride = canOverride && !isTied; // override-authority user picking below the tied band
 
   var allApps=(typeof applications!=='undefined'?applications:[]);
   var app=allApps.find(function(a){return a.id===_amAppId;});
@@ -900,9 +907,9 @@ function amSelectUnit(unitId) {
   var onReq   = document.getElementById('am_notes_req_star');
   var onPlaceholder = document.getElementById('am_override_notes');
 
-  if(role === ROLE.HOUSING_MANAGER) {
+  if(canAssignTie && !canOverride) {
     if(isTied) {
-      // Tied — HM can select, notes required
+      // Tied — assign-tied-band user can select, notes required
       if(ow) ow.style.display = '';
       if(onLabel) { onLabel.textContent = 'Selection Notes (required) — why this unit for this applicant?'; onLabel.style.color = 'var(--text)'; }
       if(onReq)   onReq.style.display = '';
@@ -910,12 +917,12 @@ function amSelectUnit(unitId) {
       var cb = document.getElementById('am_confirm_btn');
       if(cb){ cb.textContent='✓ Confirm Selection'; cb.disabled=false; cb.style.opacity='1'; cb.style.cursor='pointer'; cb.style.background='var(--yellow)'; cb.style.color='#111'; }
     } else {
-      // Below tied band — HM cannot override, ED approval required
+      // Below tied band — user can't override, ED approval required
       if(ow) ow.style.display = 'none';
       var cb = document.getElementById('am_confirm_btn');
       if(cb){ cb.textContent='⛔ ED Approval Required'; cb.disabled=true; cb.style.opacity='1'; cb.style.cursor='not-allowed'; cb.style.background='#fef2f2'; cb.style.color='#b91c1c'; }
     }
-  } else if(role === ROLE.ED) {
+  } else if(canOverride) {
     if(ow) ow.style.display = isEdOverride ? '' : 'none';
     if(onLabel) onLabel.textContent = 'Override Notes (required) — this unit scores below the top match band.';
     if(onLabel) onLabel.style.color = '#d97706';
@@ -930,15 +937,15 @@ function amSelectUnit(unitId) {
   if(warn && u){
     var warnMsgs = [];
     if(needsAccess && !u.accessible) warnMsgs.push('⚠ Applicant requires accessible unit — this unit is not accessible');
-    if(role=== ROLE.HOUSING_MANAGER && !isTied) warnMsgs.push('⛔ This unit scores below the recommended match band — only the Executive Director can assign a lower-scored unit');
+    if(canAssignTie && !canOverride && !isTied) warnMsgs.push('⛔ This unit scores below the recommended match band — only the Executive Director can assign a lower-scored unit');
     if(warnMsgs.length){
       warn.style.display=''; warn.style.background='#fef2f2'; warn.style.color='#b91c1c';
       warn.textContent = warnMsgs.join(' · ');
     } else { warn.style.display='none'; }
   }
 
-  // Confirm button for ED (HM button already set in branch above)
-  if(role !== ROLE.HOUSING_MANAGER) {
+  // Confirm button for override-authority users (assign-tied button already set in branch above)
+  if(canOverride) {
     var cb = document.getElementById('am_confirm_btn');
     if(cb){
       cb.textContent = isEdOverride ? '✓ Override & Assign' : '✓ Confirm Selection';
@@ -970,19 +977,21 @@ function confirmAssignment() {
   var selectedObj2 = _amAllScored.find(function(o){ return o.unit.id === unitId; });
   var selectedScore2 = selectedObj2 ? selectedObj2.score : 0;
   var isTied2 = selectedScore2 >= topScore2 - 1;
-  var isEdOverride2 = role=== ROLE.ED && !isTied2;
+  var canOverride2  = APPROVAL_AUTHORITY.can('overrideMatch', role);
+  var canAssignTie2 = APPROVAL_AUTHORITY.can('assignTiedBand', role);
+  var isEdOverride2 = canOverride2 && !isTied2;
 
-  // Hard gate: HM cannot assign outside the tied score band — ED only
-  if(role === ROLE.HOUSING_MANAGER && !isTied2) {
+  // Hard gate: assign-tied-only users cannot assign outside the tied score band — overrideMatch only
+  if(!canOverride2 && !isTied2) {
     showToast('This unit requires Executive Director approval to assign');
     return;
   }
 
-  // HM always requires notes; ED requires notes only when overriding below tied band
+  // assign-tied users always require notes; override users require notes only when overriding below tied band
   var overrideNotes = ((document.getElementById('am_override_notes')||{}).value||'').trim();
-  var needsNotes = (role=== ROLE.HOUSING_MANAGER && isTied2) || isEdOverride2;
+  var needsNotes = (canAssignTie2 && !canOverride2 && isTied2) || isEdOverride2;
   if(needsNotes && !overrideNotes){
-    showToast(role=== ROLE.HOUSING_MANAGER ? 'Please add selection notes before confirming' : 'Please add override notes explaining your selection');
+    showToast((canAssignTie2 && !canOverride2) ? 'Please add selection notes before confirming' : 'Please add override notes explaining your selection');
     var notesEl = document.getElementById('am_override_notes');
     if(notesEl) notesEl.focus();
     return;
@@ -1011,7 +1020,7 @@ function confirmAssignment() {
   // For transfer requests: mark new unit as 'reserved' not 'occupied'
   // Tenant stays in current unit until physical move
   u.status = isTransferReq ? 'reserved' : 'occupied';
-  u.tenantApprovedBy=role=== ROLE.ED?'Executive Director':'Housing Manager';
+  u.tenantApprovedBy=CLFN_PERMS.roleLabel(role=== ROLE.ED ? ROLE.ED : ROLE.HOUSING_MANAGER);
   u.tenantApprovedAt=new Date().toISOString().split('T')[0];
   if(overrideNotes) u.assignmentOverrideNotes = overrideNotes;
   if(isTransferReq) u.transferPending = true;
@@ -1024,8 +1033,14 @@ function confirmAssignment() {
   if(isTransferReq) allApps[appIdx].transferPending = true;
   if(overrideNotes) allApps[appIdx].assignmentOverrideNotes = overrideNotes;
 
-  sbSaveUnit(allUnits.find(function(x){return x.id===unitId;})||{}).catch(function(){});
-  sbSaveApplication(allApps[appIdx]).catch(function(){});
+  sbSaveUnit(allUnits.find(function(x){return x.id===unitId;})||{}).catch(function(e){
+    console.warn('[assign] sbSaveUnit failed:', e);
+    showToast('Could not save unit assignment to server', { type:'error' });
+  });
+  sbSaveApplication(allApps[appIdx]).catch(function(e){
+    console.warn('[assign] sbSaveApplication failed:', e);
+    showToast('Could not save application assignment to server', { type:'error' });
+  });
   // Sync in-memory housingUnits array so all views reflect the change immediately
   if(typeof housingUnits!=='undefined') housingUnits.splice(0, housingUnits.length, ...allUnits);
 
@@ -1138,11 +1153,11 @@ function renderRenoApprovalsView() {
     var pct = prog?(prog.overallPct||0):0;
     var uid = u.id;
 
-    // Inline approve button — role gated
+    // Inline approve button — role gated via SOW approval authorities
     var approveBtn = '';
-    if(role=== ROLE.HOUSING_MANAGER && appr.key==='pending_hm')
+    if(APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role) && appr.key==='pending_hm')
       approveBtn = '<button data-ra-approve="'+uid+'" data-ra-role="hm" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">✓ Approve</button>';
-    else if(role=== ROLE.ED && (appr.key==='pending_ed'||appr.key==='pending_hm'))
+    else if(APPROVAL_AUTHORITY.can('approveSowOverThreshold', role) && (appr.key==='pending_ed'||appr.key==='pending_hm'))
       approveBtn = '<button data-ra-approve="'+uid+'" data-ra-role="ed" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'+(appr.key==='pending_hm'?'Override →':'✓ Approve')+'</button>';
 
     return '<tr data-ra-uid="'+uid+'" style="border-bottom:1px solid var(--border);cursor:pointer;">'
@@ -1178,6 +1193,15 @@ function renderRenoApprovalsView() {
 }
 
 function raQuickApprove(unitId, approver) {
+  // Defense-in-depth: even though the inline approve button is gated by the
+  // approval-authority for this row's status, re-check here so callers cannot
+  // shortcut by clicking via a stale/mutated DOM.
+  var _qaRole = window.currentRole || 'staff';
+  var _needAuthority = approver === 'ed' ? 'approveSowOverThreshold' : 'approveSowUnderThreshold';
+  if(!APPROVAL_AUTHORITY.can(_needAuthority, _qaRole)){
+    showToast('You do not have authority to approve this SOW.');
+    return;
+  }
   var units=[];
   units = housingUnits.slice();
   if(!units.length)units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
@@ -1185,7 +1209,7 @@ function raQuickApprove(unitId, approver) {
   if(idx<0){showToast('Unit not found');return;}
   var u=units[idx]; var role=window.currentRole||'staff'; var today=new Date().toISOString().split('T')[0];
   var addr=u.num+' '+u.street;
-  var label=approver==='hm'?'Housing Manager':'Executive Director';
+  var label=CLFN_PERMS.roleLabel(approver==='hm' ? ROLE.HOUSING_MANAGER : ROLE.ED);
   showConfirm({
     title:       'Approve SOW?',
     message:     addr + ' &mdash; <strong>' + label + '</strong> approval',
@@ -1266,13 +1290,15 @@ function exportRenoApprovalsPDF() {
       +'</tr>';
   }).join('');
 
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Reno Approvals — CLFN</title>'
+  var _natDisp  = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
+  var _natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Reno Approvals — '+_natShort+'</title>'
     +'<style>'+_printThemeStyles()+'*{box-sizing:border-box;margin:0;padding:0;}@page{size:letter landscape;margin:12mm 14mm;}body{font-family:Arial,sans-serif;font-size:11px;color:var(--text);}</style>'
     +'</head><body>'
     +'<div style="background:var(--dark);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;">'
-      +(logoSrc?'<img src="'+logoSrc+'" style="height:34px;" alt="CLFN"/>':'<span style="color:var(--yellow);font-weight:700;font-size:14px;">CLFN</span>')
+      +(logoSrc?'<img src="'+logoSrc+'" style="height:34px;" alt="'+_natShort+'"/>':'<span style="color:var(--yellow);font-weight:700;font-size:14px;">'+_natShort+'</span>')
       +'<div style="text-align:center;">'
-        +'<div style="font-size:8px;color:var(--yellow);font-weight:700;letter-spacing:.1em;text-transform:uppercase;">Constance Lake First Nation — Housing</div>'
+        +'<div style="font-size:8px;color:var(--yellow);font-weight:700;letter-spacing:.1em;text-transform:uppercase;">'+_natDisp+' — Housing</div>'
         +'<div style="font-size:15px;font-weight:700;color:#fff;margin-top:2px;">Renovation Approvals Report</div>'
       +'</div>'
       +'<div style="text-align:right;font-size:9px;color:var(--muted);">'+today+'<br/>'+relevant.length+' units<br/>Filter: '+(_raFilter||'All')+'</div>'
@@ -1292,7 +1318,7 @@ function exportRenoApprovalsPDF() {
       +'<tbody>'+tableRows+'</tbody>'
     +'</table>'
     +'<div style="margin-top:16px;border-top:2px solid var(--yellow);padding-top:6px;display:flex;justify-content:space-between;font-size:8px;color:var(--muted);">'
-      +'<span>Constance Lake First Nation — Housing Department — Confidential</span>'
+      +'<span>'+escapeHtml(buildNationFooterStrip())+'</span>'
       +'<span>Printed: '+today+'</span>'
     +'</div>'
     +'</body></html>';
@@ -1417,6 +1443,8 @@ async function loadAppDataFromSupabase() {
     }
     // Apply saved brand theme (Settings → Admin → Themes)
     if (typeof _applyTheme === 'function') _applyTheme((window._appSettings||{}).theme || {});
+    // Apply saved nation overrides (Settings → Nation) — display name, short, logo
+    if (typeof applyNationOverrides === 'function') applyNationOverrides();
     // Apply saved required-field config (Settings → App Settings → Required Fields)
     if (typeof applyRequiredFields === 'function') applyRequiredFields();
 
@@ -1452,6 +1480,8 @@ async function loadAppDataFromSupabase() {
     } catch(e){console.warn('Settings:',e);}
     // Apply saved brand theme (Settings → Admin → Themes)
     if (typeof _applyTheme === 'function') _applyTheme((window._appSettings||{}).theme || {});
+    // Apply saved nation overrides (Settings → Nation) — display name, short, logo
+    if (typeof applyNationOverrides === 'function') applyNationOverrides();
     // Apply saved required-field config (Settings → App Settings → Required Fields)
     if (typeof applyRequiredFields === 'function') applyRequiredFields();
     // Load contacts
@@ -1475,6 +1505,8 @@ async function loadAppDataFromSupabase() {
 
     // Initialise approval authority overrides from loaded settings
     if(typeof initApprovalAuthority === 'function') initApprovalAuthority();
+    // Initialise module enable/license state from loaded settings
+    if(typeof initModuleEnablement === 'function') initModuleEnablement();
 
     // Rescore all apps with live V2 model
     if(applications.length && typeof rescoreAllApplications === 'function') {
@@ -1508,7 +1540,7 @@ async function loadAppDataFromSupabase() {
 // ══════════════════════════════════════════════════════════════
 
 function showAddHousingStaff() {
-  var isED = window.currentRole === ROLE.ED;
+  var isED = APPROVAL_AUTHORITY.can('manageAllStaffRoles', window.currentRole);
   var modal = document.getElementById('globalModal') || document.getElementById('approvalModal');
   // Use the existing showToast + a custom modal approach
   // Build inline modal
@@ -1556,7 +1588,7 @@ function showAddHousingStaff() {
     + '<select id="hs-role" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'+roleOptions+'</select></div>'
     + '</div>'
     + '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);">'
-    + '&#128274; A login account is created automatically. Default password: <strong>CLFN + FirstName + 2026!</strong>'
+    + '&#128274; A login account is created automatically. Default password: <strong>' + (window.NATION_CONFIG && NATION_CONFIG.short || '') + ' + FirstName + 2026!</strong>'
     + '</div>'
     + '<div id="hs-result" style="display:none;border-radius:8px;padding:10px 14px;font-size:12px;"></div>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">'
@@ -1592,10 +1624,11 @@ async function submitAddHousingStaff() {
   if(!email||!email.includes('@')) { showToast('Please enter a valid email address'); return; }
   if(!email.endsWith('@clfn.on.ca')) { showToast('Only @clfn.on.ca email addresses can be registered'); return; }
 
-  // Role-based add-staff gate. HM can only add HE-L1 or HE-L2. ED can add any role.
-  if(window.currentRole === ROLE.HOUSING_MANAGER){
-    var allowedForHm = ['housing_employee_l1','housing_employee_l2'];
-    if(allowedForHm.indexOf(role) === -1){
+  // Role-based add-staff gate. Only roles with manageAllStaffRoles can assign
+  // anything other than HE-L1 / HE-L2. (HM is constrained to HE-L1/L2 by default.)
+  if(!APPROVAL_AUTHORITY.can('manageAllStaffRoles', window.currentRole)){
+    var allowedForLimited = ['housing_employee_l1','housing_employee_l2'];
+    if(allowedForLimited.indexOf(role) === -1){
       showToast('Housing managers can only add Housing Employees. Only the ED can add other roles.');
       return;
     }
@@ -1610,7 +1643,9 @@ async function submitAddHousingStaff() {
     if(existing&&existing.length){ showToast(email+' is already in the staff directory'); if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';} return; }
 
     var firstName = name.split(' ')[0];
-    var defaultPassword = 'CLFN'+firstName+'2026!';
+    // Default password format includes the nation short code so it's recognizable
+    // to staff but rotated per-nation when shipping to a new tenant.
+    var defaultPassword = (window.NATION_CONFIG && NATION_CONFIG.short || 'CLFN')+firstName+'2026!';
 
     // Step 1: Create Supabase Auth account
     var signupR = await fetch(SUPABASE_URL+'/auth/v1/signup',{
@@ -1628,7 +1663,7 @@ async function submitAddHousingStaff() {
         res.style.background='#fef2f2'; res.style.border='1px solid #fecaca'; res.style.color='#b91c1c';
         res.innerHTML = '<strong>Could not create login account.</strong><br>'
           + '<span style="font-size:11px;">'+errMsg+'</span><br><br>'
-          + 'To fix: Go to <strong>CLFN Housing Supabase → Authentication → Sign In / Providers</strong><br>'
+          + 'To fix: Go to <strong>' + (window.NATION_CONFIG && NATION_CONFIG.short || '') + ' Housing Supabase → Authentication → Sign In / Providers</strong><br>'
           + 'Turn off <strong>"Confirm email"</strong> and click Save changes, then try again.';
         res.style.display='block';
       }
@@ -1657,9 +1692,9 @@ async function submitAddHousingStaff() {
     // Both succeeded
     if(res){
       res.style.background='var(--success-bg)'; res.style.border='1px solid var(--success-border)'; res.style.color='var(--success)';
-      res.innerHTML = '<strong>&#10003; '+name+' added successfully!</strong><br>'
-        + 'Email: <code style="background:var(--success-border);padding:2px 6px;border-radius:4px;">'+email+'</code><br>'
-        + 'Password: <code style="background:var(--success-border);padding:2px 6px;border-radius:4px;font-weight:700;">'+defaultPassword+'</code><br>'
+      res.innerHTML = '<strong>&#10003; '+escapeHtml(name)+' added successfully!</strong><br>'
+        + 'Email: <code style="background:var(--success-border);padding:2px 6px;border-radius:4px;">'+escapeHtml(email)+'</code><br>'
+        + 'Password: <code style="background:var(--success-border);padding:2px 6px;border-radius:4px;font-weight:700;">'+escapeHtml(defaultPassword)+'</code><br>'
         + '<span style="font-size:11px;opacity:.8;">Share these credentials directly. They can change their password after signing in.</span>';
       res.style.display='block';
       showToast('\u2713 '+name+' added successfully');
@@ -1725,7 +1760,7 @@ function initHousingPage() {
     e.style.display=(ROLE.isManagement(role))?'':'none';
   });
   document.querySelectorAll('.ed-only').forEach(function(e){
-    e.style.display=(role=== ROLE.ED)?'':'none';
+    e.style.display=APPROVAL_AUTHORITY.can('editApprovalAuthority', role)?'':'none';
   });
   // Step-progress numbering. HM/ED see steps 9 (Housing Needs) and 10
   // (Tenancy History) inserted between Pets (6) and Documents — so the
@@ -1783,7 +1818,6 @@ function initHousingPage() {
     path.endsWith('/') ||
     path === '';
   if (!isHousingHome) {
-    console.log('[housing-init] Page boot skipped — not on housing.html (path=' + path + ')');
     return;
   }
 
@@ -1812,7 +1846,6 @@ function initHousingPage() {
       // HOUSING_SESSION.role, window.currentRole, and window._realRole to match.
       if(HOUSING_SESSION.email && typeof resolveHousingRole === 'function') {
         await resolveHousingRole();
-        console.log('[housing] initHousing: resolved role =', HOUSING_SESSION.role);
       }
       await loadHousingData();
       initHousingPage();

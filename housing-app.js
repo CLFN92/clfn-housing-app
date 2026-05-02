@@ -32,6 +32,40 @@ let approvalRole   = ROLE.HE_L1;
 
 function setText(id,val){var e=document.getElementById(id);if(e)e.textContent=val;}
 
+// ── Arrears payment-plan duration calculation ──
+// Reads Amount Owed and Monthly Payment, computes ceil(amount / monthly) as
+// integer months, writes that into the (readonly) #arrPlanMonths input so
+// downstream save logic and V2 scoring still find an integer there. Also
+// renders a "X yr Y mo" hint underneath. Triggers V2 rescore on change.
+function _calcArrearsMonths(){
+  function toNum(id){
+    var el = document.getElementById(id);
+    if(!el) return 0;
+    var n = parseFloat(String(el.value||'').replace(/[^0-9.]/g,''));
+    return isFinite(n) ? n : 0;
+  }
+  var owed     = toNum('arrBalAmt');
+  var monthly  = toNum('arrMonthlyPayment');
+  var monthsEl = document.getElementById('arrPlanMonths');
+  var hintEl   = document.getElementById('arrPlanMonthsHint');
+  var months   = (owed > 0 && monthly > 0) ? Math.ceil(owed / monthly) : 0;
+  if(monthsEl) monthsEl.value = months || '';
+  if(hintEl){
+    if(months > 0){
+      var yrs = Math.floor(months / 12);
+      var mo  = months % 12;
+      var parts = [];
+      if(yrs) parts.push(yrs + ' yr' + (yrs !== 1 ? 's' : ''));
+      if(mo)  parts.push(mo  + ' mo');
+      if(!parts.length) parts.push('—');
+      hintEl.textContent = months + ' months  (' + parts.join(' ') + ')';
+    } else {
+      hintEl.textContent = '';
+    }
+  }
+  if(typeof triggerV2Score === 'function') triggerV2Score();
+}
+
 // ── Phone formatter ──
 function fmtPhone(input){
   let v=input.value.replace(/\D/g,'').slice(0,10);
@@ -259,7 +293,13 @@ function goTo(s){
   // Auto-save draft on every forward step
   if(s > cur) {
     var _ds = saveApplicationRecord();
-    if(_ds) { var _da = applications.find(function(a){ return a.id===_ds; }); if(_da) sbSaveApplication(_da).catch(function(){}); }
+    if(_ds) {
+      var _da = applications.find(function(a){ return a.id===_ds; });
+      if(_da) sbSaveApplication(_da).catch(function(e){
+        console.warn('[draft autosave] sbSaveApplication failed:', e);
+        showToast('Draft auto-save failed — your changes are still in memory', { type:'error' });
+      });
+    }
   }
 
   // ── All validation passed — now switch steps ──
@@ -362,12 +402,12 @@ function goTo(s){
         // Unlock HM fields for HM and ED
         if(_hmNameEl) { _hmNameEl.removeAttribute('readonly'); _hmNameEl.style.borderBottom = '1px solid var(--yellow)'; }
         if(_hmDateEl) { _hmDateEl.removeAttribute('readonly'); _hmDateEl.style.borderBottom = '1px solid var(--yellow)'; }
-        if(_role === ROLE.HOUSING_MANAGER && _sessionName) {
+        if(APPROVAL_AUTHORITY.can('reviewApplication', _role) && _sessionName) {
           if(_hmNameEl && !_hmNameEl.value) _hmNameEl.value = _sessionName;
           if(_hmDateEl && !_hmDateEl.value) _hmDateEl.value = _today;
         }
       }
-      if(_role === ROLE.ED) {
+      if(APPROVAL_AUTHORITY.can('finalApproveApp', _role)) {
         // Unlock ED fields for ED only
         if(_edNameEl) { _edNameEl.removeAttribute('readonly'); _edNameEl.style.borderBottom = '1px solid var(--yellow)'; }
         if(_edDateEl) { _edDateEl.removeAttribute('readonly'); _edDateEl.style.borderBottom = '1px solid var(--yellow)'; }
@@ -601,7 +641,7 @@ function handleFiles(files){
   Array.from(files).forEach(function(f){
     window._pendingAppFiles.push(f);
     var li=document.createElement('div');li.className='file-item';
-    li.innerHTML='<span class="file-name">'+f.name+'</span><span class="file-size">'+(f.size/1024).toFixed(0)+' KB</span>';
+    li.innerHTML='<span class="file-name">'+escapeHtml(f.name)+'</span><span class="file-size">'+(f.size/1024).toFixed(0)+' KB</span>';
     document.getElementById('fileList').appendChild(li);
   });
 }
@@ -723,34 +763,35 @@ function renderDashTable(){
     var statusMap={draft:['Draft','pill-draft'],submitted:['Awaiting HM Review','pill-submitted'],file_update:['File Update — Awaiting HM','pill-submitted'],mgr_approved:['Awaiting ED Approval','pill-mgr'],hm_recommended:['HM Recommended','pill-mgr'],hm_approved:['File Update Approved','pill-approved'],ed_approved:['ED Approved','pill-approved'],declined:['Declined','pill-declined'],returned:['Returned for Info','pill-returned'],housed:['Housed','pill-approved'],assigned:['Assigned','pill-assigned']};
     var sp=statusMap[a.status]||['—','pill-draft'];
     var role=window.currentRole||'housing_employee_l1';
-    var canReviewFromDash = (role=== ROLE.HOUSING_MANAGER && (a.status===APP_STATUS.SUBMITTED||a.status==='returned'||a.status===APP_STATUS.FILE_UPDATE))
-      || (role=== ROLE.ED && (a.status===APP_STATUS.MGR_APPROVED||a.status===APP_STATUS.SUBMITTED));
+    var canReviewFromDash = (APPROVAL_AUTHORITY.can('reviewApplication', role) && (a.status===APP_STATUS.SUBMITTED||a.status==='returned'||a.status===APP_STATUS.FILE_UPDATE))
+      || (APPROVAL_AUTHORITY.can('finalApproveApp', role) && (a.status===APP_STATUS.MGR_APPROVED||a.status===APP_STATUS.SUBMITTED));
     // Assign is suppressed when Review is also available so a single row
     // never shows both — the application must be reviewed/approved first.
     var canAssignFromDash = (ROLE.isManagement(role))
       && (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)
       && !a.assignedUnit && !a.archived
       && !canReviewFromDash;
+    var aIdEsc = escapeHtml(a.id);
     return '<tr>'
-      +'<td style="cursor:pointer;" data-sc-id="'+a.id+'">'
-      +'<div class="appl-name" style="text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;">'+(a.fn||'—')+' '+(a.ln||'')+'</div>'
-      +'<div class="appl-id">'+a.id+' · '+(a.appDate||'—')+'</div></td>'
-      +'<td class="col-date col-hide-mobile" class="js-txt-muted-sm">'+(a.appDate||'—')+'</td>'
-      +'<td class="col-cls col-hide-mobile"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:'+clsBg+';color:'+clsColor+';white-space:nowrap;">'+(a.classification||'—').replace(' Housing','')+'</span></td>'
-      +'<td class="col-res col-hide-mobile" class="empty-sub">'+(a.reserve||'—')+'</td>'
+      +'<td style="cursor:pointer;" data-sc-id="'+aIdEsc+'">'
+      +'<div class="appl-name" style="text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;">'+escapeHtml(a.fn||'—')+' '+escapeHtml(a.ln||'')+'</div>'
+      +'<div class="appl-id">'+aIdEsc+' · '+escapeHtml(a.appDate||'—')+'</div></td>'
+      +'<td class="col-date col-hide-mobile" class="js-txt-muted-sm">'+escapeHtml(a.appDate||'—')+'</td>'
+      +'<td class="col-cls col-hide-mobile"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:'+clsBg+';color:'+clsColor+';white-space:nowrap;">'+escapeHtml((a.classification||'—').replace(' Housing',''))+'</span></td>'
+      +'<td class="col-res col-hide-mobile" class="empty-sub">'+escapeHtml(a.reserve||'—')+'</td>'
       +'<td class="col-arr col-hide-mobile" style="font-size:12px;color:'+(a.hasArrears?'var(--danger)':'var(--muted)')+';font-weight:600;">'+(a.hasArrears?'Yes':'—')+'</td>'
       +'<td><span class="pill '+sp[1]+'"><span class="pill-dot"></span>'+sp[0]+'</span></td>'
-      +'<td class="col-score">'+(a.appType==='existing_tenant'?'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--bg);color:var(--muted);white-space:nowrap;">File Update</span>':(hasScore?'<button class="score-cell-btn" data-score-id="'+a.id+'" onclick="window._openScoreByEl(this)" title="Click to see score breakdown"><span class="score-num">'+a.score+'</span><div class="score-right"><span class="score-tier-badge" style="background:'+tc.bg+';color:'+tc.c+';font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;">'+(a.tier||'').replace(' Priority','')+'</span>'+scoreMiniBar(a.score)+'</div></button>':'<span class="js-txt-muted-sm">—</span>'))+'</td>'
+      +'<td class="col-score">'+(a.appType==='existing_tenant'?'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--bg);color:var(--muted);white-space:nowrap;">File Update</span>':(hasScore?'<button class="score-cell-btn" data-score-id="'+aIdEsc+'" onclick="window._openScoreByEl(this)" title="Click to see score breakdown"><span class="score-num">'+a.score+'</span><div class="score-right"><span class="score-tier-badge" style="background:'+tc.bg+';color:'+tc.c+';font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;">'+escapeHtml((a.tier||'').replace(' Priority',''))+'</span>'+scoreMiniBar(a.score)+'</div></button>':'<span class="js-txt-muted-sm">—</span>'))+'</td>'
       +'<td style="white-space:nowrap;"><div style="display:flex;gap:4px;align-items:center;">'
-      +'<button class="dash-action-btn edit-app-btn" data-id="'+a.id+'" title="Edit" style="padding:5px 8px;">'
+      +'<button class="dash-action-btn edit-app-btn" data-id="'+aIdEsc+'" title="Edit" style="padding:5px 8px;">'
       +'<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7\"/><path d=\"M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z\"/></svg>'
       +'</button>'
-      +'<button class="dash-action-btn preview-app-btn" data-id="'+a.id+'" title="Print Preview" style="padding:5px 8px;">'
+      +'<button class="dash-action-btn preview-app-btn" data-id="'+aIdEsc+'" title="Print Preview" style="padding:5px 8px;">'
       +'<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"6 9 6 2 18 2 18 9\"/><path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"/><rect x=\"6\" y=\"14\" width=\"12\" height=\"8\"/></svg>'
       +'</button>'
-      +'<button class="dash-action-btn app-menu-btn" data-id="'+a.id+'" title="More options" style="padding:5px 7px;font-size:14px;line-height:1;">⋮</button>'
-      +(canReviewFromDash?'<button class="dash-action-btn review-app-btn" data-id="'+a.id+'" style="padding:4px 10px;background:var(--info-blue);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;margin-left:2px;">Review →</button>':'')
-      +(canAssignFromDash?'<button class="dash-action-btn assign-app-btn" data-id="'+a.id+'" title="Assign Unit" style="padding:4px 10px;background:var(--yellow);color:var(--dark);border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;margin-left:2px;">Assign →</button>':'')
+      +'<button class="dash-action-btn app-menu-btn" data-id="'+aIdEsc+'" title="More options" style="padding:5px 7px;font-size:14px;line-height:1;">⋮</button>'
+      +(canReviewFromDash?'<button class="dash-action-btn review-app-btn" data-id="'+aIdEsc+'" style="padding:4px 10px;background:var(--info-blue);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;margin-left:2px;">Review →</button>':'')
+      +(canAssignFromDash?'<button class="dash-action-btn assign-app-btn" data-id="'+aIdEsc+'" title="Assign Unit" style="padding:4px 10px;background:var(--yellow);color:var(--dark);border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;margin-left:2px;">Assign →</button>':'')
       +'</div></td>'
       +'</tr>';
   }).join('');
@@ -963,8 +1004,10 @@ function _handleAppMenuAction(action, appId) {
     applications[idx].archived = false;
     applications[idx].archivedAt = null;
     applications[idx].archivedBy = null;
-    applications[idx].archived = false;
-    sbSaveApplication(applications[idx]).catch(function(){});
+    sbSaveApplication(applications[idx]).catch(function(e){
+      console.warn('[unarchive] sbSaveApplication failed:', e);
+      showToast('Could not save unarchive to server', { type:'error' });
+    });
     auditEntry(appId, 'unarchived', 'Application restored from archive', role);
     updateDashStats(); renderDashTable();
     showToast('📤 Application unarchived');
@@ -973,22 +1016,30 @@ function _handleAppMenuAction(action, appId) {
     var reason = prompt('Reason for declining (optional):');
     if (reason === null) return; // cancelled
     applications[idx].status = 'declined';
-    sbSaveApplication(applications[idx]).catch(function(){});
     applications[idx].declinedAt  = new Date().toISOString().split('T')[0];
     applications[idx].declinedBy  = role;
     if (reason) applications[idx].declinedReason = reason;
-    sbSaveApplication(applications[idx]).catch(function(){});
+    // Single save AFTER all fields are populated — earlier code saved twice,
+    // and the first save fired before declinedReason / declinedBy were set.
+    sbSaveApplication(applications[idx]).catch(function(e){
+      console.warn('[decline] sbSaveApplication failed:', e);
+      showToast('Could not save decline to server', { type:'error' });
+    });
     auditEntry(appId, 'status', 'Application declined' + (reason ? ' — ' + reason : ''), role);
     updateDashStats(); renderDashTable();
     showToast('Application declined');
 
   } else if (action === 'restore') {
     applications[idx].status = APP_STATUS.SUBMITTED;
-    sbSaveApplication(applications[idx]).catch(function(){});
     applications[idx].declinedAt = null;
     applications[idx].declinedBy = null;
     applications[idx].declinedReason = null;
-    sbSaveApplication(applications[idx]).catch(function(){});
+    // Single save AFTER all metadata is cleared — earlier code saved twice,
+    // and the first save fired before the declined* fields were nulled.
+    sbSaveApplication(applications[idx]).catch(function(e){
+      console.warn('[restore] sbSaveApplication failed:', e);
+      showToast('Could not save restore to server', { type:'error' });
+    });
     auditEntry(appId, 'status', 'Application restored to submitted', role);
     updateDashStats(); renderDashTable();
     showToast('↩ Application restored to submitted');
@@ -1280,9 +1331,11 @@ function renderApprovalFlow(){
   var el = document.getElementById('approvalFlow');
   if(!el) return;
   var isFileUpdate = typeof getAppType === 'function' && getAppType() === 'existing_tenant';
+  var _hmLbl = CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER);
+  var _edLbl = CLFN_PERMS.roleLabel(ROLE.ED);
   var steps = isFileUpdate
-    ? [{label:'Employee',icon:'📝',done:true},{label:'Housing Manager',icon:'✅',done:false}]
-    : [{label:'Employee',icon:'📝',done:true},{label:'Housing Manager',icon:'🔍',done:false},{label:'Exec. Director',icon:'✅',done:false}];
+    ? [{label:'Employee',icon:'📝',done:true},{label:_hmLbl,icon:'✅',done:false}]
+    : [{label:'Employee',icon:'📝',done:true},{label:_hmLbl,icon:'🔍',done:false},{label:_edLbl,icon:'✅',done:false}];
   el.innerHTML = steps.map(function(s,i){
     var circleStyle = s.done
       ? 'background:var(--yellow);color:var(--text);border:2px solid var(--yellow);'
@@ -1395,9 +1448,9 @@ function popReview(){
     html += section('Employment & Income', incomeRows.join(''), '💼');
   }
 
-  // ── CLFN Arrears ─────────────────────────────────────────────────────────
+  // ── Nation arrears ───────────────────────────────────────────────────────
   if(chk('arrToggle')){
-    html += section('CLFN Arrears',
+    html += section((window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Arrears',
       row('Amount Owed', fld('arrBalAmt'), true) +
       row('Monthly Payment', fld('arrMonthAmt')) +
       row('Plan Duration', fld('arrPlanMonths')!=='—'?fld('arrPlanMonths')+' months':'—')
@@ -1719,7 +1772,7 @@ function printApplicationPreview() {
 
   // ════════════════════════════════
   var doc = '<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
-    +'<title>CLFN — '+name+'</title>'
+    +'<title>'+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' — '+name+'</title>'
     +'<style>'
     +_printThemeStyles()
     +'*{box-sizing:border-box;margin:0;padding:0;}'
@@ -1738,9 +1791,9 @@ function printApplicationPreview() {
     +'<div style="display:flex;align-items:center;justify-content:space-between;'
     +     'border-bottom:3px solid #F8E41A;padding-bottom:10px;margin-bottom:14px;">'
     +  '<div class="flex-g10">'
-    +    (logoSrc?'<img src="'+logoSrc+'" style="width:40px;height:40px;object-fit:contain;" alt="CLFN"/>'     :'')
-    +    '<div><div class="js-txt-lg">CLFN Housing Application</div>'
-    +         '<div style="font-size:9.5px;color:var(--muted);">Constance Lake First Nation</div></div>'
+    +    (logoSrc?'<img src="'+logoSrc+'" style="width:40px;height:40px;object-fit:contain;" alt="'+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+'"/>'     :'')
+    +    '<div><div class="js-txt-lg">'+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Application</div>'
+    +         '<div style="font-size:9.5px;color:var(--muted);">'+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+'</div></div>'
     +  '</div>'
     +  '<div style="text-align:right;font-size:9.5px;color:var(--muted);line-height:1.9;">'
     +    '<strong style="font-size:12px;color:var(--text);">'+name+'</strong><br/>'
@@ -1777,7 +1830,7 @@ function printApplicationPreview() {
        row('Currently Has a House', yn(hasHouse))
       +(hasHouse ? row('Home Condition',          fld('homeCondition')) : '')
       +(hasHouse ? row('Est. Renovation Cost',    dollarQ('#homeCondBlk input[type="number"]')) : '')
-      +row('Arrears Owed to CLFN', yn(hasArr))
+      +row('Arrears Owed to '+(window.NATION_CONFIG&&NATION_CONFIG.short||''), yn(hasArr))
       +row('Amount Owed',          hasArr ? (arrNums[0]&&arrNums[0].value?'$'+parseFloat(arrNums[0].value).toLocaleString():'—') : 'N/A')
       +row('Monthly Payment',      hasArr ? (arrNums[1]&&arrNums[1].value?'$'+parseFloat(arrNums[1].value).toLocaleString():'—') : 'N/A')
       +row('Plan Duration',        hasArr ? (arrNums[3]&&arrNums[3].value?arrNums[3].value+' months':'—') : 'N/A')
@@ -1819,17 +1872,17 @@ function printApplicationPreview() {
     +     'color:var(--muted);margin-bottom:7px;padding-bottom:4px;border-bottom:1.5px solid #F8E41A;">'
     +'Terms &amp; Conditions — Applicant Declaration</div>'
     +'<p style="font-size:9.5px;color:var(--text);line-height:1.6;margin-bottom:5px;">'
-    +'By signing below, I hereby apply for housing assistance from the Constance Lake First Nation '
-    +'(CLFN) Housing Program and declare the following:</p>'
+    +'By signing below, I hereby apply for housing assistance from the '+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+' '
+    +'('+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+') Housing Program and declare the following:</p>'
     +'<ol style="font-size:9.5px;color:var(--text);line-height:1.7;padding-left:14px;">'
     +'<li>All information provided in this application is true, accurate, and complete to the best of my knowledge.</li>'
     +'<li>I understand that providing false or misleading information may result in immediate disqualification and removal from the housing waitlist.</li>'
-    +'<li>I consent to CLFN collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation.</li>'
-    +'<li>I understand that my application will be scored according to the CLFN Housing Scoring Rubric and that priority is determined by score, not date of application alone.</li>'
-    +'<li>I agree to notify the CLFN Housing Department within 30 days of any change in household composition, income, address, or contact information.</li>'
-    +'<li>I understand that acceptance into CLFN housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by CLFN prior to occupancy.</li>'
-    +'<li>I agree to comply with all CLFN Housing policies, lease agreements, and community by-laws as a condition of tenancy.</li>'
-    +'<li>I authorize CLFN to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.</li>'
+    +'<li>I consent to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation.</li>'
+    +'<li>I understand that my application will be scored according to the '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Scoring Rubric and that priority is determined by score, not date of application alone.</li>'
+    +'<li>I agree to notify the '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Department within 30 days of any change in household composition, income, address, or contact information.</li>'
+    +'<li>I understand that acceptance into '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' prior to occupancy.</li>'
+    +'<li>I agree to comply with all '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing policies, lease agreements, and community by-laws as a condition of tenancy.</li>'
+    +'<li>I authorize '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.</li>'
     +'</ol>'
     +'</div>'
 
@@ -1843,7 +1896,7 @@ function printApplicationPreview() {
     +sigBlock('Received by — Housing Staff', staffName, staffDate, sigStaff)
     +'</div></div>'
 
-    +'<div class="footer"><span>CLFN Housing Department — Confidential</span><span>Generated '+today+'</span></div>'
+    +'<div class="footer"><span>'+escapeHtml(buildNationFooterStrip())+'</span><span>Generated '+today+'</span></div>'
     +'<!-- print handled by panel -->'
     +'</body></html>';
 

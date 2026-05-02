@@ -16,13 +16,30 @@
  *   switchRole(role)               — set effective role + refresh UI
  *   updateRoleSwitcherVisibility() — no-op (handled by updateHeaderUser)
  *   setupHeaderRoleToggle(role)    — build the ED "view as" dropdown
- *   edGuard(role, featureName)     — show alert and return false if not ED
+ *   edGuard(featureName, callback) — run callback if editScoreModel allowed, else toast and return false
+ *   escapeHtml(v)                  — HTML-escape a value for safe innerHTML
+ *   applyBrandingToHeader()        — patch nation-name placeholders in the page chrome from NATION_CONFIG
+ *   applyNationOverrides()         — merge housing_settings.nation_config_override on top of NATION_CONFIG, then re-brand
+ *   buildNationFooterStrip(opts)   — assemble a one-line Confidential footer from NATION_CONFIG contact fields
  *   _showView(id, renderFn)        — hide all + show one view + run renderFn
  *   _navStack                      — navigation history array
  * ============================================================ */
 
 // ── Navigation stack ─────────────────────────────────────────────────────────
 window._navStack = [];
+
+// ── escapeHtml ───────────────────────────────────────────────────────────────
+// Escape user-supplied data before interpolating it into innerHTML strings.
+// Returns the empty string for null/undefined so template literals stay clean.
+function escapeHtml(v) {
+  if (v === null || v === undefined) return '';
+  return String(v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // ── showToast ────────────────────────────────────────────────────────────────
 // Unified toast for all pages.
@@ -259,11 +276,158 @@ function setupHeaderRoleToggle(realRole) {
   selectEl.value = window._viewAsRole || '';
 }
 
+// ── applyBrandingToHeader ────────────────────────────────────────────────────
+// Replaces nation-name placeholders in the static page chrome with the values
+// from NATION_CONFIG, so the same HTML can ship to any nation.
+//
+// Hooks (no-ops if the element/marker isn't present on the current page):
+//   - <span class="hbrand-sub">              → NATION_CONFIG.display_name
+//   - data-nation="display_name"             → NATION_CONFIG.display_name
+//   - data-nation="short"                    → NATION_CONFIG.short
+//   - data-nation-template="{NATION} — Housing Department"
+//                                            → "{display_name} — Housing Department"
+//                                              ({SHORT} → short, {NATION} → display)
+//   - <title> — only updated if it contains the placeholder token
+//                {NATION_DISPLAY_NAME}
+//
+// Idempotent: safe to call repeatedly; the boot wiring at the bottom of this
+// file invokes it once on DOMContentLoaded.
+function applyBrandingToHeader() {
+  var cfg = window.NATION_CONFIG;
+  if (!cfg) return;
+  var disp  = cfg.display_name || cfg.name || '';
+  var short = cfg.short        || '';
+
+  // .hbrand-sub appears in the header strip on every top-level page.
+  document.querySelectorAll('.hbrand-sub').forEach(function(el){
+    if (disp) el.textContent = disp;
+  });
+
+  // data-nation="display_name" / data-nation="short" — generic hook for any
+  // place we want to inject the nation label without hard-coding a class.
+  document.querySelectorAll('[data-nation="display_name"]').forEach(function(el){
+    if (disp) el.textContent = disp;
+  });
+  document.querySelectorAll('[data-nation="short"]').forEach(function(el){
+    if (short) el.textContent = short;
+  });
+  // data-nation-template — supports {NATION} and {SHORT} placeholders so
+  // markup can read e.g. "{NATION} — Housing Department" and stay nation-agnostic.
+  document.querySelectorAll('[data-nation-template]').forEach(function(el){
+    var t = el.getAttribute('data-nation-template') || '';
+    el.textContent = t.replace(/\{NATION\}/g, disp).replace(/\{SHORT\}/g, short);
+  });
+
+  // data-role-label="ed" → resolves via CLFN_PERMS.roleLabel(role), which
+  // honors NATION_CONFIG.role_labels overrides. Keeps inline HTML text
+  // ("Executive Director") nation-overridable without hardcoded strings.
+  if (window.CLFN_PERMS && window.CLFN_PERMS.roleLabel) {
+    document.querySelectorAll('[data-role-label]').forEach(function(el){
+      var key = el.getAttribute('data-role-label');
+      if (key) el.textContent = window.CLFN_PERMS.roleLabel(key);
+    });
+  }
+
+  // Document title — only swap if a placeholder token is present so we don't
+  // clobber pages that intentionally set a static title (e.g. "Sign In").
+  // Supports {NATION_DISPLAY_NAME} and {NATION_SHORT} placeholders.
+  if (document.title && /\{NATION_(DISPLAY_NAME|SHORT)\}/.test(document.title)) {
+    document.title = document.title
+      .replace(/\{NATION_DISPLAY_NAME\}/g, disp)
+      .replace(/\{NATION_SHORT\}/g,        short);
+  }
+}
+
+// Run once at boot. Pages that re-render the header later can call this again.
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyBrandingToHeader);
+  } else {
+    // Document already parsed (deferred shared-ui.js load) — apply immediately.
+    applyBrandingToHeader();
+  }
+}
+
+// ── applyNationOverrides ─────────────────────────────────────────────────────
+// Merges window._appSettings.nation_config_override (a {display_name, short,
+// role_labels} object saved via Settings → Nation) on top of the build-time
+// NATION_CONFIG, then re-runs applyBrandingToHeader() so any new values land
+// in the page chrome immediately. Logo overrides ride along on the existing
+// theme.logo settings key (handled by _applyTheme), not on this key.
+//
+// Call this AFTER housing_settings has been hydrated into _appSettings (i.e.
+// from the same boot point that runs initApprovalAuthority and _applyTheme).
+// Safe to call multiple times — each call overwrites the previous merge.
+function applyNationOverrides() {
+  try {
+    var saved = window._appSettings && window._appSettings['nation_config_override'];
+    if (!saved) return;
+    var parsed = (typeof saved === 'string') ? JSON.parse(saved) : saved;
+    if (!parsed || typeof parsed !== 'object') return;
+    if (!window.NATION_CONFIG) window.NATION_CONFIG = {};
+    // Logo lives in _appSettings.theme.logo (managed by _applyTheme), NOT here —
+    // applyNationOverrides only owns nation identity, contact info, and labels.
+    ['display_name', 'name', 'short',
+     'mailing_address', 'website', 'phone', 'email'].forEach(function(k){
+      if (parsed[k]) window.NATION_CONFIG[k] = parsed[k];
+    });
+    if (parsed.role_labels && typeof parsed.role_labels === 'object') {
+      window.NATION_CONFIG.role_labels = Object.assign(
+        {}, window.NATION_CONFIG.role_labels || {}, parsed.role_labels
+      );
+    }
+    if (parsed.socials && typeof parsed.socials === 'object') {
+      window.NATION_CONFIG.socials = Object.assign(
+        {}, window.NATION_CONFIG.socials || {}, parsed.socials
+      );
+    }
+    applyBrandingToHeader();
+  } catch (e) {
+    console.warn('[applyNationOverrides] failed:', e);
+  }
+}
+
+// ── buildNationFooterStrip ───────────────────────────────────────────────────
+// Returns a single-line "Confidential" footer string assembled from the saved
+// NATION_CONFIG contact fields. Used by every print template (contractor
+// agreement, work order, SOW, application snapshot, reno report) so they all
+// render the same "{Nation} Housing Department · {address} · {phone} · {email}
+// · {website} · Confidential" strip. Empty fields are skipped.
+//
+//   opts.includeConfidential — when true (default), appends "· Confidential"
+//   opts.suffix              — extra trailing text (e.g. "Work Order")
+function buildNationFooterStrip(opts) {
+  opts = opts || {};
+  var cfg = window.NATION_CONFIG || {};
+  var disp = cfg.display_name || cfg.name || '';
+  // Collapse multi-line addresses to comma-separated for single-line footers.
+  var addr = (cfg.mailing_address || '').replace(/\s*\n+\s*/g, ', ').trim();
+  var parts = [];
+  if (disp)        parts.push(disp + ' Housing Department');
+  if (addr)        parts.push(addr);
+  if (cfg.phone)   parts.push(cfg.phone);
+  if (cfg.email)   parts.push(cfg.email);
+  if (cfg.website) parts.push(cfg.website);
+  if (opts.suffix) parts.push(opts.suffix);
+  if (opts.includeConfidential !== false) parts.push('Confidential');
+  return parts.join(' · ');
+}
+
 // ── edGuard ───────────────────────────────────────────────────────────────────
-// Returns true if the user is ED. Shows a toast and returns false otherwise.
-// Usage: if (!edGuard(role, 'scoring model changes')) return;
-function edGuard(role, featureName) {
-  if (role === ROLE.ED) return true;
+// Wraps a callback with the editScoreModel approval gate. If the current role
+// is allowed, the callback is invoked and the function returns true (or the
+// callback's return value when it returns one). Otherwise a toast is shown
+// and false is returned.
+// Usage: edGuard('scoring model changes', function(){ ...do edit... });
+function edGuard(featureName, callback) {
+  var role = window.currentRole;
+  if (window.APPROVAL_AUTHORITY && APPROVAL_AUTHORITY.can('editScoreModel', role)) {
+    if (typeof callback === 'function') {
+      var rv = callback();
+      return (rv === undefined) ? true : rv;
+    }
+    return true;
+  }
   showToast((featureName || 'This action') + ' requires Executive Director access.');
   return false;
 }

@@ -112,6 +112,19 @@ window.ROLE = {
   }
 };
 
+// ── Forced department by role ────────────────────────────────────────────────
+// Some roles are tied to a specific department regardless of what the user
+// chose in the staff form. Used in staff add/edit flows to override the
+// dept dropdown so the staff row matches what sbMapRole expects on read.
+//   var staffDept = ROLE_FORCED_DEPT[role] || chosenDept;
+window.ROLE_FORCED_DEPT = {
+  housing_manager:     'Housing',
+  housing_employee_l2: 'Housing',
+  housing_employee_l1: 'Housing',
+  cfo:                 'Finance',
+  finance_l1:          'Finance'
+};
+
 // ── Application status constants ──────────────────────────────────────────────
 window.APP_STATUS = {
   DRAFT:        'draft',
@@ -126,23 +139,99 @@ window.APP_STATUS = {
   ARCHIVED:     'archived'
 };
 
+// ── Super-user identity ──────────────────────────────────────────────────────
+// Platform / app-owner identities. These users see super-user-only controls
+// (e.g. the module enable/disable toggles in Settings → Nation). Anyone else
+// sees those panels read-only.
+//
+// This is a UX boundary, not a security boundary — Supabase RLS still governs
+// what any session can actually write. For real subscription enforcement, swap
+// to a `staff.is_super_user` boolean column + matching RLS policy.
+window.CLFN_SUPER_USERS = [
+  'kevin.proctor@clfn.on.ca'
+];
+window.isSuperUser = function() {
+  var email = (window.HOUSING_SESSION && HOUSING_SESSION.email || '').toLowerCase();
+  return window.CLFN_SUPER_USERS.map(function(e){ return e.toLowerCase(); }).indexOf(email) !== -1;
+};
+
 // ── Module feature flags ──────────────────────────────────────────────────────
+// Two-layer enablement so subscription billing can be enforced separately from
+// the customer-side on/off toggle:
+//   _licensed[mod]  — set by the platform owner; reflects subscription status.
+//                     Non-super-users cannot change this.
+//   _enabled[mod]   — set by the super user via the Settings UI; reflects
+//                     whether this nation has the module turned on right now.
+//
+// isEnabled(mod) returns true only if BOTH are true (or the module is CORE).
+// Defaults below assume "all licensed, all on" for the lead nation; runtime
+// hydration via initModuleEnablement() merges saved overrides from
+// housing_settings (key: 'module_enablement').
 window.CLFN_MODULES = {
   CORE: ['applications', 'inventory', 'tenants', 'worklist'],
-  _enabled: { finance: true, match: true, contractors: true, renos: true },
+  _enabled:  { finance: true, match: true, contractors: true, renovations: true },
+  _licensed: { finance: true, match: true, contractors: true, renovations: true },
+
   isEnabled: function(mod) {
     if(this.CORE.indexOf(mod) !== -1) return true;
-    return !!this._enabled[mod];
+    return !!this._enabled[mod] && !!this._licensed[mod];
+  },
+  isLicensed: function(mod) {
+    if(this.CORE.indexOf(mod) !== -1) return true;
+    return !!this._licensed[mod];
   },
   enable:       function(mod) { this._enabled[mod] = true; },
   disable:      function(mod) { this._enabled[mod] = false; },
-  listOptional: function() { return Object.keys(this._enabled); }
+  setLicensed:  function(mod, val) { this._licensed[mod] = !!val; },
+  listOptional: function() { return Object.keys(this._enabled); },
+
+  // Apply saved overrides on top of defaults. Called at login with the parsed
+  // value of housing_settings['module_enablement'].
+  loadOverrides: function(saved) {
+    if(!saved || typeof saved !== 'object') return;
+    var self = this;
+    if(saved._enabled && typeof saved._enabled === 'object'){
+      Object.keys(saved._enabled).forEach(function(k){
+        if(self._enabled[k] !== undefined) self._enabled[k] = !!saved._enabled[k];
+      });
+    }
+    if(saved._licensed && typeof saved._licensed === 'object'){
+      Object.keys(saved._licensed).forEach(function(k){
+        if(self._licensed[k] !== undefined) self._licensed[k] = !!saved._licensed[k];
+      });
+    }
+  },
+  // Serialize current state for persisting back to housing_settings.
+  serialize: function() {
+    return { _enabled: Object.assign({}, this._enabled), _licensed: Object.assign({}, this._licensed) };
+  }
 };
 
+// initModuleEnablement() — called at login alongside initApprovalAuthority().
+// Reads the saved overrides from window._appSettings and applies them.
+function initModuleEnablement() {
+  try {
+    var saved = window._appSettings && window._appSettings['module_enablement'];
+    if(!saved) return;
+    var parsed = (typeof saved === 'string') ? JSON.parse(saved) : saved;
+    window.CLFN_MODULES.loadOverrides(parsed);
+    console.info('[CLFN_MODULES] Loaded saved enablement overrides.');
+  } catch(e) {
+    console.warn('[CLFN_MODULES] Could not load saved overrides:', e);
+  }
+}
+
 // ── Nation config ─────────────────────────────────────────────────────────────
+// Per-nation branding + display overrides. The role *keys* ('ed',
+// 'housing_manager', etc.) are stable identifiers across all nations — only
+// the human-readable display strings change. Add `role_labels` here to
+// override any subset of the defaults from CLFN_PERMS.ROLE_LABELS for this
+// nation. Example for a nation that calls their ED "Lands Director":
+//   role_labels: { ed: 'Lands Director', housing_manager: 'Housing Lead' }
 window.NATION_CONFIG = window.NATION_CONFIG || {
   id:           'clfn',
   name:         'Constance Lake First Nation',
   display_name: 'Constance Lake First Nation',
-  short:        'CLFN'
+  short:        'CLFN',
+  role_labels:  {} // empty for CLFN — defaults from CLFN_PERMS.ROLE_LABELS apply
 };

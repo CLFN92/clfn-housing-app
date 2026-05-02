@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<title>CLFN Housing — Renovations &amp; Contractors</title>
+<title>{NATION_SHORT} Housing — Renovations &amp; Contractors</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="shared.css"/>
 <link rel="stylesheet" href="housing.css"/>
@@ -14,6 +14,7 @@
 <script src="shared-ui.js"></script>
 <script src="approval-authority.js"></script>
 <script src="shared-data.js"></script>
+<script src="shared-sow.js"></script>
 
 
 
@@ -26,7 +27,7 @@
     <img src="data:image/png;base64,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" alt="CLFN" class="hlogo"/>
     <div>
       <strong class="hbrand-title">Housing Application</strong>
-      <span class="hbrand-sub">Constance Lake First Nation</span>
+      <span class="hbrand-sub" data-nation="display_name">Constance Lake First Nation</span>
     </div>
   </div>
   <!-- User info bar -->
@@ -346,7 +347,7 @@
     <!-- Header -->
     <div class="modal-hdr spacious sticky">
       <div>
-        <div class="lbl-uppercase-sm">Constance Lake First Nation — Housing</div>
+        <div class="lbl-uppercase-sm" data-nation-template="{NATION} — Housing">Constance Lake First Nation — Housing</div>
         <div class="txt-hdr-white">Renovation Scope of Work</div>
         <div id="sow_unit_label" class="txt-sm-meta"></div>
       </div>
@@ -475,7 +476,7 @@
           <svg id="sow_terms_chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
         <div id="sow_terms_body" style="display:none;padding:18px 20px;font-size:12px;color:var(--text);line-height:1.7;">
-          <p style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;">Constance Lake First Nation — Housing Department</p>
+          <p style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;" data-nation-template="{NATION} — Housing Department">Constance Lake First Nation — Housing Department</p>
 
           <p style="margin-bottom:14px;color:var(--muted);">By completing and submitting this Scope of Work, the submitting party acknowledges and agrees to the following terms.</p>
 
@@ -503,7 +504,7 @@
 
             <div class="box-yellow-accent">
               <div class="lbl-bold-xs">5. No Guarantee of Approval or Timeline</div>
-              <p class="txt-muted-sm">Submission of this form does not guarantee approval or a specific completion date. The CLFN Housing Department will communicate decisions in writing. Priority and scheduling are subject to change based on available resources, contractor availability, and emerging urgent needs within the community.</p>
+              <p class="txt-muted-sm">Submission of this form does not guarantee approval or a specific completion date. The <span data-nation="short">CLFN</span> Housing Department will communicate decisions in writing. Priority and scheduling are subject to change based on available resources, contractor availability, and emerging urgent needs within the community.</p>
             </div>
 
             <div class="box-yellow-accent">
@@ -646,7 +647,7 @@ function showDash() {
 }
 function showSettings() {
   var role = window.currentRole || 'housing_employee_l1';
-  if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) {
+  if(!APPROVAL_AUTHORITY.can('accessSettings', role)) {
     showToast('Settings are only accessible to the Housing Manager and Executive Director.');
     return;
   }
@@ -654,7 +655,7 @@ function showSettings() {
 }
 function showAddHousingStaff() {
   var role = window.currentRole || 'housing_employee_l1';
-  if(role !== ROLE.HOUSING_MANAGER && role !== ROLE.ED) {
+  if(!APPROVAL_AUTHORITY.can('manageStaff', role)) {
     showToast('Staff management is only accessible to the Housing Manager and Executive Director.');
     return;
   }
@@ -727,7 +728,7 @@ function showAddHousingStaff() {
 // ── Page-specific role switch hook (called by shared-ui.js switchRole) ──
 window._onSwitchRole = function(role) {
   document.querySelectorAll('.hm-ed-only').forEach(function(e){e.style.display=(ROLE.isManagement(role))?'':'none';});
-  document.querySelectorAll('.ed-only').forEach(function(e){e.style.display=(role=== ROLE.ED)?'':'none';});
+  document.querySelectorAll('.ed-only').forEach(function(e){e.style.display=APPROVAL_AUTHORITY.can('editApprovalAuthority', role)?'':'none';});
   if(true) renderRenosView();
 };
 
@@ -841,10 +842,10 @@ function openRenoProgress(unitId) {
       histEl.innerHTML = updates.slice().reverse().map(function(u) {
         return '<div style="padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">'
           +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'
-          +'<span style="font-size:11px;font-weight:700;color:var(--text);">'+u.status+' — '+u.pct+'%</span>'
-          +'<span class="txt-xs-muted">'+u.date+'</span>'
+          +'<span style="font-size:11px;font-weight:700;color:var(--text);">'+escapeHtml(u.status)+' — '+escapeHtml(String(u.pct||''))+'%</span>'
+          +'<span class="txt-xs-muted">'+escapeHtml(u.date)+'</span>'
           +'</div>'
-          +(u.notes?'<div class="txt-muted-sm">'+u.notes+'</div>':'')
+          +(u.notes?'<div class="txt-muted-sm">'+escapeHtml(u.notes)+'</div>':'')
           +(u.photos&&u.photos.length?'<div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;">'
             +u.photos.map(function(s){return '<img src="'+s+'" style="width:48px;height:48px;object-fit:cover;border-radius:5px;border:1px solid var(--border);"/>';}).join('')
             +'</div>':'')
@@ -866,7 +867,11 @@ function openRenoProgress(unitId) {
 function _applyProgressModalLock(unitId){
   var modal = document.getElementById('renoProgressModal');
   if(!modal) return;
-  var locked = unitHasCompletedSow(unitId) && _realRoleForPermissions() !== ROLE.ED;
+  var role = _realRoleForPermissions();
+  // Locked if either: viewer lacks editRenoProgress, OR (completed SOW exists and viewer isn't ED).
+  var lacksBaseAuthority = !APPROVAL_AUTHORITY.can('editRenoProgress', role);
+  var lockedByCompletedSow = unitHasCompletedSow(unitId) && role !== ROLE.ED;
+  var locked = lacksBaseAuthority || lockedByCompletedSow;
 
   var banner = document.getElementById('rp_readonly_banner');
   if(banner) banner.style.display = locked ? 'block' : 'none';
@@ -1058,7 +1063,14 @@ function openRenoBudget(unitId) {
     window.location.href = 'index.html';
     return;
   }
-  
+
+  // Module gate: bounce back to housing.html if the renovations module is
+  // disabled for this nation. The page must not render any reno UI without it.
+  if (window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('renovations')) {
+    window.location.href = 'housing.html';
+    return;
+  }
+
   // Restore session from saved values — no API call needed
   HOUSING_HEADERS['Authorization'] = 'Bearer ' + token;
   HOUSING_SESSION.accessToken = token;
@@ -1110,6 +1122,7 @@ async function loadRenosData() {
     if(rpR && rpR.ok){var rpd=await rpR.json();rpd.forEach(function(r){window._renoProgress[r.unit_id]=r.data;});}
     if(stR && stR.ok){var stD=await stR.json();window._appSettings={};stD.forEach(function(r){window._appSettings[r.key]=r.value;});}
     if(typeof initApprovalAuthority === 'function') initApprovalAuthority();
+    if(typeof applyNationOverrides === 'function') applyNationOverrides();
   } catch(e){console.warn('[RENOS] data load error:',e);}
 }
 function initRenosPage() {
@@ -1130,7 +1143,7 @@ function updateRenosHeader() {
   el=document.getElementById('header_role_badge');
   if(el) el.textContent={employee:'Employee',housing_manager:'HM',ed:'ED'}[role]||role;
   document.querySelectorAll('.hm-ed-only').forEach(function(e){e.style.display=(ROLE.isManagement(role))?'':'none';});
-  document.querySelectorAll('.ed-only').forEach(function(e){e.style.display=(role=== ROLE.ED)?'':'none';});
+  document.querySelectorAll('.ed-only').forEach(function(e){e.style.display=APPROVAL_AUTHORITY.can('editApprovalAuthority', role)?'':'none';});
 }
 function goHome(){window.location.href='index.html';}
 function goBack(){window.location.href='index.html';}
@@ -1451,7 +1464,7 @@ function saveRenoProgress() {
       sow.progress.updated_at = new Date().toISOString();
       touched = true;
     });
-    if(pct >= 100){
+    if(pct >= 100 && (typeof canMarkSowComplete === 'function') && canMarkSowComplete()){
       var candidates = list.filter(function(s){ return s.approval_status !== 'completed'; });
       if(candidates.length){
         candidates.sort(function(a, b){ return (b.created_at||'').localeCompare(a.created_at||''); });
@@ -1528,13 +1541,14 @@ function handleRenoPhotoDrop(event) {
 
 
 
-function unitHasCompletedSow(unitId){
-  return getUnitSowList(unitId).some(isSowCompleted);
-}
+// unitHasCompletedSow lives in shared-sow.js (loaded via <script>).
 function canEditProgressFor(unitId){
-  // Only ED can edit progress when a completed SOW exists for this unit.
+  // Base gate: must have editRenoProgress authority at all.
+  var role = _realRoleForPermissions();
+  if(!APPROVAL_AUTHORITY.can('editRenoProgress', role)) return false;
+  // Once a completed SOW exists, only the ED can keep editing progress.
   if(!unitHasCompletedSow(unitId)) return true;
-  return _realRoleForPermissions() === ROLE.ED;
+  return role === ROLE.ED;
 }
 
 
@@ -1578,6 +1592,19 @@ function saveSOW(){
     policeReport:chk('sow_police_report'), accountabilityNotes:get('sow_accountability_notes'),
     items:collectSowItems(), savedAt:new Date().toISOString()
   };
+
+  // ── Approval-chain authority gate ─────────────────────────────────────────
+  // Strip name/date fields the actor isn't authorized to fill so a save
+  // cannot promote the SOW past what the actor's authority allows.
+  var _saveRole = window.currentRole || 'staff';
+  if(!APPROVAL_AUTHORITY.can('approveSowOverThreshold', _saveRole)){
+    data.edName = ''; data.edDate = '';
+  }
+  if(!APPROVAL_AUTHORITY.can('approveSowUnderThreshold', _saveRole) &&
+     !APPROVAL_AUTHORITY.can('approveSowOverThreshold', _saveRole)){
+    data.hmName = ''; data.hmDate = '';
+  }
+
   if(_sowUnitId) saveSowData(_sowUnitId, data);
 
   // ── Audit trail ──────────────────────────────────────────────────────────
@@ -1987,9 +2014,9 @@ function renderRenoApprovalsView() {
     // Inline approve button — role gated, only meaningful when there's an actual SOW.
     var approveBtn = '';
     if(sow && !locked){
-      if(role=== ROLE.HOUSING_MANAGER && appr.key==='pending_hm')
+      if(APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role) && appr.key==='pending_hm')
         approveBtn = '<button data-ra-approve="'+uid+'"'+dataProj+' data-ra-role="hm" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">✓ Approve</button>';
-      else if(role=== ROLE.ED && (appr.key==='pending_ed'||appr.key==='pending_hm'))
+      else if(APPROVAL_AUTHORITY.can('approveSowOverThreshold', role) && (appr.key==='pending_ed'||appr.key==='pending_hm'))
         approveBtn = '<button data-ra-approve="'+uid+'"'+dataProj+' data-ra-role="ed" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'+(appr.key==='pending_hm'?'Override →':'✓ Approve')+'</button>';
     }
 
@@ -2034,6 +2061,14 @@ function renderRenoApprovalsView() {
 }
 
 function raQuickApprove(unitId, approver, projectNumber) {
+  // Defense-in-depth: re-check the approval authority here so a stale or
+  // mutated DOM cannot bypass the row-level gate.
+  var _qaRole = window.currentRole || 'staff';
+  var _needAuthority = approver === 'ed' ? 'approveSowOverThreshold' : 'approveSowUnderThreshold';
+  if(!APPROVAL_AUTHORITY.can(_needAuthority, _qaRole)){
+    showToast('You do not have authority to approve this SOW.');
+    return;
+  }
   var units=[];
   units = housingUnits.slice();
   if(!units.length)units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
@@ -2041,7 +2076,7 @@ function raQuickApprove(unitId, approver, projectNumber) {
   if(idx<0){showToast('Unit not found');return;}
   var u=units[idx]; var role=window.currentRole||'staff'; var today=new Date().toISOString().split('T')[0];
   var addr=u.num+' '+u.street;
-  var label=approver==='hm'?'Housing Manager':'Executive Director';
+  var label=CLFN_PERMS.roleLabel(approver==='hm' ? ROLE.HOUSING_MANAGER : ROLE.ED);
   var projLabel = projectNumber ? ' ('+projectNumber+')' : '';
   if(!confirm('Approve SOW for '+addr+projLabel+' — '+label+'?')) return;
 
@@ -2167,13 +2202,15 @@ function exportRenoApprovalsPDF() {
       +'</tr>';
   }).join('');
 
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Reno Approvals — CLFN</title>'
+  var _natDisp  = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
+  var _natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Reno Approvals — '+_natShort+'</title>'
     +'<style>'+_printThemeStyles()+'*{box-sizing:border-box;margin:0;padding:0;}@page{size:letter landscape;margin:12mm 14mm;}body{font-family:Arial,sans-serif;font-size:11px;color:var(--text);}</style>'
     +'</head><body>'
     +'<div style="background:var(--dark);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;">'
-      +(logoSrc?'<img src="'+logoSrc+'" style="height:34px;" alt="CLFN"/>':'<span style="color:var(--yellow);font-weight:700;font-size:14px;">CLFN</span>')
+      +(logoSrc?'<img src="'+logoSrc+'" style="height:34px;" alt="'+_natShort+'"/>':'<span style="color:var(--yellow);font-weight:700;font-size:14px;">'+_natShort+'</span>')
       +'<div style="text-align:center;">'
-        +'<div style="font-size:8px;color:var(--yellow);font-weight:700;letter-spacing:.1em;text-transform:uppercase;">Constance Lake First Nation — Housing</div>'
+        +'<div style="font-size:8px;color:var(--yellow);font-weight:700;letter-spacing:.1em;text-transform:uppercase;">'+_natDisp+' — Housing</div>'
         +'<div style="font-size:15px;font-weight:700;color:#fff;margin-top:2px;">Renovation Approvals Report</div>'
       +'</div>'
       +'<div style="text-align:right;font-size:9px;color:var(--muted);">'+today+'<br/>'+relevant.length+' records<br/>Filter: '+(_raFilter||'All')+'</div>'
@@ -2194,7 +2231,7 @@ function exportRenoApprovalsPDF() {
       +'<tbody>'+tableRows+'</tbody>'
     +'</table>'
     +'<div style="margin-top:16px;border-top:2px solid var(--yellow);padding-top:6px;display:flex;justify-content:space-between;font-size:8px;color:var(--muted);">'
-      +'<span>Constance Lake First Nation — Housing Department — Confidential</span>'
+      +'<span>'+escapeHtml(buildNationFooterStrip())+'</span>'
       +'<span>Printed: '+today+'</span>'
     +'</div>'
     +'</body></html>';

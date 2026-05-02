@@ -165,8 +165,15 @@ window.showConfirm = function(opts) {
     return r;
   }
 
+  // ── Nation-overridable display labels ────────────────────────────────
+  // Per-nation overrides live in NATION_CONFIG.role_labels (key → label),
+  // checked first so e.g. one nation can render "Lands & Housing Director"
+  // for the canonical 'ed' key. The role *key* itself is never overridden;
+  // only the human-readable display string changes per nation.
   function roleLabel(role){
     var r = normalizeRole(role);
+    var overrides = (window.NATION_CONFIG && window.NATION_CONFIG.role_labels) || null;
+    if (overrides && r && overrides[r]) return overrides[r];
     return ROLE_LABELS[r] || String(role||'');
   }
 

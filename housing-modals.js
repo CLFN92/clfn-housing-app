@@ -159,11 +159,11 @@ function openUnitEditModal(unitId){
     }
   }
 
-  // Archive / Restore button in footer (ED only)
+  // Archive / Restore button in footer — gated by archiveUnit authority
   var archWrap = document.getElementById('ue_archive_btn_wrap');
   if(archWrap) {
     var role = window.currentRole || 'housing_employee_l1';
-    if(role === ROLE.ED) {
+    if(APPROVAL_AUTHORITY.can('archiveUnit', role)) {
       if(u.archived) {
         archWrap.innerHTML = '<button type="button" onclick="unarchiveUnit(\''+unitId.replace(/'/g,"\\'")+'\')" style="background:none;border:1.5px solid var(--muted);color:var(--muted);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:6px;">📤 Restore Unit</button>';
       } else {
@@ -327,11 +327,11 @@ function saveUnitEdit(){
         return;
       }
       if(role2=== ROLE.HOUSING_MANAGER && !hmApproved) {
-        showToast('⚠ Housing Manager approval required before assigning tenant. Application is: '+appStatus.replace(/_/g,' '));
+        showToast('⚠ ' + CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER) + ' approval required before assigning tenant. Application is: '+appStatus.replace(/_/g,' '));
         return;
       }
       // Write back HM approval flag on unit
-      u.tenantApprovedBy = role2=== ROLE.ED?'Executive Director':'Housing Manager';
+      u.tenantApprovedBy = CLFN_PERMS.roleLabel(role2=== ROLE.ED ? ROLE.ED : ROLE.HOUSING_MANAGER);
       u.tenantApprovedAt = new Date().toISOString().split('T')[0];
     }
   }
@@ -470,7 +470,7 @@ function ueTenantSelect(appId, name, status) {
   var warn = '';
   if (!isED && !isHM) {
     warn = '<div style="margin-top:8px;padding:8px 10px;background:var(--danger-bg);border-radius:6px;font-size:11px;color:var(--danger);font-weight:600;">⛔ This application has not been approved. Cannot assign tenant.</div>';
-  } else if (isHM && role === ROLE.ED) {
+  } else if (isHM && APPROVAL_AUTHORITY.can('finalApproveApp', role)) {
     warn = '<div style="margin-top:8px;padding:8px 10px;background:var(--info-blue-bg);border-radius:6px;font-size:11px;color:var(--info-blue);">ℹ️ Recommended by Housing Manager — awaiting your final approval. You may proceed with assignment.</div>';
   }
 
@@ -731,7 +731,7 @@ document.addEventListener('keydown', function(e) {
 
 // ── Save ED adjustment ──
 function saveEdAdjustment(){
-  if(window.currentRole !== ROLE.ED){ showToast('Only the Executive Director can apply adjustments.'); return; }
+  if(!APPROVAL_AUTHORITY.can('applyScoreAdjustment', window.currentRole)){ showToast('Only the Executive Director can apply adjustments.'); return; }
   var app = window._currentScorecardApp;
   if(!app){ showToast('No application selected.'); return; }
   var pts = parseInt((document.getElementById('sc_ed_adj_pts')||{}).value||0)||0;
@@ -755,7 +755,7 @@ function saveEdAdjustment(){
     applications[idx].score = base + pts;
   }
   sbSaveApplication(applications[idx]).catch(function(e){ console.warn('ED adj save failed:',e); });
-  auditEntry(app.id, 'ed_adjustment', 'ED adjusted score by '+(pts>=0?'+':'')+pts+(reason?' — '+reason:''), 'Executive Director');
+  auditEntry(app.id, 'ed_adjustment', 'ED adjusted score by '+(pts>=0?'+':'')+pts+(reason?' — '+reason:''), CLFN_PERMS.roleLabel(ROLE.ED));
   // Update display
   window._currentScorecardApp = applications[idx];
   var scoreEl = document.getElementById('sc_score_total');
@@ -830,7 +830,7 @@ function printScorecard(){
     +'<style>'+_printThemeStyles()+'*{box-sizing:border-box;margin:0;padding:0;}@page{size:letter;margin:16mm 14mm;}body{font-family:Arial,sans-serif;font-size:11px;color:var(--text);background:var(--surface);}.footer{position:fixed;bottom:8mm;left:0;right:0;padding:0 14mm;display:flex;justify-content:space-between;font-size:9px;color:var(--muted);border-top:1px solid var(--border);padding-top:5px;}</style>'
     +'</head><body>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--yellow);padding-bottom:12px;margin-bottom:16px;">'
-    +'<div class="flex-g10">'+(logoSrc?'<img src="'+logoSrc+'" style="width:40px;height:40px;object-fit:contain;" alt="CLFN"/>':'')+'<div><div class="js-txt-lg">CLFN Housing — Score Report</div><div style="font-size:10px;color:var(--muted);">Constance Lake First Nation</div></div></div>'
+    +'<div class="flex-g10">'+(logoSrc?'<img src="'+logoSrc+'" style="width:40px;height:40px;object-fit:contain;" alt="'+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+'"/>':'')+'<div><div class="js-txt-lg">'+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing — Score Report</div><div style="font-size:10px;color:var(--muted);">'+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+'</div></div></div>'
     +'<div style="text-align:right;font-size:10px;color:var(--muted);line-height:1.7;"><strong style="font-size:12px;color:var(--text);">'+name+'</strong><br/>'+app.id+'<br/>Generated: '+today+'</div></div>'
     +'<div style="display:flex;align-items:center;gap:24px;background:var(--dark);border-radius:8px;padding:16px 20px;margin-bottom:16px;">'
     +'<div><div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Total Score</div><div style="font-size:40px;font-weight:700;color:var(--yellow);line-height:1;">'+s+'</div></div>'
@@ -841,7 +841,7 @@ function printScorecard(){
     +'<thead><tr style="background:var(--dark);border-bottom:2px solid var(--yellow);"><th style="padding:8px 12px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:700;">Category</th><th style="padding:8px 12px;text-align:right;font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:700;width:60px;">Score</th></tr></thead>'
     +'<tbody>'+tableRows+'</tbody>'
     +'<tfoot><tr style="background:var(--bg);border-top:2px solid var(--dark);"><td style="padding:10px 12px;font-weight:700;">Total</td><td style="padding:10px 12px;text-align:right;font-size:18px;font-weight:700;">'+(s>0?'+':'')+s+'</td></tr></tfoot></table>'
-    +'<div class="footer"><span>CLFN Housing Department — Confidential</span><span>Generated '+today+'</span></div>'
+    +'<div class="footer"><span>'+escapeHtml(buildNationFooterStrip())+'</span><span>Generated '+today+'</span></div>'
   showPrintPanel(doc, 'Score Report');
 }
 
@@ -952,7 +952,7 @@ function previewFromDash(app){
   var sigCols = hasCoApp ? '1fr 1fr 1fr' : '1fr 1fr';
 
   var doc = '<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
-    +'<title>CLFN Housing Application — '+name+'</title>'
+    +'<title>'+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Application — '+name+'</title>'
     +'<style>'
     +'*{box-sizing:border-box;margin:0;padding:0;}'
     +'@page{size:letter;margin:14mm 13mm 20mm 13mm;}'
@@ -964,9 +964,9 @@ function previewFromDash(app){
     // Header
     +'<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--yellow);padding-bottom:10px;margin-bottom:14px;">'
     +'<div class="flex-g10">'
-    +(logoSrc?'<img src="'+logoSrc+'" style="width:40px;height:40px;object-fit:contain;" alt="CLFN"/>':'')
-    +'<div><div class="js-txt-lg">CLFN Housing Application</div>'
-    +'<div style="font-size:9.5px;color:var(--muted);">Constance Lake First Nation</div></div></div>'
+    +(logoSrc?'<img src="'+logoSrc+'" style="width:40px;height:40px;object-fit:contain;" alt="'+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+'"/>':'')
+    +'<div><div class="js-txt-lg">'+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Application</div>'
+    +'<div style="font-size:9.5px;color:var(--muted);">'+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+'</div></div></div>'
     +'<div style="text-align:right;font-size:9.5px;color:var(--muted);line-height:1.9;">'
     +'<strong style="font-size:12px;color:var(--text);">'+name+'</strong><br/>'
     +(app.id||'—')+'<br/>Date: '+today+'</div></div>'
@@ -999,7 +999,7 @@ function previewFromDash(app){
     +section('Current Housing &amp; Arrears',
        row('Currently Has a House', yn(app.haveHouse))
       +row('Home Condition',   app.haveHouse ? (app.homeCondition||'—') : 'N/A')
-      +row('Arrears Owed to CLFN', yn(hasArr))
+      +row('Arrears Owed to '+(window.NATION_CONFIG&&NATION_CONFIG.short||''), yn(hasArr))
       +row('Arrears Amount',   hasArr ? dollar(app.arrBalAmt) : 'N/A')
     )
 
@@ -1030,16 +1030,16 @@ function previewFromDash(app){
     // Terms & Conditions
     +'<div style="margin-top:14px;padding:10px 12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);page-break-inside:avoid;">'
     +'<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:7px;padding-bottom:4px;border-bottom:1.5px solid var(--yellow);">Terms &amp; Conditions — Applicant Declaration</div>'
-    +'<p style="font-size:9.5px;color:var(--text);line-height:1.6;margin-bottom:5px;">By signing below, I hereby apply for housing assistance from the Constance Lake First Nation (CLFN) Housing Program and declare the following:</p>'
+    +'<p style="font-size:9.5px;color:var(--text);line-height:1.6;margin-bottom:5px;">By signing below, I hereby apply for housing assistance from the '+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+' ('+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+') Housing Program and declare the following:</p>'
     +'<ol style="font-size:9.5px;color:var(--text);line-height:1.7;padding-left:14px;">'
     +'<li>All information provided in this application is true, accurate, and complete to the best of my knowledge.</li>'
     +'<li>I understand that providing false or misleading information may result in immediate disqualification and removal from the housing waitlist.</li>'
-    +'<li>I consent to CLFN collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation.</li>'
-    +'<li>I understand that my application will be scored according to the CLFN Housing Scoring Rubric and that priority is determined by score, not date of application alone.</li>'
-    +'<li>I agree to notify the CLFN Housing Department within 30 days of any change in household composition, income, address, or contact information.</li>'
-    +'<li>I understand that acceptance into CLFN housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by CLFN prior to occupancy.</li>'
-    +'<li>I agree to comply with all CLFN Housing policies, lease agreements, and community by-laws as a condition of tenancy.</li>'
-    +'<li>I authorize CLFN to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.</li>'
+    +'<li>I consent to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation.</li>'
+    +'<li>I understand that my application will be scored according to the '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Scoring Rubric and that priority is determined by score, not date of application alone.</li>'
+    +'<li>I agree to notify the '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Department within 30 days of any change in household composition, income, address, or contact information.</li>'
+    +'<li>I understand that acceptance into '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' prior to occupancy.</li>'
+    +'<li>I agree to comply with all '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing policies, lease agreements, and community by-laws as a condition of tenancy.</li>'
+    +'<li>I authorize '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.</li>'
     +'</ol></div>'
 
     // Signatures
@@ -1072,7 +1072,7 @@ function previewFromDash(app){
     +'</div></div>'
 
     +'<div class="footer">'
-    +'  <span>CLFN Housing Department — Confidential</span>'
+    +'  <span>'+escapeHtml(buildNationFooterStrip())+'</span>'
     +'  <span id="footerRight" style="display:flex;gap:20px;align-items:center;">'
     +'    <span>Generated '+today+'</span>'
     +'    <span id="pageNum" style="font-weight:600;color:var(--muted);"></span>'
@@ -1623,10 +1623,10 @@ function openRenoProgress(unitId) {
       histEl.innerHTML = updates.slice().reverse().map(function(u) {
         return '<div style="padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">'
           +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'
-          +'<span style="font-size:11px;font-weight:700;color:var(--text);">'+u.status+' — '+u.pct+'%</span>'
-          +'<span class="js-lbl-xs">'+u.date+'</span>'
+          +'<span style="font-size:11px;font-weight:700;color:var(--text);">'+escapeHtml(u.status)+' — '+escapeHtml(String(u.pct||''))+'%</span>'
+          +'<span class="js-lbl-xs">'+escapeHtml(u.date)+'</span>'
           +'</div>'
-          +(u.notes?'<div class="js-txt-muted-sm">'+u.notes+'</div>':'')
+          +(u.notes?'<div class="js-txt-muted-sm">'+escapeHtml(u.notes)+'</div>':'')
           +(u.photos&&u.photos.length?'<div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;">'
             +u.photos.map(function(s){return '<img src="'+s+'" style="width:48px;height:48px;object-fit:cover;border-radius:5px;border:1px solid var(--border);"/>';}).join('')
             +'</div>':'')
@@ -1677,8 +1677,8 @@ function atSearchApps(q){
   // ed_approved = fully approved; mgr_approved = HM recommended (HM role can assign)
   var role = window.currentRole || 'housing_employee_l1';
   var valid=apps.filter(function(a){
-    if(role=== ROLE.ED) return a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED;
-    if(role=== ROLE.HOUSING_MANAGER) return a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED;
+    if(APPROVAL_AUTHORITY.can('finalApproveApp', role) || APPROVAL_AUTHORITY.can('reviewApplication', role))
+      return a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED;
     return a.status===APP_STATUS.ED_APPROVED;
   });
   var matches=q.trim().length>0
@@ -1688,7 +1688,7 @@ function atSearchApps(q){
       })
     : valid.slice(0,8);
   if(!matches.length){
-    dd.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--muted);">No approved applications found'+(q.trim().length>1?' for <strong>'+q+'</strong>':'')+'</div>'
+    dd.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--muted);">No approved applications found'+(q.trim().length>1?' for <strong>'+escapeHtml(q)+'</strong>':'')+'</div>'
       +'<div style="padding:8px 14px;border-top:1px solid var(--border);background:var(--bg);">'
       +'<button type="button" onmousedown="closeAddTenantModal();newApp();" style="background:none;border:none;font-size:12px;font-weight:600;color:var(--yellow);cursor:pointer;font-family:DM Sans,sans-serif;padding:0;">📝 Start a new application instead →</button>'
       +'</div>';
@@ -1698,17 +1698,18 @@ function atSearchApps(q){
   dd.style.display='block';
   dd.innerHTML=matches.map(function(a){
     var name=((a.fn||'')+' '+(a.ln||'')).trim()||'Unknown';
+    // Replace quotes for the inline JS arg, then escape for HTML rendering.
     var safeName=name.replace(/'/g,'’');
     var isED=a.status===APP_STATUS.ED_APPROVED; var isHM=a.status===APP_STATUS.MGR_APPROVED;
     var statusLabel=isED?'ED Approved':isHM?'HM Recommended':a.status.replace(/_/g,' ');
     var statusCol=isED?'#15803d':isHM?'#1d4ed8':'#888';
     var statusBg=isED?'#f0fdf4':isHM?'#eff6ff':'var(--bg)';
-    return '<div onmousedown="atSelectApp(\''+a.id+'\',\''+safeName+'\',\''+a.status+'\') " '
+    return '<div onmousedown="atSelectApp(\''+escapeHtml(a.id)+'\',\''+escapeHtml(safeName)+'\',\''+escapeHtml(a.status)+'\') " '
       +'style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;" '
       +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'none\'">'
       +'<div>'
-        +'<div class="js-txt-bold">'+name+'</div>'
-        +'<div class="js-lbl-sm">'+a.id+(a.bedrooms?' · '+a.bedrooms+' bed req\'d':'')+'</div>'
+        +'<div class="js-txt-bold">'+escapeHtml(name)+'</div>'
+        +'<div class="js-lbl-sm">'+escapeHtml(a.id)+(a.bedrooms?' · '+escapeHtml(String(a.bedrooms))+' bed req\'d':'')+'</div>'
       +'</div>'
       +'<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+statusBg+';color:'+statusCol+';">'+statusLabel+'</span>'
       +'</div>';
@@ -2009,6 +2010,11 @@ window.openEditModal = function(appId) {
         var txts = row.querySelectorAll('input[type="text"]');
         var nums = row.querySelectorAll('input[type="number"]');
         if(sels[0]) sels[0].value = inc.person    || 'Applicant';
+        // Programmatic .value assignment doesn't fire change events, so the
+        // dependent dropdowns (Income Type, Employment Status) stay disabled.
+        // Trigger the same handler addIncome wires to the onchange so they
+        // re-enable when the form is repopulated from a saved application.
+        if(sels[0] && typeof onIncomePersonChange === 'function') onIncomePersonChange(sels[0]);
         if(sels[1]) sels[1].value = inc.incomeType || '';
         if(txts[0]) txts[0].value = inc.employer   || '';
         if(nums[0]) nums[0].value = inc.primaryAmt  || '';
@@ -2264,7 +2270,7 @@ function confirmApprovalAction() {
   if(action === APP_STATUS.MGR_APPROVED || action === 'returned' || action === 'declined') {
     // Housing Manager action — save HM signature data
     applications[idx].hmSig = {
-      name:     _fv('sig_hm_name') || (role === ROLE.HOUSING_MANAGER ? 'Housing Manager' : ''),
+      name:     _fv('sig_hm_name') || (role === ROLE.HOUSING_MANAGER ? CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER) : ''),
       date:     _fv('sig_hm_date') || today,
       decision: action === APP_STATUS.MGR_APPROVED ? 'Approved' : action === 'declined' ? 'Declined' : 'More Info Required',
       notes:    notes || _fv('sig_hm_notes'),
@@ -2275,7 +2281,7 @@ function confirmApprovalAction() {
   if(action === APP_STATUS.ED_APPROVED || (action === 'declined' && role === ROLE.ED)) {
     // Executive Director final approval — save ED signature + create final snapshot
     applications[idx].edSig = {
-      name:     _fv('sig_ed_name') || (role === ROLE.ED ? 'Executive Director' : ''),
+      name:     _fv('sig_ed_name') || (role === ROLE.ED ? CLFN_PERMS.roleLabel(ROLE.ED) : ''),
       date:     _fv('sig_ed_date') || today,
       decision: action === APP_STATUS.ED_APPROVED ? 'Approved' : 'Declined',
       notes:    notes || _fv('sig_ed_notes_sig'),

@@ -87,6 +87,26 @@ var APPROVAL_AUTHORITY = (function() {
     // Who can add/edit staff
     manageStaff:              ['housing_manager', 'ed'],
 
+    // ── Dashboard & inventory ─────────────────────────────────────────────
+    // Who can access the management Dashboard view
+    accessDashboard:          ['housing_manager', 'ed'],
+    // Who can archive a unit (soft-delete from Inventory)
+    archiveUnit:              ['ed'],
+
+    // ── Staff management ──────────────────────────────────────────────────
+    // Who can edit / deactivate an existing staff record
+    manageStaffRecord:        ['ed'],
+    // Who can assign / change roles for ANY staff member (vs. only HE roles)
+    manageAllStaffRoles:      ['ed'],
+
+    // ── Application visibility & scoring ──────────────────────────────────
+    // Who can see the numeric application score (HE_L1 hidden by default)
+    viewApplicationScore:     ['ed', 'housing_manager', 'housing_employee_l2', 'cfo', 'finance_l1'],
+
+    // ── Renovation Progress ───────────────────────────────────────────────
+    // Who can edit progress percentages and notes on a renovation
+    editRenoProgress:         ['ed', 'housing_manager', 'housing_employee_l2'],
+
   };
 
   // ── LIVE CONFIG (defaults + any saved overrides) ──────────────────────
@@ -247,17 +267,25 @@ var APPROVAL_AUTHORITY = (function() {
       accessSettings:           'Access settings page',
       editApprovalAuthority:    'Edit approval authorities',
       manageStaff:              'Add / edit staff',
+      accessDashboard:          'Access Dashboard view',
+      archiveUnit:              'Archive a unit',
+      manageStaffRecord:        'Edit / deactivate a staff record',
+      manageAllStaffRoles:      'Assign any role to staff',
+      viewApplicationScore:     'View application score',
+      editRenoProgress:         'Edit renovation progress',
     },
 
     /** Group labels for the Settings UI sections */
     groups: {
-      'Housing Application':  ['reviewApplication','finalApproveApp','declineApplication','returnApplication'],
+      'Housing Application':  ['reviewApplication','finalApproveApp','declineApplication','returnApplication','viewApplicationScore'],
       'File Update':          ['reviewFileUpdate','approveFileUpdate'],
       'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand','assignRentAmount'],
-      'SOW & Renovation':     ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow'],
+      'SOW & Renovation':     ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow','editRenoProgress'],
       'Contractors':          ['recommendContractor','approveContractor','declineContractor'],
       'Scoring':              ['editScoreModel','applyScoreAdjustment'],
-      'System':               ['accessSettings','editApprovalAuthority','manageStaff'],
+      'Inventory':            ['archiveUnit'],
+      'Dashboard':            ['accessDashboard'],
+      'System':               ['accessSettings','editApprovalAuthority','manageStaff','manageStaffRecord','manageAllStaffRoles'],
     },
 
   };

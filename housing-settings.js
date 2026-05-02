@@ -215,7 +215,7 @@ function showSettingsSection(section) {
   if(section==='sec_users'       && typeof renderHousingUserTable==='function') renderHousingUserTable();
   if(section==='sec_nation'      && typeof renderNationPanel==='function') renderNationPanel();
   if(section==='sec_app_scoring') {
-    if(window.currentRole === ROLE.ED && typeof renderV2ScoringEditor === 'function') {
+    if(APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole) && typeof renderV2ScoringEditor === 'function') {
       renderV2ScoringEditor();
     } else {
       var wrap = document.getElementById('scoring_model_table_wrap');
@@ -504,7 +504,7 @@ function getAppType() {
 // ── Settings role locks ──
 function applySettingsRoleLocks() {
   var role = window.currentRole || window._realRole || (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.role) || '';
-  var isED = (role === ROLE.ED);
+  var isED = APPROVAL_AUTHORITY.can('editScoreModel', role);
   var locked = !isED;
 
   // Selectors for all score/budget editable inputs
@@ -627,7 +627,7 @@ function confirmResetScoringModelED() {
   });
 }
 function openAddCriteriaModalED() {
-  if(window.currentRole !== ROLE.ED) { showToast('Only the Executive Director can add scoring criteria.'); return; }
+  if(!APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole)) { showToast('Only the Executive Director can add scoring criteria.'); return; }
   openAddCriteriaModal();
 }
 
@@ -841,7 +841,7 @@ function renderThemesPanel() {
   var body = document.getElementById('themes_panel_body');
   if(!body) return;
   var role = window.currentRole || 'housing_employee_l1';
-  var isED = (role === ROLE.ED);
+  var isED = APPROVAL_AUTHORITY.can('editApprovalAuthority', role);
   if(!isED){
     body.innerHTML = '<div class="empty-state-ctr">Theme customization is restricted to the Executive Director.</div>';
     return;
@@ -1019,7 +1019,7 @@ function renderRequiredFieldsPanel() {
   var body = document.getElementById('required_fields_panel_body');
   if(!body) return;
   var role = window.currentRole || 'housing_employee_l1';
-  var isED = (role === ROLE.ED);
+  var isED = APPROVAL_AUTHORITY.can('editApprovalAuthority', role);
   if(!isED){
     body.innerHTML = '<div class="empty-state-ctr">Required-field configuration is restricted to the Executive Director.</div>';
     return;

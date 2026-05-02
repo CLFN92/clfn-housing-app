@@ -354,62 +354,464 @@ function renderNationPanel(){
   if(!identEl || !modsEl) return;
   var cfg = window.NATION_CONFIG || {};
   var modApi = window.CLFN_MODULES;
+  var role = window.currentRole || '';
+  var canEdit = (window.APPROVAL_AUTHORITY && APPROVAL_AUTHORITY.can('editApprovalAuthority', role));
 
-  // Identity card — nation display name + the subdomain it's serving.
   var host = (window.location.hostname || '').toLowerCase();
-  identEl.innerHTML =
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;">'
-    +   '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'
-    +     '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Nation</div>'
-    +     '<div style="font-size:16px;font-weight:700;color:var(--text);">'+(cfg.display_name||'—')+'</div>'
-    +     '<div class="js-lbl-sm" class="mt-4">ID: <code style="font-family:Consolas,Monaco,monospace;">'+(cfg.id||'—')+'</code></div>'
-    +   '</div>'
-    +   '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'
-    +     '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Hosting</div>'
-    +     '<div style="font-size:13px;font-weight:700;color:var(--text);font-family:Consolas,Monaco,monospace;word-break:break-all;">'+host+'</div>'
-    +     '<div class="js-lbl-sm" class="mt-4">Subdomain-routed</div>'
-    +   '</div>'
-    + '</div>';
+  var dispVal  = escapeHtml(cfg.display_name || cfg.name || '');
+  var shortVal = escapeHtml(cfg.short || '');
+  var idVal    = escapeHtml(cfg.id || '');
+  var savedLogo = (window._appSettings && window._appSettings.theme && window._appSettings.theme.logo) || '';
+  var socials   = cfg.socials || {};
 
-  // Modules list — core vs optional, each with status pill.
+  if (!canEdit) {
+    // Read-only view — same shape as before, plus contact + social readback.
+    var contactRows = [
+      cfg.mailing_address ? _nationContactRow('Mailing Address', cfg.mailing_address.replace(/\n/g,'<br/>'), true) : '',
+      cfg.phone           ? _nationContactRow('Phone',   escapeHtml(cfg.phone))    : '',
+      cfg.email           ? _nationContactRow('Email',   '<a href="mailto:'+escapeHtml(cfg.email)+'" style="color:var(--text);">'+escapeHtml(cfg.email)+'</a>') : '',
+      cfg.website         ? _nationContactRow('Website', '<a href="'+escapeHtml(_nationLinkify(cfg.website))+'" target="_blank" rel="noopener" style="color:var(--text);">'+escapeHtml(cfg.website)+'</a>') : ''
+    ].join('');
+    var socialChips = ['facebook','instagram','linkedin','twitter','youtube'].map(function(k){
+      var url = socials[k];
+      if (!url) return '';
+      var label = ({facebook:'Facebook',instagram:'Instagram',linkedin:'LinkedIn',twitter:'X',youtube:'YouTube'})[k];
+      return '<a href="'+escapeHtml(_nationLinkify(url))+'" target="_blank" rel="noopener" '
+        + 'style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;font-size:12px;font-weight:600;background:var(--surface);border:1px solid var(--border);border-radius:14px;color:var(--text);text-decoration:none;margin-right:6px;">'
+        + label + ' ↗</a>';
+    }).join('');
+
+    identEl.innerHTML =
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;">'
+      +   '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'
+      +     '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Nation</div>'
+      +     '<div style="font-size:16px;font-weight:700;color:var(--text);">'+dispVal+'</div>'
+      +     '<div class="js-lbl-sm" class="mt-4">ID: <code style="font-family:Consolas,Monaco,monospace;">'+idVal+'</code></div>'
+      +   '</div>'
+      +   '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'
+      +     '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Hosting</div>'
+      +     '<div style="font-size:13px;font-weight:700;color:var(--text);font-family:Consolas,Monaco,monospace;word-break:break-all;">'+escapeHtml(host)+'</div>'
+      +     '<div class="js-lbl-sm" class="mt-4">Subdomain-routed</div>'
+      +   '</div>'
+      + '</div>'
+      + (contactRows
+          ? '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-top:14px;">'
+            + '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Contact</div>'
+            + '<table style="font-size:13px;color:var(--text);border-collapse:collapse;">' + contactRows + '</table>'
+            + '</div>'
+          : '')
+      + (socialChips
+          ? '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-top:14px;">'
+            + '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Social</div>'
+            + socialChips
+            + '</div>'
+          : '')
+      + '<div style="font-size:11px;color:var(--muted);margin-top:12px;font-style:italic;">Nation identity, contact info, and logo are managed by the Executive Director.</div>';
+  } else {
+    // Editable form — display name, short name, logo upload, save.
+    var inputStyle = 'width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;';
+    var lblStyle   = 'display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;';
+    var hasLogo = !!savedLogo;
+
+    identEl.innerHTML =
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;">'
+      +   '<div>'
+      +     '<label style="'+lblStyle+'">Nation Display Name</label>'
+      +     '<input id="nation_input_display" type="text" value="'+dispVal+'" style="'+inputStyle+'" placeholder="e.g. Constance Lake First Nation"/>'
+      +     '<div class="js-lbl-sm" style="margin-top:4px;">Used in headers, print templates, and email subjects.</div>'
+      +   '</div>'
+      +   '<div>'
+      +     '<label style="'+lblStyle+'">Short Name / Acronym</label>'
+      +     '<input id="nation_input_short" type="text" value="'+shortVal+'" maxlength="16" style="'+inputStyle+'" placeholder="e.g. CLFN"/>'
+      +     '<div class="js-lbl-sm" style="margin-top:4px;">Used in compact contexts (titles, badges, password defaults).</div>'
+      +   '</div>'
+      +   '<div style="grid-column:1/-1;">'
+      +     '<label style="'+lblStyle+'">Logo</label>'
+      +     '<div class="theme-logo-zone upload-zone p-16"'
+      +       ' id="nation_logo_zone"'
+      +       ' ondragover="photoDragOver(event,\'nation_logo_zone\')"'
+      +       ' ondragleave="photoDragLeave(\'nation_logo_zone\')"'
+      +       ' ondrop="_nationOnLogoDrop(event)"'
+      +       ' onclick="if(event.target.tagName!==\'BUTTON\')document.getElementById(\'nation_logo_file\').click()">'
+      +       '<div id="nation_logo_preview_wrap" class="theme-logo-preview-wrap"' + (hasLogo ? '' : ' style="display:none;"') + '>'
+      +         '<div class="theme-logo-preview"><img id="nation_logo_preview" src="'+escapeHtml(savedLogo)+'" alt="Logo"/></div>'
+      +         '<button type="button" onclick="event.stopPropagation();_nationClearLogo()" class="btn btn-ghost btn-sm">Remove logo</button>'
+      +       '</div>'
+      +       '<div id="nation_logo_empty"' + (hasLogo ? ' style="display:none;"' : '') + '>'
+      +         '<svg class="upload-zone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
+      +         '<div class="upload-zone-title">Drag a logo here or <span class="link-yellow">browse</span></div>'
+      +         '<div class="txt-muted-xs">PNG, JPG, or SVG · transparent background recommended · max 200 KB</div>'
+      +       '</div>'
+      +       '<input type="file" id="nation_logo_file" accept="image/*" onchange="_nationOnLogoFile(this)"/>'
+      +     '</div>'
+      +     '<div id="nation_logo_msg" class="txt-fineprint" style="min-height:14px;margin-top:6px;"></div>'
+      +   '</div>'
+
+      // ── Contact section ─────────────────────────────────────────────
+      +   '<div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">'
+      +     '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;">Contact Information</div>'
+      +     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">'
+      +       '<div style="grid-column:1/-1;">'
+      +         '<label style="'+lblStyle+'">Mailing Address</label>'
+      +         '<textarea id="nation_input_address" rows="3" style="'+inputStyle+'resize:vertical;font-family:DM Sans,sans-serif;" placeholder="PO Box 4001&#10;Constance Lake, ON&#10;P0L 1B0">'+escapeHtml(cfg.mailing_address||'')+'</textarea>'
+      +         '<div class="js-lbl-sm" style="margin-top:4px;">Free-form. Line breaks are preserved on display; collapsed to one line in print footers.</div>'
+      +       '</div>'
+      +       '<div>'
+      +         '<label style="'+lblStyle+'">Website</label>'
+      +         '<input id="nation_input_website" type="text" value="'+escapeHtml(cfg.website||'')+'" style="'+inputStyle+'" placeholder="www.example.ca"/>'
+      +       '</div>'
+      +       '<div>'
+      +         '<label style="'+lblStyle+'">Main Email</label>'
+      +         '<input id="nation_input_email" type="email" value="'+escapeHtml(cfg.email||'')+'" style="'+inputStyle+'" placeholder="housing@example.ca"/>'
+      +       '</div>'
+      +       '<div>'
+      +         '<label style="'+lblStyle+'">Main Phone</label>'
+      +         '<input id="nation_input_phone" type="text" value="'+escapeHtml(cfg.phone||'')+'" style="'+inputStyle+'" placeholder="(705) 555-0100"/>'
+      +       '</div>'
+      +     '</div>'
+      +   '</div>'
+
+      // ── Social media section ───────────────────────────────────────
+      +   '<div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:12px;">'
+      +     '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;">Social Media</div>'
+      +     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">'
+      +       _nationSocialField('facebook',  'Facebook',  'https://facebook.com/yourpage',  socials.facebook)
+      +       _nationSocialField('instagram', 'Instagram', 'https://instagram.com/yourpage', socials.instagram)
+      +       _nationSocialField('linkedin',  'LinkedIn',  'https://linkedin.com/company/…', socials.linkedin)
+      +       _nationSocialField('twitter',   'X (Twitter)','https://x.com/yourpage',         socials.twitter)
+      +       _nationSocialField('youtube',   'YouTube',   'https://youtube.com/@yourchannel', socials.youtube)
+      +     '</div>'
+      +     '<div class="js-lbl-sm" style="margin-top:6px;">Stored for use in future public-facing pages. Leave any field blank to skip it.</div>'
+      +   '</div>'
+
+      +   '<div style="grid-column:1/-1;display:flex;gap:8px;align-items:center;border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">'
+      +     '<button type="button" onclick="saveNationSettings()" class="btn btn-primary">Save Nation Settings</button>'
+      +     '<div class="js-lbl-sm">Hosting <code style="font-family:Consolas,Monaco,monospace;">'+escapeHtml(host)+'</code> · ID <code style="font-family:Consolas,Monaco,monospace;">'+idVal+'</code></div>'
+      +   '</div>'
+      + '</div>';
+    // Stash the saved logo as the working draft so the file picker can compare/replace.
+    window._nationDraftLogo = savedLogo || '';
+  }
+
+  // Modules list — core vs optional. Super-users see interactive on/off
+  // toggles + license badges; everyone else sees read-only status pills.
   if(!modApi){
     modsEl.innerHTML = '<div class="js-txt-muted-sm">Module registry not available.</div>';
     return;
   }
+  var canToggleModules = (typeof window.isSuperUser === 'function') && window.isSuperUser();
+
   var pill = function(label, c, bg){
     return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+';">'+label+'</span>';
   };
-  var row = function(name, status, kind){
-    var humanName = name.replace(/_/g,' ').replace(/\b\w/g, function(m){return m.toUpperCase();});
-    var statusPill = status==='enabled'
-      ? pill('Enabled','#15803d','#f0fdf4')
-      : pill('Disabled','#888','#f4f4f0');
-    var kindPill = kind==='core'
-      ? pill('Core','#1d4ed8','#eff6ff')
-      : pill('Optional','#7a6000','#fef9ec');
+  var humanize = function(name){
+    return name.replace(/_/g,' ').replace(/\b\w/g, function(m){return m.toUpperCase();});
+  };
+  var coreRow = function(name){
     return '<tr class="row-divider">'
-         +   '<td style="padding:10px 12px;font-size:13px;font-weight:600;color:var(--text);">'+humanName+'</td>'
-         +   '<td class="pad-12">'+kindPill+'</td>'
-         +   '<td class="pad-12">'+statusPill+'</td>'
+         +   '<td style="padding:10px 12px;font-size:13px;font-weight:600;color:var(--text);">'+humanize(name)+'</td>'
+         +   '<td class="pad-12">'+pill('Core','#1d4ed8','#eff6ff')+'</td>'
+         +   '<td class="pad-12">'+pill('Enabled','#15803d','#f0fdf4')+'</td>'
+         +   (canToggleModules ? '<td class="pad-12"></td>' : '')
          + '</tr>';
   };
-  var coreRows = modApi.CORE.map(function(n){ return row(n, 'enabled', 'core'); }).join('');
-  var optRows  = modApi.listOptional().map(function(n){
-    return row(n, modApi.isEnabled(n) ? 'enabled' : 'disabled', 'optional');
-  }).join('');
+  var optRow = function(name){
+    var enabled  = modApi.isEnabled(name);
+    var licensed = (typeof modApi.isLicensed === 'function') ? modApi.isLicensed(name) : true;
+    var statusPill = enabled
+      ? pill('Enabled','#15803d','#f0fdf4')
+      : pill('Disabled','#888','#f4f4f0');
+    var licensePill = licensed
+      ? pill('Licensed','#1d4ed8','#eff6ff')
+      : pill('Not Licensed','#b91c1c','#fef2f2');
+    var typeCell = '<td class="pad-12">'+pill('Optional','#7a6000','#fef9ec')+' '+licensePill+'</td>';
+    var toggleCell = '';
+    if(canToggleModules){
+      var disabledAttr = licensed ? '' : ' disabled';
+      var checkedAttr  = enabled ? ' checked' : '';
+      toggleCell = '<td class="pad-12">'
+        +   '<label class="tsw" title="'+(licensed ? 'Toggle module on/off' : 'Module is not licensed')+'">'
+        +     '<input type="checkbox" data-module-toggle="'+name+'"'+checkedAttr+disabledAttr+'/>'
+        +     '<span class="tsl"></span>'
+        +   '</label>'
+        + '</td>';
+    }
+    return '<tr class="row-divider">'
+         +   '<td style="padding:10px 12px;font-size:13px;font-weight:600;color:var(--text);">'+humanize(name)+'</td>'
+         +   typeCell
+         +   '<td class="pad-12">'+statusPill+'</td>'
+         +   toggleCell
+         + '</tr>';
+  };
+  var coreRows = modApi.CORE.map(coreRow).join('');
+  var optRows  = modApi.listOptional().map(optRow).join('');
+  var toggleHeader = canToggleModules
+    ? '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);width:80px;">Toggle</th>'
+    : '';
+
   modsEl.innerHTML =
-      '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Modules</div>'
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+    +   '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;">Modules</div>'
+    +   (canToggleModules ? '<div style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:#fef9ec;color:#7a6000;border:1px solid #fde68a;">Super User</div>' : '')
+    + '</div>'
     + '<div class="overflow-x">'
     + '<table class="std-tbl">'
     +   '<thead><tr style="background:var(--bg);border-bottom:2px solid var(--border);">'
     +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);">Module</th>'
-    +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);width:100px;">Type</th>'
+    +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);width:200px;">Type</th>'
     +     '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);width:110px;">Status</th>'
+    +     toggleHeader
     +   '</tr></thead>'
     +   '<tbody>'+coreRows+optRows+'</tbody>'
     + '</table>'
     + '</div>'
-    + '<div style="font-size:11px;color:var(--muted);margin-top:12px;font-style:italic;">To enable or disable optional modules for your nation, contact your platform administrator.</div>';
+    + (canToggleModules
+        ? '<div style="font-size:11px;color:var(--muted);margin-top:12px;font-style:italic;">Disabling a module hides its nav tile and redirects anyone currently on its page back to the dashboard. Changes are audited.</div>'
+        : '<div style="font-size:11px;color:var(--muted);margin-top:12px;font-style:italic;">To enable or disable optional modules for your nation, contact your platform administrator.</div>');
+
+  // Wire toggles (super-user only)
+  if(canToggleModules){
+    var inputs = modsEl.querySelectorAll('input[data-module-toggle]');
+    for(var i=0;i<inputs.length;i++){
+      inputs[i].addEventListener('change', function(ev){
+        var modName = ev.target.getAttribute('data-module-toggle');
+        var nowOn   = !!ev.target.checked;
+        _onModuleToggle(modName, nowOn);
+      });
+    }
+  }
+}
+
+// Super-user toggle handler. Mutates CLFN_MODULES, persists to housing_settings,
+// audits, re-renders the panel, and — if disabling a module the user is
+// currently on — redirects them back to the dashboard.
+function _onModuleToggle(modName, nowOn) {
+  var modApi = window.CLFN_MODULES;
+  if(!modApi) return;
+  var prev = modApi.isEnabled(modName);
+  if(nowOn) modApi.enable(modName); else modApi.disable(modName);
+
+  // Persist via the existing housing_settings save helper
+  var payload = modApi.serialize();
+  if(typeof sbSaveSetting === 'function'){
+    sbSaveSetting('module_enablement', payload).catch(function(e){
+      console.warn('[modules] save failed:', e);
+      if(typeof showToast === 'function') showToast('Module save failed: ' + (e && e.message || e), { type:'error' });
+    });
+  }
+  // Mirror locally so subsequent reads on this page see the new state
+  if(window._appSettings) window._appSettings['module_enablement'] = payload;
+
+  // Audit
+  if(typeof auditEntry === 'function'){
+    var actor = (window.HOUSING_SESSION && HOUSING_SESSION.email) || (window.currentRole || 'super_user');
+    auditEntry('SETTINGS', 'module_toggle',
+      modName + ': ' + (prev ? 'enabled' : 'disabled') + ' → ' + (nowOn ? 'enabled' : 'disabled'),
+      actor);
+  }
+
+  // Re-render panel + nav tiles
+  renderNationPanel();
+  if(typeof showEmployeeHome === 'function' && document.getElementById('employeeHomeView')){
+    var ehv = document.getElementById('employeeHomeView');
+    if(ehv && ehv.style.display !== 'none') showEmployeeHome();
+  }
+
+  // If the module is being disabled and the current page is that module's
+  // page, redirect to the dashboard. Same-tab guarantee only — other open
+  // sessions will redirect on their next navigation since gate checks at the
+  // top of each module page now read the persisted state.
+  if(!nowOn){
+    var path = (window.location.pathname || '').toLowerCase();
+    var moduleHosts = {
+      finance:      'finance.html',
+      match:        'match.html',
+      contractors:  'contractors.html',
+      renovations:  'renos.html'
+    };
+    var host = moduleHosts[modName];
+    if(host && path.indexOf(host) !== -1){
+      window.location.href = 'housing.html';
+    }
+  }
+
+  if(typeof showToast === 'function') showToast(modName + (nowOn ? ' enabled' : ' disabled') + '.');
+}
+
+// ── Nation editor render helpers ────────────────────────────────────────────
+// Tiny markup builders used by renderNationPanel(). Kept top-level so they
+// can be hoisted by the JS engine and referenced from the inline HTML
+// template above without depending on render-order quirks.
+function _nationSocialField(key, label, placeholder, value) {
+  var inputStyle = 'width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;';
+  var lblStyle   = 'display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;';
+  return '<div>'
+    +   '<label style="'+lblStyle+'">'+label+'</label>'
+    +   '<input id="nation_input_'+key+'" type="text" value="'+escapeHtml(value||'')+'" style="'+inputStyle+'" placeholder="'+placeholder+'"/>'
+    + '</div>';
+}
+function _nationContactRow(label, valueHtml, isMultiline) {
+  return '<tr>'
+    +   '<td style="padding:4px 14px 4px 0;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;vertical-align:top;white-space:nowrap;">'+label+'</td>'
+    +   '<td style="padding:4px 0;'+(isMultiline ? 'line-height:1.5;' : '')+'">'+valueHtml+'</td>'
+    + '</tr>';
+}
+// Loose URL normalizer — adds https:// when the user typed a bare host so
+// <a href> works without a JS error. Anything that already has a scheme is
+// returned as-is. Not a security check — just a quality-of-life helper.
+function _nationLinkify(s) {
+  s = String(s||'').trim();
+  if (!s) return '';
+  if (/^[a-z][a-z0-9+.\-]*:\/\//i.test(s)) return s;
+  if (/^mailto:/i.test(s)) return s;
+  return 'https://' + s.replace(/^\/+/, '');
+}
+
+// ── Nation editor handlers ──────────────────────────────────────────────────
+// Logo upload uses the same data URL flow as the Themes panel; we write the
+// image to _appSettings.theme.logo via sbSaveSetting('theme', …) and call
+// _applyTheme() to swap every <img class="hlogo"> live. Identity, contact
+// fields, and socials save into a separate housing_settings row keyed
+// 'nation_config_override' so applyNationOverrides() picks them up at boot.
+function _nationApplyLogoFile(f) {
+  var msg = document.getElementById('nation_logo_msg');
+  if (!f) return;
+  if (!/^image\//.test(f.type)) {
+    if (msg) msg.textContent = 'That file type is not supported — pick an image.';
+    return;
+  }
+  if (f.size > 200 * 1024) {
+    if (msg) msg.textContent = 'File too large — keep logos under 200 KB.';
+    return;
+  }
+  var rdr = new FileReader();
+  rdr.onload = function(e) {
+    var dataUrl = e.target.result;
+    window._nationDraftLogo = dataUrl;
+    var img   = document.getElementById('nation_logo_preview');
+    var wrap  = document.getElementById('nation_logo_preview_wrap');
+    var empty = document.getElementById('nation_logo_empty');
+    if (img)   img.src = dataUrl;
+    if (wrap)  wrap.style.display  = '';
+    if (empty) empty.style.display = 'none';
+    if (msg) msg.textContent = 'Logo ready — click Save Nation Settings to publish.';
+  };
+  rdr.readAsDataURL(f);
+}
+function _nationOnLogoFile(input) {
+  var f = input.files && input.files[0];
+  _nationApplyLogoFile(f);
+  input.value = '';  // allow re-selecting the same file
+}
+function _nationOnLogoDrop(e) {
+  e.preventDefault();
+  if (typeof photoDragLeave === 'function') photoDragLeave('nation_logo_zone');
+  var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  _nationApplyLogoFile(f);
+}
+
+function _nationClearLogo() {
+  showConfirm({
+    title:       'Clear nation logo?',
+    message:     'The default brand logo baked into each page will be used until a new logo is uploaded.',
+    confirmText: 'Clear Logo',
+    danger:      true
+  }).then(function(ok){
+    if (!ok) return;
+    if (!window._appSettings) window._appSettings = {};
+    var theme = Object.assign({}, window._appSettings.theme || {});
+    delete theme.logo;
+    window._appSettings.theme = theme;
+    sbSaveSetting('theme', theme).then(function(saved){
+      if (saved) {
+        if (typeof _applyTheme === 'function') _applyTheme(theme);
+        showToast('Logo cleared');
+        if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'nation_logo_cleared', 'Nation logo cleared', window.currentRole||'staff');
+        renderNationPanel();
+      } else {
+        showToast('Could not clear logo — check connection');
+      }
+    });
+  });
+}
+
+function saveNationSettings() {
+  var role = window.currentRole || '';
+  if (!APPROVAL_AUTHORITY.can('editApprovalAuthority', role)) {
+    showToast('Only the Executive Director can edit nation settings.');
+    return;
+  }
+  function v(id){ var el=document.getElementById(id); return el ? (el.value||'').trim() : ''; }
+  var disp  = v('nation_input_display');
+  var short = v('nation_input_short');
+  if (!disp)  { showToast('Display name is required'); var de=document.getElementById('nation_input_display'); if(de) de.focus(); return; }
+  if (!short) { showToast('Short name is required');   var se=document.getElementById('nation_input_short');   if(se) se.focus(); return; }
+  if (short.length > 16) { showToast('Short name must be 16 characters or fewer'); return; }
+
+  var emailVal = v('nation_input_email');
+  if (emailVal && !/.+@.+\..+/.test(emailVal)) {
+    showToast('Email address looks malformed'); var ee=document.getElementById('nation_input_email'); if(ee) ee.focus(); return;
+  }
+
+  // Build the socials sub-object from whichever fields are populated.
+  var socials = {};
+  ['facebook','instagram','linkedin','twitter','youtube'].forEach(function(k){
+    var val = v('nation_input_'+k);
+    if (val) socials[k] = val;
+  });
+
+  // Persist nation identity + contact + social overrides.
+  var override = {
+    display_name:    disp,
+    name:            disp,
+    short:           short,
+    mailing_address: v('nation_input_address'),
+    website:         v('nation_input_website'),
+    phone:           v('nation_input_phone'),
+    email:           emailVal,
+    socials:         socials
+  };
+  if (!window._appSettings) window._appSettings = {};
+  window._appSettings.nation_config_override = override;
+
+  var pending = [];
+  pending.push(sbSaveSetting('nation_config_override', override));
+
+  // If a new logo was uploaded in this session, persist it via the existing
+  // theme.logo channel so _applyTheme picks it up across all pages.
+  if (window._nationDraftLogo) {
+    var theme = Object.assign({}, window._appSettings.theme || {}, { logo: window._nationDraftLogo });
+    window._appSettings.theme = theme;
+    pending.push(sbSaveSetting('theme', theme));
+  }
+
+  Promise.all(pending).then(function(results){
+    var allOk = results.every(function(ok){ return ok !== false; });
+    // Apply locally regardless of server result so the UI reflects intent.
+    if (typeof applyNationOverrides === 'function') applyNationOverrides();
+    if (window._nationDraftLogo && typeof _applyTheme === 'function') {
+      _applyTheme(window._appSettings.theme || {});
+      window._nationDraftLogo = '';
+    }
+    if (allOk) {
+      showToast('Nation settings saved');
+      if (typeof auditEntry === 'function') {
+        var summary = 'Nation settings updated: ' + disp + ' (' + short + ')';
+        var extras = [];
+        if (override.mailing_address) extras.push('address');
+        if (override.phone)           extras.push('phone');
+        if (override.email)           extras.push('email');
+        if (override.website)         extras.push('website');
+        var socialKeys = Object.keys(socials);
+        if (socialKeys.length) extras.push(socialKeys.length + ' social link' + (socialKeys.length===1?'':'s'));
+        if (extras.length) summary += ' — ' + extras.join(', ');
+        auditEntry('SETTINGS', 'nation_updated', summary, role);
+      }
+    } else {
+      showToast('Saved locally — server sync failed', { type: 'error' });
+    }
+    renderNationPanel();
+  });
 }
 
 function renderScoringModelTable() {
@@ -713,7 +1115,7 @@ function renderNosTable() {
   var bedLabels = {'0':'Studio / 0 bedrooms','1':'1 bedroom','2':'2 bedrooms','3':'3 bedrooms','4':'4 bedrooms','5':'5+ bedrooms'};
   var nos = defaults;
   try { if(typeof getNosTable === 'function') nos = getNosTable(); } catch(e) { nos = defaults; }
-  var isED = (window.currentRole === ROLE.ED);
+  var isED = APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole);
   tbody.innerHTML = Object.keys(bedLabels).map(function(beds) {
     var maxPeople = (nos[beds] !== undefined) ? nos[beds] : defaults[beds];
     var label = bedLabels[beds];
@@ -729,7 +1131,7 @@ function renderNosTable() {
 
 
 function saveNosTable() {
-  if(window.currentRole !== ROLE.ED) {
+  if(!APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole)) {
     showToast('Only the Executive Director can update the NOS table.');
     return;
   }
@@ -746,7 +1148,7 @@ function saveNosTable() {
   sbSaveSetting('nos_table', nos).then(function(ok) {
     if(ok) {
       showToast('\u2713 NOS table saved');
-      auditEntry('SETTINGS', 'nos_table_save', 'NOS table updated by ED', 'Executive Director');
+      auditEntry('SETTINGS', 'nos_table_save', 'NOS table updated by ED', CLFN_PERMS.roleLabel(ROLE.ED));
     } else {
       showToast('Save failed — check connection');
     }

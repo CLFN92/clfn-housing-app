@@ -381,67 +381,8 @@ function reopenSow(){
 
 
 
-function getSowByProjectNumber(unitId, projectNumber){
-  var list = getUnitSowList(unitId);
-  for(var i=0; i<list.length; i++){
-    if(list[i].project_number === projectNumber) return list[i];
-  }
-  return null;
-}
-
-// ── SOW lock / permission helpers ─────────────────────────────────────────
-// A SOW becomes immutable once its approval_status is 'completed'. Only the ED
-
-
-function canEditSow(sow){
-  // Anyone authenticated can edit a non-completed SOW (existing behavior).
-  // Only the ED (real role) can edit a completed one.
-  if(!isSowCompleted(sow)) return true;
-  return _realRoleForPermissions() === ROLE.ED;
-}
-function canMarkSowComplete(){
-  // HM or ED can mark a SOW complete; staff/employee cannot.
-  var r = _realRoleForPermissions();
-  return ROLE.isManagement(r) || r === 'hm';
-}
-function canReopenSow(){
-  // Only ED can reopen a completed SOW.
-  return _realRoleForPermissions() === ROLE.ED;
-}
-
-
-
-function upsertSowInList(unitId, sow){
-  // Add or update a SOW in the unit's list (matched by project_number) and persist.
-  var list = getUnitSowList(unitId);
-  var found = false;
-  for(var i=0; i<list.length; i++){
-    if(list[i].project_number === sow.project_number){
-      list[i] = sow;
-      found = true;
-      break;
-    }
-  }
-  if(!found) list.push(sow);
-  saveSowList(unitId, list);
-  return list;
-}
-
-function nextProjectNumber(unitId){
-  // Produces "<address>-SOW-NNN" where NNN is one more than the current max on this unit.
-  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
-  var u = allUnits.find(function(x){ return x.id === unitId; });
-  var addr = u ? (u.num + ' ' + u.street).trim() : 'UNIT';
-  var list = getUnitSowList(unitId);
-  var maxN = 0;
-  var re = new RegExp('^' + addr.replace(/[-\/\\^$*+?.()|[\]{}]/g,'\\$&') + '-SOW-(\\d+)$');
-  list.forEach(function(s){
-    var m = re.exec(String(s.project_number || ''));
-    if(m){ var n = parseInt(m[1], 10); if(n > maxN) maxN = n; }
-  });
-  var next = ('000' + (maxN + 1)).slice(-3);
-  return addr + '-SOW-' + next;
-}
+// ── SOW helpers (getSowByProjectNumber, canEditSow, canMarkSowComplete,
+//    canReopenSow, upsertSowInList, nextProjectNumber) live in shared-sow.js ──
 
 // ── SOW table on Unit Detail card ─────────────────────────────────────────
 // Renders every SOW for a given unit as a row in a table inside the Unit Detail modal.
@@ -602,6 +543,19 @@ function saveSOW(){
   // Normalize the amount to a number for table display / sorting.
   var totalNum = parseFloat(String(data.totalCost||'').replace(/[^0-9.\-]/g,'')) || 0;
   data.amount = totalNum;
+
+  // ── Approval-chain authority gate ─────────────────────────────────────────
+  // Strip name/date fields the actor isn't authorized to fill so the
+  // auto-promotion below cannot bump status past what they're allowed.
+  var _saveRole = window.currentRole || 'staff';
+  if(!APPROVAL_AUTHORITY.can('approveSowOverThreshold', _saveRole)){
+    data.edName = ''; data.edDate = '';
+  }
+  if(!APPROVAL_AUTHORITY.can('approveSowUnderThreshold', _saveRole) &&
+     !APPROVAL_AUTHORITY.can('approveSowOverThreshold', _saveRole)){
+    data.hmName = ''; data.hmDate = '';
+  }
+
   // Compute a simple approval_status from the signature / approval fields on the form.
   // EXCEPTION: if the SOW was already marked 'completed', preserve that — only markSowComplete/reopenSow
   // should transition into or out of the completed state. This keeps Save from accidentally
@@ -611,8 +565,8 @@ function saveSOW(){
     data.approval_status = 'completed';
     if(existingForStatus.completed_at) data.completed_at = existingForStatus.completed_at;
     if(existingForStatus.completed_by) data.completed_by = existingForStatus.completed_by;
-  } else if(data.edName && data.edDate) data.approval_status = 'ed_approved';
-  else if(data.hmName && data.hmDate) data.approval_status = 'hm_approved';
+  } else if(data.edName && data.edDate && APPROVAL_AUTHORITY.can('approveSowOverThreshold', _saveRole)) data.approval_status = 'ed_approved';
+  else if(data.hmName && data.hmDate && APPROVAL_AUTHORITY.can('approveSowUnderThreshold', _saveRole)) data.approval_status = 'hm_approved';
   else if((data.tenantSig && data.tenantSig.image) || (data.staffSig && data.staffSig.image)) data.approval_status = 'signed';
   else data.approval_status = 'draft';
 
@@ -734,9 +688,11 @@ function printSOW(){
       +'</tr>';
   }).join('');
 
+  var _natDisp  = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
+  var _natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
   var html = '<!DOCTYPE html><html lang="en"><head>'
     +'<meta charset="UTF-8"/>'
-    +'<title>Scope of Work — CLFN Housing</title>'
+    +'<title>Scope of Work — '+_natShort+' Housing</title>'
     +'<style>'
     +'*{box-sizing:border-box;margin:0;padding:0;}'
     +'body{font-family:Georgia,serif;font-size:11px;color:var(--text);background:#fff;}'
@@ -781,9 +737,9 @@ function printSOW(){
     /* HEADER */
     +'<div class="header">'
       +'<div class="header-left">'
-        +'<img class="header-logo" src="LOGO_SRC" alt="CLFN"/>'
+        +'<img class="header-logo" src="LOGO_SRC" alt="'+_natShort+'"/>'
         +'<div class="header-title">'
-          +'<div class="org">Constance Lake First Nation</div>'
+          +'<div class="org">'+_natDisp+'</div>'
           +'<div class="dept">Housing Department</div>'
         +'</div>'
       +'</div>'
@@ -874,7 +830,7 @@ function printSOW(){
       : '')
 
     /* Terms & Conditions */
-    +'<div class="section">'      +'<div class="section-title">Terms &amp; Conditions</div>'      +'<div class="section-body" style="font-size:9.5px;color:var(--text);line-height:1.65;">'        +'<p style="font-size:8.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:10px;">Constance Lake First Nation &mdash; Housing Department</p>'        +'<div class="print-mb"><strong>1. Prioritization of Requests.</strong> Renovation requests are assessed and prioritized based on urgency of need, health and safety risk to occupants, and overall unit condition. Immediate hazards &mdash; structural, electrical, plumbing, or fire safety &mdash; take priority over general maintenance and cosmetic work.</div>'        +'<div class="print-mb"><strong>2. Funding Eligibility &amp; Unit Qualifying Criteria.</strong> Approval is subject to available funding and the qualifying criteria of the unit under its applicable program (e.g. ISC, CMHC Sec. 95, CMHC Sec. 56.1, or Band-funded). Funding availability may affect the scope, cost ceiling, or timing of approved work.</div>'        +'<div class="print-mb"><strong>3. Budget Authority &amp; Approval Routing.</strong> Requests within the Housing Manager&rsquo;s approved budget authority may be approved by the HM. Requests exceeding that threshold require Executive Director approval before work commences. No work begins until all approvals are documented.</div>'        +'<div class="print-mb"><strong>4. Tenant Responsibilities.</strong> The tenant must provide timely access to the unit for inspection and work. Damage, negligence, or vandalism attributed to the tenant may reduce priority and may result in financial responsibility for a portion of repair costs.</div>'        +'<div class="print-mb"><strong>5. No Guarantee of Approval or Timeline.</strong> Submission does not guarantee approval or a specific completion date. Decisions will be communicated in writing. Priority and scheduling may change based on available resources and emerging urgent community needs.</div>'        +'<div><strong>6. Accuracy of Information.</strong> All information must be accurate and complete. False or misleading information may result in the request being cancelled, delayed, or referred for further review.</div>'      +'</div>'    +'</div>'
+    +'<div class="section">'      +'<div class="section-title">Terms &amp; Conditions</div>'      +'<div class="section-body" style="font-size:9.5px;color:var(--text);line-height:1.65;">'        +'<p style="font-size:8.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:10px;">'+_natDisp+' &mdash; Housing Department</p>'        +'<div class="print-mb"><strong>1. Prioritization of Requests.</strong> Renovation requests are assessed and prioritized based on urgency of need, health and safety risk to occupants, and overall unit condition. Immediate hazards &mdash; structural, electrical, plumbing, or fire safety &mdash; take priority over general maintenance and cosmetic work.</div>'        +'<div class="print-mb"><strong>2. Funding Eligibility &amp; Unit Qualifying Criteria.</strong> Approval is subject to available funding and the qualifying criteria of the unit under its applicable program (e.g. ISC, CMHC Sec. 95, CMHC Sec. 56.1, or Band-funded). Funding availability may affect the scope, cost ceiling, or timing of approved work.</div>'        +'<div class="print-mb"><strong>3. Budget Authority &amp; Approval Routing.</strong> Requests within the Housing Manager&rsquo;s approved budget authority may be approved by the HM. Requests exceeding that threshold require Executive Director approval before work commences. No work begins until all approvals are documented.</div>'        +'<div class="print-mb"><strong>4. Tenant Responsibilities.</strong> The tenant must provide timely access to the unit for inspection and work. Damage, negligence, or vandalism attributed to the tenant may reduce priority and may result in financial responsibility for a portion of repair costs.</div>'        +'<div class="print-mb"><strong>5. No Guarantee of Approval or Timeline.</strong> Submission does not guarantee approval or a specific completion date. Decisions will be communicated in writing. Priority and scheduling may change based on available resources and emerging urgent community needs.</div>'        +'<div><strong>6. Accuracy of Information.</strong> All information must be accurate and complete. False or misleading information may result in the request being cancelled, delayed, or referred for further review.</div>'      +'</div>'    +'</div>'
     /* Acknowledgement & Signatures */
     +'<div class="section">'
       +'<div class="section-title">Signatures &amp; Acknowledgement</div>'
@@ -908,7 +864,7 @@ function printSOW(){
 
     /* FOOTER */
     +'<div class="footer">'
-      +'<div class="footer-left">Constance Lake First Nation — Housing Department &nbsp;|&nbsp; Confidential</div>'
+      +'<div class="footer-left">'+escapeHtml(buildNationFooterStrip())+'</div>'
       +'<div class="footer-right">Generated '+today+'</div>'
     +'</div>'
 
