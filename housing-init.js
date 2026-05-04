@@ -1915,6 +1915,18 @@ function renderAppHeader(){
     +   '</button>'
     +   '<nav class="app-nav" id="app_nav"></nav>'
     +   '<div class="header-actions">'
+    +     '<div class="export-wrap" id="header_export_wrap_v2" style="display:none;">'
+    +       '<button id="header_export_btn_v2" class="btn-export-v2" type="button">'
+    +         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
+    +         '<span>Export</span>'
+    +         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>'
+    +       '</button>'
+    +       '<div class="export-menu-v2" id="header_export_menu_v2" role="menu">'
+    +         '<button class="export-menu-item-v2" data-export="csv"><span>CSV</span></button>'
+    +         '<button class="export-menu-item-v2" data-export="excel"><span>Excel (.xlsx)</span></button>'
+    +         '<button class="export-menu-item-v2" data-export="pdf"><span>PDF</span></button>'
+    +       '</div>'
+    +     '</div>'
     +     '<button id="header_settings_btn" class="header-settings" data-roles="ed,housing_manager">'
     +       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
     +       '<span>Settings</span>'
@@ -2211,21 +2223,18 @@ function _sectionOnExpand(id){
 }
 function _renderWorklistCountPills(){
   var apps  = (typeof applications !== 'undefined' && applications) ? applications : [];
-  var STATUS = (typeof APP_STATUS !== 'undefined') ? APP_STATUS : { SUBMITTED:'submitted', MGR_APPROVED:'mgr_approved', FILE_UPDATE:'file_update' };
+  var STATUS = (typeof APP_STATUS !== 'undefined') ? APP_STATUS : { SUBMITTED:'submitted', MGR_APPROVED:'mgr_approved', FILE_UPDATE:'file_update', ED_APPROVED:'ed_approved' };
   var role = window.currentRole || 'housing_employee_l1';
-  var pending = apps.filter(function(a){
-    if(!a || a.archived) return false;
-    if(role === 'ed')              return a.status === STATUS.MGR_APPROVED || a.status === STATUS.SUBMITTED;
-    if(role === 'housing_manager') return a.status === STATUS.SUBMITTED || a.status === STATUS.FILE_UPDATE;
-    return a.status === STATUS.SUBMITTED;
-  }).length;
-  var total = apps.filter(function(a){ return a && !a.archived; }).length;
+  var email = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION.email : '';
+  // Use the shared role-scoped queue so the pill, the View-all label, and
+  // renderWorklist all agree on what "awaiting your approval" means.
+  var queue = (typeof getWorkQueueForRole === 'function') ? getWorkQueueForRole(role, email) : [];
+  var pending = queue.length;
   var p = document.getElementById('worklist_count_pill'); if(p) p.textContent = pending;
-  var t = document.getElementById('worklist_total_pill'); if(t) t.textContent = total;
   var qa = document.getElementById('qa_pending_count');   if(qa) qa.textContent = pending;
-  var STATUS2 = STATUS;
+  // "Ready to match" KPI — applicants approved with no unit yet.
   var ready = apps.filter(function(a){
-    return a && !a.archived && (a.status===STATUS2.ED_APPROVED || a.status===STATUS2.MGR_APPROVED) && !a.assignedUnit;
+    return a && !a.archived && (a.status===STATUS.ED_APPROVED || a.status===STATUS.MGR_APPROVED) && !a.assignedUnit;
   }).length;
   var qr = document.getElementById('qa_ready_count'); if(qr) qr.textContent = ready;
 }
@@ -2390,6 +2399,23 @@ document.addEventListener('DOMContentLoaded', function(){
     // Header settings button (right-side)
     if(t.closest('#header_settings_btn')){ e.preventDefault(); if(typeof showSettings==='function') showSettings(); setHeaderNavActive('settings'); return; }
 
+    // Export button (header-v2)
+    if(t.closest('#header_export_btn_v2')){
+      e.preventDefault();
+      var menu = document.getElementById('header_export_menu_v2');
+      if(menu) menu.classList.toggle('open');
+      return;
+    }
+    var expItem = t.closest('.export-menu-item-v2[data-export]');
+    if(expItem){
+      e.preventDefault();
+      var fmt = expItem.getAttribute('data-export');
+      var menu2 = document.getElementById('header_export_menu_v2');
+      if(menu2) menu2.classList.remove('open');
+      if(typeof headerExport === 'function') headerExport(fmt);
+      return;
+    }
+
     // Create menu open/close
     if(t.closest('#header_create_btn')){ e.preventDefault(); _toggleCreateMenu(); return; }
     var createItem = t.closest('.create-menu-item[data-create]');
@@ -2465,6 +2491,10 @@ document.addEventListener('DOMContentLoaded', function(){
 
     // Outside-click closers (run last)
     if(!t.closest('#create_menu') && !t.closest('#header_create_btn')) _closeCreateMenu();
+    if(!t.closest('#header_export_menu_v2') && !t.closest('#header_export_btn_v2')){
+      var em = document.getElementById('header_export_menu_v2');
+      if(em) em.classList.remove('open');
+    }
     if(!t.closest('#header_avatar_pop') && !t.closest('#header_user_pill')) _closeAvatarPopover();
     if(!t.closest('#lookup_input') && !t.closest('#lookup_results')){
       var lr = document.getElementById('lookup_results');
@@ -2479,6 +2509,15 @@ document.addEventListener('DOMContentLoaded', function(){
       window._viewAsRole = e.target.value || null;
       if(typeof switchRole === 'function') switchRole(newRole);
       _closeAvatarPopover();
+      // Belt-and-suspenders: directly retally and re-render the worklist in
+      // case any earlier _onSwitchRole hook short-circuited (prev() may bail
+      // before our wrap runs in some edge cases). Idempotent when already done.
+      window._wlActiveChip = 'mine';
+      if(typeof _renderWorklistCountPills === 'function') _renderWorklistCountPills();
+      var sec = document.getElementById('sec-worklist');
+      if(sec && !sec.classList.contains('collapsed') && typeof renderWorklist === 'function'){
+        renderWorklist();
+      }
     }
   });
 });
@@ -2490,7 +2529,15 @@ document.addEventListener('DOMContentLoaded', function(){
     try { if(typeof prev === 'function') prev(role); } catch(_){}
     if(typeof renderHeaderNav === 'function') renderHeaderNav();
     if(typeof applyRoleVisibility === 'function') applyRoleVisibility(role);
+    // Reset the worklist chip selection so the new role lands on their own
+    // queue (otherwise an HM user view-as ED keeps showing HM's chip choice).
+    window._wlActiveChip = 'mine';
     _renderWorklistCountPills();
+    // Re-render the worklist body if the section is currently expanded.
+    var sec = document.getElementById('sec-worklist');
+    if(sec && !sec.classList.contains('collapsed') && typeof renderWorklist === 'function'){
+      renderWorklist();
+    }
   };
 })();
 

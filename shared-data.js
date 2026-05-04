@@ -528,6 +528,46 @@ async function sbSaveContractor(ct) {
   }
 }
 
+// ── getWorkQueueForRole ──────────────────────────────────────────────────────
+// Single source of truth for "applications awaiting your action" — used by the
+// landing-page count pill, the Worklist alert chip, and the View-all label.
+//
+// Every role sees their own drafts and returned items so they can finish them.
+// On top of that:
+//   - HM sees: status='submitted' or 'file_update' (waiting for HM review)
+//   - ED sees: status='mgr_approved' (HM recommended, awaits ED) and 'submitted'
+//             (ED can act directly without HM)
+//   - HE-L1 / HE-L2 sees only their own work in flight
+//
+// Returns the filtered array (in the same order as `applications`).
+function getWorkQueueForRole(role, email) {
+  var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
+  return apps.filter(function(a){ return isInWorkQueue(a, role, email); });
+}
+
+// Per-app predicate. Same authority rules as getWorkQueueForRole — extracted
+// so chip filters and one-off checks can share the logic.
+function isInWorkQueue(a, role, email) {
+  if(!a || a.archived) return false;
+  var STATUS = (typeof APP_STATUS !== 'undefined') ? APP_STATUS : {
+    DRAFT:'draft', SUBMITTED:'submitted', FILE_UPDATE:'file_update',
+    MGR_APPROVED:'mgr_approved', ED_APPROVED:'ed_approved'
+  };
+  email = (email || (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.email : '') || '').toLowerCase();
+  role  = role  || (window.currentRole || 'housing_employee_l1');
+  var canReview       = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('reviewApplication', role);
+  var canFinalApprove = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('finalApproveApp',   role);
+  var owner = (a.created_by_email || '').toLowerCase();
+  var isMine = !!email && owner === email;
+  // Anyone always sees their own drafts and returned items.
+  if(isMine && (a.status === STATUS.DRAFT || a.status === 'returned')) return true;
+  // ED queue — apps awaiting final approval, plus submitted (ED can act direct)
+  if(canFinalApprove && (a.status === STATUS.MGR_APPROVED || a.status === STATUS.SUBMITTED)) return true;
+  // HM queue (only when not also ED — the ED branch already covered above)
+  if(canReview && !canFinalApprove && (a.status === STATUS.SUBMITTED || a.status === STATUS.FILE_UPDATE)) return true;
+  return false;
+}
+
 // ── sbLookup* ─────────────────────────────────────────────────────────────────
 // Synchronous lookups against the in-memory caches. Used by the landing-page
 // Quick Lookup panel — no Supabase round-trips. Each function returns an
@@ -2627,10 +2667,14 @@ function renderWorklist() {
   var chipDefs;
   var canReviewApp    = APPROVAL_AUTHORITY.can('reviewApplication', role);
   var canFinalApprove = APPROVAL_AUTHORITY.can('finalApproveApp', role);
+  // _myEmail and _queueFilter share the per-row predicate so the action chip
+  // count, the rendered rows, and the landing-page pill are all in agreement.
+  var _myEmail = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION.email : '';
+  var _queueFilter = function(a){ return isInWorkQueue(a, role, _myEmail); };
   if(!canReviewApp && !canFinalApprove) {
     chipDefs = [
+      {key:'mine',      label:'My Items',       filter: _queueFilter, alert:true},
       {key:'',          label:'All',            filter: function(a){ return !a.archived; }},
-      {key:'action',    label:'Action Needed',  filter: function(a){ return a.status==='returned'; }, alert:true},
       {key:'submitted', label:'In Review',      filter: function(a){ return ['submitted','file_update','mgr_approved'].indexOf(a.status)!==-1; }},
       {key:'approved',  label:'Approved',       filter: function(a){ return ['ed_approved','assigned'].indexOf(a.status)!==-1; }},
       {key:'draft',     label:'Draft',          filter: function(a){ return a.status===APP_STATUS.DRAFT; }},
@@ -2638,8 +2682,8 @@ function renderWorklist() {
     ];
   } else if(canReviewApp && !canFinalApprove) {
     chipDefs = [
+      {key:'mine',      label:'My Queue',       filter: _queueFilter, alert:true},
       {key:'',          label:'All Active',     filter: function(a){ return !a.archived; }},
-      {key:'action',    label:'Needs Review',   filter: function(a){ return ['submitted','file_update'].indexOf(a.status)!==-1; }, alert:true},
       {key:'returned',  label:'Returned',       filter: function(a){ return a.status==='returned'; }, alert:true},
       {key:'pending',   label:'Awaiting ED',    filter: function(a){ return a.status===APP_STATUS.MGR_APPROVED; }},
       {key:'approved',  label:'ED Approved',    filter: function(a){ return a.status===APP_STATUS.ED_APPROVED; }},
@@ -2647,8 +2691,8 @@ function renderWorklist() {
     ];
   } else {
     chipDefs = [
+      {key:'mine',      label:'My Queue',       filter: _queueFilter, alert:true},
       {key:'',          label:'All Active',     filter: function(a){ return !a.archived; }},
-      {key:'action',    label:'Needs Approval', filter: function(a){ return a.status===APP_STATUS.MGR_APPROVED; }, alert:true},
       {key:'submitted', label:'Awaiting HM',    filter: function(a){ return a.status===APP_STATUS.SUBMITTED; }},
       {key:'approved',  label:'Approved',       filter: function(a){ return a.status===APP_STATUS.ED_APPROVED; }},
       {key:'assigned',  label:'Assigned',       filter: function(a){ return a.status==='assigned'; }},
@@ -2657,7 +2701,9 @@ function renderWorklist() {
   }
 
   // ── Active chip + search state ────────────────────────────────────────────
-  if(!window._wlActiveChip) window._wlActiveChip = '';
+  // Default to "My Queue" (role-scoped) so users land on their own work first.
+  // Once they pick a different chip, the choice sticks for the session.
+  if(window._wlActiveChip === undefined || window._wlActiveChip === null) window._wlActiveChip = 'mine';
   if(!window._wlSearch) window._wlSearch = '';
 
   var activeChipDef = chipDefs.find(function(c){ return c.key === window._wlActiveChip; }) || chipDefs[0];
@@ -3037,9 +3083,14 @@ async function scShowAssignDocs(app) {
 }
 function setExportView(viewName) {
   window._currentExportView = viewName;
-  var wrap = document.getElementById('header_export_wrap');
   var exportableViews = ['inventory','match','renos','contractors'];
-  if(wrap) wrap.style.display = exportableViews.indexOf(viewName) >= 0 ? 'flex' : 'none';
+  var visible = exportableViews.indexOf(viewName) >= 0;
+  // Legacy header wrap (kept for any leftover legacy headers / fallback paths).
+  var wrap = document.getElementById('header_export_wrap');
+  if(wrap) wrap.style.display = visible ? 'flex' : 'none';
+  // New v2 header wrap (the .app-header-v2 export dropdown).
+  var wrap2 = document.getElementById('header_export_wrap_v2');
+  if(wrap2) wrap2.style.display = visible ? 'flex' : 'none';
 }
 function showContractorsForRole() {
   var role = window.currentRole || 'housing_employee_l1';
