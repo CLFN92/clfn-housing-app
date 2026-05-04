@@ -133,7 +133,7 @@ function setNavActive(id) {
 function hideAllViews(keepId) {
   var base = [
     'appLayout','settingsView','scorecardView',
-    'dashView','employeeHomeView','worklistView',
+    'dashView','employeeHomeView','worklistView','landingView',
     'inventoryView','matchView','tenantsView',
     'renoApprovalsView','renosView','contractorsView',
     'renosLoadingView'

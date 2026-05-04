@@ -301,6 +301,10 @@ function renderMatchView(){
   var filtered = allApps.filter(function(a){
     if(a.archived) return false;
     if(a.status===APP_STATUS.DRAFT||a.status===APP_STATUS.ARCHIVED||a.status===APP_STATUS.FILE_UPDATE) return false;
+    // Treat any app with an assignedUnit as "housed", regardless of stored
+    // status. Older records can have status='ed_approved' but a unit set —
+    // those are already matched and should not appear in match-side chips.
+    var isHoused = a.status==='assigned' || !!a.assignedUnit;
     if(fTier   && a.tier    !== fTier)   return false;
     if(fStatus && a.status  !== fStatus) return false;
     if(fRes    && a.reserve !== fRes)    return false;
@@ -310,25 +314,29 @@ function renderMatchView(){
       if(!name.includes(search.toLowerCase()) && !id.includes(search.toLowerCase())) return false;
     }
     // Chip filter
-    if(chipFilter === 'vacant')   return a.status!=='assigned' && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.ARCHIVED && a.status!==APP_STATUS.FILE_UPDATE;
-    if(chipFilter === 'ready')    return a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED;
-    if(chipFilter === 'assigned') return a.status==='assigned';
-    if(chipFilter === 'awaiting') return a.status!==APP_STATUS.DRAFT&&a.status!==APP_STATUS.ARCHIVED&&a.status!=='assigned'&&a.status!==APP_STATUS.ED_APPROVED&&a.status!==APP_STATUS.MGR_APPROVED;
-    return true;
+    if(chipFilter === 'vacant')   return !isHoused && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.ARCHIVED && a.status!==APP_STATUS.FILE_UPDATE;
+    if(chipFilter === 'ready')    return !isHoused && (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED);
+    if(chipFilter === 'assigned') return isHoused;
+    if(chipFilter === 'awaiting') return !isHoused && a.status!==APP_STATUS.DRAFT&&a.status!==APP_STATUS.ARCHIVED&&a.status!==APP_STATUS.ED_APPROVED&&a.status!==APP_STATUS.MGR_APPROVED;
+    // Default (Total Active) — exclude housed too, so Match doesn't surface
+    // applicants who already have a unit. They'll appear under the Assigned chip.
+    return !isHoused;
   });
 
   // Sort by score desc
   filtered.sort(function(a,b){ return (b.score||0)-(a.score||0); });
 
-  // Stat chips
+  // Stat chips. _isHoused mirrors the per-row filter above so chip counts
+  // match what the user sees when they click a chip.
+  var _isHoused = function(a){ return a.status==='assigned' || !!a.assignedUnit; };
   var chips = document.getElementById('match_chips');
   var vacantCount   = vacantUnits.length;
-  var assignedCount = allApps.filter(function(a){ return a.status==='assigned'; }).length;
-  var awaitingCount = allApps.filter(function(a){ return a.status!==APP_STATUS.DRAFT&&a.status!==APP_STATUS.ARCHIVED&&a.status!=='assigned'; }).length;
+  var assignedCount = allApps.filter(function(a){ return _isHoused(a) && !a.archived; }).length;
+  var awaitingCount = allApps.filter(function(a){ return !_isHoused(a) && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.ARCHIVED; }).length;
   var activeChip = window._matchActiveChip || '';
-  var totalActiveCount = allApps.filter(function(a){ return !a.archived && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.FILE_UPDATE; }).length;
-  var readyCount    = allApps.filter(function(a){ return (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit&&!a.archived; }).length;
-  var needsHousingCount = allApps.filter(function(a){ return a.status!=='assigned'&&a.status!==APP_STATUS.DRAFT&&a.status!==APP_STATUS.ARCHIVED&&a.status!==APP_STATUS.FILE_UPDATE; }).length;
+  var totalActiveCount = allApps.filter(function(a){ return !a.archived && !_isHoused(a) && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.FILE_UPDATE; }).length;
+  var readyCount    = allApps.filter(function(a){ return !_isHoused(a) && !a.archived && (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED); }).length;
+  var needsHousingCount = allApps.filter(function(a){ return !_isHoused(a) && a.status!==APP_STATUS.DRAFT&&a.status!==APP_STATUS.ARCHIVED&&a.status!==APP_STATUS.FILE_UPDATE; }).length;
   var chipDefs = [
     {label:'Total Active: '+totalActiveCount,      color:'#15803d', bg:'#f0fdf4', key:''},
     {label:'Ready to Match: '+readyCount,          color:'#1d4ed8', bg:'#eff6ff', key:'ready'},
@@ -424,8 +432,12 @@ function renderMatchView(){
     var sl = statusLabel[app.status] || app.status || '';
     var appDateStr = app.appDate ? 'Applied '+app.appDate : '';
 
-    var canAssign = app.status===APP_STATUS.ED_APPROVED||app.status===APP_STATUS.MGR_APPROVED;
-    var isAssigned = app.status==='assigned';
+    // Treat any app with an assignedUnit as housed, regardless of stored
+    // status. Older records that pre-date the status-flip fix can have
+    // status='ed_approved' but a unit assigned — those should show ✓ Assigned,
+    // not the Assign button.
+    var isAssigned = app.status==='assigned' || !!app.assignedUnit;
+    var canAssign  = !isAssigned && (app.status===APP_STATUS.ED_APPROVED||app.status===APP_STATUS.MGR_APPROVED);
     var assignCell = isAssigned
       ? '<div style="font-size:11px;font-weight:700;color:var(--success);">✓ '+(app.assignedAddress||'Assigned')+'</div>'
       : (canAssign
@@ -793,11 +805,134 @@ window._currentExportView = null; // set by each showXxx function
 
 
 
+// ── Landing view (Phase B) ────────────────────────────────────────────────
+// Replaces the old employeeHomeView + worklistView with a single unified
+// landing. Stop-A version: render greeting + role tag + active-nav state.
+// Lookup wiring, collapsible state, count pills, and worklist body are
+// populated in Stop B (housing-init.js).
+function showLanding() {
+  if (!document.getElementById('landingView')) {
+    // Sub-page navigation: bounce back to housing.html.
+    if (!window.location.pathname.includes('housing.html') &&
+        !window.location.pathname.endsWith('/') &&
+        window.location.pathname !== '/') {
+      document.body.style.transition = 'opacity .15s ease';
+      document.body.style.opacity = '0';
+      setTimeout(function(){ window.location.href = 'housing.html'; }, 150);
+      return;
+    }
+  }
+  if(!window._navSkipPush) pushNav('home');
+  setExportView(null);
+
+  if (typeof hideAllViews === 'function') hideAllViews('landingView');
+  var lv = document.getElementById('landingView');
+  if (lv) { lv.style.display = 'flex'; lv.style.width = '100%'; }
+  if (typeof setNavActive === 'function') setNavActive('tab_dash');
+  if (typeof setHeaderNavActive === 'function') setHeaderNavActive('home');
+
+  // Greeting — same population logic as the old showEmployeeHome.
+  var role = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.role)
+          || window._realRole || window.currentRole || 'housing_employee_l1';
+  var roleLabels = {
+    employee:            'Staff',
+    housing_employee_l1: 'Staff',
+    housing_employee_l2: 'Staff',
+    housing_manager:     (typeof CLFN_PERMS !== 'undefined') ? CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER) : 'Housing Manager',
+    ed:                  (typeof CLFN_PERMS !== 'undefined') ? CLFN_PERMS.roleLabel(ROLE.ED) : 'Executive Director',
+    cfo:                 (typeof CLFN_PERMS !== 'undefined') ? CLFN_PERMS.roleLabel(ROLE.CFO) : 'CFO',
+    finance_l1:          (typeof CLFN_PERMS !== 'undefined') ? CLFN_PERMS.roleLabel(ROLE.FINANCE_L1) : 'Finance Clerk'
+  };
+  var subtitles = {
+    employee:            'Pick up where you left off.',
+    housing_employee_l1: 'Pick up where you left off.',
+    housing_employee_l2: 'Pick up where you left off.',
+    housing_manager:     "Here's a snapshot of your housing portfolio.",
+    ed:                  "Here's a snapshot of your housing portfolio.",
+    cfo:                 "Here's an overview of finance activity.",
+    finance_l1:          'Pick up where you left off.'
+  };
+
+  // Date line
+  var dateEl = document.getElementById('emp_home_date');
+  if (dateEl) {
+    var d = new Date();
+    var dayStr  = d.toLocaleDateString('en-US', { weekday: 'long' });
+    var dateStr = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    dateEl.textContent = dayStr + ' · ' + dateStr;
+  }
+
+  // Greeting name (first name only)
+  var nameEl = document.getElementById('emp_home_name');
+  if (nameEl) {
+    var userName = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.name) ? HOUSING_SESSION.name : '';
+    var firstName = userName ? userName.split(/\s+/)[0] : (roleLabels[role] || 'there');
+    nameEl.textContent = firstName;
+  }
+
+  // Role tag pill next to the name
+  var tagEl = document.getElementById('emp_home_role_tag');
+  if (tagEl) {
+    tagEl.textContent = roleLabels[role] || 'Staff';
+    tagEl.style.display = 'inline-flex';
+  }
+
+  // Subtitle
+  var subEl = document.getElementById('emp_home_subtitle');
+  if (subEl) subEl.textContent = subtitles[role] || '';
+
+  // KPI strip — housing-only metrics from the in-memory caches.
+  _renderLandingKpis();
+}
+
+// _renderLandingKpis — Open Apps · Critical · Vacant · Awaiting Match.
+// All counts come from the in-memory `applications` and `housingUnits`
+// arrays so no extra Supabase round-trips run on every landing render.
+// Finance metrics intentionally excluded — landing stays housing-only.
+function _renderLandingKpis(){
+  function setKpi(id, val){
+    var el = document.getElementById(id);
+    if (el) el.textContent = (val == null ? '—' : String(val));
+  }
+  var apps  = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var units = (typeof housingUnits  !== 'undefined' && housingUnits)  ? housingUnits  : [];
+
+  var STATUS = (typeof APP_STATUS !== 'undefined') ? APP_STATUS : {
+    SUBMITTED: 'submitted', FILE_UPDATE: 'file_update',
+    MGR_APPROVED: 'mgr_approved', ED_APPROVED: 'ed_approved'
+  };
+
+  var openApps = apps.filter(function(a){
+    if(!a || a.archived) return false;
+    return a.status === STATUS.SUBMITTED
+        || a.status === STATUS.FILE_UPDATE
+        || a.status === STATUS.MGR_APPROVED;
+  }).length;
+
+  var critical = apps.filter(function(a){
+    return a && !a.archived && (a.tier === 'Critical Priority' || a.tier_v2 === 'Critical Priority');
+  }).length;
+
+  var vacant = units.filter(function(u){
+    return u && !u.archived && u.status === 'vacant';
+  }).length;
+
+  var awaitingMatch = apps.filter(function(a){
+    if(!a || a.archived) return false;
+    var approved = a.status === STATUS.ED_APPROVED || a.status === STATUS.MGR_APPROVED;
+    return approved && !a.assignedUnit;
+  }).length;
+
+  setKpi('kpi_open_apps',       openApps);
+  setKpi('kpi_critical',        critical);
+  setKpi('kpi_vacant',          vacant);
+  setKpi('kpi_awaiting_match',  awaitingMatch);
+}
+
+// Compat shims — old call sites continue to work.
 function showEmployeeHome(){
-  // If we're on a sub-page (inventory.html, etc.), the employeeHomeView
-  // DOM element doesn't exist here — navigate back to housing.html instead
-  // of trying to render into a non-existent element (which would leave the
-  // page blank).
+  if (document.getElementById('landingView')) return showLanding();
+  // Sub-page fallback (renos.html etc.) keeps the original bounce behaviour.
   if (!document.getElementById('employeeHomeView')) {
     if (!window.location.pathname.includes('housing.html') &&
         !window.location.pathname.endsWith('/') &&

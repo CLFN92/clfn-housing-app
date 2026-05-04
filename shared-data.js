@@ -528,6 +528,70 @@ async function sbSaveContractor(ct) {
   }
 }
 
+// ── sbLookup* ─────────────────────────────────────────────────────────────────
+// Synchronous lookups against the in-memory caches. Used by the landing-page
+// Quick Lookup panel — no Supabase round-trips. Each function returns an
+// array of {id, label, meta} suitable for direct render.
+function sbLookupTenants(q) {
+  q = (q || '').toLowerCase().trim();
+  if (!q) return [];
+  var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var out = [];
+  for (var i = 0; i < apps.length && out.length < 20; i++) {
+    var a = apps[i]; if (!a || a.archived) continue;
+    var name = ((a.fn || '') + ' ' + (a.ln || '')).trim();
+    var hay  = (name + ' ' + (a.id || '') + ' ' + (a.email || '') + ' ' + (a.phone || '')).toLowerCase();
+    if (hay.indexOf(q) === -1) continue;
+    out.push({
+      id:    a.id,
+      label: name || a.id,
+      meta:  (a.id || '') + (a.status ? ' · ' + a.status : '') + (a.tier ? ' · ' + a.tier : '')
+    });
+  }
+  return out;
+}
+
+function sbLookupUnits(q) {
+  q = (q || '').toLowerCase().trim();
+  if (!q) return [];
+  var units = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var out = [];
+  for (var i = 0; i < units.length && out.length < 20; i++) {
+    var u = units[i]; if (!u || u.archived) continue;
+    var hay = ((u.unitNumber || '') + ' ' + (u.address || '') + ' ' + (u.assignedName || '') + ' ' + (u.id || '')).toLowerCase();
+    if (hay.indexOf(q) === -1) continue;
+    out.push({
+      id:    u.id,
+      label: 'Unit ' + (u.unitNumber || u.id),
+      meta:  (u.address || '') + (u.status ? ' · ' + u.status : '') + (u.assignedName ? ' · ' + u.assignedName : '')
+    });
+  }
+  return out;
+}
+
+function sbLookupSOWs(q) {
+  q = (q || '').toLowerCase().trim();
+  if (!q) return [];
+  var cache = window._sowCache || {};
+  var units = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
+  var out = [];
+  Object.keys(cache).forEach(function (unitId) {
+    if (out.length >= 20) return;
+    var sow = cache[unitId]; if (!sow) return;
+    var unit = null;
+    for (var i = 0; i < units.length; i++) { if (units[i] && units[i].id === unitId) { unit = units[i]; break; } }
+    var unitLbl = unit ? ('Unit ' + (unit.unitNumber || unit.id)) : unitId;
+    var hay = (unitLbl + ' ' + (sow.id || '') + ' ' + (sow.contractor || '') + ' ' + (sow.scope || '')).toLowerCase();
+    if (hay.indexOf(q) === -1) return;
+    out.push({
+      id:    unitId,
+      label: 'SOW · ' + unitLbl,
+      meta:  (sow.contractor || '') + (sow.status ? ' · ' + sow.status : '')
+    });
+  });
+  return out;
+}
+
 // ── auditEntry ────────────────────────────────────────────────────────────────
 // Writes one entry to both:
 //   1. window.auditLog[]  — in-memory array for current-session display
@@ -3008,21 +3072,43 @@ function showTenants(){
   }
 }
 function showWorklist() {
+  // Phase B: the standalone worklistView has been folded into landingView.
+  // If landingView exists (housing.html), route there and ensure the
+  // worklist section is expanded so the user sees it.
+  if (document.getElementById('landingView') && typeof showLanding === 'function') {
+    showLanding();
+    var sec = document.getElementById('sec-worklist');
+    if (sec) sec.classList.remove('collapsed');
+    if (typeof renderWorklist === 'function') renderWorklist();
+    // Keep worklist_datetime populated for any downstream readers.
+    var dtEl = document.getElementById('worklist_datetime');
+    if (dtEl) {
+      var now = new Date();
+      var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      var h = now.getHours(), m = now.getMinutes();
+      var ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      dtEl.textContent = days[now.getDay()] + ' · ' + months[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear() + ' · ' + h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+    }
+    return;
+  }
+  // Sub-page fallback (this function is loaded everywhere via shared-data.js
+  // — on pages without landingView we keep the legacy worklistView path).
   if(!window._navSkipPush) pushNav('worklist');
   hideAllViews('worklistView');
   setNavActive('tab_worklist');
   var view = document.getElementById('worklistView');
   if(view){ view.style.display='flex'; view.style.flexDirection='column'; }
-  // Date/time stamp — matches landing page pattern
-  var dtEl = document.getElementById('worklist_datetime');
-  if(dtEl) {
-    var now = new Date();
-    var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    var h = now.getHours(), m = now.getMinutes();
-    var ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
-    dtEl.textContent = days[now.getDay()] + ' · ' + months[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear() + ' · ' + h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+  var dtEl2 = document.getElementById('worklist_datetime');
+  if(dtEl2) {
+    var now2 = new Date();
+    var days2 = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    var months2 = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var h2 = now2.getHours(), m2 = now2.getMinutes();
+    var ampm2 = h2 >= 12 ? 'PM' : 'AM';
+    h2 = h2 % 12 || 12;
+    dtEl2.textContent = days2[now2.getDay()] + ' · ' + months2[now2.getMonth()] + ' ' + now2.getDate() + ', ' + now2.getFullYear() + ' · ' + h2 + ':' + (m2 < 10 ? '0' : '') + m2 + ' ' + ampm2;
   }
   renderWorklist();
 }

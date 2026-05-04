@@ -91,6 +91,15 @@
   --tile-tenants:      #0ea5e9;
   --tile-renos:        #d97706;
   --tile-contractors:  #6b7280;
+  /* Type-color palette — used by the landing-page Quick Lookup icons /
+     badges / chips so tenant / unit / SOW results are visually distinct.
+     Pair: -bg (light tint) + -fg (deeper text). */
+  --type-tenant-bg:    #dbeafe;
+  --type-tenant-fg:    #1d4ed8;
+  --type-unit-bg:      #ede9fe;
+  --type-unit-fg:      #6d28d9;
+  --type-sow-bg:       #fed7aa;
+  --type-sow-fg:       #9a3412;
   /* Typography */
   --serif: 'DM Serif Display', serif;
   --sans:  'DM Sans', sans-serif;
@@ -337,7 +346,8 @@ body {
    page-header-bar provides vertical breathing room below the back button. */
 #worklistView, #dashView, .dash-view, #settingsView, .settings-view,
 #inventoryView, #matchView, #tenantsView, #renoApprovalsView,
-#renosView, #contractorsView, #scorecardView { padding-top: 0 !important; }
+#renosView, #contractorsView, #scorecardView,
+#landingView { padding-top: 0 !important; }
 .back-link {
   color: var(--yellow); font-size: 12px; font-weight: 600;
   text-decoration: none; border: 1px solid rgba(248,228,26,.3);

@@ -784,9 +784,20 @@ function openAssignModal(appId, suggestedUnitId) {
   // Default move-in to today
   var mi=document.getElementById('am_movein_date'); if(mi) mi.value=new Date().toISOString().split('T')[0];
 
-  // Reset override notes + warning
-  var ow=document.getElementById('am_override_wrap'); if(ow) ow.style.display='none';
+  // Reset override notes + warning. For override-authority users (ED), keep
+  // the notes textarea visible from the start — required only when they pick
+  // a unit below the top tied band, but always reachable to type into.
+  var ow=document.getElementById('am_override_wrap');
+  var preShowNotes = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('overrideMatch', role);
+  // Set an explicit 'block' value rather than '' — the CSS has #am_override_wrap
+  // { display:none } as the default, so '' would let that rule re-apply.
+  if(ow) ow.style.display = preShowNotes ? 'block' : 'none';
   var on=document.getElementById('am_override_notes'); if(on) on.value='';
+  var preLabel = document.getElementById('am_notes_label');
+  if(preLabel && preShowNotes) {
+    preLabel.textContent = 'Selection Notes (optional) — why this unit for this applicant?';
+    preLabel.style.color = 'var(--text)';
+  }
   var warn=document.getElementById('am_warn'); if(warn) warn.style.display='none';
 
   // Reset confirm button
@@ -910,7 +921,7 @@ function amSelectUnit(unitId) {
   if(canAssignTie && !canOverride) {
     if(isTied) {
       // Tied — assign-tied-band user can select, notes required
-      if(ow) ow.style.display = '';
+      if(ow) ow.style.display = 'block';
       if(onLabel) { onLabel.textContent = 'Selection Notes (required) — why this unit for this applicant?'; onLabel.style.color = 'var(--text)'; }
       if(onReq)   onReq.style.display = '';
       if(onPlaceholder) onPlaceholder.placeholder = 'e.g. Closest to family, applicant requested this street, accessibility needs met…';
@@ -923,11 +934,21 @@ function amSelectUnit(unitId) {
       if(cb){ cb.textContent='⛔ ED Approval Required'; cb.disabled=true; cb.style.opacity='1'; cb.style.cursor='not-allowed'; cb.style.background='#fef2f2'; cb.style.color='#b91c1c'; }
     }
   } else if(canOverride) {
-    if(ow) ow.style.display = isEdOverride ? '' : 'none';
-    if(onLabel) onLabel.textContent = 'Override Notes (required) — this unit scores below the top match band.';
-    if(onLabel) onLabel.style.color = '#d97706';
-    if(onReq)   onReq.style.display = isEdOverride ? '' : 'none';
-    if(onPlaceholder) onPlaceholder.placeholder = 'Reason for overriding the recommended match…';
+    // Always show the notes wrap for override-authority users so the field is
+    // visible whether the pick is the top match (notes optional) or below the
+    // tied band (notes required). 'block' explicitly overrides the CSS rule
+    // #am_override_wrap { display:none } that hides it by default.
+    if(ow) ow.style.display = 'block';
+    if(onLabel) {
+      onLabel.textContent = isEdOverride
+        ? 'Override Notes (required) — this unit scores below the top match band.'
+        : 'Selection Notes (optional) — why this unit for this applicant?';
+      onLabel.style.color = isEdOverride ? '#d97706' : 'var(--text)';
+    }
+    if(onReq) onReq.style.display = isEdOverride ? '' : 'none';
+    if(onPlaceholder) onPlaceholder.placeholder = isEdOverride
+      ? 'Reason for overriding the recommended match…'
+      : 'e.g. Closest to family, applicant requested this street, accessibility needs met…';
   } else {
     if(ow) ow.style.display = 'none';
   }
@@ -939,7 +960,7 @@ function amSelectUnit(unitId) {
     if(needsAccess && !u.accessible) warnMsgs.push('⚠ Applicant requires accessible unit — this unit is not accessible');
     if(canAssignTie && !canOverride && !isTied) warnMsgs.push('⛔ This unit scores below the recommended match band — only the Executive Director can assign a lower-scored unit');
     if(warnMsgs.length){
-      warn.style.display=''; warn.style.background='#fef2f2'; warn.style.color='#b91c1c';
+      warn.style.display='block'; warn.style.background='#fef2f2'; warn.style.color='#b91c1c';
       warn.textContent = warnMsgs.join(' · ');
     } else { warn.style.display='none'; }
   }
@@ -952,6 +973,13 @@ function amSelectUnit(unitId) {
       cb.disabled = false; cb.style.opacity = '1'; cb.style.cursor = 'pointer';
       cb.style.background = 'var(--yellow)'; cb.style.color = '#111';
     }
+  }
+
+  // Make sure the notes textarea is actually on screen — on shorter viewports
+  // the unit list can push it below the visible area inside the scrollable
+  // modal body. Scroll it into view whenever it's shown.
+  if(ow && ow.style.display !== 'none'){
+    try { ow.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch(_){}
   }
 }
 
@@ -1435,6 +1463,11 @@ async function loadAppDataFromSupabase() {
       } catch(e) { console.warn('[CLFN] localStorage units fallback failed:', e); }
     }
 
+    // Reconcile any drift between unit.assignedTo and app.assignedUnit so
+    // older records pre-dating the saveUnitEdit status-flip fix surface
+    // correctly on Match / Tenants / Inventory views.
+    if(typeof reconcileAssignments === 'function') reconcileAssignments();
+
     // Settings
     var setR = await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=*',{headers:HOUSING_HEADERS});
     if(setR.ok){
@@ -1721,12 +1754,55 @@ async function submitAddHousingStaff() {
 
 
 
+// reconcileAssignments — repairs assignment-side drift between housing_units
+// and housing_applications. Run after both arrays are loaded. For every unit
+// that has assignedTo set, ensure the matching application's assignedUnit /
+// assignedAddress / status / assignedAt fields agree. Persists fixes back to
+// Supabase so the drift is fixed permanently.
+//
+// Drift sources:
+//   - Old saveUnitEdit (pre-2026-05-04) saved unit.assignedTo + application.assignedUnit
+//     but did not flip application.status to 'assigned'. Tenants stuck in
+//     ed_approved show up in the Match queue with an Assign button.
+//   - In rare cases (failed network call), one side persisted and the other
+//     didn't. Re-syncing is a safe no-op when both sides agree.
+function reconcileAssignments(){
+  if(typeof housingUnits === 'undefined' || typeof applications === 'undefined') return;
+  if(!housingUnits.length || !applications.length) return;
+  var fixed = 0;
+  housingUnits.forEach(function(u){
+    if(!u || u.archived) return;
+    if(!u.assignedTo) return;
+    var app = applications.find(function(a){ return a && a.id === u.assignedTo; });
+    if(!app) return;
+    var addr = ((u.num||'')+' '+(u.street||'')).trim();
+    var changed = false;
+    if(app.assignedUnit !== u.id){      app.assignedUnit    = u.id;  changed = true; }
+    if(app.assignedAddress !== addr){    app.assignedAddress = addr;  changed = true; }
+    if(app.status !== APP_STATUS.ASSIGNED){
+      app.status   = APP_STATUS.ASSIGNED;
+      app.assignedAt = app.assignedAt || (u.assignedDate || new Date().toISOString());
+      changed = true;
+    }
+    if(changed){
+      fixed++;
+      if(typeof sbSaveApplication === 'function'){
+        sbSaveApplication(app).catch(function(e){ console.warn('[reconcile] save app failed:', e); });
+      }
+    }
+  });
+  if(fixed){
+    console.info('[CLFN] Reconciled assignment drift on '+fixed+' application(s).');
+  }
+}
+
 async function loadHousingData() {
   try {
     var appsData = await sbLoadApplications();
     if(appsData) applications = appsData;
     var unitsData = await sbLoadUnits();
     if(unitsData) housingUnits = unitsData;
+    if(typeof reconcileAssignments === 'function') reconcileAssignments();
     var cR = await sbLoadContractors(); if(cR) window._contractors = cR;
     var sowR = await fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=*',{headers:HOUSING_HEADERS});
     if(sowR.ok){var sd=await sowR.json(); sd.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
@@ -1777,6 +1853,11 @@ function initHousingPage() {
   // Update header
   if(true) updateHeaderUser(role);
   if(true) updateRoleSwitcherVisibility();
+  // Re-render the header nav + role-vis pass now that the resolved role is in.
+  // _onSwitchRole is suppressed during boot, so do it directly here.
+  if(typeof renderHeaderNav      === 'function') renderHeaderNav();
+  if(typeof applyRoleVisibility  === 'function') applyRoleVisibility(role);
+  if(typeof _renderWorklistCountPills === 'function') _renderWorklistCountPills();
 
   // Navigate to requested view from URL param
   var params = new URLSearchParams(window.location.search);
@@ -1786,8 +1867,11 @@ function initHousingPage() {
     window.openEditModal(openAppId);
     return;
   }
-  var view = params.get('view') || 'dashboard';
-  if(view==='home')             { if(typeof showEmployeeHome==='function') showEmployeeHome(); }
+  // Landing is the default for housing.html — old worklistView + employeeHomeView
+  // collapsed into landingView. Sub-pages still default to their own views.
+  var defaultView = document.getElementById('landingView') ? 'home' : 'dashboard';
+  var view = params.get('view') || defaultView;
+  if(view==='home')             { if(typeof showLanding==='function') showLanding(); else if(typeof showEmployeeHome==='function') showEmployeeHome(); }
   else if(view==='newapp')      { if(typeof newApp==='function') newApp(); }
   else if(view==='worklist')    { if(true) showWorklist(); }
   else if(view==='inventory')   { if(true) showInventory(); }
@@ -1797,6 +1881,618 @@ function initHousingPage() {
   else if(view==='contractors') { if(true) showContractors(); }
   else                          { if(typeof showDashboard==='function') showDashboard(); else if(true) showWorklist(); }
 }
+
+// ══════════════════════════════════════════════════════
+// LANDING PAGE WIRING (Stop B) — header nav, role-vis,
+// quick lookup, sections, quick actions, deep-links
+// ══════════════════════════════════════════════════════
+// CLFN brand logo — base64 data URL. Single source of truth shared by
+// renderAppHeader() across every page. Per-nation overrides will eventually
+// come from NATION_CONFIG.logo (Phase A multi-nation work).
+var CLFN_LOGO_DATA_URL = "data:image/png;base64,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";
+
+// renderAppHeader — builds the .app-header-v2 markup into #app_header_host.
+// Centralized so every page (housing.html + sub-pages) renders the identical
+// header. No-op if the placeholder isn't present (the page still has its own
+// markup, e.g. sign-in, or hasn't been migrated yet).
+//
+// Stop C migrates inventory/renos/contractors/tenants/match.html to use this.
+function renderAppHeader(){
+  var host = document.getElementById('app_header_host');
+  if(!host) return;
+  if(host.getAttribute('data-rendered') === '1') return; // idempotent
+  host.outerHTML = ''
+    + '<header class="app-header app-header-v2">'
+    +   '<div class="hbrand" id="app_hbrand" title="Return to Home">'
+    +     '<img src="'+CLFN_LOGO_DATA_URL+'" alt="CLFN" class="hlogo hlogo-v2"/>'
+    +     '<div>'
+    +       '<strong class="hbrand-title">CLFN Housing</strong>'
+    +       '<span class="hbrand-sub" data-nation="display_name">Constance Lake First Nation</span>'
+    +     '</div>'
+    +   '</div>'
+    +   '<button class="nav-toggle" id="nav_toggle" aria-label="Toggle navigation">'
+    +     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>'
+    +   '</button>'
+    +   '<nav class="app-nav" id="app_nav"></nav>'
+    +   '<div class="header-actions">'
+    +     '<button id="header_settings_btn" class="header-settings" data-roles="ed,housing_manager">'
+    +       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
+    +       '<span>Settings</span>'
+    +     '</button>'
+    +     '<div class="create-wrap">'
+    +       '<button class="btn-create" id="header_create_btn" type="button">'
+    +         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>'
+    +         '<span class="btn-create-label">Create</span>'
+    +         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>'
+    +       '</button>'
+    +       '<div class="create-menu" id="create_menu" role="menu">'
+    +         '<button class="create-menu-item" data-create="application"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg> New Application <span class="role-gate">All</span></button>'
+    +         '<button class="create-menu-item" data-create="unit" data-roles="ed,housing_manager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg> New Unit <span class="role-gate">ED &middot; HM</span></button>'
+    +         '<button class="create-menu-item" data-create="contractor" data-roles="ed,housing_manager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> New Contractor <span class="role-gate">ED &middot; HM</span></button>'
+    +         '<button class="create-menu-item" data-create="tenant" data-roles="ed,housing_manager,housing_employee_l2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg> New Tenant <span class="role-gate">ED &middot; HM &middot; L2</span></button>'
+    +       '</div>'
+    +     '</div>'
+    +     '<div class="avatar-wrap" id="header_user_pill" title="Account">'
+    +       '<div id="header_avatar" class="header-avatar">&mdash;</div>'
+    +       '<span id="header_role_badge" class="avatar-role-pill">&mdash;</span>'
+    +       '<span id="header_user_name" class="visually-hidden"></span>'
+    +       '<span id="header_user_display" class="visually-hidden"></span>'
+    +     '</div>'
+    +   '</div>'
+    +   // Legacy compat strip — hidden, kept so existing exports/staff/role-switcher
+    +   // bindings keep working until those features get refactored onto the avatar popover.
+    +   '<div id="header_user_bar" class="header-user-bar header-user-bar-legacy">'
+    +     '<div id="roleSwitcher">'
+    +       '<select id="rb_select" onchange="switchRole(this.value)">'
+    +         '<option value="ed">Executive Director</option>'
+    +         '<option value="housing_manager">Housing Manager</option>'
+    +         '<option value="housing_employee_l2">Housing Employee L2</option>'
+    +         '<option value="housing_employee_l1">Housing Employee L1</option>'
+    +         '<option value="cfo">CFO</option>'
+    +         '<option value="finance_l1">Finance Clerk L1</option>'
+    +       '</select>'
+    +     '</div>'
+    +     '<div id="header_export_wrap" class="header-export-wrap">'
+    +       '<button type="button" onclick="toggleHeaderExportMenu()" class="btn-header-ghost">'
+    +         '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
+    +         ' Export <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>'
+    +       '</button>'
+    +       '<div id="header_export_menu" class="header-export-menu">'
+    +         '<button onclick="headerExport(\'csv\')"   class="header-export-item"><span class="header-export-icon">&#128196;</span> CSV</button>'
+    +         '<button onclick="headerExport(\'excel\')" class="header-export-item"><span class="header-export-icon">&#128202;</span> Excel (.xlsx)</button>'
+    +         '<button onclick="headerExport(\'pdf\')"   class="header-export-item"><span class="header-export-icon">&#128209;</span> PDF</button>'
+    +       '</div>'
+    +     '</div>'
+    +     '<button onclick="showAddHousingStaff()" id="header_addstaff_btn" class="btn-header-ghost" style="display:none;">+ Staff</button>'
+    +   '</div>'
+    + '</header>';
+  // Mark home click — bounce to housing.html on sub-pages, in-page showLanding on housing.html
+  var hb = document.getElementById('app_hbrand');
+  if(hb){
+    hb.addEventListener('click', function(){
+      if(typeof showLanding === 'function' && document.getElementById('landingView')) showLanding();
+      else window.location.href = 'housing.html';
+    });
+  }
+  // Apply nation branding now that markup exists.
+  if(typeof applyBrandingToHeader === 'function') applyBrandingToHeader();
+}
+
+// HEADER_NAV — single source of truth for the primary nav strip.
+// Each entry: { key, label, svg, run, module?, drawerOnly? }
+//   key        — data-nav attribute (matches landingView active marking)
+//   module     — optional CLFN_MODULES key; tab is omitted if not enabled
+//   drawerOnly — only shown inside the hamburger drawer (≤1200px)
+//   run        — function called on click (returns nothing)
+window.HEADER_NAV = [
+  { key:'home',         label:'Home',         module:null,           svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>',                                                                                                                                                                                                                run:function(){ if(typeof showLanding==='function') showLanding(); else if(typeof showEmployeeHome==='function') showEmployeeHome(); } },
+  { key:'applications', label:'Applications', module:'applications', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>',                                                                                                                                                                                                run:function(){ if(typeof showDashboard==='function') showDashboard(); } },
+  { key:'worklist',     label:'Worklist',     module:'worklist',     svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',                                                                                                                                                          run:function(){ if(typeof showWorklist==='function') showWorklist(); } },
+  { key:'inventory',    label:'Inventory',    module:'inventory',    svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>',                                                                                                                                            run:function(){ if(typeof showInventory==='function') showInventory(); } },
+  { key:'match',        label:'Match',        module:'match',        svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',                                                                                                                       run:function(){ if(typeof showMatch==='function') showMatch(); } },
+  { key:'renovations',  label:'Renovations',  module:'renovations',  svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',                                                                                              run:function(){ if(typeof showRenos==='function') showRenos(); } },
+  { key:'contractors',  label:'Contractors',  module:'contractors',  svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',                                                                                                                                                                                  run:function(){ if(typeof showContractorsForRole==='function') showContractorsForRole(); else if(typeof showContractors==='function') showContractors(); } },
+  { key:'tenants',      label:'Tenants',      module:'tenants',      svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',                                                                                                       run:function(){ if(typeof showTenants==='function') showTenants(); } },
+  { key:'settings',     label:'Settings',     module:null,           drawerOnly:true, roles:'ed,housing_manager', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>', run:function(){ if(typeof showSettings==='function') showSettings(); } }
+];
+
+// renderHeaderNav — rebuilds #app_nav from HEADER_NAV. Skips items whose
+// module is disabled. data-roles is only honoured for drawer-only items
+// here; in-strip items use module gating + applyRoleVisibility().
+function renderHeaderNav(){
+  var nav = document.getElementById('app_nav');
+  if(!nav) return;
+  var html = '';
+  var hadDivider = false;
+  HEADER_NAV.forEach(function(item){
+    if(item.module && window.CLFN_MODULES && !CLFN_MODULES.isEnabled(item.module)) return;
+    if(item.drawerOnly && !hadDivider){
+      html += '<div class="nav-divider"></div>';
+      hadDivider = true;
+    }
+    var cls = 'app-nav-item' + (item.drawerOnly ? ' in-drawer-only' : '');
+    var roles = item.roles ? ' data-roles="'+item.roles+'"' : '';
+    html += '<button class="'+cls+'" data-nav="'+item.key+'"'+roles+'>'+item.svg+' '+item.label+'</button>';
+  });
+  nav.innerHTML = html;
+  setHeaderNavActive(_currentNavKey());
+}
+
+// _currentNavKey — best-effort detection of which nav tab should be active
+// based on currently visible view. Used after a re-render or role switch.
+function _currentNavKey(){
+  function vis(id){ var e=document.getElementById(id); return e && e.style.display !== 'none' && e.style.display !== ''; }
+  if(vis('landingView'))      return 'home';
+  if(vis('dashView'))         return 'applications';
+  if(vis('worklistView'))     return 'worklist';
+  if(vis('inventoryView'))    return 'inventory';
+  if(vis('matchView'))        return 'match';
+  if(vis('renosView'))        return 'renovations';
+  if(vis('contractorsView'))  return 'contractors';
+  if(vis('tenantsView'))      return 'tenants';
+  if(vis('settingsView'))     return 'settings';
+  return 'home';
+}
+
+function setHeaderNavActive(key){
+  var all = document.querySelectorAll('.app-header-v2 .app-nav-item');
+  for(var i=0;i<all.length;i++){
+    var btn = all[i];
+    if(btn.getAttribute('data-nav') === key) btn.classList.add('active');
+    else btn.classList.remove('active');
+  }
+}
+
+// applyRoleVisibility — show/hide every [data-roles] element based on the
+// current effective role. Empty/missing data-roles means "visible to all".
+function applyRoleVisibility(role){
+  role = role || window.currentRole || 'housing_employee_l1';
+  var els = document.querySelectorAll('[data-roles]');
+  for(var i=0;i<els.length;i++){
+    var el = els[i];
+    var allowed = (el.getAttribute('data-roles')||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
+    if(allowed.length && allowed.indexOf(role) === -1) el.style.display = 'none';
+    else el.style.display = '';
+  }
+}
+
+// _debounce — minimal debouncer for the lookup input.
+function _debounce(fn, ms){
+  var t=null;
+  return function(){
+    var args=arguments, ctx=this;
+    if(t) clearTimeout(t);
+    t = setTimeout(function(){ fn.apply(ctx,args); }, ms);
+  };
+}
+
+// ── Quick Lookup ─────────────────────────────────────────────────────────
+// Lookup state lives on window so the tab filter and recently-viewed list
+// can read it without re-querying.
+window._lookupState = window._lookupState || { tab:'all', q:'', results:{tenants:[],units:[],sows:[]} };
+var LOOKUP_RECENT_KEY = 'clfn_landing_recent_lookups';
+
+function _lookupReadRecent(){
+  try { return JSON.parse(localStorage.getItem(LOOKUP_RECENT_KEY) || '[]'); } catch(e){ return []; }
+}
+function _lookupPushRecent(entry){
+  if(!entry || !entry.id) return;
+  var list = _lookupReadRecent().filter(function(r){ return !(r.id===entry.id && r.kind===entry.kind); });
+  list.unshift(entry);
+  if(list.length > 8) list.length = 8;
+  try { localStorage.setItem(LOOKUP_RECENT_KEY, JSON.stringify(list)); } catch(e){}
+  _renderLookupRecent();
+}
+function _renderLookupRecent(){
+  var host = document.getElementById('lookup_recent');
+  if(!host) return;
+  var list = _lookupReadRecent();
+  if(!list.length){ host.innerHTML = ''; return; } // CSS :empty pseudo handles the empty-state copy
+  host.innerHTML = list.map(function(r){
+    var initial = r.kind === 'tenant' ? 'T' : (r.kind === 'unit' ? 'U' : 'S');
+    return '<button type="button" class="lookup-chip" data-recent-kind="'+_esc(r.kind)+'" data-recent-id="'+_esc(r.id)+'">'
+        + '<span class="lookup-chip-icon type-'+_esc(r.kind)+'">'+initial+'</span>'
+        + _esc(r.label || r.id) + '</button>';
+  }).join('');
+}
+
+function _runLookup(q){
+  q = (q||'').trim();
+  window._lookupState.q = q;
+  var results = { tenants:[], units:[], sows:[] };
+  if(q.length >= 1){
+    if(typeof sbLookupTenants === 'function') results.tenants = sbLookupTenants(q) || [];
+    if(typeof sbLookupUnits   === 'function') results.units   = sbLookupUnits(q)   || [];
+    if(typeof sbLookupSOWs    === 'function') results.sows    = sbLookupSOWs(q)    || [];
+  }
+  window._lookupState.results = results;
+  _renderLookupCounts();
+  _renderLookupResults();
+}
+
+function _renderLookupCounts(){
+  var r = window._lookupState.results || {tenants:[],units:[],sows:[]};
+  var total = r.tenants.length + r.units.length + r.sows.length;
+  function set(id,n){ var el=document.getElementById(id); if(el) el.textContent = n; }
+  set('lookup_tab_count_all',     total);
+  set('lookup_tab_count_tenants', r.tenants.length);
+  set('lookup_tab_count_units',   r.units.length);
+  set('lookup_tab_count_sows',    r.sows.length);
+}
+
+function _renderLookupResults(){
+  var host = document.getElementById('lookup_results');
+  if(!host) return;
+  var st = window._lookupState;
+  if(!st.q){ host.classList.remove('open'); host.innerHTML=''; return; }
+  var r = st.results || {tenants:[],units:[],sows:[]};
+  var rows = [];
+  if(st.tab==='all' || st.tab==='tenants') r.tenants.forEach(function(x){ rows.push(_lookupRow('tenant', x)); });
+  if(st.tab==='all' || st.tab==='units')   r.units  .forEach(function(x){ rows.push(_lookupRow('unit',   x)); });
+  if(st.tab==='all' || st.tab==='sows')    r.sows   .forEach(function(x){ rows.push(_lookupRow('sow',    x)); });
+  host.classList.add('open');
+  host.innerHTML = rows.length
+    ? rows.join('')
+    : '<div class="lookup-empty">No matches for &ldquo;'+_esc(st.q)+'&rdquo;</div>';
+}
+
+function _lookupRow(kind, x){
+  var label = _esc(x.label || x.id || '');
+  var meta  = _esc(x.meta  || '');
+  var initial = kind === 'tenant' ? 'T' : (kind === 'unit' ? 'U' : 'S');
+  return '<div class="lookup-result" data-lookup-kind="'+kind+'" data-lookup-id="'+_esc(x.id||'')+'">'
+       + '<span class="lookup-result-icon type-'+kind+'">'+initial+'</span>'
+       + '<span class="lookup-result-main">'
+       +   '<div class="lookup-result-title">'+label+'</div>'
+       +   (meta ? '<div class="lookup-result-sub">'+meta+'</div>' : '')
+       + '</span>'
+       + '<span class="lookup-result-badge badge-'+kind+'">'+kind+'</span>'
+       + '</div>';
+}
+function _esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+function _lookupOpen(kind, id, label){
+  if(!id) return;
+  _lookupPushRecent({ kind:kind, id:id, label:label });
+  if(kind==='tenant'){
+    // Tenant lookup → open the Tenant Information Card. The TIC keys off a
+    // unit id (it resolves the tenant via housing_units.assigned_name) or a
+    // tenant UUID. Our lookup gives us an application id, so map it to the
+    // assigned unit first. If the applicant has no unit yet, fall back to the
+    // application form — the TIC has no record to show until they're housed.
+    var apps = (typeof applications !== 'undefined') ? applications : [];
+    var app  = null;
+    for(var i=0;i<apps.length;i++){ if(apps[i] && apps[i].id === id){ app = apps[i]; break; } }
+    var unitId = app && app.assignedUnit;
+    if(unitId){
+      if(typeof window.openTenantCard === 'function' && document.getElementById('ticModal')){
+        window.openTenantCard(unitId);
+      } else {
+        window.location.href = 'tenants.html?tic=' + encodeURIComponent(unitId);
+      }
+    } else {
+      // No unit assigned yet — open the application instead.
+      if(typeof window.openEditModal === 'function') window.openEditModal(id);
+      else window.location.href = 'housing.html?openApp=' + encodeURIComponent(id);
+    }
+  } else if(kind==='unit'){
+    window.location.href = 'inventory.html?unit=' + encodeURIComponent(id);
+  } else if(kind==='sow'){
+    window.location.href = 'renos.html?sow=' + encodeURIComponent(id);
+  }
+}
+
+// ── Section toggles (Worklist / Recent activity) ────────────────────────
+function _sectionStorageKey(id){ return 'clfn_landing_sec_' + id + '_collapsed'; }
+function _sectionApplyState(id){
+  var sec = document.getElementById(id);
+  if(!sec) return;
+  var stored = null;
+  try { stored = localStorage.getItem(_sectionStorageKey(id)); } catch(e){}
+  var collapsed = (stored === null) ? sec.classList.contains('collapsed') : (stored === '1');
+  sec.classList.toggle('collapsed', collapsed);
+  if(!collapsed) _sectionOnExpand(id);
+}
+function _sectionToggle(id){
+  var sec = document.getElementById(id);
+  if(!sec) return;
+  var nowCollapsed = !sec.classList.contains('collapsed');
+  sec.classList.toggle('collapsed', nowCollapsed);
+  try { localStorage.setItem(_sectionStorageKey(id), nowCollapsed ? '1' : '0'); } catch(e){}
+  if(!nowCollapsed) _sectionOnExpand(id);
+}
+function _sectionOnExpand(id){
+  if(id === 'sec-worklist'){
+    if(typeof renderWorklist === 'function') renderWorklist();
+    _renderWorklistCountPills();
+  } else if(id === 'sec-recent'){
+    _renderRecentActivity();
+  }
+}
+function _renderWorklistCountPills(){
+  var apps  = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var STATUS = (typeof APP_STATUS !== 'undefined') ? APP_STATUS : { SUBMITTED:'submitted', MGR_APPROVED:'mgr_approved', FILE_UPDATE:'file_update' };
+  var role = window.currentRole || 'housing_employee_l1';
+  var pending = apps.filter(function(a){
+    if(!a || a.archived) return false;
+    if(role === 'ed')              return a.status === STATUS.MGR_APPROVED || a.status === STATUS.SUBMITTED;
+    if(role === 'housing_manager') return a.status === STATUS.SUBMITTED || a.status === STATUS.FILE_UPDATE;
+    return a.status === STATUS.SUBMITTED;
+  }).length;
+  var total = apps.filter(function(a){ return a && !a.archived; }).length;
+  var p = document.getElementById('worklist_count_pill'); if(p) p.textContent = pending;
+  var t = document.getElementById('worklist_total_pill'); if(t) t.textContent = total;
+  var qa = document.getElementById('qa_pending_count');   if(qa) qa.textContent = pending;
+  var STATUS2 = STATUS;
+  var ready = apps.filter(function(a){
+    return a && !a.archived && (a.status===STATUS2.ED_APPROVED || a.status===STATUS2.MGR_APPROVED) && !a.assignedUnit;
+  }).length;
+  var qr = document.getElementById('qa_ready_count'); if(qr) qr.textContent = ready;
+}
+function _renderRecentActivity(){
+  var host = document.getElementById('emp_recent_activity');
+  if(!host) return;
+  var log = (typeof auditLog !== 'undefined' && auditLog) ? auditLog : [];
+  var rows = log.slice(0, 8);
+  if(!rows.length){ host.innerHTML = '<div class="recent-empty">No recent activity.</div>'; return; }
+  host.innerHTML = rows.map(function(e){
+    var when = '';
+    try { when = new Date(e.ts).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }); } catch(_){}
+    var pill = e.appId ? '<button type="button" class="recent-link" data-recent-app="'+_esc(e.appId)+'">'+_esc(e.appId)+'</button>' : '';
+    return '<div class="recent-row">'
+         + '<div class="recent-row-head"><span class="recent-action">'+_esc(e.action||'')+'</span> '+pill+'</div>'
+         + '<div class="recent-row-meta">'+_esc(e.user||'')+' · '+_esc(when)+(e.detail?' · '+_esc(e.detail):'')+'</div>'
+         + '</div>';
+  }).join('');
+  var rcp = document.getElementById('recent_count_pill'); if(rcp) rcp.textContent = log.length;
+}
+
+// ── Quick Action handlers ────────────────────────────────────────────────
+function _runQuickAction(action){
+  if(action === 'new-app'){
+    if(typeof newApp === 'function') newApp();
+  } else if(action === 'approve-queue'){
+    if(typeof showWorklist === 'function') showWorklist();
+  } else if(action === 'run-match'){
+    if(typeof showMatch === 'function') showMatch();
+  } else if(action === 'rent-payment'){
+    showToast('Coming soon — Finance module.');
+  }
+}
+
+// ── Create menu handlers ─────────────────────────────────────────────────
+function _runCreateAction(action){
+  _closeCreateMenu();
+  if(action === 'application'){
+    if(typeof newApp === 'function') newApp();
+  } else if(action === 'unit'){
+    if(typeof openAddUnitModal === 'function') openAddUnitModal();
+    else window.location.href = 'inventory.html?action=newUnit';
+  } else if(action === 'contractor'){
+    if(typeof openAddContractorModal === 'function') openAddContractorModal();
+    else window.location.href = 'contractors.html?action=newContractor';
+  } else if(action === 'tenant'){
+    if(typeof openAddTenantModal === 'function') openAddTenantModal();
+    else window.location.href = 'tenants.html?action=newTenant';
+  }
+}
+function _toggleCreateMenu(){
+  var m = document.getElementById('create_menu');
+  if(!m) return;
+  m.classList.toggle('open');
+}
+function _closeCreateMenu(){
+  var m = document.getElementById('create_menu');
+  if(m) m.classList.remove('open');
+}
+function _toggleNavDrawer(){
+  var n = document.getElementById('app_nav');
+  if(n) n.classList.toggle('open');
+}
+function _closeNavDrawer(){
+  var n = document.getElementById('app_nav');
+  if(n) n.classList.remove('open');
+}
+
+// ── Avatar popover (sign out / view-as) ─────────────────────────────────
+function _toggleAvatarPopover(){
+  var existing = document.getElementById('header_avatar_pop');
+  if(existing){ existing.remove(); return; }
+  var anchor = document.getElementById('header_user_pill');
+  if(!anchor) return;
+  var role = window.currentRole || 'housing_employee_l1';
+  var realRole = window._realRole || role;
+  var name = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.name) ? HOUSING_SESSION.name : 'Staff';
+  var label = (window.CLFN_PERMS && CLFN_PERMS.roleLabel) ? CLFN_PERMS.roleLabel(role) : role;
+  var pop = document.createElement('div');
+  pop.id = 'header_avatar_pop';
+  pop.className = 'header-avatar-pop';
+  // ED gets view-as switcher; everyone gets sign out
+  var viewAs = '';
+  if(window.CLFN_PERMS && realRole === 'ed'){
+    var opts = CLFN_PERMS.getViewAsOptions('ed') || [];
+    if(opts.length){
+      viewAs = '<div class="hap-section"><div class="hap-section-label">View as</div>'
+             + '<select id="hap_view_as">'
+             + '<option value="">My role (ED)</option>'
+             + opts.map(function(k){ return '<option value="'+k+'"'+(k===role?' selected':'')+'>'+CLFN_PERMS.roleLabel(k)+'</option>'; }).join('')
+             + '</select></div>';
+    }
+  }
+  pop.innerHTML = '<div class="hap-head"><div class="hap-name">'+_esc(name)+'</div><div class="hap-role">'+_esc(label)+'</div></div>'
+                + viewAs
+                + '<button type="button" class="hap-action" data-hap="signout">Sign out</button>';
+  document.body.appendChild(pop);
+  var rect = anchor.getBoundingClientRect();
+  pop.style.position = 'fixed';
+  pop.style.top = (rect.bottom + 8) + 'px';
+  pop.style.right = (window.innerWidth - rect.right) + 'px';
+}
+function _closeAvatarPopover(){
+  var p = document.getElementById('header_avatar_pop');
+  if(p) p.remove();
+}
+
+// ── Delegated event listener ─────────────────────────────────────────────
+// One listener on document handles every header / landing interaction.
+// Header bits run on any page that has .app-header-v2; landing bits
+// (lookup, sections, recent activity) only run on housing.html.
+document.addEventListener('DOMContentLoaded', function(){
+  // First, render the shared header into #app_header_host if the page uses it.
+  // No-op on pages that still ship their own static header markup.
+  if(typeof renderAppHeader === 'function') renderAppHeader();
+
+  var hasHeader  = !!document.querySelector('.app-header-v2');
+  var hasLanding = !!document.getElementById('landingView');
+  if(!hasHeader && !hasLanding) return;
+
+  // Initial render of the dynamic nav + visibility pass (header pages only).
+  if(hasHeader){
+    if(typeof renderHeaderNav === 'function') renderHeaderNav();
+    if(typeof applyRoleVisibility === 'function') applyRoleVisibility(window.currentRole);
+  }
+
+  // Landing-only state hydrate.
+  if(hasLanding){
+    _sectionApplyState('sec-worklist');
+    _sectionApplyState('sec-recent');
+    _renderLookupRecent();
+    _renderWorklistCountPills();
+
+    var lookupInput = document.getElementById('lookup_input');
+    if(lookupInput){
+      var debounced = _debounce(function(e){ _runLookup(e.target.value); }, 200);
+      lookupInput.addEventListener('input', debounced);
+      lookupInput.addEventListener('focus', function(){ if(lookupInput.value) _renderLookupResults(); });
+    }
+  }
+
+  // One delegated click handler for everything else.
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    if(!t || !t.closest) return;
+
+    // Hamburger
+    if(t.closest('#nav_toggle')){ e.preventDefault(); _toggleNavDrawer(); return; }
+
+    // Nav item click
+    var navBtn = t.closest('.app-header-v2 .app-nav-item[data-nav]');
+    if(navBtn){
+      e.preventDefault();
+      var key = navBtn.getAttribute('data-nav');
+      var item = HEADER_NAV.filter(function(x){ return x.key===key; })[0];
+      _closeNavDrawer();
+      if(item && typeof item.run === 'function') item.run();
+      setHeaderNavActive(key);
+      return;
+    }
+
+    // Header settings button (right-side)
+    if(t.closest('#header_settings_btn')){ e.preventDefault(); if(typeof showSettings==='function') showSettings(); setHeaderNavActive('settings'); return; }
+
+    // Create menu open/close
+    if(t.closest('#header_create_btn')){ e.preventDefault(); _toggleCreateMenu(); return; }
+    var createItem = t.closest('.create-menu-item[data-create]');
+    if(createItem){ e.preventDefault(); _runCreateAction(createItem.getAttribute('data-create')); return; }
+
+    // Worklist view-all — must be checked before the section-toggle catch-all
+    // since the link sits inside the section header [data-section-toggle].
+    if(t.closest('#worklist_view_all')){ e.preventDefault(); if(typeof showDashboard==='function') showDashboard(); return; }
+
+    // Section toggles — only when clicking the toggle row itself, not a child
+    // button/link inside it that has its own behaviour (e.g. wlOpenApp on a row,
+    // wlSetChip on a chip, the search input, etc.).
+    var secHdr = t.closest('[data-section-toggle]');
+    if(secHdr){
+      // If the click landed on an interactive child (button/a/input/select),
+      // don't hijack it — let the inline handler run.
+      var interactive = t.closest('button, a, input, select, textarea, [data-wl-id], [data-wl-edit], [data-wlchip]');
+      if(!interactive || !secHdr.contains(interactive)){
+        e.preventDefault(); _sectionToggle(secHdr.getAttribute('data-section-toggle')); return;
+      }
+    }
+
+    // Quick actions
+    var qa = t.closest('.qa-btn[data-qa]');
+    if(qa){ if(qa.disabled) return; e.preventDefault(); _runQuickAction(qa.getAttribute('data-qa')); return; }
+
+    // Lookup tab
+    var ltab = t.closest('.lookup-tab[data-lookup-tab]');
+    if(ltab){
+      e.preventDefault();
+      var tab = ltab.getAttribute('data-lookup-tab');
+      window._lookupState.tab = tab;
+      var allTabs = document.querySelectorAll('.lookup-tab');
+      for(var i=0;i<allTabs.length;i++) allTabs[i].classList.toggle('active', allTabs[i] === ltab);
+      _renderLookupResults();
+      return;
+    }
+
+    // Lookup result row
+    var lrow = t.closest('.lookup-result[data-lookup-kind]');
+    if(lrow){
+      e.preventDefault();
+      var kind = lrow.getAttribute('data-lookup-kind');
+      var id   = lrow.getAttribute('data-lookup-id');
+      var titleEl = lrow.querySelector('.lookup-result-title');
+      var label = (titleEl && titleEl.textContent.trim()) || id;
+      _lookupOpen(kind, id, label);
+      return;
+    }
+
+    // Recently-viewed chip
+    var chip = t.closest('[data-recent-kind][data-recent-id]');
+    if(chip){
+      e.preventDefault();
+      _lookupOpen(chip.getAttribute('data-recent-kind'), chip.getAttribute('data-recent-id'), (chip.textContent||'').trim());
+      return;
+    }
+
+    // (Worklist view-all handled earlier — before the section-toggle catch-all.)
+
+    // Recent-activity row → open application
+    var rapp = t.closest('[data-recent-app]');
+    if(rapp){ e.preventDefault(); if(typeof window.openEditModal==='function') window.openEditModal(rapp.getAttribute('data-recent-app')); return; }
+
+    // Avatar popover
+    if(t.closest('#header_user_pill')){ e.preventDefault(); _toggleAvatarPopover(); return; }
+    var hap = t.closest('[data-hap]');
+    if(hap){
+      e.preventDefault();
+      if(hap.getAttribute('data-hap')==='signout'){ _closeAvatarPopover(); if(typeof headerSignOut==='function') headerSignOut(); else if(typeof doLogout==='function') doLogout(); }
+      return;
+    }
+
+    // Outside-click closers (run last)
+    if(!t.closest('#create_menu') && !t.closest('#header_create_btn')) _closeCreateMenu();
+    if(!t.closest('#header_avatar_pop') && !t.closest('#header_user_pill')) _closeAvatarPopover();
+    if(!t.closest('#lookup_input') && !t.closest('#lookup_results')){
+      var lr = document.getElementById('lookup_results');
+      if(lr){ lr.classList.remove('open'); }
+    }
+  });
+
+  // ED view-as (delegated change event)
+  document.addEventListener('change', function(e){
+    if(e.target && e.target.id === 'hap_view_as'){
+      var newRole = e.target.value || (window._realRole || 'ed');
+      window._viewAsRole = e.target.value || null;
+      if(typeof switchRole === 'function') switchRole(newRole);
+      _closeAvatarPopover();
+    }
+  });
+});
+
+// Refresh dynamic header bits whenever role changes (boot or view-as).
+(function(){
+  var prev = window._onSwitchRole;
+  window._onSwitchRole = function(role){
+    try { if(typeof prev === 'function') prev(role); } catch(_){}
+    if(typeof renderHeaderNav === 'function') renderHeaderNav();
+    if(typeof applyRoleVisibility === 'function') applyRoleVisibility(role);
+    _renderWorklistCountPills();
+  };
+})();
 
 // ══════════════════════════════════════════════════════
 // PAGE BOOT — only on housing.html

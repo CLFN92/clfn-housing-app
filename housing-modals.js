@@ -306,6 +306,12 @@ function saveUnitEdit(){
   var nmVal=(document.getElementById('ue_assignedName')||{}).value||'';
   u.assignedTo=toVal; u.assignedName=nmVal;
   u.assignedDate=get('ue_assignedDate');
+  // Belt-and-suspenders: if a tenant was selected but status is still vacant,
+  // flip to 'occupied' so the vacant-clears-assignment guard below doesn't
+  // silently wipe the selection (users used to lose tenants this way).
+  if(u.assignedTo && u.status==='vacant'){
+    u.status = 'occupied';
+  }
   // If status changed to vacant/repair/condemned, clear assignment
   if(u.status==='vacant'||u.status==='under_repair'||u.status==='condemned'){
     u.assignedTo=null; u.assignedName=null; u.assignedDate=null;
@@ -337,14 +343,32 @@ function saveUnitEdit(){
   }
   // Save unit to Supabase
   sbSaveUnit(u).catch(function(e){ console.warn('Unit save failed:', e); });
-  // Sync assigned unit back onto the application record
+  // Sync assigned unit back onto the application record. Also flip status to
+  // ASSIGNED so the applicant drops out of the Match queue (which filters by
+  // status). Without this the same applicant keeps showing on the Match page
+  // even though they're now housed.
   if(u.assignedTo) {
     var apps3 = typeof applications!=='undefined'?applications:[];
     var aIdx = apps3.findIndex(function(a){return a.id===u.assignedTo;});
     if(aIdx>=0){
-      apps3[aIdx].assignedUnit = u.id;
+      apps3[aIdx].assignedUnit    = u.id;
       apps3[aIdx].assignedAddress = (u.num+' '+u.street).trim();
+      apps3[aIdx].status          = APP_STATUS.ASSIGNED;
+      apps3[aIdx].assignedAt      = new Date().toISOString();
       sbSaveApplication(apps3[aIdx]).catch(function(e){ console.warn('App assignment save failed:', e); });
+    }
+  }
+  // If the unit had a different tenant before, return that prior application
+  // to ed_approved so it isn't permanently stuck in 'assigned' state with no
+  // unit. Skip if the prior tenant is the same as the new one (no-op edit).
+  if(prevAssignedTo && prevAssignedTo !== u.assignedTo){
+    var apps4 = typeof applications!=='undefined'?applications:[];
+    var prevIdx = apps4.findIndex(function(a){return a.id===prevAssignedTo;});
+    if(prevIdx>=0 && apps4[prevIdx].status === APP_STATUS.ASSIGNED){
+      apps4[prevIdx].assignedUnit    = null;
+      apps4[prevIdx].assignedAddress = null;
+      apps4[prevIdx].status          = APP_STATUS.ED_APPROVED;
+      sbSaveApplication(apps4[prevIdx]).catch(function(e){ console.warn('App unassign save failed:', e); });
     }
   }
   // UNIT: prefix is required so shared-data.js auditEntry classifies the
@@ -446,6 +470,15 @@ function ueTenantSelect(appId, name, status) {
   var nmEl = document.getElementById('ue_assignedName');
   if (toEl) toEl.value = appId;
   if (nmEl) nmEl.value = name;
+
+  // Selecting a tenant on a vacant unit implies an occupancy. Auto-flip the
+  // status so saveUnitEdit's vacant-clears-assignment guard doesn't wipe the
+  // selection. User can still change to 'reserved' or other before saving.
+  var statusEl = document.getElementById('ue_status');
+  if (statusEl && (statusEl.value === 'vacant' || statusEl.value === '')) {
+    statusEl.value = 'occupied';
+    if (typeof unitEditStatusChange === 'function') unitEditStatusChange();
+  }
 
   // Hide current tenant card (we're replacing it)
   var curCard = document.getElementById('ue_current_tenant');
