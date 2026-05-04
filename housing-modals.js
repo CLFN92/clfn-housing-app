@@ -1067,13 +1067,36 @@ function previewFromDash(app){
     +'<ol style="font-size:9.5px;color:var(--text);line-height:1.7;padding-left:14px;">'
     +'<li>All information provided in this application is true, accurate, and complete to the best of my knowledge.</li>'
     +'<li>I understand that providing false or misleading information may result in immediate disqualification and removal from the housing waitlist.</li>'
-    +'<li>I consent to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation.</li>'
+    +'<li>I consent to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation (<a href="https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;">PIPEDA</a>).</li>'
+    // Item #4 — CLFN-program sharing consent. Only printed when the applicant
+    // checked the consent box at submit time (saved as app.consentShareCLFN).
+    // If unchecked, omitted so the print mirrors what was actually agreed to.
+    +(app && app.consentShareCLFN
+      ? '<li>I consent to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing sharing relevant information from this application with other '+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+' programs and departments &mdash; including but not limited to Health, Education, Wellness, Ontario Works, and Finance &mdash; strictly for the purpose of supporting and coordinating services connected to my housing application. Sharing will occur only with authorized staff, on a need-to-know basis, in accordance with applicable privacy legislation (<a href="https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;">PIPEDA</a>). I may withdraw this consent in writing to the Housing Manager at any time.</li>'
+      : '')
     +'<li>I understand that my application will be scored according to the '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Scoring Rubric and that priority is determined by score, not date of application alone.</li>'
     +'<li>I agree to notify the '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Department within 30 days of any change in household composition, income, address, or contact information.</li>'
     +'<li>I understand that acceptance into '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' prior to occupancy.</li>'
     +'<li>I agree to comply with all '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing policies, lease agreements, and community by-laws as a condition of tenancy.</li>'
     +'<li>I authorize '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.</li>'
     +'</ol></div>'
+
+    // Consent acknowledgment — visible confirmation block, only when the
+    // saved record carries consentShareCLFN=true. Reads the captured stamp
+    // (consentShareCLFNAt / consentShareCLFNBy) so it shows a real audit trail.
+    +(app && app.consentShareCLFN
+      ? '<div style="margin-top:12px;padding:10px 12px;border:1.5px solid #15803d;border-radius:4px;background:#f0fdf4;page-break-inside:avoid;">'
+        + '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#15803d;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #bbf7d0;">'
+        + '&#x2611; Consent to Share &mdash; CLFN Programs &middot; <span style="font-weight:700;">CONFIRMED</span></div>'
+        + '<p style="font-size:9.5px;color:var(--text);line-height:1.55;margin:0 0 5px;">'
+        + 'The applicant has consented to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing sharing relevant information from this application with other '+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+' programs and departments &mdash; including Health, Education, Wellness, Ontario Works, and Finance &mdash; in support of this housing application.'
+        + '</p>'
+        + '<p style="font-size:8.5px;color:var(--muted);margin:0;">'
+        + 'Recorded: '+(app.consentShareCLFNAt ? escapeHtml(String(app.consentShareCLFNAt).slice(0,10)) : 'on submission')
+        + (app.consentShareCLFNBy ? ' &middot; Captured by '+escapeHtml(app.consentShareCLFNBy) : '')
+        + '</p>'
+        + '</div>'
+      : '')
 
     // Signatures
     +'<div style="margin-top:14px;page-break-inside:avoid;">'
@@ -1984,6 +2007,8 @@ window.openEditModal = function(appId) {
   // Use classification value as-is; only remap truly legacy values that no longer exist as options
   var clsVal = app.classification || '';
   set('classification', clsVal);
+  // Restore the CLFN-program consent checkbox (Step 8).
+  set('consent_share_programs', !!app.consentShareCLFN);
   liveSync();
 
   // Restore application type toggle

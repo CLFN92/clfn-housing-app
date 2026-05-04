@@ -1241,6 +1241,26 @@ function saveApplicationRecord(){
     pets:        pets.length ? pets : [{name:null,type:null,size:null,desc:null}],
     references:  refs.length ? refs : [{fn:null,ln:null,phone:null,email:null,relationship:null}],
     classification: (function(){ var v=(document.getElementById('classification')||{}).value||''; if(v) return v; var t=((document.getElementById('classificationCard')||{}).textContent||'').trim(); return (t&&t!=='—')?t:'Undetermined'; })(),
+    // Consent to share with other CLFN programs (PIPEDA-aligned). Recorded but
+    // not gated — applicants can submit either way; HM/ED can see the choice
+    // when reviewing. Timestamp + capturing role tell us when/by-whom the box
+    // was last toggled.
+    consentShareCLFN:    fb('consent_share_programs'),
+    consentShareCLFNAt:  (function(){
+      var existing = applications.find(function(a){ return a.id === appId; });
+      var checkedNow = fb('consent_share_programs');
+      // Stamp on the first save that has the box checked; preserve existing stamp.
+      if(checkedNow && existing && existing.consentShareCLFNAt) return existing.consentShareCLFNAt;
+      if(checkedNow) return new Date().toISOString();
+      return null;
+    })(),
+    consentShareCLFNBy:  (function(){
+      var existing = applications.find(function(a){ return a.id === appId; });
+      var checkedNow = fb('consent_share_programs');
+      if(checkedNow && existing && existing.consentShareCLFNBy) return existing.consentShareCLFNBy;
+      if(checkedNow) return (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.email) || (window.currentRole || 'staff');
+      return null;
+    })(),
     status:      isFileUpdate ? 'file_update' : 'submitted',
     submittedAt: new Date().toISOString().slice(0,10),
     score:       isFileUpdate ? null : scoreTotal,
@@ -1885,7 +1905,14 @@ function printApplicationPreview() {
     +'<ol style="font-size:9.5px;color:var(--text);line-height:1.7;padding-left:14px;">'
     +'<li>All information provided in this application is true, accurate, and complete to the best of my knowledge.</li>'
     +'<li>I understand that providing false or misleading information may result in immediate disqualification and removal from the housing waitlist.</li>'
-    +'<li>I consent to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation.</li>'
+    +'<li>I consent to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation (<a href="https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;">PIPEDA</a>).</li>'
+    // Item #4 — CLFN-program sharing consent. Only printed when the applicant
+    // checked the "Consent to Share — CLFN Programs" box on Step 8. If they
+    // didn't, this clause is omitted entirely so the printed declaration
+    // matches what they actually agreed to. The <ol> auto-renumbers.
+    +((document.getElementById('consent_share_programs')||{}).checked
+      ? '<li>I consent to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing sharing relevant information from this application with other '+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+' programs and departments &mdash; including but not limited to Health, Education, Wellness, Ontario Works, and Finance &mdash; strictly for the purpose of supporting and coordinating services connected to my housing application. Sharing will occur only with authorized staff, on a need-to-know basis, in accordance with applicable privacy legislation (<a href="https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;">PIPEDA</a>). I may withdraw this consent in writing to the Housing Manager at any time.</li>'
+      : '')
     +'<li>I understand that my application will be scored according to the '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Scoring Rubric and that priority is determined by score, not date of application alone.</li>'
     +'<li>I agree to notify the '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Department within 30 days of any change in household composition, income, address, or contact information.</li>'
     +'<li>I understand that acceptance into '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' prior to occupancy.</li>'
@@ -1893,6 +1920,23 @@ function printApplicationPreview() {
     +'<li>I authorize '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.</li>'
     +'</ol>'
     +'</div>'
+
+    // CONSENT ACKNOWLEDGMENT — visible confirmation block (only when ticked).
+    // Mirrors the on-screen Step 8 consent box and stamps when/by whom the
+    // box was confirmed so HM/ED have a clear paper trail in the printed PDF.
+    +((document.getElementById('consent_share_programs')||{}).checked
+      ? '<div style="margin-top:12px;padding:10px 12px;border:1.5px solid #15803d;border-radius:4px;background:#f0fdf4;page-break-inside:avoid;">'
+        + '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#15803d;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #bbf7d0;">'
+        + '&#x2611; Consent to Share &mdash; CLFN Programs &middot; <span style="font-weight:700;">CONFIRMED</span></div>'
+        + '<p style="font-size:9.5px;color:var(--text);line-height:1.55;margin:0 0 5px;">'
+        + 'The applicant has consented to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing sharing relevant information from this application with other '+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+' programs and departments &mdash; including Health, Education, Wellness, Ontario Works, and Finance &mdash; in support of this housing application.'
+        + '</p>'
+        + '<p style="font-size:8.5px;color:var(--muted);margin:0;">'
+        + 'Recorded: '+today
+        + ((typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.email) ? ' &middot; Captured by '+escapeHtml(HOUSING_SESSION.email) : '')
+        + '</p>'
+        + '</div>'
+      : '')
 
     // SIGNATURES
     +'<div style="margin-top:14px;page-break-inside:avoid;">'
