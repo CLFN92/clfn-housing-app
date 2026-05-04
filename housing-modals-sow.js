@@ -622,7 +622,28 @@ function saveSOW(){
 
   var ind=document.getElementById('sow_saved_indicator');
   if(ind) ind.textContent='✓ Saved '+new Date().toLocaleTimeString();
-  showToast('Scope of work saved');
+
+  // Close the SOW modal, then show a centered branded confirmation.
+  // Dismissing the confirmation routes the user to the Renovation Approvals
+  // screen — on renos.html we call showRenoApprovals() in-page; on any other
+  // page we navigate via ?view=approvals so the boot opens the right view.
+  var _addrSummary = data.address || (_sowUnitId ? 'Unit '+_sowUnitId : 'this unit');
+  if(typeof closeSowModal === 'function') closeSowModal();
+  if(typeof window.showAlert === 'function'){
+    window.showAlert({
+      title:   isNew ? 'Renovation request submitted' : 'Renovation request updated',
+      message: 'Scope of Work for ' + _addrSummary + ' was saved successfully. You can review it in the Renovation Approvals queue.',
+      okText:  'Go to Approvals'
+    }).then(function(){
+      if(typeof showRenoApprovals === 'function' && document.getElementById('renoApprovalsView')){
+        showRenoApprovals();
+      } else {
+        window.location.href = 'renos.html?view=approvals';
+      }
+    });
+  } else {
+    showToast('Scope of work saved');
+  }
 }
 
 

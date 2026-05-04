@@ -42,6 +42,43 @@ window._printThemeStyles = function() {
 window.THEME_KEYS = ['yellow','dark','text'];
 window.THEME_DEFAULTS = { yellow: '#F8E41A', dark: '#111110', text: '#111110' };
 
+// ═══════════════════════════════════════════════════════════════════════
+// showAlert — centered branded notification with a single OK button.
+// Same visual language as showConfirm but for one-way information.
+//
+//   showAlert({
+//     title:   'Renovation request saved',
+//     message: 'Your scope of work has been recorded.',
+//     okText:  'Continue'                // optional, default 'OK'
+//   }).then(function(){ window.location.href = 'renos.html?view=approvals'; });
+//
+// The promise resolves when the user dismisses (OK / × / overlay click).
+// ═══════════════════════════════════════════════════════════════════════
+window.showAlert = function(opts) {
+  opts = opts || {};
+  return new Promise(function(resolve){
+    var ov = document.createElement('div');
+    ov.className = 'modal-overlay modal-overlay-centered modal-z-1100 is-open';
+    ov.innerHTML =
+      '<div class="modal-body modal-body-sm">' +
+        '<div class="modal-hdr">' +
+          '<div class="modal-hdr-title">' + (opts.title || 'Notice') + '</div>' +
+          '<button type="button" class="btn-close-dark-30" data-al-close>&times;</button>' +
+        '</div>' +
+        '<div class="modal-body-stack">' +
+          '<p class="txt-help m-0">' + (opts.message || '') + '</p>' +
+        '</div>' +
+        '<div class="modal-footer">' +
+          '<button type="button" class="btn btn-primary" data-al-close>' + (opts.okText || 'OK') + '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    function close(){ if (ov.parentNode) ov.parentNode.removeChild(ov); resolve(); }
+    ov.querySelectorAll('[data-al-close]').forEach(function(b){ b.onclick = close; });
+    ov.addEventListener('click', function(e){ if (e.target === ov) close(); });
+  });
+};
+
 window._applyTheme = function(theme) {
   theme = theme || {};
   var root = document.documentElement;
@@ -1180,18 +1217,34 @@ window.DocLibrary = (function(){
           if (!r.ok) {
             return r.text().then(function(body){
               console.error('[DocLib] Storage upload failed:', r.status, body, 'path:', path, 'type:', _mimeType(f));
-              throw new Error('upload failed: ' + body);
+              throw new Error('storage '+r.status+': ' + body);
             });
           }
-          return _saveMeta(opts, path, f.name, f.size, f.type, state.uploadCategory);
+          // Storage upload succeeded — now record the metadata. If THIS step
+          // fails (RLS denial on housing_audit_log), the file is in Storage but
+          // invisible in the UI; the catch below surfaces that explicitly.
+          return _saveMeta(opts, path, f.name, f.size, f.type, state.uploadCategory).then(function(metaResp){
+            if (metaResp && !metaResp.ok) {
+              return metaResp.text().then(function(body){
+                console.error('[DocLib] Metadata save failed:', metaResp.status, body);
+                throw new Error('metadata '+metaResp.status+': ' + body);
+              });
+            }
+          });
         }).then(function(){
           if (typeof opts.onChange === 'function') {
             opts.onChange('upload', { path:path, name:f.name, category:state.uploadCategory });
           }
           next(i+1);
-        }).catch(function(){
+        }).catch(function(err){
           state.uploading = false;
-          _setError('Upload failed: ' + f.name);
+          var msg = (err && err.message) ? err.message : 'unknown error';
+          _setError('Upload failed: ' + f.name + ' (' + msg + ')');
+          // Also fire a toast — the in-widget banner auto-dismisses and users
+          // miss it. The toast keeps the failure visible long enough to read.
+          if (typeof window.showToast === 'function') {
+            window.showToast('Upload failed: ' + f.name, { type:'error', duration:6000 });
+          }
         });
       }
       next(0);

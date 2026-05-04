@@ -218,14 +218,17 @@ async function sbSaveApplication(app) {
     });
     if (!r.ok) {
       var e = await r.text();
-      console.error('[SB] save application 400 — Supabase says:', e);
+      console.error('[SB] save application '+r.status+' — Supabase says:', e);
       console.error('[SB] row keys sent:', Object.keys(row).join(', '));
-      return false;
+      // Throw so the caller's .catch() can surface a visible error. Returning
+      // false here was masking RLS / network failures — users would type a
+      // change, see no error, then find their change gone after reload.
+      throw new Error('save failed ('+r.status+'): '+e);
     }
     return true;
   } catch(e) {
     console.warn('[SB] save application error:', e);
-    return false;
+    throw e;
   }
 }
 

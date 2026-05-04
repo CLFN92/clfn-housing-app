@@ -1298,8 +1298,16 @@ function saveApplicationRecord(){
     applications.push(appObj);
   }
 
-  // Persist to Supabase
-  sbSaveApplication(appObj).catch(function(e){ console.warn('App save failed:', e); });
+  // Persist to Supabase. Surface failures as a visible toast — silently
+  // swallowing them caused "I changed the email but it reverted" bug reports
+  // because the local applications array updated even when the server save
+  // (RLS denial, network error, etc.) failed.
+  sbSaveApplication(appObj).catch(function(e){
+    console.warn('App save failed:', e);
+    if (typeof showToast === 'function') {
+      showToast('Could not save application — ' + ((e && e.message) || 'check your connection'), { type:'error', duration:5000 });
+    }
+  });
 
   // Audit — log save/update events
   var _isNew = (idx < 0);  // idx was set before push
