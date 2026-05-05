@@ -1276,15 +1276,26 @@ async function renderRecentActivity(role) {
     'settings_saved':           {icon:'⚙️', color:'var(--muted)', label:'Settings Saved'}
   };
 
-  // ── Group by calendar day ──────────────────────────────────────────────────
+  // ── Group by calendar day (LOCAL time, not UTC) ────────────────────────────
+  // Using toISOString().slice(0,10) here was giving us a UTC date string while
+  // dayLabel() parses it back as local — so an event at 9 PM yesterday in EDT
+  // (= 1 AM UTC today) was bucketed under "Today". Build the key from local
+  // date components so the bucket matches what dayLabel will show.
   var today     = new Date(); today.setHours(0,0,0,0);
   var yesterday = new Date(today); yesterday.setDate(yesterday.getDate()-1);
 
-  var groups = {}; // key = YYYY-MM-DD, value = []
+  function _localDateKey(ts){
+    var d = new Date(ts);
+    var y  = d.getFullYear();
+    var m  = String(d.getMonth()+1).padStart(2,'0');
+    var dd = String(d.getDate()).padStart(2,'0');
+    return y + '-' + m + '-' + dd;
+  }
+
+  var groups = {}; // key = YYYY-MM-DD (local), value = []
   var order  = [];
   filtered.forEach(function(e) {
-    var d = new Date(e.ts);
-    var key = d.toISOString().slice(0,10);
+    var key = _localDateKey(e.ts);
     if(!groups[key]) { groups[key] = []; order.push(key); }
     groups[key].push(e);
   });
@@ -1352,6 +1363,17 @@ async function renderRecentActivity(role) {
       + '</div>'
       + '</div>';
   }).join('');
+
+  // Update the section count pill — show TODAY's event count only (post role
+  // filter), so the header reflects "what happened today" rather than the full
+  // visible window. Reuses the local date key so the pill matches the "Today"
+  // group rendered above.
+  var rcp = document.getElementById('recent_count_pill');
+  if(rcp){
+    var todayKey = _localDateKey(today);
+    var todayCount = (groups[todayKey] || []).length;
+    rcp.textContent = todayCount;
+  }
 }
 
 // ══════════════════════════════════════════════════════

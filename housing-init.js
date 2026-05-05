@@ -2053,8 +2053,24 @@ var LOOKUP_RECENT_KEY = 'clfn_landing_recent_lookups';
 function _lookupReadRecent(){
   try { return JSON.parse(localStorage.getItem(LOOKUP_RECENT_KEY) || '[]'); } catch(e){ return []; }
 }
+// Defensive: an earlier version of the chip design saved labels with a
+// leading single-letter type prefix ("T John Smith", "U 12 Maple St").
+// Strip it on both save and render so cached entries clean themselves up
+// the next time the recent list is touched. Regex requires a single
+// uppercase T/U/S followed by whitespace — safe against real names like
+// "Tom Smith" or "Sara Lee".
+function _lookupStripTypePrefix(s){
+  var str = String(s == null ? '' : s);
+  var stripped = str.replace(/^[TUS]\s+/, '');
+  if (stripped !== str && typeof console !== 'undefined') {
+    console.warn('[lookup recent] stripped legacy type prefix:', JSON.stringify(str));
+  }
+  return stripped;
+}
 function _lookupPushRecent(entry){
   if(!entry || !entry.id) return;
+  // Sanitize before persisting so further saves can't carry the bad prefix.
+  if(entry.label) entry.label = _lookupStripTypePrefix(entry.label);
   var list = _lookupReadRecent().filter(function(r){ return !(r.id===entry.id && r.kind===entry.kind); });
   list.unshift(entry);
   if(list.length > 8) list.length = 8;
@@ -2070,8 +2086,9 @@ function _renderLookupRecent(){
   // visible chip just shows the name. The kind class lets CSS tint the chip
   // border/background subtly per type without dropping a letter on the user.
   host.innerHTML = list.map(function(r){
+    var lbl = _lookupStripTypePrefix(r.label || r.id);
     return '<button type="button" class="lookup-chip lookup-chip--'+_esc(r.kind)+'" data-recent-kind="'+_esc(r.kind)+'" data-recent-id="'+_esc(r.id)+'">'
-        + _esc(r.label || r.id) + '</button>';
+        + _esc(lbl) + '</button>';
   }).join('');
 }
 
@@ -2163,6 +2180,11 @@ function _lookupOpen(kind, id, label){
 
 // ── Section toggles (Worklist / Recent activity) ────────────────────────
 function _sectionStorageKey(id){ return 'clfn_landing_sec_' + id + '_collapsed'; }
+function _sectionSyncAria(sec){
+  if(!sec) return;
+  var hdr = sec.querySelector('[data-section-toggle]');
+  if(hdr) hdr.setAttribute('aria-expanded', sec.classList.contains('collapsed') ? 'false' : 'true');
+}
 function _sectionApplyState(id){
   var sec = document.getElementById(id);
   if(!sec) return;
@@ -2170,6 +2192,7 @@ function _sectionApplyState(id){
   try { stored = localStorage.getItem(_sectionStorageKey(id)); } catch(e){}
   var collapsed = (stored === null) ? sec.classList.contains('collapsed') : (stored === '1');
   sec.classList.toggle('collapsed', collapsed);
+  _sectionSyncAria(sec);
   if(!collapsed) _sectionOnExpand(id);
 }
 function _sectionToggle(id){
@@ -2177,6 +2200,7 @@ function _sectionToggle(id){
   if(!sec) return;
   var nowCollapsed = !sec.classList.contains('collapsed');
   sec.classList.toggle('collapsed', nowCollapsed);
+  _sectionSyncAria(sec);
   try { localStorage.setItem(_sectionStorageKey(id), nowCollapsed ? '1' : '0'); } catch(e){}
   if(!nowCollapsed) _sectionOnExpand(id);
 }
@@ -2185,7 +2209,12 @@ function _sectionOnExpand(id){
     if(typeof renderWorklist === 'function') renderWorklist();
     _renderWorklistCountPills();
   } else if(id === 'sec-recent'){
-    _renderRecentActivity();
+    // Use the role-aware version in housing-views.js — it pulls from Supabase
+    // when the in-memory auditLog is empty, applies role-scoped filtering,
+    // and renders icons. (The local _renderRecentActivity stub was a no-data
+    // shim and has been removed.)
+    var _role = window._viewAsRole || window.currentRole || 'housing_employee_l1';
+    if(typeof renderRecentActivity === 'function') renderRecentActivity(_role);
   }
 }
 function _renderWorklistCountPills(){
@@ -2205,24 +2234,6 @@ function _renderWorklistCountPills(){
   }).length;
   var qr = document.getElementById('qa_ready_count'); if(qr) qr.textContent = ready;
 }
-function _renderRecentActivity(){
-  var host = document.getElementById('emp_recent_activity');
-  if(!host) return;
-  var log = (typeof auditLog !== 'undefined' && auditLog) ? auditLog : [];
-  var rows = log.slice(0, 8);
-  if(!rows.length){ host.innerHTML = '<div class="recent-empty">No recent activity.</div>'; return; }
-  host.innerHTML = rows.map(function(e){
-    var when = '';
-    try { when = new Date(e.ts).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }); } catch(_){}
-    var pill = e.appId ? '<button type="button" class="recent-link" data-recent-app="'+_esc(e.appId)+'">'+_esc(e.appId)+'</button>' : '';
-    return '<div class="recent-row">'
-         + '<div class="recent-row-head"><span class="recent-action">'+_esc(e.action||'')+'</span> '+pill+'</div>'
-         + '<div class="recent-row-meta">'+_esc(e.user||'')+' · '+_esc(when)+(e.detail?' · '+_esc(e.detail):'')+'</div>'
-         + '</div>';
-  }).join('');
-  var rcp = document.getElementById('recent_count_pill'); if(rcp) rcp.textContent = log.length;
-}
-
 // ── Quick Action handlers ────────────────────────────────────────────────
 function _runQuickAction(action){
   if(action === 'new-app'){

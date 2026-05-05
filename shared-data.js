@@ -3129,8 +3129,11 @@ function showContractorsForRole() {
   }
 }
 function showInventory(){
-  // Inventory lives in inventory.html
-  if(window.location.pathname.includes('inventory.html')) {
+  // Inventory lives in inventory.html. Use an element-based check (the page's
+  // own view markup) instead of pathname.includes('inventory.html') — clean
+  // URL servers like `npx serve` strip the .html extension, so the URL check
+  // would falsely fail and trigger a redirect loop on /inventory.
+  if(document.getElementById('inventoryView')) {
     if(!window._navSkipPush) pushNav('inventory');
     setExportView('inventory');
     setNavActive('tab_inventory');
@@ -3140,8 +3143,8 @@ function showInventory(){
   }
 }
 function showTenants(){
-  // Tenants lives in tenants.html
-  if(window.location.pathname.includes('tenants.html')) {
+  // Tenants lives in tenants.html. Element-based check (see showInventory).
+  if(document.getElementById('tenantsView')) {
     if(!window._navSkipPush) pushNav('tenants');
     setExportView(null);
     setNavActive('tab_tenants');
@@ -3837,8 +3840,8 @@ function showMatch(){
     showToast('Match module is not enabled for this nation.');
     return;
   }
-  // Match lives in match.html
-  if(window.location.pathname.includes('match.html')) {
+  // Match lives in match.html. Element-based check (see showInventory).
+  if(document.getElementById('matchView')) {
     if(!window._navSkipPush) pushNav('match');
     setExportView('match');
     setNavActive('tab_match');
