@@ -610,12 +610,16 @@ function _onModuleToggle(modName, nowOn) {
       actor);
   }
 
-  // Re-render panel + nav tiles
+  // Re-render panel + nav tiles. Re-run the home renderer if the user is
+  // currently on the landing (or legacy employeeHomeView, sub-page only) so
+  // module enable/disable changes show up immediately in the nav strip.
   renderNationPanel();
-  if(typeof showEmployeeHome === 'function' && document.getElementById('employeeHomeView')){
-    var ehv = document.getElementById('employeeHomeView');
-    if(ehv && ehv.style.display !== 'none') showEmployeeHome();
-  }
+  var landingEl = document.getElementById('landingView');
+  var ehv       = document.getElementById('employeeHomeView');
+  var onHome = (landingEl && landingEl.style.display !== 'none' && landingEl.style.display !== '')
+            || (ehv       && ehv.style.display       !== 'none' && ehv.style.display       !== '');
+  if(onHome && typeof showEmployeeHome === 'function') showEmployeeHome();
+  if(landingEl && typeof renderHeaderNav === 'function') renderHeaderNav();
 
   // If the module is being disabled and the current page is that module's
   // page, redirect to the dashboard. Same-tab guarantee only — other open

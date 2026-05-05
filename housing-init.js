@@ -132,17 +132,13 @@ async function deleteTenantFile(path){
 // the header, and nav visibility. Housing-page-specific logic goes here.
 window._onSwitchRole = function(role) {
   approvalRole = role;
-  var rbSel = document.getElementById('rb_select');
-  if (rbSel) rbSel.value = role;
-  var hud = document.getElementById('header_user_display');
-  if (hud) hud.textContent = (window.CLFN_PERMS && window.CLFN_PERMS.roleLabel)
-    ? window.CLFN_PERMS.roleLabel(role) : role;
   if (window._currentScorecardApp && typeof renderScorecardActions === 'function')
     renderScorecardActions(window._currentScorecardApp);
   if (typeof applyTenancyFieldRoles === 'function') applyTenancyFieldRoles();
-  // Only navigate home if no view is currently visible (i.e. during boot)
-  // Not on every role switch — that causes the worklist flash
-  var anyVisible = ['worklistView','dashView','inventoryView','matchView',
+  // Only navigate home if no view is currently visible (i.e. during boot).
+  // Includes landingView so role switches on the landing page don't trigger a
+  // redundant re-render via showEmployeeHome (which already handles landing).
+  var anyVisible = ['landingView','worklistView','dashView','inventoryView','matchView',
     'tenantsView','settingsView','scorecardView','appLayout'].some(function(id) {
     var el = document.getElementById(id);
     return el && el.style.display !== 'none' && el.style.display !== '';
@@ -412,11 +408,6 @@ function renderAddUnitPhotoPreview() {
       + '</div>';
   }).join('');
 }
-
-// ══════════════════════════════════════════════════════
-// MISSING HEADER ELEMENT — header_user_display
-// ══════════════════════════════════════════════════════
-
 
 // ══════════════════════════════════════════════════════
 // PHOTO DRAG/DROP HELPERS (addUnitModal)
@@ -1553,11 +1544,13 @@ async function loadAppDataFromSupabase() {
       if(typeof updateDashStats === 'function') updateDashStats();
       if(typeof renderDashTable === 'function') renderDashTable();
     }
-    // Re-render worklist if visible
-    var wv = document.getElementById('worklistView');
-    if(wv && wv.style.display !== 'none') {
+    // Re-render worklist if its section is currently expanded on the landing.
+    // (The standalone worklistView is gone — Phase B folded it into landingView.)
+    var sec = document.getElementById('sec-worklist');
+    if(sec && !sec.classList.contains('collapsed')) {
       if(typeof renderWorklist === 'function') renderWorklist();
     }
+    if(typeof _renderWorklistCountPills === 'function') _renderWorklistCountPills();
   } catch(e) {
     console.error('[CLFN Housing] loadAppData failed:',e);
     console.warn('[CLFN] Could not load data — using cached version');
@@ -1948,34 +1941,7 @@ function renderAppHeader(){
     +       '<div id="header_avatar" class="header-avatar">&mdash;</div>'
     +       '<span id="header_role_badge" class="avatar-role-pill">&mdash;</span>'
     +       '<span id="header_user_name" class="visually-hidden"></span>'
-    +       '<span id="header_user_display" class="visually-hidden"></span>'
     +     '</div>'
-    +   '</div>'
-    +   // Legacy compat strip — hidden, kept so existing exports/staff/role-switcher
-    +   // bindings keep working until those features get refactored onto the avatar popover.
-    +   '<div id="header_user_bar" class="header-user-bar header-user-bar-legacy">'
-    +     '<div id="roleSwitcher">'
-    +       '<select id="rb_select" onchange="switchRole(this.value)">'
-    +         '<option value="ed">Executive Director</option>'
-    +         '<option value="housing_manager">Housing Manager</option>'
-    +         '<option value="housing_employee_l2">Housing Employee L2</option>'
-    +         '<option value="housing_employee_l1">Housing Employee L1</option>'
-    +         '<option value="cfo">CFO</option>'
-    +         '<option value="finance_l1">Finance Clerk L1</option>'
-    +       '</select>'
-    +     '</div>'
-    +     '<div id="header_export_wrap" class="header-export-wrap">'
-    +       '<button type="button" onclick="toggleHeaderExportMenu()" class="btn-header-ghost">'
-    +         '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
-    +         ' Export <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>'
-    +       '</button>'
-    +       '<div id="header_export_menu" class="header-export-menu">'
-    +         '<button onclick="headerExport(\'csv\')"   class="header-export-item"><span class="header-export-icon">&#128196;</span> CSV</button>'
-    +         '<button onclick="headerExport(\'excel\')" class="header-export-item"><span class="header-export-icon">&#128202;</span> Excel (.xlsx)</button>'
-    +         '<button onclick="headerExport(\'pdf\')"   class="header-export-item"><span class="header-export-icon">&#128209;</span> PDF</button>'
-    +       '</div>'
-    +     '</div>'
-    +     '<button onclick="showAddHousingStaff()" id="header_addstaff_btn" class="btn-header-ghost" style="display:none;">+ Staff</button>'
     +   '</div>'
     + '</header>';
   // Mark home click — bounce to housing.html on sub-pages, in-page showLanding on housing.html
@@ -1999,7 +1965,6 @@ function renderAppHeader(){
 window.HEADER_NAV = [
   { key:'home',         label:'Home',         module:null,           svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>',                                                                                                                                                                                                                run:function(){ if(typeof showLanding==='function') showLanding(); else if(typeof showEmployeeHome==='function') showEmployeeHome(); } },
   { key:'applications', label:'Applications', module:'applications', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>',                                                                                                                                                                                                run:function(){ if(typeof showDashboard==='function') showDashboard(); } },
-  { key:'worklist',     label:'Worklist',     module:'worklist',     svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',                                                                                                                                                          run:function(){ if(typeof showWorklist==='function') showWorklist(); } },
   { key:'inventory',    label:'Inventory',    module:'inventory',    svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>',                                                                                                                                            run:function(){ if(typeof showInventory==='function') showInventory(); } },
   { key:'match',        label:'Match',        module:'match',        svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',                                                                                                                       run:function(){ if(typeof showMatch==='function') showMatch(); } },
   { key:'renovations',  label:'Renovations',  module:'renovations',  svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',                                                                                              run:function(){ if(typeof showRenos==='function') showRenos(); } },
@@ -2100,10 +2065,11 @@ function _renderLookupRecent(){
   if(!host) return;
   var list = _lookupReadRecent();
   if(!list.length){ host.innerHTML = ''; return; } // CSS :empty pseudo handles the empty-state copy
+  // Type info is preserved on the data attribute for the click handler — the
+  // visible chip just shows the name. The kind class lets CSS tint the chip
+  // border/background subtly per type without dropping a letter on the user.
   host.innerHTML = list.map(function(r){
-    var initial = r.kind === 'tenant' ? 'T' : (r.kind === 'unit' ? 'U' : 'S');
-    return '<button type="button" class="lookup-chip" data-recent-kind="'+_esc(r.kind)+'" data-recent-id="'+_esc(r.id)+'">'
-        + '<span class="lookup-chip-icon type-'+_esc(r.kind)+'">'+initial+'</span>'
+    return '<button type="button" class="lookup-chip lookup-chip--'+_esc(r.kind)+'" data-recent-kind="'+_esc(r.kind)+'" data-recent-id="'+_esc(r.id)+'">'
         + _esc(r.label || r.id) + '</button>';
   }).join('');
 }

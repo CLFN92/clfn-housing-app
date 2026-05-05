@@ -694,24 +694,24 @@
         <div class="modal-hdr"><div class="ctitle" class="m-0">Disclosure &amp; Signatures</div></div>
         <div style="padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg);"><p style="font-size:12px;color:var(--muted);line-height:1.6;">By signing below, I declare that all information provided in this application is true and complete to the best of my knowledge.</p></div>
         <!-- ── Consent to Share — CLFN Programs ─────────────────────────────── -->
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border);background:var(--surface);">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text);margin-bottom:8px;">Consent to Share &mdash; CLFN Programs</div>
-          <p style="font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 8px;">
+        <div class="consent-share-block">
+          <div class="consent-share-title">Consent to Share &mdash; CLFN Programs</div>
+          <p class="consent-share-body">
             To better support my housing application, I consent to <strong>CLFN Housing</strong> sharing relevant information from this application with other <strong data-nation="display_name">Constance Lake First Nation</strong> programs and departments &mdash; including but not limited to Health, Education, Wellness, Ontario Works, and Finance.
           </p>
-          <p style="font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 6px;">Information will only be shared with authorized program staff, on a need-to-know basis, for the purpose of:</p>
-          <ul style="font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 8px 18px;padding:0;">
+          <p class="consent-share-body">Information will only be shared with authorized program staff, on a need-to-know basis, for the purpose of:</p>
+          <ul class="consent-share-list">
             <li>Coordinating wraparound supports (medical, social, financial) where helpful</li>
             <li>Reducing duplicate paperwork between programs</li>
             <li>Confirming eligibility that depends on inputs from another department</li>
           </ul>
-          <p style="font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 12px;">
+          <p class="consent-share-body consent-share-footer">
             This consent is voluntary, conducted in accordance with applicable privacy legislation
-            (<a href="https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/" target="_blank" rel="noopener noreferrer" style="color:var(--text);text-decoration:underline;">PIPEDA</a>),
+            (<a href="https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/" target="_blank" rel="noopener noreferrer" class="consent-share-link">PIPEDA</a>),
             and may be withdrawn in writing to the Housing Manager at any time.
           </p>
-          <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--text);font-weight:600;cursor:pointer;line-height:1.5;">
-            <input type="checkbox" id="consent_share_programs" style="margin-top:2px;width:16px;height:16px;cursor:pointer;flex-shrink:0;"/>
+          <label class="consent-share-check">
+            <input type="checkbox" id="consent_share_programs"/>
             <span>I consent to CLFN Housing sharing my application information with other CLFN programs in support of my housing application.</span>
           </label>
         </div>
@@ -1092,6 +1092,7 @@
       <div class="stg-lookup-row">
         <input type="email" id="user_lookup_email" placeholder="Enter @clfn.on.ca email to search or add..." class="stg-lookup-input" oninput="userLookupDebounce()" onkeydown="if(event.key==='Enter')lookupUser()"/>
         <button onclick="lookupUser()" class="btn btn-primary">Look Up</button>
+        <button onclick="showAddHousingStaff()" id="settings_add_staff_btn" class="btn btn-ghost" data-roles="ed,housing_manager">+ Add Staff</button>
       </div>
       <div id="user_lookup_result"></div>
     </div>

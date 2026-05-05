@@ -15,7 +15,6 @@
  *   headerSignOut()                — prompt and sign out
  *   switchRole(role)               — set effective role + refresh UI
  *   updateRoleSwitcherVisibility() — no-op (handled by updateHeaderUser)
- *   setupHeaderRoleToggle(role)    — build the ED "view as" dropdown
  *   edGuard(featureName, callback) — run callback if editScoreModel allowed, else toast and return false
  *   escapeHtml(v)                  — HTML-escape a value for safe innerHTML
  *   applyBrandingToHeader()        — patch nation-name placeholders in the page chrome from NATION_CONFIG
@@ -199,10 +198,8 @@ function updateHeaderUser(role) {
   if (settingsBtn) settingsBtn.style.display =
     (ROLE.isManagement(role)) ? 'flex' : 'none';
 
-  // Show Add Staff only for HM / ED
-  var addStaffBtn = document.getElementById('header_addstaff_btn');
-  if (addStaffBtn) addStaffBtn.style.display =
-    (ROLE.isManagement(role)) ? 'flex' : 'none';
+  // Add Staff entry now lives under Settings → Admin → Users (gated via
+  // applyRoleVisibility on data-roles="ed,housing_manager"); no header pill.
 }
 
 // ── headerSignOut ─────────────────────────────────────────────────────────────
@@ -247,34 +244,9 @@ function switchRole(role) {
 }
 
 // ── updateRoleSwitcherVisibility ──────────────────────────────────────────────
-// No-op — handled by updateHeaderUser and setupHeaderRoleToggle.
-// Kept as a stub so any residual calls don't throw.
+// No-op — handled by updateHeaderUser. Kept as a stub so any residual calls
+// in older modules don't throw. Safe to delete once all callers are gone.
 function updateRoleSwitcherVisibility() { /* handled by updateHeaderUser */ }
-
-// ── setupHeaderRoleToggle ─────────────────────────────────────────────────────
-// Builds the "View As" dropdown for ED. Non-ED roles get the dropdown hidden.
-function setupHeaderRoleToggle(realRole) {
-  var toggleEl = document.getElementById('roleSwitcher');
-  var selectEl = document.getElementById('rb_select');
-  if (!toggleEl || !selectEl) return;
-
-  var perms = window.CLFN_PERMS;
-  if (!perms) { toggleEl.style.display = 'none'; return; }
-
-  var normalized = perms.normalizeRole(realRole);
-  var options    = perms.getViewAsOptions(normalized);
-
-  if (options.length === 0) { toggleEl.style.display = 'none'; return; }
-
-  toggleEl.style.display = 'flex';
-
-  var html = '<option value="">My Role</option>';
-  options.forEach(function(roleKey) {
-    html += '<option value="' + roleKey + '">' + perms.roleLabel(roleKey) + '</option>';
-  });
-  selectEl.innerHTML = html;
-  selectEl.value = window._viewAsRole || '';
-}
 
 // ── applyBrandingToHeader ────────────────────────────────────────────────────
 // Replaces nation-name placeholders in the static page chrome with the values

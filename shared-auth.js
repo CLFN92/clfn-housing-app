@@ -74,9 +74,6 @@ window.CLFN_AUTH = {
     if (typeof switchRole       === 'function') switchRole(this.currentRole);
     if (typeof updateHeaderUser === 'function') updateHeaderUser(this.currentRole);
 
-    var switcher = document.getElementById('roleSwitcher');
-    if (switcher) switcher.style.display = 'none';
-
     console.log('[CLFN] Session set — ' + this.currentUser.name + ' (' + this.currentRole + ')');
 
     // Start idle-logout watcher now that a session exists
@@ -131,14 +128,7 @@ async function resolveHousingRole() {
       window.CLFN_AUTH.isAuthenticated = true;
       window.CLFN_AUTH.currentRole     = housingRole;
 
-      if (typeof switchRole           === 'function') switchRole(housingRole);
-      if (typeof setupHeaderRoleToggle === 'function') setupHeaderRoleToggle(housingRole);
-
-      var addStaffBtn = document.getElementById('header_addstaff_btn');
-      if (addStaffBtn) {
-        addStaffBtn.style.display =
-          (housingRole === 'ed' || housingRole === 'housing_manager') ? 'flex' : 'none';
-      }
+      if (typeof switchRole === 'function') switchRole(housingRole);
 
       // Session is real — start the idle-logout watcher
       if (typeof startIdleTimer === 'function') startIdleTimer();

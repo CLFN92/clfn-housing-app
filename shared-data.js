@@ -1724,8 +1724,9 @@ function getUnitScoreModel(){
   });
 }
 function headerExport(format) {
-  var m = document.getElementById('header_export_menu');
-  if(m) m.style.display='none';
+  // Close the v2 header export dropdown after a format is picked.
+  var m = document.getElementById('header_export_menu_v2');
+  if(m) m.classList.remove('open');
   var view = window._currentExportView;
   if(view==='inventory')   exportInventory(format);
   else if(view==='match')  exportMatch(format);
@@ -3088,12 +3089,8 @@ function setExportView(viewName) {
   window._currentExportView = viewName;
   var exportableViews = ['inventory','match','renos','contractors'];
   var visible = exportableViews.indexOf(viewName) >= 0;
-  // Legacy header wrap (kept for any leftover legacy headers / fallback paths).
-  var wrap = document.getElementById('header_export_wrap');
+  var wrap = document.getElementById('header_export_wrap_v2');
   if(wrap) wrap.style.display = visible ? 'flex' : 'none';
-  // New v2 header wrap (the .app-header-v2 export dropdown).
-  var wrap2 = document.getElementById('header_export_wrap_v2');
-  if(wrap2) wrap2.style.display = visible ? 'flex' : 'none';
 }
 function showContractorsForRole() {
   var role = window.currentRole || 'housing_employee_l1';
@@ -3126,14 +3123,25 @@ function showTenants(){
   }
 }
 function showWorklist() {
-  // Phase B: the standalone worklistView has been folded into landingView.
-  // If landingView exists (housing.html), route there and ensure the
-  // worklist section is expanded so the user sees it.
+  // The standalone worklistView was folded into landingView (Phase B). If
+  // landingView is in DOM (housing.html), expand the section + render. On
+  // any other page, navigate to housing.html?view=worklist so the boot
+  // dispatches into this function with landingView present.
   if (document.getElementById('landingView') && typeof showLanding === 'function') {
+    if(!window._navSkipPush) pushNav('worklist');
     showLanding();
+    // Reset chip to 'mine' so the role-scoped queue is what shows up first
+    // when arriving via the Worklist nav button — matches the count pill.
+    window._wlActiveChip = 'mine';
     var sec = document.getElementById('sec-worklist');
     if (sec) sec.classList.remove('collapsed');
     if (typeof renderWorklist === 'function') renderWorklist();
+    if (typeof setHeaderNavActive === 'function') setHeaderNavActive('worklist');
+    // Bring the worklist section into view — clicking the tab while already
+    // on landing otherwise scrolls nowhere and looks like nothing happened.
+    if (sec && sec.scrollIntoView) {
+      try { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(_) {}
+    }
     // Keep worklist_datetime populated for any downstream readers.
     var dtEl = document.getElementById('worklist_datetime');
     if (dtEl) {
@@ -3147,24 +3155,10 @@ function showWorklist() {
     }
     return;
   }
-  // Sub-page fallback (this function is loaded everywhere via shared-data.js
-  // — on pages without landingView we keep the legacy worklistView path).
-  if(!window._navSkipPush) pushNav('worklist');
-  hideAllViews('worklistView');
-  setNavActive('tab_worklist');
-  var view = document.getElementById('worklistView');
-  if(view){ view.style.display='flex'; view.style.flexDirection='column'; }
-  var dtEl2 = document.getElementById('worklist_datetime');
-  if(dtEl2) {
-    var now2 = new Date();
-    var days2 = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    var months2 = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    var h2 = now2.getHours(), m2 = now2.getMinutes();
-    var ampm2 = h2 >= 12 ? 'PM' : 'AM';
-    h2 = h2 % 12 || 12;
-    dtEl2.textContent = days2[now2.getDay()] + ' · ' + months2[now2.getMonth()] + ' ' + now2.getDate() + ', ' + now2.getFullYear() + ' · ' + h2 + ':' + (m2 < 10 ? '0' : '') + m2 + ' ' + ampm2;
-  }
-  renderWorklist();
+  // Sub-page (inventory / tenants / match / renos / contractors): navigate
+  // to housing.html with the view param. The landing-page boot picks it up
+  // and dispatches back into this function on the right DOM.
+  window.location.href = 'housing.html?view=worklist';
 }
 function sowAddNewContractor() {
   var dd = document.getElementById('sow_ct_dropdown');
@@ -3218,23 +3212,6 @@ function sowSelectContractor(el) {
   if(hid) hid.value = id;
   var dd = document.getElementById('sow_ct_dropdown');
   if(dd) dd.style.display = 'none';
-}
-function toggleHeaderExportMenu() {
-  var m = document.getElementById('header_export_menu');
-  if(!m) return;
-  var open = m.style.display !== 'none';
-  m.style.display = open ? 'none' : 'block';
-  if(!open) {
-    setTimeout(function(){
-      document.addEventListener('click', function closeMenu(e){
-        var wrap = document.getElementById('header_export_wrap');
-        if(wrap && !wrap.contains(e.target)){
-          m.style.display='none';
-          document.removeEventListener('click', closeMenu);
-        }
-      });
-    }, 10);
-  }
 }
 function toggleInvExportMenu(){}
 function triggerPrint() {

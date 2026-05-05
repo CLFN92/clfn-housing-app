@@ -1607,10 +1607,6 @@ body.tic-modal-open       { overflow: hidden; }
   text-transform: uppercase;
 }
 
-/* Hide the legacy header_user_bar block. The DOM hooks (rb_select, export menu,
-   add-staff button) remain in the page so legacy callers can still find them by
-   id; they just don't render. */
-.app-header-v2 .header-user-bar-legacy { display: none !important; }
 
 /* Drawer-only items (Settings inside the hamburger drawer). Hidden by default. */
 .app-header-v2 .app-nav-item.in-drawer-only { display: none; }
@@ -1769,21 +1765,18 @@ body.tic-modal-open       { overflow: hidden; }
   color: var(--muted); font-size: 12px; font-style: italic;
 }
 .lookup-chip {
-  display: flex; align-items: center; gap: 8px;
+  display: inline-flex; align-items: center;
   background: var(--bg); border: 1px solid var(--border);
   color: var(--dark); border-radius: 999px;
-  padding: 5px 12px 5px 5px; font-size: 12px; font-weight: 600; cursor: pointer;
+  padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
   font-family: inherit;
 }
 .lookup-chip:hover { background: var(--yellow-light); border-color: var(--yellow-mid); }
-.lookup-chip-icon {
-  width: 22px; height: 22px; border-radius: 50%;
-  display: grid; place-items: center; font-size: 10px; font-weight: 700;
-  flex-shrink: 0;
-}
-.lookup-chip-icon.type-tenant { background: var(--type-tenant-bg); color: var(--type-tenant-fg); }
-.lookup-chip-icon.type-unit   { background: var(--type-unit-bg);   color: var(--type-unit-fg); }
-.lookup-chip-icon.type-sow    { background: var(--type-sow-bg);    color: var(--type-sow-fg); }
+/* Subtle per-type tint on the chip itself — preserves the at-a-glance type
+   cue without prepending a letter. Comment out for a fully-neutral look. */
+.lookup-chip--tenant { border-left: 3px solid var(--type-tenant-fg); }
+.lookup-chip--unit   { border-left: 3px solid var(--type-unit-fg); }
+.lookup-chip--sow    { border-left: 3px solid var(--type-sow-fg); }
 .lookup-chip-meta { color: var(--muted); font-weight: 500; }
 
 /* Quick actions */
@@ -1943,6 +1936,36 @@ body.tic-modal-open       { overflow: hidden; }
 }
 #landingView .recent-empty {
   font-size: 13px; color: var(--muted); font-style: italic; padding: 6px 0;
+}
+
+/* ── Step 8 Consent to Share — CLFN Programs ───────────────────────────── */
+.consent-share-block {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.consent-share-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--text); margin-bottom: 8px;
+}
+.consent-share-body {
+  font-size: 12px; color: var(--muted); line-height: 1.6;
+  margin: 0 0 8px;
+}
+.consent-share-footer { margin-bottom: 12px; }
+.consent-share-list {
+  font-size: 12px; color: var(--muted); line-height: 1.6;
+  margin: 0 0 8px 18px; padding: 0;
+}
+.consent-share-link { color: var(--text); text-decoration: underline; }
+.consent-share-check {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 12.5px; color: var(--text); font-weight: 600;
+  cursor: pointer; line-height: 1.5;
+}
+.consent-share-check input[type="checkbox"] {
+  margin-top: 2px; width: 16px; height: 16px;
+  cursor: pointer; flex-shrink: 0;
 }
 
 /* ── Header Export dropdown (.app-header-v2) ────────────────────────────── */

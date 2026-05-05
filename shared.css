@@ -223,18 +223,9 @@ body {
 }
 .btn-header-ghost:hover { border-color: var(--yellow); color: var(--yellow); }
 
-/* Role switcher (ED view-as toggle).
-   Hidden by default; setupHeaderRoleToggle() sets style.display='flex' for ED. */
-#roleSwitcher { display: none; align-items: center; gap: 6px; }
-#rb_select {
-  padding: 5px 10px; border: 1px solid #444; border-radius: 8px;
-  font-size: 12px; font-weight: 600; font-family: var(--sans);
-  background: #1a1a18; color: #ccc; cursor: pointer; outline: none;
-}
-
-/* Export dropdown.
-   Wrap is hidden by default; setExportView() shows it on exportable views. */
-.header-export-wrap { position: relative; display: none; }
+/* Export dropdown menu — shared between the v2 header export and the inline
+   .export-dropdown pattern (audit log, scorecards). The v2 header has its
+   own .export-wrap container; inline cards use .export-dropdown. */
 .header-export-menu {
   display: none; position: absolute; top: calc(100% + 6px); right: 0;
   background: var(--surface); border: 1px solid var(--border);
