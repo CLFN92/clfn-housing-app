@@ -403,3 +403,15 @@ function edGuard(featureName, callback) {
   showToast((featureName || 'This action') + ' requires Executive Director access.');
   return false;
 }
+
+// ── Tip popover toggle (shared) ─────────────────────────────────────────────
+// Drives the `.tip-panel` open/close state used on form fields and table
+// headers. Wired into markup via onclick="toggleTip('id')" or closeTip('id').
+function toggleTip(id){
+  var el = document.getElementById(id);
+  if(el) el.classList.toggle('is-open');
+}
+function closeTip(id){
+  var el = document.getElementById(id);
+  if(el) el.classList.remove('is-open');
+}

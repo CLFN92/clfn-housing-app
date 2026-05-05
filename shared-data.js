@@ -2633,10 +2633,16 @@ function renderWorklist() {
 
   var apps = (typeof applications !== 'undefined') ? applications : [];
 
-  // If no data loaded yet, show loading and try fetching
+  // If no data loaded yet, fetch once. If the fetch completes and the list
+  // is still empty, render the empty state — never loop the fetch.
   if(!apps.length) {
+    if(window._wlBootFetched) {
+      body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--muted);font-size:13px;">No applications yet.</div>';
+      return;
+    }
     body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px;">Loading applications…</div>';
     if(typeof loadAppDataFromSupabase === 'function') {
+      window._wlBootFetched = true;
       loadAppDataFromSupabase().then(function(){ renderWorklist(); });
     }
     return;
@@ -2691,7 +2697,8 @@ function renderWorklist() {
       {key:'returned',  label:'Returned',       filter: function(a){ return a.status==='returned'; }, alert:true},
       {key:'pending',   label:'Awaiting ED',    filter: function(a){ return a.status===APP_STATUS.MGR_APPROVED; }},
       {key:'approved',  label:'ED Approved',    filter: function(a){ return a.status===APP_STATUS.ED_APPROVED; }},
-      {key:'assigned',  label:'Assigned',       filter: function(a){ return a.status==='assigned'; }}
+      {key:'assigned',  label:'Assigned',       filter: function(a){ return a.status==='assigned'; }},
+      {key:'draft',     label:'Drafts',         filter: function(a){ return a.status===APP_STATUS.DRAFT; }}
     ];
   } else {
     chipDefs = [
@@ -2700,7 +2707,8 @@ function renderWorklist() {
       {key:'submitted', label:'Awaiting HM',    filter: function(a){ return a.status===APP_STATUS.SUBMITTED; }},
       {key:'approved',  label:'Approved',       filter: function(a){ return a.status===APP_STATUS.ED_APPROVED; }},
       {key:'assigned',  label:'Assigned',       filter: function(a){ return a.status==='assigned'; }},
-      {key:'declined',  label:'Declined',       filter: function(a){ return a.status==='declined'; }}
+      {key:'declined',  label:'Declined',       filter: function(a){ return a.status==='declined'; }},
+      {key:'draft',     label:'Drafts',         filter: function(a){ return a.status===APP_STATUS.DRAFT; }}
     ];
   }
 
@@ -2757,11 +2765,13 @@ function renderWorklist() {
     } else if((ROLE.isManagement(role))&&(a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit) {
       actionBtn = '<button data-wl-id="'+_aIdEsc+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:var(--success);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
     }
-    return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-wl-id="'+_aIdEsc+'" onclick="wlOpenApp(this)">'
-      + '<td style="padding:11px 14px;font-weight:600;font-size:13px;">'+escapeHtml(name)+'</td>'
-      + '<td style="padding:11px 14px;font-size:12px;color:var(--muted);">'+_aIdEsc+'</td>'
+    return '<tr style="border-bottom:1px solid var(--border);" data-wl-id="'+_aIdEsc+'">'
+      + '<td onclick="event.stopPropagation();wlOpenApplicantCell(this)" style="padding:11px 14px;font-weight:600;font-size:13px;cursor:pointer;">'+escapeHtml(name)+'</td>'
+      + '<td onclick="event.stopPropagation();wlOpenIdCell(this)" style="padding:11px 14px;font-size:12px;color:var(--muted);cursor:pointer;">'+_aIdEsc+'</td>'
       + '<td style="padding:11px 14px;font-size:12px;color:var(--muted);">'+escapeHtml(a.appDate||'—')+'</td>'
-      + '<td style="padding:11px 14px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+sm.bg+';color:'+sm.c+';">'+sm.label+'</span></td>'
+      + '<td style="padding:11px 14px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+sm.bg+';color:'+sm.c+';">'+sm.label+'</span>'
+      + (a.status===APP_STATUS.DRAFT && a.created_by_name ? '<div class="txt-xs-muted" style="margin-top:2px;">by '+escapeHtml(a.created_by_name)+'</div>' : '')
+      + '</td>'
       + (showScore ? '<td style="padding:11px 14px;text-align:center;"><span style="font-size:16px;font-weight:800;color:var(--text);">'+(typeof a.score==='number'?a.score:'—')+'</span>'+(tier?'<div style="font-size:9px;color:'+tc+';font-weight:700;margin-top:1px;">'+tier.replace(' Priority','')+'</div>':'')+'</td>' : '')
       + '<td style="padding:11px 14px;text-align:right;white-space:nowrap;">'+actionBtn+'</td>'
       + '</tr>';
@@ -2783,8 +2793,26 @@ function renderWorklist() {
         ? '<div style="padding:32px;text-align:center;color:var(--muted);font-size:13px;">'+emptyMsg+'</div>'
         : '<div class="overflow-x"><table class="std-tbl">'
           + '<thead><tr style="background:var(--dark);">'
-          + '<th class="js-th">Applicant</th>'
-          + '<th class="js-th">ID</th>'
+          + '<th class="js-th">Applicant'
+          +   '<span class="tip-host">'
+          +     '<button type="button" class="tip-btn" onclick="toggleTip(\'wl_tip_applicant\')">?</button>'
+          +     '<div id="wl_tip_applicant" class="tip-panel">'
+          +       '<div class="tip-panel-title">Applicant column</div>'
+          +       '<div class="tip-panel-body">Click an applicant&#39;s name to open the application. If the applicant is matched to a unit, opens the Tenant Information Card instead.</div>'
+          +       '<button type="button" class="tip-panel-close" onclick="closeTip(\'wl_tip_applicant\')">Close ✕</button>'
+          +     '</div>'
+          +   '</span>'
+          + '</th>'
+          + '<th class="js-th">ID'
+          +   '<span class="tip-host">'
+          +     '<button type="button" class="tip-btn" onclick="toggleTip(\'wl_tip_id\')">?</button>'
+          +     '<div id="wl_tip_id" class="tip-panel">'
+          +       '<div class="tip-panel-title">ID column</div>'
+          +       '<div class="tip-panel-body">Click an Application ID to open the scoring form.</div>'
+          +       '<button type="button" class="tip-panel-close" onclick="closeTip(\'wl_tip_id\')">Close ✕</button>'
+          +     '</div>'
+          +   '</span>'
+          + '</th>'
           + '<th class="js-th">Date</th>'
           + '<th class="js-th">Status</th>'
           + (showScore ? '<th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Score</th>' : '')
@@ -3272,6 +3300,28 @@ function wlOpenApp(el) {
     // All other statuses — open read-only scorecard
     if(true) showScorecard(app);
   }
+}
+function wlOpenApplicantCell(el) {
+  var host = el.closest('[data-wl-id]');
+  var id = host && host.getAttribute('data-wl-id');
+  if(!id) return;
+  var apps = typeof applications !== 'undefined' ? applications : [];
+  var app = apps.find(function(x){ return x.id === id; });
+  if(!app) return;
+  if(app.assignedUnit && typeof window.openTenantCard === 'function') {
+    window.openTenantCard(app.assignedUnit);
+    return;
+  }
+  if(typeof window.openEditModal === 'function') window.openEditModal(id);
+}
+function wlOpenIdCell(el) {
+  var host = el.closest('[data-wl-id]');
+  var id = host && host.getAttribute('data-wl-id');
+  if(!id) return;
+  var apps = typeof applications !== 'undefined' ? applications : [];
+  var app = apps.find(function(x){ return x.id === id; });
+  if(!app) return;
+  if(typeof showScorecard === 'function') showScorecard(app);
 }
 function wlSection(title, count, content) {
   var badge = count !== null ? ' <span style="font-size:12px;font-weight:700;background:var(--yellow);color:var(--dark);padding:1px 8px;border-radius:10px;margin-left:6px;">'+(count||0)+'</span>' : '';

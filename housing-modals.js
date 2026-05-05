@@ -2086,6 +2086,9 @@ window.openEditModal = function(appId) {
   set('co_status', coStatus);
   var coBlk = document.getElementById('coBlk');
   if(coBlk) coBlk.style.display = coStatus === 'yes' ? 'block' : 'none';
+  // Co-applicant arrears card lives in step 2 too; show/hide alongside #coBlk.
+  var coArrCardEl = document.getElementById('coArrCard');
+  if(coArrCardEl) coArrCardEl.style.display = coStatus === 'yes' ? 'block' : 'none';
   if(co) {
     set('co_fn',      co.fn);
     set('co_ln',      co.ln);
@@ -2095,6 +2098,31 @@ window.openEditModal = function(appId) {
     set('co_cell',    co.cell);
     set('co_home',    co.home);
     set('co_email',   co.email);
+    set('coOccDate',  co.occDate);
+    // ── Co-applicant arrears (mirrors applicant arrears restore below) ──
+    tog('coArrToggle', co.hasArrears);
+    var coArrBlkEl = document.getElementById('coArrBlk');
+    if(coArrBlkEl) coArrBlkEl.style.display = co.hasArrears ? 'block' : 'none';
+    if(co.hasArrears) {
+      var _coBalEl = document.getElementById('coArrBalAmt');
+      if(_coBalEl && co.arrBalAmt) {
+        var _coBalNum = parseFloat(co.arrBalAmt) || 0;
+        _coBalEl.value = _coBalNum ? '$' + _coBalNum.toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
+      }
+      var _coMonEl = document.getElementById('coArrMonthlyPayment');
+      if(_coMonEl && co.arrMonthlyPayment) {
+        var _coMonNum = parseFloat(co.arrMonthlyPayment) || 0;
+        _coMonEl.value = _coMonNum ? '$' + _coMonNum.toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
+      }
+      var _coPlanEl = document.getElementById('coArrPlanMonths');
+      if(_coPlanEl) _coPlanEl.value = co.arrPlanMonths || '';
+      var _coAgrEl = document.getElementById('coArrAgreementDate');
+      if(_coAgrEl) _coAgrEl.value = co.arrAgreementDate || '';
+      var _coDueEl = document.getElementById('coArrFirstDueDate');
+      if(_coDueEl) _coDueEl.value = co.arrFirstDueDate || '';
+      var _coFreqEl = document.getElementById('coArrFrequency');
+      if(_coFreqEl) _coFreqEl.value = co.arrFrequency || 'monthly';
+    }
   }
 
   // ── Step 3: Household Members ──
@@ -2241,6 +2269,11 @@ window.openEditModal = function(appId) {
   // Apply role locks and trigger fresh V2 score
   applyTenancyFieldRoles();
   triggerV2Score();
+  // Defensive recalc: at this point co_status and habList are fully populated,
+  // so rerun the household totals so occ_total / occ_coapplicant / occ_members
+  // reflect the loaded record (otherwise they show defaults from when the
+  // edit form was first rendered with co_status='no' and an empty habList).
+  if(typeof calcPersonsOverStandard === 'function') calcPersonsOverStandard();
 
   // Audit — log that this application was opened for editing
   var _editType = app.appType === 'existing_tenant' ? 'File Update' : 'New Housing';

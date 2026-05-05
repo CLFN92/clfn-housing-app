@@ -1398,3 +1398,37 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .sigw-presence-btn.active { background: var(--yellow); border-color: var(--yellow); color: #111; }
 
 .ct-modal-form { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Help tooltip / popover (shared) ───────────────────────────────────────
+   Click-toggled `?` button reveals a positioned panel. Used on form fields
+   (Housing Needs NOS, Health Risk levels) and table headers (Worklist).
+   Open state is driven by the `is-open` class — toggleTip()/closeTip() in
+   shared-ui.js manage it. */
+.tip-host        { position: relative; display: inline-block; }
+.js-th .tip-host { margin-left: 6px; }
+.tip-btn         { width: 18px; height: 18px; border-radius: 50%; background: var(--border); border: none; color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-family: var(--sans); line-height: 1; vertical-align: middle; }
+.tip-btn:hover   { background: var(--yellow); color: var(--dark); }
+.tip-panel       { display: none; position: absolute; left: 0; top: 24px; width: 280px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; z-index: 200; box-shadow: 0 4px 20px rgba(0,0,0,0.3); text-align: left; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.tip-panel.tip-panel-wide { width: 320px; }
+.tip-panel.is-open { display: block; }
+.tip-panel-title { font-size: 11px; font-weight: 700; color: var(--yellow); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .6px; }
+.tip-panel-body  { font-size: 11px; color: var(--text); line-height: 1.6; margin-bottom: 10px; }
+.tip-panel-body:last-of-type { margin-bottom: 0; }
+.tip-panel-section { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; }
+.tip-panel-table { width: 100%; font-size: 11px; border-collapse: collapse; }
+.tip-panel-meta  { font-size: 10px; color: var(--muted); margin-top: 10px; line-height: 1.5; font-style: italic; }
+.tip-panel-close { margin-top: 10px; font-size: 11px; color: var(--muted); background: none; border: none; cursor: pointer; font-family: var(--sans); padding: 0; }
+.tip-panel-close:hover { color: var(--text); }
+.tip-risk-severe   { color: var(--danger);     font-weight: 700; }
+.tip-risk-moderate { color: var(--warn-amber); font-weight: 700; }
+.tip-risk-minor    { color: var(--info-blue);  font-weight: 700; }
+.tip-risk-none     { color: var(--muted);      font-weight: 700; }
+
+/* ── Field summary box (auto-calculated multi-line displays) ──────────────
+   Composite display for read-only auto-calculated values (e.g. Persons Over
+   Occupancy Standard). Replaces standalone <input readonly> fields where
+   we need to show multiple derived values at once. */
+.field-summary       { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 13px; line-height: 1.7; color: var(--text); }
+.field-summary-label { color: var(--muted); }
+.field-summary-meta  { color: var(--muted); font-size: 11px; }
+.field-summary-empty { color: var(--muted); font-size: 11px; font-style: italic; margin-top: 2px; }

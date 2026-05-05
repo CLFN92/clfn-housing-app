@@ -172,11 +172,12 @@ function _saveToggleStates(){
 function submitApplication(){ if(typeof openSubmitModal==="function") openSubmitModal(); }
 
 function syncAccessibility(){
-  // Update accessibility field from checkboxes
-  var checks = document.querySelectorAll('input[data-acc]');
+  // Read every checked acc_* checkbox by its visible value, write to the
+  // hidden #accessibility field that the save path reads.
+  var checks = document.querySelectorAll('input[id^="acc_"]:checked');
   var vals = [];
-  checks.forEach(function(el){ if(el.checked) vals.push(el.getAttribute('data-acc')); });
-  var field = document.getElementById('f_accessibility');
+  checks.forEach(function(el){ vals.push(el.value); });
+  var field = document.getElementById('accessibility');
   if(field) field.value = vals.join(', ') || 'None';
 }
 
@@ -2521,9 +2522,13 @@ document.addEventListener('DOMContentLoaded', function(){
 // either shows the wrong thing or, more commonly, a blank screen.
 (function () {
   var path = window.location.pathname;
+  // Accept both `/housing.html` (Azure Static Web Apps) and `/housing` (static
+  // servers like `npx serve` that strip the .html extension via clean URLs).
   var isHousingHome =
     path.endsWith('/housing.html') ||
     path === '/housing.html' ||
+    path.endsWith('/housing') ||
+    path === '/housing' ||
     path.endsWith('/') ||
     path === '';
   if (!isHousingHome) {

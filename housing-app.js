@@ -66,6 +66,38 @@ function _calcArrearsMonths(){
   if(typeof triggerV2Score === 'function') triggerV2Score();
 }
 
+// ── Co-applicant arrears payment-plan duration ──
+// Mirrors _calcArrearsMonths but reads/writes the coArr* field ids. Lives next
+// to its applicant counterpart so future tweaks land on both sides together.
+function _calcCoArrearsMonths(){
+  function toNum(id){
+    var el = document.getElementById(id);
+    if(!el) return 0;
+    var n = parseFloat(String(el.value||'').replace(/[^0-9.]/g,''));
+    return isFinite(n) ? n : 0;
+  }
+  var owed     = toNum('coArrBalAmt');
+  var monthly  = toNum('coArrMonthlyPayment');
+  var monthsEl = document.getElementById('coArrPlanMonths');
+  var hintEl   = document.getElementById('coArrPlanMonthsHint');
+  var months   = (owed > 0 && monthly > 0) ? Math.ceil(owed / monthly) : 0;
+  if(monthsEl) monthsEl.value = months || '';
+  if(hintEl){
+    if(months > 0){
+      var yrs = Math.floor(months / 12);
+      var mo  = months % 12;
+      var parts = [];
+      if(yrs) parts.push(yrs + ' yr' + (yrs !== 1 ? 's' : ''));
+      if(mo)  parts.push(mo  + ' mo');
+      if(!parts.length) parts.push('—');
+      hintEl.textContent = months + ' months  (' + parts.join(' ') + ')';
+    } else {
+      hintEl.textContent = '';
+    }
+  }
+  if(typeof triggerV2Score === 'function') triggerV2Score();
+}
+
 // ── Phone formatter ──
 function fmtPhone(input){
   let v=input.value.replace(/\D/g,'').slice(0,10);
@@ -292,7 +324,7 @@ function goTo(s){
 
   // Auto-save draft on every forward step
   if(s > cur) {
-    var _ds = saveApplicationRecord();
+    var _ds = saveApplicationRecord({draft: true});
     if(_ds) {
       var _da = applications.find(function(a){ return a.id===_ds; });
       if(_da) sbSaveApplication(_da).catch(function(e){
@@ -1087,7 +1119,10 @@ function liveSync(){
 }
 
 // ── Collect all form fields into an app object and save ──
-function saveApplicationRecord(){
+// opts.draft: true → treat as autosave; status stays 'draft' until the user
+//                    explicitly submits. Never downgrades an already-submitted
+//                    or approved application back to draft.
+function saveApplicationRecord(opts){
   var appType = typeof getAppType === 'function' ? getAppType() : 'new_housing';
   var isFileUpdate = (appType === 'existing_tenant');
 
@@ -1137,9 +1172,16 @@ function saveApplicationRecord(){
   var coApp = hasCoApp ? {
     fn:fv('co_fn'), ln:fv('co_ln'), dob:fv('co_dob'),
     band:fv('co_band'), reserve:fsel('co_reserve'),
-    cell:fv('co_cell'), email:fv('co_email'),
+    cell:fv('co_cell'), home:fv('co_home'), email:fv('co_email'),
     occDate:fv('coOccDate'),
-    sameAddr: fb('co_same_addr') ? 'True' : 'False'
+    sameAddr: fb('co_same_addr') ? 'True' : 'False',
+    hasArrears:        fb('coArrToggle'),
+    arrBalAmt:         fb('coArrToggle') ? parseFloat((fv('coArrBalAmt')||'').replace(/[^0-9.]/g,''))||null : null,
+    arrMonthlyPayment: fb('coArrToggle') ? parseFloat((fv('coArrMonthlyPayment')||'').replace(/[^0-9.]/g,''))||null : null,
+    arrFrequency:      fb('coArrToggle') ? fsel('coArrFrequency') : null,
+    arrPlanMonths:     fv('coArrPlanMonths') ? parseInt(fv('coArrPlanMonths'))||null : null,
+    arrAgreementDate:  fv('coArrAgreementDate') || null,
+    arrFirstDueDate:   fv('coArrFirstDueDate') || null
   } : null;
 
   // Pets
@@ -1261,7 +1303,19 @@ function saveApplicationRecord(){
       if(checkedNow) return (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.email) || (window.currentRole || 'staff');
       return null;
     })(),
-    status:      isFileUpdate ? 'file_update' : 'submitted',
+    status:      (function(){
+      // Autosave path: stay in 'draft' until the user explicitly submits, but
+      // never downgrade an already submitted/approved application.
+      if (opts && opts.draft) {
+        var existingApp = applications.find(function(a){ return a.id === appId; });
+        var existingStatus = existingApp && existingApp.status;
+        if (!existingStatus || existingStatus === APP_STATUS.DRAFT) {
+          return APP_STATUS.DRAFT;
+        }
+        return existingStatus;
+      }
+      return isFileUpdate ? 'file_update' : 'submitted';
+    })(),
     submittedAt: new Date().toISOString().slice(0,10),
     score:       isFileUpdate ? null : scoreTotal,
     // ── Ownership ──
@@ -1273,6 +1327,12 @@ function saveApplicationRecord(){
       return (existing && existing.created_by_email)
         ? existing.created_by_email
         : (HOUSING_SESSION.email || null);
+    })(),
+    created_by_name: (function() {
+      var existing = applications.find(function(a){ return a.id === appId; });
+      return (existing && existing.created_by_name)
+        ? existing.created_by_name
+        : (HOUSING_SESSION.name || null);
     })(),
     tier:        isFileUpdate ? 'File Update' : scoreTier,
     scoreBreakdown: isFileUpdate ? {} : (window._lastScoreBreakdown || {}),

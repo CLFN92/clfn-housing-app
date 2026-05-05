@@ -1179,30 +1179,62 @@ function calcPersonsOverStandard() {
     nosSettings['5'] || 10
   ];
 
-  // Determine how many bedrooms the applicant's current home has
-  // We use the current unit's bedrooms if selected, otherwise estimate from people
-  var currentUnit = document.getElementById('currentUnitId');
+  // Recommended bedroom size per NOS — smallest bedroom count whose max ≥ totalPeople.
+  // Sizes are 0..nosMax.length-1 (0 = bachelor / studio).
+  var recommendedBeds = nosMax.length - 1;
+  for (var i = 0; i < nosMax.length; i++) {
+    if (nosMax[i] >= totalPeople) { recommendedBeds = i; break; }
+  }
+  var recommendedLabel = recommendedBeds === 0 ? 'Bachelor / Studio' : (recommendedBeds + '-bedroom');
+
+  // Determine the applicant's current band-unit bedroom count. Only a selected
+  // current unit (`currentUnitId`) is treated as a "matched house" — without
+  // it we can't know the bedroom count, so we don't compute over-standard.
+  var currentUnitEl = document.getElementById('currentUnitId');
+  var hasMatchedUnit = !!(currentUnitEl && currentUnitEl.value);
   var currentBeds = 0;
-  if(currentUnit && currentUnit.value) {
+  if(hasMatchedUnit) {
     var allUnits = (typeof housingUnits !== 'undefined') ? housingUnits : [];
-    var unit = allUnits.find(function(u){ return u.id === currentUnit.value; });
+    var unit = allUnits.find(function(u){ return u.id === currentUnitEl.value; });
     if(unit) currentBeds = parseInt(unit.bedrooms) || 0;
   }
-  // If no current unit selected, use bedrooms field if available
-  if(!currentBeds) {
-    var bedsEl = document.getElementById('au_bedrooms') || document.getElementById('ue_bedrooms');
-    if(bedsEl) currentBeds = parseInt(bedsEl.value) || 0;
+
+  // Over-standard only counts when we have a matched unit with a known bedroom count.
+  var over = 0;
+  if (hasMatchedUnit) {
+    var maxAllowed = nosMax[Math.min(currentBeds, nosMax.length-1)];
+    over = Math.max(0, Math.min(10, totalPeople - maxAllowed));
   }
 
-  // Max people allowed in current home per NOS
-  var maxAllowed = nosMax[Math.min(currentBeds, nosMax.length-1)];
-  var over = Math.max(0, Math.min(10, totalPeople - maxAllowed));
-
-  // Update the field
+  // Update the hidden input that scoring + save read from.
   var posEl = document.getElementById('persons_over_standard');
   if(posEl) posEl.value = over;
 
-  // Update display counters
+  // Composite display on the Housing Needs step.
+  var totEl = document.getElementById('occ_total_display');
+  if(totEl) totEl.textContent = totalPeople;
+  var totLbl = document.getElementById('occ_total_label');
+  if(totLbl) totLbl.textContent = totalPeople === 1 ? 'person' : 'people';
+  var recEl = document.getElementById('occ_recommended_display');
+  if(recEl) recEl.textContent = recommendedLabel;
+  var overRow = document.getElementById('occ_over_row');
+  var noUnitRow = document.getElementById('occ_no_unit_row');
+  if (hasMatchedUnit) {
+    if(overRow) overRow.hidden = false;
+    if(noUnitRow) noUnitRow.hidden = true;
+    var overEl = document.getElementById('occ_over_display');
+    if(overEl) overEl.textContent = over;
+    var ctxEl = document.getElementById('occ_over_context');
+    if(ctxEl) {
+      var currentLabel = currentBeds === 0 ? 'Bachelor / Studio' : (currentBeds + '-bedroom');
+      ctxEl.textContent = '(current unit: ' + currentLabel + ')';
+    }
+  } else {
+    if(overRow) overRow.hidden = true;
+    if(noUnitRow) noUnitRow.hidden = false;
+  }
+
+  // Vestigial counters — kept guarded so any leftover wiring still works.
   var occCo  = document.getElementById('occ_coapplicant'); if(occCo) occCo.textContent = coCount;
   var occMem = document.getElementById('occ_members');    if(occMem) occMem.textContent = habCount;
   var occTot = document.getElementById('occ_total');      if(occTot) occTot.textContent = totalPeople;
@@ -1217,7 +1249,11 @@ function scoreApplicationLocally(app) {
   var urgentPts = urgentMap[app.urgentNeed || 'none'] !== undefined ? urgentMap[app.urgentNeed || 'none'] : 0;
   var healthMap = { severe:15, moderate:10, minor:5, none:0 };
   var healthPts = healthMap[app.healthRisk || 'none'] !== undefined ? healthMap[app.healthRisk || 'none'] : 0;
-  var overcrowdingPts = Math.min(10, Math.max(0, parseInt(app.personsOverStandard || '0') || 0));
+  // Overcrowding only applies if the applicant has an existing house — if they
+  // have no current home, "over occupancy" isn't a meaningful housing-need signal.
+  var overcrowdingPts = app.haveHouse
+    ? Math.min(10, Math.max(0, parseInt(app.personsOverStandard || '0') || 0))
+    : 0;
   var deps = Math.min(5, parseInt(app.dependentsUnder18 || '0') || 0);
   var householdPts = Math.min(10, deps + (app.elderInHousehold?3:0) + (app.loneParent?3:0) + (app.householdDisability?2:0));
   var accessMap = { high:10, moderate:5, none:0 };
@@ -1265,12 +1301,20 @@ function triggerV2Score() {
     if (age < 18) dependentsUnder18++;
   });
 
-  // Arrears status — derive from toggle + plan months
-  var hasArrears = document.getElementById('arrToggle') && document.getElementById('arrToggle').checked;
+  // Arrears status — derive from applicant AND co-applicant toggles + plan months.
+  // Worst-case wins: if either party has arrears with no repayment plan, status
+  // is 'no_repayment'; if either has arrears (and all are on a plan), status is
+  // 'repayment'; otherwise 'none'. Both parties' info round-trips separately
+  // (app.* for applicant, app.coApp.* for co-applicant); only the derived
+  // status feeds the score so we don't have to change the scoring model.
+  var appArrChecked = !!(document.getElementById('arrToggle') && document.getElementById('arrToggle').checked);
+  var coArrChecked  = !!(document.getElementById('coArrToggle') && document.getElementById('coArrToggle').checked);
   var arrStatus = 'none';
-  if (hasArrears) {
-    var planMonths = parseInt((document.getElementById('arrPlanMonths')||{}).value || '0') || 0;
-    arrStatus = planMonths > 0 ? 'repayment' : 'no_repayment';
+  if (appArrChecked || coArrChecked) {
+    var appPlan = parseInt((document.getElementById('arrPlanMonths')||{}).value || '0') || 0;
+    var coPlan  = parseInt((document.getElementById('coArrPlanMonths')||{}).value || '0') || 0;
+    var anyNoPlan = (appArrChecked && appPlan === 0) || (coArrChecked && coPlan === 0);
+    arrStatus = anyNoPlan ? 'no_repayment' : 'repayment';
   }
 
   // Accessibility — map to high/moderate/none
