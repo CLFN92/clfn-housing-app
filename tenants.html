@@ -134,6 +134,7 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
         <button id="sow_mark_complete_btn" type="button" onclick="markSowComplete()" style="display:none;background:var(--success);border:none;color:#fff;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;align-items:center;gap:5px;">✓ Mark Complete</button>
         <button id="sow_reopen_btn" type="button" onclick="reopenSow()" style="display:none;background:none;border:1px solid var(--warn-amber-border);color:var(--warn-amber);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;align-items:center;gap:5px;">↺ Reopen</button>
+        <button id="sow_archive_btn" type="button" onclick="archiveCurrentSow()" style="display:none;background:none;border:1px solid var(--dark-border);color:var(--txt-on-dark);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;align-items:center;gap:5px;">🗄 Archive</button>
         <button type="button" onclick="printWorkOrder()" style="background:var(--yellow);border:none;color:var(--dark);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;display:flex;align-items:center;gap:5px;">🏗 Work Order</button>
         <button type="button" onclick="printSOW()" style="background:none;border:1px solid var(--dark-border);color:var(--txt-on-dark);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;">🖨 Full SOW</button>
         <button type="button" onclick="closeSowModal()" class="btn-close-sm">✕</button>
@@ -220,12 +221,13 @@
         </div>
       </div>
 
-      <!-- ── TENANT ACCOUNTABILITY ───────────────────────────────────────── -->
-      <div class="card card-flush-mb">
-        <div class="modal-hdr compact">
+      <!-- ── TENANT ACCOUNTABILITY (collapsible — defaults collapsed) ───── -->
+      <div class="card card-flush-mb collapsible-card is-collapsed">
+        <div class="modal-hdr compact collapsible-head" onclick="this.parentElement.classList.toggle('is-collapsed')">
           <div class="lbl-yellow">Tenant Accountability</div>
+          <svg class="collapsible-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
-        <div class="p-16">
+        <div class="p-16 collapsible-body">
           <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Record factors that affect renovation priority and tenant responsibility.</div>
           <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
             <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_rent_arrears"/><span class="tsl"></span></label><label for="sow_rent_arrears" class="txt-sm-bold">Tenant has rent arrears</label></div>
@@ -325,14 +327,13 @@
         </div>
       </div>
 
-      <!-- ── SIGNATURES (collapsible) ──────────────────────────────────── -->
-      <div class="card card-flush-mb">
-        <div class="modal-hdr compact"
-          onclick="var b=document.getElementById('sow_sig_body');var c=document.getElementById('sow_sig_chevron');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';">
-          <div class="lbl-yellow">Signatures &amp; Acknowledgement</div>
-          <svg id="sow_sig_chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transform:rotate(-90deg);transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
+      <!-- ── SIGNATURES (collapsible — defaults collapsed; required) ───── -->
+      <div class="card card-flush-mb collapsible-card is-collapsed">
+        <div class="modal-hdr compact collapsible-head" onclick="this.parentElement.classList.toggle('is-collapsed')">
+          <div class="lbl-yellow">Signatures &amp; Acknowledgement<span class="lbl-required">Required</span></div>
+          <svg class="collapsible-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
-        <div id="sow_sig_body" style="display:none;padding:16px;flex-direction:column;gap:14px;">
+        <div id="sow_sig_body" class="collapsible-body" style="padding:16px;display:flex;flex-direction:column;gap:14px;">
 
           <!-- Tenant signature -->
           <div class="box-bg-card">
@@ -383,34 +384,10 @@
         </div>
       </div>
 
-      <!-- ── AUDIT LOG (internal, not printed) ──────────────────────────── -->
-      <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;">
-        <div class="modal-hdr compact"
-          onclick="var b=document.getElementById('sow_audit_body');var c=document.getElementById('sow_audit_chevron');var open=b.style.display!=='none';b.style.display=open?'none':'block';c.style.transform=open?'rotate(-90deg)':'rotate(0deg)';if(!open&&typeof renderSowAuditLog==='function')renderSowAuditLog(window._sowUnitId);">
-          <div class="flex-gap8">
-            <div class="lbl-yellow">📋 Audit Log</div>
-            <span style="font-size:10px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;">— internal use only, not printed</span>
-          </div>
-          <svg id="sow_audit_chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5" style="transform:rotate(-90deg);transition:transform .2s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div id="sow_audit_body">
-          <div style="padding:0 0 4px 0;">
-            <table style="width:100%;border-collapse:collapse;font-size:12px;">
-              <thead>
-                <tr style="background:var(--bg);border-bottom:1px solid var(--border);">
-                  <th class="lbl-muted" style="padding:8px 14px;text-align:left;white-space:nowrap">Time</th>
-                  <th class="lbl-muted th-left-pad">Action</th>
-                  <th class="lbl-muted th-left-pad">Detail</th>
-                  <th class="lbl-muted th-left-pad">By</th>
-                </tr>
-              </thead>
-              <tbody id="sow_audit_tbody">
-                <tr><td colspan="4" style="padding:16px 14px;color:var(--muted);font-style:italic;font-size:12px;">Save the SOW to generate audit entries.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+      <!-- Audit Log card removed — auditEntry() writes still go to the
+           master Audit Log on the Settings page. Same pattern as the other
+           SOW modal copies (renos / inventory / match) where the inline
+           panel was removed earlier. -->
 
     </div><!-- /body -->
 

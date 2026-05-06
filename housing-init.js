@@ -1243,6 +1243,14 @@ function raQuickApprove(unitId, approver) {
       u.unitEdSig={name:role,date:today,decision:'approved',savedAt:today};
       auditEntry('UNIT:'+unitId,'sow_ed_approval',addr+' SOW approved by Executive Director',role);
     }
+    // Auto-flip unit status to under_repair on the FIRST approval (mirrors
+    // the saveSOW path, but for the inline quick-approve button on the Reno
+    // Approvals row). Idempotent: no-op if the unit is already under_repair
+    // or condemned. Captures priorStatus so the lifecycle can revert it
+    // when the last SOW on this unit completes / is archived.
+    if(typeof flipUnitToUnderRepair === 'function' && flipUnitToUnderRepair(u)){
+      auditEntry('UNIT:'+unitId,'unit_status_auto',addr+' → Under Repair (quick-approved by '+(approver==='hm'?'HM':'ED')+')',role);
+    }
     units[idx]=u;
     sbSaveUnit(u).catch(function(e){ console.warn('SOW approval unit save:',e); });
     if(typeof housingUnits!=='undefined') housingUnits.splice(0,housingUnits.length,...units);

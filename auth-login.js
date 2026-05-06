@@ -17,6 +17,11 @@
 'use strict';
 
 // ── "Remember me" persistence (cookie + localStorage) ─────────────────────────
+// Both mechanisms are written on save and read on load. Cookie is written
+// with `path=/;SameSite=Lax` so it's reachable from any path the app uses
+// (`/`, `/index.html`, etc.) and deleted with the SAME signature so the
+// browser actually removes the original (a path mismatch on deletion silently
+// creates a new orphan cookie instead of deleting the existing one).
 var HOUSING_REMEMBER_KEY = 'clfn_housing_email';
 function hSetCookie(name, value, days) {
   try {
@@ -31,30 +36,48 @@ function hGetCookie(name) {
   } catch(e) { return null; }
 }
 function hDeleteCookie(name) {
-  try { document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/'; } catch(e) {}
+  // Delete with the SAME flags used on set (path + SameSite) so the browser
+  // matches the original cookie. Without this, an "uncheck → sign in" cycle
+  // leaves the cookie in place and the email is still remembered next visit.
+  try { document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax'; } catch(e) {}
 }
 
+// loadRememberedEmail — pre-fills the email field and ticks the checkbox.
+// Idempotent + safe to call multiple times. Called from the login boot AND
+// from showSignInPanel() so navigating between sub-panels (forgot/verify)
+// and back re-applies the saved value (some browsers wipe on hide/show).
 function loadRememberedEmail() {
   try {
     var saved = null;
     try { saved = localStorage.getItem(HOUSING_REMEMBER_KEY); } catch(e) {}
     if (!saved) saved = hGetCookie(HOUSING_REMEMBER_KEY);
+
+    var emailEl = document.getElementById('signin-email');
+    var remEl   = document.getElementById('remember-me');
     if (saved) {
-      var emailEl = document.getElementById('signin-email');
-      var remEl   = document.getElementById('remember-me');
-      if (emailEl) emailEl.value = saved;
-      if (remEl)   remEl.checked = true;
+      if (emailEl && !emailEl.value) emailEl.value = saved;
+      if (remEl) remEl.checked = true;
+      // If the email is already filled (we have a remembered value), focus
+      // the password field so the user can type immediately. The 150ms delay
+      // lets the panel transition complete first.
       setTimeout(function(){
         var p = document.getElementById('signin-password');
-        if (p) p.focus();
+        if (p && !p.value) p.focus();
       }, 150);
+    } else {
+      // No saved value — leave the checkbox at whatever state the user has
+      // chosen. Do not force-uncheck here; that would surprise users who
+      // ticked the box and haven't signed in yet.
     }
   } catch(e) {}
 }
 
+// saveRememberedEmail — writes (or clears) BOTH localStorage and cookie.
+// Called from startSignIn() on successful auth. Defensive: if either store
+// fails (private browsing, full quota, etc.) the other still persists.
 function saveRememberedEmail(email, remember) {
   try {
-    if (remember) {
+    if (remember && email) {
       try { localStorage.setItem(HOUSING_REMEMBER_KEY, email); } catch(e) {}
       hSetCookie(HOUSING_REMEMBER_KEY, email, 365);
     } else {
@@ -72,6 +95,10 @@ function showSignInPanel() {
   if (p) p.style.display = '';
   if (v) v.style.display = 'none';
   if (f) f.style.display = 'none';
+  // Re-apply the remembered email when returning to the sign-in panel from
+  // the verify or forgot-password panel. Without this, navigating Back from
+  // those panels leaves the email blank even though localStorage has it.
+  loadRememberedEmail();
 }
 function showForgotPassword() {
   var p = document.getElementById('signin-panel');
@@ -219,3 +246,39 @@ async function startSignIn() {
     if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
   }
 }
+
+// ── Login page boot ──────────────────────────────────────────────────────────
+// Used to live as an inline <script> in index.html. Moved here so index.html
+// is just markup. Two responsibilities:
+//   1. Hand off to housing.html if the user already has a session token in
+//      sessionStorage (shared-auth.js on that page validates it; if stale,
+//      the user gets bounced back here).
+//   2. Otherwise show the sign-in screen with the remembered email pre-filled.
+//
+// `init` is named on the function so the registration is a no-op if the script
+// is loaded by a page that doesn't have #loginScreen (e.g. the file is now
+// pulled into other entry points).
+function initLoginPage() {
+  // Only act on pages that actually contain the login markup.
+  if (!document.getElementById('loginScreen')) return;
+
+  // Set the brand logo from the shared constant (single source of truth) so
+  // the same default image lives in shared-config.js and is reused by every
+  // page chrome that has an img.hlogo.
+  var logoEl = document.getElementById('login-logo');
+  if (logoEl && typeof CLFN_LOGO_DATA_URL === 'string') logoEl.src = CLFN_LOGO_DATA_URL;
+
+  loadRememberedEmail();
+
+  // Restored session — hand off directly to housing.html.
+  var token = null;
+  try { token = sessionStorage.getItem('clfn_housing_token'); } catch(e) {}
+  if (token) {
+    window.location.href = 'housing.html?view=home';
+    return;
+  }
+
+  showLoginScreen();
+}
+
+document.addEventListener('DOMContentLoaded', initLoginPage);

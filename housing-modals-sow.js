@@ -197,6 +197,15 @@ function openSowModal(unitId, projectNumber) {
       if(tnEl) tnEl.value = u2.assignedName;
     }
   }
+  // Auto-populate "Prepared By (Staff)" from the logged-in user. Done for both
+  // new and existing SOWs, but only when the field is empty — never overwrite
+  // a saved value (the original preparer should be preserved on re-open).
+  var pbEl = document.getElementById('sow_prepared_by');
+  if(pbEl && !pbEl.value){
+    var sess = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION : null;
+    var who = (sess && (sess.name || sess.email)) || (window.currentUserName || '');
+    if(who) pbEl.value = who;
+  }
 
   // Show project number header (new visual identifier for the SOW).
   var pnLabel = document.getElementById('sow_project_number_label');
@@ -252,6 +261,18 @@ function _applySowModalLock(sow){
   var roBtn = document.getElementById('sow_reopen_btn');
   if(roBtn){
     roBtn.style.display = (completed && canReopenSow()) ? 'flex' : 'none';
+  }
+
+  // Archive button: visible whenever the SOW has been initiated (has a
+  // project_number) and isn't already archived — regardless of viewer role.
+  // Hidden on new SOWs (no project number yet — nothing to archive) and on
+  // already-archived SOWs (restore happens from the unit-detail-panel SOW
+  // table where the archived row is visible).
+  var arBtn = document.getElementById('sow_archive_btn');
+  if(arBtn){
+    var _arSaved = !!sow && !!sow.project_number;
+    var _arShow  = _arSaved && !sow.archived;
+    arBtn.style.display = _arShow ? 'flex' : 'none';
   }
 
   // Save button: hidden in read-only mode.
@@ -311,6 +332,17 @@ function markSowComplete(){
     sow.completed_by = window.currentUserName || _realRoleForPermissions();
     upsertSowInList(_sowUnitId, sow);
     auditEntry('SOW:'+_sowUnitId, 'sow_completed', 'SOW '+pn+' marked Completed', _realRoleForPermissions());
+    // If this completion drained the last active SOW on the unit, revert the
+    // unit's status back to whatever it was before the renovation kicked in.
+    try {
+      var _allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : [];
+      var _u = _allUnits.find(function(x){ return x.id === _sowUnitId; });
+      if(_u && typeof hasActiveSows === 'function' && !hasActiveSows(_sowUnitId)
+         && typeof revertUnitFromRepair === 'function' && revertUnitFromRepair(_u)){
+        sbSaveUnit(_u).catch(function(e){ console.warn('[SOW] revert unit save failed:', e); });
+        auditEntry('UNIT:'+_sowUnitId, 'unit_status_auto', (_u.num+' '+_u.street).trim()+' → '+(_u.status||'updated')+' (SOW '+pn+' completed, no active SOWs remain)', _realRoleForPermissions());
+      }
+    } catch(e){ console.warn('[SOW] complete-revert threw:', e); }
     showToast('✓ SOW marked Completed');
     _applySowModalLock(sow);
   });
@@ -394,8 +426,11 @@ function udpRenderSowTable(unitId){
     wrap.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:12px;font-style:italic;background:var(--bg);">No scopes of work yet. Click <strong style="color:var(--text);">New SOW</strong> to create one.</div>';
     return;
   }
+  // Filter archived SOWs out by default (toggle re-includes them).
+  var _archivedTotal = list.filter(function(s){ return !!s.archived; }).length;
+  var _visibleList = window._udpShowArchived ? list.slice() : list.filter(function(s){ return !s.archived; });
   // Sort newest first by created_at.
-  list = list.slice().sort(function(a, b){
+  list = _visibleList.sort(function(a, b){
     return (b.created_at || '').localeCompare(a.created_at || '');
   });
 
@@ -404,8 +439,15 @@ function udpRenderSowTable(unitId){
     signed:       {bg:'#eff6ff', c:'#1d4ed8', label:'Signed'},
     hm_approved:  {bg:'#fffbeb', c:'#92400e', label:'HM Approved'},
     ed_approved:  {bg:'#f0fdf4', c:'#15803d', label:'ED Approved'},
-    completed:    {bg:'#f0fdf4', c:'#15803d', label:'Completed'}
+    completed:    {bg:'#f0fdf4', c:'#15803d', label:'Completed'},
+    archived:     {bg:'#f4f4f0', c:'#888',    label:'Archived'}
   };
+  // Archive UI gating: HM/ED only. Read-only viewers don't see the button.
+  var _udpRole = window.currentRole || 'staff';
+  var _canArchive = (typeof ROLE !== 'undefined' && ROLE.isManagement && ROLE.isManagement(_udpRole));
+  // "Show archived" toggle state lives on window so it survives re-renders
+  // within the same panel session. Default: hide archived.
+  if(window._udpShowArchived == null) window._udpShowArchived = false;
 
   function fmtCurrency(n){
     var v = Number(n) || 0;
@@ -427,10 +469,24 @@ function udpRenderSowTable(unitId){
     // Completed SOW + non-ED → View (opens read-only) instead of Edit.
     // Work Order stays available to everyone regardless of status.
     var locked = isSowCompleted(sow) && !canEditSow(sow);
+    var isArchived = !!sow.archived;
+    // Archived SOWs always render the "Archived" pill (overrides the
+    // approval-status pill) so the row's state is unmistakable when the
+    // "Show archived" toggle is on.
+    if(isArchived){ ss = statusStyles.archived; }
     var editBtn = locked
       ? '<button onclick="udpEditSow(\''+esc(unitId)+'\',\''+pn+'\')" title="View SOW (read-only)" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:600;font-family:DM Sans,sans-serif;margin-right:4px;">View</button>'
       : '<button onclick="udpEditSow(\''+esc(unitId)+'\',\''+pn+'\')" title="Edit SOW" style="background:none;border:1px solid var(--border);color:var(--text);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:600;font-family:DM Sans,sans-serif;margin-right:4px;">Edit</button>';
-    return '<tr style="border-top:1px solid var(--border);">'
+    // Archive / Unarchive — HM/ED only. Archive on active SOWs, Unarchive
+    // (restore) on archived ones. Both feed udpArchiveSow / udpUnarchiveSow
+    // which confirm + persist + may revert the unit's status.
+    var archiveBtn = '';
+    if(_canArchive){
+      archiveBtn = isArchived
+        ? '<button onclick="udpUnarchiveSow(\''+esc(unitId)+'\',\''+pn+'\')" title="Restore archived SOW" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:600;font-family:DM Sans,sans-serif;margin-right:4px;">Restore</button>'
+        : '<button onclick="udpArchiveSow(\''+esc(unitId)+'\',\''+pn+'\')" title="Archive this SOW" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:600;font-family:DM Sans,sans-serif;margin-right:4px;">🗄 Archive</button>';
+    }
+    return '<tr style="border-top:1px solid var(--border);'+(isArchived?'opacity:.6;':'')+'">'
       +'<td style="padding:8px 10px;font-size:11px;color:var(--muted);white-space:nowrap;">'+date+'</td>'
       +'<td style="padding:8px 10px;"><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:'+ss.bg+';color:'+ss.c+';white-space:nowrap;">'+ss.label+(locked?' 🔒':'')+'</span></td>'
       +'<td style="padding:8px 10px;font-size:12px;font-weight:700;white-space:nowrap;">'+amount+'</td>'
@@ -438,12 +494,24 @@ function udpRenderSowTable(unitId){
       +'<td style="padding:8px 10px;font-size:10px;">'+progressCell+'</td>'
       +'<td style="padding:6px 8px;white-space:nowrap;text-align:right;">'
         +editBtn
+        +archiveBtn
         +'<button onclick="udpPrintWorkOrder(\''+esc(unitId)+'\',\''+pn+'\')" title="Print work order" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700;font-family:DM Sans,sans-serif;">Work Order</button>'
       +'</td>'
       +'</tr>';
   }).join('');
 
-  wrap.innerHTML = '<div class="overflow-x"><table style="width:100%;border-collapse:collapse;font-family:DM Sans,sans-serif;">'
+  // "Show archived" toggle — only rendered if at least one archived SOW
+  // exists, to avoid clutter when there's nothing to reveal.
+  var archivedToggle = '';
+  if(_archivedTotal > 0){
+    archivedToggle = '<div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-bottom:6px;">'
+      +'<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">'
+      +'<input type="checkbox" '+(window._udpShowArchived?'checked':'')+' onchange="window._udpShowArchived=this.checked;udpRenderSowTable(\''+esc(unitId)+'\')" style="margin:0;cursor:pointer;accent-color:var(--yellow);"/>'
+      +'Show archived ('+_archivedTotal+')'
+      +'</label></div>';
+  }
+  wrap.innerHTML = archivedToggle
+    +'<div class="overflow-x"><table style="width:100%;border-collapse:collapse;font-family:DM Sans,sans-serif;">'
     +'<thead><tr style="background:var(--bg);"><th style="padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;">Date</th>'
     +'<th style="padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;">Status</th>'
     +'<th style="padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;">Amount</th>'
@@ -452,6 +520,89 @@ function udpRenderSowTable(unitId){
     +'<th style="padding:7px 10px;"></th></tr></thead>'
     +'<tbody>'+rows+'</tbody></table></div>';
 }
+
+// ── udpArchiveSow / udpUnarchiveSow ─────────────────────────────────────
+// Confirm + persist + re-render. archiveSow flips the per-SOW flag and
+// (if no other active SOWs remain) reverts the unit's status. Restoring
+// an archived SOW does NOT auto-flip the unit back to under_repair —
+// that requires a fresh approval (matches the lifecycle direction).
+window.udpArchiveSow = function(unitId, projectNumber){
+  if(!unitId || !projectNumber) return;
+  showConfirm({
+    title:       'Archive this SOW?',
+    message:     'Project ' + projectNumber + ' will be hidden from the active list. This is reversible — use the "Show archived" toggle to find it again.',
+    confirmText: 'Archive'
+  }).then(function(ok){
+    if(!ok) return;
+    var role = window.currentRole || 'staff';
+    if(typeof archiveSow !== 'function'){ showToast('Archive helper missing.'); return; }
+    var sow = archiveSow(unitId, projectNumber, role);
+    if(!sow){ showToast('SOW not found'); return; }
+    auditEntry('SOW:'+unitId, 'sow_archived', 'SOW '+projectNumber+' archived', role);
+    // If archiving emptied the active-SOW set on this unit, revert the
+    // unit's status back to its prior state.
+    try {
+      var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : [];
+      var u = allUnits.find(function(x){ return x.id === unitId; });
+      if(u && typeof hasActiveSows === 'function' && !hasActiveSows(unitId)
+         && typeof revertUnitFromRepair === 'function' && revertUnitFromRepair(u)){
+        sbSaveUnit(u).catch(function(e){ console.warn('[SOW archive] unit revert save failed:', e); });
+        auditEntry('UNIT:'+unitId, 'unit_status_auto', (u.num+' '+u.street).trim()+' → '+(u.status||'updated')+' (last active SOW archived)', role);
+      }
+    } catch(e){ console.warn('[SOW archive] revert threw:', e); }
+    udpRenderSowTable(unitId);
+    showToast('✓ SOW '+projectNumber+' archived');
+  });
+};
+window.udpUnarchiveSow = function(unitId, projectNumber){
+  if(!unitId || !projectNumber) return;
+  if(typeof unarchiveSow !== 'function'){ showToast('Unarchive helper missing.'); return; }
+  var sow = unarchiveSow(unitId, projectNumber);
+  if(!sow){ showToast('SOW not found'); return; }
+  auditEntry('SOW:'+unitId, 'sow_unarchived', 'SOW '+projectNumber+' restored', window.currentRole || 'staff');
+  udpRenderSowTable(unitId);
+  showToast('✓ SOW '+projectNumber+' restored');
+};
+
+// archiveCurrentSow — invoked by the 🗄 Archive button in the SOW modal
+// header. Archives the SOW currently open in the modal (uses _sowUnitId +
+// window._sowEditingProjectNumber), reverts the unit's status if no other
+// active SOWs remain, closes the modal, and refreshes whichever upstream
+// view rendered the row (Reno Approvals, Unit Detail Panel SOW table).
+window.archiveCurrentSow = function(){
+  var unitId = _sowUnitId;
+  var projectNumber = window._sowEditingProjectNumber;
+  if(!unitId || !projectNumber){ showToast('No SOW to archive.'); return; }
+  // Permission: anyone with the SOW modal open can archive an initiated SOW.
+  // The audit-log entry below records who archived it for accountability.
+  var role = window.currentRole || 'staff';
+  showConfirm({
+    title:       'Archive this SOW?',
+    message:     'Project ' + projectNumber + ' will be hidden from the active list. This is reversible — use the "Show archived" toggle on the Unit Detail Panel to restore it.',
+    confirmText: 'Archive'
+  }).then(function(ok){
+    if(!ok) return;
+    if(typeof archiveSow !== 'function'){ showToast('Archive helper missing.'); return; }
+    var sow = archiveSow(unitId, projectNumber, role);
+    if(!sow){ showToast('SOW not found'); return; }
+    auditEntry('SOW:'+unitId, 'sow_archived', 'SOW '+projectNumber+' archived from SOW modal', role);
+    // If this was the last active SOW, revert the unit's status.
+    try {
+      var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : [];
+      var u = allUnits.find(function(x){ return x.id === unitId; });
+      if(u && typeof hasActiveSows === 'function' && !hasActiveSows(unitId)
+         && typeof revertUnitFromRepair === 'function' && revertUnitFromRepair(u)){
+        sbSaveUnit(u).catch(function(e){ console.warn('[SOW archive] unit revert save failed:', e); });
+        auditEntry('UNIT:'+unitId, 'unit_status_auto', (u.num+' '+u.street).trim()+' → '+(u.status||'updated')+' (last active SOW archived)', role);
+      }
+    } catch(e){ console.warn('[SOW archive modal] revert threw:', e); }
+    closeSowModal();
+    showToast('✓ SOW '+projectNumber+' archived');
+    // Refresh whichever upstream view is in the DOM.
+    if(typeof renderRenoApprovalsView === 'function' && document.getElementById('ra_tbody')) renderRenoApprovalsView();
+    if(typeof udpRenderSowTable === 'function' && document.getElementById('udp_sow_table_wrap')) udpRenderSowTable(unitId);
+  });
+};
 
 function udpNewSow(){
   if(!_currentDetailUnitId) return;
@@ -571,6 +722,25 @@ function saveSOW(){
   else data.approval_status = 'draft';
 
   if(_sowUnitId) upsertSowInList(_sowUnitId, data);
+
+  // ── Unit status auto-flip ────────────────────────────────────────────────
+  // When this save took the SOW into its first HM/ED-approved state, flip
+  // the unit to 'under_repair' so it surfaces in the Renovations view. When
+  // it took the SOW to 'completed' AND no other SOWs on the unit are still
+  // active, revert the unit to its prior status. See maybeAutoFlipUnitForSow
+  // in shared-sow.js for the transition rules.
+  if(_sowUnitId){
+    try {
+      var _allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : [];
+      var _u = _allUnits.find(function(x){ return x.id === _sowUnitId; });
+      var _prev = existingForStatus ? existingForStatus.approval_status : null;
+      if(_u && typeof maybeAutoFlipUnitForSow === 'function' && maybeAutoFlipUnitForSow(_u, data, _prev)){
+        sbSaveUnit(_u).catch(function(e){ console.warn('[SOW] auto-flip unit save failed:', e); });
+        var _newStatus = _u.status === 'under_repair' ? 'Under Repair' : (_u.status || 'updated');
+        auditEntry('UNIT:'+_sowUnitId, 'unit_status_auto', (_u.num+' '+_u.street).trim()+' → '+_newStatus+' (SOW '+(data.project_number||'')+' '+(data.approval_status==='completed'?'completed':'approved')+')', _saveRole);
+      }
+    } catch(e){ console.warn('[SOW] auto-flip threw:', e); }
+  }
 
   // ── Audit trail ──────────────────────────────────────────────────────────
   var role = window.currentRole || 'staff';

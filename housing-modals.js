@@ -284,7 +284,17 @@ function saveUnitEdit(){
     // get persisted.
     u.monthlyRent = (rentRaw === '' || rentRaw == null) ? null : Math.round(Number(rentRaw) * 100) / 100;
   }
+  // Capture the prior status BEFORE the user's pick so we can detect a manual
+  // status change. The auto-revert lifecycle (priorStatus, set when a SOW
+  // approval flipped the unit to under_repair) must NOT survive a manual
+  // status change — otherwise we'd later "revert" to a stale value the user
+  // already overrode. Drop priorStatus whenever the user explicitly picks
+  // any status other than under_repair.
+  var _ueStatusBefore = u.status;
   u.status=get('ue_status')||'vacant'; u.accessible=chk('ue_accessible'); u.isElders=chk('ue_isElders');
+  if(u.status !== 'under_repair' && _ueStatusBefore !== u.status){
+    delete u.priorStatus;
+  }
   u.notes=get('ue_notes');
   // HM approval
   var hmDec = (document.getElementById('ue_sig_hm_decision')||{}).value||'';

@@ -31,6 +31,18 @@
   <div style="width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--yellow);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
   <div style="font-size:13px;color:var(--muted);">Loading...</div>
 </div>
+
+<!-- Renos page tab bar — toggles between the Approvals and Renovations
+     views below. Uses the shared .pill-tabs segmented control (same look
+     as Admin / App Settings on the Settings page). Wrapped in a centred
+     row so it lines up with the 1200px-max content area below. -->
+<div id="renosTabsRow" style="display:none;max-width:1200px;margin:0 auto;padding:14px clamp(14px,3vw,28px) 0;box-sizing:border-box;width:100%;">
+  <div class="pill-tabs" id="renosTabsBar">
+    <button type="button" id="renos-tab-approvals"   class="pill-tab" onclick="setRenosTab('approvals')">Approvals</button>
+    <button type="button" id="renos-tab-renovations" class="pill-tab" onclick="setRenosTab('renovations')">Renovations</button>
+  </div>
+</div>
+
 <div id="renoApprovalsView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
   <div class="page-back-row">
     <button onclick="goBack()" class="back-btn-yellow">
@@ -46,7 +58,8 @@
     <div class="phb-actions">
       <button onclick="exportRenoApprovalsCSV()" style="background:none;border:1.5px solid var(--border);color:var(--text);padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="this.style.borderColor='var(--border)'">⬇ CSV</button>
       <button onclick="exportRenoApprovalsPDF()" style="background:none;border:1.5px solid var(--border);color:var(--text);padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="this.style.borderColor='var(--border)'">🖨 PDF</button>
-      <button onclick="showRenos()" style="background:none;border:1.5px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:600;">Progress View</button>
+      <!-- "Progress View" cross-link removed — the tab bar above both views
+           handles switching between Approvals and Renovations now. -->
     </div>
   </div>
 
@@ -297,6 +310,7 @@
         <div id="sow_unit_label" class="txt-sm-meta"></div>
       </div>
       <div style="display:flex;gap:8px;">
+        <button id="sow_archive_btn" type="button" onclick="archiveCurrentSow()" style="display:none;background:none;border:1px solid var(--dark-border);color:var(--txt-on-dark);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;align-items:center;gap:5px;">🗄 Archive</button>
         <button type="button" onclick="printWorkOrder()" style="background:var(--yellow);border:none;color:var(--dark);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;font-weight:700;display:flex;align-items:center;gap:5px;">🏗 Work Order</button>
         <button type="button" onclick="printSOW()" style="background:none;border:1px solid var(--dark-border);color:var(--txt-on-dark);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;">🖨 Full SOW</button>
         <button type="button" onclick="closeSowModal()" class="btn-close-dark-30">✕</button>
@@ -381,12 +395,13 @@
         </div>
       </div>
 
-      <!-- ── TENANT ACCOUNTABILITY ───────────────────────────────────────── -->
-      <div class="card card-flush-mb">
-        <div class="modal-hdr compact">
+      <!-- ── TENANT ACCOUNTABILITY (collapsible — defaults collapsed) ───── -->
+      <div class="card card-flush-mb collapsible-card is-collapsed">
+        <div class="modal-hdr compact collapsible-head" onclick="this.parentElement.classList.toggle('is-collapsed')">
           <div class="lbl-yellow">Tenant Accountability</div>
+          <svg class="collapsible-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
-        <div class="p-16">
+        <div class="p-16 collapsible-body">
           <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Record factors that affect renovation priority and tenant responsibility.</div>
           <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
             <div class="ftog"><label class="tsw"><input type="checkbox" id="sow_rent_arrears"/><span class="tsl"></span></label><label for="sow_rent_arrears" style="cursor:pointer;font-size:13px;">Tenant has rent arrears</label></div>
@@ -463,12 +478,13 @@
         </div>
       </div>
 
-      <!-- ── SIGNATURES ──────────────────────────────────────────────────── -->
-      <div class="card card-flush-mb">
-        <div class="modal-hdr compact">
-          <div class="lbl-yellow">Signatures &amp; Acknowledgement</div>
+      <!-- ── SIGNATURES (collapsible — defaults collapsed; required) ───── -->
+      <div class="card card-flush-mb collapsible-card is-collapsed">
+        <div class="modal-hdr compact collapsible-head" onclick="this.parentElement.classList.toggle('is-collapsed')">
+          <div class="lbl-yellow">Signatures &amp; Acknowledgement<span class="lbl-required">Required</span></div>
+          <svg class="collapsible-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
+        <div class="collapsible-body" style="padding:16px;display:flex;flex-direction:column;gap:14px;">
 
           <!-- Tenant signature -->
           <div class="box-bg-card">
@@ -1072,7 +1088,6 @@ async function loadRenosData() {
 }
 function initRenosPage() {
   var params = new URLSearchParams(window.location.search);
-  var view = params.get('view') || 'renovations';
   updateRenosHeader();
   var role = window.currentRole || 'housing_employee_l1';
   // Also apply the shared header updates (role switcher visibility, settings button, etc.)
@@ -1082,6 +1097,16 @@ function initRenosPage() {
   if (typeof applyRoleVisibility === 'function') applyRoleVisibility(role);
   if (typeof setHeaderNavActive === 'function') setHeaderNavActive('renovations');
   var ldg = document.getElementById('renosLoadingView'); if(ldg) ldg.style.display='none';
+  // Default tab is role-aware when no ?view= hint is present:
+  //   - management (ED / HM) → Approvals (their primary daily workflow)
+  //   - everyone else        → Renovations (progress-tracking view)
+  // Live had this behaviour because shared-data.js showRenos() routed by role
+  // through the URL; local can lose the query param across clean-URL redirects,
+  // so we now derive the default in-page from currentRole instead.
+  var roleDefault = (typeof ROLE !== 'undefined' && ROLE.isManagement && ROLE.isManagement(role))
+                  ? 'approvals'
+                  : 'renovations';
+  var view = params.get('view') || roleDefault;
   if(view==='contractors') showContractors();
   else if(view==='approvals') showRenoApprovals();
   else showRenos();
@@ -1102,35 +1127,42 @@ function updateRenosHeader() {
 }
 function goHome(){window.location.href='index.html';}
 function goBack(){window.location.href='index.html';}
-function setRenosNav(active){
-  ['renos','contractors','approvals'].forEach(function(n){var b=document.getElementById('renos-nav-'+n);if(b)b.classList.toggle('active',n===active);});
-}
-function showRenoApprovals(){
-  hideAllViews('renoApprovalsView');setRenosNav('approvals');
-  var v=document.getElementById('renoApprovalsView');
-  if(v){v.style.display='flex';v.style.flexDirection='column';}
-  renderRenoApprovalsView();
-}
-
-
-function showRenosSimple(){
-  if(!window._navSkipPush) pushNav('renos');
-  setExportView('reno_approvals');
-  setNavActive('tab_renos');
-  _showView('renosView', renderRenosView);
-}
-
-// ── Contractors view ──
-// Override shared-data.js showContractors() — on renos.html we switch the
-// view directly instead of navigating (which would cause an infinite redirect).
-// Override shared-data.js showRenos() — same redirect-loop fix as showContractors.
-function showRenos() {
-  hideAllViews('renosView');
-  setRenosNav('renos');
-  var v = document.getElementById('renosView');
+// setRenosTab(name) — single entry point for switching between the
+// Approvals (SOW queue) and Renovations (under-repair / condemned units)
+// views. Replaces the prior split between showRenoApprovals() / showRenos()
+// with separate per-view URL params (?view=approvals|renovations) — the tab
+// bar above both views now drives the toggle in-page. URL params are still
+// honored as initial-tab hints for backward compatibility (initRenosPage
+// reads ?view= once on boot and maps it to setRenosTab).
+function setRenosTab(name) {
+  // Hide both renos views (and any other top-level views) first.
+  hideAllViews(name === 'approvals' ? 'renoApprovalsView' : 'renosView');
+  // Reveal the chosen view.
+  var targetId = name === 'approvals' ? 'renoApprovalsView' : 'renosView';
+  var v = document.getElementById(targetId);
   if (v) { v.style.display = 'flex'; v.style.flexDirection = 'column'; }
-  if (typeof renderRenosView === 'function') renderRenosView();
+  // Reveal the tab bar wrapper (hidden until first tab is chosen so it
+  // doesn't flash before loadRenosData completes).
+  var row = document.getElementById('renosTabsRow');
+  if (row) row.style.display = 'block';
+  // Mark the active tab. .active is the convention used by .pill-tab on
+  // the Settings page (Admin / App Settings) — same segmented-control look.
+  var ta = document.getElementById('renos-tab-approvals');
+  var tr = document.getElementById('renos-tab-renovations');
+  if (ta) ta.classList.toggle('active', name === 'approvals');
+  if (tr) tr.classList.toggle('active', name === 'renovations');
+  // Render the target view.
+  if (name === 'approvals' && typeof renderRenoApprovalsView === 'function') {
+    renderRenoApprovalsView();
+  } else if (name === 'renovations' && typeof renderRenosView === 'function') {
+    renderRenosView();
+  }
 }
+
+// Public wrappers — kept for backward compat with anything (header nav,
+// inline onclicks, cross-page handoff) that still calls these names.
+function showRenoApprovals() { setRenosTab('approvals'); }
+function showRenos()         { setRenosTab('renovations'); }
 
 
 

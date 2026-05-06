@@ -23,6 +23,24 @@
 <script src="housing-app.js"></script>
 <script src="housing-init.js"></script>
 
+<!-- EmailJS SDK (v3.2.0 — same version as contractors.html) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/emailjs-com/3.2.0/email.min.js"></script>
+<script>
+  // Initialise EmailJS once per page load
+  document.addEventListener('DOMContentLoaded', function(){
+    if(window.emailjs) {
+      try {
+        emailjs.init('3ntLombYmwN6HHQXb');
+        console.log('[CLFN] EmailJS initialised on housing.html');
+      } catch(e) {
+        console.error('[CLFN] EmailJS init failed:', e);
+      }
+    } else {
+      console.warn('[CLFN] EmailJS SDK failed to load on housing.html');
+    }
+  });
+</script>
+
 <style>body{opacity:0;transition:opacity .15s ease;}</style>
 </head><body>
 <!-- ─── APPROVAL ACTION MODAL ─── -->

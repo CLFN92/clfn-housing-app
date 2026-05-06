@@ -82,3 +82,84 @@ function nextProjectNumber(unitId){
   var next = ('000' + (maxN + 1)).slice(-3);
   return addr + '-SOW-' + next;
 }
+
+// ─── SOW archive lifecycle ────────────────────────────────────────────────
+// archiveSow / unarchiveSow flip the per-SOW `archived` flag inside the
+// unit's SOW list and persist via upsertSowInList. The Reno Approvals view
+// and the unit-detail SOW table both filter archived SOWs out by default;
+// a "Show archived" toggle exposes them for review.
+//
+// hasActiveSows is the trigger for unit-status auto-revert: the unit is
+// flipped back from 'under_repair' to its priorStatus once no SOW remains
+// that is both not-archived AND not-completed. Multi-SOW units stay
+// 'under_repair' while phased work is still active.
+function archiveSow(unitId, projectNumber, role){
+  var sow = getSowByProjectNumber(unitId, projectNumber);
+  if(!sow) return null;
+  sow.archived   = true;
+  sow.archivedAt = new Date().toISOString();
+  sow.archivedBy = role || (window.currentRole || 'staff');
+  upsertSowInList(unitId, sow);
+  return sow;
+}
+function unarchiveSow(unitId, projectNumber){
+  var sow = getSowByProjectNumber(unitId, projectNumber);
+  if(!sow) return null;
+  sow.archived = false;
+  delete sow.archivedAt;
+  delete sow.archivedBy;
+  upsertSowInList(unitId, sow);
+  return sow;
+}
+function hasActiveSows(unitId){
+  var list = getUnitSowList(unitId);
+  return list.some(function(s){
+    return !s.archived && s.approval_status !== 'completed';
+  });
+}
+
+// ─── Unit-status auto-flip for the renovation lifecycle ────────────────────
+// flipUnitToUnderRepair: when a SOW is first HM/ED-approved we set the unit
+// to 'under_repair' so it surfaces in the Renovations view. The prior status
+// (vacant, occupied, reserved) is preserved on `priorStatus` so we can put
+// the unit back when the SOW completes or is archived. Idempotent — no-op
+// if the unit is already under_repair (or condemned, which we never touch).
+function flipUnitToUnderRepair(unit){
+  if(!unit) return false;
+  if(unit.status === 'under_repair' || unit.status === 'condemned') return false;
+  unit.priorStatus = unit.status || 'vacant';
+  unit.status      = 'under_repair';
+  return true;
+}
+// revertUnitFromRepair: only acts when the unit is currently under_repair
+// AND there are no remaining active SOWs. Returns the prior status (or
+// 'vacant' if none was captured — happens for units that were already
+// under_repair before this lifecycle was added).
+function revertUnitFromRepair(unit){
+  if(!unit || unit.status !== 'under_repair') return false;
+  unit.status = unit.priorStatus || 'vacant';
+  delete unit.priorStatus;
+  return true;
+}
+
+// maybeAutoFlipUnitForSow — called from saveSOW after the new approval_status
+// is computed. Detects two transitions:
+//   • first HM/ED approval (was draft/signed, now hm/ed_approved) → flip to under_repair
+//   • completion (now 'completed' AND no other active SOWs)       → revert
+// Returns true if the unit was changed (caller should persist via sbSaveUnit).
+function maybeAutoFlipUnitForSow(unit, newSow, prevApprovalStatus){
+  if(!unit || !newSow) return false;
+  var newStatus  = newSow.approval_status;
+  var wasApproved = prevApprovalStatus === 'hm_approved'
+                 || prevApprovalStatus === 'ed_approved'
+                 || prevApprovalStatus === 'completed';
+  // First-approval transition.
+  if((newStatus === 'hm_approved' || newStatus === 'ed_approved') && !wasApproved){
+    return flipUnitToUnderRepair(unit);
+  }
+  // Completion → maybe revert (only if no other SOW is still active).
+  if(newStatus === 'completed' && !hasActiveSows(unit.id)){
+    return revertUnitFromRepair(unit);
+  }
+  return false;
+}
