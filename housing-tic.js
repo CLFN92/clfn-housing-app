@@ -871,7 +871,7 @@
          +     '<div class="tic-field"><label class="tic-field-lbl">First Name *</label><input class="tic-input" id="tic_hab_fn" type="text"/></div>'
          +     '<div class="tic-field"><label class="tic-field-lbl">Last Name *</label><input class="tic-input" id="tic_hab_ln" type="text"/></div>'
          +     '<div class="tic-field"><label class="tic-field-lbl">Date of Birth</label><input class="tic-input" id="tic_hab_dob" type="date"/></div>'
-         +     '<div class="tic-field"><label class="tic-field-lbl">Relationship</label><input class="tic-input" id="tic_hab_rel" type="text" placeholder="e.g. spouse, child, parent"/></div>'
+         +     '<div class="tic-field"><label class="tic-field-lbl">Relationship</label><select class="tic-input" id="tic_hab_rel"><option value="">Select</option><option>Spouse</option><option>Child</option><option>Parent</option><option>Sibling</option><option>Other</option></select></div>'
          +   '</div>'
          +   '<div class="tic-form-actions">'
          +     '<button type="button" class="btn btn-ghost"   data-tic-action="hab-cancel">Cancel</button>'

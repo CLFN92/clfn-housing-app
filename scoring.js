@@ -2210,3 +2210,21 @@ if (typeof window.livePoints !== 'function') {
 if (typeof window.liveAgePoints !== 'function') {
   window.liveAgePoints = function(_age) { return 0; };
 }
+// livePerMemberPoints is referenced once at calcScore (band membership row)
+// but was never defined. Same shape as livePoints — alias so opening any
+// existing application for edit doesn't throw a ReferenceError mid-render.
+if (typeof window.livePerMemberPoints !== 'function') {
+  window.livePerMemberPoints = window.livePoints;
+}
+// liveRangeScore(key, amount) and livePerYearPoints() are also referenced by
+// the legacy V1 calcScore path (renos / arrears / payment-plan / waitlist
+// rows) without ever being defined. The V2 model owns the real scoring math
+// now — these stubs just keep V1 from throwing during edit-modal hydration.
+// Returning 0 is safe: V1 totals are no longer used for the persisted score,
+// only V2 (driven by triggerV2Score) feeds app.score.
+if (typeof window.liveRangeScore !== 'function') {
+  window.liveRangeScore = function(_key, _amount) { return 0; };
+}
+if (typeof window.livePerYearPoints !== 'function') {
+  window.livePerYearPoints = function() { return 0; };
+}

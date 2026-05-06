@@ -1808,6 +1808,17 @@ async function loadHousingData() {
       var _sm = window._appSettings['scoring_model_v2'] || window._appSettings['scoring_model'];
       if(_sm && Array.isArray(_sm) && _sm.length) window.liveScoreModel = _sm;
     }
+    // Apply theme + nation-name overrides + required-field config now that
+    // _appSettings is hydrated. Sub-pages (inventory / match / renos /
+    // contractors / tenants) call loadHousingData on boot — without these
+    // the shared header (rendered by renderAppHeader) keeps the build-time
+    // default logo and "Constance Lake" placeholder strings instead of the
+    // customer-saved values from Settings → Admin → Themes / Nation.
+    // _applyTheme rewrites every img.hlogo src; applyBrandingToHeader (called
+    // from inside applyNationOverrides) updates [data-nation*] text nodes.
+    if (typeof _applyTheme === 'function')           _applyTheme((window._appSettings||{}).theme || {});
+    if (typeof applyNationOverrides === 'function')  applyNationOverrides();
+    if (typeof applyRequiredFields === 'function')   applyRequiredFields();
     if(applications.length && typeof rescoreAllApplications==='function') rescoreAllApplications();
     console.log('[CLFN] Loaded '+applications.length+' apps, '+housingUnits.length+' units');
   } catch(e){ console.warn('[HOUSING] data load error:',e); console.warn('[CLFN] Could not load data'); }
