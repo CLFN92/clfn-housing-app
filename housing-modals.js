@@ -1935,18 +1935,68 @@ function getUnitPhotos(unitId){
   } catch(e){ return []; }
 }
 
-function saveUnitPhotos(unitId, photos){
+async function saveUnitPhotos(unitId, photos){
   if(!window._unitPhotos) window._unitPhotos = {};
   window._unitPhotos[unitId] = photos;
-  // Sync to Supabase — delete existing and re-insert
-  fetch(SUPABASE_URL+'/rest/v1/housing_unit_photos?unit_id=eq.'+encodeURIComponent(unitId), { method:'DELETE', headers:HOUSING_HEADERS })
-    .then(function(){
-      if(!photos.length) return;
-      return fetch(SUPABASE_URL+'/rest/v1/housing_unit_photos', {
-        method:'POST', headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
-        body: JSON.stringify(photos.map(function(p){ return { unit_id: unitId, file_path: typeof p==='string'?p:(p.file_path||''), file_name: typeof p==='string'?p.split('/').pop():(p.file_name||''), added_by: window.currentUser||'staff' }; }))
+  // Diff-based sync against current DB state. The previous implementation
+  // did DELETE-then-INSERT; if the INSERT failed (network / RLS / 5xx) all
+  // photo metadata for the unit was lost while storage blobs were left
+  // orphaned. Now we fetch the current rows, compute added/removed, and
+  // INSERT first then DELETE — worst-case failure leaves extra rows
+  // instead of losing data.
+  var nextRecords = (photos || []).map(function(p){
+    var path = typeof p === 'string' ? p : ((p && p.file_path) || '');
+    return {
+      file_path: path,
+      file_name: typeof p === 'string' ? path.split('/').pop() : ((p && p.file_name) || '')
+    };
+  }).filter(function(r){ return r.file_path; });
+  var nextPaths = nextRecords.map(function(r){ return r.file_path; });
+  try {
+    // 1) Read current rows for this unit (source of truth, not the in-memory cache).
+    var existingRows = [];
+    var existingResp = await fetch(
+      SUPABASE_URL + '/rest/v1/housing_unit_photos?unit_id=eq.' + encodeURIComponent(unitId) + '&select=file_path',
+      { headers: HOUSING_HEADERS }
+    );
+    if (existingResp.ok) existingRows = await existingResp.json();
+    var existingPaths = (existingRows || []).map(function(row){ return row.file_path; }).filter(Boolean);
+
+    // 2) Diff.
+    var added   = nextRecords.filter(function(r){ return existingPaths.indexOf(r.file_path) === -1; });
+    var removed = existingPaths.filter(function(p){ return nextPaths.indexOf(p) === -1; });
+
+    // 3) Insert FIRST so a delete failure can't strand the user with empty
+    //    metadata on storage blobs that still exist.
+    if (added.length) {
+      await fetch(SUPABASE_URL + '/rest/v1/housing_unit_photos', {
+        method:  'POST',
+        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body:    JSON.stringify(added.map(function(r){
+          return {
+            unit_id:   unitId,
+            file_path: r.file_path,
+            file_name: r.file_name,
+            added_by:  window.currentUser || 'staff'
+          };
+        }))
       });
-    }).catch(function(e){ console.warn('Unit photos save failed:',e); });
+    }
+
+    // 4) Delete only paths that are no longer present.
+    if (removed.length) {
+      var inList = '(' + removed.map(function(p){
+        return '"' + String(p).replace(/"/g, '\\"') + '"';
+      }).join(',') + ')';
+      await fetch(
+        SUPABASE_URL + '/rest/v1/housing_unit_photos?unit_id=eq.' + encodeURIComponent(unitId)
+          + '&file_path=in.' + encodeURIComponent(inList),
+        { method: 'DELETE', headers: HOUSING_HEADERS }
+      );
+    }
+  } catch(e) {
+    console.warn('Unit photos save failed:', e);
+  }
 }
 
 function openAppFromMatch(appId){

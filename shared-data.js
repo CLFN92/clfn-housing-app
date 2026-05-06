@@ -1835,6 +1835,10 @@ function openAddContractorModal(editIdx){
         if(ct.sigCt    && ct.sigCt.image)    _restoreSigCanvas('ct_sig_canvas_ct',    ct.sigCt.image);
       }, 80);
       ctRenderPeople(ct.people || []);
+      // Hydrate previously-uploaded files so they show in the WSIB / Insurance
+      // / Other tiles. Without this, the user thinks attachments were lost and
+      // re-uploads, creating duplicate blobs in storage.
+      if(ct.id && typeof _loadCtFilesFromStorage === 'function') _loadCtFilesFromStorage(ct.id);
     }
     // Update modal title and button
     var title = document.getElementById('ct_modal_title');
@@ -2250,8 +2254,73 @@ function renderCtFilePreview(bucket){
       +'<button type="button" data-bucket="'+escapeHtml(bucket)+'" data-idx="'+i+'" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:0 2px;">✕</button></div>';
   }).join('');
   container.querySelectorAll('button[data-bucket]').forEach(function(btn){
-    btn.onclick=function(){window._ctFiles[btn.getAttribute('data-bucket')].splice(parseInt(btn.getAttribute('data-idx')),1);renderCtFilePreview(btn.getAttribute('data-bucket'));};
+    btn.onclick=function(){
+      var bk = btn.getAttribute('data-bucket');
+      var idx = parseInt(btn.getAttribute('data-idx'));
+      var rec = (window._ctFiles||{})[bk] && window._ctFiles[bk][idx];
+      // Existing files (have a storage path) need their blob removed AND a
+      // file_deleted audit row so the next sbLoadFileMeta() filters them out.
+      // Staged files (have .data, no .path) only live in memory — splice is
+      // enough.
+      if (rec && rec.path) {
+        var ctId = (window._ctEditIdx >= 0 && (window._contractors||[])[window._ctEditIdx])
+                   ? (window._contractors[window._ctEditIdx].id || null)
+                   : null;
+        if (typeof sbDeleteFile === 'function') {
+          sbDeleteFile(rec.path).catch(function(e){ console.warn('[ct file] storage delete failed:', e); });
+        }
+        if (ctId) {
+          try {
+            fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
+              method: 'POST',
+              headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+              body: JSON.stringify({
+                entity_type: 'contractor',
+                entity_id:   String(ctId),
+                action:      'file_deleted',
+                detail:      JSON.stringify({ path: rec.path, name: rec.name, bucket: bk }),
+                actor:       window.currentRole || 'staff',
+                created_at:  new Date().toISOString()
+              })
+            }).catch(function(e){ console.warn('[ct file] file_deleted audit failed:', e); });
+          } catch(e) { console.warn('[ct file] file_deleted audit threw:', e); }
+        }
+      }
+      window._ctFiles[bk].splice(idx, 1);
+      renderCtFilePreview(bk);
+    };
   });
+}
+// _loadCtFilesFromStorage(ctId) — populate window._ctFiles from the audit log
+// when an existing contractor is opened for edit. Without this, files that
+// were uploaded on prior saves (under contractors/{ctId}/{bucket}/) remain
+// in storage but invisible in the modal — users think their attachments are
+// missing and re-upload, creating duplicates.
+//
+// Bucket recovery: the upload path written by saveContractor is
+//   contractors/{ctId}/{bucket}/{ts}_{name}
+// so we split on '/' and take index 2. Falls back to 'other' if the path
+// doesn't match the expected prefix (e.g. legacy data).
+async function _loadCtFilesFromStorage(ctId){
+  if(!ctId || typeof sbLoadFileMeta !== 'function') return;
+  try {
+    var meta = await sbLoadFileMeta('contractor', ctId);
+    if(!Array.isArray(meta) || !meta.length) return;
+    if(!window._ctFiles) window._ctFiles = {wsib:[],insurance:[],other:[]};
+    meta.forEach(function(f){
+      var parts = String(f.path||'').split('/');
+      var bk = (parts[0] === 'contractors' && ['wsib','insurance','other'].indexOf(parts[2]) !== -1)
+             ? parts[2]
+             : 'other';
+      if(!window._ctFiles[bk]) window._ctFiles[bk] = [];
+      // Existing-file marker: has .path, no .data. saveContractor skips these.
+      window._ctFiles[bk].push({
+        name: f.name, type: f.type, size: f.size, path: f.path,
+        added: f.addedAt
+      });
+    });
+    ['wsib','insurance','other'].forEach(function(bk){ renderCtFilePreview(bk); });
+  } catch(e) { console.warn('[ct file] load from storage failed:', e); }
 }
 async function renderHousingUserTable(){
   var tbody = document.getElementById('userTableBody');
@@ -2928,10 +2997,14 @@ function saveContractor(){
   window._contractors = contractors;
   // Persist to Supabase
   sbSaveContractor(ct).catch(function(e){ console.warn('saveContractor SB failed:',e); });
-  // Upload contractor files to Supabase Storage
+  // Upload contractor files to Supabase Storage. Only newly-staged files
+  // (those with .data and no .path) get uploaded — existing files loaded
+  // from storage on edit-open already have a .path and are skipped to avoid
+  // creating duplicate blobs.
   var ctf = window._ctFiles||{wsib:[],insurance:[],other:[]};
   ['wsib','insurance','other'].forEach(function(bucket){
     (ctf[bucket]||[]).forEach(function(fileRecord){
+      if (!fileRecord || !fileRecord.data || fileRecord.path) return;
       // fileRecord has .name .type .size .data (base64) — convert back to blob and upload
       try {
         var byteStr = atob(fileRecord.data.split(',')[1]||fileRecord.data);
