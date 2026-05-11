@@ -168,8 +168,20 @@ async function sendPasswordReset() {
       headers: { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
       body:    JSON.stringify({ email: email, redirect_to: redirectTo })
     });
-    // Supabase returns 200 even for unknown emails (to prevent enumeration).
-    // Show a generic "if registered" message either way.
+    // Supabase rate-limits /auth/v1/recover per-email and per-IP. Surface
+    // the throttle honestly — previously the UI showed a generic success
+    // message on 429 too, which made the button look broken when really
+    // the request was just being throttled.
+    if (r.status === 429) {
+      if (msgEl) { msgEl.textContent = 'Too many reset attempts. Please wait a few minutes and try again.'; msgEl.style.color = '#fca5a5'; msgEl.style.background = '#3b0a0a'; msgEl.style.display = ''; }
+      return;
+    }
+    if (!r.ok) {
+      if (msgEl) { msgEl.textContent = 'Could not send the reset link. Please try again.'; msgEl.style.color = '#fca5a5'; msgEl.style.background = '#3b0a0a'; msgEl.style.display = ''; }
+      return;
+    }
+    // 200 path: Supabase returns 200 whether or not the email is registered
+    // (anti-enumeration). Keep the generic "if registered" wording here.
     if (msgEl) { msgEl.textContent = 'If that email is registered, a reset link has been sent. Check your inbox.'; msgEl.style.color = '#86efac'; msgEl.style.background = 'rgba(22,101,52,0.2)'; }
   } catch(e) {
     console.warn('[FORGOT PWD]', e);
