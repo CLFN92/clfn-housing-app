@@ -1698,7 +1698,22 @@ async function submitAddHousingStaff() {
       body:JSON.stringify({email:email, password:defaultPassword, data:{full_name:name}})
     });
     var signupData = await signupR.json();
-    var authCreated = signupR.ok && signupData.user && signupData.user.id;
+    // Supabase /auth/v1/signup returns two different shapes depending on
+    // whether "Confirm email" is enabled in the dashboard:
+    //   • Confirm email OFF → { user: {...}, session: {...} }
+    //   • Confirm email ON  → the user object directly at the top level
+    //     (no `user` wrapper, no session — there's nothing to session into
+    //     until the email is verified)
+    // Recognise both shapes; otherwise a successful create-with-confirm
+    // flow gets misread as a failure and the staff row never gets inserted.
+    var authUserId  = (signupData.user && signupData.user.id) || signupData.id;
+    var authCreated = signupR.ok && !!authUserId && !!(signupData.user ? signupData.user.email : signupData.email);
+    // emailNeedsConfirmation is true when the user object indicates they
+    // haven't verified yet — used to tailor the success message so the
+    // admin tells the new hire to check their inbox.
+    var emailNeedsConfirmation = !!(signupData.confirmation_sent_at)
+        || (signupData.user && !signupData.user.email_confirmed_at && !signupData.user.confirmed_at)
+        || (signupData.email_verified === false);
     // Detect "already in auth" robustly. Supabase has used several wordings
     // here over time — "already registered", "already been registered",
     // "User already registered" — plus the newer structured `code` field
@@ -1763,9 +1778,11 @@ async function submitAddHousingStaff() {
         res.innerHTML = head
           + '<span style="font-size:11px;opacity:.8;">A login account for this email already existed — it has been linked to the new staff record. Use <strong>Send Reset</strong> on their row to issue a fresh password.</span>';
       } else {
-        res.innerHTML = head
-          + 'Password: <code style="background:var(--success-border);padding:2px 6px;border-radius:4px;font-weight:700;">'+escapeHtml(defaultPassword)+'</code><br>'
-          + '<span style="font-size:11px;opacity:.8;">Share these credentials directly. They can change their password after signing in.</span>';
+        var pwLine = 'Password: <code style="background:var(--success-border);padding:2px 6px;border-radius:4px;font-weight:700;">'+escapeHtml(defaultPassword)+'</code><br>';
+        var tailLine = emailNeedsConfirmation
+          ? '<span style="font-size:11px;opacity:.8;">A verification email was sent to <code>'+escapeHtml(email)+'</code>. They must click that link <em>before</em> the password above will work.</span>'
+          : '<span style="font-size:11px;opacity:.8;">Share these credentials directly. They can change their password after signing in.</span>';
+        res.innerHTML = head + pwLine + tailLine;
       }
       res.style.display='block';
       showToast('\u2713 '+name+' added successfully');
