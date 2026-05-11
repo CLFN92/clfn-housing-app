@@ -102,6 +102,28 @@
       <div id="forgot-msg" class="login-msg"></div>
     </div>
 
+    <!-- Set-new-password panel — shown only when the URL hash carries a
+         Supabase recovery token (auth-login.js parses it on boot). The
+         recovery access_token kept in window._recoveryToken is consumed
+         once by submitNewPassword(), then auto-signs the user in. -->
+    <div id="reset-panel" class="login-panel login-panel--center" style="display:none;">
+      <div class="login-icon-large">&#128273;</div>
+      <div class="login-title">Set a new password</div>
+      <p class="login-help login-help--tight">Choose a new password for your account. The reset link is valid for one use.</p>
+      <div class="login-field">
+        <label class="login-label" for="reset-pw1">New password</label>
+        <input id="reset-pw1" class="login-input" type="password" placeholder="At least 8 characters" autocomplete="new-password"/>
+      </div>
+      <div class="login-field">
+        <label class="login-label" for="reset-pw2">Confirm password</label>
+        <input id="reset-pw2" class="login-input" type="password" placeholder="Re-enter new password" autocomplete="new-password"
+          onkeydown="if(event.key==='Enter')submitNewPassword()"/>
+      </div>
+      <button id="reset-btn" onclick="submitNewPassword()" class="login-btn login-btn--sm">Save new password</button>
+      <button onclick="showSignInPanel()" class="login-link login-link--block">Cancel</button>
+      <div id="reset-msg" class="login-msg"></div>
+    </div>
+
   </div>
 </div>
 

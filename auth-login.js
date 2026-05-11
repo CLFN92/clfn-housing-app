@@ -92,12 +92,15 @@ function showSignInPanel() {
   var p = document.getElementById('signin-panel');
   var v = document.getElementById('verify-panel');
   var f = document.getElementById('forgot-panel');
+  var r = document.getElementById('reset-panel');
   if (p) p.style.display = '';
   if (v) v.style.display = 'none';
   if (f) f.style.display = 'none';
+  if (r) r.style.display = 'none';
   // Re-apply the remembered email when returning to the sign-in panel from
-  // the verify or forgot-password panel. Without this, navigating Back from
-  // those panels leaves the email blank even though localStorage has it.
+  // the verify / forgot-password / reset panels. Without this, navigating
+  // Back from those panels leaves the email blank even though localStorage
+  // has it.
   loadRememberedEmail();
 }
 function showForgotPassword() {
@@ -154,10 +157,16 @@ async function sendPasswordReset() {
   }
   if (msgEl) { msgEl.textContent = 'Sending reset link…'; msgEl.style.color = '#888'; msgEl.style.background = 'transparent'; msgEl.style.display = ''; }
   try {
+    // redirect_to pins the email link to the page that actually knows how to
+    // consume the recovery token (#reset-panel below). Without this, the link
+    // falls back to whatever Site URL is configured in the Supabase dashboard,
+    // which has drifted before and sent users to a dead page.
+    // The redirect_to host must be in the dashboard's Redirect URLs allowlist.
+    var redirectTo = window.location.origin + '/index.html';
     var r = await fetch(SUPABASE_URL + '/auth/v1/recover', {
       method:  'POST',
       headers: { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ email: email })
+      body:    JSON.stringify({ email: email, redirect_to: redirectTo })
     });
     // Supabase returns 200 even for unknown emails (to prevent enumeration).
     // Show a generic "if registered" message either way.
@@ -165,6 +174,120 @@ async function sendPasswordReset() {
   } catch(e) {
     console.warn('[FORGOT PWD]', e);
     if (msgEl) { msgEl.textContent = 'Request could not be completed. Please try again.'; msgEl.style.color = '#fca5a5'; msgEl.style.background = '#3b0a0a'; }
+  }
+}
+
+// ── Recovery flow ─────────────────────────────────────────────────────────────
+// When a user clicks the reset link in their email, Supabase appends a
+// fragment like `#access_token=...&refresh_token=...&type=recovery&expires_in=...`
+// to the redirect target and loads this page. _parseRecoveryHash extracts the
+// values; initLoginPage routes into showResetPasswordPanel; submitNewPassword
+// PUTs the new password using the recovery access_token as a bearer.
+//
+// Security notes:
+//   • URL fragments are NEVER sent to servers, so the token stays client-side.
+//   • Recovery tokens are short-lived (Supabase default ~1h) and one-time use.
+//   • We history.replaceState() to strip the fragment as soon as we read it,
+//     so the token doesn't sit in browser history or get pasted accidentally.
+//   • The token is held only in window._recoveryToken (memory, this tab) —
+//     never stored to localStorage / sessionStorage / cookies.
+//   • Failed attempts don't reveal whether the email exists.
+function _parseRecoveryHash() {
+  var hash = (window.location.hash || '').replace(/^#/, '');
+  if (!hash) return null;
+  var params = {};
+  hash.split('&').forEach(function(kv){
+    var eq = kv.indexOf('=');
+    if (eq < 0) return;
+    params[decodeURIComponent(kv.slice(0, eq))] = decodeURIComponent(kv.slice(eq + 1));
+  });
+  if (params.type !== 'recovery' || !params.access_token) return null;
+  return params;
+}
+
+function showResetPasswordPanel() {
+  var p = document.getElementById('signin-panel');
+  var v = document.getElementById('verify-panel');
+  var f = document.getElementById('forgot-panel');
+  var r = document.getElementById('reset-panel');
+  if (p) p.style.display = 'none';
+  if (v) v.style.display = 'none';
+  if (f) f.style.display = 'none';
+  if (r) r.style.display = '';
+  // Make sure the login screen itself is visible (initLoginPage may have
+  // bailed early before reaching showLoginScreen).
+  var ls = document.getElementById('loginScreen');
+  if (ls) ls.style.display = 'flex';
+}
+
+async function submitNewPassword() {
+  var pw1El   = document.getElementById('reset-pw1');
+  var pw2El   = document.getElementById('reset-pw2');
+  var msgEl   = document.getElementById('reset-msg');
+  var btn     = document.getElementById('reset-btn');
+  var token   = window._recoveryToken || '';
+
+  var pw1 = pw1El ? (pw1El.value || '') : '';
+  var pw2 = pw2El ? (pw2El.value || '') : '';
+
+  if (msgEl) msgEl.style.display = 'none';
+  if (!token) {
+    if (msgEl) { msgEl.textContent = 'Reset link is missing or expired. Please request a new one.'; msgEl.style.color = '#fca5a5'; msgEl.style.background = '#3b0a0a'; msgEl.style.display = ''; }
+    return;
+  }
+  if (pw1.length < 8) {
+    if (msgEl) { msgEl.textContent = 'Password must be at least 8 characters.'; msgEl.style.color = '#fca5a5'; msgEl.style.background = '#3b0a0a'; msgEl.style.display = ''; }
+    return;
+  }
+  if (pw1 !== pw2) {
+    if (msgEl) { msgEl.textContent = 'Passwords do not match.'; msgEl.style.color = '#fca5a5'; msgEl.style.background = '#3b0a0a'; msgEl.style.display = ''; }
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    var r = await fetch(SUPABASE_URL + '/auth/v1/user', {
+      method:  'PUT',
+      headers: {
+        'apikey':        SUPABASE_ANON,
+        'Authorization': 'Bearer ' + token,
+        'Content-Type':  'application/json'
+      },
+      body: JSON.stringify({ password: pw1 })
+    });
+    var data; try { data = await r.json(); } catch(e) { data = {}; }
+    if (!r.ok) {
+      var msg = (data && (data.error_description || data.msg)) || 'Could not update password. The reset link may have expired.';
+      throw new Error(msg);
+    }
+
+    // Password updated. The recovery access_token is now a full bearer for
+    // this user — stash it and hand off to housing.html the same way
+    // startSignIn does. This keeps the user from having to type their brand
+    // new password immediately after setting it.
+    var email = (data && data.email) || '';
+    HOUSING_SESSION.email       = email;
+    HOUSING_SESSION.name        = (data && data.user_metadata && data.user_metadata.full_name) || email;
+    HOUSING_SESSION.accessToken = token;
+    HOUSING_HEADERS['Authorization'] = 'Bearer ' + token;
+    try { sessionStorage.setItem('clfn_housing_token', token); } catch(e) {}
+
+    await resolveHousingRole();
+    try {
+      sessionStorage.setItem('clfn_housing_role',          window.currentRole || 'employee');
+      sessionStorage.setItem('clfn_housing_name',          HOUSING_SESSION.name  || '');
+      sessionStorage.setItem('clfn_housing_email_session', HOUSING_SESSION.email || '');
+    } catch(e) {}
+
+    // Clear the recovery token from memory and the URL.
+    window._recoveryToken = null;
+    try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch(e) {}
+
+    window.location.href = 'housing.html?view=home';
+  } catch(e) {
+    console.warn('[RESET PWD]', e);
+    if (msgEl) { msgEl.textContent = e.message || 'Could not update password.'; msgEl.style.color = '#fca5a5'; msgEl.style.background = '#3b0a0a'; msgEl.style.display = ''; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Save new password'; }
   }
 }
 
@@ -269,6 +392,20 @@ function initLoginPage() {
   if (logoEl && typeof CLFN_LOGO_DATA_URL === 'string') logoEl.src = CLFN_LOGO_DATA_URL;
 
   loadRememberedEmail();
+
+  // Recovery flow takes precedence over both the stashed-session redirect
+  // AND the regular sign-in panel. If the URL hash carries a Supabase
+  // recovery token, the user needs to set a new password before doing
+  // anything else — even if they happen to already be signed in in this
+  // browser. Without this check, a signed-in user clicking a reset email
+  // gets bounced straight to housing.html and the token is silently
+  // discarded (this was half of the "reset loops back" symptom).
+  var recovery = _parseRecoveryHash();
+  if (recovery) {
+    window._recoveryToken = recovery.access_token;
+    showResetPasswordPanel();
+    return;
+  }
 
   // Restored session — hand off directly to housing.html.
   var token = null;
