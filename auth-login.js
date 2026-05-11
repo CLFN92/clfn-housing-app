@@ -345,9 +345,32 @@ async function startSignIn() {
       body:    JSON.stringify({ email: email, password: password })
     });
     var data = await r.json();
-    if (!r.ok) throw new Error(GENERIC_AUTH_ERROR);
+    // When "Confirm email" is enabled on the Supabase project, the token
+    // endpoint REJECTS sign-in for unverified users (non-ok response with
+    // error_code === 'email_not_confirmed'). Without this branch the catch
+    // block surfaces the generic "check your email and password" error,
+    // making the user think the password is wrong. Detect the specific
+    // case and route them to the verify panel instead.
+    if (!r.ok) {
+      var errCode = data && (data.error_code || data.code || '');
+      var errBlob = ((data && (data.msg || data.error_description || data.error)) || '');
+      var emailUnconfirmed = errCode === 'email_not_confirmed'
+                          || /email\s+not\s+confirmed/i.test(errBlob)
+                          || /confirm\s+your\s+email/i.test(errBlob);
+      if (emailUnconfirmed) {
+        var dispE = document.getElementById('verify-email-display');
+        if (dispE) dispE.textContent = email;
+        document.getElementById('signin-panel').style.display = 'none';
+        document.getElementById('verify-panel').style.display = '';
+        if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
+        return;
+      }
+      throw new Error(GENERIC_AUTH_ERROR);
+    }
 
-    // Email verification check — stop here and show the verify panel
+    // Email verification check for the success path — covers the case where
+    // Supabase returns 200 but the user is still unverified (older project
+    // setting). Same destination as the not-ok branch above.
     var emailConfirmed = data.user.email_confirmed_at || data.user.confirmed_at;
     if (!emailConfirmed) {
       var dispEl = document.getElementById('verify-email-display');

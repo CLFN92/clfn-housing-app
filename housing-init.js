@@ -1945,7 +1945,25 @@ function initHousingPage() {
   else if(view==='tenants')     { if(true) showTenants(); }
   else if(view==='settings')    { if(typeof showSettings==='function') showSettings(); }
   else if(view==='contractors') { if(true) showContractors(); }
-  else                          { if(typeof showDashboard==='function') showDashboard(); else if(true) showWorklist(); }
+  else {
+    // Fallback when view doesn't match any branch. Previously this called
+    // showDashboard() unconditionally — for HE-L1/L2 (who can't access the
+    // dashboard) that showed a denial toast during boot and crashed when
+    // the toast tried to mount before document.body was attached. Route
+    // by role instead: management roles see the dashboard, everyone else
+    // gets the landing / worklist they can actually use.
+    var canDash = (typeof APPROVAL_AUTHORITY !== 'undefined')
+                  && APPROVAL_AUTHORITY.can('accessDashboard', role);
+    if (canDash && typeof showDashboard === 'function') {
+      showDashboard();
+    } else if (typeof showLanding === 'function') {
+      showLanding();
+    } else if (typeof showEmployeeHome === 'function') {
+      showEmployeeHome();
+    } else if (typeof showWorklist === 'function') {
+      showWorklist();
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -2651,10 +2669,13 @@ document.addEventListener('DOMContentLoaded', function(){
       }
       await loadHousingData();
       initHousingPage();
-      document.body.style.opacity = '1';
+      if (document.body) document.body.style.opacity = '1';
     } catch(e) {
       console.error('[HOUSING] init failed:', e.message, e.stack);
-      document.body.style.opacity = '1';
+      // Guard the catch's body access too — if document.body is null
+      // (early boot race), the catch itself would throw and bury the
+      // original error in the console.
+      if (document.body) document.body.style.opacity = '1';
     }
   }());
 }());

@@ -71,8 +71,25 @@ function showToast(msg, opts) {
     'white-space:nowrap;pointer-events:none;'
   ].join('');
 
-  document.body.appendChild(t);
-  setTimeout(function() { if(t.parentNode) t.remove(); }, duration);
+  // Defensive: if showToast fires during early boot (e.g. a role check
+  // bails out before body is attached), document.body is null and the
+  // appendChild crashes the init flow. Defer the mount in that case so
+  // the message still surfaces once the page is ready instead of taking
+  // down the rest of the script with it.
+  function _mount() {
+    if (!document.body) {
+      // Body still not ready — try once more on DOMContentLoaded, then give up.
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _mount, { once: true });
+      } else {
+        setTimeout(_mount, 50);
+      }
+      return;
+    }
+    document.body.appendChild(t);
+    setTimeout(function() { if(t.parentNode) t.remove(); }, duration);
+  }
+  _mount();
 }
 
 
