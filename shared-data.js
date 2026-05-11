@@ -714,15 +714,32 @@ function auditEntry(appId, action, detail, user) {
 // Signature block helper for printable agreements / SOWs.
 // Lives here (rather than in housing-modals.js) so that contractor pages
 // — which only load shared-data.js — can also call it via printContractorAgreement.
-function sigBlock(label, pName, dt, imgSrc) {
+// Signature block helper for printable agreements / SOWs.
+// Two calling conventions for backwards compatibility:
+//   sigBlock(label, pName, dt, imgSrc)              — 4-arg (SOW prints, etc.)
+//   sigBlock(label, pName, title, dt, imgSrc)       — 5-arg (Contractor print)
+// The 5-arg form was added because the contractor agreement renders the
+// contractor's job title under their name; passing it through a 5th param
+// avoids breaking existing callers. When called with 4 args, `title` is
+// treated as empty and the remaining args shift into dt/imgSrc.
+// When `imgSrc` is empty (wet ink, e-sign envelope, or just unsigned) the
+// box renders empty — no "Sign here" placeholder. The bordered box itself
+// is sufficient signal for a wet signature, and avoids placeholder text
+// muddying the printed page.
+function sigBlock(label, pName, title, dt, imgSrc) {
+  if (arguments.length === 4) { imgSrc = dt; dt = title; title = ''; }
   var sigHtml = imgSrc
     ? '<img src="'+imgSrc+'" style="max-height:55px;max-width:100%;object-fit:contain;"/>'
-    : '<span style="font-size:9px;color:var(--txt-on-dark);">Sign here</span>';
+    : '';
+  var titleRow = title
+    ? '<div style="font-size:9px;color:var(--muted);font-style:italic;margin-top:2px;">'+title+'</div>'
+    : '';
   return '<div class="print-sec">'
     +'<div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid var(--border);">'+label+'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 90px;gap:8px;margin-bottom:6px;">'
       +'<div><div class="sig-lbl">Full Name</div>'
-        +'<div style="font-size:10.5px;font-weight:600;border-bottom:1px solid var(--border);padding-bottom:2px;min-height:15px;">'+(pName||'')+'</div></div>'
+        +'<div style="font-size:10.5px;font-weight:600;border-bottom:1px solid var(--border);padding-bottom:2px;min-height:15px;">'+(pName||'')+'</div>'
+        +titleRow+'</div>'
       +'<div><div class="sig-lbl">Date</div>'
         +'<div style="font-size:10px;border-bottom:1px solid var(--border);padding-bottom:2px;min-height:15px;">'+(dt||'')+'</div></div>'
     +'</div>'
@@ -852,8 +869,13 @@ function _buildContractorAgreementHTML(ct) {
     +'<div class="footer"><span>'+escapeHtml(buildNationFooterStrip({ suffix: "Contractor Registry", includeConfidential: false }))+'</span><span>Generated '+today+' · CONFIDENTIAL</span></div>'
     +'</body></html>';
 }
-function _ctRenderActions(ct) {
-  var el = document.getElementById('ctap_actions');
+// prefix lets the same renderer feed two surfaces: the legacy side panel
+// (ctap_*) and the new inline CIC section in the edit modal (cic_*). The
+// host id is `${prefix}_actions`; action pill clicks pass the prefix
+// through to initCtAction so confirm/cancel target the right notes UI.
+function _ctRenderActions(ct, prefix) {
+  prefix = prefix || 'ctap';
+  var el = document.getElementById(prefix + '_actions');
   if(!el) return;
   var role = window.currentRole || 'housing_employee_l1';
   var status = ct.status || 'pending_review';
@@ -885,7 +907,7 @@ function _ctRenderActions(ct) {
     return '<button class="btn btn-sm ' + a.cls + '" data-act="' + a.action + '" data-notes="' + (a.needsNotes?'1':'0') + '">' + a.label + '</button>';
   }).join('') + '</div>';
   el.querySelectorAll('[data-act]').forEach(function(b){
-    b.addEventListener('click',function(){initCtAction(b.getAttribute('data-act'),b.getAttribute('data-notes')==='1');});
+    b.addEventListener('click',function(){initCtAction(b.getAttribute('data-act'),b.getAttribute('data-notes')==='1',prefix);});
   });
 }
 // Click handler for a row in the contractor card's Forms & SOWs list.
@@ -927,8 +949,9 @@ function getAllSowsForContractor(contractorId) {
 // Renders the contractor's Forms & SOWs in the contractor detail card.
 // Audit entries themselves continue to be written via auditEntry() and shown
 // on the master Audit Log (Settings → Audit Log) — they no longer surface here.
-function _ctRenderFormsSows(ctId) {
-  var el = document.getElementById('ctap_forms_sows');
+function _ctRenderFormsSows(ctId, prefix) {
+  prefix = prefix || 'ctap';
+  var el = document.getElementById(prefix + '_forms_sows');
   if (!el) return;
   var rows = getAllSowsForContractor(ctId);
   if (!rows.length) {
@@ -970,8 +993,9 @@ function _ctRenderFormsSows(ctId) {
       + '</div>';
   }).join('') + '</div>';
 }
-function _ctRenderFlow(status, ct) {
-  var flow = document.getElementById('ctap_flow');
+function _ctRenderFlow(status, ct, prefix) {
+  prefix = prefix || 'ctap';
+  var flow = document.getElementById(prefix + '_flow');
   if(!flow) return;
 
   var steps = [
@@ -1354,10 +1378,11 @@ function addSowItem(data){
   recalcSowTotal();
 }
 function cancelCtAction() {
+  var prefix = (_ctPendingAction && _ctPendingAction.prefix) || 'ctap';
   _ctPendingAction = null;
-  var nw = document.getElementById('ctap_notes_wrap');
+  var nw = document.getElementById(prefix + '_notes_wrap');
   if(nw) nw.style.display='none';
-  var ni = document.getElementById('ctap_notes');
+  var ni = document.getElementById(prefix + '_notes');
   if(ni) ni.value='';
 }
 function closeAddContractorModal(){
@@ -1423,16 +1448,16 @@ function confirmCtAction() {
   if(!_ctPendingAction) return;
   var action = _ctPendingAction.action;
   var needsNotes = _ctPendingAction.needsNotes;
-  var notes = (document.getElementById('ctap_notes')||{}).value||'';
-  notes = notes.trim();
+  var prefix = _ctPendingAction.prefix || 'ctap';
+  var notesEl = document.getElementById(prefix + '_notes');
+  var notes = (notesEl && notesEl.value) ? notesEl.value.trim() : '';
 
   if(needsNotes && !notes) {
     showToast('Please add a note explaining this decision.');
-    document.getElementById('ctap_notes').focus();
+    if(notesEl) notesEl.focus();
     return;
   }
 
-  var contractors = [];
   var contractors = window._contractors || [];
   if(_ctApprovalIdx < 0 || _ctApprovalIdx >= contractors.length) return;
   var ct = contractors[_ctApprovalIdx];
@@ -1448,10 +1473,19 @@ function confirmCtAction() {
 
   contractors[_ctApprovalIdx] = ct;
   window._contractors = contractors;
+  // Keep _ctLastSaved current so Print uses the latest status without
+  // requiring a separate Save Changes click.
+  window._ctLastSaved = ct;
 
   // Audit entry
   var actionLabels = {hm_recommended:'HM verified and recommended to ED',approved:'ED granted final approval',declined:'Application declined'+(notes?' — '+notes:''),returned:'Returned for more information'+(notes?' — '+notes:'')};
   auditEntry('CT:'+ct.id, action, (actionLabels[action]||action)+': '+ct.name, role);
+
+  // Persist the status change so it survives a reload — without this,
+  // approvals only live in window._contractors and vanish on refresh.
+  if(typeof sbSaveContractor === 'function') {
+    sbSaveContractor(ct).catch(function(e){ console.warn('confirmCtAction SB failed:', e); });
+  }
 
   // Workflow email
   _sendCtWorkflowEmail(action, ct);
@@ -1459,8 +1493,39 @@ function confirmCtAction() {
   var toastLabels = {hm_recommended:'Recommended to ED',approved:'Contractor approved',declined:'Application declined',returned:'Returned for more info'};
   showToast(toastLabels[action]||action);
   cancelCtAction();
-  openCtApprovalPanel(_ctApprovalIdx); // refresh panel
+  // Refresh whichever surface the action came from. CIC = inline approval
+  // sections inside the edit modal; ctap = legacy side panel.
+  if(prefix === 'cic') {
+    _ctRenderCicApproval(ct);
+  } else {
+    openCtApprovalPanel(_ctApprovalIdx);
+  }
   renderContractorsView();
+}
+// Re-render the inline approval surface inside the edit modal. Used after
+// confirmCtAction lands, so the status banner / flow / action pills reflect
+// the new state without closing and reopening the CIC.
+function _ctRenderCicApproval(ct) {
+  if(!ct) return;
+  _ctSetCicStatusBanner(ct);
+  if(typeof _ctRenderActions === 'function')   _ctRenderActions(ct, 'cic');
+  if(typeof _ctRenderFlow === 'function')      _ctRenderFlow(ct.status || 'pending_review', ct, 'cic');
+  if(typeof _ctRenderFormsSows === 'function') _ctRenderFormsSows(ct.id, 'cic');
+}
+function _ctSetCicStatusBanner(ct) {
+  var banner = document.getElementById('cic_status_banner');
+  if(!banner) return;
+  var ctStatusStyle = {
+    pending_review: {bg:'#fffbeb',c:'#92400e',label:'⏳ Pending Housing Manager Review'},
+    hm_recommended: {bg:'#eff6ff',c:'#1d4ed8',label:'📋 HM Recommended — Awaiting ED Approval'},
+    approved:       {bg:'#f0fdf4',c:'#15803d',label:'✅ Approved — Active Contractor'},
+    declined:       {bg:'#fef2f2',c:'#b91c1c',label:'❌ Declined'},
+    returned:       {bg:'#faf5ff',c:'#7c3aed',label:'↩ Returned for More Information'}
+  };
+  var ss = ctStatusStyle[ct.status || 'pending_review'] || {bg:'#f4f4f0',c:'#888',label:ct.status||'Unknown'};
+  banner.textContent = ss.label;
+  banner.style.background = ss.bg;
+  banner.style.color = ss.c;
 }
 function ctFileDragLeave(zoneId){var z=document.getElementById(zoneId);if(z){z.style.borderColor='var(--border)';z.style.background='var(--bg)';}}
 function ctFileUpload(input,bucket){
@@ -1734,11 +1799,14 @@ function headerExport(format) {
   else if(view==='contractors') exportContractors(format);
   else showToast('Nothing to export on this page.');
 }
-function initCtAction(action, needsNotes) {
-  _ctPendingAction = {action:action, needsNotes:needsNotes};
-  var nw = document.getElementById('ctap_notes_wrap');
-  var nr = document.getElementById('ctap_notes_req');
-  var cb = document.getElementById('ctap_confirm_btn');
+function initCtAction(action, needsNotes, prefix) {
+  prefix = prefix || 'ctap';
+  // Stash the prefix on the pending action so confirm/cancel know which
+  // notes UI to read from / hide.
+  _ctPendingAction = {action:action, needsNotes:needsNotes, prefix:prefix};
+  var nw = document.getElementById(prefix + '_notes_wrap');
+  var nr = document.getElementById(prefix + '_notes_req');
+  var cb = document.getElementById(prefix + '_confirm_btn');
   var actionLabels = {hm_recommended:'Confirm Recommendation',approved:'Confirm Approval',declined:'Confirm Decline',returned:'Confirm Return'};
   if(nw) nw.style.display='block';
   if(nr) nr.textContent = needsNotes?'*':'';
@@ -1789,12 +1857,22 @@ function openAddContractorModal(editIdx){
   window._ctEditIdx = (editIdx !== undefined) ? editIdx : -1;
   window._ctLastSaved = null;
   window._ctFiles={wsib:[],insurance:[],other:[]};
-  ['ct_print_btn','ct_email_btn'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none';});
+  // Approval index gates the Approve/Decline pill handlers. Reset on every
+  // open — edit mode will re-set it below.
+  _ctApprovalIdx = -1;
+  _ctPendingAction = null;
+  // Print/Email buttons (both footer and modal header) are hidden until
+  // edit mode confirms we have a saved contractor to print.
+  ['ct_print_btn','ct_email_btn','ct_header_print_btn','ct_header_email_btn'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none';});
+  // Hide the inline CIC approval surface by default — only shown in edit
+  // mode below.
+  ['cic_approval_surface','cic_flow_card','cic_forms_sows_card'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none';});
+  var cicNotesWrap=document.getElementById('cic_notes_wrap'); if(cicNotesWrap) cicNotesWrap.style.display='none';
   ['ct_name','ct_trade','ct_phone','ct_email','ct_notes','ct_address','ct_hst',
    'ct_wsib_num','ct_wsib_expiry','ct_ins_provider','ct_ins_policy','ct_ins_amount','ct_ins_expiry',
    'ct_class_proof','ct_sig_staff_name','ct_sig_staff_date','ct_sig_ct_name','ct_sig_ct_title','ct_sig_ct_date'
   ].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-  ['ct_wsib_preview','ct_ins_preview','ct_other_preview'].forEach(function(id){
+  ['ct_wsib_preview','ct_insurance_preview','ct_other_preview'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.innerHTML='';
   });
   // Reset classification
@@ -1842,9 +1920,26 @@ function openAddContractorModal(editIdx){
     }
     // Update modal title and button
     var title = document.getElementById('ct_modal_title');
-    if(title) title.textContent = 'Edit Contractor Application';
+    if(title) title.textContent = 'Contractor Information';
     var btn = document.getElementById('ct_save_btn');
     if(btn) btn.textContent = 'Save Changes';
+    // Wire the unified CIC: status banner + action pills + flow + Forms&SOWs.
+    // _ctApprovalIdx is what initCtAction / confirmCtAction key off of;
+    // _ctLastSaved lets Print render the current record without a fresh save.
+    if(ct) {
+      _ctApprovalIdx = window._ctEditIdx;
+      window._ctLastSaved = ct;
+      ['cic_approval_surface','cic_flow_card','cic_forms_sows_card'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='';});
+      if(typeof _ctSetCicStatusBanner === 'function') _ctSetCicStatusBanner(ct);
+      if(typeof _ctRenderActions === 'function')      _ctRenderActions(ct, 'cic');
+      if(typeof _ctRenderFlow === 'function')         _ctRenderFlow(ct.status || 'pending_review', ct, 'cic');
+      if(typeof _ctRenderFormsSows === 'function')    _ctRenderFormsSows(ct.id, 'cic');
+      // Show header Print (always) and Email (only when contractor has an
+      // email on file). Footer copies stay hidden — header buttons are the
+      // canonical surface now.
+      var hp=document.getElementById('ct_header_print_btn'); if(hp){ hp.classList.remove('hidden'); hp.style.display=''; }
+      var he=document.getElementById('ct_header_email_btn'); if(he && ct.email){ he.classList.remove('hidden'); he.style.display=''; }
+    }
   } else {
     var title = document.getElementById('ct_modal_title');
     if(title) title.textContent = 'Contractor Application';
@@ -2211,7 +2306,11 @@ function renderContractorsView(){
     var totalFiles=wsibFiles.length+insFiles.length+otherFiles.length;
     var ss = ctStatusStyle[ct.status||'pending_review'] || {cls:'', label:ct.status||'Unknown'};
     var classLabels = {internal_indigenous:'Internal — Indigenous',external_indigenous:'External — Indigenous',external_non_indigenous:'External — Non-Indigenous'};
-    return '<div class="card ct-card" onclick="openCtApprovalPanel('+i+')" title="View application">'
+    // Whole card click + the single Open button both route through the
+    // unified Contractor Information Card (openAddContractorModal). It
+    // handles view, edit, approval actions, and Print in one surface, so
+    // there's no separate Review path anymore.
+    return '<div class="card ct-card" onclick="openAddContractorModal('+i+')" title="Open contractor">'
       +'<div class="ct-card-head">'
         +'<div class="ct-card-icon">'+escapeHtml((function(n){var w=n.trim().split(/\s+/);return w.length>=2?w[0][0].toUpperCase()+w[w.length-1][0].toUpperCase():n.slice(0,2).toUpperCase();})(ct.name||'??'))+'</div>'
         +'<div class="ct-card-body">'
@@ -2228,8 +2327,7 @@ function renderContractorsView(){
         +(function(dateStr,label){ if(!dateStr) return ''; var days=Math.round((new Date(dateStr)-new Date())/(1000*60*60*24)); var cls=days<0?'ct-tag-expired':days<30?'ct-tag-expiring':'ct-tag-valid'; return '<span class="ct-card-tag '+cls+'">'+label+': '+(days<0?'Expired':days<30?'Expiring soon':'Valid')+'</span>'; })(ct.insExpiry,'Insurance')
       +'</div>'
       +'<div class="ct-card-actions">'
-        +(ROLE.isManagement(role)?'<button type="button" class="btn btn-ghost btn-sm btn-full" onclick="event.stopPropagation();openCtApprovalPanel('+i+')">Review</button>':'')
-        +'<button type="button" class="btn btn-ghost btn-sm btn-full" onclick="event.stopPropagation();openAddContractorModal('+i+')">Edit</button>'
+        +'<button type="button" class="btn btn-primary btn-sm btn-full" onclick="event.stopPropagation();openAddContractorModal('+i+')">Open</button>'
       +'</div>'
       +'</div>';
   }).join('');
@@ -2250,9 +2348,34 @@ function renderCtFilePreview(bucket){
   var files=(window._ctFiles||{})[bucket]||[];
   container.innerHTML=files.map(function(f,i){
     return '<div style="display:flex;align-items:center;gap:5px;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;">'
-      +(f.type&&f.type.includes('pdf')?'📄':'📎')+' <span style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escapeHtml(f.name)+'</span>'
+      +(f.type&&f.type.includes('pdf')?'📄':'📎')
+      +' <span data-open-bucket="'+escapeHtml(bucket)+'" data-open-idx="'+i+'" title="Open file" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-decoration:underline;text-decoration-color:var(--border);">'+escapeHtml(f.name)+'</span>'
       +'<button type="button" data-bucket="'+escapeHtml(bucket)+'" data-idx="'+i+'" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:0 2px;">✕</button></div>';
   }).join('');
+  // Filename click → open the file. Staged uploads still have the base64
+  // data URL in memory; saved-and-reloaded files have a storage path that
+  // scViewFile() can fetch with the auth header.
+  container.querySelectorAll('span[data-open-bucket]').forEach(function(el){
+    el.onclick=function(){
+      var bk = el.getAttribute('data-open-bucket');
+      var idx = parseInt(el.getAttribute('data-open-idx'));
+      var rec = (window._ctFiles||{})[bk] && window._ctFiles[bk][idx];
+      if(!rec) return;
+      if(rec.path && typeof scViewFile === 'function'){ scViewFile(rec.path); return; }
+      if(rec.data){
+        try {
+          var w = window.open();
+          if(w){
+            if((rec.type||'').indexOf('pdf') !== -1){
+              w.location.href = rec.data;
+            } else {
+              w.document.write('<title>'+escapeHtml(rec.name)+'</title><img src="'+rec.data+'" style="max-width:100%;max-height:100vh;display:block;margin:auto;"/>');
+            }
+          }
+        } catch(e){ console.warn('[ct file] open failed:', e); }
+      }
+    };
+  });
   container.querySelectorAll('button[data-bucket]').forEach(function(btn){
     btn.onclick=function(){
       var bk = btn.getAttribute('data-bucket');
@@ -2995,8 +3118,11 @@ function saveContractor(){
     auditEntry('CT:'+id, 'ct_submitted', 'Contractor application submitted: ' + name, window.currentRole||'staff');
   }
   window._contractors = contractors;
-  // Persist to Supabase
-  sbSaveContractor(ct).catch(function(e){ console.warn('saveContractor SB failed:',e); });
+  // Persist to Supabase. The contractor record is `data` (built above) — an
+  // older revision named it `ct`, this site was missed in the rename and
+  // threw a ReferenceError that aborted the save mid-flight (so the
+  // contractor stayed in memory but never reached the DB).
+  sbSaveContractor(data).catch(function(e){ console.warn('saveContractor SB failed:',e); });
   // Upload contractor files to Supabase Storage. Only newly-staged files
   // (those with .data and no .path) get uploaded — existing files loaded
   // from storage on edit-open already have a .path and are skipped to avoid
@@ -3052,19 +3178,37 @@ function saveContractor(){
 function saveContractorAndFinalize() {
   // Save first (reuses existing saveContractor logic)
   saveContractor();
-  // After save, grab the record back and show print/email buttons
+  // After save, grab the record back and reveal the header Print + Email
+  // buttons. The CIC modal uses header buttons as the canonical Print
+  // surface — the older footer copies stay hidden but are kept in markup
+  // for backwards compatibility with any external callers.
   try {
     var contractors = (window._contractors || []).slice();
     if(contractors.length) {
       window._ctLastSaved = contractors[contractors.length - 1];
-      // If editing, find by id
       if(window._ctEditIdx >= 0 && window._ctEditIdx < contractors.length) {
         window._ctLastSaved = contractors[window._ctEditIdx];
       }
-      var printBtn = document.getElementById('ct_print_btn');
-      var emailBtn = document.getElementById('ct_email_btn');
-      if(printBtn) printBtn.style.display = 'flex';
-      if(emailBtn && window._ctLastSaved.email) emailBtn.style.display = 'flex';
+      var hp = document.getElementById('ct_header_print_btn');
+      var he = document.getElementById('ct_header_email_btn');
+      if(hp){ hp.classList.remove('hidden'); hp.style.display=''; }
+      if(he && window._ctLastSaved.email){ he.classList.remove('hidden'); he.style.display=''; }
+      // If we just saved a brand-new contractor, switch the modal into
+      // edit mode so the CIC approval surface appears for managers
+      // without a second click.
+      if(window._ctEditIdx < 0) {
+        window._ctEditIdx = contractors.length - 1;
+        _ctApprovalIdx = window._ctEditIdx;
+        ['cic_approval_surface','cic_flow_card','cic_forms_sows_card'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='';});
+        if(typeof _ctSetCicStatusBanner === 'function') _ctSetCicStatusBanner(window._ctLastSaved);
+        if(typeof _ctRenderActions === 'function')      _ctRenderActions(window._ctLastSaved, 'cic');
+        if(typeof _ctRenderFlow === 'function')         _ctRenderFlow(window._ctLastSaved.status || 'pending_review', window._ctLastSaved, 'cic');
+        if(typeof _ctRenderFormsSows === 'function')    _ctRenderFormsSows(window._ctLastSaved.id, 'cic');
+        var title = document.getElementById('ct_modal_title');
+        if(title) title.textContent = 'Contractor Information';
+        var btn = document.getElementById('ct_save_btn');
+        if(btn) btn.textContent = 'Save Changes';
+      }
     }
   } catch(e) {}
 }

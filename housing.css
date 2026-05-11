@@ -1259,6 +1259,15 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 .ct-panel-footer    { padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg); }
 .ct-status-banner   { padding:10px 20px;font-size:12px;font-weight:700;text-align:center; }
 
+/* ── Contractor Information Card (CIC) — inline approval surface ── */
+/* Lives inside #addContractorModal between the modal header and the form
+   body. JS toggles each section's inline display when entering edit mode. */
+.cic-notes-wrap     { padding:12px 24px;background:var(--bg);border-bottom:1px solid var(--border); }
+.cic-notes-label    { display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px; }
+.cic-notes-req      { color:var(--danger); }
+.cic-notes-input    { width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);resize:vertical; }
+.cic-notes-actions  { display:flex;gap:8px;justify-content:flex-end;margin-top:8px; }
+
 /* ── Modal (centred form) ── */
 /* ct-modal-body: simple block — the overlay scrolls, so this can grow freely.
    border-radius + overflow:hidden gives clean corner clipping on the shell.

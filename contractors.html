@@ -115,8 +115,31 @@
       </div>
     </div>
 
+    <!-- Inline approval surface (visible in edit/view mode only; hidden when
+         creating a new contractor). Action pills target roles with authority
+         via APPROVAL_AUTHORITY; the notes wrap shows after a pill is clicked.
+         openAddContractorModal toggles display on these via the style attr. -->
+    <div id="cic_approval_surface" style="display:none;">
+      <div id="cic_status_banner" class="ct-status-banner"></div>
+      <div id="cic_actions"></div>
+      <div id="cic_notes_wrap" class="cic-notes-wrap" style="display:none;">
+        <label class="cic-notes-label">Notes <span id="cic_notes_req" class="cic-notes-req"></span></label>
+        <textarea id="cic_notes" rows="2" class="cic-notes-input"></textarea>
+        <div class="cic-notes-actions">
+          <button type="button" onclick="cancelCtAction()" class="btn btn-ghost btn-sm">Cancel</button>
+          <button type="button" id="cic_confirm_btn" onclick="confirmCtAction()" class="btn btn-primary btn-sm">Confirm</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Form body -->
     <div class="ct-modal-form-body">
+
+      <!-- Approval Flow (edit/view mode only) -->
+      <div id="cic_flow_card" class="card ct-sec" style="display:none;">
+        <div class="modal-hdr compact"><div class="ct-lbl-yellow">Approval Flow</div></div>
+        <div class="ct-sec-pad"><div id="cic_flow" class="ct-flow-row"></div></div>
+      </div>
 
       <!-- Company Information -->
       <div class="card ct-sec">
@@ -175,11 +198,11 @@
             <div class="f"><label>Policy #</label><input id="ct_ins_policy" type="text" placeholder="Policy number"/></div>
             <div class="f"><label>Expiry Date</label><input id="ct_ins_expiry" type="date"/></div>
           </div>
-          <div id="ct_ins_preview" class="ct-upload-preview"></div>
-          <div id="ct_ins_drop" ondragover="ctFileDragOver(event,'ct_ins_drop')" ondragleave="ctFileDragLeave('ct_ins_drop')" ondrop="ctFileDrop(event,'insurance')" class="upload-zone" onclick="document.getElementById('ct_ins_input').click()">
+          <div id="ct_insurance_preview" class="ct-upload-preview"></div>
+          <div id="ct_insurance_drop" ondragover="ctFileDragOver(event,'ct_insurance_drop')" ondragleave="ctFileDragLeave('ct_insurance_drop')" ondrop="ctFileDrop(event,'insurance')" class="upload-zone" onclick="document.getElementById('ct_insurance_input').click()">
             <div class="ct-upload-label">📎 Upload Insurance Certificate &nbsp;<span class="lbl-yellow">browse</span></div>
           </div>
-          <input type="file" id="ct_ins_input" accept=".pdf,image/*" style="display:none;" onchange="ctFileUpload(this,'insurance')"/>
+          <input type="file" id="ct_insurance_input" accept=".pdf,image/*" style="display:none;" onchange="ctFileUpload(this,'insurance')"/>
         </div>
       </div>
 
@@ -306,6 +329,12 @@
           </div>
 
         </div>
+      </div>
+
+      <!-- Forms & SOWs (edit/view mode only) -->
+      <div id="cic_forms_sows_card" class="card ct-sec-last" style="display:none;">
+        <div class="modal-hdr compact"><div class="ct-lbl-yellow">Forms &amp; SOWs</div></div>
+        <div id="cic_forms_sows" class="ct-audit-scroll"></div>
       </div>
 
     </div><!-- end form body -->
@@ -660,6 +689,11 @@ async function loadRenosData() {
     if(rpR && rpR.ok){var rpd=await rpR.json();rpd.forEach(function(r){window._renoProgress[r.unit_id]=r.data;});}
     if(stR && stR.ok){var stD=await stR.json();window._appSettings={};stD.forEach(function(r){window._appSettings[r.key]=r.value;});}
     if(typeof initApprovalAuthority === 'function') initApprovalAuthority();
+    // Apply saved theme (logo + brand colors) — without this, the shared
+    // header keeps the build-time default logo instead of the one uploaded
+    // in Settings → Admin → Branding. Mirrors what loadHousingData() does
+    // for inventory / tenants / match.
+    if(typeof _applyTheme === 'function') _applyTheme((window._appSettings||{}).theme || {});
     if(typeof applyNationOverrides === 'function') applyNationOverrides();
   } catch(e){ console.warn('[contractors] data load error:', e); }
 }

@@ -2269,16 +2269,21 @@ function _runQuickAction(action){
 // ── Create menu handlers ─────────────────────────────────────────────────
 function _runCreateAction(action){
   _closeCreateMenu();
+  // Element-based check (not `typeof X === 'function'`): the modal-opening
+  // helpers are loaded on every page via shared-data.js, but the modal
+  // *markup* lives only on its home page. Probing for the modal DOM tells us
+  // whether we can open in-place or need to navigate.
   if(action === 'application'){
-    if(typeof newApp === 'function') newApp();
+    if(document.getElementById('appLayout') && typeof newApp === 'function') newApp();
+    else window.location.href = 'housing.html?view=newapp';
   } else if(action === 'unit'){
-    if(typeof openAddUnitModal === 'function') openAddUnitModal();
+    if(document.getElementById('addUnitModal') && typeof openAddUnitModal === 'function') openAddUnitModal();
     else window.location.href = 'inventory.html?action=newUnit';
   } else if(action === 'contractor'){
-    if(typeof openAddContractorModal === 'function') openAddContractorModal();
+    if(document.getElementById('addContractorModal') && typeof openAddContractorModal === 'function') openAddContractorModal();
     else window.location.href = 'contractors.html?action=newContractor';
   } else if(action === 'tenant'){
-    if(typeof openAddTenantModal === 'function') openAddTenantModal();
+    if(document.getElementById('addTenantModal') && typeof openAddTenantModal === 'function') openAddTenantModal();
     else window.location.href = 'tenants.html?action=newTenant';
   }
 }
