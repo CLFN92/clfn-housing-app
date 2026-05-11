@@ -1620,6 +1620,66 @@ async function deactivateStaff(id, btn){
     if(btn){btn.disabled=false;btn.textContent='Deactivate';}
   }
 }
+// Flip a deactivated staff record back on. The underlying Supabase Auth
+// user is untouched by deactivation, so a single PATCH on the staff row
+// fully restores app access. The admin should follow up with Send Reset
+// if the returning employee can't recall their password.
+async function reactivateStaff(id, btn){
+  var ok = await showConfirm({
+    title:       'Reactivate this staff member?',
+    message:     'They will regain access to the app. If they have forgotten their password, use Send Reset afterwards.',
+    confirmText: 'Reactivate'
+  });
+  if (!ok) return;
+  if(btn){btn.disabled=true;btn.textContent='...';}
+  try {
+    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id,{
+      method:'PATCH',
+      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
+      body:JSON.stringify({is_active:true})
+    });
+    if(r.ok){
+      showToast('Staff member reactivated');
+      auditEntry('SETTINGS','settings_user_reactivate','Staff reactivated (id='+id+')',window.currentRole||'ed');
+      renderHousingUserTable();
+    } else {
+      showToast('Could not reactivate — check permissions');
+      if(btn){btn.disabled=false;btn.textContent='Reactivate';}
+    }
+  } catch(e){
+    showToast('Error: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='Reactivate';}
+  }
+}
+// Send a password-reset email to a staff member from the admin table. Uses
+// the same /auth/v1/recover endpoint + redirect_to as the public Forgot
+// Password flow, so the email link lands on the reset panel on index.html.
+// We don't surface response details (anti-enumeration) and we don't gate
+// resends — Supabase rate-limits the endpoint server-side per email + IP.
+async function sendStaffPasswordReset(email, btn){
+  if(!email){ showToast('No email on file'); return; }
+  if(btn){btn.disabled=true; btn.textContent='Sending…';}
+  try {
+    var redirectTo = window.location.origin + '/index.html';
+    var r = await fetch(SUPABASE_URL + '/auth/v1/recover', {
+      method:  'POST',
+      headers: { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email: email, redirect_to: redirectTo })
+    });
+    if(r.status === 429){
+      showToast('Too many reset attempts — try again in a few minutes');
+    } else if(!r.ok){
+      showToast('Could not send reset — try again');
+    } else {
+      showToast('Reset link sent to '+email);
+      auditEntry('SETTINGS','settings_user_send_reset','Password reset sent to '+email,window.currentRole||'ed');
+    }
+  } catch(e){
+    showToast('Error: '+e.message);
+  } finally {
+    if(btn){btn.disabled=false; btn.textContent='Send Reset';}
+  }
+}
 async function _sbEditStaffModal(id) {
   // Fetch current staff record
   var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id+'&select=*', { headers: HOUSING_HEADERS });
@@ -2445,15 +2505,31 @@ async function _loadCtFilesFromStorage(ctId){
     ['wsib','insurance','other'].forEach(function(bk){ renderCtFilePreview(bk); });
   } catch(e) { console.warn('[ct file] load from storage failed:', e); }
 }
+// Active / Inactive tab switcher for the Settings → Application Users table.
+// Flips window._staffFilter and re-renders. Deactivated staff are kept in
+// the DB (is_active=false) so historical audit references resolve; this
+// surface lets an admin find them and bring them back via reactivateStaff.
+function setStaffFilter(which) {
+  window._staffFilter = (which === 'inactive') ? 'inactive' : 'active';
+  var a = document.getElementById('staff_tab_active');
+  var i = document.getElementById('staff_tab_inactive');
+  if(a) a.classList.toggle('active', window._staffFilter === 'active');
+  if(i) i.classList.toggle('active', window._staffFilter === 'inactive');
+  renderHousingUserTable();
+}
+
 async function renderHousingUserTable(){
   var tbody = document.getElementById('userTableBody');
   if(!tbody) return;
   tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;">Loading…</td></tr>';
   try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?select=*&is_active=eq.true&order=name',{headers:HOUSING_HEADERS});
+    var filter   = window._staffFilter === 'inactive' ? 'inactive' : 'active';
+    var activeQ  = filter === 'inactive' ? 'eq.false' : 'eq.true';
+    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?select=*&is_active='+activeQ+'&order=name',{headers:HOUSING_HEADERS});
     var staff = await r.json();
     if(!staff||!staff.length){
-      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;">No staff found.</td></tr>';
+      var emptyMsg = filter === 'inactive' ? 'No deactivated staff.' : 'No staff found.';
+      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;">'+emptyMsg+'</td></tr>';
       return;
     }
     var roleColors = {
@@ -2487,21 +2563,33 @@ async function renderHousingUserTable(){
       var initials = words.length >= 2
         ? words[0][0].toUpperCase() + words[words.length-1][0].toUpperCase()
         : (u.name||'??').slice(0,2).toUpperCase();
+      var canManage = APPROVAL_AUTHORITY.can('manageStaffRecord', window.currentRole);
+      var actionsHtml = '';
+      if (isMe) {
+        actionsHtml = '<span style="font-size:11px;color:var(--muted);">You</span>';
+      } else if (canManage) {
+        if (filter === 'inactive') {
+          // Inactive: offer Reactivate. No Send Reset here — handle that
+          // after they're brought back so the standard Active-row controls
+          // apply uniformly.
+          actionsHtml = '<div class="flex-end gap-8">'
+            +'<button onclick="reactivateStaff('+u.id+',this)" class="btn btn-sm btn-primary">Reactivate</button>'
+            +'</div>';
+        } else {
+          // Active: Edit + Send Reset + Deactivate.
+          actionsHtml = '<div class="flex-end gap-8">'
+            +'<button onclick="_sbEditStaffModal('+u.id+')" class="btn btn-ghost btn-sm">Edit</button>'
+            +'<button onclick="sendStaffPasswordReset(\''+escapeHtml(u.email)+'\',this)" class="btn btn-ghost btn-sm">Send Reset</button>'
+            +'<button onclick="deactivateStaff('+u.id+',this)" class="btn btn-sm" style="border-color:var(--danger-border);color:var(--danger);">Deactivate</button>'
+            +'</div>';
+        }
+      }
       return '<tr>'
         +'<td class="std-row-avatar-cell"><div class="std-row-avatar">'+escapeHtml(initials)+'</div></td>'
         +'<td style="font-weight:600;">'+escapeHtml(u.name)+'</td>'
         +'<td style="color:var(--muted);font-size:12px;">'+escapeHtml(u.email)+'</td>'
         +'<td><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+rc.bg+';color:'+rc.c+';">'+escapeHtml(rl)+'</span></td>'
-        +'<td class="std-cell-right">'
-          +(isMe
-            ? '<span style="font-size:11px;color:var(--muted);">You</span>'
-            : (APPROVAL_AUTHORITY.can('manageStaffRecord', window.currentRole)
-              ? '<div class="flex-end gap-8">'
-                  +'<button onclick="_sbEditStaffModal('+u.id+')" class="btn btn-ghost btn-sm">Edit</button>'
-                  +'<button onclick="deactivateStaff('+u.id+',this)" class="btn btn-sm" style="border-color:var(--danger-border);color:var(--danger);">Deactivate</button>'
-                +'</div>'
-              : ''))
-        +'</td>'
+        +'<td class="std-cell-right">'+actionsHtml+'</td>'
         +'</tr>';
     }).join('');
   } catch(e){

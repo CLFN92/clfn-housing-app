@@ -1137,6 +1137,12 @@
         <button onclick="showAddHousingStaff()" id="settings_add_staff_btn" class="btn btn-ghost" data-roles="ed,housing_manager">+ Add Staff</button>
       </div>
       <div id="user_lookup_result"></div>
+      <!-- Active / Inactive switcher. setStaffFilter() flips window._staffFilter
+           and re-renders the table from is_active=eq.true|false. -->
+      <div class="pill-tabs" id="staff_filter_tabs" style="margin-top:12px;">
+        <button type="button" id="staff_tab_active"   class="pill-tab active" onclick="setStaffFilter('active')">Active</button>
+        <button type="button" id="staff_tab_inactive" class="pill-tab"        onclick="setStaffFilter('inactive')">Inactive</button>
+      </div>
     </div>
     <div class="doclib-table-wrap">
       <table class="std-table">

@@ -1672,10 +1672,20 @@ async function submitAddHousingStaff() {
   if(btn){ btn.disabled=true; btn.textContent='Adding…'; }
 
   try {
-    // Check if already in staff table
-    var checkR = await fetch(SUPABASE_URL+'/rest/v1/staff?select=id&email=eq.'+encodeURIComponent(email),{headers:HOUSING_HEADERS});
+    // Check staff table without filtering on is_active so we can also flag
+    // deactivated records (the renderHousingUserTable view hides them, but
+    // the row still exists in the DB and would 409 on insert).
+    var checkR = await fetch(SUPABASE_URL+'/rest/v1/staff?select=id,is_active&email=eq.'+encodeURIComponent(email),{headers:HOUSING_HEADERS});
     var existing = await checkR.json();
-    if(existing&&existing.length){ showToast(email+' is already in the staff directory'); if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';} return; }
+    if(existing && existing.length){
+      var existRow = existing[0];
+      var msg = existRow.is_active === false
+        ? email + ' is a deactivated staff member. Use the Inactive tab → Reactivate.'
+        : email + ' is already in the staff directory';
+      showToast(msg);
+      if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';}
+      return;
+    }
 
     var firstName = name.split(' ')[0];
     // Default password format includes the nation short code so it's recognizable
@@ -1689,17 +1699,35 @@ async function submitAddHousingStaff() {
     });
     var signupData = await signupR.json();
     var authCreated = signupR.ok && signupData.user && signupData.user.id;
-    var alreadyInAuth = (signupData.msg||'').includes('already registered') || (signupData.error_description||'').includes('already registered');
+    // Detect "already in auth" robustly. Supabase has used several wordings
+    // here over time — "already registered", "already been registered",
+    // "User already registered" — plus the newer structured `code` field
+    // (e.g. user_already_exists). Match any of them so we can adopt the
+    // orphan auth user instead of failing.
+    var sdMsg = (signupData.msg || '') + ' ' + (signupData.error_description || '') + ' ' + (signupData.error || '');
+    var alreadyInAuth = signupData.code === 'user_already_exists'
+                     || /already.*registered/i.test(sdMsg)
+                     || /already.*exists/i.test(sdMsg);
+    var signupsDisabled = signupData.code === 'signup_disabled'
+                       || /signups?\s+not\s+allowed/i.test(sdMsg)
+                       || /signups?\s+disabled/i.test(sdMsg);
 
     if(!authCreated && !alreadyInAuth) {
-      // Auth failed — show error, do NOT save staff record
+      // Auth failed and not an "already exists" case. Surface what Supabase
+      // actually said + targeted dashboard guidance when we recognise the
+      // signups-disabled error specifically (the older copy here told the
+      // admin to toggle "Confirm email" — that's a different setting and
+      // doesn't address this error at all).
       var errMsg = signupData.msg || signupData.error_description || signupData.error || JSON.stringify(signupData);
       if(res){
         res.style.background='#fef2f2'; res.style.border='1px solid #fecaca'; res.style.color='#b91c1c';
-        res.innerHTML = '<strong>Could not create login account.</strong><br>'
-          + '<span style="font-size:11px;">'+errMsg+'</span><br><br>'
-          + 'To fix: Go to <strong>' + (window.NATION_CONFIG && NATION_CONFIG.short || '') + ' Housing Supabase → Authentication → Sign In / Providers</strong><br>'
-          + 'Turn off <strong>"Confirm email"</strong> and click Save changes, then try again.';
+        var html = '<strong>Could not create login account.</strong><br>'
+          + '<span style="font-size:11px;">'+errMsg+'</span>';
+        if(signupsDisabled){
+          html += '<br><br>To fix: in the <strong>Supabase dashboard → Authentication → Sign In / Providers → Email</strong>, '
+                + 'turn <strong>ON</strong> "<strong>Allow new users to sign up</strong>" and Save. Then try again.';
+        }
+        res.innerHTML = html;
         res.style.display='block';
       }
       if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';}
@@ -1724,13 +1752,21 @@ async function submitAddHousingStaff() {
       return;
     }
 
-    // Both succeeded
+    // Both succeeded. When we adopted an existing auth user (alreadyInAuth)
+    // we don't know their current password, so suppress the default-password
+    // hint and tell the admin to use Send Reset on the row instead.
     if(res){
       res.style.background='var(--success-bg)'; res.style.border='1px solid var(--success-border)'; res.style.color='var(--success)';
-      res.innerHTML = '<strong>&#10003; '+escapeHtml(name)+' added successfully!</strong><br>'
-        + 'Email: <code style="background:var(--success-border);padding:2px 6px;border-radius:4px;">'+escapeHtml(email)+'</code><br>'
-        + 'Password: <code style="background:var(--success-border);padding:2px 6px;border-radius:4px;font-weight:700;">'+escapeHtml(defaultPassword)+'</code><br>'
-        + '<span style="font-size:11px;opacity:.8;">Share these credentials directly. They can change their password after signing in.</span>';
+      var head = '<strong>&#10003; '+escapeHtml(name)+' added successfully!</strong><br>'
+        + 'Email: <code style="background:var(--success-border);padding:2px 6px;border-radius:4px;">'+escapeHtml(email)+'</code><br>';
+      if(alreadyInAuth) {
+        res.innerHTML = head
+          + '<span style="font-size:11px;opacity:.8;">A login account for this email already existed — it has been linked to the new staff record. Use <strong>Send Reset</strong> on their row to issue a fresh password.</span>';
+      } else {
+        res.innerHTML = head
+          + 'Password: <code style="background:var(--success-border);padding:2px 6px;border-radius:4px;font-weight:700;">'+escapeHtml(defaultPassword)+'</code><br>'
+          + '<span style="font-size:11px;opacity:.8;">Share these credentials directly. They can change their password after signing in.</span>';
+      }
       res.style.display='block';
       showToast('\u2713 '+name+' added successfully');
     }
