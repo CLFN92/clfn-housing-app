@@ -2505,6 +2505,27 @@ async function _loadCtFilesFromStorage(ctId){
     ['wsib','insurance','other'].forEach(function(bk){ renderCtFilePreview(bk); });
   } catch(e) { console.warn('[ct file] load from storage failed:', e); }
 }
+// Short relative-time formatter for the Last Login column. Returns strings
+// like "2h ago", "3d ago", "5w ago", "Today", "Yesterday", "Never". Keeps
+// cells narrow so the table doesn't reflow on a wide last-login string.
+function _fmtRelativeTime(iso) {
+  if (!iso) return 'Never';
+  var t = new Date(iso).getTime();
+  if (isNaN(t)) return '—';
+  var diffMs   = Date.now() - t;
+  var diffMin  = Math.floor(diffMs / 60000);
+  if (diffMin < 1)    return 'Just now';
+  if (diffMin < 60)   return diffMin + 'm ago';
+  var diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24)  return diffHour + 'h ago';
+  var diffDay  = Math.floor(diffHour / 24);
+  if (diffDay === 1)  return 'Yesterday';
+  if (diffDay < 7)    return diffDay + 'd ago';
+  if (diffDay < 30)   return Math.floor(diffDay / 7) + 'w ago';
+  if (diffDay < 365)  return Math.floor(diffDay / 30) + 'mo ago';
+  return Math.floor(diffDay / 365) + 'y ago';
+}
+
 // Active / Inactive tab switcher for the Settings → Application Users table.
 // Flips window._staffFilter and re-renders. Deactivated staff are kept in
 // the DB (is_active=false) so historical audit references resolve; this
@@ -2521,7 +2542,7 @@ function setStaffFilter(which) {
 async function renderHousingUserTable(){
   var tbody = document.getElementById('userTableBody');
   if(!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;">Loading…</td></tr>';
   try {
     var filter   = window._staffFilter === 'inactive' ? 'inactive' : 'active';
     var activeQ  = filter === 'inactive' ? 'eq.false' : 'eq.true';
@@ -2529,7 +2550,7 @@ async function renderHousingUserTable(){
     var staff = await r.json();
     if(!staff||!staff.length){
       var emptyMsg = filter === 'inactive' ? 'No deactivated staff.' : 'No staff found.';
-      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;">'+emptyMsg+'</td></tr>';
+      tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;">'+emptyMsg+'</td></tr>';
       return;
     }
     var roleColors = {
@@ -2584,16 +2605,24 @@ async function renderHousingUserTable(){
             +'</div>';
         }
       }
+      // Last-login cell. Muted "Never" reads as a soft warning prompt for
+      // freshly-added staff who haven't signed in yet, without alarming
+      // colour. Tooltip carries the absolute timestamp for precise lookup.
+      var lastLogin = u.last_login_at || null;
+      var lastLoginCell = '<td style="font-size:12px;color:var(--muted);"'
+        + (lastLogin ? ' title="'+escapeHtml(lastLogin)+'"' : '')
+        + '>'+escapeHtml(_fmtRelativeTime(lastLogin))+'</td>';
       return '<tr>'
         +'<td class="std-row-avatar-cell"><div class="std-row-avatar">'+escapeHtml(initials)+'</div></td>'
         +'<td style="font-weight:600;">'+escapeHtml(u.name)+'</td>'
         +'<td style="color:var(--muted);font-size:12px;">'+escapeHtml(u.email)+'</td>'
         +'<td><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+rc.bg+';color:'+rc.c+';">'+escapeHtml(rl)+'</span></td>'
+        +lastLoginCell
         +'<td class="std-cell-right">'+actionsHtml+'</td>'
         +'</tr>';
     }).join('');
   } catch(e){
-    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--danger);font-size:12px;">Error loading staff: '+escapeHtml(e.message)+'</td></tr>';
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--danger);font-size:12px;">Error loading staff: '+escapeHtml(e.message)+'</td></tr>';
   }
 }
 function renderRenoScoreBadge(unitId) {

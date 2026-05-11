@@ -291,6 +291,11 @@ async function submitNewPassword() {
       sessionStorage.setItem('clfn_housing_email_session', HOUSING_SESSION.email || '');
     } catch(e) {}
 
+    // Reset is a sign-in event too — stamp last_login_at the same way the
+    // regular password path does, so the Settings → Users table reflects
+    // when a user came back via the recovery flow.
+    _stampStaffLastLogin(email);
+
     // Clear the recovery token from memory and the URL.
     window._recoveryToken = null;
     try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch(e) {}
@@ -364,6 +369,12 @@ async function startSignIn() {
     // Resolve role from the staff table — this is the real authorization gate
     await resolveHousingRole();
 
+    // Stamp last_login_at on the staff row. Fire-and-forget — a slow PATCH
+    // must not delay the redirect to housing.html. Relies on RLS allowing a
+    // user to update their own staff row; if it doesn't, the warn lands in
+    // the console and the rest of the sign-in continues normally.
+    _stampStaffLastLogin(email);
+
     // Persist session info for module pages so they don't re-validate on navigation
     try {
       sessionStorage.setItem('clfn_housing_role',          window.currentRole || 'employee');
@@ -379,6 +390,29 @@ async function startSignIn() {
     if (errEl) { errEl.textContent = GENERIC_AUTH_ERROR; errEl.style.display = 'block'; }
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
+  }
+}
+
+// ── Last-login stamp ──────────────────────────────────────────────────────────
+// Writes public.staff.last_login_at on every successful sign-in (regular and
+// post-reset auto-sign-in). Used by Settings → Users to show when each staff
+// member last opened the app. Fire-and-forget: the PATCH never blocks the
+// redirect and a failure (e.g. RLS denies self-update) is logged-only.
+//
+// The staff row is identified by email. We don't have the staff.id at this
+// point in the flow and looking it up would mean an extra round-trip, so we
+// rely on email being unique in public.staff (which it is — there's a unique
+// index there).
+function _stampStaffLastLogin(email) {
+  if (!email) return;
+  try {
+    fetch(SUPABASE_URL + '/rest/v1/staff?email=eq.' + encodeURIComponent(email), {
+      method:  'PATCH',
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+      body:    JSON.stringify({ last_login_at: new Date().toISOString() })
+    }).catch(function(e){ console.warn('[LAST LOGIN] write failed:', e); });
+  } catch (e) {
+    console.warn('[LAST LOGIN] write threw:', e);
   }
 }
 
