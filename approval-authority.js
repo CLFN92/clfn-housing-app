@@ -66,8 +66,10 @@ var APPROVAL_AUTHORITY = (function() {
     lockSow:                  ['ed'],
 
     // ── Contractor approvals ──────────────────────────────────────────────
-    // Who can recommend a contractor to ED
-    recommendContractor:      ['housing_manager'],
+    // Who can recommend a contractor to ED. HE-L2 included so senior
+    // employees can move new contractors forward without HM having to be
+    // the bottleneck — ED still owns the final approve/decline.
+    recommendContractor:      ['housing_employee_l2', 'housing_manager'],
     // Who gives final contractor approval
     approveContractor:        ['ed'],
     // Who can decline a contractor

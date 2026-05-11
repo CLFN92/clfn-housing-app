@@ -3455,12 +3455,13 @@ function setExportView(viewName) {
   if(wrap) wrap.style.display = visible ? 'flex' : 'none';
 }
 function showContractorsForRole() {
-  var role = window.currentRole || 'housing_employee_l1';
-  if(ROLE.isManagement(role)) {
-    showContractors();
-  } else {
-    openContractorSearch();
-  }
+  // All roles see the full contractor directory. Previously non-management
+  // roles were routed to a search-only modal (openContractorSearch), which
+  // meant HE-L1/L2 couldn't add contractors or browse the list. Approval
+  // actions (Recommend / Approve / Decline) are still gated inside the card
+  // via APPROVAL_AUTHORITY — HM recommends, ED approves — so opening the
+  // directory to everyone widens *access*, not *authority*.
+  showContractors();
 }
 function showInventory(){
   // Inventory lives in inventory.html. Use an element-based check (the page's
