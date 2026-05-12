@@ -85,7 +85,6 @@ Canonical roles (see `shared-config.js` `ROLE` and the role matrix in `PLAN.md` 
 - **Helper functions called from dynamic renders must live in `shared-data.js`** (not scoped inside page-level functions) so both `housing.html` and `renos.html` can call them.
 - **Refactor moves to `shared.js` are deferred to Phase C** (`PLAN.md`). Don't preemptively hoist things; snapshot files first as documented.
 - **`finance.html` is ~12 MB** because it bundles a large base64 logo and a lot of inline UI. Read it with `offset`/`limit` rather than wholesale.
-- **`housing_1.html` is a pre-refactor snapshot** kept around for reference. Don't edit it.
 
 ### Buttons & Export dropdowns (shared design — do not re-derive)
 
