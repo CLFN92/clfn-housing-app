@@ -148,7 +148,430 @@ var SOW_CATEGORIES = [
   'Flooring','Kitchen','Bathroom','Painting','Accessibility Modifications','Other'
 ];
 
+// ════════════════════════════════════════════════════════════════════════════
+// SOW MODAL TEMPLATE — single source of truth
+// ════════════════════════════════════════════════════════════════════════════
+// Until Stop B the SOW modal markup was duplicated across renos.html,
+// inventory.html, match.html, and tenants.html — four copies that drifted
+// (renos.html was an older variant missing project number, file uploads,
+// mark-complete/reopen buttons, and used inline styles instead of semantic
+// classes). The template lives here now; each page just hosts an empty
+// <div id="sowModalHost"></div> and openSowModal() mounts the template on
+// first call via _ensureSowModal().
+//
+// Sections are wrapped in 7 .modal-tab-panel containers so the modal can scroll
+// far less on iPad/iPhone (Stop C tab refactor):
+//   overview     — Unit Information + Condition Assessment
+//   scope        — Scope of Work Items + Photos & Documents
+//   safety       — Health & Safety Concerns
+//   acct         — Tenant Accountability (no longer collapsible; tabs handle it)
+//   notes        — Additional Notes + Terms & Conditions
+//   sigs         — Signatures & Acknowledgement (Required)
+//   approvals    — HM + ED approval fields
+//
+// All element IDs and onclick handlers are preserved exactly so existing JS
+// (saveSOW, addSowItem, setSigMethod, clearSig, sowContractorSearch,
+// markSowComplete, reopenSow, archiveCurrentSow, handleSowFileUpload,
+// photoDragOver, photoDragLeave, sowFileDrop, printSOW, printWorkOrder,
+// closeSowModal) keeps working unchanged.
+function _buildSowModalHTML() {
+  return '' +
+    '<div class="modal-body-sow-shell">' +
+      // ── Header ───────────────────────────────────────────────────────────
+      '<div class="modal-hdr spacious sticky">' +
+        '<div>' +
+          '<div class="lbl-uppercase-sm" data-nation-template="{NATION} — Housing">Constance Lake First Nation — Housing</div>' +
+          '<div class="txt-hdr-white">Renovation Scope of Work</div>' +
+          '<div id="sow_unit_label" class="txt-sm-meta"></div>' +
+          '<div class="sow-pn-row"><span class="sow-pn-lbl">Project #</span><span id="sow_project_number_label" class="sow-pn-val"></span></div>' +
+        '</div>' +
+        '<div class="sow-hdr-actions">' +
+          '<button id="sow_mark_complete_btn" type="button" onclick="markSowComplete()" class="sow-hdr-btn-success" style="display:none;">✓ Mark Complete</button>' +
+          '<button id="sow_reopen_btn" type="button" onclick="reopenSow()" class="sow-hdr-btn-warn" style="display:none;">↺ Reopen</button>' +
+          '<button id="sow_archive_btn" type="button" onclick="archiveCurrentSow()" class="sow-hdr-btn-ghost" style="display:none;">🗄 Archive</button>' +
+          '<button type="button" onclick="printWorkOrder()" class="sow-hdr-btn-primary">🏗 Work Order</button>' +
+          '<button type="button" onclick="printSOW()" class="sow-hdr-btn-ghost">🖨 Full SOW</button>' +
+          '<button type="button" onclick="closeSowModal()" class="btn-close-sm">✕</button>' +
+        '</div>' +
+      '</div>' +
+
+      // Read-only banner (shown when SOW is marked Complete and locked)
+      '<div id="sow_readonly_banner" class="banner-strip-success" style="display:none;"><span class="banner-icon">🔒</span>This Scope of Work is marked Completed and is read-only. Only the Executive Director can reopen or modify a completed SOW.</div>' +
+
+      // ── Tab strip (desktop) ──────────────────────────────────────────────
+      // CSS hides this on viewports < 640px and shows the drawer below.
+      '<div class="modal-tabs" id="sow_tab_bar">' +
+        '<button type="button" class="modal-tab active" data-modal-tab="overview"  onclick="setSowTab(\'overview\')">Overview</button>' +
+        '<button type="button" class="modal-tab"        data-modal-tab="scope"     onclick="setSowTab(\'scope\')">Scope of Work</button>' +
+        '<button type="button" class="modal-tab"        data-modal-tab="documents" onclick="setSowTab(\'documents\')">Documents</button>' +
+        '<button type="button" class="modal-tab"        data-modal-tab="safety"    onclick="setSowTab(\'safety\')">Health &amp; Safety</button>' +
+        '<button type="button" class="modal-tab"        data-modal-tab="acct"      onclick="setSowTab(\'acct\')">Accountability</button>' +
+        '<button type="button" class="modal-tab"        data-modal-tab="notes"     onclick="setSowTab(\'notes\')">Notes &amp; Terms</button>' +
+        '<button type="button" class="modal-tab"        data-modal-tab="sigs"      onclick="setSowTab(\'sigs\')">Signatures</button>' +
+      '</div>' +
+
+      // ── Tab drawer (mobile) ──────────────────────────────────────────────
+      // Always-open vertical tab list for small screens. No toggle — all 7
+      // sections are visible at once so the user can tap any one without
+      // an extra expand step. CSS hides this whole block on viewports
+      // >= 640px (the horizontal strip above takes over).
+      '<div class="modal-tab-drawer" id="sow_tab_drawer">' +
+        '<button type="button" class="modal-drawer-item active" data-modal-tab="overview"  onclick="setSowTab(\'overview\')">Overview</button>' +
+        '<button type="button" class="modal-drawer-item"        data-modal-tab="scope"     onclick="setSowTab(\'scope\')">Scope of Work</button>' +
+        '<button type="button" class="modal-drawer-item"        data-modal-tab="documents" onclick="setSowTab(\'documents\')">Documents</button>' +
+        '<button type="button" class="modal-drawer-item"        data-modal-tab="safety"    onclick="setSowTab(\'safety\')">Health &amp; Safety</button>' +
+        '<button type="button" class="modal-drawer-item"        data-modal-tab="acct"      onclick="setSowTab(\'acct\')">Accountability</button>' +
+        '<button type="button" class="modal-drawer-item"        data-modal-tab="notes"     onclick="setSowTab(\'notes\')">Notes &amp; Terms</button>' +
+        '<button type="button" class="modal-drawer-item"        data-modal-tab="sigs"      onclick="setSowTab(\'sigs\')">Signatures</button>' +
+      '</div>' +
+
+      // ── Tab panels ───────────────────────────────────────────────────────
+      '<div class="modal-body-stack">' +
+
+        // ── OVERVIEW ─────────────────────────────────────────────────────
+        '<div class="modal-tab-panel active" data-modal-panel="overview">' +
+          '<div class="card card-flush-mb-overflow">' +
+            '<div class="modal-hdr compact"><div class="lbl-yellow">Unit Information</div></div>' +
+            '<div class="grid-c2-pad">' +
+              '<div class="f"><label>Unit Address</label><input id="sow_address" type="text" placeholder="e.g. 11 Musko Road"/></div>' +
+              '<div class="f"><label>Date Prepared</label><input id="sow_date" type="date"/></div>' +
+              '<div class="f"><label>Current Tenant Name</label><input id="sow_tenant_name" type="text" placeholder="Full name of tenant"/></div>' +
+              '<div class="f"><label>Prepared By (Staff)</label><input id="sow_prepared_by" type="text" placeholder="Staff name"/></div>' +
+              '<div class="f sow-ct-row"><label>Contractor (if assigned)</label>' +
+                '<input id="sow_contractor" type="text" placeholder="Search contractors…" autocomplete="off"' +
+                  ' oninput="sowContractorSearch(this.value)" onfocus="sowContractorSearch(this.value)"' +
+                  ' onblur="setTimeout(function(){var d=document.getElementById(\'sow_ct_dropdown\');if(d)d.style.display=\'none\';},180)"/>' +
+                '<input type="hidden" id="sow_contractor_id"/>' +
+                '<div id="sow_ct_dropdown"></div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="card card-flush-mb">' +
+            '<div class="modal-hdr compact"><div class="lbl-yellow">Condition Assessment</div></div>' +
+            '<div class="grid-c2-pad">' +
+              '<div class="f"><label>Overall Condition</label>' +
+                '<select id="sow_condition">' +
+                  '<option value="">— Select —</option>' +
+                  '<option value="Good">Good — minor maintenance only</option>' +
+                  '<option value="Fair">Fair — moderate repairs needed</option>' +
+                  '<option value="Poor">Poor — significant repairs needed</option>' +
+                  '<option value="Critical">Critical — unsafe / condemned</option>' +
+                '</select>' +
+              '</div>' +
+              '<div class="f"><label>Target Start Date</label><input id="sow_start_date" type="date"/></div>' +
+              '<div class="f"><label>Target Completion Date</label><input id="sow_end_date" type="date"/></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // ── SCOPE OF WORK ────────────────────────────────────────────────
+        // Estimated Total Cost sits HERE (not on Overview) because the
+        // value is auto-calculated from the SOW Items list above it —
+        // reading top-to-bottom: itemize the work → see the total.
+        '<div class="modal-tab-panel" data-modal-panel="scope">' +
+          '<div class="card card-flush-mb">' +
+            '<div class="modal-hdr compact"><div class="lbl-yellow">Scope of Work Items</div></div>' +
+            '<div class="p-16">' +
+              '<div id="sow_items"></div>' +
+              '<button type="button" onclick="addSowItem()" class="sow-add-item-btn">+ Add Work Item</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="card card-flush-mb">' +
+            '<div class="modal-hdr compact"><div class="lbl-yellow">Estimated Total Cost</div></div>' +
+            '<div class="grid-c2-pad">' +
+              '<div class="f"><label>Sum of items above</label><input id="sow_total_cost" type="text" placeholder="Auto-calculated" readonly class="sow-total-cost-input"/></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // ── DOCUMENTS ────────────────────────────────────────────────────
+        // Photos + supporting documents (PDFs, quotes, inspection reports).
+        // Split out of the Scope of Work tab so files don't compete with
+        // the work-items list for screen space, especially on tablet.
+        '<div class="modal-tab-panel" data-modal-panel="documents">' +
+          '<div class="card card-flush-mb">' +
+            '<div class="modal-hdr compact"><div class="lbl-yellow">Photos &amp; Documents</div><div id="sow_files_size" class="file-list-meta"></div></div>' +
+            '<div class="p-16">' +
+              '<div id="sow_drop_zone" class="upload-zone"' +
+                ' ondragover="photoDragOver(event,\'sow_drop_zone\')"' +
+                ' ondragleave="photoDragLeave(\'sow_drop_zone\')"' +
+                ' ondrop="sowFileDrop(event)"' +
+                ' onclick="document.getElementById(\'sow_files_input\').click()">' +
+                '<svg class="upload-zone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>' +
+                '<div class="upload-zone-title">Drag files here or <span class="link-yellow">browse</span></div>' +
+                '<div class="txt-muted-xs">Photos · PDF · DOC/DOCX · XLS/XLSX · CSV · TXT — up to 50 MB total</div>' +
+                '<input type="file" id="sow_files_input" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" multiple onchange="handleSowFileUpload(this)"/>' +
+              '</div>' +
+              '<div id="sow_files_list" class="file-list"></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // ── HEALTH & SAFETY ──────────────────────────────────────────────
+        '<div class="modal-tab-panel" data-modal-panel="safety">' +
+          '<div class="card card-flush-mb">' +
+            '<div class="modal-hdr compact"><div class="lbl-yellow">Health &amp; Safety Concerns</div></div>' +
+            '<div class="p-16">' +
+              '<div class="grid-c3-tight">' +
+                '<label class="check-row"><input type="checkbox" id="sow_mold" class="icon-sm"/> Mould / Mildew</label>' +
+                '<label class="check-row"><input type="checkbox" id="sow_asbestos" class="icon-sm"/> Asbestos Risk</label>' +
+                '<label class="check-row"><input type="checkbox" id="sow_electrical" class="icon-sm"/> Electrical Hazard</label>' +
+                '<label class="check-row"><input type="checkbox" id="sow_structural" class="icon-sm"/> Structural Concern</label>' +
+                '<label class="check-row"><input type="checkbox" id="sow_plumbing" class="icon-sm"/> Plumbing / Sewage</label>' +
+                '<label class="check-row"><input type="checkbox" id="sow_fire" class="icon-sm"/> Fire Safety</label>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // ── ACCOUNTABILITY ───────────────────────────────────────────────
+        '<div class="modal-tab-panel" data-modal-panel="acct">' +
+          '<div class="card card-flush-mb">' +
+            '<div class="modal-hdr compact"><div class="lbl-yellow">Tenant Accountability</div></div>' +
+            '<div class="p-16">' +
+              '<div class="sow-acct-hint">Record factors that affect renovation priority and tenant responsibility.</div>' +
+              '<div class="sow-acct-list">' +
+                '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_rent_arrears"/><span class="tsl"></span></label><label for="sow_rent_arrears" class="txt-sm-bold">Tenant has rent arrears</label></div>' +
+                '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_tenant_damage"/><span class="tsl"></span></label><label for="sow_tenant_damage" class="txt-sm-bold">Damage caused by tenant</label></div>' +
+                '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_negligence"/><span class="tsl"></span></label><label for="sow_negligence" class="txt-sm-bold">Negligence (failure to maintain / report issues)</label></div>' +
+                '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_vandalism"/><span class="tsl"></span></label><label for="sow_vandalism" class="txt-sm-bold">Vandalism</label></div>' +
+                '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_police_report"/><span class="tsl"></span></label><label for="sow_police_report" class="txt-sm-bold">Police report on file</label></div>' +
+              '</div>' +
+              '<div class="f"><label>Accountability Notes</label>' +
+                '<textarea id="sow_accountability_notes" rows="2" placeholder="Details on tenant responsibility, incident dates, report numbers…"></textarea>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // ── NOTES & TERMS ────────────────────────────────────────────────
+        '<div class="modal-tab-panel" data-modal-panel="notes">' +
+          '<div class="card card-flush-mb">' +
+            '<div class="modal-hdr compact"><div class="lbl-yellow">Additional Notes</div></div>' +
+            '<div class="p-16">' +
+              '<div class="f"><label>Special Instructions / Access Requirements</label>' +
+                '<textarea id="sow_notes" rows="3" placeholder="Any additional context, access requirements, tenant considerations…"></textarea>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          // Terms & Conditions default to COLLAPSED — the section is long
+          // boilerplate that users rarely need to read in full once they've
+          // seen it once. The accordion uses the shared .collapsible-card
+          // pattern (toggling .is-collapsed on the wrapper card hides the
+          // .collapsible-body and rotates the chevron).
+          '<div class="card card-flush-mb collapsible-card is-collapsed">' +
+            '<div class="modal-hdr compact collapsible-head" onclick="this.parentElement.classList.toggle(\'is-collapsed\')">' +
+              '<div class="lbl-yellow">Terms &amp; Conditions</div>' +
+              '<svg class="collapsible-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>' +
+            '</div>' +
+            '<div id="sow_terms_body" class="sow-terms-body collapsible-body">' +
+              '<p class="sow-terms-eyebrow" data-nation-template="{NATION} — Housing Department">Constance Lake First Nation — Housing Department</p>' +
+              '<p class="sow-terms-lead">By completing and submitting this Scope of Work, the submitting party acknowledges and agrees to the following terms.</p>' +
+              '<div class="flex-col-12">' +
+                '<div class="yellow-accent"><div class="lbl-field">1. Prioritization of Requests</div><p class="txt-muted-sm">Renovation requests are assessed and prioritized based on the urgency of need, health and safety risk to occupants, and the overall condition of the unit. Requests involving immediate hazards — including structural, electrical, plumbing, or fire safety concerns — are given priority consideration over general maintenance and cosmetic work.</p></div>' +
+                '<div class="yellow-accent"><div class="lbl-field">2. Funding Eligibility &amp; Unit Qualifying Criteria</div><p class="txt-muted-sm">Approval is subject to available funding and the qualifying criteria of the unit under its applicable program (e.g. ISC, CMHC Section 95, CMHC Section 56.1, or Band-funded). Not all units qualify under all funding sources, and funding availability may affect the scope, cost ceiling, or timing of approved work. Requests will be assessed against the current budget allocation for the relevant funding pool.</p></div>' +
+                '<div class="yellow-accent"><div class="lbl-field">3. Budget Authority &amp; Approval Routing</div><p class="txt-muted-sm">Renovation requests within the Housing Manager’s approved budget authority may be approved by the Housing Manager. Any request exceeding that threshold — as established in the Housing Department’s current budget policy — requires Executive Director approval before work may commence. No work is to be initiated until all required approvals have been obtained and documented.</p></div>' +
+                '<div class="yellow-accent"><div class="lbl-field">4. Tenant Responsibilities</div><p class="txt-muted-sm">The tenant is required to provide timely and reasonable access to the unit for inspection, assessment, and the completion of approved work. Damage, negligence, or vandalism attributed to the tenant may reduce the priority of the request and may result in the tenant being held financially responsible for a portion of repair costs, as determined by the Housing Manager.</p></div>' +
+                '<div class="yellow-accent"><div class="lbl-field">5. No Guarantee of Approval or Timeline</div><p class="txt-muted-sm">Submission of this form does not guarantee approval or a specific completion date. The <span data-nation="short">CLFN</span> Housing Department will communicate decisions in writing. Priority and scheduling are subject to change based on available resources, contractor availability, and emerging urgent needs within the community.</p></div>' +
+                '<div class="yellow-accent"><div class="lbl-field">6. Accuracy of Information</div><p class="txt-muted-sm">All information provided in this Scope of Work must be accurate and complete. Submitting false or misleading information may result in the request being cancelled, delayed, or referred for further review.</p></div>' +
+              '</div>' +
+              '<p class="sow-terms-foot">By signing below, the tenant and the housing staff member confirm they have read, understood, and agree to these terms.</p>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // ── SIGNATURES ───────────────────────────────────────────────────
+        '<div class="modal-tab-panel" data-modal-panel="sigs">' +
+          '<div class="card card-flush-mb">' +
+            '<div class="modal-hdr compact"><div class="lbl-yellow">Signatures &amp; Acknowledgement<span class="lbl-required">Required</span></div></div>' +
+            '<div id="sow_sig_body" class="sow-sig-body">' +
+              // Tenant signature
+              '<div class="box-bg-card">' +
+                '<div class="flex-row-mb">' +
+                  '<div class="sow-sig-badge sow-sig-badge-tenant">T</div>' +
+                  '<div><div class="fw-bold-sm">Tenant</div><div class="txt-xs-muted">I acknowledge the scope of work and grant access to the unit</div></div>' +
+                '</div>' +
+                '<div class="grid-c2-tight-mb">' +
+                  '<div class="f"><label>Printed Name</label><input type="text" id="sow_sig_tenant_name" placeholder="Tenant full name"/></div>' +
+                  '<div class="f"><label>Date</label><input type="date" id="sow_sig_tenant_date"/></div>' +
+                '</div>' +
+                '<div class="sig-canvas-wrap">' +
+                  '<div class="tab-bar">' +
+                    '<button type="button" onclick="setSigMethod(\'sow_sig_canvas_tenant\',\'canvas\')" id="sow_sig_canvas_tenant_tab_canvas" class="ct-sig-tab active">✏️ Draw</button>' +
+                    '<button type="button" onclick="setSigMethod(\'sow_sig_canvas_tenant\',\'type\')"   id="sow_sig_canvas_tenant_tab_type"   class="ct-sig-tab">⌨️ Type</button>' +
+                    '<button type="button" onclick="setSigMethod(\'sow_sig_canvas_tenant\',\'wet\')"    id="sow_sig_canvas_tenant_tab_wet"    class="ct-sig-tab">🖊 Wet / E-Sign</button>' +
+                  '</div>' +
+                  '<div id="sow_sig_canvas_tenant_panel_canvas" class="bg-paper">' +
+                    '<canvas id="sow_sig_canvas_tenant" width="620" height="90" class="sig-canvas"></canvas>' +
+                    '<div class="sig-footer-row"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig(\'sow_sig_canvas_tenant\')" class="sig-clear-btn">Clear</button></div>' +
+                  '</div>' +
+                  '<div id="sow_sig_canvas_tenant_panel_type" class="sec-hidden"><input type="text" id="sow_sig_canvas_tenant_typed" placeholder="Type full legal name" class="sig-typed-input"/><div class="txt-fineprint">Typing your name constitutes a legal electronic signature</div></div>' +
+                  '<div id="sow_sig_canvas_tenant_panel_wet" class="sec-hidden"><div class="txt-help">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="sow_sig_canvas_tenant_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" class="sig-wet-input"/></div>' +
+                '</div>' +
+              '</div>' +
+              // Staff signature
+              '<div class="box-bg-card">' +
+                '<div class="flex-row-mb">' +
+                  '<div class="sow-sig-badge sow-sig-badge-staff">S</div>' +
+                  '<div><div class="fw-bold-sm">Housing Staff</div><div class="txt-xs-muted">Employee completing this scope of work</div></div>' +
+                '</div>' +
+                '<div class="grid-c2-tight-mb">' +
+                  '<div class="f"><label>Printed Name</label><input type="text" id="sow_sig_staff_name" placeholder="Staff full name"/></div>' +
+                  '<div class="f"><label>Date</label><input type="date" id="sow_sig_staff_date"/></div>' +
+                '</div>' +
+                '<div class="sig-canvas-wrap">' +
+                  '<div class="tab-bar">' +
+                    '<button type="button" onclick="setSigMethod(\'sow_sig_canvas_staff\',\'canvas\')" id="sow_sig_canvas_staff_tab_canvas" class="ct-sig-tab active">✏️ Draw</button>' +
+                    '<button type="button" onclick="setSigMethod(\'sow_sig_canvas_staff\',\'type\')"   id="sow_sig_canvas_staff_tab_type"   class="ct-sig-tab">⌨️ Type</button>' +
+                    '<button type="button" onclick="setSigMethod(\'sow_sig_canvas_staff\',\'wet\')"    id="sow_sig_canvas_staff_tab_wet"    class="ct-sig-tab">🖊 Wet / E-Sign</button>' +
+                  '</div>' +
+                  '<div id="sow_sig_canvas_staff_panel_canvas" class="bg-paper">' +
+                    '<canvas id="sow_sig_canvas_staff" width="620" height="90" class="sig-canvas"></canvas>' +
+                    '<div class="sig-footer-row"><span class="txt-xs-muted">Sign with finger or mouse</span><button type="button" onclick="clearSig(\'sow_sig_canvas_staff\')" class="sig-clear-btn">Clear</button></div>' +
+                  '</div>' +
+                  '<div id="sow_sig_canvas_staff_panel_type" class="sec-hidden"><input type="text" id="sow_sig_canvas_staff_typed" placeholder="Type full legal name" class="sig-typed-input"/><div class="txt-fineprint">Typing your name constitutes a legal electronic signature</div></div>' +
+                  '<div id="sow_sig_canvas_staff_panel_wet" class="sec-hidden"><div class="txt-help">Print this form for a wet signature, or send via DocuSign / Adobe Sign and attach the signed copy.</div><input type="text" id="sow_sig_canvas_staff_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" class="sig-wet-input"/></div>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // Approvals tab removed — HM / ED approval flow is handled outside
+        // the SOW form (Renovation Approvals view, internal-only). The
+        // hidden inputs below preserve the IDs that saveSOW reads so the
+        // existing status-computation logic doesn't break. Empty values
+        // mean the auto-promote-to-hm_approved/ed_approved branches never
+        // fire from the modal — the SOW status caps at "signed" until an
+        // external approval action lifts it.
+        '<div class="sow-hidden-approvals" hidden>' +
+          '<input id="sow_hm_name" type="hidden"/>' +
+          '<input id="sow_hm_date" type="hidden"/>' +
+          '<input id="sow_ed_name" type="hidden"/>' +
+          '<input id="sow_ed_date" type="hidden"/>' +
+          '<span id="sow_budget_badge"></span>' +
+        '</div>' +
+
+      '</div>' + /* /modal-body-stack */
+
+      // ── Footer ───────────────────────────────────────────────────────────
+      '<div class="flex-sb sow-modal-footer">' +
+        '<div id="sow_saved_indicator" class="txt-muted-sm"></div>' +
+        '<div class="flex-row-10 sow-footer-right">' +
+          // Review progress label — populated by _updateSowSaveButtonState.
+          // Reads "3 of 8 sections reviewed" until all tabs have been
+          // visited at least once; then flips to "All sections reviewed".
+          '<div id="sow_review_progress" class="txt-muted-sm sow-review-progress"></div>' +
+          '<button type="button" onclick="closeSowModal()" class="btn btn-ghost">Cancel</button>' +
+          // Initial label is "Save Draft" because a fresh modal starts with
+          // only the Overview tab visited. _updateSowSaveButtonState flips
+          // it to "Submit Scope of Work" once all 8 tabs have been opened.
+          '<button id="sow_save_btn" type="button" onclick="saveSOW()" class="btn btn-primary" data-mode="draft">💾 Save Draft</button>' +
+        '</div>' +
+      '</div>' +
+
+    '</div>'; /* /modal-body-sow-shell */
+}
+
+// Mount the SOW template into a host on first call. Re-using #sowModal as
+// the overlay element so existing JS (display:flex toggles, status-driven
+// lock styling) doesn't need to change. _sowModalMounted is a one-shot
+// guard so we don't redo the innerHTML work on every open.
+function _ensureSowModal() {
+  if (window._sowModalMounted) return;
+  // Resolve a host element. Each page should declare ONE of:
+  //   <div id="sowModalHost"></div>            (preferred, post-consolidation)
+  //   <div id="sowModal" class="modal-overlay">…stale markup…</div> (legacy)
+  // If a host is present we mount cleanly. If only a legacy #sowModal
+  // exists we replace its innerHTML so the old markup is shed.
+  var host = document.getElementById('sowModalHost');
+  var modal;
+  if (host) {
+    host.outerHTML = '<div id="sowModal" class="modal-overlay modal-z-900"></div>';
+    modal = document.getElementById('sowModal');
+  } else {
+    modal = document.getElementById('sowModal');
+    if (!modal) {
+      // No host at all — page hasn't been wired up. Bail loudly so we
+      // notice during dev rather than silently no-op.
+      console.warn('[SOW] Neither #sowModalHost nor #sowModal exists on this page. SOW modal will not render.');
+      return;
+    }
+  }
+  modal.innerHTML = _buildSowModalHTML();
+  window._sowModalMounted = true;
+}
+
+// Total tabs in the SOW modal — keep in sync with _buildSowModalHTML and
+// _SOW_TAB_NAMES below. Drives the "Save Draft → Submit" gate: until the
+// user has visited every tab the Save button writes draft status only.
+var _SOW_TAB_NAMES  = ['overview','scope','documents','safety','acct','notes','sigs'];
+var _SOW_TAB_TOTAL  = _SOW_TAB_NAMES.length;
+
+// Tab switcher for the SOW modal. Mirrors the TIC pattern (data-modal-tab on
+// the buttons, data-modal-panel on the panels). Also tracks visited tabs in
+// window._sowVisitedTabs (a Set) so the Save button can flip between draft
+// and submit modes. Updates BOTH the desktop tab strip and the mobile
+// drawer in lockstep so the visible UI is the same regardless of viewport.
+function setSowTab(name) {
+  if (!window._sowVisitedTabs) window._sowVisitedTabs = new Set();
+  window._sowVisitedTabs.add(name);
+  // Desktop strip
+  var bar = document.getElementById('sow_tab_bar');
+  if (bar) {
+    bar.querySelectorAll(".modal-tab").forEach(function(b){
+      var n = b.getAttribute('data-modal-tab');
+      b.classList.toggle('active', n === name);
+      b.classList.toggle('visited', window._sowVisitedTabs.has(n));
+    });
+  }
+  // Mobile drawer (always-open vertical list, mirrors the desktop strip)
+  var drawer = document.getElementById('sow_tab_drawer');
+  if (drawer) {
+    drawer.querySelectorAll(".modal-drawer-item").forEach(function(b){
+      var n = b.getAttribute('data-modal-tab');
+      b.classList.toggle('active', n === name);
+      b.classList.toggle('visited', window._sowVisitedTabs.has(n));
+    });
+  }
+  // Panels
+  document.querySelectorAll(".modal-tab-panel").forEach(function(p){
+    p.classList.toggle('active', p.getAttribute('data-modal-panel') === name);
+  });
+  _updateSowSaveButtonState();
+}
+
+// Flips the Save button between "Save Draft" (not all tabs reviewed yet)
+// and "Submit Scope of Work" (every tab has been clicked at least once).
+// saveSOW reads btn.dataset.mode to decide whether to force draft status.
+function _updateSowSaveButtonState() {
+  var btn = document.getElementById('sow_save_btn');
+  var prog = document.getElementById('sow_review_progress');
+  if (!btn) return;
+  var visited = (window._sowVisitedTabs && window._sowVisitedTabs.size) || 0;
+  var allReviewed = visited >= _SOW_TAB_TOTAL;
+  btn.dataset.mode  = allReviewed ? 'submit' : 'draft';
+  btn.textContent   = allReviewed ? '📤 Submit Scope of Work' : '💾 Save Draft';
+  if (prog) prog.textContent = allReviewed ? 'All sections reviewed' : (visited + ' of ' + _SOW_TAB_TOTAL + ' sections reviewed');
+}
+
 function openSowModal(unitId, projectNumber) {
+  // Mount the consolidated template on first call. Stays idempotent on
+  // subsequent opens so element IDs survive between sessions.
+  _ensureSowModal();
+  // Reset visited-tab tracking. Re-opens of an EXISTING saved SOW pre-fill
+  // all tabs as reviewed (the user is editing, not first-walking the form),
+  // so the Save button immediately offers Submit mode. Brand-new SOWs
+  // start with no tabs visited; setSowTab('overview') below adds the
+  // first one. The "review every tab" gate only applies to new authoring.
+  window._sowVisitedTabs = new Set();
+  var willBeEdit = !!(projectNumber || (unitId && typeof getUnitSowList === 'function' && getUnitSowList(unitId).length));
+  if (willBeEdit) {
+    _SOW_TAB_NAMES.forEach(function(t){ window._sowVisitedTabs.add(t); });
+  }
+  // Always reset the tab to Overview on open — otherwise re-opening shows
+  // whatever tab the user was last on, which is rarely what they want.
+  if (typeof setSowTab === 'function') setSowTab('overview');
   _sowUnitId  = unitId || null;
   _sowItemIdx = 0;
 
@@ -720,6 +1143,19 @@ function saveSOW(){
   else if(data.hmName && data.hmDate && APPROVAL_AUTHORITY.can('approveSowUnderThreshold', _saveRole)) data.approval_status = 'hm_approved';
   else if((data.tenantSig && data.tenantSig.image) || (data.staffSig && data.staffSig.image)) data.approval_status = 'signed';
   else data.approval_status = 'draft';
+
+  // Review-all-tabs gate. The Save button switches between data-mode="draft"
+  // (some tabs unvisited) and data-mode="submit" (all 8 tabs clicked). In
+  // draft mode we override the auto-computed status back to 'draft' so the
+  // SOW can't accidentally advance into the approval workflow before the
+  // user has walked every section. Edits to an existing saved SOW open
+  // with every tab pre-marked visited, so this gate is effectively skipped
+  // for re-edits — only first-time authoring is forced through the walk.
+  var _saveBtn = document.getElementById('sow_save_btn');
+  var _saveMode = _saveBtn && _saveBtn.dataset ? _saveBtn.dataset.mode : null;
+  if (_saveMode !== 'submit' && data.approval_status !== 'completed') {
+    data.approval_status = 'draft';
+  }
 
   if(_sowUnitId) upsertSowInList(_sowUnitId, data);
 

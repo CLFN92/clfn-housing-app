@@ -721,7 +721,112 @@ function _scoreUnit(u, needsBeds, needsAccess, isElders) {
   return sc;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// ASSIGN-UNIT MODAL TEMPLATE — single source of truth
+// ════════════════════════════════════════════════════════════════════════════
+// The modal markup used to live only in match.html, but the Assign button on
+// the housing.html dashboard also calls openAssignModal — which crashed when
+// the modal element wasn't on the current page. Same divergence pattern that
+// hit the SOW modal. Both pages now host an empty <div id="assignModalHost">
+// which the template mounts into on first call via _ensureAssignModal().
+function _buildAssignModalHTML() {
+  return '' +
+    '<div class="assign-modal-body">' +
+      // ── Header ───────────────────────────────────────────────────────
+      '<div class="modal-hdr spacious assign-modal-hdr">' +
+        '<div>' +
+          '<div class="assign-modal-eyebrow">Housing Match</div>' +
+          '<div class="panel-title">Assign Unit to Applicant</div>' +
+        '</div>' +
+        '<button onclick="closeAssignModal()" class="btn-close-sm">✕</button>' +
+      '</div>' +
+
+      '<div class="assign-modal-content">' +
+
+        // ── Applicant summary strip ────────────────────────────────────
+        '<div style="background:var(--bg);border-radius:10px;padding:14px 16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;border:1px solid var(--border);">' +
+          '<div>' +
+            '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Applicant</div>' +
+            '<div id="am_app_name" class="txt-md-bold"></div>' +
+            '<div id="am_app_id"   style="font-size:11px;color:var(--muted);margin-top:1px;"></div>' +
+          '</div>' +
+          '<div>' +
+            '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Score</div>' +
+            '<div id="am_app_score"  class="txt-md-bold"></div>' +
+            '<div id="am_app_status" style="font-size:11px;font-weight:700;margin-top:1px;"></div>' +
+          '</div>' +
+          '<div>' +
+            '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Needs</div>' +
+            '<div id="am_app_reqs" style="font-size:12px;color:var(--text);line-height:1.4;"></div>' +
+          '</div>' +
+        '</div>' +
+
+        // ── Unit match list ────────────────────────────────────────────
+        '<div class="card card-flush">' +
+          '<div class="modal-hdr compact">' +
+            '<div class="lbl-yellow">Available Units — Ranked by Match</div>' +
+            '<div id="am_role_badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,0.1);color:var(--txt-on-dark);"></div>' +
+          '</div>' +
+          '<div class="search-row">' +
+            '<input type="text" id="am_search_input" oninput="amFilterUnits(this.value)" placeholder="&#128269; Search by address or street…" autocomplete="off"/>' +
+          '</div>' +
+          '<div id="am_unit_list"></div>' +
+        '</div>' +
+
+        // ── Selection / Override notes ─────────────────────────────────
+        '<div id="am_override_wrap">' +
+          '<div class="f">' +
+            '<label><span id="am_notes_label" style="font-weight:700;">Selection Notes</span> <span id="am_notes_req_star" style="color:var(--danger);display:none;">*</span></label>' +
+            '<textarea id="am_override_notes" rows="2" placeholder="Notes…" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);resize:vertical;"></textarea>' +
+          '</div>' +
+        '</div>' +
+
+        // ── Move-in date + warning ─────────────────────────────────────
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end;">' +
+          '<div class="f">' +
+            '<label>Move-in / Occupancy Date</label>' +
+            '<input type="date" id="am_movein_date" style="font-size:13px;"/>' +
+          '</div>' +
+          '<div id="am_warn" style="display:none;padding:10px 12px;border-radius:8px;font-size:11px;font-weight:600;"></div>' +
+        '</div>' +
+
+      '</div>' + /* /assign-modal-content */
+
+      // ── Footer ───────────────────────────────────────────────────────
+      '<div class="assign-modal-footer">' +
+        '<button onclick="closeAssignModal()" class="btn btn-ghost">Cancel</button>' +
+        '<button onclick="confirmAssignment()" id="am_confirm_btn" class="btn btn-primary assign-modal-confirm" disabled>Select a unit above</button>' +
+      '</div>' +
+
+    '</div>'; /* /assign-modal-body */
+}
+
+// Mount the assign template into a host on first call. Re-uses
+// #assignUnitModal as the overlay element so existing close/show logic
+// keeps working unchanged. Idempotent — the _assignModalMounted guard
+// prevents redoing the innerHTML on subsequent opens.
+function _ensureAssignModal() {
+  if (window._assignModalMounted) return;
+  var host = document.getElementById('assignModalHost');
+  var modal;
+  if (host) {
+    host.outerHTML = '<div id="assignUnitModal" class="modal-overlay modal-z-900" onclick="if(event.target===this)closeAssignModal()"></div>';
+    modal = document.getElementById('assignUnitModal');
+  } else {
+    modal = document.getElementById('assignUnitModal');
+    if (!modal) {
+      console.warn('[ASSIGN] Neither #assignModalHost nor #assignUnitModal exists on this page. Assign modal will not render.');
+      return;
+    }
+  }
+  modal.innerHTML = _buildAssignModalHTML();
+  window._assignModalMounted = true;
+}
+
 function openAssignModal(appId, suggestedUnitId) {
+  // Mount the consolidated template on first call. Idempotent so element
+  // IDs survive between opens.
+  _ensureAssignModal();
   _amAppId = appId; _amBestUnitId = suggestedUnitId || ''; _amSelectedUnitId = null;
   var allApps  = (typeof applications !== 'undefined' ? applications : []);
   var allUnits = [];

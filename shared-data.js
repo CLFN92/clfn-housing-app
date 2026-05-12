@@ -869,6 +869,78 @@ function _buildContractorAgreementHTML(ct) {
     +'<div class="footer"><span>'+escapeHtml(buildNationFooterStrip({ suffix: "Contractor Registry", includeConfidential: false }))+'</span><span>Generated '+today+' · CONFIDENTIAL</span></div>'
     +'</body></html>';
 }
+// Tab names for the CIC modal. Drives the "Save Draft → Submit Contractor"
+// gate via _updateCicSaveButtonState — until every tab has been opened the
+// Save button writes status='draft' so the contractor doesn't enter the
+// HM review queue prematurely. Mirrors _SOW_TAB_NAMES in housing-modals-sow.js.
+var _CIC_TAB_NAMES = ['overview','compliance','documents','terms','sigs'];
+var _CIC_TAB_TOTAL = _CIC_TAB_NAMES.length;
+
+// Tab switcher for the Contractor Information Card (CIC) modal. Mirrors
+// the SOW pattern (setSowTab in housing-modals-sow.js) but scoped to the
+// CIC's container IDs so the two modals don't collide. Updates both the
+// desktop tab strip (#cic_tab_bar) and the mobile drawer (#cic_tab_drawer)
+// plus the .modal-tab-panel[data-cic-panel="..."] panels. Visited tabs
+// get the .visited class so the amber unread-dot disappears once a tab
+// has been opened.
+function setCicTab(name) {
+  if (!window._cicVisitedTabs) window._cicVisitedTabs = new Set();
+  window._cicVisitedTabs.add(name);
+  var bar = document.getElementById('cic_tab_bar');
+  if (bar) {
+    bar.querySelectorAll('.modal-tab').forEach(function(b){
+      var n = b.getAttribute('data-cic-tab');
+      b.classList.toggle('active', n === name);
+      b.classList.toggle('visited', window._cicVisitedTabs.has(n));
+    });
+  }
+  var drawer = document.getElementById('cic_tab_drawer');
+  if (drawer) {
+    drawer.querySelectorAll('.modal-drawer-item').forEach(function(b){
+      var n = b.getAttribute('data-cic-tab');
+      b.classList.toggle('active', n === name);
+      b.classList.toggle('visited', window._cicVisitedTabs.has(n));
+    });
+  }
+  // Scope panel toggle to the CIC modal so SOW panels (different
+  // data attribute) on a future shared page wouldn't be affected.
+  var modal = document.getElementById('addContractorModal');
+  var scope = modal || document;
+  scope.querySelectorAll('.modal-tab-panel[data-cic-panel]').forEach(function(p){
+    p.classList.toggle('active', p.getAttribute('data-cic-panel') === name);
+  });
+  _updateCicSaveButtonState();
+}
+
+// Flips the contractor Save button between three modes:
+//   "edit"   → existing contractor being edited; label is "Save Changes",
+//              gate is skipped (status preserved as-is)
+//   "draft"  → new contractor with at least one tab unvisited; label is
+//              "Save Draft", saveContractor forces status='draft' so the
+//              record doesn't enter the HM review queue yet
+//   "submit" → new contractor with every tab visited; label is "Submit
+//              Contractor", saveContractor lets the normal status
+//              ('pending_review') take effect
+// The footer progress label ("3 of 5 sections reviewed") only renders for
+// the new-contractor case — edits don't need it.
+function _updateCicSaveButtonState() {
+  var btn  = document.getElementById('ct_save_btn');
+  var prog = document.getElementById('cic_review_progress');
+  if (!btn) return;
+  var isEdit = (typeof window._ctEditIdx === 'number') && window._ctEditIdx >= 0;
+  if (isEdit) {
+    btn.dataset.mode = 'edit';
+    btn.textContent  = 'Save Changes';
+    if (prog) prog.textContent = '';
+    return;
+  }
+  var visited = (window._cicVisitedTabs && window._cicVisitedTabs.size) || 0;
+  var allReviewed = visited >= _CIC_TAB_TOTAL;
+  btn.dataset.mode = allReviewed ? 'submit' : 'draft';
+  btn.textContent  = allReviewed ? '📤 Submit Contractor' : '💾 Save Draft';
+  if (prog) prog.textContent = allReviewed ? 'All sections reviewed' : (visited + ' of ' + _CIC_TAB_TOTAL + ' sections reviewed');
+}
+
 // prefix lets the same renderer feed two surfaces: the legacy side panel
 // (ctap_*) and the new inline CIC section in the edit modal (cic_*). The
 // host id is `${prefix}_actions`; action pill clicks pass the prefix
@@ -1925,9 +1997,22 @@ function openAddContractorModal(editIdx){
   // edit mode confirms we have a saved contractor to print.
   ['ct_print_btn','ct_email_btn','ct_header_print_btn','ct_header_email_btn'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none';});
   // Hide the inline CIC approval surface by default — only shown in edit
-  // mode below.
-  ['cic_approval_surface','cic_flow_card','cic_forms_sows_card'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none';});
+  // mode below. The Approval Flow + Forms & SOWs cards were dropped from
+  // the CIC entirely (internal-only flow now), so only the inline action
+  // pills / status banner / notes wrap remain.
+  var cas = document.getElementById('cic_approval_surface');
+  if (cas) cas.style.display = 'none';
   var cicNotesWrap=document.getElementById('cic_notes_wrap'); if(cicNotesWrap) cicNotesWrap.style.display='none';
+  // Reset visited-tab tracking. For edits, pre-fill all tabs as visited
+  // so the gate is effectively skipped (re-editing shouldn't force the
+  // user to re-walk every section). For new contractors, only overview
+  // starts visited via setCicTab below — they must tap every tab to
+  // unlock the "Submit Contractor" button mode.
+  window._cicVisitedTabs = new Set();
+  if ((typeof window._ctEditIdx === 'number') && window._ctEditIdx >= 0) {
+    _CIC_TAB_NAMES.forEach(function(t){ window._cicVisitedTabs.add(t); });
+  }
+  if (typeof setCicTab === 'function') setCicTab('overview');
   ['ct_name','ct_trade','ct_phone','ct_email','ct_notes','ct_address','ct_hst',
    'ct_wsib_num','ct_wsib_expiry','ct_ins_provider','ct_ins_policy','ct_ins_amount','ct_ins_expiry',
    'ct_class_proof','ct_sig_staff_name','ct_sig_staff_date','ct_sig_ct_name','ct_sig_ct_title','ct_sig_ct_date'
@@ -1978,22 +2063,24 @@ function openAddContractorModal(editIdx){
       // re-uploads, creating duplicate blobs in storage.
       if(ct.id && typeof _loadCtFilesFromStorage === 'function') _loadCtFilesFromStorage(ct.id);
     }
-    // Update modal title and button
+    // Update modal title — the Save button label is owned by
+    // _updateCicSaveButtonState (Save Changes / Save Draft / Submit
+    // Contractor) so we no longer set it here.
     var title = document.getElementById('ct_modal_title');
     if(title) title.textContent = 'Contractor Information';
-    var btn = document.getElementById('ct_save_btn');
-    if(btn) btn.textContent = 'Save Changes';
     // Wire the unified CIC: status banner + action pills + flow + Forms&SOWs.
     // _ctApprovalIdx is what initCtAction / confirmCtAction key off of;
     // _ctLastSaved lets Print render the current record without a fresh save.
     if(ct) {
       _ctApprovalIdx = window._ctEditIdx;
       window._ctLastSaved = ct;
-      ['cic_approval_surface','cic_flow_card','cic_forms_sows_card'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='';});
+      // Reveal the inline approval surface (banner + pills + notes).
+      // The Approval Flow diagram and Forms & SOWs cards are gone from
+      // the modal — those concerns moved to internal-only views.
+      var cas = document.getElementById('cic_approval_surface');
+      if (cas) cas.style.display = '';
       if(typeof _ctSetCicStatusBanner === 'function') _ctSetCicStatusBanner(ct);
       if(typeof _ctRenderActions === 'function')      _ctRenderActions(ct, 'cic');
-      if(typeof _ctRenderFlow === 'function')         _ctRenderFlow(ct.status || 'pending_review', ct, 'cic');
-      if(typeof _ctRenderFormsSows === 'function')    _ctRenderFormsSows(ct.id, 'cic');
       // Show header Print (always) and Email (only when contractor has an
       // email on file). Footer copies stay hidden — header buttons are the
       // canonical surface now.
@@ -2003,8 +2090,8 @@ function openAddContractorModal(editIdx){
   } else {
     var title = document.getElementById('ct_modal_title');
     if(title) title.textContent = 'Contractor Application';
-    var btn = document.getElementById('ct_save_btn');
-    if(btn) btn.textContent = 'Add Contractor';
+    // Save button label is owned by _updateCicSaveButtonState (currently
+    // "💾 Save Draft" until all tabs are visited, then "📤 Submit Contractor").
   }
   var acm=document.getElementById('addContractorModal');
   if(acm) acm.style.display = 'flex';
@@ -3229,10 +3316,22 @@ function saveContractor(){
     contractors[editIdx] = data;
     auditEntry('CT:'+id, 'ct_updated', 'Contractor record updated: ' + name, window.currentRole||'staff');
   } else {
-    data.status = 'pending_review';
-    data.submittedAt = new Date().toISOString().split('T')[0];
+    // Review-all-tabs gate. The Save button switches between
+    // data-mode="draft" (some tabs still unvisited) and data-mode="submit"
+    // (all 5 CIC tabs clicked). In draft mode we hold the contractor at
+    // status='draft' so it doesn't enter the HM review queue prematurely;
+    // in submit mode it goes straight into 'pending_review'. Mirrors the
+    // SOW Save Draft → Submit gate.
+    var _saveBtn = document.getElementById('ct_save_btn');
+    var _saveMode = _saveBtn && _saveBtn.dataset ? _saveBtn.dataset.mode : null;
+    data.status = (_saveMode === 'submit') ? 'pending_review' : 'draft';
+    data.submittedAt = (_saveMode === 'submit') ? new Date().toISOString().split('T')[0] : '';
     contractors.push(data);
-    auditEntry('CT:'+id, 'ct_submitted', 'Contractor application submitted: ' + name, window.currentRole||'staff');
+    var _auditAction = (data.status === 'draft') ? 'ct_drafted' : 'ct_submitted';
+    var _auditDetail = (data.status === 'draft')
+      ? 'Contractor saved as draft: ' + name
+      : 'Contractor application submitted: ' + name;
+    auditEntry('CT:'+id, _auditAction, _auditDetail, window.currentRole||'staff');
   }
   window._contractors = contractors;
   // Persist to Supabase. The contractor record is `data` (built above) — an
@@ -3316,15 +3415,19 @@ function saveContractorAndFinalize() {
       if(window._ctEditIdx < 0) {
         window._ctEditIdx = contractors.length - 1;
         _ctApprovalIdx = window._ctEditIdx;
-        ['cic_approval_surface','cic_flow_card','cic_forms_sows_card'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='';});
+        var cas2 = document.getElementById('cic_approval_surface');
+        if (cas2) cas2.style.display = '';
         if(typeof _ctSetCicStatusBanner === 'function') _ctSetCicStatusBanner(window._ctLastSaved);
         if(typeof _ctRenderActions === 'function')      _ctRenderActions(window._ctLastSaved, 'cic');
-        if(typeof _ctRenderFlow === 'function')         _ctRenderFlow(window._ctLastSaved.status || 'pending_review', window._ctLastSaved, 'cic');
-        if(typeof _ctRenderFormsSows === 'function')    _ctRenderFormsSows(window._ctLastSaved.id, 'cic');
         var title = document.getElementById('ct_modal_title');
         if(title) title.textContent = 'Contractor Information';
-        var btn = document.getElementById('ct_save_btn');
-        if(btn) btn.textContent = 'Save Changes';
+        // Now that this is an edit (saved contractor exists), pre-fill
+        // all tabs as visited and refresh the Save button — it'll flip
+        // to "Save Changes" mode automatically.
+        if (window._cicVisitedTabs && typeof _CIC_TAB_NAMES !== 'undefined') {
+          _CIC_TAB_NAMES.forEach(function(t){ window._cicVisitedTabs.add(t); });
+        }
+        if(typeof _updateCicSaveButtonState === 'function') _updateCicSaveButtonState();
       }
     }
   } catch(e) {}

@@ -979,6 +979,185 @@ body.is-sow-only .modal-overlay { visibility: visible; }
   overflow: hidden;
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+ * SOW Modal — tabbed layout (Stop C consolidation)
+ * The SOW modal markup was duplicated across renos / inventory / match /
+ * tenants HTML. It now lives as a single innerHTML template in
+ * housing-modals-sow.js (_buildSowModalHTML). These rules style the new
+ * tab strip + per-section panels and the small wrapper utilities the
+ * template introduced.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+/* Outer modal-body shell (replaces the inline width/border-radius div).
+   min-height anchors the modal to a stable size so switching between
+   short tabs (Health & Safety = a single checkbox grid) and long tabs
+   (Notes & Terms with the full Terms accordion expanded) doesn't bounce
+   the page height. max-height keeps it within viewport. */
+.modal-body-sow-shell {
+  background: var(--surface);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 760px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+  overflow: hidden;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 75vh;
+  max-height: 92vh;
+}
+.modal-body-sow-shell .modal-body-stack { overflow-y: auto; flex: 1; }
+
+/* Project # row in the header */
+.sow-pn-row { margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+.sow-pn-lbl { font-size: 9px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--muted); }
+.sow-pn-val { font-size: 11px; font-weight: 700; color: var(--yellow); font-family: ui-monospace, Menlo, Monaco, 'Courier New', monospace; }
+
+/* Header action buttons (was inline) */
+.sow-hdr-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.sow-hdr-btn-success,
+.sow-hdr-btn-warn,
+.sow-hdr-btn-ghost,
+.sow-hdr-btn-primary {
+  padding: 5px 12px; border-radius: 7px; cursor: pointer; font-size: 12px;
+  font-family: 'DM Sans', sans-serif; font-weight: 700;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.sow-hdr-btn-success { background: var(--success); border: none; color: #fff; }
+.sow-hdr-btn-warn    { background: none; border: 1px solid var(--warn-amber-border); color: var(--warn-amber); }
+.sow-hdr-btn-ghost   { background: none; border: 1px solid var(--dark-border); color: var(--txt-on-dark); }
+.sow-hdr-btn-primary { background: var(--yellow); border: none; color: var(--dark); }
+
+.banner-icon { font-size: 14px; margin-right: 6px; }
+
+/* ── Tabbed modal pattern ──────────────────────────────────────────────
+   Shared by the SOW modal and the Contractor Information Card (CIC).
+   .modal-tabs is the horizontal desktop strip; .modal-tab-drawer is the
+   always-open vertical list on phones. Class names used to be .sow-*
+   because SOW was the first user — generalised to .modal-* once CIC
+   adopted the same layout. Page-specific JS scopes its querySelectors
+   by container ID (sow_tab_bar vs cic_tab_bar) so the two modals don't
+   collide. */
+.modal-tabs {
+  display: flex; gap: 4px; padding: 6px 16px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  position: sticky; top: 0; z-index: 2;
+}
+.modal-tabs::-webkit-scrollbar { display: none; }
+.modal-tab {
+  flex: 0 0 auto;
+  padding: 9px 14px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+}
+.modal-tab:hover { color: var(--text); }
+.modal-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--yellow);
+  font-weight: 700;
+}
+
+/* Unreviewed-tab indicator — small amber dot before the label. Active tab
+   is always "visited" by definition (setSowTab / setCicTab adds it on
+   click), so this only renders on tabs the user hasn't opened yet. */
+.modal-tab:not(.visited)::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--warn-amber, #f59e0b);
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* Review-progress label in the SOW + CIC footers ("3 of 7 sections reviewed") */
+.sow-footer-right,
+.cic-footer-right     { display: flex; align-items: center; gap: 10px; }
+.sow-review-progress,
+.cic-review-progress  { font-size: 11px; color: var(--muted); font-style: italic; white-space: nowrap; }
+
+/* ── Mobile tab drawer ─────────────────────────────────────────────────
+   Always-open vertical tab list for small viewports. The .modal-tabs
+   strip handles >= 640px; this block handles < 640px (see @media below).
+   All items render stacked so the user can tap any section without an
+   extra expand step. */
+.modal-tab-drawer  { display: none; background: var(--surface); border-bottom: 1px solid var(--border); }
+.modal-drawer-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 11px 16px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.modal-drawer-item:last-child { border-bottom: none; }
+.modal-drawer-item.active {
+  background: var(--bg);
+  font-weight: 700;
+  border-left: 3px solid var(--yellow);
+  padding-left: 13px; /* 16 - 3 to keep label aligned with the others */
+}
+.modal-drawer-item:not(.visited)::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--warn-amber, #f59e0b);
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* Tab panels — only the active one renders */
+.modal-tab-panel { display: none; padding: 14px 0; }
+.modal-tab-panel.active { display: block; }
+
+/* Misc inline-style replacements introduced by the template builder */
+.sow-ct-row              { position: relative; grid-column: span 2; }
+.sow-total-cost-input    { background: var(--bg); font-weight: 700; color: var(--yellow); font-size: 16px; }
+.sow-add-item-btn        { background: none; border: 1.5px dashed var(--border); color: var(--muted); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; font-family: 'DM Sans', sans-serif; width: 100%; transition: all .15s; }
+.sow-add-item-btn:hover  { border-color: var(--yellow); color: var(--text); }
+.sow-acct-hint           { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+.sow-acct-list           { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.sow-terms-body          { padding: 18px 20px; font-size: 12px; color: var(--text); line-height: 1.7; }
+.sow-terms-eyebrow       { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 14px; }
+.sow-terms-lead          { margin-bottom: 14px; color: var(--muted); }
+.sow-terms-foot          { margin-top: 14px; font-size: 11px; color: var(--muted); font-style: italic; }
+.sow-sig-body            { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.sow-sig-badge           { width: 26px; height: 26px; border-radius: 50%; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.sow-sig-badge-tenant    { background: var(--yellow); color: var(--dark); }
+.sow-sig-badge-staff     { background: var(--surface); border: 2px solid var(--border); color: var(--muted); }
+.sow-approvals-card      { margin-bottom: 0; padding: 0; overflow: hidden; border-color: var(--yellow); }
+.sow-modal-footer        { padding: 14px 24px; border-top: 1px solid var(--border); gap: 10px; background: var(--bg); position: sticky; bottom: 0; }
+
+@media (max-width: 640px) {
+  .modal-body-sow-shell { max-height: 100vh; border-radius: 0; }
+  .modal-tab-panel     { padding: 10px 0; }
+  /* Swap horizontal strip for the always-open vertical drawer at phone
+     widths. Applies to both the SOW modal and the contractor CIC. */
+  .modal-tabs          { display: none; }
+  .modal-tab-drawer    { display: block; }
+}
+
 /* Flex utilities already in shared.css but repeated inline */
 .flex-col   { display: flex; flex-direction: column; }
 .flex-sb    { display: flex; justify-content: space-between; align-items: center; }

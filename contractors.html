@@ -132,14 +132,32 @@
       </div>
     </div>
 
+    <!-- Tab strip (desktop ≥ 640px). Shared CSS with the SOW modal —
+         see .modal-tabs / .modal-tab in housing.css. Queries scoped to
+         #cic_tab_bar so the SOW modal's setSowTab can't reach in. -->
+    <div class="modal-tabs" id="cic_tab_bar">
+      <button type="button" class="modal-tab active" data-cic-tab="overview"   onclick="setCicTab('overview')">Overview</button>
+      <button type="button" class="modal-tab"        data-cic-tab="compliance" onclick="setCicTab('compliance')">Compliance</button>
+      <button type="button" class="modal-tab"        data-cic-tab="documents"  onclick="setCicTab('documents')">Documents</button>
+      <button type="button" class="modal-tab"        data-cic-tab="terms"      onclick="setCicTab('terms')">Terms</button>
+      <button type="button" class="modal-tab"        data-cic-tab="sigs"       onclick="setCicTab('sigs')">Signatures</button>
+    </div>
+
+    <!-- Tab drawer (mobile < 640px). Always-open vertical list — same
+         pattern as the SOW drawer. -->
+    <div class="modal-tab-drawer" id="cic_tab_drawer">
+      <button type="button" class="modal-drawer-item active" data-cic-tab="overview"   onclick="setCicTab('overview')">Overview</button>
+      <button type="button" class="modal-drawer-item"        data-cic-tab="compliance" onclick="setCicTab('compliance')">Compliance</button>
+      <button type="button" class="modal-drawer-item"        data-cic-tab="documents"  onclick="setCicTab('documents')">Documents</button>
+      <button type="button" class="modal-drawer-item"        data-cic-tab="terms"      onclick="setCicTab('terms')">Terms</button>
+      <button type="button" class="modal-drawer-item"        data-cic-tab="sigs"       onclick="setCicTab('sigs')">Signatures</button>
+    </div>
+
     <!-- Form body -->
     <div class="ct-modal-form-body">
 
-      <!-- Approval Flow (edit/view mode only) -->
-      <div id="cic_flow_card" class="card ct-sec" style="display:none;">
-        <div class="modal-hdr compact"><div class="ct-lbl-yellow">Approval Flow</div></div>
-        <div class="ct-sec-pad"><div id="cic_flow" class="ct-flow-row"></div></div>
-      </div>
+      <!-- ── OVERVIEW tab ──────────────────────────────────────────────── -->
+      <div class="modal-tab-panel active" data-cic-panel="overview">
 
       <!-- Company Information -->
       <div class="card ct-sec">
@@ -174,6 +192,11 @@
         </div>
       </div>
 
+      </div><!-- /overview panel -->
+
+      <!-- ── COMPLIANCE tab ───────────────────────────────────────────── -->
+      <div class="modal-tab-panel" data-cic-panel="compliance">
+
       <!-- WSIB -->
       <div class="card ct-sec">
         <div class="modal-hdr compact"><div class="ct-lbl-yellow">WSIB Clearance Certificate</div></div>
@@ -206,17 +229,7 @@
         </div>
       </div>
 
-      <!-- Other Documents -->
-      <div class="card ct-sec">
-        <div class="modal-hdr compact"><div class="ct-lbl-yellow">Other Documents</div></div>
-        <div class="ct-sec-col">
-          <div id="ct_other_preview" class="ct-upload-preview"></div>
-          <div id="ct_other_drop" ondragover="ctFileDragOver(event,'ct_other_drop')" ondragleave="ctFileDragLeave('ct_other_drop')" ondrop="ctFileDrop(event,'other')" class="upload-zone" onclick="document.getElementById('ct_other_input').click()">
-            <div class="ct-upload-label">📎 Upload Other Documents &nbsp;<span class="lbl-yellow">browse</span></div>
-          </div>
-          <input type="file" id="ct_other_input" multiple accept=".pdf,image/*,.doc,.docx" style="display:none;" onchange="ctFileUpload(this,'other')"/>
-        </div>
-      </div>
+      <!-- Other Documents moved to the Documents tab (below Compliance) -->
 
       <!-- Classification & Compliance -->
       <div class="card ct-sec">
@@ -238,6 +251,28 @@
         </div>
       </div>
 
+      </div><!-- /compliance panel -->
+
+      <!-- ── DOCUMENTS tab ─────────────────────────────────────────────── -->
+      <div class="modal-tab-panel" data-cic-panel="documents">
+
+      <!-- Other Documents (moved here from between Insurance and Classification) -->
+      <div class="card ct-sec">
+        <div class="modal-hdr compact"><div class="ct-lbl-yellow">Other Documents</div></div>
+        <div class="ct-sec-col">
+          <div id="ct_other_preview" class="ct-upload-preview"></div>
+          <div id="ct_other_drop" ondragover="ctFileDragOver(event,'ct_other_drop')" ondragleave="ctFileDragLeave('ct_other_drop')" ondrop="ctFileDrop(event,'other')" class="upload-zone" onclick="document.getElementById('ct_other_input').click()">
+            <div class="ct-upload-label">📎 Upload Other Documents &nbsp;<span class="lbl-yellow">browse</span></div>
+          </div>
+          <input type="file" id="ct_other_input" multiple accept=".pdf,image/*,.doc,.docx" style="display:none;" onchange="ctFileUpload(this,'other')"/>
+        </div>
+      </div>
+
+      </div><!-- /documents panel -->
+
+      <!-- ── TERMS tab ─────────────────────────────────────────────────── -->
+      <div class="modal-tab-panel" data-cic-panel="terms">
+
       <!-- Terms of Reference -->
       <div class="card ct-sec">
         <div class="modal-hdr compact" class="ct-tor-toggle" onclick="var b=document.getElementById('ct_tor_body');var a=this.querySelector('.ct-tor-arrow');if(b.style.display==='block'){b.style.display='none';a.style.transform='';}else{b.style.display='block';a.style.transform='rotate(90deg)';}">
@@ -258,6 +293,11 @@
           <div class="ct-tor-note"><div class="ct-txt-sm-muted">This agreement becomes binding upon submission and <span data-nation="short">CLFN</span> approval of this contractor application.</div></div>
         </div>
       </div>
+
+      </div><!-- /terms panel -->
+
+      <!-- ── SIGNATURES tab ────────────────────────────────────────────── -->
+      <div class="modal-tab-panel" data-cic-panel="sigs">
 
       <!-- Signatures -->
       <div class="card ct-sec-last">
@@ -331,11 +371,10 @@
         </div>
       </div>
 
-      <!-- Forms & SOWs (edit/view mode only) -->
-      <div id="cic_forms_sows_card" class="card ct-sec-last" style="display:none;">
-        <div class="modal-hdr compact"><div class="ct-lbl-yellow">Forms &amp; SOWs</div></div>
-        <div id="cic_forms_sows" class="ct-audit-scroll"></div>
-      </div>
+      </div><!-- /sigs panel -->
+
+      <!-- Approval Flow + Forms & SOWs cards removed — approval is handled
+           outside the CIC (internal-only Renovation Approvals view). -->
 
     </div><!-- end form body -->
 
@@ -345,9 +384,17 @@
         <button type="button" id="ct_print_btn" class="ct-hdr-btn hidden" onclick="printContractorAgreement()">🖨 Print / Save PDF</button>
         <button type="button" id="ct_email_btn" class="ct-hdr-btn hidden" onclick="emailContractorAgreement()">✉ Email to Contractor</button>
       </div>
-      <div class="flex-end gap-8">
+      <div class="flex-end gap-8 cic-footer-right">
+        <!-- Review progress label — populated by _updateCicSaveButtonState
+             ("3 of 5 sections reviewed" / "All sections reviewed"). Empty
+             when editing an existing contractor (gate doesn't apply). -->
+        <div id="cic_review_progress" class="txt-muted-sm cic-review-progress"></div>
         <button type="button" onclick="closeAddContractorModal()" class="btn btn-ghost">Cancel</button>
-        <button type="button" id="ct_save_btn" onclick="saveContractorAndFinalize()" class="btn btn-primary">Save &amp; Finalize</button>
+        <!-- Initial label is "Save Draft" because a fresh modal starts
+             with only the Overview tab visited. _updateCicSaveButtonState
+             flips it to "Submit Contractor" once all 5 tabs are visited,
+             and to "Save Changes" when editing an existing contractor. -->
+        <button type="button" id="ct_save_btn" onclick="saveContractorAndFinalize()" class="btn btn-primary" data-mode="draft">💾 Save Draft</button>
       </div>
     </div>
 
