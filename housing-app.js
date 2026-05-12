@@ -100,7 +100,7 @@ function _calcCoArrearsMonths(){
 
 // ── Phone formatter ──
 // Now a thin wrapper around the shared window.formatPhone — single source
-// of truth for "705-000-0000" canonical formatting (no parens, dashes only).
+// of truth for "(705)-000-0000" canonical formatting (parens + dashes).
 function fmtPhone(input){
   if (!input) return;
   input.value = (typeof formatPhone === 'function')
@@ -495,7 +495,7 @@ function addIncome(){
     +'<div class="js-lbl-muted" style="margin:10px 0 6px;">Employer Details</div>'
     +'<div class="fg c3">'
     +'<div class="f"><label>Employer Name <span class="r">*</span></label><input data-role="empName" type="text" placeholder="Employer or N/A"/></div>'
-    +'<div class="f"><label>Employer Phone <span class="r">*</span></label><input data-role="empPhone" type="tel" placeholder="705-555-0100" oninput="fmtPhone(this)"/></div>'
+    +'<div class="f"><label>Employer Phone <span class="r">*</span></label><input data-role="empPhone" type="tel" placeholder="(705)-555-0100" oninput="fmtPhone(this)"/></div>'
     +'<div class="f"><label>Manager / Supervisor <span class="r">*</span></label><input data-role="mgr" type="text"/></div>'
     +'<div class="f"><label>Start / Hire Date <span class="r">*</span></label><input data-role="startDate" type="date" onchange="calcDuration(this)"/></div>'
     +'<div class="f"><label>Duration</label><input type="text" data-role="duration" readonly placeholder="Calculated from start date" style="background:var(--bg);color:var(--muted);cursor:default;"/></div>'
@@ -505,7 +505,7 @@ function addIncome(){
     +'<div class="js-lbl-muted" style="margin:10px 0 6px;">Employer / Source Details</div>'
     +'<div class="fg c3">'
     +'<div class="f"><label>Employer / Source Name</label><input type="text" placeholder="Employer or source"/></div>'
-    +'<div class="f"><label>Phone</label><input type="tel" placeholder="705-555-0100" oninput="fmtPhone(this)"/></div>'
+    +'<div class="f"><label>Phone</label><input type="tel" placeholder="(705)-555-0100" oninput="fmtPhone(this)"/></div>'
     +'<div class="f"><label>Manager / Supervisor</label><input type="text"/></div>'
     +'<div class="f"><label>Start / Hire Date</label><input data-role="startDate" type="date" onchange="calcDuration(this)"/></div>'
     +'<div class="f"><label>Duration</label><input type="text" data-role="duration" readonly placeholder="Calculated from start date" style="background:var(--bg);color:var(--muted);cursor:default;"/></div>'

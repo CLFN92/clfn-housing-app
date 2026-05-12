@@ -95,18 +95,19 @@ window._applyTheme = function(theme) {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
-// formatPhone — canonical phone-string formatter (no parens, dashes only).
-// Strips non-digits, caps at 10 digits, and emits "705-555-0100" /
-// "705-555" / "705" depending on length. Used by both the typing-side
-// fmtPhone(input) helper and every display surface that renders a stored
-// phone value, so legacy strings like "(705)-555-0100" or "7055550100"
-// all show consistently as "705-555-0100" without a DB migration.
+// formatPhone — canonical phone-string formatter "(705)-555-0100".
+// Strips non-digits, caps at 10 digits, and emits the parens + dash form
+// progressively as the user types: "(705)-555-0100" / "(705)-555" /
+// "(705" depending on length. Used by both the typing-side fmtPhone(input)
+// helper and every display surface that renders a stored phone value, so
+// legacy strings like "705-555-0100" or "7055550100" all reformat to
+// "(705)-555-0100" without a DB migration.
 // ═══════════════════════════════════════════════════════════════════════
 window.formatPhone = function(str){
   var v = String(str || '').replace(/\D/g, '').slice(0, 10);
-  if (v.length >= 7) return v.slice(0, 3) + '-' + v.slice(3, 6) + '-' + v.slice(6);
-  if (v.length >= 4) return v.slice(0, 3) + '-' + v.slice(3);
-  return v;
+  if (v.length >= 7) return '(' + v.slice(0, 3) + ')-' + v.slice(3, 6) + '-' + v.slice(6);
+  if (v.length >= 4) return '(' + v.slice(0, 3) + ')-' + v.slice(3);
+  return v ? '(' + v : '';
 };
 
 // ═══════════════════════════════════════════════════════════════════════
