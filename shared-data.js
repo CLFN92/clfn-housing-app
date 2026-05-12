@@ -3113,11 +3113,19 @@ function renderWorklist() {
   // Once they pick a different chip, the choice sticks for the session.
   if(window._wlActiveChip === undefined || window._wlActiveChip === null) window._wlActiveChip = 'mine';
   if(!window._wlSearch) window._wlSearch = '';
+  // Reserve filter is an INDEPENDENT axis from the main chips — it
+  // composes with whatever main chip is active so the user can e.g. see
+  // "Approved + On Reserve" or "My Queue + Off Reserve". States cycle on
+  // each tap: '' (no filter) → 'On Reserve' → 'Off Reserve' → ''.
+  if(window._wlReserveFilter === undefined) window._wlReserveFilter = '';
 
   var activeChipDef = chipDefs.find(function(c){ return c.key === window._wlActiveChip; }) || chipDefs[0];
 
   // ── Filter apps ───────────────────────────────────────────────────────────
   var filtered = apps.filter(activeChipDef.filter);
+  if(window._wlReserveFilter) {
+    filtered = filtered.filter(function(a){ return a.reserve === window._wlReserveFilter; });
+  }
   var search = (window._wlSearch||'').toLowerCase().trim();
   if(search) {
     filtered = filtered.filter(function(a){
@@ -3139,6 +3147,28 @@ function renderWorklist() {
       + c.label + (count ? ' <span style="font-size:11px;opacity:.7;">'+count+'</span>' : '')
       + '</button>';
   }).join('');
+
+  // ── Reserve toggle chip (independent axis) ────────────────────────────────
+  // Cycles: All → On Reserve → Off Reserve → All. The ↻ glyph hints at the
+  // toggle nature; the active states (On/Off Reserve) get the same dark/
+  // yellow treatment as the main chip selection. A small left margin
+  // separates it from the main chip group so the two axes read distinctly.
+  var _resState = window._wlReserveFilter; // '' | 'On Reserve' | 'Off Reserve'
+  var _resLabel = _resState === 'On Reserve' ? 'On Reserve'
+                : _resState === 'Off Reserve' ? 'Off Reserve'
+                : 'All Reserve';
+  var _resCount = _resState
+    ? apps.filter(function(a){ return a.reserve === _resState; }).length
+    : 0;
+  var _resBase = _resState
+    ? 'background:var(--dark);border:2px solid var(--yellow);color:#fff;'
+    : 'background:var(--surface);border:1.5px solid var(--border);color:var(--muted);';
+  var reserveChipHtml = '<button onclick="wlCycleReserveFilter()" '
+    + 'style="'+_resBase+'padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;transition:all .12s;margin-left:8px;border-left-style:solid;" '
+    + 'title="Toggle: All → On Reserve → Off Reserve">'
+    + '↻ ' + _resLabel + (_resCount ? ' <span style="font-size:11px;opacity:.7;">'+_resCount+'</span>' : '')
+    + '</button>';
+  chipsHtml = chipsHtml + reserveChipHtml;
 
   // ── Build rows ────────────────────────────────────────────────────────────
   var sorted = filtered.slice().sort(function(a,b){
@@ -3165,9 +3195,14 @@ function renderWorklist() {
       // button, so we use a dedicated wlAssignApp helper.
       actionBtn = '<button data-wl-id="'+_aIdEsc+'" onclick="event.stopPropagation();wlAssignApp(this)" style="background:var(--success);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
     }
+    // Current street address from the application form (housing.html
+    // #street). Hidden on mobile via col-hide-mobile to keep narrow
+    // viewports readable.
+    var _addr = a.street || '—';
     return '<tr style="border-bottom:1px solid var(--border);" data-wl-id="'+_aIdEsc+'">'
       + '<td onclick="event.stopPropagation();wlOpenApplicantCell(this)" style="padding:11px 14px;font-weight:600;font-size:13px;cursor:pointer;">'+escapeHtml(name)+'</td>'
       + '<td onclick="event.stopPropagation();wlOpenIdCell(this)" style="padding:11px 14px;font-size:12px;color:var(--muted);cursor:pointer;">'+_aIdEsc+'</td>'
+      + '<td class="col-hide-mobile" style="padding:11px 14px;font-size:12px;color:var(--muted);">'+escapeHtml(_addr)+'</td>'
       + '<td style="padding:11px 14px;font-size:12px;color:var(--muted);">'+escapeHtml(a.appDate||'—')+'</td>'
       + '<td style="padding:11px 14px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+sm.bg+';color:'+sm.c+';">'+sm.label+'</span>'
       + (a.status===APP_STATUS.DRAFT && a.created_by_name ? '<div class="txt-xs-muted" style="margin-top:2px;">by '+escapeHtml(a.created_by_name)+'</div>' : '')
@@ -3213,6 +3248,7 @@ function renderWorklist() {
           +     '</div>'
           +   '</span>'
           + '</th>'
+          + '<th class="js-th col-hide-mobile">Current Address</th>'
           + '<th class="js-th">Date</th>'
           + '<th class="js-th">Status</th>'
           + (showScore ? '<th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Score</th>' : '')
@@ -3789,6 +3825,15 @@ function wlSection(title, count, content) {
 }
 function wlSetChip(el) {
   window._wlActiveChip = el.getAttribute('data-wlchip') || '';
+  renderWorklist();
+}
+// Cycle the reserve filter: '' → 'On Reserve' → 'Off Reserve' → ''.
+// Composes with whatever main chip is active (status / queue / etc.).
+function wlCycleReserveFilter() {
+  var cur = window._wlReserveFilter || '';
+  window._wlReserveFilter = cur === '' ? 'On Reserve'
+                          : cur === 'On Reserve' ? 'Off Reserve'
+                          : '';
   renderWorklist();
 }
 
