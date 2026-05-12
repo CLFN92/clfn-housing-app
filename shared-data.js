@@ -3199,12 +3199,21 @@ function renderWorklist() {
     // #street). Hidden on mobile via col-hide-mobile to keep narrow
     // viewports readable.
     var _addr = a.street || '—';
-    // ⋮ menu reuses the dashboard's window.openAppMenu — same Decline /
-    // Archive / Restore items, same role gating (HM/ED only inside the
-    // menu). Only render the trigger button for management roles so the
-    // surface itself is hidden from staff.
+    // Row actions — mirror the Applications dashboard's icon set so the
+    // worklist becomes feature-equivalent and the dashboard can eventually
+    // be retired. Edit + Print are available to every role (read/own-app
+    // operations); ⋮ stays HM/ED only (write actions live inside it).
+    // All three reuse the .dash-action-btn class for visual consistency.
+    var _wlEditBtn =
+      '<button class="dash-action-btn" data-wl-edit="'+_aIdEsc+'" onclick="event.stopPropagation();wlEditApp(this)" title="Edit">' +
+      '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+      '</button>';
+    var _wlPrintBtn =
+      '<button class="dash-action-btn" data-wl-preview="'+_aIdEsc+'" onclick="event.stopPropagation();wlPreviewApp(this)" title="Print Preview">' +
+      '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>' +
+      '</button>';
     var _wlMenuBtn = ROLE.isManagement(role)
-      ? '<button class="app-menu-btn" onclick="event.stopPropagation();window.openAppMenu(event,\''+_aIdEsc+'\')" title="More options" style="padding:5px 9px;font-size:14px;line-height:1;margin-left:6px;background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--muted);">⋮</button>'
+      ? '<button class="dash-action-btn app-menu-btn" onclick="event.stopPropagation();window.openAppMenu(event,\''+_aIdEsc+'\')" title="More options" style="font-size:14px;line-height:1;">⋮</button>'
       : '';
     return '<tr style="border-bottom:1px solid var(--border);" data-wl-id="'+_aIdEsc+'">'
       + '<td onclick="event.stopPropagation();wlOpenApplicantCell(this)" style="padding:11px 14px;font-weight:600;font-size:13px;cursor:pointer;">'+escapeHtml(name)+'</td>'
@@ -3215,7 +3224,14 @@ function renderWorklist() {
       + (a.status===APP_STATUS.DRAFT && a.created_by_name ? '<div class="txt-xs-muted" style="margin-top:2px;">by '+escapeHtml(a.created_by_name)+'</div>' : '')
       + '</td>'
       + (showScore ? '<td style="padding:11px 14px;text-align:center;"><span style="font-size:16px;font-weight:800;color:var(--text);">'+(typeof a.score==='number'?a.score:'—')+'</span>'+(tier?'<div style="font-size:9px;color:'+tc+';font-weight:700;margin-top:1px;">'+tier.replace(' Priority','')+'</div>':'')+'</td>' : '')
-      + '<td style="padding:11px 14px;text-align:right;white-space:nowrap;">'+actionBtn+_wlMenuBtn+'</td>'
+      // Action cell: icons (Edit / Print / ⋮) + primary action button.
+      // Matches the order used by the Applications dashboard table so the
+      // two surfaces feel identical to the user.
+      + '<td style="padding:11px 14px;text-align:right;white-space:nowrap;">'
+      +   '<div style="display:inline-flex;gap:4px;align-items:center;justify-content:flex-end;">'
+      +     _wlEditBtn + _wlPrintBtn + _wlMenuBtn + actionBtn
+      +   '</div>'
+      + '</td>'
       + '</tr>';
   }).join('');
 
@@ -3769,6 +3785,18 @@ function wlEditApp(el) {
   var id = el.getAttribute('data-wl-edit') || (el.closest('[data-wl-edit]') && el.closest('[data-wl-edit]').getAttribute('data-wl-edit'));
   if(!id) return;
   if(typeof window.openEditModal === 'function') window.openEditModal(id);
+}
+// Worklist Print/Preview button — resolves the row's app id, finds the
+// record, and hands off to previewFromDash (the same flow the dashboard
+// table's print icon uses).
+function wlPreviewApp(el) {
+  var id = el.getAttribute('data-wl-preview') || (el.closest('[data-wl-preview]') && el.closest('[data-wl-preview]').getAttribute('data-wl-preview'));
+  if(!id) return;
+  var apps = typeof applications !== 'undefined' ? applications : [];
+  var app = apps.find(function(x){ return x.id === id; });
+  if(!app) { showToast('Application not found'); return; }
+  if(typeof previewFromDash === 'function') previewFromDash(app);
+  else showToast('Print preview not available on this page');
 }
 function wlEmpty(msg, sub) {
   return '<div class="empty-state-ctr">'+msg
