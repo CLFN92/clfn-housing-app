@@ -39,33 +39,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 
-function showDashboard(){
-  // If we're on a sub-page (inventory.html, etc.), the dashView DOM element
-  // doesn't exist here — navigate back to housing.html instead of trying to
-  // render into a non-existent element (which would leave the page blank).
-  if (!document.getElementById('dashView')) {
-    if (!window.location.pathname.includes('housing.html') &&
-        !window.location.pathname.endsWith('/') &&
-        window.location.pathname !== '/') {
-      window.location.href = 'housing.html';
-      return;
-    }
-  }
-  // The actual applications dashboard — HM and ED only
-  var role = window.currentRole || 'housing_employee_l1';
-  if(!APPROVAL_AUTHORITY.can('accessDashboard', role)) { showToast('Dashboard access requires Housing Manager or Executive Director role.'); return; }
-  if(!window._navSkipPush) pushNav('dashboard');
-  var _dv = document.getElementById('dashView');
-  if(_dv){ _dv.style.display='flex'; _dv.style.width='100%'; }
-  hideAllViews('dashView');
-  if(_dv){ _dv.style.display='flex'; _dv.style.width='100%'; }
-  setNavActive('tab_dash');
-  window._userSetDashFilter = false;
-  var fs = document.getElementById('dashFilterStatus');
-  if(fs) fs.value = '';
-  document.getElementById('dashView').style.display='flex';
-  updateDashStats();renderDashTable();wireDashTable();
-}
+// showDashboard removed — the Applications dashboard (#dashView) was
+// retired in favour of the worklist on the Home page, which now has
+// feature parity (Edit / Print / ⋮ / primary action). Helpers from
+// housing-app.js (renderDashTable, updateDashStats, wireDashTable) are
+// kept as dead callables because confirmAssignment et al. still invoke
+// them; they null-guard on missing DOM and become silent no-ops.
 
 function saveTenantFiles(unitId, files){ /* legacy no-op — files saved via DocLibrary */ }
 
@@ -138,7 +117,7 @@ window._onSwitchRole = function(role) {
   // Only navigate home if no view is currently visible (i.e. during boot).
   // Includes landingView so role switches on the landing page don't trigger a
   // redundant re-render via showEmployeeHome (which already handles landing).
-  var anyVisible = ['landingView','worklistView','dashView','inventoryView','matchView',
+  var anyVisible = ['landingView','worklistView','inventoryView','matchView',
     'tenantsView','settingsView','scorecardView','appLayout'].some(function(id) {
     var el = document.getElementById(id);
     return el && el.style.display !== 'none' && el.style.display !== '';
@@ -257,7 +236,6 @@ function closeApplicationForm(){
   var prev = stack.length ? stack[stack.length-1] : null;
   var navMap = {
     'home':        showEmployeeHome,
-    'dashboard':   showDashboard,
     'inventory':   showInventory,
     'match':       showMatch,
     'tenants':     showTenants,
@@ -1657,12 +1635,8 @@ async function loadAppDataFromSupabase() {
       console.log('[CLFN] Rescored '+applications.length+' applications on V2 model');
     }
 
-    // Re-render dashboard if it's currently visible (fixes timing: data arrives after render)
-    var dv = document.getElementById('dashView');
-    if(dv && dv.style.display !== 'none') {
-      if(typeof updateDashStats === 'function') updateDashStats();
-      if(typeof renderDashTable === 'function') renderDashTable();
-    }
+    // Dashboard view (#dashView) was retired — the worklist below is the
+    // only application list now, so we skip the old re-render block.
     // Re-render worklist if its section is currently expanded on the landing.
     // (The standalone worklistView is gone — Phase B folded it into landingView.)
     var sec = document.getElementById('sec-worklist');
@@ -2056,23 +2030,12 @@ function initHousingPage() {
   else if(view==='settings')    { if(typeof showSettings==='function') showSettings(); }
   else if(view==='contractors') { if(true) showContractors(); }
   else {
-    // Fallback when view doesn't match any branch. Previously this called
-    // showDashboard() unconditionally — for HE-L1/L2 (who can't access the
-    // dashboard) that showed a denial toast during boot and crashed when
-    // the toast tried to mount before document.body was attached. Route
-    // by role instead: management roles see the dashboard, everyone else
-    // gets the landing / worklist they can actually use.
-    var canDash = (typeof APPROVAL_AUTHORITY !== 'undefined')
-                  && APPROVAL_AUTHORITY.can('accessDashboard', role);
-    if (canDash && typeof showDashboard === 'function') {
-      showDashboard();
-    } else if (typeof showLanding === 'function') {
-      showLanding();
-    } else if (typeof showEmployeeHome === 'function') {
-      showEmployeeHome();
-    } else if (typeof showWorklist === 'function') {
-      showWorklist();
-    }
+    // Fallback when view doesn't match any branch. The Applications
+    // dashboard (#dashView) was retired, so every role now lands on the
+    // worklist-based landing page instead.
+    if (typeof showLanding === 'function') showLanding();
+    else if (typeof showEmployeeHome === 'function') showEmployeeHome();
+    else if (typeof showWorklist === 'function') showWorklist();
   }
 }
 
@@ -2165,7 +2128,6 @@ function renderAppHeader(){
 //   run        — function called on click (returns nothing)
 window.HEADER_NAV = [
   { key:'home',         label:'Home',         module:null,           svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>',                                                                                                                                                                                                                run:function(){ if(typeof showLanding==='function') showLanding(); else if(typeof showEmployeeHome==='function') showEmployeeHome(); } },
-  { key:'applications', label:'Applications', module:'applications', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>',                                                                                                                                                                                                run:function(){ if(typeof showDashboard==='function') showDashboard(); } },
   { key:'inventory',    label:'Inventory',    module:'inventory',    svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>',                                                                                                                                            run:function(){ if(typeof showInventory==='function') showInventory(); } },
   { key:'match',        label:'Match',        module:'match',        svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',                                                                                                                       run:function(){ if(typeof showMatch==='function') showMatch(); } },
   { key:'renovations',  label:'Renovations',  module:'renovations',  svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',                                                                                              run:function(){ if(typeof showRenos==='function') showRenos(); } },
@@ -2201,7 +2163,6 @@ function renderHeaderNav(){
 function _currentNavKey(){
   function vis(id){ var e=document.getElementById(id); return e && e.style.display !== 'none' && e.style.display !== ''; }
   if(vis('landingView'))      return 'home';
-  if(vis('dashView'))         return 'applications';
   if(vis('worklistView'))     return 'worklist';
   if(vis('inventoryView'))    return 'inventory';
   if(vis('matchView'))        return 'match';
@@ -2604,9 +2565,8 @@ document.addEventListener('DOMContentLoaded', function(){
     var createItem = t.closest('.create-menu-item[data-create]');
     if(createItem){ e.preventDefault(); _runCreateAction(createItem.getAttribute('data-create')); return; }
 
-    // Worklist view-all — must be checked before the section-toggle catch-all
-    // since the link sits inside the section header [data-section-toggle].
-    if(t.closest('#worklist_view_all')){ e.preventDefault(); if(typeof showDashboard==='function') showDashboard(); return; }
+    // #worklist_view_all link was removed along with the Applications
+    // dashboard — the worklist itself is now the canonical list view.
 
     // Section toggles — only when clicking the toggle row itself, not a child
     // button/link inside it that has its own behaviour (e.g. wlOpenApp on a row,

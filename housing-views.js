@@ -1063,11 +1063,8 @@ function showEmployeeHome(){
       makeStat(_canFinalApprove?'Awaiting Final Approval':'Awaiting Your Review', _wlActionCount, _wlActionCount>0?'alert':'neutral') +
       makeStat('Returned for Info', _wlReturnCount, _wlReturnCount>0?'alert':'neutral') +
       makeStat('Total Active', totalApps, 'neutral'));
-    var appTile = tile('📋','Applications','showDashboard()','#3b82f6',
-      makeStat('Awaiting HM Review', pending,   pending>0?'alert':'info') +
-      makeStat('Awaiting ED Approval', awaitingED, (awaitingED>0&&_canFinalApprove)?'alert':'info') +
-      makeStat('Critical Priority',    critical,    critical>0?'alert':'info') +
-      makeStat('Total Active',       totalApps, 'neutral'));
+    // Applications tile removed — the My Worklist tile above and the
+    // worklist section on the home page are now the canonical list view.
 
     var invTile = tile('🏠','Inventory','showInventory()','#7c3aed',
       makeStat('Vacant', vacant,   vacant>0?'good':'alert') +
@@ -1153,7 +1150,7 @@ function showEmployeeHome(){
         +'</div>';
     }
 
-    tilesEl.innerHTML = newAppTile + worklistTile + appTile + invTile + matchTileOut + tenantTile + renoTileOut + ctTileOut + financeTile;
+    tilesEl.innerHTML = newAppTile + worklistTile + invTile + matchTileOut + tenantTile + renoTileOut + ctTileOut + financeTile;
 
   } else {
     // ── Employee: simple tiles ──

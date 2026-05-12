@@ -2067,7 +2067,6 @@ window._navStack = [];
 // defines showDashboard). Functions are resolved at call time, not parse time.
 window._navMap = {
   'home':        function(){ return showEmployeeHome.apply(this, arguments); },
-  'dashboard':   function(){ return showDashboard.apply(this, arguments); },
   'inventory':   function(){ return showInventory.apply(this, arguments); },
   'match':       function(){ return showMatch.apply(this, arguments); },
   'tenants':     function(){ return showTenants.apply(this, arguments); },
