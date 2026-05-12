@@ -2441,70 +2441,366 @@ function renderBudgetPools(){
   var gt = document.getElementById('budget_grand_total');
   if(gt) gt.textContent = '$' + Math.round(total).toLocaleString();
 }
-function renderContractorsView(){
-  var list=document.getElementById('contractors_list');
-  if(!list) return;
+// ── Contractor row stats ──────────────────────────────────────────────
+// Returns the number of SOWs filed against a contractor and the cumulative
+// dollar value (sum of totalCost across all SOWs). Used by both the KPI
+// strip and the per-row #Jobs / Cumulative $ columns. Cheap enough to
+// recompute on every render — _sowCache is fully in-memory.
+function _ctRowStats(ct) {
+  var ctId = ct && ct.id;
+  if (!ctId || typeof getAllSowsForContractor !== 'function') {
+    return { jobCount: 0, totalValue: 0 };
+  }
+  var sows = getAllSowsForContractor(ctId);
+  var total = 0;
+  for (var i = 0; i < sows.length; i++) {
+    var s = sows[i] && sows[i].sow;
+    if (!s) continue;
+    var n = (typeof s.amount === 'number' && !isNaN(s.amount)) ? s.amount
+          : parseFloat(String(s.totalCost || '').replace(/[^0-9.\-]/g, '')) || 0;
+    total += n;
+  }
+  return { jobCount: sows.length, totalValue: total };
+}
+
+// ── Contractor KPIs ──────────────────────────────────────────────────
+// Aggregates over the whole contractor + SOW set for the page header
+// strip. "Top trade" is the trade with the highest job count (computed
+// by walking each contractor's SOWs and crediting them to that
+// contractor's trade — so a Plumbing contractor's SOWs count toward
+// Plumbing regardless of the SOW's own line items).
+function _ctComputeKpis() {
+  var contractors = (window._contractors || []).filter(function(c){ return c && !c.archived; });
+  var byStatus = { approved:0, pending:0 };
+  var totalJobs = 0;
+  var totalSpend = 0;
+  var jobsByTrade = {};
+  contractors.forEach(function(ct){
+    var st = ct.status || 'pending_review';
+    if (st === 'approved') byStatus.approved++;
+    else if (st === 'pending_review' || st === 'hm_recommended' || st === 'returned') byStatus.pending++;
+    var s = _ctRowStats(ct);
+    totalJobs  += s.jobCount;
+    totalSpend += s.totalValue;
+    var trade = (ct.trade || 'Unspecified').trim() || 'Unspecified';
+    jobsByTrade[trade] = (jobsByTrade[trade] || 0) + s.jobCount;
+  });
+  var topTrade = null;
+  Object.keys(jobsByTrade).forEach(function(t){
+    if (!topTrade || jobsByTrade[t] > jobsByTrade[topTrade]) topTrade = t;
+  });
+  return {
+    totalContractors: contractors.length,
+    approved:         byStatus.approved,
+    pending:          byStatus.pending,
+    totalJobs:        totalJobs,
+    totalSpend:       totalSpend,
+    topTrade:         topTrade,
+    topTradeJobs:     topTrade ? jobsByTrade[topTrade] : 0
+  };
+}
+
+// Short relative-expiry label + colour class for WSIB / Insurance dates.
+function _ctExpiryCell(dateStr) {
+  if (!dateStr) return '<span class="txt-xs-muted">—</span>';
+  var d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '<span class="txt-xs-muted">'+escapeHtml(dateStr)+'</span>';
+  var days = Math.round((d - new Date()) / (24*3600*1000));
+  var cls = days < 0 ? 'ct-tag-expired' : days < 30 ? 'ct-tag-expiring' : 'ct-tag-valid';
+  var lbl = days < 0 ? 'Expired' : days < 30 ? '<30 days' : 'Valid';
+  return '<div class="ct-exp-cell">' +
+           '<div class="ct-exp-date">'+escapeHtml(dateStr)+'</div>' +
+           '<span class="ct-card-tag '+cls+'">'+lbl+'</span>' +
+         '</div>';
+}
+
+// Currency formatter for the Cumulative $ column + Total Spend KPI.
+function _ctFmtCurrency(n) {
+  n = Number(n) || 0;
+  return '$' + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+// Print a contractor agreement directly from the table row, without
+// opening the CIC modal. Sets _ctLastSaved (which printContractorAgreement
+// reads), then triggers the print.
+function ctPrintFromRow(idx) {
   var contractors = window._contractors || [];
-  if(!contractors.length){
-    list.innerHTML='<div style="grid-column:1/-1;" class="card"><div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px;text-align:center;"><span style="font-size:32px;">🧰</span><div style="font-weight:600;font-size:14px;">No contractors added yet</div><div style="color:var(--muted);font-size:13px;">Click "Add Contractor" to build your directory.</div></div></div>';
+  var ct = contractors[idx];
+  if (!ct) { showToast('Contractor not found'); return; }
+  window._ctLastSaved = ct;
+  if (typeof printContractorAgreement === 'function') printContractorAgreement();
+  else showToast('Print is not available on this page');
+}
+
+// ⋮ menu for a contractor row — HM/ED only. Items intentionally lean:
+// Decline + Archive are the two destructive actions that make sense to
+// expose without opening the CIC. Approval pills still live inside the
+// CIC where the manager can see context before acting.
+function ctOpenRowMenu(idx, anchorEl) {
+  var role = window.currentRole || 'housing_employee_l1';
+  if (typeof ROLE === 'undefined' || !ROLE.isManagement(role)) return;
+  var contractors = window._contractors || [];
+  var ct = contractors[idx];
+  if (!ct) return;
+
+  // Remove any existing menu
+  var prev = document.getElementById('_ctRowMenu');
+  if (prev) prev.remove();
+
+  var items = [];
+  if (ct.status !== 'declined' && ct.status !== 'archived') {
+    items.push({ icon: '❌', label: 'Decline Contractor', action: 'decline' });
+  }
+  if (!ct.archived) {
+    items.push({ icon: '📦', label: 'Archive', action: 'archive' });
+  } else {
+    items.push({ icon: '📤', label: 'Unarchive', action: 'unarchive' });
+  }
+  if (!items.length) return;
+
+  var menu = document.createElement('div');
+  menu.id = '_ctRowMenu';
+  menu.className = 'ct-row-menu';
+  menu.innerHTML = items.map(function(it){
+    return '<button class="ct-row-menu-item" data-act="'+it.action+'">'+
+             '<span class="ct-row-menu-icon">'+it.icon+'</span>'+
+             '<span>'+it.label+'</span>'+
+           '</button>';
+  }).join('');
+  // Position next to the trigger button
+  var rect = anchorEl ? anchorEl.getBoundingClientRect() : { top: 100, right: 100 };
+  menu.style.top   = (rect.bottom + 4) + 'px';
+  menu.style.right = (window.innerWidth - rect.right) + 'px';
+  document.body.appendChild(menu);
+  menu.querySelectorAll('[data-act]').forEach(function(btn){
+    btn.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      var act = btn.getAttribute('data-act');
+      menu.remove();
+      _ctHandleRowAction(act, idx);
+    });
+  });
+  setTimeout(function(){
+    document.addEventListener('click', function _close(){ menu.remove(); document.removeEventListener('click', _close); }, { once: true });
+  }, 0);
+}
+
+function _ctHandleRowAction(action, idx) {
+  var contractors = window._contractors || [];
+  var ct = contractors[idx];
+  if (!ct) return;
+  var role = window.currentRole || 'staff';
+  if (action === 'archive') {
+    showConfirm({
+      title: 'Archive this contractor?',
+      message: 'It will be hidden from the main list. Existing SOWs and audit records are preserved.',
+      confirmText: 'Archive',
+      danger: true
+    }).then(function(ok){
+      if (!ok) return;
+      ct.archived = true;
+      contractors[idx] = ct;
+      if (typeof sbSaveContractor === 'function') sbSaveContractor(ct).catch(function(e){ console.warn('archive failed:', e); });
+      auditEntry('CT:'+ct.id, 'ct_archived', 'Contractor archived: ' + (ct.name||''), role);
+      showToast('📦 Contractor archived');
+      renderContractorsView();
+    });
+  } else if (action === 'unarchive') {
+    ct.archived = false;
+    contractors[idx] = ct;
+    if (typeof sbSaveContractor === 'function') sbSaveContractor(ct).catch(function(e){ console.warn('unarchive failed:', e); });
+    auditEntry('CT:'+ct.id, 'ct_unarchived', 'Contractor restored from archive: ' + (ct.name||''), role);
+    showToast('📤 Contractor unarchived');
+    renderContractorsView();
+  } else if (action === 'decline') {
+    showPrompt({
+      title:       'Decline contractor',
+      message:     'Reason for declining (optional):',
+      placeholder: 'e.g. compliance docs incomplete, …',
+      confirmText: 'Decline',
+      danger:      true,
+      multiline:   true
+    }).then(function(reason){
+      if (reason === null) return;
+      ct.status = 'declined';
+      ct.declinedAt = new Date().toISOString().split('T')[0];
+      ct.declinedBy = role;
+      if (reason) ct.declinedReason = reason;
+      contractors[idx] = ct;
+      if (typeof sbSaveContractor === 'function') sbSaveContractor(ct).catch(function(e){ console.warn('decline failed:', e); });
+      auditEntry('CT:'+ct.id, 'declined', 'Contractor declined' + (reason ? ' — ' + reason : ''), role);
+      showToast('Contractor declined');
+      renderContractorsView();
+    });
+  }
+}
+
+// Search + sort handlers — keep state on window so re-renders pick up the
+// last user choice within the session.
+function ctSetSearch(val) { window._ctSearch = val || ''; renderContractorsView(); }
+function ctSetSort(key) {
+  var s = window._ctSort || { key:'name', dir:1 };
+  if (s.key === key) s.dir = -s.dir; else { s.key = key; s.dir = 1; }
+  window._ctSort = s;
+  renderContractorsView();
+}
+
+function renderContractorsView(){
+  var list = document.getElementById('contractors_list');
+  if(!list) return;
+  var allContractors = window._contractors || [];
+
+  // ── Empty state ──────────────────────────────────────────────────────
+  if(!allContractors.length){
+    list.innerHTML = '<div class="card ct-empty"><div class="ct-empty-inner"><span class="ct-empty-icon">🧰</span><div class="ct-empty-title">No contractors added yet</div><div class="ct-empty-sub">Click "Add Contractor" to build your directory.</div></div></div>';
     return;
   }
-  
+
+  // ── KPIs ─────────────────────────────────────────────────────────────
+  var kpi = _ctComputeKpis();
+  var kpiHtml =
+    '<div class="ct-kpi-strip">' +
+      '<div class="ct-kpi-card"><div class="ct-kpi-label">Total Contractors</div>'+
+        '<div class="ct-kpi-val">'+kpi.totalContractors+'</div>'+
+        '<div class="ct-kpi-sub">'+kpi.approved+' approved · '+kpi.pending+' pending</div></div>' +
+      '<div class="ct-kpi-card"><div class="ct-kpi-label">Total Jobs (SOWs)</div>'+
+        '<div class="ct-kpi-val">'+kpi.totalJobs+'</div>'+
+        '<div class="ct-kpi-sub">across all contractors</div></div>' +
+      '<div class="ct-kpi-card"><div class="ct-kpi-label">Total Spend</div>'+
+        '<div class="ct-kpi-val">'+_ctFmtCurrency(kpi.totalSpend)+'</div>'+
+        '<div class="ct-kpi-sub">cumulative SOW value</div></div>' +
+      '<div class="ct-kpi-card"><div class="ct-kpi-label">Top Trade</div>'+
+        '<div class="ct-kpi-val ct-kpi-val-sm">'+escapeHtml(kpi.topTrade || '—')+'</div>'+
+        '<div class="ct-kpi-sub">'+(kpi.topTrade ? kpi.topTradeJobs + ' job' + (kpi.topTradeJobs===1?'':'s') : 'no jobs yet')+'</div></div>' +
+    '</div>';
+
+  // ── Filter + search ──────────────────────────────────────────────────
   var ctFilter = window._ctFilter || '';
-  var filtered = contractors.map(function(ct,i){ return {ct:ct, i:i}; }).filter(function(obj){
-    if(!ctFilter) return true;
-    return (obj.ct.status||'pending_review') === ctFilter;
+  var ctSearch = (window._ctSearch || '').toLowerCase().trim();
+  var sort = window._ctSort || { key:'name', dir:1 };
+
+  // Decorate each contractor with derived stats once, then filter / sort.
+  var classLabels = {internal_indigenous:'Internal — Indigenous',external_indigenous:'External — Indigenous',external_non_indigenous:'External — Non-Indigenous'};
+  var enriched = allContractors.map(function(ct, i){
+    var stats = _ctRowStats(ct);
+    return {
+      ct: ct, i: i,
+      name: (ct.name || '').toLowerCase(),
+      classLabel: classLabels[ct.classification] || '',
+      jobs: stats.jobCount,
+      value: stats.totalValue,
+      wsib: ct.wsibExpiry || '',
+      ins:  ct.insExpiry  || ''
+    };
+  }).filter(function(r){
+    if (r.ct.archived && ctFilter !== 'archived') return false;
+    if (ctFilter && (r.ct.status||'pending_review') !== ctFilter) return false;
+    if (ctSearch) {
+      var hay = (r.name + ' ' + (r.ct.trade||'') + ' ' + (r.ct.phone||'') + ' ' + (r.ct.email||'')).toLowerCase();
+      if (hay.indexOf(ctSearch) === -1) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  enriched.sort(function(a,b){
+    var dir = sort.dir;
+    function cmp(x,y){ if (x<y) return -1*dir; if (x>y) return 1*dir; return 0; }
+    if (sort.key === 'name')  return cmp(a.name, b.name);
+    if (sort.key === 'class') return cmp(a.classLabel, b.classLabel);
+    if (sort.key === 'jobs')  return cmp(a.jobs, b.jobs);
+    if (sort.key === 'value') return cmp(a.value, b.value);
+    if (sort.key === 'wsib')  return cmp(a.wsib, b.wsib);
+    if (sort.key === 'ins')   return cmp(a.ins,  b.ins);
+    return cmp(a.name, b.name);
   });
 
   var ctStatusStyle = {
-    pending_review: {cls:'pending-review', label:'⏳ Pending HM Review'},
-    hm_recommended: {cls:'hm-recommended', label:'📋 Awaiting ED Approval'},
+    pending_review: {cls:'pending-review', label:'⏳ Pending HM'},
+    hm_recommended: {cls:'hm-recommended', label:'📋 Awaiting ED'},
     approved:       {cls:'approved',        label:'✅ Approved'},
     declined:       {cls:'declined',        label:'❌ Declined'},
-    returned:       {cls:'returned',        label:'↩ Returned for Info'}
+    returned:       {cls:'returned',        label:'↩ Returned'}
   };
-
   var role = window.currentRole || 'housing_employee_l1';
+  var isMgmt = (typeof ROLE !== 'undefined') && ROLE.isManagement(role);
 
-  if(!filtered.length) {
-    list.innerHTML = '<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--muted);font-size:13px;">No contractors match this filter.</div>';
-    return;
+  // ── Search input ─────────────────────────────────────────────────────
+  var searchHtml =
+    '<div class="ct-search-row">' +
+      '<input id="ct_search_input" type="text" class="ct-search-input" placeholder="🔍 Search by name, trade, phone, or email…" '+
+        'value="'+escapeHtml(window._ctSearch||'')+'" oninput="ctSetSearch(this.value)"/>' +
+    '</div>';
+
+  // ── Table ────────────────────────────────────────────────────────────
+  function sortArrow(key) {
+    if (sort.key !== key) return '';
+    return sort.dir > 0 ? ' ▲' : ' ▼';
   }
 
-  list.innerHTML = filtered.map(function(obj){
-    var ct = obj.ct; var i = obj.i;
-    var wsibFiles=[];
-    var insFiles=[];
-    var otherFiles=[];
-    var totalFiles=wsibFiles.length+insFiles.length+otherFiles.length;
-    var ss = ctStatusStyle[ct.status||'pending_review'] || {cls:'', label:ct.status||'Unknown'};
-    var classLabels = {internal_indigenous:'Internal — Indigenous',external_indigenous:'External — Indigenous',external_non_indigenous:'External — Non-Indigenous'};
-    // Whole card click + the single Open button both route through the
-    // unified Contractor Information Card (openAddContractorModal). It
-    // handles view, edit, approval actions, and Print in one surface, so
-    // there's no separate Review path anymore.
-    return '<div class="card ct-card" onclick="openAddContractorModal('+i+')" title="Open contractor">'
-      +'<div class="ct-card-head">'
-        +'<div class="ct-card-icon">'+escapeHtml((function(n){var w=n.trim().split(/\s+/);return w.length>=2?w[0][0].toUpperCase()+w[w.length-1][0].toUpperCase():n.slice(0,2).toUpperCase();})(ct.name||'??'))+'</div>'
-        +'<div class="ct-card-body">'
-          +'<div class="ct-card-name">'+escapeHtml(ct.name)+'</div>'
-          +'<div class="ct-card-trade">'+escapeHtml(ct.trade||'General Contractor')+'</div>'
-          +'<div class="ct-card-status"><span class="std-pill ct-status-pill '+ss.cls+'">'+escapeHtml(ss.label)+'</span></div>'
-        +'</div>'
-      +'</div>'
-      +(ct.phone?'<div class="ct-card-info">📞 '+escapeHtml(ct.phone)+'</div>':'')
-      +(ct.email?'<div class="ct-card-info">✉ '+escapeHtml(ct.email)+'</div>':'')
-      +(ct.classification?'<div class="ct-card-info">🏷 '+escapeHtml(classLabels[ct.classification]||ct.classification)+'</div>':'')
-      +'<div class="ct-card-tags">'
-        +(function(dateStr,label){ if(!dateStr) return ''; var days=Math.round((new Date(dateStr)-new Date())/(1000*60*60*24)); var cls=days<0?'ct-tag-expired':days<30?'ct-tag-expiring':'ct-tag-valid'; return '<span class="ct-card-tag '+cls+'">'+label+': '+(days<0?'Expired':days<30?'Expiring soon':'Valid')+'</span>'; })(ct.wsibExpiry,'WSIB')
-        +(function(dateStr,label){ if(!dateStr) return ''; var days=Math.round((new Date(dateStr)-new Date())/(1000*60*60*24)); var cls=days<0?'ct-tag-expired':days<30?'ct-tag-expiring':'ct-tag-valid'; return '<span class="ct-card-tag '+cls+'">'+label+': '+(days<0?'Expired':days<30?'Expiring soon':'Valid')+'</span>'; })(ct.insExpiry,'Insurance')
-      +'</div>'
-      +'<div class="ct-card-actions">'
-        +'<button type="button" class="btn btn-primary btn-sm btn-full" onclick="event.stopPropagation();openAddContractorModal('+i+')">Open</button>'
-      +'</div>'
-      +'</div>';
-  }).join('');
-  // Update tab active states
+  var headerHtml =
+    '<thead><tr>' +
+      '<th class="ct-th-w"></th>' +
+      '<th class="ct-th-sortable" onclick="ctSetSort(\'name\')">Contractor'+sortArrow('name')+'</th>' +
+      '<th class="ct-th-hide-mobile">Contact</th>' +
+      '<th class="ct-th-sortable ct-th-hide-mobile" onclick="ctSetSort(\'class\')">Indigenous Status'+sortArrow('class')+'</th>' +
+      '<th class="ct-th-sortable ct-th-num" onclick="ctSetSort(\'jobs\')"># Jobs'+sortArrow('jobs')+'</th>' +
+      '<th class="ct-th-sortable ct-th-num" onclick="ctSetSort(\'value\')">Cumulative $'+sortArrow('value')+'</th>' +
+      '<th class="ct-th-sortable ct-th-hide-mobile" onclick="ctSetSort(\'wsib\')">WSIB Expiry'+sortArrow('wsib')+'</th>' +
+      '<th class="ct-th-sortable ct-th-hide-mobile" onclick="ctSetSort(\'ins\')">Insurance Expiry'+sortArrow('ins')+'</th>' +
+      '<th>Status</th>' +
+      '<th></th>' +
+    '</tr></thead>';
+
+  var rowsHtml = enriched.length === 0
+    ? '<tr><td colspan="10" class="ct-table-empty">No contractors match the current filter / search.</td></tr>'
+    : enriched.map(function(r){
+        var ct = r.ct; var i = r.i;
+        var ss = ctStatusStyle[ct.status||'pending_review'] || {cls:'', label:ct.status||'Unknown'};
+        var initials = (function(n){var w=(n||'??').trim().split(/\s+/);return w.length>=2?w[0][0].toUpperCase()+w[w.length-1][0].toUpperCase():(n||'??').slice(0,2).toUpperCase();})(ct.name);
+        var contact = ct.phone || ct.email || '—';
+        var indigClass = 'ct-indig-other';
+        if (ct.classification === 'internal_indigenous') indigClass = 'ct-indig-internal';
+        else if (ct.classification === 'external_indigenous') indigClass = 'ct-indig-external';
+        else if (ct.classification === 'external_non_indigenous') indigClass = 'ct-indig-nonindig';
+        var indigLabel = r.classLabel || '—';
+        return '<tr class="ct-row" onclick="openAddContractorModal('+i+')" title="Open contractor">' +
+          '<td class="ct-row-avatar"><div class="std-row-avatar">'+escapeHtml(initials)+'</div></td>' +
+          '<td class="ct-row-name"><div class="ct-name-line">'+escapeHtml(ct.name||'—')+'</div><div class="ct-name-trade">'+escapeHtml(ct.trade||'General Contractor')+'</div></td>' +
+          '<td class="ct-th-hide-mobile ct-row-contact">'+escapeHtml(contact)+'</td>' +
+          '<td class="ct-th-hide-mobile"><span class="ct-indig-pill '+indigClass+'">'+escapeHtml(indigLabel.replace(' — Indigenous','').replace(' — Non-Indigenous',''))+'</span></td>' +
+          '<td class="ct-th-num">'+r.jobs+'</td>' +
+          '<td class="ct-th-num">'+_ctFmtCurrency(r.value)+'</td>' +
+          '<td class="ct-th-hide-mobile">'+_ctExpiryCell(ct.wsibExpiry)+'</td>' +
+          '<td class="ct-th-hide-mobile">'+_ctExpiryCell(ct.insExpiry)+'</td>' +
+          '<td class="ct-row-status"><span class="std-pill ct-status-pill '+ss.cls+'">'+escapeHtml(ss.label)+'</span></td>' +
+          '<td class="ct-row-actions">' +
+            '<div class="ct-row-actions-inner">' +
+              '<button class="dash-action-btn" onclick="event.stopPropagation();openAddContractorModal('+i+')" title="Edit">'+
+                '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'+
+              '</button>' +
+              '<button class="dash-action-btn" onclick="event.stopPropagation();ctPrintFromRow('+i+')" title="Print Agreement">'+
+                '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>'+
+              '</button>' +
+              (isMgmt
+                ? '<button class="dash-action-btn" onclick="event.stopPropagation();ctOpenRowMenu('+i+', this)" title="More options" style="font-size:14px;line-height:1;">⋮</button>'
+                : '') +
+            '</div>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+
+  var tableHtml =
+    '<div class="ct-table-wrap">' +
+      '<table class="ct-table">' +
+        headerHtml +
+        '<tbody>' + rowsHtml + '</tbody>' +
+      '</table>' +
+    '</div>';
+
+  list.innerHTML = kpiHtml + searchHtml + tableHtml;
+
+  // Update tab active states (same logic as before — chip filters stay)
   ['all','pending','hm','approved','declined'].forEach(function(k){
     var el = document.getElementById('ct_tab_'+k);
     if(!el) return;
