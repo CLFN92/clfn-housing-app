@@ -244,10 +244,7 @@
             </div>
             <div id="ct_class_proof_row" class="f" style="display:none;"><label>Classification Proof / Notes</label><input id="ct_class_proof" type="text" placeholder="Optional — document number, notes"/></div>
           </div>
-          <div class="ct-class-actions">
-            <input type="checkbox" id="ct_tor_agreed" onchange="ctUpdateClassBorder(this)"/>
-            <label for="ct_tor_agreed" class="ct-txt-sm-muted">I agree to the Terms of Reference below</label>
-          </div>
+          <!-- TOR agreement checkbox moved to the Terms tab — see ct_tor_agreed below the TOR clauses. -->
         </div>
       </div>
 
@@ -291,6 +288,14 @@
             <div class="ct-tor-clause"><div class="ct-txt-xs-val">7. Environmental Responsibility</div><div class="ct-txt-sm-muted">Work must comply with environmental standards; hazardous materials must be disposed of properly.</div></div>
           </div>
           <div class="ct-tor-note"><div class="ct-txt-sm-muted">This agreement becomes binding upon submission and <span data-nation="short">CLFN</span> approval of this contractor application.</div></div>
+          <!-- TOR agreement checkbox — moved from the Compliance tab so it
+               sits with the content it acknowledges. ID and onchange
+               handler are unchanged so saveContractor / openAddContractorModal
+               keep working. -->
+          <div class="ct-class-actions" style="margin-top:12px;">
+            <input type="checkbox" id="ct_tor_agreed" onchange="ctUpdateClassBorder(this)"/>
+            <label for="ct_tor_agreed" class="ct-txt-sm-muted">I agree to the Terms of Reference above</label>
+          </div>
         </div>
       </div>
 

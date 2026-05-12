@@ -934,8 +934,19 @@ function _updateCicSaveButtonState() {
   var btn  = document.getElementById('ct_save_btn');
   var prog = document.getElementById('cic_review_progress');
   if (!btn) return;
+  // Re-opened drafts and returned contractors aren't really "edits" — the
+  // user is still authoring. They share the gate with brand-new contractors
+  // so reviewing all tabs is required to flip into "Submit Contractor"
+  // (and out of status=draft into status=pending_review).
   var isEdit = (typeof window._ctEditIdx === 'number') && window._ctEditIdx >= 0;
+  var isAuthoring = !isEdit; // new contractor with no row yet
   if (isEdit) {
+    var _ctList = window._contractors || [];
+    var _ctRow  = _ctList[window._ctEditIdx];
+    var _status = (_ctRow && _ctRow.status) || '';
+    if (_status === 'draft' || _status === 'returned') isAuthoring = true;
+  }
+  if (!isAuthoring) {
     btn.dataset.mode = 'edit';
     btn.textContent  = 'Save Changes';
     if (prog) prog.textContent = '';
@@ -2010,14 +2021,22 @@ function openAddContractorModal(editIdx){
   var cas = document.getElementById('cic_approval_surface');
   if (cas) cas.style.display = 'none';
   var cicNotesWrap=document.getElementById('cic_notes_wrap'); if(cicNotesWrap) cicNotesWrap.style.display='none';
-  // Reset visited-tab tracking. For edits, pre-fill all tabs as visited
-  // so the gate is effectively skipped (re-editing shouldn't force the
-  // user to re-walk every section). For new contractors, only overview
-  // starts visited via setCicTab below — they must tap every tab to
-  // unlock the "Submit Contractor" button mode.
+  // Reset visited-tab tracking. The gate applies to:
+  //   • new contractors (no _ctEditIdx)
+  //   • re-opened drafts (still being authored)
+  //   • returned contractors (needs fixes before resubmit)
+  // For contractors past those states (pending_review / hm_recommended /
+  // approved / declined), pre-fill every tab as visited so the button
+  // sits in "Save Changes" edit mode and the user can touch up fields
+  // without re-walking the form.
   window._cicVisitedTabs = new Set();
   if ((typeof window._ctEditIdx === 'number') && window._ctEditIdx >= 0) {
-    _CIC_TAB_NAMES.forEach(function(t){ window._cicVisitedTabs.add(t); });
+    var _ctList = window._contractors || [];
+    var _ctRow  = _ctList[window._ctEditIdx];
+    var _status = (_ctRow && _ctRow.status) || '';
+    if (_status && _status !== 'draft' && _status !== 'returned') {
+      _CIC_TAB_NAMES.forEach(function(t){ window._cicVisitedTabs.add(t); });
+    }
   }
   if (typeof setCicTab === 'function') setCicTab('overview');
   ['ct_name','ct_trade','ct_phone','ct_email','ct_notes','ct_address','ct_hst',
@@ -3383,21 +3402,39 @@ function saveContractor(){
     sigCt:    { name:get('ct_sig_ct_name'),    title:get('ct_sig_ct_title'), date:get('ct_sig_ct_date'), image:(typeof getSigDataURL==='function'?getSigDataURL('ct_sig_canvas_ct'):'') },
     addedAt: isEdit ? (contractors[editIdx].addedAt||new Date().toISOString().slice(0,10)) : new Date().toISOString().slice(0,10)
   };
-  // Set workflow status
+  // Set workflow status. The "Save Draft → Submit Contractor" gate
+  // applies to:
+  //   • brand-new contractors (no edit row)
+  //   • re-opened DRAFT rows (still being authored)
+  //   • RETURNED rows (need fixes before resubmit)
+  // Already-submitted rows (pending_review / hm_recommended / approved /
+  // declined) preserve their current status — the user is just editing
+  // a field, not advancing the workflow.
+  var _saveBtn = document.getElementById('ct_save_btn');
+  var _saveMode = _saveBtn && _saveBtn.dataset ? _saveBtn.dataset.mode : null;
   if(isEdit) {
-    data.status = contractors[editIdx].status || 'pending_review';
-    data.submittedAt = contractors[editIdx].submittedAt || new Date().toISOString().split('T')[0];
+    var _prevStatus = contractors[editIdx].status || 'pending_review';
+    var _gated = (_prevStatus === 'draft' || _prevStatus === 'returned');
+    if (_gated) {
+      // Honour the Save button's mode: submit → advance to pending_review,
+      // draft → stay where you are (or move to 'draft' if previously
+      // 'returned' — same author-phase semantics).
+      data.status = (_saveMode === 'submit') ? 'pending_review' : 'draft';
+      data.submittedAt = (_saveMode === 'submit')
+        ? new Date().toISOString().split('T')[0]
+        : (contractors[editIdx].submittedAt || '');
+    } else {
+      data.status = _prevStatus;
+      data.submittedAt = contractors[editIdx].submittedAt || new Date().toISOString().split('T')[0];
+    }
     contractors[editIdx] = data;
-    auditEntry('CT:'+id, 'ct_updated', 'Contractor record updated: ' + name, window.currentRole||'staff');
+    var _editAuditAction = _gated && data.status === 'pending_review' ? 'ct_submitted' : 'ct_updated';
+    var _editAuditDetail = _gated && data.status === 'pending_review'
+      ? 'Contractor application submitted: ' + name
+      : 'Contractor record updated: ' + name;
+    auditEntry('CT:'+id, _editAuditAction, _editAuditDetail, window.currentRole||'staff');
   } else {
-    // Review-all-tabs gate. The Save button switches between
-    // data-mode="draft" (some tabs still unvisited) and data-mode="submit"
-    // (all 5 CIC tabs clicked). In draft mode we hold the contractor at
-    // status='draft' so it doesn't enter the HM review queue prematurely;
-    // in submit mode it goes straight into 'pending_review'. Mirrors the
-    // SOW Save Draft → Submit gate.
-    var _saveBtn = document.getElementById('ct_save_btn');
-    var _saveMode = _saveBtn && _saveBtn.dataset ? _saveBtn.dataset.mode : null;
+    // Brand-new contractor — same gate.
     data.status = (_saveMode === 'submit') ? 'pending_review' : 'draft';
     data.submittedAt = (_saveMode === 'submit') ? new Date().toISOString().split('T')[0] : '';
     contractors.push(data);
