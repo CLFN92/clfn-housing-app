@@ -440,7 +440,7 @@ function applyTransferPrefill(appId) {
   set('fn', src.fn);
   set('ln', src.ln);
   set('dob', src.dob);
-  set('phone', src.phone);
+  set('phone', src.phone ? formatPhone(src.phone) : '');
   set('email', src.email);
   set('address', src.address);
   set('city', src.city);

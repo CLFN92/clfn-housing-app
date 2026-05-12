@@ -872,10 +872,9 @@ function udpRenderSowTable(unitId){
   // within the same panel session. Default: hide archived.
   if(window._udpShowArchived == null) window._udpShowArchived = false;
 
-  function fmtCurrency(n){
-    var v = Number(n) || 0;
-    return '$' + v.toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:0});
-  }
+  // Local alias to the canonical formatCurrency so existing call sites
+  // in this function keep working without renaming.
+  var fmtCurrency = formatCurrency;
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
   var rows = list.map(function(sow){
@@ -1307,7 +1306,7 @@ function printSOW(){
   }
 
   var itemRows = items.filter(function(it){ return it.category||it.description||it.cost; }).map(function(it, i){
-    var cost = it.cost ? '$'+parseFloat(it.cost).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+    var cost = it.cost ? formatCurrency(parseFloat(it.cost)||0) : '—';
     return '<tr style="'+(i%2===1?'background:var(--bg);':'')+'">'
       +'<td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:10px;color:var(--text);">'+( it.category||'—')+'</td>'
       +'<td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:10px;color:var(--text);">'+(it.description||'—')+'</td>'

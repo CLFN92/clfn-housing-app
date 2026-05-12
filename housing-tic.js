@@ -1093,7 +1093,7 @@
         html += '<tr data-tic-ref-idx="' + idx + '">'
              +   '<td>' + _ticEsc(_ticAppFullName(r) || '—') + '</td>'
              +   '<td>' + _ticEsc(r.relationship || '—') + '</td>'
-             +   '<td>' + _ticEsc(r.phone || '—') + '</td>'
+             +   '<td>' + _ticEsc(r.phone ? formatPhone(r.phone) : '—') + '</td>'
              +   '<td>' + _ticEsc(r.email || '—') + '</td>'
              +   '<td class="tic-row-actions">'
              +     '<button type="button" class="btn btn-ghost" data-tic-action="ref-edit">Edit</button>'
@@ -1109,7 +1109,7 @@
          +     '<div class="tic-field"><label class="tic-field-lbl">First Name *</label><input class="tic-input" id="tic_ref_fn" type="text"/></div>'
          +     '<div class="tic-field"><label class="tic-field-lbl">Last Name</label><input class="tic-input" id="tic_ref_ln" type="text"/></div>'
          +     '<div class="tic-field"><label class="tic-field-lbl">Relationship</label><input class="tic-input" id="tic_ref_rel" type="text"/></div>'
-         +     '<div class="tic-field"><label class="tic-field-lbl">Phone</label><input class="tic-input" id="tic_ref_phone" type="tel"/></div>'
+         +     '<div class="tic-field"><label class="tic-field-lbl">Phone</label><input class="tic-input" id="tic_ref_phone" type="tel" placeholder="705-000-0000" oninput="fmtPhone(this)"/></div>'
          +     '<div class="tic-field"><label class="tic-field-lbl">Email</label><input class="tic-input" id="tic_ref_email" type="email"/></div>'
          +   '</div>'
          +   '<div class="tic-form-actions">'
@@ -1149,7 +1149,7 @@
     _ticEl('tic_ref_fn').value    = r.fn    || '';
     _ticEl('tic_ref_ln').value    = r.ln    || '';
     _ticEl('tic_ref_rel').value   = r.relationship || '';
-    _ticEl('tic_ref_phone').value = r.phone || '';
+    _ticEl('tic_ref_phone').value = r.phone ? formatPhone(r.phone) : '';
     _ticEl('tic_ref_email').value = r.email || '';
     form.classList.add('tic-open');
   }

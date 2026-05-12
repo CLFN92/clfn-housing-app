@@ -95,6 +95,64 @@ window._applyTheme = function(theme) {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
+// formatPhone — canonical phone-string formatter (no parens, dashes only).
+// Strips non-digits, caps at 10 digits, and emits "705-555-0100" /
+// "705-555" / "705" depending on length. Used by both the typing-side
+// fmtPhone(input) helper and every display surface that renders a stored
+// phone value, so legacy strings like "(705)-555-0100" or "7055550100"
+// all show consistently as "705-555-0100" without a DB migration.
+// ═══════════════════════════════════════════════════════════════════════
+window.formatPhone = function(str){
+  var v = String(str || '').replace(/\D/g, '').slice(0, 10);
+  if (v.length >= 7) return v.slice(0, 3) + '-' + v.slice(3, 6) + '-' + v.slice(6);
+  if (v.length >= 4) return v.slice(0, 3) + '-' + v.slice(3);
+  return v;
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// formatCurrency — canonical "$1,234.56" formatter for any rendered dollar
+// amount in the app. Always uses en-CA so commas + dot-decimal stay
+// consistent regardless of the browser's locale. Single source of truth
+// — every dollar( ), _ctFmtCurrency, and inline `'$'+x.toLocaleString()`
+// site should resolve through here so the app reads as one product.
+// ═══════════════════════════════════════════════════════════════════════
+window.formatCurrency = function(n){
+  var v = Number(n) || 0;
+  return '$' + v.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// fmtCurrency — input-side live formatter (called from oninput).
+// Strips non-numeric chars while the user types, keeps at most one
+// decimal point and two fraction digits, emits e.g. "1,234.56" WITHOUT
+// the $ sign so the input stays editable. The $ is added at display
+// time via formatCurrency.
+//
+// Used by housing-app.js currency inputs (income, arrears, etc.) via
+// the existing oninput="fmtCurrency(this)" attribute, which previously
+// referred to an undefined global and silently no-op'd.
+// ═══════════════════════════════════════════════════════════════════════
+window.fmtCurrency = function(input){
+  if (!input) return;
+  var raw     = String(input.value || '').replace(/[^\d.]/g, '');
+  var parts   = raw.split('.');
+  // Drop leading zeros on the integer part (so "01234" → "1,234").
+  var intPart = parts[0].replace(/^0+(?=\d)/, '');
+  // Reattach the decimal portion, capped at two digits.
+  var decPart = parts.length > 1 ? '.' + parts.slice(1).join('').slice(0, 2) : '';
+  if (!intPart && !decPart) { input.value = ''; return; }
+  input.value = (intPart ? Number(intPart).toLocaleString('en-CA') : '0') + decPart;
+};
+
+// Parse a "$1,234.56" / "1,234.56" / "1234" style string back into a
+// number. Useful at save-time when the input value carries display
+// formatting that the DB shouldn't store.
+window.parseCurrency = function(str){
+  if (str == null) return 0;
+  return parseFloat(String(str).replace(/[^0-9.\-]/g, '')) || 0;
+};
+
+// ═══════════════════════════════════════════════════════════════════════
 // showConfirm — branded replacement for native window.confirm().
 // Renders a centered modal using the standard .modal-hdr / .modal-body
 // pattern, returns a Promise<boolean>. Pass `danger: true` for destructive

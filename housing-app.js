@@ -99,12 +99,13 @@ function _calcCoArrearsMonths(){
 }
 
 // ── Phone formatter ──
+// Now a thin wrapper around the shared window.formatPhone — single source
+// of truth for "705-000-0000" canonical formatting (no parens, dashes only).
 function fmtPhone(input){
-  let v=input.value.replace(/\D/g,'').slice(0,10);
-  if(v.length>=7)      v='('+v.slice(0,3)+')-'+v.slice(3,6)+'-'+v.slice(6);
-  else if(v.length>=4) v='('+v.slice(0,3)+')-'+v.slice(3);
-  else if(v.length>0)  v='('+v;
-  input.value=v;
+  if (!input) return;
+  input.value = (typeof formatPhone === 'function')
+    ? formatPhone(input.value)
+    : input.value;
 }
 
 // ── App ID ──
@@ -494,7 +495,7 @@ function addIncome(){
     +'<div class="js-lbl-muted" style="margin:10px 0 6px;">Employer Details</div>'
     +'<div class="fg c3">'
     +'<div class="f"><label>Employer Name <span class="r">*</span></label><input data-role="empName" type="text" placeholder="Employer or N/A"/></div>'
-    +'<div class="f"><label>Employer Phone <span class="r">*</span></label><input data-role="empPhone" type="tel" placeholder="(705)-555-0100" oninput="fmtPhone(this)"/></div>'
+    +'<div class="f"><label>Employer Phone <span class="r">*</span></label><input data-role="empPhone" type="tel" placeholder="705-555-0100" oninput="fmtPhone(this)"/></div>'
     +'<div class="f"><label>Manager / Supervisor <span class="r">*</span></label><input data-role="mgr" type="text"/></div>'
     +'<div class="f"><label>Start / Hire Date <span class="r">*</span></label><input data-role="startDate" type="date" onchange="calcDuration(this)"/></div>'
     +'<div class="f"><label>Duration</label><input type="text" data-role="duration" readonly placeholder="Calculated from start date" style="background:var(--bg);color:var(--muted);cursor:default;"/></div>'
@@ -504,7 +505,7 @@ function addIncome(){
     +'<div class="js-lbl-muted" style="margin:10px 0 6px;">Employer / Source Details</div>'
     +'<div class="fg c3">'
     +'<div class="f"><label>Employer / Source Name</label><input type="text" placeholder="Employer or source"/></div>'
-    +'<div class="f"><label>Phone</label><input type="tel" placeholder="(705)-555-0100" oninput="fmtPhone(this)"/></div>'
+    +'<div class="f"><label>Phone</label><input type="tel" placeholder="705-555-0100" oninput="fmtPhone(this)"/></div>'
     +'<div class="f"><label>Manager / Supervisor</label><input type="text"/></div>'
     +'<div class="f"><label>Start / Hire Date</label><input data-role="startDate" type="date" onchange="calcDuration(this)"/></div>'
     +'<div class="f"><label>Duration</label><input type="text" data-role="duration" readonly placeholder="Calculated from start date" style="background:var(--bg);color:var(--muted);cursor:default;"/></div>'
@@ -1814,8 +1815,8 @@ function printApplicationPreview() {
       +'</div>';
   }
   function yn(v) { return v ? 'Yes' : 'No'; }
-  function dollar(id) { var e=document.getElementById(id); return (e&&e.value)?'$'+parseFloat(e.value).toLocaleString():'—'; }
-  function dollarQ(sel) { var e=document.querySelector(sel); return (e&&e.value)?'$'+parseFloat(e.value).toLocaleString():'—'; }
+  function dollar(id) { var e=document.getElementById(id); return (e&&e.value) ? formatCurrency(parseCurrency(e.value)) : '—'; }
+  function dollarQ(sel) { var e=document.querySelector(sel); return (e&&e.value) ? formatCurrency(parseCurrency(e.value)) : '—'; }
 
   // ── Income rows ──
   var incBody = '';
@@ -1825,7 +1826,7 @@ function printApplicationPreview() {
     var txts = r.querySelectorAll('input[type="text"]');
     var person = sels[0] ? sels[0].value : '';
     var type   = sels[1] ? sels[1].value : '';
-    var amt    = nums[0] && nums[0].value ? '$'+parseFloat(nums[0].value).toLocaleString() : '';
+    var amt    = nums[0] && nums[0].value ? formatCurrency(parseCurrency(nums[0].value)) : '';
     var emp    = txts[0] ? txts[0].value : '';
     incBody += row(person || ('Income '+(i+1)), type+(amt?' — '+amt:'')+(emp?' · '+emp:''));
   });
@@ -1850,7 +1851,7 @@ function printApplicationPreview() {
     var ems  = r.querySelectorAll('input[type="email"]');
     var sel  = r.querySelector('select');
     var nm   = [(txts[0]?txts[0].value:''),(txts[1]?txts[1].value:'')].filter(Boolean).join(' ') || ('Reference '+(i+1));
-    refBody += row(nm, (sel?sel.value:'')+(tels[0]&&tels[0].value?' · '+tels[0].value:'')+(ems[0]&&ems[0].value?' · '+ems[0].value:''));
+    refBody += row(nm, (sel?sel.value:'')+(tels[0]&&tels[0].value?' · '+formatPhone(tels[0].value):'')+(ems[0]&&ems[0].value?' · '+ems[0].value:''));
   });
   if(!refBody) refBody = row('References', '—');
 
@@ -1980,8 +1981,8 @@ function printApplicationPreview() {
       +(hasHouse ? row('Home Condition',          fld('homeCondition')) : '')
       +(hasHouse ? row('Est. Renovation Cost',    dollarQ('#homeCondBlk input[type="number"]')) : '')
       +row('Arrears Owed to '+(window.NATION_CONFIG&&NATION_CONFIG.short||''), yn(hasArr))
-      +row('Amount Owed',          hasArr ? (arrNums[0]&&arrNums[0].value?'$'+parseFloat(arrNums[0].value).toLocaleString():'—') : 'N/A')
-      +row('Monthly Payment',      hasArr ? (arrNums[1]&&arrNums[1].value?'$'+parseFloat(arrNums[1].value).toLocaleString():'—') : 'N/A')
+      +row('Amount Owed',          hasArr ? (arrNums[0]&&arrNums[0].value?formatCurrency(parseCurrency(arrNums[0].value)):'—') : 'N/A')
+      +row('Monthly Payment',      hasArr ? (arrNums[1]&&arrNums[1].value?formatCurrency(parseCurrency(arrNums[1].value)):'—') : 'N/A')
       +row('Plan Duration',        hasArr ? (arrNums[3]&&arrNums[3].value?arrNums[3].value+' months':'—') : 'N/A')
       +row('Payment Frequency',    hasArr ? (arrSel?arrSel.value:'—') : 'N/A')
       +row('Agreement Date',       hasArr ? (arrDates[0]&&arrDates[0].value?arrDates[0].value:'—') : 'N/A')

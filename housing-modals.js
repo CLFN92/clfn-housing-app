@@ -71,7 +71,7 @@ function contractorSearchFilter(q) {
       +'<div style="width:40px;height:40px;border-radius:10px;background:var(--dark);color:var(--yellow);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+initials+'</div>'
       +'<div style="flex:1;min-width:0;">'
         +'<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">'+( c.name||'Unknown')+'</div>'
-        +'<div class="js-lbl-sm">'+(c.trade||'General')+(c.phone?' · '+c.phone:'')+'</div>'
+        +'<div class="js-lbl-sm">'+(c.trade||'General')+(c.phone?' · '+formatPhone(c.phone):'')+'</div>'
       +'</div>'
       +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>'
       +'</div>';
@@ -228,8 +228,8 @@ function ueUpdateBudgetRouting() {
   }
 
   var overBudget = totalCost > limit;
-  var fmtCost  = '$' + Math.round(totalCost).toLocaleString();
-  var fmtLimit = '$' + Math.round(limit).toLocaleString();
+  var fmtCost  = formatCurrency(totalCost);
+  var fmtLimit = formatCurrency(limit);
 
   if(indicator) {
     indicator.style.display = 'block';
@@ -918,7 +918,7 @@ function previewFromDash(app){
       +'</div>';
   }
   function yn(v) { return v ? 'Yes' : 'No'; }
-  function dollar(v) { var f=parseFloat(v)||0; return f>0 ? '$'+f.toLocaleString() : '—'; }
+  function dollar(v) { var f=parseFloat(v)||0; return f>0 ? formatCurrency(f) : '—'; }
 
   // ── sig block (pen-on-paper for dash print — no canvas available) ──
   function sigBlock(label, pName, dt) {
@@ -979,7 +979,7 @@ function previewFromDash(app){
   if(app.references && app.references.length) {
     app.references.forEach(function(r, i) {
       var nm = [(r.fn||''),(r.ln||'')].filter(Boolean).join(' ') || ('Reference '+(i+1));
-      if(nm || r.phone) refBody += row(nm, (r.relationship||'') + (r.phone ? ' · '+r.phone : '') + (r.email ? ' · '+r.email : ''));
+      if(nm || r.phone) refBody += row(nm, (r.relationship||'') + (r.phone ? ' · '+formatPhone(r.phone) : '') + (r.email ? ' · '+r.email : ''));
     });
   }
   if(!refBody) refBody = row('References', '—');
@@ -1022,7 +1022,7 @@ function previewFromDash(app){
       +row('Band Number',          app.band ||'—')
       +row('On Reserve Status',    app.reserve||'—')
       +row('Marital Status',       app.marital||'—')
-      +row('Cell Phone',           app.phone||'—')
+      +row('Cell Phone',           app.phone?formatPhone(app.phone):'—')
       +row('Email Address',        app.email||'—')
       +row('Application Date',     app.appDate||'—')
       +row('Accessibility Needs',  app.accessibility||'None')
@@ -1057,7 +1057,7 @@ function previewFromDash(app){
       +(hasCoApp ? row('Date of Birth', app.coApp.dob ||'—') : '')
       +(hasCoApp ? row('Band Number',   app.coApp.band||'—') : '')
       +(hasCoApp ? row('Reserve Status',app.coApp.reserve||'—') : '')
-      +(hasCoApp ? row('Cell Phone',    app.coApp.cell||'—') : '')
+      +(hasCoApp ? row('Cell Phone',    app.coApp.cell?formatPhone(app.coApp.cell):'—') : '')
       +(hasCoApp ? row('Email',         app.coApp.email||'—') : '')
     )
 
@@ -1859,7 +1859,7 @@ function openContractorDetail(idx) {
 
   setT('cdp_name',  ct.name);
   setT('cdp_trade', ct.trade);
-  setT('cdp_phone', ct.phone);
+  setT('cdp_phone', ct.phone?formatPhone(ct.phone):'');
   setT('cdp_email', ct.email);
   setT('cdp_address', ct.address);
   setT('cdp_hst',   ct.hst);
@@ -1896,7 +1896,7 @@ function openContractorDetail(idx) {
           +'<div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Role</div>'
           +'<div class="js-txt-bold2" style="font-weight:400;">'+(p.role||'—')+'</div></div>'
           +'<div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Phone</div>'
-          +'<div class="js-txt-bold2" style="font-weight:400;">'+(p.phone||'—')+'</div></div>'
+          +'<div class="js-txt-bold2" style="font-weight:400;">'+(p.phone?formatPhone(p.phone):'—')+'</div></div>'
           +'</div>';
       }).join('');
     }
@@ -2054,7 +2054,7 @@ window.openEditModal = function(appId) {
   set('band',         app.band);
   set('reserve',      app.reserve);
   set('marital',      app.marital);
-  set('phone',        app.phone);
+  set('phone',        app.phone?formatPhone(app.phone):'');
   set('email',        app.email);
   set('street',       app.street);
   set('city',         app.city);
@@ -2094,12 +2094,12 @@ window.openEditModal = function(appId) {
     var arrBalEl = document.getElementById('arrBalAmt');
     if(arrBalEl && app.arrBalAmt) {
       var _arrNum = parseFloat(app.arrBalAmt) || 0;
-      arrBalEl.value = _arrNum ? '$' + _arrNum.toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
+      arrBalEl.value = _arrNum ? formatCurrency(_arrNum) : '';
     }
     var arrMonEl = document.getElementById('arrMonthlyPayment');
     if(arrMonEl && app.arrMonthlyPayment) {
       var _monNum = parseFloat(app.arrMonthlyPayment) || 0;
-      arrMonEl.value = _monNum ? '$' + _monNum.toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
+      arrMonEl.value = _monNum ? formatCurrency(_monNum) : '';
     }
     var arrPlanEl = document.getElementById('arrPlanMonths');
     if(arrPlanEl) arrPlanEl.value = app.arrPlanMonths || '';
@@ -2155,8 +2155,8 @@ window.openEditModal = function(appId) {
     set('co_dob',     co.dob);
     set('co_band',    co.band);
     set('co_reserve', co.reserve);
-    set('co_cell',    co.cell);
-    set('co_home',    co.home);
+    set('co_cell',    co.cell ? formatPhone(co.cell) : '');
+    set('co_home',    co.home ? formatPhone(co.home) : '');
     set('co_email',   co.email);
     set('coOccDate',  co.occDate);
     // ── Co-applicant arrears (mirrors applicant arrears restore below) ──
@@ -2167,12 +2167,12 @@ window.openEditModal = function(appId) {
       var _coBalEl = document.getElementById('coArrBalAmt');
       if(_coBalEl && co.arrBalAmt) {
         var _coBalNum = parseFloat(co.arrBalAmt) || 0;
-        _coBalEl.value = _coBalNum ? '$' + _coBalNum.toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
+        _coBalEl.value = _coBalNum ? formatCurrency(_coBalNum) : '';
       }
       var _coMonEl = document.getElementById('coArrMonthlyPayment');
       if(_coMonEl && co.arrMonthlyPayment) {
         var _coMonNum = parseFloat(co.arrMonthlyPayment) || 0;
-        _coMonEl.value = _coMonNum ? '$' + _coMonNum.toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
+        _coMonEl.value = _coMonNum ? formatCurrency(_coMonNum) : '';
       }
       var _coPlanEl = document.getElementById('coArrPlanMonths');
       if(_coPlanEl) _coPlanEl.value = co.arrPlanMonths || '';
@@ -2224,7 +2224,7 @@ window.openEditModal = function(appId) {
         if(txts[0]) txts[0].value = r.fn || '';
         if(txts[1]) txts[1].value = r.ln || '';
         if(sels[0]) sels[0].value = r.relationship || '';
-        if(tels[0]) tels[0].value = r.phone || '';
+        if(tels[0]) tels[0].value = r.phone ? formatPhone(r.phone) : '';
         if(ems[0])  ems[0].value  = r.email || '';
       });
     }

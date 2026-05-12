@@ -1256,7 +1256,7 @@ function renderRenoApprovalsView() {
   tbody.innerHTML = filtered.map(function(r) {
     var u=r.u; var sow=r.sow; var prog=r.prog; var rs=r.rs; var appr=r.appr;
     var tier = rs.score>=40?{l:'Critical',c:'#b91c1c',bg:'#fef2f2'}:rs.score>=25?{l:'High',c:'#7a6000',bg:'#fef9ec'}:rs.score>=12?{l:'Medium',c:'#1d4ed8',bg:'#eff6ff'}:{l:'Low',c:'#15803d',bg:'#f0fdf4'};
-    var costStr = r.cost>0?('$'+r.cost.toLocaleString()):'—';
+    var costStr = r.cost>0 ? formatCurrency(r.cost) : '—';
     var needsED = r.cost > hmLimit;
     var pct = prog?(prog.overallPct||0):0;
     var uid = u.id;
@@ -1397,7 +1397,7 @@ function exportRenoApprovalsPDF() {
     return '<tr style="background:'+bg+';border-bottom:1px solid var(--border);">'
       +'<td style="padding:7px 10px;font-size:11px;font-weight:600;">'+u.num+' '+u.street+(u.status==='condemned'?' <span class="txt-danger-bold" style="font-size:9px;">[CONDEMNED]</span>':'')+'</td>'
       +'<td style="padding:7px 8px;font-size:11px;text-align:center;font-weight:800;color:'+tier.c+';">'+rs.score+'<br/><span style="font-size:9px;font-weight:700;">'+tier.l+'</span></td>'
-      +'<td style="padding:7px 8px;font-size:11px;">'+(cost>0?'$'+cost.toLocaleString():'—')+(cost>hmLimit?' <span style="font-size:9px;color:var(--info-blue);">ED</span>':'')+'</td>'
+      +'<td style="padding:7px 8px;font-size:11px;">'+(cost>0?formatCurrency(cost):'—')+(cost>hmLimit?' <span style="font-size:9px;color:var(--info-blue);">ED</span>':'')+'</td>'
       +'<td style="padding:7px 8px;font-size:10px;font-weight:700;color:'+appr.c+';">'+appr.label+'</td>'
       +'<td style="padding:7px 8px;font-size:10px;color:var(--text);">'+(u.unitHmSig&&u.unitHmSig.decision?u.unitHmSig.decision+(u.unitHmSig.date?' ('+u.unitHmSig.date+')':''):'—')+'</td>'
       +'<td style="padding:7px 8px;font-size:10px;color:var(--text);">'+(u.unitEdSig&&u.unitEdSig.decision?u.unitEdSig.decision+(u.unitEdSig.date?' ('+u.unitEdSig.date+')':''):'—')+'</td>'

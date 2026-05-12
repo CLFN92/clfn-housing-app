@@ -821,7 +821,7 @@ function _buildContractorAgreementHTML(ct) {
       +'<div class="field"><label>Company / Name</label><span>'+(ct.name||'—')+'</span></div>'
       +'<div class="field"><label>Trade / Specialty</label><span>'+(ct.trade||'—')+'</span></div>'
       +'<div class="field"><label>HST / Business #</label><span>'+(ct.hst||'—')+'</span></div>'
-      +'<div class="field"><label>Phone</label><span>'+(ct.phone||'—')+'</span></div>'
+      +'<div class="field"><label>Phone</label><span>'+(ct.phone?formatPhone(ct.phone):'—')+'</span></div>'
       +'<div class="field"><label>Email</label><span>'+(ct.email||'—')+'</span></div>'
       +'<div class="field"><label>Address</label><span>'+(ct.address||'—')+'</span></div>'
     +'</div></div></div>'
@@ -1055,10 +1055,7 @@ function _ctRenderFormsSows(ctId, prefix) {
     draft:'Draft', signed:'Signed', hm_approved:'HM Approved',
     ed_approved:'ED Approved', completed:'Completed'
   };
-  var fmtMoney = function(n){
-    var v = Number(n) || 0;
-    return '$' + v.toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:0});
-  };
+  var fmtMoney = formatCurrency; // canonical $1,234.56
 
   el.innerHTML = '<div class="ct-sow-list">' + rows.map(function(r){
     var s = r.sow;
@@ -1404,7 +1401,7 @@ function _updateRbaAllocSummary(totalCost, eligiblePools, budgetData) {
     var using = poolTotals[pid]||0;
     if(using > available) {
       overBudget = true;
-      poolWarnings.push((pool?pool.label:pid)+' is over available balance by $'+Math.round(using-available).toLocaleString());
+      poolWarnings.push((pool?pool.label:pid)+' is over available balance by '+formatCurrency(using-available));
     }
   });
 
@@ -1423,7 +1420,7 @@ function _updateRbaAllocSummary(totalCost, eligiblePools, budgetData) {
   } else {
     summaryEl.style.background='#f0fdf4'; summaryEl.style.border='1px solid #bbf7d0';
     summaryEl.innerHTML = '<div style="color:var(--success);font-weight:700;">✓ Within Budget</div>'
-      +'<div style="font-size:11px;color:var(--success);">Total allocated: $'+Math.round(totalAlloc).toLocaleString()+' of $'+Math.round(totalCost).toLocaleString()+' SOW cost</div>';
+      +'<div style="font-size:11px;color:var(--success);">Total allocated: '+formatCurrency(totalAlloc)+' of '+formatCurrency(totalCost)+' SOW cost</div>';
     overBudgetSection.style.display='none';
     statusBadge.textContent='Pending Approval'; statusBadge.style.background='var(--bg)'; statusBadge.style.color='var(--muted)';
   }
@@ -1659,7 +1656,7 @@ function ctRenderPeople(people) {
   list.innerHTML = window._ctPeople.map(function(p, i) {
     return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;">'
       +'<input type="text"  class="ct-person-name"  data-pi="'+i+'" value="'+(p.name||'')+'"  placeholder="Full name"  style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
-      +'<input type="tel"   class="ct-person-phone" data-pi="'+i+'" value="'+(p.phone||'')+'" placeholder="Phone"      style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
+      +'<input type="tel"   class="ct-person-phone" data-pi="'+i+'" value="'+(p.phone?formatPhone(p.phone):'')+'" placeholder="705-000-0000" oninput="fmtPhone(this)" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
       +'<input type="email" class="ct-person-email" data-pi="'+i+'" value="'+(p.email||'')+'" placeholder="Email"      style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
       +'<button type="button" onclick="ctRemovePerson('+i+')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:2px 6px;line-height:1;" title="Remove">✕</button>'
       +'</div>';
@@ -1871,8 +1868,8 @@ function exportContractors(format) {
   var contractors = window._contractors || [];
   var headers=['Company','Trade','Phone','Email','Address','HST #','WSIB #','WSIB Expiry','Insurance Provider','Insurance Expiry','Key Contacts'];
   var data=contractors.map(function(ct){
-    var people=(ct.people||[]).map(function(p){return p.name+(p.phone?' ('+p.phone+')':'');}).join('; ');
-    return[ct.name||'',ct.trade||'',ct.phone||'',ct.email||'',ct.address||'',ct.hst||'',ct.wsibNum||'',ct.wsibExpiry||'',ct.insProvider||'',ct.insExpiry||'',people];
+    var people=(ct.people||[]).map(function(p){return p.name+(p.phone?' ('+formatPhone(p.phone)+')':'');}).join('; ');
+    return[ct.name||'',ct.trade||'',ct.phone?formatPhone(ct.phone):'',ct.email||'',ct.address||'',ct.hst||'',ct.wsibNum||'',ct.wsibExpiry||'',ct.insProvider||'',ct.insExpiry||'',people];
   });
   _doExport(format,headers,data,'CLFN_Contractors_'+new Date().toISOString().slice(0,10),[28,18,14,24,24,14,14,14,20,14,24],true);
 }
@@ -2064,7 +2061,7 @@ function openAddContractorModal(editIdx){
     var ct = contractors[window._ctEditIdx];
     if(ct) {
       var set = function(id,v){ var el=document.getElementById(id); if(el) el.value=v||''; };
-      set('ct_name', ct.name); set('ct_trade', ct.trade); set('ct_phone', ct.phone);
+      set('ct_name', ct.name); set('ct_trade', ct.trade); set('ct_phone', ct.phone ? formatPhone(ct.phone) : '');
       set('ct_email', ct.email); set('ct_notes', ct.notes); set('ct_address', ct.address);
       set('ct_hst', ct.hst); set('ct_wsib_num', ct.wsibNum); set('ct_wsib_expiry', ct.wsibExpiry);
       set('ct_ins_provider', ct.insProvider); set('ct_ins_policy', ct.insPolicy);
@@ -2137,7 +2134,7 @@ function openCtApprovalPanel(idx) {
 
   setT('ctap_name',  ct.name);
   setT('ctap_trade', ct.trade);
-  setT('ctap_phone', ct.phone);
+  setT('ctap_phone', ct.phone ? formatPhone(ct.phone) : '');
   setT('ctap_email', ct.email);
   setT('ctap_class', classLabels[ct.classification]||ct.classification||'Not specified');
   setT('ctap_hst',   ct.hst);
@@ -2279,7 +2276,7 @@ function printWorkOrder(){
 
   var itemRows = items.map(function(it, i){
     var quote = (it.quote && parseFloat(it.quote) > 0)
-      ? '$'+parseFloat(it.quote).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})
+      ? formatCurrency(parseFloat(it.quote)||0)
       : '<span style="color:var(--muted);">Pending</span>';
     return '<tr style="'+(i%2===1?'background:var(--bg);':'')+'">'
       +'<td style="padding:8px 10px;border-bottom:1px solid var(--border);font-size:10px;color:var(--text);width:140px;">'+( it.category||'—')+'</td>'
@@ -2289,7 +2286,7 @@ function printWorkOrder(){
   }).join('');
 
   var totalRow = hasQuotes
-    ? '<tr class="total-row"><td colspan="2" style="text-align:right;padding:9px 10px;font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.04em;">Total Quoted Amount</td><td style="text-align:right;padding:9px 10px;font-size:12px;font-weight:bold;">$'+quoteTotal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</td></tr>'
+    ? '<tr class="total-row"><td colspan="2" style="text-align:right;padding:9px 10px;font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.04em;">Total Quoted Amount</td><td style="text-align:right;padding:9px 10px;font-size:12px;font-weight:bold;">'+formatCurrency(quoteTotal)+'</td></tr>'
     : '<tr><td colspan="3" style="padding:9px 10px;font-size:10px;color:var(--muted);font-style:italic;">Pricing to be confirmed by contractor</td></tr>';
 
   var html = '<!DOCTYPE html><html lang="en"><head>'
@@ -2391,7 +2388,7 @@ function recalcSowTotal(){
     total+=v;
   });
   var el=document.getElementById('sow_total_cost');
-  if(el) el.value = total>0 ? '$'+total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : '';
+  if(el) el.value = total>0 ? formatCurrency(total) : '';
 }
 function removeRenoPhoto(idx) {
   window._rpStoredPhotos = window._rpStoredPhotos || [];
@@ -2439,7 +2436,7 @@ function renderBudgetPools(){
   }).join('');
 
   var gt = document.getElementById('budget_grand_total');
-  if(gt) gt.textContent = '$' + Math.round(total).toLocaleString();
+  if(gt) gt.textContent = formatCurrency(total);
 }
 // ── Contractor row stats ──────────────────────────────────────────────
 // Returns the number of SOWs filed against a contractor and the cumulative
@@ -2514,11 +2511,11 @@ function _ctExpiryCell(dateStr) {
          '</div>';
 }
 
-// Currency formatter for the Cumulative $ column + Total Spend KPI.
-function _ctFmtCurrency(n) {
-  n = Number(n) || 0;
-  return '$' + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
-}
+// Thin wrapper kept for backwards compat — _ctFmtCurrency originally
+// rendered $1,234 (no decimals). Now routed through the canonical
+// formatCurrency so every dollar value across the app uses the same
+// "$###,###.00" style. Callers don't need to change.
+function _ctFmtCurrency(n) { return formatCurrency(n); }
 
 // Print a contractor agreement directly from the table row, without
 // opening the CIC modal. Sets _ctLastSaved (which printContractorAgreement
@@ -2758,7 +2755,7 @@ function renderContractorsView(){
         var ct = r.ct; var i = r.i;
         var ss = ctStatusStyle[ct.status||'pending_review'] || {cls:'', label:ct.status||'Unknown'};
         var initials = (function(n){var w=(n||'??').trim().split(/\s+/);return w.length>=2?w[0][0].toUpperCase()+w[w.length-1][0].toUpperCase():(n||'??').slice(0,2).toUpperCase();})(ct.name);
-        var contact = ct.phone || ct.email || '—';
+        var contact = ct.phone ? formatPhone(ct.phone) : (ct.email || '—');
         var indigClass = 'ct-indig-other';
         if (ct.classification === 'internal_indigenous') indigClass = 'ct-indig-internal';
         else if (ct.classification === 'external_indigenous') indigClass = 'ct-indig-external';
@@ -4119,7 +4116,7 @@ function updateBudgetTotal(){
     total += parseFloat((el&&el.value)||0) || 0;
   });
   var gt = document.getElementById('budget_grand_total');
-  if(gt) gt.textContent = '$' + Math.round(total).toLocaleString();
+  if(gt) gt.textContent = formatCurrency(total);
 }
 function userLookupDebounce(){
   clearTimeout(window._userLookupTimer);
