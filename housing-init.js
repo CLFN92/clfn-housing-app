@@ -1179,6 +1179,11 @@ function confirmAssignment() {
   if(typeof renderMatchView === 'function') renderMatchView();
   if(typeof renderDashTable === 'function') renderDashTable();
   if(typeof updateDashStats === 'function') updateDashStats();
+  // Refresh the Home-page worklist too. Once status flips to 'assigned',
+  // the row drops out of the "ED Approved" chip filter and the applicant
+  // no longer surfaces in the assignment queue. Without this call the row
+  // lingered until the next manual page reload.
+  if(typeof renderWorklist === 'function') renderWorklist();
   showToast('✓ '+name+' assigned to '+u.num+' '+u.street+(isEdOverride2?' (override)':''));
 }
 
