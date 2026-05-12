@@ -3159,7 +3159,11 @@ function renderWorklist() {
     } else if((APPROVAL_AUTHORITY.can('reviewApplication', role)&&(a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)) || (APPROVAL_AUTHORITY.can('finalApproveApp', role)&&a.status===APP_STATUS.MGR_APPROVED)) {
       actionBtn = '<button data-wl-id="'+_aIdEsc+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:var(--info-blue);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Review →</button>';
     } else if((ROLE.isManagement(role))&&(a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit) {
-      actionBtn = '<button data-wl-id="'+_aIdEsc+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:var(--success);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
+      // Assign on the worklist must open the unit-assignment modal — not
+      // the scorecard. wlOpenApp routes approved apps to showScorecard,
+      // which is correct for the row's name/id click but wrong for this
+      // button, so we use a dedicated wlAssignApp helper.
+      actionBtn = '<button data-wl-id="'+_aIdEsc+'" onclick="event.stopPropagation();wlAssignApp(this)" style="background:var(--success);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
     }
     return '<tr style="border-bottom:1px solid var(--border);" data-wl-id="'+_aIdEsc+'">'
       + '<td onclick="event.stopPropagation();wlOpenApplicantCell(this)" style="padding:11px 14px;font-weight:600;font-size:13px;cursor:pointer;">'+escapeHtml(name)+'</td>'
@@ -3741,6 +3745,16 @@ function wlOpenApp(el) {
     // All other statuses — open read-only scorecard
     if(true) showScorecard(app);
   }
+}
+// Worklist Assign button — routes the row's app id straight into the
+// unit-assignment modal. Skips wlOpenApp's status-based dispatch, which
+// would have sent approved apps to the scorecard. Suggested-unit is left
+// blank; openAssignModal ranks all vacant units internally.
+function wlAssignApp(el) {
+  var id = el.getAttribute('data-wl-id') || (el.closest('[data-wl-id]') && el.closest('[data-wl-id]').getAttribute('data-wl-id'));
+  if(!id) return;
+  if(typeof openAssignModal === 'function') openAssignModal(id, '');
+  else showToast('Assign modal not available on this page');
 }
 function wlOpenApplicantCell(el) {
   var host = el.closest('[data-wl-id]');
