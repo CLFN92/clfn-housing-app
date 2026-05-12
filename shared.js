@@ -137,6 +137,83 @@ window.showConfirm = function(opts) {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
+// showPrompt — styled replacement for the native browser prompt().
+// Returns a Promise<string|null>: the entered text on confirm, or null
+// when the user cancels. Mirrors showConfirm's modal-overlay-centered
+// styling so the dialog feels like part of the app instead of dropping
+// from the top of the viewport.
+//
+//   var reason = await showPrompt({
+//     title: 'Decline application',
+//     message: 'Reason for declining (optional):',
+//     placeholder: 'e.g. duplicate submission',
+//     confirmText: 'Decline',
+//     danger: true,
+//     multiline: true
+//   });
+//   if (reason === null) return; // cancelled
+//
+// Options:
+//   title, message, placeholder, confirmText, cancelText — strings
+//   danger    — boolean; red confirm button if true
+//   multiline — boolean; renders a textarea instead of an input
+//   required  — boolean; when true, confirm stays disabled until non-empty
+//   value     — string; initial value (defaults to '')
+// ═══════════════════════════════════════════════════════════════════════
+window.showPrompt = function(opts) {
+  opts = opts || {};
+  return new Promise(function(resolve){
+    var ov = document.createElement('div');
+    ov.className = 'modal-overlay modal-overlay-centered modal-z-1100 is-open';
+    var btnClass = opts.danger ? 'btn btn-danger' : 'btn btn-primary';
+    var fieldId = 'showPrompt_' + Date.now();
+    var field = opts.multiline
+      ? '<textarea id="' + fieldId + '" rows="3" placeholder="' + (opts.placeholder || '') + '" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);resize:vertical;">' + (opts.value || '') + '</textarea>'
+      : '<input id="' + fieldId + '" type="text" placeholder="' + (opts.placeholder || '') + '" value="' + (opts.value || '') + '" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>';
+    ov.innerHTML =
+      '<div class="modal-body modal-body-sm">' +
+        '<div class="modal-hdr">' +
+          '<div class="modal-hdr-title">' + (opts.title || 'Enter a value') + '</div>' +
+          '<button type="button" class="btn-close-dark-30" data-cn-cancel>&times;</button>' +
+        '</div>' +
+        '<div class="modal-body-stack">' +
+          (opts.message ? '<p class="txt-help m-0" style="margin-bottom:8px;">' + opts.message + '</p>' : '') +
+          field +
+        '</div>' +
+        '<div class="modal-footer">' +
+          '<button type="button" class="btn btn-ghost" data-cn-cancel>' + (opts.cancelText || 'Cancel') + '</button>' +
+          '<button type="button" class="' + btnClass + '" data-cn-confirm>' + (opts.confirmText || 'Confirm') + '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    var input = document.getElementById(fieldId);
+    var confirmBtn = ov.querySelector('[data-cn-confirm]');
+    function syncRequired(){
+      if(!opts.required || !confirmBtn) return;
+      var v = (input && input.value ? input.value.trim() : '');
+      confirmBtn.disabled = !v;
+      confirmBtn.style.opacity = v ? '' : '.45';
+    }
+    syncRequired();
+    if(input){
+      input.addEventListener('input', syncRequired);
+      // Enter submits on single-line input; Ctrl/Cmd-Enter submits on textarea.
+      input.addEventListener('keydown', function(e){
+        if(e.key === 'Enter' && (!opts.multiline || e.ctrlKey || e.metaKey)){
+          e.preventDefault();
+          if(!confirmBtn.disabled) confirmBtn.click();
+        }
+      });
+      setTimeout(function(){ input.focus(); }, 30);
+    }
+    function close(result){ if (ov.parentNode) ov.parentNode.removeChild(ov); resolve(result); }
+    ov.querySelectorAll('[data-cn-cancel]').forEach(function(b){ b.onclick = function(){ close(null); }; });
+    confirmBtn.onclick = function(){ close(input ? input.value : ''); };
+    ov.addEventListener('click', function(e){ if (e.target === ov) close(null); });
+  });
+};
+
+// ═══════════════════════════════════════════════════════════════════════
 // CLFN_PERMS — Authoritative role definitions and capability checks
 // Single source of truth for all four app pages.
 // Previously duplicated in housing.html, renos.html, finance.html,

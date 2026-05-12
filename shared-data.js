@@ -560,6 +560,7 @@ function isInWorkQueue(a, role, email) {
   role  = role  || (window.currentRole || 'housing_employee_l1');
   var canReview       = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('reviewApplication', role);
   var canFinalApprove = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('finalApproveApp',   role);
+  var canAssign       = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('assignUnit',        role);
   var owner = (a.created_by_email || '').toLowerCase();
   var isMine = !!email && owner === email;
   // Anyone always sees their own drafts and returned items.
@@ -568,6 +569,12 @@ function isInWorkQueue(a, role, email) {
   if(canFinalApprove && (a.status === STATUS.MGR_APPROVED || a.status === STATUS.SUBMITTED)) return true;
   // HM queue (only when not also ED — the ED branch already covered above)
   if(canReview && !canFinalApprove && (a.status === STATUS.SUBMITTED || a.status === STATUS.FILE_UPDATE)) return true;
+  // Assignment queue — apps that have cleared approval and are awaiting a
+  // unit. HM/ED with assignUnit authority should see them here so My Queue
+  // shows everything they can act on, not just things needing approval.
+  // The row's action button (shared-data.js:3161) already renders "Assign →"
+  // for these rows; this just brings them into the queue.
+  if(canAssign && !a.assignedUnit && (a.status === STATUS.ED_APPROVED || a.status === STATUS.MGR_APPROVED)) return true;
   return false;
 }
 
@@ -3187,7 +3194,11 @@ function renderWorklist() {
     if(a.status==='returned') {
       actionBtn = '<button data-wl-edit="'+_aIdEsc+'" onclick="event.stopPropagation();wlEditApp(this)" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Update →</button>';
     } else if((APPROVAL_AUTHORITY.can('reviewApplication', role)&&(a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)) || (APPROVAL_AUTHORITY.can('finalApproveApp', role)&&a.status===APP_STATUS.MGR_APPROVED)) {
-      actionBtn = '<button data-wl-id="'+_aIdEsc+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:var(--info-blue);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Review →</button>';
+      // "Approve →" (green, success) matches the Assign button styling —
+      // both are workflow-advancing actions, so they read as a family.
+      // Click still opens the scorecard, where the actual Recommend /
+      // Approve / Decline pills live.
+      actionBtn = '<button data-wl-id="'+_aIdEsc+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:var(--success);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Approve →</button>';
     } else if((ROLE.isManagement(role))&&(a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit) {
       // Assign on the worklist must open the unit-assignment modal — not
       // the scorecard. wlOpenApp routes approved apps to showScorecard,

@@ -1018,6 +1018,66 @@ window.openAppMenu = function(e, appId) {
   }, 0);
 };
 
+// Completes the decline action once the user has typed (or skipped) a
+// reason in the styled showPrompt dialog. Pulled out of the menu-action
+// switch so the prompt's .then() callback can call it cleanly. Handles
+// the unit-unwind, status flip, audit rows, persistence, and post-action
+// re-renders all in one place.
+function _finishDeclineApp(appId, reason, role) {
+  var idx = applications.findIndex(function(a){ return a.id === appId; });
+  if (idx === -1) { showToast('Application not found'); return; }
+
+  // If the applicant had a unit assigned, unwind that first. Without this,
+  // declining an already-assigned applicant left the unit stuck as
+  // occupied/reserved with no live tenancy. We flip the unit back to
+  // vacant, clear its assignment fields, audit the unit row, and clear
+  // the assignment from the app side too.
+  var hadUnit = applications[idx].assignedUnit;
+  if (hadUnit) {
+    var allU = (typeof housingUnits !== 'undefined') ? housingUnits : [];
+    var uIdx = allU.findIndex(function(u){ return u.id === hadUnit; });
+    if (uIdx >= 0) {
+      var u = allU[uIdx];
+      var prevAddr = ((u.num||'')+' '+(u.street||'')).trim() || hadUnit;
+      u.assignedTo = '';
+      u.assignedName = '';
+      u.assignedDate = '';
+      u.tenantApprovedBy = '';
+      u.tenantApprovedAt = '';
+      u.transferPending = false;
+      u.status = 'vacant';
+      allU[uIdx] = u;
+      sbSaveUnit(u).catch(function(e){
+        console.warn('[decline] sbSaveUnit failed:', e);
+        showToast('Could not save unit unassignment to server', { type:'error' });
+      });
+      auditEntry(u.id, 'unit_unassigned',
+        prevAddr + ' returned to vacant — applicant declined' + (reason ? ' (' + reason + ')' : ''),
+        role);
+    }
+    applications[idx].assignedUnit = '';
+    applications[idx].assignedAddress = '';
+    applications[idx].assignmentOverrideNotes = '';
+    applications[idx].transferPending = false;
+  }
+
+  applications[idx].status = 'declined';
+  applications[idx].declinedAt  = new Date().toISOString().split('T')[0];
+  applications[idx].declinedBy  = role;
+  if (reason) applications[idx].declinedReason = reason;
+  sbSaveApplication(applications[idx]).catch(function(e){
+    console.warn('[decline] sbSaveApplication failed:', e);
+    showToast('Could not save decline to server', { type:'error' });
+  });
+  auditEntry(appId, 'status',
+    'Application declined' + (hadUnit ? ' (and unit assignment unwound)' : '') + (reason ? ' — ' + reason : ''),
+    role);
+  if (typeof updateDashStats === 'function') updateDashStats();
+  if (typeof renderDashTable === 'function') renderDashTable();
+  if (typeof renderWorklist === 'function') renderWorklist();
+  showToast('Application declined' + (hadUnit ? ' — unit returned to vacant' : ''));
+}
+
 function _handleAppMenuAction(action, appId) {
   var idx = applications.findIndex(function(a){ return a.id === appId; });
   if (idx === -1) { showToast('Application not found'); return; }
@@ -1046,59 +1106,20 @@ function _handleAppMenuAction(action, appId) {
     showToast('📤 Application unarchived');
 
   } else if (action === 'decline') {
-    var reason = prompt('Reason for declining (optional):');
-    if (reason === null) return; // cancelled
-
-    // If the applicant had a unit assigned, unwind that first. Without this,
-    // declining an already-assigned applicant left the unit stuck as
-    // occupied/reserved with no live tenancy. We flip the unit back to
-    // vacant, clear its assignment fields, audit the unit row, and clear
-    // the assignment from the app side too.
-    var hadUnit = applications[idx].assignedUnit;
-    if (hadUnit) {
-      var allU = (typeof housingUnits !== 'undefined') ? housingUnits : [];
-      var uIdx = allU.findIndex(function(u){ return u.id === hadUnit; });
-      if (uIdx >= 0) {
-        var u = allU[uIdx];
-        var prevAddr = ((u.num||'')+' '+(u.street||'')).trim() || hadUnit;
-        u.assignedTo = '';
-        u.assignedName = '';
-        u.assignedDate = '';
-        u.tenantApprovedBy = '';
-        u.tenantApprovedAt = '';
-        u.transferPending = false;
-        u.status = 'vacant';
-        allU[uIdx] = u;
-        sbSaveUnit(u).catch(function(e){
-          console.warn('[decline] sbSaveUnit failed:', e);
-          showToast('Could not save unit unassignment to server', { type:'error' });
-        });
-        auditEntry(u.id, 'unit_unassigned',
-          prevAddr + ' returned to vacant — applicant declined' + (reason ? ' (' + reason + ')' : ''),
-          role);
-      }
-      applications[idx].assignedUnit = '';
-      applications[idx].assignedAddress = '';
-      applications[idx].assignmentOverrideNotes = '';
-      applications[idx].transferPending = false;
-    }
-
-    applications[idx].status = 'declined';
-    applications[idx].declinedAt  = new Date().toISOString().split('T')[0];
-    applications[idx].declinedBy  = role;
-    if (reason) applications[idx].declinedReason = reason;
-    // Single save AFTER all fields are populated — earlier code saved twice,
-    // and the first save fired before declinedReason / declinedBy were set.
-    sbSaveApplication(applications[idx]).catch(function(e){
-      console.warn('[decline] sbSaveApplication failed:', e);
-      showToast('Could not save decline to server', { type:'error' });
+    // Styled prompt (showPrompt in shared.js) — replaces the native
+    // browser prompt() that dropped from the top of the viewport.
+    showPrompt({
+      title:       'Decline application',
+      message:     'Reason for declining (optional):',
+      placeholder: 'e.g. duplicate submission, applicant withdrew, …',
+      confirmText: 'Decline',
+      cancelText:  'Cancel',
+      danger:      true,
+      multiline:   true
+    }).then(function(reason){
+      if (reason === null) return; // cancelled
+      _finishDeclineApp(appId, reason, role);
     });
-    auditEntry(appId, 'status',
-      'Application declined' + (hadUnit ? ' (and unit assignment unwound)' : '') + (reason ? ' — ' + reason : ''),
-      role);
-    updateDashStats(); renderDashTable();
-    if (typeof renderWorklist === 'function') renderWorklist();
-    showToast('Application declined' + (hadUnit ? ' — unit returned to vacant' : ''));
 
   } else if (action === 'restore') {
     applications[idx].status = APP_STATUS.SUBMITTED;
