@@ -3199,6 +3199,13 @@ function renderWorklist() {
     // #street). Hidden on mobile via col-hide-mobile to keep narrow
     // viewports readable.
     var _addr = a.street || '—';
+    // ⋮ menu reuses the dashboard's window.openAppMenu — same Decline /
+    // Archive / Restore items, same role gating (HM/ED only inside the
+    // menu). Only render the trigger button for management roles so the
+    // surface itself is hidden from staff.
+    var _wlMenuBtn = ROLE.isManagement(role)
+      ? '<button class="app-menu-btn" onclick="event.stopPropagation();window.openAppMenu(event,\''+_aIdEsc+'\')" title="More options" style="padding:5px 9px;font-size:14px;line-height:1;margin-left:6px;background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--muted);">⋮</button>'
+      : '';
     return '<tr style="border-bottom:1px solid var(--border);" data-wl-id="'+_aIdEsc+'">'
       + '<td onclick="event.stopPropagation();wlOpenApplicantCell(this)" style="padding:11px 14px;font-weight:600;font-size:13px;cursor:pointer;">'+escapeHtml(name)+'</td>'
       + '<td onclick="event.stopPropagation();wlOpenIdCell(this)" style="padding:11px 14px;font-size:12px;color:var(--muted);cursor:pointer;">'+_aIdEsc+'</td>'
@@ -3208,7 +3215,7 @@ function renderWorklist() {
       + (a.status===APP_STATUS.DRAFT && a.created_by_name ? '<div class="txt-xs-muted" style="margin-top:2px;">by '+escapeHtml(a.created_by_name)+'</div>' : '')
       + '</td>'
       + (showScore ? '<td style="padding:11px 14px;text-align:center;"><span style="font-size:16px;font-weight:800;color:var(--text);">'+(typeof a.score==='number'?a.score:'—')+'</span>'+(tier?'<div style="font-size:9px;color:'+tc+';font-weight:700;margin-top:1px;">'+tier.replace(' Priority','')+'</div>':'')+'</td>' : '')
-      + '<td style="padding:11px 14px;text-align:right;white-space:nowrap;">'+actionBtn+'</td>'
+      + '<td style="padding:11px 14px;text-align:right;white-space:nowrap;">'+actionBtn+_wlMenuBtn+'</td>'
       + '</tr>';
   }).join('');
 
