@@ -466,7 +466,7 @@ function renderNationPanel(){
       +       '</div>'
       +       '<div>'
       +         '<label style="'+lblStyle+'">Main Phone</label>'
-      +         '<input id="nation_input_phone" type="text" value="'+escapeHtml(cfg.phone||'')+'" style="'+inputStyle+'" placeholder="(705) 555-0100"/>'
+      +         '<input id="nation_input_phone" type="tel" value="'+escapeHtml(cfg.phone?formatPhone(cfg.phone):'')+'" style="'+inputStyle+'" placeholder="(705)-555-0100" oninput="fmtPhone(this)"/>'
       +       '</div>'
       +     '</div>'
       +   '</div>'
