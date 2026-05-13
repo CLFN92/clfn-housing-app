@@ -2034,6 +2034,8 @@ window.openEditModal = function(appId) {
 
   // Store the ID so saveApplicationRecord knows which record to update
   currentAppId = app.id;
+  // Existing application → Internal Notes tab is available immediately.
+  if (typeof _refreshAppNotesTabVisibility === 'function') _refreshAppNotesTabVisibility();
 
   // ── Helper: set field value safely ──
   function set(id, val) {

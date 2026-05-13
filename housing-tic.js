@@ -109,6 +109,7 @@
     application: null,   // housing_applications row (rich data lives in .data merged via sbLoadApplications)
     ledger: null,        // rent_ledger row
     notes: [],           // tenant_notes rows
+    applicationNotes: [],// housing_application_notes rows — merged into Notes panel
     activeTab: 'overview',
     prevFocus: null,
     keyHandler: null
@@ -250,21 +251,34 @@
       if(!appId){ _ticState.application = null; return; }
       var local = (typeof applications !== 'undefined' && applications && applications.length)
                 ? applications : (window.SP_APPLICATIONS || []);
+      var hydrated = null;
       for(var i=0;i<local.length;i++){
-        if(local[i] && local[i].id === appId){ _ticState.application = local[i]; return; }
+        if(local[i] && local[i].id === appId){ hydrated = local[i]; break; }
       }
-      return _ticGet(TIC_T.applications + '?id=eq.' + encodeURIComponent(appId) + '&select=*&limit=1').then(function(rows){
-        if(_ticIsArray(rows) && rows.length){
-          var raw = rows[0];
-          // The applications table stores rich data in a JSONB `data` column.
-          // Mirror sbLoadApplications: spread data first so callers see a flat
-          // app object with fn/ln/pets/references/etc. directly addressable.
-          _ticState.application = Object.assign({}, raw.data || {}, raw, { id: raw.id });
-        } else {
-          _ticState.application = null;
-        }
+      var appPromise = hydrated
+        ? Promise.resolve().then(function(){ _ticState.application = hydrated; })
+        : _ticGet(TIC_T.applications + '?id=eq.' + encodeURIComponent(appId) + '&select=*&limit=1').then(function(rows){
+            if(_ticIsArray(rows) && rows.length){
+              var raw = rows[0];
+              // The applications table stores rich data in a JSONB `data` column.
+              // Mirror sbLoadApplications: spread data first so callers see a flat
+              // app object with fn/ln/pets/references/etc. directly addressable.
+              _ticState.application = Object.assign({}, raw.data || {}, raw, { id: raw.id });
+            } else {
+              _ticState.application = null;
+            }
+          });
+      // After the application row resolves, also pull any internal notes that
+      // were captured during intake. These are merged into the TIC Notes panel
+      // alongside tenant_notes so attribution carries over once the applicant
+      // becomes a tenant.
+      return appPromise.then(function(){
+        if(typeof window.sbLoadAppNotes !== 'function') return;
+        return window.sbLoadAppNotes(appId).then(function(rows){
+          _ticState.applicationNotes = Array.isArray(rows) ? rows : [];
+        }).catch(function(){ _ticState.applicationNotes = []; });
       });
-    }).catch(function(){ _ticState.application = null; });
+    }).catch(function(){ _ticState.application = null; _ticState.applicationNotes = []; });
   }
 
   // ── Render: hero, strip, tabs ─────────────────────────────────────────────
@@ -1343,8 +1357,29 @@
 
   // ── Render: Notes ─────────────────────────────────────────────────────────
   function _ticRenderNotes(){
-    var notes = _ticState.notes || [];
-    // Form first (always visible at the top), then the list below.
+    var tenantNotes = _ticIsArray(_ticState.notes) ? _ticState.notes : [];
+    var appNotes    = _ticIsArray(_ticState.applicationNotes) ? _ticState.applicationNotes : [];
+    var tenantNotesErrored = _ticIsError(_ticState.notes);
+
+    // Normalize application-note rows into the tenant-note shape so a single
+    // render path covers both. App notes carry over from intake so they show
+    // up identically alongside notes added in the TIC.
+    var normalizedAppNotes = appNotes.map(function(n){
+      var row = {};
+      row[TIC_C.author_name] = n.author_name || n.author_email || 'Unknown';
+      row[TIC_C.note_body]   = n.body || '';
+      row[TIC_C.created_at]  = n.created_at || null;
+      return row;
+    });
+
+    var merged = tenantNotes.concat(normalizedAppNotes);
+    merged.sort(function(a, b){
+      var aT = a[TIC_C.created_at] || '';
+      var bT = b[TIC_C.created_at] || '';
+      if(aT === bT) return 0;
+      return aT < bT ? 1 : -1; // newest first
+    });
+
     var html = '<div class="tic-section">'
              +   '<div class="tic-section-h">Add a Note</div>'
              +   '<textarea id="tic_note_input" class="tic-textarea" placeholder="Type your note…"></textarea>'
@@ -1354,12 +1389,12 @@
              + '</div>';
     html += '<div class="tic-section tic-section-spaced"><div class="tic-section-h">Notes &amp; History</div>';
     html += '<div id="tic_notes_list">';
-    if(_ticIsError(notes)){
+    if(tenantNotesErrored && !merged.length){
       html += '<div class="tic-error-inline">Unable to load notes.</div>';
-    } else if(_ticIsMissing(notes) || !notes.length){
+    } else if(!merged.length){
       html += '<div class="tic-empty">No notes yet.</div>';
     } else {
-      notes.forEach(function(n){
+      merged.forEach(function(n){
         html += _ticNoteHtml(n);
       });
     }
@@ -1711,7 +1746,7 @@
 
     // Reset state + UI
     _ticState.tenant = null; _ticState.unit = null; _ticState.application = null;
-    _ticState.ledger = null; _ticState.notes = [];
+    _ticState.ledger = null; _ticState.notes = []; _ticState.applicationNotes = [];
     _ticDocLib = null; _ticDocLibKey = null;
     ['overview','occupants','contact','emergency','references','pets','documents','notes'].forEach(function(n){
       var p = _ticEl('tic_panel_' + n); if(p) p.innerHTML = '';

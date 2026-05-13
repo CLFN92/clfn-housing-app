@@ -257,6 +257,10 @@ function newApp(){
   currentAppId = null;
   window._appFormReturnTo = null;
   _step6DocLib = null; // reset so DocLibrary re-mounts for new app ID
+  // Hide Internal Notes tab — re-appears after the first auto-save.
+  if (typeof _refreshAppNotesTabVisibility === 'function') _refreshAppNotesTabVisibility();
+  var _noteTa = document.getElementById('appNoteBody');     if(_noteTa) _noteTa.value = '';
+  var _noteEr = document.getElementById('appNoteError');    if(_noteEr) { _noteEr.style.display='none'; _noteEr.textContent=''; }
 
   // Clear all form fields
   document.querySelectorAll('#appLayout input[type="text"], #appLayout input[type="email"], #appLayout input[type="tel"], #appLayout input[type="number"], #appLayout input[type="date"], #appLayout textarea').forEach(function(el){

@@ -396,6 +396,57 @@ async function sbLoadAuditLog(limit) {
   }
 }
 
+// ── housing_application_notes ─────────────────────────────────────────────────
+// Append-only internal staff notes on a housing application. DB enforces
+// no-update / no-delete (RLS + trigger). Returns newest-first.
+async function sbLoadAppNotes(appId) {
+  if (!appId) return [];
+  try {
+    var r = await fetch(
+      SUPABASE_URL + '/rest/v1/housing_application_notes'
+        + '?select=*&app_id=eq.' + encodeURIComponent(appId)
+        + '&order=created_at.desc&limit=500',
+      { headers: HOUSING_HEADERS }
+    );
+    if (!r.ok) { console.warn('[SB] load app notes failed:', r.status); return []; }
+    return await r.json();
+  } catch(e) {
+    console.warn('[SB] load app notes error:', e);
+    return [];
+  }
+}
+
+async function sbAddAppNote(appId, body) {
+  if (!appId || !body || !String(body).trim()) {
+    return Promise.reject(new Error('sbAddAppNote: appId and body required'));
+  }
+  var sess = window.HOUSING_SESSION || {};
+  var row = {
+    app_id:         String(appId),
+    body:           String(body).trim(),
+    author_email:   sess.email || null,
+    author_name:    sess.name  || null,
+    author_role:    sess.role  || (window.currentRole || null)
+  };
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/housing_application_notes', {
+      method:  'POST',
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=representation' }),
+      body:    JSON.stringify(row)
+    });
+    if (!r.ok) {
+      var e = await r.text();
+      console.error('[SB] add app note '+r.status+':', e);
+      throw new Error('add note failed ('+r.status+'): '+e);
+    }
+    var data = await r.json();
+    return Array.isArray(data) ? data[0] : data;
+  } catch(e) {
+    console.warn('[SB] add app note error:', e);
+    throw e;
+  }
+}
+
 // ── Required-field helpers ────────────────────────────────────────────────────
 // Drive both the application form's red * markers AND validation off a single
 // settings key (housing_settings.required_fields). ED-only edit; everyone else

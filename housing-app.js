@@ -284,8 +284,18 @@ function _isHmOrEdRole(){
 function _goAfterPets(){ goTo(_isHmOrEdRole() ? 9 : 6); }
 function _goBeforeDocuments(){ goTo(_isHmOrEdRole() ? 10 : 5); }
 
+// Internal-notes step is a side panel, not part of the wizard flow. We skip
+// the validation/auto-save/progress-bar machinery for it.
+function _isStaffSession(){
+  var s = window.HOUSING_SESSION || {};
+  return !!(s.email && s.role);
+}
+
 // ── Step navigation ──
 function goTo(s){
+  // Internal-notes tab — side panel, bypass wizard flow entirely.
+  if (s === 11) { _openAppNotesStep(); return; }
+
   // Applicants never visit the staff-only steps. If they somehow target one
   // (saved-state restore, deep link, programmatic), forward them to the next
   // visible step in the flow.
@@ -332,6 +342,8 @@ function goTo(s){
         console.warn('[draft autosave] sbSaveApplication failed:', e);
         showToast('Draft auto-save failed — your changes are still in memory', { type:'error' });
       });
+      // Application now exists in-memory → enable the Internal Notes tab.
+      if (typeof _refreshAppNotesTabVisibility === 'function') _refreshAppNotesTabVisibility();
     }
   }
 
@@ -394,6 +406,14 @@ function goTo(s){
       _lbl.style.color      = _active ? '#111' : _done ? '#555' : '#aaa';
       _lbl.style.fontWeight = _active ? '700' : '600';
     }
+  }
+
+  // Leaving the Internal Notes side tab — reset its highlight.
+  var _notesBtn = document.getElementById('spb_11');
+  if (_notesBtn) {
+    _notesBtn.style.borderTopColor = 'transparent';
+    var _notesLbl = document.getElementById('spb_lbl_11');
+    if (_notesLbl) _notesLbl.style.color = 'var(--dark)';
   }
 
   if(s===7){ goTo(8); return; }
@@ -2079,6 +2099,152 @@ function printApplicationPreview() {
     console.error('printApplicationPreview error:', err);
     showToast('Print error — see browser console (F12)');
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INTERNAL APPLICATION NOTES (step 11) — staff-only side panel
+// Append-only via DB (housing_application_notes). Never printed.
+// ═══════════════════════════════════════════════════════════════
+
+function _openAppNotesStep() {
+  if (!_isStaffSession()) { showToast && showToast('Notes are staff-only.'); return; }
+  if (!currentAppId) {
+    showToast && showToast('Save the application first to add notes.');
+    return;
+  }
+
+  var _stepCur = document.getElementById('step'+cur);
+  if (_stepCur) _stepCur.classList.remove('on');
+  var _stepN = document.getElementById('step11');
+  if (_stepN) _stepN.classList.add('on');
+
+  var btn = document.getElementById('spb_11');
+  if (btn) {
+    btn.style.borderTopColor = '#000';
+    var lbl = document.getElementById('spb_lbl_11');
+    if (lbl) lbl.style.color = '#111';
+  }
+
+  cur = 11;
+  window.scrollTo(0, 0);
+  _renderAppNoteAuthorHint();
+  renderAppNotes();
+}
+
+function _renderAppNoteAuthorHint() {
+  var sess = window.HOUSING_SESSION || {};
+  var nm = document.getElementById('appNoteAuthorName');
+  var rl = document.getElementById('appNoteAuthorRole');
+  if (nm) nm.textContent = sess.name || sess.email || '—';
+  if (rl) rl.textContent = sess.role || (window.currentRole || '—');
+}
+
+function _formatNoteTs(iso) {
+  if (!iso) return '';
+  try {
+    var d = new Date(iso);
+    return d.toLocaleDateString('en-CA') + ' ' + d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });
+  } catch(e) { return iso; }
+}
+
+function _roleLabel(r) {
+  if (!r) return '';
+  var map = {
+    'ed':                   'Executive Director',
+    'housing_manager':      'Housing Manager',
+    'housing_employee_l2':  'Housing Employee (L2)',
+    'housing_employee_l1':  'Housing Employee (L1)',
+    'cfo':                  'CFO',
+    'finance_l1':           'Finance (L1)'
+  };
+  return map[r] || r;
+}
+
+function renderAppNotes() {
+  var listEl  = document.getElementById('appNotesList');
+  var countEl = document.getElementById('appNotesCount');
+  if (!listEl) return;
+  if (!currentAppId) {
+    listEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px;">Save the application first to add notes.</div>';
+    if (countEl) countEl.textContent = '0 notes';
+    return;
+  }
+  listEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px;">Loading…</div>';
+  sbLoadAppNotes(currentAppId).then(function(notes) {
+    notes = notes || [];
+    if (countEl) countEl.textContent = notes.length + (notes.length === 1 ? ' note' : ' notes');
+    if (!notes.length) {
+      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px;">No notes yet. Add the first one above.</div>';
+      return;
+    }
+    var html = '';
+    notes.forEach(function(n) {
+      var author = n.author_name || n.author_email || 'Unknown';
+      var role   = _roleLabel(n.author_role || '');
+      var ts     = _formatNoteTs(n.created_at);
+      var body   = escapeHtml(n.body || '');
+      html += '<div style="padding:14px 18px;border-bottom:1px solid var(--border);">'
+        +    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px;">'
+        +      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+        +        '<span style="font-size:12px;font-weight:700;color:var(--text);">'+escapeHtml(author)+'</span>'
+        +        (role ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--muted);">'+escapeHtml(role)+'</span>' : '')
+        +      '</div>'
+        +      '<span style="font-size:11px;color:var(--muted);">'+escapeHtml(ts)+'</span>'
+        +    '</div>'
+        +    '<div style="font-size:13px;line-height:1.55;color:var(--text);white-space:pre-wrap;">'+body+'</div>'
+        +  '</div>';
+    });
+    listEl.innerHTML = html;
+  }).catch(function(e) {
+    console.warn('[notes] render failed:', e);
+    listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#b91c1c;font-size:12px;">Failed to load notes. Try refreshing.</div>';
+  });
+}
+
+function submitAppNote() {
+  var ta   = document.getElementById('appNoteBody');
+  var btn  = document.getElementById('appNoteSubmitBtn');
+  var errE = document.getElementById('appNoteError');
+  if (errE) { errE.style.display = 'none'; errE.textContent = ''; }
+  if (!ta) return;
+  var body = (ta.value || '').trim();
+  if (!body) {
+    if (errE) { errE.textContent = 'Enter a note before adding.'; errE.style.display = 'block'; }
+    ta.focus();
+    return;
+  }
+  if (!currentAppId) {
+    if (errE) { errE.textContent = 'Save the application first.'; errE.style.display = 'block'; }
+    return;
+  }
+  if (!_isStaffSession()) {
+    if (errE) { errE.textContent = 'Sign in as staff to add notes.'; errE.style.display = 'block'; }
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
+  sbAddAppNote(currentAppId, body).then(function() {
+    ta.value = '';
+    auditEntry && auditEntry(currentAppId, 'note_added', 'Internal note added (' + body.length + ' chars)');
+    renderAppNotes();
+    showToast && showToast('Note added.');
+  }).catch(function(e) {
+    if (errE) { errE.textContent = 'Failed to add note: ' + (e && e.message ? e.message : e); errE.style.display = 'block'; }
+  }).finally(function() {
+    if (btn) { btn.disabled = false; btn.textContent = '+ Add Note'; }
+  });
+}
+
+// Show or hide the Notes tab button. Visible only when (a) we have a staff
+// session AND (b) the application has been saved at least once (has an id
+// AND is in the in-memory applications array → matches a real DB row).
+function _refreshAppNotesTabVisibility() {
+  var btn = document.getElementById('spb_11');
+  if (!btn) return;
+  var staff = _isStaffSession();
+  var saved = !!currentAppId
+    && Array.isArray(typeof applications !== 'undefined' ? applications : null)
+    && applications.some(function(a){ return a && a.id === currentAppId; });
+  btn.style.display = (staff && saved) ? '' : 'none';
 }
 
 // ── Navigation history stack ──
