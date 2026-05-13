@@ -15,6 +15,7 @@ The active roadmap and phase status (A0/A/B/C/D/E + F1/F2/F3/F3B for the Finance
 - **Deploy:** Azure Static Web Apps via the workflow in `.github/workflows/azure-static-web-apps-white-ground-0635e2610.yml`. `app_location: "/"`, `output_location: "."` — every push to `main` deploys the repo root. Routes are declared in `staticwebapp.config.json`.
 - **Backend:** Supabase project `fkhzrbalumzeripzolph` (URL + anon key hardcoded in `shared-config.js`). Auth, staff lookup, applications, units, audit, finance tables — all REST/PostgREST calls from the browser. There is no API server in this repo.
 - **Schema changes:** SQL migrations are run by the user via the Supabase SQL Editor (not via this repo). Phase F2 in `PLAN.md` documents the finance schema that's already deployed.
+- **Edge Functions:** Source lives under `supabase/functions/`. Deployed manually via the Supabase Dashboard (paste into the function editor) or via `supabase functions deploy <name>` (CLI install on Windows is via Scoop, not npm — `npm i -g supabase` is explicitly blocked). Secrets go in Project Settings → Edge Functions → Secrets, never in code.
 
 ## Architecture
 
@@ -77,12 +78,22 @@ Canonical roles (see `shared-config.js` `ROLE` and the role matrix in `PLAN.md` 
 - `tenants` is a platform-level table shared by housing + finance, trigger-synced from `housing_units.assigned_name`. Backfill ran at the F2 migration. Don't insert tenant rows by hand for production data — change `housing_units.assigned_name` and the trigger handles it.
 - The current `tenants` schema is slim: housing-specific fields (unit type, rent amount, hydro/gas accounts, autoPay, …) aren't there yet and default to empty/false on load. Phase C will reconcile.
 
+### Email notifications (in progress)
+- Outbound transactional email goes through a Supabase Edge Function at `supabase/functions/send-notification/index.ts` (deployed; source committed). The function verifies the caller's JWT, sends via Resend, and writes an audit row via service_role.
+- **Current state:** function works end-to-end, but Resend's `from` address is the sandbox `onboarding@resend.dev` because no sending domain is verified yet. Until that's resolved, Resend will only deliver to the account-holder's email.
+- **Two unlocking paths in flight:**
+  1. **Microsoft Graph (preferred)** — Entra app `CLFN Housing App — Notifications` is registered; `Mail.Send` (Application) permission is added but admin consent is **blocked** pending a Global Admin click. Once consented, the Edge Function gets rewritten to call Graph instead of Resend (no DNS work needed; sent items appear in the `housing@clfn.on.ca` shared mailbox).
+  2. **Resend DNS** — IT adds SPF/DKIM/DMARC for clfn.on.ca → verify in Resend → switch FROM address in the function.
+- The legacy EmailJS `<script>` tags in HTML files (`index.html`, `housing.html`, `contractors.html`, etc.) plus `emailjs.init()` calls are **placeholder-only** (no real service/template IDs). They will be removed once the new pipeline is fully wired. **Don't write new code against EmailJS.**
+- Client helpers `_sendWorkflowEmail` (housing-init.js) and `_sendCtWorkflowEmail` (shared-data.js) still reference EmailJS and silent-fail today. They'll be refactored to call a `window.sendNotification(opts)` helper that hits the Edge Function.
+
 ## Conventions
 
 - **Vanilla JS only.** No bundler, no transpiler, no JSX, no TypeScript. Use ES5-compatible patterns (`var` is fine and matches existing code; arrow functions and `async/await` are used where they already appear).
 - **No new top-level HTML files without a route.** Add an entry to `staticwebapp.config.json` `routes` for any new page, or it'll 404 in production.
 - **Page layout, tables, pills, forms, and breakpoints are defined in `shared.css`.** Do not duplicate. The full template + class catalog is in `CLFN_PAGE_TEMPLATE.md` — read it before adding a new view. New view IDs must be added to the `shared.css` padding-top list and `housing.css` responsive overrides.
 - **Helper functions called from dynamic renders must live in `shared-data.js`** (not scoped inside page-level functions) so both `housing.html` and `renos.html` can call them.
+- **No `@supabase/supabase-js`** — all Supabase calls are raw `fetch()` to REST/Auth/Storage endpoints (see `shared.js:941`). The `window._sb = null` lines in `housing-init.js`, `contractors.html`, and `renos.html` are dead code — the SDK is never loaded so `_sb` stays null forever. The actual session access token lives at `HOUSING_SESSION.accessToken`. Don't reference `_sb`.
 - **Refactor moves to `shared.js` are deferred to Phase C** (`PLAN.md`). Don't preemptively hoist things; snapshot files first as documented.
 - **`finance.html` is ~12 MB** because it bundles a large base64 logo and a lot of inline UI. Read it with `offset`/`limit` rather than wholesale.
 
