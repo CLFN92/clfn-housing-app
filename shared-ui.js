@@ -151,6 +151,378 @@ function consumeNavReferrer() {
   return v;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TABLE SORT + COLUMN-MENU FILTER — shared scaffolding (Phase 2)
+// ═══════════════════════════════════════════════════════════════════════════
+// Pattern: each <th> the page wants interactive carries data-sort-key="X"
+// and class="std-th-sortable". Clicking ANY column header opens a small
+// popover anchored to that column with:
+//   • Sort: A→Z, Z→A, Clear
+//   • Show values: a checklist of every value present in the current data
+//     for that column, with counts. Tick/untick to filter that column.
+// Sort and column-filters are combinable: one active sort across the table,
+// plus per-column filter sets. Empty filter set = column passes through.
+//
+// State shape (persisted to sessionStorage so an in-tab reload preserves it):
+//   { sort:    { key: '', dir: 1 },
+//     filters: { colKey: ['valueA','valueB'], … }
+//   }
+//
+// Per-page registration: the render fn calls tableRegisterColumns(page, config)
+// each render so the menu has fresh accessor / row-source closures. The
+// 'config' shape:
+//   { columns: { colKey: { label, accessor: fn(row), filterable: bool } },
+//     getRows: fn() → currentFilteredRows (pre-column-filter),
+//     onChange: fn() // re-render }
+
+var _TABLE_STATE_KEY = 'clfn_table_state';
+
+function _tableStateAll() {
+  try {
+    var raw = sessionStorage.getItem(_TABLE_STATE_KEY);
+    return raw ? (JSON.parse(raw) || {}) : {};
+  } catch(e) { return {}; }
+}
+function _tableStateSave(all) {
+  try { sessionStorage.setItem(_TABLE_STATE_KEY, JSON.stringify(all || {})); } catch(e) {}
+}
+function tableStateGet(page) {
+  var all = _tableStateAll();
+  if (!all[page]) all[page] = { sort: { key: '', dir: 1 }, filters: {} };
+  if (!all[page].filters || typeof all[page].filters !== 'object') all[page].filters = {};
+  return all[page];
+}
+function tableSetSort(page, key, dir) {
+  var all = _tableStateAll();
+  var st = all[page] || { sort: { key: '', dir: 1 }, filters: {} };
+  if (dir === 0 || dir === null) {
+    st.sort = { key: '', dir: 1 };
+  } else if (dir === 1 || dir === -1) {
+    st.sort = { key: key, dir: dir };
+  } else {
+    // No explicit dir → cycle asc → desc → off (legacy callers)
+    if (st.sort.key !== key)       st.sort = { key: key, dir: 1 };
+    else if (st.sort.dir > 0)      st.sort = { key: key, dir: -1 };
+    else                            st.sort = { key: '',  dir: 1 };
+  }
+  all[page] = st;
+  _tableStateSave(all);
+}
+function tableClearSort(page) { tableSetSort(page, '', 0); }
+
+// Per-column filter helpers. Three states:
+//   • missing (no filter set)    → show every row (default)
+//   • [] empty array              → show nothing (every box unchecked)
+//   • ['a','b']                   → show only rows where this column ∈ {a,b}
+// tableClearColumnFilter removes the filter entirely (back to default).
+// Passing an explicit [] keeps the filter active but with no values selected.
+function tableSetColumnFilter(page, colKey, values) {
+  var all = _tableStateAll();
+  var st = all[page] || { sort: { key: '', dir: 1 }, filters: {} };
+  if (!st.filters) st.filters = {};
+  if (values == null) delete st.filters[colKey];
+  else st.filters[colKey] = (values || []).map(String);
+  all[page] = st;
+  _tableStateSave(all);
+}
+function tableToggleColumnFilterValue(page, colKey, value) {
+  var st = tableStateGet(page);
+  var cur = (st.filters[colKey] || []).slice();
+  var k   = String(value);
+  var idx = cur.indexOf(k);
+  if (idx === -1) cur.push(k);
+  else cur.splice(idx, 1);
+  tableSetColumnFilter(page, colKey, cur);
+}
+function tableClearColumnFilter(page, colKey) {
+  tableSetColumnFilter(page, colKey, null);
+}
+
+// Refresh ▲/▼ indicators on every <th data-sort-key> inside the given thead.
+// Active column also gets the .is-sorted class so the CSS can paint the
+// yellow background. Non-active columns clear it.
+function tableRefreshSortIndicators(thead, page) {
+  if (!thead) return;
+  var state = tableStateGet(page);
+  thead.querySelectorAll('th[data-sort-key]').forEach(function(th){
+    var key = th.getAttribute('data-sort-key');
+    var existing = th.querySelector('.std-sort-arrow');
+    if (existing) existing.remove();
+    // Mark columns that have an active filter so they get an indicator.
+    // An explicit empty array (Clear → uncheck all) also counts as filtered.
+    var hasFilter = !!(state.filters && state.filters[key] != null);
+    th.classList.toggle('is-filtered', hasFilter);
+    if (state.sort.key === key) {
+      th.classList.add('is-sorted');
+      var arrow = document.createElement('span');
+      arrow.className = 'std-sort-arrow';
+      arrow.textContent = state.sort.dir > 0 ? ' ▲' : ' ▼';
+      th.appendChild(arrow);
+    } else {
+      th.classList.remove('is-sorted');
+    }
+  });
+}
+
+// Apply per-column filters + sort. Returns a flat sorted array.
+// accessors = { colKey: fn(row) → value }.
+function tableApplyFilterSort(rows, accessors, state) {
+  state = state || { sort: { key: '', dir: 1 }, filters: {} };
+  accessors = accessors || {};
+  var filtered = (rows || []).slice();
+  // Per-column filters (AND across columns, OR within each column).
+  // Missing key = no filter on this column. Empty array = explicit "show
+  // nothing" (every box unchecked in the menu — user clicked Clear).
+  if (state.filters && typeof state.filters === 'object') {
+    Object.keys(state.filters).forEach(function(colKey){
+      var values = state.filters[colKey];
+      if (values == null) return; // no filter on this column
+      var get = accessors[colKey];
+      if (typeof get !== 'function') return;
+      if (!values.length) { filtered = []; return; } // explicit empty = show nothing
+      var allowed = {};
+      values.forEach(function(v){ allowed[String(v)] = true; });
+      filtered = filtered.filter(function(r){
+        var v = get(r);
+        if (v == null || v === '') v = '(none)';
+        return !!allowed[String(v)];
+      });
+    });
+  }
+  // Sort
+  if (state.sort && state.sort.key && typeof accessors[state.sort.key] === 'function') {
+    var getS = accessors[state.sort.key];
+    var dir = state.sort.dir;
+    filtered.sort(function(a, b){
+      var av = getS(a), bv = getS(b);
+      var aN = (av == null || av === '');
+      var bN = (bv == null || bv === '');
+      if (aN && bN) return 0;
+      if (aN) return 1;
+      if (bN) return -1;
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+      var as = String(av).toLowerCase(), bs = String(bv).toLowerCase();
+      if (as < bs) return -1 * dir;
+      if (as > bs) return  1 * dir;
+      return 0;
+    });
+  }
+  return filtered;
+}
+
+// ── Column-menu popover ─────────────────────────────────────────────────
+// One reusable popover element. Each open() rebuilds its content for the
+// requested column. Click-outside / Escape close it.
+window._tableRegistry = window._tableRegistry || {};
+function tableRegisterColumns(page, config) {
+  window._tableRegistry[page] = config || {};
+}
+
+function _ensureColumnMenu() {
+  var menu = document.getElementById('std_col_menu');
+  if (menu) return menu;
+  menu = document.createElement('div');
+  menu.id = 'std_col_menu';
+  menu.className = 'std-col-menu';
+  menu.style.display = 'none';
+  document.body.appendChild(menu);
+  return menu;
+}
+
+function tableCloseColumnMenu() {
+  var menu = document.getElementById('std_col_menu');
+  if (menu) { menu.style.display = 'none'; menu.innerHTML = ''; menu.removeAttribute('data-page'); menu.removeAttribute('data-col-key'); }
+  document.removeEventListener('click',  _tableMenuOutsideClick, true);
+  document.removeEventListener('keydown', _tableMenuKeydown,     true);
+}
+
+function _tableMenuOutsideClick(e) {
+  var menu = document.getElementById('std_col_menu');
+  if (!menu || menu.style.display === 'none') return;
+  if (menu.contains(e.target)) return;
+  if (e.target.closest('th[data-sort-key]')) return; // header clicks reopen the menu
+  tableCloseColumnMenu();
+}
+function _tableMenuKeydown(e) {
+  if (e.key === 'Escape') tableCloseColumnMenu();
+}
+
+function tableOpenColumnMenu(page, colKey, anchorTh) {
+  var cfg = window._tableRegistry[page];
+  if (!cfg || !cfg.columns || !cfg.columns[colKey]) return;
+  var col = cfg.columns[colKey];
+  var state = tableStateGet(page);
+
+  var menu = _ensureColumnMenu();
+  menu.setAttribute('data-page', page);
+  menu.setAttribute('data-col-key', colKey);
+
+  // Compute unique values + counts from the page's current row source.
+  var rows = (typeof cfg.getRows === 'function') ? (cfg.getRows() || []) : [];
+  var get  = col.accessor;
+  var counts = {};
+  rows.forEach(function(r){
+    var v = (typeof get === 'function') ? get(r) : null;
+    if (v == null || v === '') v = '(none)';
+    v = String(v);
+    counts[v] = (counts[v] || 0) + 1;
+  });
+  var valuesList = Object.keys(counts).sort();
+  // Three states for selected:
+  //   • undefined (filter absent) → all boxes checked (default — show all)
+  //   • []                          → all boxes unchecked (user clicked Clear)
+  //   • ['vacant', …]               → only those boxes checked
+  var hasFilter  = !!(state.filters && state.filters[colKey]);
+  var selected   = hasFilter ? state.filters[colKey] : [];
+  var selSet     = {}; selected.forEach(function(v){ selSet[v] = true; });
+  // allChecked = no explicit filter set yet. Show every value as checked.
+  var allChecked = !hasFilter;
+
+  var isFilterable = col.filterable !== false;
+  var activeSort   = state.sort.key === colKey ? state.sort.dir : 0;
+
+  // Build HTML
+  var html = ''
+    + '<div class="std-col-menu-header">' + _esc(col.label || colKey) + '</div>'
+    + '<div class="std-col-menu-section">'
+    +   '<button type="button" class="std-col-menu-action' + (activeSort === 1 ? ' is-active' : '') + '" data-action="sort-asc">▲ Sort A → Z</button>'
+    +   '<button type="button" class="std-col-menu-action' + (activeSort === -1 ? ' is-active' : '') + '" data-action="sort-desc">▼ Sort Z → A</button>'
+    +   '<button type="button" class="std-col-menu-action" data-action="sort-clear"' + (activeSort === 0 ? ' disabled' : '') + '>✕ Clear sort</button>'
+    + '</div>';
+  if (isFilterable && valuesList.length) {
+    html += '<div class="std-col-menu-divider"></div>'
+          + '<div class="std-col-menu-section std-col-menu-section-values">';
+    // Always show a search box inside the popover — even for short lists
+    // it's a quick filter, and on long lists (e.g. every address) it's
+    // essential. Kept lightweight via a debounced filter on the values list.
+    html += '<input type="text" class="std-col-menu-search" placeholder="🔍 Find..." />';
+    html += '<div class="std-col-menu-values">';
+    valuesList.forEach(function(v){
+      var checked = allChecked || !!selSet[v];
+      html += '<label class="std-col-menu-value">'
+            +   '<input type="checkbox" data-value="' + _esc(v).replace(/"/g, '&quot;') + '"' + (checked ? ' checked' : '') + '/>'
+            +   '<span class="std-col-menu-value-label">' + _esc(v) + '</span>'
+            +   '<span class="std-col-menu-value-count">' + counts[v] + '</span>'
+            + '</label>';
+    });
+    html += '</div>'
+          + '<div class="std-col-menu-footer">'
+          +   '<button type="button" class="std-col-menu-link" data-action="select-all">Select all</button>'
+          +   '<button type="button" class="std-col-menu-link" data-action="clear-filter">Clear</button>'
+          + '</div>'
+          + '</div>';
+  }
+  menu.innerHTML = html;
+
+  // Position the popover near the anchor th. Below the header, right-aligned
+  // so it doesn't overflow on far-right columns.
+  menu.style.display = 'block';
+  menu.style.visibility = 'hidden';
+  var rect = anchorTh ? anchorTh.getBoundingClientRect() : null;
+  if (rect) {
+    var menuW = menu.offsetWidth;
+    var menuH = menu.offsetHeight;
+    var top   = rect.bottom + window.scrollY + 4;
+    var left  = rect.left   + window.scrollX;
+    // Prefer left-aligned with the column; if that would overflow the viewport,
+    // pull the menu left until it fits.
+    if (left + menuW > window.scrollX + document.documentElement.clientWidth - 8) {
+      left = Math.max(window.scrollX + 8, window.scrollX + document.documentElement.clientWidth - menuW - 8);
+    }
+    // If the menu would go off the bottom, flip it above the header.
+    if (top + menuH > window.scrollY + document.documentElement.clientHeight - 8) {
+      top = Math.max(window.scrollY + 8, rect.top + window.scrollY - menuH - 4);
+    }
+    menu.style.top  = top  + 'px';
+    menu.style.left = left + 'px';
+  }
+  menu.style.visibility = '';
+
+  // Wire menu interactions
+  menu.querySelectorAll('[data-action]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var action = btn.getAttribute('data-action');
+      if (action === 'sort-asc')   { tableSetSort(page, colKey, 1); }
+      else if (action === 'sort-desc')  { tableSetSort(page, colKey, -1); }
+      else if (action === 'sort-clear') { tableClearSort(page); }
+      else if (action === 'select-all') {
+        // Select all = remove the filter entirely (default state: show every row).
+        tableClearColumnFilter(page, colKey);
+        menu.querySelectorAll('.std-col-menu-value input[type="checkbox"]').forEach(function(cb){ cb.checked = true; });
+      }
+      else if (action === 'clear-filter') {
+        // Clear = uncheck every box. User can now tick the values they want.
+        // Stored as an explicit empty filter so the table shows nothing until
+        // they pick at least one value.
+        tableSetColumnFilter(page, colKey, []);
+        menu.querySelectorAll('.std-col-menu-value input[type="checkbox"]').forEach(function(cb){ cb.checked = false; });
+      }
+      if (typeof cfg.onChange === 'function') cfg.onChange();
+      // For sort actions, close the menu after applying. For filter changes,
+      // leave it open so the user can adjust multiple values.
+      if (action === 'sort-asc' || action === 'sort-desc' || action === 'sort-clear') {
+        tableCloseColumnMenu();
+      }
+    });
+  });
+  // Checkbox toggles — apply immediately, leave menu open.
+  menu.querySelectorAll('.std-col-menu-value input[type="checkbox"]').forEach(function(cb){
+    cb.addEventListener('change', function(){
+      // Capture the full current selection from the menu and write it back.
+      var newSel = [];
+      menu.querySelectorAll('.std-col-menu-value input[type="checkbox"]').forEach(function(cb2){
+        if (cb2.checked) newSel.push(cb2.getAttribute('data-value'));
+      });
+      // If all values are checked, that's the same as "no filter".
+      if (newSel.length === valuesList.length) tableClearColumnFilter(page, colKey);
+      else tableSetColumnFilter(page, colKey, newSel);
+      if (typeof cfg.onChange === 'function') cfg.onChange();
+    });
+  });
+  // Search box within the values list (only present when >8 values)
+  var search = menu.querySelector('.std-col-menu-search');
+  if (search) {
+    search.addEventListener('input', function(){
+      var q = (search.value || '').toLowerCase().trim();
+      menu.querySelectorAll('.std-col-menu-value').forEach(function(row){
+        var label = (row.textContent || '').toLowerCase();
+        row.style.display = (!q || label.indexOf(q) !== -1) ? '' : 'none';
+      });
+    });
+    setTimeout(function(){ search.focus(); }, 0);
+  }
+
+  // Install outside-click + Escape handlers
+  setTimeout(function(){
+    document.addEventListener('click',  _tableMenuOutsideClick, true);
+    document.addEventListener('keydown', _tableMenuKeydown,     true);
+  }, 0);
+}
+
+// Wire <th> click handlers — every sortable header opens the column menu.
+// Idempotent: dedupes via a data-attribute flag on the thead.
+function tableBindColumnMenuClicks(thead, page) {
+  if (!thead || thead.getAttribute('data-col-menu-bound') === '1') return;
+  thead.setAttribute('data-col-menu-bound', '1');
+  thead.addEventListener('click', function(e){
+    var th = e.target.closest('th[data-sort-key]');
+    if (!th || !thead.contains(th)) return;
+    e.stopPropagation();
+    tableOpenColumnMenu(page, th.getAttribute('data-sort-key'), th);
+  });
+}
+
+// Legacy alias — old callers expect tableBindSortClicks.
+function tableBindSortClicks(thead, page) { tableBindColumnMenuClicks(thead, page); }
+
+// Local HTML-escape helper (reuses the existing escapeHtml if available).
+function _esc(s) {
+  if (typeof escapeHtml === 'function') return escapeHtml(s == null ? '' : String(s));
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+  });
+}
+
 // ── goBack ────────────────────────────────────────────────────────────────────
 // Pops the navigation stack and navigates to the previous view.
 // Pages register their view→function map via window._navMap.

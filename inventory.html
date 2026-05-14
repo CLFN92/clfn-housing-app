@@ -98,42 +98,30 @@
       <p>All <span id="inv_count">—</span> <span data-nation="short">CLFN</span> housing units — <span id="inv_vacant_count" style="color:var(--success);font-weight:600;">—</span> vacant</p>
     </div>
     <div class="phb-actions">
-      <select id="inv_filter_status" class="std-filter-control" onchange="renderInventoryView()">
-        <option value="">All Statuses</option><option value="vacant">Vacant</option><option value="occupied">Occupied</option><option value="under_repair">Under Repair</option><option value="reserved">Reserved</option><option value="condemned">Condemned</option><option value="archived">Archived</option>
-      </select>
-      <select id="inv_filter_type" class="std-filter-control" onchange="renderInventoryView()">
-        <option value="">All Types</option><option value="detached">Detached</option><option value="duplex">Duplex</option><option value="plex">Multi-unit</option><option value="complex">Complex</option><option value="mobile">Mobile</option>
-      </select>
-      <select id="inv_filter_access" class="std-filter-control" onchange="renderInventoryView()">
-        <option value="">Accessibility: All</option><option value="yes">Accessible Only</option><option value="no">Non-Accessible</option>
-      </select>
+      <button type="button" onclick="openAddUnitModal()" style="background:var(--yellow);border:none;color:var(--dark);padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Unit
+      </button>
     </div>
   </div>
-  <div class="std-search-row">
+  <div class="std-search-row std-search-row-wide">
     <input id="inv_search" class="std-search" type="text" placeholder="🔍 Search address, status, type, bedrooms, or tenant..." oninput="renderInventoryView()"/>
-  </div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;" id="inv_stat_chips_row">
-    <div style="display:flex;gap:10px;flex-wrap:wrap;" id="inv_stat_chips"></div>
-    <button type="button" onclick="openAddUnitModal()" style="background:var(--yellow);border:none;color:var(--dark);padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;margin-left:4px;">
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Unit
-    </button>
   </div>
   <div class="std-table-card">
     <div class="doclib-table-wrap">
       <table class="std-table" style="min-width:640px;table-layout:fixed;">
-        <thead><tr>
-          <th class="col-address">Address</th>
-          <th style="text-align:center;width:50px;">Beds</th>
-          <th style="text-align:center;width:50px;">Bath</th>
-          <th style="width:130px;">Type</th>
-          <th class="col-hide-tablet" style="width:110px;">Foundation</th>
-          <th style="text-align:center;width:60px;">Access.</th>
-          <th class="col-hide-tablet" style="width:80px;">Funder</th>
-          <th style="width:110px;">Status</th>
-          <th id="inv_reno_score_th" style="width:120px;">Reno Score</th>
+        <thead id="inv_thead"><tr>
+          <th class="col-address std-th-sortable" data-sort-key="addr">Address</th>
+          <th class="std-th-sortable" data-sort-key="bedrooms" style="text-align:center;width:50px;">Beds</th>
+          <th class="std-th-sortable" data-sort-key="bathrooms" style="text-align:center;width:50px;">Bath</th>
+          <th class="std-th-sortable" data-sort-key="type" style="width:130px;">Type</th>
+          <th class="col-hide-tablet std-th-sortable" data-sort-key="foundation" style="width:110px;">Foundation</th>
+          <th class="std-th-sortable" data-sort-key="accessible" style="text-align:center;width:60px;">Access.</th>
+          <th class="col-hide-tablet std-th-sortable" data-sort-key="funder" style="width:80px;">Funder</th>
+          <th class="std-th-sortable" data-sort-key="status" style="width:110px;">Status</th>
+          <th id="inv_reno_score_th" class="std-th-sortable" data-sort-key="reno_score" style="width:120px;">Reno Score</th>
           <th style="width:80px;white-space:nowrap;"></th>
         </tr></thead>
-        <tbody id="inv_tbody"><tr><td colspan="10" class="empty-state" style="padding:40px;text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+        <tbody id="inv_tbody" data-table-page="inventory"><tr><td colspan="10" class="empty-state" style="padding:40px;text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>

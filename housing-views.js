@@ -166,15 +166,13 @@ function renderInventoryView(){
   units = housingUnits.slice();
   if(!units.length) units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
   var search = (document.getElementById('inv_search')||{}).value||'';
-  var fStatus = (document.getElementById('inv_filter_status')||{}).value||'';
-  var fType   = (document.getElementById('inv_filter_type')||{}).value||'';
-  var fAccess = (document.getElementById('inv_filter_access')||{}).value||'';
-
   var _searchLc = (search || '').toLowerCase().trim();
+  // Pre-filter (search bar only — every other filter is now in the column-
+  // menu popovers via tableApplyFilterSort below). Archived units stay
+  // hidden by default; users can re-include them via the Status column
+  // menu (or — once we add an "Include archived" toggle).
   var filtered = units.filter(function(u){
-    // Hide archived units unless explicitly filtering for them
-    if(u.archived && fStatus !== APP_STATUS.ARCHIVED) return false;
-    if(!u.archived && fStatus === APP_STATUS.ARCHIVED) return false;
+    if(u.archived) return false;
     if(_searchLc) {
       // Scan every visible column: address, status, type, beds, tenant name.
       var hay = [
@@ -185,45 +183,12 @@ function renderInventoryView(){
       ].filter(Boolean).join(' ').toLowerCase();
       if (hay.indexOf(_searchLc) === -1) return false;
     }
-    if(fStatus && fStatus !== APP_STATUS.ARCHIVED && u.status !== fStatus) return false;
-    if(fType){
-      var t = (u.type||'').toLowerCase();
-      if(fType==='detached' && !t.includes('detached')) return false;
-      if(fType==='duplex'   && !t.includes('duplex'))   return false;
-      if(fType==='plex'     && !t.match(/plex/) )       return false;
-      if(fType==='complex'  && !t.includes('complex'))  return false;
-      if(fType==='mobile'   && !t.includes('mobile'))   return false;
-    }
-    if(fAccess==='yes' && !u.accessible) return false;
-    if(fAccess==='no'  &&  u.accessible) return false;
     return true;
   });
 
   var vacantCount = units.filter(function(u){return u.status==='vacant' && !u.archived;}).length;
-  var archivedCount = units.filter(function(u){return u.archived;}).length;
   var el = document.getElementById('inv_count'); if(el) el.textContent = units.filter(function(u){return !u.archived;}).length;
   var ve = document.getElementById('inv_vacant_count'); if(ve) ve.textContent = vacantCount+' vacant';
-
-  // Stat chips
-  var chips = document.getElementById('inv_stat_chips');
-  if(chips){
-    var byStatus = {};
-    units.filter(function(u){return !u.archived;}).forEach(function(u){ byStatus[u.status]=(byStatus[u.status]||0)+1; });
-    var statusColors = {vacant:'#15803d',occupied:'#3b82f6',under_repair:'#d97706',reserved:'#7c3aed',condemned:'#b91c1c'};
-    var statusLabels = {vacant:'Vacant',occupied:'Occupied',under_repair:'Under Repair',reserved:'Reserved',condemned:'Condemned'};
-    var chipsHtml = Object.keys(byStatus).map(function(s){
-      var c = statusColors[s]||'#888';
-      return '<div style="display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;" onclick="document.getElementById(\'inv_filter_status\').value=\''+s+'\';renderInventoryView();">'
-        +'<span style="width:7px;height:7px;border-radius:50%;background:'+c+';flex-shrink:0;"></span>'
-        +(statusLabels[s]||s)+' <span style="color:'+c+';">'+byStatus[s]+'</span></div>';
-    }).join('');
-    if(archivedCount) {
-      chipsHtml += '<div style="display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;" onclick="document.getElementById(\'inv_filter_status\').value=\'archived\';renderInventoryView();">'
-        +'<span style="width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;"></span>'
-        +'Archived <span style="color:var(--muted);">'+archivedCount+'</span></div>';
-    }
-    chips.innerHTML = chipsHtml;
-  }
 
   var tbody = document.getElementById('inv_tbody');
   if(!tbody) return;
@@ -238,7 +203,46 @@ function renderInventoryView(){
     archived:    {bg:'#f4f4f0',c:'#888',   label:'Archived'}
   };
 
-  tbody.innerHTML = filtered.map(function(u){
+  // ── Column-menu sort + filter via the shared scaffolding (Phase 2A) ────
+  // Each accessor defines how a column reads from a unit row, plus a
+  // user-facing label and whether the column is worth showing a value
+  // checklist for (Address/Reno Score skip the checklist — too many uniques).
+  // Every column is filterable — even Address and Reno Score. The popover's
+  // search box makes long value lists manageable.
+  var _invColumns = {
+    addr:        { label: 'Address',       accessor: function(u){ return ((u.num||'') + ' ' + (u.street||'')).trim(); } },
+    bedrooms:    { label: 'Beds',          accessor: function(u){ return parseInt(u.bedrooms, 10) || 0; } },
+    bathrooms:   { label: 'Baths',         accessor: function(u){ return parseInt(u.bathrooms, 10) || 0; } },
+    type:        { label: 'Type',          accessor: function(u){ return (u.type && u.type !== '0' && u.type !== 'nan') ? u.type : '(none)'; } },
+    foundation:  { label: 'Foundation',    accessor: function(u){ return (u.foundation && u.foundation !== '0' && u.foundation !== 'nan') ? u.foundation : '(none)'; } },
+    accessible:  { label: 'Accessibility', accessor: function(u){ return u.accessible ? 'Accessible' : 'Non-accessible'; } },
+    funder:      { label: 'Funder',        accessor: function(u){ return u.funder || '(none)'; } },
+    status:      { label: 'Status',        accessor: function(u){ return (statusStyle[u.status]||{}).label || u.status || 'Unknown'; } },
+    reno_score:  { label: 'Reno Score',    accessor: function(u){ try { return calcRenoScore(u.id).score; } catch(e){ return 0; } } }
+  };
+  // Build a plain accessor map for tableApplyFilterSort.
+  var _invAccessors = {};
+  Object.keys(_invColumns).forEach(function(k){ _invAccessors[k] = _invColumns[k].accessor; });
+
+  var _invState = (typeof tableStateGet === 'function') ? tableStateGet('inventory') : { sort:{key:'',dir:1}, filters:{} };
+
+  // Register the columns + a getter for the pre-sort row source so the
+  // column menu can compute uniques + counts on demand.
+  if (typeof tableRegisterColumns === 'function') {
+    tableRegisterColumns('inventory', {
+      columns:  _invColumns,
+      getRows:  function(){ return filtered; },
+      onChange: renderInventoryView
+    });
+  }
+
+  // Apply per-column filters + sort → flat list.
+  var _invRows = (typeof tableApplyFilterSort === 'function')
+    ? tableApplyFilterSort(filtered, _invAccessors, _invState)
+    : filtered;
+
+  // ─────────────────────────────────────────────────────────────────────
+  function _invRowHtml(u){
     var ss = statusStyle[u.status]||{bg:'#f0f0ec',c:'#888',label:u.status||'Unknown'};
     var addr = u.num+' '+u.street;
     var bath = (u.bathrooms&&u.bathrooms!=='0'&&u.bathrooms!=='nan') ? u.bathrooms : '—';
@@ -281,7 +285,20 @@ function renderInventoryView(){
       +'</div>'
       +'</td>'
       +'</tr>';
-  }).join('');
+  }
+
+  // Empty-state path
+  if (!_invRows.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="padding:32px;text-align:center;color:var(--muted);">No units match the current filters.</td></tr>';
+  } else {
+    tbody.innerHTML = _invRows.map(_invRowHtml).join('');
+  }
+
+  // Wire column-menu click + sort indicators on the table header.
+  var thead = document.getElementById('inv_thead');
+  if (typeof tableBindColumnMenuClicks === 'function') tableBindColumnMenuClicks(thead, 'inventory');
+  if (typeof tableRefreshSortIndicators === 'function') tableRefreshSortIndicators(thead, 'inventory');
+
   // Wire action buttons
   tbody.querySelectorAll('[data-inv-reno-sow]').forEach(function(cell){
     cell.addEventListener('click', function(e){ e.stopPropagation(); openSowModal(cell.getAttribute('data-inv-reno-sow')); });
