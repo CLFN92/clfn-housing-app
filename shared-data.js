@@ -232,129 +232,251 @@ async function sbSaveApplication(app) {
   }
 }
 
-// ── Local-first draft queue ───────────────────────────────────────────────────
+// ── Local-first save queue ────────────────────────────────────────────────────
 // On flaky networks (iPad cellular, marginal wifi) and on PostgREST auth errors
-// (PGRST301/302/303), the in-flight sbSaveApplication call rejects and the
-// applicant's edits would be lost on tab close. The queue keeps every save
-// attempt in localStorage immediately so nothing disappears, then drains in
-// the background and on next boot.
+// (PGRST301/302/303), in-flight sb*Save* calls reject and edits would be lost
+// on tab close. The queue keeps every save attempt in localStorage immediately
+// so nothing disappears, then drains in the background and on next boot.
 //
-// Storage shape (key = APP_DRAFT_QUEUE_KEY):
+// Storage shape (key = SAVE_QUEUE_KEY):
 //   {
-//     [appId]: {
-//       app: { ...full app object... },
-//       updatedAt: '2026-05-14T10:33:00.000Z',
-//       lastError:  'save failed (401): {...PGRST303...}'  // optional
-//     }
+//     "app:APP-000123": {
+//       entityType: 'app',
+//       id:         'APP-000123',
+//       entity:     { ...full object... },
+//       ownerEmail: 'kevin.proctor@clfn.on.ca',
+//       updatedAt:  '2026-05-14T10:33:00.000Z',
+//       lastError:  'save failed (401): {...}'  // optional
+//     },
+//     "unit:UNIT-42": { entityType:'unit', ... },
+//     "contractor:CT-9": { ... },
+//     "app_note:APP-000123|1747234567890": { ... },
+//     "setting:approval_authority": { ... }
 //   }
-// Entries are removed from the queue on successful sync.
-var APP_DRAFT_QUEUE_KEY = 'clfn_housing_draft_queue';
+// Entries are removed on successful sync.
+var SAVE_QUEUE_KEY       = 'clfn_save_queue';
+// Legacy app-only queue key (pre-2026-05-14). Migrated on first boot then dropped.
+var APP_DRAFT_QUEUE_KEY  = 'clfn_housing_draft_queue';
 
-function _draftQueueRead(){
+function _saveQueueRead(){
   try {
-    var raw = localStorage.getItem(APP_DRAFT_QUEUE_KEY);
+    var raw = localStorage.getItem(SAVE_QUEUE_KEY);
     if(!raw) return {};
     var parsed = JSON.parse(raw);
     return (parsed && typeof parsed === 'object') ? parsed : {};
   } catch(e) { return {}; }
 }
 
-function _draftQueueWrite(map){
-  try { localStorage.setItem(APP_DRAFT_QUEUE_KEY, JSON.stringify(map || {})); }
-  catch(e) { console.warn('[draft-queue] write failed:', e); }
+function _saveQueueWrite(map){
+  try { localStorage.setItem(SAVE_QUEUE_KEY, JSON.stringify(map || {})); }
+  catch(e) { console.warn('[save-queue] write failed:', e); }
 }
 
+function _queueKey(entityType, id) { return entityType + ':' + id; }
+
 // Owner-email guard: each queue entry is stamped with the staff email that
-// created it. On shared devices (multi-staff iPad), syncDraftQueue only pushes
-// entries owned by the currently signed-in user. Other users' drafts are left
-// untouched until their owner signs back in.
+// created it. On shared devices (multi-staff iPad), syncSaveQueue only pushes
+// entries owned by the currently signed-in user. Other users' entries are
+// left untouched until their owner signs back in.
 function _currentOwnerEmail(){
   var s = window.HOUSING_SESSION || {};
   return (s.email || '').toLowerCase();
 }
 
-function appDraftQueueAdd(app, lastError){
-  if(!app || !app.id) return;
-  var map = _draftQueueRead();
+function saveQueueAdd(entityType, id, entity, lastError){
+  if(!entityType || !id) return;
+  var map = _saveQueueRead();
+  var k = _queueKey(entityType, id);
   // Preserve the original ownerEmail on subsequent updates — never silently
   // re-stamp ownership to whoever happens to be signed in now.
-  var existing = map[app.id] || {};
-  map[app.id] = {
-    app:        app,
+  var existing = map[k] || {};
+  map[k] = {
+    entityType: entityType,
+    id:         id,
+    entity:     entity,
     ownerEmail: existing.ownerEmail || _currentOwnerEmail() || null,
     updatedAt:  new Date().toISOString(),
     lastError:  lastError || null
   };
-  _draftQueueWrite(map);
+  _saveQueueWrite(map);
 }
 
-function appDraftQueueRemove(appId){
-  if(!appId) return;
-  var map = _draftQueueRead();
-  if(map[appId]) { delete map[appId]; _draftQueueWrite(map); }
+function saveQueueRemove(entityType, id){
+  if(!entityType || !id) return;
+  var map = _saveQueueRead();
+  var k = _queueKey(entityType, id);
+  if(map[k]) { delete map[k]; _saveQueueWrite(map); }
 }
 
-function appDraftQueueGetAll(){
-  var map = _draftQueueRead();
-  return Object.keys(map).map(function(id){ return Object.assign({ appId: id }, map[id]); });
+function saveQueueGetAll(){
+  var map = _saveQueueRead();
+  return Object.keys(map).map(function(k){ return map[k]; });
 }
 
-// saveApplicationWithDraftFallback — write to localStorage FIRST, then push to
-// Supabase in the background. Never throws. Returns a Promise<bool> indicating
-// whether the cloud sync succeeded. The local copy is always preserved.
-function saveApplicationWithDraftFallback(app){
-  if(!app || !app.id) return Promise.resolve(false);
-  // Always stash locally before touching the network.
-  appDraftQueueAdd(app, null);
-  return sbSaveApplication(app).then(function(){
-    appDraftQueueRemove(app.id);
+// Retry-dispatch table — maps entityType → network function. Each adapter
+// takes the cached entity and returns a Promise (resolves on success, rejects
+// on failure). Adapters are looked up at retry time so they pick up the
+// latest sb*Save* implementation.
+//
+// Mixed contracts: sbSaveApplication and sbAddAppNote *throw* on failure;
+// sbSaveUnit, sbSaveContractor, sbSaveSetting resolve to false. The adapter
+// normalizes the latter to a rejection so the wrapper's .catch always fires.
+function _rejectIfFalse(promise, label){
+  return promise.then(function(ok){
+    if(ok === false) throw new Error(label + ' returned false (HTTP error or RLS rejection — see console)');
+    return true;
+  });
+}
+var _SAVE_RETRY = {
+  app:        function(entity){ return sbSaveApplication(entity); },
+  unit:       function(entity){ return _rejectIfFalse(sbSaveUnit(entity), 'sbSaveUnit'); },
+  contractor: function(entity){ return _rejectIfFalse(sbSaveContractor(entity), 'sbSaveContractor'); },
+  // App notes are append-only POSTs with a fresh server-generated UUID. The
+  // queue entity carries the original args; the retry re-fires the insert.
+  app_note:   function(entity){ return sbAddAppNote(entity.app_id, entity.body); },
+  setting:    function(entity){ return _rejectIfFalse(sbSaveSetting(entity.key, entity.value), 'sbSaveSetting'); }
+};
+
+// saveWithDraftFallback — write to localStorage FIRST, then push to Supabase
+// in the background. Never throws. Returns a Promise<bool> indicating whether
+// the cloud sync succeeded. Local copy is always preserved.
+function saveWithDraftFallback(entityType, id, entity){
+  if(!entityType || !id || entity == null) return Promise.resolve(false);
+  if(typeof _SAVE_RETRY[entityType] !== 'function'){
+    console.warn('[save-queue] no retry adapter registered for entityType:', entityType);
+    return Promise.resolve(false);
+  }
+  // Stash locally before touching the network.
+  saveQueueAdd(entityType, id, entity, null);
+  return _SAVE_RETRY[entityType](entity).then(function(){
+    saveQueueRemove(entityType, id);
     return true;
   }).catch(function(err){
     var msg = (err && err.message) ? err.message : String(err);
-    appDraftQueueAdd(app, msg);
-    console.warn('[draft-queue] cloud sync failed for ' + app.id + ' — kept in queue:', msg);
+    saveQueueAdd(entityType, id, entity, msg);
+    console.warn('[save-queue] cloud sync failed for ' + entityType + ':' + id + ' — kept in queue:', msg);
     return false;
   });
 }
 
-// syncDraftQueue — called on boot after auth resolves. Tries to push every
-// queued draft owned by the current user to Supabase, in parallel. Entries
+// ── Per-entity convenience wrappers ──────────────────────────────────────────
+function saveApplicationWithDraftFallback(app){
+  if(!app || !app.id) return Promise.resolve(false);
+  return saveWithDraftFallback('app', app.id, app);
+}
+function saveUnitWithDraftFallback(unit){
+  if(!unit || !unit.id) return Promise.resolve(false);
+  return saveWithDraftFallback('unit', unit.id, unit);
+}
+function saveContractorWithDraftFallback(ct){
+  if(!ct || !ct.id) return Promise.resolve(false);
+  return saveWithDraftFallback('contractor', ct.id, ct);
+}
+function saveAppNoteWithDraftFallback(appId, body){
+  if(!appId || !body) return Promise.resolve(false);
+  // Notes have no client-side primary key — synthesize a stable queue id so
+  // retries don't duplicate. The appId+timestamp combo never repeats.
+  var qid = appId + '|' + Date.now();
+  return saveWithDraftFallback('app_note', qid, { app_id: appId, body: body });
+}
+function saveSettingWithDraftFallback(key, value){
+  if(!key) return Promise.resolve(false);
+  return saveWithDraftFallback('setting', key, { key: key, value: value });
+}
+
+// One-time migration: move entries from the old app-only queue (pre-2026-05-14)
+// into the unified queue, then drop the old key. Safe to re-run.
+function _migrateLegacyAppDraftQueue(){
+  var oldMap = {};
+  try {
+    var raw = localStorage.getItem(APP_DRAFT_QUEUE_KEY);
+    if(!raw) return;
+    oldMap = JSON.parse(raw) || {};
+  } catch(e) { return; }
+  var keys = Object.keys(oldMap);
+  if(!keys.length) { try { localStorage.removeItem(APP_DRAFT_QUEUE_KEY); } catch(e){} return; }
+  var newMap = _saveQueueRead();
+  keys.forEach(function(appId){
+    var entry = oldMap[appId] || {};
+    var k = _queueKey('app', appId);
+    if(!newMap[k]) {
+      newMap[k] = {
+        entityType: 'app',
+        id:         appId,
+        entity:     entry.app,
+        ownerEmail: entry.ownerEmail || null,
+        updatedAt:  entry.updatedAt || new Date().toISOString(),
+        lastError:  entry.lastError || null
+      };
+    }
+  });
+  _saveQueueWrite(newMap);
+  try { localStorage.removeItem(APP_DRAFT_QUEUE_KEY); } catch(e) {}
+  console.log('[save-queue] migrated ' + keys.length + ' legacy app draft(s) to unified queue');
+}
+
+// syncSaveQueue — called on boot after auth resolves. Tries to push every
+// queued entry owned by the current user to Supabase, in parallel. Entries
 // stamped with a different ownerEmail are skipped (shared-iPad safety) and
 // stay in the queue for that owner's next sign-in. Successes drop out of the
-// queue; failures stay for next time. Silent on success; logs only.
-function syncDraftQueue(){
-  var entries = appDraftQueueGetAll();
+// queue; failures stay for next time.
+function syncSaveQueue(){
+  var entries = saveQueueGetAll();
   if(!entries.length) return Promise.resolve({ tried:0, synced:0, skipped:0 });
   var me = _currentOwnerEmail();
   var mine    = [];
   var skipped = 0;
   entries.forEach(function(entry){
     var owner = (entry.ownerEmail || '').toLowerCase();
-    // Unowned entries (pre-guard upgrade) attach to the current user — they
-    // came from this device, no one else can claim them.
+    // Unowned entries (pre-guard upgrade or non-staff context) attach to the
+    // current user — they came from this device, no one else can claim them.
     if(!owner) { mine.push(entry); return; }
     if(owner === me) { mine.push(entry); return; }
     skipped++;
   });
-  if(skipped > 0) console.log('[draft-queue] skipped ' + skipped + ' draft(s) owned by another user');
+  if(skipped > 0) console.log('[save-queue] skipped ' + skipped + ' entry(ies) owned by another user');
   if(!mine.length) return Promise.resolve({ tried:0, synced:0, skipped: skipped });
-  console.log('[draft-queue] retrying ' + mine.length + ' unsynced draft(s)…');
+  console.log('[save-queue] retrying ' + mine.length + ' unsynced entry(ies)…');
   var synced = 0;
   return Promise.all(mine.map(function(entry){
-    return sbSaveApplication(entry.app).then(function(){
-      appDraftQueueRemove(entry.appId);
+    var adapter = _SAVE_RETRY[entry.entityType];
+    if(typeof adapter !== 'function'){
+      console.warn('[save-queue] no retry adapter for entityType:', entry.entityType);
+      return null;
+    }
+    return adapter(entry.entity).then(function(){
+      saveQueueRemove(entry.entityType, entry.id);
       synced++;
     }).catch(function(err){
       var msg = (err && err.message) ? err.message : String(err);
-      appDraftQueueAdd(entry.app, msg);
-      console.warn('[draft-queue] retry failed for ' + entry.appId + ':', msg);
+      saveQueueAdd(entry.entityType, entry.id, entry.entity, msg);
+      console.warn('[save-queue] retry failed for ' + entry.entityType + ':' + entry.id + ':', msg);
     });
   })).then(function(){
     if(synced > 0 && typeof showToast === 'function'){
-      showToast(synced + ' draft' + (synced === 1 ? '' : 's') + ' synced from local backup.');
+      showToast(synced + ' item' + (synced === 1 ? '' : 's') + ' synced from local backup.');
     }
     return { tried: mine.length, synced: synced, skipped: skipped };
   });
+}
+
+// Backwards-compatible aliases. Boot path still calls syncDraftQueue();
+// older sites may reference appDraftQueueAdd / Remove / GetAll.
+function syncDraftQueue(){
+  _migrateLegacyAppDraftQueue();
+  return syncSaveQueue();
+}
+function appDraftQueueAdd(app, lastError){
+  if(!app || !app.id) return;
+  saveQueueAdd('app', app.id, app, lastError);
+}
+function appDraftQueueRemove(appId){
+  saveQueueRemove('app', appId);
+}
+function appDraftQueueGetAll(){
+  return saveQueueGetAll()
+    .filter(function(e){ return e.entityType === 'app'; })
+    .map(function(e){ return { appId: e.id, app: e.entity, ownerEmail: e.ownerEmail, updatedAt: e.updatedAt, lastError: e.lastError }; });
 }
 
 // ── sbSaveAllApplications ─────────────────────────────────────────────────────
@@ -1747,7 +1869,7 @@ function confirmCtAction() {
   // Persist the status change so it survives a reload — without this,
   // approvals only live in window._contractors and vanish on refresh.
   if(typeof sbSaveContractor === 'function') {
-    sbSaveContractor(ct).catch(function(e){ console.warn('confirmCtAction SB failed:', e); });
+    saveContractorWithDraftFallback(ct);
   }
 
   // Workflow email
@@ -2031,9 +2153,8 @@ function emailContractorAgreement() {
         if(idx >= 0) {
           contractors[idx].agreementEmailedAt = new Date().toISOString().split('T')[0];
           window._contractors = contractors;
-          sbSaveContractor(contractors[idx]).catch(function(e){
-            console.warn('[contractor agreement emailed] sbSaveContractor failed:', e);
-            showToast('Could not record agreement-emailed timestamp', { type:'error' });
+          saveContractorWithDraftFallback(contractors[idx]).then(function(ok){
+            if(!ok) showToast('Agreement-emailed timestamp saved locally — will sync when network is available.', { type:'info', duration:3500 });
           });
         }
       } catch(e) {}
@@ -2773,7 +2894,8 @@ function _ctHandleRowAction(action, idx) {
       if (!ok) return;
       ct.archived = true;
       contractors[idx] = ct;
-      if (typeof sbSaveContractor === 'function') sbSaveContractor(ct).catch(function(e){ console.warn('archive failed:', e); });
+      if (typeof saveContractorWithDraftFallback === 'function') saveContractorWithDraftFallback(ct);
+      else if (typeof sbSaveContractor === 'function') sbSaveContractor(ct).catch(function(e){ console.warn('archive failed:', e); });
       auditEntry('CT:'+ct.id, 'ct_archived', 'Contractor archived: ' + (ct.name||''), role);
       showToast('📦 Contractor archived');
       renderContractorsView();
@@ -2781,7 +2903,8 @@ function _ctHandleRowAction(action, idx) {
   } else if (action === 'unarchive') {
     ct.archived = false;
     contractors[idx] = ct;
-    if (typeof sbSaveContractor === 'function') sbSaveContractor(ct).catch(function(e){ console.warn('unarchive failed:', e); });
+    if (typeof saveContractorWithDraftFallback === 'function') saveContractorWithDraftFallback(ct);
+    else if (typeof sbSaveContractor === 'function') sbSaveContractor(ct).catch(function(e){ console.warn('unarchive failed:', e); });
     auditEntry('CT:'+ct.id, 'ct_unarchived', 'Contractor restored from archive: ' + (ct.name||''), role);
     showToast('📤 Contractor unarchived');
     renderContractorsView();
@@ -2800,7 +2923,8 @@ function _ctHandleRowAction(action, idx) {
       ct.declinedBy = role;
       if (reason) ct.declinedReason = reason;
       contractors[idx] = ct;
-      if (typeof sbSaveContractor === 'function') sbSaveContractor(ct).catch(function(e){ console.warn('decline failed:', e); });
+      if (typeof saveContractorWithDraftFallback === 'function') saveContractorWithDraftFallback(ct);
+      else if (typeof sbSaveContractor === 'function') sbSaveContractor(ct).catch(function(e){ console.warn('decline failed:', e); });
       auditEntry('CT:'+ct.id, 'declined', 'Contractor declined' + (reason ? ' — ' + reason : ''), role);
       showToast('Contractor declined');
       renderContractorsView();
@@ -3918,7 +4042,7 @@ function saveContractor(){
   // older revision named it `ct`, this site was missed in the rename and
   // threw a ReferenceError that aborted the save mid-flight (so the
   // contractor stayed in memory but never reached the DB).
-  sbSaveContractor(data).catch(function(e){ console.warn('saveContractor SB failed:',e); });
+  saveContractorWithDraftFallback(data);
   // Upload contractor files to Supabase Storage. Only newly-staged files
   // (those with .data and no .path) get uploaded — existing files loaded
   // from storage on edit-open already have a .path and are skipped to avoid
@@ -4020,7 +4144,7 @@ function saveRenoScoreModel() {
   });
   if(!window._appSettings) window._appSettings={};
   window._appSettings['reno_score_model']=model;
-  sbSaveSetting('reno_score_model', model).then(function(ok){
+  saveSettingWithDraftFallback('reno_score_model', model).then(function(ok){
     if(!ok){ showToast('Renovation scoring did NOT save to server — please retry.'); return; }
     auditEntry('SETTINGS','settings_reno_score_save','Renovation priority scoring model saved',window.currentRole||'staff');
     showToast('Renovation scoring saved');
@@ -4035,7 +4159,7 @@ function saveUnitScoreModel(){
   });
   if(!window._appSettings) window._appSettings={};
   window._appSettings['unit_score_model']=model;
-  sbSaveSetting('unit_score_model', model).then(function(ok){
+  saveSettingWithDraftFallback('unit_score_model', model).then(function(ok){
     if(!ok){ showToast('Unit match scoring did NOT save to server — please retry.'); return; }
     auditEntry('SETTINGS','settings_unit_score_save','Unit matching scoring model saved',window.currentRole||'staff');
     showToast('Unit match scoring saved');
@@ -4654,7 +4778,7 @@ function saveBudgetData(data){
   if(!window._appSettings) window._appSettings={};
   var prev = window._appSettings['budget_pools'];
   window._appSettings['budget_pools']=data;
-  sbSaveSetting('budget_pools', data).then(function(ok){
+  saveSettingWithDraftFallback('budget_pools', data).then(function(ok){
     if(!ok){
       // Roll back in-memory so UI reflects reality
       if(prev === undefined) delete window._appSettings['budget_pools'];
@@ -4800,7 +4924,7 @@ function updateUnitScorePts(id,val){
   if(!window._appSettings) window._appSettings={};
   window._appSettings['unit_score_model']=model;
   // Fire-and-forget — this runs on every keystroke so we only log, not toast
-  sbSaveSetting('unit_score_model', model);
+  saveSettingWithDraftFallback('unit_score_model', model);
   var maxScore=0;
   ['bed','acc','eld'].forEach(function(g){
     var mx=Math.max.apply(null,model.filter(function(r){return r.group===g;}).map(function(r){return r.pts;}));

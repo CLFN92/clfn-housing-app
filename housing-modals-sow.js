@@ -762,7 +762,7 @@ function markSowComplete(){
       var _u = _allUnits.find(function(x){ return x.id === _sowUnitId; });
       if(_u && typeof hasActiveSows === 'function' && !hasActiveSows(_sowUnitId)
          && typeof revertUnitFromRepair === 'function' && revertUnitFromRepair(_u)){
-        sbSaveUnit(_u).catch(function(e){ console.warn('[SOW] revert unit save failed:', e); });
+        saveUnitWithDraftFallback(_u);
         auditEntry('UNIT:'+_sowUnitId, 'unit_status_auto', (_u.num+' '+_u.street).trim()+' → '+(_u.status||'updated')+' (SOW '+pn+' completed, no active SOWs remain)', _realRoleForPermissions());
       }
     } catch(e){ console.warn('[SOW] complete-revert threw:', e); }
@@ -968,7 +968,7 @@ window.udpArchiveSow = function(unitId, projectNumber){
       var u = allUnits.find(function(x){ return x.id === unitId; });
       if(u && typeof hasActiveSows === 'function' && !hasActiveSows(unitId)
          && typeof revertUnitFromRepair === 'function' && revertUnitFromRepair(u)){
-        sbSaveUnit(u).catch(function(e){ console.warn('[SOW archive] unit revert save failed:', e); });
+        saveUnitWithDraftFallback(u);
         auditEntry('UNIT:'+unitId, 'unit_status_auto', (u.num+' '+u.street).trim()+' → '+(u.status||'updated')+' (last active SOW archived)', role);
       }
     } catch(e){ console.warn('[SOW archive] revert threw:', e); }
@@ -1014,7 +1014,7 @@ window.archiveCurrentSow = function(){
       var u = allUnits.find(function(x){ return x.id === unitId; });
       if(u && typeof hasActiveSows === 'function' && !hasActiveSows(unitId)
          && typeof revertUnitFromRepair === 'function' && revertUnitFromRepair(u)){
-        sbSaveUnit(u).catch(function(e){ console.warn('[SOW archive] unit revert save failed:', e); });
+        saveUnitWithDraftFallback(u);
         auditEntry('UNIT:'+unitId, 'unit_status_auto', (u.num+' '+u.street).trim()+' → '+(u.status||'updated')+' (last active SOW archived)', role);
       }
     } catch(e){ console.warn('[SOW archive modal] revert threw:', e); }
@@ -1170,7 +1170,7 @@ function saveSOW(){
       var _u = _allUnits.find(function(x){ return x.id === _sowUnitId; });
       var _prev = existingForStatus ? existingForStatus.approval_status : null;
       if(_u && typeof maybeAutoFlipUnitForSow === 'function' && maybeAutoFlipUnitForSow(_u, data, _prev)){
-        sbSaveUnit(_u).catch(function(e){ console.warn('[SOW] auto-flip unit save failed:', e); });
+        saveUnitWithDraftFallback(_u);
         var _newStatus = _u.status === 'under_repair' ? 'Under Repair' : (_u.status || 'updated');
         auditEntry('UNIT:'+_sowUnitId, 'unit_status_auto', (_u.num+' '+_u.street).trim()+' → '+_newStatus+' (SOW '+(data.project_number||'')+' '+(data.approval_status==='completed'?'completed':'approved')+')', _saveRole);
       }

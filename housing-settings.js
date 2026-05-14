@@ -139,7 +139,7 @@ function saveApprovalAuthoritySettings() {
   var data = APPROVAL_AUTHORITY.serialize();
   if(!window._appSettings) window._appSettings = {};
   window._appSettings['approval_authority'] = data;
-  sbSaveSetting('approval_authority', data).then(function(ok) {
+  saveSettingWithDraftFallback('approval_authority', data).then(function(ok) {
     if(ok) {
       showToast('✓ Approval authority saved');
       if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'approval_authority_save', 'Approval authority configuration updated', window.currentRole || 'ed');
@@ -974,7 +974,7 @@ function saveThemeSettings() {
   if(typeof _applyTheme === 'function') _applyTheme(theme);
   if(!window._appSettings) window._appSettings = {};
   window._appSettings.theme = theme;
-  sbSaveSetting('theme', theme).then(function(ok){
+  saveSettingWithDraftFallback('theme', theme).then(function(ok){
     if(ok){
       showToast('Theme saved and applied');
       if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'theme_updated', 'Brand theme updated', window.currentRole||'staff');
@@ -998,7 +998,7 @@ function resetThemeSettings() {
     if(!window._appSettings) window._appSettings = {};
     window._appSettings.theme = empty;
     window._themeDraftLogo = '';
-    sbSaveSetting('theme', empty).then(function(saved){
+    saveSettingWithDraftFallback('theme', empty).then(function(saved){
       if(saved){
         showToast('Theme reset to defaults');
         if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'theme_reset', 'Brand theme reset to defaults', window.currentRole||'staff');
@@ -1134,7 +1134,7 @@ function saveRequiredFieldsSettings() {
   var cfg = Object.assign({}, window._appSettings.required_fields || {}, visible);
   window._appSettings.required_fields = cfg;
   if(typeof applyRequiredFields === 'function') applyRequiredFields();
-  sbSaveSetting('required_fields', cfg).then(function(ok){
+  saveSettingWithDraftFallback('required_fields', cfg).then(function(ok){
     if(ok){
       showToast('Required fields saved');
       if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'required_fields_updated', 'Application required-field config updated', window.currentRole||'staff');
@@ -1156,7 +1156,7 @@ function resetRequiredFieldsSettings() {
     if(!window._appSettings) window._appSettings = {};
     window._appSettings.required_fields = {};
     if(typeof applyRequiredFields === 'function') applyRequiredFields();
-    sbSaveSetting('required_fields', {}).then(function(saved){
+    saveSettingWithDraftFallback('required_fields', {}).then(function(saved){
       if(saved){
         showToast('Required fields reset to defaults');
         if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'required_fields_reset', 'Required fields reset to defaults', window.currentRole||'staff');

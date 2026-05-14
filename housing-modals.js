@@ -352,7 +352,7 @@ function saveUnitEdit(){
     }
   }
   // Save unit to Supabase
-  sbSaveUnit(u).catch(function(e){ console.warn('Unit save failed:', e); });
+  saveUnitWithDraftFallback(u);
   // Sync assigned unit back onto the application record. Also flip status to
   // ASSIGNED so the applicant drops out of the Match queue (which filters by
   // status). Without this the same applicant keeps showing on the Match page
@@ -1376,7 +1376,7 @@ function saveNewUnit(){
 
   units.push(newUnit);
   housingUnits.push(newUnit);
-  sbSaveUnit(newUnit).catch(function(e){ console.warn('Add unit save failed:',e); });
+  saveUnitWithDraftFallback(newUnit);
   if(_auStagedPhotos.length){ saveUnitPhotos(newId, _auStagedPhotos); _auStagedPhotos=[]; }
   closeAddUnitModal();
   renderInventoryView();
@@ -1445,7 +1445,7 @@ function saveBudgetPools(){
     var prevLimit = s.hmBudgetLimit;
     s.hmBudgetLimit = parseFloat(limitEl.value)||25000;
     window._appSettings = s;
-    sbSaveSetting('app_settings', s).then(function(ok){
+    saveSettingWithDraftFallback('app_settings', s).then(function(ok){
       if(!ok){
         s.hmBudgetLimit = prevLimit;
         window._appSettings = s;
@@ -1837,7 +1837,7 @@ function saveAddTenant(){
   units[idx].assignedTo=appId;
   units[idx].assignedDate=date;
   units[idx].status=status;
-  sbSaveUnit(units[idx]).catch(function(e){ console.warn('Tenant assign unit save:',e); });
+  saveUnitWithDraftFallback(units[idx]);
 
   closeAddTenantModal();
   if(typeof renderTenantsView==='function') renderTenantsView();
@@ -2036,6 +2036,9 @@ window.openEditModal = function(appId) {
   currentAppId = app.id;
   // Existing application → Internal Notes tab is available immediately.
   if (typeof _refreshAppNotesTabVisibility === 'function') _refreshAppNotesTabVisibility();
+  // Apply or remove the signature-panel lock based on the app's status —
+  // submitted/approved/etc. apps are locked; drafts stay editable.
+  if (typeof _applySignatureLockState === 'function') _applySignatureLockState(app);
 
   // ── Helper: set field value safely ──
   function set(id, val) {

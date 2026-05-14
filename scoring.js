@@ -48,14 +48,14 @@ var SCORING_MODEL_KEY = 'clfn_scoring_model';
 
 function saveV2ScoringModel() {
   localStorage.setItem('clfn_scoring_model_v2', JSON.stringify(liveV2ScoreModel));
-  sbSaveSetting('scoring_model_v2', liveV2ScoreModel).then(function(ok){
+  saveSettingWithDraftFallback('scoring_model_v2', liveV2ScoreModel).then(function(ok){
     if(!ok) showToast('Scoring model saved locally but did not reach the server — it may revert on next sign-in.');
   });
 }
 
 function saveV2Tiers() {
   localStorage.setItem('clfn_scoring_tiers_v2', JSON.stringify(liveV2Tiers));
-  sbSaveSetting('scoring_tiers_v2', liveV2Tiers).then(function(ok){
+  saveSettingWithDraftFallback('scoring_tiers_v2', liveV2Tiers).then(function(ok){
     if(!ok) {
       showToast('Tier thresholds saved locally but did not reach the server — please retry.');
       return;
@@ -594,7 +594,7 @@ function _onModuleToggle(modName, nowOn) {
   // Persist via the existing housing_settings save helper
   var payload = modApi.serialize();
   if(typeof sbSaveSetting === 'function'){
-    sbSaveSetting('module_enablement', payload).catch(function(e){
+    saveSettingWithDraftFallback('module_enablement', payload).catch(function(e){
       console.warn('[modules] save failed:', e);
       if(typeof showToast === 'function') showToast('Module save failed: ' + (e && e.message || e), { type:'error' });
     });
@@ -673,7 +673,7 @@ function _nationLinkify(s) {
 
 // ── Nation editor handlers ──────────────────────────────────────────────────
 // Logo upload uses the same data URL flow as the Themes panel; we write the
-// image to _appSettings.theme.logo via sbSaveSetting('theme', …) and call
+// image to _appSettings.theme.logo via saveSettingWithDraftFallback('theme', …) and call
 // _applyTheme() to swap every <img class="hlogo"> live. Identity, contact
 // fields, and socials save into a separate housing_settings row keyed
 // 'nation_config_override' so applyNationOverrides() picks them up at boot.
@@ -726,7 +726,7 @@ function _nationClearLogo() {
     var theme = Object.assign({}, window._appSettings.theme || {});
     delete theme.logo;
     window._appSettings.theme = theme;
-    sbSaveSetting('theme', theme).then(function(saved){
+    saveSettingWithDraftFallback('theme', theme).then(function(saved){
       if (saved) {
         if (typeof _applyTheme === 'function') _applyTheme(theme);
         showToast('Logo cleared');
@@ -779,14 +779,14 @@ function saveNationSettings() {
   window._appSettings.nation_config_override = override;
 
   var pending = [];
-  pending.push(sbSaveSetting('nation_config_override', override));
+  pending.push(saveSettingWithDraftFallback('nation_config_override', override));
 
   // If a new logo was uploaded in this session, persist it via the existing
   // theme.logo channel so _applyTheme picks it up across all pages.
   if (window._nationDraftLogo) {
     var theme = Object.assign({}, window._appSettings.theme || {}, { logo: window._nationDraftLogo });
     window._appSettings.theme = theme;
-    pending.push(sbSaveSetting('theme', theme));
+    pending.push(saveSettingWithDraftFallback('theme', theme));
   }
 
   Promise.all(pending).then(function(results){
@@ -1149,7 +1149,7 @@ function saveNosTable() {
   if(!window._appSettings) window._appSettings = {};
   window._appSettings['nos_table'] = nos;
 
-  sbSaveSetting('nos_table', nos).then(function(ok) {
+  saveSettingWithDraftFallback('nos_table', nos).then(function(ok) {
     if(ok) {
       showToast('\u2713 NOS table saved');
       auditEntry('SETTINGS', 'nos_table_save', 'NOS table updated by ED', CLFN_PERMS.roleLabel(ROLE.ED));
@@ -1890,7 +1890,7 @@ function archiveUnit(unitId) {
         auditEntry(a.id, 'archived', 'Auto-archived — linked unit ' + addr + ' demolished', role);
       }
     });
-    sbSaveUnit(u).catch(function(e){ console.warn('Unit archive save failed:',e); });
+    saveUnitWithDraftFallback(u);
     applications.forEach(function(a){
       if(a.archived && (a.assignedUnit===unitId||a.assignedUnitId===unitId)){
         if(typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
@@ -1924,7 +1924,7 @@ function unarchiveUnit(unitId) {
     u.archivedBy = null;
     u.status     = 'vacant';
     u.assignedTo = null; u.assignedName = null; u.assignedDate = null;
-    sbSaveUnit(u).catch(function(e){ console.warn('Unarchive unit save failed:',e); });
+    saveUnitWithDraftFallback(u);
     auditEntry('UNIT:' + unitId, 'unit_unarchived', addr + ' restored from archive to Vacant', role);
     closeUnitEditModal();
     renderInventoryView();

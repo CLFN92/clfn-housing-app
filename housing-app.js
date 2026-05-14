@@ -1065,9 +1065,8 @@ function _finishDeclineApp(appId, reason, role) {
       u.transferPending = false;
       u.status = 'vacant';
       allU[uIdx] = u;
-      sbSaveUnit(u).catch(function(e){
-        console.warn('[decline] sbSaveUnit failed:', e);
-        showToast('Could not save unit unassignment to server', { type:'error' });
+      saveUnitWithDraftFallback(u).then(function(ok){
+        if(!ok) showToast('Unit unassignment saved locally — will sync when network is available.', { type:'info', duration:3500 });
       });
       auditEntry(u.id, 'unit_unassigned',
         prevAddr + ' returned to vacant — applicant declined' + (reason ? ' (' + reason + ')' : ''),
@@ -1721,6 +1720,10 @@ function finalSubmit(){
   triggerV2Score();
   var id=saveApplicationRecord();
   var submittedApp = applications.find(function(a){ return a.id === id; }) || null;
+  // Lock the applicant-side signature panels immediately — the document is
+  // now a submitted record and the canvases shouldn't be alterable.
+  if (typeof _lockApplicantSignatures === 'function') _lockApplicantSignatures();
+  auditEntry(id, 'signatures_locked', 'Applicant / Co-Applicant / Staff signature panels locked on submission', window.currentRole||'staff');
   sendWorkflowEmail('submit', submittedApp);
   showSubmissionConfirmation(id, isFileUpdate);
 }
@@ -2164,6 +2167,108 @@ function _roleLabel(r) {
   return map[r] || r;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// SIGNATURE LOCKING — applicant-side panels only
+// Locked on application submission (status !== 'draft'). HM/ED
+// approval signatures are NOT touched; they're governed separately
+// by the approval workflow gates.
+// ═══════════════════════════════════════════════════════════════
+
+function _shouldLockApplicantSignatures(app) {
+  if (!app || !app.status) return false;
+  return app.status !== 'draft';
+}
+
+function _lockSignaturePanel(canvasId) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  var wrap = canvas.closest('.sig-canvas-wrap');
+  if (!wrap) return;
+  if (wrap.getAttribute('data-sig-locked') === '1') return; // idempotent
+  wrap.setAttribute('data-sig-locked', '1');
+
+  // Hide mode tabs.
+  var tabs = wrap.querySelector('.tab-bar');
+  if (tabs) tabs.style.display = 'none';
+
+  // Canvas inert.
+  canvas.style.pointerEvents = 'none';
+  canvas.style.cursor = 'default';
+
+  // Clear button hidden.
+  var canvasPanel = document.getElementById(canvasId + '_panel_canvas');
+  if (canvasPanel) {
+    var clearBtn = canvasPanel.querySelector('button');
+    if (clearBtn) clearBtn.style.display = 'none';
+  }
+
+  // Typed input readonly.
+  var typed = document.getElementById(canvasId + '_typed');
+  if (typed) { typed.readOnly = true; typed.style.opacity = '0.7'; typed.style.cursor = 'default'; }
+
+  // Wet-ref input readonly.
+  var wetRef = document.getElementById(canvasId + '_wet_ref');
+  if (wetRef) { wetRef.readOnly = true; wetRef.style.opacity = '0.7'; wetRef.style.cursor = 'default'; }
+
+  // "Locked" badge at the top of the wrap.
+  if (!wrap.querySelector('.sig-locked-badge')) {
+    var badge = document.createElement('div');
+    badge.className = 'sig-locked-badge';
+    badge.style.cssText = 'background:rgba(248,228,26,0.15);border:1px solid var(--yellow);color:var(--dark);padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px;';
+    badge.innerHTML = '🔒 Signed — locked on submission';
+    wrap.insertBefore(badge, wrap.firstChild);
+  }
+}
+
+function _unlockSignaturePanel(canvasId) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  var wrap = canvas.closest('.sig-canvas-wrap');
+  if (!wrap) return;
+  if (wrap.getAttribute('data-sig-locked') !== '1') return;
+  wrap.removeAttribute('data-sig-locked');
+
+  var badge = wrap.querySelector('.sig-locked-badge');
+  if (badge) badge.remove();
+
+  var tabs = wrap.querySelector('.tab-bar');
+  if (tabs) tabs.style.display = '';
+
+  canvas.style.pointerEvents = '';
+  canvas.style.cursor = 'crosshair';
+
+  var canvasPanel = document.getElementById(canvasId + '_panel_canvas');
+  if (canvasPanel) {
+    var clearBtn = canvasPanel.querySelector('button');
+    if (clearBtn) clearBtn.style.display = '';
+  }
+
+  var typed = document.getElementById(canvasId + '_typed');
+  if (typed) { typed.readOnly = false; typed.style.opacity = ''; typed.style.cursor = ''; }
+
+  var wetRef = document.getElementById(canvasId + '_wet_ref');
+  if (wetRef) { wetRef.readOnly = false; wetRef.style.opacity = ''; wetRef.style.cursor = ''; }
+}
+
+function _lockApplicantSignatures() {
+  _lockSignaturePanel('sig_canvas_app');
+  _lockSignaturePanel('sig_canvas_co');
+  _lockSignaturePanel('sig_canvas_staff');
+}
+
+function _unlockApplicantSignatures() {
+  _unlockSignaturePanel('sig_canvas_app');
+  _unlockSignaturePanel('sig_canvas_co');
+  _unlockSignaturePanel('sig_canvas_staff');
+}
+
+// Apply or remove the lock based on the application's current status. Safe to
+// call on every step transition / modal open — both helpers are idempotent.
+function _applySignatureLockState(app) {
+  if (_shouldLockApplicantSignatures(app)) _lockApplicantSignatures();
+  else _unlockApplicantSignatures();
+}
+
 function renderAppNotes() {
   var listEl  = document.getElementById('appNotesList');
   var countEl = document.getElementById('appNotesCount');
@@ -2226,13 +2331,18 @@ function submitAppNote() {
     return;
   }
   if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
-  sbAddAppNote(currentAppId, body).then(function() {
+  // Local-first: queue the note immediately. Renders on success or queued-fail
+  // both clear the textarea — the note will appear via the queue retry next
+  // time if the cloud insert failed.
+  saveAppNoteWithDraftFallback(currentAppId, body).then(function(ok) {
     ta.value = '';
     auditEntry && auditEntry(currentAppId, 'note_added', 'Internal note added (' + body.length + ' chars)');
-    renderAppNotes();
-    showToast && showToast('Note added.');
-  }).catch(function(e) {
-    if (errE) { errE.textContent = 'Failed to add note: ' + (e && e.message ? e.message : e); errE.style.display = 'block'; }
+    if(ok) {
+      renderAppNotes();
+      showToast && showToast('Note added.');
+    } else {
+      showToast && showToast('Note saved locally — will sync when network is available.', { type:'info', duration:3500 });
+    }
   }).finally(function() {
     if (btn) { btn.disabled = false; btn.textContent = '+ Add Note'; }
   });

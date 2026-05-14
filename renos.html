@@ -1838,7 +1838,7 @@ function raQuickApprove(unitId, approver, projectNumber) {
       auditEntry('UNIT:'+unitId,'sow_ed_approval',addr+' SOW'+projLabel+' approved by Executive Director',role);
     }
     units[idx]=u;
-    sbSaveUnit(u).catch(function(e){ console.warn('SOW approval unit save:',e); });
+    saveUnitWithDraftFallback(u);
     if(typeof housingUnits!=='undefined') housingUnits.splice(0,housingUnits.length,...units);
 
     // New per-SOW approval: update the specific SOW's approval_status so multi-SOW approvals track independently.

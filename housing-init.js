@@ -261,6 +261,8 @@ function newApp(){
   if (typeof _refreshAppNotesTabVisibility === 'function') _refreshAppNotesTabVisibility();
   var _noteTa = document.getElementById('appNoteBody');     if(_noteTa) _noteTa.value = '';
   var _noteEr = document.getElementById('appNoteError');    if(_noteEr) { _noteEr.style.display='none'; _noteEr.textContent=''; }
+  // Unlock signature panels — a fresh application is always editable.
+  if (typeof _unlockApplicantSignatures === 'function') _unlockApplicantSignatures();
 
   // Clear all form fields
   document.querySelectorAll('#appLayout input[type="text"], #appLayout input[type="email"], #appLayout input[type="tel"], #appLayout input[type="number"], #appLayout input[type="date"], #appLayout textarea').forEach(function(el){
@@ -1140,9 +1142,8 @@ function confirmAssignment() {
   if(isTransferReq) allApps[appIdx].transferPending = true;
   if(overrideNotes) allApps[appIdx].assignmentOverrideNotes = overrideNotes;
 
-  sbSaveUnit(allUnits.find(function(x){return x.id===unitId;})||{}).catch(function(e){
-    console.warn('[assign] sbSaveUnit failed:', e);
-    showToast('Could not save unit assignment to server', { type:'error' });
+  saveUnitWithDraftFallback(allUnits.find(function(x){return x.id===unitId;})||{}).then(function(ok){
+    if(!ok) showToast('Unit assignment saved locally — will sync when network is available.', { type:'info', duration:3500 });
   });
   saveApplicationWithDraftFallback(allApps[appIdx]).then(function(ok){
     if(!ok) showToast('Assignment saved locally — will sync when network is available.', { type:'info', duration:3500 });
@@ -1343,7 +1344,7 @@ function raQuickApprove(unitId, approver) {
       auditEntry('UNIT:'+unitId,'unit_status_auto',addr+' → Under Repair (quick-approved by '+(approver==='hm'?'HM':'ED')+')',role);
     }
     units[idx]=u;
-    sbSaveUnit(u).catch(function(e){ console.warn('SOW approval unit save:',e); });
+    saveUnitWithDraftFallback(u);
     if(typeof housingUnits!=='undefined') housingUnits.splice(0,housingUnits.length,...units);
     showToast('✓ '+addr+' SOW approved');
     renderRenoApprovalsView();
