@@ -795,14 +795,20 @@
     if(!app || !app.id){
       return Promise.reject(new Error('No application linked to this tenant.'));
     }
-    if(typeof sbSaveApplication !== 'function'){
-      return Promise.reject(new Error('sbSaveApplication is not available on this page.'));
+    if(typeof saveApplicationWithDraftFallback !== 'function' && typeof sbSaveApplication !== 'function'){
+      return Promise.reject(new Error('Application save helper is not available on this page.'));
     }
-    return Promise.resolve().then(function(){ return sbSaveApplication(app); }).then(function(ok){
-      // sbSaveApplication returns true on success, false on HTTP error (logs to
-      // console). Convert the false case to a rejection so save handlers can
-      // toast an error and red-border the input rather than claiming success.
-      if(ok === false){ throw new Error('Supabase save failed (see console for details)'); }
+    var _save = (typeof saveApplicationWithDraftFallback === 'function')
+      ? saveApplicationWithDraftFallback(app)
+      : sbSaveApplication(app);
+    return Promise.resolve(_save).then(function(ok){
+      // saveApplicationWithDraftFallback resolves true (synced) or false
+      // (queued locally — will sync later). Either way the local draft is
+      // safe, so we treat both as success here. The legacy sbSaveApplication
+      // path resolves true or throws; the throw is handled by .catch below.
+      if(ok === false){
+        if(typeof showToast === 'function') showToast('Saved locally — will sync when network is available.', { type:'info', duration:3500 });
+      }
       var arr = (typeof applications !== 'undefined' && applications) || null;
       if(arr && arr.length){
         for(var i=0;i<arr.length;i++){

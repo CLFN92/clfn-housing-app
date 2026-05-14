@@ -365,7 +365,7 @@ function saveUnitEdit(){
       apps3[aIdx].assignedAddress = (u.num+' '+u.street).trim();
       apps3[aIdx].status          = APP_STATUS.ASSIGNED;
       apps3[aIdx].assignedAt      = new Date().toISOString();
-      sbSaveApplication(apps3[aIdx]).catch(function(e){ console.warn('App assignment save failed:', e); });
+      saveApplicationWithDraftFallback(apps3[aIdx]);
     }
   }
   // If the unit had a different tenant before, return that prior application
@@ -378,7 +378,7 @@ function saveUnitEdit(){
       apps4[prevIdx].assignedUnit    = null;
       apps4[prevIdx].assignedAddress = null;
       apps4[prevIdx].status          = APP_STATUS.ED_APPROVED;
-      sbSaveApplication(apps4[prevIdx]).catch(function(e){ console.warn('App unassign save failed:', e); });
+      saveApplicationWithDraftFallback(apps4[prevIdx]);
     }
   }
   // UNIT: prefix is required so shared-data.js auditEntry classifies the
@@ -797,7 +797,7 @@ function saveEdAdjustment(){
       .reduce(function(sum,k){return sum+(bd[k]||0);},0);
     applications[idx].score = base + pts;
   }
-  sbSaveApplication(applications[idx]).catch(function(e){ console.warn('ED adj save failed:',e); });
+  saveApplicationWithDraftFallback(applications[idx]);
   auditEntry(app.id, 'ed_adjustment', 'ED adjusted score by '+(pts>=0?'+':'')+pts+(reason?' — '+reason:''), CLFN_PERMS.roleLabel(ROLE.ED));
   // Update display
   window._currentScorecardApp = applications[idx];
@@ -2459,8 +2459,9 @@ function confirmApprovalAction() {
     };
   }
 
-  // Persist to Supabase
-  sbSaveApplication(applications[idx]).catch(function(e){ console.warn('Approval save failed:',e); });
+  // Persist via the local-first wrapper so a PGRST303 / 401 on iPad doesn't
+  // drop the approval action.
+  saveApplicationWithDraftFallback(applications[idx]);
 
   // Audit
   auditEntry(app.id, 'status_change',

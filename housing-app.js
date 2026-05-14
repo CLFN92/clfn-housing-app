@@ -1083,9 +1083,8 @@ function _finishDeclineApp(appId, reason, role) {
   applications[idx].declinedAt  = new Date().toISOString().split('T')[0];
   applications[idx].declinedBy  = role;
   if (reason) applications[idx].declinedReason = reason;
-  sbSaveApplication(applications[idx]).catch(function(e){
-    console.warn('[decline] sbSaveApplication failed:', e);
-    showToast('Could not save decline to server', { type:'error' });
+  saveApplicationWithDraftFallback(applications[idx]).then(function(ok){
+    if(!ok) showToast('Decline saved locally — will sync when network is available.', { type:'info', duration:3500 });
   });
   auditEntry(appId, 'status',
     'Application declined' + (hadUnit ? ' (and unit assignment unwound)' : '') + (reason ? ' — ' + reason : ''),
@@ -1114,9 +1113,8 @@ function _handleAppMenuAction(action, appId) {
     applications[idx].archived = false;
     applications[idx].archivedAt = null;
     applications[idx].archivedBy = null;
-    sbSaveApplication(applications[idx]).catch(function(e){
-      console.warn('[unarchive] sbSaveApplication failed:', e);
-      showToast('Could not save unarchive to server', { type:'error' });
+    saveApplicationWithDraftFallback(applications[idx]).then(function(ok){
+      if(!ok) showToast('Unarchive saved locally — will sync when network is available.', { type:'info', duration:3500 });
     });
     auditEntry(appId, 'unarchived', 'Application restored from archive', role);
     updateDashStats(); renderDashTable();
@@ -1146,9 +1144,8 @@ function _handleAppMenuAction(action, appId) {
     applications[idx].declinedReason = null;
     // Single save AFTER all metadata is cleared — earlier code saved twice,
     // and the first save fired before the declined* fields were nulled.
-    sbSaveApplication(applications[idx]).catch(function(e){
-      console.warn('[restore] sbSaveApplication failed:', e);
-      showToast('Could not save restore to server', { type:'error' });
+    saveApplicationWithDraftFallback(applications[idx]).then(function(ok){
+      if(!ok) showToast('Restore saved locally — will sync when network is available.', { type:'info', duration:3500 });
     });
     auditEntry(appId, 'status', 'Application restored to submitted', role);
     updateDashStats(); renderDashTable();

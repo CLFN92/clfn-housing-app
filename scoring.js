@@ -1848,7 +1848,8 @@ function archiveApplication(appId) {
   app.archived   = true;
   app.archivedAt = new Date().toISOString().split('T')[0];
   app.archivedBy = role;
-  sbSaveApplication(app).catch(function(e){ console.warn('Archive save failed:',e); });
+  if(typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(app);
+  else sbSaveApplication(app).catch(function(e){ console.warn('Archive save failed:',e); });
   auditEntry(appId, 'archived',
     'Application archived' + (linkedUnitId ? ' — unit docs bundled for ' + linkedUnitId : ''),
     role);
@@ -1892,7 +1893,8 @@ function archiveUnit(unitId) {
     sbSaveUnit(u).catch(function(e){ console.warn('Unit archive save failed:',e); });
     applications.forEach(function(a){
       if(a.archived && (a.assignedUnit===unitId||a.assignedUnitId===unitId)){
-        sbSaveApplication(a).catch(function(e){ console.warn('Linked app archive save failed:',e); });
+        if(typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
+        else sbSaveApplication(a).catch(function(e){ console.warn('Linked app archive save failed:',e); });
       }
     });
     auditEntry('UNIT:' + unitId, 'unit_archived',

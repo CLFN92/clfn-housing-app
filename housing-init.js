@@ -1144,9 +1144,8 @@ function confirmAssignment() {
     console.warn('[assign] sbSaveUnit failed:', e);
     showToast('Could not save unit assignment to server', { type:'error' });
   });
-  sbSaveApplication(allApps[appIdx]).catch(function(e){
-    console.warn('[assign] sbSaveApplication failed:', e);
-    showToast('Could not save application assignment to server', { type:'error' });
+  saveApplicationWithDraftFallback(allApps[appIdx]).then(function(ok){
+    if(!ok) showToast('Assignment saved locally — will sync when network is available.', { type:'info', duration:3500 });
   });
   // Sync in-memory housingUnits array so all views reflect the change immediately
   if(typeof housingUnits!=='undefined') housingUnits.splice(0, housingUnits.length, ...allUnits);
@@ -1929,7 +1928,9 @@ function reconcileAssignments(){
     }
     if(changed){
       fixed++;
-      if(typeof sbSaveApplication === 'function'){
+      if(typeof saveApplicationWithDraftFallback === 'function'){
+        saveApplicationWithDraftFallback(app);
+      } else if(typeof sbSaveApplication === 'function'){
         sbSaveApplication(app).catch(function(e){ console.warn('[reconcile] save app failed:', e); });
       }
     }
