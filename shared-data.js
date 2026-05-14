@@ -3443,6 +3443,17 @@ function renderRenosView(){
                : activeFilter === 'condemned' ? allReno.filter(function(u){ return u.status==='condemned'; })
                : allReno;
 
+  // Search filter — address or contractor (resolved via the unit's SOW).
+  var _renoSearch = ((document.getElementById('renos_search')||{}).value || '').toLowerCase().trim();
+  if (_renoSearch) {
+    filtered = filtered.filter(function(u){
+      var addr = ((u.num||'') + ' ' + (u.street||'')).toLowerCase();
+      var sow  = getSowData(u.id) || {};
+      var cont = (sow.contractor || '').toLowerCase();
+      return addr.indexOf(_renoSearch) !== -1 || cont.indexOf(_renoSearch) !== -1;
+    });
+  }
+
   // ── Pill chips ────────────────────────────────────────────────────────────
   var repairCount    = allReno.filter(function(u){ return u.status==='under_repair'; }).length;
   var condemnedCount = allReno.filter(function(u){ return u.status==='condemned'; }).length;

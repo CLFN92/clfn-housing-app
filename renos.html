@@ -64,6 +64,11 @@
     </div>
   </div>
 
+  <!-- Search -->
+  <div style="margin-bottom:12px;">
+    <input id="ra_search" class="std-filter-control" type="text" placeholder="🔍 Search address, project #, or contractor..." oninput="renderRenoApprovalsView()" style="width:100%;max-width:520px;"/>
+  </div>
+
   <!-- Stat chips -->
   <div id="ra_chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
 
@@ -112,6 +117,10 @@
       <h1>Renovations</h1>
       <p>Units under repair or condemned — click a unit to view progress</p>
     </div>
+  </div>
+  <!-- Search -->
+  <div style="margin-bottom:12px;">
+    <input id="renos_search" class="std-filter-control" type="text" placeholder="🔍 Search address or contractor..." oninput="renderRenosView()" style="width:100%;max-width:520px;"/>
   </div>
   <div id="renos_unified" style="width:100%;"></div>
 </div><!-- end renosView -->
@@ -1694,6 +1703,19 @@ function renderRenoApprovalsView() {
 
   // Filter by status tab
   var filtered = _raFilter ? rows.filter(function(r){ return r.appr.key===_raFilter; }) : rows;
+
+  // Filter by search query — matches address, project number, or contractor.
+  var _raSearch = ((document.getElementById('ra_search')||{}).value || '').toLowerCase().trim();
+  if (_raSearch) {
+    filtered = filtered.filter(function(r){
+      var addr = ((r.u.num||'') + ' ' + (r.u.street||'')).toLowerCase();
+      var proj = (r.projectNumber || '').toLowerCase();
+      var cont = (r.sow && r.sow.contractor || '').toLowerCase();
+      return addr.indexOf(_raSearch) !== -1
+          || proj.indexOf(_raSearch) !== -1
+          || cont.indexOf(_raSearch) !== -1;
+    });
+  }
 
   // Sort: priority desc, then address, then project # for stable ordering within a unit
   filtered.sort(function(a,b){
