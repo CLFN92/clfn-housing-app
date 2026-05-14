@@ -333,15 +333,28 @@ function goTo(s){
     clearStepErrors('step5','step5_error_banner');
   }
 
-  // Auto-save draft on every forward step
+  // Auto-save draft on every forward step.
+  // Local-first: saveApplicationWithDraftFallback writes to localStorage
+  // synchronously, then attempts the Supabase upsert in the background.
+  // Network/auth failures no longer drop edits.
   if(s > cur) {
     var _ds = saveApplicationRecord({draft: true});
     if(_ds) {
       var _da = applications.find(function(a){ return a.id===_ds; });
-      if(_da) sbSaveApplication(_da).catch(function(e){
-        console.warn('[draft autosave] sbSaveApplication failed:', e);
-        showToast('Draft auto-save failed — your changes are still in memory', { type:'error' });
-      });
+      if(_da && typeof saveApplicationWithDraftFallback === 'function') {
+        saveApplicationWithDraftFallback(_da).then(function(ok){
+          if(!ok) {
+            // Cloud sync failed but local copy is safe; keep the message gentle.
+            showToast('Saved locally — will sync when network is available.', { type:'info', duration:3500 });
+          }
+        });
+      } else if(_da) {
+        // Defensive fallback if the helper isn't loaded yet.
+        sbSaveApplication(_da).catch(function(e){
+          console.warn('[draft autosave] sbSaveApplication failed:', e);
+          showToast('Draft auto-save failed — your changes are still in memory', { type:'error' });
+        });
+      }
       // Application now exists in-memory → enable the Internal Notes tab.
       if (typeof _refreshAppNotesTabVisibility === 'function') _refreshAppNotesTabVisibility();
     }

@@ -50,35 +50,49 @@ function showToast(msg, opts) {
   var duration = opts.duration || 2800;
   var position = opts.position || 'top';
   var isError  = opts.type === 'error';
+  var isInfo   = opts.type === 'info';
+
+  // Reuse a single fixed-position stack so multiple toasts queue vertically
+  // instead of stacking on top of each other at the same coordinates. Without
+  // this, two errors fired back-to-back are completely unreadable.
+  function _ensureStack() {
+    var stackId = position === 'bottom' ? '_clfn_toast_stack_b' : '_clfn_toast_stack_t';
+    var s = document.getElementById(stackId);
+    if (s) return s;
+    s = document.createElement('div');
+    s.id = stackId;
+    var posCss = position === 'bottom' ? 'bottom:24px;top:auto;' : 'top:20px;';
+    s.style.cssText = [
+      'position:fixed;', posCss,
+      'left:50%;transform:translateX(-50%);',
+      'display:flex;flex-direction:' + (position === 'bottom' ? 'column-reverse' : 'column') + ';gap:8px;',
+      'align-items:center;z-index:99999;pointer-events:none;',
+      'max-width:calc(100vw - 24px);'
+    ].join('');
+    return s;
+  }
 
   var t = document.createElement('div');
   t.textContent = msg;
-
-  var pos = position === 'bottom'
-    ? 'bottom:24px;top:auto;'
-    : 'top:20px;';
   var colors = isError
     ? 'background:#3b0a0a;color:#fca5a5;border:1.5px solid #7f1d1d;'
-    : 'background:#111;color:#F8E41A;';
-
+    : isInfo
+      ? 'background:#0b1d3b;color:#bfdbfe;border:1.5px solid #1d4ed8;'
+      : 'background:#111;color:#F8E41A;';
   t.style.cssText = [
-    'position:fixed;', pos,
-    'left:50%;transform:translateX(-50%);',
     colors,
     'padding:10px 22px;border-radius:8px;',
     'font-size:13px;font-weight:600;font-family:DM Sans,sans-serif;',
-    'z-index:99999;box-shadow:0 4px 24px rgba(0,0,0,0.5);',
-    'white-space:nowrap;pointer-events:none;'
+    'box-shadow:0 4px 24px rgba(0,0,0,0.5);',
+    'max-width:100%;text-align:center;pointer-events:auto;',
+    // Multi-line allowed so long PostgREST errors aren't truncated.
+    'white-space:pre-wrap;word-break:break-word;'
   ].join('');
+  // Tap-to-dismiss on touch devices.
+  t.addEventListener('click', function(){ if(t.parentNode) t.remove(); });
 
-  // Defensive: if showToast fires during early boot (e.g. a role check
-  // bails out before body is attached), document.body is null and the
-  // appendChild crashes the init flow. Defer the mount in that case so
-  // the message still surfaces once the page is ready instead of taking
-  // down the rest of the script with it.
   function _mount() {
     if (!document.body) {
-      // Body still not ready — try once more on DOMContentLoaded, then give up.
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', _mount, { once: true });
       } else {
@@ -86,8 +100,13 @@ function showToast(msg, opts) {
       }
       return;
     }
-    document.body.appendChild(t);
-    setTimeout(function() { if(t.parentNode) t.remove(); }, duration);
+    var stack = _ensureStack();
+    if (!stack.parentNode) document.body.appendChild(stack);
+    stack.appendChild(t);
+    setTimeout(function() {
+      if (t.parentNode) t.remove();
+      if (stack.parentNode && !stack.children.length) stack.remove();
+    }, duration);
   }
   _mount();
 }

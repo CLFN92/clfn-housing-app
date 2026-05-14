@@ -2741,6 +2741,12 @@ document.addEventListener('DOMContentLoaded', function(){
       if(HOUSING_SESSION.email && typeof resolveHousingRole === 'function') {
         await resolveHousingRole();
       }
+      // Drain any drafts that the previous session left in localStorage because
+      // the cloud upsert failed (network blip, PGRST303, etc). Silent on
+      // empty queue. Fires after auth is resolved so the Bearer token is fresh.
+      if(typeof syncDraftQueue === 'function') {
+        syncDraftQueue().catch(function(e){ console.warn('[boot] syncDraftQueue:', e); });
+      }
       await loadHousingData();
       initHousingPage();
       if (document.body) document.body.style.opacity = '1';

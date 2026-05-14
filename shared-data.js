@@ -232,6 +232,103 @@ async function sbSaveApplication(app) {
   }
 }
 
+// ── Local-first draft queue ───────────────────────────────────────────────────
+// On flaky networks (iPad cellular, marginal wifi) and on PostgREST auth errors
+// (PGRST301/302/303), the in-flight sbSaveApplication call rejects and the
+// applicant's edits would be lost on tab close. The queue keeps every save
+// attempt in localStorage immediately so nothing disappears, then drains in
+// the background and on next boot.
+//
+// Storage shape (key = APP_DRAFT_QUEUE_KEY):
+//   {
+//     [appId]: {
+//       app: { ...full app object... },
+//       updatedAt: '2026-05-14T10:33:00.000Z',
+//       lastError:  'save failed (401): {...PGRST303...}'  // optional
+//     }
+//   }
+// Entries are removed from the queue on successful sync.
+var APP_DRAFT_QUEUE_KEY = 'clfn_housing_draft_queue';
+
+function _draftQueueRead(){
+  try {
+    var raw = localStorage.getItem(APP_DRAFT_QUEUE_KEY);
+    if(!raw) return {};
+    var parsed = JSON.parse(raw);
+    return (parsed && typeof parsed === 'object') ? parsed : {};
+  } catch(e) { return {}; }
+}
+
+function _draftQueueWrite(map){
+  try { localStorage.setItem(APP_DRAFT_QUEUE_KEY, JSON.stringify(map || {})); }
+  catch(e) { console.warn('[draft-queue] write failed:', e); }
+}
+
+function appDraftQueueAdd(app, lastError){
+  if(!app || !app.id) return;
+  var map = _draftQueueRead();
+  map[app.id] = {
+    app:        app,
+    updatedAt:  new Date().toISOString(),
+    lastError:  lastError || null
+  };
+  _draftQueueWrite(map);
+}
+
+function appDraftQueueRemove(appId){
+  if(!appId) return;
+  var map = _draftQueueRead();
+  if(map[appId]) { delete map[appId]; _draftQueueWrite(map); }
+}
+
+function appDraftQueueGetAll(){
+  var map = _draftQueueRead();
+  return Object.keys(map).map(function(id){ return Object.assign({ appId: id }, map[id]); });
+}
+
+// saveApplicationWithDraftFallback — write to localStorage FIRST, then push to
+// Supabase in the background. Never throws. Returns a Promise<bool> indicating
+// whether the cloud sync succeeded. The local copy is always preserved.
+function saveApplicationWithDraftFallback(app){
+  if(!app || !app.id) return Promise.resolve(false);
+  // Always stash locally before touching the network.
+  appDraftQueueAdd(app, null);
+  return sbSaveApplication(app).then(function(){
+    appDraftQueueRemove(app.id);
+    return true;
+  }).catch(function(err){
+    var msg = (err && err.message) ? err.message : String(err);
+    appDraftQueueAdd(app, msg);
+    console.warn('[draft-queue] cloud sync failed for ' + app.id + ' — kept in queue:', msg);
+    return false;
+  });
+}
+
+// syncDraftQueue — called on boot after auth resolves. Tries to push every
+// queued draft to Supabase, in parallel. Successes drop out of the queue;
+// failures stay for next time. Silent on success; logs only.
+function syncDraftQueue(){
+  var entries = appDraftQueueGetAll();
+  if(!entries.length) return Promise.resolve({ tried:0, synced:0 });
+  console.log('[draft-queue] retrying ' + entries.length + ' unsynced draft(s)…');
+  var synced = 0;
+  return Promise.all(entries.map(function(entry){
+    return sbSaveApplication(entry.app).then(function(){
+      appDraftQueueRemove(entry.appId);
+      synced++;
+    }).catch(function(err){
+      var msg = (err && err.message) ? err.message : String(err);
+      appDraftQueueAdd(entry.app, msg);
+      console.warn('[draft-queue] retry failed for ' + entry.appId + ':', msg);
+    });
+  })).then(function(){
+    if(synced > 0 && typeof showToast === 'function'){
+      showToast(synced + ' draft' + (synced === 1 ? '' : 's') + ' synced from local backup.');
+    }
+    return { tried: entries.length, synced: synced };
+  });
+}
+
 // ── sbSaveAllApplications ─────────────────────────────────────────────────────
 // Batch upsert — used during localStorage→Supabase migration and bulk ops.
 async function sbSaveAllApplications(apps) {
