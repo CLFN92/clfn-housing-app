@@ -30,7 +30,6 @@
 
 // ── Module-level state ────────────────────────────────────────────────────────
 // Declare all implicit globals here so they're never undefined on first access.
-var _raFilter        = '';   // reno approvals active filter key
 var _scoresSortKey   = 'score';
 var _scoresSortDir   = -1;
 
@@ -2713,10 +2712,6 @@ function printWorkOrder(){
     setTimeout(function(){ w.print(); }, 400);
   }
 }
-function raSetFilter(f) {
-  _raFilter = f;
-  renderRenoApprovalsView();
-}
 function recalcSowTotal(){
   var total=0;
   document.querySelectorAll('#sow_items [data-sow="cost"]').forEach(function(inp){
@@ -3439,18 +3434,14 @@ function renderRenosView(){
     return (u.status==='under_repair' || u.status==='condemned') && !u.archived;
   });
 
-  function byScore(a,b){ return calcRenoScore(b.id).score - calcRenoScore(a.id).score; }
-  allReno.sort(byScore);
-
-  // Active filter — stored on window so pill clicks re-render
-  var activeFilter = window._renoViewFilter || 'all';
-
-  var filtered = activeFilter === 'repair'    ? allReno.filter(function(u){ return u.status==='under_repair'; })
-               : activeFilter === 'condemned' ? allReno.filter(function(u){ return u.status==='condemned'; })
-               : allReno;
+  // Default sort — priority desc. Stays in effect until the user picks
+  // a column-menu sort (tableApplyFilterSort preserves this when no
+  // sort key is set).
+  allReno.sort(function(a,b){ return calcRenoScore(b.id).score - calcRenoScore(a.id).score; });
 
   // Search filter — scans every visible column.
   var _renoSearch = ((document.getElementById('renos_search')||{}).value || '').toLowerCase().trim();
+  var filtered = allReno;
   if (_renoSearch) {
     filtered = filtered.filter(function(u){
       var sow  = getSowData(u.id) || {};
@@ -3462,27 +3453,6 @@ function renderRenosView(){
     });
   }
 
-  // ── Pill chips ────────────────────────────────────────────────────────────
-  var repairCount    = allReno.filter(function(u){ return u.status==='under_repair'; }).length;
-  var condemnedCount = allReno.filter(function(u){ return u.status==='condemned'; }).length;
-
-  var chipDefs = [
-    { key:'all',       label:'All',             count: allReno.length },
-    { key:'repair',    label:'🔨 Under Repair',  count: repairCount },
-    { key:'condemned', label:'🚫 Condemned',     count: condemnedCount },
-  ];
-
-  function chip(def) {
-    var active = activeFilter === def.key;
-    return '<button onclick="window._renoViewFilter=\''+def.key+'\';renderRenosView();" style="'
-      +'display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;border:1.5px solid '
-      +(active ? 'var(--yellow);background:var(--yellow);color:var(--text);font-weight:700;' : 'var(--border);background:none;color:var(--muted);font-weight:600;')
-      +'font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif;transition:all .15s;">'
-      +def.label
-      +' <span style="font-size:11px;font-weight:800;padding:1px 7px;border-radius:10px;background:'+(active?'rgba(0,0,0,.15)':'var(--surface)')+';">'+def.count+'</span>'
-      +'</button>';
-  }
-
   function scoreBadge(uid){
     var r=calcRenoScore(uid); var s=r.score;
     var tier=s>=40?{label:'Critical',c:'#b91c1c',bg:'#fef2f2'}:s>=25?{label:'High',c:'#7a6000',bg:'#fef9ec'}:s>=12?{label:'Medium',c:'#1d4ed8',bg:'#eff6ff'}:{label:'Low',c:'#15803d',bg:'#f0fdf4'};
@@ -3490,71 +3460,81 @@ function renderRenosView(){
       +' <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+tier.bg+';color:'+tier.c+';">'+tier.label+'</span>';
   }
 
-  var cols = '<colgroup>'
-    +'<col style="width:30%"/><col style="width:8%"/><col style="width:12%"/>'
-    +'<col style="width:22%"/><col style="width:12%"/><col style="width:10%"/><col style="width:6%"/>'
-    +'</colgroup>';
+  // ── Column-menu sort + filter (Phase 2B) ─────────────────────
+  var _renosColumns = {
+    addr:       { label: 'Address',    accessor: function(u){ return ((u.num||'')+' '+(u.street||'')).trim(); } },
+    bedrooms:   { label: 'Beds',       accessor: function(u){ return parseInt(u.bedrooms, 10) || 0; } },
+    status:     { label: 'Status',     accessor: function(u){ return u.status === 'condemned' ? 'Condemned' : 'Under Repair'; } },
+    progress:   { label: 'Progress',   accessor: function(u){ var p=getRenoProgress(u.id); return p && p.overallPct || 0; } },
+    contractor: { label: 'Contractor', accessor: function(u){ var s=getSowData(u.id); return (s && s.contractor) || '(none)'; } },
+    priority:   { label: 'Priority',   accessor: function(u){ return calcRenoScore(u.id).score || 0; } }
+  };
+  var _renosAccessors = {};
+  Object.keys(_renosColumns).forEach(function(k){ _renosAccessors[k] = _renosColumns[k].accessor; });
 
-  var thead = '<thead><tr style="background:var(--dark2);border-bottom:2px solid var(--yellow);">'
-    +'<th style="text-align:left;padding:9px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Address</th>'
-    +'<th style="text-align:center;padding:9px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Beds</th>'
-    +'<th class="js-th">Status</th>'
-    +'<th class="js-th">Progress</th>'
-    +'<th class="js-th">Contractor</th>'
-    +'<th class="js-th">Priority</th>'
-    +'<th style="padding:9px 14px;"></th>'
-    +'</tr></thead>';
+  var _renosState = (typeof tableStateGet === 'function') ? tableStateGet('renos') : { sort:{key:'',dir:1}, filters:{} };
 
-  var rows = filtered.length ? filtered.map(function(u){
-    var isCondemned = u.status === 'condemned';
-    var statusPill = isCondemned
-      ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:var(--danger-bg);color:var(--danger);">🚫 Condemned</span>'
-      : '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:var(--warn-amber-bg);color:var(--warn-amber);">🔨 Under Repair</span>';
-    var sow=getSowData(u.id);
-    var prog=getRenoProgress(u.id);
-    var pct=prog.overallPct||0;
-    var progressCell=sow
-      ?'<div style="font-size:12px;font-weight:600;margin-bottom:3px;">'+(prog.status||'No updates yet')+(pct?' — '+pct+'%':'')+'</div>'
-        +'<div style="height:4px;width:100px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'var(--success)':'var(--yellow)')+';border-radius:2px;"></div></div>'
-      :'<span class="js-lbl-sm">No SOW filed</span>';
-    var ctName=sow&&sow.contractor?sow.contractor:'—';
-    return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-rpid="'+u.id+'">'
-      +'<td style="padding:10px 14px;font-weight:600;font-size:13px;'+(isCondemned?'color:var(--danger);':'')+'">'+u.num+' '+u.street+'</td>'
-      +'<td style="padding:10px 10px;text-align:center;font-weight:700;">'+u.bedrooms+'</td>'
-      +'<td class="pad-10">'+statusPill+'</td>'
-      +'<td class="pad-10">'+progressCell+'</td>'
-      +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);">'+ctName+'</td>'
-      +'<td class="pad-10">'+scoreBadge(u.id)+'</td>'
-      +'<td style="padding:10px 14px;text-align:right;white-space:nowrap;">'
-        +'<div style="display:flex;gap:5px;justify-content:flex-end;">'
-        +'<button type="button" data-sow-rpid="'+u.id+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;color:var(--muted);">🔨 SOW</button>'
-        +'<button type="button" data-rp-rpid="'+u.id+'" style="background:var(--yellow);border:1px solid var(--yellow);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;color:var(--dark);">📊 Progress</button>'
-        +'</div>'
-      +'</td></tr>';
-  }).join('')
-  : '<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--muted);">No units match this filter.</td></tr>';
+  if (typeof tableRegisterColumns === 'function') {
+    tableRegisterColumns('renos', {
+      columns:  _renosColumns,
+      getRows:  function(){ return filtered; },
+      onChange: renderRenosView
+    });
+  }
 
-  var container = document.getElementById('renos_unified');
-  if(!container) return;
+  var _renosRows = (typeof tableApplyFilterSort === 'function')
+    ? tableApplyFilterSort(filtered, _renosAccessors, _renosState)
+    : filtered;
 
-  container.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">'
-    + chipDefs.map(chip).join('') + '</div>'
-    + '<div class="card" style="padding:0;overflow:hidden;">'
-    + '<table class="std-tbl">'+cols+thead+'<tbody id="renos_unified_tbody">'+rows+'</tbody></table>'
-    + '</div>';
+  var tbody = document.getElementById('renos_tbody');
+  if(!tbody) return;
 
-  var tbody2 = document.getElementById('renos_unified_tbody');
-  if(tbody2){
-    tbody2.querySelectorAll('[data-rpid]').forEach(function(row){
+  if(!_renosRows.length){
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--muted);">No units match the current filters.</td></tr>';
+  } else {
+    tbody.innerHTML = _renosRows.map(function(u){
+      var isCondemned = u.status === 'condemned';
+      var statusPill = isCondemned
+        ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:var(--danger-bg);color:var(--danger);">🚫 Condemned</span>'
+        : '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:var(--warn-amber-bg);color:var(--warn-amber);">🔨 Under Repair</span>';
+      var sow=getSowData(u.id);
+      var prog=getRenoProgress(u.id);
+      var pct=prog.overallPct||0;
+      var progressCell=sow
+        ?'<div style="font-size:12px;font-weight:600;margin-bottom:3px;">'+(prog.status||'No updates yet')+(pct?' — '+pct+'%':'')+'</div>'
+          +'<div style="height:4px;width:100px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'var(--success)':'var(--yellow)')+';border-radius:2px;"></div></div>'
+        :'<span class="js-lbl-sm">No SOW filed</span>';
+      var ctName=sow&&sow.contractor?sow.contractor:'—';
+      return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-rpid="'+u.id+'">'
+        +'<td style="padding:10px 14px;font-weight:600;font-size:13px;'+(isCondemned?'color:var(--danger);':'')+'">'+u.num+' '+u.street+'</td>'
+        +'<td style="padding:10px 10px;text-align:center;font-weight:700;">'+u.bedrooms+'</td>'
+        +'<td class="pad-10">'+statusPill+'</td>'
+        +'<td class="pad-10">'+progressCell+'</td>'
+        +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);">'+ctName+'</td>'
+        +'<td class="pad-10">'+scoreBadge(u.id)+'</td>'
+        +'<td style="padding:10px 14px;text-align:right;white-space:nowrap;">'
+          +'<div style="display:flex;gap:5px;justify-content:flex-end;">'
+          +'<button type="button" data-sow-rpid="'+u.id+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;color:var(--muted);">🔨 SOW</button>'
+          +'<button type="button" data-rp-rpid="'+u.id+'" style="background:var(--yellow);border:1px solid var(--yellow);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;color:var(--dark);">📊 Progress</button>'
+          +'</div>'
+        +'</td></tr>';
+    }).join('');
+
+    tbody.querySelectorAll('[data-rpid]').forEach(function(row){
       row.addEventListener('click',function(){ openRenoProgress(row.getAttribute('data-rpid')); });
     });
-    tbody2.querySelectorAll('[data-sow-rpid]').forEach(function(btn){
+    tbody.querySelectorAll('[data-sow-rpid]').forEach(function(btn){
       btn.addEventListener('click',function(e){ e.stopPropagation(); openSowModal(btn.getAttribute('data-sow-rpid')); });
     });
-    tbody2.querySelectorAll('[data-rp-rpid]').forEach(function(btn){
+    tbody.querySelectorAll('[data-rp-rpid]').forEach(function(btn){
       btn.addEventListener('click',function(e){ e.stopPropagation(); openRenoProgress(btn.getAttribute('data-rp-rpid')); });
     });
   }
+
+  // Column-menu click + sort indicators
+  var _renosThead = document.getElementById('renos_thead');
+  if (typeof tableBindColumnMenuClicks === 'function')   tableBindColumnMenuClicks(_renosThead, 'renos');
+  if (typeof tableRefreshSortIndicators === 'function') tableRefreshSortIndicators(_renosThead, 'renos');
 }
 
 function renderScoresTable() {

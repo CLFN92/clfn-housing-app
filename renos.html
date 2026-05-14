@@ -65,41 +65,27 @@
   </div>
 
   <!-- Search -->
-  <div class="std-search-row">
+  <div class="std-search-row std-search-row-wide">
     <input id="ra_search" class="std-search" type="text" placeholder="🔍 Search address, project #, contractor, status, or cost..." oninput="renderRenoApprovalsView()"/>
-  </div>
-
-  <!-- Stat chips -->
-  <div id="ra_chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
-
-  <!-- Status filter tabs -->
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;" id="ra_filter_tabs">
-    <button onclick="raSetFilter('')"                 id="ra_tab_all"     class="btn btn-ghost btn-chip">All SOWs</button>
-    <button onclick="raSetFilter('no_sow')"           id="ra_tab_nosow"   class="btn btn-ghost btn-chip">📋 No SOW Filed</button>
-    <button onclick="raSetFilter('pending_hm')"       id="ra_tab_phm"     class="btn btn-ghost btn-chip">⏳ Pending HM</button>
-    <button onclick="raSetFilter('pending_ed')"       id="ra_tab_ped"     class="btn btn-ghost btn-chip">📋 Pending ED</button>
-    <button onclick="raSetFilter('approved')"         id="ra_tab_app"     class="btn btn-ghost btn-chip">✅ Approved</button>
-    <button onclick="raSetFilter('in_progress')"      id="ra_tab_prog"    class="btn btn-ghost btn-chip">🔨 In Progress</button>
-    <button onclick="raSetFilter('complete')"         id="ra_tab_done"    class="btn btn-ghost btn-chip">✅ Complete</button>
   </div>
 
   <!-- Table -->
   <div class="std-table-card">
     <div class="doclib-table-wrap">
       <table id="ra_table" class="std-table" style="min-width:760px;">
-        <thead>
+        <thead id="ra_thead">
           <tr>
-            <th>Address</th>
-            <th style="width:155px;">Project #</th>
-            <th style="width:80px;">Priority</th>
-            <th style="width:80px;">SOW Cost</th>
-            <th style="width:130px;">Approval Status</th>
-            <th style="width:110px;">Contractor</th>
-            <th style="width:80px;">Progress</th>
+            <th class="std-th-sortable" data-sort-key="addr">Address</th>
+            <th class="std-th-sortable" data-sort-key="projectNumber" style="width:155px;">Project #</th>
+            <th class="std-th-sortable" data-sort-key="priority" style="width:80px;">Priority</th>
+            <th class="std-th-sortable" data-sort-key="cost" style="width:80px;">SOW Cost</th>
+            <th class="std-th-sortable" data-sort-key="approval" style="width:130px;">Approval Status</th>
+            <th class="std-th-sortable" data-sort-key="contractor" style="width:110px;">Contractor</th>
+            <th class="std-th-sortable" data-sort-key="progress" style="width:80px;">Progress</th>
             <th style="width:1%;white-space:nowrap;"></th>
           </tr>
         </thead>
-        <tbody id="ra_tbody"><tr><td colspan="8" class="empty-state" style="padding:40px;text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+        <tbody id="ra_tbody" data-table-page="ra"><tr><td colspan="8" class="empty-state" style="padding:40px;text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -119,10 +105,27 @@
     </div>
   </div>
   <!-- Search -->
-  <div class="std-search-row">
+  <div class="std-search-row std-search-row-wide">
     <input id="renos_search" class="std-search" type="text" placeholder="🔍 Search address, contractor, status, project #, or bedrooms..." oninput="renderRenosView()"/>
   </div>
-  <div id="renos_unified" style="width:100%;"></div>
+  <div class="std-table-card">
+    <div class="doclib-table-wrap">
+      <table class="std-table" style="min-width:760px;">
+        <thead id="renos_thead">
+          <tr>
+            <th class="std-th-sortable" data-sort-key="addr">Address</th>
+            <th class="std-th-sortable" data-sort-key="bedrooms" style="text-align:center;width:60px;">Beds</th>
+            <th class="std-th-sortable" data-sort-key="status" style="width:130px;">Status</th>
+            <th class="std-th-sortable" data-sort-key="progress" style="width:160px;">Progress</th>
+            <th class="std-th-sortable" data-sort-key="contractor" style="width:140px;">Contractor</th>
+            <th class="std-th-sortable" data-sort-key="priority" style="width:110px;">Priority</th>
+            <th style="width:1%;white-space:nowrap;"></th>
+          </tr>
+        </thead>
+        <tbody id="renos_tbody" data-table-page="renos"><tr><td colspan="7" class="empty-state" style="padding:40px;text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
 </div><!-- end renosView -->
 
 <!-- ═══ CONTRACTORS VIEW ═══ -->
@@ -336,7 +339,6 @@ if(typeof ROLE === 'undefined') {
 // sites — just loaded from the shared file now.
 
 window._sb = null;
-if(typeof _raFilter === "undefined") var _raFilter = "";
 document.addEventListener('DOMContentLoaded', function() {
   try {
     if(window.supabase && window.supabase.createClient) {
@@ -1701,11 +1703,9 @@ function renderRenoApprovalsView() {
     });
   });
 
-  // Filter by status tab
-  var filtered = _raFilter ? rows.filter(function(r){ return r.appr.key===_raFilter; }) : rows;
-
   // Filter by search query — scans every visible column.
   var _raSearch = ((document.getElementById('ra_search')||{}).value || '').toLowerCase().trim();
+  var filtered = rows;
   if (_raSearch) {
     filtered = filtered.filter(function(r){
       var hay = [
@@ -1719,7 +1719,9 @@ function renderRenoApprovalsView() {
     });
   }
 
-  // Sort: priority desc, then address, then project # for stable ordering within a unit
+  // Default sort — priority desc, then address, then project #. Stays in
+  // effect until the user picks a column-menu sort (tableApplyFilterSort
+  // preserves this order when state.sort.key is empty).
   filtered.sort(function(a,b){
     if(b.rs.score !== a.rs.score) return b.rs.score - a.rs.score;
     var addrA = (a.u.num||'')+' '+(a.u.street||'');
@@ -1728,45 +1730,47 @@ function renderRenoApprovalsView() {
     return (a.projectNumber||'').localeCompare(b.projectNumber||'');
   });
 
-  // ── Stat chips ──────────────────────────────────────────────
-  var chipsEl = document.getElementById('ra_chips');
-  if(chipsEl) {
-    var counts = {};
-    rows.forEach(function(r){ counts[r.appr.key]=(counts[r.appr.key]||0)+1; });
-    var chipDefs = [
-      {key:'pending_hm', label:'Pending HM',  c:'#92400e', bg:'#fffbeb'},
-      {key:'pending_ed', label:'Pending ED',  c:'#1d4ed8', bg:'#eff6ff'},
-      {key:'approved',   label:'Approved',    c:'#15803d', bg:'#f0fdf4'},
-      {key:'in_progress',label:'In Progress', c:'#92400e', bg:'#fffbeb'},
-      {key:'complete',   label:'Complete',    c:'#15803d', bg:'#f0fdf4'},
-      {key:'no_sow',     label:'No SOW',      c:'#888',    bg:'#f4f4f0'},
-    ];
-    chipsEl.innerHTML = chipDefs.map(function(d){
-      var cnt = counts[d.key]||0; if(!cnt) return '';
-      var active = _raFilter===d.key;
-      return '<span data-ra-f="'+(active?'':d.key)+'" style="font-size:12px;font-weight:700;padding:5px 14px;border-radius:20px;background:'+(active?d.c:d.bg)+';color:'+(active?'#fff':d.c)+';border:2px solid '+d.c+';cursor:pointer;user-select:none;">'+d.label+' '+cnt+'</span>';
-    }).join('');
+  // ── Column-menu sort + filter (Phase 2B) ─────────────────────
+  var _raColumns = {
+    addr:          { label: 'Address',         accessor: function(r){ return ((r.u.num||'')+' '+(r.u.street||'')).trim(); } },
+    projectNumber: { label: 'Project #',       accessor: function(r){ return r.projectNumber || '(none)'; } },
+    priority:      { label: 'Priority',        accessor: function(r){ return r.rs && r.rs.score || 0; } },
+    cost:          { label: 'SOW Cost',        accessor: function(r){ return r.cost || 0; } },
+    approval:      { label: 'Approval Status', accessor: function(r){ return (r.appr && r.appr.label) || '(none)'; } },
+    contractor:    { label: 'Contractor',      accessor: function(r){ return (r.sow && r.sow.contractor) || '(none)'; } },
+    progress:      { label: 'Progress',        accessor: function(r){ return (r.prog && r.prog.overallPct) || 0; } }
+  };
+  var _raAccessors = {};
+  Object.keys(_raColumns).forEach(function(k){ _raAccessors[k] = _raColumns[k].accessor; });
+
+  var _raState = (typeof tableStateGet === 'function') ? tableStateGet('ra') : { sort:{key:'',dir:1}, filters:{} };
+
+  if (typeof tableRegisterColumns === 'function') {
+    tableRegisterColumns('ra', {
+      columns:  _raColumns,
+      getRows:  function(){ return filtered; },
+      onChange: renderRenoApprovalsView
+    });
   }
 
-  // ── Tab active states ────────────────────────────────────────
-  var tabMap={ra_tab_all:'',ra_tab_nosow:'no_sow',ra_tab_phm:'pending_hm',ra_tab_ped:'pending_ed',ra_tab_app:'approved',ra_tab_prog:'in_progress',ra_tab_done:'complete'};
-  Object.keys(tabMap).forEach(function(id){
-    var el=document.getElementById(id); if(!el) return;
-    var active=_raFilter===tabMap[id];
-    el.style.background=active?'var(--yellow)':''; el.style.color=active?'#111':''; el.style.fontWeight=active?'700':'';
-  });
+  var _raRows = (typeof tableApplyFilterSort === 'function')
+    ? tableApplyFilterSort(filtered, _raAccessors, _raState)
+    : filtered;
 
   // ── Table rows ───────────────────────────────────────────────
   var tbody = document.getElementById('ra_tbody');
   if(!tbody) return;
 
-  if(!filtered.length) {
-    tbody.innerHTML='<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--muted);">No renovation records match this filter.</td></tr>';
+  if(!_raRows.length) {
+    tbody.innerHTML='<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--muted);">No renovation records match the current filters.</td></tr>';
+    var _raTheadEmpty = document.getElementById('ra_thead');
+    if (typeof tableBindColumnMenuClicks === 'function')   tableBindColumnMenuClicks(_raTheadEmpty, 'ra');
+    if (typeof tableRefreshSortIndicators === 'function') tableRefreshSortIndicators(_raTheadEmpty, 'ra');
     return;
   }
 
   var hmLimit = _getHmLimit();
-  tbody.innerHTML = filtered.map(function(r) {
+  tbody.innerHTML = _raRows.map(function(r) {
     var u=r.u; var sow=r.sow; var prog=r.prog; var rs=r.rs; var appr=r.appr;
     var tier = rs.score>=40?{l:'Critical',c:'#b91c1c',bg:'#fef2f2'}:rs.score>=25?{l:'High',c:'#7a6000',bg:'#fef9ec'}:rs.score>=12?{l:'Medium',c:'#1d4ed8',bg:'#eff6ff'}:{l:'Low',c:'#15803d',bg:'#f0fdf4'};
     var costStr = r.cost>0?('$'+Math.round(r.cost).toLocaleString()):'—';
@@ -1825,6 +1829,11 @@ function renderRenoApprovalsView() {
     if(progBtn) progBtn.addEventListener('click', function(e){e.stopPropagation(); openRenoProgress(uid);});
     if(appBtn)  appBtn.addEventListener('click',  function(e){e.stopPropagation(); raQuickApprove(uid, appBtn.getAttribute('data-ra-role'), proj);});
   });
+
+  // Column-menu click + sort indicators
+  var _raThead = document.getElementById('ra_thead');
+  if (typeof tableBindColumnMenuClicks === 'function')   tableBindColumnMenuClicks(_raThead, 'ra');
+  if (typeof tableRefreshSortIndicators === 'function') tableRefreshSortIndicators(_raThead, 'ra');
 }
 
 function raQuickApprove(unitId, approver, projectNumber) {
@@ -1954,8 +1963,22 @@ function exportRenoApprovalsPDF() {
     });
   });
 
-  var relevant = _raFilter ? records.filter(function(r){ return r.appr.key === _raFilter; }) : records;
-  relevant.sort(function(a,b){ return b.rs.score - a.rs.score; });
+  // Respect the column-menu filter + sort state the user currently has on screen.
+  var _exAccessors = {
+    addr:          function(r){ return ((r.u.num||'')+' '+(r.u.street||'')).trim(); },
+    projectNumber: function(r){ return r.projectNumber || '(none)'; },
+    priority:      function(r){ return r.rs && r.rs.score || 0; },
+    cost:          function(r){ return r.cost || 0; },
+    approval:      function(r){ return (r.appr && r.appr.label) || '(none)'; },
+    contractor:    function(r){ return (r.sow && r.sow.contractor) || '(none)'; },
+    progress:      function(r){ return r.pct || 0; }
+  };
+  // Pre-sort by priority desc so unsorted exports keep the default ordering.
+  records.sort(function(a,b){ return b.rs.score - a.rs.score; });
+  var _exState = (typeof tableStateGet === 'function') ? tableStateGet('ra') : { sort:{key:'',dir:1}, filters:{} };
+  var relevant = (typeof tableApplyFilterSort === 'function')
+    ? tableApplyFilterSort(records, _exAccessors, _exState)
+    : records;
 
   var tableRows = relevant.map(function(r, i){
     var u=r.u, sow=r.sow, appr=r.appr, rs=r.rs;
@@ -1987,7 +2010,7 @@ function exportRenoApprovalsPDF() {
         +'<div style="font-size:8px;color:var(--yellow);font-weight:700;letter-spacing:.1em;text-transform:uppercase;">'+_natDisp+' — Housing</div>'
         +'<div style="font-size:15px;font-weight:700;color:#fff;margin-top:2px;">Renovation Approvals Report</div>'
       +'</div>'
-      +'<div style="text-align:right;font-size:9px;color:var(--muted);">'+today+'<br/>'+relevant.length+' records<br/>Filter: '+(_raFilter||'All')+'</div>'
+      +'<div style="text-align:right;font-size:9px;color:var(--muted);">'+today+'<br/>'+relevant.length+' records</div>'
     +'</div>'
     +'<div style="background:var(--yellow);height:3px;margin-bottom:14px;"></div>'
     +'<table style="width:100%;border-collapse:collapse;">'
