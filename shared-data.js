@@ -264,11 +264,24 @@ function _draftQueueWrite(map){
   catch(e) { console.warn('[draft-queue] write failed:', e); }
 }
 
+// Owner-email guard: each queue entry is stamped with the staff email that
+// created it. On shared devices (multi-staff iPad), syncDraftQueue only pushes
+// entries owned by the currently signed-in user. Other users' drafts are left
+// untouched until their owner signs back in.
+function _currentOwnerEmail(){
+  var s = window.HOUSING_SESSION || {};
+  return (s.email || '').toLowerCase();
+}
+
 function appDraftQueueAdd(app, lastError){
   if(!app || !app.id) return;
   var map = _draftQueueRead();
+  // Preserve the original ownerEmail on subsequent updates — never silently
+  // re-stamp ownership to whoever happens to be signed in now.
+  var existing = map[app.id] || {};
   map[app.id] = {
     app:        app,
+    ownerEmail: existing.ownerEmail || _currentOwnerEmail() || null,
     updatedAt:  new Date().toISOString(),
     lastError:  lastError || null
   };
@@ -305,14 +318,29 @@ function saveApplicationWithDraftFallback(app){
 }
 
 // syncDraftQueue — called on boot after auth resolves. Tries to push every
-// queued draft to Supabase, in parallel. Successes drop out of the queue;
-// failures stay for next time. Silent on success; logs only.
+// queued draft owned by the current user to Supabase, in parallel. Entries
+// stamped with a different ownerEmail are skipped (shared-iPad safety) and
+// stay in the queue for that owner's next sign-in. Successes drop out of the
+// queue; failures stay for next time. Silent on success; logs only.
 function syncDraftQueue(){
   var entries = appDraftQueueGetAll();
-  if(!entries.length) return Promise.resolve({ tried:0, synced:0 });
-  console.log('[draft-queue] retrying ' + entries.length + ' unsynced draft(s)…');
+  if(!entries.length) return Promise.resolve({ tried:0, synced:0, skipped:0 });
+  var me = _currentOwnerEmail();
+  var mine    = [];
+  var skipped = 0;
+  entries.forEach(function(entry){
+    var owner = (entry.ownerEmail || '').toLowerCase();
+    // Unowned entries (pre-guard upgrade) attach to the current user — they
+    // came from this device, no one else can claim them.
+    if(!owner) { mine.push(entry); return; }
+    if(owner === me) { mine.push(entry); return; }
+    skipped++;
+  });
+  if(skipped > 0) console.log('[draft-queue] skipped ' + skipped + ' draft(s) owned by another user');
+  if(!mine.length) return Promise.resolve({ tried:0, synced:0, skipped: skipped });
+  console.log('[draft-queue] retrying ' + mine.length + ' unsynced draft(s)…');
   var synced = 0;
-  return Promise.all(entries.map(function(entry){
+  return Promise.all(mine.map(function(entry){
     return sbSaveApplication(entry.app).then(function(){
       appDraftQueueRemove(entry.appId);
       synced++;
@@ -325,7 +353,7 @@ function syncDraftQueue(){
     if(synced > 0 && typeof showToast === 'function'){
       showToast(synced + ' draft' + (synced === 1 ? '' : 's') + ' synced from local backup.');
     }
-    return { tried: entries.length, synced: synced };
+    return { tried: mine.length, synced: synced, skipped: skipped };
   });
 }
 
