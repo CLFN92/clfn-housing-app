@@ -1821,42 +1821,49 @@ function raQuickApprove(unitId, approver, projectNumber) {
   var addr=u.num+' '+u.street;
   var label=CLFN_PERMS.roleLabel(approver==='hm' ? ROLE.HOUSING_MANAGER : ROLE.ED);
   var projLabel = projectNumber ? ' ('+projectNumber+')' : '';
-  if(!confirm('Approve SOW for '+addr+projLabel+' — '+label+'?')) return;
 
-  // Legacy unit-level approval sig (keeps old dashboards working).
-  if(approver==='hm') {
-    u.unitHmSig={name:role,date:today,decision:'approved',savedAt:today};
-    auditEntry('UNIT:'+unitId,'sow_hm_approval',addr+' SOW'+projLabel+' approved by Housing Manager',role);
-  } else {
-    u.unitEdSig={name:role,date:today,decision:'approved',savedAt:today};
-    auditEntry('UNIT:'+unitId,'sow_ed_approval',addr+' SOW'+projLabel+' approved by Executive Director',role);
-  }
-  units[idx]=u;
-  sbSaveUnit(u).catch(function(e){ console.warn('SOW approval unit save:',e); });
-  if(typeof housingUnits!=='undefined') housingUnits.splice(0,housingUnits.length,...units);
+  showConfirm({
+    title:       'Approve SOW?',
+    message:     'Approve SOW for ' + addr + projLabel + ' as ' + label + '?',
+    confirmText: 'Approve'
+  }).then(function(ok){
+    if(!ok) return;
 
-  // New per-SOW approval: update the specific SOW's approval_status so multi-SOW approvals track independently.
-  if(projectNumber && typeof saveSowList === 'function'){
-    var list = getUnitSowList(unitId);
-    var touched = false;
-    for(var i=0; i<list.length; i++){
-      if(list[i].project_number !== projectNumber) continue;
-      if(list[i].approval_status === 'completed') break;  // don't overwrite completed
-      if(approver === 'hm'){
-        list[i].approval_status = 'hm_approved';
-        list[i].hmName = role; list[i].hmDate = today;
-      } else {
-        list[i].approval_status = 'ed_approved';
-        list[i].edName = role; list[i].edDate = today;
-      }
-      touched = true;
-      break;
+    // Legacy unit-level approval sig (keeps old dashboards working).
+    if(approver==='hm') {
+      u.unitHmSig={name:role,date:today,decision:'approved',savedAt:today};
+      auditEntry('UNIT:'+unitId,'sow_hm_approval',addr+' SOW'+projLabel+' approved by Housing Manager',role);
+    } else {
+      u.unitEdSig={name:role,date:today,decision:'approved',savedAt:today};
+      auditEntry('UNIT:'+unitId,'sow_ed_approval',addr+' SOW'+projLabel+' approved by Executive Director',role);
     }
-    if(touched) saveSowList(unitId, list);
-  }
+    units[idx]=u;
+    sbSaveUnit(u).catch(function(e){ console.warn('SOW approval unit save:',e); });
+    if(typeof housingUnits!=='undefined') housingUnits.splice(0,housingUnits.length,...units);
 
-  showToast('✓ '+addr+projLabel+' SOW approved');
-  renderRenoApprovalsView();
+    // New per-SOW approval: update the specific SOW's approval_status so multi-SOW approvals track independently.
+    if(projectNumber && typeof saveSowList === 'function'){
+      var list = getUnitSowList(unitId);
+      var touched = false;
+      for(var i=0; i<list.length; i++){
+        if(list[i].project_number !== projectNumber) continue;
+        if(list[i].approval_status === 'completed') break;  // don't overwrite completed
+        if(approver === 'hm'){
+          list[i].approval_status = 'hm_approved';
+          list[i].hmName = role; list[i].hmDate = today;
+        } else {
+          list[i].approval_status = 'ed_approved';
+          list[i].edName = role; list[i].edDate = today;
+        }
+        touched = true;
+        break;
+      }
+      if(touched) saveSowList(unitId, list);
+    }
+
+    showToast('✓ '+addr+projLabel+' SOW approved');
+    renderRenoApprovalsView();
+  });
 }
 
 function exportRenoApprovalsCSV() {
