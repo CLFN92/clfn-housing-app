@@ -318,100 +318,33 @@ function renderMatchView(){
   var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
   var vacantUnits = allUnits.filter(function(u){ return u.status==='vacant' && !u.archived; });
 
-  // Filters
-  var search  = (document.getElementById('match_search')||{}).value||'';
-  var fTier   = (document.getElementById('match_filter_tier')||{}).value||'';
-  var fStatus = (document.getElementById('match_filter_status')||{}).value||'';
-  var fRes    = (document.getElementById('match_filter_reserve')||{}).value||'';
-
-  var chipFilter = window._matchActiveChip || '';
+  // Search-bar pre-filter. All other filtering happens via the column-menu
+  // popovers (see tableApplyFilterSort below).
+  var search = (document.getElementById('match_search')||{}).value||'';
+  var _searchLc = (search || '').toLowerCase().trim();
   var filtered = allApps.filter(function(a){
     if(a.archived) return false;
     // File-update applications normally don't belong on Match — they're
     // updates to an existing tenant's record, not housing requests. BUT a
-    // file update WITHOUT an assignedUnit is a data anomaly (or a file
-    // update filed against an applicant who actually needs housing), so
-    // those still surface here so a unit can be attached.
+    // file update WITHOUT an assignedUnit is a data anomaly and should
+    // surface so a unit can be attached.
     if(a.appType === 'existing_tenant' && a.assignedUnit) return false;
     if(a.status===APP_STATUS.DRAFT||a.status===APP_STATUS.ARCHIVED||a.status===APP_STATUS.FILE_UPDATE) return false;
-    // Treat any app with an assignedUnit as "housed", regardless of stored
-    // status. Older records can have status='ed_approved' but a unit set —
-    // those are already matched and should not appear in match-side chips.
+    // Hide already-housed applicants from the Match list by default.
     var isHoused = a.status==='assigned' || !!a.assignedUnit;
-    if(fTier   && a.tier    !== fTier)   return false;
-    if(fStatus && a.status  !== fStatus) return false;
-    if(fRes    && a.reserve !== fRes)    return false;
-    if(search){
-      var _q = search.toLowerCase().trim();
-      // Scan every visible field on the Match row.
+    if(isHoused) return false;
+    if(_searchLc){
       var hay = [
         a.fn, a.ln, a.id, a.tier, a.status, a.reserve,
         a.score, a.classification, a.assignedAddress
       ].filter(function(v){ return v != null; }).join(' ').toLowerCase();
-      if (hay.indexOf(_q) === -1) return false;
+      if (hay.indexOf(_searchLc) === -1) return false;
     }
-    // Chip filter
-    if(chipFilter === 'vacant')   return !isHoused && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.ARCHIVED && a.status!==APP_STATUS.FILE_UPDATE;
-    if(chipFilter === 'ready')    return !isHoused && (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED);
-    if(chipFilter === 'assigned') return isHoused;
-    if(chipFilter === 'awaiting') return !isHoused && a.status!==APP_STATUS.DRAFT&&a.status!==APP_STATUS.ARCHIVED&&a.status!==APP_STATUS.ED_APPROVED&&a.status!==APP_STATUS.MGR_APPROVED;
-    // Default (Total Active) — exclude housed too, so Match doesn't surface
-    // applicants who already have a unit. They'll appear under the Assigned chip.
-    return !isHoused;
-  });
-
-  // Sort by score desc
-  filtered.sort(function(a,b){ return (b.score||0)-(a.score||0); });
-
-  // Stat chips. _isHoused mirrors the per-row filter above so chip counts
-  // match what the user sees when they click a chip.
-  var _isHoused = function(a){ return a.status==='assigned' || !!a.assignedUnit; };
-  var chips = document.getElementById('match_chips');
-  var vacantCount   = vacantUnits.length;
-  // File-update apps with a unit are excluded from every Match chip count —
-  // same rule as the per-row filter above. File updates WITHOUT a unit stay
-  // visible so they can be matched (anomaly recovery). _eligible() centralises
-  // the gate.
-  function _eligible(a) {
-    if (!a || a.archived) return false;
-    if (a.appType === 'existing_tenant' && a.assignedUnit) return false;
     return true;
-  }
-  var assignedCount = allApps.filter(function(a){ return _eligible(a) && _isHoused(a); }).length;
-  var awaitingCount = allApps.filter(function(a){ return _eligible(a) && !_isHoused(a) && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.ARCHIVED; }).length;
-  var activeChip = window._matchActiveChip || '';
-  var totalActiveCount = allApps.filter(function(a){ return _eligible(a) && !_isHoused(a) && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.FILE_UPDATE; }).length;
-  var readyCount    = allApps.filter(function(a){ return _eligible(a) && !_isHoused(a) && (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED); }).length;
-  var needsHousingCount = allApps.filter(function(a){ return _eligible(a) && !_isHoused(a) && a.status!==APP_STATUS.DRAFT&&a.status!==APP_STATUS.ARCHIVED&&a.status!==APP_STATUS.FILE_UPDATE; }).length;
-  var chipDefs = [
-    {label:'Total Active: '+totalActiveCount,      color:'#15803d', bg:'#f0fdf4', key:''},
-    {label:'Ready to Match: '+readyCount,          color:'#1d4ed8', bg:'#eff6ff', key:'ready'},
-    {label:'Assigned: '+assignedCount,             color:'#7c3aed', bg:'#faf5ff', key:'assigned'},
-    {label:'Awaiting Approval: '+awaitingCount,    color:'#b91c1c', bg:'#fef2f2', key:'awaiting'},
-  ];
-  if(chips) {
-    chips.innerHTML = chipDefs.map(function(ch){
-      var active = activeChip === ch.key;
-      return '<span data-chip-key="'+ch.key+'" style="font-size:12px;font-weight:700;padding:5px 14px;border-radius:20px;background:'+(active?ch.color:ch.bg)+';color:'+(active?'#fff':ch.color)+';border:2px solid '+ch.color+';cursor:pointer;transition:all .15s;user-select:none;">• '+ch.label+'</span>';
-    }).join('');
-    // Wire click handlers
-    chips.querySelectorAll('[data-chip-key]').forEach(function(chip) {
-      chip.addEventListener('click', function() {
-        var key = chip.getAttribute('data-chip-key');
-        // Toggle off if already active
-        window._matchActiveChip = (window._matchActiveChip === key) ? '' : key;
-        renderMatchView();
-      });
-    });
-  }
+  });
 
   var content = document.getElementById('match_content');
   if(!content) return;
-
-  if(!filtered.length){
-    content.innerHTML='<div class="card" style="text-align:center;padding:40px;color:var(--muted);">No applicants match the current filters.</div>';
-    return;
-  }
 
   // For each applicant find their best matching vacant unit
   function bestUnit(app){
@@ -449,7 +382,42 @@ function renderMatchView(){
     'assigned':     'Assigned'
   };
 
-  var rows = filtered.map(function(app, i){
+  // ── Column-menu sort + filter via the shared scaffolding (Phase 2B) ────
+  function _bestUnitAddr(app){
+    var b = bestUnit(app);
+    return b && b.unit ? (b.unit.num + ' ' + b.unit.street) : '';
+  }
+  var _matchColumns = {
+    applicant:   { label: 'Applicant',  accessor: function(a){ return ((a.fn||'') + ' ' + (a.ln||'')).trim(); } },
+    score:       { label: 'Score',      accessor: function(a){ return a.score || 0; } },
+    tier:        { label: 'Tier',       accessor: function(a){ return (a.tier || 'Low Priority').replace(' Priority',''); } },
+    reserve:     { label: 'Reserve',    accessor: function(a){ return a.reserve || '(none)'; } },
+    bestUnit:    { label: 'Best Unit',  accessor: function(a){ return _bestUnitAddr(a) || '(no match)'; } },
+    status:      { label: 'Status',     accessor: function(a){ return statusLabel[a.status] || a.status || 'Unknown'; } }
+  };
+  var _matchAccessors = {};
+  Object.keys(_matchColumns).forEach(function(k){ _matchAccessors[k] = _matchColumns[k].accessor; });
+
+  var _matchState = (typeof tableStateGet === 'function') ? tableStateGet('match') : { sort:{key:'score',dir:-1}, filters:{} };
+
+  if (typeof tableRegisterColumns === 'function') {
+    tableRegisterColumns('match', {
+      columns:  _matchColumns,
+      getRows:  function(){ return filtered; },
+      onChange: renderMatchView
+    });
+  }
+
+  var _matchRows = (typeof tableApplyFilterSort === 'function')
+    ? tableApplyFilterSort(filtered, _matchAccessors, _matchState)
+    : filtered.slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
+
+  if(!_matchRows.length){
+    content.innerHTML='<div class="card" style="text-align:center;padding:40px;color:var(--muted);">No applicants match the current filters.</div>';
+    return;
+  }
+
+  var rows = _matchRows.map(function(app, i){
     var best = bestUnit(app);
     var name = ((app.fn||'')+' '+(app.ln||'')).trim();
     var tCol = tierColor[app.tier] || '#6b7280';
@@ -502,14 +470,13 @@ function renderMatchView(){
         +'<div style="font-weight:700;font-size:13px;color:var(--text);text-decoration:underline;text-underline-offset:2px;">'+name+'</div>'
         +'<div class="js-lbl-sm">'+app.id+'</div>'
       +'</td>'
-      +'<td style="padding:12px 10px;white-space:nowrap;">'
-        +'<div style="font-size:18px;font-weight:800;color:'+tCol+';">'+(app.score||0)+'</div>'
-        +'<div style="font-size:10px;font-weight:700;color:'+tCol+';">'+tier+'</div>'
-      +'</td>'
+      +'<td style="padding:12px 10px;white-space:nowrap;font-size:18px;font-weight:800;color:'+tCol+';">'+(app.score||0)+'</td>'
+      +'<td style="padding:12px 10px;white-space:nowrap;font-size:11px;font-weight:700;color:'+tCol+';">'+tier+'</td>'
+      +'<td style="padding:12px 10px;white-space:nowrap;font-size:12px;color:var(--muted);">'+(app.reserve||'—')+'</td>'
       +'<td style="padding:12px 10px;max-width:180px;">'+unitCell+'</td>'
       +'<td style="padding:12px 14px;">'
-        +'<div style="font-size:11px;color:var(--muted);margin-bottom:3px;">'+appDateStr+'</div>'
         +'<div style="font-size:12px;font-weight:700;color:'+tCol+';">'+sl+'</div>'
+        +(appDateStr?'<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+appDateStr+'</div>':'')
         +(reqs.length?'<div style="margin-top:3px;">'+reqs.join(' ')+'</div>':'')
       +'</td>'
       +'<td style="padding:12px 14px;">'+assignCell+'</td>'
@@ -520,16 +487,22 @@ function renderMatchView(){
   content.innerHTML = '<div class="std-table-card">'
     +'<div class="doclib-table-wrap">'
     +'<table class="std-table" style="min-width:650px;">'
-    +'<thead><tr>'
+    +'<thead id="match_thead"><tr>'
     +'<th>#</th>'
-    +'<th>Applicant</th>'
-    +'<th>Score</th>'
-    +'<th>Best Unit Match</th>'
-    +'<th>Requirements &amp; Status</th>'
+    +'<th class="std-th-sortable" data-sort-key="applicant">Applicant</th>'
+    +'<th class="std-th-sortable" data-sort-key="score">Score</th>'
+    +'<th class="std-th-sortable" data-sort-key="tier">Tier</th>'
+    +'<th class="std-th-sortable" data-sort-key="reserve">Reserve</th>'
+    +'<th class="std-th-sortable" data-sort-key="bestUnit">Best Unit Match</th>'
+    +'<th class="std-th-sortable" data-sort-key="status">Status</th>'
     +'<th>Action</th>'
     +'</tr></thead>'
-    +'<tbody id="match_tbody">'+rows+'</tbody>'
+    +'<tbody id="match_tbody" data-table-page="match">'+rows+'</tbody>'
     +'</table></div></div>';
+  // Wire column-menu click + sort indicators on the table header.
+  var matchThead = document.getElementById('match_thead');
+  if (typeof tableBindColumnMenuClicks === 'function') tableBindColumnMenuClicks(matchThead, 'match');
+  if (typeof tableRefreshSortIndicators === 'function') tableRefreshSortIndicators(matchThead, 'match');
   // Wire assign buttons
   var matchContent = document.getElementById('match_content');
   if(matchContent) matchContent.querySelectorAll('[data-assign-app]').forEach(function(btn){
