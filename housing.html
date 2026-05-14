@@ -1316,6 +1316,12 @@
 </div><!-- end content-area -->
 </div><!-- end app-wrapper -->
 
+<!-- SOW modal host — housing-modals-sow.js mounts the SOW/Work-Order modal
+     into this div on first openSowModal() call. Without this host, the TIC's
+     "New Work Order" button silently fails after closing the TIC and the
+     user sees the landing page. -->
+<div id="sowModalHost"></div>
+
 <!-- ══ TENANT INFORMATION CARD MODAL ══════════════════════════════════════
      Mirrors the markup in tenants.html so housing.html can open the TIC in
      place when a user clicks a recently-viewed tenant chip in Quick Lookup.
