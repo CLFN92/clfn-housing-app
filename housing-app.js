@@ -333,28 +333,12 @@ function goTo(s){
     clearStepErrors('step5','step5_error_banner');
   }
 
-  // Auto-save draft on every forward step.
-  // Local-first: saveApplicationWithDraftFallback writes to localStorage
-  // synchronously, then attempts the Supabase upsert in the background.
-  // Network/auth failures no longer drop edits.
+  // Auto-save draft on every forward step. saveApplicationRecord now routes
+  // through the local-first wrapper internally, so we don't need to re-queue
+  // here — just trigger the save and refresh the Notes tab.
   if(s > cur) {
     var _ds = saveApplicationRecord({draft: true});
     if(_ds) {
-      var _da = applications.find(function(a){ return a.id===_ds; });
-      if(_da && typeof saveApplicationWithDraftFallback === 'function') {
-        saveApplicationWithDraftFallback(_da).then(function(ok){
-          if(!ok) {
-            // Cloud sync failed but local copy is safe; keep the message gentle.
-            showToast('Saved locally — will sync when network is available.', { type:'info', duration:3500 });
-          }
-        });
-      } else if(_da) {
-        // Defensive fallback if the helper isn't loaded yet.
-        sbSaveApplication(_da).catch(function(e){
-          console.warn('[draft autosave] sbSaveApplication failed:', e);
-          showToast('Draft auto-save failed — your changes are still in memory', { type:'error' });
-        });
-      }
       // Application now exists in-memory → enable the Internal Notes tab.
       if (typeof _refreshAppNotesTabVisibility === 'function') _refreshAppNotesTabVisibility();
     }
@@ -1473,16 +1457,26 @@ function saveApplicationRecord(opts){
     applications.push(appObj);
   }
 
-  // Persist to Supabase. Surface failures as a visible toast — silently
-  // swallowing them caused "I changed the email but it reverted" bug reports
-  // because the local applications array updated even when the server save
-  // (RLS denial, network error, etc.) failed.
-  sbSaveApplication(appObj).catch(function(e){
-    console.warn('App save failed:', e);
-    if (typeof showToast === 'function') {
-      showToast('Could not save application — ' + ((e && e.message) || 'check your connection'), { type:'error', duration:5000 });
-    }
-  });
+  // Persist via the local-first wrapper. The wrapper writes to the localStorage
+  // draft queue synchronously before attempting the Supabase upsert, so a
+  // PGRST303 / 401 / network blip cannot drop the row (including signature
+  // images captured on the Review step). The next housing.html boot drains
+  // the queue automatically.
+  if (typeof saveApplicationWithDraftFallback === 'function') {
+    saveApplicationWithDraftFallback(appObj).then(function(ok){
+      if(!ok && typeof showToast === 'function') {
+        showToast('Saved locally — will sync when network is available.', { type:'info', duration:3500 });
+      }
+    });
+  } else {
+    // Defensive fallback if shared-data.js hasn't loaded yet.
+    sbSaveApplication(appObj).catch(function(e){
+      console.warn('App save failed:', e);
+      if (typeof showToast === 'function') {
+        showToast('Could not save application — ' + ((e && e.message) || 'check your connection'), { type:'error', duration:5000 });
+      }
+    });
+  }
 
   // Audit — log save/update events
   var _isNew = (idx < 0);  // idx was set before push
