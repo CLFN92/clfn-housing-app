@@ -3032,7 +3032,13 @@ function renderContractorsView(){
     if (r.ct.archived && ctFilter !== 'archived') return false;
     if (ctFilter && (r.ct.status||'pending_review') !== ctFilter) return false;
     if (ctSearch) {
-      var hay = (r.name + ' ' + (r.ct.trade||'') + ' ' + (r.ct.phone||'') + ' ' + (r.ct.email||'')).toLowerCase();
+      // Scan every visible column on the contractors table.
+      var hay = [
+        r.name, r.ct.trade, r.ct.phone, r.ct.email,
+        r.ct.address, r.ct.city, r.ct.bbb_id,
+        (r.ct.status || 'pending_review'),
+        r.classLabel
+      ].filter(Boolean).join(' ').toLowerCase();
       if (hay.indexOf(ctSearch) === -1) return false;
     }
     return true;
@@ -3063,8 +3069,8 @@ function renderContractorsView(){
 
   // ── Search input ─────────────────────────────────────────────────────
   var searchHtml =
-    '<div class="ct-search-row">' +
-      '<input id="ct_search_input" type="text" class="ct-search-input" placeholder="🔍 Search by name, trade, phone, or email…" '+
+    '<div class="std-search-row">' +
+      '<input id="ct_search_input" type="text" class="std-search" placeholder="🔍 Search name, trade, phone, email, address, or status..." '+
         'value="'+escapeHtml(window._ctSearch||'')+'" oninput="ctSetSearch(this.value)"/>' +
     '</div>';
 
@@ -3443,14 +3449,16 @@ function renderRenosView(){
                : activeFilter === 'condemned' ? allReno.filter(function(u){ return u.status==='condemned'; })
                : allReno;
 
-  // Search filter — address or contractor (resolved via the unit's SOW).
+  // Search filter — scans every visible column.
   var _renoSearch = ((document.getElementById('renos_search')||{}).value || '').toLowerCase().trim();
   if (_renoSearch) {
     filtered = filtered.filter(function(u){
-      var addr = ((u.num||'') + ' ' + (u.street||'')).toLowerCase();
       var sow  = getSowData(u.id) || {};
-      var cont = (sow.contractor || '').toLowerCase();
-      return addr.indexOf(_renoSearch) !== -1 || cont.indexOf(_renoSearch) !== -1;
+      var hay = [
+        u.num, u.street, u.bedrooms, u.type, u.status,
+        sow.contractor, sow.project_number
+      ].filter(function(v){ return v != null && v !== ''; }).join(' ').toLowerCase();
+      return hay.indexOf(_renoSearch) !== -1;
     });
   }
 
@@ -3798,8 +3806,13 @@ function renderWorklist() {
   var search = (window._wlSearch||'').toLowerCase().trim();
   if(search) {
     filtered = filtered.filter(function(a){
-      var name = ((a.fn||'')+' '+(a.ln||'')).toLowerCase();
-      return name.includes(search) || (a.id||'').toLowerCase().includes(search);
+      // Scan every visible column on the worklist row.
+      var hay = [
+        a.fn, a.ln, a.id, a.status, a.tier, a.score,
+        a.street, a.city, a.classification,
+        a.assignedAddress, a.reserve
+      ].filter(function(v){ return v != null; }).join(' ').toLowerCase();
+      return hay.indexOf(search) !== -1;
     });
   }
   var showScore = APPROVAL_AUTHORITY.can('viewApplicationScore', role);
@@ -3921,9 +3934,11 @@ function renderWorklist() {
   body.innerHTML =
     // Search + chips bar
     '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">'
-    + '<input id="wl_search_input" type="text" placeholder="🔍  Search by name or ID…" value="'+escapeHtml(window._wlSearch||'')+'" '
-    + 'oninput="window._wlSearch=this.value;clearTimeout(window._wlST);window._wlST=setTimeout(renderWorklist,200)" '
-    + 'style="width:100%;padding:9px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;" />'
+    + '<div class="std-search-row" style="margin-bottom:0;">'
+    +   '<input id="wl_search_input" class="std-search" type="text" placeholder="🔍 Search name, ID, status, address, score, or tier..." '
+    +   'value="'+escapeHtml(window._wlSearch||'')+'" '
+    +   'oninput="window._wlSearch=this.value;clearTimeout(window._wlST);window._wlST=setTimeout(renderWorklist,200)" />'
+    + '</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+chipsHtml+'</div>'
     + '</div>'
     // Table

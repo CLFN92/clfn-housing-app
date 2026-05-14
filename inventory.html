@@ -98,7 +98,6 @@
       <p>All <span id="inv_count">—</span> <span data-nation="short">CLFN</span> housing units — <span id="inv_vacant_count" style="color:var(--success);font-weight:600;">—</span> vacant</p>
     </div>
     <div class="phb-actions">
-      <input id="inv_search" class="std-filter-control" type="text" placeholder="🔍 Search address..." oninput="renderInventoryView()"/>
       <select id="inv_filter_status" class="std-filter-control" onchange="renderInventoryView()">
         <option value="">All Statuses</option><option value="vacant">Vacant</option><option value="occupied">Occupied</option><option value="under_repair">Under Repair</option><option value="reserved">Reserved</option><option value="condemned">Condemned</option><option value="archived">Archived</option>
       </select>
@@ -109,6 +108,9 @@
         <option value="">Accessibility: All</option><option value="yes">Accessible Only</option><option value="no">Non-Accessible</option>
       </select>
     </div>
+  </div>
+  <div class="std-search-row">
+    <input id="inv_search" class="std-search" type="text" placeholder="🔍 Search address, status, type, bedrooms, or tenant..." oninput="renderInventoryView()"/>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;" id="inv_stat_chips_row">
     <div style="display:flex;gap:10px;flex-wrap:wrap;" id="inv_stat_chips"></div>

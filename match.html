@@ -98,8 +98,10 @@
       <p>Applicants ranked by score matched against vacant units</p>
     </div>
   </div>
+  <div class="std-search-row">
+    <input id="match_search" class="std-search" type="text" placeholder="🔍 Search applicant, ID, tier, status, or reserve..." oninput="renderMatchView()"/>
+  </div>
   <div class="filter-bar">
-    <input id="match_search" class="std-filter-control" type="text" placeholder="🔍 Search applicant..." oninput="renderMatchView()"/>
     <select id="match_filter_tier" class="std-filter-control" onchange="renderMatchView()">
       <option value="">All Priority Tiers</option><option value="Critical Priority">Critical Priority</option><option value="High Priority">High Priority</option><option value="Medium Priority">Medium Priority</option><option value="Low Priority">Low Priority</option>
     </select>

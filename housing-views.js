@@ -170,11 +170,21 @@ function renderInventoryView(){
   var fType   = (document.getElementById('inv_filter_type')||{}).value||'';
   var fAccess = (document.getElementById('inv_filter_access')||{}).value||'';
 
+  var _searchLc = (search || '').toLowerCase().trim();
   var filtered = units.filter(function(u){
     // Hide archived units unless explicitly filtering for them
     if(u.archived && fStatus !== APP_STATUS.ARCHIVED) return false;
     if(!u.archived && fStatus === APP_STATUS.ARCHIVED) return false;
-    if(search && !(u.street+' '+u.num).toLowerCase().includes(search.toLowerCase())) return false;
+    if(_searchLc) {
+      // Scan every visible column: address, status, type, beds, tenant name.
+      var hay = [
+        u.num, u.street, u.status, u.type, u.bedrooms,
+        u.assignedName, u.funder, u.foundation,
+        (u.accessible ? 'accessible' : ''),
+        (u.isElders ? 'elders' : '')
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (hay.indexOf(_searchLc) === -1) return false;
+    }
     if(fStatus && fStatus !== APP_STATUS.ARCHIVED && u.status !== fStatus) return false;
     if(fType){
       var t = (u.type||'').toLowerCase();
@@ -315,9 +325,13 @@ function renderMatchView(){
     if(fStatus && a.status  !== fStatus) return false;
     if(fRes    && a.reserve !== fRes)    return false;
     if(search){
-      var name = ((a.fn||'')+' '+(a.ln||'')).toLowerCase();
-      var id   = (a.id||'').toLowerCase();
-      if(!name.includes(search.toLowerCase()) && !id.includes(search.toLowerCase())) return false;
+      var _q = search.toLowerCase().trim();
+      // Scan every visible field on the Match row.
+      var hay = [
+        a.fn, a.ln, a.id, a.tier, a.status, a.reserve,
+        a.score, a.classification, a.assignedAddress
+      ].filter(function(v){ return v != null; }).join(' ').toLowerCase();
+      if (hay.indexOf(_q) === -1) return false;
     }
     // Chip filter
     if(chipFilter === 'vacant')   return !isHoused && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.ARCHIVED && a.status!==APP_STATUS.FILE_UPDATE;
@@ -533,9 +547,14 @@ function renderTenantsView(){
       ? housingUnits : (window.HOUSING_UNITS_DATA || []);
   }
   var units = allUnits.filter(function(u){return (u.status==='occupied'||u.status==='reserved') && !u.archived;});
-  var search = ((document.getElementById('tenant_search')||{}).value||'').toLowerCase();
-  if(search) units=units.filter(function(u){
-    return (u.num+' '+u.street).toLowerCase().includes(search)||(u.assignedName||'').toLowerCase().includes(search);
+  var search = ((document.getElementById('tenant_search')||{}).value||'').toLowerCase().trim();
+  if(search) units = units.filter(function(u){
+    // Scan every visible column on the Tenants row.
+    var hay = [
+      u.num, u.street, u.assignedName, u.assignedDate, u.status,
+      u.bedrooms, u.type, u.classification
+    ].filter(function(v){ return v != null; }).join(' ').toLowerCase();
+    return hay.indexOf(search) !== -1;
   });
   setText('tenant_count',units.length);
   var tbody=document.getElementById('tenants_tbody');
