@@ -420,8 +420,8 @@ body {
 .search-row input:focus { border-color: var(--yellow); outline: none; }
 
 /* matchView bare filter div — selects and inputs inside any flex filter row */
-#matchView > div > select,
-#matchView > div > input  { width: auto; min-width: 0; box-sizing: border-box; }
+#matchView > div > select:not(.std-search),
+#matchView > div > input:not(.std-search)  { width: auto; min-width: 0; box-sizing: border-box; }
 
 /* Application type card text */
 .appty-title           { font-weight: 700; font-size: 13px; }
