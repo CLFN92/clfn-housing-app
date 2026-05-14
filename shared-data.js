@@ -100,6 +100,35 @@ function sbMapRole(staffRow) {
   return 'housing_employee_l1';
 }
 
+// ── formatAppStatusLabel ──────────────────────────────────────────────────────
+// Pretty-print an APP_STATUS internal value for user-facing surfaces (toasts,
+// banners, pills). The raw values (hm_approved, mgr_approved, etc.) read as
+// terminal-style debug strings to staff — this gives the polished label.
+// Defined here in shared-data.js so it loads before housing-modals / -init.
+function formatAppStatusLabel(status) {
+  var map = {
+    'draft':         'Draft',
+    'submitted':     'Awaiting HM Review',
+    'file_update':   'File Update',
+    'mgr_approved':  'HM Recommended (Awaiting ED)',
+    'hm_approved':   'HM Approved',
+    'ed_approved':   'ED Approved',
+    'returned':      'Returned',
+    'declined':      'Declined',
+    'assigned':      'Assigned',
+    'archived':      'Archived'
+  };
+  if (map[status]) return map[status];
+  // Fallback: replace underscores, uppercase HM/ED/Mgr tokens, title-case rest.
+  return String(status || '')
+    .replace(/_/g, ' ')
+    .replace(/\bhm\b/gi, 'HM')
+    .replace(/\bed\b/gi, 'ED')
+    .replace(/\bmgr\b/gi, 'Mgr')
+    .replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+}
+window.formatAppStatusLabel = formatAppStatusLabel;
+
 // ── sbLoadApplications ────────────────────────────────────────────────────────
 // Fetches all applications and maps DB columns → app object shape.
 // Prefers dedicated columns over the jsonb data blob for queryable fields.
@@ -872,7 +901,17 @@ function isInWorkQueue(a, role, email) {
   // shows everything they can act on, not just things needing approval.
   // The row's action button (shared-data.js:3161) already renders "Assign →"
   // for these rows; this just brings them into the queue.
-  if(canAssign && !a.assignedUnit && (a.status === STATUS.ED_APPROVED || a.status === STATUS.MGR_APPROVED)) return true;
+  //
+  // hm_approved (file-update terminal) and 'assigned'-with-null-unit (data
+  // anomaly) are included so file updates filed against a tenant who
+  // actually needs a unit don't disappear from the queue, and so rows
+  // marked assigned but missing their unit_id can be repaired.
+  if(canAssign && !a.assignedUnit && (
+       a.status === STATUS.ED_APPROVED ||
+       a.status === STATUS.MGR_APPROVED ||
+       a.status === 'hm_approved' ||
+       a.status === 'assigned'
+     )) return true;
   return false;
 }
 
@@ -3701,7 +3740,7 @@ function renderWorklist() {
       {key:'mine',      label:'My Items',       filter: _queueFilter, alert:true},
       {key:'',          label:'All',            filter: function(a){ return !a.archived; }},
       {key:'submitted', label:'In Review',      filter: function(a){ return ['submitted','file_update','mgr_approved'].indexOf(a.status)!==-1; }},
-      {key:'approved',  label:'Approved',       filter: function(a){ return ['ed_approved','assigned'].indexOf(a.status)!==-1; }},
+      {key:'approved',  label:'Approved',       filter: function(a){ return ['ed_approved','hm_approved','assigned'].indexOf(a.status)!==-1; }},
       {key:'draft',     label:'Draft',          filter: function(a){ return a.status===APP_STATUS.DRAFT; }},
       {key:'declined',  label:'Declined',       filter: function(a){ return a.status==='declined'; }}
     ];
@@ -3711,7 +3750,7 @@ function renderWorklist() {
       {key:'',          label:'All Active',     filter: function(a){ return !a.archived; }},
       {key:'returned',  label:'Returned',       filter: function(a){ return a.status==='returned'; }, alert:true},
       {key:'pending',   label:'Awaiting ED',    filter: function(a){ return a.status===APP_STATUS.MGR_APPROVED; }},
-      {key:'approved',  label:'ED Approved',    filter: function(a){ return a.status===APP_STATUS.ED_APPROVED; }},
+      {key:'approved',  label:'Approved',       filter: function(a){ return a.status===APP_STATUS.ED_APPROVED || a.status===APP_STATUS.HM_APPROVED; }},
       {key:'assigned',  label:'Assigned',       filter: function(a){ return a.status==='assigned'; }},
       {key:'draft',     label:'Drafts',         filter: function(a){ return a.status===APP_STATUS.DRAFT; }}
     ];
@@ -3720,7 +3759,7 @@ function renderWorklist() {
       {key:'mine',      label:'My Queue',       filter: _queueFilter, alert:true},
       {key:'',          label:'All Active',     filter: function(a){ return !a.archived; }},
       {key:'submitted', label:'Awaiting HM',    filter: function(a){ return a.status===APP_STATUS.SUBMITTED; }},
-      {key:'approved',  label:'Approved',       filter: function(a){ return a.status===APP_STATUS.ED_APPROVED; }},
+      {key:'approved',  label:'Approved',       filter: function(a){ return a.status===APP_STATUS.ED_APPROVED || a.status===APP_STATUS.HM_APPROVED; }},
       {key:'assigned',  label:'Assigned',       filter: function(a){ return a.status==='assigned'; }},
       {key:'declined',  label:'Declined',       filter: function(a){ return a.status==='declined'; }},
       {key:'draft',     label:'Drafts',         filter: function(a){ return a.status===APP_STATUS.DRAFT; }}
@@ -3811,11 +3850,19 @@ function renderWorklist() {
       // Click still opens the scorecard, where the actual Recommend /
       // Approve / Decline pills live.
       actionBtn = '<button data-wl-id="'+_aIdEsc+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:var(--success);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Approve →</button>';
-    } else if((ROLE.isManagement(role))&&(a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED)&&!a.assignedUnit) {
+    } else if((ROLE.isManagement(role)) && !a.assignedUnit && (
+                a.status===APP_STATUS.ED_APPROVED ||
+                a.status===APP_STATUS.MGR_APPROVED ||
+                a.status===APP_STATUS.HM_APPROVED ||
+                a.status==='assigned'      // data-anomaly: marked assigned but no unit
+              )) {
       // Assign on the worklist must open the unit-assignment modal — not
       // the scorecard. wlOpenApp routes approved apps to showScorecard,
       // which is correct for the row's name/id click but wrong for this
       // button, so we use a dedicated wlAssignApp helper.
+      // Any approved-flavour status without a unit gets the Assign button —
+      // covers file-update apps that were filed in error against a tenant
+      // who actually needs a unit, plus 'assigned' rows with null unit_id.
       actionBtn = '<button data-wl-id="'+_aIdEsc+'" onclick="event.stopPropagation();wlAssignApp(this)" style="background:var(--success);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
     }
     // Current street address from the application form (housing.html

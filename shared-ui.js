@@ -120,11 +120,50 @@ function pushNav(viewName) {
   if (stack.length > 20) stack.shift(); // cap
 }
 
+// ── Cross-page navigation referrer ────────────────────────────────────────────
+// In-memory _navStack resets on every page navigation, so a back button on
+// housing.html can't know the user came from match.html. setNavReferrer is
+// called just before a cross-page redirect; consumeNavReferrer reads-and-clears
+// on the destination. Persisted in sessionStorage so it survives the page load.
+var CLFN_NAV_REFERRER_KEY = 'clfn_nav_referrer';
+// Page-key → URL mapping. Used by goBack / closeApplicationForm when there is
+// no in-page back target to fall back on.
+window.CLFN_PAGE_ROUTES = window.CLFN_PAGE_ROUTES || {
+  'home':        'housing.html',
+  'worklist':    'housing.html?view=worklist',
+  'inventory':   'inventory.html',
+  'match':       'match.html',
+  'renovations': 'renos.html',
+  'contractors': 'contractors.html',
+  'tenants':     'tenants.html',
+  'settings':    'housing.html?view=settings'
+};
+function setNavReferrer(pageKey) {
+  if (!pageKey) return;
+  try { sessionStorage.setItem(CLFN_NAV_REFERRER_KEY, String(pageKey)); } catch(e) {}
+}
+function peekNavReferrer() {
+  try { return sessionStorage.getItem(CLFN_NAV_REFERRER_KEY) || ''; } catch(e) { return ''; }
+}
+function consumeNavReferrer() {
+  var v = peekNavReferrer();
+  try { sessionStorage.removeItem(CLFN_NAV_REFERRER_KEY); } catch(e) {}
+  return v;
+}
+
 // ── goBack ────────────────────────────────────────────────────────────────────
 // Pops the navigation stack and navigates to the previous view.
 // Pages register their view→function map via window._navMap.
 // Default map covers the common views; pages can extend it.
 function goBack() {
+  // Cross-page referrer wins — if a sibling page stamped one before the
+  // current page loaded, route back to that page instead of falling through
+  // to the in-memory stack (which resets on every navigation).
+  var ref = consumeNavReferrer();
+  if (ref) {
+    var routes = window.CLFN_PAGE_ROUTES || {};
+    if (routes[ref]) { window.location.href = routes[ref]; return; }
+  }
   var stack = window._navStack;
   if (stack.length) stack.pop();
   while (stack.length && stack[stack.length - 1] === 'app') stack.pop();

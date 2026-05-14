@@ -112,11 +112,12 @@ window.ROLE = {
   HE_L1:           'housing_employee_l1',
   CFO:             'cfo',
   FINANCE_L1:      'finance_l1',
+  SUPER_USER:      'super_user',
   isManagement: function(r) {
-    return r === 'ed' || r === 'housing_manager';
+    return r === 'ed' || r === 'housing_manager' || r === 'super_user';
   },
   hasAccess: function(r) {
-    return r === 'ed' || r === 'housing_manager' ||
+    return r === 'ed' || r === 'housing_manager' || r === 'super_user' ||
            r === 'housing_employee_l2' || r === 'housing_employee_l1';
   }
 };
@@ -160,7 +161,14 @@ window.CLFN_SUPER_USERS = [
   'kevin.proctor@clfn.on.ca'
 ];
 window.isSuperUser = function() {
-  var email = (window.HOUSING_SESSION && HOUSING_SESSION.email || '').toLowerCase();
+  // Role-based super-user wins — anyone in the staff table with
+  // role='super_user' is treated as a super user regardless of email.
+  // The email allowlist is kept as a bootstrap (so the platform owner can
+  // promote new super users without being one themselves yet).
+  var sess = window.HOUSING_SESSION || {};
+  var role = (sess.role || window._realRole || '').toLowerCase();
+  if (role === 'super_user') return true;
+  var email = (sess.email || '').toLowerCase();
   return window.CLFN_SUPER_USERS.map(function(e){ return e.toLowerCase(); }).indexOf(email) !== -1;
 };
 

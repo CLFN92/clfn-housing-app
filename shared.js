@@ -289,7 +289,10 @@ window.showPrompt = function(opts) {
     HE_L2:      'housing_employee_l2',
     HE_L1:      'housing_employee_l1',
     CFO:        'cfo',
-    FINANCE_L1: 'finance_l1'
+    FINANCE_L1: 'finance_l1',
+    // Cross-department admin tier — same authority as ED everywhere, no
+    // forced department. See approval-authority.js can() for the inheritance.
+    SUPER_USER: 'super_user'
   });
 
   // ── Legacy-name aliases ───────────────────────────────────────────────
@@ -310,7 +313,8 @@ window.showPrompt = function(opts) {
     'housing_employee_l2':  'Housing Employee L2',
     'housing_employee_l1':  'Housing Employee L1',
     'cfo':                  'CFO',
-    'finance_l1':           'Finance Clerk L1'
+    'finance_l1':           'Finance Clerk L1',
+    'super_user':           'Super User'
   });
 
   var VALID_KEYS = Object.freeze(Object.keys(ROLE_LABELS));
@@ -365,13 +369,15 @@ window.showPrompt = function(opts) {
   // ── Module-level access gates ─────────────────────────────────────────
   function hasHousingAccess(role){
     var r = assertRole(role, 'hasHousingAccess');
-    return r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2 || r === ROLES.HE_L1;
+    return r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2 || r === ROLES.HE_L1
+        || r === ROLES.SUPER_USER;
   }
 
   function hasFinanceAccess(role){
     var r = assertRole(role, 'hasFinanceAccess');
     return r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2
-        || r === ROLES.CFO || r === ROLES.FINANCE_L1;
+        || r === ROLES.CFO || r === ROLES.FINANCE_L1
+        || r === ROLES.SUPER_USER;
   }
 
   // ── Housing-app capabilities ──────────────────────────────────────────
@@ -381,9 +387,13 @@ window.showPrompt = function(opts) {
     return hasHousingAccess(r);
   }
 
+  // Super User inherits ED's authority everywhere. _isEdTier centralises
+  // the check so callers don't have to enumerate both keys.
+  function _isEdTier(r) { return r === ROLES.ED || r === ROLES.SUPER_USER; }
+
   function canEditApp(role, opts){
     var r = assertRole(role, 'canEditApp');
-    if(r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2) return true;
+    if(_isEdTier(r) || r === ROLES.HM || r === ROLES.HE_L2) return true;
     if(r === ROLES.HE_L1){
       if(!opts) return false;
       var isOwner = (opts.ownerRole === r) || (opts.ownerName && opts.ownerName === opts.currentUserName);
@@ -396,7 +406,7 @@ window.showPrompt = function(opts) {
   function canEditSow(role, sowStatus){
     var r = assertRole(role, 'canEditSow');
     if(!hasHousingAccess(r)) return false;
-    if(sowStatus === 'completed') return realRole() === ROLES.ED;
+    if(sowStatus === 'completed') return _isEdTier(realRole());
     if(r === ROLES.HE_L1) return false;
     return true;
   }
@@ -405,33 +415,35 @@ window.showPrompt = function(opts) {
     var r = assertRole(role, 'canEditProgressForUnit');
     if(!hasHousingAccess(r)) return false;
     if(r === ROLES.HE_L1) return false;
-    if(unitHasCompletedSow) return realRole() === ROLES.ED;
+    if(unitHasCompletedSow) return _isEdTier(realRole());
     return true;
   }
 
   // ── Approval authority ────────────────────────────────────────────────
   function canApproveSowHm(role){
     var r = assertRole(role, 'canApproveSowHm');
-    return r === ROLES.HM || r === ROLES.ED;
+    return r === ROLES.HM || _isEdTier(r);
   }
   function canApproveSowEd(role){
     var r = assertRole(role, 'canApproveSowEd');
-    return r === ROLES.ED;
+    return _isEdTier(r);
   }
   function canMarkSowComplete(role){
     var r = assertRole(role, 'canMarkSowComplete');
-    return r === ROLES.ED || r === ROLES.HM;
+    return _isEdTier(r) || r === ROLES.HM;
   }
   function canReopenSow(role){
     var r = assertRole(role, 'canReopenSow');
-    return r === ROLES.ED;
+    return _isEdTier(r);
   }
 
-  // ── Role switcher (ED's "view as") ────────────────────────────────────
+  // ── Role switcher (ED & Super User "view as") ────────────────────────
   function getViewAsOptions(role){
     var r = assertRole(role, 'getViewAsOptions');
-    if(r !== ROLES.ED) return [];
-    return VALID_KEYS.filter(function(k){ return k !== ROLES.ED; });
+    if(!_isEdTier(r)) return [];
+    // Super User and ED see every OTHER role in their view-as picker. Skip
+    // your own role so the dropdown doesn't include a no-op option.
+    return VALID_KEYS.filter(function(k){ return k !== r; });
   }
 
   // Expose immutable API.

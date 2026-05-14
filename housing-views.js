@@ -300,6 +300,12 @@ function renderMatchView(){
   var chipFilter = window._matchActiveChip || '';
   var filtered = allApps.filter(function(a){
     if(a.archived) return false;
+    // File-update applications normally don't belong on Match — they're
+    // updates to an existing tenant's record, not housing requests. BUT a
+    // file update WITHOUT an assignedUnit is a data anomaly (or a file
+    // update filed against an applicant who actually needs housing), so
+    // those still surface here so a unit can be attached.
+    if(a.appType === 'existing_tenant' && a.assignedUnit) return false;
     if(a.status===APP_STATUS.DRAFT||a.status===APP_STATUS.ARCHIVED||a.status===APP_STATUS.FILE_UPDATE) return false;
     // Treat any app with an assignedUnit as "housed", regardless of stored
     // status. Older records can have status='ed_approved' but a unit set —
@@ -331,12 +337,21 @@ function renderMatchView(){
   var _isHoused = function(a){ return a.status==='assigned' || !!a.assignedUnit; };
   var chips = document.getElementById('match_chips');
   var vacantCount   = vacantUnits.length;
-  var assignedCount = allApps.filter(function(a){ return _isHoused(a) && !a.archived; }).length;
-  var awaitingCount = allApps.filter(function(a){ return !_isHoused(a) && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.ARCHIVED; }).length;
+  // File-update apps with a unit are excluded from every Match chip count —
+  // same rule as the per-row filter above. File updates WITHOUT a unit stay
+  // visible so they can be matched (anomaly recovery). _eligible() centralises
+  // the gate.
+  function _eligible(a) {
+    if (!a || a.archived) return false;
+    if (a.appType === 'existing_tenant' && a.assignedUnit) return false;
+    return true;
+  }
+  var assignedCount = allApps.filter(function(a){ return _eligible(a) && _isHoused(a); }).length;
+  var awaitingCount = allApps.filter(function(a){ return _eligible(a) && !_isHoused(a) && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.ARCHIVED; }).length;
   var activeChip = window._matchActiveChip || '';
-  var totalActiveCount = allApps.filter(function(a){ return !a.archived && !_isHoused(a) && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.FILE_UPDATE; }).length;
-  var readyCount    = allApps.filter(function(a){ return !_isHoused(a) && !a.archived && (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED); }).length;
-  var needsHousingCount = allApps.filter(function(a){ return !_isHoused(a) && a.status!==APP_STATUS.DRAFT&&a.status!==APP_STATUS.ARCHIVED&&a.status!==APP_STATUS.FILE_UPDATE; }).length;
+  var totalActiveCount = allApps.filter(function(a){ return _eligible(a) && !_isHoused(a) && a.status!==APP_STATUS.DRAFT && a.status!==APP_STATUS.FILE_UPDATE; }).length;
+  var readyCount    = allApps.filter(function(a){ return _eligible(a) && !_isHoused(a) && (a.status===APP_STATUS.ED_APPROVED||a.status===APP_STATUS.MGR_APPROVED); }).length;
+  var needsHousingCount = allApps.filter(function(a){ return _eligible(a) && !_isHoused(a) && a.status!==APP_STATUS.DRAFT&&a.status!==APP_STATUS.ARCHIVED&&a.status!==APP_STATUS.FILE_UPDATE; }).length;
   var chipDefs = [
     {label:'Total Active: '+totalActiveCount,      color:'#15803d', bg:'#f0fdf4', key:''},
     {label:'Ready to Match: '+readyCount,          color:'#1d4ed8', bg:'#eff6ff', key:'ready'},
@@ -432,12 +447,18 @@ function renderMatchView(){
     var sl = statusLabel[app.status] || app.status || '';
     var appDateStr = app.appDate ? 'Applied '+app.appDate : '';
 
-    // Treat any app with an assignedUnit as housed, regardless of stored
-    // status. Older records that pre-date the status-flip fix can have
-    // status='ed_approved' but a unit assigned — those should show ✓ Assigned,
-    // not the Assign button.
-    var isAssigned = app.status==='assigned' || !!app.assignedUnit;
-    var canAssign  = !isAssigned && (app.status===APP_STATUS.ED_APPROVED||app.status===APP_STATUS.MGR_APPROVED);
+    // "Has a unit" is the source of truth — an app with an assignedUnit is
+    // housed regardless of stored status. Conversely, anything WITHOUT a unit
+    // that has cleared approval (mgr/ed/hm) — or is marked 'assigned' due to
+    // a data anomaly — gets the Assign button so a unit can be attached.
+    var hasUnit    = !!app.assignedUnit;
+    var isAssigned = hasUnit;
+    var canAssign  = !hasUnit && (
+                       app.status === APP_STATUS.ED_APPROVED ||
+                       app.status === APP_STATUS.MGR_APPROVED ||
+                       app.status === APP_STATUS.HM_APPROVED ||
+                       app.status === 'assigned'
+                     );
     var assignCell = isAssigned
       ? '<div style="font-size:11px;font-weight:700;color:var(--success);">✓ '+(app.assignedAddress||'Assigned')+'</div>'
       : (canAssign

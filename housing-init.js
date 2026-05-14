@@ -228,7 +228,17 @@ function closeApplicationForm(){
   var apf = document.getElementById('appProgressFoot'); if(apf) apf.style.display='none';
   var em = document.getElementById('editModal'); if(em) em.classList.remove('on');
 
-  // Use nav stack to go back to wherever user came from
+  // Cross-page referrer wins — the user came from match.html (or similar)
+  // via a hard navigation, so the in-memory _navStack is empty on this page
+  // and would otherwise dump them at home/landing.
+  if (typeof consumeNavReferrer === 'function') {
+    var ref = consumeNavReferrer();
+    var routes = window.CLFN_PAGE_ROUTES || {};
+    if (ref && routes[ref]) { window.location.href = routes[ref]; return; }
+  }
+
+  // Use in-memory nav stack to go back to wherever the user came from on this
+  // page (e.g. they were on Inventory in this same tab before opening the app).
   var stack = window._navStack || [];
   // Pop the 'app' entry if it's on top
   if(stack.length && stack[stack.length-1] === 'app') stack.pop();
@@ -832,10 +842,12 @@ function openAssignModal(appId, suggestedUnitId) {
   document.getElementById('am_app_id').textContent    = app.id;
   var scoreEl = document.getElementById('am_app_score');
   if(scoreEl) scoreEl.textContent = (app.score||0)+' pts · '+(app.tier||'—').replace(' Priority','');
-  var statusLabels={ed_approved:'ED Approved',mgr_approved:'HM Recommended',submitted:'Pending HM Review'};
-  var statusColors={ed_approved:'#15803d',mgr_approved:'#1d4ed8',submitted:'#92400e'};
+  var statusColors={ed_approved:'#15803d',hm_approved:'#15803d',mgr_approved:'#1d4ed8',submitted:'#92400e'};
   var statusEl=document.getElementById('am_app_status');
-  if(statusEl){ statusEl.textContent=statusLabels[app.status]||app.status; statusEl.style.color=statusColors[app.status]||'#888'; }
+  if(statusEl){
+    statusEl.textContent = (typeof formatAppStatusLabel === 'function') ? formatAppStatusLabel(app.status) : (app.status||'—');
+    statusEl.style.color = statusColors[app.status]||'#888';
+  }
   var reqs=[needsBeds+' bed'+(needsBeds!==1?'s':'')+' needed'];
   if(needsAccess) reqs.push('Accessible');
   if(isElders)    reqs.push('Elders eligible');
@@ -1119,9 +1131,19 @@ function confirmAssignment() {
   var app=allApps[appIdx]; var u=allUnits[unitIdx];
   var name=((app.fn||'')+' '+(app.ln||'')).trim();
 
-  // Role gate
-  if(role=== ROLE.ED&&app.status!==APP_STATUS.ED_APPROVED){showToast('ED approval required — status: '+app.status.replace(/_/g,' '));return;}
-  if(role=== ROLE.HOUSING_MANAGER&&app.status!==APP_STATUS.MGR_APPROVED&&app.status!==APP_STATUS.ED_APPROVED){showToast('HM recommendation required — status: '+app.status.replace(/_/g,' '));return;}
+  // Role gate — any approved-flavour status is acceptable for assignment,
+  // regardless of role. ED retains higher authority and can assign past any
+  // approved state; HM can assign past their own approval. The earlier
+  // strict gate blocked file_update apps (hm_approved) even when the ED
+  // already had the assign authority.
+  var _isApproved = app.status === APP_STATUS.ED_APPROVED ||
+                    app.status === APP_STATUS.MGR_APPROVED ||
+                    app.status === APP_STATUS.HM_APPROVED;
+  if(!_isApproved){
+    var _gateLbl = (role === ROLE.ED) ? 'ED' : 'HM';
+    showToast(_gateLbl + ' approval required — status: ' + (typeof formatAppStatusLabel === 'function' ? formatAppStatusLabel(app.status) : app.status.replace(/_/g,' ')));
+    return;
+  }
 
   // Write unit
   var isTransferReq = (app.appType === 'transfer_request');
@@ -2019,9 +2041,13 @@ function initHousingPage() {
   var params = new URLSearchParams(window.location.search);
   // ?openApp=APP_ID — cross-page handoff (e.g. from match.html applicant click)
   var openAppId = params.get('openApp');
-  if(openAppId && typeof window.openEditModal === 'function'){
-    window.openEditModal(openAppId);
-    return;
+  if(openAppId){
+    console.log('[boot] openApp param detected:', openAppId, '| openEditModal type:', typeof window.openEditModal);
+    if(typeof window.openEditModal === 'function'){
+      window.openEditModal(openAppId);
+      return;
+    }
+    console.warn('[boot] openEditModal not loaded — falling through to default view');
   }
   // Landing is the default for housing.html — old worklistView + employeeHomeView
   // collapsed into landingView. Sub-pages still default to their own views.
@@ -2331,16 +2357,22 @@ function _lookupOpen(kind, id, label){
       if(typeof window.openTenantCard === 'function' && document.getElementById('ticModal')){
         window.openTenantCard(unitId);
       } else {
+        if (typeof setNavReferrer === 'function') setNavReferrer('home');
         window.location.href = 'tenants.html?tic=' + encodeURIComponent(unitId);
       }
     } else {
       // No unit assigned yet — open the application instead.
       if(typeof window.openEditModal === 'function') window.openEditModal(id);
-      else window.location.href = 'housing.html?openApp=' + encodeURIComponent(id);
+      else {
+        if (typeof setNavReferrer === 'function') setNavReferrer('home');
+        window.location.href = 'housing.html?openApp=' + encodeURIComponent(id);
+      }
     }
   } else if(kind==='unit'){
+    if (typeof setNavReferrer === 'function') setNavReferrer('home');
     window.location.href = 'inventory.html?unit=' + encodeURIComponent(id);
   } else if(kind==='sow'){
+    if (typeof setNavReferrer === 'function') setNavReferrer('home');
     window.location.href = 'renos.html?sow=' + encodeURIComponent(id);
   }
 }
@@ -2466,14 +2498,15 @@ function _toggleAvatarPopover(){
   var pop = document.createElement('div');
   pop.id = 'header_avatar_pop';
   pop.className = 'header-avatar-pop';
-  // ED gets view-as switcher; everyone gets sign out
+  // ED and Super User get view-as switcher; everyone gets sign out.
   var viewAs = '';
-  if(window.CLFN_PERMS && realRole === 'ed'){
-    var opts = CLFN_PERMS.getViewAsOptions('ed') || [];
+  if(window.CLFN_PERMS && (realRole === 'ed' || realRole === 'super_user')){
+    var opts = CLFN_PERMS.getViewAsOptions(realRole) || [];
     if(opts.length){
+      var ownLabel = CLFN_PERMS.roleLabel(realRole);
       viewAs = '<div class="hap-section"><div class="hap-section-label">View as</div>'
              + '<select id="hap_view_as">'
-             + '<option value="">My role (ED)</option>'
+             + '<option value="">My role (' + _esc(ownLabel) + ')</option>'
              + opts.map(function(k){ return '<option value="'+k+'"'+(k===role?' selected':'')+'>'+CLFN_PERMS.roleLabel(k)+'</option>'; }).join('')
              + '</select></div>';
     }

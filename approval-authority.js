@@ -123,12 +123,20 @@ var APPROVAL_AUTHORITY = (function() {
      * @param {string} action  — key from DEFAULTS
      * @param {string} role    — current role string (e.g. 'ed', 'housing_manager')
      * @returns {boolean}
+     *
+     * Super User inheritance: anyone with role='super_user' is treated as
+     * having every grant ED has. Saved overrides can still target 'super_user'
+     * explicitly to grant access to actions ED doesn't have (rare).
      */
     can: function(action, role) {
       if (!action || !role) return false;
       var allowed = _live[action];
-      if (Array.isArray(allowed)) return allowed.indexOf(role) !== -1;
-      return false; // non-array entries are thresholds/values, not role lists
+      if (!Array.isArray(allowed)) return false;
+      if (allowed.indexOf(role) !== -1) return true;
+      // Super User inherits everything granted to ED. If admin later removes
+      // ED's authority for an action, super_user loses it too — they're a tier.
+      if (role === 'super_user' && allowed.indexOf('ed') !== -1) return true;
+      return false;
     },
 
     /**
@@ -242,6 +250,7 @@ var APPROVAL_AUTHORITY = (function() {
         { value: 'housing_employee_l1', label: 'Housing Employee L1' },
         { value: 'cfo',                 label: 'CFO' },
         { value: 'finance_l1',          label: 'Finance Clerk L1' },
+        { value: 'super_user',          label: 'Super User' },
       ];
     },
 

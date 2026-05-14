@@ -279,7 +279,7 @@ document.addEventListener('DOMContentLoaded',initAppId);
 //    the visible flow for HM/ED, but applicants skip them entirely.
 function _isHmOrEdRole(){
   var r = window.currentRole || '';
-  return r === ROLE.HOUSING_MANAGER || r === ROLE.ED;
+  return r === ROLE.HOUSING_MANAGER || r === ROLE.ED || r === ROLE.SUPER_USER;
 }
 function _goAfterPets(){ goTo(_isHmOrEdRole() ? 9 : 6); }
 function _goBeforeDocuments(){ goTo(_isHmOrEdRole() ? 10 : 5); }

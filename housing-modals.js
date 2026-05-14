@@ -336,14 +336,18 @@ function saveUnitEdit(){
     var role2 = window.currentRole||'housing_employee_l1';
     if(linkedApp2) {
       var appStatus = linkedApp2.status||'';
-      var edApproved = appStatus===APP_STATUS.ED_APPROVED;
-      var hmApproved = appStatus===APP_STATUS.MGR_APPROVED||edApproved;
-      if(role2=== ROLE.ED && !edApproved) {
-        showToast('⚠ ED Approval required before assigning tenant. Application is: '+appStatus.replace(/_/g,' '));
-        return;
-      }
-      if(role2=== ROLE.HOUSING_MANAGER && !hmApproved) {
-        showToast('⚠ ' + CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER) + ' approval required before assigning tenant. Application is: '+appStatus.replace(/_/g,' '));
+      // Any approved-flavour status is fine for assignment, regardless of
+      // role — ED can assign hm_approved file updates, HM can assign past
+      // ed_approved, etc. The earlier role-strict gate blocked the ED from
+      // assigning hm_approved apps even though ED is the higher authority.
+      var isApproved = appStatus === APP_STATUS.ED_APPROVED ||
+                       appStatus === APP_STATUS.MGR_APPROVED ||
+                       appStatus === APP_STATUS.HM_APPROVED;
+      if(!isApproved) {
+        var _label = (role2 === ROLE.ED)
+          ? CLFN_PERMS.roleLabel(ROLE.ED)
+          : CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER);
+        showToast('⚠ ' + _label + ' approval required before assigning tenant. Application is: ' + (typeof formatAppStatusLabel === 'function' ? formatAppStatusLabel(appStatus) : appStatus.replace(/_/g,' ')));
         return;
       }
       // Write back HM approval flag on unit
@@ -502,18 +506,20 @@ function ueTenantSelect(appId, name, status) {
   var sel = document.getElementById('ue_tenant_selected');
   if (!sel) return;
 
-  var isED = status === APP_STATUS.ED_APPROVED;
-  var isHM = status === APP_STATUS.MGR_APPROVED;
-  var statusLabel = isED ? 'ED Approved' : isHM ? 'HM Recommended' : status.replace(/_/g,' ');
-  var statusColor = isED ? '#15803d' : isHM ? '#1d4ed8' : '#92400e';
-  var statusBg    = isED ? '#f0fdf4'  : isHM ? '#eff6ff' : '#fffbeb';
+  var isED      = status === APP_STATUS.ED_APPROVED;
+  var isHMRec   = status === APP_STATUS.MGR_APPROVED;     // HM recommended → awaiting ED
+  var isHMApp   = status === APP_STATUS.HM_APPROVED;      // HM final approval (file-update terminal)
+  var isApprovedAtAll = isED || isHMRec || isHMApp;
+  var statusLabel = (typeof formatAppStatusLabel === 'function') ? formatAppStatusLabel(status) : status.replace(/_/g,' ');
+  var statusColor = isED ? '#15803d' : isHMApp ? '#15803d' : isHMRec ? '#1d4ed8' : '#92400e';
+  var statusBg    = isED ? '#f0fdf4' : isHMApp ? '#f0fdf4' : isHMRec ? '#eff6ff' : '#fffbeb';
 
   // Role-based warning
   var role = window.currentRole || 'housing_employee_l1';
   var warn = '';
-  if (!isED && !isHM) {
+  if (!isApprovedAtAll) {
     warn = '<div style="margin-top:8px;padding:8px 10px;background:var(--danger-bg);border-radius:6px;font-size:11px;color:var(--danger);font-weight:600;">⛔ This application has not been approved. Cannot assign tenant.</div>';
-  } else if (isHM && APPROVAL_AUTHORITY.can('finalApproveApp', role)) {
+  } else if (isHMRec && APPROVAL_AUTHORITY.can('finalApproveApp', role)) {
     warn = '<div style="margin-top:8px;padding:8px 10px;background:var(--info-blue-bg);border-radius:6px;font-size:11px;color:var(--info-blue);">ℹ️ Recommended by Housing Manager — awaiting your final approval. You may proceed with assignment.</div>';
   }
 
@@ -1767,9 +1773,10 @@ function atSearchApps(q){
     // Replace quotes for the inline JS arg, then escape for HTML rendering.
     var safeName=name.replace(/'/g,'’');
     var isED=a.status===APP_STATUS.ED_APPROVED; var isHM=a.status===APP_STATUS.MGR_APPROVED;
-    var statusLabel=isED?'ED Approved':isHM?'HM Recommended':a.status.replace(/_/g,' ');
-    var statusCol=isED?'#15803d':isHM?'#1d4ed8':'#888';
-    var statusBg=isED?'#f0fdf4':isHM?'#eff6ff':'var(--bg)';
+    var isHMApp=a.status===APP_STATUS.HM_APPROVED;
+    var statusLabel=(typeof formatAppStatusLabel === 'function') ? formatAppStatusLabel(a.status) : (isED?'ED Approved':isHM?'HM Recommended':a.status.replace(/_/g,' '));
+    var statusCol=isED?'#15803d':isHMApp?'#15803d':isHM?'#1d4ed8':'#888';
+    var statusBg=isED?'#f0fdf4':isHMApp?'#f0fdf4':isHM?'#eff6ff':'var(--bg)';
     return '<div onmousedown="atSelectApp(\''+escapeHtml(a.id)+'\',\''+escapeHtml(safeName)+'\',\''+escapeHtml(a.status)+'\') " '
       +'style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;" '
       +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'none\'">'
@@ -2015,8 +2022,10 @@ function openAppFromMatch(appId){
   // application form and the form is hidden behind it.
   closeMatchScorecard();
   // If the app form (#appLayout) doesn't exist on this page (e.g. match.html),
-  // hand off to housing.html which owns the form view.
+  // hand off to housing.html which owns the form view. Stamp the cross-page
+  // referrer so the Back button on the form returns to match.html.
   if(!document.getElementById('appLayout')){
+    if (typeof setNavReferrer === 'function') setNavReferrer('match');
     window.location.href = 'housing.html?openApp=' + encodeURIComponent(appId);
     return;
   }
@@ -2029,8 +2038,15 @@ function closeMatchScorecard(){
 }
 
 window.openEditModal = function(appId) {
+  console.log('[openEditModal] called with appId:', appId,
+              '| applications.length:', (typeof applications !== 'undefined' && applications ? applications.length : 'undefined'));
   var app = applications.find(function(a){ return a.id === appId; });
-  if(!app) { showToast('Application not found'); return; }
+  if(!app) {
+    console.warn('[openEditModal] app not found in applications[] — bailing. id:', appId);
+    showToast('Application not found');
+    return;
+  }
+  console.log('[openEditModal] app found — status:', app.status, '| appType:', app.appType);
 
   // Store the ID so saveApplicationRecord knows which record to update
   currentAppId = app.id;
