@@ -45,14 +45,30 @@
       </button>
     </div>
   </div>
-  <div class="ct-filter-bar" id="ct_filter_tabs">
-    <button onclick="ctSetFilter('')"               id="ct_tab_all"      class="btn btn-ghost ct-filter-tab">All</button>
-    <button onclick="ctSetFilter('pending_review')" id="ct_tab_pending"  class="btn btn-ghost ct-filter-tab">⏳ Pending Review</button>
-    <button onclick="ctSetFilter('hm_recommended')" id="ct_tab_hm"       class="btn btn-ghost ct-filter-tab">📋 Awaiting ED</button>
-    <button onclick="ctSetFilter('approved')"       id="ct_tab_approved" class="btn btn-ghost ct-filter-tab">✅ Approved</button>
-    <button onclick="ctSetFilter('declined')"       id="ct_tab_declined" class="btn btn-ghost ct-filter-tab">❌ Declined</button>
+  <div class="std-search-row std-search-row-wide">
+    <input id="ct_search_input" type="text" class="std-search" placeholder="🔍 Search name, trade, phone, email, address, or status..." oninput="renderContractorsView()"/>
   </div>
-  <div id="contractors_list"></div>
+  <div id="ct_kpi_strip_host"></div>
+  <div id="ct_empty_host"></div>
+  <div class="ct-table-wrap" id="ct_table_wrap">
+    <table class="ct-table">
+      <thead id="ct_thead">
+        <tr>
+          <th class="ct-th-w"></th>
+          <th class="std-th-sortable" data-sort-key="name">Contractor</th>
+          <th class="ct-th-hide-mobile">Contact</th>
+          <th class="std-th-sortable ct-th-hide-mobile" data-sort-key="class">Indigenous Status</th>
+          <th class="std-th-sortable ct-th-num" data-sort-key="jobs"># Jobs</th>
+          <th class="std-th-sortable ct-th-num" data-sort-key="value">Cumulative $</th>
+          <th class="std-th-sortable ct-th-hide-mobile" data-sort-key="wsib">WSIB Expiry</th>
+          <th class="std-th-sortable ct-th-hide-mobile" data-sort-key="ins">Insurance Expiry</th>
+          <th class="std-th-sortable" data-sort-key="status">Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="ct_tbody" data-table-page="contractors"><tr><td colspan="10" class="ct-table-empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
 </div><!-- end contractorsView -->
 
 <!-- ── Contractor Approval Panel (slide-in from right) ── -->

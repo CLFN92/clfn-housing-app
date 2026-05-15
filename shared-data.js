@@ -1998,10 +1998,6 @@ function ctRenderPeople(people) {
       +'</div>';
   }).join('');
 }
-function ctSetFilter(status) {
-  window._ctFilter = status;
-  renderContractorsView();
-}
 function ctUpdateClassBorders() {
   var labels = document.querySelectorAll('input[name="ct_classification"]');
   labels.forEach(function(radio) {
@@ -2966,91 +2962,47 @@ function _ctHandleRowAction(action, idx) {
   }
 }
 
-// Search + sort handlers — keep state on window so re-renders pick up the
-// last user choice within the session.
-function ctSetSearch(val) { window._ctSearch = val || ''; renderContractorsView(); }
-function ctSetSort(key) {
-  var s = window._ctSort || { key:'name', dir:1 };
-  if (s.key === key) s.dir = -s.dir; else { s.key = key; s.dir = 1; }
-  window._ctSort = s;
-  renderContractorsView();
-}
-
 function renderContractorsView(){
-  var list = document.getElementById('contractors_list');
-  if(!list) return;
+  var tbody    = document.getElementById('ct_tbody');
+  var thead    = document.getElementById('ct_thead');
+  var kpiHost  = document.getElementById('ct_kpi_strip_host');
+  var emptyHost= document.getElementById('ct_empty_host');
+  var tableWrap= document.getElementById('ct_table_wrap');
+  if(!tbody) return;
   var allContractors = window._contractors || [];
 
-  // ── Empty state ──────────────────────────────────────────────────────
+  // ── Fully-empty directory ────────────────────────────────────────────
+  // No contractors yet → swap the search/KPI/table out for a single empty
+  // card. Search input stays visible (sits above) but with nothing to
+  // search, that's harmless.
   if(!allContractors.length){
-    list.innerHTML = '<div class="card ct-empty"><div class="ct-empty-inner"><span class="ct-empty-icon">🧰</span><div class="ct-empty-title">No contractors added yet</div><div class="ct-empty-sub">Click "Add Contractor" to build your directory.</div></div></div>';
+    if (kpiHost)   kpiHost.innerHTML = '';
+    if (tableWrap) tableWrap.style.display = 'none';
+    if (emptyHost) emptyHost.innerHTML = '<div class="card ct-empty"><div class="ct-empty-inner"><span class="ct-empty-icon">🧰</span><div class="ct-empty-title">No contractors added yet</div><div class="ct-empty-sub">Click "Add Contractor" to build your directory.</div></div></div>';
     return;
   }
+  if (emptyHost) emptyHost.innerHTML = '';
+  if (tableWrap) tableWrap.style.display = '';
 
   // ── KPIs ─────────────────────────────────────────────────────────────
   var kpi = _ctComputeKpis();
-  var kpiHtml =
-    '<div class="ct-kpi-strip">' +
-      '<div class="ct-kpi-card"><div class="ct-kpi-label">Total Contractors</div>'+
-        '<div class="ct-kpi-val">'+kpi.totalContractors+'</div>'+
-        '<div class="ct-kpi-sub">'+kpi.approved+' approved · '+kpi.pending+' pending</div></div>' +
-      '<div class="ct-kpi-card"><div class="ct-kpi-label">Total Jobs (SOWs)</div>'+
-        '<div class="ct-kpi-val">'+kpi.totalJobs+'</div>'+
-        '<div class="ct-kpi-sub">across all contractors</div></div>' +
-      '<div class="ct-kpi-card"><div class="ct-kpi-label">Total Spend</div>'+
-        '<div class="ct-kpi-val">'+_ctFmtCurrency(kpi.totalSpend)+'</div>'+
-        '<div class="ct-kpi-sub">cumulative SOW value</div></div>' +
-      '<div class="ct-kpi-card"><div class="ct-kpi-label">Top Trade</div>'+
-        '<div class="ct-kpi-val ct-kpi-val-sm">'+escapeHtml(kpi.topTrade || '—')+'</div>'+
-        '<div class="ct-kpi-sub">'+(kpi.topTrade ? kpi.topTradeJobs + ' job' + (kpi.topTradeJobs===1?'':'s') : 'no jobs yet')+'</div></div>' +
-    '</div>';
-
-  // ── Filter + search ──────────────────────────────────────────────────
-  var ctFilter = window._ctFilter || '';
-  var ctSearch = (window._ctSearch || '').toLowerCase().trim();
-  var sort = window._ctSort || { key:'name', dir:1 };
-
-  // Decorate each contractor with derived stats once, then filter / sort.
-  var classLabels = {internal_indigenous:'Internal — Indigenous',external_indigenous:'External — Indigenous',external_non_indigenous:'External — Non-Indigenous'};
-  var enriched = allContractors.map(function(ct, i){
-    var stats = _ctRowStats(ct);
-    return {
-      ct: ct, i: i,
-      name: (ct.name || '').toLowerCase(),
-      classLabel: classLabels[ct.classification] || '',
-      jobs: stats.jobCount,
-      value: stats.totalValue,
-      wsib: ct.wsibExpiry || '',
-      ins:  ct.insExpiry  || ''
-    };
-  }).filter(function(r){
-    if (r.ct.archived && ctFilter !== 'archived') return false;
-    if (ctFilter && (r.ct.status||'pending_review') !== ctFilter) return false;
-    if (ctSearch) {
-      // Scan every visible column on the contractors table.
-      var hay = [
-        r.name, r.ct.trade, r.ct.phone, r.ct.email,
-        r.ct.address, r.ct.city, r.ct.bbb_id,
-        (r.ct.status || 'pending_review'),
-        r.classLabel
-      ].filter(Boolean).join(' ').toLowerCase();
-      if (hay.indexOf(ctSearch) === -1) return false;
-    }
-    return true;
-  });
-
-  // Sort
-  enriched.sort(function(a,b){
-    var dir = sort.dir;
-    function cmp(x,y){ if (x<y) return -1*dir; if (x>y) return 1*dir; return 0; }
-    if (sort.key === 'name')  return cmp(a.name, b.name);
-    if (sort.key === 'class') return cmp(a.classLabel, b.classLabel);
-    if (sort.key === 'jobs')  return cmp(a.jobs, b.jobs);
-    if (sort.key === 'value') return cmp(a.value, b.value);
-    if (sort.key === 'wsib')  return cmp(a.wsib, b.wsib);
-    if (sort.key === 'ins')   return cmp(a.ins,  b.ins);
-    return cmp(a.name, b.name);
-  });
+  if (kpiHost) {
+    kpiHost.innerHTML =
+      '<div class="ct-kpi-strip">' +
+        '<div class="ct-kpi-card"><div class="ct-kpi-label">Total Contractors</div>'+
+          '<div class="ct-kpi-val">'+kpi.totalContractors+'</div>'+
+          '<div class="ct-kpi-sub">'+kpi.approved+' approved · '+kpi.pending+' pending</div></div>' +
+        '<div class="ct-kpi-card"><div class="ct-kpi-label">Total Jobs (SOWs)</div>'+
+          '<div class="ct-kpi-val">'+kpi.totalJobs+'</div>'+
+          '<div class="ct-kpi-sub">across all contractors</div></div>' +
+        '<div class="ct-kpi-card"><div class="ct-kpi-label">Total Spend</div>'+
+          '<div class="ct-kpi-val">'+_ctFmtCurrency(kpi.totalSpend)+'</div>'+
+          '<div class="ct-kpi-sub">cumulative SOW value</div></div>' +
+        '<div class="ct-kpi-card"><div class="ct-kpi-label">Top Trade</div>'+
+          '<div class="ct-kpi-val ct-kpi-val-sm">'+escapeHtml(kpi.topTrade || '—')+'</div>'+
+          '<div class="ct-kpi-sub">'+(kpi.topTrade ? kpi.topTradeJobs + ' job' + (kpi.topTradeJobs===1?'':'s') : 'no jobs yet')+'</div></div>' +
+      '</div>';
+  }
 
   var ctStatusStyle = {
     pending_review: {cls:'pending-review', label:'⏳ Pending HM'},
@@ -3059,94 +3011,119 @@ function renderContractorsView(){
     declined:       {cls:'declined',        label:'❌ Declined'},
     returned:       {cls:'returned',        label:'↩ Returned'}
   };
+  var classLabels = {internal_indigenous:'Internal — Indigenous',external_indigenous:'External — Indigenous',external_non_indigenous:'External — Non-Indigenous'};
   var role = window.currentRole || 'housing_employee_l1';
   var isMgmt = (typeof ROLE !== 'undefined') && ROLE.isManagement(role);
 
-  // ── Search input ─────────────────────────────────────────────────────
-  var searchHtml =
-    '<div class="std-search-row">' +
-      '<input id="ct_search_input" type="text" class="std-search" placeholder="🔍 Search name, trade, phone, email, address, or status..." '+
-        'value="'+escapeHtml(window._ctSearch||'')+'" oninput="ctSetSearch(this.value)"/>' +
-    '</div>';
+  // Decorate each contractor with derived stats once. Hide archived rows
+  // by default (no filter UI to surface them yet — Phase 2C, mirrors
+  // inventory's archived treatment).
+  var enriched = allContractors.map(function(ct, i){
+    var stats = _ctRowStats(ct);
+    var statusKey = ct.status || 'pending_review';
+    return {
+      ct: ct, i: i,
+      name:       ct.name || '',
+      classLabel: classLabels[ct.classification] || '(none)',
+      jobs:       stats.jobCount,
+      value:      stats.totalValue,
+      wsib:       ct.wsibExpiry || '',
+      ins:        ct.insExpiry  || '',
+      statusKey:  statusKey,
+      statusLabel:(ctStatusStyle[statusKey] || {label:statusKey}).label
+    };
+  }).filter(function(r){ return !r.ct.archived; });
 
-  // ── Table ────────────────────────────────────────────────────────────
-  function sortArrow(key) {
-    if (sort.key !== key) return '';
-    return sort.dir > 0 ? ' ▲' : ' ▼';
+  // Search filter — scans every visible column.
+  var ctSearch = ((document.getElementById('ct_search_input')||{}).value || '').toLowerCase().trim();
+  if (ctSearch) {
+    enriched = enriched.filter(function(r){
+      var hay = [
+        r.name, r.ct.trade, r.ct.phone, r.ct.email,
+        r.ct.address, r.ct.city, r.ct.bbb_id,
+        r.statusLabel, r.classLabel
+      ].filter(Boolean).join(' ').toLowerCase();
+      return hay.indexOf(ctSearch) !== -1;
+    });
   }
 
-  var headerHtml =
-    '<thead><tr>' +
-      '<th class="ct-th-w"></th>' +
-      '<th class="ct-th-sortable" onclick="ctSetSort(\'name\')">Contractor'+sortArrow('name')+'</th>' +
-      '<th class="ct-th-hide-mobile">Contact</th>' +
-      '<th class="ct-th-sortable ct-th-hide-mobile" onclick="ctSetSort(\'class\')">Indigenous Status'+sortArrow('class')+'</th>' +
-      '<th class="ct-th-sortable ct-th-num" onclick="ctSetSort(\'jobs\')"># Jobs'+sortArrow('jobs')+'</th>' +
-      '<th class="ct-th-sortable ct-th-num" onclick="ctSetSort(\'value\')">Cumulative $'+sortArrow('value')+'</th>' +
-      '<th class="ct-th-sortable ct-th-hide-mobile" onclick="ctSetSort(\'wsib\')">WSIB Expiry'+sortArrow('wsib')+'</th>' +
-      '<th class="ct-th-sortable ct-th-hide-mobile" onclick="ctSetSort(\'ins\')">Insurance Expiry'+sortArrow('ins')+'</th>' +
-      '<th>Status</th>' +
-      '<th></th>' +
-    '</tr></thead>';
-
-  var rowsHtml = enriched.length === 0
-    ? '<tr><td colspan="10" class="ct-table-empty">No contractors match the current filter / search.</td></tr>'
-    : enriched.map(function(r){
-        var ct = r.ct; var i = r.i;
-        var ss = ctStatusStyle[ct.status||'pending_review'] || {cls:'', label:ct.status||'Unknown'};
-        var initials = (function(n){var w=(n||'??').trim().split(/\s+/);return w.length>=2?w[0][0].toUpperCase()+w[w.length-1][0].toUpperCase():(n||'??').slice(0,2).toUpperCase();})(ct.name);
-        var contact = ct.phone ? formatPhone(ct.phone) : (ct.email || '—');
-        var indigClass = 'ct-indig-other';
-        if (ct.classification === 'internal_indigenous') indigClass = 'ct-indig-internal';
-        else if (ct.classification === 'external_indigenous') indigClass = 'ct-indig-external';
-        else if (ct.classification === 'external_non_indigenous') indigClass = 'ct-indig-nonindig';
-        var indigLabel = r.classLabel || '—';
-        return '<tr class="ct-row" onclick="openAddContractorModal('+i+')" title="Open contractor">' +
-          '<td class="ct-row-avatar"><div class="std-row-avatar">'+escapeHtml(initials)+'</div></td>' +
-          '<td class="ct-row-name"><div class="ct-name-line">'+escapeHtml(ct.name||'—')+'</div><div class="ct-name-trade">'+escapeHtml(ct.trade||'General Contractor')+'</div></td>' +
-          '<td class="ct-th-hide-mobile ct-row-contact">'+escapeHtml(contact)+'</td>' +
-          '<td class="ct-th-hide-mobile"><span class="ct-indig-pill '+indigClass+'">'+escapeHtml(indigLabel.replace(' — Indigenous','').replace(' — Non-Indigenous',''))+'</span></td>' +
-          '<td class="ct-th-num">'+r.jobs+'</td>' +
-          '<td class="ct-th-num">'+_ctFmtCurrency(r.value)+'</td>' +
-          '<td class="ct-th-hide-mobile">'+_ctExpiryCell(ct.wsibExpiry)+'</td>' +
-          '<td class="ct-th-hide-mobile">'+_ctExpiryCell(ct.insExpiry)+'</td>' +
-          '<td class="ct-row-status"><span class="std-pill ct-status-pill '+ss.cls+'">'+escapeHtml(ss.label)+'</span></td>' +
-          '<td class="ct-row-actions">' +
-            '<div class="ct-row-actions-inner">' +
-              '<button class="dash-action-btn" onclick="event.stopPropagation();openAddContractorModal('+i+')" title="Edit">'+
-                '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'+
-              '</button>' +
-              '<button class="dash-action-btn" onclick="event.stopPropagation();ctPrintFromRow('+i+')" title="Print Agreement">'+
-                '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>'+
-              '</button>' +
-              (isMgmt
-                ? '<button class="dash-action-btn" onclick="event.stopPropagation();ctOpenRowMenu('+i+', this)" title="More options" style="font-size:14px;line-height:1;">⋮</button>'
-                : '') +
-            '</div>' +
-          '</td>' +
-        '</tr>';
-      }).join('');
-
-  var tableHtml =
-    '<div class="ct-table-wrap">' +
-      '<table class="ct-table">' +
-        headerHtml +
-        '<tbody>' + rowsHtml + '</tbody>' +
-      '</table>' +
-    '</div>';
-
-  list.innerHTML = kpiHtml + searchHtml + tableHtml;
-
-  // Update tab active states (same logic as before — chip filters stay)
-  ['all','pending','hm','approved','declined'].forEach(function(k){
-    var el = document.getElementById('ct_tab_'+k);
-    if(!el) return;
-    var match = k==='all'?'':k==='pending'?'pending_review':k==='hm'?'hm_recommended':k;
-    var active = (window._ctFilter||'') === match;
-    el.style.background = active ? 'var(--yellow)' : '';
-    el.style.color = active ? '#111' : '';
-    el.style.border = active ? 'none' : '';
+  // Default sort — name asc. Preserved when state.sort.key is empty.
+  enriched.sort(function(a,b){
+    var av=(a.name||'').toLowerCase(), bv=(b.name||'').toLowerCase();
+    return av < bv ? -1 : av > bv ? 1 : 0;
   });
+
+  // ── Column-menu sort + filter (Phase 2B) ─────────────────────────────
+  var _ctColumns = {
+    name:   { label: 'Contractor',        accessor: function(r){ return r.name || '(none)'; } },
+    class:  { label: 'Indigenous Status', accessor: function(r){ return r.classLabel || '(none)'; } },
+    jobs:   { label: '# Jobs',            accessor: function(r){ return r.jobs || 0; } },
+    value:  { label: 'Cumulative $',      accessor: function(r){ return r.value || 0; } },
+    wsib:   { label: 'WSIB Expiry',       accessor: function(r){ return r.wsib || '(none)'; } },
+    ins:    { label: 'Insurance Expiry',  accessor: function(r){ return r.ins  || '(none)'; } },
+    status: { label: 'Status',            accessor: function(r){ return r.statusLabel || '(none)'; } }
+  };
+  var _ctAccessors = {};
+  Object.keys(_ctColumns).forEach(function(k){ _ctAccessors[k] = _ctColumns[k].accessor; });
+
+  var _ctState = (typeof tableStateGet === 'function') ? tableStateGet('contractors') : { sort:{key:'',dir:1}, filters:{} };
+
+  if (typeof tableRegisterColumns === 'function') {
+    tableRegisterColumns('contractors', {
+      columns:  _ctColumns,
+      getRows:  function(){ return enriched; },
+      onChange: renderContractorsView
+    });
+  }
+
+  var rows = (typeof tableApplyFilterSort === 'function')
+    ? tableApplyFilterSort(enriched, _ctAccessors, _ctState)
+    : enriched;
+
+  // ── Table rows ───────────────────────────────────────────────────────
+  if(!rows.length){
+    tbody.innerHTML = '<tr><td colspan="10" class="ct-table-empty">No contractors match the current filters.</td></tr>';
+  } else {
+    tbody.innerHTML = rows.map(function(r){
+      var ct = r.ct; var i = r.i;
+      var ss = ctStatusStyle[r.statusKey] || {cls:'', label:r.statusKey};
+      var initials = (function(n){var w=(n||'??').trim().split(/\s+/);return w.length>=2?w[0][0].toUpperCase()+w[w.length-1][0].toUpperCase():(n||'??').slice(0,2).toUpperCase();})(ct.name);
+      var contact = ct.phone ? formatPhone(ct.phone) : (ct.email || '—');
+      var indigClass = 'ct-indig-other';
+      if (ct.classification === 'internal_indigenous') indigClass = 'ct-indig-internal';
+      else if (ct.classification === 'external_indigenous') indigClass = 'ct-indig-external';
+      else if (ct.classification === 'external_non_indigenous') indigClass = 'ct-indig-nonindig';
+      var indigLabel = r.classLabel || '—';
+      return '<tr class="ct-row" onclick="openAddContractorModal('+i+')" title="Open contractor">' +
+        '<td class="ct-row-avatar"><div class="std-row-avatar">'+escapeHtml(initials)+'</div></td>' +
+        '<td class="ct-row-name"><div class="ct-name-line">'+escapeHtml(ct.name||'—')+'</div><div class="ct-name-trade">'+escapeHtml(ct.trade||'General Contractor')+'</div></td>' +
+        '<td class="ct-th-hide-mobile ct-row-contact">'+escapeHtml(contact)+'</td>' +
+        '<td class="ct-th-hide-mobile"><span class="ct-indig-pill '+indigClass+'">'+escapeHtml(indigLabel.replace(' — Indigenous','').replace(' — Non-Indigenous',''))+'</span></td>' +
+        '<td class="ct-th-num">'+r.jobs+'</td>' +
+        '<td class="ct-th-num">'+_ctFmtCurrency(r.value)+'</td>' +
+        '<td class="ct-th-hide-mobile">'+_ctExpiryCell(ct.wsibExpiry)+'</td>' +
+        '<td class="ct-th-hide-mobile">'+_ctExpiryCell(ct.insExpiry)+'</td>' +
+        '<td class="ct-row-status"><span class="std-pill ct-status-pill '+ss.cls+'">'+escapeHtml(ss.label)+'</span></td>' +
+        '<td class="ct-row-actions">' +
+          '<div class="ct-row-actions-inner">' +
+            '<button class="dash-action-btn" onclick="event.stopPropagation();openAddContractorModal('+i+')" title="Edit">'+
+              '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'+
+            '</button>' +
+            '<button class="dash-action-btn" onclick="event.stopPropagation();ctPrintFromRow('+i+')" title="Print Agreement">'+
+              '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>'+
+            '</button>' +
+            (isMgmt
+              ? '<button class="dash-action-btn" onclick="event.stopPropagation();ctOpenRowMenu('+i+', this)" title="More options" style="font-size:14px;line-height:1;">⋮</button>'
+              : '') +
+          '</div>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  // Column-menu click + sort indicators
+  if (typeof tableBindColumnMenuClicks === 'function')   tableBindColumnMenuClicks(thead, 'contractors');
+  if (typeof tableRefreshSortIndicators === 'function') tableRefreshSortIndicators(thead, 'contractors');
 }
 function renderCtFilePreview(bucket){
   var container=document.getElementById('ct_'+bucket+'_preview');
