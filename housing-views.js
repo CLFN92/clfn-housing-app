@@ -959,6 +959,13 @@ function showLanding() {
 
   // KPI strip — housing-only metrics from the in-memory caches.
   _renderLandingKpis();
+
+  // Recent Activity — kick off the role-aware render so the count pill
+  // (#recent_count_pill) reflects today's events on first paint, not just
+  // after the user expands the section. The body update happens against
+  // a hidden element (section defaults collapsed) and primes the
+  // auditLog cache so the eventual expand renders instantly.
+  if (typeof renderRecentActivity === 'function') renderRecentActivity(role);
 }
 
 // _renderLandingKpis — Open Apps · Critical · Vacant · Awaiting Match.

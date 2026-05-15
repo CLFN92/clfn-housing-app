@@ -1902,6 +1902,17 @@ function archiveUnit(unitId) {
     closeUnitEditModal();
     renderInventoryView();
     if(typeof updateDashStats === 'function') updateDashStats();
+    // Landing-page surfaces — refresh KPI strip (Vacant Units / Awaiting
+    // Match), Worklist count (linked apps were auto-archived above), and
+    // Recent Activity pill so the new unit_archived event lands without a
+    // page reload. All gated — these are no-ops on inventory.html / etc.
+    if(typeof _renderLandingKpis === 'function')        _renderLandingKpis();
+    if(typeof _renderWorklistCountPills === 'function') _renderWorklistCountPills();
+    if(typeof renderRecentActivity === 'function')      renderRecentActivity(role);
+    var _wlSec = document.getElementById('sec-worklist');
+    if(_wlSec && !_wlSec.classList.contains('collapsed') && typeof renderWorklist === 'function'){
+      renderWorklist();
+    }
     showToast('Unit archived — all documents preserved');
   });
 }
@@ -1928,6 +1939,16 @@ function unarchiveUnit(unitId) {
     auditEntry('UNIT:' + unitId, 'unit_unarchived', addr + ' restored from archive to Vacant', role);
     closeUnitEditModal();
     renderInventoryView();
+    // Mirror archiveUnit: refresh landing surfaces so the restored unit
+    // shows up in Vacant Units / Worklist / Recent Activity without a
+    // page reload. Gated — no-ops where the landing globals aren't loaded.
+    if(typeof _renderLandingKpis === 'function')        _renderLandingKpis();
+    if(typeof _renderWorklistCountPills === 'function') _renderWorklistCountPills();
+    if(typeof renderRecentActivity === 'function')      renderRecentActivity(role);
+    var _wlSec = document.getElementById('sec-worklist');
+    if(_wlSec && !_wlSec.classList.contains('collapsed') && typeof renderWorklist === 'function'){
+      renderWorklist();
+    }
     showToast(addr + ' restored to active inventory');
   });
 }
