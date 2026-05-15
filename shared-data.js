@@ -3699,67 +3699,15 @@ function renderWorklist() {
   };
   if(sub) sub.textContent = subtitles[role] || '';
 
-  // ── Chip filter definitions ───────────────────────────────────────────────
-  // Tiered by review/final-approval authority:
-  //   no reviewApplication → submitter view (HE_L1)
-  //   reviewApplication only (no finalApproveApp) → HM view
-  //   finalApproveApp → ED view
-  var chipDefs;
-  var canReviewApp    = APPROVAL_AUTHORITY.can('reviewApplication', role);
-  var canFinalApprove = APPROVAL_AUTHORITY.can('finalApproveApp', role);
-  // _myEmail and _queueFilter share the per-row predicate so the action chip
-  // count, the rendered rows, and the landing-page pill are all in agreement.
-  var _myEmail = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION.email : '';
-  var _queueFilter = function(a){ return isInWorkQueue(a, role, _myEmail); };
-  if(!canReviewApp && !canFinalApprove) {
-    chipDefs = [
-      {key:'mine',      label:'My Items',       filter: _queueFilter, alert:true},
-      {key:'',          label:'All',            filter: function(a){ return !a.archived; }},
-      {key:'submitted', label:'In Review',      filter: function(a){ return ['submitted','file_update','mgr_approved'].indexOf(a.status)!==-1; }},
-      {key:'approved',  label:'Approved',       filter: function(a){ return ['ed_approved','hm_approved','assigned'].indexOf(a.status)!==-1; }},
-      {key:'draft',     label:'Draft',          filter: function(a){ return a.status===APP_STATUS.DRAFT; }},
-      {key:'declined',  label:'Declined',       filter: function(a){ return a.status==='declined'; }}
-    ];
-  } else if(canReviewApp && !canFinalApprove) {
-    chipDefs = [
-      {key:'mine',      label:'My Queue',       filter: _queueFilter, alert:true},
-      {key:'',          label:'All Active',     filter: function(a){ return !a.archived; }},
-      {key:'returned',  label:'Returned',       filter: function(a){ return a.status==='returned'; }, alert:true},
-      {key:'pending',   label:'Awaiting ED',    filter: function(a){ return a.status===APP_STATUS.MGR_APPROVED; }},
-      {key:'approved',  label:'Approved',       filter: function(a){ return a.status===APP_STATUS.ED_APPROVED || a.status===APP_STATUS.HM_APPROVED; }},
-      {key:'assigned',  label:'Assigned',       filter: function(a){ return a.status==='assigned'; }},
-      {key:'draft',     label:'Drafts',         filter: function(a){ return a.status===APP_STATUS.DRAFT; }}
-    ];
-  } else {
-    chipDefs = [
-      {key:'mine',      label:'My Queue',       filter: _queueFilter, alert:true},
-      {key:'',          label:'All Active',     filter: function(a){ return !a.archived; }},
-      {key:'submitted', label:'Awaiting HM',    filter: function(a){ return a.status===APP_STATUS.SUBMITTED; }},
-      {key:'approved',  label:'Approved',       filter: function(a){ return a.status===APP_STATUS.ED_APPROVED || a.status===APP_STATUS.HM_APPROVED; }},
-      {key:'assigned',  label:'Assigned',       filter: function(a){ return a.status==='assigned'; }},
-      {key:'declined',  label:'Declined',       filter: function(a){ return a.status==='declined'; }},
-      {key:'draft',     label:'Drafts',         filter: function(a){ return a.status===APP_STATUS.DRAFT; }}
-    ];
-  }
-
-  // ── Active chip + search state ────────────────────────────────────────────
-  // Default to "My Queue" (role-scoped) so users land on their own work first.
-  // Once they pick a different chip, the choice sticks for the session.
-  if(window._wlActiveChip === undefined || window._wlActiveChip === null) window._wlActiveChip = 'mine';
-  if(!window._wlSearch) window._wlSearch = '';
-  // Reserve filter is an INDEPENDENT axis from the main chips — it
-  // composes with whatever main chip is active so the user can e.g. see
-  // "Approved + On Reserve" or "My Queue + Off Reserve". States cycle on
-  // each tap: '' (no filter) → 'On Reserve' → 'Off Reserve' → ''.
-  if(window._wlReserveFilter === undefined) window._wlReserveFilter = '';
-
-  var activeChipDef = chipDefs.find(function(c){ return c.key === window._wlActiveChip; }) || chipDefs[0];
-
   // ── Filter apps ───────────────────────────────────────────────────────────
-  var filtered = apps.filter(activeChipDef.filter);
-  if(window._wlReserveFilter) {
-    filtered = filtered.filter(function(a){ return a.reserve === window._wlReserveFilter; });
-  }
+  // Worklist is locked to the role-scoped "my queue" — the same predicate the
+  // landing-page count pill uses, so the section title, count, and rendered
+  // rows are always in agreement. Status / reserve narrowing now lives in the
+  // column-menu filters.
+  var _myEmail = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION.email : '';
+  var filtered = apps.filter(function(a){ return isInWorkQueue(a, role, _myEmail); });
+
+  if(!window._wlSearch) window._wlSearch = '';
   var search = (window._wlSearch||'').toLowerCase().trim();
   if(search) {
     filtered = filtered.filter(function(a){
@@ -3774,46 +3722,46 @@ function renderWorklist() {
   }
   var showScore = APPROVAL_AUTHORITY.can('viewApplicationScore', role);
 
-  // ── Chip counts ───────────────────────────────────────────────────────────
-  var chipsHtml = chipDefs.map(function(c){
-    var count = apps.filter(c.filter).length;
-    var isActive = c.key === (window._wlActiveChip||'');
-    var base = isActive
-      ? 'background:var(--dark);border:2px solid var(--yellow);color:#fff;'
-      : (c.alert && count>0 ? 'background:#fef2f2;border:1.5px solid #fecaca;color:#b91c1c;' : 'background:var(--surface);border:1.5px solid var(--border);color:var(--muted);');
-    return '<button data-wlchip="'+c.key+'" onclick="wlSetChip(this)" '
-      + 'style="'+base+'padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;transition:all .12s;">'
-      + c.label + (count ? ' <span style="font-size:11px;opacity:.7;">'+count+'</span>' : '')
-      + '</button>';
-  }).join('');
-
-  // ── Reserve toggle chip (independent axis) ────────────────────────────────
-  // Cycles: All → On Reserve → Off Reserve → All. The ↻ glyph hints at the
-  // toggle nature; the active states (On/Off Reserve) get the same dark/
-  // yellow treatment as the main chip selection. A small left margin
-  // separates it from the main chip group so the two axes read distinctly.
-  var _resState = window._wlReserveFilter; // '' | 'On Reserve' | 'Off Reserve'
-  var _resLabel = _resState === 'On Reserve' ? 'On Reserve'
-                : _resState === 'Off Reserve' ? 'Off Reserve'
-                : 'All Reserve';
-  var _resCount = _resState
-    ? apps.filter(function(a){ return a.reserve === _resState; }).length
-    : 0;
-  var _resBase = _resState
-    ? 'background:var(--dark);border:2px solid var(--yellow);color:#fff;'
-    : 'background:var(--surface);border:1.5px solid var(--border);color:var(--muted);';
-  var reserveChipHtml = '<button onclick="wlCycleReserveFilter()" '
-    + 'style="'+_resBase+'padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;transition:all .12s;margin-left:8px;border-left-style:solid;" '
-    + 'title="Toggle: All → On Reserve → Off Reserve">'
-    + '↻ ' + _resLabel + (_resCount ? ' <span style="font-size:11px;opacity:.7;">'+_resCount+'</span>' : '')
-    + '</button>';
-  chipsHtml = chipsHtml + reserveChipHtml;
-
-  // ── Build rows ────────────────────────────────────────────────────────────
-  var sorted = filtered.slice().sort(function(a,b){
+  // ── Default sort ──────────────────────────────────────────────────────────
+  // Applied to `filtered` so tableApplyFilterSort preserves it when no
+  // user sort is active (sort.key === ''). Once the user picks a column-
+  // menu sort, that wins.
+  filtered.sort(function(a,b){
     if(showScore) return (b.score||0)-(a.score||0);
     return (b.appDate||'').localeCompare(a.appDate||'');
   });
+
+  // ── Column-menu sort + filter (Phase 2B parity) ───────────────────────────
+  // Layered on top of the queue-scope + search filter. Status menu lists
+  // values from the current queue + search set.
+  var _wlColumns = {
+    applicant: { label: 'Applicant',       accessor: function(a){ return ((a.fn||'')+' '+(a.ln||'')).trim(); } },
+    id:        { label: 'ID',              accessor: function(a){ return a.id || ''; } },
+    addr:      { label: 'Current Address', accessor: function(a){ return a.street || ''; } },
+    date:      { label: 'Date',            accessor: function(a){ return a.appDate || ''; } },
+    status:    { label: 'Status',          accessor: function(a){ var sm = SM[a.status]; return sm ? sm.label : (a.status || ''); } }
+  };
+  if (showScore) {
+    _wlColumns.score = { label: 'Score', accessor: function(a){ return (typeof a.score === 'number') ? a.score : 0; } };
+  }
+  var _wlAccessors = {};
+  Object.keys(_wlColumns).forEach(function(k){ _wlAccessors[k] = _wlColumns[k].accessor; });
+
+  var _wlState = (typeof tableStateGet === 'function')
+    ? tableStateGet('worklist')
+    : { sort:{key:'',dir:1}, filters:{} };
+
+  if (typeof tableRegisterColumns === 'function') {
+    tableRegisterColumns('worklist', {
+      columns:  _wlColumns,
+      getRows:  function(){ return filtered; },
+      onChange: renderWorklist
+    });
+  }
+
+  var sorted = (typeof tableApplyFilterSort === 'function')
+    ? tableApplyFilterSort(filtered, _wlAccessors, _wlState)
+    : filtered;
 
   var rows = sorted.map(function(a){
     var sm = SM[a.status] || {label:a.status, c:'#888', bg:'#f4f4f0'};
@@ -3889,24 +3837,21 @@ function renderWorklist() {
   var emptyMsg = search ? 'No results for "'+escapeHtml(search)+'"' : 'No applications in this category.';
 
   body.innerHTML =
-    // Search + chips bar
-    '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">'
-    + '<div class="std-search-row" style="margin-bottom:0;">'
+    // Search bar
+    '<div class="std-search-row std-search-row-wide">'
     +   '<input id="wl_search_input" class="std-search" type="text" placeholder="🔍 Search name, ID, status, address, score, or tier..." '
     +   'value="'+escapeHtml(window._wlSearch||'')+'" '
     +   'oninput="window._wlSearch=this.value;clearTimeout(window._wlST);window._wlST=setTimeout(renderWorklist,200)" />'
     + '</div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+chipsHtml+'</div>'
-    + '</div>'
     // Table
-    + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'
+    + '<div class="std-table-card">'
     + (sorted.length === 0
         ? '<div style="padding:32px;text-align:center;color:var(--muted);font-size:13px;">'+emptyMsg+'</div>'
-        : '<div class="overflow-x"><table class="std-tbl">'
-          + '<thead><tr style="background:var(--dark);">'
-          + '<th class="js-th">Applicant'
+        : '<div class="doclib-table-wrap"><table class="std-table">'
+          + '<thead id="wl_thead"><tr>'
+          + '<th class="std-th-sortable" data-sort-key="applicant">Applicant'
           +   '<span class="tip-host">'
-          +     '<button type="button" class="tip-btn" onclick="toggleTip(\'wl_tip_applicant\')">?</button>'
+          +     '<button type="button" class="tip-btn" onclick="event.stopPropagation();toggleTip(\'wl_tip_applicant\')">?</button>'
           +     '<div id="wl_tip_applicant" class="tip-panel">'
           +       '<div class="tip-panel-title">Applicant column</div>'
           +       '<div class="tip-panel-body">Click an applicant&#39;s name to open the application. If the applicant is matched to a unit, opens the Tenant Information Card instead.</div>'
@@ -3914,9 +3859,9 @@ function renderWorklist() {
           +     '</div>'
           +   '</span>'
           + '</th>'
-          + '<th class="js-th">ID'
+          + '<th class="std-th-sortable" data-sort-key="id">ID'
           +   '<span class="tip-host">'
-          +     '<button type="button" class="tip-btn" onclick="toggleTip(\'wl_tip_id\')">?</button>'
+          +     '<button type="button" class="tip-btn" onclick="event.stopPropagation();toggleTip(\'wl_tip_id\')">?</button>'
           +     '<div id="wl_tip_id" class="tip-panel">'
           +       '<div class="tip-panel-title">ID column</div>'
           +       '<div class="tip-panel-body">Click an Application ID to open the scoring form.</div>'
@@ -3924,13 +3869,18 @@ function renderWorklist() {
           +     '</div>'
           +   '</span>'
           + '</th>'
-          + '<th class="js-th col-hide-mobile">Current Address</th>'
-          + '<th class="js-th">Date</th>'
-          + '<th class="js-th">Status</th>'
-          + (showScore ? '<th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Score</th>' : '')
+          + '<th class="std-th-sortable col-hide-mobile" data-sort-key="addr">Current Address</th>'
+          + '<th class="std-th-sortable" data-sort-key="date">Date</th>'
+          + '<th class="std-th-sortable" data-sort-key="status">Status</th>'
+          + (showScore ? '<th class="std-th-sortable" data-sort-key="score" style="text-align:center;">Score</th>' : '')
           + '<th></th>'
-          + '</tr></thead><tbody>'+rows+'</tbody></table></div>')
+          + '</tr></thead><tbody id="wl_tbody" data-table-page="worklist">'+rows+'</tbody></table></div>')
     + '</div>';
+
+  // Column-menu click + sort indicators (Phase 2B parity)
+  var _wlThead = document.getElementById('wl_thead');
+  if (typeof tableBindColumnMenuClicks === 'function')   tableBindColumnMenuClicks(_wlThead, 'worklist');
+  if (typeof tableRefreshSortIndicators === 'function') tableRefreshSortIndicators(_wlThead, 'worklist');
 
   // Re-focus search if it was active
   if(search) { var si=document.getElementById('wl_search_input'); if(si){ var l=si.value.length; si.focus(); si.setSelectionRange(l,l); } }
@@ -4333,9 +4283,6 @@ function showWorklist() {
   if (document.getElementById('landingView') && typeof showLanding === 'function') {
     if(!window._navSkipPush) pushNav('worklist');
     showLanding();
-    // Reset chip to 'mine' so the role-scoped queue is what shows up first
-    // when arriving via the Worklist nav button — matches the count pill.
-    window._wlActiveChip = 'mine';
     var sec = document.getElementById('sec-worklist');
     if (sec) sec.classList.remove('collapsed');
     if (typeof renderWorklist === 'function') renderWorklist();
@@ -4529,20 +4476,6 @@ function wlSection(title, count, content) {
     + '<div>'+(content||wlEmpty('None', ''))+'</div>'
     + '</div>';
 }
-function wlSetChip(el) {
-  window._wlActiveChip = el.getAttribute('data-wlchip') || '';
-  renderWorklist();
-}
-// Cycle the reserve filter: '' → 'On Reserve' → 'Off Reserve' → ''.
-// Composes with whatever main chip is active (status / queue / etc.).
-function wlCycleReserveFilter() {
-  var cur = window._wlReserveFilter || '';
-  window._wlReserveFilter = cur === '' ? 'On Reserve'
-                          : cur === 'On Reserve' ? 'Off Reserve'
-                          : '';
-  renderWorklist();
-}
-
 /* ════════════════════════════════════════════════════════════════════════════
  * SHARED DOMAIN FUNCTIONS — BATCH 2
  * Diverged-but-equivalent (housing.html version used — most complete).

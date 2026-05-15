@@ -438,7 +438,7 @@ body {
 
 /* Dashboard table — matches std-table pattern from finance module */
 .dash-table            { width: 100%; border-collapse: collapse; font-size: 13px; }
-.dash-table th         { padding: 9px 14px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #888; background: var(--dark2); }
+.dash-table th         { padding: 9px 14px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--yellow); vertical-align: top; background: var(--dark2); }
 .dash-table td         { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .dash-table tbody tr:last-child td { border-bottom: none; }
 .dash-table tbody tr:hover td { background: var(--surface); }
@@ -918,7 +918,7 @@ input:disabled, select:disabled, textarea:disabled {
 .std-table-hdr        { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); gap: 8px; flex-wrap: wrap; }
 .std-table-count      { font-size: 11px; font-weight: 700; color: var(--muted); }
 .std-table            { width: 100%; border-collapse: collapse; font-size: 13px; }
-.std-table th         { padding: 9px 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #888; text-align: left; background: var(--dark2); }
+.std-table th         { padding: 9px 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--yellow); text-align: left; vertical-align: top; background: var(--dark2); }
 .std-table td         { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .std-table tr:last-child td { border-bottom: none; }
 .std-table tr.clickable { cursor: pointer; }
@@ -1517,6 +1517,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
    shared-ui.js manage it. */
 .tip-host        { position: relative; display: inline-block; }
 .js-th .tip-host { margin-left: 6px; }
+.std-th-sortable .tip-host { margin: 0 8px 0 10px; }
 .tip-btn         { width: 18px; height: 18px; border-radius: 50%; background: var(--border); border: none; color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-family: var(--sans); line-height: 1; vertical-align: middle; }
 .tip-btn:hover   { background: var(--yellow); color: var(--dark); }
 .tip-panel       { display: none; position: absolute; left: 0; top: 24px; width: 280px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; z-index: 200; box-shadow: 0 4px 20px rgba(0,0,0,0.3); text-align: left; text-transform: none; letter-spacing: 0; font-weight: 400; }

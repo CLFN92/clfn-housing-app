@@ -2609,12 +2609,12 @@ document.addEventListener('DOMContentLoaded', function(){
 
     // Section toggles — only when clicking the toggle row itself, not a child
     // button/link inside it that has its own behaviour (e.g. wlOpenApp on a row,
-    // wlSetChip on a chip, the search input, etc.).
+    // the search input, etc.).
     var secHdr = t.closest('[data-section-toggle]');
     if(secHdr){
       // If the click landed on an interactive child (button/a/input/select),
       // don't hijack it — let the inline handler run.
-      var interactive = t.closest('button, a, input, select, textarea, [data-wl-id], [data-wl-edit], [data-wlchip]');
+      var interactive = t.closest('button, a, input, select, textarea, [data-wl-id], [data-wl-edit]');
       if(!interactive || !secHdr.contains(interactive)){
         e.preventDefault(); _sectionToggle(secHdr.getAttribute('data-section-toggle')); return;
       }
@@ -2694,7 +2694,6 @@ document.addEventListener('DOMContentLoaded', function(){
       // Belt-and-suspenders: directly retally and re-render the worklist in
       // case any earlier _onSwitchRole hook short-circuited (prev() may bail
       // before our wrap runs in some edge cases). Idempotent when already done.
-      window._wlActiveChip = 'mine';
       if(typeof _renderWorklistCountPills === 'function') _renderWorklistCountPills();
       var sec = document.getElementById('sec-worklist');
       if(sec && !sec.classList.contains('collapsed') && typeof renderWorklist === 'function'){
@@ -2711,9 +2710,6 @@ document.addEventListener('DOMContentLoaded', function(){
     try { if(typeof prev === 'function') prev(role); } catch(_){}
     if(typeof renderHeaderNav === 'function') renderHeaderNav();
     if(typeof applyRoleVisibility === 'function') applyRoleVisibility(role);
-    // Reset the worklist chip selection so the new role lands on their own
-    // queue (otherwise an HM user view-as ED keeps showing HM's chip choice).
-    window._wlActiveChip = 'mine';
     _renderWorklistCountPills();
     // Re-render the worklist body if the section is currently expanded.
     var sec = document.getElementById('sec-worklist');
