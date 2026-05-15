@@ -547,9 +547,50 @@ function renderTenantsView(){
     return hay.indexOf(search) !== -1;
   });
   setText('tenant_count',units.length);
+
+  // Default sort — address ascending. Preserved when no column-menu sort
+  // is active (tableApplyFilterSort leaves order alone when state.sort.key
+  // is empty).
+  units.sort(function(a,b){
+    var av = ((a.num||'')+' '+(a.street||'')).toLowerCase();
+    var bv = ((b.num||'')+' '+(b.street||'')).toLowerCase();
+    return av < bv ? -1 : av > bv ? 1 : 0;
+  });
+
+  // ── Column-menu sort + filter (Phase 2B) ─────────────────────
+  var _tenColumns = {
+    address:    { label: 'Unit / Address', accessor: function(u){ return ((u.num||'')+' '+(u.street||'')).trim(); } },
+    tenant:     { label: 'Tenant Name',    accessor: function(u){ return u.assignedName || '(unassigned)'; } },
+    move_in:    { label: 'Move-In Date',   accessor: function(u){ return u.assignedDate || '(none)'; } },
+    status:     { label: 'Status',         accessor: function(u){ return u.status === 'reserved' ? 'Reserved' : 'Occupied'; } },
+    reno_score: { label: 'Reno Score',     accessor: function(u){ return hasSowOrReno(u.id) ? (calcRenoScore(u.id).score || 0) : 0; } }
+  };
+  var _tenAccessors = {};
+  Object.keys(_tenColumns).forEach(function(k){ _tenAccessors[k] = _tenColumns[k].accessor; });
+
+  var _tenState = (typeof tableStateGet === 'function') ? tableStateGet('tenants') : { sort:{key:'',dir:1}, filters:{} };
+
+  if (typeof tableRegisterColumns === 'function') {
+    tableRegisterColumns('tenants', {
+      columns:  _tenColumns,
+      getRows:  function(){ return units; },
+      onChange: renderTenantsView
+    });
+  }
+
+  units = (typeof tableApplyFilterSort === 'function')
+    ? tableApplyFilterSort(units, _tenAccessors, _tenState)
+    : units;
+
   var tbody=document.getElementById('tenants_tbody');
   if(!tbody) return;
-  if(!units.length){tbody.innerHTML='<tr><td colspan="6" style="padding:32px;text-align:center;color:var(--muted);">No tenants found.</td></tr>';return;}
+  if(!units.length){
+    tbody.innerHTML='<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);">No tenants match the current filters.</td></tr>';
+    var _tenTheadEmpty = document.getElementById('tenants_thead');
+    if (typeof tableBindColumnMenuClicks === 'function')   tableBindColumnMenuClicks(_tenTheadEmpty, 'tenants');
+    if (typeof tableRefreshSortIndicators === 'function') tableRefreshSortIndicators(_tenTheadEmpty, 'tenants');
+    return;
+  }
   tbody.innerHTML=units.map(function(u){
     var name=u.assignedName||'<span style="color:var(--muted);font-style:italic;">No tenant assigned</span>';
     var date=u.assignedDate||'—';
@@ -604,6 +645,11 @@ function renderTenantsView(){
   tbody.querySelectorAll('[data-files-uid]').forEach(function(btn){
     btn.addEventListener('click',function(e){e.stopPropagation();openTenantFilesPanel(btn.getAttribute('data-files-uid'));});
   });
+
+  // Column-menu click + sort indicators
+  var _tenThead = document.getElementById('tenants_thead');
+  if (typeof tableBindColumnMenuClicks === 'function')   tableBindColumnMenuClicks(_tenThead, 'tenants');
+  if (typeof tableRefreshSortIndicators === 'function') tableRefreshSortIndicators(_tenThead, 'tenants');
 }
 
 
