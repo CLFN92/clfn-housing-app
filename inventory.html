@@ -129,7 +129,7 @@
 
 <!-- ═══ MATCH VIEW ═══ -->
 <div id="addUnitModal" class="modal-overlay modal-z-800">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:580px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
+  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:820px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
     <div class="modal-hdr spacious">
       <div class="panel-title">Add New Unit</div>
       <button onclick="closeAddUnitModal()" class="btn-close-dark-30">✕</button>
@@ -142,10 +142,11 @@
         <div class="f"><label>Bathrooms</label><select id="au_bathrooms"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
         <div class="f"><label>Type</label><select id="au_type"><option value="">— Select —</option><option value="detached unit">Detached</option><option value="duplex unit">Duplex</option><option value="4-plex unit">4-Plex</option><option value="5-plex unit">5-Plex</option><option value="6-plex unit">6-Plex</option><option value="complex">Complex</option><option value="mobile unit">Mobile</option></select></div>
         <div class="f"><label>Foundation</label><select id="au_foundation"><option value="">— Select —</option><option value="basement">Basement</option><option value="crawlspace">Crawlspace</option><option value="Slab">Slab</option><option value="unknown">Unknown</option></select></div>
-        <div class="f"><label>Funder / Program</label><select id="au_funder"><option value="">None / Band</option><option value="ISC">ISC</option><option value="CMHC_95">CMHC Sec. 95</option><option value="CMHC_56">CMHC Sec. 56.1</option><option value="Other">Other</option></select></div>
+        <div class="f"><label>Funder / Program</label><select id="au_funder"><option value="">Band</option><option value="ISC">ISC</option><option value="CMHC_95">CMHC Sec. 95</option><option value="Other">Other</option></select></div>
         <div class="f"><label>Phase</label><input type="text" id="au_phase" placeholder="e.g. 15"/></div>
         <div class="f"><label>Year Built</label><input type="text" id="au_year" placeholder="e.g. 1998"/></div>
         <div class="f"><label>Monthly Rent (CAD)</label><input type="number" id="au_rent" min="0" step="any" placeholder="e.g. 750"/></div>
+        <div class="f"><label>Construction Cost (CAD)</label><input type="number" id="au_constructionCost" min="0" step="any" placeholder="e.g. 250000"/></div>
       </div>
       <div style="display:flex;gap:20px;">
         <div class="ftog"><label class="tsw"><input type="checkbox" id="au_accessible"/><span class="tsl"></span></label><label for="au_accessible">Accessible ♿</label></div>
@@ -246,7 +247,7 @@
 
 <!-- unitEditModal -->
 <div id="unitEditModal" class="modal-overlay modal-z-700">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:620px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
+  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:820px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
     <!-- Header -->
     <div class="modal-hdr spacious">
       <div>
@@ -310,6 +311,7 @@
             </select>
           </div>
           <div class="f"><label>Phase</label><input id="ue_phase" type="text" placeholder="e.g. 15"/></div>
+          <div class="f"><label>Construction Cost (CAD)</label><input id="ue_constructionCost" type="number" min="0" step="any" placeholder="e.g. 250000"/></div>
         </div>
       </div>
 
@@ -329,10 +331,9 @@
       <div class="grid-c2-10">
         <div class="f"><label>Funder / Program</label>
           <select id="ue_funder">
-            <option value="">None / Band</option>
+            <option value="">Band</option>
             <option value="ISC">ISC</option>
             <option value="CMHC_95">CMHC Section 95</option>
-            <option value="CMHC_56">CMHC Section 56.1</option>
             <option value="Other">Other</option>
           </select>
         </div>

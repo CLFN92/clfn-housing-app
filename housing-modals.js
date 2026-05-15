@@ -88,6 +88,7 @@ function openUnitEditModal(unitId){
   set('ue_street',u.street); set('ue_num',u.num); set('ue_bedrooms',u.bedrooms);
   set('ue_bathrooms',u.bathrooms); set('ue_type',u.type); set('ue_foundation',u.foundation);
   set('ue_funder',u.funder); set('ue_phase',u.phase); set('ue_year',u.year);
+  set('ue_constructionCost', (u.constructionCost != null ? u.constructionCost : (u.construction_cost != null ? u.construction_cost : '')));
   set('ue_rent', (u.monthlyRent != null ? u.monthlyRent : (u.monthly_rent != null ? u.monthly_rent : '')));
   _gateRentInput('ue_rent');
   set('ue_status',u.status||'vacant');
@@ -277,6 +278,8 @@ function saveUnitEdit(){
   u.bedrooms=parseInt(get('ue_bedrooms'))||u.bedrooms;
   u.bathrooms=get('ue_bathrooms'); u.type=get('ue_type'); u.foundation=get('ue_foundation');
   u.funder=get('ue_funder'); u.phase=get('ue_phase'); u.year=get('ue_year');
+  var ccRaw = get('ue_constructionCost');
+  u.constructionCost = (ccRaw === '' || ccRaw == null) ? null : Math.round(Number(ccRaw) * 100) / 100;
   if(_canEditUnitRent()){
     var rentRaw = get('ue_rent');
     // Round to 2 dp on save so any floating-point drift from the number input
@@ -1277,11 +1280,15 @@ function openUnitDetail(unitId) {
   // Details grid
   var det = document.getElementById('udp_details');
   if(det){
+    var _ccVal = (u.constructionCost != null && u.constructionCost !== '')
+      ? '$' + Number(u.constructionCost).toLocaleString('en-CA', {minimumFractionDigits:0, maximumFractionDigits:2})
+      : '—';
     var fields = [
       ['Foundation', (u.foundation&&u.foundation!=='nan'&&u.foundation!=='0')?u.foundation:'—'],
-      ['Funder', u.funder||'None / Band'],
+      ['Funder', u.funder||'Band'],
       ['Phase', (u.phase&&u.phase!=='nan')?u.phase:'—'],
       ['Year Built', (u.year&&u.year!=='nan')?u.year:'—'],
+      ['Construction Cost', _ccVal],
     ];
     det.innerHTML = fields.map(function(f){
       return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'
@@ -1363,6 +1370,7 @@ function saveNewUnit(){
   if(units.find(function(u){ return u.id === newId; })){ showToast('A unit at that address already exists'); return; }
 
   var rentRaw = _canEditUnitRent() ? get('au_rent') : '';
+  var auCcRaw = get('au_constructionCost');
   var newUnit = {
     id: newId, street: street, num: num,
     bedrooms: parseInt(get('au_bedrooms'))||3,
@@ -1373,6 +1381,7 @@ function saveNewUnit(){
     phase: get('au_phase')||'',
     year: get('au_year')||'',
     monthlyRent: (rentRaw === '' || rentRaw == null) ? null : Math.round(Number(rentRaw) * 100) / 100,
+    constructionCost: (auCcRaw === '' || auCcRaw == null) ? null : Math.round(Number(auCcRaw) * 100) / 100,
     notes: get('au_notes')||'',
     accessible: chk('au_accessible'),
     isElders: chk('au_isElders'),
@@ -1408,7 +1417,7 @@ function _gateRentInput(inputId){
   if(!allowed) el.classList.add('tic-readonly-input'); else el.classList.remove('tic-readonly-input');
 }
 function openAddUnitModal(){
-  var fields = ['au_num','au_street','au_bathrooms','au_year','au_phase','au_notes','au_rent'];
+  var fields = ['au_num','au_street','au_bathrooms','au_year','au_phase','au_notes','au_rent','au_constructionCost'];
   fields.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   _gateRentInput('au_rent');
   var bedEl = document.getElementById('au_bedrooms'); if(bedEl) bedEl.value='3';

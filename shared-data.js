@@ -550,21 +550,22 @@ async function sbLoadUnits() {
     var data = await r.json();
     return data.map(function(row) {
       return Object.assign({}, row.data || {}, {
-        id:          row.id,
-        num:         row.num,
-        street:      row.street,
-        bedrooms:    row.bedrooms,
-        bathrooms:   row.bathrooms,
-        type:        row.type,
-        foundation:  row.foundation,
-        funder:      row.funder,
-        status:      row.status,
-        accessible:  !!row.accessible,
-        isElders:    !!row.is_elders,
-        archived:    !!row.archived,
-        assignedTo:  row.assigned_to,
-        assignedName:row.assigned_name,
-        assignedDate:row.assigned_date
+        id:               row.id,
+        num:              row.num,
+        street:           row.street,
+        bedrooms:         row.bedrooms,
+        bathrooms:        row.bathrooms,
+        type:             row.type,
+        foundation:       row.foundation,
+        funder:           row.funder,
+        status:           row.status,
+        accessible:       !!row.accessible,
+        isElders:         !!row.is_elders,
+        archived:         !!row.archived,
+        assignedTo:       row.assigned_to,
+        assignedName:     row.assigned_name,
+        assignedDate:     row.assigned_date,
+        constructionCost: (row.construction_cost != null) ? Number(row.construction_cost) : null
       });
     });
   } catch(e) {
@@ -579,22 +580,23 @@ async function sbSaveUnit(u) {
     return Promise.reject(new Error('sbSaveUnit: invalid input'));
   }
   var row = {
-    id:            u.id,
-    num:           u.num           || null,
-    street:        u.street        || null,
-    bedrooms:      u.bedrooms      || null,
-    bathrooms:     u.bathrooms     || null,
-    type:          u.type          || null,
-    foundation:    u.foundation    || null,
-    funder:        u.funder        || null,
-    status:        u.status        || 'vacant',
-    accessible:    !!u.accessible,
-    is_elders:     !!u.isElders,
-    archived:      !!u.archived,
-    assigned_to:   u.assignedTo   || null,
-    assigned_name: u.assignedName || null,
-    assigned_date: u.assignedDate || null,
-    data:          u
+    id:                u.id,
+    num:               u.num           || null,
+    street:            u.street        || null,
+    bedrooms:          u.bedrooms      || null,
+    bathrooms:         u.bathrooms     || null,
+    type:              u.type          || null,
+    foundation:        u.foundation    || null,
+    funder:            u.funder        || null,
+    status:            u.status        || 'vacant',
+    accessible:        !!u.accessible,
+    is_elders:         !!u.isElders,
+    archived:          !!u.archived,
+    assigned_to:       u.assignedTo   || null,
+    assigned_name:     u.assignedName || null,
+    assigned_date:     u.assignedDate || null,
+    construction_cost: (u.constructionCost != null && u.constructionCost !== '') ? Number(u.constructionCost) : null,
+    data:              u
   };
   try {
     var r = await fetch(SUPABASE_URL + '/rest/v1/housing_units', {
@@ -615,22 +617,23 @@ async function sbSaveAllUnits(units) {
   if (!units || !units.length) return true;
   var rows = units.map(function(u) {
     return {
-      id:            u.id,
-      num:           u.num           || null,
-      street:        u.street        || null,
-      bedrooms:      u.bedrooms      || null,
-      bathrooms:     u.bathrooms     || null,
-      type:          u.type          || null,
-      foundation:    u.foundation    || null,
-      funder:        u.funder        || null,
-      status:        u.status        || 'vacant',
-      accessible:    !!u.accessible,
-      is_elders:     !!u.isElders,
-      archived:      !!u.archived,
-      assigned_to:   u.assignedTo   || null,
-      assigned_name: u.assignedName || null,
-      assigned_date: u.assignedDate || null,
-      data:          u
+      id:                u.id,
+      num:               u.num           || null,
+      street:            u.street        || null,
+      bedrooms:          u.bedrooms      || null,
+      bathrooms:         u.bathrooms     || null,
+      type:              u.type          || null,
+      foundation:        u.foundation    || null,
+      funder:            u.funder        || null,
+      status:            u.status        || 'vacant',
+      accessible:        !!u.accessible,
+      is_elders:         !!u.isElders,
+      archived:          !!u.archived,
+      assigned_to:       u.assignedTo   || null,
+      assigned_name:     u.assignedName || null,
+      assigned_date:     u.assignedDate || null,
+      construction_cost: (u.constructionCost != null && u.constructionCost !== '') ? Number(u.constructionCost) : null,
+      data:              u
     };
   });
   for (var i = 0; i < rows.length; i += 100) {
