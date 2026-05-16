@@ -2003,8 +2003,6 @@ var DEFAULT_UNIT_SCORE_MODEL = [
 
 
 // ══ RENOVATION PRIORITY SCORING MODEL ══════════════════════════════════════
-var RENO_SCORE_KEY = 'clfn_reno_score_model_v3'; // v3 — conduct scores now negative
-
 var DEFAULT_RENO_SCORE_MODEL = [
   // Unit Condition (from unit record)
   {id:'rs_cond_critical', group:'condition', factor:'Unit Condition', condition:'Condemned / Critical',         pts:20, editable:true,  notes:'Unit status is condemned'},

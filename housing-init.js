@@ -1419,14 +1419,8 @@ async function loadAppDataFromSupabase() {
     if (typeof applyNationOverrides === 'function') applyNationOverrides();
     // Apply saved required-field config (Settings → App Settings → Required Fields)
     if (typeof applyRequiredFields === 'function') applyRequiredFields();
-    // Load contacts
-    try {
-      var conR=await fetch(SUPABASE_URL+'/rest/v1/housing_contacts?select=*&limit=1',{headers:HOUSING_HEADERS});
-      if(conR.ok){var cond=await conR.json();window._contacts=cond.length?(cond[0].data||{}):{}}
-    } catch(e){console.warn('Contacts:',e);}
 
-    console.info('[CLFN] Loaded '+applications.length+' applications, '+housingUnits.length+' units');
-    console.info('[CLFN Housing] Data loaded:',applications.length,'apps,',housingUnits.length,'units');
+    console.info('[CLFN] Loaded '+applications.length+' apps, '+housingUnits.length+' units');
 
     // Refresh V2 scoring model and tiers from loaded settings
     try {
