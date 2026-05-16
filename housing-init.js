@@ -2557,6 +2557,7 @@ document.addEventListener('DOMContentLoaded', function(){
     }
 
     // Outside-click closers (run last)
+    if(!t.closest('#app_nav') && !t.closest('#nav_toggle')) _closeNavDrawer();
     if(!t.closest('#create_menu') && !t.closest('#header_create_btn')) _closeCreateMenu();
     if(!t.closest('#header_export_menu_v2') && !t.closest('#header_export_btn_v2')){
       var em = document.getElementById('header_export_menu_v2');
