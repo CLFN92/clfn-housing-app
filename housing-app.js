@@ -18,7 +18,6 @@
 
 let cur = 0;
 const STEPS = 9; // 7 visible steps (0-6) + review (8) = 8 total
-const uploadedFiles = [];
 const DRAFT_KEY = 'clfn_housing_draft';
 let currentAppId = null;
 
@@ -1670,8 +1669,7 @@ function popReview(){
   if(petRows.length) html += section('Pets ('+petRows.length+')', petRows.join(''), '🐾');
 
   // ── Documents ────────────────────────────────────────────────────────────
-  var docCount = (typeof uploadedFiles!=='undefined'&&uploadedFiles.length)?uploadedFiles.length:
-    document.querySelectorAll('#fileList .file-item').length;
+  var docCount = document.querySelectorAll('#fileList .file-item').length;
   html += section('Documents',
     row('Files Attached', docCount > 0 ? docCount+' file'+(docCount!==1?'s':'') : 'None')
   , '📎');
