@@ -4156,35 +4156,60 @@ function saveUnitScoreModelED() {
     saveUnitScoreModel();
   });
 }
-async function scSaveAssignedDocs(app, previouslyAssigned) {
+// Match selected pool files to an applicant: copy each into the app's Storage
+// folder, insert an app_documents row pointing to the new path, then delete
+// the original from the shared pool so it no longer appears in the match list.
+async function scSaveAssignedDocs(app) {
   var checkboxes = document.querySelectorAll('#assignDocsList input[type=checkbox]');
-  var appId = app.id || '';
-  var prevPaths = previouslyAssigned.map(function(a){ return a.file_path; });
-  for(var i=0; i<checkboxes.length; i++) {
+  var appId      = app.id || '';
+  var matched    = 0;
+  var errors     = [];
+
+  for (var i = 0; i < checkboxes.length; i++) {
     var cb = checkboxes[i];
-    var fpath = cb.dataset.path;
-    var isChecked = cb.checked;
-    var wasAssigned = prevPaths.includes(fpath);
-    if(isChecked && !wasAssigned) {
-      await fetch(SUPABASE_URL+'/rest/v1/app_documents', {
-        method: 'POST',
+    if (!cb.checked) continue;
+    var srcPath = cb.dataset.path;
+    var fname   = cb.dataset.name;
+    var destPath = 'applications/' + appId + '/' + Date.now() + '_' + fname;
+
+    try {
+      await sbCopyFile(srcPath, destPath);
+      await fetch(SUPABASE_URL + '/rest/v1/app_documents', {
+        method:  'POST',
         headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({ app_id: appId, file_path: fpath, file_name: cb.dataset.name,
-          file_size: parseInt(cb.dataset.size)||0, file_type: cb.dataset.type, added_by: window.currentUser||'admin' })
+        body:    JSON.stringify({
+          app_id:    appId,
+          file_path: destPath,
+          file_name: fname,
+          file_size: parseInt(cb.dataset.size) || 0,
+          file_type: cb.dataset.type,
+          added_by:  window.currentUser || window.currentRole || 'admin'
+        })
       });
-    } else if(!isChecked && wasAssigned) {
-      var row = previouslyAssigned.find(function(a){ return a.file_path === fpath; });
-      if(row) await fetch(SUPABASE_URL+'/rest/v1/app_documents?id=eq.'+row.id, { method:'DELETE', headers:HOUSING_HEADERS });
+      await sbDeleteFile(srcPath);
+      matched++;
+    } catch (e) {
+      console.warn('[assignDocs] failed for ' + fname + ':', e);
+      errors.push(fname);
     }
   }
+
   var modal = document.getElementById('assignDocsModal');
-  if(modal) modal.remove();
-  showToast('✓ File assignments saved');
-  scLoadDocs(app);
+  if (modal) modal.remove();
+
+  if (errors.length) {
+    showToast('⚠ ' + matched + ' matched, ' + errors.length + ' failed — see console');
+  } else if (matched > 0) {
+    showToast('✓ ' + matched + ' file' + (matched === 1 ? '' : 's') + ' added to document library');
+  } else {
+    showToast('No files selected');
+  }
+  if (matched > 0) scLoadDocs(app);
 }
+
 async function scShowAssignDocs(app) {
   var modal = document.getElementById('assignDocsModal');
-  if(modal) modal.remove();
+  if (modal) modal.remove();
   modal = document.createElement('div');
   modal.id = 'assignDocsModal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
@@ -4192,53 +4217,95 @@ async function scShowAssignDocs(app) {
 
   modal.innerHTML = '<div style="background:var(--surface);border-radius:12px;padding:24px;max-width:560px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2);">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
-    + '<div style="font-size:14px;font-weight:700;">Assign Files — ' + ((app.fn||'')+' '+(app.ln||'')).trim() + '</div>'
+    + '<div style="font-size:14px;font-weight:700;">Match Files — ' + ((app.fn || '') + ' ' + (app.ln || '')).trim() + '</div>'
     + '<button id="assignDocsClose" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">&times;</button>'
     + '</div>'
-    + '<div id="assignDocsList" class="js-txt-muted-sm">Loading available files…</div>'
+    + '<div id="assignDocsList" class="js-txt-muted-sm">Loading shared pool…</div>'
     + '</div>';
-  document.getElementById('assignDocsClose').addEventListener('click', function(){ modal.remove(); });
+  document.getElementById('assignDocsClose').addEventListener('click', function() { modal.remove(); });
 
   var available = [];
   try {
     var files = await sbListFiles('applications/APP-/');
-    available = (files||[]).filter(function(f){ return f.name && f.name !== '.emptyFolderPlaceholder'; });
-  } catch(e) {}
-
-  var assigned = [];
-  try {
-    var r = await fetch(SUPABASE_URL+'/rest/v1/app_documents?app_id=eq.'+encodeURIComponent(app.id||''), { headers: HOUSING_HEADERS });
-    if(r.ok) assigned = await r.json();
-  } catch(e) {}
-  var assignedPaths = assigned.map(function(a){ return a.file_path; });
+    available = (files || []).filter(function(f) { return f.name && f.name !== '.emptyFolderPlaceholder'; });
+  } catch (e) {}
 
   var listEl = document.getElementById('assignDocsList');
-  if(!available.length) { listEl.textContent = 'No files found in migrated folder.'; return; }
+  if (!available.length) {
+    listEl.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">No files in the shared pool.</div>';
+    return;
+  }
 
-  listEl.innerHTML = '<div style="margin-bottom:10px;color:var(--text);">Check the files that belong to this applicant:</div>';
+  listEl.innerHTML = '<div style="margin-bottom:12px;font-size:12px;color:var(--muted);">'
+    + 'Select files to copy into this applicant’s document library. '
+    + 'Each matched file is removed from the shared pool.'
+    + '</div>';
+
   available.forEach(function(f) {
-    var fpath = 'applications/APP-/'+f.name;
-    var row = document.createElement('label');
+    var fpath = 'applications/APP-/' + f.name;
+    var row   = document.createElement('label');
     row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid var(--border);cursor:pointer;';
     var cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.checked = assignedPaths.includes(fpath);
-    cb.dataset.path = fpath; cb.dataset.name = f.name;
-    cb.dataset.size = f.metadata ? (f.metadata.size||0) : 0;
-    cb.dataset.type = f.metadata ? (f.metadata.mimetype||'') : '';
+    cb.type          = 'checkbox';
+    cb.checked       = false;
+    cb.dataset.path  = fpath;
+    cb.dataset.name  = f.name;
+    cb.dataset.size  = f.metadata ? (f.metadata.size  || 0) : 0;
+    cb.dataset.type  = f.metadata ? (f.metadata.mimetype || '') : '';
     row.appendChild(cb);
     var txt = document.createElement('span');
     txt.style.fontSize = '12px';
-    txt.textContent = f.name;
+    txt.textContent    = f.name;
     row.appendChild(txt);
     listEl.appendChild(row);
   });
 
   var saveBtn = document.createElement('button');
-  saveBtn.textContent = 'Save Assignments';
+  saveBtn.textContent  = 'Match Selected Files';
   saveBtn.style.cssText = 'margin-top:16px;background:var(--yellow);border:none;color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;width:100%;';
-  saveBtn.addEventListener('click', function(){ scSaveAssignedDocs(app, assigned); });
+  saveBtn.addEventListener('click', function() { scSaveAssignedDocs(app); });
   listEl.appendChild(saveBtn);
 }
+
+// One-time migration: for any existing app_documents rows still pointing to the
+// shared pool (applications/APP-/...), copy the file into the app's own folder,
+// update the row, and delete the original from the pool.
+// Run once from the browser console: runDocPoolMigration()
+async function runDocPoolMigration() {
+  console.log('[migration] Loading pool-assigned app_documents rows...');
+  var r = await fetch(
+    SUPABASE_URL + '/rest/v1/app_documents?file_path=like.applications%2FAPP-%2F%25&select=*',
+    { headers: HOUSING_HEADERS }
+  );
+  if (!r.ok) { console.error('[migration] Could not load app_documents:', await r.text()); return; }
+  var rows = await r.json();
+  console.log('[migration] ' + rows.length + ' row(s) to migrate.');
+
+  var ok = 0, fail = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var row    = rows[i];
+    var fname  = row.file_name || row.file_path.split('/').pop();
+    var destPath = 'applications/' + row.app_id + '/' + fname;
+    try {
+      await sbCopyFile(row.file_path, destPath);
+      var upR = await fetch(SUPABASE_URL + '/rest/v1/app_documents?id=eq.' + encodeURIComponent(row.id), {
+        method:  'PATCH',
+        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body:    JSON.stringify({ file_path: destPath })
+      });
+      if (!upR.ok) throw new Error('Row update failed: ' + await upR.text());
+      await sbDeleteFile(row.file_path);
+      console.log('[migration] ✓ ' + fname + ' → ' + row.app_id);
+      ok++;
+    } catch (e) {
+      console.error('[migration] ✗ ' + (row.file_path || row.id) + ':', e);
+      fail++;
+    }
+  }
+  console.log('[migration] Done. ' + ok + ' migrated, ' + fail + ' failed.');
+  if (typeof showToast === 'function') showToast('Migration: ' + ok + ' moved, ' + fail + ' failed');
+}
+window.runDocPoolMigration = runDocPoolMigration;
 function setExportView(viewName) {
   window._currentExportView = viewName;
   var exportableViews = ['inventory','match','renos','contractors'];

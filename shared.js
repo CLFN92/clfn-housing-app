@@ -1546,6 +1546,25 @@ window.DocLibrary = (function(){
     return sbGetFileUrl(path);
   }
 
+  // Copy a file within the same bucket by fetching as a blob and re-uploading.
+  // Supabase Storage has no native server-side copy REST endpoint.
+  async function sbCopyFile(sourcePath, destPath) {
+    var srcUrl = sbGetFileUrl(sourcePath);
+    var blobRes = await fetch(srcUrl);
+    if (!blobRes.ok) throw new Error('Could not read source file: ' + sourcePath);
+    var blob = await blobRes.blob();
+    var upUrl = window.SUPABASE_URL + '/storage/v1/object/' + window.STORAGE_BUCKET + '/' + destPath;
+    var upRes = await fetch(upUrl, {
+      method:  'POST',
+      headers: Object.assign({}, sbStorageHeaders(), {
+        'x-upsert':     'true',
+        'Content-Type': blob.type || 'application/octet-stream'
+      }),
+      body: blob
+    });
+    if (!upRes.ok) throw new Error('Copy upload failed: ' + await upRes.text());
+  }
+
   // Delete a file from storage
   async function sbDeleteFile(path) {
     var url = window.SUPABASE_URL + '/storage/v1/object/' + window.STORAGE_BUCKET;
@@ -1649,6 +1668,7 @@ window.DocLibrary = (function(){
   window.sbGetFileUrl     = sbGetFileUrl;
   window.sbUploadFile     = sbUploadFile;
   window.sbGetSignedUrl   = sbGetSignedUrl;
+  window.sbCopyFile       = sbCopyFile;
   window.sbDeleteFile     = sbDeleteFile;
   window.sbListFiles      = sbListFiles;
   window.sbSaveFileMeta   = sbSaveFileMeta;
