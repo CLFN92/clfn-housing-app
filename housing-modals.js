@@ -819,8 +819,7 @@ function saveEdAdjustment(){
   }
   var msg=document.getElementById('sc_ed_save_msg');
   if(msg){msg.style.display='flex';setTimeout(function(){msg.style.display='none';},2000);}
-  if(typeof updateDashStats==='function') updateDashStats();
-  if(typeof renderDashTable==='function') renderDashTable();
+  if(typeof _refreshAppViews==='function') _refreshAppViews();
   showToast('ED adjustment saved'+(pts?' ('+( pts>0?'+':'')+pts+' pts)':''));
 }
 

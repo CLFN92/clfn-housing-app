@@ -329,10 +329,7 @@ function saveScoringModel() {
     body: JSON.stringify({ key: 'scoring_model', value: liveScoreModel })
   }).catch(function(e){ console.warn('Scoring model save failed:',e); });
   rescoreAllApplications();
-  // Refresh dashboard if visible
-  if(document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none') {
-    updateDashStats(); renderDashTable();
-  }
+  _refreshAppViews();
 }
 
 // ── Nation & Modules panel (read-only, Phase A0) ─────────────────────────
@@ -1692,8 +1689,7 @@ function archiveApplication(appId) {
   auditEntry(appId, 'archived',
     'Application archived' + (linkedUnitId ? ' — unit docs bundled for ' + linkedUnitId : ''),
     role);
-  updateDashStats(); renderDashTable();
-  if (typeof renderWorklist === 'function') renderWorklist();
+  _refreshAppViews();
   showToast('Application and supporting documents archived');
 }
 

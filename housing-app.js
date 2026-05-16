@@ -1081,9 +1081,7 @@ function _finishDeclineApp(appId, reason, role) {
   auditEntry(appId, 'status',
     'Application declined' + (hadUnit ? ' (and unit assignment unwound)' : '') + (reason ? ' — ' + reason : ''),
     role);
-  if (typeof updateDashStats === 'function') updateDashStats();
-  if (typeof renderDashTable === 'function') renderDashTable();
-  if (typeof renderWorklist === 'function') renderWorklist();
+  _refreshAppViews();
   showToast('Application declined' + (hadUnit ? ' — unit returned to vacant' : ''));
 }
 
@@ -1109,8 +1107,7 @@ function _handleAppMenuAction(action, appId) {
       if(!ok) showToast('Unarchive saved locally — will sync when network is available.', { type:'info', duration:3500 });
     });
     auditEntry(appId, 'unarchived', 'Application restored from archive', role);
-    updateDashStats(); renderDashTable();
-    if (typeof renderWorklist === 'function') renderWorklist();
+    _refreshAppViews();
     showToast('📤 Application unarchived');
 
   } else if (action === 'decline') {
@@ -1140,8 +1137,7 @@ function _handleAppMenuAction(action, appId) {
       if(!ok) showToast('Restore saved locally — will sync when network is available.', { type:'info', duration:3500 });
     });
     auditEntry(appId, 'status', 'Application restored to submitted', role);
-    updateDashStats(); renderDashTable();
-    if (typeof renderWorklist === 'function') renderWorklist();
+    _refreshAppViews();
     showToast('↩ Application restored to submitted');
 
   } else if (action === 'scorecard') {

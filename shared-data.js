@@ -3621,6 +3621,16 @@ function renderUnitScoreTable(){
     });
   });
 }
+// Single refresh point for all app-facing tables. Call this after any
+// operation that changes application or unit status so every visible
+// surface (dashboard stats, dashboard table, worklist) stays in sync.
+function _refreshAppViews() {
+  if (typeof updateDashStats  === 'function') updateDashStats();
+  if (typeof renderDashTable  === 'function') renderDashTable();
+  if (typeof renderWorklist   === 'function') renderWorklist();
+}
+window._refreshAppViews = _refreshAppViews;
+
 function renderWorklist() {
   var realRole = window._realRole || window.currentRole || 'housing_employee_l1';
   var role = window._viewAsRole || realRole;
