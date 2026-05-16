@@ -54,6 +54,38 @@ var EMAIL_EVENT_REGISTRY = [
       bodyHtml: '<p>A file update has been submitted for <strong>{applicantName}</strong> ({applicantId}) and requires your review and approval in the {nationShort} Housing app.</p>'
               + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
     }
+  },
+  {
+    key:                   'sow_created',
+    label:                 'Scope of Work Created',
+    description:           'Sent on the first save of a new SOW (not on subsequent edits).',
+    defaultRecipientRoles: ['housing_manager'],
+    wired:                 true,
+    placeholders:          ['unitAddress','totalCost','condition','contractor','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — New SOW Created: {unitAddress}',
+      bodyHtml: '<p>A new Scope of Work has been created for <strong>{unitAddress}</strong> and requires your review.</p>'
+              + '<p>Total cost: <strong>{totalCost}</strong></p>'
+              + '<p>Condition: <strong>{condition}</strong></p>'
+              + '<p>Contractor: <strong>{contractor}</strong></p>'
+              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+    }
+  },
+  {
+    key:                   'contractor_submitted',
+    label:                 'New Contractor Submitted for Review',
+    description:           'Sent when a new contractor record is submitted (not when saved as draft).',
+    defaultRecipientRoles: ['housing_manager'],
+    wired:                 true,
+    placeholders:          ['contractorName','contractorTrade','contractorClassification','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — New Contractor Submitted: {contractorName}',
+      bodyHtml: '<p>A new contractor application has been submitted and requires your review and recommendation.</p>'
+              + '<p>Contractor: <strong>{contractorName}</strong></p>'
+              + '<p>Trade: <strong>{contractorTrade}</strong></p>'
+              + '<p>Classification: <strong>{contractorClassification}</strong></p>'
+              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+    }
   }
 ];
 
@@ -79,10 +111,14 @@ function _emailEventConfig(eventKey) {
 
 // ── Template renderer ──────────────────────────────────────────────────────
 // Returns { subject, bodyHtml } for the given event, with placeholders
-// substituted from the app context. Unknown placeholders left untouched
-// in the saved template are replaced with '—' so they never reach the
-// recipient as raw {token}.
-function _renderEmailTemplate(eventKey, app) {
+// substituted from the supplied tokens map. Unknown placeholders left
+// untouched in the saved template are replaced with '—' so they never
+// reach the recipient as raw {token}.
+//
+// Per-event notify functions build the tokens map via _emailTokensForApp,
+// _emailTokensForSow, _emailTokensForContractor, etc. Adding a new
+// entity type = add a token builder + use it from the notify function.
+function _renderEmailTemplate(eventKey, tokens) {
   var cfg = _emailEventConfig(eventKey);
   if (!cfg) {
     console.warn('[notifications] unknown event:', eventKey);
@@ -94,32 +130,70 @@ function _renderEmailTemplate(eventKey, app) {
   var subject  = (saved.subject  != null && saved.subject  !== '') ? saved.subject  : cfg.defaults.subject;
   var bodyHtml = (saved.bodyHtml != null && saved.bodyHtml !== '') ? saved.bodyHtml : cfg.defaults.bodyHtml;
 
-  var tokens = _emailTokens(app);
   return {
-    subject:  _substitutePlaceholders(subject,  tokens),
-    bodyHtml: _substitutePlaceholders(bodyHtml, tokens)
+    subject:  _substitutePlaceholders(subject,  tokens || {}),
+    bodyHtml: _substitutePlaceholders(bodyHtml, tokens || {})
   };
 }
 
-// Build the placeholder token map from an application object. Adding a
-// new placeholder = add a key here AND list it in the registry entry's
-// `placeholders` array so the Settings UI can offer it.
-function _emailTokens(app) {
-  var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || 'CLFN';
-  var name     = ((app && app.fn) || '') + ' ' + ((app && app.ln) || '');
+// appLink token — best-effort deep link to the housing app at the
+// current origin. Shared by every entity-specific token builder so
+// recipients always have a way to open the app.
+function _emailAppLink() {
+  if (typeof window === 'undefined' || !window.location) return '/';
+  return window.location.origin + (window.location.pathname.indexOf('/housing.html') >= 0 ? '/housing.html' : '/');
+}
+
+function _emailNationShort() {
+  return (window.NATION_CONFIG && NATION_CONFIG.short) || 'CLFN';
+}
+
+// Build the placeholder token map from an application object.
+function _emailTokensForApp(app) {
+  var name = ((app && app.fn) || '') + ' ' + ((app && app.ln) || '');
   name = name.trim() || 'Applicant';
-  // appLink — best-effort deep link to the housing app at the current
-  // origin. If we ever host a public landing URL elsewhere, swap this out.
-  var origin   = (typeof window !== 'undefined' && window.location)
-                 ? (window.location.origin + (window.location.pathname.indexOf('/housing.html') >= 0 ? '/housing.html' : '/'))
-                 : '/';
   return {
     applicantName: name,
     applicantId:   (app && app.id)    || '—',
     score:         (app && app.score != null) ? String(app.score) : '—',
     tier:          (app && app.tier)  || '—',
-    nationShort:   natShort,
-    appLink:       origin
+    nationShort:   _emailNationShort(),
+    appLink:       _emailAppLink()
+  };
+}
+
+// Build tokens from an SOW save payload. `unitId` falls back to a unit
+// lookup for the address when the form's address field is blank.
+function _emailTokensForSow(sow, unitId) {
+  var addr = (sow && sow.address) || '';
+  if (!addr && unitId && typeof housingUnits !== 'undefined') {
+    var u = (housingUnits || []).find(function(x){ return x.id === unitId; });
+    if (u) addr = ((u.num || '') + ' ' + (u.street || '')).trim();
+  }
+  if (!addr) addr = unitId || '—';
+  return {
+    unitAddress: addr,
+    totalCost:   (sow && sow.totalCost)  || '—',
+    condition:   (sow && sow.condition)  || '—',
+    contractor:  (sow && sow.contractor) || '—',
+    nationShort: _emailNationShort(),
+    appLink:     _emailAppLink()
+  };
+}
+
+// Build tokens from a contractor record.
+function _emailTokensForContractor(ct) {
+  var classLabels = {
+    internal_indigenous:     'Internal - Indigenous',
+    external_indigenous:     'External - Indigenous',
+    external_non_indigenous: 'External - Non-Indigenous'
+  };
+  return {
+    contractorName:           (ct && ct.name)  || '—',
+    contractorTrade:          (ct && ct.trade) || '—',
+    contractorClassification: (ct && classLabels[ct.classification]) || (ct && ct.classification) || '—',
+    nationShort:              _emailNationShort(),
+    appLink:                  _emailAppLink()
   };
 }
 
@@ -177,7 +251,7 @@ async function notifyApplicationSubmitted(app) {
     console.warn('[notify] no active staff in roles ' + roles.join(',') + ' for ' + (app.id || 'new app'));
     return;
   }
-  var rendered = _renderEmailTemplate(eventKey, app);
+  var rendered = _renderEmailTemplate(eventKey, _emailTokensForApp(app));
   if (!rendered) return;
 
   recipients.forEach(function(rcp){
@@ -189,6 +263,74 @@ async function notifyApplicationSubmitted(app) {
       event:       eventKey,
       entity_type: 'application',
       entity_id:   app.id || '—'
+    }).catch(function(err){
+      console.warn('[notify] ' + eventKey + ' to ' + rcp.email + ' failed:', err);
+    });
+  });
+}
+
+// Wired from saveSOW() in housing-modals-sow.js, only on the FIRST save
+// of a SOW (subsequent edits do not re-notify). Emails every active
+// staff member whose role is in the saved (or default) recipient list.
+async function notifySowCreated(sow, unitId) {
+  if (!sow) return;
+  var eventKey = 'sow_created';
+  var roles    = _emailEventRecipientRoles(eventKey);
+  if (!roles.length) {
+    console.warn('[notify] no recipient roles configured for ' + eventKey);
+    return;
+  }
+  var recipients = await _resolveActiveStaffForRoles(roles);
+  if (!recipients.length) {
+    console.warn('[notify] no active staff in roles ' + roles.join(',') + ' for SOW on ' + (unitId || 'unknown unit'));
+    return;
+  }
+  var rendered = _renderEmailTemplate(eventKey, _emailTokensForSow(sow, unitId));
+  if (!rendered) return;
+
+  recipients.forEach(function(rcp){
+    window.sendNotification({
+      to:          rcp.email,
+      to_name:     rcp.name || '',
+      subject:     rendered.subject,
+      bodyHtml:    rendered.bodyHtml,
+      event:       eventKey,
+      entity_type: 'sow',
+      entity_id:   unitId || '—'
+    }).catch(function(err){
+      console.warn('[notify] ' + eventKey + ' to ' + rcp.email + ' failed:', err);
+    });
+  });
+}
+
+// Wired from saveContractor() in shared-data.js, only when a contractor
+// is submitted (status === 'pending_review'). Drafts do not notify
+// because there's nothing for an approver to act on yet.
+async function notifyContractorSubmitted(ct) {
+  if (!ct) return;
+  var eventKey = 'contractor_submitted';
+  var roles    = _emailEventRecipientRoles(eventKey);
+  if (!roles.length) {
+    console.warn('[notify] no recipient roles configured for ' + eventKey);
+    return;
+  }
+  var recipients = await _resolveActiveStaffForRoles(roles);
+  if (!recipients.length) {
+    console.warn('[notify] no active staff in roles ' + roles.join(',') + ' for contractor ' + (ct.id || ct.name || 'unknown'));
+    return;
+  }
+  var rendered = _renderEmailTemplate(eventKey, _emailTokensForContractor(ct));
+  if (!rendered) return;
+
+  recipients.forEach(function(rcp){
+    window.sendNotification({
+      to:          rcp.email,
+      to_name:     rcp.name || '',
+      subject:     rendered.subject,
+      bodyHtml:    rendered.bodyHtml,
+      event:       eventKey,
+      entity_type: 'contractor',
+      entity_id:   ct.id || '—'
     }).catch(function(err){
       console.warn('[notify] ' + eventKey + ' to ' + rcp.email + ' failed:', err);
     });
@@ -569,15 +711,7 @@ function sendNotificationTest() {
   var to      = session && session.email;
   if (!to) { showToast('No signed-in email to send to'); return; }
 
-  var mockApp = {
-    id:      'APP-TEST-0001',
-    fn:      'Jane',
-    ln:      'Sample',
-    score:   42,
-    tier:    'High Priority',
-    appType: 'new_housing'
-  };
-  var tokens = _emailTokens(mockApp);
+  var tokens   = _ntfMockTokensForEvent(ed.eventKey);
   var subject  = _substitutePlaceholders(ed.subject,  tokens);
   var bodyHtml = _substitutePlaceholders(ed.bodyHtml, tokens);
 
@@ -596,6 +730,39 @@ function sendNotificationTest() {
     console.warn('[ntf] test send failed:', err);
     showToast('Test send failed - see console');
   });
+}
+
+// Mock data for Send Test — picks the right token builder per event so
+// every notification can be previewed against representative-looking
+// values. Add a new branch here when adding a new entity type.
+function _ntfMockTokensForEvent(eventKey) {
+  if (eventKey === 'application_submitted' || eventKey === 'file_update_submitted') {
+    return _emailTokensForApp({
+      id: 'APP-TEST-0001', fn: 'Jane', ln: 'Sample',
+      score: 42, tier: 'High Priority', appType: 'new_housing'
+    });
+  }
+  if (eventKey === 'sow_created') {
+    return _emailTokensForSow({
+      address:    '123 Test Street',
+      totalCost:  '$15,000',
+      condition:  'Habitable - needs work',
+      contractor: 'Sample Contractor Ltd.'
+    }, 'TEST-UNIT');
+  }
+  if (eventKey === 'contractor_submitted') {
+    return _emailTokensForContractor({
+      id:             'CT-TEST-0001',
+      name:           'Sample Contractor Ltd.',
+      trade:          'General Contractor',
+      classification: 'internal_indigenous'
+    });
+  }
+  // Fallback — only the always-available tokens are populated.
+  return {
+    nationShort: _emailNationShort(),
+    appLink:     _emailAppLink()
+  };
 }
 
 // Read + sanitize the current editor state. Returns null on missing

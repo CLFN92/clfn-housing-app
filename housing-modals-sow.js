@@ -1189,6 +1189,13 @@ function saveSOW(){
   if(data.condition) detail += ' · Condition: ' + data.condition;
   auditEntry('SOW:'+(_sowUnitId||'?'), isNew ? 'sow_created' : 'sow_updated', detail, role);
 
+  // Notify approvers on FIRST save only — subsequent edits don't re-fire
+  // so the SOW reviewers don't get spammed during iteration. Fire-and-
+  // forget; UI never blocks on delivery.
+  if (isNew && typeof notifySowCreated === 'function') {
+    notifySowCreated(data, _sowUnitId);
+  }
+
   // Tenant signature captured
   if(data.tenantSig && (data.tenantSig.name || data.tenantSig.image)) {
     auditEntry('SOW:'+(_sowUnitId||'?'), 'sow_tenant_signed',

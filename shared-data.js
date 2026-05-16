@@ -3991,6 +3991,10 @@ function saveContractor(){
       ? 'Contractor application submitted: ' + name
       : 'Contractor record updated: ' + name;
     auditEntry('CT:'+id, _editAuditAction, _editAuditDetail, window.currentRole||'staff');
+    // Notify approvers when a draft is being submitted for review.
+    if (_editAuditAction === 'ct_submitted' && typeof notifyContractorSubmitted === 'function') {
+      notifyContractorSubmitted(data);
+    }
   } else {
     // Brand-new contractor — same gate.
     data.status = (_saveMode === 'submit') ? 'pending_review' : 'draft';
@@ -4001,6 +4005,11 @@ function saveContractor(){
       ? 'Contractor saved as draft: ' + name
       : 'Contractor application submitted: ' + name;
     auditEntry('CT:'+id, _auditAction, _auditDetail, window.currentRole||'staff');
+    // Drafts don't notify (nothing to act on yet). Only submitted
+    // contractors trigger an approver notification.
+    if (_auditAction === 'ct_submitted' && typeof notifyContractorSubmitted === 'function') {
+      notifyContractorSubmitted(data);
+    }
   }
   window._contractors = contractors;
   // Persist to Supabase. The contractor record is `data` (built above) — an
