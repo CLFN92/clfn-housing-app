@@ -669,7 +669,6 @@ function headerSignOut() {
 function switchRole(role) {
   window.currentRole = role;
   updateHeaderUser(role);
-  updateRoleSwitcherVisibility();
 
   // Update nav dashboard label
   var dashLabel = document.getElementById('tab_dash_label');

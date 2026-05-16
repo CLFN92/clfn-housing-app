@@ -13,8 +13,6 @@
 
 'use strict';
 
-function initRoleSwitcher(){ /* no-op - dropdown handles role switching */ }
-
 // ── Preview from Dash ──
 
 

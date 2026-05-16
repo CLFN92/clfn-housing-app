@@ -518,7 +518,6 @@ function renderTenantsView(){
   var showRenoCol = (ROLE.isManagement(window.currentRole));
   var th = document.getElementById('ten_reno_score_th');
   if(th) th.style.display = showRenoCol ? '' : 'none';
-  // File counts loaded asynchronously — see getTenantFiles (Supabase Storage)
   function hasSowOrReno(uid){
     try{
       var sow = getSowData(uid);
@@ -1480,10 +1479,6 @@ var _HOUSING_TENANT_DOC_CATEGORIES = [
 
 // Retained as a thin compat wrapper: udpRenderFilePreviews still calls
 // this. Once that path is fully migrated to DocLibrary, this can go away.
-async function getTenantFiles(unitId){
-  return await sbLoadFileMeta('tenant', unitId);
-}
-
 // ── Settings page patches ─────────────────────────────────────────────────
 // Runs once after DOMContentLoaded so that housing.html's inline
 // showSettingsSection has already been defined.

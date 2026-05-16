@@ -37,7 +37,6 @@ function closeContractorSearch() {
 }
 
 function contractorSearchFilter(q) {
-  var contractors = [];
   var contractors = window._contractors || [];
   var results = document.getElementById('ct_search_results');
   if(!results) return;
@@ -1975,15 +1974,12 @@ function closeMatchScorecard(){
 }
 
 window.openEditModal = function(appId) {
-  console.log('[openEditModal] called with appId:', appId,
-              '| applications.length:', (typeof applications !== 'undefined' && applications ? applications.length : 'undefined'));
   var app = applications.find(function(a){ return a.id === appId; });
   if(!app) {
     console.warn('[openEditModal] app not found in applications[] — bailing. id:', appId);
     showToast('Application not found');
     return;
   }
-  console.log('[openEditModal] app found — status:', app.status, '| appType:', app.appType);
 
   // Store the ID so saveApplicationRecord knows which record to update
   currentAppId = app.id;

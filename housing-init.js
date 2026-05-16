@@ -1787,9 +1787,6 @@ async function loadHousingData() {
 
 
 function initHousingPage() {
-  // Set up role view switcher
-  initRoleSwitcher();
-
   // Show sidebar nav for HM/ED
   
   // Show settings button for HM/ED
@@ -1817,8 +1814,7 @@ function initHousingPage() {
   })();
 
   // Update header
-  if(true) updateHeaderUser(role);
-  if(true) updateRoleSwitcherVisibility();
+  updateHeaderUser(role);
   // Re-render the header nav + role-vis pass now that the resolved role is in.
   // _onSwitchRole is suppressed during boot, so do it directly here.
   if(typeof renderHeaderNav      === 'function') renderHeaderNav();

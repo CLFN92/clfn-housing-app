@@ -565,7 +565,6 @@ async function loadRenosData() {
     try { await loadRenosData(); } catch(e) { console.warn('[contractors] data load error:', e); }
   }
   showContractors();
-  console.log('[contractors] loaded', (window._contractors||[]).length, 'contractors');
 
   // Round-trip handoff: if we returned here from a SOW modal close, re-open
   // the same contractor card the user was viewing before they navigated away.

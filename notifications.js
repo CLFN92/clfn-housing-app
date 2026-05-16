@@ -958,9 +958,6 @@ async function _generateApplicationPdfBase64() {
 
   var dataUri = pdf.output('datauristring');
   var base64  = dataUri.substring(dataUri.indexOf(',') + 1);
-  console.log('[notify/pdf] generated base64 length:', base64.length,
-              '(~' + Math.round(base64.length * 0.75 / 1024) + 'KB,', pageNum,
-              'page' + (pageNum === 1 ? '' : 's') + ')');
   return base64;
 }
 
@@ -1215,9 +1212,6 @@ async function _generateSowPdfBase64() {
 
   var dataUri = pdf.output('datauristring');
   var base64  = dataUri.substring(dataUri.indexOf(',') + 1);
-  console.log('[notify/pdf] SOW base64 length:', base64.length,
-              '(~' + Math.round(base64.length * 0.75 / 1024) + 'KB,', pageNum,
-              'page' + (pageNum === 1 ? '' : 's') + ')');
   return base64;
 }
 
@@ -1539,9 +1533,6 @@ async function _generateWorkOrderPdfBase64() {
 
   var dataUri = pdf.output('datauristring');
   var base64  = dataUri.substring(dataUri.indexOf(',') + 1);
-  console.log('[notify/pdf] Work Order base64 length:', base64.length,
-              '(~' + Math.round(base64.length * 0.75 / 1024) + 'KB,', pageNum,
-              'page' + (pageNum === 1 ? '' : 's') + ')');
   return base64;
 }
 

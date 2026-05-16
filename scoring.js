@@ -1802,18 +1802,10 @@ const SP_APPLICATIONS=[];
 
 // ── Housing Unit Inventory (from SharePoint — 262 units) ──
 const HOUSING_UNITS_DATA=[];
-let housingUnits=[];
-(function(){
-  var stored=null; // RESET_v2 - localStorage.getItem('clfn_housing_units');
-  if(stored){try{housingUnits=JSON.parse(stored);}catch(e){housingUnits=HOUSING_UNITS_DATA.slice();}}
-  else{housingUnits=HOUSING_UNITS_DATA.slice();}
-})();
+let housingUnits=HOUSING_UNITS_DATA.slice();
 
 // ── Audit Log ──
 var auditLog=[];
-(function(){
-  auditLog = []; // audit log is now in Supabase housing_audit_log
-})();
 
 
 // ══════════════════════════════════════════════════════════════
