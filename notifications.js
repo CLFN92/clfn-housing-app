@@ -548,84 +548,108 @@ async function _loadJsPdf() {
 // selectable text rather than rasterised HTML. Signature canvases are
 // embedded as small PNG images at the end (the only raster content).
 // Output is typically ~20-60 KB and the text stays sharp at any zoom.
-async function _generateApplicationPdfBase64() {
-  await _loadJsPdf();
+
+// ── Shared PDF scaffolding ──────────────────────────────────────────────────
+// Called by each _generate*PdfBase64 function. Returns a ctx object with
+// the pdf instance, layout constants, mutable cursor state (ctx.y /
+// ctx.pageNum), and six shared layout primitives. ctx.finish() stamps the
+// final page footer and returns the base64 string.
+function _makePdfDoc() {
   if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF not available');
+  var pdf      = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
+  var pageW    = pdf.internal.pageSize.getWidth();
+  var pageH    = pdf.internal.pageSize.getHeight();
+  var marginL  = 14, marginR = 14, marginT = 14, marginB = 14;
+  var contentW = pageW - marginL - marginR;
 
-  var pdf       = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
-  var pageW     = pdf.internal.pageSize.getWidth();   // 210
-  var pageH     = pdf.internal.pageSize.getHeight();  // 297
-  var marginL = 14, marginR = 14, marginT = 14, marginB = 14;
-  var contentW  = pageW - marginL - marginR;
-  var y         = marginT;
-  var pageNum   = 1;
+  var ctx = {
+    pdf: pdf, pageW: pageW, pageH: pageH,
+    marginL: marginL, marginR: marginR, marginT: marginT, marginB: marginB,
+    contentW: contentW,
+    y: marginT, pageNum: 1
+  };
 
-  // ── Layout primitives ─────────────────────────────────────────────
-  function drawFooter() {
+  ctx.drawFooter = function() {
     pdf.setFontSize(8);
     pdf.setTextColor(140);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('Page ' + pageNum, pageW - marginR, pageH - 6, { align: 'right' });
+    pdf.text('Page ' + ctx.pageNum, pageW - marginR, pageH - 6, { align: 'right' });
     pdf.setTextColor(0);
-  }
-  function needSpace(h) {
-    if (y + h > pageH - marginB) {
-      drawFooter();
+  };
+  ctx.needSpace = function(h) {
+    if (ctx.y + h > pageH - marginB) {
+      ctx.drawFooter();
       pdf.addPage();
-      pageNum++;
-      y = marginT;
+      ctx.pageNum++;
+      ctx.y = marginT;
     }
-  }
-  function sectionHeader(title) {
-    needSpace(10);
+  };
+  ctx.sectionHeader = function(title) {
+    ctx.needSpace(10);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(10);
     pdf.setTextColor(100);
-    pdf.text(String(title).toUpperCase(), marginL, y + 3);
-    pdf.setDrawColor(248, 228, 26);   // CLFN yellow
+    pdf.text(String(title).toUpperCase(), marginL, ctx.y + 3);
+    pdf.setDrawColor(248, 228, 26);
     pdf.setLineWidth(0.8);
-    pdf.line(marginL, y + 4.5, pageW - marginR, y + 4.5);
+    pdf.line(marginL, ctx.y + 4.5, pageW - marginR, ctx.y + 4.5);
     pdf.setDrawColor(0);
     pdf.setTextColor(0);
-    y += 7;
-  }
-  function row(label, value) {
-    var labelW = 55;
-    var gap    = 3;
-    var valueX = marginL + labelW + gap;
-    var valueW = contentW - labelW - gap;
-    var v      = (value == null || value === '') ? '—' : String(value);
-
+    ctx.y += 7;
+  };
+  ctx.row = function(label, value) {
+    var labelW = 55, colGap = 3;
+    var valueX = marginL + labelW + colGap;
+    var valueW = contentW - labelW - colGap;
+    var v = (value == null || value === '') ? '—' : String(value);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8.5);
     var labelLines = pdf.splitTextToSize(label, labelW);
-    var valueLines = pdf.splitTextToSize(v,    valueW);
+    var valueLines = pdf.splitTextToSize(v, valueW);
     var rowH = Math.max(labelLines.length, valueLines.length) * 4 + 1;
-    needSpace(rowH + 1);
-
+    ctx.needSpace(rowH + 1);
     pdf.setTextColor(110);
-    pdf.text(labelLines, marginL, y + 3);
+    pdf.text(labelLines, marginL, ctx.y + 3);
     pdf.setTextColor(20);
-    pdf.text(valueLines, valueX, y + 3);
-
-    y += rowH;
+    pdf.text(valueLines, valueX, ctx.y + 3);
+    ctx.y += rowH;
     pdf.setDrawColor(230);
     pdf.setLineWidth(0.1);
-    pdf.line(marginL, y, pageW - marginR, y);
+    pdf.line(marginL, ctx.y, pageW - marginR, ctx.y);
     pdf.setDrawColor(0);
-    y += 1.5;
-  }
-  function paragraph(text, fontSize) {
+    ctx.y += 1.5;
+  };
+  ctx.paragraph = function(text, fontSize) {
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(fontSize || 9);
     pdf.setTextColor(40);
     var lines = pdf.splitTextToSize(String(text), contentW);
-    needSpace(lines.length * 4 + 2);
-    pdf.text(lines, marginL, y + 3);
-    y += lines.length * 4 + 2;
+    ctx.needSpace(lines.length * 4 + 2);
+    pdf.text(lines, marginL, ctx.y + 3);
+    ctx.y += lines.length * 4 + 2;
     pdf.setTextColor(0);
-  }
-  function gap(h) { y += (h || 3); }
+  };
+  ctx.gap = function(h) { ctx.y += (h || 3); };
+  ctx.finish = function() {
+    ctx.drawFooter();
+    var dataUri = pdf.output('datauristring');
+    return dataUri.substring(dataUri.indexOf(',') + 1);
+  };
+
+  return ctx;
+}
+
+async function _generateApplicationPdfBase64() {
+  await _loadJsPdf();
+  var ctx         = _makePdfDoc();
+  var pdf         = ctx.pdf, pageW = ctx.pageW, pageH = ctx.pageH;
+  var marginL     = ctx.marginL, marginR = ctx.marginR, marginT = ctx.marginT;
+  var contentW    = ctx.contentW;
+  var needSpace   = ctx.needSpace.bind(ctx);
+  var sectionHeader = ctx.sectionHeader.bind(ctx);
+  var row         = ctx.row.bind(ctx);
+  var paragraph   = ctx.paragraph.bind(ctx);
+  var gap         = ctx.gap.bind(ctx);
 
   // ── Form readers ──────────────────────────────────────────────────
   function fld(id) {
@@ -671,28 +695,28 @@ async function _generateApplicationPdfBase64() {
   // ── HEADER ────────────────────────────────────────────────────────
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(15);
-  pdf.text((short ? short + ' ' : '') + 'Housing Application', marginL, y + 5);
+  pdf.text((short ? short + ' ' : '') + 'Housing Application', marginL, ctx.y + 5);
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
   pdf.setTextColor(110);
-  if (nation) pdf.text(nation, marginL, y + 10);
+  if (nation) pdf.text(nation, marginL, ctx.y + 10);
 
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   pdf.setTextColor(20);
-  pdf.text(fullName, pageW - marginR, y + 5, { align: 'right' });
+  pdf.text(fullName, pageW - marginR, ctx.y + 5, { align: 'right' });
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
   pdf.setTextColor(110);
-  pdf.text(appId,             pageW - marginR, y + 10, { align: 'right' });
-  pdf.text('Date: ' + today,  pageW - marginR, y + 15, { align: 'right' });
-  y += 17;
+  pdf.text(appId,             pageW - marginR, ctx.y + 10, { align: 'right' });
+  pdf.text('Date: ' + today,  pageW - marginR, ctx.y + 15, { align: 'right' });
+  ctx.y += 17;
   pdf.setDrawColor(248, 228, 26);
   pdf.setLineWidth(1);
-  pdf.line(marginL, y, pageW - marginR, y);
+  pdf.line(marginL, ctx.y, pageW - marginR, ctx.y);
   pdf.setDrawColor(0);
   pdf.setTextColor(0);
-  y += 6;
+  ctx.y += 6;
 
   // ── 1. APPLICANT INFORMATION ──────────────────────────────────────
   sectionHeader('Applicant Information');
@@ -860,8 +884,8 @@ async function _generateApplicationPdfBase64() {
   terms.forEach(function(t, i) {
     var lines = pdf.splitTextToSize((i + 1) + '. ' + t, contentW - 4);
     needSpace(lines.length * 4 + 1.5);
-    pdf.text(lines, marginL + 3, y + 3);
-    y += lines.length * 4 + 1.5;
+    pdf.text(lines, marginL + 3, ctx.y + 3);
+    ctx.y += lines.length * 4 + 1.5;
   });
   pdf.setTextColor(0);
   gap();
@@ -873,11 +897,11 @@ async function _generateApplicationPdfBase64() {
     pdf.setFillColor(240, 253, 244);
     pdf.setDrawColor(21, 128, 61);
     pdf.setLineWidth(0.5);
-    pdf.rect(marginL, y, contentW, boxH, 'FD');
+    pdf.rect(marginL, ctx.y, contentW, boxH, 'FD');
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(9);
     pdf.setTextColor(21, 128, 61);
-    pdf.text('[X] Consent to Share — ' + (short || '') + ' Programs — CONFIRMED', marginL + 3, y + 5);
+    pdf.text('[X] Consent to Share — ' + (short || '') + ' Programs — CONFIRMED', marginL + 3, ctx.y + 5);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8.5);
     pdf.setTextColor(40);
@@ -888,15 +912,15 @@ async function _generateApplicationPdfBase64() {
       + ' programs and departments — including Health, Education, Wellness, Ontario Works, and Finance — in support of this housing application.',
       contentW - 6
     );
-    pdf.text(cLines, marginL + 3, y + 10);
+    pdf.text(cLines, marginL + 3, ctx.y + 10);
     pdf.setFontSize(8);
     pdf.setTextColor(100);
     var capturedBy = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.email)
       ? ' · Captured by ' + HOUSING_SESSION.email : '';
-    pdf.text('Recorded: ' + today + capturedBy, marginL + 3, y + boxH - 2);
+    pdf.text('Recorded: ' + today + capturedBy, marginL + 3, ctx.y + boxH - 2);
     pdf.setTextColor(0);
     pdf.setDrawColor(0);
-    y += boxH + 4;
+    ctx.y += boxH + 4;
   }
 
   // ── SIGNATURES ────────────────────────────────────────────────────
@@ -922,22 +946,22 @@ async function _generateApplicationPdfBase64() {
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(8);
     pdf.setTextColor(100);
-    pdf.text(String(label).toUpperCase(), x, y + 3);
+    pdf.text(String(label).toUpperCase(), x, ctx.y + 3);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8.5);
     pdf.setTextColor(20);
-    pdf.text('Name: ' + (name || '—'), x, y + 8);
-    pdf.text('Date: ' + (date || '—'), x, y + 12);
+    pdf.text('Name: ' + (name || '—'), x, ctx.y + 8);
+    pdf.text('Date: ' + (date || '—'), x, ctx.y + 12);
     pdf.setDrawColor(180);
     pdf.setLineWidth(0.2);
-    pdf.rect(x, y + 14, sigW, sigBlockH - 14);
+    pdf.rect(x, ctx.y + 14, sigW, sigBlockH - 14);
     if (imgUrl) {
-      try { pdf.addImage(imgUrl, 'PNG', x + 1, y + 15, sigW - 2, sigBlockH - 16); }
+      try { pdf.addImage(imgUrl, 'PNG', x + 1, ctx.y + 15, sigW - 2, sigBlockH - 16); }
       catch (e) { /* ignore unreadable canvas */ }
     } else {
       pdf.setFontSize(7);
       pdf.setTextColor(180);
-      pdf.text('(unsigned)', x + sigW / 2, y + sigBlockH - 3, { align: 'center' });
+      pdf.text('(unsigned)', x + sigW / 2, ctx.y + sigBlockH - 3, { align: 'center' });
     }
     pdf.setDrawColor(0);
     pdf.setTextColor(0);
@@ -951,14 +975,9 @@ async function _generateApplicationPdfBase64() {
     sigX += sigW + sigGap;
   }
   drawSig(sigX, 'Received by — Housing Staff', staffName, staffDate, sigStaImg);
-  y += sigBlockH + 4;
+  ctx.y += sigBlockH + 4;
 
-  // Footer on the final page
-  drawFooter();
-
-  var dataUri = pdf.output('datauristring');
-  var base64  = dataUri.substring(dataUri.indexOf(',') + 1);
-  return base64;
+  return ctx.finish();
 }
 
 // ── SOW PDF generator ─────────────────────────────────────────────────────
@@ -968,78 +987,15 @@ async function _generateApplicationPdfBase64() {
 // at any zoom; tenant + staff signatures embedded as PNG images.
 async function _generateSowPdfBase64() {
   await _loadJsPdf();
-  if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF not available');
-
-  var pdf      = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
-  var pageW    = pdf.internal.pageSize.getWidth();
-  var pageH    = pdf.internal.pageSize.getHeight();
-  var marginL = 14, marginR = 14, marginT = 14, marginB = 14;
-  var contentW = pageW - marginL - marginR;
-  var y        = marginT;
-  var pageNum  = 1;
-
-  function drawFooter() {
-    pdf.setFontSize(8);
-    pdf.setTextColor(140);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('Page ' + pageNum, pageW - marginR, pageH - 6, { align: 'right' });
-    pdf.setTextColor(0);
-  }
-  function needSpace(h) {
-    if (y + h > pageH - marginB) {
-      drawFooter();
-      pdf.addPage();
-      pageNum++;
-      y = marginT;
-    }
-  }
-  function sectionHeader(title) {
-    needSpace(10);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
-    pdf.setTextColor(100);
-    pdf.text(String(title).toUpperCase(), marginL, y + 3);
-    pdf.setDrawColor(248, 228, 26);
-    pdf.setLineWidth(0.8);
-    pdf.line(marginL, y + 4.5, pageW - marginR, y + 4.5);
-    pdf.setDrawColor(0);
-    pdf.setTextColor(0);
-    y += 7;
-  }
-  function row(label, value) {
-    var labelW = 55;
-    var gap    = 3;
-    var valueX = marginL + labelW + gap;
-    var valueW = contentW - labelW - gap;
-    var v      = (value == null || value === '') ? '—' : String(value);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(8.5);
-    var labelLines = pdf.splitTextToSize(label, labelW);
-    var valueLines = pdf.splitTextToSize(v,    valueW);
-    var rowH = Math.max(labelLines.length, valueLines.length) * 4 + 1;
-    needSpace(rowH + 1);
-    pdf.setTextColor(110);
-    pdf.text(labelLines, marginL, y + 3);
-    pdf.setTextColor(20);
-    pdf.text(valueLines, valueX, y + 3);
-    y += rowH;
-    pdf.setDrawColor(230);
-    pdf.setLineWidth(0.1);
-    pdf.line(marginL, y, pageW - marginR, y);
-    pdf.setDrawColor(0);
-    y += 1.5;
-  }
-  function paragraph(text, fontSize) {
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(fontSize || 9);
-    pdf.setTextColor(40);
-    var lines = pdf.splitTextToSize(String(text), contentW);
-    needSpace(lines.length * 4 + 2);
-    pdf.text(lines, marginL, y + 3);
-    y += lines.length * 4 + 2;
-    pdf.setTextColor(0);
-  }
-  function gap(h) { y += (h || 3); }
+  var ctx         = _makePdfDoc();
+  var pdf         = ctx.pdf, pageW = ctx.pageW, pageH = ctx.pageH;
+  var marginL     = ctx.marginL, marginR = ctx.marginR, marginT = ctx.marginT;
+  var contentW    = ctx.contentW;
+  var needSpace   = ctx.needSpace.bind(ctx);
+  var sectionHeader = ctx.sectionHeader.bind(ctx);
+  var row         = ctx.row.bind(ctx);
+  var paragraph   = ctx.paragraph.bind(ctx);
+  var gap         = ctx.gap.bind(ctx);
 
   function fld(id) {
     var e = document.getElementById(id);
@@ -1073,28 +1029,28 @@ async function _generateSowPdfBase64() {
   // Header
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(15);
-  pdf.text((short ? short + ' ' : '') + 'Scope of Work', marginL, y + 5);
+  pdf.text((short ? short + ' ' : '') + 'Scope of Work', marginL, ctx.y + 5);
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
   pdf.setTextColor(110);
-  if (nation) pdf.text(nation + ' — Housing Department', marginL, y + 10);
+  if (nation) pdf.text(nation + ' — Housing Department', marginL, ctx.y + 10);
 
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   pdf.setTextColor(20);
-  pdf.text(unitAddr,           pageW - marginR, y + 5,  { align: 'right' });
+  pdf.text(unitAddr,           pageW - marginR, ctx.y + 5,  { align: 'right' });
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
   pdf.setTextColor(110);
-  pdf.text(projNum,            pageW - marginR, y + 10, { align: 'right' });
-  pdf.text('Date: ' + today,   pageW - marginR, y + 15, { align: 'right' });
-  y += 17;
+  pdf.text(projNum,            pageW - marginR, ctx.y + 10, { align: 'right' });
+  pdf.text('Date: ' + today,   pageW - marginR, ctx.y + 15, { align: 'right' });
+  ctx.y += 17;
   pdf.setDrawColor(248, 228, 26);
   pdf.setLineWidth(1);
-  pdf.line(marginL, y, pageW - marginR, y);
+  pdf.line(marginL, ctx.y, pageW - marginR, ctx.y);
   pdf.setDrawColor(0);
   pdf.setTextColor(0);
-  y += 6;
+  ctx.y += 6;
 
   // Unit Information
   sectionHeader('Unit Information');
@@ -1185,34 +1141,30 @@ async function _generateSowPdfBase64() {
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(9);
     pdf.setTextColor(60);
-    pdf.text(title, x, y + 4);
+    pdf.text(title, x, ctx.y + 4);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8);
     pdf.setTextColor(110);
-    pdf.text((name || '—') + '  ·  ' + (date || '—'), x, y + 9);
+    pdf.text((name || '—') + '  ·  ' + (date || '—'), x, ctx.y + 9);
     pdf.setDrawColor(200);
     pdf.setLineWidth(0.2);
-    pdf.rect(x, y + 11, sigW, sigBlockH - 11);
+    pdf.rect(x, ctx.y + 11, sigW, sigBlockH - 11);
     if (imgUrl) {
-      try { pdf.addImage(imgUrl, 'PNG', x + 1, y + 12, sigW - 2, sigBlockH - 13); }
+      try { pdf.addImage(imgUrl, 'PNG', x + 1, ctx.y + 12, sigW - 2, sigBlockH - 13); }
       catch (e) { /* ignore unreadable canvas */ }
     } else {
       pdf.setFontSize(7);
       pdf.setTextColor(180);
-      pdf.text('(unsigned)', x + sigW / 2, y + sigBlockH - 3, { align: 'center' });
+      pdf.text('(unsigned)', x + sigW / 2, ctx.y + sigBlockH - 3, { align: 'center' });
     }
     pdf.setDrawColor(0);
     pdf.setTextColor(0);
   }
   drawSig(marginL,                'Tenant Signature',        tenantName, tenantDate, tenantSig);
   drawSig(marginL + sigW + sigGap,'Housing Staff Signature', staffName,  staffDate,  staffSig);
-  y += sigBlockH + 4;
+  ctx.y += sigBlockH + 4;
 
-  drawFooter();
-
-  var dataUri = pdf.output('datauristring');
-  var base64  = dataUri.substring(dataUri.indexOf(',') + 1);
-  return base64;
+  return ctx.finish();
 }
 
 // Resolve the tenant's email from the tenants table by looking up the
@@ -1326,77 +1278,15 @@ async function notifySowTenantCopy(sow, unit) {
 // contractor representative and the authorized housing signatory.
 async function _generateWorkOrderPdfBase64() {
   await _loadJsPdf();
-  if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF not available');
-
-  var pdf      = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
-  var pageW    = pdf.internal.pageSize.getWidth();
-  var pageH    = pdf.internal.pageSize.getHeight();
-  var marginL = 14, marginR = 14, marginT = 14, marginB = 14;
-  var contentW = pageW - marginL - marginR;
-  var y        = marginT;
-  var pageNum  = 1;
-
-  function drawFooter() {
-    pdf.setFontSize(8);
-    pdf.setTextColor(140);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('Page ' + pageNum, pageW - marginR, pageH - 6, { align: 'right' });
-    pdf.setTextColor(0);
-  }
-  function needSpace(h) {
-    if (y + h > pageH - marginB) {
-      drawFooter();
-      pdf.addPage();
-      pageNum++;
-      y = marginT;
-    }
-  }
-  function sectionHeader(title) {
-    needSpace(10);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
-    pdf.setTextColor(100);
-    pdf.text(String(title).toUpperCase(), marginL, y + 3);
-    pdf.setDrawColor(248, 228, 26);
-    pdf.setLineWidth(0.8);
-    pdf.line(marginL, y + 4.5, pageW - marginR, y + 4.5);
-    pdf.setDrawColor(0);
-    pdf.setTextColor(0);
-    y += 7;
-  }
-  function row(label, value) {
-    var labelW = 55, gap = 3;
-    var valueX = marginL + labelW + gap;
-    var valueW = contentW - labelW - gap;
-    var v      = (value == null || value === '') ? '—' : String(value);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(8.5);
-    var labelLines = pdf.splitTextToSize(label, labelW);
-    var valueLines = pdf.splitTextToSize(v,    valueW);
-    var rowH = Math.max(labelLines.length, valueLines.length) * 4 + 1;
-    needSpace(rowH + 1);
-    pdf.setTextColor(110);
-    pdf.text(labelLines, marginL, y + 3);
-    pdf.setTextColor(20);
-    pdf.text(valueLines, valueX, y + 3);
-    y += rowH;
-    pdf.setDrawColor(230);
-    pdf.setLineWidth(0.1);
-    pdf.line(marginL, y, pageW - marginR, y);
-    pdf.setDrawColor(0);
-    y += 1.5;
-  }
-  function paragraph(text, fontSize) {
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(fontSize || 9);
-    pdf.setTextColor(40);
-    var lines = pdf.splitTextToSize(String(text), contentW);
-    needSpace(lines.length * 4 + 2);
-    pdf.text(lines, marginL, y + 3);
-    y += lines.length * 4 + 2;
-    pdf.setTextColor(0);
-  }
-  function gap(h) { y += (h || 3); }
+  var ctx         = _makePdfDoc();
+  var pdf         = ctx.pdf, pageW = ctx.pageW, pageH = ctx.pageH;
+  var marginL     = ctx.marginL, marginR = ctx.marginR, marginT = ctx.marginT;
+  var contentW    = ctx.contentW;
+  var needSpace   = ctx.needSpace.bind(ctx);
+  var sectionHeader = ctx.sectionHeader.bind(ctx);
+  var row         = ctx.row.bind(ctx);
+  var paragraph   = ctx.paragraph.bind(ctx);
+  var gap         = ctx.gap.bind(ctx);
 
   function fld(id) {
     var e = document.getElementById(id);
@@ -1420,28 +1310,28 @@ async function _generateWorkOrderPdfBase64() {
   // Header
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(15);
-  pdf.text((short ? short + ' ' : '') + 'Work Order', marginL, y + 5);
+  pdf.text((short ? short + ' ' : '') + 'Work Order', marginL, ctx.y + 5);
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
   pdf.setTextColor(110);
-  if (nation) pdf.text(nation + ' — Housing Department', marginL, y + 10);
+  if (nation) pdf.text(nation + ' — Housing Department', marginL, ctx.y + 10);
 
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   pdf.setTextColor(20);
-  pdf.text(unitAddr,           pageW - marginR, y + 5,  { align: 'right' });
+  pdf.text(unitAddr,           pageW - marginR, ctx.y + 5,  { align: 'right' });
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
   pdf.setTextColor(110);
-  pdf.text(projNum,            pageW - marginR, y + 10, { align: 'right' });
-  pdf.text('Date: ' + today,   pageW - marginR, y + 15, { align: 'right' });
-  y += 17;
+  pdf.text(projNum,            pageW - marginR, ctx.y + 10, { align: 'right' });
+  pdf.text('Date: ' + today,   pageW - marginR, ctx.y + 15, { align: 'right' });
+  ctx.y += 17;
   pdf.setDrawColor(248, 228, 26);
   pdf.setLineWidth(1);
-  pdf.line(marginL, y, pageW - marginR, y);
+  pdf.line(marginL, ctx.y, pageW - marginR, ctx.y);
   pdf.setDrawColor(0);
   pdf.setTextColor(0);
-  y += 6;
+  ctx.y += 6;
 
   // Project Information
   sectionHeader('Project Information');
@@ -1511,29 +1401,25 @@ async function _generateWorkOrderPdfBase64() {
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(9);
     pdf.setTextColor(60);
-    pdf.text(role, x, y + 4);
+    pdf.text(role, x, ctx.y + 4);
     pdf.setDrawColor(160);
     pdf.setLineWidth(0.3);
     // Signature line
-    pdf.line(x, y + 16, x + sigW, y + 16);
+    pdf.line(x, ctx.y + 16, x + sigW, ctx.y + 16);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7);
     pdf.setTextColor(120);
-    pdf.text('Signature', x, y + 20);
-    pdf.text('Date: ____________', x + sigW, y + 20, { align: 'right' });
-    pdf.text('Print name: ____________________________', x, y + 25);
+    pdf.text('Signature', x, ctx.y + 20);
+    pdf.text('Date: ____________', x + sigW, ctx.y + 20, { align: 'right' });
+    pdf.text('Print name: ____________________________', x, ctx.y + 25);
     pdf.setDrawColor(0);
     pdf.setTextColor(0);
   }
   sigBox(marginL,                'Contractor Representative');
   sigBox(marginL + sigW + sigGap,(short || 'CLFN') + ' Housing — Authorized Signatory');
-  y += sigBlockH + 4;
+  ctx.y += sigBlockH + 4;
 
-  drawFooter();
-
-  var dataUri = pdf.output('datauristring');
-  var base64  = dataUri.substring(dataUri.indexOf(',') + 1);
-  return base64;
+  return ctx.finish();
 }
 
 // Resolve the contractor's email + name from the in-memory cache first,
