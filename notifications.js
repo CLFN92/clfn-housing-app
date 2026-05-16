@@ -108,6 +108,27 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>The {nationShort} Housing team will review your application and contact you with next steps. If you have any questions in the meantime, reply directly to this email.</p>'
               + '<p>Thank you,<br/>{nationShort} Housing</p>'
     }
+  },
+  {
+    key:                   'sow_tenant_copy',
+    label:                 'Tenant Copy of SOW (PDF)',
+    description:           'Sent to the tenant on SOW submit (only if the tenant has an email on file and the preparer ticks the inline checkbox). PDF of the SOW is attached.',
+    recipientType:         'tenant',
+    defaultRecipientRoles: [],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['tenantName','unitAddress','projectNumber','totalCost','condition','contractor','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — Scope of Work for {unitAddress}',
+      bodyHtml: '<p>Hello {tenantName},</p>'
+              + '<p>A Scope of Work has been prepared for <strong>{unitAddress}</strong> and a copy is attached to this email for your records.</p>'
+              + '<p>Project #: <strong>{projectNumber}</strong><br/>'
+              +    'Estimated cost: <strong>{totalCost}</strong><br/>'
+              +    'Condition: <strong>{condition}</strong><br/>'
+              +    'Contractor: <strong>{contractor}</strong></p>'
+              + '<p>If you have any questions, please reply to this email or contact the {nationShort} Housing office.</p>'
+              + '<p>Thank you,<br/>{nationShort} Housing</p>'
+    }
   }
 ];
 
@@ -201,6 +222,18 @@ function _emailTokensForSow(sow, unitId) {
     nationShort: _emailNationShort(),
     appLink:     _emailAppLink()
   };
+}
+
+// Build tokens for the tenant-copy variant of the SOW email. Reuses the
+// SOW builder fields but adds the tenantName + projectNumber tokens the
+// tenant-facing template uses. `unit` is the housing_units row (for the
+// fallback address derivation); `tenantName` is the resolved tenant name
+// — taken from the SOW form field if entered, else from unit.assignedName.
+function _emailTokensForSowTenant(sow, unit, tenantName) {
+  var base = _emailTokensForSow(sow, unit && unit.id);
+  base.tenantName    = tenantName || (sow && sow.tenantName) || (unit && unit.assignedName) || '—';
+  base.projectNumber = (sow && sow.project_number) || '—';
+  return base;
 }
 
 // Build tokens from a contractor record.
@@ -893,6 +926,366 @@ async function _generateApplicationPdfBase64() {
   return base64;
 }
 
+// ── SOW PDF generator ─────────────────────────────────────────────────────
+// Mirrors _generateApplicationPdfBase64 but emits a Scope of Work doc. Reads
+// from the live SOW modal form fields (the modal is still open at notify
+// time, same as the application-confirmation flow). Selectable text, sharp
+// at any zoom; tenant + staff signatures embedded as PNG images.
+async function _generateSowPdfBase64() {
+  await _loadJsPdf();
+  if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF not available');
+
+  var pdf      = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
+  var pageW    = pdf.internal.pageSize.getWidth();
+  var pageH    = pdf.internal.pageSize.getHeight();
+  var marginL = 14, marginR = 14, marginT = 14, marginB = 14;
+  var contentW = pageW - marginL - marginR;
+  var y        = marginT;
+  var pageNum  = 1;
+
+  function drawFooter() {
+    pdf.setFontSize(8);
+    pdf.setTextColor(140);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Page ' + pageNum, pageW - marginR, pageH - 6, { align: 'right' });
+    pdf.setTextColor(0);
+  }
+  function needSpace(h) {
+    if (y + h > pageH - marginB) {
+      drawFooter();
+      pdf.addPage();
+      pageNum++;
+      y = marginT;
+    }
+  }
+  function sectionHeader(title) {
+    needSpace(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.setTextColor(100);
+    pdf.text(String(title).toUpperCase(), marginL, y + 3);
+    pdf.setDrawColor(248, 228, 26);
+    pdf.setLineWidth(0.8);
+    pdf.line(marginL, y + 4.5, pageW - marginR, y + 4.5);
+    pdf.setDrawColor(0);
+    pdf.setTextColor(0);
+    y += 7;
+  }
+  function row(label, value) {
+    var labelW = 55;
+    var gap    = 3;
+    var valueX = marginL + labelW + gap;
+    var valueW = contentW - labelW - gap;
+    var v      = (value == null || value === '') ? '—' : String(value);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8.5);
+    var labelLines = pdf.splitTextToSize(label, labelW);
+    var valueLines = pdf.splitTextToSize(v,    valueW);
+    var rowH = Math.max(labelLines.length, valueLines.length) * 4 + 1;
+    needSpace(rowH + 1);
+    pdf.setTextColor(110);
+    pdf.text(labelLines, marginL, y + 3);
+    pdf.setTextColor(20);
+    pdf.text(valueLines, valueX, y + 3);
+    y += rowH;
+    pdf.setDrawColor(230);
+    pdf.setLineWidth(0.1);
+    pdf.line(marginL, y, pageW - marginR, y);
+    pdf.setDrawColor(0);
+    y += 1.5;
+  }
+  function paragraph(text, fontSize) {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(fontSize || 9);
+    pdf.setTextColor(40);
+    var lines = pdf.splitTextToSize(String(text), contentW);
+    needSpace(lines.length * 4 + 2);
+    pdf.text(lines, marginL, y + 3);
+    y += lines.length * 4 + 2;
+    pdf.setTextColor(0);
+  }
+  function gap(h) { y += (h || 3); }
+
+  function fld(id) {
+    var e = document.getElementById(id);
+    return (e && e.value && String(e.value).trim()) ? String(e.value).trim() : '';
+  }
+  function chk(id) {
+    var e = document.getElementById(id); return e ? !!e.checked : false;
+  }
+  function fmtCur(v) {
+    if (v == null || v === '') return '';
+    if (typeof formatCurrency === 'function') {
+      var n = parseFloat(String(v).replace(/[^0-9.\-]/g,'')) || 0;
+      return formatCurrency(n);
+    }
+    return String(v);
+  }
+  function getSig(canvasId) {
+    if (typeof getSigDataURL === 'function') {
+      try { return getSigDataURL(canvasId); } catch (e) { return ''; }
+    }
+    var c = document.getElementById(canvasId);
+    try { return c ? c.toDataURL('image/png') : ''; } catch (e) { return ''; }
+  }
+
+  var today    = new Date().toLocaleDateString('en-CA');
+  var nation   = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
+  var short    = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
+  var projNum  = (window._sowEditingProjectNumber) || '—';
+  var unitAddr = fld('sow_address') || '—';
+
+  // Header
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(15);
+  pdf.text((short ? short + ' ' : '') + 'Scope of Work', marginL, y + 5);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  pdf.setTextColor(110);
+  if (nation) pdf.text(nation + ' — Housing Department', marginL, y + 10);
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(11);
+  pdf.setTextColor(20);
+  pdf.text(unitAddr,           pageW - marginR, y + 5,  { align: 'right' });
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  pdf.setTextColor(110);
+  pdf.text(projNum,            pageW - marginR, y + 10, { align: 'right' });
+  pdf.text('Date: ' + today,   pageW - marginR, y + 15, { align: 'right' });
+  y += 17;
+  pdf.setDrawColor(248, 228, 26);
+  pdf.setLineWidth(1);
+  pdf.line(marginL, y, pageW - marginR, y);
+  pdf.setDrawColor(0);
+  pdf.setTextColor(0);
+  y += 6;
+
+  // Unit Information
+  sectionHeader('Unit Information');
+  row('Unit Address',     unitAddr);
+  row('Current Tenant',   fld('sow_tenant_name'));
+  row('Project Number',   projNum);
+  row('Date Prepared',    fld('sow_date'));
+  row('Prepared By',      fld('sow_prepared_by'));
+  row('Contractor',       fld('sow_contractor'));
+  gap();
+
+  // Condition & Schedule
+  sectionHeader('Condition Assessment & Schedule');
+  row('Overall Condition',     fld('sow_condition'));
+  row('Estimated Total Cost',  fmtCur(fld('sow_total_cost')) || '—');
+  row('Target Start Date',     fld('sow_start_date'));
+  row('Target Completion',     fld('sow_end_date'));
+  gap();
+
+  // Scope of Work items — table-style rows using the row() helper.
+  sectionHeader('Scope of Work Items');
+  var items = (typeof collectSowItems === 'function') ? collectSowItems() : [];
+  var filtered = items.filter(function(it){ return it.category || it.description || it.cost; });
+  if (filtered.length) {
+    filtered.forEach(function(it){
+      var cost = it.cost ? fmtCur(it.cost) : '—';
+      row((it.category || '—'),
+          (it.description || '—') + '  ·  ' + cost);
+    });
+  } else {
+    row('Scope Items', 'No line items added.');
+  }
+  gap();
+
+  // Health & Safety hazards
+  var hazards = [
+    {id:'sow_mold',       label:'Mould / Mildew'},
+    {id:'sow_asbestos',   label:'Asbestos Risk'},
+    {id:'sow_electrical', label:'Electrical Hazard'},
+    {id:'sow_structural', label:'Structural Concern'},
+    {id:'sow_plumbing',   label:'Plumbing / Sewage'},
+    {id:'sow_fire',       label:'Fire Safety'}
+  ].filter(function(h){ return chk(h.id); }).map(function(h){ return h.label; });
+  if (hazards.length) {
+    sectionHeader('Health & Safety Concerns');
+    paragraph(hazards.join(' · '));
+    gap();
+  }
+
+  // Notes
+  var sowNotes = fld('sow_notes');
+  if (sowNotes) {
+    sectionHeader('Additional Notes');
+    paragraph(sowNotes);
+    gap();
+  }
+
+  // Tenant Accountability
+  var acctFlags = [];
+  if (chk('sow_rent_arrears'))  acctFlags.push('Rent arrears');
+  if (chk('sow_tenant_damage')) acctFlags.push('Tenant damage');
+  if (chk('sow_negligence'))    acctFlags.push('Negligence');
+  if (chk('sow_vandalism'))     acctFlags.push('Vandalism');
+  if (chk('sow_police_report')) acctFlags.push('Police report on file');
+  var acctNotes = fld('sow_accountability_notes');
+  if (acctFlags.length || acctNotes) {
+    sectionHeader('Tenant Accountability');
+    if (acctFlags.length) paragraph(acctFlags.join(' · '));
+    if (acctNotes)        paragraph(acctNotes);
+    gap();
+  }
+
+  // Signatures
+  sectionHeader('Signatures');
+  var tenantSig    = getSig('sow_sig_canvas_tenant');
+  var staffSig     = getSig('sow_sig_canvas_staff');
+  var tenantName   = fld('sow_sig_tenant_name') || fld('sow_tenant_name') || '—';
+  var tenantDate   = fld('sow_sig_tenant_date') || '—';
+  var staffName    = fld('sow_sig_staff_name')  || fld('sow_prepared_by') || '—';
+  var staffDate    = fld('sow_sig_staff_date')  || today;
+
+  var sigBlockH = 26;
+  var sigGap    = 6;
+  var sigW      = (contentW - sigGap) / 2;
+  needSpace(sigBlockH + 6);
+
+  function drawSig(x, title, name, date, imgUrl) {
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(9);
+    pdf.setTextColor(60);
+    pdf.text(title, x, y + 4);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(110);
+    pdf.text((name || '—') + '  ·  ' + (date || '—'), x, y + 9);
+    pdf.setDrawColor(200);
+    pdf.setLineWidth(0.2);
+    pdf.rect(x, y + 11, sigW, sigBlockH - 11);
+    if (imgUrl) {
+      try { pdf.addImage(imgUrl, 'PNG', x + 1, y + 12, sigW - 2, sigBlockH - 13); }
+      catch (e) { /* ignore unreadable canvas */ }
+    } else {
+      pdf.setFontSize(7);
+      pdf.setTextColor(180);
+      pdf.text('(unsigned)', x + sigW / 2, y + sigBlockH - 3, { align: 'center' });
+    }
+    pdf.setDrawColor(0);
+    pdf.setTextColor(0);
+  }
+  drawSig(marginL,                'Tenant Signature',        tenantName, tenantDate, tenantSig);
+  drawSig(marginL + sigW + sigGap,'Housing Staff Signature', staffName,  staffDate,  staffSig);
+  y += sigBlockH + 4;
+
+  drawFooter();
+
+  var dataUri = pdf.output('datauristring');
+  var base64  = dataUri.substring(dataUri.indexOf(',') + 1);
+  console.log('[notify/pdf] SOW base64 length:', base64.length,
+              '(~' + Math.round(base64.length * 0.75 / 1024) + 'KB,', pageNum,
+              'page' + (pageNum === 1 ? '' : 's') + ')');
+  return base64;
+}
+
+// Resolve the tenant's email from the tenants table by looking up the
+// unit's assigned_name. Returns '' on any error / no match. The tenants
+// table is the source of truth (TIC reads from it) and unit.assignedName
+// is trigger-synced from housing_units.assigned_name — same join that
+// the TIC's _ticResolveTenant uses, just slimmed down for one column.
+async function _resolveTenantEmailForUnit(unit) {
+  if (!unit || !unit.assignedName) return '';
+  if (typeof SUPABASE_URL === 'undefined' || typeof HOUSING_HEADERS === 'undefined') return '';
+  try {
+    var url = SUPABASE_URL
+            + '/rest/v1/tenants?select=email&full_name=eq.'
+            + encodeURIComponent(unit.assignedName);
+    var r = await fetch(url, { headers: HOUSING_HEADERS });
+    if (!r.ok) {
+      console.warn('[notify] tenant email lookup HTTP ' + r.status);
+      return '';
+    }
+    var rows = await r.json();
+    var email = (rows && rows[0] && rows[0].email) || '';
+    return String(email || '').trim();
+  } catch (e) {
+    console.warn('[notify] tenant email lookup error:', e);
+    return '';
+  }
+}
+
+// Wired from saveSOW() in housing-modals-sow.js when the preparer ticks
+// the inline "Email a copy to the tenant" checkbox on the submit
+// confirmation. Sends the SOW PDF to the tenant's email + any active
+// staff in CC roles configured on the Settings -> Notifications tab.
+// Silent skip when there's no tenant email AND no CC roles configured.
+async function notifySowTenantCopy(sow, unit) {
+  if (!sow) return;
+  var eventKey = 'sow_tenant_copy';
+
+  var seen   = {};
+  var emails = [];
+  function _addEmail(addr) {
+    if (!addr) return;
+    var clean = String(addr).trim().toLowerCase();
+    if (!clean || seen[clean]) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) return;
+    seen[clean] = true;
+    emails.push(clean);
+  }
+
+  // Tenant email — silent skip if nothing on file.
+  var tenantEmail = await _resolveTenantEmailForUnit(unit);
+  _addEmail(tenantEmail);
+
+  // Additional staff recipients: primary + CC role checkboxes from the
+  // Settings -> Notifications tab. Both default to empty for this event.
+  var extraRoles = _emailEventRecipientRoles(eventKey).concat(_emailEventCcRoles(eventKey));
+  if (extraRoles.length) {
+    var extraRecipients = await _resolveActiveStaffForRoles(extraRoles);
+    extraRecipients.forEach(function(r){ _addEmail(r.email); });
+  }
+
+  if (!emails.length) {
+    console.log('[notify] sow_tenant_copy skipped - no tenant email or CC recipients for SOW ' + (sow.project_number || '—'));
+    return;
+  }
+
+  var tenantName = (sow.tenantName) || (unit && unit.assignedName) || '';
+  var rendered = _renderEmailTemplate(eventKey, _emailTokensForSowTenant(sow, unit, tenantName));
+  if (!rendered) return;
+
+  // Generate the SOW PDF. Best-effort — never block delivery on PDF.
+  var pdfBase64 = null;
+  try {
+    pdfBase64 = await _generateSowPdfBase64();
+  } catch (e) {
+    console.warn('[notify] SOW PDF generation failed, sending without attachment:', e);
+  }
+
+  var attachments;
+  var bodyHtml = rendered.bodyHtml;
+  if (pdfBase64) {
+    attachments = [{
+      name:         'SOW ' + (sow.project_number || 'scope') + '.pdf',
+      contentType:  'application/pdf',
+      contentBytes: pdfBase64
+    }];
+  } else {
+    bodyHtml += '<p style="color:#888;font-size:12px;font-style:italic;">'
+              + '(PDF copy could not be generated automatically. Reply to this email to request one.)'
+              + '</p>';
+  }
+
+  await _sendSerially(emails.map(function(e){ return { email: e }; }), function(rcp){
+    return {
+      to:          rcp.email,
+      to_name:     '',
+      subject:     rendered.subject,
+      bodyHtml:    bodyHtml,
+      attachments: attachments,
+      event:       eventKey,
+      entity_type: 'sow',
+      entity_id:   sow.project_number || '—'
+    };
+  }, eventKey);
+}
+
 // Returns the recipient role list for an event — saved override if the
 // ED has set one, otherwise the registry default. Always returns an
 // array (possibly empty).
@@ -1024,16 +1417,21 @@ function _ntfRenderEditorHtml(eventKey) {
   }
 
   // Primary block. Every event renders the role checkbox grid so the
-  // editor pane reads consistently. Applicant-type events ALSO show a
-  // static info line above the grid noting the applicant's email is
-  // always included as a primary recipient — the grid then adds
-  // additional staff roles on top of the applicant.
+  // editor pane reads consistently. Applicant- and tenant-type events
+  // ALSO show a static info line above the grid noting the implicit
+  // recipient — the grid then adds additional staff roles on top.
   var primaryBlock = '';
   if (cfg.recipientType === 'applicant') {
     primaryBlock +=
         '<div class="ntf-recipients-fixed">'
       +   'Always sends to the <strong>applicant&#39;s email</strong> from the application form '
       +   '(plus the <strong>co-applicant&#39;s email</strong> if it differs).'
+      + '</div>';
+  } else if (cfg.recipientType === 'tenant') {
+    primaryBlock +=
+        '<div class="ntf-recipients-fixed">'
+      +   'Always sends to the <strong>tenant&#39;s email</strong> from their Tenant Information Card '
+      +   '(silent skip if no email is on file).'
       + '</div>';
   }
   primaryBlock += '<div class="ntf-roles" id="ntf_roles">'
@@ -1074,7 +1472,7 @@ function _ntfRenderEditorHtml(eventKey) {
     +   '</div>'
     + '</div>'
     + '<div class="ntf-field">'
-    +   '<label class="ntf-label">Recipients' + (cfg.recipientType === 'applicant'
+    +   '<label class="ntf-label">Recipients' + (cfg.recipientType === 'applicant' || cfg.recipientType === 'tenant'
           ? ''
           : ' <span class="ntf-label-hint">(active staff in any ticked role)</span>') + '</label>'
     +   primaryBlock
@@ -1370,6 +1768,16 @@ function _ntfMockTokensForEvent(eventKey) {
       contractor: 'Sample Contractor Ltd.'
     }, 'TEST-UNIT');
   }
+  if (eventKey === 'sow_tenant_copy') {
+    return _emailTokensForSowTenant({
+      address:        '123 Test Street',
+      project_number: '123 Test Street-SOW-001',
+      totalCost:      '$15,000',
+      condition:      'Habitable - needs work',
+      contractor:     'Sample Contractor Ltd.',
+      tenantName:     'Jane Sample'
+    }, null, 'Jane Sample');
+  }
   if (eventKey === 'contractor_submitted') {
     return _emailTokensForContractor({
       id:             'CT-TEST-0001',
@@ -1417,7 +1825,8 @@ function _ntfReadEditorState() {
       if (cb.checked) ccRoles.push(cb.getAttribute('data-ntf-cc-role'));
     });
   }
-  if ((!cfg || cfg.recipientType !== 'applicant') && !roles.length) {
+  var isImplicitRecipient = cfg && (cfg.recipientType === 'applicant' || cfg.recipientType === 'tenant');
+  if (!isImplicitRecipient && !roles.length) {
     showToast('Pick at least one recipient role');
     return null;
   }

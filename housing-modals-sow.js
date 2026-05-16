@@ -466,7 +466,7 @@ function _buildSowModalHTML() {
           // Initial label is "Save Draft" because a fresh modal starts with
           // only the Overview tab visited. _updateSowSaveButtonState flips
           // it to "Submit Scope of Work" once all 8 tabs have been opened.
-          '<button id="sow_save_btn" type="button" onclick="saveSOW()" class="btn btn-primary" data-mode="draft">💾 Save Draft</button>' +
+          '<button id="sow_save_btn" type="button" onclick="sowSaveClicked()" class="btn btn-primary" data-mode="draft">💾 Save Draft</button>' +
         '</div>' +
       '</div>' +
 
@@ -611,13 +611,16 @@ function openSowModal(unitId, projectNumber) {
     resetSow();
     if(label) { var addr=document.getElementById('sow_address'); if(addr) addr.value=label; }
   }
-  // Auto-populate tenant name from unit's assigned tenant (for new SOWs only).
-  if(unitId && !saved) {
-    var allUnits2 = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
-    var u2 = allUnits2.find(function(x){ return x.id===unitId; });
-    if(u2 && u2.assignedName) {
-      var tnEl = document.getElementById('sow_tenant_name');
-      if(tnEl) tnEl.value = u2.assignedName;
+  // Auto-populate tenant name from the unit's assigned tenant whenever the
+  // field is empty — covers both brand-new SOWs and existing SOWs that were
+  // saved before this auto-fill existed (tenantName missing from the payload).
+  // Never overwrites a value the user already entered.
+  if(unitId) {
+    var tnEl = document.getElementById('sow_tenant_name');
+    if(tnEl && !tnEl.value) {
+      var allUnits2 = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
+      var u2 = allUnits2.find(function(x){ return x.id===unitId; });
+      if(u2 && u2.assignedName) tnEl.value = u2.assignedName;
     }
   }
   // Auto-populate "Prepared By (Staff)" from the logged-in user. Done for both
@@ -1071,7 +1074,49 @@ function udpPrintWorkOrder(unitId, projectNumber){
 
 
 
-function saveSOW(){
+// Submit-confirmation gate for the save button. In draft mode we just save
+// — no prompt, no tenant copy. In submit mode we look up the tenant email
+// and, if one is on file, show an inline "Email a copy to the tenant"
+// checkbox on the confirm modal. Mirror of housing-app.js openSubmitModal /
+// finalSubmit. Called only via the #sow_save_btn onclick; programmatic
+// saveSOW() callers (printSOW, etc.) skip this entirely.
+async function sowSaveClicked() {
+  var btn = document.getElementById('sow_save_btn');
+  var mode = (btn && btn.dataset) ? btn.dataset.mode : 'draft';
+  if (mode !== 'submit') { saveSOW(); return; }
+
+  var unitId = _sowUnitId;
+  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var unit = unitId ? allUnits.find(function(x){ return x.id === unitId; }) : null;
+
+  // Tenant email lookup is best-effort. If the helper is missing (older
+  // notifications.js) OR the lookup throws OR no email comes back, we
+  // submit without the copy prompt — the SOW still saves normally.
+  var tenantEmail = '';
+  if (unit && typeof _resolveTenantEmailForUnit === 'function') {
+    try { tenantEmail = await _resolveTenantEmailForUnit(unit); }
+    catch (e) { tenantEmail = ''; }
+  }
+
+  if (!tenantEmail || typeof showConfirm !== 'function') { saveSOW(); return; }
+
+  var tenantName = (unit && unit.assignedName) || 'the tenant';
+  showConfirm({
+    title:       'Submit Scope of Work?',
+    message:     'This will submit the SOW for review. You can still edit it later if you have approval authority.',
+    confirmText: 'Confirm Submit',
+    checkbox:    { label: 'Email a PDF copy of this SOW to ' + tenantName + ' (' + tenantEmail + ')', defaultChecked: true }
+  }).then(function(result){
+    var ok       = (typeof result === 'object' && result !== null) ? !!result.ok      : !!result;
+    var sendCopy = (typeof result === 'object' && result !== null) ? !!result.checked : false;
+    if (!ok) return;
+    saveSOW({ sendTenantCopy: sendCopy });
+  });
+}
+
+function saveSOW(opts){
+  opts = opts || {};
+  var sendTenantCopy = opts.sendTenantCopy === true;
   var get=function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
   var chk=function(id){ var el=document.getElementById(id); return el?el.checked:false; };
   var data = {
@@ -1194,6 +1239,17 @@ function saveSOW(){
   // forget; UI never blocks on delivery.
   if (isNew && typeof notifySowCreated === 'function') {
     notifySowCreated(data, _sowUnitId);
+  }
+
+  // Tenant copy email (PDF attached) — only fires when the preparer
+  // opted in via the inline checkbox on the submit confirmation. Looked
+  // up against the tenants table; silent skip if no email on file. Same
+  // fire-and-forget pattern as notifyApplicationConfirmation in
+  // housing-app.js finalSubmit.
+  if (sendTenantCopy && typeof notifySowTenantCopy === 'function') {
+    var _allUnitsT = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+    var _unitT = _sowUnitId ? _allUnitsT.find(function(x){ return x.id === _sowUnitId; }) : null;
+    notifySowTenantCopy(data, _unitT);
   }
 
   // Tenant signature captured
