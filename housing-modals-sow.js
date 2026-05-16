@@ -239,7 +239,7 @@ function _buildSowModalHTML() {
               '<div class="f"><label>Prepared By (Staff)</label><input id="sow_prepared_by" type="text" placeholder="Staff name"/></div>' +
               '<div class="f sow-ct-row"><label>Contractor (if assigned)</label>' +
                 '<input id="sow_contractor" type="text" placeholder="Search contractors…" autocomplete="off"' +
-                  ' oninput="sowContractorSearch(this.value)" onfocus="sowContractorSearch(this.value)"' +
+                  ' oninput="sowContractorSearch(this.value)" onfocus="sowContractorSearch(\'\')"' +
                   ' onblur="setTimeout(function(){var d=document.getElementById(\'sow_ct_dropdown\');if(d)d.style.display=\'none\';},180)"/>' +
                 '<input type="hidden" id="sow_contractor_id"/>' +
                 '<div id="sow_ct_dropdown"></div>' +
@@ -1250,6 +1250,44 @@ function saveSOW(opts){
     var _allUnitsT = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
     var _unitT = _sowUnitId ? _allUnitsT.find(function(x){ return x.id === _sowUnitId; }) : null;
     notifySowTenantCopy(data, _unitT);
+  }
+
+  // Work Order email to contractor — fires when THIS save transitioned the
+  // SOW into an approved state (hm_approved or ed_approved). Detached
+  // async: looks up the contractor, shows a confirm dialog with an
+  // opt-in checkbox, and only sends if the approver ticks it. Silent
+  // skip when there's no assigned contractor / no email on file.
+  var _prevApproved = existingForStatus && (
+    existingForStatus.approval_status === 'hm_approved'
+    || existingForStatus.approval_status === 'ed_approved'
+    || existingForStatus.approval_status === 'completed'
+  );
+  var _nowApproved = data.approval_status === 'hm_approved' || data.approval_status === 'ed_approved';
+  if (_nowApproved && !_prevApproved && data.contractorId
+      && typeof notifyWorkOrderToContractor === 'function'
+      && typeof _resolveContractorForEmail === 'function') {
+    var _allUnitsW = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+    var _unitW = _sowUnitId ? _allUnitsW.find(function(x){ return x.id === _sowUnitId; }) : null;
+    var _sowSnapshot = data;
+    (async function(){
+      try {
+        var ct = await _resolveContractorForEmail(_sowSnapshot.contractorId);
+        if (!ct || !ct.email) return;
+        if (typeof showConfirm !== 'function') return;
+        var result = await showConfirm({
+          title:       'SOW approved — send Work Order?',
+          message:     'Optionally email a Work Order PDF to the assigned contractor for the work that was just approved.',
+          confirmText: 'Done',
+          checkbox:    { label: 'Email Work Order to ' + (ct.name || 'contractor') + ' (' + ct.email + ')', defaultChecked: true }
+        });
+        var ok     = (typeof result === 'object' && result !== null) ? !!result.ok      : !!result;
+        var sendIt = (typeof result === 'object' && result !== null) ? !!result.checked : false;
+        if (!ok || !sendIt) return;
+        notifyWorkOrderToContractor(_sowSnapshot, _unitW, ct);
+      } catch (e) {
+        console.warn('[notify] work-order prompt threw:', e);
+      }
+    })();
   }
 
   // Tenant signature captured

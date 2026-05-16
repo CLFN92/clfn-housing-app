@@ -129,6 +129,30 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>If you have any questions, please reply to this email or contact the {nationShort} Housing office.</p>'
               + '<p>Thank you,<br/>{nationShort} Housing</p>'
     }
+  },
+  {
+    key:                   'sow_work_order_to_contractor',
+    label:                 'Work Order to Contractor (PDF)',
+    description:           'Sent to the assigned contractor when an HM or ED approves the SOW (only if the contractor has an email on file and the approver ticks the inline checkbox). PDF work order is attached.',
+    recipientType:         'contractor',
+    defaultRecipientRoles: [],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['contractorName','unitAddress','projectNumber','totalCost','tenantName','startDate','endDate','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — Work Order: {unitAddress} ({projectNumber})',
+      bodyHtml: '<p>Hello {contractorName},</p>'
+              + '<p>A Work Order has been approved for the project below and is attached to this email for your records.</p>'
+              + '<p>Unit address: <strong>{unitAddress}</strong><br/>'
+              +    'Project #: <strong>{projectNumber}</strong><br/>'
+              +    'Tenant: <strong>{tenantName}</strong><br/>'
+              +    'Estimated value: <strong>{totalCost}</strong><br/>'
+              +    'Start date: <strong>{startDate}</strong><br/>'
+              +    'Target completion: <strong>{endDate}</strong></p>'
+              + '<p>Please review the attached Work Order. Work may only proceed on the items listed; any change to scope requires written approval before commencing. Invoices must reference this Work Order and unit address.</p>'
+              + '<p>If you have any questions, please reply to this email or contact the {nationShort} Housing office.</p>'
+              + '<p>Thank you,<br/>{nationShort} Housing</p>'
+    }
   }
 ];
 
@@ -233,6 +257,20 @@ function _emailTokensForSowTenant(sow, unit, tenantName) {
   var base = _emailTokensForSow(sow, unit && unit.id);
   base.tenantName    = tenantName || (sow && sow.tenantName) || (unit && unit.assignedName) || '—';
   base.projectNumber = (sow && sow.project_number) || '—';
+  return base;
+}
+
+// Build tokens for the work-order-to-contractor email. Mirrors the tenant
+// builder but keys on contractorName instead, and surfaces the start/end
+// dates the contractor cares about. `contractor` is the contractors row;
+// `tenantName` falls back to unit.assignedName.
+function _emailTokensForWorkOrder(sow, unit, contractor) {
+  var base = _emailTokensForSow(sow, unit && unit.id);
+  base.contractorName = (contractor && contractor.name) || (sow && sow.contractor) || '—';
+  base.tenantName     = (sow && sow.tenantName) || (unit && unit.assignedName) || '—';
+  base.projectNumber  = (sow && sow.project_number) || '—';
+  base.startDate      = (sow && sow.startDate) || '—';
+  base.endDate        = (sow && sow.endDate)   || '—';
   return base;
 }
 
@@ -1286,6 +1324,331 @@ async function notifySowTenantCopy(sow, unit) {
   }, eventKey);
 }
 
+// ── Work Order PDF generator ──────────────────────────────────────────────
+// Mirrors printWorkOrder's structure (contractor-facing variant of the SOW
+// PDF). Reads from the live SOW modal form fields. Different from the SOW
+// PDF: surfaces line-item quoted prices (not estimates), includes the
+// Work Authorization notice, and has signature lines for both the
+// contractor representative and the authorized housing signatory.
+async function _generateWorkOrderPdfBase64() {
+  await _loadJsPdf();
+  if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF not available');
+
+  var pdf      = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
+  var pageW    = pdf.internal.pageSize.getWidth();
+  var pageH    = pdf.internal.pageSize.getHeight();
+  var marginL = 14, marginR = 14, marginT = 14, marginB = 14;
+  var contentW = pageW - marginL - marginR;
+  var y        = marginT;
+  var pageNum  = 1;
+
+  function drawFooter() {
+    pdf.setFontSize(8);
+    pdf.setTextColor(140);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Page ' + pageNum, pageW - marginR, pageH - 6, { align: 'right' });
+    pdf.setTextColor(0);
+  }
+  function needSpace(h) {
+    if (y + h > pageH - marginB) {
+      drawFooter();
+      pdf.addPage();
+      pageNum++;
+      y = marginT;
+    }
+  }
+  function sectionHeader(title) {
+    needSpace(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.setTextColor(100);
+    pdf.text(String(title).toUpperCase(), marginL, y + 3);
+    pdf.setDrawColor(248, 228, 26);
+    pdf.setLineWidth(0.8);
+    pdf.line(marginL, y + 4.5, pageW - marginR, y + 4.5);
+    pdf.setDrawColor(0);
+    pdf.setTextColor(0);
+    y += 7;
+  }
+  function row(label, value) {
+    var labelW = 55, gap = 3;
+    var valueX = marginL + labelW + gap;
+    var valueW = contentW - labelW - gap;
+    var v      = (value == null || value === '') ? '—' : String(value);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8.5);
+    var labelLines = pdf.splitTextToSize(label, labelW);
+    var valueLines = pdf.splitTextToSize(v,    valueW);
+    var rowH = Math.max(labelLines.length, valueLines.length) * 4 + 1;
+    needSpace(rowH + 1);
+    pdf.setTextColor(110);
+    pdf.text(labelLines, marginL, y + 3);
+    pdf.setTextColor(20);
+    pdf.text(valueLines, valueX, y + 3);
+    y += rowH;
+    pdf.setDrawColor(230);
+    pdf.setLineWidth(0.1);
+    pdf.line(marginL, y, pageW - marginR, y);
+    pdf.setDrawColor(0);
+    y += 1.5;
+  }
+  function paragraph(text, fontSize) {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(fontSize || 9);
+    pdf.setTextColor(40);
+    var lines = pdf.splitTextToSize(String(text), contentW);
+    needSpace(lines.length * 4 + 2);
+    pdf.text(lines, marginL, y + 3);
+    y += lines.length * 4 + 2;
+    pdf.setTextColor(0);
+  }
+  function gap(h) { y += (h || 3); }
+
+  function fld(id) {
+    var e = document.getElementById(id);
+    return (e && e.value && String(e.value).trim()) ? String(e.value).trim() : '';
+  }
+  function fmtCur(v) {
+    if (v == null || v === '') return '';
+    if (typeof formatCurrency === 'function') {
+      var n = parseFloat(String(v).replace(/[^0-9.\-]/g,'')) || 0;
+      return formatCurrency(n);
+    }
+    return String(v);
+  }
+
+  var today    = new Date().toLocaleDateString('en-CA');
+  var nation   = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
+  var short    = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
+  var projNum  = (window._sowEditingProjectNumber) || '—';
+  var unitAddr = fld('sow_address') || '—';
+
+  // Header
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(15);
+  pdf.text((short ? short + ' ' : '') + 'Work Order', marginL, y + 5);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  pdf.setTextColor(110);
+  if (nation) pdf.text(nation + ' — Housing Department', marginL, y + 10);
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(11);
+  pdf.setTextColor(20);
+  pdf.text(unitAddr,           pageW - marginR, y + 5,  { align: 'right' });
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  pdf.setTextColor(110);
+  pdf.text(projNum,            pageW - marginR, y + 10, { align: 'right' });
+  pdf.text('Date: ' + today,   pageW - marginR, y + 15, { align: 'right' });
+  y += 17;
+  pdf.setDrawColor(248, 228, 26);
+  pdf.setLineWidth(1);
+  pdf.line(marginL, y, pageW - marginR, y);
+  pdf.setDrawColor(0);
+  pdf.setTextColor(0);
+  y += 6;
+
+  // Project Information
+  sectionHeader('Project Information');
+  row('Unit Address',     unitAddr);
+  row('Tenant',           fld('sow_tenant_name'));
+  row('Contractor',       fld('sow_contractor'));
+  row('Issued By',        fld('sow_prepared_by'));
+  row('Start Date',       fld('sow_start_date'));
+  row('Completion Date',  fld('sow_end_date'));
+  row('Project Number',   projNum);
+  gap();
+
+  // Scope of Work — use quoted price when available, fall back to estimate.
+  sectionHeader('Scope of Work');
+  var items = (typeof collectSowItems === 'function') ? collectSowItems() : [];
+  var filtered = items.filter(function(it){ return it.category || it.description || it.quote || it.cost; });
+  var quoteTotal = 0;
+  var hasQuotes  = false;
+  if (filtered.length) {
+    filtered.forEach(function(it){
+      var price;
+      if (it.quote && parseFloat(it.quote) > 0) {
+        quoteTotal += parseFloat(it.quote);
+        hasQuotes   = true;
+        price       = fmtCur(it.quote);
+      } else {
+        price = 'Pending';
+      }
+      row((it.category || '—'),
+          (it.description || '—') + '  ·  ' + price);
+    });
+    if (hasQuotes) {
+      row('Total Quoted Amount', fmtCur(quoteTotal));
+    } else {
+      row('Pricing', 'To be confirmed by contractor.');
+    }
+  } else {
+    row('Scope Items', 'No line items added.');
+  }
+  gap();
+
+  // Work Authorization notice
+  sectionHeader('Work Authorization');
+  paragraph(
+    'The contractor is authorized to perform only the work described above. '
+    + 'Any additional work or changes to scope must be approved in writing by ' + (short || 'CLFN')
+    + ' Housing before work commences. Invoices must reference this Work Order and unit address. '
+    + 'Payment is subject to satisfactory completion and inspection.'
+  );
+  gap();
+
+  // Notes
+  var sowNotes = fld('sow_notes');
+  if (sowNotes) {
+    sectionHeader('Additional Notes');
+    paragraph(sowNotes);
+    gap();
+  }
+
+  // Signature blocks — empty lines; this is a printed/signed artifact.
+  sectionHeader('Authorization');
+  var sigBlockH = 26;
+  var sigGap    = 6;
+  var sigW      = (contentW - sigGap) / 2;
+  needSpace(sigBlockH + 6);
+  function sigBox(x, role) {
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(9);
+    pdf.setTextColor(60);
+    pdf.text(role, x, y + 4);
+    pdf.setDrawColor(160);
+    pdf.setLineWidth(0.3);
+    // Signature line
+    pdf.line(x, y + 16, x + sigW, y + 16);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(120);
+    pdf.text('Signature', x, y + 20);
+    pdf.text('Date: ____________', x + sigW, y + 20, { align: 'right' });
+    pdf.text('Print name: ____________________________', x, y + 25);
+    pdf.setDrawColor(0);
+    pdf.setTextColor(0);
+  }
+  sigBox(marginL,                'Contractor Representative');
+  sigBox(marginL + sigW + sigGap,(short || 'CLFN') + ' Housing — Authorized Signatory');
+  y += sigBlockH + 4;
+
+  drawFooter();
+
+  var dataUri = pdf.output('datauristring');
+  var base64  = dataUri.substring(dataUri.indexOf(',') + 1);
+  console.log('[notify/pdf] Work Order base64 length:', base64.length,
+              '(~' + Math.round(base64.length * 0.75 / 1024) + 'KB,', pageNum,
+              'page' + (pageNum === 1 ? '' : 's') + ')');
+  return base64;
+}
+
+// Resolve the contractor's email + name from the in-memory cache first,
+// falling back to Supabase REST if the cache is empty (sub-pages may not
+// have loaded contractors yet). Returns { email, name } or null.
+async function _resolveContractorForEmail(contractorId) {
+  if (!contractorId) return null;
+  var cache = window._contractors || [];
+  for (var i = 0; i < cache.length; i++) {
+    if (cache[i] && cache[i].id === contractorId) {
+      var e = (cache[i].email || '').trim();
+      return e ? { email: e, name: cache[i].name || '' } : null;
+    }
+  }
+  if (typeof SUPABASE_URL === 'undefined' || typeof HOUSING_HEADERS === 'undefined') return null;
+  try {
+    var url = SUPABASE_URL
+            + '/rest/v1/contractors?select=name,email&id=eq.'
+            + encodeURIComponent(contractorId);
+    var r = await fetch(url, { headers: HOUSING_HEADERS });
+    if (!r.ok) {
+      console.warn('[notify] contractor email lookup HTTP ' + r.status);
+      return null;
+    }
+    var rows = await r.json();
+    var row  = rows && rows[0];
+    var em   = row && (row.email || '').trim();
+    return em ? { email: em, name: row.name || '' } : null;
+  } catch (e) {
+    console.warn('[notify] contractor email lookup error:', e);
+    return null;
+  }
+}
+
+// Wired from saveSOW() when the save transitions the SOW into an approved
+// state (hm_approved or ed_approved) AND the approver ticked the inline
+// checkbox on the post-save "send work order?" confirm. Silent skip when
+// no contractor is assigned, no email on file, or save is fire-and-forget
+// and any step throws. CC roles configurable via Settings -> Notifications.
+async function notifyWorkOrderToContractor(sow, unit, contractor) {
+  if (!sow) return;
+  var eventKey = 'sow_work_order_to_contractor';
+
+  var seen   = {};
+  var emails = [];
+  function _addEmail(addr) {
+    if (!addr) return;
+    var clean = String(addr).trim().toLowerCase();
+    if (!clean || seen[clean]) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) return;
+    seen[clean] = true;
+    emails.push(clean);
+  }
+
+  if (contractor && contractor.email) _addEmail(contractor.email);
+
+  // Additional staff recipients: primary + CC role checkboxes.
+  var extraRoles = _emailEventRecipientRoles(eventKey).concat(_emailEventCcRoles(eventKey));
+  if (extraRoles.length) {
+    var extraRecipients = await _resolveActiveStaffForRoles(extraRoles);
+    extraRecipients.forEach(function(r){ _addEmail(r.email); });
+  }
+
+  if (!emails.length) {
+    console.log('[notify] sow_work_order_to_contractor skipped - no contractor email or CC recipients for SOW ' + (sow.project_number || '—'));
+    return;
+  }
+
+  var rendered = _renderEmailTemplate(eventKey, _emailTokensForWorkOrder(sow, unit, contractor));
+  if (!rendered) return;
+
+  var pdfBase64 = null;
+  try {
+    pdfBase64 = await _generateWorkOrderPdfBase64();
+  } catch (e) {
+    console.warn('[notify] Work Order PDF generation failed, sending without attachment:', e);
+  }
+
+  var attachments;
+  var bodyHtml = rendered.bodyHtml;
+  if (pdfBase64) {
+    attachments = [{
+      name:         'Work Order ' + (sow.project_number || 'wo') + '.pdf',
+      contentType:  'application/pdf',
+      contentBytes: pdfBase64
+    }];
+  } else {
+    bodyHtml += '<p style="color:#888;font-size:12px;font-style:italic;">'
+              + '(Work Order PDF could not be generated automatically. Reply to this email to request one.)'
+              + '</p>';
+  }
+
+  await _sendSerially(emails.map(function(e){ return { email: e }; }), function(rcp){
+    return {
+      to:          rcp.email,
+      to_name:     '',
+      subject:     rendered.subject,
+      bodyHtml:    bodyHtml,
+      attachments: attachments,
+      event:       eventKey,
+      entity_type: 'sow',
+      entity_id:   sow.project_number || '—'
+    };
+  }, eventKey);
+}
+
 // Returns the recipient role list for an event — saved override if the
 // ED has set one, otherwise the registry default. Always returns an
 // array (possibly empty).
@@ -1433,6 +1796,12 @@ function _ntfRenderEditorHtml(eventKey) {
       +   'Always sends to the <strong>tenant&#39;s email</strong> from their Tenant Information Card '
       +   '(silent skip if no email is on file).'
       + '</div>';
+  } else if (cfg.recipientType === 'contractor') {
+    primaryBlock +=
+        '<div class="ntf-recipients-fixed">'
+      +   'Always sends to the <strong>assigned contractor&#39;s email</strong> from their contractor record '
+      +   '(silent skip if no email is on file).'
+      + '</div>';
   }
   primaryBlock += '<div class="ntf-roles" id="ntf_roles">'
                + _buildRoleChecks(primaryRoles, 'data-ntf-role')
@@ -1472,7 +1841,7 @@ function _ntfRenderEditorHtml(eventKey) {
     +   '</div>'
     + '</div>'
     + '<div class="ntf-field">'
-    +   '<label class="ntf-label">Recipients' + (cfg.recipientType === 'applicant' || cfg.recipientType === 'tenant'
+    +   '<label class="ntf-label">Recipients' + (cfg.recipientType === 'applicant' || cfg.recipientType === 'tenant' || cfg.recipientType === 'contractor'
           ? ''
           : ' <span class="ntf-label-hint">(active staff in any ticked role)</span>') + '</label>'
     +   primaryBlock
@@ -1778,6 +2147,16 @@ function _ntfMockTokensForEvent(eventKey) {
       tenantName:     'Jane Sample'
     }, null, 'Jane Sample');
   }
+  if (eventKey === 'sow_work_order_to_contractor') {
+    return _emailTokensForWorkOrder({
+      address:        '123 Test Street',
+      project_number: '123 Test Street-SOW-001',
+      totalCost:      '$15,000',
+      tenantName:     'Jane Sample',
+      startDate:      '2026-06-01',
+      endDate:        '2026-07-15'
+    }, null, { name: 'Sample Contractor Ltd.' });
+  }
   if (eventKey === 'contractor_submitted') {
     return _emailTokensForContractor({
       id:             'CT-TEST-0001',
@@ -1825,7 +2204,7 @@ function _ntfReadEditorState() {
       if (cb.checked) ccRoles.push(cb.getAttribute('data-ntf-cc-role'));
     });
   }
-  var isImplicitRecipient = cfg && (cfg.recipientType === 'applicant' || cfg.recipientType === 'tenant');
+  var isImplicitRecipient = cfg && (cfg.recipientType === 'applicant' || cfg.recipientType === 'tenant' || cfg.recipientType === 'contractor');
   if (!isImplicitRecipient && !roles.length) {
     showToast('Pick at least one recipient role');
     return null;
