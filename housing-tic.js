@@ -90,7 +90,9 @@
     note_body:          'note_body',
     created_at:         'created_at',
     author_name:        'author_name',
-    phone:              'phone'
+    phone:              'phone',
+    hydro_account:      'hydro_account_number',
+    hydro_meter:        'hydro_meter_number'
   };
 
   var TIC_SCORE_CAP = 100;
@@ -355,7 +357,9 @@
     { key: TIC_C.move_in_date,    label: 'Move-In Date',        type: 'date',   group: 'unit' },
     { key: TIC_C.tenancy_status,  label: 'Tenancy Status',      type: 'select', options: TIC_TENANCY_OPTIONS, group: 'unit' },
     { key: TIC_C.vulnerability,   label: 'Vulnerability Flags', type: 'multi',  options: TIC_VULN_OPTIONS, group: 'unit' },
-    { key: TIC_C.application_id,  label: 'Application Number',  type: 'text',   group: 'meta', readOnly: true }
+    { key: TIC_C.application_id,  label: 'Application Number',  type: 'text',   group: 'meta',      readOnly: true },
+    { key: TIC_C.hydro_account,   label: 'Hydro Account #',     type: 'text',   group: 'utilities' },
+    { key: TIC_C.hydro_meter,     label: 'Hydro Meter #',       type: 'text',   group: 'utilities' }
   ];
 
   function _ticOverviewRowVal(field){
@@ -566,6 +570,12 @@
          +      _ticField('Arrangement Payment',    _ticFmtMoney(l[TIC_C.arrangement_payment]))
          +      _ticField('Arrangement Start',      _ticFmtDate(l[TIC_C.arrangement_start]))
          +      _ticField('Clear-By Date',          _ticFmtDate(l[TIC_C.arrangement_clear]))
+         +    '</div>'
+         + '</div>'
+         + '<div class="tic-section">'
+         +    '<div class="tic-section-h">Utilities</div>'
+         +    '<div class="tic-rows">'
+         +      renderGroup(function(f){ return f.group === 'utilities'; })
          +    '</div>'
          + '</div>';
     _ticEl('tic_panel_overview').innerHTML = html;
@@ -1337,7 +1347,15 @@
     }
     var key = String(unit.id);
     if(_ticDocLibKey === key && _ticDocLib){ return; } // already mounted for this tenant
-    p.innerHTML = '<div id="tic_doclib_mount"></div>';
+    p.innerHTML = '<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:flex-end;">'
+      + '<div class="export-dropdown">'
+      +   '<button type="button" onclick="toggleExportMenu(this)" class="btn btn-primary">&#128196; Generate Forms &#9660;</button>'
+      +   '<div class="header-export-menu">'
+      +     '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>'
+      +   '</div>'
+      + '</div>'
+      + '</div>'
+      + '<div id="tic_doclib_mount"></div>';
     var mount = _ticEl('tic_doclib_mount');
     if(!window.DocLibrary){
       p.innerHTML = '<div class="tic-pending-inline">Document library is not loaded on this page.</div>';
@@ -1805,6 +1823,416 @@
     });
   }
 
+  // ── Hydro One Consent for Disclosure — pre-generation modal ───────────────
+  function _ticOpenHydroOneConsentModal() {
+    var t   = _ticState.tenant      || {};
+    var u   = _ticState.unit        || {};
+    var app = _ticState.application || {};
+    var today = new Date().toISOString().split('T')[0];
+
+    var custName   = t[TIC_C.full_name]      || ((app.fn||'') + ' ' + (app.ln||'')).trim();
+    var custPhone  = app.phone               || '';
+    var custAddr   = u.num ? ((u.num||'') + ' ' + (u.street||'')).trim() : (app.street||'');
+    var custCity   = app.city                || '';
+    var custPostal = app.postal              || '';
+    var hydroAcct  = t[TIC_C.hydro_account]  || '';
+    var hydroMeter = t[TIC_C.hydro_meter]    || '';
+    var tpName     = ((window.NATION_CONFIG && (NATION_CONFIG.display_name||NATION_CONFIG.name))||'CLFN') + ' Housing';
+    var tpPhone    = (window.NATION_CONFIG && NATION_CONFIG.phone) || '';
+
+    var existing = document.getElementById('tic_hydroone_modal');
+    if (existing) existing.remove();
+
+    function inp(id, val, ph) {
+      return '<input id="' + id + '" type="text" value="' + _ticEsc(val||'') + '" placeholder="' + _ticEsc(ph||'') + '" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>';
+    }
+    function fld(label, inputHtml) {
+      return '<div class="tic-field"><label class="tic-field-lbl">' + label + '</label>' + inputHtml + '</div>';
+    }
+
+    var modal = document.createElement('div');
+    modal.id = 'tic_hydroone_modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.innerHTML =
+        '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:680px;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35);">'
+      + '<div class="modal-hdr"><div>'
+      +   '<div class="lbl-yellow">&#128196; Hydro One &mdash; Consent for Disclosure</div>'
+      +   '<div class="txt-sm-meta">Complete the details below, collect the tenant signature, then generate the PDF.</div>'
+      + '</div><button type="button" onclick="document.getElementById(\'tic_hydroone_modal\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button></div>'
+
+      + '<div style="overflow-y:auto;padding:20px 24px;flex:1;">'
+
+      // Part A
+      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin-bottom:12px;padding-bottom:5px;border-bottom:1px solid var(--border);">Part A &mdash; Customer Information</div>'
+      + '<div class="tic-grid-2" style="margin-bottom:16px;">'
+      +   fld('Name',            inp('ho_name',   custName,   'Full legal name'))
+      +   fld('Phone #',         inp('ho_phone',  custPhone,  '(___) ___-____'))
+      +   fld('Service Address', inp('ho_addr',   custAddr,   'Street address'))
+      +   fld('City / Town',     inp('ho_city',   custCity,   'City or town'))
+      +   fld('Postal Code',     inp('ho_postal', custPostal, 'A1A 1A1'))
+      +   fld('Bill Account #',  inp('ho_acct',   hydroAcct,  'Hydro One account number'))
+      +   fld('Meter #',         inp('ho_meter',  hydroMeter, 'Meter number'))
+      + '</div>'
+
+      // Third Party (read-only display)
+      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--border);">Third Party (pre-filled)</div>'
+      + '<div style="padding:10px 14px;background:var(--bg);border-radius:6px;font-size:12px;margin-bottom:16px;color:var(--text);">'
+      +   '<strong>' + _ticEsc(tpName) + '</strong>'
+      +   (tpPhone ? '<div style="color:var(--muted);margin-top:2px;">Phone: ' + _ticEsc(tpPhone) + '</div>' : '')
+      + '</div>'
+
+      // Part B — Checkboxes
+      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--border);">Part B &mdash; Information to Disclose</div>'
+      + '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;font-size:12px;">'
+      + '<label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;"><input type="checkbox" id="ho_chk_usage" checked style="margin-top:3px;accent-color:var(--yellow);width:15px;height:15px;"/> <span><strong>Electricity Usage</strong> — historical and ongoing meter readings, dates, interval data, and energy charges (up to 24 months)</span></label>'
+      + '<label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;"><input type="checkbox" id="ho_chk_acct" checked style="margin-top:3px;accent-color:var(--yellow);width:15px;height:15px;"/> <span><strong>Account Information</strong> — name, contact info, service address, account number, meter number, customer rate class</span></label>'
+      + '<label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;"><input type="checkbox" id="ho_chk_billing" checked style="margin-top:3px;accent-color:var(--yellow);width:15px;height:15px;"/> <span><strong>Billing Information</strong> — billing period details, current and last read dates, days per period, current charges (up to 24 months, excluding payment info)</span></label>'
+      + '<div style="display:flex;align-items:center;gap:8px;">'
+      +   '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;"><input type="checkbox" id="ho_chk_other" style="accent-color:var(--yellow);width:15px;height:15px;"/> <strong>Other (specify):</strong></label>'
+      +   '<input type="text" id="ho_other_text" placeholder="Specify other information…" style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>'
+      + '</div>'
+      + '</div>'
+
+      // Signature
+      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--border);">Customer Signature</div>'
+      + '<div class="sig-canvas-wrap" style="margin-bottom:16px;">'
+      +   '<div class="tab-bar">'
+      +     '<button type="button" onclick="setSigMethod(\'tic_hydro_sig\',\'canvas\')" id="tic_hydro_sig_tab_canvas" class="tab-item active">&#9999;&#65039; Draw</button>'
+      +     '<button type="button" onclick="setSigMethod(\'tic_hydro_sig\',\'type\')"   id="tic_hydro_sig_tab_type"   class="tab-item">&#9000;&#65039; Type</button>'
+      +     '<button type="button" onclick="setSigMethod(\'tic_hydro_sig\',\'wet\')"    id="tic_hydro_sig_tab_wet"    class="tab-item">&#128396; Wet / E-Sign</button>'
+      +   '</div>'
+      +   '<div id="tic_hydro_sig_panel_canvas" class="bg-paper">'
+      +     '<canvas id="tic_hydro_sig" width="700" height="110" style="width:100%;height:110px;display:block;touch-action:none;cursor:crosshair;"></canvas>'
+      +     '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-top:1px solid var(--border);">'
+      +       '<span class="txt-xs-muted">Sign with finger or mouse</span>'
+      +       '<button type="button" onclick="clearSig(\'tic_hydro_sig\')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button>'
+      +     '</div>'
+      +   '</div>'
+      +   '<div id="tic_hydro_sig_panel_type" class="sec-hidden">'
+      +     '<input type="text" id="tic_hydro_sig_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;"/>'
+      +     '<div style="font-size:10px;color:var(--muted);margin-top:8px;">Typing your name constitutes a legal electronic signature</div>'
+      +   '</div>'
+      +   '<div id="tic_hydro_sig_panel_wet" class="sec-hidden">'
+      +     '<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;">Print or email for signature</div>'
+      +     '<div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Print this form and collect a wet signature, or use an e-signature service and attach the signed copy to this tenant\'s file.</div>'
+      +     '<input type="text" id="tic_hydro_sig_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>'
+      +   '</div>'
+      + '</div>'
+
+      // Date
+      + '<div class="tic-field"><label class="tic-field-lbl">Date of Authorization</label>'
+      + '<input id="ho_date" type="date" value="' + today + '" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/></div>'
+      + '</div>'
+
+      // Footer
+      + '<div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;">'
+      +   '<button type="button" onclick="document.getElementById(\'tic_hydroone_modal\').remove()" class="btn btn-ghost">Cancel</button>'
+      +   '<button type="button" onclick="window._ticGenerateHydroOneConsentPdf && window._ticGenerateHydroOneConsentPdf()" class="btn btn-primary">Generate PDF</button>'
+      + '</div>'
+      + '</div>';
+
+    document.body.appendChild(modal);
+    setTimeout(function() {
+      if (typeof _initSigPad === 'function') _initSigPad('tic_hydro_sig');
+    }, 80);
+  }
+
+  // ── Hydro One Consent for Disclosure — PDF generator ──────────────────────
+  // Replicates the official Hydro One form layout exactly so it is accepted.
+  // Part C (Termination) is rendered blank for later use.
+  async function _ticGenerateHydroOneConsentPdf() {
+    if (typeof _loadJsPdf === 'function') await _loadJsPdf();
+    if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable'); return; }
+
+    var fv = function(id) { var e = document.getElementById(id); return e ? (e.value || '').trim() : ''; };
+    var fc = function(id) { var e = document.getElementById(id); return e ? e.checked : false; };
+
+    var custName   = fv('ho_name');
+    var custPhone  = fv('ho_phone');
+    var custAddr   = fv('ho_addr');
+    var custCity   = fv('ho_city');
+    var custPostal = fv('ho_postal');
+    var hydroAcct  = fv('ho_acct');
+    var hydroMeter = fv('ho_meter');
+    var dateRaw    = fv('ho_date');
+    var chkUsage   = fc('ho_chk_usage');
+    var chkAcct    = fc('ho_chk_acct');
+    var chkBilling = fc('ho_chk_billing');
+    var chkOther   = fc('ho_chk_other');
+    var otherText  = fv('ho_other_text');
+    var sigData    = (typeof getSigDataURL === 'function') ? getSigDataURL('tic_hydro_sig') : '';
+
+    var tpName  = ((window.NATION_CONFIG && (NATION_CONFIG.display_name||NATION_CONFIG.name))||'CLFN') + ' Housing';
+    var tpPhone = (window.NATION_CONFIG && NATION_CONFIG.phone) || '';
+    var dateDisp = dateRaw ? (function(){ var d = new Date(dateRaw + 'T12:00:00'); return isNaN(d) ? dateRaw : d.toLocaleDateString('en-CA'); })() : '';
+
+    var pdf  = new window.jspdf.jsPDF({ unit:'mm', format:'letter', orientation:'portrait', compress:true });
+    var W    = pdf.internal.pageSize.getWidth();   // 215.9
+    var L    = 12, R = 12;
+    var CW   = W - L - R;                          // 191.9
+    var y    = 10;
+    var lh   = 3.8; // standard line height for body text
+
+    // Helpers
+    function hline(yy, lw) { pdf.setDrawColor(0); pdf.setLineWidth(lw||0.2); pdf.line(L, yy, W-R, yy); }
+    function uline(x1, x2, yy) { pdf.setDrawColor(0); pdf.setLineWidth(0.15); pdf.line(x1, yy, x2, yy); }
+    function fline(label, val, x, w, yy) {
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(6.5); pdf.setTextColor(90);
+      pdf.text(label, x, yy - 2.8);
+      pdf.setTextColor(0); pdf.setFontSize(8.5);
+      if (val) pdf.text(String(val).substring(0, Math.floor(w / 1.8)), x, yy);
+      uline(x, x + w, yy + 0.8);
+    }
+    function chkBox(x, yy, checked) {
+      pdf.setDrawColor(0); pdf.setLineWidth(0.35); pdf.setFillColor(255,255,255);
+      pdf.rect(x, yy - 3.2, 3.8, 3.8, 'FD');
+      if (checked) {
+        pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(0);
+        pdf.text('✓', x + 0.4, yy - 0.1);
+      }
+    }
+    function chkRow(x, yy, checked, boldLabel, description) {
+      chkBox(x, yy, checked);
+      var tx = x + 5.5;
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(7.5); pdf.setTextColor(0);
+      pdf.text(boldLabel + ':', tx, yy);
+      var descLines = pdf.splitTextToSize(description, CW - 5.5 - 3);
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5);
+      pdf.text(descLines, tx, yy + lh);
+      return yy + lh + descLines.length * lh + 1.5;
+    }
+    function sigBlock(x, w, yy, printedName, sigImg, label) {
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(80);
+      pdf.text(label, x, yy);
+      yy += 3;
+      pdf.setFontSize(7.5); pdf.setTextColor(0);
+      pdf.text('Name (Print): ' + (printedName || ''), x, yy);
+      yy += 5;
+      pdf.text('Signature:', x, yy);
+      // Signature box / line
+      var bY = yy + 1, bH = 18;
+      if (sigImg && sigImg.indexOf('data:image') === 0) {
+        try { pdf.addImage(sigImg, 'PNG', x, bY, w - 2, bH); } catch(e) {}
+      } else if (sigImg && sigImg.indexOf('typed:') === 0) {
+        var typed = sigImg.replace('typed:', '');
+        pdf.setFont('helvetica','italic'); pdf.setFontSize(13); pdf.setTextColor(0);
+        pdf.text(typed, x + 2, bY + bH / 2 + 2);
+        pdf.setFont('helvetica','normal');
+      } else if (sigImg && sigImg.indexOf('wet:') === 0) {
+        var ref = sigImg.replace('wet:', '');
+        pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(100);
+        pdf.text(ref === 'pending' ? 'Physical signature on file' : 'E-sign ref: ' + ref, x + 2, bY + bH / 2);
+        pdf.setTextColor(0);
+      }
+      uline(x, x + w - 2, bY + bH);
+      return bY + bH + 2;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // HEADER
+    // ═══════════════════════════════════════════════════════════════════
+    pdf.setFillColor(0, 0, 0);
+    pdf.rect(L, y, CW, 19, 'F');
+
+    // Title text (centered, offset left to make room for logo)
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.setTextColor(255,255,255);
+    pdf.text('DISCLOSURE OF INFORMATION TO A THIRD PARTY', L + CW * 0.44, y + 7, { align:'center' });
+    pdf.text('CONSENT AND TERMINATION OF CONSENT FORM',   L + CW * 0.44, y + 13, { align:'center' });
+
+    // Hydro One text badge (top-right of header)
+    var hX = W - R - 32;
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(9.5); pdf.setTextColor(100,200,100);
+    pdf.text('hydro', hX, y + 7);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(14); pdf.setTextColor(100,200,100);
+    pdf.text('G', hX + 13, y + 8);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(9.5);
+    pdf.text('one', hX + 19, y + 12);
+
+    y += 21;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5); pdf.setTextColor(0);
+    pdf.text('Commercial & Industrial Customer Relations    Phone: 1-866-922-2466', W/2, y, {align:'center'});
+    y += 2; hline(y, 0.4); y += 4;
+
+    // ═══════════════════════════════════════════════════════════════════
+    // PART A: Customer Information
+    // ═══════════════════════════════════════════════════════════════════
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(0);
+    pdf.text('PART A: Customer Information (complete ', L, y);
+    var uStart = L + pdf.getStringUnitWidth('PART A: Customer Information (complete ') * 8 / pdf.internal.scaleFactor;
+    pdf.setFont('helvetica','bolditalic');
+    pdf.text('all', uStart, y);
+    var uEnd = uStart + pdf.getStringUnitWidth('all') * 8 / pdf.internal.scaleFactor;
+    uline(uStart, uEnd, y + 0.5);
+    pdf.setFont('helvetica','bold');
+    pdf.text(' applicable customer information)', uEnd, y);
+    y += 6;
+
+    var c1 = CW * 0.42, c2 = CW * 0.31, c3 = CW - c1 - c2;
+    fline('Name',            custName,  L,         c1 - 2,  y);
+    fline('Premises Phone #',custPhone, L + c1,    c2 - 2,  y);
+    fline('Alt/Bus #',       '',        L + c1+c2, c3,      y);
+    y += 7;
+
+    fline('Meter #',         hydroMeter,L,         CW * 0.42 - 2, y);
+    fline('Bill Account #',  hydroAcct, L + CW*0.42, CW * 0.58 - 2, y);
+    y += 7;
+
+    var aW = CW * 0.40, cW2 = CW * 0.38, pW = CW - aW - cW2;
+    fline('Address',    custAddr,   L,          aW - 2,  y);
+    fline('City/Town',  custCity,   L + aW,     cW2 - 2, y);
+    fline('Postal Code',custPostal, L + aW+cW2, pW,      y);
+    y += 7;
+
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(0);
+    pdf.text('Service Location', L, y);
+    var slX = L + 28;
+    fline('Lot #',      '', slX,       44,          y);
+    fline('Concession', '', slX + 46,  60,          y);
+    fline('Township',   '', slX + 108, CW - 28 - 46 - 62, y);
+    y += 7;
+
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8);
+    pdf.text('Reg. Plan #', L, y);      uline(L + 19, L + 50, y + 0.8);
+    pdf.text('RP Lot #', L + 53, y);    uline(L + 65, L + 88, y + 0.8);
+    pdf.text('911 # address', L + 91, y); uline(L + 109, W - R, y + 0.8);
+    y += 7;
+
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(7.5);
+    pdf.text('Mailing address for billing (if different from above):', L, y);
+    fline('Name', '', L + 86, CW - 86, y);
+    y += 6;
+    fline('Address',    '', L,          aW - 2,  y);
+    fline('City/Town',  '', L + aW,     cW2 - 2, y);
+    fline('Postal Code','', L + aW+cW2, pW,      y);
+    y += 7;
+
+    // Third Party
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8.5); pdf.setTextColor(0);
+    pdf.text('Third Party Information', L, y);
+    y += 5;
+    fline('Name', tpName, L, CW, y);
+    y += 7;
+    var phW = CW * 0.33 - 2;
+    fline('Phone #', tpPhone, L,              phW,          y);
+    fline('Cell #',  '',       L + CW * 0.33, phW,          y);
+    fline('Fax #',   '',       L + CW * 0.66, CW * 0.34-2, y);
+    y += 5;
+
+    hline(y, 0.5); y += 4;
+
+    // ═══════════════════════════════════════════════════════════════════
+    // PART B: Consent
+    // ═══════════════════════════════════════════════════════════════════
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(0);
+    pdf.text('PART B: Consent for Disclosure of Information to Above-Named Third-Party', L, y);
+    y += 4.5;
+
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5);
+    var preamble1 = pdf.splitTextToSize(
+      'The above-noted customer hereby consents to the disclosure by Hydro One Networks Inc. the following account related information to the Third-Party named above.',
+      CW);
+    pdf.text(preamble1, L, y); y += preamble1.length * lh + 1.5;
+    pdf.text('The relevant account-related information that can be disclosed is as follows:', L, y);
+    y += 5;
+
+    y = chkRow(L + 2, y, chkUsage,
+      'Electricity Usage',
+      'Your electricity usage data for up to the last 24 months (if applicable) includes a historical and ongoing meter readings and dates, interval data, and energy charges.');
+    y = chkRow(L + 2, y, chkAcct,
+      'Account Information',
+      'Your account information comprises personal details (like your name and contact information) as well as your service address, account number, meter number, and customer rate class.');
+    y = chkRow(L + 2, y, chkBilling,
+      'Billing Information',
+      'Your billing information for up to the last 24 months (if applicable) includes billing period details, current and last read dates, number of days in each billing period, current charges for each bill period excluding payment information (i.e. past due balance, due dates).');
+    // Other
+    chkBox(L + 2, y, chkOther);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5); pdf.setTextColor(0);
+    pdf.text('Other (please specify): ' + (chkOther && otherText ? otherText : ''), L + 7.5, y);
+    uline(L + 49, W - R, y + 0.8);
+    y += 5;
+
+    var durLines = pdf.splitTextToSize(
+      'The above consent remains in effect from the date of authorization to the date that written termination of the consent is received by Hydro One Networks Inc., or the account is no longer in the account holder\'s name, whichever happens first.',
+      CW);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5);
+    pdf.text(durLines, L, y); y += durLines.length * lh + 3;
+
+    // Date
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5);
+    pdf.text('Date: ' + dateDisp, L, y);
+    uline(L + 10, L + 70, y + 0.8);
+    y += 6;
+
+    // Part B Name (Print) row
+    pdf.text('Name (Print):',     L,          y);
+    uline(L + 24, L + CW/2 - 4,  y + 0.8);
+    pdf.text('Name (Print):',     L + CW/2 + 4, y);
+    uline(L + CW/2 + 28, W - R,  y + 0.8);
+    y += 5;
+
+    // Part B Signature blocks
+    var halfW = CW / 2 - 3;
+    var newY1 = sigBlock(L,              halfW, y, custName, sigData, 'Customer');
+    var newY2 = sigBlock(L + CW/2 + 4,  halfW, y, '',       '',      'Hydro One Networks Inc.');
+    y = Math.max(newY1, newY2) + 2;
+
+    // Note box
+    pdf.setDrawColor(0); pdf.setLineWidth(0.3); pdf.setFillColor(245,245,245);
+    var noteText = 'Note:  For Hydro One accounts where two parties are responsible, both account holders must sign the above consent before account information will be disclosed.';
+    var noteLines = pdf.splitTextToSize(noteText, CW - 6);
+    var noteH = noteLines.length * lh + 5;
+    pdf.rect(L, y, CW, noteH, 'FD');
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(0);
+    pdf.text(noteLines, L + 3, y + 4);
+    y += noteH + 3;
+
+    hline(y, 0.5); y += 4;
+
+    // ═══════════════════════════════════════════════════════════════════
+    // PART C: Termination (blank — for future use)
+    // ═══════════════════════════════════════════════════════════════════
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(0);
+    pdf.text('PART C: Termination of Consent for Disclosure of Information to Above-Named Third-Party', L, y);
+    y += 4.5;
+
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5);
+    var termLines = pdf.splitTextToSize(
+      'The above-noted customer terminates consent to the disclosure of account-related information to the Third-Party above-named effective as of the date signed below.',
+      CW);
+    pdf.text(termLines, L, y); y += termLines.length * lh + 4;
+
+    // Part C date + names
+    pdf.text('Date:',         L,            y); uline(L + 10, L + CW/2 - 4, y + 0.8);
+    pdf.text('Date:',         L + CW/2 + 4, y); uline(L + CW/2 + 14, W - R, y + 0.8);
+    y += 5;
+    pdf.text('Name (Print):', L,            y); uline(L + 24, L + CW/2 - 4, y + 0.8);
+    pdf.text('Name (Print):', L + CW/2 + 4, y); uline(L + CW/2 + 28, W - R, y + 0.8);
+    y += 5;
+    pdf.text('Signature:',    L,            y); uline(L + 18, L + CW/2 - 4, y + 0.8);
+    pdf.text('Signature:',    L + CW/2 + 4, y); uline(L + CW/2 + 22, W - R, y + 0.8);
+    y += 10;
+    pdf.text('Name (Print):', L,            y); uline(L + 24, L + CW/2 - 4, y + 0.8);
+    pdf.text('Hydro',         L + CW/2 + 4, y);
+    pdf.text('Name (Print):', L + CW/2 + 20, y); uline(L + CW/2 + 44, W - R, y + 0.8);
+    y += 5;
+    pdf.text('Signature:',    L,            y); uline(L + 18, L + CW/2 - 4, y + 0.8);
+    pdf.text('One',           L + CW/2 + 4, y);
+    pdf.text('Signature:',    L + CW/2 + 20, y); uline(L + CW/2 + 38, W - R, y + 0.8);
+
+    // Rotated Hydro One watermark (left margin, like the original)
+    pdf.setFontSize(7); pdf.setTextColor(100);
+    pdf.setFont('helvetica','normal');
+    pdf.text('Hydro One Networks Inc.  04/12', 5, 260, { angle: 90 });
+    pdf.setTextColor(0);
+
+    // Output
+    var filename = 'HydroOne_Consent_' + (custName || 'Tenant').replace(/\s+/g, '_') + '.pdf';
+    pdf.save(filename);
+    if (typeof showToast === 'function') showToast('✓ PDF generated');
+  }
+
   window.openTenantCard = openTenantCard;
   window.closeTenantCard = _ticClose;
+  window._ticOpenHydroOneConsentModal  = _ticOpenHydroOneConsentModal;
+  window._ticGenerateHydroOneConsentPdf = _ticGenerateHydroOneConsentPdf;
 })();
