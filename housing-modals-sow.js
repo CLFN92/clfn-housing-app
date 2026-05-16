@@ -1556,8 +1556,31 @@ function printSOW(){
         +'</div>'
       : '')
 
-    /* Terms & Conditions */
-    +'<div class="section">'      +'<div class="section-title">Terms &amp; Conditions</div>'      +'<div class="section-body" style="font-size:9.5px;color:var(--text);line-height:1.65;">'        +'<p style="font-size:8.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:10px;">'+_natDisp+' &mdash; Housing Department</p>'        +'<div class="print-mb"><strong>1. Prioritization of Requests.</strong> Renovation requests are assessed and prioritized based on urgency of need, health and safety risk to occupants, and overall unit condition. Immediate hazards &mdash; structural, electrical, plumbing, or fire safety &mdash; take priority over general maintenance and cosmetic work.</div>'        +'<div class="print-mb"><strong>2. Funding Eligibility &amp; Unit Qualifying Criteria.</strong> Approval is subject to available funding and the qualifying criteria of the unit under its applicable program (e.g. ISC, CMHC Sec. 95, CMHC Sec. 56.1, or Band-funded). Funding availability may affect the scope, cost ceiling, or timing of approved work.</div>'        +'<div class="print-mb"><strong>3. Budget Authority &amp; Approval Routing.</strong> Requests within the Housing Manager&rsquo;s approved budget authority may be approved by the HM. Requests exceeding that threshold require Executive Director approval before work commences. No work begins until all approvals are documented.</div>'        +'<div class="print-mb"><strong>4. Tenant Responsibilities.</strong> The tenant must provide timely access to the unit for inspection and work. Damage, negligence, or vandalism attributed to the tenant may reduce priority and may result in financial responsibility for a portion of repair costs.</div>'        +'<div class="print-mb"><strong>5. No Guarantee of Approval or Timeline.</strong> Submission does not guarantee approval or a specific completion date. Decisions will be communicated in writing. Priority and scheduling may change based on available resources and emerging urgent community needs.</div>'        +'<div><strong>6. Accuracy of Information.</strong> All information must be accurate and complete. False or misleading information may result in the request being cancelled, delayed, or referred for further review.</div>'      +'</div>'    +'</div>'
+    /* Terms & Conditions — rendered from Settings → Terms & Conditions (ED-editable) */
+    +(function(){
+      var _tp = (typeof _termsParseHtml === 'function' && typeof getTermsBody === 'function')
+              ? _termsParseHtml(getTermsBody('sow_reno_request'))
+              : { introHtml: '', itemsHtml: [] };
+      var introHtml = _tp.introHtml
+        ? '<p style="margin:0 0 8px;">' + _tp.introHtml + '</p>'
+        : '';
+      var liHtml = _tp.itemsHtml.length
+        ? _tp.itemsHtml.map(function(h){ return '<li>' + h + '</li>'; }).join('')
+        : ('<li><strong>Prioritization of Requests.</strong> Renovation requests are assessed and prioritized based on urgency of need, health and safety risk to occupants, and overall unit condition.</li>'
+          +'<li><strong>Funding Eligibility.</strong> Approval is subject to available funding and the qualifying criteria of the unit under its applicable program.</li>'
+          +'<li><strong>Budget Authority.</strong> Requests within the HM\'s budget authority may be approved by the HM. Requests exceeding that threshold require Executive Director approval before work commences.</li>'
+          +'<li><strong>Tenant Responsibilities.</strong> The tenant must provide timely access to the unit for inspection and work.</li>'
+          +'<li><strong>No Guarantee of Approval or Timeline.</strong> Submission does not guarantee approval or a specific completion date.</li>'
+          +'<li><strong>Accuracy of Information.</strong> All information must be accurate and complete.</li>');
+      return '<div class="section">'
+           + '<div class="section-title">Terms &amp; Conditions</div>'
+           + '<div class="section-body" style="font-size:9.5px;color:var(--text);line-height:1.65;">'
+           + '<p style="font-size:8.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:10px;">' + _natDisp + ' &mdash; Housing Department</p>'
+           + introHtml
+           + '<ol style="margin:0;padding-left:16px;">' + liHtml + '</ol>'
+           + '</div>'
+           + '</div>';
+    })()
     /* Acknowledgement & Signatures */
     +'<div class="section">'
       +'<div class="section-title">Signatures &amp; Acknowledgement</div>'

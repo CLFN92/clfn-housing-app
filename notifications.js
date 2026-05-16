@@ -1120,6 +1120,24 @@ async function _generateSowPdfBase64() {
     gap();
   }
 
+  // Terms & Conditions — Renovation Request
+  var _sowTP = _termsParseHtml(typeof getTermsBody === 'function' ? getTermsBody('sow_reno_request') : '');
+  if (_sowTP.items.length) {
+    sectionHeader('Terms & Conditions — Renovation Request');
+    if (_sowTP.intro) { paragraph(_sowTP.intro); gap(1); }
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(40);
+    _sowTP.items.forEach(function(t, i) {
+      var lines = pdf.splitTextToSize((i + 1) + '. ' + t, contentW - 4);
+      needSpace(lines.length * 4 + 1.5);
+      pdf.text(lines, marginL + 3, ctx.y + 3);
+      ctx.y += lines.length * 4 + 1.5;
+    });
+    pdf.setTextColor(0);
+    gap();
+  }
+
   // Signatures
   sectionHeader('Signatures');
   var tenantSig    = getSig('sow_sig_canvas_tenant');
@@ -2294,6 +2312,26 @@ var TERMS_DOCS_REGISTRY = [
                + '<li><strong>Workplace Safety and Insurance.</strong> The contractor assumes full responsibility for workplace safety and must maintain current WSIB clearance and general liability insurance throughout the project. Certificates must be provided to CLFN Housing upon request.</li>'
                + '<li><strong>Deficiencies.</strong> The contractor is responsible for correcting any deficiencies identified during inspection at no additional cost to CLFN.</li>'
                + '<li><strong>Compliance.</strong> The contractor must comply with all applicable federal, provincial, and First Nations regulations, as well as CLFN community by-laws, while on-reserve.</li>'
+               + '</ol>'
+  },
+  {
+    key:         'sow_reno_request',
+    label:       'Scope of Work — Renovation Request Terms',
+    description: 'Printed on the Terms & Conditions section of the Scope of Work document sent to tenants.',
+    defaultBody: '<p>By submitting this renovation request, I acknowledge and agree to the following:</p>'
+               + '<ol>'
+               + '<li><strong>Prioritization of Requests.</strong> Renovation requests are assessed and prioritized based on urgency of need, health and safety risk to occupants, and overall unit condition. Immediate hazards — structural, electrical, plumbing, fire safety, or matters affecting habitability — take priority over general maintenance and cosmetic work.</li>'
+               + '<li><strong>Funding Eligibility and Unit Qualifying Criteria.</strong> Approval is subject to available funding and the qualifying criteria of the unit under its applicable program (e.g. ISC, CMHC Section 95, or Band-funded). Funding availability and program restrictions may affect the scope, cost ceiling, materials, or timing of approved work.</li>'
+               + '<li><strong>Budget Authority and Approval Routing.</strong> Requests within the Housing Manager\'s approved budget authority may be approved by the Housing Manager. Requests exceeding that threshold require Executive Director approval, and requests beyond the Executive Director\'s authority require Chief and Council approval by Band Council Resolution before work commences. No work begins until all required approvals are documented in writing.</li>'
+               + '<li><strong>Tenant Responsibilities.</strong> The tenant must provide timely and reasonable access to the unit for inspection, assessment, and the performance of work, in accordance with the CLFN Housing Policy. Failure to permit reasonable access may result in the request being delayed, deprioritized, or closed.</li>'
+               + '<li><strong>Tenant Neglect and Cost Recovery.</strong> Damage or unsafe conditions arising from willful damage, misuse, failure to report issues in a timely manner, or tenant neglect may reduce the priority of the request and may result in the tenant being financially responsible for all or part of the repair cost. Outstanding charges may be recovered through the Band payment recovery provisions of the CLFN Housing Policy, including from rent, per capita distributions, honoraria, or other monetary payments administered by the Band.</li>'
+               + '<li><strong>Good Standing.</strong> Non-emergency renovation work may be conditional on the tenant being in good standing with CLFN, or actively working toward good standing through a written payment arrangement approved by the Housing Department. Emergency health and safety work will not be withheld on the basis of arrears.</li>'
+               + '<li><strong>No Guarantee of Approval or Timeline.</strong> Submission of a request does not guarantee approval or a specific completion date. Decisions will be communicated in writing. Priority and scheduling may be adjusted based on available resources, weather, contractor availability, and emerging urgent community needs.</li>'
+               + '<li><strong>Scope of Work and Change Orders.</strong> Approved work will be performed in accordance with the documented scope of work. Any additions, deletions, or substantive changes require a written change order approved through the same approval routing as the original request before that work is undertaken.</li>'
+               + '<li><strong>Procurement and Contractors.</strong> All contractors performing work must meet CLFN procurement, insurance, and WSIB requirements. Tenants may not engage contractors directly on behalf of CLFN, and unauthorized work will not be reimbursed.</li>'
+               + '<li><strong>Accuracy of Information.</strong> All information provided in this request must be accurate and complete. False or misleading information may result in the request being cancelled, delayed, or referred for further review.</li>'
+               + '<li><strong>Privacy and Consent.</strong> I consent to CLFN collecting, using, and retaining information related to this request — including photographs, inspection notes, and contractor records — for the purpose of assessing, performing, and documenting the work, in accordance with PIPEDA and OCAP® principles.</li>'
+               + '<li><strong>Compliance with Policy.</strong> I agree that all renovation work and related obligations are governed by the CLFN Housing Policy, my Housing Agreement or lease, and applicable community by-laws.</li>'
                + '</ol>'
   }
 ];
