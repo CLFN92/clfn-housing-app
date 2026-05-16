@@ -2229,10 +2229,40 @@
     pdf.text('Hydro One Networks Inc.  04/12', 6, 262, { angle: 90 });
     pdf.setTextColor(0);
 
-    // Output
+    // ── Output ────────────────────────────────────────────────────────────────
     var filename = 'HydroOne_Consent_' + (custName || 'Tenant').replace(/\s+/g, '_') + '.pdf';
+
+    // Download to browser
     pdf.save(filename);
-    if (typeof showToast === 'function') showToast('✓ PDF generated');
+
+    // Save to tenant document library
+    var unit = _ticState.unit || {};
+    if (unit.id) {
+      try {
+        var blob      = pdf.output('blob');
+        var storePath = 'tenants/' + unit.id + '/' + Date.now() + '_' + filename;
+        await window.sbUploadFile(storePath, blob);
+        if (typeof window.sbSaveFileMeta === 'function') {
+          await window.sbSaveFileMeta('tenant', String(unit.id), storePath, filename, blob.size, 'application/pdf');
+        }
+        // Force doc-lib remount so the new file appears immediately
+        _ticDocLibKey = null;
+        _ticDocLib    = null;
+        // Close the modal now that the PDF is done
+        var mo = document.getElementById('tic_hydroone_modal');
+        if (mo) mo.remove();
+        if (typeof showToast === 'function') showToast('✓ PDF saved to document library');
+      } catch (e) {
+        console.warn('[tic] PDF upload to doc library failed:', e);
+        var mo2 = document.getElementById('tic_hydroone_modal');
+        if (mo2) mo2.remove();
+        if (typeof showToast === 'function') showToast('✓ PDF downloaded (document library save failed — see console)');
+      }
+    } else {
+      var mo3 = document.getElementById('tic_hydroone_modal');
+      if (mo3) mo3.remove();
+      if (typeof showToast === 'function') showToast('✓ PDF generated');
+    }
   }
 
   window.openTenantCard = openTenantCard;
