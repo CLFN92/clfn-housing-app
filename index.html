@@ -11,22 +11,6 @@
 <script src="shared-auth.js"></script>
 <script src="auth-login.js"></script>
 
-<!-- EmailJS SDK -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/emailjs-com/3.2.0/email.min.js"></script>
-<script>
-  document.addEventListener('DOMContentLoaded', function(){
-    if(window.emailjs) {
-      try {
-        emailjs.init('3ntLombYmwN6HHQXb');
-        console.log('[CLFN] EmailJS initialised on index.html');
-      } catch(e) {
-        console.error('[CLFN] EmailJS init failed:', e);
-      }
-    } else {
-      console.warn('[CLFN] EmailJS SDK failed to load on index.html');
-    }
-  });
-</script>
 </head>
 <body>
 

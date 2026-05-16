@@ -1724,7 +1724,10 @@ function finalSubmit(){
   // now a submitted record and the canvases shouldn't be alterable.
   if (typeof _lockApplicantSignatures === 'function') _lockApplicantSignatures();
   auditEntry(id, 'signatures_locked', 'Applicant / Co-Applicant / Staff signature panels locked on submission', window.currentRole||'staff');
-  sendWorkflowEmail('submit', submittedApp);
+  // Microsoft Graph notification pipeline — emails every active Housing
+  // Manager resolved from the staff table. Fire-and-forget; UI never
+  // blocks on delivery.
+  if(typeof notifyApplicationSubmitted === 'function') notifyApplicationSubmitted(submittedApp);
   showSubmissionConfirmation(id, isFileUpdate);
 }
 

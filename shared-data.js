@@ -1687,31 +1687,48 @@ function _rsm(model, id) {
   var r = model.find(function(x){ return x.id === id; });
   return r ? (r.pts||0) : 0;
 }
-function _sendCtWorkflowEmail(event, ct) {
-  if(!window.emailjs) return;
-  var contacts = getContactSettings();
-  var hmName  = contacts.hm_name  || CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER);
-  var hmEmail = contacts.hm_email || '';
-  var edName  = contacts.ed_name  || CLFN_PERMS.roleLabel(ROLE.ED);
-  var edEmail = contacts.ed_email || '';
+// Contractor workflow notifications are not yet wired to the new
+// notifications.js pipeline. When they are, replace the call site at
+// the contractor approval action handler with notifyContractor<Event>().
 
-  var _appName = (window.NATION_CONFIG && NATION_CONFIG.short || '') + ' Housing';
-  var _hmLbl = CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER);
-  var _edLbl = CLFN_PERMS.roleLabel(ROLE.ED);
-  var configs = {
-    hm_recommended: { to_name: edName,  to_email: edEmail,  subject: _appName + ' — Contractor Application Recommended: '+ct.name, message: 'The ' + _hmLbl + ' has reviewed and recommended the contractor application for '+ct.name+' ('+ct.trade+'). Your final approval is required.' },
-    approved:       { to_name: hmName,  to_email: hmEmail,  subject: _appName + ' — Contractor Approved: '+ct.name,                 message: 'The ' + _edLbl + ' has granted final approval for '+ct.name+'. They are now listed as an approved contractor.' },
-    declined:       { to_name: hmName,  to_email: hmEmail,  subject: _appName + ' — Contractor Application Declined: '+ct.name,      message: 'The application for '+ct.name+' has been declined.'+(ct.declinedReason?' Reason: '+ct.declinedReason:'') },
-    returned:       { to_name: hmName,  to_email: hmEmail,  subject: _appName + ' — Contractor Application Returned: '+ct.name,      message: 'The application for '+ct.name+' has been returned for more information.'+(ct.returnedNotes?' Notes: '+ct.returnedNotes:'') }
-  };
-  var cfg = configs[event];
-  if(!cfg || !cfg.to_email) return;
-  emailjs.send('service_35sybq2','template_d0wynda',{
-    to_name:cfg.to_name, to_email:cfg.to_email, from_name: _appName + ' App',
-    subject:cfg.subject, message:cfg.message,
-    app_name:ct.name, app_id:ct.id||'—', app_score:'—', app_tier:'—', notes:'', action_url:window.location.href
-  }).then(function(){console.log('CT email sent:',event);}).catch(function(e){console.error(e);});
-}
+// ════════════════════════════════════════════════════════════════════════
+// window.sendNotification — generic Edge Function wrapper
+// ────────────────────────────────────────────────────────────────────────
+// Posts to the deployed `send-notification` Edge Function (Microsoft Graph
+// pipeline) using the caller's Supabase JWT. Throws on HTTP/network
+// errors so callers can attach a .catch() for logging — most callers
+// should fire-and-forget.
+//
+// Per-event composition + recipient resolution lives in notifications.js.
+// ════════════════════════════════════════════════════════════════════════
+window.sendNotification = async function(opts) {
+  if(!opts || !opts.to || !opts.subject || (!opts.message && !opts.html && !opts.bodyHtml)) {
+    throw new Error('sendNotification: requires to + subject + (message|html|bodyHtml)');
+  }
+  var session = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION : null;
+  var token   = session && session.accessToken;
+  if(!token) throw new Error('sendNotification: no access token (not signed in)');
+  var url = SUPABASE_URL + '/functions/v1/send-notification';
+  var r = await fetch(url, {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': 'Bearer ' + token
+    },
+    body: JSON.stringify(opts)
+  });
+  var data;
+  try { data = await r.json(); } catch(_) { data = {}; }
+  if(!r.ok) {
+    var msg = data.error || 'Unknown error';
+    if(data.detail)  msg += ' — detail: ' + (typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail));
+    if(data.missing) msg += ' — missing: ' + JSON.stringify(data.missing);
+    if(data.status)  msg += ' — graph status: ' + data.status;
+    throw new Error('sendNotification ' + r.status + ': ' + msg);
+  }
+  return data;
+};
+
 function _updateRbaAllocSummary(totalCost, eligiblePools, budgetData) {
   var totalAlloc = 0;
   document.querySelectorAll('#rba_alloc_rows input[type="number"]').forEach(function(inp){
@@ -1913,8 +1930,10 @@ function confirmCtAction() {
     saveContractorWithDraftFallback(ct);
   }
 
-  // Workflow email
-  _sendCtWorkflowEmail(action, ct);
+  // TODO (notifications.js): wire contractor-workflow events
+  // (hm_recommended / approved / declined / returned) into the new
+  // pipeline. Add an entry per event to EMAIL_EVENT_REGISTRY and a
+  // notifyContractor<Event>() helper, then call it here.
 
   var toastLabels = {hm_recommended:'Recommended to ED',approved:'Contractor approved',declined:'Application declined',returned:'Returned for more info'};
   showToast(toastLabels[action]||action);
@@ -2153,50 +2172,13 @@ async function _sbEditStaffModal(id) {
   document.getElementById('editStaffSave').addEventListener('click', function(){ saveStaffEdit(id, u, modal); });
 }
 function emailContractorAgreement() {
-  var ct = window._ctLastSaved || _readContractorFormData();
-  if(!ct.email) { showToast('No email address on file for this contractor'); return; }
-  if(!window.emailjs) { showToast('EmailJS not available — will be configured at launch'); return; }
-
-  var today = new Date().toLocaleDateString('en-CA');
-  var classLabels = {
-    internal_indigenous:     'Internal — Indigenous',
-    external_indigenous:     'External — Indigenous',
-    external_non_indigenous: 'External — Non-Indigenous'
-  };
-
-  var _appName = (window.NATION_CONFIG && NATION_CONFIG.short || '') + ' Housing';
-  var params = {
-    to_name:    ct.name,
-    to_email:   ct.email,
-    from_name:  _appName + ' Department',
-    subject:    _appName + ' — Contractor Agreement Confirmation: ' + ct.name,
-    message:    'Please find below a summary of your contractor registration with ' + _appName + ', completed on ' + today + '. Contractor: ' + ct.name + '. Trade: ' + (ct.trade||'--') + '. Classification: ' + (classLabels[ct.classification]||'--') + '. WSIB: ' + (ct.wsibNum||'--') + ' (Expiry: ' + (ct.wsibExpiry||'--') + '). Insurance: ' + (ct.insProvider||'--') + ' ' + (ct.insAmount||'--') + ' (Expiry: ' + (ct.insExpiry||'--') + '). Terms of Reference: ' + (ct.torAgreed ? 'Agreed on ' + (ct.torAgreedAt||today) : 'Not yet agreed') + '. A signed copy has been retained on file by ' + _appName + '.',
-    app_name:   ct.name,
-    app_id:     ct.id || '—',
-    app_score:  '—',
-    app_tier:   '—',
-    notes:      '',
-    action_url: window.location.href
-  };
-
-  showToast('Sending agreement to ' + ct.email + '…');
-  emailjs.send('service_35sybq2', 'template_d0wynda', params)
-    .then(function(){
-      showToast('✓ Agreement emailed to ' + ct.email);
-      // Mark as emailed in the contractor record
-      try {
-        var contractors = (window._contractors || []).slice();
-        var idx = contractors.findIndex(function(c){ return c.id === ct.id; });
-        if(idx >= 0) {
-          contractors[idx].agreementEmailedAt = new Date().toISOString().split('T')[0];
-          window._contractors = contractors;
-          saveContractorWithDraftFallback(contractors[idx]).then(function(ok){
-            if(!ok) showToast('Agreement-emailed timestamp saved locally — will sync when network is available.', { type:'info', duration:3500 });
-          });
-        }
-      } catch(e) {}
-    })
-    .catch(function(err){ showToast('Email failed — check EmailJS config'); console.error(err); });
+  // Stub — the contractor-agreement send was on the legacy EmailJS path.
+  // Re-implement against window.sendNotification when the contractor
+  // notification surface is wired into notifications.js (Phase 3+).
+  // Two buttons in contractors.html still bind to this onclick, so
+  // keeping it callable (with a clear "not wired yet" toast) avoids
+  // ReferenceErrors on click.
+  showToast('Email agreement is being re-wired — coming soon.');
 }
 function exportContractors(format) {
   var contractors = window._contractors || [];

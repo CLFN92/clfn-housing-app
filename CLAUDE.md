@@ -78,14 +78,12 @@ Canonical roles (see `shared-config.js` `ROLE` and the role matrix in `PLAN.md` 
 - `tenants` is a platform-level table shared by housing + finance, trigger-synced from `housing_units.assigned_name`. Backfill ran at the F2 migration. Don't insert tenant rows by hand for production data — change `housing_units.assigned_name` and the trigger handles it.
 - The current `tenants` schema is slim: housing-specific fields (unit type, rent amount, hydro/gas accounts, autoPay, …) aren't there yet and default to empty/false on load. Phase C will reconcile.
 
-### Email notifications (in progress)
-- Outbound transactional email goes through a Supabase Edge Function at `supabase/functions/send-notification/index.ts` (deployed; source committed). The function verifies the caller's JWT, sends via Resend, and writes an audit row via service_role.
-- **Current state:** function works end-to-end, but Resend's `from` address is the sandbox `onboarding@resend.dev` because no sending domain is verified yet. Until that's resolved, Resend will only deliver to the account-holder's email.
-- **Two unlocking paths in flight:**
-  1. **Microsoft Graph (preferred)** — Entra app `CLFN Housing App — Notifications` is registered; `Mail.Send` (Application) permission is added but admin consent is **blocked** pending a Global Admin click. Once consented, the Edge Function gets rewritten to call Graph instead of Resend (no DNS work needed; sent items appear in the `housing@clfn.on.ca` shared mailbox).
-  2. **Resend DNS** — IT adds SPF/DKIM/DMARC for clfn.on.ca → verify in Resend → switch FROM address in the function.
-- The legacy EmailJS `<script>` tags in HTML files (`index.html`, `housing.html`, `contractors.html`, etc.) plus `emailjs.init()` calls are **placeholder-only** (no real service/template IDs). They will be removed once the new pipeline is fully wired. **Don't write new code against EmailJS.**
-- Client helpers `_sendWorkflowEmail` (housing-init.js) and `_sendCtWorkflowEmail` (shared-data.js) still reference EmailJS and silent-fail today. They'll be refactored to call a `window.sendNotification(opts)` helper that hits the Edge Function.
+### Email notifications
+- Outbound transactional email goes through a Supabase Edge Function at `supabase/functions/send-notification/index.ts`. The function verifies the caller's JWT, sends via **Microsoft Graph** (`/users/{from}/sendMail`) using OAuth2 client_credentials against the Entra app `CLFN Housing App — Notifications`, and writes an audit row via service_role. FROM is the `housing@clfn.on.ca` shared mailbox; sent items appear in its Sent folder. The Application Access Policy locks the app to that mailbox only.
+- Required Edge Function secrets: `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET`, `GRAPH_FROM_USER`. The Graph token is cached in-memory per Edge Function instance.
+- **Client API** is `window.sendNotification(opts)` in `shared-data.js` — generic Edge Function wrapper. Per-event composition + recipient resolution lives in `notifications.js` (`EMAIL_EVENT_REGISTRY`, `_renderEmailTemplate`, `notifyApplication<Event>` helpers). Add a new workflow notification = add a registry entry + a `notify…()` helper + call it from the firing point. The Settings → Notifications tab (Phase 2) will auto-render the registry for editing.
+- Wired events today: `application_submitted`, `file_update_submitted` (both fire from `finalSubmit()` in housing-app.js, both target active `housing_manager` rows in the `staff` table). Pending wiring: `mgr_approved`, `hm_approved`, `ed_approved`, `declined`, `returned`, contractor workflow events. TODO comments mark the firing points in housing-modals.js (application actions) and shared-data.js (contractor actions).
+- **EmailJS is gone.** The legacy `<script>` tags, `emailjs.init()` calls, `sendWorkflowEmail`, `sendTestEmail`, and `_sendCtWorkflowEmail` were removed. `emailContractorAgreement` is a stub that toasts "coming soon" until wired into the new pipeline.
 
 ## Conventions
 
