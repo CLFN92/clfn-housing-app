@@ -929,31 +929,6 @@ function updateV2ScoreModel(el) {
     showToast('Score updated \u2014 rescore all to apply');
   }, 800);
 }
-
-
-
-
-function openAddCriteriaModal() {
-  var modal = document.getElementById('addCriteriaModal');
-  if(!modal){ showToast('Refresh the page and try again'); return; }
-  modal.style.removeProperty('display');
-  modal.style.setProperty('display', 'flex', 'important');
-  modal.style.setProperty('position', 'fixed', 'important');
-  modal.style.setProperty('z-index', '9000', 'important');
-  // Reset all fields
-  var set = function(id,v){ var el=document.getElementById(id); if(el) el.value=v||''; };
-  set('acm_cat','reserve_status'); set('acm_label',''); set('acm_pts','0');
-}
-
-function closeAddCriteriaModal() {
-  var modal = document.getElementById('addCriteriaModal');
-  if(modal){
-    modal.style.removeProperty('display');
-    modal.style.removeProperty('position');
-    modal.style.removeProperty('z-index');
-    modal.style.setProperty('display', 'none', 'important');
-  }
-}
 function setPts(elId,score){
   const el=document.getElementById(elId);if(!el)return;
   const abs=Math.abs(score);

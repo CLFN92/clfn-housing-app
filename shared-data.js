@@ -1768,24 +1768,6 @@ function _updateRbaAllocSummary(totalCost, eligiblePools, budgetData) {
     statusBadge.textContent='Pending Approval'; statusBadge.style.background='var(--bg)'; statusBadge.style.color='var(--muted)';
   }
 }
-function addScoringCriteria(){
-  var cat  = (document.getElementById('ac_category')||{}).value||'Custom';
-  var lbl  = (document.getElementById('ac_label')||{}).value||'';
-  var cond = (document.getElementById('ac_condition')||{}).value||'';
-  var pts  = parseInt((document.getElementById('ac_points')||{}).value)||0;
-  if(!lbl){ showToast('Label is required'); return; }
-  var newRow = {
-    id: 'custom_'+Date.now(), category: cat, label: lbl,
-    condition_key: cond, min_value: null, max_value: null,
-    points: pts, sortOrder: 9999
-  };
-  liveScoreModel.push(newRow);
-  saveScoringModel();
-  renderScoringModelTable();
-  closeAddCriteriaModal();
-  rescoreAllApplications();
-  showToast('Criteria added');
-}
 function addSowItem(data){
   var cont=document.getElementById('sow_items');if(!cont)return;
   var idx=_sowItemIdx++;

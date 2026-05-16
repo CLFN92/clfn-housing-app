@@ -1431,9 +1431,6 @@ function openAddUnitModal(){
   if(modal){ modal.style.removeProperty('display'); modal.style.setProperty('display','flex','important'); }
 }
 
-// ── addScoringCriteria ──
-
-
 // ── renderBudgetPools ──
 var BUDGET_POOLS = [
   { id:'emergency', label:'Emergency Repairs',  icon:'🚨', color:'#b91c1c', bg:'#fef2f2' },
