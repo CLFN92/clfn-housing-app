@@ -3673,7 +3673,8 @@ function renderWorklist() {
     ed_approved:  {label:'ED Approved',             c:'#15803d', bg:'#f0fdf4'},
     returned:     {label:'Returned — Action Needed',c:'#b91c1c', bg:'#fef2f2'},
     declined:     {label:'Declined',                c:'#b91c1c', bg:'#fef2f2'},
-    assigned:     {label:'Assigned',                c:'#15803d', bg:'#f0fdf4'}
+    assigned:     {label:'Assigned',                c:'#15803d', bg:'#f0fdf4'},
+    archived:     {label:'Archived',                c:'#888',    bg:'#f4f4f0'}
   };
 
   // ── Subtitle ──────────────────────────────────────────────────────────────
@@ -3685,12 +3686,21 @@ function renderWorklist() {
   if(sub) sub.textContent = subtitles[role] || '';
 
   // ── Filter apps ───────────────────────────────────────────────────────────
-  // Worklist is locked to the role-scoped "my queue" — the same predicate the
-  // landing-page count pill uses, so the section title, count, and rendered
-  // rows are always in agreement. Status / reserve narrowing now lives in the
-  // column-menu filters.
-  var _myEmail = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION.email : '';
-  var filtered = apps.filter(function(a){ return isInWorkQueue(a, role, _myEmail); });
+  // Source set is intentionally broader than the action queue — it
+  // includes every status (incl. Declined, Archived) so the Status
+  // column-menu filter has a complete dropdown to work with. The user
+  // can tick specific statuses to narrow. Management roles see every
+  // application; non-management sees only apps they own. Archived
+  // items stay in the set so they can be found via the Status filter.
+  // The landing-page count pill keeps using isInWorkQueue for the
+  // "items awaiting your action" count.
+  var _myEmail = ((typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION.email : '').toLowerCase();
+  var filtered = apps.filter(function(a){
+    if (!a) return false;
+    if (ROLE.isManagement(role)) return true;
+    var owner = (a.created_by_email || '').toLowerCase();
+    return owner === _myEmail;
+  });
 
   if(!window._wlSearch) window._wlSearch = '';
   var search = (window._wlSearch||'').toLowerCase().trim();
@@ -3724,7 +3734,12 @@ function renderWorklist() {
     id:        { label: 'ID',              accessor: function(a){ return a.id || ''; } },
     addr:      { label: 'Current Address', accessor: function(a){ return a.street || ''; } },
     date:      { label: 'Date',            accessor: function(a){ return a.appDate || ''; } },
-    status:    { label: 'Status',          accessor: function(a){ var sm = SM[a.status]; return sm ? sm.label : (a.status || ''); } }
+    status:    { label: 'Status',          accessor: function(a){
+                                              // Archived overrides the underlying status so it appears
+                                              // as its own value in the column-menu filter dropdown.
+                                              if (a.archived) return SM.archived.label;
+                                              var sm = SM[a.status]; return sm ? sm.label : (a.status || '');
+                                            } }
   };
   if (showScore) {
     _wlColumns.score = { label: 'Score', accessor: function(a){ return (typeof a.score === 'number') ? a.score : 0; } };
@@ -3749,7 +3764,9 @@ function renderWorklist() {
     : filtered;
 
   var rows = sorted.map(function(a){
-    var sm = SM[a.status] || {label:a.status, c:'#888', bg:'#f4f4f0'};
+    // Archived takes priority so the row's pill matches what the
+    // column-menu Status filter reports for that row.
+    var sm = (a.archived ? SM.archived : SM[a.status]) || {label:a.status, c:'#888', bg:'#f4f4f0'};
     var name = ((a.fn||'')+' '+(a.ln||'')).trim()||'—';
     var tier = a.tier||'';
     var tc = tier==='Critical Priority'?'#b91c1c':tier==='High Priority'?'#1d4ed8':tier==='Medium Priority'?'#7a6000':'#888';
@@ -3819,7 +3836,21 @@ function renderWorklist() {
       + '</tr>';
   }).join('');
 
-  var emptyMsg = search ? 'No results for "'+escapeHtml(search)+'"' : 'No applications in this category.';
+  var emptyMsg = search ? 'No results for "'+escapeHtml(search)+'"'
+                        : 'No applications match the current filters. Click a column header to adjust.';
+  // Column count for the empty-state colspan. Keep in sync with the
+  // <th> count below: Applicant, ID, Address, Date, Status, [Score],
+  // Actions = 6 base + 1 if showScore.
+  var colCount = 6 + (showScore ? 1 : 0);
+  // Always render the full table (incl. headers) — when no rows pass
+  // the column filters, the tbody shows a single empty-state row so
+  // the user can still reach the column-menu to relax the filter.
+  var bodyContent = rows
+    ? rows
+    : '<tr><td colspan="' + colCount + '" '
+    +   'style="padding:32px;text-align:center;color:var(--muted);font-size:13px;font-style:italic;">'
+    +   emptyMsg
+    + '</td></tr>';
 
   body.innerHTML =
     // Search bar
@@ -3830,36 +3861,34 @@ function renderWorklist() {
     + '</div>'
     // Table
     + '<div class="std-table-card">'
-    + (sorted.length === 0
-        ? '<div style="padding:32px;text-align:center;color:var(--muted);font-size:13px;">'+emptyMsg+'</div>'
-        : '<div class="doclib-table-wrap"><table class="std-table">'
-          + '<thead id="wl_thead"><tr>'
-          + '<th class="std-th-sortable" data-sort-key="applicant">Applicant'
-          +   '<span class="tip-host">'
-          +     '<button type="button" class="tip-btn" onclick="event.stopPropagation();toggleTip(\'wl_tip_applicant\')">?</button>'
-          +     '<div id="wl_tip_applicant" class="tip-panel">'
-          +       '<div class="tip-panel-title">Applicant column</div>'
-          +       '<div class="tip-panel-body">Click an applicant&#39;s name to open the application. If the applicant is matched to a unit, opens the Tenant Information Card instead.</div>'
-          +       '<button type="button" class="tip-panel-close" onclick="closeTip(\'wl_tip_applicant\')">Close ✕</button>'
-          +     '</div>'
-          +   '</span>'
-          + '</th>'
-          + '<th class="std-th-sortable" data-sort-key="id">ID'
-          +   '<span class="tip-host">'
-          +     '<button type="button" class="tip-btn" onclick="event.stopPropagation();toggleTip(\'wl_tip_id\')">?</button>'
-          +     '<div id="wl_tip_id" class="tip-panel">'
-          +       '<div class="tip-panel-title">ID column</div>'
-          +       '<div class="tip-panel-body">Click an Application ID to open the scoring form.</div>'
-          +       '<button type="button" class="tip-panel-close" onclick="closeTip(\'wl_tip_id\')">Close ✕</button>'
-          +     '</div>'
-          +   '</span>'
-          + '</th>'
-          + '<th class="std-th-sortable col-hide-mobile" data-sort-key="addr">Current Address</th>'
-          + '<th class="std-th-sortable" data-sort-key="date">Date</th>'
-          + '<th class="std-th-sortable" data-sort-key="status">Status</th>'
-          + (showScore ? '<th class="std-th-sortable" data-sort-key="score" style="text-align:center;">Score</th>' : '')
-          + '<th></th>'
-          + '</tr></thead><tbody id="wl_tbody" data-table-page="worklist">'+rows+'</tbody></table></div>')
+    +   '<div class="doclib-table-wrap"><table class="std-table">'
+    +     '<thead id="wl_thead"><tr>'
+    +       '<th class="std-th-sortable" data-sort-key="applicant">Applicant'
+    +         '<span class="tip-host">'
+    +           '<button type="button" class="tip-btn" onclick="event.stopPropagation();toggleTip(\'wl_tip_applicant\')">?</button>'
+    +           '<div id="wl_tip_applicant" class="tip-panel">'
+    +             '<div class="tip-panel-title">Applicant column</div>'
+    +             '<div class="tip-panel-body">Click an applicant&#39;s name to open the application. If the applicant is matched to a unit, opens the Tenant Information Card instead.</div>'
+    +             '<button type="button" class="tip-panel-close" onclick="closeTip(\'wl_tip_applicant\')">Close ✕</button>'
+    +           '</div>'
+    +         '</span>'
+    +       '</th>'
+    +       '<th class="std-th-sortable" data-sort-key="id">ID'
+    +         '<span class="tip-host">'
+    +           '<button type="button" class="tip-btn" onclick="event.stopPropagation();toggleTip(\'wl_tip_id\')">?</button>'
+    +           '<div id="wl_tip_id" class="tip-panel">'
+    +             '<div class="tip-panel-title">ID column</div>'
+    +             '<div class="tip-panel-body">Click an Application ID to open the scoring form.</div>'
+    +             '<button type="button" class="tip-panel-close" onclick="closeTip(\'wl_tip_id\')">Close ✕</button>'
+    +           '</div>'
+    +         '</span>'
+    +       '</th>'
+    +       '<th class="std-th-sortable col-hide-mobile" data-sort-key="addr">Current Address</th>'
+    +       '<th class="std-th-sortable" data-sort-key="date">Date</th>'
+    +       '<th class="std-th-sortable" data-sort-key="status">Status</th>'
+    +       (showScore ? '<th class="std-th-sortable" data-sort-key="score" style="text-align:center;">Score</th>' : '')
+    +       '<th></th>'
+    +     '</tr></thead><tbody id="wl_tbody" data-table-page="worklist">' + bodyContent + '</tbody></table></div>'
     + '</div>';
 
   // Column-menu click + sort indicators (Phase 2B parity)
