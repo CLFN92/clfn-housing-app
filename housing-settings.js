@@ -236,60 +236,11 @@ function showSettingsSection(section) {
 
 
 
-function ctRemovePerson(idx) {
-  var people = ctGetPeople();
-  people.splice(idx, 1);
-  ctRenderPeople(people);
-}
-
-
-
-// ══════════════════════════════════════════════════════════════
-// WORKLIST VIEW
-// Role-aware worklist — employees see their own apps (no score)
-// HM sees action queue, ED sees approval queue
-// ══════════════════════════════════════════════════════════════
 
 
 
 
 
-
-
-
-
-
-
-
-
-function renderWlTable(apps, showScore, showReview) {
-  if(!apps||!apps.length) return wlEmpty('None', '');
-  var sorted = apps.slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
-  var rows = sorted.map(function(a){
-    var name = ((a.fn||'')+' '+(a.ln||'')).trim()||'—';
-    var tier = a.tier||'';
-    var tc = tier==='Critical Priority'?'#b91c1c':tier==='High Priority'?'#1d4ed8':tier==='Medium Priority'?'#7a6000':'#888';
-    return '<tr class="row-divider">'
-      + '<td style="padding:10px 14px;font-weight:600;font-size:13px;">'+name+'</td>'
-      + '<td style="padding:10px 14px;font-size:12px;color:var(--muted);">'+a.id+'</td>'
-      + '<td style="padding:10px 14px;font-size:12px;color:var(--muted);">'+(a.appDate||'—')+'</td>'
-      + (showScore ? '<td style="padding:10px 14px;"><span style="font-size:18px;font-weight:800;color:var(--text);">'+(typeof a.score==='number'?a.score:'—')+'</span>'
-          +(tier?'<span style="font-size:10px;font-weight:700;margin-left:6px;color:'+tc+';">'+tier.replace(' Priority','')+'</span>':'')+'</td>' : '')
-      + '<td style="padding:10px 14px;text-align:right;">'
-      + (showReview ? '<button data-wl-id="'+a.id+'" onclick="wlOpenApp(this)" style="background:var(--info-blue);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Review →</button>' : '')
-      + '</td>'
-      + '</tr>';
-  }).join('');
-
-  return '<div class="overflow-x"><table class="std-tbl">'
-    + '<thead><tr style="background:var(--dark);">'
-    + '<th class="js-th">Applicant</th>'
-    + '<th class="js-th">ID</th>'
-    + '<th class="js-th">Date</th>'
-    + (showScore ? '<th class="js-th">Score</th>' : '')
-    + '<th></th>'
-    + '</tr></thead><tbody>'+rows+'</tbody></table></div>';
-}
 
 
 
@@ -579,21 +530,6 @@ function applySettingsRoleLocks() {
   }
 }
 
-function saveScoringModelED() {
-  edGuard('Housing Application Scoring Model updated', function() {
-    // Save scoring model to Supabase housing_settings
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings', {
-    method: 'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-    body: JSON.stringify({ key: 'scoring_model', value: liveScoreModel })
-  }).catch(function(e){ console.warn('Scoring model save failed:',e); });
-    rescoreAllApplications();
-    if(document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none') {
-      updateDashStats(); renderDashTable();
-    }
-    showToast('Application scoring model saved.');
-  });
-}
 async function rescoreAndSave() {
   if(typeof rescoreAllApplications !== 'function') return;
   var btn = document.getElementById('settings_save_scoring_btn');
@@ -623,16 +559,6 @@ async function rescoreAndSave() {
   } finally {
     if(btn) { btn.disabled = false; btn.textContent = '↺ Rescore All Applications'; }
   }
-}
-
-function confirmResetScoringModelED() {
-  edGuard('Housing Application Scoring Model reset to defaults', function() {
-    confirmResetScoringModel();
-  });
-}
-function openAddCriteriaModalED() {
-  if(!APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole)) { showToast('Only the Executive Director can add scoring criteria.'); return; }
-  openAddCriteriaModal();
 }
 
 function saveRenoScoreModelED() {
@@ -796,34 +722,6 @@ function exportAudit(format) {
 function showRenosForRole() {
   var role = window.currentRole || 'housing_employee_l1';
   if(ROLE.isManagement(role)) { showRenos(); } else { openRenoSearch(); }
-}
-
-function getContactSettings() {
-  return window._contacts || {};
-}
-function saveContactSettings() {
-  var s = {
-    hm_name:  (document.getElementById('hm_name')  || {}).value || '',
-    hm_email: (document.getElementById('hm_email') || {}).value || '',
-    ed_name:  (document.getElementById('ed_name')  || {}).value || '',
-    ed_email: (document.getElementById('ed_email') || {}).value || ''
-  };
-  window._contacts = s;
-  fetch(SUPABASE_URL+'/rest/v1/housing_contacts', {
-    method: 'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-    body: JSON.stringify({ id: '00000000-0000-0000-0000-000000000001', data: s, updated_at: new Date().toISOString() })
-  }).catch(function(e){ console.warn('Contacts save failed:',e); });
-  var msg = document.getElementById('contacts_save_msg');
-  if(msg) { msg.style.display = 'inline'; setTimeout(function(){ msg.style.display = 'none'; }, 2500); }
-  showToast('Contact settings saved');
-}
-function populateContactSettings() {
-  var s = getContactSettings();
-  ['hm_name','hm_email','ed_name','ed_email'].forEach(function(id) {
-    var el = document.getElementById(id);
-    if(el && s[id]) el.value = s[id];
-  });
 }
 
 // ══════════════════════════════════════════════════════════════

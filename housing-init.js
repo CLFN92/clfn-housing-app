@@ -26,86 +26,6 @@ if (typeof ROLE === 'undefined') {
 // ── Build marker ──────────────────────────────────────────────────────────────
 console.log('%c[CLFN HOUSING] Build: F1-2026-04-21', 'background:#F8E41A;color:#111;font-weight:700;padding:4px 8px;');
 
-// ── Supabase client ───────────────────────────────────────────────────────────
-window._sb = null;
-document.addEventListener('DOMContentLoaded', function() {
-  try {
-    if (window.supabase && window.supabase.createClient) {
-      window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-      console.log('[CLFN] Supabase client ready');
-    }
-  } catch(e) { console.warn('[CLFN] Supabase init failed:', e.message); }
-});
-
-
-
-// showDashboard removed — the Applications dashboard (#dashView) was
-// retired in favour of the worklist on the Home page, which now has
-// feature parity (Edit / Print / ⋮ / primary action). Helpers from
-// housing-app.js (renderDashTable, updateDashStats, wireDashTable) are
-// kept as dead callables because confirmAssignment et al. still invoke
-// them; they null-guard on missing DOM and become silent no-ops.
-
-function saveTenantFiles(unitId, files){ /* legacy no-op — files saved via DocLibrary */ }
-
-
-// ── Legacy compat wrappers ──────────────────────────────────────────
-// Older code paths (and the Unit Detail Panel preview) may still call
-// these. They now delegate to the DocLibrary-backed flow. If you're
-// reading this in Phase D cleanup: these can go away once every caller
-// uses DocLibrary directly.
-async function deleteTenantFile(path){
-  // Still present because Turn 3 Item 2's authorized scope was tenantFiles*
-  // + udp* wrappers only. This one has no external callers in housing.html
-  // today but it's left for a future cleanup pass to delete explicitly.
-  var ok = await showConfirm({
-    title:       'Remove this file?',
-    message:     'The file will be deleted from storage. This cannot be undone.',
-    confirmText: 'Remove',
-    danger:      true
-  });
-  if (!ok) return;
-  var entityId = _tenantFilesUnitId || (typeof _currentDetailUnitId !== 'undefined' ? _currentDetailUnitId : '');
-  try {
-    await sbDeleteFile(path);
-    if (entityId) {
-      await fetch(SUPABASE_URL+'/rest/v1/housing_audit_log',{
-        method:'POST',
-        headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
-        body:JSON.stringify({entity_type:'tenant',entity_id:String(entityId),
-          action:'file_deleted',details:JSON.stringify({path:path}),
-          actor:window.currentRole||'staff',created_at:new Date().toISOString()})
-      });
-    }
-    showToast('File removed');
-    if (_tenantFilesLib) _tenantFilesLib.refresh();
-    if (typeof _currentDetailUnitId !== 'undefined') {
-      udpRenderFilePreviews(_currentDetailUnitId);
-    }
-  } catch(e){ showToast('Could not remove: '+e.message); }
-}
-
-// ══════════════════════════════════════════════════════
-// AUTH FOUNDATION — Ready for Supabase integration
-// ══════════════════════════════════════════════════════
-/**
- * CLFN_AUTH is the single source of truth for the current session.
- *
- * When Supabase auth is wired up:
- *   1. On login success, call: CLFN_AUTH.setSession(supabaseUser, staffRow)
- *      where staffRow is the matching row from your staff/employees table.
- *   2. On logout, call: CLFN_AUTH.clearSession()
- *   3. All role checks in the app already read from window.currentRole,
- *      which setSession() sets automatically.
- *
- * staffRow shape (from your existing employees table):
- *   { id, name, email, role }
- *   role values: 'employee' | 'housing_manager' | 'ed'
- */
-
-
-
-
 // ── Page-specific role switch hook ────────────────────────────────────────────
 // shared-ui.js switchRole() calls this after updating window.currentRole,
 // the header, and nav visibility. Housing-page-specific logic goes here.
@@ -145,10 +65,6 @@ function _saveToggleStates(){
     sessionStorage.setItem('_toggleStates',JSON.stringify(states));
   }catch(e){}
 }
-
-// saveApplicant stub removed — see below
-
-function submitApplication(){ if(typeof openSubmitModal==="function") openSubmitModal(); }
 
 function syncAccessibility(){
   // Read every checked acc_* checkbox by its visible value, write to the
@@ -217,10 +133,6 @@ function selectCurrentUnit(el){
   if(sel) sel.style.display='block';
   if(typeof calcPersonsOverStandard === "function") { calcPersonsOverStandard(); triggerV2Score(); }
 }
-function saveApplicant(){ /* auto-save stub - data saved on submit */ }
-function nextStep(){ if(typeof goTo==='function'){ var c=document.getElementById('cur'); goTo((parseInt((c&&c.value)||0)+1)); } }
-function prevStep(){ if(typeof goTo==='function'){ var c=document.getElementById('cur'); goTo((parseInt((c&&c.value)||1)-1)); } }
-
 function closeApplicationForm(){
   // Hide the form
   var al = document.getElementById('appLayout'); if(al) al.style.display='none';
@@ -343,11 +255,6 @@ function initSignaturePads() {
 // ══════════════════════════════════════════════════════
 // MISSING CLOSE FUNCTIONS
 // ══════════════════════════════════════════════════════
-function closeContractorDetail() {
-  var p = document.getElementById('contractorDetailPanel');
-  if (p) p.style.display = 'none';
-  document.body.classList.remove('modal-open');
-}
 // closePrintPanel defined above
 function closeAddUnitModal() {
   var m = document.getElementById('addUnitModal');
@@ -961,8 +868,6 @@ function amSelectUnit(unitId) {
   }
 }
 
-function amUnitChange() {} // stub kept for compat
-
 function closeAssignModal() {
   var modal=document.getElementById('assignUnitModal'); if(modal)modal.style.display='none';
   _amAppId=null; _amBestUnitId=null; _amSelectedUnitId=null; _amAllScored=[];
@@ -1370,8 +1275,6 @@ function exportRenoApprovalsPDF() {
 function showLoginScreen() {
   try { window.location.href = 'index.html'; } catch(e) {}
 }
-function hidLoginScreen() { /* no-op on module pages — no login screen present */ }
-
 // ── Global in-memory caches for Supabase data ───────────────────────────────
 window._contractors   = window._contractors   || [];
 window._sowCache      = window._sowCache      || {};  // keyed by unit_id

@@ -225,15 +225,6 @@ function tableSetColumnFilter(page, colKey, values) {
   all[page] = st;
   _tableStateSave(all);
 }
-function tableToggleColumnFilterValue(page, colKey, value) {
-  var st = tableStateGet(page);
-  var cur = (st.filters[colKey] || []).slice();
-  var k   = String(value);
-  var idx = cur.indexOf(k);
-  if (idx === -1) cur.push(k);
-  else cur.splice(idx, 1);
-  tableSetColumnFilter(page, colKey, cur);
-}
 function tableClearColumnFilter(page, colKey) {
   tableSetColumnFilter(page, colKey, null);
 }
@@ -511,9 +502,6 @@ function tableBindColumnMenuClicks(thead, page) {
     tableOpenColumnMenu(page, th.getAttribute('data-sort-key'), th);
   });
 }
-
-// Legacy alias — old callers expect tableBindSortClicks.
-function tableBindSortClicks(thead, page) { tableBindColumnMenuClicks(thead, page); }
 
 // Local HTML-escape helper (reuses the existing escapeHtml if available).
 function _esc(s) {

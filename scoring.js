@@ -35,9 +35,6 @@ window.liveV2ScoreModel = window.liveV2ScoreModel || {};
 window.liveV2Tiers      = window.liveV2Tiers      || { critical: 80, high: 60, medium: 40 };
 window.liveScoreModel   = window.liveScoreModel   || null;
 
-var SCORING_MODEL_KEY = 'clfn_scoring_model';
-
-
 // ── V2 Scoring Model Defaults ──────────────────────────────────────────
 // These are the editable point values for each option in the V2 model.
 // Stored in housing_settings as 'scoring_model_v2'. ED can adjust via Settings.
@@ -1801,9 +1798,7 @@ function calcDuration(startInput) {
 }
 
 // ── SP Data (v9) ──
-const SAMPLE_DATA_VERSION='10';
 const SP_APPLICATIONS=[];
-const SAMPLE_APPLICATIONS=SP_APPLICATIONS;
 
 // ── Housing Unit Inventory (from SharePoint — 262 units) ──
 const HOUSING_UNITS_DATA=[];

@@ -339,16 +339,6 @@ if(typeof ROLE === 'undefined') {
 // Moved to /shared.js (Turn 3, Phase C dedup). Same behavior, same call
 // sites — just loaded from the shared file now.
 
-window._sb = null;
-document.addEventListener('DOMContentLoaded', function() {
-  try {
-    if(window.supabase && window.supabase.createClient) {
-      window._sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-      console.log('[CLFN] Supabase client ready');
-    }
-  } catch(e) { console.log('[CLFN] Supabase init failed:', e.message); }
-});
-
 // ══════════════════════════════════════════════════════════════
 // SUPABASE DATA LAYER
 // All localStorage reads/writes have Supabase equivalents here.
@@ -893,7 +883,6 @@ function updateRenosHeader() {
   document.querySelectorAll('.hm-ed-only').forEach(function(e){e.style.display=(ROLE.isManagement(role))?'':'none';});
   document.querySelectorAll('.ed-only').forEach(function(e){e.style.display=APPROVAL_AUTHORITY.can('editApprovalAuthority', role)?'':'none';});
 }
-function goHome(){window.location.href='index.html';}
 function goBack(){window.location.href='index.html';}
 // setRenosTab(name) — single entry point for switching between the
 // Approvals (SOW queue) and Renovations (under-repair / condemned units)
@@ -950,13 +939,6 @@ function showRenos()         { setRenosTab('renovations'); }
 
 
 
-// (showScores removed — was calling getElementById with a missing argument and had zero callers. Dead code from an earlier scoring view design.)
-
-var _scoresSortKey='score', _scoresSortDir=-1;
-
-
-
-
 // ── Application Scores view ──
 
 // ── Scorecard document functions ──────────────────────────────────────────────
@@ -1002,7 +984,6 @@ document.addEventListener('keydown', function(e) {
 // ══════════════════════════════════════════════════════════
 
 var _sowUnitId  = null;
-var _sowItemIdx = 0;
 var _sowItemIdx = 0;
 
 var SOW_CATEGORIES = [
@@ -1432,35 +1413,6 @@ function saveSOW(){
 
 
 
-
-function saveSettings(section){
-  // HM and ED contacts now managed via the User Management lookup above
-  auditEntry('SETTINGS','settings_saved','Settings saved — section: '+(section||'general'),window.currentRole||'staff');
-  showToast('Settings saved');
-}
-
-function udpOpenFiles(){
-  if(_currentDetailUnitId) {
-    closeUnitDetail();
-    openTenantFilesPanel(_currentDetailUnitId);
-  }
-}
-
-function udpFileDrop(e) {
-  e.preventDefault();
-  var zone = document.getElementById('udp_drop_zone');
-  if(zone){ zone.style.borderColor='var(--border)'; zone.style.background='var(--bg)'; }
-  if(!_currentDetailUnitId) return;
-  var files = Array.from(e.dataTransfer.files||[]);
-  udpProcessFiles(files);
-}
-
-function udpFileUploadInline(input) {
-  if(!_currentDetailUnitId) return;
-  var files = Array.from(input.files||[]);
-  udpProcessFiles(files);
-  input.value = '';
-}
 
 async function udpProcessFiles(files) {
   if(!files||!files.length) return;

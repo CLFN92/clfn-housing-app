@@ -48,58 +48,20 @@ window._viewAsRole  = '';                     // '' = not using view-as
 // ── CLFN_AUTH ───────────────────────────────────────────────────────────────
 // Central auth state object. All session reads should go through here or
 // window.currentRole. Direct reads of HOUSING_SESSION are also fine.
-window.CLFL_AUTH_VERSION = '2.0'; // bump when shape changes
 window.CLFN_AUTH = {
-  currentUser:     null,   // { id, name, email }
   currentRole:     'housing_employee_l1',
-  employeeId:      null,
   isAuthenticated: false,
-
-  // ── Called by index.html after successful Supabase login + staff lookup ──
-  setSession: function(supabaseUser, staffRow) {
-    this.currentUser     = { id: supabaseUser.id, name: staffRow.name, email: supabaseUser.email };
-    this.currentRole     = staffRow.role || 'housing_employee_l1';
-    this.employeeId      = staffRow.id;
-    this.isAuthenticated = true;
-    window.currentRole   = this.currentRole;
-    window._realRole     = this.currentRole;
-    window._viewAsRole   = '';
-
-    // Sync HOUSING_SESSION
-    HOUSING_SESSION.email = supabaseUser.email;
-    HOUSING_SESSION.name  = staffRow.name || '';
-    HOUSING_SESSION.role  = this.currentRole;
-
-    // Update UI if available (page may not have these yet)
-    if (typeof switchRole       === 'function') switchRole(this.currentRole);
-    if (typeof updateHeaderUser === 'function') updateHeaderUser(this.currentRole);
-
-    console.log('[CLFN] Session set — ' + this.currentUser.name + ' (' + this.currentRole + ')');
-
-    // Start idle-logout watcher now that a session exists
-    if (typeof startIdleTimer === 'function') startIdleTimer();
-  },
 
   // ── Called on logout ────────────────────────────────────────────────────
   clearSession: function() {
-    this.currentUser     = null;
     this.currentRole     = 'housing_employee_l1';
-    this.employeeId      = null;
     this.isAuthenticated = false;
     window.currentRole   = 'housing_employee_l1';
     window._realRole     = null;
     window._viewAsRole   = '';
     console.log('[CLFN] Session cleared');
-  },
-
-  // ── Role helpers ────────────────────────────────────────────────────────
-  getRole:   function() { return window.currentRole || this.currentRole || 'housing_employee_l1'; },
-  isManager: function() { var r = this.getRole(); return r === 'housing_manager' || r === 'ed'; },
-  isED:      function() { return this.getRole() === 'ed'; }
+  }
 };
-
-// Convenience global — existing code calls getRole() directly
-function getRole() { return window.CLFN_AUTH.getRole(); }
 
 // ── resolveHousingRole ───────────────────────────────────────────────────────
 // Called after navigation to a housing/renos page to re-establish the role
@@ -154,7 +116,7 @@ function _clearLocalClientState() {
     'clfn_applications', 'clfn_housing_units',
     'clfn_scoring_model', 'clfn_scoring_model_v2', 'clfn_scoring_tiers_v2',
     'clfn_budget_pools', 'clfn_reno_score_model_v3', 'clfn_unit_score_model',
-    'HOUSING_REMEMBER_KEY'
+    'clfn_housing_email'
   ];
   try { lsKeys.forEach(function(k) { try { localStorage.removeItem(k); } catch(e) {} }); } catch(e) {}
 

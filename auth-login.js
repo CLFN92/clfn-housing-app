@@ -109,10 +109,6 @@ function showForgotPassword() {
   if (p) p.style.display = 'none';
   if (f) f.style.display = '';
 }
-function hidLoginScreen() {
-  var ls = document.getElementById('loginScreen');
-  if (ls) ls.style.display = 'none';
-}
 function showLoginScreen() {
   var ls = document.getElementById('loginScreen');
   if (ls) { ls.style.display = 'flex'; }

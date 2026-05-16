@@ -488,23 +488,10 @@ function syncSaveQueue(){
   });
 }
 
-// Backwards-compatible aliases. Boot path still calls syncDraftQueue();
-// older sites may reference appDraftQueueAdd / Remove / GetAll.
+// Backwards-compatible alias. Boot path still calls syncDraftQueue().
 function syncDraftQueue(){
   _migrateLegacyAppDraftQueue();
   return syncSaveQueue();
-}
-function appDraftQueueAdd(app, lastError){
-  if(!app || !app.id) return;
-  saveQueueAdd('app', app.id, app, lastError);
-}
-function appDraftQueueRemove(appId){
-  saveQueueRemove('app', appId);
-}
-function appDraftQueueGetAll(){
-  return saveQueueGetAll()
-    .filter(function(e){ return e.entityType === 'app'; })
-    .map(function(e){ return { appId: e.id, app: e.entity, ownerEmail: e.ownerEmail, updatedAt: e.updatedAt, lastError: e.lastError }; });
 }
 
 // ── sbSaveAllApplications ─────────────────────────────────────────────────────
@@ -4709,7 +4696,6 @@ function sowSelectContractor(el) {
   var dd = document.getElementById('sow_ct_dropdown');
   if(dd) dd.style.display = 'none';
 }
-function toggleInvExportMenu(){}
 function triggerPrint() {
   if(!_printPanelDoc) return;
   // Use a hidden iframe — no popup blocker, panel stays visible

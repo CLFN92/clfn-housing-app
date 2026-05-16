@@ -470,8 +470,6 @@ function goTo(s){
   }
 }
 
-// ── Toggle helpers ──
-function tog(id){const e=document.getElementById(id);if(e)e.classList.toggle('on');}
 // ── Dynamic rows ──
 function addIncome(){
   var list=document.getElementById('incomeList');
@@ -1732,9 +1730,6 @@ function openSubmitModal(){
     finalSubmit({ sendApplicantCopy: sendCopy });
   });
 }
-
-// Legacy no-op kept for any orphan markup that still references it.
-function closeModal(){}
 
 function finalSubmit(opts){
   opts = opts || {};

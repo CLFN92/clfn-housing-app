@@ -1579,10 +1579,6 @@ function renoSearchFilter(q) {
 // ── Contractors export ──
 
 
-// ── (legacy stubs — kept for compatibility) ──
-
-function getInventoryExportData(){ return []; }
-
 // ── MOBILE MENU ──
 
 
@@ -1861,74 +1857,6 @@ function saveAddTenant(){
   showToast('✓ '+tenantName+' assigned to '+units[idx].num+' '+units[idx].street);
 }
 
-
-function openContractorDetail(idx) {
-  var contractors = [];
-  var contractors = window._contractors || [];
-  var ct = contractors[idx];
-  if(!ct) return;
-
-  var panel = document.getElementById('contractorDetailPanel');
-  if(!panel) return;
-
-  var setT = function(id, v){ var el=panel.querySelector('#'+id); if(el) el.textContent=v||'—'; };
-
-  setT('cdp_name',  ct.name);
-  setT('cdp_trade', ct.trade);
-  setT('cdp_phone', ct.phone?formatPhone(ct.phone):'');
-  setT('cdp_email', ct.email);
-  setT('cdp_address', ct.address);
-  setT('cdp_hst',   ct.hst);
-  setT('cdp_wsib_num',    ct.wsibNum);
-  setT('cdp_ins_provider', ct.insProvider);
-  setT('cdp_ins_policy',   ct.insPolicy);
-  setT('cdp_ins_amount',   ct.insAmount);
-
-  // Expiry badges with colour coding
-  function expiryBadge(id, dateStr) {
-    var el = panel.querySelector('#'+id);
-    if(!el) return;
-    if(!dateStr) { el.textContent = '—'; el.style.color = '#888'; return; }
-    var days = Math.round((new Date(dateStr) - new Date()) / (1000*60*60*24));
-    var label = days < 0 ? 'Expired ' + dateStr : days < 30 ? 'Expires ' + dateStr + ' (' + days + 'd)' : dateStr;
-    var color = days < 0 ? '#b91c1c' : days < 30 ? '#d97706' : '#15803d';
-    el.textContent = label;
-    el.style.color = color;
-  }
-  expiryBadge('cdp_wsib_expiry', ct.wsibExpiry);
-  expiryBadge('cdp_ins_expiry',  ct.insExpiry);
-
-  // Key contacts section
-  var peopleCard = panel.querySelector('#cdp_people_card');
-  var peopleEl   = panel.querySelector('#cdp_people');
-  var people = ct.people || [];
-  var validPeople = people.filter(function(p){ return p && p.name; });
-  if(peopleEl) {
-    if(validPeople.length) {
-      peopleEl.innerHTML = validPeople.map(function(p){
-        return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px 12px;background:var(--bg);border-radius:8px;">'
-          +'<div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Name</div>'
-          +'<div class="js-txt-bold">'+(p.name||'—')+'</div></div>'
-          +'<div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Role</div>'
-          +'<div class="js-txt-bold2" style="font-weight:400;">'+(p.role||'—')+'</div></div>'
-          +'<div><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Phone</div>'
-          +'<div class="js-txt-bold2" style="font-weight:400;">'+(p.phone?formatPhone(p.phone):'—')+'</div></div>'
-          +'</div>';
-      }).join('');
-    }
-  }
-  if(peopleCard) peopleCard.style.display = validPeople.length ? '' : 'none';
-
-  // Notes section
-  var notesCard = panel.querySelector('#cdp_notes_card');
-  var notesEl   = panel.querySelector('#cdp_notes');
-  if(notesEl) notesEl.textContent = ct.notes || '';
-  if(notesCard) notesCard.style.display = ct.notes ? '' : 'none';
-
-  panel.style.removeProperty('display');
-  panel.style.setProperty('display','flex','important');
-  document.body.classList.add('modal-open');
-}
 
 function renderEditUnitPhotoPreview(unitId) {
   var container = document.getElementById('ue_photo_preview');
