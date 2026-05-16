@@ -855,28 +855,25 @@ async function _generateApplicationPdfBase64() {
   // ── TERMS & CONDITIONS ────────────────────────────────────────────
   needSpace(20);
   sectionHeader('Terms & Conditions — Applicant Declaration');
-  paragraph('By signing below, I hereby apply for housing assistance from the '
-    + (nation ? nation + ' ' : '')
-    + (short  ? '(' + short + ') ' : '')
-    + 'Housing Program and declare the following:');
-  gap(1);
 
-  var consented = (document.getElementById('consent_share_programs') || {}).checked;
-  var terms = [
+  var consented    = (document.getElementById('consent_share_programs') || {}).checked;
+  var _tParsed     = _termsParseHtml(typeof getTermsBody === 'function' ? getTermsBody('housing_application') : '');
+  var termsIntro   = _tParsed.intro || ('By signing below, I hereby apply for housing assistance from the '
+    + (nation ? nation + ' ' : '') + (short ? '(' + short + ') ' : '')
+    + 'Housing Program and declare the following:');
+  var terms        = _tParsed.items.length ? _tParsed.items : [
     'All information provided in this application is true, accurate, and complete to the best of my knowledge.',
     'I understand that providing false or misleading information may result in immediate disqualification and removal from the housing waitlist.',
-    'I consent to ' + (short || 'CLFN') + ' collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation (PIPEDA).'
+    'I consent to ' + (short || 'CLFN') + ' collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation (PIPEDA).',
+    'I understand that my application will be scored according to the ' + (short || 'CLFN') + ' Housing Scoring Rubric and that priority is determined by score, not date of application alone.',
+    'I agree to notify the ' + (short || 'CLFN') + ' Housing Department within 30 days of any change in household composition, income, address, or contact information.',
+    'I understand that acceptance into ' + (short || 'CLFN') + ' housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by ' + (short || 'CLFN') + ' prior to occupancy.',
+    'I agree to comply with all ' + (short || 'CLFN') + ' Housing policies, lease agreements, and community by-laws as a condition of tenancy.',
+    'I authorize ' + (short || 'CLFN') + ' to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.'
   ];
-  if (consented) {
-    terms.push('I consent to ' + (short || 'CLFN') + ' Housing sharing relevant information from this application with other '
-      + (nation || 'CLFN')
-      + ' programs and departments — including but not limited to Health, Education, Wellness, Ontario Works, and Finance — strictly for the purpose of supporting and coordinating services connected to my housing application. Sharing will occur only with authorized staff, on a need-to-know basis, in accordance with applicable privacy legislation (PIPEDA). I may withdraw this consent in writing to the Housing Manager at any time.');
-  }
-  terms.push('I understand that my application will be scored according to the ' + (short || 'CLFN') + ' Housing Scoring Rubric and that priority is determined by score, not date of application alone.');
-  terms.push('I agree to notify the ' + (short || 'CLFN') + ' Housing Department within 30 days of any change in household composition, income, address, or contact information.');
-  terms.push('I understand that acceptance into ' + (short || 'CLFN') + ' housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by ' + (short || 'CLFN') + ' prior to occupancy.');
-  terms.push('I agree to comply with all ' + (short || 'CLFN') + ' Housing policies, lease agreements, and community by-laws as a condition of tenancy.');
-  terms.push('I authorize ' + (short || 'CLFN') + ' to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.');
+
+  paragraph(termsIntro);
+  gap(1);
 
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
@@ -1375,12 +1372,29 @@ async function _generateWorkOrderPdfBase64() {
 
   // Work Authorization notice
   sectionHeader('Work Authorization');
-  paragraph(
-    'The contractor is authorized to perform only the work described above. '
-    + 'Any additional work or changes to scope must be approved in writing by ' + (short || 'CLFN')
-    + ' Housing before work commences. Invoices must reference this Work Order and unit address. '
-    + 'Payment is subject to satisfactory completion and inspection.'
-  );
+  var _woParsed    = _termsParseHtml(typeof getTermsBody === 'function' ? getTermsBody('work_order') : '');
+  var woTermsIntro = _woParsed.intro;
+  var woTermsItems = _woParsed.items;
+  if (woTermsIntro) paragraph(woTermsIntro);
+  if (woTermsItems.length) {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(40);
+    woTermsItems.forEach(function(t, i) {
+      var lines = pdf.splitTextToSize((i + 1) + '. ' + t, contentW - 4);
+      needSpace(lines.length * 4 + 1.5);
+      pdf.text(lines, marginL + 3, ctx.y + 3);
+      ctx.y += lines.length * 4 + 1.5;
+    });
+    pdf.setTextColor(0);
+  } else {
+    paragraph(
+      'The contractor is authorized to perform only the work described above. '
+      + 'Any additional work or changes to scope must be approved in writing by ' + (short || 'CLFN')
+      + ' Housing before work commences. Invoices must reference this Work Order and unit address. '
+      + 'Payment is subject to satisfactory completion and inspection.'
+    );
+  }
   gap();
 
   // Notes
@@ -2233,4 +2247,268 @@ function _healthBlock(level, html) {
        +   '<div class="cfg-health-icon">' + icon + '</div>'
        +   '<div class="cfg-health-body">' + html + '</div>'
        + '</div>';
+}
+
+
+// ════════════════════════════════════════════════════════════════════════
+// Settings → Terms & Conditions tab
+// ────────────────────────────────────────────────────────────────────────
+// Two-column layout mirroring the Notifications tab:
+//   Left  - document list (Housing Application T&C, Work Order T&C)
+//   Right - rich text editor (toolbar + contenteditable body)
+// Saved to housing_settings key='terms_and_conditions' as
+//   { housing_application: { bodyHtml: '...' }, work_order: { bodyHtml: '...' } }
+// Loaded automatically at boot alongside all other settings rows.
+// Public accessor: getTermsBody(docKey) - used by PDF generators.
+// ════════════════════════════════════════════════════════════════════════
+
+var TERMS_DOCS_REGISTRY = [
+  {
+    key:         'housing_application',
+    label:       'Housing Application — Terms & Conditions',
+    description: 'Printed on the applicant declaration page of every housing application PDF.',
+    defaultBody: '<p>By signing below, I hereby apply for housing assistance from the Constance Lake First Nation (CLFN) Housing Program and declare the following:</p>'
+               + '<ol>'
+               + '<li><strong>Truthful Information.</strong> All information provided in this application is true, accurate, and complete to the best of my knowledge. I understand that providing false or misleading information may result in immediate disqualification, removal from the housing waitlist, and — where tenancy has already commenced — may constitute grounds for termination of my housing agreement.</li>'
+               + '<li><strong>Eligibility.</strong> I confirm that I am a registered Band member of Constance Lake First Nation, am 18 years of age or older, and meet the eligibility requirements set out in the CLFN Housing Policy. I understand that all registered Band members are eligible regardless of on- or off-reserve residency, and that ownership of property off-reserve does not affect my eligibility.</li>'
+               + '<li><strong>Privacy and Consent.</strong> I consent to CLFN collecting, using, retaining, and sharing my personal information for the purpose of assessing this application, administering housing services, and meeting reporting obligations, in accordance with PIPEDA and the OCAP® principles of the First Nations Information Governance Centre (FNIGC).</li>'
+               + '<li><strong>Assessment and Priority.</strong> I understand that my application will be assessed against the criteria set out in the CLFN Housing Policy, and that placement priority is determined by assessed need and unit availability — not by date of application alone.</li>'
+               + '<li><strong>Duty to Update.</strong> I agree to notify the CLFN Housing Department within thirty (30) days of any change in household composition, income, employment, address, contact information, or any other matter that may affect my eligibility or assessment. Failure to notify may result in re-assessment or removal from the waitlist.</li>'
+               + '<li><strong>Arrears and Good Standing.</strong> I understand that I must be in good standing with CLFN, or actively working toward good standing through a written payment arrangement approved by the Housing Department, as a condition of placement. I acknowledge that CLFN follows a supportive arrears model providing up to twelve (12) months under a payment arrangement before eviction proceedings may be initiated, and that the minimum monthly payment under such an arrangement is regular rent plus fifty percent (50%) of monthly rent applied against arrears.</li>'
+               + '<li><strong>Utilities and Band Payment Recovery.</strong> I authorize CLFN to recover unpaid utilities, rent, damage charges, or other housing-related debts from any monetary payments administered by the Band to me, including but not limited to per capita distributions, honoraria, and program benefits, as provided under the CLFN Housing Policy.</li>'
+               + '<li><strong>Compliance.</strong> I agree to comply with the CLFN Housing Policy, my Housing Agreement or lease, the Governance and Administration Policy, and all applicable community by-laws as a condition of tenancy.</li>'
+               + '<li><strong>Verification.</strong> I authorize CLFN to verify any information provided in this application with relevant third parties, including employers, financial institutions, utility providers, previous landlords, and other First Nations housing authorities where applicable.</li>'
+               + '<li><strong>Acknowledgement of Policy.</strong> I acknowledge that I have been offered access to the current CLFN Housing Policy and Governance and Administration Policy, and that I am responsible for familiarizing myself with their contents.</li>'
+               + '</ol>'
+  },
+  {
+    key:         'work_order',
+    label:       'Work Order — Terms & Conditions',
+    description: 'Printed in the Work Authorization section of every contractor work order PDF.',
+    defaultBody: '<p>By accepting this Work Order, the contractor agrees to the following terms and conditions:</p>'
+               + '<ol>'
+               + '<li><strong>Authorized Scope.</strong> The contractor is authorized to perform only the work described in this Work Order. Any additional work or changes to scope require prior written approval from CLFN Housing before work commences.</li>'
+               + '<li><strong>Invoicing.</strong> All invoices must reference this Work Order number and the unit address. Payment is subject to satisfactory completion and inspection by CLFN Housing staff.</li>'
+               + '<li><strong>Quality and Standards.</strong> All work must be performed in a good and workmanlike manner, in compliance with applicable building codes, health and safety regulations, and CLFN Housing standards.</li>'
+               + '<li><strong>Timeline.</strong> Work must commence and be completed within the dates specified in this Work Order. Any anticipated delays must be reported promptly to CLFN Housing in writing before the affected date.</li>'
+               + '<li><strong>Workplace Safety and Insurance.</strong> The contractor assumes full responsibility for workplace safety and must maintain current WSIB clearance and general liability insurance throughout the project. Certificates must be provided to CLFN Housing upon request.</li>'
+               + '<li><strong>Deficiencies.</strong> The contractor is responsible for correcting any deficiencies identified during inspection at no additional cost to CLFN.</li>'
+               + '<li><strong>Compliance.</strong> The contractor must comply with all applicable federal, provincial, and First Nations regulations, as well as CLFN community by-laws, while on-reserve.</li>'
+               + '</ol>'
+  }
+];
+
+function _termsDocConfig(docKey) {
+  for (var i = 0; i < TERMS_DOCS_REGISTRY.length; i++) {
+    if (TERMS_DOCS_REGISTRY[i].key === docKey) return TERMS_DOCS_REGISTRY[i];
+  }
+  return null;
+}
+
+// Public accessor for PDF generators. Falls back to the registry default
+// when no ED override has been saved yet.
+function getTermsBody(docKey) {
+  var saved = (window._appSettings && window._appSettings.terms_and_conditions
+            && window._appSettings.terms_and_conditions[docKey]) || {};
+  if (saved.bodyHtml != null && saved.bodyHtml !== '') return saved.bodyHtml;
+  var cfg = _termsDocConfig(docKey);
+  return cfg ? cfg.defaultBody : '';
+}
+
+var _termsSelectedDoc = null;
+
+function renderTermsTab() {
+  var body = document.getElementById('terms_panel_body');
+  if (!body) return;
+
+  if (!_termsSelectedDoc) _termsSelectedDoc = TERMS_DOCS_REGISTRY[0] && TERMS_DOCS_REGISTRY[0].key;
+
+  body.innerHTML =
+      '<div class="ntf-grid">'
+    +   '<div class="ntf-event-list" id="terms_doc_list">' + _termsRenderDocListHtml() + '</div>'
+    +   '<div class="ntf-editor"     id="terms_editor">'   + _termsRenderEditorHtml(_termsSelectedDoc) + '</div>'
+    + '</div>';
+
+  _termsWireDocListClicks();
+  _termsWireEditor();
+}
+
+function _termsRenderDocListHtml() {
+  return TERMS_DOCS_REGISTRY.map(function(doc) {
+    var isActive = doc.key === _termsSelectedDoc;
+    return '<button type="button" data-terms-doc="' + _ntfEsc(doc.key) + '" '
+         + 'class="ntf-event-item' + (isActive ? ' is-active' : '') + '">'
+         + '<span class="ntf-dot ntf-dot-on" title="Active"></span>'
+         + '<div class="ntf-event-text">'
+         +   '<div class="ntf-event-label">' + _ntfEsc(doc.label) + '</div>'
+         +   '<div class="ntf-event-desc">'  + _ntfEsc(doc.description || '') + '</div>'
+         + '</div>'
+         + '</button>';
+  }).join('');
+}
+
+function _termsRenderEditorHtml(docKey) {
+  var cfg = _termsDocConfig(docKey);
+  if (!cfg) return '<div class="empty-state-italic">Select a document from the list to edit it.</div>';
+
+  var saved    = (window._appSettings && window._appSettings.terms_and_conditions
+               && window._appSettings.terms_and_conditions[docKey]) || {};
+  var bodyHtml = (saved.bodyHtml != null && saved.bodyHtml !== '') ? saved.bodyHtml : cfg.defaultBody;
+
+  var toolbar =
+      '<div class="ntf-toolbar" role="toolbar" aria-label="Formatting">'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="bold"                title="Bold (Ctrl+B)"><b>B</b></button>'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="italic"              title="Italic (Ctrl+I)"><i>I</i></button>'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="underline"           title="Underline (Ctrl+U)"><u>U</u></button>'
+    +   '<span class="ntf-tool-sep"></span>'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="formatBlock-p"       title="Paragraph">&para;</button>'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="insertUnorderedList" title="Bulleted list">&bull;</button>'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="insertOrderedList"   title="Numbered list">1.</button>'
+    +   '<span class="ntf-tool-sep"></span>'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="createLink"          title="Insert link">&#128279;</button>'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="unlink"              title="Remove link">&#10005;&#128279;</button>'
+    + '</div>';
+
+  return ''
+    + '<div class="ntf-editor-header">'
+    +   '<div class="ntf-editor-title">' + _ntfEsc(cfg.label) + '</div>'
+    +   '<div class="ntf-editor-meta">Paste from Word supported &mdash; formatting is preserved, styles are stripped.</div>'
+    + '</div>'
+    + '<div class="ntf-field">'
+    +   '<label class="ntf-label">Body</label>'
+    +   toolbar
+    +   '<div id="terms_body" class="ntf-body" contenteditable="true">' + bodyHtml + '</div>'
+    + '</div>'
+    + '<div class="ntf-actions">'
+    +   '<button type="button" class="btn btn-primary" onclick="saveTermsDoc()">Save</button>'
+    +   '<button type="button" class="btn btn-ghost"   onclick="resetTermsDoc()">Reset to Default</button>'
+    + '</div>';
+}
+
+function _termsWireDocListClicks() {
+  var list = document.getElementById('terms_doc_list');
+  if (!list) return;
+  list.querySelectorAll('[data-terms-doc]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      _termsSelectedDoc = btn.getAttribute('data-terms-doc');
+      list.innerHTML = _termsRenderDocListHtml();
+      var ed = document.getElementById('terms_editor');
+      if (ed) ed.innerHTML = _termsRenderEditorHtml(_termsSelectedDoc);
+      _termsWireDocListClicks();
+      _termsWireEditor();
+    });
+  });
+}
+
+function _termsWireEditor() {
+  var editorEl = document.getElementById('terms_editor');
+  var bodyEl   = document.getElementById('terms_body');
+  if (!editorEl || !bodyEl) return;
+
+  // Scope toolbar wiring to this editor container so it targets terms_body,
+  // not ntf_body, even when both sections have been rendered.
+  editorEl.querySelectorAll('.ntf-tool').forEach(function(btn) {
+    if (btn.getAttribute('data-ntf-bound') === '1') return;
+    btn.setAttribute('data-ntf-bound', '1');
+    btn.addEventListener('mousedown', function(e) { e.preventDefault(); });
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      _ntfRunToolbarCmd(btn.getAttribute('data-ntf-cmd'), bodyEl);
+    });
+  });
+
+  // Paste handler: strip Word MSO styles on paste, preserve semantic markup.
+  if (!bodyEl.getAttribute('data-paste-wired')) {
+    bodyEl.setAttribute('data-paste-wired', '1');
+    bodyEl.addEventListener('paste', function(e) {
+      e.preventDefault();
+      var html = (e.clipboardData && e.clipboardData.getData('text/html')) || '';
+      if (!html) {
+        var text = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+        html = '<p>' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                           .replace(/\n\n+/g,'</p><p>').replace(/\n/g,'<br>') + '</p>';
+      }
+      document.execCommand('insertHTML', false, _ntfSanitizeBodyHtml(html));
+    });
+  }
+}
+
+function saveTermsDoc() {
+  var role = window.currentRole || window._realRole;
+  if (role !== 'ed') { showToast('Only the Executive Director can edit terms & conditions'); return; }
+  if (!_termsSelectedDoc) { showToast('Select a document first'); return; }
+
+  var bodyEl = document.getElementById('terms_body');
+  if (!bodyEl) { showToast('Editor not ready'); return; }
+
+  var bodyHtml = _ntfSanitizeBodyHtml(bodyEl.innerHTML || '');
+  if (!bodyHtml || bodyHtml === '<br>' || bodyHtml.replace(/<[^>]+>/g, '').trim() === '') {
+    showToast('Body cannot be empty'); bodyEl.focus(); return;
+  }
+
+  var all  = (window._appSettings && window._appSettings.terms_and_conditions) || {};
+  var next = Object.assign({}, all);
+  next[_termsSelectedDoc] = { bodyHtml: bodyHtml };
+
+  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
+    method:  'POST',
+    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+    body:    JSON.stringify({ key: 'terms_and_conditions', value: next })
+  }).then(function(r) {
+    if (!r.ok) { showToast('Save failed — check connection'); return; }
+    if (!window._appSettings) window._appSettings = {};
+    window._appSettings.terms_and_conditions = next;
+    if (typeof auditEntry === 'function') {
+      auditEntry('SETTINGS', 'terms_save', 'Terms & Conditions updated: ' + _termsSelectedDoc, window.currentRole || 'ed');
+    }
+    showToast('✓ Terms & Conditions saved');
+  }).catch(function(e) {
+    console.warn('[terms] save failed:', e);
+    showToast('Save failed — see console');
+  });
+}
+
+function resetTermsDoc() {
+  if (!_termsSelectedDoc) return;
+  var cfg    = _termsDocConfig(_termsSelectedDoc);
+  var bodyEl = document.getElementById('terms_body');
+  if (cfg && bodyEl) bodyEl.innerHTML = cfg.defaultBody;
+  showToast('Reverted to default. Click Save to persist.');
+}
+
+// Parse saved T&C HTML into parts for both renderers.
+// Returns:
+//   intro     — plain text of the opening paragraph (for jsPDF)
+//   introHtml — innerHTML of the opening paragraph (for HTML print)
+//   items     — plain text of each <li> (for jsPDF numbered list)
+//   itemsHtml — innerHTML of each <li>, preserving <strong> etc. (for HTML print)
+function _termsParseHtml(html) {
+  var result = { intro: '', introHtml: '', items: [], itemsHtml: [] };
+  if (!html) return result;
+  try {
+    var doc  = new DOMParser().parseFromString('<div id="r">' + html + '</div>', 'text/html');
+    var root = doc.getElementById('r');
+    if (!root) return result;
+    var nodes = Array.prototype.slice.call(root.childNodes);
+    nodes.forEach(function(node) {
+      if (!node.tagName) return;
+      var tag = node.tagName.toUpperCase();
+      if ((tag === 'P' || tag === 'DIV') && !result.intro) {
+        result.intro    = (node.textContent || '').trim();
+        result.introHtml = node.innerHTML || '';
+      } else if (tag === 'OL' || tag === 'UL') {
+        var lis = node.querySelectorAll('li');
+        lis.forEach(function(li) {
+          var text = (li.textContent || '').trim();
+          if (text) {
+            result.items.push(text);
+            result.itemsHtml.push(li.innerHTML || text);
+          }
+        });
+      }
+    });
+  } catch (e) {
+    console.warn('[terms] parse failed:', e);
+  }
+  return result;
 }

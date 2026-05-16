@@ -2637,12 +2637,25 @@ function printWorkOrder(){
     +totalRow
     +'</tbody></table>'
     +'</div>'
-    // Terms notice
-    +'<div class="notice">'
-      +'<strong>Work Authorization:</strong> The contractor is authorized to perform only the work described above. '
-      +'Any additional work or changes to scope must be approved in writing by the '+_natShort+' '+CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER)+' or '+CLFN_PERMS.roleLabel(ROLE.ED)+' before work commences. '
-      +'Invoices must reference this work order and unit address. Payment is subject to satisfactory completion and inspection.'
-    +'</div>'
+    // Terms notice — rendered from Settings → Terms & Conditions (ED-editable).
+    +(function(){
+      var _tp = (typeof _termsParseHtml === 'function' && typeof getTermsBody === 'function')
+              ? _termsParseHtml(getTermsBody('work_order'))
+              : { introHtml: '', itemsHtml: [] };
+      var body = '';
+      if (_tp.introHtml) body += '<p style="margin:0 0 6px;">' + _tp.introHtml + '</p>';
+      if (_tp.itemsHtml.length) {
+        body += '<ol style="margin:0;padding-left:16px;">'
+             + _tp.itemsHtml.map(function(h){ return '<li>' + h + '</li>'; }).join('')
+             + '</ol>';
+      }
+      if (!body) {
+        body = '<strong>Work Authorization:</strong> The contractor is authorized to perform only the work described above. '
+             + 'Any additional work or changes to scope must be approved in writing by the '+_natShort+' '+CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER)+' or '+CLFN_PERMS.roleLabel(ROLE.ED)+' before work commences. '
+             + 'Invoices must reference this work order and unit address. Payment is subject to satisfactory completion and inspection.';
+      }
+      return '<div class="notice">' + body + '</div>';
+    })()
     // Signatures
     +'<div style="margin-top:24px;">'
     +'<div class="section-title">Authorization</div>'

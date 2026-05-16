@@ -2071,33 +2071,35 @@ function printApplicationPreview() {
     // 9. DOCUMENTS
     +section('Supporting Documents Submitted', docsBody)
 
-    // TERMS & CONDITIONS
-    +'<div style="margin-top:14px;padding:10px 12px;border:1px solid var(--border);border-radius:4px;'
-    +     'background:var(--bg);page-break-inside:avoid;">'
-    +'<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;'
-    +     'color:var(--muted);margin-bottom:7px;padding-bottom:4px;border-bottom:1.5px solid #F8E41A;">'
-    +'Terms &amp; Conditions — Applicant Declaration</div>'
-    +'<p style="font-size:9.5px;color:var(--text);line-height:1.6;margin-bottom:5px;">'
-    +'By signing below, I hereby apply for housing assistance from the '+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+' '
-    +'('+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+') Housing Program and declare the following:</p>'
-    +'<ol style="font-size:9.5px;color:var(--text);line-height:1.7;padding-left:14px;">'
-    +'<li>All information provided in this application is true, accurate, and complete to the best of my knowledge.</li>'
-    +'<li>I understand that providing false or misleading information may result in immediate disqualification and removal from the housing waitlist.</li>'
-    +'<li>I consent to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation (<a href="https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;">PIPEDA</a>).</li>'
-    // Item #4 — CLFN-program sharing consent. Only printed when the applicant
-    // checked the "Consent to Share — CLFN Programs" box on Step 8. If they
-    // didn't, this clause is omitted entirely so the printed declaration
-    // matches what they actually agreed to. The <ol> auto-renumbers.
-    +((document.getElementById('consent_share_programs')||{}).checked
-      ? '<li>I consent to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing sharing relevant information from this application with other '+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+' programs and departments &mdash; including but not limited to Health, Education, Wellness, Ontario Works, and Finance &mdash; strictly for the purpose of supporting and coordinating services connected to my housing application. Sharing will occur only with authorized staff, on a need-to-know basis, in accordance with applicable privacy legislation (<a href="https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;">PIPEDA</a>). I may withdraw this consent in writing to the Housing Manager at any time.</li>'
-      : '')
-    +'<li>I understand that my application will be scored according to the '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Scoring Rubric and that priority is determined by score, not date of application alone.</li>'
-    +'<li>I agree to notify the '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Department within 30 days of any change in household composition, income, address, or contact information.</li>'
-    +'<li>I understand that acceptance into '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' prior to occupancy.</li>'
-    +'<li>I agree to comply with all '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing policies, lease agreements, and community by-laws as a condition of tenancy.</li>'
-    +'<li>I authorize '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.</li>'
-    +'</ol>'
-    +'</div>'
+    // TERMS & CONDITIONS — rendered from Settings → Terms & Conditions (ED-editable).
+    +(function(){
+      var _tp = (typeof _termsParseHtml === 'function' && typeof getTermsBody === 'function')
+              ? _termsParseHtml(getTermsBody('housing_application'))
+              : { intro: '', introHtml: '', items: [], itemsHtml: [] };
+      var _nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
+      var _short  = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
+      var introHtml = _tp.introHtml
+        ? '<p style="font-size:9.5px;color:var(--text);line-height:1.6;margin-bottom:5px;">' + _tp.introHtml + '</p>'
+        : '<p style="font-size:9.5px;color:var(--text);line-height:1.6;margin-bottom:5px;">By signing below, I hereby apply for housing assistance from the ' + _nation + ' (' + _short + ') Housing Program and declare the following:</p>';
+      var liHtml = _tp.itemsHtml.length
+        ? _tp.itemsHtml.map(function(h){ return '<li>' + h + '</li>'; }).join('')
+        : ('<li>All information provided in this application is true, accurate, and complete to the best of my knowledge.</li>'
+          +'<li>I understand that providing false or misleading information may result in immediate disqualification and removal from the housing waitlist.</li>'
+          +'<li>I consent to ' + _short + ' collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation (PIPEDA).</li>'
+          +'<li>I understand that my application will be scored according to the ' + _short + ' Housing Scoring Rubric and that priority is determined by score, not date of application alone.</li>'
+          +'<li>I agree to notify the ' + _short + ' Housing Department within 30 days of any change in household composition, income, address, or contact information.</li>'
+          +'<li>I understand that acceptance into ' + _short + ' housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by ' + _short + ' prior to occupancy.</li>'
+          +'<li>I agree to comply with all ' + _short + ' Housing policies, lease agreements, and community by-laws as a condition of tenancy.</li>'
+          +'<li>I authorize ' + _short + ' to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.</li>');
+      return '<div style="margin-top:14px;padding:10px 12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);page-break-inside:avoid;">'
+           + '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:7px;padding-bottom:4px;border-bottom:1.5px solid #F8E41A;">'
+           + 'Terms &amp; Conditions — Applicant Declaration</div>'
+           + introHtml
+           + '<ol style="font-size:9.5px;color:var(--text);line-height:1.7;padding-left:14px;">'
+           + liHtml
+           + '</ol>'
+           + '</div>';
+    })()
 
     // CONSENT ACKNOWLEDGMENT — visible confirmation block (only when ticked).
     // Mirrors the on-screen Step 8 consent box and stamps when/by whom the
