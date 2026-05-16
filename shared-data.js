@@ -3733,6 +3733,18 @@ function renderWorklist() {
     ? tableStateGet('worklist')
     : { sort:{key:'',dir:1}, filters:{} };
 
+  // On first open (no saved status filter), hide Archived and Declined by
+  // default. Once the user adjusts via the column menu the choice persists
+  // in sessionStorage and this block is skipped on subsequent renders.
+  if (typeof tableSetColumnFilter === 'function' && _wlState.filters.status === undefined) {
+    tableSetColumnFilter('worklist', 'status', [
+      SM.draft.label, SM.submitted.label, SM.file_update.label,
+      SM.mgr_approved.label, SM.hm_approved.label, SM.ed_approved.label,
+      SM.returned.label, SM.assigned.label
+    ]);
+    _wlState = tableStateGet('worklist');
+  }
+
   if (typeof tableRegisterColumns === 'function') {
     tableRegisterColumns('worklist', {
       columns:  _wlColumns,
