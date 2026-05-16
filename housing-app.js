@@ -21,8 +21,6 @@ const STEPS = 9; // 7 visible steps (0-6) + review (8) = 8 total
 const uploadedFiles = [];
 const DRAFT_KEY = 'clfn_housing_draft';
 let currentAppId = null;
-let approvalState  = 'draft';
-let approvalRole   = ROLE.HE_L1;
 
 // ── Helpers ──
 
@@ -1739,7 +1737,7 @@ function finalSubmit(opts){
     ? 'File update submitted by applicant — awaiting Housing Manager review'
     : 'New housing application submitted by applicant — awaiting Housing Manager review';
   auditEntry(currentAppId||'new', actionLabel, detail, 'Applicant');
-  approvalState='submitted';renderApprovalFlow();
+  renderApprovalFlow();
   triggerV2Score();
   var id=saveApplicationRecord();
   var submittedApp = applications.find(function(a){ return a.id === id; }) || null;

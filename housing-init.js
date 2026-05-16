@@ -30,7 +30,6 @@ console.log('%c[CLFN HOUSING] Build: F1-2026-04-21', 'background:#F8E41A;color:#
 // shared-ui.js switchRole() calls this after updating window.currentRole,
 // the header, and nav visibility. Housing-page-specific logic goes here.
 window._onSwitchRole = function(role) {
-  approvalRole = role;
   if (window._currentScorecardApp && typeof renderScorecardActions === 'function')
     renderScorecardActions(window._currentScorecardApp);
   if (typeof applyTenancyFieldRoles === 'function') applyTenancyFieldRoles();
