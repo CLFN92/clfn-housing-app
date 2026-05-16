@@ -352,6 +352,9 @@ function renderNationPanel(){
   var identEl = document.getElementById('nation_panel_identity');
   var modsEl  = document.getElementById('nation_panel_modules');
   if(!identEl || !modsEl) return;
+  // Render the per-tenant Position Names section in its own host div.
+  // ED-only edit; everyone else sees the same block but read-only.
+  if (typeof _renderNationPositionsBlock === 'function') _renderNationPositionsBlock();
   var cfg = window.NATION_CONFIG || {};
   var modApi = window.CLFN_MODULES;
   var role = window.currentRole || '';
@@ -2251,3 +2254,159 @@ if (typeof window.liveRangeScore !== 'function') {
 if (typeof window.livePerYearPoints !== 'function') {
   window.livePerYearPoints = function() { return 0; };
 }
+
+
+// ════════════════════════════════════════════════════════════════════════
+// Position Names editor (Settings -> Nation)
+// ────────────────────────────────────────────────────────────────────────
+// Renames the 7 canonical roles for THIS tenant. Stored in
+// housing_settings.role_labels = { roleKey: 'Custom Label', ... }.
+// Empty/missing entries fall through the 3-layer fallback in
+// shared.js -> roleLabel() (DB → NATION_CONFIG → ROLE_LABELS).
+// Cannot add or remove roles — only relabel them.
+// ════════════════════════════════════════════════════════════════════════
+
+// Canonical role keys in display order. Mirrored from CLFN_PERMS but
+// pinned here so the editor's row order is stable regardless of how the
+// underlying frozen registry is iterated.
+var _POSITION_ROLE_KEYS = [
+  'ed',
+  'housing_manager',
+  'housing_employee_l2',
+  'housing_employee_l1',
+  'cfo',
+  'finance_l1',
+  'super_user'
+];
+
+function _renderNationPositionsBlock(){
+  var host = document.getElementById('nation_panel_positions');
+  if (!host) return;
+  var role   = window.currentRole || '';
+  var canEdit = !!(window.APPROVAL_AUTHORITY && APPROVAL_AUTHORITY.can('editApprovalAuthority', role));
+
+  var defaults = (window.CLFN_PERMS && CLFN_PERMS.ROLE_LABELS) || {};
+  var saved    = (window._appSettings && window._appSettings.role_labels) || {};
+
+  function _systemDefault(k) {
+    // Defaults are the ROLE_LABELS frozen map — these are what falls
+    // through when no override is set. NATION_CONFIG.role_labels
+    // would also win above, but the canonical "system default" the
+    // user sees in the placeholder is ROLE_LABELS.
+    return defaults[k] || k;
+  }
+
+  var headerHtml =
+      '<div class="cfg-section-title" style="margin-top:4px;">Position names</div>'
+    + '<div class="cfg-section-sub">Customise how role titles appear throughout the app '
+    +   '(badges, signatures, audit log, sign-in greeting, notifications). '
+    +   'Leave blank to use the system default. Cannot add or remove roles here.</div>';
+
+  if (!canEdit) {
+    // Read-only — same row layout as the editable form, no inputs.
+    var roRows = _POSITION_ROLE_KEYS.map(function(k){
+      var sysDef = _systemDefault(k);
+      var current = saved[k] || sysDef;
+      var note    = (saved[k] && saved[k] !== sysDef) ? ('Default: ' + escapeHtml(sysDef)) : '';
+      return '<div class="cfg-row">'
+           +   '<div class="cfg-label">' + escapeHtml(k) + '</div>'
+           +   '<div class="cfg-value"><span class="cfg-value-text">' + escapeHtml(current) + '</span>'
+           +     (note ? ' <span class="cfg-value-note">(' + note + ')</span>' : '')
+           +   '</div>'
+           + '</div>';
+    }).join('');
+    host.innerHTML = headerHtml
+                   + '<div class="cfg-grid" style="margin-top:10px;">' + roRows + '</div>'
+                   + '<div class="js-lbl-sm" style="margin-top:8px;font-style:italic;">Position names are managed by the Executive Director.</div>';
+    return;
+  }
+
+  // Editable — input per role, placeholder shows the system default.
+  var inputStyle = 'width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;background:var(--surface);color:var(--text);';
+
+  var rowsHtml = _POSITION_ROLE_KEYS.map(function(k){
+    var sysDef     = _systemDefault(k);
+    var currentVal = (saved[k] && saved[k] !== sysDef) ? saved[k] : '';
+    return '<div class="cfg-row">'
+         +   '<div class="cfg-label">' + escapeHtml(k) + '</div>'
+         +   '<div class="cfg-value">'
+         +     '<input type="text" data-pos-key="' + escapeHtml(k) + '" '
+         +           'value="' + escapeHtml(currentVal) + '" '
+         +           'placeholder="' + escapeHtml(sysDef) + '" '
+         +           'style="' + inputStyle + '"/>'
+         +   '</div>'
+         + '</div>';
+  }).join('');
+
+  host.innerHTML = headerHtml
+    + '<div class="cfg-grid" style="margin-top:10px;">' + rowsHtml + '</div>'
+    + '<div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap;">'
+    +   '<button type="button" class="btn btn-primary" onclick="saveNationPositionLabels()">Save Position Names</button>'
+    +   '<button type="button" class="btn btn-ghost"   onclick="resetNationPositionLabels()">Reset all to defaults</button>'
+    +   '<span class="js-lbl-sm">Empty inputs fall back to the system default.</span>'
+    + '</div>';
+}
+
+// Read every input, persist non-empty overrides to housing_settings.role_labels.
+// Empty inputs are written as nothing (key omitted) so roleLabel() falls back
+// to the system default. Reuses the same PostgREST upsert pattern as the
+// other settings (key+value row in housing_settings).
+function saveNationPositionLabels(){
+  if (typeof APPROVAL_AUTHORITY === 'undefined'
+      || !APPROVAL_AUTHORITY.can('editApprovalAuthority', window.currentRole)) {
+    showToast('Only the Executive Director can rename positions');
+    return;
+  }
+  var host = document.getElementById('nation_panel_positions');
+  if (!host) return;
+  var defaults = (window.CLFN_PERMS && CLFN_PERMS.ROLE_LABELS) || {};
+  var next = {};
+  host.querySelectorAll('input[data-pos-key]').forEach(function(inp){
+    var key = inp.getAttribute('data-pos-key');
+    var val = (inp.value || '').trim();
+    // Only persist if it's a non-default override — keeps the saved map
+    // small and self-describing.
+    if (val && val !== defaults[key]) next[key] = val;
+  });
+
+  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
+    method:  'POST',
+    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+    body:    JSON.stringify({ key: 'role_labels', value: next })
+  }).then(function(r){
+    if (!r.ok) { showToast('Save failed - check connection'); return; }
+    if (!window._appSettings) window._appSettings = {};
+    window._appSettings.role_labels = next;
+    if (typeof auditEntry === 'function') {
+      var changed = Object.keys(next).map(function(k){ return k + '=' + next[k]; }).join('; ');
+      auditEntry('SETTINGS', 'role_labels_save',
+        'Position names updated: ' + (changed || '(all reset to defaults)'),
+        window.currentRole || 'ed');
+    }
+    showToast('Position names saved');
+    // Re-render the block so the placeholders + saved values stay in sync.
+    _renderNationPositionsBlock();
+    // Push the new labels through the header avatar + badge so the
+    // rename is visible without a page reload. Other surfaces (settings
+    // tabs, notifications panel) re-render when next opened.
+    if (typeof updateHeaderUser === 'function') {
+      updateHeaderUser(window._viewAsRole || window.currentRole || window._realRole);
+    }
+  }).catch(function(e){
+    console.warn('[positions] save failed:', e);
+    showToast('Save failed - see console');
+  });
+}
+
+// Reset clears EVERY input in the block. User still has to click Save to
+// persist the empty state - matches the pattern used by the notifications
+// Reset to Default button.
+function resetNationPositionLabels(){
+  var host = document.getElementById('nation_panel_positions');
+  if (!host) return;
+  host.querySelectorAll('input[data-pos-key]').forEach(function(inp){
+    inp.value = '';
+  });
+  showToast('Reverted to defaults. Click Save to persist.');
+}
+

@@ -365,15 +365,19 @@ window.showPrompt = function(opts) {
     return r;
   }
 
-  // ── Nation-overridable display labels ────────────────────────────────
-  // Per-nation overrides live in NATION_CONFIG.role_labels (key → label),
-  // checked first so e.g. one nation can render "Lands & Housing Director"
-  // for the canonical 'ed' key. The role *key* itself is never overridden;
-  // only the human-readable display string changes per nation.
+  // ── Overridable display labels ───────────────────────────────────────
+  // Three-layer fallback for the human-readable role label:
+  //   1. _appSettings.role_labels      — saved by ED via Settings → Nation
+  //                                      → Position Names (per-tenant)
+  //   2. NATION_CONFIG.role_labels     — build-time per-nation override
+  //   3. ROLE_LABELS                   — system default
+  // The role *key* itself is never overridden; only the display string changes.
   function roleLabel(role){
     var r = normalizeRole(role);
-    var overrides = (window.NATION_CONFIG && window.NATION_CONFIG.role_labels) || null;
-    if (overrides && r && overrides[r]) return overrides[r];
+    var db = (window._appSettings && window._appSettings.role_labels) || null;
+    if (db && r && db[r]) return db[r];
+    var natCfg = (window.NATION_CONFIG && window.NATION_CONFIG.role_labels) || null;
+    if (natCfg && r && natCfg[r]) return natCfg[r];
     return ROLE_LABELS[r] || String(role||'');
   }
 

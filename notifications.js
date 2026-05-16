@@ -1101,3 +1101,131 @@ function _ntfEsc(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+
+// ════════════════════════════════════════════════════════════════════════
+// Settings -> Config tab (display-only reference)
+// ────────────────────────────────────────────────────────────────────────
+// Shows the non-secret values used at app setup time (today: the
+// Microsoft Graph email pipeline IDs). All values are read from
+// shared-config.js constants - the actual sending continues to use
+// the Supabase Edge Function secrets, which are NEVER exposed here.
+// Editing is via the deep-link to the Supabase Dashboard.
+// ════════════════════════════════════════════════════════════════════════
+
+async function renderConfigPanel() {
+  var body = document.getElementById('config_panel_body');
+  if (!body) return;
+
+  var gc = window.CLFN_GRAPH_CONFIG || {};
+
+  // Project ref from the Supabase URL drives the deep-link to the
+  // Edge Function secrets page. Falls back to the dashboard root if
+  // we can't parse the project ref.
+  var projectRef = '';
+  if (typeof SUPABASE_URL === 'string') {
+    var m = SUPABASE_URL.match(/https:\/\/([^.]+)\.supabase\.co/);
+    if (m) projectRef = m[1];
+  }
+  var secretsUrl = projectRef
+    ? 'https://supabase.com/dashboard/project/' + projectRef + '/settings/functions'
+    : 'https://supabase.com/dashboard';
+  var entraUrl = 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Overview/appId/'
+               + encodeURIComponent(gc.clientId || '');
+
+  // Pipeline health — recent email_sent rows from the audit log.
+  var health = await _renderPipelineHealth();
+
+  body.innerHTML =
+      '<div class="cfg-section">'
+    +   '<div class="cfg-section-title">Email pipeline (Microsoft Graph)</div>'
+    +   '<div class="cfg-section-sub">Reference only. Update the actual secrets via the Supabase Dashboard.</div>'
+
+    +   '<div class="cfg-grid">'
+    +     _cfgRow('Entra app',          gc.appName  || '—')
+    +     _cfgRow('Tenant ID',          gc.tenantId || '—', { mono: true, copy: true })
+    +     _cfgRow('Client ID',          gc.clientId || '—', { mono: true, copy: true })
+    +     _cfgRow('FROM mailbox',       gc.fromUser || '—', { mono: true, copy: true })
+    +     _cfgRow('Reply-To',           gc.replyTo  || '—', { mono: true })
+    +     _cfgRow('Client secret',      'Stored in Supabase secrets - not shown', { muted: true })
+    +   '</div>'
+
+    +   '<div class="cfg-health">' + health + '</div>'
+
+    +   '<div class="cfg-actions">'
+    +     '<a class="btn btn-primary" href="' + _ntfEsc(secretsUrl) + '" target="_blank" rel="noopener">Open Supabase Edge Function Secrets</a>'
+    +     '<a class="btn btn-ghost"   href="' + _ntfEsc(entraUrl)   + '" target="_blank" rel="noopener">Open Entra App Registration</a>'
+    +   '</div>'
+    + '</div>';
+}
+
+function _cfgRow(label, value, opts) {
+  opts = opts || {};
+  var valClass = 'cfg-value' + (opts.mono ? ' is-mono' : '') + (opts.muted ? ' is-muted' : '');
+  var copyBtn  = opts.copy
+    ? ' <button type="button" class="cfg-copy" onclick="_cfgCopyValue(this)" title="Copy">&#128203;</button>'
+    : '';
+  return '<div class="cfg-row">'
+       +   '<div class="cfg-label">' + _ntfEsc(label) + '</div>'
+       +   '<div class="' + valClass + '"><span class="cfg-value-text">' + _ntfEsc(value) + '</span>' + copyBtn + '</div>'
+       + '</div>';
+}
+
+function _cfgCopyValue(btn) {
+  try {
+    var txt = btn.parentNode.querySelector('.cfg-value-text');
+    var val = txt ? (txt.textContent || '') : '';
+    if (!val) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(val).then(function(){ showToast('Copied'); });
+    } else {
+      // Fallback for older browsers
+      var ta = document.createElement('textarea');
+      ta.value = val; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+      showToast('Copied');
+    }
+  } catch (e) {
+    console.warn('[cfg] copy failed:', e);
+  }
+}
+
+// Pipeline health card — queries housing_audit_log for recent email_sent
+// rows. Best-effort: any error renders as "status unknown" so the panel
+// stays usable when the API is unreachable.
+async function _renderPipelineHealth() {
+  try {
+    var sinceIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    var url = SUPABASE_URL + '/rest/v1/housing_audit_log'
+            + '?select=created_at,action,detail'
+            + '&entity_type=eq.notification'
+            + '&created_at=gte.' + encodeURIComponent(sinceIso)
+            + '&order=created_at.desc&limit=50';
+    var r = await fetch(url, { headers: HOUSING_HEADERS });
+    if (!r.ok) return _healthBlock('unknown', 'Could not load recent send history.');
+    var rows = await r.json();
+    if (!rows.length) return _healthBlock('warn', 'No sends in the last 7 days.');
+    var last = rows[0];
+    var when = new Date(last.created_at);
+    var ageMin = Math.round((Date.now() - when.getTime()) / 60000);
+    var ageLabel = ageMin < 60 ? (ageMin + ' min ago')
+                 : ageMin < 1440 ? (Math.round(ageMin / 60) + ' h ago')
+                 : (Math.round(ageMin / 1440) + ' d ago');
+    return _healthBlock('ok',
+        '<strong>Last send:</strong> ' + _ntfEsc(when.toLocaleString()) + ' (' + ageLabel + ')<br/>'
+      + _ntfEsc(last.detail || '') + '<br/>'
+      + '<span class="cfg-health-meta">' + rows.length + ' send' + (rows.length === 1 ? '' : 's') + ' in the last 7 days.</span>');
+  } catch (e) {
+    console.warn('[cfg] pipeline health load failed:', e);
+    return _healthBlock('unknown', 'Could not load recent send history.');
+  }
+}
+
+function _healthBlock(level, html) {
+  var cls = 'cfg-health-box cfg-health-' + level;
+  var icon = level === 'ok' ? '&#9989;' : level === 'warn' ? '&#9888;&#65039;' : '&#10067;';
+  return '<div class="' + cls + '">'
+       +   '<div class="cfg-health-icon">' + icon + '</div>'
+       +   '<div class="cfg-health-body">' + html + '</div>'
+       + '</div>';
+}

@@ -170,6 +170,92 @@
 /* (.ntf-cc-label removed — the unified Recipients + Optional CC layout
    uses the standard .ntf-label for both section headers.) */
 
+/* ── Settings -> Config tab ───────────────────────────────────────────── */
+.cfg-section { display: flex; flex-direction: column; gap: 14px; }
+.cfg-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.cfg-section-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: -8px;
+}
+.cfg-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.cfg-row {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface);
+  align-items: center;
+}
+@media (max-width: 600px) {
+  .cfg-row { grid-template-columns: 1fr; gap: 4px; padding: 10px 12px; }
+}
+.cfg-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--muted);
+}
+.cfg-value {
+  font-size: 13px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.cfg-value.is-mono   { font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, monospace; font-size: 12px; }
+.cfg-value.is-muted  { font-style: italic; color: var(--muted); }
+.cfg-value-text      { overflow-wrap: anywhere; }
+.cfg-value-note      { font-size: 11px; color: var(--muted); font-style: italic; }
+.cfg-copy {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.cfg-copy:hover { background: var(--yellow); color: var(--dark); border-color: var(--yellow); }
+
+/* Pipeline health box */
+.cfg-health-box {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.cfg-health-ok      { border-color: var(--success, #15803d); background: #f0fdf4; }
+.cfg-health-warn    { border-color: var(--warn-amber, #b45309); background: #fef9ec; }
+.cfg-health-unknown { border-color: var(--border); }
+.cfg-health-icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+.cfg-health-body { font-size: 12px; color: var(--text); line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
+.cfg-health-meta { color: var(--muted); font-size: 11px; }
+
+.cfg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 /* ── Placeholder chips ──────────────────────────────────────────────── */
 .ntf-chips {
   display: flex;

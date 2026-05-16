@@ -620,14 +620,26 @@ function updateHeaderUser(role) {
       cfo: 'CFO', finance_l1: 'Finance Clerk' }[role] || 'Staff'
   );
 
-  // Short badge (shown next to name)
-  var badge = { housing_manager: 'HM', ed: 'ED', cfo: 'CFO' }[role] || '';
+  // Short badge (shown next to name). Only management-tier roles get one;
+  // for those, derive the letters from the (possibly renamed) label so
+  // a rename in Settings -> Nation flows through automatically. Skips
+  // common joiners (of, and, the, &) so "Lands & Housing Director" -> "LH".
+  function _initialsFromLabel(s) {
+    if (!s) return '';
+    var words = String(s).trim().split(/\s+/).filter(function(w){
+      return w && !/^(of|the|and|a|an|&)$/i.test(w);
+    });
+    if (!words.length) return '';
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  var BADGE_ROLES = { housing_manager: 1, ed: 1, cfo: 1 };
+  var badge = BADGE_ROLES[role] ? _initialsFromLabel(label) : '';
 
-  // Avatar initials
-  var initials = { housing_employee_l1: 'ST', housing_employee_l2: 'ST',
-                   housing_manager: 'HM', ed: 'ED', cfo: 'CF', finance_l1: 'FC' }[role] || '?';
-
-  // Override with real name initials if session has a name
+  // Avatar initials — name initials if a session name exists, else
+  // derive from the (renamed) label so the avatar tracks the rename
+  // even when sessions lack a display name.
+  var initials = _initialsFromLabel(label) || '?';
   if (HOUSING_SESSION && HOUSING_SESSION.name) {
     var parts = HOUSING_SESSION.name.trim().split(/\s+/);
     initials = parts.length >= 2

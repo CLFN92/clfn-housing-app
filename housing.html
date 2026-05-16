@@ -987,6 +987,7 @@
   <button onclick="showSettingsSection('sec_nation');renderNationPanel();" id="stab_nation" class="tab-btn">&#127760; Nation</button>
   <button onclick="showSettingsSection('sec_themes');renderThemesPanel();" id="stab_themes" class="tab-btn">&#127912; Themes</button>
   <button onclick="showSettingsSection('sec_notifications')" id="stab_notifications" class="tab-btn" data-roles="ed">&#9993;&#65039; Notifications</button>
+  <button onclick="showSettingsSection('sec_config')" id="stab_config" class="tab-btn" data-roles="ed">&#128295; Config</button>
   <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="tab-btn">&#128203; Audit Log</button>
   <button onclick="showSettingsSection('sec_approval_authority');renderApprovalAuthorityPanel();" id="stab_approval_authority" class="tab-btn">&#128274; Approval Authority</button>
 </div>
@@ -1178,7 +1179,8 @@
       </div>
     </div>
     <div class="sec-pad">
-      <div id="nation_panel_identity" class="mb-20"></div>
+      <div id="nation_panel_identity"  class="mb-20"></div>
+      <div id="nation_panel_positions" class="mb-20"></div>
       <div id="nation_panel_modules"></div>
     </div>
   </div>
@@ -1210,6 +1212,21 @@
       </div>
     </div>
     <div class="sec-pad" id="notifications_panel_body">
+      <div class="empty-state-ctr">Loading&hellip;</div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIG -->
+<div id="sec_config" class="settings-section">
+  <div class="card card-flush-gold">
+    <div class="modal-hdr">
+      <div>
+        <div class="lbl-yellow">&#128295; App Configuration</div>
+        <div class="txt-sm-meta">Reference view of the values configured at app setup time. Editable via the linked admin consoles. ED only.</div>
+      </div>
+    </div>
+    <div class="sec-pad" id="config_panel_body">
       <div class="empty-state-ctr">Loading&hellip;</div>
     </div>
   </div>

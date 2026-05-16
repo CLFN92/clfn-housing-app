@@ -15,6 +15,22 @@ window.STORAGE_BUCKET  = 'housing-files';
 // Sentinel checked by shared-auth.js to confirm this file loaded
 window.CLFN_CONFIG_LOADED = true;
 
+// ── Email pipeline reference (display-only) ──────────────────────────────────
+// Mirror of the non-secret GRAPH_* values configured as Supabase Edge
+// Function secrets. Shown in Settings -> Admin -> Config so an admin can
+// verify what's configured without opening the Supabase Dashboard.
+// CLIENT_SECRET deliberately omitted - it's a secret and never leaves
+// Supabase's secrets storage. Update these constants if the Entra app
+// registration or shared mailbox changes; the actual sending continues
+// to read from the Edge Function env vars.
+window.CLFN_GRAPH_CONFIG = {
+  tenantId: '603975c1-4d60-4e17-80bd-61a2b2bb721a',  // CLFN Entra tenant
+  clientId: 'fba694aa-791a-4aa4-aeef-f7ce3a1505cb',  // "CLFN Housing App - Notifications" app
+  fromUser: 'housing@clfn.on.ca',                      // Shared mailbox sent items appear here
+  appName:  'CLFN Housing App - Notifications',
+  replyTo:  'housing@clfn.on.ca'
+};
+
 // ── Build-time fallback logo ────────────────────────────────────────────────
 // Used when no theme.logo override is saved in housing_settings. Lives here
 // (loaded on every page) so the login screen, the shared header, and any
