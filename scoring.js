@@ -335,12 +335,6 @@ function saveScoringModel() {
   }
 }
 
-function resetScoringModel() {
-  liveScoreModel = DEFAULT_SCORING_MODEL.map(function(r){ return Object.assign({},r); });
-  saveScoringModel();
-  auditEntry('SETTINGS','settings_scoring_reset','Housing application scoring model reset to defaults',window.currentRole||'staff');
-}
-
 // ── Nation & Modules panel (read-only, Phase A0) ─────────────────────────
 // Renders the NATION_CONFIG identity + the CLFN_MODULES enablement list so
 // the ED can see what their nation is licensed for. Module toggles are
@@ -863,20 +857,6 @@ function renderScoringModelTable() {
 
   if(!html) html = '<div style="padding:20px;text-align:center;color:var(--muted);">No scoring criteria defined. Click "Add Criteria" to add one.</div>';
   wrap.innerHTML = html;
-}
-
-function confirmResetScoringModel() {
-  showConfirm({
-    title:       'Reset scoring model?',
-    message:     'All custom criteria will be replaced by the defaults. This cannot be undone.',
-    confirmText: 'Reset to Defaults',
-    danger:      true
-  }).then(function(ok){
-    if (!ok) return;
-    resetScoringModel();
-    renderScoringModelTable();
-    showToast('Scoring model reset to defaults');
-  });
 }
 
 // Called by the ✕ button in renderScoringModelTable rows.
