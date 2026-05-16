@@ -158,6 +158,7 @@ var SETTINGS_SECTION_GROUPS = {
   sec_themes:              'admin',
   sec_audit:               'admin',
   sec_approval_authority:  'admin',
+  sec_notifications:       'admin',
   sec_app_scoring:         'app',
   sec_required_fields:     'app',
   sec_unit_match:          'app',
@@ -194,7 +195,7 @@ function showSettingsGroup(groupId) {
 }
 
 function showSettingsSection(section) {
-  var sections = ['sec_users','sec_app_scoring','sec_required_fields','sec_unit_match','sec_reno_score','sec_budget','sec_nation','sec_themes','sec_approval_authority','sec_audit','sec_occupancy'];
+  var sections = ['sec_users','sec_app_scoring','sec_required_fields','sec_unit_match','sec_reno_score','sec_budget','sec_nation','sec_themes','sec_approval_authority','sec_notifications','sec_audit','sec_occupancy'];
   sections.forEach(function(id){
     var el=document.getElementById(id);
     if(el) el.style.display=(id===section)?'block':'none';
@@ -227,6 +228,7 @@ function showSettingsSection(section) {
   if(section==='sec_budget'      && typeof renderBudgetPools==='function') renderBudgetPools();
   if(section==='sec_audit'       && typeof renderAuditLog==='function') renderAuditLog();
   if(section==='sec_occupancy'   && typeof renderNosTable==='function') renderNosTable();
+  if(section==='sec_notifications' && typeof renderNotificationsTab==='function') renderNotificationsTab();
   if(section==='sec_approval_authority' && typeof renderApprovalAuthorityPanel==='function') renderApprovalAuthorityPanel();
 }
 

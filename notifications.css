@@ -1,10 +1,255 @@
 /* ════════════════════════════════════════════════════════════════════════
- * notifications.css — CLFN Housing email notification UI
+ * notifications.css - Settings -> Notifications tab UI
  * ────────────────────────────────────────────────────────────────────────
- * Phase 1 stub. Phase 2 fills this with:
- *   • Settings → Notifications tab two-column layout
- *   • Event list (left) + editor pane (right)
- *   • Rich text toolbar styling
- *   • contentEditable body editor styling
- *   • Placeholder chip styling
+ * Two-column layout (event list + editor pane), rich-text toolbar,
+ * contentEditable body styling, and placeholder chips.
  * ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Two-column grid ────────────────────────────────────────────────── */
+.ntf-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 768px) {
+  .ntf-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Left column: event list ────────────────────────────────────────── */
+.ntf-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+.ntf-event-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background-color .12s ease, border-color .12s ease;
+}
+.ntf-event-item:hover {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.ntf-event-item.is-active {
+  background: var(--surface);
+  border-color: var(--yellow);
+  box-shadow: 0 0 0 1px var(--yellow) inset;
+}
+.ntf-event-text { flex: 1; min-width: 0; }
+.ntf-event-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.ntf-event-desc {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.ntf-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+.ntf-dot-on  { background: var(--success, #15803d); }
+.ntf-dot-off { background: var(--border); }
+
+/* ── Right column: editor pane ──────────────────────────────────────── */
+.ntf-editor {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  min-height: 400px;
+}
+.ntf-editor-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.ntf-editor-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.ntf-editor-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ── Form fields ────────────────────────────────────────────────────── */
+.ntf-field { margin-bottom: 14px; }
+.ntf-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.ntf-label-hint {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+  font-size: 10px;
+  margin-left: 4px;
+}
+.ntf-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+.ntf-input:focus {
+  outline: none;
+  border-color: var(--yellow);
+  box-shadow: 0 0 0 2px rgba(248,228,26,0.18);
+}
+
+/* ── Recipient roles checklist ──────────────────────────────────────── */
+.ntf-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px 12px;
+}
+.ntf-role-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color .12s ease, border-color .12s ease;
+}
+.ntf-role-check:hover    { background: var(--surface); border-color: var(--yellow); }
+.ntf-role-check input    { margin: 0; cursor: pointer; }
+.ntf-role-check input:checked + span { font-weight: 700; color: var(--text); }
+
+/* ── Placeholder chips ──────────────────────────────────────────────── */
+.ntf-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ntf-chip {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, monospace;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color .12s ease, border-color .12s ease;
+}
+.ntf-chip:hover {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: var(--dark);
+}
+
+/* ── Rich text toolbar ──────────────────────────────────────────────── */
+.ntf-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  flex-wrap: wrap;
+}
+.ntf-tool {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 9px;
+  min-width: 28px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color .12s ease, border-color .12s ease;
+}
+.ntf-tool:hover {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.ntf-tool b { font-weight: 800; }
+.ntf-tool i { font-style: italic; }
+.ntf-tool u { text-decoration: underline; }
+.ntf-tool-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+/* ── ContentEditable body ───────────────────────────────────────────── */
+.ntf-body {
+  min-height: 200px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 0 0 6px 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.6;
+  outline: none;
+  overflow-y: auto;
+  max-height: 400px;
+}
+.ntf-body:focus {
+  border-color: var(--yellow);
+  box-shadow: 0 0 0 2px rgba(248,228,26,0.18);
+}
+.ntf-body p  { margin: 0 0 10px; }
+.ntf-body ul,
+.ntf-body ol { margin: 0 0 10px; padding-left: 24px; }
+.ntf-body li { margin-bottom: 4px; }
+.ntf-body a  { color: var(--info-blue, #1d4ed8); text-decoration: underline; }
+.ntf-body strong, .ntf-body b { font-weight: 700; }
+.ntf-body em,     .ntf-body i { font-style: italic; }
+
+/* ── Action buttons row ─────────────────────────────────────────────── */
+.ntf-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}

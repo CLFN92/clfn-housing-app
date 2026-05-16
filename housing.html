@@ -986,6 +986,7 @@
   <button onclick="showSettingsSection('sec_users')" id="stab_users" class="tab-btn active">&#128101; Users</button>
   <button onclick="showSettingsSection('sec_nation');renderNationPanel();" id="stab_nation" class="tab-btn">&#127760; Nation</button>
   <button onclick="showSettingsSection('sec_themes');renderThemesPanel();" id="stab_themes" class="tab-btn">&#127912; Themes</button>
+  <button onclick="showSettingsSection('sec_notifications')" id="stab_notifications" class="tab-btn" data-roles="ed">&#9993;&#65039; Notifications</button>
   <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="tab-btn">&#128203; Audit Log</button>
   <button onclick="showSettingsSection('sec_approval_authority');renderApprovalAuthorityPanel();" id="stab_approval_authority" class="tab-btn">&#128274; Approval Authority</button>
 </div>
@@ -1194,6 +1195,21 @@
       <button onclick="saveApprovalAuthoritySettings()" class="btn btn-primary">Save Changes</button>
     </div>
     <div class="sec-pad" id="approval_authority_panel_body">
+      <div class="empty-state-ctr">Loading&hellip;</div>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATIONS -->
+<div id="sec_notifications" class="settings-section">
+  <div class="card card-flush-gold">
+    <div class="modal-hdr">
+      <div>
+        <div class="lbl-yellow">&#9993;&#65039; Email Notifications</div>
+        <div class="txt-sm-meta">Edit the subject + body of each workflow notification email. Rich text supported. ED only.</div>
+      </div>
+    </div>
+    <div class="sec-pad" id="notifications_panel_body">
       <div class="empty-state-ctr">Loading&hellip;</div>
     </div>
   </div>
