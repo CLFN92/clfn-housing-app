@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
  * housing-tic.js — Tenant Information Card (TIC)
  *
  * Self-contained IIFE that powers the full-screen tenant dashboard

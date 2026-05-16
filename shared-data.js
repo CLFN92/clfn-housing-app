@@ -4232,79 +4232,79 @@ async function scSaveAssignedDocs(app) {
 }
 
 async function scShowAssignDocs(app) {
-  var existing = document.getElementById(‘assignDocsModal’);
+  var existing = document.getElementById('assignDocsModal');
   if (existing) existing.remove();
-  var modal = document.createElement(‘div’);
-  modal.id = ‘assignDocsModal’;
-  modal.style.cssText = ‘position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;’;
+  var modal = document.createElement('div');
+  modal.id = 'assignDocsModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
   document.body.appendChild(modal);
 
-  var appName = ((app.fn || ‘’) + ‘ ‘ + (app.ln || ‘’)).trim();
+  var appName = ((app.fn || '') + ' ' + (app.ln || '')).trim();
   modal.innerHTML =
-      ‘<div style="background:var(--surface);border-radius:12px;width:100%;max-width:580px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.25);">’
-    + ‘<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--border);flex-shrink:0;">’
-    +   ‘<div style="font-size:14px;font-weight:700;">Assign / Manage Files &mdash; ‘ + escapeHtml(appName) + ‘</div>’
-    +   ‘<button id="assignDocsClose" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button>’
-    + ‘</div>’
-    + ‘<div id="assignDocsBody" style="overflow-y:auto;padding:18px 22px;flex:1;">Loading&hellip;</div>’
-    + ‘</div>’;
-  document.getElementById(‘assignDocsClose’).addEventListener(‘click’, function() { modal.remove(); });
+      '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:580px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.25);">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--border);flex-shrink:0;">'
+    +   '<div style="font-size:14px;font-weight:700;">Assign / Manage Files &mdash; ' + escapeHtml(appName) + '</div>'
+    +   '<button id="assignDocsClose" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button>'
+    + '</div>'
+    + '<div id="assignDocsBody" style="overflow-y:auto;padding:18px 22px;flex:1;">Loading&hellip;</div>'
+    + '</div>';
+  document.getElementById('assignDocsClose').addEventListener('click', function() { modal.remove(); });
 
   // Load both in parallel
   var assigned = [], available = [];
   try {
     var [assignedRes, poolFiles] = await Promise.all([
-      fetch(SUPABASE_URL + ‘/rest/v1/app_documents?app_id=eq.’ + encodeURIComponent(app.id || ‘’) + ‘&select=*&order=added_at.asc’, { headers: HOUSING_HEADERS }),
-      sbListFiles(‘applications/APP-/’)
+      fetch(SUPABASE_URL + '/rest/v1/app_documents?app_id=eq.' + encodeURIComponent(app.id || '') + '&select=*&order=added_at.asc', { headers: HOUSING_HEADERS }),
+      sbListFiles('applications/APP-/')
     ]);
     if (assignedRes.ok) assigned = await assignedRes.json();
-    available = (poolFiles || []).filter(function(f) { return f.name && f.name !== ‘.emptyFolderPlaceholder’; });
-  } catch (e) { console.warn(‘[assignDocs] load error:’, e); }
+    available = (poolFiles || []).filter(function(f) { return f.name && f.name !== '.emptyFolderPlaceholder'; });
+  } catch (e) { console.warn('[assignDocs] load error:', e); }
 
-  var body = document.getElementById(‘assignDocsBody’);
+  var body = document.getElementById('assignDocsBody');
   if (!body) return;
 
-  var secH = ‘font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--border);’;
-  var html = ‘’;
+  var secH = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--border);';
+  var html = '';
 
   // ── Section 1: already assigned ──────────────────────────────────────────
-  html += ‘<div style="’ + secH + ‘">Assigned to this applicant (‘ + assigned.length + ‘)</div>’;
+  html += '<div style="' + secH + '">Assigned to this applicant (' + assigned.length + ')</div>';
   if (!assigned.length) {
-    html += ‘<div style="font-size:12px;color:var(--muted);margin-bottom:18px;">No files currently assigned.</div>’;
+    html += '<div style="font-size:12px;color:var(--muted);margin-bottom:18px;">No files currently assigned.</div>';
   } else {
-    html += ‘<div style="margin-bottom:18px;">’;
+    html += '<div style="margin-bottom:18px;">';
     assigned.forEach(function(doc) {
-      var fname = doc.file_name || doc.file_path.split(‘/’).pop();
-      html += ‘<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">’
-            +   ‘<span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="’ + escapeHtml(fname) + ‘">’ + escapeHtml(fname) + ‘</span>’
-            +   ‘<button class="btn btn-ghost btn-sm" onclick="scDeleteAssignedDoc(‘ + escapeHtml(JSON.stringify(doc)) + ‘)" style="white-space:nowrap;color:var(--danger);">Delete</button>’
-            +   ‘<button class="btn btn-ghost btn-sm" onclick="scReassignDoc(‘ + escapeHtml(JSON.stringify(doc)) + ‘)" style="white-space:nowrap;">Reassign &rarr;</button>’
-            + ‘</div>’;
+      var fname = doc.file_name || doc.file_path.split('/').pop();
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">'
+            +   '<span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(fname) + '">' + escapeHtml(fname) + '</span>'
+            +   '<button class="btn btn-ghost btn-sm" onclick="scDeleteAssignedDoc(' + escapeHtml(JSON.stringify(doc)) + ')" style="white-space:nowrap;color:var(--danger);">Delete</button>'
+            +   '<button class="btn btn-ghost btn-sm" onclick="scReassignDoc(' + escapeHtml(JSON.stringify(doc)) + ')" style="white-space:nowrap;">Reassign &rarr;</button>'
+            + '</div>';
     });
-    html += ‘</div>’;
+    html += '</div>';
   }
 
   // ── Section 2: shared pool ────────────────────────────────────────────────
-  html += ‘<div style="’ + secH + ‘">Shared pool (‘ + available.length + ‘)</div>’;
+  html += '<div style="' + secH + '">Shared pool (' + available.length + ')</div>';
   if (!available.length) {
-    html += ‘<div style="font-size:12px;color:var(--muted);">No files in the shared pool.</div>’;
+    html += '<div style="font-size:12px;color:var(--muted);">No files in the shared pool.</div>';
   } else {
-    html += ‘<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Select files to copy into this applicant\’s document library. Each matched file is removed from the pool.</div>’;
-    html += ‘<div id="assignDocsList">’;
+    html += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Select files to copy into this applicant\'s document library. Each matched file is removed from the pool.</div>';
+    html += '<div id="assignDocsList">';
     available.forEach(function(f) {
-      var fpath = ‘applications/APP-/’ + f.name;
+      var fpath = 'applications/APP-/' + f.name;
       var sz    = f.metadata ? (f.metadata.size || 0) : 0;
-      var mime  = f.metadata ? (f.metadata.mimetype || ‘’) : ‘’;
-      html += ‘<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;">’
-            +   ‘<input type="checkbox" data-path="’ + escapeHtml(fpath) + ‘" data-name="’ + escapeHtml(f.name) + ‘" data-size="’ + sz + ‘" data-type="’ + escapeHtml(mime) + ‘"/>’
-            +   ‘<span style="font-size:12px;">’ + escapeHtml(f.name) + ‘</span>’
-            + ‘</label>’;
+      var mime  = f.metadata ? (f.metadata.mimetype || '') : '';
+      html += '<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;">'
+            +   '<input type="checkbox" data-path="' + escapeHtml(fpath) + '" data-name="' + escapeHtml(f.name) + '" data-size="' + sz + '" data-type="' + escapeHtml(mime) + '"/>'
+            +   '<span style="font-size:12px;">' + escapeHtml(f.name) + '</span>'
+            + '</label>';
     });
-    html += ‘</div>’
-          + ‘<button onclick="scSaveAssignedDocs(‘ + escapeHtml(JSON.stringify({id: app.id, fn: app.fn, ln: app.ln})) + ‘)" ‘
-          +   ‘style="margin-top:14px;background:var(--yellow);border:none;color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;width:100%;">’
-          +   ‘Match Selected Files’
-          + ‘</button>’;
+    html += '</div>'
+          + '<button onclick="scSaveAssignedDocs(' + escapeHtml(JSON.stringify({id: app.id, fn: app.fn, ln: app.ln})) + ')" '
+          +   'style="margin-top:14px;background:var(--yellow);border:none;color:var(--text);padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;width:100%;">'
+          +   'Match Selected Files'
+          + '</button>';
   }
 
   body.innerHTML = html;
@@ -4314,126 +4314,126 @@ async function scShowAssignDocs(app) {
 
 async function scDeleteAssignedDoc(doc) {
   if (!doc || !doc.id) return;
-  var fname = doc.file_name || doc.file_path.split(‘/’).pop();
+  var fname = doc.file_name || doc.file_path.split('/').pop();
   var confirmed = await showConfirm({
-    title:       ‘Delete "’ + fname + ‘"?’,
-    message:     ‘This permanently removes the file from this applicant\’s document library and from Storage.’,
-    confirmText: ‘Delete’,
+    title:       'Delete "' + fname + '"?',
+    message:     'This permanently removes the file from this applicant\'s document library and from Storage.',
+    confirmText: 'Delete',
     danger:      true
   });
   if (!confirmed) return;
 
   try {
     // Remove app_documents row
-    await fetch(SUPABASE_URL + ‘/rest/v1/app_documents?id=eq.’ + encodeURIComponent(doc.id), {
-      method: ‘DELETE’, headers: HOUSING_HEADERS
+    await fetch(SUPABASE_URL + '/rest/v1/app_documents?id=eq.' + encodeURIComponent(doc.id), {
+      method: 'DELETE', headers: HOUSING_HEADERS
     });
-    // Delete from Storage (only if file is in the applicant’s own folder, not a pool path)
-    if (doc.file_path && doc.file_path.indexOf(‘applications/APP-/’) === -1) {
+    // Delete from Storage (only if file is in the applicant's own folder, not a pool path)
+    if (doc.file_path && doc.file_path.indexOf('applications/APP-/') === -1) {
       await sbDeleteFile(doc.file_path);
     }
-    showToast(‘File deleted’);
+    showToast('File deleted');
     // Re-open modal for the same app
-    var modal = document.getElementById(‘assignDocsModal’);
+    var modal = document.getElementById('assignDocsModal');
     var app   = modal && modal._scApp;
     if (app) scShowAssignDocs(app);
   } catch (e) {
-    console.warn(‘[assignDocs] delete failed:’, e);
-    showToast(‘Delete failed — see console’);
+    console.warn('[assignDocs] delete failed:', e);
+    showToast('Delete failed — see console');
   }
 }
 
 async function scReassignDoc(doc) {
   if (!doc || !doc.id) return;
-  var fname = doc.file_name || doc.file_path.split(‘/’).pop();
-  var apps  = (typeof applications !== ‘undefined’ ? applications : [])
+  var fname = doc.file_name || doc.file_path.split('/').pop();
+  var apps  = (typeof applications !== 'undefined' ? applications : [])
     .filter(function(a) { return a && a.id && a.id !== doc.app_id && !a.archived; });
 
   // Build picker modal
-  var picker = document.createElement(‘div’);
-  picker.id  = ‘reassignPickerModal’;
-  picker.style.cssText = ‘position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;’;
+  var picker = document.createElement('div');
+  picker.id  = 'reassignPickerModal';
+  picker.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
 
   picker.innerHTML =
-      ‘<div style="background:var(--surface);border-radius:12px;width:100%;max-width:480px;max-height:75vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.3);">’
-    + ‘<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0;">’
-    +   ‘<div><div style="font-size:13px;font-weight:700;">Reassign &mdash; ‘ + escapeHtml(fname) + ‘</div>’
-    +   ‘<div style="font-size:11px;color:var(--muted);margin-top:2px;">Select the applicant to move this file to</div></div>’
-    +   ‘<button onclick="document.getElementById(\’reassignPickerModal\’).remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">&times;</button>’
-    + ‘</div>’
-    + ‘<div style="padding:12px 20px;border-bottom:1px solid var(--border);flex-shrink:0;">’
-    +   ‘<input id="reassignSearch" type="text" placeholder="Search applicant name or ID…" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>’
-    + ‘</div>’
-    + ‘<div id="reassignList" style="overflow-y:auto;flex:1;"></div>’
-    + ‘</div>’;
+      '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:480px;max-height:75vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.3);">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0;">'
+    +   '<div><div style="font-size:13px;font-weight:700;">Reassign &mdash; ' + escapeHtml(fname) + '</div>'
+    +   '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Select the applicant to move this file to</div></div>'
+    +   '<button onclick="document.getElementById(\'reassignPickerModal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">&times;</button>'
+    + '</div>'
+    + '<div style="padding:12px 20px;border-bottom:1px solid var(--border);flex-shrink:0;">'
+    +   '<input id="reassignSearch" type="text" placeholder="Search applicant name or ID…" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>'
+    + '</div>'
+    + '<div id="reassignList" style="overflow-y:auto;flex:1;"></div>'
+    + '</div>';
 
   document.body.appendChild(picker);
 
   function renderPicker(filter) {
-    var listEl = document.getElementById(‘reassignList’);
+    var listEl = document.getElementById('reassignList');
     if (!listEl) return;
     var filtered = apps.filter(function(a) {
       if (!filter) return true;
-      var name = ((a.fn || ‘’) + ‘ ‘ + (a.ln || ‘’)).toLowerCase();
-      return name.indexOf(filter.toLowerCase()) !== -1 || (a.id || ‘’).toLowerCase().indexOf(filter.toLowerCase()) !== -1;
+      var name = ((a.fn || '') + ' ' + (a.ln || '')).toLowerCase();
+      return name.indexOf(filter.toLowerCase()) !== -1 || (a.id || '').toLowerCase().indexOf(filter.toLowerCase()) !== -1;
     });
     if (!filtered.length) {
-      listEl.innerHTML = ‘<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;">No matching applicants.</div>’;
+      listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;">No matching applicants.</div>';
       return;
     }
     listEl.innerHTML = filtered.map(function(a) {
-      var aName = ((a.fn || ‘’) + ‘ ‘ + (a.ln || ‘’)).trim() || ‘—‘;
-      return ‘<button style="display:block;width:100%;text-align:left;padding:10px 20px;border:none;border-bottom:1px solid var(--border);background:none;cursor:pointer;font-family:DM Sans,sans-serif;" ‘
-           + ‘onmouseover="this.style.background=\’var(--bg)\’" onmouseout="this.style.background=\’none\’" ‘
-           + ‘onclick="_scDoReassign(‘ + escapeHtml(JSON.stringify(doc)) + ‘,\’’ + escapeHtml(a.id) + ‘\’,\’’ + escapeHtml(aName) + ‘\’)">’
-           +   ‘<div style="font-size:13px;font-weight:600;color:var(--text);">’ + escapeHtml(aName) + ‘</div>’
-           +   ‘<div style="font-size:11px;color:var(--muted);">’ + escapeHtml(a.id || ‘’) + ‘ &middot; ‘ + escapeHtml(a.status || ‘’) + ‘</div>’
-           + ‘</button>’;
-    }).join(‘’);
+      var aName = ((a.fn || '') + ' ' + (a.ln || '')).trim() || '—';
+      return '<button style="display:block;width:100%;text-align:left;padding:10px 20px;border:none;border-bottom:1px solid var(--border);background:none;cursor:pointer;font-family:DM Sans,sans-serif;" '
+           + 'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'none\'" '
+           + 'onclick="_scDoReassign(' + escapeHtml(JSON.stringify(doc)) + ',\'' + escapeHtml(a.id) + '\',\'' + escapeHtml(aName) + '\')">'
+           +   '<div style="font-size:13px;font-weight:600;color:var(--text);">' + escapeHtml(aName) + '</div>'
+           +   '<div style="font-size:11px;color:var(--muted);">' + escapeHtml(a.id || '') + ' &middot; ' + escapeHtml(a.status || '') + '</div>'
+           + '</button>';
+    }).join('');
   }
 
-  renderPicker(‘’);
-  var searchEl = document.getElementById(‘reassignSearch’);
-  if (searchEl) searchEl.addEventListener(‘input’, function() { renderPicker(this.value); });
+  renderPicker('');
+  var searchEl = document.getElementById('reassignSearch');
+  if (searchEl) searchEl.addEventListener('input', function() { renderPicker(this.value); });
 }
 
 async function _scDoReassign(doc, targetAppId, targetName) {
-  document.getElementById(‘reassignPickerModal’) && document.getElementById(‘reassignPickerModal’).remove();
-  var fname = doc.file_name || doc.file_path.split(‘/’).pop();
-  showToast(‘Reassigning ‘ + fname + ‘…’);
+  document.getElementById('reassignPickerModal') && document.getElementById('reassignPickerModal').remove();
+  var fname = doc.file_name || doc.file_path.split('/').pop();
+  showToast('Reassigning ' + fname + '…');
   try {
-    var destPath = ‘applications/’ + targetAppId + ‘/’ + Date.now() + ‘_’ + fname;
-    // Copy to target applicant’s folder
+    var destPath = 'applications/' + targetAppId + '/' + Date.now() + '_' + fname;
+    // Copy to target applicant's folder
     await sbCopyFile(doc.file_path, destPath);
     // Insert new app_documents row for target
-    await fetch(SUPABASE_URL + ‘/rest/v1/app_documents’, {
-      method:  ‘POST’,
-      headers: Object.assign({}, HOUSING_HEADERS, { ‘Prefer’: ‘return=minimal’ }),
+    await fetch(SUPABASE_URL + '/rest/v1/app_documents', {
+      method:  'POST',
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
       body:    JSON.stringify({
         app_id:    targetAppId,
         file_path: destPath,
         file_name: fname,
         file_size: doc.file_size || 0,
-        file_type: doc.file_type || ‘’,
-        added_by:  window.currentUser || window.currentRole || ‘admin’
+        file_type: doc.file_type || '',
+        added_by:  window.currentUser || window.currentRole || 'admin'
       })
     });
     // Delete old app_documents row
-    await fetch(SUPABASE_URL + ‘/rest/v1/app_documents?id=eq.’ + encodeURIComponent(doc.id), {
-      method: ‘DELETE’, headers: HOUSING_HEADERS
+    await fetch(SUPABASE_URL + '/rest/v1/app_documents?id=eq.' + encodeURIComponent(doc.id), {
+      method: 'DELETE', headers: HOUSING_HEADERS
     });
     // Delete source file from Storage (if not a pool path)
-    if (doc.file_path && doc.file_path.indexOf(‘applications/APP-/’) === -1) {
+    if (doc.file_path && doc.file_path.indexOf('applications/APP-/') === -1) {
       await sbDeleteFile(doc.file_path);
     }
-    showToast(‘✓ ‘ + fname + ‘ reassigned to ‘ + targetName);
+    showToast('✓ ' + fname + ' reassigned to ' + targetName);
     // Refresh the assign modal
-    var modal = document.getElementById(‘assignDocsModal’);
+    var modal = document.getElementById('assignDocsModal');
     var app   = modal && modal._scApp;
     if (app) scShowAssignDocs(app);
   } catch (e) {
-    console.warn(‘[assignDocs] reassign failed:’, e);
-    showToast(‘Reassign failed — see console’);
+    console.warn('[assignDocs] reassign failed:', e);
+    showToast('Reassign failed — see console');
   }
 }
 
