@@ -2212,17 +2212,17 @@
     }
     blankSigCol(L,     halfW); blankSigCol(col2X, halfW);
     y += 7;
-    pdf.text('Name (Print):', L);     uline(L + 26,     L + halfW,  y + 0.8);
-    pdf.text('Name (Print):', col2X); uline(col2X + 26, W - R,      y + 0.8);
+    pdf.text('Name (Print):', L,     y); uline(L + 26,     L + halfW,  y + 0.8);
+    pdf.text('Name (Print):', col2X, y); uline(col2X + 26, W - R,      y + 0.8);
     y += 7;
-    pdf.text('Signature:',    L);     uline(L + 18,     L + halfW,  y + 0.8);
-    pdf.text('Signature:',    col2X); uline(col2X + 18, W - R,      y + 0.8);
+    pdf.text('Signature:',    L,     y); uline(L + 18,     L + halfW,  y + 0.8);
+    pdf.text('Signature:',    col2X, y); uline(col2X + 18, W - R,      y + 0.8);
     y += 10;
-    pdf.text('Name (Print):', L);     uline(L + 26,     L + halfW,  y + 0.8);
-    pdf.text('Name (Print):', col2X); uline(col2X + 26, W - R,      y + 0.8);
+    pdf.text('Name (Print):', L,     y); uline(L + 26,     L + halfW,  y + 0.8);
+    pdf.text('Name (Print):', col2X, y); uline(col2X + 26, W - R,      y + 0.8);
     y += 7;
-    pdf.text('Signature:',    L);     uline(L + 18,     L + halfW,  y + 0.8);
-    pdf.text('Signature:',    col2X); uline(col2X + 18, W - R,      y + 0.8);
+    pdf.text('Signature:',    L,     y); uline(L + 18,     L + halfW,  y + 0.8);
+    pdf.text('Signature:',    col2X, y); uline(col2X + 18, W - R,      y + 0.8);
 
     // Rotated watermark (left margin, matching the original)
     pdf.setFontSize(6.5); pdf.setTextColor(120);
