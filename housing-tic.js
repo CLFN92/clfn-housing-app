@@ -1940,6 +1940,11 @@
   // ── Hydro One Consent for Disclosure — PDF generator ──────────────────────
   // Replicates the official Hydro One form layout exactly so it is accepted.
   // Part C (Termination) is rendered blank for later use.
+  //
+  // Fixes applied vs v1:
+  //   • Checkboxes: drawn tick lines (✓ glyph is absent in jsPDF Helvetica)
+  //   • Part B sigs: single clean two-column block — no duplicate Name rows
+  //   • Part C: clean two-column blocks — no stray "Hydro"/"One" inline text
   async function _ticGenerateHydroOneConsentPdf() {
     if (typeof _loadJsPdf === 'function') await _loadJsPdf();
     if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable'); return; }
@@ -1983,12 +1988,14 @@
       if (val) pdf.text(String(val).substring(0, Math.floor(w / 1.8)), x, yy);
       uline(x, x + w, yy + 0.8);
     }
+    // Draw checkbox square + tick mark via lines (✓ glyph missing in jsPDF Helvetica)
     function chkBox(x, yy, checked) {
       pdf.setDrawColor(0); pdf.setLineWidth(0.35); pdf.setFillColor(255,255,255);
       pdf.rect(x, yy - 3.2, 3.8, 3.8, 'FD');
       if (checked) {
-        pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(0);
-        pdf.text('✓', x + 0.4, yy - 0.1);
+        pdf.setDrawColor(0); pdf.setLineWidth(0.6);
+        pdf.line(x + 0.5, yy - 1.4, x + 1.5, yy - 0.2);
+        pdf.line(x + 1.5, yy - 0.2, x + 3.3, yy - 2.8);
       }
     }
     function chkRow(x, yy, checked, boldLabel, description) {
@@ -2001,31 +2008,22 @@
       pdf.text(descLines, tx, yy + lh);
       return yy + lh + descLines.length * lh + 1.5;
     }
-    function sigBlock(x, w, yy, printedName, sigImg, label) {
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(80);
-      pdf.text(label, x, yy);
-      yy += 3;
-      pdf.setFontSize(7.5); pdf.setTextColor(0);
-      pdf.text('Name (Print): ' + (printedName || ''), x, yy);
-      yy += 5;
-      pdf.text('Signature:', x, yy);
-      // Signature box / line
-      var bY = yy + 1, bH = 18;
+    // Render a signature into an existing signature line area.
+    // Does NOT write "Name (Print)" or "Signature:" labels — caller owns those.
+    function renderSig(sigImg, x, lineY, w) {
+      var sigH = 15;
       if (sigImg && sigImg.indexOf('data:image') === 0) {
-        try { pdf.addImage(sigImg, 'PNG', x, bY, w - 2, bH); } catch(e) {}
+        try { pdf.addImage(sigImg, 'PNG', x, lineY - sigH, w, sigH); } catch(e) {}
       } else if (sigImg && sigImg.indexOf('typed:') === 0) {
-        var typed = sigImg.replace('typed:', '');
-        pdf.setFont('helvetica','italic'); pdf.setFontSize(13); pdf.setTextColor(0);
-        pdf.text(typed, x + 2, bY + bH / 2 + 2);
-        pdf.setFont('helvetica','normal');
+        pdf.setFont('helvetica','italic'); pdf.setFontSize(12); pdf.setTextColor(0);
+        pdf.text(sigImg.replace('typed:',''), x + 1, lineY - 3);
+        pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5);
       } else if (sigImg && sigImg.indexOf('wet:') === 0) {
-        var ref = sigImg.replace('wet:', '');
+        var ref = sigImg.replace('wet:','');
         pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(100);
-        pdf.text(ref === 'pending' ? 'Physical signature on file' : 'E-sign ref: ' + ref, x + 2, bY + bH / 2);
-        pdf.setTextColor(0);
+        pdf.text(ref === 'pending' ? 'Physical signature on file' : 'E-sign ref: ' + ref, x + 1, lineY - 5);
+        pdf.setTextColor(0); pdf.setFontSize(7.5);
       }
-      uline(x, x + w - 2, bY + bH);
-      return bY + bH + 2;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -2161,20 +2159,26 @@
     pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5);
     pdf.text('Date: ' + dateDisp, L, y);
     uline(L + 10, L + 70, y + 0.8);
-    y += 6;
+    y += 7;
 
-    // Part B Name (Print) row
-    pdf.text('Name (Print):',     L,          y);
-    uline(L + 24, L + CW/2 - 4,  y + 0.8);
-    pdf.text('Name (Print):',     L + CW/2 + 4, y);
-    uline(L + CW/2 + 28, W - R,  y + 0.8);
-    y += 5;
+    // Part B — Name (Print) row
+    var halfW = (CW - 4) / 2;
+    var col2X = L + halfW + 4;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5); pdf.setTextColor(0);
+    pdf.text('Name (Print): ' + custName, L, y);
+    uline(L + 26, L + halfW, y + 0.8);
+    pdf.text('Name (Print):', col2X, y);
+    uline(col2X + 26, W - R, y + 0.8);
+    y += 7;
 
-    // Part B Signature blocks
-    var halfW = CW / 2 - 3;
-    var newY1 = sigBlock(L,              halfW, y, custName, sigData, 'Customer');
-    var newY2 = sigBlock(L + CW/2 + 4,  halfW, y, '',       '',      'Hydro One Networks Inc.');
-    y = Math.max(newY1, newY2) + 2;
+    // Part B — Signature row (left = customer, right = Hydro One blank)
+    pdf.text('Signature:', L, y);
+    pdf.text('Signature:', col2X, y);
+    var sigLineY = y + 16;
+    renderSig(sigData, L + 18, sigLineY, halfW - 18);
+    uline(L + 18, L + halfW, sigLineY);
+    uline(col2X + 18, W - R, sigLineY);
+    y = sigLineY + 4;
 
     // Note box
     pdf.setDrawColor(0); pdf.setLineWidth(0.3); pdf.setFillColor(245,245,245);
@@ -2184,12 +2188,12 @@
     pdf.rect(L, y, CW, noteH, 'FD');
     pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(0);
     pdf.text(noteLines, L + 3, y + 4);
-    y += noteH + 3;
+    y += noteH + 4;
 
     hline(y, 0.5); y += 4;
 
     // ═══════════════════════════════════════════════════════════════════
-    // PART C: Termination (blank — for future use)
+    // PART C: Termination (blank — completed only when terminating)
     // ═══════════════════════════════════════════════════════════════════
     pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(0);
     pdf.text('PART C: Termination of Consent for Disclosure of Information to Above-Named Third-Party', L, y);
@@ -2199,30 +2203,30 @@
     var termLines = pdf.splitTextToSize(
       'The above-noted customer terminates consent to the disclosure of account-related information to the Third-Party above-named effective as of the date signed below.',
       CW);
-    pdf.text(termLines, L, y); y += termLines.length * lh + 4;
+    pdf.text(termLines, L, y); y += termLines.length * lh + 5;
 
-    // Part C date + names
-    pdf.text('Date:',         L,            y); uline(L + 10, L + CW/2 - 4, y + 0.8);
-    pdf.text('Date:',         L + CW/2 + 4, y); uline(L + CW/2 + 14, W - R, y + 0.8);
-    y += 5;
-    pdf.text('Name (Print):', L,            y); uline(L + 24, L + CW/2 - 4, y + 0.8);
-    pdf.text('Name (Print):', L + CW/2 + 4, y); uline(L + CW/2 + 28, W - R, y + 0.8);
-    y += 5;
-    pdf.text('Signature:',    L,            y); uline(L + 18, L + CW/2 - 4, y + 0.8);
-    pdf.text('Signature:',    L + CW/2 + 4, y); uline(L + CW/2 + 22, W - R, y + 0.8);
+    // Part C — two clean signature columns (both blank)
+    function blankSigCol(x, w) {
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5); pdf.setTextColor(0);
+      pdf.text('Date:', x, y); uline(x + 10, x + w, y + 0.8);
+    }
+    blankSigCol(L,     halfW); blankSigCol(col2X, halfW);
+    y += 7;
+    pdf.text('Name (Print):', L);     uline(L + 26,     L + halfW,  y + 0.8);
+    pdf.text('Name (Print):', col2X); uline(col2X + 26, W - R,      y + 0.8);
+    y += 7;
+    pdf.text('Signature:',    L);     uline(L + 18,     L + halfW,  y + 0.8);
+    pdf.text('Signature:',    col2X); uline(col2X + 18, W - R,      y + 0.8);
     y += 10;
-    pdf.text('Name (Print):', L,            y); uline(L + 24, L + CW/2 - 4, y + 0.8);
-    pdf.text('Hydro',         L + CW/2 + 4, y);
-    pdf.text('Name (Print):', L + CW/2 + 20, y); uline(L + CW/2 + 44, W - R, y + 0.8);
-    y += 5;
-    pdf.text('Signature:',    L,            y); uline(L + 18, L + CW/2 - 4, y + 0.8);
-    pdf.text('One',           L + CW/2 + 4, y);
-    pdf.text('Signature:',    L + CW/2 + 20, y); uline(L + CW/2 + 38, W - R, y + 0.8);
+    pdf.text('Name (Print):', L);     uline(L + 26,     L + halfW,  y + 0.8);
+    pdf.text('Name (Print):', col2X); uline(col2X + 26, W - R,      y + 0.8);
+    y += 7;
+    pdf.text('Signature:',    L);     uline(L + 18,     L + halfW,  y + 0.8);
+    pdf.text('Signature:',    col2X); uline(col2X + 18, W - R,      y + 0.8);
 
-    // Rotated Hydro One watermark (left margin, like the original)
-    pdf.setFontSize(7); pdf.setTextColor(100);
-    pdf.setFont('helvetica','normal');
-    pdf.text('Hydro One Networks Inc.  04/12', 5, 260, { angle: 90 });
+    // Rotated watermark (left margin, matching the original)
+    pdf.setFontSize(6.5); pdf.setTextColor(120);
+    pdf.text('Hydro One Networks Inc.  04/12', 6, 262, { angle: 90 });
     pdf.setTextColor(0);
 
     // Output
