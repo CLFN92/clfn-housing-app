@@ -471,85 +471,425 @@ async function _loadJsPdf() {
     function(){ return !!(window.jspdf && window.jspdf.jsPDF); }
   );
 }
-async function _loadHtml2Canvas() {
-  await _loadScriptOnce(
-    'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
-    function(){ return !!window.html2canvas; }
-  );
-}
-
-// Build the application preview HTML by intercepting showPrintPanel —
-// printApplicationPreview() in housing-app.js builds a full HTML doc
-// then hands it off; we capture the doc and skip the on-screen panel.
-// Avoids refactoring the 320-line printApplicationPreview function.
-function _captureApplicationPreviewHtml() {
-  if (typeof printApplicationPreview !== 'function') {
-    throw new Error('printApplicationPreview not available on this page');
-  }
-  var captured = null;
-  var original = window.showPrintPanel;
-  window.showPrintPanel = function(html /*, title*/){
-    captured = html;
-  };
-  try {
-    printApplicationPreview();
-  } finally {
-    window.showPrintPanel = original;
-  }
-  if (!captured) throw new Error('Could not capture application preview HTML');
-  return captured;
-}
-
-// Render the application preview HTML to a base64-encoded PDF using
-// jsPDF.html(). Generates an off-screen iframe so the page stylesheets
-// don't bleed into the rendered output. Caller awaits the base64 string.
+// Generate the applicant confirmation PDF as a text-rendered (vector)
+// document using jsPDF's native text + line primitives. Walks the live
+// form fields the same way printApplicationPreview() does, but emits
+// selectable text rather than rasterised HTML. Signature canvases are
+// embedded as small PNG images at the end (the only raster content).
+// Output is typically ~20-60 KB and the text stays sharp at any zoom.
 async function _generateApplicationPdfBase64() {
   await _loadJsPdf();
-  await _loadHtml2Canvas();
   if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF not available');
 
-  var html = _captureApplicationPreviewHtml();
-  console.log('[notify/pdf] captured preview html length:', html.length);
+  var pdf       = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
+  var pageW     = pdf.internal.pageSize.getWidth();   // 210
+  var pageH     = pdf.internal.pageSize.getHeight();  // 297
+  var marginL = 14, marginR = 14, marginT = 14, marginB = 14;
+  var contentW  = pageW - marginL - marginR;
+  var y         = marginT;
+  var pageNum   = 1;
 
-  // Mount in an off-screen iframe so the page's own styles don't apply
-  // to the PDF render. Width matches A4 (~794px @ 96dpi). Height is
-  // tall enough for a multi-page application — html2canvas needs the
-  // body to actually have height to capture content; 10px clipped.
-  var iframe = document.createElement('iframe');
-  iframe.style.position   = 'absolute';
-  iframe.style.left       = '-99999px';
-  iframe.style.top        = '0';
-  iframe.style.width      = '794px';
-  iframe.style.height     = '2400px';
-  iframe.style.border     = 'none';
-  document.body.appendChild(iframe);
-  var idoc = iframe.contentDocument;
-  idoc.open();
-  idoc.write(html);
-  idoc.close();
+  // ── Layout primitives ─────────────────────────────────────────────
+  function drawFooter() {
+    pdf.setFontSize(8);
+    pdf.setTextColor(140);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Page ' + pageNum, pageW - marginR, pageH - 6, { align: 'right' });
+    pdf.setTextColor(0);
+  }
+  function needSpace(h) {
+    if (y + h > pageH - marginB) {
+      drawFooter();
+      pdf.addPage();
+      pageNum++;
+      y = marginT;
+    }
+  }
+  function sectionHeader(title) {
+    needSpace(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.setTextColor(100);
+    pdf.text(String(title).toUpperCase(), marginL, y + 3);
+    pdf.setDrawColor(248, 228, 26);   // CLFN yellow
+    pdf.setLineWidth(0.8);
+    pdf.line(marginL, y + 4.5, pageW - marginR, y + 4.5);
+    pdf.setDrawColor(0);
+    pdf.setTextColor(0);
+    y += 7;
+  }
+  function row(label, value) {
+    var labelW = 55;
+    var gap    = 3;
+    var valueX = marginL + labelW + gap;
+    var valueW = contentW - labelW - gap;
+    var v      = (value == null || value === '') ? '—' : String(value);
 
-  // Wait a beat for the iframe to parse + lay out (signature images,
-  // any inline data URLs, etc.). 200ms is enough for the typical case;
-  // jsPDF.html() also internally awaits html2canvas, which is what
-  // actually rasterises the content.
-  await new Promise(function(r){ setTimeout(r, 200); });
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8.5);
+    var labelLines = pdf.splitTextToSize(label, labelW);
+    var valueLines = pdf.splitTextToSize(v,    valueW);
+    var rowH = Math.max(labelLines.length, valueLines.length) * 4 + 1;
+    needSpace(rowH + 1);
 
-  var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
-  await doc.html(idoc.body, {
-    margin:      [10, 10, 10, 10],
-    autoPaging:  'text',
-    width:       190,    // mm — fits A4 with 10mm margins
-    windowWidth: 794,    // px — matches iframe width
-    html2canvas: { scale: 0.75, useCORS: true, allowTaint: true, logging: false }
+    pdf.setTextColor(110);
+    pdf.text(labelLines, marginL, y + 3);
+    pdf.setTextColor(20);
+    pdf.text(valueLines, valueX, y + 3);
+
+    y += rowH;
+    pdf.setDrawColor(230);
+    pdf.setLineWidth(0.1);
+    pdf.line(marginL, y, pageW - marginR, y);
+    pdf.setDrawColor(0);
+    y += 1.5;
+  }
+  function paragraph(text, fontSize) {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(fontSize || 9);
+    pdf.setTextColor(40);
+    var lines = pdf.splitTextToSize(String(text), contentW);
+    needSpace(lines.length * 4 + 2);
+    pdf.text(lines, marginL, y + 3);
+    y += lines.length * 4 + 2;
+    pdf.setTextColor(0);
+  }
+  function gap(h) { y += (h || 3); }
+
+  // ── Form readers ──────────────────────────────────────────────────
+  function fld(id) {
+    var e = document.getElementById(id);
+    return (e && e.value && String(e.value).trim()) ? String(e.value).trim() : '';
+  }
+  function chk(id) {
+    var e = document.getElementById(id); return e ? !!e.checked : false;
+  }
+  function yn(v) { return v ? 'Yes' : 'No'; }
+  function fmtPhone(v) {
+    return (typeof formatPhone === 'function' && v) ? formatPhone(v) : (v || '');
+  }
+  function fmtCur(v) {
+    if (v == null || v === '') return '';
+    if (typeof formatCurrency === 'function' && typeof parseCurrency === 'function') {
+      return formatCurrency(parseCurrency(v));
+    }
+    return '$' + v;
+  }
+  function dollarQ(sel) {
+    var e = document.querySelector(sel); return e ? fmtCur(e.value) : '';
+  }
+  function getSig(canvasId) {
+    if (typeof getSigDataURL === 'function') {
+      try { return getSigDataURL(canvasId); } catch (e) { return ''; }
+    }
+    var c = document.getElementById(canvasId);
+    try { return c ? c.toDataURL('image/png') : ''; } catch (e) { return ''; }
+  }
+
+  var today   = new Date().toLocaleDateString('en-CA');
+  var appId   = (typeof currentAppId !== 'undefined' && currentAppId) ? currentAppId : '—';
+  var nation  = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
+  var short   = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
+  var fnVal   = fld('fn');
+  var lnVal   = fld('ln');
+  var fullName= (fnVal + ' ' + lnVal).trim() || '—';
+  var hasCoApp= (document.getElementById('co_status') || {}).value === 'yes';
+  var hasHouse= chk('hasHouseToggle');
+  var hasArr  = chk('arrToggle');
+
+  // ── HEADER ────────────────────────────────────────────────────────
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(15);
+  pdf.text((short ? short + ' ' : '') + 'Housing Application', marginL, y + 5);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  pdf.setTextColor(110);
+  if (nation) pdf.text(nation, marginL, y + 10);
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(11);
+  pdf.setTextColor(20);
+  pdf.text(fullName, pageW - marginR, y + 5, { align: 'right' });
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  pdf.setTextColor(110);
+  pdf.text(appId,             pageW - marginR, y + 10, { align: 'right' });
+  pdf.text('Date: ' + today,  pageW - marginR, y + 15, { align: 'right' });
+  y += 17;
+  pdf.setDrawColor(248, 228, 26);
+  pdf.setLineWidth(1);
+  pdf.line(marginL, y, pageW - marginR, y);
+  pdf.setDrawColor(0);
+  pdf.setTextColor(0);
+  y += 6;
+
+  // ── 1. APPLICANT INFORMATION ──────────────────────────────────────
+  sectionHeader('Applicant Information');
+  row('First Name',             fld('fn'));
+  row('Last Name',              fld('ln'));
+  row('Date of Birth',          fld('dob'));
+  row('Band Number',            fld('band'));
+  row('On Reserve Status',      fld('reserve'));
+  row('Marital Status',         fld('marital'));
+  row('Cell Phone',             fmtPhone(fld('phone')));
+  row('Email Address',          fld('email'));
+  row('Application Date',       fld('appDate'));
+  row('Accessibility Needs',    fld('accessibility'));
+  row('Housing Classification',
+    typeof getHousingClassification === 'function' ? getHousingClassification() : '');
+  gap();
+
+  // ── 2. CURRENT ADDRESS ────────────────────────────────────────────
+  sectionHeader('Current Address');
+  row('Street Address',           fld('street'));
+  row('City',                     fld('city'));
+  row('Province',                 fld('prov'));
+  row('Postal Code',              fld('postal'));
+  row('Expected Occupancy Date',  fld('occDate'));
+  gap();
+
+  // ── 3. CURRENT HOUSING & ARREARS ──────────────────────────────────
+  sectionHeader('Current Housing & Arrears');
+  row('Currently Has a House', yn(hasHouse));
+  if (hasHouse) {
+    row('Home Condition',       fld('homeCondition'));
+    row('Est. Renovation Cost', dollarQ('#homeCondBlk input[type="number"]'));
+  }
+  row('Arrears Owed to ' + (short || 'CLFN'), yn(hasArr));
+  var arrNums  = document.querySelectorAll('#arrBlk input[type="number"]');
+  var arrDates = document.querySelectorAll('#arrBlk input[type="date"]');
+  var arrSel   = document.querySelector('#arrBlk select');
+  row('Amount Owed',        hasArr ? fmtCur(arrNums[0] && arrNums[0].value) : 'N/A');
+  row('Monthly Payment',    hasArr ? fmtCur(arrNums[1] && arrNums[1].value) : 'N/A');
+  row('Plan Duration',      hasArr ? (arrNums[3] && arrNums[3].value ? arrNums[3].value + ' months' : '—') : 'N/A');
+  row('Payment Frequency',  hasArr ? (arrSel ? arrSel.value : '') : 'N/A');
+  row('Agreement Date',     hasArr ? (arrDates[0] ? arrDates[0].value : '') : 'N/A');
+  gap();
+
+  // ── 4. EMPLOYMENT & INCOME ────────────────────────────────────────
+  sectionHeader('Employment & Income');
+  var incomeRows = 0;
+  document.querySelectorAll('#incomeList .rrow').forEach(function(r, i){
+    var sels = r.querySelectorAll('select');
+    var nums = r.querySelectorAll('input[type="number"]');
+    var txts = r.querySelectorAll('input[type="text"]');
+    var person = sels[0] ? sels[0].value : '';
+    var type   = sels[1] ? sels[1].value : '';
+    var amt    = nums[0] && nums[0].value ? fmtCur(nums[0].value) : '';
+    var emp    = txts[0] ? txts[0].value : '';
+    row(person || ('Income ' + (i + 1)),
+        type + (amt ? ' — ' + amt : '') + (emp ? ' · ' + emp : ''));
+    incomeRows++;
   });
+  if (!incomeRows) row('Income / Employment', '');
+  gap();
 
-  document.body.removeChild(iframe);
+  // ── 5. CO-APPLICANT ───────────────────────────────────────────────
+  sectionHeader('Co-Applicant');
+  row('Co-Applicant', hasCoApp ? 'Yes' : 'No');
+  if (hasCoApp) {
+    row('First Name',     fld('co_fn'));
+    row('Last Name',      fld('co_ln'));
+    row('Date of Birth',  fld('co_dob'));
+    row('Band Number',    fld('co_band'));
+    row('Reserve Status', fld('co_reserve'));
+    row('Cell Phone',     fmtPhone(fld('co_cell')));
+    row('Email',          fld('co_email'));
+  }
+  gap();
 
-  // Use jsPDF's data-URI output and strip the prefix to get clean base64.
-  // Avoids btoa(binary) edge cases when PDF bytes include chars > 0xFF.
-  var dataUri = doc.output('datauristring');
+  // ── 6. HOUSEHOLD MEMBERS ──────────────────────────────────────────
+  sectionHeader('Household Members');
+  var habRows = 0;
+  document.querySelectorAll('#habList .rrow').forEach(function(r, i){
+    var txts = r.querySelectorAll('input[type="text"]');
+    var dt   = r.querySelector('input[type="date"]');
+    var sel  = r.querySelector('select');
+    var nm   = [(txts[0] ? txts[0].value : ''), (txts[1] ? txts[1].value : '')]
+                 .filter(Boolean).join(' ') || ('Member ' + (i + 1));
+    row(nm, (sel ? sel.value : '') + (dt && dt.value ? ' · DOB: ' + dt.value : ''));
+    habRows++;
+  });
+  if (!habRows) row('Household Members', '');
+  gap();
+
+  // ── 7. REFERENCES ─────────────────────────────────────────────────
+  sectionHeader('References');
+  var refRows = 0;
+  document.querySelectorAll('#refList .rrow').forEach(function(r, i){
+    var txts = r.querySelectorAll('input[type="text"]');
+    var tels = r.querySelectorAll('input[type="tel"]');
+    var ems  = r.querySelectorAll('input[type="email"]');
+    var sel  = r.querySelector('select');
+    var nm   = [(txts[0] ? txts[0].value : ''), (txts[1] ? txts[1].value : '')]
+                 .filter(Boolean).join(' ') || ('Reference ' + (i + 1));
+    row(nm, (sel ? sel.value : '')
+          + (tels[0] && tels[0].value ? ' · ' + fmtPhone(tels[0].value) : '')
+          + (ems[0]  && ems[0].value  ? ' · ' + ems[0].value : ''));
+    refRows++;
+  });
+  if (!refRows) row('References', '');
+  gap();
+
+  // ── 8. PETS ───────────────────────────────────────────────────────
+  var petRows = document.querySelectorAll('#petList .rrow');
+  if (petRows.length) {
+    sectionHeader('Pets');
+    petRows.forEach(function(r, i){
+      var txts = r.querySelectorAll('input[type="text"]');
+      var sels = r.querySelectorAll('select');
+      var ta   = r.querySelector('textarea');
+      var nm   = txts[0] ? txts[0].value : ('Pet ' + (i + 1));
+      row(nm, [(sels[0] ? sels[0].value : ''),
+               (sels[1] ? sels[1].value : ''),
+               (ta      ? ta.value      : '')].filter(Boolean).join(' · '));
+    });
+    gap();
+  }
+
+  // ── 9. SUPPORTING DOCUMENTS ───────────────────────────────────────
+  sectionHeader('Supporting Documents Submitted');
+  var docLabels = ['Government Issued Photo ID', 'Proof of Band Membership',
+                   'Income / Employment Letter', 'Last 2 Pay Stubs',
+                   'Utility Bills',              'Arrears Payment Agreement'];
+  document.querySelectorAll('#step6 input[type="checkbox"]').forEach(function(cb, i){
+    row(docLabels[i] || ('Doc ' + (i + 1)), cb.checked ? 'Included' : 'Not included');
+  });
+  gap();
+
+  // ── TERMS & CONDITIONS ────────────────────────────────────────────
+  needSpace(20);
+  sectionHeader('Terms & Conditions — Applicant Declaration');
+  paragraph('By signing below, I hereby apply for housing assistance from the '
+    + (nation ? nation + ' ' : '')
+    + (short  ? '(' + short + ') ' : '')
+    + 'Housing Program and declare the following:');
+  gap(1);
+
+  var consented = (document.getElementById('consent_share_programs') || {}).checked;
+  var terms = [
+    'All information provided in this application is true, accurate, and complete to the best of my knowledge.',
+    'I understand that providing false or misleading information may result in immediate disqualification and removal from the housing waitlist.',
+    'I consent to ' + (short || 'CLFN') + ' collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation (PIPEDA).'
+  ];
+  if (consented) {
+    terms.push('I consent to ' + (short || 'CLFN') + ' Housing sharing relevant information from this application with other '
+      + (nation || 'CLFN')
+      + ' programs and departments — including but not limited to Health, Education, Wellness, Ontario Works, and Finance — strictly for the purpose of supporting and coordinating services connected to my housing application. Sharing will occur only with authorized staff, on a need-to-know basis, in accordance with applicable privacy legislation (PIPEDA). I may withdraw this consent in writing to the Housing Manager at any time.');
+  }
+  terms.push('I understand that my application will be scored according to the ' + (short || 'CLFN') + ' Housing Scoring Rubric and that priority is determined by score, not date of application alone.');
+  terms.push('I agree to notify the ' + (short || 'CLFN') + ' Housing Department within 30 days of any change in household composition, income, address, or contact information.');
+  terms.push('I understand that acceptance into ' + (short || 'CLFN') + ' housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by ' + (short || 'CLFN') + ' prior to occupancy.');
+  terms.push('I agree to comply with all ' + (short || 'CLFN') + ' Housing policies, lease agreements, and community by-laws as a condition of tenancy.');
+  terms.push('I authorize ' + (short || 'CLFN') + ' to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.');
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  pdf.setTextColor(40);
+  terms.forEach(function(t, i) {
+    var lines = pdf.splitTextToSize((i + 1) + '. ' + t, contentW - 4);
+    needSpace(lines.length * 4 + 1.5);
+    pdf.text(lines, marginL + 3, y + 3);
+    y += lines.length * 4 + 1.5;
+  });
+  pdf.setTextColor(0);
+  gap();
+
+  // ── CONSENT CONFIRMED BOX (when ticked) ───────────────────────────
+  if (consented) {
+    var boxH = 26;
+    needSpace(boxH + 2);
+    pdf.setFillColor(240, 253, 244);
+    pdf.setDrawColor(21, 128, 61);
+    pdf.setLineWidth(0.5);
+    pdf.rect(marginL, y, contentW, boxH, 'FD');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(9);
+    pdf.setTextColor(21, 128, 61);
+    pdf.text('[X] Consent to Share — CLFN Programs — CONFIRMED', marginL + 3, y + 5);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(40);
+    var cLines = pdf.splitTextToSize(
+      'The applicant has consented to ' + (short || 'CLFN')
+      + ' Housing sharing relevant information from this application with other '
+      + (nation || 'CLFN')
+      + ' programs and departments — including Health, Education, Wellness, Ontario Works, and Finance — in support of this housing application.',
+      contentW - 6
+    );
+    pdf.text(cLines, marginL + 3, y + 10);
+    pdf.setFontSize(8);
+    pdf.setTextColor(100);
+    var capturedBy = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.email)
+      ? ' · Captured by ' + HOUSING_SESSION.email : '';
+    pdf.text('Recorded: ' + today + capturedBy, marginL + 3, y + boxH - 2);
+    pdf.setTextColor(0);
+    pdf.setDrawColor(0);
+    y += boxH + 4;
+  }
+
+  // ── SIGNATURES ────────────────────────────────────────────────────
+  var sigBlockH = 34;
+  needSpace(sigBlockH + 10);
+  sectionHeader('Signatures');
+
+  var sigCount  = hasCoApp ? 3 : 2;
+  var sigGap    = 4;
+  var sigW      = (contentW - (sigCount - 1) * sigGap) / sigCount;
+  var sigAppImg = getSig('sig_canvas_app');
+  var sigCoImg  = getSig('sig_canvas_co');
+  var sigStaImg = getSig('sig_canvas_staff');
+  var sigName   = fld('sig_name') || fullName;
+  var sigDate   = fld('sig_date') || today;
+  var coFn      = fld('co_fn');
+  var coLn      = fld('co_ln');
+  var coSigName = fld('sig_co_name') || ((coFn + ' ' + coLn).trim() || '—');
+  var staffName = fld('sig_staff') || '—';
+  var staffDate = fld('sig_recv')  || today;
+
+  function drawSig(x, label, name, date, imgUrl) {
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(100);
+    pdf.text(String(label).toUpperCase(), x, y + 3);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(20);
+    pdf.text('Name: ' + (name || '—'), x, y + 8);
+    pdf.text('Date: ' + (date || '—'), x, y + 12);
+    pdf.setDrawColor(180);
+    pdf.setLineWidth(0.2);
+    pdf.rect(x, y + 14, sigW, sigBlockH - 14);
+    if (imgUrl) {
+      try { pdf.addImage(imgUrl, 'PNG', x + 1, y + 15, sigW - 2, sigBlockH - 16); }
+      catch (e) { /* ignore unreadable canvas */ }
+    } else {
+      pdf.setFontSize(7);
+      pdf.setTextColor(180);
+      pdf.text('(unsigned)', x + sigW / 2, y + sigBlockH - 3, { align: 'center' });
+    }
+    pdf.setDrawColor(0);
+    pdf.setTextColor(0);
+  }
+
+  var sigX = marginL;
+  drawSig(sigX, 'Applicant', sigName, sigDate, sigAppImg);
+  sigX += sigW + sigGap;
+  if (hasCoApp) {
+    drawSig(sigX, 'Co-Applicant', coSigName, sigDate, sigCoImg);
+    sigX += sigW + sigGap;
+  }
+  drawSig(sigX, 'Received by — Housing Staff', staffName, staffDate, sigStaImg);
+  y += sigBlockH + 4;
+
+  // Footer on the final page
+  drawFooter();
+
+  var dataUri = pdf.output('datauristring');
   var base64  = dataUri.substring(dataUri.indexOf(',') + 1);
-  console.log('[notify/pdf] generated base64 length:', base64.length, '(~' + Math.round(base64.length * 0.75 / 1024) + 'KB)');
+  console.log('[notify/pdf] generated base64 length:', base64.length,
+              '(~' + Math.round(base64.length * 0.75 / 1024) + 'KB,', pageNum,
+              'page' + (pageNum === 1 ? '' : 's') + ')');
   return base64;
 }
 
