@@ -1951,14 +1951,34 @@
 
     var fv = function(id) { var e = document.getElementById(id); return e ? (e.value || '').trim() : ''; };
     var fc = function(id) { var e = document.getElementById(id); return e ? e.checked : false; };
+    function markRequired(id) {
+      var e = document.getElementById(id);
+      if (e) { e.style.borderColor = 'var(--danger)'; e.focus(); }
+    }
+    function clearRequired(id) {
+      var e = document.getElementById(id);
+      if (e) e.style.borderColor = '';
+    }
+
+    var hydroAcct  = fv('ho_acct');
+    var hydroMeter = fv('ho_meter');
+
+    // Meter # and Bill Account # are required by Hydro One
+    var missing = [];
+    if (!hydroAcct)  missing.push('ho_acct');
+    if (!hydroMeter) missing.push('ho_meter');
+    ['ho_acct', 'ho_meter'].forEach(clearRequired);
+    if (missing.length) {
+      missing.forEach(markRequired);
+      if (typeof showToast === 'function') showToast('Bill Account # and Meter # are required');
+      return;
+    }
 
     var custName   = fv('ho_name');
     var custPhone  = fv('ho_phone');
     var custAddr   = fv('ho_addr');
     var custCity   = fv('ho_city');
     var custPostal = fv('ho_postal');
-    var hydroAcct  = fv('ho_acct');
-    var hydroMeter = fv('ho_meter');
     var dateRaw    = fv('ho_date');
     var chkUsage   = fc('ho_chk_usage');
     var chkAcct    = fc('ho_chk_acct');
