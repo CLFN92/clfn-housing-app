@@ -1693,6 +1693,7 @@ function archiveApplication(appId) {
     'Application archived' + (linkedUnitId ? ' — unit docs bundled for ' + linkedUnitId : ''),
     role);
   updateDashStats(); renderDashTable();
+  if (typeof renderWorklist === 'function') renderWorklist();
   showToast('Application and supporting documents archived');
 }
 
