@@ -877,7 +877,7 @@ async function _generateApplicationPdfBase64() {
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(9);
     pdf.setTextColor(21, 128, 61);
-    pdf.text('[X] Consent to Share — CLFN Programs — CONFIRMED', marginL + 3, y + 5);
+    pdf.text('[X] Consent to Share — ' + (short || '') + ' Programs — CONFIRMED', marginL + 3, y + 5);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8.5);
     pdf.setTextColor(40);

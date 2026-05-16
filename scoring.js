@@ -151,20 +151,20 @@ function renderV2ScoringEditor() {
   html += optRow('Mostly on time', pts(m.rent_payment.mostly, 'rent_payment', 'mostly'));
   html += optRow('Occasionally late', pts(m.rent_payment.occasional, 'rent_payment', 'occasional'));
   html += optRow('Frequently late', pts(m.rent_payment.frequent, 'rent_payment', 'frequent'));
-  html += optRow('No prior CLFN tenancy (neutral baseline)', pts(m.rent_payment.no_history, 'rent_payment', 'no_history'), 'Applied automatically for new applicants');
+  html += optRow('No prior ' + ((window.NATION_CONFIG && NATION_CONFIG.short) || 'housing') + ' tenancy (neutral baseline)', pts(m.rent_payment.no_history, 'rent_payment', 'no_history'), 'Applied automatically for new applicants');
 
   html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:14px 0 6px;">Unit Condition / No Damage</div>';
   html += optRow('Excellent — no damage at last inspection', pts(m.unit_condition.excellent, 'unit_condition', 'excellent'));
   html += optRow('Good', pts(m.unit_condition.good, 'unit_condition', 'good'));
   html += optRow('Fair', pts(m.unit_condition.fair, 'unit_condition', 'fair'));
   html += optRow('Damage noted', pts(m.unit_condition.damage, 'unit_condition', 'damage'));
-  html += optRow('No prior CLFN tenancy (neutral baseline)', pts(m.unit_condition.no_history, 'unit_condition', 'no_history'), 'Applied automatically for new applicants');
+  html += optRow('No prior ' + ((window.NATION_CONFIG && NATION_CONFIG.short) || 'housing') + ' tenancy (neutral baseline)', pts(m.unit_condition.no_history, 'unit_condition', 'no_history'), 'Applied automatically for new applicants');
 
   html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:14px 0 6px;">Tenancy Conduct</div>';
   html += optRow('No complaints or violations in 2 years', pts(m.tenancy_conduct.clean, 'tenancy_conduct', 'clean'));
   html += optRow('Minor complaints, resolved', pts(m.tenancy_conduct.minor, 'tenancy_conduct', 'minor'));
   html += optRow('Ongoing unresolved complaints', pts(m.tenancy_conduct.unresolved, 'tenancy_conduct', 'unresolved'));
-  html += optRow('No prior CLFN tenancy (neutral baseline)', pts(m.tenancy_conduct.no_history, 'tenancy_conduct', 'no_history'), 'Applied automatically for new applicants');
+  html += optRow('No prior ' + ((window.NATION_CONFIG && NATION_CONFIG.short) || 'housing') + ' tenancy (neutral baseline)', pts(m.tenancy_conduct.no_history, 'tenancy_conduct', 'no_history'), 'Applied automatically for new applicants');
 
   html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:14px 0 6px;">Income Stability</div>';
   html += optRow('Stable income — any source', pts(m.income_stability.stable, 'income_stability', 'stable'), 'Employment, social assistance, pension, LTD');
@@ -311,7 +311,7 @@ var SCORING_CAT_LABELS = {
   occupancy:         'Persons Over Occupancy Standard',
   income_stability:  'Income Stability',
   household_comp:    'Household Composition',
-  prior_tenancy:     'Prior CLFN Tenancy',
+  prior_tenancy:     'Prior ' + ((window.NATION_CONFIG && NATION_CONFIG.short) || 'Housing') + ' Tenancy',
   waitlist_age:      'Application Age (Waitlist Duration)'
 };
 
@@ -355,7 +355,6 @@ function renderNationPanel(){
   var dispVal  = escapeHtml(cfg.display_name || cfg.name || '');
   var shortVal = escapeHtml(cfg.short || '');
   var idVal    = escapeHtml(cfg.id || '');
-  var savedLogo = (window._appSettings && window._appSettings.theme && window._appSettings.theme.logo) || '';
   var socials   = cfg.socials || {};
 
   if (!canEdit) {
@@ -405,7 +404,6 @@ function renderNationPanel(){
     // Editable form — display name, short name, logo upload, save.
     var inputStyle = 'width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;';
     var lblStyle   = 'display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;';
-    var hasLogo = !!savedLogo;
 
     identEl.innerHTML =
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;">'
@@ -419,28 +417,6 @@ function renderNationPanel(){
       +     '<input id="nation_input_short" type="text" value="'+shortVal+'" maxlength="16" style="'+inputStyle+'" placeholder="e.g. CLFN"/>'
       +     '<div class="js-lbl-sm" style="margin-top:4px;">Used in compact contexts (titles, badges, password defaults).</div>'
       +   '</div>'
-      +   '<div style="grid-column:1/-1;">'
-      +     '<label style="'+lblStyle+'">Logo</label>'
-      +     '<div class="theme-logo-zone upload-zone p-16"'
-      +       ' id="nation_logo_zone"'
-      +       ' ondragover="photoDragOver(event,\'nation_logo_zone\')"'
-      +       ' ondragleave="photoDragLeave(\'nation_logo_zone\')"'
-      +       ' ondrop="_nationOnLogoDrop(event)"'
-      +       ' onclick="if(event.target.tagName!==\'BUTTON\')document.getElementById(\'nation_logo_file\').click()">'
-      +       '<div id="nation_logo_preview_wrap" class="theme-logo-preview-wrap"' + (hasLogo ? '' : ' style="display:none;"') + '>'
-      +         '<div class="theme-logo-preview"><img id="nation_logo_preview" src="'+escapeHtml(savedLogo)+'" alt="Logo"/></div>'
-      +         '<button type="button" onclick="event.stopPropagation();_nationClearLogo()" class="btn btn-ghost btn-sm">Remove logo</button>'
-      +       '</div>'
-      +       '<div id="nation_logo_empty"' + (hasLogo ? ' style="display:none;"' : '') + '>'
-      +         '<svg class="upload-zone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
-      +         '<div class="upload-zone-title">Drag a logo here or <span class="link-yellow">browse</span></div>'
-      +         '<div class="txt-muted-xs">PNG, JPG, or SVG · transparent background recommended · max 200 KB</div>'
-      +       '</div>'
-      +       '<input type="file" id="nation_logo_file" accept="image/*" onchange="_nationOnLogoFile(this)"/>'
-      +     '</div>'
-      +     '<div id="nation_logo_msg" class="txt-fineprint" style="min-height:14px;margin-top:6px;"></div>'
-      +   '</div>'
-
       // ── Contact section ─────────────────────────────────────────────
       +   '<div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">'
       +     '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;">Contact Information</div>'
@@ -483,8 +459,6 @@ function renderNationPanel(){
       +     '<div class="js-lbl-sm">Hosting <code style="font-family:Consolas,Monaco,monospace;">'+escapeHtml(host)+'</code> · ID <code style="font-family:Consolas,Monaco,monospace;">'+idVal+'</code></div>'
       +   '</div>'
       + '</div>';
-    // Stash the saved logo as the working draft so the file picker can compare/replace.
-    window._nationDraftLogo = savedLogo || '';
   }
 
   // Modules list — core vs optional. Super-users see interactive on/off
@@ -665,74 +639,6 @@ function _nationLinkify(s) {
   return 'https://' + s.replace(/^\/+/, '');
 }
 
-// ── Nation editor handlers ──────────────────────────────────────────────────
-// Logo upload uses the same data URL flow as the Themes panel; we write the
-// image to _appSettings.theme.logo via saveSettingWithDraftFallback('theme', …) and call
-// _applyTheme() to swap every <img class="hlogo"> live. Identity, contact
-// fields, and socials save into a separate housing_settings row keyed
-// 'nation_config_override' so applyNationOverrides() picks them up at boot.
-function _nationApplyLogoFile(f) {
-  var msg = document.getElementById('nation_logo_msg');
-  if (!f) return;
-  if (!/^image\//.test(f.type)) {
-    if (msg) msg.textContent = 'That file type is not supported — pick an image.';
-    return;
-  }
-  if (f.size > 200 * 1024) {
-    if (msg) msg.textContent = 'File too large — keep logos under 200 KB.';
-    return;
-  }
-  var rdr = new FileReader();
-  rdr.onload = function(e) {
-    var dataUrl = e.target.result;
-    window._nationDraftLogo = dataUrl;
-    var img   = document.getElementById('nation_logo_preview');
-    var wrap  = document.getElementById('nation_logo_preview_wrap');
-    var empty = document.getElementById('nation_logo_empty');
-    if (img)   img.src = dataUrl;
-    if (wrap)  wrap.style.display  = '';
-    if (empty) empty.style.display = 'none';
-    if (msg) msg.textContent = 'Logo ready — click Save Nation Settings to publish.';
-  };
-  rdr.readAsDataURL(f);
-}
-function _nationOnLogoFile(input) {
-  var f = input.files && input.files[0];
-  _nationApplyLogoFile(f);
-  input.value = '';  // allow re-selecting the same file
-}
-function _nationOnLogoDrop(e) {
-  e.preventDefault();
-  if (typeof photoDragLeave === 'function') photoDragLeave('nation_logo_zone');
-  var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-  _nationApplyLogoFile(f);
-}
-
-function _nationClearLogo() {
-  showConfirm({
-    title:       'Clear nation logo?',
-    message:     'The default brand logo baked into each page will be used until a new logo is uploaded.',
-    confirmText: 'Clear Logo',
-    danger:      true
-  }).then(function(ok){
-    if (!ok) return;
-    if (!window._appSettings) window._appSettings = {};
-    var theme = Object.assign({}, window._appSettings.theme || {});
-    delete theme.logo;
-    window._appSettings.theme = theme;
-    saveSettingWithDraftFallback('theme', theme).then(function(saved){
-      if (saved) {
-        if (typeof _applyTheme === 'function') _applyTheme(theme);
-        showToast('Logo cleared');
-        if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'nation_logo_cleared', 'Nation logo cleared', window.currentRole||'staff');
-        renderNationPanel();
-      } else {
-        showToast('Could not clear logo — check connection');
-      }
-    });
-  });
-}
-
 function saveNationSettings() {
   var role = window.currentRole || '';
   if (!APPROVAL_AUTHORITY.can('editApprovalAuthority', role)) {
@@ -775,22 +681,10 @@ function saveNationSettings() {
   var pending = [];
   pending.push(saveSettingWithDraftFallback('nation_config_override', override));
 
-  // If a new logo was uploaded in this session, persist it via the existing
-  // theme.logo channel so _applyTheme picks it up across all pages.
-  if (window._nationDraftLogo) {
-    var theme = Object.assign({}, window._appSettings.theme || {}, { logo: window._nationDraftLogo });
-    window._appSettings.theme = theme;
-    pending.push(saveSettingWithDraftFallback('theme', theme));
-  }
-
   Promise.all(pending).then(function(results){
     var allOk = results.every(function(ok){ return ok !== false; });
     // Apply locally regardless of server result so the UI reflects intent.
     if (typeof applyNationOverrides === 'function') applyNationOverrides();
-    if (window._nationDraftLogo && typeof _applyTheme === 'function') {
-      _applyTheme(window._appSettings.theme || {});
-      window._nationDraftLogo = '';
-    }
     if (allOk) {
       showToast('Nation settings saved');
       if (typeof auditEntry === 'function') {

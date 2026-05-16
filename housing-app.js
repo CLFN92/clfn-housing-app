@@ -2105,7 +2105,7 @@ function printApplicationPreview() {
     +((document.getElementById('consent_share_programs')||{}).checked
       ? '<div style="margin-top:12px;padding:10px 12px;border:1.5px solid #15803d;border-radius:4px;background:#f0fdf4;page-break-inside:avoid;">'
         + '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#15803d;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #bbf7d0;">'
-        + '&#x2611; Consent to Share &mdash; CLFN Programs &middot; <span style="font-weight:700;">CONFIRMED</span></div>'
+        + '&#x2611; Consent to Share &mdash; '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Programs &middot; <span style="font-weight:700;">CONFIRMED</span></div>'
         + '<p style="font-size:9.5px;color:var(--text);line-height:1.55;margin:0 0 5px;">'
         + 'The applicant has consented to '+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing sharing relevant information from this application with other '+(window.NATION_CONFIG&&(NATION_CONFIG.display_name||NATION_CONFIG.name)||'')+' programs and departments &mdash; including Health, Education, Wellness, Ontario Works, and Finance &mdash; in support of this housing application.'
         + '</p>'
