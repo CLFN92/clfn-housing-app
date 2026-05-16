@@ -139,6 +139,7 @@ serve(async (req: Request) => {
   const event       = payload.event       as string | undefined;
   const entity_type = payload.entity_type as string | undefined;
   const entity_id   = payload.entity_id   as string | undefined;
+  const attachments = payload.attachments as Array<{ name: string; contentType: string; contentBytes: string }> | undefined;
 
   if (!to || !subject || (!message && !html && !bodyHtml)) {
     return jsonResponse({
@@ -184,13 +185,30 @@ serve(async (req: Request) => {
   const sendUrl = "https://graph.microsoft.com/v1.0/users/"
                 + encodeURIComponent(GRAPH_FROM_USER!)
                 + "/sendMail";
+
+  // Build Graph file attachments from the caller's spec.
+  // Each item: { name, contentType, contentBytes (base64) }.
+  const graphAttachments = (attachments && attachments.length)
+    ? attachments.map(function(a){
+        return {
+          "@odata.type":  "#microsoft.graph.fileAttachment",
+          name:           a.name,
+          contentType:    a.contentType,
+          contentBytes:   a.contentBytes,
+        };
+      })
+    : undefined;
+
+  const graphMessage: Record<string, unknown> = {
+    subject,
+    body:         { contentType: "HTML", content: emailHtml },
+    toRecipients: [{ emailAddress: { address: to, name: to_name || undefined } }],
+    replyTo:      [{ emailAddress: { address: REPLY_TO } }],
+  };
+  if (graphAttachments) graphMessage.attachments = graphAttachments;
+
   const graphBody = {
-    message: {
-      subject,
-      body:         { contentType: "HTML", content: emailHtml },
-      toRecipients: [{ emailAddress: { address: to, name: to_name || undefined } }],
-      replyTo:      [{ emailAddress: { address: REPLY_TO } }],
-    },
+    message:         graphMessage,
     saveToSentItems: true,
   };
 

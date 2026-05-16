@@ -156,6 +156,20 @@
 .ntf-role-check input    { margin: 0; cursor: pointer; }
 .ntf-role-check input:checked + span { font-weight: 700; color: var(--text); }
 
+/* Fixed-recipient info line (used when recipientType is not role-based,
+   e.g. the applicant-confirmation event sends to the form's email field). */
+.ntf-recipients-fixed {
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+/* (.ntf-cc-label removed — the unified Recipients + Optional CC layout
+   uses the standard .ntf-label for both section headers.) */
+
 /* ── Placeholder chips ──────────────────────────────────────────────── */
 .ntf-chips {
   display: flex;

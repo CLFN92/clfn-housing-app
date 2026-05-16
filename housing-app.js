@@ -1696,19 +1696,49 @@ function openSubmitModal(){
   popReview();
   var appType = (typeof getAppType==='function') ? getAppType() : 'new_housing';
   var isFileUpdate = (appType === 'existing_tenant');
-  showConfirm({
+
+  // If the applicant supplied an email, surface an inline opt-in to send
+  // them a PDF copy along with the submit confirmation. Default ticked
+  // because most applicants want their own record. If no email is on
+  // file, skip the checkbox entirely (nothing to opt into).
+  var emailEl       = document.getElementById('email');
+  var coEmailEl     = document.getElementById('co_email');
+  var applicantEmail = (emailEl && emailEl.value && emailEl.value.trim().toLowerCase()) || '';
+  var coEmail        = (coEmailEl && coEmailEl.value && coEmailEl.value.trim().toLowerCase()) || '';
+  var hasAnyEmail    = !!(applicantEmail || (coEmail && coEmail !== applicantEmail));
+
+  var copyTarget = applicantEmail
+    || coEmail
+    || '';
+  var copyLabel  = (applicantEmail && coEmail && coEmail !== applicantEmail)
+    ? ('Email a PDF copy to ' + applicantEmail + ' and ' + coEmail)
+    : ('Email a PDF copy to ' + copyTarget);
+
+  var confirmOpts = {
     title:       isFileUpdate ? 'Submit file update?' : 'Submit application?',
     message:     'This will send the application to the Housing Manager for review. You will not be able to edit it after submission.',
     confirmText: 'Confirm Submit'
-  }).then(function(ok){
-    if (ok) finalSubmit();
+  };
+  if (hasAnyEmail) {
+    confirmOpts.checkbox = { label: copyLabel, defaultChecked: true };
+  }
+
+  showConfirm(confirmOpts).then(function(result){
+    // showConfirm returns a plain boolean unless a checkbox was passed
+    // in opts — then it returns { ok, checked }. Normalise.
+    var ok       = (typeof result === 'object' && result !== null) ? !!result.ok      : !!result;
+    var sendCopy = (typeof result === 'object' && result !== null) ? !!result.checked : false;
+    if (!ok) return;
+    finalSubmit({ sendApplicantCopy: sendCopy });
   });
 }
 
 // Legacy no-op kept for any orphan markup that still references it.
 function closeModal(){}
 
-function finalSubmit(){
+function finalSubmit(opts){
+  opts = opts || {};
+  var sendApplicantCopy = opts.sendApplicantCopy === true;
   var appType = (typeof getAppType==='function') ? getAppType() : 'new_housing';
   var isFileUpdate = (appType === 'existing_tenant');
   var actionLabel = isFileUpdate ? 'file_update_submitted' : 'application_submitted';
@@ -1728,6 +1758,13 @@ function finalSubmit(){
   // Manager resolved from the staff table. Fire-and-forget; UI never
   // blocks on delivery.
   if(typeof notifyApplicationSubmitted === 'function') notifyApplicationSubmitted(submittedApp);
+  // Confirmation email to the applicant (and co-applicant if a separate
+  // address) with a PDF copy attached. Only fires when the applicant
+  // opted in via the inline checkbox on openSubmitModal — keeps the
+  // applicant in control and avoids sending when they don't want a copy.
+  if(sendApplicantCopy && typeof notifyApplicationConfirmation === 'function') {
+    notifyApplicationConfirmation(submittedApp);
+  }
   showSubmissionConfirmation(id, isFileUpdate);
 }
 

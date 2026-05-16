@@ -32,6 +32,7 @@ var EMAIL_EVENT_REGISTRY = [
     label:                 'New Application Submitted',
     description:           'Sent when a new applicant submits.',
     defaultRecipientRoles: ['housing_manager'],
+    defaultCcRoles:        [],
     wired:                 true,
     placeholders:          ['applicantName','applicantId','score','tier','nationShort','appLink'],
     defaults: {
@@ -47,6 +48,7 @@ var EMAIL_EVENT_REGISTRY = [
     label:                 'File Update Submitted',
     description:           'Sent when an existing tenant submits a file update.',
     defaultRecipientRoles: ['housing_manager'],
+    defaultCcRoles:        [],
     wired:                 true,
     placeholders:          ['applicantName','applicantId','nationShort','appLink'],
     defaults: {
@@ -60,6 +62,7 @@ var EMAIL_EVENT_REGISTRY = [
     label:                 'Scope of Work Created',
     description:           'Sent on the first save of a new SOW (not on subsequent edits).',
     defaultRecipientRoles: ['housing_manager'],
+    defaultCcRoles:        [],
     wired:                 true,
     placeholders:          ['unitAddress','totalCost','condition','contractor','nationShort','appLink'],
     defaults: {
@@ -76,6 +79,7 @@ var EMAIL_EVENT_REGISTRY = [
     label:                 'New Contractor Submitted for Review',
     description:           'Sent when a new contractor record is submitted (not when saved as draft).',
     defaultRecipientRoles: ['housing_manager'],
+    defaultCcRoles:        [],
     wired:                 true,
     placeholders:          ['contractorName','contractorTrade','contractorClassification','nationShort','appLink'],
     defaults: {
@@ -85,6 +89,24 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>Trade: <strong>{contractorTrade}</strong></p>'
               + '<p>Classification: <strong>{contractorClassification}</strong></p>'
               + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+    }
+  },
+  {
+    key:                   'application_confirmation_to_applicant',
+    label:                 'Applicant Confirmation (PDF Copy)',
+    description:           'Sent to the applicant (and co-applicant if a separate email) on every submit, with a PDF copy of the application attached.',
+    recipientType:         'applicant',
+    defaultRecipientRoles: [],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['applicantName','applicantId','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — Application Received: {applicantId}',
+      bodyHtml: '<p>Hello {applicantName},</p>'
+              + '<p>Thank you for submitting your housing application to {nationShort} Housing. We have received your submission and a copy is attached to this email for your records.</p>'
+              + '<p>Your reference ID is <strong>{applicantId}</strong>. Please keep this for any future correspondence.</p>'
+              + '<p>The {nationShort} Housing team will review your application and contact you with next steps. If you have any questions in the meantime, reply directly to this email.</p>'
+              + '<p>Thank you,<br/>{nationShort} Housing</p>'
     }
   }
 ];
@@ -241,7 +263,7 @@ async function notifyApplicationSubmitted(app) {
   var eventKey = (app.appType === 'existing_tenant') ? 'file_update_submitted' : 'application_submitted';
   var cfg      = _emailEventConfig(eventKey);
   if (!cfg) return;
-  var roles    = _emailEventRecipientRoles(eventKey);
+  var roles    = _emailEventRecipientRoles(eventKey).concat(_emailEventCcRoles(eventKey));
   if (!roles.length) {
     console.warn('[notify] no recipient roles configured for ' + eventKey);
     return;
@@ -254,8 +276,8 @@ async function notifyApplicationSubmitted(app) {
   var rendered = _renderEmailTemplate(eventKey, _emailTokensForApp(app));
   if (!rendered) return;
 
-  recipients.forEach(function(rcp){
-    window.sendNotification({
+  await _sendSerially(recipients, function(rcp){
+    return {
       to:          rcp.email,
       to_name:     rcp.name || '',
       subject:     rendered.subject,
@@ -263,10 +285,23 @@ async function notifyApplicationSubmitted(app) {
       event:       eventKey,
       entity_type: 'application',
       entity_id:   app.id || '—'
-    }).catch(function(err){
-      console.warn('[notify] ' + eventKey + ' to ' + rcp.email + ' failed:', err);
-    });
-  });
+    };
+  }, eventKey);
+}
+
+// Send a list of payloads serially (one Graph call at a time) so the
+// app stays under Microsoft Graph's MailboxConcurrency throttle (~4
+// concurrent sends per app per mailbox). Continues on per-recipient
+// failure so one bad address doesn't block the rest.
+async function _sendSerially(recipients, payloadBuilder, eventKey) {
+  for (var i = 0; i < recipients.length; i++) {
+    var rcp = recipients[i];
+    try {
+      await window.sendNotification(payloadBuilder(rcp));
+    } catch (err) {
+      console.warn('[notify] ' + eventKey + ' to ' + (rcp.email || rcp) + ' failed:', err);
+    }
+  }
 }
 
 // Wired from saveSOW() in housing-modals-sow.js, only on the FIRST save
@@ -275,7 +310,7 @@ async function notifyApplicationSubmitted(app) {
 async function notifySowCreated(sow, unitId) {
   if (!sow) return;
   var eventKey = 'sow_created';
-  var roles    = _emailEventRecipientRoles(eventKey);
+  var roles    = _emailEventRecipientRoles(eventKey).concat(_emailEventCcRoles(eventKey));
   if (!roles.length) {
     console.warn('[notify] no recipient roles configured for ' + eventKey);
     return;
@@ -288,8 +323,8 @@ async function notifySowCreated(sow, unitId) {
   var rendered = _renderEmailTemplate(eventKey, _emailTokensForSow(sow, unitId));
   if (!rendered) return;
 
-  recipients.forEach(function(rcp){
-    window.sendNotification({
+  await _sendSerially(recipients, function(rcp){
+    return {
       to:          rcp.email,
       to_name:     rcp.name || '',
       subject:     rendered.subject,
@@ -297,10 +332,8 @@ async function notifySowCreated(sow, unitId) {
       event:       eventKey,
       entity_type: 'sow',
       entity_id:   unitId || '—'
-    }).catch(function(err){
-      console.warn('[notify] ' + eventKey + ' to ' + rcp.email + ' failed:', err);
-    });
-  });
+    };
+  }, eventKey);
 }
 
 // Wired from saveContractor() in shared-data.js, only when a contractor
@@ -309,7 +342,7 @@ async function notifySowCreated(sow, unitId) {
 async function notifyContractorSubmitted(ct) {
   if (!ct) return;
   var eventKey = 'contractor_submitted';
-  var roles    = _emailEventRecipientRoles(eventKey);
+  var roles    = _emailEventRecipientRoles(eventKey).concat(_emailEventCcRoles(eventKey));
   if (!roles.length) {
     console.warn('[notify] no recipient roles configured for ' + eventKey);
     return;
@@ -322,8 +355,8 @@ async function notifyContractorSubmitted(ct) {
   var rendered = _renderEmailTemplate(eventKey, _emailTokensForContractor(ct));
   if (!rendered) return;
 
-  recipients.forEach(function(rcp){
-    window.sendNotification({
+  await _sendSerially(recipients, function(rcp){
+    return {
       to:          rcp.email,
       to_name:     rcp.name || '',
       subject:     rendered.subject,
@@ -331,10 +364,193 @@ async function notifyContractorSubmitted(ct) {
       event:       eventKey,
       entity_type: 'contractor',
       entity_id:   ct.id || '—'
-    }).catch(function(err){
-      console.warn('[notify] ' + eventKey + ' to ' + rcp.email + ' failed:', err);
-    });
+    };
+  }, eventKey);
+}
+
+// ── Applicant confirmation w/ PDF attachment ───────────────────────────────
+// Wired from finalSubmit() in housing-app.js. Sends a copy of the just-
+// submitted application as a PDF to the applicant's email (and the
+// co-applicant's email if it's set and different). Silent skip if the
+// applicant didn't provide an email — the audit log records the no-op.
+async function notifyApplicationConfirmation(app) {
+  if (!app) return;
+  var eventKey = 'application_confirmation_to_applicant';
+
+  // Collect the applicant's email + co-applicant's email if distinct,
+  // PLUS any active staff in the configured CC roles. All deduped by
+  // lowercased email so a staffer who happens to also be the applicant
+  // doesn't get two copies.
+  var seen   = {};
+  var emails = [];
+  function _addEmail(addr) {
+    if (!addr) return;
+    var clean = String(addr).trim().toLowerCase();
+    if (!clean || seen[clean]) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) return;
+    seen[clean] = true;
+    emails.push(clean);
+  }
+  _addEmail(app.email);
+  _addEmail(app.co_email);
+
+  // Additional staff recipients: primary + CC role checkboxes from the
+  // Settings -> Notifications tab. Both default to empty for this event
+  // (applicant is the only required recipient). Combined + deduped
+  // against the applicant emails already collected above.
+  var extraRoles = _emailEventRecipientRoles(eventKey).concat(_emailEventCcRoles(eventKey));
+  if (extraRoles.length) {
+    var extraRecipients = await _resolveActiveStaffForRoles(extraRoles);
+    extraRecipients.forEach(function(r){ _addEmail(r.email); });
+  }
+
+  if (!emails.length) {
+    console.log('[notify] application_confirmation skipped - no applicant email or CC recipients on ' + (app.id || 'app'));
+    return;
+  }
+
+  // Render template (reuses applicant token builder — same placeholder set).
+  var rendered = _renderEmailTemplate(eventKey, _emailTokensForApp(app));
+  if (!rendered) return;
+
+  // Generate the PDF from the live form (the just-submitted form is still
+  // in the DOM at this point). If the PDF generator fails for any reason,
+  // we still send the email — just without the attachment, with a note in
+  // the body. Best-effort: never block delivery on PDF rendering.
+  var pdfBase64 = null;
+  try {
+    pdfBase64 = await _generateApplicationPdfBase64();
+  } catch (e) {
+    console.warn('[notify] PDF generation failed, sending without attachment:', e);
+  }
+
+  var attachments;
+  var bodyHtml = rendered.bodyHtml;
+  if (pdfBase64) {
+    attachments = [{
+      name:         'Application ' + (app.id || 'submitted') + '.pdf',
+      contentType:  'application/pdf',
+      contentBytes: pdfBase64
+    }];
+  } else {
+    bodyHtml += '<p style="color:#888;font-size:12px;font-style:italic;">'
+              + '(PDF copy could not be generated automatically. Reply to this email to request one.)'
+              + '</p>';
+  }
+
+  await _sendSerially(emails.map(function(e){ return { email: e }; }), function(rcp){
+    return {
+      to:          rcp.email,
+      to_name:     '',
+      subject:     rendered.subject,
+      bodyHtml:    bodyHtml,
+      attachments: attachments,
+      event:       eventKey,
+      entity_type: 'application',
+      entity_id:   app.id || '—'
+    };
+  }, eventKey);
+}
+
+// Lazy-load a CDN script and resolve once it's available. Used to pull
+// in jsPDF and html2canvas on demand — neither is loaded on every page,
+// so the application-confirmation flow grabs them when first needed.
+function _loadScriptOnce(src, isAvailable) {
+  return new Promise(function(resolve, reject){
+    if (isAvailable && isAvailable()) return resolve();
+    var s = document.createElement('script');
+    s.src     = src;
+    s.onload  = function(){ resolve(); };
+    s.onerror = function(){ reject(new Error('script load failed: ' + src)); };
+    document.head.appendChild(s);
   });
+}
+async function _loadJsPdf() {
+  await _loadScriptOnce(
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+    function(){ return !!(window.jspdf && window.jspdf.jsPDF); }
+  );
+}
+async function _loadHtml2Canvas() {
+  await _loadScriptOnce(
+    'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+    function(){ return !!window.html2canvas; }
+  );
+}
+
+// Build the application preview HTML by intercepting showPrintPanel —
+// printApplicationPreview() in housing-app.js builds a full HTML doc
+// then hands it off; we capture the doc and skip the on-screen panel.
+// Avoids refactoring the 320-line printApplicationPreview function.
+function _captureApplicationPreviewHtml() {
+  if (typeof printApplicationPreview !== 'function') {
+    throw new Error('printApplicationPreview not available on this page');
+  }
+  var captured = null;
+  var original = window.showPrintPanel;
+  window.showPrintPanel = function(html /*, title*/){
+    captured = html;
+  };
+  try {
+    printApplicationPreview();
+  } finally {
+    window.showPrintPanel = original;
+  }
+  if (!captured) throw new Error('Could not capture application preview HTML');
+  return captured;
+}
+
+// Render the application preview HTML to a base64-encoded PDF using
+// jsPDF.html(). Generates an off-screen iframe so the page stylesheets
+// don't bleed into the rendered output. Caller awaits the base64 string.
+async function _generateApplicationPdfBase64() {
+  await _loadJsPdf();
+  await _loadHtml2Canvas();
+  if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF not available');
+
+  var html = _captureApplicationPreviewHtml();
+  console.log('[notify/pdf] captured preview html length:', html.length);
+
+  // Mount in an off-screen iframe so the page's own styles don't apply
+  // to the PDF render. Width matches A4 (~794px @ 96dpi). Height is
+  // tall enough for a multi-page application — html2canvas needs the
+  // body to actually have height to capture content; 10px clipped.
+  var iframe = document.createElement('iframe');
+  iframe.style.position   = 'absolute';
+  iframe.style.left       = '-99999px';
+  iframe.style.top        = '0';
+  iframe.style.width      = '794px';
+  iframe.style.height     = '2400px';
+  iframe.style.border     = 'none';
+  document.body.appendChild(iframe);
+  var idoc = iframe.contentDocument;
+  idoc.open();
+  idoc.write(html);
+  idoc.close();
+
+  // Wait a beat for the iframe to parse + lay out (signature images,
+  // any inline data URLs, etc.). 200ms is enough for the typical case;
+  // jsPDF.html() also internally awaits html2canvas, which is what
+  // actually rasterises the content.
+  await new Promise(function(r){ setTimeout(r, 200); });
+
+  var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+  await doc.html(idoc.body, {
+    margin:      [10, 10, 10, 10],
+    autoPaging:  'text',
+    width:       190,    // mm — fits A4 with 10mm margins
+    windowWidth: 794,    // px — matches iframe width
+    html2canvas: { scale: 0.75, useCORS: true, allowTaint: true, logging: false }
+  });
+
+  document.body.removeChild(iframe);
+
+  // Use jsPDF's data-URI output and strip the prefix to get clean base64.
+  // Avoids btoa(binary) edge cases when PDF bytes include chars > 0xFF.
+  var dataUri = doc.output('datauristring');
+  var base64  = dataUri.substring(dataUri.indexOf(',') + 1);
+  console.log('[notify/pdf] generated base64 length:', base64.length, '(~' + Math.round(base64.length * 0.75 / 1024) + 'KB)');
+  return base64;
 }
 
 // Returns the recipient role list for an event — saved override if the
@@ -346,6 +562,16 @@ function _emailEventRecipientRoles(eventKey) {
   if (Array.isArray(saved.recipientRoles)) return saved.recipientRoles.slice();
   var cfg = _emailEventConfig(eventKey);
   return (cfg && Array.isArray(cfg.defaultRecipientRoles)) ? cfg.defaultRecipientRoles.slice() : [];
+}
+
+// Same shape for the optional CC role list. Empty by default for every
+// event; the ED can opt-in via the Settings -> Notifications tab.
+function _emailEventCcRoles(eventKey) {
+  var saved = (window._appSettings && window._appSettings.email_templates
+            && window._appSettings.email_templates[eventKey]) || {};
+  if (Array.isArray(saved.ccRoles)) return saved.ccRoles.slice();
+  var cfg = _emailEventConfig(eventKey);
+  return (cfg && Array.isArray(cfg.defaultCcRoles)) ? cfg.defaultCcRoles.slice() : [];
 }
 
 // Look up active staff across multiple roles + dedupe by email so a
@@ -435,18 +661,51 @@ function _ntfRenderEditorHtml(eventKey) {
             && window._appSettings.email_templates[eventKey]) || {};
   var subject  = (saved.subject  != null && saved.subject  !== '') ? saved.subject  : cfg.defaults.subject;
   var bodyHtml = (saved.bodyHtml != null && saved.bodyHtml !== '') ? saved.bodyHtml : cfg.defaults.bodyHtml;
-  var roles    = _emailEventRecipientRoles(eventKey);
-  var roleSet  = {}; roles.forEach(function(r){ roleSet[r] = true; });
+  // Recipients block - unified layout across every event:
+  //   1) Primary Recipients - either the applicant's email (fixed, for
+  //      applicant-type events) OR a role checklist (everyone else).
+  //   2) Optional CC - always a role checklist, defaulting to nothing
+  //      ticked. Anyone ticked here gets a copy in addition to the
+  //      primary recipient(s). Deduped at send time.
+  var primaryRoles = _emailEventRecipientRoles(eventKey);
+  var ccRoles      = _emailEventCcRoles(eventKey);
 
-  var roleChecks = NTF_ROLE_CHOICES.map(function(rk){
-    var label = (typeof CLFN_PERMS !== 'undefined' && CLFN_PERMS.roleLabel)
-                ? CLFN_PERMS.roleLabel(rk) : rk;
-    var checked = roleSet[rk] ? ' checked' : '';
-    return '<label class="ntf-role-check">'
-         +   '<input type="checkbox" data-ntf-role="' + _ntfEsc(rk) + '"' + checked + '/>'
-         +   '<span>' + _ntfEsc(label) + '</span>'
-         + '</label>';
-  }).join('');
+  function _buildRoleChecks(checkedRoles, gridDataAttr) {
+    var set = {}; (checkedRoles || []).forEach(function(r){ set[r] = true; });
+    return NTF_ROLE_CHOICES.map(function(rk){
+      var label = (typeof CLFN_PERMS !== 'undefined' && CLFN_PERMS.roleLabel)
+                  ? CLFN_PERMS.roleLabel(rk) : rk;
+      var checked = set[rk] ? ' checked' : '';
+      return '<label class="ntf-role-check">'
+           +   '<input type="checkbox" ' + gridDataAttr + '="' + _ntfEsc(rk) + '"' + checked + '/>'
+           +   '<span>' + _ntfEsc(label) + '</span>'
+           + '</label>';
+    }).join('');
+  }
+
+  // Primary block. Every event renders the role checkbox grid so the
+  // editor pane reads consistently. Applicant-type events ALSO show a
+  // static info line above the grid noting the applicant's email is
+  // always included as a primary recipient — the grid then adds
+  // additional staff roles on top of the applicant.
+  var primaryBlock = '';
+  if (cfg.recipientType === 'applicant') {
+    primaryBlock +=
+        '<div class="ntf-recipients-fixed">'
+      +   'Always sends to the <strong>applicant&#39;s email</strong> from the application form '
+      +   '(plus the <strong>co-applicant&#39;s email</strong> if it differs).'
+      + '</div>';
+  }
+  primaryBlock += '<div class="ntf-roles" id="ntf_roles">'
+               + _buildRoleChecks(primaryRoles, 'data-ntf-role')
+               + '</div>';
+
+  // Optional CC block — identical structure across every event so the
+  // editor pane reads consistently. Different data-attr so the reader
+  // can tell the two grids apart.
+  var ccBlock = '<div class="ntf-roles" id="ntf_cc_roles">'
+              + _buildRoleChecks(ccRoles, 'data-ntf-cc-role')
+              + '</div>';
 
   var chips = (cfg.placeholders || []).map(function(t){
     return '<button type="button" class="ntf-chip" data-ntf-token="' + _ntfEsc(t) + '" '
@@ -475,8 +734,14 @@ function _ntfRenderEditorHtml(eventKey) {
     +   '</div>'
     + '</div>'
     + '<div class="ntf-field">'
-    +   '<label class="ntf-label">Recipients <span class="ntf-label-hint">(active staff in any ticked role; deduped by email)</span></label>'
-    +   '<div class="ntf-roles" id="ntf_roles">' + roleChecks + '</div>'
+    +   '<label class="ntf-label">Recipients' + (cfg.recipientType === 'applicant'
+          ? ''
+          : ' <span class="ntf-label-hint">(active staff in any ticked role)</span>') + '</label>'
+    +   primaryBlock
+    + '</div>'
+    + '<div class="ntf-field">'
+    +   '<label class="ntf-label">Optional CC <span class="ntf-label-hint">(active staff in any ticked role; deduped against the primary recipients)</span></label>'
+    +   ccBlock
     + '</div>'
     + '<div class="ntf-field">'
     +   '<label class="ntf-label" for="ntf_subject">Subject</label>'
@@ -657,7 +922,8 @@ function saveNotificationTemplate() {
   next[ed.eventKey] = {
     subject:        ed.subject,
     bodyHtml:       ed.bodyHtml,
-    recipientRoles: ed.recipientRoles
+    recipientRoles: ed.recipientRoles,
+    ccRoles:        ed.ccRoles
   };
 
   fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
@@ -669,9 +935,11 @@ function saveNotificationTemplate() {
     if (!window._appSettings) window._appSettings = {};
     window._appSettings.email_templates = next;
     if (typeof auditEntry === 'function') {
-      auditEntry('SETTINGS', 'email_template_save',
-        'Email template updated: ' + ed.eventKey + ' (recipients: ' + ed.recipientRoles.join(',') + ')',
-        window.currentRole || 'ed');
+      var _detail = 'Email template updated: ' + ed.eventKey
+                  + ' (recipients: ' + (ed.recipientRoles.join(',') || '-')
+                  + '; cc: '         + (ed.ccRoles.join(',')        || '-')
+                  + ')';
+      auditEntry('SETTINGS', 'email_template_save', _detail, window.currentRole || 'ed');
     }
     showToast('✓ Template saved');
   }).catch(function(e){
@@ -691,11 +959,21 @@ function resetNotificationTemplate() {
   var body = document.getElementById('ntf_body');
   if (subj) subj.value     = cfg.defaults.subject;
   if (body) body.innerHTML = cfg.defaults.bodyHtml;
+  // Restore both checkbox grids from registry defaults. For applicant-
+  // type events there's no primary grid (no #ntf_roles in the DOM), so
+  // the querySelectorAll is a no-op there.
   var defaultRoles = (cfg.defaultRecipientRoles || []).reduce(function(m,r){ m[r] = true; return m; }, {});
   var rolesEl = document.getElementById('ntf_roles');
   if (rolesEl) {
     rolesEl.querySelectorAll('input[type="checkbox"][data-ntf-role]').forEach(function(cb){
       cb.checked = !!defaultRoles[cb.getAttribute('data-ntf-role')];
+    });
+  }
+  var defaultCc = (cfg.defaultCcRoles || []).reduce(function(m,r){ m[r] = true; return m; }, {});
+  var ccEl = document.getElementById('ntf_cc_roles');
+  if (ccEl) {
+    ccEl.querySelectorAll('input[type="checkbox"][data-ntf-cc-role]').forEach(function(cb){
+      cb.checked = !!defaultCc[cb.getAttribute('data-ntf-cc-role')];
     });
   }
   showToast('Reverted to default. Click Save to persist.');
@@ -736,7 +1014,9 @@ function sendNotificationTest() {
 // every notification can be previewed against representative-looking
 // values. Add a new branch here when adding a new entity type.
 function _ntfMockTokensForEvent(eventKey) {
-  if (eventKey === 'application_submitted' || eventKey === 'file_update_submitted') {
+  if (eventKey === 'application_submitted'
+   || eventKey === 'file_update_submitted'
+   || eventKey === 'application_confirmation_to_applicant') {
     return _emailTokensForApp({
       id: 'APP-TEST-0001', fn: 'Jane', ln: 'Sample',
       score: 42, tier: 'High Priority', appType: 'new_housing'
@@ -778,6 +1058,11 @@ function _ntfReadEditorState() {
   if (!bodyHtml || bodyHtml === '<br>' || bodyHtml.replace(/<[^>]+>/g,'').trim() === '') {
     showToast('Body is required'); bodyEl.focus(); return null;
   }
+  // Read both checkbox grids. Primary (#ntf_roles) is required for
+  // non-applicant events; applicant-type events have no primary grid
+  // because the applicant's email is the fixed primary recipient.
+  // CC (#ntf_cc_roles) is always optional.
+  var cfg   = _emailEventConfig(_ntfSelectedEvent);
   var roles = [];
   var rolesEl = document.getElementById('ntf_roles');
   if (rolesEl) {
@@ -785,7 +1070,14 @@ function _ntfReadEditorState() {
       if (cb.checked) roles.push(cb.getAttribute('data-ntf-role'));
     });
   }
-  if (!roles.length) {
+  var ccRoles = [];
+  var ccEl = document.getElementById('ntf_cc_roles');
+  if (ccEl) {
+    ccEl.querySelectorAll('input[type="checkbox"][data-ntf-cc-role]').forEach(function(cb){
+      if (cb.checked) ccRoles.push(cb.getAttribute('data-ntf-cc-role'));
+    });
+  }
+  if ((!cfg || cfg.recipientType !== 'applicant') && !roles.length) {
     showToast('Pick at least one recipient role');
     return null;
   }
@@ -793,7 +1085,8 @@ function _ntfReadEditorState() {
     eventKey:       _ntfSelectedEvent,
     subject:        subject,
     bodyHtml:       bodyHtml,
-    recipientRoles: roles
+    recipientRoles: roles,
+    ccRoles:        ccRoles
   };
 }
 

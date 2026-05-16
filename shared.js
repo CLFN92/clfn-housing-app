@@ -167,12 +167,26 @@ window.parseCurrency = function(str){
 //     danger:      true               // optional, red confirm button
 //   }).then(function(ok){ if (ok) ... });
 // ═══════════════════════════════════════════════════════════════════════
+// showConfirm — styled replacement for native confirm().
+// Returns Promise<boolean> by default, OR Promise<{ok, checked}> when
+// opts.checkbox is passed (so callers can read an opt-in toggle inline
+// with the confirm). The mixed return type keeps every existing
+// `if (ok) ...` caller working unchanged.
+//
+//   opts.checkbox: { label: '...', defaultChecked: true } — optional
 window.showConfirm = function(opts) {
   opts = opts || {};
   return new Promise(function(resolve){
     var ov = document.createElement('div');
     ov.className = 'modal-overlay modal-overlay-centered modal-z-1100 is-open';
-    var btnClass = opts.danger ? 'btn btn-danger' : 'btn btn-primary';
+    var btnClass    = opts.danger ? 'btn btn-danger' : 'btn btn-primary';
+    var hasCheckbox = !!(opts.checkbox && opts.checkbox.label);
+    var checkboxHtml = hasCheckbox
+      ? '<label style="display:flex;align-items:flex-start;gap:8px;margin-top:12px;font-size:13px;cursor:pointer;line-height:1.4;">' +
+          '<input type="checkbox" data-cn-checkbox' + (opts.checkbox.defaultChecked ? ' checked' : '') + ' style="margin-top:3px;flex-shrink:0;cursor:pointer;"/>' +
+          '<span>' + opts.checkbox.label + '</span>' +
+        '</label>'
+      : '';
     ov.innerHTML =
       '<div class="modal-body modal-body-sm">' +
         '<div class="modal-hdr">' +
@@ -181,6 +195,7 @@ window.showConfirm = function(opts) {
         '</div>' +
         '<div class="modal-body-stack">' +
           '<p class="txt-help m-0">' + (opts.message || 'Are you sure?') + '</p>' +
+          checkboxHtml +
         '</div>' +
         '<div class="modal-footer">' +
           '<button type="button" class="btn btn-ghost" data-cn-cancel>' + (opts.cancelText || 'Cancel') + '</button>' +
@@ -188,7 +203,15 @@ window.showConfirm = function(opts) {
         '</div>' +
       '</div>';
     document.body.appendChild(ov);
-    function close(result){ if (ov.parentNode) ov.parentNode.removeChild(ov); resolve(result); }
+    function getCheckboxState(){
+      var cb = ov.querySelector('[data-cn-checkbox]');
+      return cb ? !!cb.checked : false;
+    }
+    function close(ok){
+      var checked = hasCheckbox ? getCheckboxState() : false;
+      if (ov.parentNode) ov.parentNode.removeChild(ov);
+      resolve(hasCheckbox ? { ok: ok, checked: checked } : ok);
+    }
     ov.querySelectorAll('[data-cn-cancel]').forEach(function(b){ b.onclick = function(){ close(false); }; });
     ov.querySelector('[data-cn-confirm]').onclick = function(){ close(true); };
     ov.addEventListener('click', function(e){ if (e.target === ov) close(false); });
