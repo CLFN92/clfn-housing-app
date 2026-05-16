@@ -92,6 +92,15 @@ window._applyTheme = function(theme) {
     if (theme.logo) img.src = theme.logo;
     img.classList.toggle('logo-transparent', !!theme.logoTransparent);
   });
+  // Cache logo in sessionStorage so renderAppHeader() can apply it
+  // synchronously on subsequent page navigations, eliminating the flash
+  // of the hardcoded fallback logo between DOMContentLoaded and settings load.
+  try {
+    if (theme.logo) {
+      sessionStorage.setItem('clfn_logo_cache', theme.logo);
+      sessionStorage.setItem('clfn_logo_transparent', theme.logoTransparent ? '1' : '');
+    }
+  } catch(e) {}
 };
 
 // ═══════════════════════════════════════════════════════════════════════

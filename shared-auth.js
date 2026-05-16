@@ -122,7 +122,8 @@ function _clearLocalClientState() {
 
   // sessionStorage
   try {
-    ['clfn_housing_token','clfn_housing_role','clfn_housing_name','clfn_housing_email_session']
+    ['clfn_housing_token','clfn_housing_role','clfn_housing_name','clfn_housing_email_session',
+     'clfn_logo_cache','clfn_logo_transparent']
       .forEach(function(k) { try { sessionStorage.removeItem(k); } catch(e) {} });
   } catch(e) {}
 
