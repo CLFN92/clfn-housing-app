@@ -5765,3 +5765,272 @@ function closeUnitDetail() {
     p.classList.remove('is-open');
   }
 }
+
+// ════════════════════════════════════════════════════════════════════════
+// RFQ (Request for Quotes) module -- shared functions
+// ════════════════════════════════════════════════════════════════════════
+
+async function loadRfqCache() {
+  window._rfqCache = {};
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/housing_rfq?select=*&order=created_at.desc', { headers: HOUSING_HEADERS });
+    if (!r.ok) { console.warn('[rfq] cache load failed:', r.status); return; }
+    var rows = await r.json();
+    (rows || []).forEach(function(row) { window._rfqCache[row.id] = row; });
+    console.log('[rfq] loaded ' + (rows || []).length + ' RFQ(s)');
+  } catch(e) { console.warn('[rfq] cache error:', e); }
+}
+
+function generateRfqNumber() {
+  var year = new Date().getFullYear();
+  var prefix = 'RFQ-' + year + '-';
+  var maxSeq = 0;
+  Object.keys(window._rfqCache || {}).forEach(function(id) {
+    if (id.indexOf(prefix) === 0) {
+      var seq = parseInt(id.slice(prefix.length), 10);
+      if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+    }
+  });
+  return prefix + String(maxSeq + 1).padStart(4, '0');
+}
+
+function _sowMeetsRfqThreshold(sow) {
+  var threshold = ((window._appSettings && window._appSettings.rfq_threshold) || 10000);
+  var amt = parseFloat((sow && (sow.amount || sow.totalCost || sow.total_cost)) || 0) || 0;
+  return amt >= threshold;
+}
+
+function buildRfqDocumentHtml(rfq, sow, unit) {
+  var natDisp  = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || 'Constance Lake First Nation';
+  var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || 'CLFN';
+  var addr     = unit ? ((unit.num || '') + ' ' + (unit.street || '')).trim() : (rfq.sow_unit_id || '--');
+  var today    = new Date().toLocaleDateString('en-CA');
+  var closingDisplay = rfq.closes_at ? new Date(rfq.closes_at).toLocaleString('en-CA', {dateStyle:'long', timeStyle:'short'}) : '--';
+  var items    = (rfq.data && rfq.data.scope_snapshot) || (sow && sow.items) || [];
+  var contact  = (rfq.data && rfq.data.contact_person) || '';
+  var contactEmail = (rfq.data && rfq.data.contact_email) || '';
+  var subMethod = (rfq.data && rfq.data.submission_method) || 'email';
+
+  var termsHtml = '';
+  var rawTerms = (window._appSettings && window._appSettings.rfq_terms);
+  if (rawTerms && typeof _termsParseHtml === 'function') {
+    var tp = _termsParseHtml(typeof rawTerms === 'string' ? rawTerms : (rawTerms.bodyHtml || ''));
+    if (tp.introHtml) termsHtml += '<p style="font-size:10px;line-height:1.6;margin-bottom:8px;">' + tp.introHtml + '</p>';
+    if (tp.itemsHtml.length) {
+      termsHtml += '<ol style="font-size:10px;line-height:1.65;padding-left:18px;">';
+      tp.itemsHtml.forEach(function(h){ termsHtml += '<li style="margin-bottom:4px;">' + h + '</li>'; });
+      termsHtml += '</ol>';
+    }
+  }
+
+  var visItems = items.filter(function(it){ return it && !it._hidden && (it.category || it.description); });
+
+  var scopeRows = visItems.map(function(it, i) {
+    return '<tr style="' + (i%2 ? 'background:#f9f9f9;' : '') + '">'
+      + '<td style="padding:7px 10px;border-bottom:1px solid #e0e0e0;font-size:10px;">' + escapeHtml(it.category || '--') + '</td>'
+      + '<td style="padding:7px 10px;border-bottom:1px solid #e0e0e0;font-size:10px;">' + escapeHtml(it.description || '--') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  var bidRows = visItems.map(function(it) {
+    return '<tr><td style="padding:10px;border-bottom:1px solid #e0e0e0;font-size:10px;min-height:32px;">' + escapeHtml(it.description || it.category || '--') + '</td>'
+      + '<td style="padding:10px;border-bottom:1px solid #e0e0e0;"></td>'
+      + '<td style="padding:10px;border-bottom:1px solid #e0e0e0;"></td>'
+      + '<td style="padding:10px;border-bottom:1px solid #e0e0e0;"></td></tr>';
+  }).join('');
+
+  var subInstr = subMethod === 'email'  ? 'Email your complete bid package to: <strong>' + escapeHtml(contactEmail || contact) + '</strong>'
+               : subMethod === 'office' ? 'Deliver your complete bid package to the ' + escapeHtml(natShort) + ' Housing Department office.'
+               : 'Submit by email to <strong>' + escapeHtml(contactEmail || contact) + '</strong> OR deliver to the ' + escapeHtml(natShort) + ' Housing Department office.';
+
+  return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>'
+    + '<title>' + escapeHtml(rfq.id) + ' -- ' + escapeHtml(natShort) + ' Housing</title>'
+    + '<style>*{box-sizing:border-box;margin:0;padding:0;}'
+    + 'body{font-family:Georgia,serif;font-size:11px;color:#222;background:#fff;}'
+    + '@page{size:letter portrait;margin:15mm 15mm 18mm 15mm;}'
+    + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}'
+    + '.hdr{background:#000;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;}'
+    + '.hdr-org{font-size:13px;font-weight:bold;color:#F8E41A;letter-spacing:.04em;}'
+    + '.hdr-dept{font-size:10px;color:#ccc;margin-top:2px;}'
+    + '.hdr-type{font-size:18px;font-weight:bold;color:#F8E41A;letter-spacing:.05em;}'
+    + '.hdr-num{font-size:10px;color:#aaa;margin-top:3px;}'
+    + '.ybar{background:#F8E41A;height:4px;}'
+    + '.body{padding:20px 0 0;}'
+    + '.sec{margin-bottom:18px;}'
+    + '.sec-h{font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#fff;background:#000;padding:5px 10px;}'
+    + '.sec-b{border:1px solid #ddd;border-top:none;padding:12px 14px;}'
+    + '.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;}'
+    + '.mf label{display:block;font-size:8px;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:2px;}'
+    + '.mf span{display:block;font-size:11px;color:#222;}'
+    + 'table{width:100%;border-collapse:collapse;}'
+    + 'th{background:#000;color:#F8E41A;padding:7px 10px;text-align:left;font-size:9px;font-weight:bold;text-transform:uppercase;}'
+    + '.cl{list-style:none;padding:0;}'
+    + '.cl li{padding:4px 0;font-size:10px;line-height:1.5;}'
+    + '.cl li:before{content:"\\2610  ";font-size:12px;}'
+    + '.sig-line{margin-top:30px;border-top:1px solid #333;padding-top:5px;font-size:9px;color:#888;}'
+    + '.footer{margin-top:20px;border-top:3px solid #F8E41A;padding-top:8px;display:flex;justify-content:space-between;font-size:8px;color:#888;}'
+    + '</style></head><body>'
+
+    + '<div class="hdr"><div><div class="hdr-org">' + escapeHtml(natDisp.toUpperCase()) + '</div><div class="hdr-dept">Housing Department</div></div>'
+    + '<div style="text-align:right;"><div class="hdr-type">REQUEST FOR QUOTES</div><div class="hdr-num">' + escapeHtml(rfq.id) + '</div></div></div>'
+    + '<div class="ybar"></div>'
+    + '<div class="body">'
+
+    + '<div class="sec"><div class="sec-h">Project Details</div><div class="sec-b"><div class="mgrid">'
+    + '<div class="mf"><label>RFQ Number</label><span>' + escapeHtml(rfq.id) + '</span></div>'
+    + '<div class="mf"><label>Issue Date</label><span>' + today + '</span></div>'
+    + '<div class="mf"><label>Project Address</label><span>' + escapeHtml(addr) + '</span></div>'
+    + '<div class="mf"><label>SOW Reference</label><span>' + escapeHtml(rfq.sow_project_number || '--') + '</span></div>'
+    + '<div class="mf"><label>Bid Closing Date &amp; Time</label><span style="font-weight:bold;color:#b91c1c;">' + escapeHtml(closingDisplay) + '</span></div>'
+    + '<div class="mf"><label>CLFN Contact</label><span>' + escapeHtml(contact) + (contactEmail ? ' &lt;' + escapeHtml(contactEmail) + '&gt;' : '') + '</span></div>'
+    + '</div></div></div>'
+
+    + '<div class="sec"><div class="sec-h">Scope of Work</div>'
+    + '<table><thead><tr><th style="width:28%">Category</th><th>Description of Work Required</th></tr></thead>'
+    + '<tbody>' + (scopeRows || '<tr><td colspan="2" style="padding:10px;text-align:center;color:#888;">No line items specified.</td></tr>') + '</tbody>'
+    + '</table></div>'
+
+    + '<div class="sec"><div class="sec-h">Contractor Bid Form — Complete and Return</div>'
+    + '<div class="sec-b" style="font-size:9.5px;color:#555;margin-bottom:8px;">Price all line items below in Canadian dollars (CDN), exclusive of HST. Attach additional rows if required.</div>'
+    + '<table><thead><tr><th>Line Item / Description</th><th style="width:18%">Unit Price ($)</th><th style="width:18%">Extended Price ($)</th><th style="width:18%">Notes</th></tr></thead>'
+    + '<tbody>' + (bidRows || '<tr><td colspan="4" style="padding:10px;"></td></tr>') + '</tbody>'
+    + '<tfoot><tr style="background:#F8E41A;"><td colspan="2" style="padding:8px 10px;font-size:11px;font-weight:bold;text-align:right;">TOTAL BID AMOUNT:</td><td style="padding:8px 10px;border:1px solid #ccc;min-width:80px;">&nbsp;</td><td></td></tr></tfoot>'
+    + '</table></div>'
+
+    + '<div class="sec"><div class="sec-h">Mandatory Inclusions</div><div class="sec-b">'
+    + '<div style="font-size:9.5px;color:#555;margin-bottom:8px;">The following documents must be included with your bid. Incomplete packages will not be considered.</div>'
+    + '<ul class="cl"><li>Current WSIB clearance certificate</li><li>Certificate of general liability insurance (minimum $2,000,000 per occurrence)</li>'
+    + '<li>List of at least two comparable completed projects (name, owner, value, completion date)</li>'
+    + '<li>Proposed project start date and estimated completion timeline</li>'
+    + '<li>Fully completed bid form above with all line items priced</li></ul></div></div>'
+
+    + '<div class="sec"><div class="sec-h">Submission Instructions</div><div class="sec-b" style="font-size:10px;line-height:1.7;">'
+    + '<p>' + subInstr + '</p>'
+    + '<p style="margin-top:6px;">Bids must be received by: <strong>' + escapeHtml(closingDisplay) + '</strong>. Late submissions will not be accepted under any circumstances.</p>'
+    + '</div></div>'
+
+    + (termsHtml ? '<div class="sec"><div class="sec-h">Terms &amp; Conditions</div><div class="sec-b">' + termsHtml + '</div></div>' : '')
+
+    + '<div class="sec"><div class="sec-h">Authorization</div><div class="sec-b">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;padding-top:8px;">'
+    + '<div><div style="font-size:9px;font-weight:bold;text-transform:uppercase;color:#888;margin-bottom:4px;">Issued by</div>'
+    + '<div class="sig-line">Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date: ____________</div>'
+    + '<div style="margin-top:6px;font-size:9px;color:#888;">Print name: ____________________________</div>'
+    + '<div style="margin-top:2px;font-size:9px;color:#888;">Title: ____________________________</div></div>'
+    + '<div><div style="font-size:9px;font-weight:bold;text-transform:uppercase;color:#888;margin-bottom:4px;">On behalf of</div>'
+    + '<div style="font-size:11px;font-weight:bold;margin-top:8px;">' + escapeHtml(natDisp) + '</div>'
+    + '<div style="font-size:10px;color:#555;">Housing Department</div></div>'
+    + '</div></div></div>'
+    + '</div>'
+    + '<div class="footer"><span>' + escapeHtml(natShort) + ' Housing  |  ' + escapeHtml(rfq.id) + '</span><span>Generated: ' + today + '</span></div>'
+    + '</body></html>';
+}
+
+async function sendRfqToRecipients(rfq, contractorList) {
+  var coverRaw = (window._appSettings && window._appSettings.rfq_cover_letter) || '';
+  var cover = typeof coverRaw === 'string' ? coverRaw : (coverRaw.bodyHtml || String(coverRaw));
+  var units  = (typeof housingUnits !== 'undefined' ? housingUnits : []);
+  var unit   = units.find(function(u){ return u && u.id === rfq.sow_unit_id; }) || {};
+  var addr   = ((unit.num || '') + ' ' + (unit.street || '')).trim() || rfq.sow_unit_id;
+  var closing = rfq.closes_at ? new Date(rfq.closes_at).toLocaleString('en-CA') : '--';
+  var rfqLink = (rfq.data && rfq.data.document_url) ? rfq.data.document_url : '(see attached or contact Housing Department)';
+  var contact = (rfq.data && rfq.data.contact_person) || '';
+  var contactEmail = (rfq.data && rfq.data.contact_email) || '';
+  var subMethod = (rfq.data && rfq.data.submission_method) || 'email';
+
+  var ok = 0, fail = 0, failNames = [];
+  for (var i = 0; i < contractorList.length; i++) {
+    var ct = contractorList[i];
+    if (!ct || !ct.email) { fail++; failNames.push((ct && ct.name) || '(no email)'); continue; }
+    var body = cover
+      .replace(/\{contractorName\}/g, ct.name || 'Contractor')
+      .replace(/\{rfqNumber\}/g, rfq.id)
+      .replace(/\{projectAddress\}/g, addr)
+      .replace(/\{closingDate\}/g, closing)
+      .replace(/\{contactPerson\}/g, contact)
+      .replace(/\{contactEmail\}/g, contactEmail)
+      .replace(/\{submissionMethod\}/g, subMethod)
+      .replace(/\{rfqLink\}/g, rfqLink)
+      .replace(/\\n/g, '\n');
+    try {
+      await window.sendNotification({
+        to: ct.email, to_name: ct.name || '',
+        subject: rfq.id + ' -- ' + addr + ' -- Bids close ' + closing,
+        bodyHtml: '<pre style="font-family:Georgia,serif;font-size:11px;white-space:pre-wrap;line-height:1.6;">' + escapeHtml(body) + '</pre>',
+        event: 'rfq_invite', entity_type: 'rfq', entity_id: rfq.id
+      });
+      if (typeof auditEntry === 'function') auditEntry('RFQ:' + rfq.id, 'recipient_emailed', 'Emailed to ' + ct.name + ' <' + ct.email + '>', window.currentRole || 'staff');
+      ok++;
+    } catch(e) {
+      console.warn('[rfq] send failed:', ct.email, e);
+      fail++; failNames.push(ct.name || ct.email);
+    }
+  }
+  if (typeof showToast === 'function') {
+    if (fail) showToast('Sent to ' + ok + ' of ' + (ok+fail) + ' -- failed: ' + failNames.join(', '));
+    else      showToast('RFQ sent to ' + ok + ' contractor' + (ok === 1 ? '' : 's'));
+  }
+  return { ok: ok, fail: fail, failNames: failNames };
+}
+
+async function awardRfq(rfqId, contractorId, amount, notes) {
+  var rfq = (window._rfqCache || {})[rfqId];
+  if (!rfq) { if (typeof showToast === 'function') showToast('RFQ not found'); return false; }
+  var role = window.currentRole || 'staff';
+  var updates = { status: 'awarded', awarded_contractor_id: contractorId,
+                  award_amount: parseFloat(amount) || 0, award_notes: notes || null,
+                  updated_at: new Date().toISOString() };
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/housing_rfq?id=eq.' + encodeURIComponent(rfqId), {
+      method: 'PATCH', headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'return=minimal'}),
+      body: JSON.stringify(updates)
+    });
+    if (!r.ok) throw new Error('PATCH failed: ' + await r.text());
+    Object.assign(rfq, updates);
+    var ct = (window._contractors || []).find(function(c){ return c && c.id === contractorId; });
+    if (typeof auditEntry === 'function') auditEntry('RFQ:' + rfqId, 'awarded', 'Awarded to ' + ((ct && ct.name) || contractorId) + ' -- $' + (parseFloat(amount)||0).toFixed(2) + (notes ? ' -- ' + notes : ''), role);
+    if (ct && ct.email && typeof window.sendNotification === 'function') {
+      var units = (typeof housingUnits !== 'undefined' ? housingUnits : []);
+      var unit  = units.find(function(u){ return u && u.id === rfq.sow_unit_id; }) || {};
+      var addr  = ((unit.num || '') + ' ' + (unit.street || '')).trim() || rfq.sow_unit_id;
+      window.sendNotification({
+        to: ct.email, to_name: ct.name || '',
+        subject: rfq.id + ' -- Contract Award Notification',
+        bodyHtml: '<p>Dear ' + escapeHtml(ct.name || 'Contractor') + ',</p><p>We are pleased to inform you that your bid for <strong>' + escapeHtml(rfq.id) + '</strong> (' + escapeHtml(addr) + ') has been accepted. The awarded amount is <strong>$' + (parseFloat(amount)||0).toFixed(2) + ' CDN</strong>.</p>' + (notes ? '<p>Notes: ' + escapeHtml(notes) + '</p>' : '') + '<p>The Housing Department will contact you shortly to arrange commencement. Thank you for your submission.</p>',
+        event: 'rfq_award', entity_type: 'rfq', entity_id: rfqId
+      }).catch(function(e){ console.warn('[rfq] award notify failed:', e); });
+    }
+    if (typeof showToast === 'function') showToast('RFQ ' + rfqId + ' awarded');
+    return true;
+  } catch(e) { console.warn('[rfq] award failed:', e); if (typeof showToast === 'function') showToast('Award failed -- see console'); return false; }
+}
+
+function openRfqFromSow() {
+  var unitId = window._sowUnitId;
+  var pn     = window._sowEditingProjectNumber;
+  if (!unitId) return;
+  var sow = null;
+  var sowData = window._sowCache && window._sowCache[unitId];
+  if (sowData && sowData.sows) {
+    sow = sowData.sows.find(function(s){ return s && s.project_number === pn; });
+  }
+  var threshold = ((window._appSettings && window._appSettings.rfq_threshold) || 10000);
+  var role = window.currentRole || '';
+  var meetsThreshold = sow && _sowMeetsRfqThreshold(sow);
+  if (!meetsThreshold && role !== 'ed' && role !== 'housing_manager') {
+    if (typeof showToast === 'function') showToast('RFQ required only for scopes >= $' + threshold.toLocaleString());
+    return;
+  }
+  var params = new URLSearchParams({ unit: unitId });
+  if (pn) params.set('sow', pn);
+  if (!meetsThreshold) params.set('override', '1');
+  window.location.href = 'rfq.html?' + params.toString();
+}
+
+window.loadRfqCache         = loadRfqCache;
+window.generateRfqNumber    = generateRfqNumber;
+window._sowMeetsRfqThreshold = _sowMeetsRfqThreshold;
+window.buildRfqDocumentHtml = buildRfqDocumentHtml;
+window.sendRfqToRecipients  = sendRfqToRecipients;
+window.awardRfq             = awardRfq;
+window.openRfqFromSow       = openRfqFromSow;

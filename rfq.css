@@ -1,0 +1,48 @@
+/* rfq.css -- RFQ module page-specific styles */
+
+.rfq-status-pill {
+  display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;
+}
+.rfq-status-draft    { background:#f4f4f0; color:#888; }
+.rfq-status-issued   { background:#eff6ff; color:#1d4ed8; }
+.rfq-status-closed   { background:#fef2f2; color:#b91c1c; }
+.rfq-status-awarded  { background:#f0fdf4; color:#15803d; }
+.rfq-status-cancelled{ background:#fef9c3; color:#854d0e; }
+
+.rfq-contractor-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
+  gap:10px;
+  margin-top:12px;
+}
+.rfq-ct-card {
+  border:1.5px solid var(--border);
+  border-radius:8px;
+  padding:12px 14px;
+  cursor:pointer;
+  transition:border-color .12s, box-shadow .12s;
+  background:var(--surface);
+  user-select:none;
+}
+.rfq-ct-card:hover  { border-color:var(--yellow); }
+.rfq-ct-card.is-selected { border-color:var(--yellow); box-shadow:0 0 0 2px var(--yellow); }
+.rfq-ct-name  { font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px; }
+.rfq-ct-trade { font-size:11px;color:var(--muted); }
+.rfq-ct-email { font-size:11px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.rfq-ct-badge { display:inline-block;font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;margin-top:5px; }
+.rfq-ct-badge-ok  { background:#f0fdf4;color:#15803d;border:1px solid #86efac; }
+.rfq-ct-badge-warn{ background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5; }
+
+.rfq-scope-table { width:100%;border-collapse:collapse;margin-top:8px; }
+.rfq-scope-table th { background:var(--dark);color:var(--yellow);padding:7px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em; }
+.rfq-scope-table td { padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text); }
+.rfq-scope-table tr:hover td { background:var(--bg); }
+
+.rfq-filter-bar { display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px; }
+.rfq-filter-bar label { display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);cursor:pointer; }
+
+.rfq-progress-msg { font-size:12px;color:var(--muted);padding:12px 0;text-align:center; }
+
+@media(max-width:640px){
+  .rfq-contractor-grid { grid-template-columns:1fr; }
+}

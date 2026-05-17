@@ -191,6 +191,7 @@ function _buildSowModalHTML() {
           '<button id="sow_archive_btn" type="button" onclick="archiveCurrentSow()" class="sow-hdr-btn-ghost" style="display:none;">🗄 Archive</button>' +
           '<button type="button" onclick="printWorkOrder()" class="sow-hdr-btn-primary">🏗 Work Order</button>' +
           '<button type="button" onclick="printSOW()" class="sow-hdr-btn-ghost">🖨 Full SOW</button>' +
+          '<button type="button" id="sow_rfq_btn" onclick="openRfqFromSow()" class="sow-hdr-btn-ghost" style="display:none;">📋 RFQ</button>' +
           '<button type="button" onclick="closeSowModal()" class="btn-close-sm">✕</button>' +
         '</div>' +
       '</div>' +
@@ -701,6 +702,17 @@ function _applySowModalLock(sow){
     arBtn.style.display = _arShow ? 'flex' : 'none';
   }
 
+  // RFQ button: show when SOW amount meets the threshold (or HM/ED override).
+  var rfqBtn = document.getElementById('sow_rfq_btn');
+  if (rfqBtn) {
+    var _rfqRole = window.currentRole || '';
+    var _rfqShow = !!sow && !sow.archived && (
+      (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)) ||
+      (_rfqRole === 'housing_manager' || _rfqRole === 'ed')
+    );
+    rfqBtn.style.display = _rfqShow ? 'flex' : 'none';
+  }
+
   // Save button: hidden in read-only mode.
   var saveBtn = document.getElementById('sow_save_btn');
   if(saveBtn) saveBtn.style.display = readOnly ? 'none' : '';
@@ -921,6 +933,9 @@ function udpRenderSowTable(unitId){
         +editBtn
         +archiveBtn
         +'<button onclick="udpPrintWorkOrder(\''+esc(unitId)+'\',\''+pn+'\')" title="Print work order" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700;font-family:DM Sans,sans-serif;">Work Order</button>'
+        +(typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)
+          ? '<a href="rfq.html?unit='+esc(unitId)+'&sow='+esc(pn)+'" style="margin-left:4px;background:#1d4ed8;border:none;color:#fff;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;display:inline-block;">RFQ</a>'
+          : '')
       +'</td>'
       +'</tr>';
   }).join('');

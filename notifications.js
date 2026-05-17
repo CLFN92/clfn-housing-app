@@ -2333,6 +2333,22 @@ var TERMS_DOCS_REGISTRY = [
                + '<li><strong>Privacy and Consent.</strong> I consent to CLFN collecting, using, and retaining information related to this request — including photographs, inspection notes, and contractor records — for the purpose of assessing, performing, and documenting the work, in accordance with PIPEDA and OCAP® principles.</li>'
                + '<li><strong>Compliance with Policy.</strong> I agree that all renovation work and related obligations are governed by the CLFN Housing Policy, my Housing Agreement or lease, and applicable community by-laws.</li>'
                + '</ol>'
+  },
+  {
+    key:         'rfq_terms',
+    label:       'Request for Quotes (RFQ) — Terms & Conditions',
+    description: 'Printed in the Terms & Conditions section of every RFQ document issued to contractors.',
+    defaultBody: '<p>By submitting a bid in response to this Request for Quotes, the contractor agrees to the following terms and conditions:</p>'
+               + '<ol>'
+               + '<li><strong>Bid Validity.</strong> All bids submitted in response to this RFQ shall remain valid and irrevocable for a minimum of sixty (60) calendar days from the bid closing date.</li>'
+               + '<li><strong>Compliance with Scope.</strong> Bids must address the full scope of work as described. Partial bids will not be considered unless explicitly invited in writing.</li>'
+               + '<li><strong>WSIB and Insurance.</strong> The contractor must provide a current WSIB clearance certificate and proof of general liability insurance (minimum $2,000,000) with this bid. Failure to include these documents will result in disqualification.</li>'
+               + '<li><strong>No Award Guarantee.</strong> Submission of a bid does not guarantee award. Constance Lake First Nation reserves the right to reject any or all bids, to cancel this RFQ at any time, and to award the work to the contractor deemed most advantageous to the community, price and other factors considered.</li>'
+               + '<li><strong>Indigenous Preference.</strong> In accordance with the CLFN Housing Policy, preference will be given to Indigenous-owned and CLFN-member-owned businesses where qualifications and price are competitive.</li>'
+               + '<li><strong>Confidentiality.</strong> All bid information submitted is confidential and will not be disclosed to other bidders.</li>'
+               + '<li><strong>Accuracy.</strong> All information submitted must be accurate and complete. Misrepresentation will result in immediate disqualification and may affect future eligibility.</li>'
+               + '<li><strong>Governing Authority.</strong> This RFQ and any resulting contract are governed by the inherent jurisdiction of Constance Lake First Nation and applicable federal and provincial law.</li>'
+               + '</ol>'
   }
 ];
 

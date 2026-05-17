@@ -39,6 +39,11 @@
       "route": "/contractors.html",
       "serve": "/contractors.html",
       "statusCode": 200
+    },
+    {
+      "route": "/rfq.html",
+      "serve": "/rfq.html",
+      "statusCode": 200
     }
   ],
   "navigationFallback": {

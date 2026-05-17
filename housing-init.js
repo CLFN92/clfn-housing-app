@@ -1277,6 +1277,7 @@ function showLoginScreen() {
 // ── Global in-memory caches for Supabase data ───────────────────────────────
 window._contractors   = window._contractors   || [];
 window._sowCache      = window._sowCache      || {};  // keyed by unit_id
+window._rfqCache      = window._rfqCache      || {};  // keyed by rfq.id
 window._renoProgress  = window._renoProgress  || {};  // keyed by unit_id
 window._renoBudget    = window._renoBudget    || {};  // keyed by unit_id
 window._unitPhotos    = window._unitPhotos    || {};  // keyed by unit_id
@@ -1392,6 +1393,8 @@ async function loadAppDataFromSupabase() {
       var sowR=await fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=unit_id,data',{headers:HOUSING_HEADERS});
       if(sowR.ok){var sd=await sowR.json();window._sowCache={};sd.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
     } catch(e){console.warn('SOW cache:',e);}
+    // Load RFQ cache
+    if (typeof loadRfqCache === 'function') { try { await loadRfqCache(); } catch(e) { console.warn('RFQ cache:', e); } }
     // Load reno progress cache
     try {
       var rpR=await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress?select=unit_id,data',{headers:HOUSING_HEADERS});
