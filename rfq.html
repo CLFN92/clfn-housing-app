@@ -132,6 +132,73 @@
       </div>
     </div>
 
+    <!-- Award & Signature section (shown below the tab panels) -->
+    <div class="card card-flush" style="margin-top:16px;">
+      <div class="modal-hdr">
+        <div>
+          <div class="lbl-yellow">Award</div>
+          <div class="txt-sm-meta">Record the winning contractor and amount once bids are received.</div>
+        </div>
+      </div>
+      <div class="sec-pad">
+        <div class="tic-grid-2">
+          <div class="f">
+            <label>Awarded To</label>
+            <select id="rfq_awarded_to" class="stg-lookup-input">
+              <option value="">-- Select contractor --</option>
+            </select>
+          </div>
+          <div class="f">
+            <label>Award Amount ($)</label>
+            <input type="number" id="rfq_award_amount" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01"/>
+          </div>
+          <div class="f" style="grid-column:1/-1;">
+            <label>Award Notes</label>
+            <textarea id="rfq_award_notes" class="stg-lookup-input" rows="2" placeholder="Reason for selection, conditions, next steps..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Authorized Signature -->
+    <div class="card card-flush" style="margin-top:16px;">
+      <div class="modal-hdr"><div class="lbl-yellow">Authorized Signature</div></div>
+      <div class="sec-pad">
+        <div class="tic-grid-2" style="margin-bottom:14px;">
+          <div class="f">
+            <label>Signatory Name</label>
+            <input type="text" id="rfq_sig_name" class="stg-lookup-input" placeholder="Print full name"/>
+          </div>
+          <div class="f">
+            <label>Title</label>
+            <input type="text" id="rfq_sig_title" class="stg-lookup-input" placeholder="e.g. Housing Manager"/>
+          </div>
+        </div>
+        <div class="sig-canvas-wrap">
+          <div class="tab-bar">
+            <button type="button" onclick="setSigMethod('rfq_sig','canvas')" id="rfq_sig_tab_canvas" class="tab-item active">&#9999;&#65039; Draw</button>
+            <button type="button" onclick="setSigMethod('rfq_sig','type')"   id="rfq_sig_tab_type"   class="tab-item">&#9000;&#65039; Type</button>
+            <button type="button" onclick="setSigMethod('rfq_sig','wet')"    id="rfq_sig_tab_wet"    class="tab-item">&#128396; Wet / E-Sign</button>
+          </div>
+          <div id="rfq_sig_panel_canvas" class="bg-paper">
+            <canvas id="rfq_sig" width="700" height="100" style="width:100%;height:100px;display:block;touch-action:none;cursor:crosshair;"></canvas>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);">
+              <span class="txt-xs-muted">Sign with finger or mouse</span>
+              <button type="button" onclick="clearSig('rfq_sig')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button>
+            </div>
+          </div>
+          <div id="rfq_sig_panel_type" class="sec-hidden">
+            <input type="text" id="rfq_sig_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;"/>
+            <div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div>
+          </div>
+          <div id="rfq_sig_panel_wet" class="sec-hidden">
+            <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Print this form and collect a wet signature, or use an e-signature service and attach the signed copy.</div>
+            <input type="text" id="rfq_sig_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Footer actions -->
     <div class="rfq-footer-actions">
       <button type="button" class="btn btn-ghost" onclick="saveRfqDraft()">Save Draft</button>

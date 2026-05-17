@@ -311,6 +311,8 @@ function showRfqForm(rfqId, unitId, sowPn, navCtx) {
   // Load SOW data and unit
   _loadRfqSowContext();
   updateRecipientBadge();
+  _renderAwardedToDropdown();
+  setTimeout(function(){ if (typeof _initSigPad === 'function') _initSigPad('rfq_sig'); }, 80);
 }
 
 function _populateFormFields(rfq) {
@@ -321,6 +323,37 @@ function _populateFormFields(rfq) {
   document.getElementById('rfq_contact').value         = d.contact_person || '';
   document.getElementById('rfq_contact_email').value   = d.contact_email  || '';
   document.getElementById('rfq_sub_method').value      = d.submission_method || 'email';
+  // Award fields
+  var amtEl = document.getElementById('rfq_award_amount');
+  var notEl = document.getElementById('rfq_award_notes');
+  var snmEl = document.getElementById('rfq_sig_name');
+  var sttEl = document.getElementById('rfq_sig_title');
+  if (amtEl) amtEl.value = rfq.award_amount || '';
+  if (notEl) notEl.value = rfq.award_notes  || '';
+  if (snmEl) snmEl.value = d.sig_name       || '';
+  if (sttEl) sttEl.value = d.sig_title      || '';
+  // Awarded-to dropdown populated after recipients are loaded
+  setTimeout(function(){
+    _renderAwardedToDropdown();
+    var awdEl = document.getElementById('rfq_awarded_to');
+    if (awdEl && rfq.awarded_contractor_id) awdEl.value = rfq.awarded_contractor_id;
+  }, 150);
+}
+
+function _renderAwardedToDropdown() {
+  var sel = document.getElementById('rfq_awarded_to');
+  if (!sel) return;
+  var prev = sel.value;
+  sel.innerHTML = '<option value="">-- Select contractor --</option>';
+  Object.keys(_rfqSelectedCts).forEach(function(id) {
+    var ct = (window._contractors || []).find(function(c){ return c && c.id === id; });
+    if (!ct) return;
+    var opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = ct.name + (ct.trade ? ' (' + ct.trade + ')' : '');
+    if (id === prev) opt.selected = true;
+    sel.appendChild(opt);
+  });
 }
 
 function _loadRfqSowContext() {
@@ -458,6 +491,7 @@ function renderContractorCards() {
 function toggleContractor(ctId) {
   if (_rfqSelectedCts[ctId]) delete _rfqSelectedCts[ctId];
   else _rfqSelectedCts[ctId] = true;
+  _renderAwardedToDropdown();
   renderContractorCards();
   updateRecipientBadge();
 }
@@ -497,11 +531,18 @@ function _buildRfqPayload() {
     status:                  _rfqCurrentId ? ((window._rfqCache||{})[_rfqCurrentId] || {}).status || 'draft' : 'draft',
     closes_at:               document.getElementById('rfq_closes_at').value || null,
     recipient_contractor_ids: Object.keys(_rfqSelectedCts),
+    // Award fields (top-level columns in housing_rfq)
+    awarded_contractor_id: (document.getElementById('rfq_awarded_to')   || {}).value || null,
+    award_amount:          parseFloat((document.getElementById('rfq_award_amount') || {}).value) || null,
+    award_notes:           (document.getElementById('rfq_award_notes')  || {}).value.trim() || null,
     data: {
       contact_person:    document.getElementById('rfq_contact').value.trim(),
       contact_email:     document.getElementById('rfq_contact_email').value.trim(),
       submission_method: document.getElementById('rfq_sub_method').value,
-      scope_snapshot:    snap
+      scope_snapshot:    snap,
+      sig_name:          (document.getElementById('rfq_sig_name')  || {}).value || '',
+      sig_title:         (document.getElementById('rfq_sig_title') || {}).value || '',
+      sig_data:          (typeof getSigDataURL === 'function') ? getSigDataURL('rfq_sig') : ''
     },
     created_by: (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || '',
     updated_at: new Date().toISOString()

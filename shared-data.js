@@ -5911,12 +5911,27 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
 
     + (termsHtml ? '<div class="sec"><div class="sec-h">Terms &amp; Conditions</div><div class="sec-b">' + termsHtml + '</div></div>' : '')
 
-    + '<div class="sec"><div class="sec-h">Authorization</div><div class="sec-b">'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;padding-top:8px;">'
-    + '<div><div style="font-size:9px;font-weight:bold;text-transform:uppercase;color:#888;margin-bottom:4px;">Issued by</div>'
-    + '<div class="sig-line">Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date: ____________</div>'
-    + '<div style="margin-top:6px;font-size:9px;color:#888;">Print name: ____________________________</div>'
-    + '<div style="margin-top:2px;font-size:9px;color:#888;">Title: ____________________________</div></div>'
+    + (function() {
+        var d = rfq.data || {};
+        var sigData  = d.sig_data  || '';
+        var sigName  = d.sig_name  || '';
+        var sigTitle = d.sig_title || '';
+        var sigHtml  = '';
+        if (sigData && sigData.indexOf('data:image/png;base64,') === 0) {
+          sigHtml = '<img src="' + sigData + '" style="max-height:50px;max-width:200px;display:block;margin-bottom:2px;" alt="signature"/>';
+        } else if (sigData && sigData.indexOf('typed:') === 0) {
+          sigHtml = '<div style="font-family:Georgia,serif;font-style:italic;font-size:18px;color:#111;margin-bottom:2px;">' + escapeHtml(sigData.replace('typed:','')) + '</div>';
+        } else if (sigData && sigData.indexOf('wet:') === 0) {
+          sigHtml = '<div style="font-size:9px;color:#555;margin-bottom:2px;">' + escapeHtml(sigData.replace('wet:','pending') === 'pending' ? 'Wet signature on file' : 'E-sign ref: ' + sigData.replace('wet:','')) + '</div>';
+        }
+        return '<div class="sec"><div class="sec-h">Authorization</div><div class="sec-b">'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;padding-top:8px;">'
+          + '<div><div style="font-size:9px;font-weight:bold;text-transform:uppercase;color:#888;margin-bottom:4px;">Issued by</div>'
+          + sigHtml
+          + '<div class="sig-line">' + (sigHtml ? '' : 'Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ') + 'Date: ____________</div>'
+          + '<div style="margin-top:6px;font-size:9px;color:#888;">Print name: ' + escapeHtml(sigName || '____________________________') + '</div>'
+          + '<div style="margin-top:2px;font-size:9px;color:#888;">Title: ' + escapeHtml(sigTitle || '____________________________') + '</div></div>';
+      })()
     + '<div><div style="font-size:9px;font-weight:bold;text-transform:uppercase;color:#888;margin-bottom:4px;">On behalf of</div>'
     + '<div style="font-size:11px;font-weight:bold;margin-top:8px;">' + escapeHtml(natDisp) + '</div>'
     + '<div style="font-size:10px;color:#555;">Housing Department</div></div>'
