@@ -1351,7 +1351,7 @@
       + '<div class="export-dropdown">'
       +   '<button type="button" onclick="toggleExportMenu(this)" class="btn btn-primary">&#128196; Generate Forms &#9660;</button>'
       +   '<div class="header-export-menu">'
-      +     '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>'
+      +     '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">CLFN Residential Occupancy Agreement</button>'
       +   '</div>'
       + '</div>'
       + '</div>'
@@ -1823,6 +1823,504 @@
     });
   }
 
+
+  // ════════════════════════════════════════════════════════════════════════
+  // CLFN Residential Occupancy Agreement — Pre-generation modal
+  // ════════════════════════════════════════════════════════════════════════
+  function _ticOpenLeaseModal() {
+    var t   = _ticState.tenant      || {};
+    var u   = _ticState.unit        || {};
+    var app = _ticState.application || {};
+    var l   = _ticState.ledger      || {};
+    var today = new Date().toISOString().split('T')[0];
+
+    var tenantName = t[TIC_C.full_name] || ((app.fn||'') + ' ' + (app.ln||'')).trim();
+    var coName     = '';
+    if (app.hasCoApp && app.coApp) {
+      coName = ((app.coApp.fn||'') + ' ' + (app.coApp.ln||'')).trim();
+    }
+    var bandNum   = app.band     || '';
+    var dob       = app.dob      || '';
+    var phone     = app.phone    || '';
+    var email     = app.email    || '';
+    var emergRef  = (app.references || [])[0] || {};
+    var emerg     = ((emergRef.fn||'') + ' ' + (emergRef.ln||'')).trim();
+    if (emergRef.phone) emerg += (emerg ? ' ' : '') + emergRef.phone;
+    var lotNum    = u.num    || '';
+    var street    = u.street || '';
+    var beds      = u.bedrooms != null ? String(u.bedrooms) + ' bed' : '';
+    var stream    = t[TIC_C.housing_stream] || '';
+    var allocDate = t[TIC_C.move_in_date]   || u.assignedDate || '';
+    var rentAmt   = l[TIC_C.monthly_rent]   != null ? String(l[TIC_C.monthly_rent]) : '';
+    var startDate = allocDate || today;
+    var habitants = (app.habitants || []).filter(function(h){ return h && (h.fn || h.ln); });
+    var hasCoApp  = !!(app.hasCoApp && coName);
+
+    var existing = document.getElementById('tic_lease_modal');
+    if (existing) existing.remove();
+
+    function inp(id, val, ph, type) {
+      return '<input id="' + id + '" type="' + (type||'text') + '" value="' + _ticEsc(val||'') + '" placeholder="' + _ticEsc(ph||'') + '" style="width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>';
+    }
+    function fld(label, inputHtml) {
+      return '<div class="tic-field"><label class="tic-field-lbl">' + label + '</label>' + inputHtml + '</div>';
+    }
+    function secH(title) {
+      return '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin:16px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--border);">' + title + '</div>';
+    }
+    function sigPad(id, label) {
+      return '<div style="margin-bottom:14px;"><div class="tic-field-lbl" style="margin-bottom:6px;">' + label + '</div>'
+        + '<div class="sig-canvas-wrap"><div class="tab-bar">'
+        + '<button type="button" onclick="setSigMethod(\'' + id + '\',\'canvas\')" id="' + id + '_tab_canvas" class="tab-item active">&#9999;&#65039; Draw</button>'
+        + '<button type="button" onclick="setSigMethod(\'' + id + '\',\'type\')"   id="' + id + '_tab_type"   class="tab-item">&#9000;&#65039; Type</button>'
+        + '<button type="button" onclick="setSigMethod(\'' + id + '\',\'wet\')"    id="' + id + '_tab_wet"    class="tab-item">&#128396; Wet</button>'
+        + '</div>'
+        + '<div id="' + id + '_panel_canvas" class="bg-paper"><canvas id="' + id + '" width="600" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;"></canvas>'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);">'
+        + '<span class="txt-xs-muted">Sign with finger or mouse</span>'
+        + '<button type="button" onclick="clearSig(\'' + id + '\')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button>'
+        + '</div></div>'
+        + '<div id="' + id + '_panel_type" class="sec-hidden"><input type="text" id="' + id + '_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:16px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;"/>'
+        + '<div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div>'
+        + '<div id="' + id + '_panel_wet" class="sec-hidden"><div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Print this form and collect a wet signature, or use an e-signature service and attach the signed copy to this tenant\'s file.</div>'
+        + '<input type="text" id="' + id + '_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/></div>'
+        + '</div></div>';
+    }
+
+    // Build occupants rows
+    var occRows = '';
+    for (var i = 0; i < 6; i++) {
+      var h  = habitants[i] || {};
+      var nm = ((h.fn||'') + ' ' + (h.ln||'')).trim();
+      occRows += '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 80px;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);">'
+        + '<div style="font-size:10px;color:var(--muted);grid-column:1/-1;font-weight:600;padding-bottom:2px;">Occupant ' + (i+1) + '</div>'
+        + inp('ls_occ_name_'+i, nm, 'Full name')
+        + inp('ls_occ_rel_'+i, h.relationship||'', 'Relationship')
+        + inp('ls_occ_dob_'+i, h.dob||'', 'DOB', 'date')
+        + inp('ls_occ_band_'+i, '', 'Y / N')
+        + '</div>';
+    }
+
+    var modal = document.createElement('div');
+    modal.id = 'tic_lease_modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.innerHTML =
+        '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:700px;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35);">'
+      + '<div class="modal-hdr"><div>'
+      +   '<div class="lbl-yellow">&#128209; CLFN Residential Occupancy Agreement</div>'
+      +   '<div class="txt-sm-meta">Pre-filled from the Tenant Information Card. Review, collect signatures, then generate.</div>'
+      + '</div><button type="button" onclick="document.getElementById(\'tic_lease_modal\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button></div>'
+      + '<div style="overflow-y:auto;padding:18px 22px;flex:1;">'
+
+      + secH('Execution Date')
+      + '<div class="tic-grid-2">'
+      + fld('Date of Agreement', inp('ls_exec_date', today, '', 'date'))
+      + fld('Commencement Date', inp('ls_start_date', startDate, '', 'date'))
+      + '</div>'
+
+      + secH('Primary Tenant')
+      + '<div class="tic-grid-2">'
+      + fld('Full Legal Name',             inp('ls_t_name',  tenantName, 'Full name'))
+      + fld('Band Membership #',           inp('ls_t_band',  bandNum,    'Band number'))
+      + fld('Date of Birth',               inp('ls_t_dob',   dob,        'YYYY-MM-DD', 'date'))
+      + fld('Telephone',                   inp('ls_t_phone', phone,      'Phone'))
+      + fld('Email',                       inp('ls_t_email', email,      'Email'))
+      + fld('Emergency Contact (name & phone)', inp('ls_t_emerg', emerg, 'Name and phone'))
+      + '</div>'
+
+      + secH('Co-Tenant' + (hasCoApp ? '' : ' (if applicable)'))
+      + '<div class="tic-grid-2">'
+      + fld('Co-Tenant Full Legal Name', inp('ls_co_name', coName, 'Leave blank if none'))
+      + '</div>'
+
+      + secH('Residence')
+      + '<div class="tic-grid-2">'
+      + fld('Lot Number',          inp('ls_r_lot',    lotNum,    'Lot'))
+      + fld('Street Name',         inp('ls_r_street', street,    'Street'))
+      + fld('Unit Type',           inp('ls_r_type',   '',        'e.g. single-detached'))
+      + fld('Bedrooms / Bathrooms', inp('ls_r_bed',   beds,      'e.g. 3 bed / 1 bath'))
+      + fld('Funding Stream',      inp('ls_r_stream', stream,    'e.g. Section 95'))
+      + fld('Allocation Date',     inp('ls_r_alloc',  allocDate, '', 'date'))
+      + '</div>'
+
+      + secH('Rent')
+      + '<div class="tic-grid-2">'
+      + fld('Monthly Rent ($)', inp('ls_rent', rentAmt, '0.00'))
+      + '</div>'
+
+      + secH('Authorized Occupants — Schedule A')
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Pre-filled from the Occupants tab. Edit as needed. Leave rows blank if fewer than 6 additional occupants.</div>'
+      + occRows
+
+      + secH('Signatures')
+      + sigPad('ls_sig_tenant', 'Primary Tenant Signature')
+      + (hasCoApp ? sigPad('ls_sig_cotenant', 'Co-Tenant Signature') : '')
+      + sigPad('ls_sig_staff', 'Housing Staff / Landlord Signature')
+
+      + '</div>'
+      + '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;">'
+      + '<button type="button" onclick="document.getElementById(\'tic_lease_modal\').remove()" class="btn btn-ghost">Cancel</button>'
+      + '<button type="button" onclick="window._ticGenerateLeasePdf && window._ticGenerateLeasePdf()" class="btn btn-primary">Generate PDF</button>'
+      + '</div>'
+      + '</div>';
+
+    document.body.appendChild(modal);
+    setTimeout(function() {
+      if (typeof _initSigPad === 'function') {
+        _initSigPad('ls_sig_tenant');
+        if (hasCoApp) _initSigPad('ls_sig_cotenant');
+        _initSigPad('ls_sig_staff');
+      }
+    }, 80);
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // CLFN Residential Occupancy Agreement -- PDF generator
+  // ════════════════════════════════════════════════════════════════════════
+  async function _ticGenerateLeasePdf() {
+    if (typeof _loadJsPdf === 'function') await _loadJsPdf();
+    if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable'); return; }
+    var fv = function(id){ var e=document.getElementById(id); return e ? (e.value||'').trim() : ''; };
+    var execDate=fv('ls_exec_date'), startDate=fv('ls_start_date'),
+        tName=fv('ls_t_name'), tBand=fv('ls_t_band'), tDob=fv('ls_t_dob'),
+        tPhone=fv('ls_t_phone'), tEmail=fv('ls_t_email'), tEmerg=fv('ls_t_emerg'),
+        coName=fv('ls_co_name'), rLot=fv('ls_r_lot'), rStreet=fv('ls_r_street'),
+        rType=fv('ls_r_type'), rBed=fv('ls_r_bed'), rStream=fv('ls_r_stream'),
+        rAlloc=fv('ls_r_alloc'), rentAmt=fv('ls_rent');
+    var sigT=(typeof getSigDataURL==='function')?getSigDataURL('ls_sig_tenant'):'';
+    var sigC=(typeof getSigDataURL==='function')?getSigDataURL('ls_sig_cotenant'):'';
+    var sigS=(typeof getSigDataURL==='function')?getSigDataURL('ls_sig_staff'):'';
+    var occs=[];
+    for(var oi=0;oi<6;oi++){occs.push({name:fv('ls_occ_name_'+oi),rel:fv('ls_occ_rel_'+oi),dob:fv('ls_occ_dob_'+oi),band:fv('ls_occ_band_'+oi)});}
+    function fmtDate(d){if(!d)return'';var dt=new Date(d+'T12:00:00');return isNaN(dt)?d:dt.toLocaleDateString('en-CA');}
+    var pdf=new window.jspdf.jsPDF({unit:'mm',format:'letter',orientation:'portrait',compress:true});
+    var PW=215.9,PH=279.4,ML=19.1,MR=19.1,CW=PW-ML-MR,HDR=14,FTR=12,MAXY=PH-FTR-6,LH=4.0;
+    var pageNum=0,y=0;
+    function newPage(){
+      if(pageNum>0)pdf.addPage('letter','portrait');
+      pageNum++;
+      pdf.setFillColor(0,0,0);pdf.rect(0,0,PW,HDR,'F');
+      pdf.setFillColor(248,228,26);pdf.rect(0,HDR,PW,1,'F');
+      pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(248,228,26);
+      pdf.text('CONSTANCE LAKE FIRST NATION',ML,5.5);
+      pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(255,255,255);
+      pdf.text('Housing Department  |  Residential Occupancy Agreement',ML,9.5);
+      pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.setTextColor(248,228,26);
+      pdf.text('Page '+pageNum,PW-MR,6,{align:'right'});
+      var fy=PH-FTR;
+      pdf.setFillColor(248,228,26);pdf.rect(0,fy,PW,0.8,'F');
+      pdf.setFillColor(0,0,0);pdf.rect(0,fy+0.8,PW,FTR-0.8,'F');
+      pdf.setFont('helvetica','italic');pdf.setFontSize(6.5);pdf.setTextColor(255,255,255);
+      pdf.text('Issued under the CLFN Housing Policy (2026) and the inherent jurisdiction of Constance Lake First Nation.',ML,fy+5.5);
+      pdf.setFont('helvetica','bold');pdf.setFontSize(6.5);pdf.setTextColor(248,228,26);
+      pdf.text('CLFN Housing  |  Form LEASE-001',PW-MR,fy+5.5,{align:'right'});
+      pdf.setTextColor(0);y=HDR+8;
+    }
+    function need(h){if(y+h>MAXY)newPage();}
+    function bt(text,x,w,sz){
+      pdf.setFont('helvetica','normal');pdf.setFontSize(sz||8.5);pdf.setTextColor(40);
+      var lines=pdf.splitTextToSize(text,w||CW);need(lines.length*LH+1);
+      pdf.text(lines,x||ML,y);y+=lines.length*LH+1;
+    }
+    function secH(num,title){
+      need(12);y+=3;
+      pdf.setFont('helvetica','bold');pdf.setFontSize(10.5);pdf.setTextColor(0);
+      pdf.text(num+'. '+title.toUpperCase(),ML,y);y+=6;
+    }
+    function subH(title){
+      need(8);y+=1;
+      pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(0);
+      pdf.text(title,ML,y);y+=5;
+    }
+    function cl(key,text){
+      pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(40);
+      var lines=pdf.splitTextToSize('('+key+')  '+text,CW-8);
+      need(lines.length*LH+2);
+      pdf.text(lines[0],ML+8,y);
+      for(var i=1;i<lines.length;i++){y+=LH;pdf.text(lines[i],ML+13,y);}
+      y+=LH+2;
+    }
+    function cl2(key,text){
+      pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(40);
+      var lines=pdf.splitTextToSize('('+key+')  '+text,CW-16);
+      need(lines.length*LH+1.5);
+      pdf.text(lines[0],ML+16,y);
+      for(var i=1;i<lines.length;i++){y+=LH;pdf.text(lines[i],ML+22,y);}
+      y+=LH+1.5;
+    }
+    function ul(x1,x2,yy){pdf.setDrawColor(180);pdf.setLineWidth(0.2);pdf.line(x1,yy,x2,yy);}
+    function lf(label,val,x,w,yy){
+      pdf.setFont('helvetica','normal');pdf.setFontSize(6);pdf.setTextColor(100);pdf.text(label,x,yy-2.5);
+      pdf.setFontSize(8.5);pdf.setTextColor(0);if(val)pdf.text(String(val).substring(0,Math.floor(w/1.6)),x,yy);
+      ul(x,x+w,yy+1);
+    }
+    function putSig(sig,x,ly,w){
+      if(!sig)return;
+      if(sig.indexOf('data:image')===0){try{pdf.addImage(sig,'PNG',x,ly-14,w,14);}catch(e){}}
+      else if(sig.indexOf('typed:')===0){pdf.setFont('helvetica','italic');pdf.setFontSize(12);pdf.setTextColor(0);pdf.text(sig.replace('typed:',''),x,ly-2);pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);}
+      else if(sig.indexOf('wet:')===0){pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(100);pdf.text(sig.replace('wet:','pending')==='pending'?'Physical signature on file':'E-sign ref: '+sig.replace('wet:',''),x,ly-4);pdf.setTextColor(0);pdf.setFontSize(8.5);}
+    }
+    // COVER PAGE
+    pdf.setFillColor(0,0,0);pdf.rect(0,0,PW,PH,'F');
+    pdf.setFillColor(248,228,26);pdf.rect(0,PH-8,PW,8,'F');pdf.rect(0,0,PW,8,'F');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(22);pdf.setTextColor(248,228,26);
+    pdf.text('CONSTANCE LAKE FIRST NATION',PW/2,PH-100,{align:'center'});
+    pdf.setFontSize(16);pdf.text('RESIDENTIAL OCCUPANCY AGREEMENT',PW/2,PH-88,{align:'center'});
+    pdf.setFillColor(248,228,26);pdf.rect(ML+20,PH-83,CW-40,0.8,'F');
+    pdf.setFont('helvetica','normal');pdf.setFontSize(11);pdf.setTextColor(255,255,255);
+    pdf.text('Between Constance Lake First Nation, Housing Department',PW/2,PH-75,{align:'center'});
+    pdf.text('and the Tenant named within.',PW/2,PH-68,{align:'center'});
+    pdf.setFillColor(248,228,26);pdf.rect(ML+30,PH-58,CW-60,22,'F');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(10);pdf.setTextColor(0,0,0);
+    pdf.text('Issued under the CLFN Housing Policy',PW/2,PH-49,{align:'center'});
+    pdf.setFontSize(13);pdf.text('approved by Chief and Council, 2026',PW/2,PH-41,{align:'center'});
+    pdf.setFont('helvetica','italic');pdf.setFontSize(9);pdf.setTextColor(255,255,255);
+    pdf.text('This Agreement is governed by the inherent jurisdiction of Constance Lake First Nation',PW/2,45,{align:'center'});
+    pdf.text('and the Indian Act, R.S.C. 1985, c. I-5. The Ontario Residential Tenancies Act does not apply.',PW/2,51,{align:'center'});
+    pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(248,228,26);
+    pdf.text('CLFN HOUSING DEPARTMENT',PW/2,32,{align:'center'});
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(255,255,255);
+    pdf.text('P.O. Box 4000, Constance Lake First Nation, ON  P0L 1B0',PW/2,26,{align:'center'});
+    // PARTIES PAGE
+    newPage();
+    pdf.setFont('helvetica','bold');pdf.setFontSize(12);pdf.setTextColor(0);pdf.text('RESIDENTIAL OCCUPANCY AGREEMENT',ML,y);y+=8;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(40);
+    var exDay=execDate?new Date(execDate+'T12:00:00').getDate():'___';
+    var exMon=execDate?new Date(execDate+'T12:00:00').toLocaleString('en-CA',{month:'long'}):'_____________';
+    var exYr=execDate?new Date(execDate+'T12:00:00').getFullYear():'____';
+    pdf.text('THIS AGREEMENT is made and entered into on this '+exDay+' day of '+exMon+', '+exYr+', between:',ML,y);y+=7;
+    pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(0);pdf.text('THE LANDLORD:',ML,y);y+=5;
+    pdf.text('CONSTANCE LAKE FIRST NATION -- HOUSING DEPARTMENT',ML+8,y);y+=4.5;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(40);
+    pdf.text('P.O. Box 4000, Constance Lake First Nation, Ontario P0L 1B0',ML+8,y);y+=4.5;
+    pdf.text('(hereinafter referred to as the "Landlord" or the "Housing Department")',ML+8,y);y+=7;
+    pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(0);pdf.text('-- AND --',PW/2,y,{align:'center'});y+=7;
+    pdf.text('THE TENANT:',ML,y);y+=5;
+    var tflds=[['Primary Tenant (full legal name):',tName],['Co-Tenant (full legal name, if applicable):',coName],['CLFN Band Membership Number:',tBand],['Date of Birth (Primary):',fmtDate(tDob)],['Mailing Address (P.O. Box):',''],['Telephone:',tPhone],['Email:',tEmail],['Emergency Contact (name & phone):',tEmerg]];
+    tflds.forEach(function(tf){pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(40);pdf.text(tf[0],ML+8,y);ul(ML+76,ML+CW,y+1);if(tf[1])pdf.text(tf[1],ML+77,y);y+=5.5;});
+    pdf.setFont('helvetica','italic');pdf.setFontSize(8.5);pdf.text('(hereinafter referred to as the "Tenant")',ML,y);y+=8;
+    pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(0);pdf.text('THE RESIDENCE:',ML,y);y+=5;
+    var hw=(CW-4)/2;
+    lf('Lot Number:',rLot,ML,hw*0.5-2,y);lf('Street Name:',rStreet,ML+hw*0.5+2,hw*1.5-2,y);y+=7;
+    lf('Unit Type:',rType,ML,hw*0.7-2,y);lf('Bedrooms / Bathrooms:',rBed,ML+hw*0.7+2,hw*1.3-2,y);y+=7;
+    lf('Funding Stream:',rStream,ML,hw*0.7-2,y);lf('Allocation Date:',fmtDate(rAlloc),ML+hw*0.7+2,hw*1.3-2,y);y+=6;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(40);
+    pdf.text('Situated within Constance Lake First Nation Reserve, Ontario, (hereinafter referred to as the "Residence" or the "Unit").',ML,y);y+=8;
+    pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(0);pdf.text('RECITALS',ML,y);y+=5;
+    var rec='WHEREAS Constance Lake First Nation is the lawful occupier of the lands on which the Residence is situated, pursuant to the Indian Act, R.S.C. 1985, c. I-5, and the inherent jurisdiction of Constance Lake First Nation over its lands and members; AND WHEREAS the Tenant has applied for and been allocated the Residence in accordance with the CLFN Housing Policy approved by Chief and Council in 2026 (the "Housing Policy"); AND WHEREAS the Tenant acknowledges that this Agreement is not subject to the Residential Tenancies Act, 2006 (Ontario), as that statute does not apply to lands reserved for the Indians within the meaning of the Constitution Act, 1867; NOW THEREFORE in consideration of the mutual covenants contained herein, the parties agree as follows:';
+    var recL=pdf.splitTextToSize(rec,CW-6);var recH2=recL.length*LH+8;
+    need(recH2+4);pdf.setFillColor(255,249,214);pdf.setDrawColor(248,228,26);pdf.setLineWidth(0.6);pdf.rect(ML,y,CW,recH2,'FD');
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(40);pdf.text(recL,ML+3,y+5);y+=recH2+4;
+    // SECTIONS 1-10
+    secH(1,'Governing Authority and Application of the Housing Policy');
+    cl('a','This Agreement is entered into pursuant to the inherent jurisdiction of Constance Lake First Nation, the Indian Act, and the policies and resolutions of Chief and Council. It is a private contractual arrangement between the Landlord and the Tenant.');
+    cl('b','The Tenant acknowledges that the Residential Tenancies Act, 2006 (Ontario) does not apply to this Agreement, that the Landlord and Tenant Board of Ontario has no jurisdiction over this Agreement, and that any dispute arising under this Agreement shall be addressed through the internal grievance process established under the Housing Policy and, where necessary, through the Ontario Superior Court of Justice as a matter of contract law.');
+    cl('c','The CLFN Housing Policy approved by Chief and Council in 2026 is hereby incorporated into this Agreement by reference and forms an integral part of it. In the event of any conflict between this Agreement and the Housing Policy, the Housing Policy shall prevail except where this Agreement expressly states otherwise.');
+    cl('d','The Tenant confirms receipt of a copy of the Housing Policy, or alternatively confirms that the Housing Department has made the Housing Policy available for review at its offices and on the CLFN website, and that the Tenant has had the opportunity to ask questions about it prior to signing this Agreement.');
+    secH(2,'Use of the Residence');
+    cl('a','The Tenant shall use the Residence solely for residential purposes as a primary dwelling and shall not use, or permit any other person to use, the Residence for any commercial, industrial, or other non-residential purpose without the prior written consent of the Housing Department.');
+    cl('b','The Tenant shall not use the Residence, or permit it to be used, for any illegal or improper purpose, or in any manner that interferes with the use and enjoyment of neighbouring properties, the peace and good order of the community, or the safety of any person.');
+    cl('c','Smoking. The Residence is a smoking-permitted environment. The Tenant and occupants may smoke or vaporize tobacco and cannabis lawfully within the Residence. The Tenant acknowledges and agrees that:');
+    cl2('i','Smoking shall not be permitted in a manner that endangers the safety of any person or the structural integrity of the Residence;');
+    cl2('ii','All smoking materials must be extinguished and disposed of safely, and the Tenant assumes full responsibility for any fire or fire-related damage caused by smoking;');
+    cl2('iii','The Tenant shall be liable to the Landlord for the full cost of remediating any damage to the Residence arising from smoking recoverable as arrears under Section 4; and');
+    cl2('iv','Smoking shall not be conducted in a manner that constitutes a nuisance to other community members.');
+    cl('d','Cannabis cultivation, production, and processing -- prohibited. The cultivation, growing, production, manufacture, or processing of cannabis in any quantity -- on, within, or about the Residence, its lot, any outbuilding, or any attached or detached structure -- is strictly prohibited as a condition of this Agreement. The Tenant acknowledges and agrees that:');
+    cl2('i','This prohibition is a reasonable condition of tenancy given the risks that indoor cultivation poses to the structural integrity, habitability, and insurability of Band housing;');
+    cl2('ii','Any breach constitutes a material breach and immediate grounds for termination under Section 13.1 of the Housing Policy, without the standard fifteen (15) day cure period;');
+    cl2('iii','The Tenant shall be liable for the full cost of any environmental remediation, decontamination, mold abatement, structural repair, or electrical restoration arising from any breach; and');
+    cl2('iv','Unauthorized alterations made to facilitate cultivation may void the Landlord\'s insurance coverage under Section 8(c), and any resulting cost shall be the Tenant\'s responsibility.');
+    cl('e','Unlawful drugs and unlawful drug-related activity. The Tenant and all occupants shall not, and shall not permit any guest or other person to: possess, use, consume, or store any controlled substance (except lawfully prescribed medications); manufacture or produce any controlled substance; sell, distribute, or traffic any controlled substance from or in connection with the Residence; or permit the Residence to be used for any unlawful drug-related activity.');
+    cl('f','Consequences of unlawful drug breach. Any breach of clause (e) constitutes a material breach and shall result in immediate termination without the standard fifteen (15) day cure period. The Housing Department shall report any suspected criminal activity to the appropriate police service.');
+    cl('g','Search, inspection, and remediation. Where the Housing Department has reasonable grounds to believe that a breach of clause (d) or (e) has occurred, it may, on twenty-four (24) hours\' notice -- or without notice in cases of imminent risk -- enter and inspect the Residence in accordance with Section 9.');
+    cl('h','The Tenant shall maintain quiet enjoyment of the Residence and shall ensure that any household member or guest does not create noise or disturbance after 11:00 p.m.');
+    cl('i','Occupancy. Only the Tenant, the co-Tenant named above, and the dependents listed in Schedule "A" shall occupy the Residence. Any change in household composition exceeding fourteen (14) consecutive days must be reported to the Housing Manager in writing.');
+    need(22);var iText='Tenant acknowledgement of smoking, cannabis, and drug-related provisions. By initialling below, the Tenant confirms understanding of and agreement to clauses (c) through (g) above, acknowledges full liability for damage arising from smoking, acknowledges that cannabis cultivation is strictly prohibited regardless of federal legality, and acknowledges that any breach of clause (d) or (e) constitutes immediate grounds for termination without a cure period.';
+    var iLines=pdf.splitTextToSize(iText,CW-52);var iH=iLines.length*LH+8;
+    pdf.setFillColor(255,249,214);pdf.setDrawColor(248,228,26);pdf.setLineWidth(0.5);pdf.rect(ML,y,CW,iH,'FD');
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(40);pdf.text(iLines,ML+3,y+5);
+    pdf.setTextColor(0);pdf.text('Initial:',ML+CW-46,y+5);ul(ML+CW-30,ML+CW-4,y+6);y+=iH+4;
+    secH(3,'Rent and Payment Terms');
+    subH('3.1  Monthly Rent');
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(40);
+    pdf.text('The Tenant shall pay to the Landlord monthly rent in the amount of:  $',ML,y);
+    pdf.setFont('helvetica','bold');pdf.setTextColor(0);pdf.text(rentAmt||'___________',ML+110,y);
+    pdf.setFont('helvetica','normal');pdf.setTextColor(40);pdf.text('CDN',ML+142,y);y+=LH;
+    bt('Rent shall be paid on or before the first (1st) day of each calendar month. Rent is calculated in accordance with Section 11 of the Housing Policy and shall be reviewed annually.');
+    subH('3.2  Method of Payment');
+    bt('Pre-authorized debit (preferred)  [ ]     Payroll deduction  [ ]     Interac e-Transfer  [ ]     Cheque or money order  [ ]');
+    bt('All payments shall be made payable to Constance Lake First Nation.');
+    subH('3.3  First Month\'s Rent');
+    bt('The Tenant shall pay the first month\'s rent in full on or before the commencement date of this Agreement. No occupancy shall commence until the first month\'s rent is paid.');
+    subH('3.4  Late Payment and NSF Charges');
+    bt('Where any rent payment remains unpaid fifteen (15) days past the due date, a late payment fee of $25.00 shall be added to the Tenant\'s account. Where a cheque or pre-authorized debit is returned for insufficient funds, a $45.00 NSF fee shall be added to the Tenant\'s account, in addition to any charges imposed by the financial institution.');
+    subH('3.5  Application of Payments');
+    bt('All payments received shall be applied first to outstanding fees, then to arrears in chronological order, and lastly to current rent. The Tenant may not direct the Housing Department to apply payments otherwise.');
+    secH(4,'Arrears, Repayment Arrangements, and Default');
+    subH('4.1  Notification and Repayment Arrangements');
+    bt('Where the Tenant fails to pay rent in full by the due date, the Housing Manager shall initiate the arrears escalation process set out in Section 12.3 of the Housing Policy.');
+    subH('4.2  Minimum Repayment Schedule');
+    bt('Repayment arrangements shall apply the minimum repayment formula established under Section 12.2 of the Housing Policy. The terms shall be documented in a written Repayment Agreement signed by the Tenant and retained on file.');
+    subH('4.3  Default and Termination for Non-Payment');
+    bt('Persistent non-payment combined with failure to engage with the Housing Department shall result in default and may lead to termination in accordance with Sections 12.3 to 12.5 of the Housing Policy. The Tenant acknowledges that the Housing Department\'s right to terminate is governed by the Housing Policy and not by the Residential Tenancies Act, 2006 (Ontario).');
+    subH('4.4  Recovery from Other Band Payments');
+    bt('Where arrears remain unpaid and a Repayment Agreement has not been honoured, the Tenant consents to the recovery of arrears from any monetary payments administered by Constance Lake First Nation on behalf of the Tenant, in accordance with the withholding mechanism set out in the Housing Policy.');
+    secH(5,'Term of the Agreement');
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(40);
+    pdf.text('This Agreement commences on',ML,y);
+    pdf.setFont('helvetica','bold');pdf.setTextColor(0);pdf.text(' '+(fmtDate(startDate)||'___________________'),ML+50,y);
+    pdf.setFont('helvetica','normal');pdf.setTextColor(40);pdf.text(' and continues month-to-month thereafter, subject to Section 12.',ML+110,y);y+=LH+2;
+    bt('The Tenant\'s continued occupancy is conditional upon continued compliance with this Agreement and the Housing Policy.');
+    secH(6,'Tenant Responsibilities');
+    bt('In addition to the obligations contained elsewhere in this Agreement and in the Housing Policy (in particular Section 13), the Tenant shall:');
+    cl('a','Maintain the Residence and its yard and ditch areas in a clean, sanitary, and structurally sound condition;');
+    cl('b','Promptly report to the Housing Manager, in writing, any required repairs, damage, hazards, or conditions that may cause damage to the Residence;');
+    cl('c','Permit authorized staff, contractors, and inspectors to enter the Residence for inspection, maintenance, and repair purposes, subject to reasonable notice under Section 9;');
+    cl('d','Not undertake any alterations, additions, renovations, or modifications without the prior written approval of the Housing Manager under Section 13.1 of the Housing Policy;');
+    cl('e','Not remove kitchen or washroom fixtures upon vacating -- failing which a financial penalty shall be charged to the Tenant\'s account;');
+    cl('f','Ensure that household members, occupants, and guests conduct themselves in a manner that does not endanger any person or damage the Residence;');
+    cl('g','Comply with all applicable building, housing, health, fire, and safety codes;');
+    cl('h','Submit to the inspection regime described in Section 9 of this Agreement and Section 13 of the Housing Policy.');
+    secH(7,'Utilities');
+    cl('a','The Tenant shall transfer all applicable utility accounts into the Tenant\'s name within thirty (30) calendar days of taking possession of the Residence and shall maintain those accounts in good standing throughout the Term.');
+    cl('b','Default on utility obligations resulting in service disconnection, or in any risk of damage to the Residence (including freezing), may constitute a breach of this Agreement.');
+    cl('c','Where Constance Lake First Nation pays a utility account on the Tenant\'s behalf to prevent disconnection or damage, the amount paid shall be added to the Tenant\'s account and is recoverable in the same manner as rent arrears, including through the withholding mechanism in Section 4.4 above.');
+    secH(8,'Insurance');
+    cl('a','Building insurance. Constance Lake First Nation shall maintain fire insurance for the full replacement value of the Residence. This coverage applies to the building only. Any loss is payable to the Housing Program.');
+    cl('b','Tenant content insurance. Constance Lake First Nation does not insure the Tenant\'s personal property. The Tenant is solely responsible for obtaining content insurance and personal liability coverage.');
+    cl('c','Unauthorized alterations. Any renovation, addition, or modification undertaken without prior written approval may void the Landlord\'s insurance coverage, and any resulting cost or loss shall be the Tenant\'s responsibility.');
+    secH(9,'Inspections and Entry');
+    cl('a','Move-in inspection. A joint move-in inspection shall be completed by the Housing Manager and the Tenant on or before the commencement date, and the resulting condition report shall be signed by both parties and retained on file.');
+    cl('b','Annual inspections. The Housing Department shall conduct at least one annual inspection of the Residence. The Tenant shall be given twenty-four (24) hours written notice in advance of any non-emergency inspection.');
+    cl('c','Emergency entry. The Housing Department may enter the Residence without notice in the event of an emergency, including (without limitation) fire, flood, gas leak, or risk of imminent harm to persons or property.');
+    cl('d','Refusal of inspection. Where the Tenant refuses or repeatedly fails to permit a scheduled inspection, the Housing Manager shall document the refusal and may treat the refusal as a breach of this Agreement.');
+    cl('e','Move-out inspection. A move-out inspection shall be completed at the conclusion of the tenancy and shall be assessed against the move-in report. Damage beyond reasonable wear and tear shall be charged to the Tenant\'s account.');
+    secH(10,'Pets');
+    bt('The Tenant may keep pets in the Residence provided that they are controlled at all times, do not cause nuisance or pose a safety risk to others, and that any damage caused by a pet is remediated at the Tenant\'s sole expense.');    secH(11,'Damage, Vandalism, and Maintenance Cost Recovery');
+    cl('a','The Tenant is responsible for the cost of repairing or replacing any damage to the Residence caused by the Tenant, an occupant, or a guest, beyond reasonable wear and tear.');
+    cl('b','Where damage results from negligence, wilful misconduct, vandalism, or unauthorized alteration, the full cost of remediation shall be charged to the Tenant\'s account.');
+    cl('c','Charges under this Section may be recovered as arrears under Sections 4.3 and 4.4 above.');
+    secH(12,'Termination of the Agreement');
+    subH('12.1  Termination by the Tenant');
+    bt('The Tenant may terminate this Agreement at any time by giving the Housing Department written notice of at least thirty (30) days. The Tenant remains responsible for rent and any other obligations under this Agreement until the effective termination date and until the Residence is fully vacated and the keys returned.');
+    subH('12.2  Termination by the Landlord');
+    bt('The Housing Department may terminate this Agreement in accordance with the grounds and procedures set out in the Housing Policy, including:');
+    cl('i','Persistent non-payment of rent, in accordance with Section 12.3 of the Housing Policy;');
+    cl('ii','Material breach of this Agreement or of the Housing Policy that is not remedied within fifteen (15) days of written notice;');
+    cl('iii','Any breach of Section 2(d) concerning cannabis cultivation, or Section 2(e) concerning unlawful drug activity -- for which immediate termination applies without the standard cure period;');
+    cl('iv','Persistent failure to remediate damage to the Residence caused by smoking under Section 2(c);');
+    cl('v','Damage to the Residence resulting from negligence or wilful misconduct;');
+    cl('vi','Abandonment of the Residence, as defined in Section 12.4 below;');
+    cl('vii','Any other ground specified in the Housing Policy.');
+    subH('12.3  Surrender on Termination');
+    bt('On the effective date of termination, the Tenant shall: (a) vacate the Residence and remove all personal property; (b) leave the Residence in a clean and sanitary condition, subject only to reasonable wear and tear; (c) return all keys, fobs, and access devices to the Housing Department; and (d) provide a forwarding address for correspondence and any refund or final statement.');
+    subH('12.4  Abandonment');
+    bt('Absence of the Tenant from the Residence for thirty (30) consecutive days or more, while rent or other charges remain unpaid, constitutes abandonment. The Housing Department may re-enter and re-allocate the Residence and may dispose of any personal property left behind in accordance with the Housing Policy.');
+    subH('12.5  Holdover');
+    bt('Where the Tenant remains in occupation after the effective date of termination without the written consent of the Housing Department, the Tenant shall be liable for the rent that would otherwise have been payable, plus any costs incurred by the Housing Department in obtaining vacant possession.');
+    secH(13,'Assignment and Subletting');
+    bt('The Tenant shall not assign this Agreement, sublet the Residence, or grant any licence to occupy any part of the Residence, without the prior written consent of the Housing Department. Any purported assignment, sublet, or licence without such consent shall be void and shall constitute a material breach of this Agreement, addressable under Section 13.5 of the Housing Policy.');
+    secH(14,'Marital Breakdown and Domestic Violence');
+    bt('Where the tenancy is affected by marital breakdown or domestic violence, the matter shall be addressed in accordance with Section 15 of the Housing Policy. The Housing Department may, in consultation with the affected parties and with appropriate supports, vary the occupancy arrangements under this Agreement.');
+    secH(15,'Death of the Tenant');
+    bt('In the event of the death of the Tenant, succession of tenancy shall be addressed in accordance with Section 16 of the Housing Policy.');
+    secH(16,'Incarceration');
+    bt('Incarceration of the Tenant for any period exceeding ninety (90) consecutive days shall be addressed under Section 13.6 of the Housing Policy.');
+    secH(17,'No Interest in Land');
+    bt('This Agreement grants the Tenant a personal right of occupation of the Residence only. It does not create, transfer, or imply any interest in the land on which the Residence is situated, nor does it confer any allotment under Section 20 of the Indian Act.');
+    secH(18,'Notice');
+    bt('Any notice required under this Agreement shall be in writing and shall be delivered by hand, by registered mail, by email to the address provided by the recipient, or by posting on the door of the Residence. Notice is deemed received: on delivery if by hand or posting; five (5) days after mailing; or on the next business day if sent by email.');
+    secH(19,'Dispute Resolution and Jurisdiction');
+    cl('a','Internal grievance. Any dispute arising under this Agreement shall first be raised through the internal grievance process established by the Housing Policy.');
+    cl('b','Court of competent jurisdiction. Where the dispute cannot be resolved internally, the parties acknowledge that the Ontario Superior Court of Justice has jurisdiction to hear and determine matters arising under this Agreement as a matter of contract law, including the issuance of eviction orders. The parties expressly acknowledge that the Ontario Landlord and Tenant Board has no jurisdiction over this Agreement.');
+    cl('c','Governing law. This Agreement shall be interpreted in accordance with the laws of Constance Lake First Nation, the Indian Act, and, where not in conflict, the common law of Ontario.');
+    secH(20,'General Provisions');
+    cl('a','Entire agreement. This Agreement, together with the Housing Policy and any schedules attached, constitutes the entire agreement between the parties and supersedes all prior written or oral covenants and representations relating to the Residence.');
+    cl('b','Amendment. No amendment to this Agreement is binding unless made in writing and signed by both parties. Amendments to the Housing Policy do not require re-execution of this Agreement; the Housing Policy as amended from time to time governs by reference.');
+    cl('c','Severability. If any provision of this Agreement is held invalid or unenforceable, the remaining provisions shall continue in full force and effect.');
+    cl('d','Waiver. No failure by the Landlord to enforce any provision of this Agreement shall be deemed a waiver of that provision or of any other provision.');
+    cl('e','Binding effect. This Agreement binds the parties and their respective heirs, executors, administrators, and permitted successors.');
+    cl('f','Headings. Headings are for convenience only and shall not be used to interpret this Agreement.');
+    cl('g','Legal costs. Where the Landlord is required to engage legal counsel or a collection agency to enforce this Agreement or recover arrears or damages, the Tenant shall indemnify the Landlord for all reasonable legal fees and out-of-pocket costs.');
+    // SIGNATURES PAGE
+    newPage();
+    pdf.setFont('helvetica','bold');pdf.setFontSize(10.5);pdf.setTextColor(0);pdf.text('21. ACKNOWLEDGEMENT AND SIGNATURES',ML,y);y+=6;
+    bt('The parties acknowledge that they have read this Agreement in full, that they understand its terms, that they have had the opportunity to seek independent advice, and that they agree to be bound by it and by the CLFN Housing Policy (2026) incorporated by reference.');
+    y+=3;
+    var ackTxt='Tenant Acknowledgement: By initialling below, the Tenant confirms understanding that this Agreement is governed by the inherent jurisdiction of Constance Lake First Nation and the Indian Act, and that the Ontario Residential Tenancies Act, 2006 does not apply.';
+    var ackL=pdf.splitTextToSize(ackTxt,CW*0.72);var ackH=ackL.length*LH+10;
+    need(ackH+4);pdf.setFillColor(255,249,214);pdf.setDrawColor(248,228,26);pdf.setLineWidth(0.5);pdf.rect(ML,y,CW,ackH,'FD');
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(40);pdf.text(ackL,ML+4,y+5);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(0);pdf.text('Tenant Initial:',ML+CW*0.74,y+5);
+    ul(ML+CW*0.74+22,ML+CW-4,y+6);y+=ackH+8;
+    need(28);
+    var hw2=(CW-6)/2;
+    pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(0);pdf.text('FOR THE LANDLORD -- CONSTANCE LAKE FIRST NATION HOUSING DEPARTMENT',ML,y);y+=6;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(40);
+    pdf.text('Signature:',ML,y);var sLy=y+12;putSig(sigS,ML+20,sLy,hw2-20);ul(ML+20,ML+hw2,sLy);
+    pdf.text('Date:',ML+hw2+4,y);pdf.text(fmtDate(execDate),ML+hw2+16,y);ul(ML+hw2+16,PW-MR,sLy);y=sLy+4;
+    pdf.text('Print Name:',ML,y);ul(ML+22,ML+hw2,y+1);pdf.text('Title:',ML+hw2+4,y);ul(ML+hw2+16,PW-MR,y+1);y+=10;
+    need(36);
+    pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(0);pdf.text('FOR THE TENANT',ML,y);y+=6;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(40);
+    pdf.text('Signature (Primary Tenant):',ML,y);var ts1=y+12;putSig(sigT,ML+50,ts1,hw2-50);ul(ML+50,ML+hw2,ts1);
+    pdf.text('Date:',ML+hw2+4,y);pdf.text(fmtDate(execDate),ML+hw2+16,y);ul(ML+hw2+16,PW-MR,ts1);y=ts1+3;
+    pdf.text('Print Name:',ML,y);if(tName)pdf.text(tName,ML+22,y);ul(ML+22,ML+hw2,y+1);y+=10;
+    pdf.text('Signature (Co-Tenant):',ML,y);var ts2=y+12;if(coName&&sigC)putSig(sigC,ML+42,ts2,hw2-42);ul(ML+42,ML+hw2,ts2);
+    pdf.text('Date:',ML+hw2+4,y);ul(ML+hw2+16,PW-MR,ts2);y=ts2+3;
+    pdf.text('Print Name:',ML,y);if(coName)pdf.text(coName,ML+22,y);ul(ML+22,ML+hw2,y+1);y+=10;
+    need(24);
+    pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(0);pdf.text('WITNESS',ML,y);y+=6;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(40);
+    pdf.text('Signature:',ML,y);var wsY=y+12;ul(ML+20,ML+hw2,wsY);pdf.text('Date:',ML+hw2+4,y);ul(ML+hw2+16,PW-MR,wsY);y=wsY+3;
+    pdf.text('Print Name:',ML,y);ul(ML+22,ML+hw2,y+1);y+=8;
+    // SCHEDULE A
+    newPage();
+    pdf.setFont('helvetica','bold');pdf.setFontSize(10.5);pdf.setTextColor(0);pdf.text('A. SCHEDULE A -- AUTHORIZED OCCUPANTS',ML,y);y+=6;
+    var sched='The following persons, in addition to the Primary Tenant and Co-Tenant named on page 2, are authorized to occupy the Residence as part of the Tenant\'s household. Any change to this list must be reported in writing to the Housing Manager.';
+    var schedL=pdf.splitTextToSize(sched,CW);pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(40);pdf.text(schedL,ML,y);y+=schedL.length*LH+5;
+    var cX=[ML,ML+12,ML+82,ML+128,ML+158];
+    pdf.setFillColor(0,0,0);pdf.rect(ML,y,CW,8,'F');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.setTextColor(248,228,26);
+    pdf.text('#',cX[0]+1,y+5.5);pdf.text('Full Name',cX[1]+1,y+5.5);pdf.text('Relationship to Tenant',cX[2]+1,y+5.5);pdf.text('Date of Birth',cX[3]+1,y+5.5);pdf.text('Band Member (Y/N)',cX[4]+1,y+5.5);y+=9;
+    for(var ri=0;ri<6;ri++){
+      var occ=occs[ri]||{name:'',rel:'',dob:'',band:''};
+      pdf.setFillColor(ri%2===1?248:255,ri%2===1?248:255,ri%2===1?248:255);pdf.rect(ML,y,CW,9,'F');
+      pdf.setDrawColor(220);pdf.setLineWidth(0.2);pdf.line(ML,y+9,ML+CW,y+9);
+      pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(40);
+      pdf.text(String(ri+1),cX[0]+3,y+6);
+      if(occ.name)pdf.text(occ.name.substring(0,30),cX[1]+1,y+6);
+      if(occ.rel) pdf.text(occ.rel.substring(0,20), cX[2]+1,y+6);
+      if(occ.dob) pdf.text(fmtDate(occ.dob),        cX[3]+1,y+6);
+      if(occ.band)pdf.text(occ.band.substring(0,8),  cX[4]+1,y+6);
+      y+=9;
+    }
+    y+=10;
+    pdf.setFont('helvetica','italic');pdf.setFontSize(8);pdf.setTextColor(100);
+    pdf.text('End of Agreement. Form LEASE-001 -- CLFN Housing Department -- Issued under the CLFN Housing Policy (2026).',PW/2,y,{align:'center'});
+    // SAVE
+    var filename='CLFN_Occupancy_Agreement_'+(tName||'Tenant').replace(/\s+/g,'_')+'.pdf';
+    pdf.save(filename);
+    var unit=_ticState.unit||{};
+    if(unit.id){
+      try{
+        var blob=pdf.output('blob');
+        var sp='tenants/'+unit.id+'/'+Date.now()+'_'+filename;
+        await window.sbUploadFile(sp,blob);
+        if(typeof window.sbSaveFileMeta==='function')await window.sbSaveFileMeta('tenant',String(unit.id),sp,filename,blob.size,'application/pdf');
+        _ticDocLibKey=null;_ticDocLib=null;
+        var mo=document.getElementById('tic_lease_modal');if(mo)mo.remove();
+        if(typeof showToast==='function')showToast('Occupancy Agreement saved to document library');
+      }catch(e){
+        console.warn('[lease] upload failed:',e);
+        var mo2=document.getElementById('tic_lease_modal');if(mo2)mo2.remove();
+        if(typeof showToast==='function')showToast('PDF downloaded (document library save failed)');
+      }
+    }else{
+      var mo3=document.getElementById('tic_lease_modal');if(mo3)mo3.remove();
+      if(typeof showToast==='function')showToast('Occupancy Agreement generated');
+    }
+  }
   // ── Hydro One Consent for Disclosure — pre-generation modal ───────────────
   function _ticOpenHydroOneConsentModal() {
     var t   = _ticState.tenant      || {};
@@ -2275,4 +2773,6 @@
   window.closeTenantCard = _ticClose;
   window._ticOpenHydroOneConsentModal  = _ticOpenHydroOneConsentModal;
   window._ticGenerateHydroOneConsentPdf = _ticGenerateHydroOneConsentPdf;
+  window._ticOpenLeaseModal             = _ticOpenLeaseModal;
+  window._ticGenerateLeasePdf           = _ticGenerateLeasePdf;
 })();
