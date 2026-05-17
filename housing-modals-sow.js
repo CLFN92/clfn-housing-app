@@ -22,6 +22,19 @@
 var _sowUnitId  = null;
 var _sowItemIdx = 0;
 
+// ── RFQ navigation — global so the onclick attribute can reach it ────────────
+// Passes just the unit ID and project number to rfq.html which fetches the
+// full SOW data from Supabase. No cross-page data passing needed.
+function sowNavigateToRfq() {
+  var u = _sowUnitId;                                // module-scope, always current
+  var p = window._sowEditingProjectNumber || null;   // set in openSowModal
+  if (!u || !p) {
+    if (typeof showToast === 'function') showToast('Save the SOW before creating an RFQ');
+    return;
+  }
+  window.location.href = 'rfq.html?unit=' + encodeURIComponent(u) + '&sow=' + encodeURIComponent(p);
+}
+
 // ── SOW Photos & Documents widget ───────────────────────────────────────────
 // Files list is staged on window._sowFiles while the modal is open; saveSOW()
 // writes it to data.files, populateSow() restores it. Files are uploaded
@@ -191,7 +204,7 @@ function _buildSowModalHTML() {
           '<button id="sow_archive_btn" type="button" onclick="archiveCurrentSow()" class="sow-hdr-btn-ghost" style="display:none;">🗄 Archive</button>' +
           '<button type="button" onclick="printWorkOrder()" class="sow-hdr-btn-primary">🏗 Work Order</button>' +
           '<button type="button" onclick="printSOW()" class="sow-hdr-btn-ghost">🖨 Full SOW</button>' +
-          '<button type="button" id="sow_rfq_btn" onclick="openRfqFromSow()" class="sow-hdr-btn-ghost" style="display:none;">📋 RFQ</button>' +
+          '<button type="button" id="sow_rfq_btn" onclick="sowNavigateToRfq()" class="sow-hdr-btn-ghost" style="display:none;">📋 RFQ</button>' +
           '<button type="button" onclick="closeSowModal()" class="btn-close-sm">✕</button>' +
         '</div>' +
       '</div>' +

@@ -41,23 +41,15 @@ var _rfqAwardingId  = null;
 
   var params = new URLSearchParams(window.location.search);
   var rfqId  = params.get('rfq');
-  var isNew  = params.get('new') === '1';
-  var unitId = params.get('unit'); // legacy URL-param path (kept as fallback)
+  var unitId = params.get('unit');
+  var sowPn  = params.get('sow');
 
   if (rfqId) {
-    // Edit existing RFQ
     showRfqForm(rfqId, null, null, null);
-  } else if (isNew) {
-    // New RFQ from SOW -- read sessionStorage navigation token set by openRfqFromSow()
-    var ctx = null;
-    try {
-      var raw = sessionStorage.getItem('rfq_nav_context');
-      if (raw) { ctx = JSON.parse(raw); sessionStorage.removeItem('rfq_nav_context'); }
-    } catch(e) { console.warn('[rfq] nav context read failed:', e); }
-    showRfqForm(null, (ctx && ctx.unitId) || null, (ctx && ctx.sow) || null, ctx || null);
-  } else if (unitId) {
-    // Legacy path: ?unit=X&sow=Y in URL (backward compat with old shared-data.js)
-    showRfqForm(null, unitId, params.get('sow'), null);
+  } else if (unitId && sowPn) {
+    // New RFQ from SOW — show form immediately then fetch SOW data from Supabase
+    showRfqForm(null, unitId, sowPn, null);
+    _fetchAndPopulateSow(unitId, sowPn);
   } else {
     renderRfqList();
   }
@@ -225,7 +217,57 @@ function renderRfqList() {
 }
 
 // ── Form view ─────────────────────────────────────────────────────────────────
-var _rfqNavCtx = null; // SOW navigation context set by openRfqFromSow
+var _rfqNavCtx = null; // SOW navigation context (legacy, kept for compat)
+
+// Fetch the SOW record from Supabase and populate form fields.
+// Called after showRfqForm() so the form is already visible.
+async function _fetchAndPopulateSow(unitId, sowPn) {
+  try {
+    var r = await fetch(
+      SUPABASE_URL + '/rest/v1/housing_sow?unit_id=eq.' + encodeURIComponent(unitId) + '&select=data',
+      { headers: HOUSING_HEADERS }
+    );
+    if (!r.ok) return;
+    var rows = await r.json();
+    if (!rows || !rows.length) return;
+
+    var data = rows[0].data || {};
+    var sowsArr = Array.isArray(data.sows) ? data.sows : (Array.isArray(data) ? data : []);
+    var sow = sowsArr.find(function(s){ return s && s.project_number === sowPn; })
+           || sowsArr[0]
+           || null;
+    if (!sow) return;
+
+    // Unit address from cached housingUnits (already loaded)
+    var unit = (window.housingUnits || []).find(function(u){ return u && u.id === unitId; }) || {};
+    var addr = ((unit.num||'') + ' ' + (unit.street||'')).trim()
+            || sow.address || unitId;
+
+    // Estimated budget
+    var amount = parseFloat(sow.amount || sow.totalCost || sow.total_cost || 0) || 0;
+    var amtStr = amount ? '$' + amount.toLocaleString('en-CA', {minimumFractionDigits:2}) : '--';
+
+    // Populate the read-only display fields
+    var sowDisp  = document.getElementById('rfq_sow_display');
+    var budgDisp = document.getElementById('rfq_budget_display');
+    var subLbl   = document.getElementById('rfqFormSub');
+    if (sowDisp)  sowDisp.value  = sowPn + (addr ? '  —  ' + addr : '');
+    if (budgDisp) budgDisp.value = amtStr;
+    if (subLbl)   subLbl.textContent = addr;
+
+    // Update module-level state so scope tab and context are correct
+    _rfqSowData   = sow;
+    _rfqUnitData  = unit;
+
+    // Pre-populate scope items if not already set
+    if (!_rfqScopeItems.length && sow) {
+      var items = sow.items || sow.lineItems || [];
+      _rfqScopeItems = items.map(function(it){ return Object.assign({}, it, {_hidden:false}); });
+    }
+  } catch(e) {
+    console.warn('[rfq] SOW fetch failed:', e);
+  }
+}
 
 function showRfqForm(rfqId, unitId, sowPn, navCtx) {
   _rfqNavCtx = navCtx || null;
