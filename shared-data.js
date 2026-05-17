@@ -1554,7 +1554,11 @@ function _getPoolSpent(pid) {
 }
 function _initSigPad(canvasId) {
   var canvas = document.getElementById(canvasId);
-  if (!canvas || _sigPads[canvasId]) return;
+  if (!canvas) return;
+  // If _sigPads already holds THIS exact element, it's already wired — skip.
+  // A new element with the same ID (modal reopened) won't match, so it gets
+  // initialized fresh instead of being silently skipped.
+  if (_sigPads[canvasId] === canvas) return;
   var ctx = canvas.getContext('2d');
   var drawing = false;
   var lastX = 0, lastY = 0;
@@ -1582,7 +1586,7 @@ function _initSigPad(canvasId) {
   canvas.addEventListener('touchstart', start, { passive: false });
   canvas.addEventListener('touchmove', move, { passive: false });
   canvas.addEventListener('touchend', end);
-  _sigPads[canvasId] = true;
+  _sigPads[canvasId] = canvas; // store element ref so re-open detection works
 }
 function _rbaAllocRow(key, label, suggestedCost, eligiblePools, budgetData, approval) {
   var prevAlloc = approval && approval.allocations && approval.allocations[key];
