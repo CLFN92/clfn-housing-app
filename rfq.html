@@ -14,19 +14,8 @@
 <div id="app_header_host"></div>
 
 
-<!-- Print panel overlay (same pattern as renos.html) -->
-<div id="printPanelOverlay" class="print-overlay" style="display:none;">
-  <div class="print-panel">
-    <div class="print-toolbar">
-      <span id="printPanelTitle" class="print-title">RFQ Preview</span>
-      <div class="flex-gap8">
-        <button class="btn btn-primary" onclick="triggerPrint()">&#128424; Print / Save PDF</button>
-        <button class="btn btn-ghost" onclick="closePrintPanel()">Close</button>
-      </div>
-    </div>
-    <div id="printPanelBody" class="print-body"></div>
-  </div>
-</div>
+<!-- Print panel injected automatically by _ensurePrintPanel() in shared-data.js
+     (same as inventory.html, tenants.html, match.html — no custom markup needed) -->
 
 <!-- Award modal -->
 <div id="rfqAwardModal" class="modal-overlay modal-overlay-centered" style="display:none;">
