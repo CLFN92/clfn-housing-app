@@ -88,10 +88,11 @@ async function loadRfqPageData() {
     (await rfqR.json()).forEach(function(r) { window._rfqCache[r.id] = r; });
   }
   if (ctR && ctR.ok) {
+    // Matches housing-init.js pattern: spread r.data first so email/phone/etc.
+    // from the JSONB data column are preserved; override only the top-level cols.
     window._contractors = (await ctR.json()).map(function(r) {
       return Object.assign({}, r.data || {}, {
-        id: r.id, name: r.name, trade: r.trade,
-        status: r.status, email: r.email
+        id: r.id, name: r.name, trade: r.trade, status: r.status
       });
     });
   }
