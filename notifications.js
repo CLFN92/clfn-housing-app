@@ -131,6 +131,28 @@ var EMAIL_EVENT_REGISTRY = [
     }
   },
   {
+    key:                   'rfq_invite',
+    label:                 'RFQ Invitation to Contractors',
+    description:           'Sent to each selected contractor individually when an RFQ is issued. The housing mailbox is always the TO; contractors are BCC\'d. Use CC below to include housing staff.',
+    recipientType:         'rfq_contractor',
+    defaultRecipientRoles: [],
+    defaultCcRoles:        ['housing_manager'],
+    wired:                 true,
+    placeholders:          ['contractorName','rfqNumber','projectAddress','closingDate','contactPerson','contactEmail','submissionMethod','rfqLink','nationShort'],
+    defaults: {
+      subject:  '{nationShort} Housing — RFQ {rfqNumber}: {projectAddress} — Bids close {closingDate}',
+      bodyHtml: '<p>Dear {contractorName},</p>'
+              + '<p>{nationShort} Housing invites your firm to submit a competitive bid for the project referenced above.</p>'
+              + '<p><strong>RFQ Number:</strong> {rfqNumber}<br/>'
+              + '<strong>Project:</strong> {projectAddress}<br/>'
+              + '<strong>Bids close:</strong> {closingDate}</p>'
+              + '<p>The full RFQ document — including the scope of work, bid form, and terms and conditions — is available at:<br/>{rfqLink}</p>'
+              + '<p>Your complete bid package must include: completed bid form, current WSIB clearance certificate, general liability insurance certificate (min. $2,000,000), at least two comparable project references, and your proposed timeline.</p>'
+              + '<p>Submission method: {submissionMethod}<br/>Questions: contact {contactPerson} at {contactEmail}.</p>'
+              + '<p>Thank you for your interest.<br/>{contactPerson}<br/>{nationShort} Housing Department</p>'
+    }
+  },
+  {
     key:                   'sow_work_order_to_contractor',
     label:                 'Work Order to Contractor (PDF)',
     description:           'Sent to the assigned contractor when an HM or ED approves the SOW (only if the contractor has an email on file and the approver ticks the inline checkbox). PDF work order is attached.',
@@ -1711,6 +1733,14 @@ function _ntfRenderEditorHtml(eventKey) {
       +   'Always sends to the <strong>assigned contractor&#39;s email</strong> from their contractor record '
       +   '(silent skip if no email is on file).'
       + '</div>';
+  } else if (cfg.recipientType === 'rfq_contractor') {
+    primaryBlock +=
+        '<div class="ntf-recipients-fixed">'
+      +   'Sent to each <strong>selected contractor</strong> individually when an RFQ is issued '
+      +   '(each contractor only sees their own email &mdash; addresses are never shared). '
+      +   'The <strong>housing mailbox</strong> is always included. '
+      +   'Use the CC checkboxes below to include additional housing staff on every RFQ email.'
+      + '</div>';
   }
   primaryBlock += '<div class="ntf-roles" id="ntf_roles">'
                + _buildRoleChecks(primaryRoles, 'data-ntf-role')
@@ -2113,7 +2143,7 @@ function _ntfReadEditorState() {
       if (cb.checked) ccRoles.push(cb.getAttribute('data-ntf-cc-role'));
     });
   }
-  var isImplicitRecipient = cfg && (cfg.recipientType === 'applicant' || cfg.recipientType === 'tenant' || cfg.recipientType === 'contractor');
+  var isImplicitRecipient = cfg && (cfg.recipientType === 'applicant' || cfg.recipientType === 'tenant' || cfg.recipientType === 'contractor' || cfg.recipientType === 'rfq_contractor');
   if (!isImplicitRecipient && !roles.length) {
     showToast('Pick at least one recipient role');
     return null;

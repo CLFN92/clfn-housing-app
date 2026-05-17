@@ -5942,38 +5942,59 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
 }
 
 async function sendRfqToRecipients(rfq, contractorList) {
-  var coverRaw = (window._appSettings && window._appSettings.rfq_cover_letter) || '';
-  var cover = typeof coverRaw === 'string' ? coverRaw : (coverRaw.bodyHtml || String(coverRaw));
-  var units  = (typeof housingUnits !== 'undefined' ? housingUnits : []);
-  var unit   = units.find(function(u){ return u && u.id === rfq.sow_unit_id; }) || {};
-  var addr   = ((unit.num || '') + ' ' + (unit.street || '')).trim() || rfq.sow_unit_id;
+  var units   = (typeof housingUnits !== 'undefined' ? housingUnits : []);
+  var unit    = units.find(function(u){ return u && u.id === rfq.sow_unit_id; }) || {};
+  var addr    = ((unit.num || '') + ' ' + (unit.street || '')).trim() || rfq.sow_unit_id;
   var closing = rfq.closes_at ? new Date(rfq.closes_at).toLocaleString('en-CA') : '--';
-  var rfqLink = (rfq.data && rfq.data.document_url) ? rfq.data.document_url : '(see attached or contact Housing Department)';
-  var contact = (rfq.data && rfq.data.contact_person) || '';
+  var rfqLink = (rfq.data && rfq.data.document_url) ? rfq.data.document_url : '(contact Housing Department for document)';
+  var contact     = (rfq.data && rfq.data.contact_person) || '';
   var contactEmail = (rfq.data && rfq.data.contact_email) || '';
-  var subMethod = (rfq.data && rfq.data.submission_method) || 'email';
+  var subMethod   = (rfq.data && rfq.data.submission_method) || 'email';
+  var natShort    = (window.NATION_CONFIG && NATION_CONFIG.short) || 'CLFN';
+
+  // Use the saved template from Settings > Notifications > RFQ Invitation
+  var rendered = null;
+  if (typeof _renderEmailTemplate === 'function') {
+    rendered = _renderEmailTemplate('rfq_invite', {
+      rfqNumber: rfq.id, projectAddress: addr, closingDate: closing,
+      contactPerson: contact, contactEmail: contactEmail,
+      submissionMethod: subMethod, rfqLink: rfqLink,
+      nationShort: natShort, contractorName: '{contractorName}' // substituted per-contractor below
+    });
+  }
+
+  // Resolve CC recipients from saved ccRoles (standard checkbox pattern)
+  var ccRoles = [];
+  if (typeof _emailEventCcRoles === 'function') ccRoles = _emailEventCcRoles('rfq_invite');
+  var ccRecipients = [];
+  if (ccRoles.length && typeof _resolveActiveStaffForRoles === 'function') {
+    ccRecipients = await _resolveActiveStaffForRoles(ccRoles);
+  }
 
   var ok = 0, fail = 0, failNames = [];
   for (var i = 0; i < contractorList.length; i++) {
     var ct = contractorList[i];
     if (!ct || !ct.email) { fail++; failNames.push((ct && ct.name) || '(no email)'); continue; }
-    var body = cover
-      .replace(/\{contractorName\}/g, ct.name || 'Contractor')
-      .replace(/\{rfqNumber\}/g, rfq.id)
-      .replace(/\{projectAddress\}/g, addr)
-      .replace(/\{closingDate\}/g, closing)
-      .replace(/\{contactPerson\}/g, contact)
-      .replace(/\{contactEmail\}/g, contactEmail)
-      .replace(/\{submissionMethod\}/g, subMethod)
-      .replace(/\{rfqLink\}/g, rfqLink)
-      .replace(/\\n/g, '\n');
+
+    // Substitute contractor name into the rendered template
+    var subject  = rendered ? rendered.subject.replace(/\{contractorName\}/g, ct.name || 'Contractor')
+                            : (rfq.id + ' -- ' + addr + ' -- Bids close ' + closing);
+    var bodyHtml = rendered ? rendered.bodyHtml.replace(/\{contractorName\}/g, ct.name || 'Contractor')
+                            : ('<p>Dear ' + escapeHtml(ct.name || 'Contractor') + ',</p><p>' + escapeHtml(rfqLink) + '</p>');
+
+    var payload = {
+      to: ct.email, to_name: ct.name || '',
+      subject: subject,
+      bodyHtml: bodyHtml,
+      event: 'rfq_invite', entity_type: 'rfq', entity_id: rfq.id
+    };
+    // Add CC staff if configured
+    if (ccRecipients.length) {
+      payload.cc = ccRecipients.map(function(r){ return r.email; }).filter(Boolean).join(',');
+    }
+
     try {
-      await window.sendNotification({
-        to: ct.email, to_name: ct.name || '',
-        subject: rfq.id + ' -- ' + addr + ' -- Bids close ' + closing,
-        bodyHtml: '<pre style="font-family:Georgia,serif;font-size:11px;white-space:pre-wrap;line-height:1.6;">' + escapeHtml(body) + '</pre>',
-        event: 'rfq_invite', entity_type: 'rfq', entity_id: rfq.id
-      });
+      await window.sendNotification(payload);
       if (typeof auditEntry === 'function') auditEntry('RFQ:' + rfq.id, 'recipient_emailed', 'Emailed to ' + ct.name + ' <' + ct.email + '>', window.currentRole || 'staff');
       ok++;
     } catch(e) {
