@@ -1551,11 +1551,14 @@ window.DocLibrary = (function(){
   // Uses Authorization headers (same as sbUploadFile) rather than the token
   // query-string URL — the latter returns 400 on some paths/token lengths.
   async function sbCopyFile(sourcePath, destPath) {
-    var downUrl = window.SUPABASE_URL + '/storage/v1/object/' + window.STORAGE_BUCKET + '/' + sourcePath;
+    function encodePath(p) {
+      return p.split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
+    }
+    var downUrl = window.SUPABASE_URL + '/storage/v1/object/' + window.STORAGE_BUCKET + '/' + encodePath(sourcePath);
     var blobRes = await fetch(downUrl, { headers: sbStorageHeaders() });
     if (!blobRes.ok) throw new Error('Could not read source file: ' + sourcePath + ' (HTTP ' + blobRes.status + ')');
     var blob = await blobRes.blob();
-    var upUrl = window.SUPABASE_URL + '/storage/v1/object/' + window.STORAGE_BUCKET + '/' + destPath;
+    var upUrl = window.SUPABASE_URL + '/storage/v1/object/' + window.STORAGE_BUCKET + '/' + encodePath(destPath);
     var upRes = await fetch(upUrl, {
       method:  'POST',
       headers: Object.assign({}, sbStorageHeaders(), {
