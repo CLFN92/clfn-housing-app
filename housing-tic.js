@@ -2189,6 +2189,10 @@
         } catch(e) { console.warn('[lease pdf] sig embed failed for', fieldName, e); }
       }
 
+      // Flatten form fields → bakes values into static content, removes
+      // interactive blue/pink field highlighting from the output PDF.
+      try { form.flatten(); } catch(e) { console.warn('[lease] flatten failed:', e); }
+
       // Save and download
       var tenantName = fieldValues['tenant_primary_name'] || 'Tenant';
       var filename   = 'CLFN_Occupancy_Agreement_' + tenantName.replace(/\s+/g,'_') + '.pdf';
