@@ -49,12 +49,14 @@
       "*.png",
       "*.jpg",
       "*.json",
-      "*.html"
+      "*.html",
+      "*.pdf"
     ]
   },
   "mimeTypes": {
     ".html": "text/html",
-    ".json": "application/json"
+    ".json": "application/json",
+    ".pdf":  "application/pdf"
   },
   "globalHeaders": {
     "Cache-Control": "no-cache"
