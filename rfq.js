@@ -267,9 +267,19 @@ function _populateFormFields(rfq) {
 function _loadRfqSowContext() {
   _rfqSowData = null; _rfqUnitData = null;
   if (!_rfqSowUnitId) return;
-  // Find unit
+
+  // URL params carry authoritative data passed from the live SOW modal
+  var urlParams = new URLSearchParams(window.location.search);
+  var urlAddr   = urlParams.get('addr')   || '';
+  var urlAmount = parseFloat(urlParams.get('amount') || '0') || 0;
+
+  // Find unit from cache (may enrich the address)
   _rfqUnitData = (window.housingUnits || []).find(function(u){ return u && u.id === _rfqSowUnitId; }) || null;
-  // Find SOW -- handle { sows: [...] } or bare array or single object
+  var addr = urlAddr
+    || (_rfqUnitData ? ((_rfqUnitData.num||'') + ' ' + (_rfqUnitData.street||'')).trim() : '')
+    || _rfqSowUnitId;
+
+  // Find SOW in cache for scope items (secondary, best-effort)
   var sowEntry = (window._sowCache || {})[_rfqSowUnitId];
   if (sowEntry) {
     var sowsArr = Array.isArray(sowEntry.sows) ? sowEntry.sows
@@ -277,21 +287,25 @@ function _loadRfqSowContext() {
     if (sowsArr && _rfqSowPn) {
       _rfqSowData = sowsArr.find(function(s){ return s && s.project_number === _rfqSowPn; }) || null;
     }
-    // Fallback to first SOW if project number didn't match
     if (!_rfqSowData && sowsArr && sowsArr.length) _rfqSowData = sowsArr[0] || null;
-    // Fallback for flat (non-array) data
     if (!_rfqSowData && sowEntry && sowEntry.items) _rfqSowData = sowEntry;
   }
-  var addr = _rfqUnitData ? ((_rfqUnitData.num||'') + ' ' + (_rfqUnitData.street||'')).trim() : (_rfqSowUnitId||'');
-  var raw  = _rfqSowData ? parseFloat(_rfqSowData.amount || _rfqSowData.totalCost || _rfqSowData.total_cost || 0) : 0;
-  var amt  = _rfqSowData ? '$' + raw.toLocaleString('en-CA', {minimumFractionDigits:2}) : '--';
-  var sowDisp   = document.getElementById('rfq_sow_display');
-  var budgDisp  = document.getElementById('rfq_budget_display');
-  var subLbl    = document.getElementById('rfqFormSub');
-  if (sowDisp)  sowDisp.value  = (_rfqSowPn||'') + (addr ? '  --  ' + addr : '');
+
+  // Amount: URL param is authoritative, cache is secondary
+  var raw = urlAmount || (_rfqSowData
+    ? parseFloat(_rfqSowData.amount || _rfqSowData.totalCost || _rfqSowData.total_cost || 0)
+    : 0);
+  var amt = raw ? '$' + raw.toLocaleString('en-CA', {minimumFractionDigits:2}) : '--';
+
+  // Populate display fields
+  var sowDisp  = document.getElementById('rfq_sow_display');
+  var budgDisp = document.getElementById('rfq_budget_display');
+  var subLbl   = document.getElementById('rfqFormSub');
+  if (sowDisp)  sowDisp.value  = (_rfqSowPn||'') + (addr ? '  —  ' + addr : '');
   if (budgDisp) budgDisp.value = amt;
   if (subLbl)   subLbl.textContent = addr || '';
-  // Pre-populate scope items from SOW
+
+  // Pre-populate scope items from SOW cache
   if (!_rfqScopeItems.length && _rfqSowData) {
     var rawItems = _rfqSowData.items || _rfqSowData.lineItems || [];
     _rfqScopeItems = rawItems.map(function(it){ return Object.assign({}, it, {_hidden:false}); });
