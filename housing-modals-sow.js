@@ -711,6 +711,9 @@ function _applySowModalLock(sow){
       (_rfqRole === 'housing_manager' || _rfqRole === 'ed')
     );
     rfqBtn.style.display = _rfqShow ? 'flex' : 'none';
+    // Expose the current unit ID on window so openRfqFromSow() can read it.
+    // _sowUnitId is module-scoped; window._sowUnitId bridges to the shared function.
+    if (_rfqShow) window._sowUnitId = _sowUnitId;
   }
 
   // Save button: hidden in read-only mode.
