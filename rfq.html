@@ -9,23 +9,30 @@
 </head>
 <body>
 
-<!-- Standard app header (matches renos.html) -->
-<header class="app-header" id="appHeader">
-  <div class="header-left">
-    <a href="index.html" class="header-logo-link">
-      <img id="headerLogo" src="" alt="" class="header-logo-img" onerror="this.style.display='none'"/>
-    </a>
-    <div class="header-nav">
-      <a href="housing.html" class="header-nav-link">Applications</a>
-      <a href="inventory.html" class="header-nav-link">Inventory</a>
-      <a href="renos.html" class="header-nav-link">Renovations</a>
-      <a href="rfq.html" class="header-nav-link is-active">RFQ</a>
-      <a href="contractors.html" class="header-nav-link">Contractors</a>
+<!-- Standard app header — inline styles match renos.html/contractors.html pattern -->
+<header id="rfqHeader" style="position:sticky;top:0;z-index:400;background:#000;border-bottom:3px solid #F8E41A;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:56px;">
+    <div style="display:flex;align-items:center;gap:16px;">
+      <img id="headerLogo" src="" alt="" style="height:38px;width:auto;" onerror="this.style.display='none'"/>
+      <div>
+        <div id="rfqOrgName" style="font-size:12px;font-weight:800;color:#F8E41A;letter-spacing:.04em;">CONSTANCE LAKE FIRST NATION</div>
+        <div style="font-size:10px;color:#ccc;">Housing Department</div>
+      </div>
+      <nav style="display:flex;gap:2px;margin-left:16px;">
+        <a href="housing.html"     class="btn-header-ghost">Applications</a>
+        <a href="renos.html"       class="btn-header-ghost">Renovations</a>
+        <a href="rfq.html"         class="btn-header-ghost" style="border-color:#F8E41A;color:#F8E41A;">RFQ</a>
+        <a href="contractors.html" class="btn-header-ghost">Contractors</a>
+      </nav>
     </div>
-  </div>
-  <div class="header-right">
-    <span id="headerUserPill" class="header-user-pill"></span>
-    <button class="btn-header-ghost" onclick="doLogout()">Sign Out</button>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div id="rfqUserAvatar" style="width:32px;height:32px;border-radius:50%;background:#F8E41A;color:#000;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;"></div>
+      <div>
+        <div id="rfqUserName" style="font-size:12px;font-weight:700;color:#fff;line-height:1.2;"></div>
+        <div id="rfqUserRole" style="font-size:10px;color:#aaa;"></div>
+      </div>
+      <button class="btn-header-ghost" onclick="doLogout()" style="margin-left:8px;">Sign Out</button>
+    </div>
   </div>
 </header>
 
@@ -210,16 +217,23 @@ var _rfqAwardingId  = null;
   window.currentRole    = savedRole;
   if (!window._realRole) window._realRole = savedRole;
 
-  // Header
+  // Header population
   var headerLogo = document.getElementById('headerLogo');
-  var pill = document.getElementById('headerUserPill');
-  if (pill) pill.textContent = savedName || savedEmail;
+  var rfqAvatar  = document.getElementById('rfqUserAvatar');
+  var rfqUName   = document.getElementById('rfqUserName');
+  var rfqURole   = document.getElementById('rfqUserRole');
+  var rfqOrgEl   = document.getElementById('rfqOrgName');
+  if (rfqAvatar) rfqAvatar.textContent = (savedName || savedEmail || '?').charAt(0).toUpperCase();
+  if (rfqUName)  rfqUName.textContent  = savedName || savedEmail;
+  var _roleLabels = {ed:'Executive Director',housing_manager:'Housing Manager',housing_employee_l2:'Employee L2',housing_employee_l1:'Employee L1',cfo:'CFO',finance_l1:'Finance'};
+  if (rfqURole) rfqURole.textContent = _roleLabels[savedRole] || savedRole;
 
   try { await loadRfqPageData(); } catch(e) { console.error('[RFQ] data load failed:', e); }
 
-  if (typeof _applyTheme        === 'function') _applyTheme((window._appSettings||{}).theme || {});
-  if (typeof applyNationOverrides==='function') applyNationOverrides();
+  if (typeof _applyTheme         === 'function') _applyTheme((window._appSettings||{}).theme || {});
+  if (typeof applyNationOverrides === 'function') applyNationOverrides();
   if (headerLogo && window.NATION_CONFIG && NATION_CONFIG.logo_url) headerLogo.src = NATION_CONFIG.logo_url;
+  if (rfqOrgEl   && window.NATION_CONFIG) rfqOrgEl.textContent = ((NATION_CONFIG.display_name || NATION_CONFIG.name) || 'Constance Lake First Nation').toUpperCase();
 
   var params = new URLSearchParams(window.location.search);
   var rfqId  = params.get('rfq');
@@ -381,23 +395,34 @@ function _populateFormFields(rfq) {
 function _loadRfqSowContext() {
   _rfqSowData = null; _rfqUnitData = null;
   if (!_rfqSowUnitId) return;
-  var units = (typeof housingUnits !== 'undefined' ? housingUnits : []);
-  _rfqUnitData = units.find(function(u){ return u && u.id === _rfqSowUnitId; }) || null;
-  var sowData  = (window._sowCache || {})[_rfqSowUnitId];
-  if (sowData && sowData.sows && _rfqSowPn) {
-    _rfqSowData = sowData.sows.find(function(s){ return s && s.project_number === _rfqSowPn; }) || null;
+  // Find unit
+  _rfqUnitData = (window.housingUnits || []).find(function(u){ return u && u.id === _rfqSowUnitId; }) || null;
+  // Find SOW -- handle { sows: [...] } or bare array or single object
+  var sowEntry = (window._sowCache || {})[_rfqSowUnitId];
+  if (sowEntry) {
+    var sowsArr = Array.isArray(sowEntry.sows) ? sowEntry.sows
+                : Array.isArray(sowEntry) ? sowEntry : null;
+    if (sowsArr && _rfqSowPn) {
+      _rfqSowData = sowsArr.find(function(s){ return s && s.project_number === _rfqSowPn; }) || null;
+    }
+    // Fallback to first SOW if project number didn't match
+    if (!_rfqSowData && sowsArr && sowsArr.length) _rfqSowData = sowsArr[0] || null;
+    // Fallback for flat (non-array) data
+    if (!_rfqSowData && sowEntry && sowEntry.items) _rfqSowData = sowEntry;
   }
-  // Populate read-only fields
-  var addr = _rfqUnitData ? ((_rfqUnitData.num||'')+' '+(_rfqUnitData.street||'')).trim() : _rfqSowUnitId;
-  var amt  = _rfqSowData ? ('$' + parseFloat(_rfqSowData.amount || _rfqSowData.totalCost || 0).toLocaleString('en-CA')) : '--';
-  document.getElementById('rfq_sow_display').value    = (_rfqSowPn||'') + (addr ? '  --  ' + addr : '');
-  document.getElementById('rfq_budget_display').value = amt;
-  document.getElementById('rfqFormSub').textContent   = addr || '';
-  // Pre-populate scope if empty
-  if (!_rfqScopeItems.length && _rfqSowData && _rfqSowData.items) {
-    _rfqScopeItems = (_rfqSowData.items || []).map(function(it){
-      return Object.assign({}, it, {_hidden: false});
-    });
+  var addr = _rfqUnitData ? ((_rfqUnitData.num||'') + ' ' + (_rfqUnitData.street||'')).trim() : (_rfqSowUnitId||'');
+  var raw  = _rfqSowData ? parseFloat(_rfqSowData.amount || _rfqSowData.totalCost || _rfqSowData.total_cost || 0) : 0;
+  var amt  = _rfqSowData ? '$' + raw.toLocaleString('en-CA', {minimumFractionDigits:2}) : '--';
+  var sowDisp   = document.getElementById('rfq_sow_display');
+  var budgDisp  = document.getElementById('rfq_budget_display');
+  var subLbl    = document.getElementById('rfqFormSub');
+  if (sowDisp)  sowDisp.value  = (_rfqSowPn||'') + (addr ? '  --  ' + addr : '');
+  if (budgDisp) budgDisp.value = amt;
+  if (subLbl)   subLbl.textContent = addr || '';
+  // Pre-populate scope items from SOW
+  if (!_rfqScopeItems.length && _rfqSowData) {
+    var rawItems = _rfqSowData.items || _rfqSowData.lineItems || [];
+    _rfqScopeItems = rawItems.map(function(it){ return Object.assign({}, it, {_hidden:false}); });
   }
 }
 
@@ -449,13 +474,19 @@ function renderContractorCards() {
 
   var cts = (window._contractors || []).filter(function(ct) {
     if (!ct || !ct.name) return false;
-    if (activeOnly && ct.status !== 'active') return false;
-    if (tradeMatch && Object.keys(sowCategories).length) {
-      var trade = (ct.trade || '').toLowerCase();
-      if (!Object.keys(sowCategories).some(function(cat){ return trade.indexOf(cat) !== -1 || cat.indexOf(trade) !== -1; })) return false;
+    // Only exclude contractors with an explicit non-active status;
+    // contractors with no status set are treated as active.
+    if (activeOnly && ct.status && ct.status !== 'active') return false;
+    // Trade match: only filter when SOW has scope items AND contractor has a trade value.
+    if (tradeMatch && Object.keys(sowCategories).length && ct.trade) {
+      var trade = ct.trade.toLowerCase();
+      var hit = Object.keys(sowCategories).some(function(cat) {
+        return trade.indexOf(cat) !== -1 || cat.indexOf(trade) !== -1;
+      });
+      if (!hit) return false;
     }
     if (search) {
-      var hay = (ct.name + ' ' + (ct.trade||'')).toLowerCase();
+      var hay = ((ct.name||'') + ' ' + (ct.trade||'')).toLowerCase();
       if (hay.indexOf(search) === -1) return false;
     }
     return true;
