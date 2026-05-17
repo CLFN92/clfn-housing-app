@@ -711,9 +711,30 @@ function _applySowModalLock(sow){
       (_rfqRole === 'housing_manager' || _rfqRole === 'ed')
     );
     rfqBtn.style.display = _rfqShow ? 'flex' : 'none';
-    // Expose the current unit ID on window so openRfqFromSow() can read it.
-    // _sowUnitId is module-scoped; window._sowUnitId bridges to the shared function.
-    if (_rfqShow) window._sowUnitId = _sowUnitId;
+
+    if (_rfqShow) {
+      // Wire onclick directly as a closure — captures _sowUnitId and project
+      // number NOW (module-scoped, always accurate) and reads amount + addr from
+      // the live DOM at click time. No external function dependency.
+      var _rfqUid = _sowUnitId;
+      var _rfqPn  = window._sowEditingProjectNumber || '';
+      rfqBtn.onclick = function() {
+        if (!_rfqUid || !_rfqPn) {
+          if (typeof showToast === 'function') showToast('Save the SOW first');
+          return;
+        }
+        var tcEl   = document.getElementById('sow_total_cost');
+        var amount = tcEl ? (parseFloat(tcEl.value) || 0) : 0;
+        var addrEl = document.getElementById('sow_address');
+        var addr   = addrEl ? addrEl.value.trim() : '';
+        try {
+          sessionStorage.setItem('rfq_nav_context', JSON.stringify({
+            unitId: _rfqUid, sow: _rfqPn, amount: amount, addr: addr
+          }));
+        } catch(e) { console.warn('[rfq] sessionStorage write failed:', e); }
+        window.location.href = 'rfq.html?new=1';
+      };
+    }
   }
 
   // Save button: hidden in read-only mode.
