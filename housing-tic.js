@@ -2127,18 +2127,59 @@
       var form   = pdfDoc.getForm();
       var pages  = pdfDoc.getPages();
 
-      // Fill all text fields
+      // Embed standard font for drawing text directly on pages
+      var stdFont = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+
+      // Build field-position map: fieldName -> { pageIdx, rect }
+      var fieldPos = {};
+      var allPDFFields = form.getFields();
+      for (var ffi = 0; ffi < allPDFFields.length; ffi++) {
+        try {
+          var ff = allPDFFields[ffi];
+          var fw = ff.acroField.getWidgets();
+          if (!fw.length) continue;
+          var fwR = fw[0].getRectangle();
+          var fwP = fw[0].P();
+          var fpIdx = -1;
+          for (var fpi = 0; fpi < pages.length; fpi++) {
+            if (pages[fpi].ref.objectNumber === fwP.objectNumber) { fpIdx = fpi; break; }
+          }
+          if (fpIdx >= 0) fieldPos[ff.getName()] = { pageIdx: fpIdx, rect: fwR };
+        } catch(e) {}
+      }
+
+      // Draw text values directly onto pages (pure black on white — no appearance generation)
       Object.keys(fieldValues).forEach(function(name) {
         var val = fieldValues[name];
         if (val == null || val === '') return;
+        var pos = fieldPos[name];
+        if (!pos) return;
         try {
-          var f = form.getTextField(name);
-          f.setText(String(val));
-        } catch(e) { /* field may not exist or be wrong type */ }
+          var sz = Math.min(9, pos.rect.height * 0.72);
+          pages[pos.pageIdx].drawText(String(val), {
+            x: pos.rect.x + 2,
+            y: pos.rect.y + pos.rect.height * 0.18,
+            size: sz,
+            font: stdFont,
+            color: PDFLib.rgb(0, 0, 0),
+            maxWidth: pos.rect.width - 4
+          });
+        } catch(e) { console.warn('[lease] text draw failed for', name, ':', e); }
       });
 
-      // Check payment method checkboxes (pre-authorized debit by default)
-      try { form.getCheckBox('pmt_pad').check(); } catch(e) {}
+      // Draw an X for the pre-authorized debit checkbox
+      var pmtPos = fieldPos['pmt_pad'];
+      if (pmtPos) {
+        try {
+          pages[pmtPos.pageIdx].drawText('X', {
+            x: pmtPos.rect.x + pmtPos.rect.width * 0.2,
+            y: pmtPos.rect.y + pmtPos.rect.height * 0.1,
+            size: Math.min(10, pmtPos.rect.height * 0.8),
+            font: stdFont,
+            color: PDFLib.rgb(0, 0, 0)
+          });
+        } catch(e) {}
+      }
 
       // Embed drawn/typed initials and signatures
       var sigEntries = Object.keys(initSigs);
@@ -2189,9 +2230,14 @@
         } catch(e) { console.warn('[lease pdf] sig embed failed for', fieldName, e); }
       }
 
-      // Flatten form fields → bakes values into static content, removes
-      // interactive blue/pink field highlighting from the output PDF.
-      try { form.flatten(); } catch(e) { console.warn('[lease] flatten failed:', e); }
+      // Strip all widget annotations and AcroForm -- produces a plain static
+      // document with no interactive elements and no colored field overlays.
+      pages.forEach(function(page) {
+        try { page.node.delete(PDFLib.PDFName.of('Annots')); } catch(e) {}
+      });
+      try { pdfDoc.catalog.delete(PDFLib.PDFName.of('AcroForm')); } catch(e) {}
+
+      // Save and download
 
       // Save and download
       var tenantName = fieldValues['tenant_primary_name'] || 'Tenant';
