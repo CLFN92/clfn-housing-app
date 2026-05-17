@@ -30,23 +30,14 @@ var _rfqAwardingId  = null;
   window.currentRole    = savedRole;
   if (!window._realRole) window._realRole = savedRole;
 
-  // Header population
-  var headerLogo = document.getElementById('headerLogo');
-  var rfqAvatar  = document.getElementById('rfqUserAvatar');
-  var rfqUName   = document.getElementById('rfqUserName');
-  var rfqURole   = document.getElementById('rfqUserRole');
-  var rfqOrgEl   = document.getElementById('rfqOrgName');
-  if (rfqAvatar) rfqAvatar.textContent = (savedName || savedEmail || '?').charAt(0).toUpperCase();
-  if (rfqUName)  rfqUName.textContent  = savedName || savedEmail;
-  var _roleLabels = {ed:'Executive Director',housing_manager:'Housing Manager',housing_employee_l2:'Employee L2',housing_employee_l1:'Employee L1',cfo:'CFO',finance_l1:'Finance'};
-  if (rfqURole) rfqURole.textContent = _roleLabels[savedRole] || savedRole;
+  // Header is rendered by renderAppHeader() in housing-init.js (standard pattern)
 
   try { await loadRfqPageData(); } catch(e) { console.error('[RFQ] data load failed:', e); }
 
-  if (typeof _applyTheme         === 'function') _applyTheme((window._appSettings||{}).theme || {});
-  if (typeof applyNationOverrides === 'function') applyNationOverrides();
-  if (headerLogo && window.NATION_CONFIG && NATION_CONFIG.logo_url) headerLogo.src = NATION_CONFIG.logo_url;
-  if (rfqOrgEl   && window.NATION_CONFIG) rfqOrgEl.textContent = ((NATION_CONFIG.display_name || NATION_CONFIG.name) || 'Constance Lake First Nation').toUpperCase();
+  if (typeof _applyTheme          === 'function') _applyTheme((window._appSettings||{}).theme || {});
+  if (typeof applyNationOverrides  === 'function') applyNationOverrides();
+  // Mark RFQ as the active nav item (housing-init.js renders the nav)
+  if (typeof setHeaderNavActive === 'function') setHeaderNavActive('rfq');
 
   var params = new URLSearchParams(window.location.search);
   var rfqId  = params.get('rfq');

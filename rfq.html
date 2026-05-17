@@ -9,32 +9,9 @@
 </head>
 <body>
 
-<!-- Standard app header — inline styles match renos.html/contractors.html pattern -->
-<header id="rfqHeader" style="position:sticky;top:0;z-index:400;background:#000;border-bottom:3px solid #F8E41A;">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:56px;">
-    <div style="display:flex;align-items:center;gap:16px;">
-      <img id="headerLogo" src="" alt="" style="height:38px;width:auto;" onerror="this.style.display='none'"/>
-      <div>
-        <div id="rfqOrgName" style="font-size:12px;font-weight:800;color:#F8E41A;letter-spacing:.04em;">CONSTANCE LAKE FIRST NATION</div>
-        <div style="font-size:10px;color:#ccc;">Housing Department</div>
-      </div>
-      <nav style="display:flex;gap:2px;margin-left:16px;">
-        <a href="housing.html"     class="btn-header-ghost">Applications</a>
-        <a href="renos.html"       class="btn-header-ghost">Renovations</a>
-        <a href="rfq.html"         class="btn-header-ghost" style="border-color:#F8E41A;color:#F8E41A;">RFQ</a>
-        <a href="contractors.html" class="btn-header-ghost">Contractors</a>
-      </nav>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;">
-      <div id="rfqUserAvatar" style="width:32px;height:32px;border-radius:50%;background:#F8E41A;color:#000;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;"></div>
-      <div>
-        <div id="rfqUserName" style="font-size:12px;font-weight:700;color:#fff;line-height:1.2;"></div>
-        <div id="rfqUserRole" style="font-size:10px;color:#aaa;"></div>
-      </div>
-      <button class="btn-header-ghost" onclick="doLogout()" style="margin-left:8px;">Sign Out</button>
-    </div>
-  </div>
-</header>
+<!-- Standard app header rendered by housing-init.js (same as all other pages) -->
+<div id="app_header_host"></div>
+
 
 <!-- Print panel overlay (same pattern as renos.html) -->
 <div id="printPanelOverlay" class="print-overlay" style="display:none;">
@@ -185,5 +162,6 @@
 <script src="notifications.js"></script>
 
 <script src="rfq.js"></script>
+<script src="housing-init.js"></script>
 </body>
 </html>
