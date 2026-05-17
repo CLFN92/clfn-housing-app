@@ -1548,10 +1548,12 @@ window.DocLibrary = (function(){
 
   // Copy a file within the same bucket by fetching as a blob and re-uploading.
   // Supabase Storage has no native server-side copy REST endpoint.
+  // Uses Authorization headers (same as sbUploadFile) rather than the token
+  // query-string URL — the latter returns 400 on some paths/token lengths.
   async function sbCopyFile(sourcePath, destPath) {
-    var srcUrl = sbGetFileUrl(sourcePath);
-    var blobRes = await fetch(srcUrl);
-    if (!blobRes.ok) throw new Error('Could not read source file: ' + sourcePath);
+    var downUrl = window.SUPABASE_URL + '/storage/v1/object/' + window.STORAGE_BUCKET + '/' + sourcePath;
+    var blobRes = await fetch(downUrl, { headers: sbStorageHeaders() });
+    if (!blobRes.ok) throw new Error('Could not read source file: ' + sourcePath + ' (HTTP ' + blobRes.status + ')');
     var blob = await blobRes.blob();
     var upUrl = window.SUPABASE_URL + '/storage/v1/object/' + window.STORAGE_BUCKET + '/' + destPath;
     var upRes = await fetch(upUrl, {
