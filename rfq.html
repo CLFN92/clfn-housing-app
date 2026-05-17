@@ -176,54 +176,102 @@
 <script src="shared-ui.js"></script>
 <script src="shared-data.js"></script>
 <script src="notifications.js"></script>
-<script src="housing-init.js"></script>
+
 <script>
 'use strict';
 
-var _rfqCurrentId   = null;   // RFQ being edited (null = new)
+var _rfqCurrentId   = null;
 var _rfqSowUnitId   = null;
 var _rfqSowPn       = null;
-var _rfqSowData     = null;   // the specific SOW object
-var _rfqUnitData    = null;   // the housing_units row
-var _rfqScopeItems  = [];     // working copy of scope items (with _hidden flag)
-var _rfqSelectedCts = {};     // {contractorId: true}
+var _rfqSowData     = null;
+var _rfqUnitData    = null;
+var _rfqScopeItems  = [];
+var _rfqSelectedCts = {};
 var _rfqActiveTab   = 'details';
 var _rfqAwardingId  = null;
 
-// ── Page init ────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
-  var session = window.HOUSING_SESSION;
-  if (!session || !session.email) { window.location.href = 'index.html'; return; }
-  window.currentRole = session.role || 'housing_employee_l1';
-  window._realRole   = window.currentRole;
+// ── Page init (mirrors renos.html IIFE pattern — never loads housing-init.js) ─
+(async function initRfq() {
+  // Restore session from sessionStorage (same keys as renos.html)
+  var token = null, savedRole = null, savedName = null, savedEmail = null;
+  try {
+    token      = sessionStorage.getItem('clfn_housing_token');
+    savedRole  = sessionStorage.getItem('clfn_housing_role')          || 'housing_employee_l1';
+    savedName  = sessionStorage.getItem('clfn_housing_name')          || '';
+    savedEmail = sessionStorage.getItem('clfn_housing_email_session') || '';
+  } catch(e) {}
+  if (!token) { window.location.href = 'index.html'; return; }
 
+  HOUSING_HEADERS['Authorization'] = 'Bearer ' + token;
+  HOUSING_SESSION.accessToken = token;
+  HOUSING_SESSION.role  = savedRole;
+  HOUSING_SESSION.name  = savedName;
+  HOUSING_SESSION.email = savedEmail;
+  window.currentRole    = savedRole;
+  if (!window._realRole) window._realRole = savedRole;
+
+  // Header
   var headerLogo = document.getElementById('headerLogo');
-  if (headerLogo && window.NATION_CONFIG && NATION_CONFIG.logo_url) headerLogo.src = NATION_CONFIG.logo_url;
   var pill = document.getElementById('headerUserPill');
-  if (pill) pill.textContent = session.name || session.email;
+  if (pill) pill.textContent = savedName || savedEmail;
 
-  var params  = new URLSearchParams(window.location.search);
-  var rfqId   = params.get('rfq');
-  var unitId  = params.get('unit');
-  var sowPn   = params.get('sow');
-  var isOvr   = params.get('override') === '1';
+  try { await loadRfqPageData(); } catch(e) { console.error('[RFQ] data load failed:', e); }
 
-  // Wait for caches (loaded by housing-init.js boot)
-  function waitAndInit() {
-    if (window._rfqCache !== undefined && window._contractors !== undefined && window._sowCache !== undefined) {
-      if (rfqId) {
-        showRfqForm(rfqId, null, null);
-      } else if (unitId) {
-        showRfqForm(null, unitId, sowPn);
-      } else {
-        renderRfqList();
-      }
-    } else {
-      setTimeout(waitAndInit, 120);
-    }
+  if (typeof _applyTheme        === 'function') _applyTheme((window._appSettings||{}).theme || {});
+  if (typeof applyNationOverrides==='function') applyNationOverrides();
+  if (headerLogo && window.NATION_CONFIG && NATION_CONFIG.logo_url) headerLogo.src = NATION_CONFIG.logo_url;
+
+  var params = new URLSearchParams(window.location.search);
+  var rfqId  = params.get('rfq');
+  var unitId = params.get('unit');
+  var sowPn  = params.get('sow');
+
+  if (rfqId)       showRfqForm(rfqId, null, null);
+  else if (unitId) showRfqForm(null, unitId, sowPn);
+  else             renderRfqList();
+}());
+
+async function loadRfqPageData() {
+  var results = await Promise.all([
+    fetch(SUPABASE_URL + '/rest/v1/housing_units?select=*&order=street,num&limit=9999', { headers: HOUSING_HEADERS }),
+    fetch(SUPABASE_URL + '/rest/v1/housing_sow?select=unit_id,data',                   { headers: HOUSING_HEADERS }),
+    fetch(SUPABASE_URL + '/rest/v1/housing_settings?select=key,value',                 { headers: HOUSING_HEADERS }),
+    fetch(SUPABASE_URL + '/rest/v1/housing_rfq?select=*&order=created_at.desc',        { headers: HOUSING_HEADERS }),
+    fetch(SUPABASE_URL + '/rest/v1/housing_contractors?select=*&order=name',           { headers: HOUSING_HEADERS })
+  ]);
+  var uR = results[0], sowR = results[1], stR = results[2], rfqR = results[3], ctR = results[4];
+  if (uR && uR.ok) {
+    window.housingUnits = (await uR.json()).map(function(row) {
+      return Object.assign({}, row.data || {}, {
+        id: row.id, num: row.num, street: row.street,
+        bedrooms: row.bedrooms, status: row.status || 'vacant',
+        assignedTo: row.assigned_to, assignedName: row.assigned_name
+      });
+    });
   }
-  waitAndInit();
-});
+  if (sowR && sowR.ok) {
+    var sd = await sowR.json();
+    window._sowCache = {};
+    sd.forEach(function(r) { window._sowCache[r.unit_id] = r.data; });
+  }
+  if (stR && stR.ok) {
+    var settings = await stR.json();
+    window._appSettings = {};
+    settings.forEach(function(r) { window._appSettings[r.key] = r.value; });
+  }
+  if (rfqR && rfqR.ok) {
+    window._rfqCache = {};
+    (await rfqR.json()).forEach(function(r) { window._rfqCache[r.id] = r; });
+  }
+  if (ctR && ctR.ok) {
+    window._contractors = (await ctR.json()).map(function(r) {
+      return Object.assign({}, r.data || {}, {
+        id: r.id, name: r.name, trade: r.trade,
+        status: r.status, email: r.email
+      });
+    });
+  }
+}
 
 // ── List view ─────────────────────────────────────────────────────────────────
 function showRfqList() {
