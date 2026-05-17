@@ -48,38 +48,21 @@
 <!-- Main content -->
 <main id="rfqMain" class="rfq-page-content">
 
-  <!-- LIST VIEW -->
+  <!-- LIST VIEW — header is static; table+search rendered by renderRfqList() like the worklist -->
   <div id="rfqListView">
-    <div class="page-header-bar">
+    <div class="page-header-bar" style="margin-bottom:16px;">
       <div>
         <h1>Request for Quotes</h1>
-        <p>Manage competitive bid processes for qualifying scopes of work</p>
+        <p id="rfqListSub">Manage competitive bid processes for qualifying scopes of work</p>
       </div>
-      <div class="page-header-actions"><button class="btn btn-primary" onclick="showRfqForm(null,null,null)">+ New RFQ</button></div>
+      <div class="page-header-actions">
+        <button class="btn btn-primary" onclick="showRfqForm(null,null,null)">+ New RFQ</button>
+      </div>
     </div>
-    <div class="std-search-row std-search-row-wide">
-      <input id="rfqSearch" class="std-search" type="text"
-             placeholder="&#128269; Search RFQ #, unit, status, contractor&hellip;"
-             oninput="clearTimeout(window._rfqST);window._rfqST=setTimeout(renderRfqList,200)"/>
-    </div>
-    <div class="std-table-card" style="border-radius:0;border-left:none;border-right:none;">
-      <div class="doclib-table-wrap">
-        <table class="std-table">
-          <thead id="rfq_thead"><tr>
-            <th class="std-th-sortable" data-sort-key="id">RFQ #</th>
-            <th class="std-th-sortable" data-sort-key="unit">Unit / SOW</th>
-            <th class="std-th-sortable" data-sort-key="status">Status</th>
-            <th class="std-th-sortable" data-sort-key="issued">Issued</th>
-            <th class="std-th-sortable" data-sort-key="closes">Closes</th>
-            <th>Recipients</th>
-            <th class="std-th-sortable" data-sort-key="awarded">Awarded To</th>
-            <th class="std-th-sortable" data-sort-key="amount">Award $</th>
-            <th></th>
-          </tr></thead>
-          <tbody id="rfqTableBody" data-table-page="rfq">
-            <tr class="empty-row"><td colspan="9">Loading&hellip;</td></tr>
-          </tbody>
-        </table>
+    <!-- search + table injected here by renderRfqList() exactly as the worklist does -->
+    <div id="rfqListBody">
+      <div class="std-search-row std-search-row-wide">
+        <input class="std-search" type="text" disabled placeholder="Loading&hellip;"/>
       </div>
     </div>
   </div>

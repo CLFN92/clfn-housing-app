@@ -98,38 +98,41 @@ function showRfqList() {
   renderRfqList();
 }
 
+// Mirrors renderWorklist() exactly: builds search + table as innerHTML string
+// into #rfqListBody so layout, spacing and column-menu are identical.
 function renderRfqList() {
-  var tbody  = document.getElementById('rfqTableBody');
-  var thead  = document.getElementById('rfq_thead');
-  if (!tbody) return;
+  var body  = document.getElementById('rfqListBody');
+  if (!body) return;
 
   var cache  = window._rfqCache || {};
   var units  = (typeof housingUnits !== 'undefined' ? housingUnits : []);
-  var search = ((document.getElementById('rfqSearch')||{}).value || '').toLowerCase().trim();
+  // Preserve search value across re-renders
+  var prevSearch = ((document.getElementById('rfq_search_input')||{}).value || '');
 
-  // Enrich each row with resolved display values
+  // Enrich rows
   var allRows = Object.values(cache).map(function(rfq) {
-    var unit     = units.find(function(u){ return u && u.id === rfq.sow_unit_id; }) || {};
-    var addr     = ((unit.num||'') + ' ' + (unit.street||'')).trim() || rfq.sow_unit_id || '';
-    var awardCt  = rfq.awarded_contractor_id
+    var unit    = units.find(function(u){ return u && u.id === rfq.sow_unit_id; }) || {};
+    var addr    = ((unit.num||'') + ' ' + (unit.street||'')).trim() || rfq.sow_unit_id || '';
+    var awardCt = rfq.awarded_contractor_id
       ? ((window._contractors||[]).find(function(c){ return c && c.id === rfq.awarded_contractor_id; }) || {}).name || rfq.awarded_contractor_id
       : '';
     return { rfq: rfq, addr: addr, awardCt: awardCt };
   });
 
-  // Search filter
+  // Search
+  var search = prevSearch.toLowerCase().trim();
   if (search) {
     allRows = allRows.filter(function(r) {
-      var hay = [r.rfq.id, r.addr, r.rfq.sow_project_number, r.rfq.status, r.awardCt].filter(Boolean).join(' ').toLowerCase();
-      return hay.indexOf(search) !== -1;
+      return [r.rfq.id, r.addr, r.rfq.sow_project_number, r.rfq.status, r.awardCt]
+        .filter(Boolean).join(' ').toLowerCase().indexOf(search) !== -1;
     });
   }
 
   // Default sort: newest first
   allRows.sort(function(a,b){ return (b.rfq.created_at||'').localeCompare(a.rfq.created_at||''); });
 
-  // ── Column sort + filter (standard shared-ui.js pattern) ────────────────
-  var _rfqColumns = {
+  // Column definitions — same shape as worklist / contractors
+  var _cols = {
     id:      { label: 'RFQ #',      accessor: function(r){ return r.rfq.id || ''; } },
     unit:    { label: 'Unit / SOW', accessor: function(r){ return r.addr; } },
     status:  { label: 'Status',     accessor: function(r){ return r.rfq.status || 'draft'; } },
@@ -138,50 +141,71 @@ function renderRfqList() {
     awarded: { label: 'Awarded To', accessor: function(r){ return r.awardCt; } },
     amount:  { label: 'Award $',    accessor: function(r){ return Number(r.rfq.award_amount) || 0; } }
   };
-  var _rfqAccessors = {};
-  Object.keys(_rfqColumns).forEach(function(k){ _rfqAccessors[k] = _rfqColumns[k].accessor; });
-
-  var _rfqState = (typeof tableStateGet === 'function') ? tableStateGet('rfq') : { sort:{key:'',dir:1}, filters:{} };
-
+  var _acc = {};
+  Object.keys(_cols).forEach(function(k){ _acc[k] = _cols[k].accessor; });
+  var _state = (typeof tableStateGet === 'function') ? tableStateGet('rfq') : { sort:{key:'',dir:1}, filters:{} };
   if (typeof tableRegisterColumns === 'function') {
-    tableRegisterColumns('rfq', { columns: _rfqColumns, getRows: function(){ return allRows; }, onChange: renderRfqList });
+    tableRegisterColumns('rfq', { columns: _cols, getRows: function(){ return allRows; }, onChange: renderRfqList });
   }
+  var sorted = (typeof tableApplyFilterSort === 'function') ? tableApplyFilterSort(allRows, _acc, _state) : allRows;
 
-  var sorted = (typeof tableApplyFilterSort === 'function')
-    ? tableApplyFilterSort(allRows, _rfqAccessors, _rfqState)
-    : allRows;
+  // Build row HTML
+  var emptyMsg = search
+    ? 'No results for &ldquo;' + escapeHtml(search) + '&rdquo;. Click a column header to adjust filters.'
+    : 'No RFQs yet. Click &ldquo;+ New RFQ&rdquo; to get started.';
+  var rowsHtml = sorted.length ? sorted.map(function(r) {
+    var rfq   = r.rfq;
+    var clos  = rfq.closes_at ? new Date(rfq.closes_at).toLocaleDateString('en-CA') : '--';
+    var iss   = rfq.issued_at ? new Date(rfq.issued_at).toLocaleDateString('en-CA')  : '--';
+    var rcp   = (rfq.recipient_contractor_ids || []).length;
+    var amt   = rfq.award_amount ? '$' + Number(rfq.award_amount).toLocaleString('en-CA',{minimumFractionDigits:2}) : '--';
+    var stCls = 'rfq-status-' + (rfq.status || 'draft');
+    return '<tr style="border-bottom:1px solid var(--border);" class="clickable" onclick="showRfqForm(\'' + escapeHtml(rfq.id) + '\',null,null)">'
+      + '<td style="padding:11px 14px;font-weight:600;font-size:13px;">' + escapeHtml(rfq.id) + '</td>'
+      + '<td style="padding:11px 14px;font-size:12px;">' + escapeHtml(r.addr) + (rfq.sow_project_number ? '<div class="txt-xs-muted">' + escapeHtml(rfq.sow_project_number) + '</div>' : '') + '</td>'
+      + '<td style="padding:11px 14px;"><span class="rfq-status-pill ' + stCls + '">' + escapeHtml(rfq.status||'draft') + '</span></td>'
+      + '<td style="padding:11px 14px;font-size:12px;color:var(--muted);">' + iss + '</td>'
+      + '<td style="padding:11px 14px;font-size:12px;color:var(--muted);">' + clos + '</td>'
+      + '<td style="padding:11px 14px;font-size:12px;text-align:center;">' + rcp + '</td>'
+      + '<td style="padding:11px 14px;font-size:12px;">' + escapeHtml(r.awardCt || '--') + '</td>'
+      + '<td style="padding:11px 14px;font-size:12px;">' + amt + '</td>'
+      + '<td style="padding:11px 14px;text-align:right;white-space:nowrap;" onclick="event.stopPropagation();">'
+      +   '<div style="display:inline-flex;gap:4px;align-items:center;">'
+      +     (rfq.status === 'draft'  ? '<button class="btn btn-ghost btn-sm" onclick="showRfqForm(\'' + escapeHtml(rfq.id) + '\',null,null)">Edit</button>' : '')
+      +     (rfq.status === 'issued' ? '<button class="btn btn-ghost btn-sm" onclick="showAwardModal(\'' + escapeHtml(rfq.id) + '\')">Award</button>' : '')
+      +     (rfq.status !== 'cancelled' && rfq.status !== 'awarded' ? '<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="cancelRfq(\'' + escapeHtml(rfq.id) + '\')">Cancel</button>' : '')
+      +   '</div>'
+      + '</td>'
+      + '</tr>';
+  }).join('')
+  : '<tr><td colspan="9" style="padding:32px;text-align:center;color:var(--muted);font-size:13px;font-style:italic;">' + emptyMsg + '</td></tr>';
 
-  // ── Render rows ──────────────────────────────────────────────────────────
-  if (!sorted.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No RFQs match. Click &ldquo;+ New RFQ&rdquo; to get started.</td></tr>';
-  } else {
-    tbody.innerHTML = sorted.map(function(r) {
-      var rfq        = r.rfq;
-      var closing    = rfq.closes_at ? new Date(rfq.closes_at).toLocaleDateString('en-CA') : '--';
-      var issued     = rfq.issued_at ? new Date(rfq.issued_at).toLocaleDateString('en-CA')  : '--';
-      var recipCount = (rfq.recipient_contractor_ids || []).length;
-      var awardAmt   = rfq.award_amount ? '$' + Number(rfq.award_amount).toLocaleString('en-CA',{minimumFractionDigits:2}) : '--';
-      var stCls      = 'rfq-status-' + (rfq.status || 'draft');
-      var isEdit     = rfq.status === 'draft';
-      return '<tr class="clickable" onclick="showRfqForm(\'' + escapeHtml(rfq.id) + '\',null,null)">'
-        + '<td class="js-txt-bold">' + escapeHtml(rfq.id) + '</td>'
-        + '<td>' + escapeHtml(r.addr) + '<br/><span class="txt-muted-xs">' + escapeHtml(rfq.sow_project_number||'') + '</span></td>'
-        + '<td><span class="rfq-status-pill ' + stCls + '">' + escapeHtml(rfq.status||'draft') + '</span></td>'
-        + '<td>' + issued + '</td>'
-        + '<td>' + closing + '</td>'
-        + '<td class="std-cell-center">' + recipCount + '</td>'
-        + '<td>' + escapeHtml(r.awardCt || '--') + '</td>'
-        + '<td>' + awardAmt + '</td>'
-        + '<td class="std-cell-tail" onclick="event.stopPropagation();">'
-        +   (isEdit ? '<button class="btn btn-ghost btn-sm" onclick="showRfqForm(\'' + escapeHtml(rfq.id) + '\',null,null)">Edit</button> ' : '')
-        +   (rfq.status === 'issued' ? '<button class="btn btn-ghost btn-sm" onclick="showAwardModal(\'' + escapeHtml(rfq.id) + '\')">Award</button> ' : '')
-        +   (rfq.status !== 'cancelled' && rfq.status !== 'awarded' ? '<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="cancelRfq(\'' + escapeHtml(rfq.id) + '\')">Cancel</button>' : '')
-        + '</td>'
-        + '</tr>';
-    }).join('');
-  }
+  // Inject full HTML into the body container — mirrors worklist body.innerHTML pattern
+  body.innerHTML =
+      '<div class="std-search-row std-search-row-wide">'
+    +   '<input id="rfq_search_input" class="std-search" type="text"'
+    +   ' placeholder="&#128269; Search RFQ #, unit, status, contractor…"'
+    +   ' value="' + escapeHtml(prevSearch) + '"'
+    +   ' oninput="window._rfqSearch=this.value;clearTimeout(window._rfqST);window._rfqST=setTimeout(renderRfqList,200)"/>'
+    + '</div>'
+    + '<div class="std-table-card">'
+    +   '<div class="doclib-table-wrap"><table class="std-table">'
+    +     '<thead id="rfq_thead"><tr>'
+    +       '<th class="std-th-sortable" data-sort-key="id">RFQ #</th>'
+    +       '<th class="std-th-sortable" data-sort-key="unit">Unit / SOW</th>'
+    +       '<th class="std-th-sortable" data-sort-key="status">Status</th>'
+    +       '<th class="std-th-sortable" data-sort-key="issued">Issued</th>'
+    +       '<th class="std-th-sortable" data-sort-key="closes">Closes</th>'
+    +       '<th>Recipients</th>'
+    +       '<th class="std-th-sortable" data-sort-key="awarded">Awarded To</th>'
+    +       '<th class="std-th-sortable" data-sort-key="amount">Award $</th>'
+    +       '<th></th>'
+    +     '</tr></thead>'
+    +     '<tbody id="rfqTableBody">' + rowsHtml + '</tbody>'
+    +   '</table></div>'
+    + '</div>';
 
-  // Wire column-menu sort indicators (standard pattern)
+  var thead = document.getElementById('rfq_thead');
   if (typeof tableBindColumnMenuClicks  === 'function' && thead) tableBindColumnMenuClicks(thead, 'rfq');
   if (typeof tableRefreshSortIndicators === 'function' && thead) tableRefreshSortIndicators(thead, 'rfq');
 }
