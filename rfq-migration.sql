@@ -80,15 +80,22 @@ values (
 )
 on conflict (key) do nothing;
 
--- ── 4. RLS (uncomment and adjust to match your existing bucket policies) ────
--- alter table housing_rfq enable row level security;
---
--- create policy "Authenticated staff can read RFQs"
---   on housing_rfq for select to authenticated using (true);
---
--- create policy "Authenticated staff can write RFQs"
---   on housing_rfq for all to authenticated
---   using (true) with check (true);
+-- ── 4. RLS — ALREADY APPLIED in Supabase (run manually 2026-05-17) ──────────
+-- Supabase enabled RLS automatically on the new table. The following policies
+-- were added via the SQL Editor to allow authenticated staff full access:
+alter table housing_rfq enable row level security;
+
+create policy "Authenticated staff can read RFQs"
+  on housing_rfq for select to authenticated using (true);
+
+create policy "Authenticated staff can insert RFQs"
+  on housing_rfq for insert to authenticated with check (true);
+
+create policy "Authenticated staff can update RFQs"
+  on housing_rfq for update to authenticated using (true) with check (true);
+
+create policy "Authenticated staff can delete RFQs"
+  on housing_rfq for delete to authenticated using (true);
 
 -- ── 5. Audit log append-only guard (matches housing_audit_log pattern) ──────
 -- If your audit log table already has a trigger blocking UPDATE/DELETE,
