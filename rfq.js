@@ -42,21 +42,22 @@ var _rfqAwardingId  = null;
   var params = new URLSearchParams(window.location.search);
   var rfqId  = params.get('rfq');
   var isNew  = params.get('new') === '1';
+  var unitId = params.get('unit'); // legacy URL-param path (kept as fallback)
 
   if (rfqId) {
-    showRfqForm(rfqId, null, null);
+    // Edit existing RFQ
+    showRfqForm(rfqId, null, null, null);
   } else if (isNew) {
-    // Read the one-shot navigation context set by openRfqFromSow() and clear it immediately
+    // New RFQ from SOW -- read sessionStorage navigation token set by openRfqFromSow()
     var ctx = null;
     try {
       var raw = sessionStorage.getItem('rfq_nav_context');
       if (raw) { ctx = JSON.parse(raw); sessionStorage.removeItem('rfq_nav_context'); }
     } catch(e) { console.warn('[rfq] nav context read failed:', e); }
-    if (ctx && ctx.unitId) {
-      showRfqForm(null, ctx.unitId, ctx.sow, ctx);
-    } else {
-      showRfqForm(null, null, null, null);
-    }
+    showRfqForm(null, (ctx && ctx.unitId) || null, (ctx && ctx.sow) || null, ctx || null);
+  } else if (unitId) {
+    // Legacy path: ?unit=X&sow=Y in URL (backward compat with old shared-data.js)
+    showRfqForm(null, unitId, params.get('sow'), null);
   } else {
     renderRfqList();
   }
