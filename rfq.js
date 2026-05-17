@@ -101,7 +101,6 @@ function showRfqList() {
 function renderRfqList() {
   var tbody  = document.getElementById('rfqTableBody');
   var thead  = document.getElementById('rfq_thead');
-  var countEl = document.getElementById('rfqTableCount');
   if (!tbody) return;
 
   var cache  = window._rfqCache || {};
@@ -151,8 +150,6 @@ function renderRfqList() {
   var sorted = (typeof tableApplyFilterSort === 'function')
     ? tableApplyFilterSort(allRows, _rfqAccessors, _rfqState)
     : allRows;
-
-  if (countEl) countEl.textContent = sorted.length + ' RFQ' + (sorted.length === 1 ? '' : 's');
 
   // ── Render rows ──────────────────────────────────────────────────────────
   if (!sorted.length) {
