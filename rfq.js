@@ -41,12 +41,25 @@ var _rfqAwardingId  = null;
 
   var params = new URLSearchParams(window.location.search);
   var rfqId  = params.get('rfq');
-  var unitId = params.get('unit');
-  var sowPn  = params.get('sow');
+  var isNew  = params.get('new') === '1';
 
-  if (rfqId)       showRfqForm(rfqId, null, null);
-  else if (unitId) showRfqForm(null, unitId, sowPn);
-  else             renderRfqList();
+  if (rfqId) {
+    showRfqForm(rfqId, null, null);
+  } else if (isNew) {
+    // Read the one-shot navigation context set by openRfqFromSow() and clear it immediately
+    var ctx = null;
+    try {
+      var raw = sessionStorage.getItem('rfq_nav_context');
+      if (raw) { ctx = JSON.parse(raw); sessionStorage.removeItem('rfq_nav_context'); }
+    } catch(e) { console.warn('[rfq] nav context read failed:', e); }
+    if (ctx && ctx.unitId) {
+      showRfqForm(null, ctx.unitId, ctx.sow, ctx);
+    } else {
+      showRfqForm(null, null, null, null);
+    }
+  } else {
+    renderRfqList();
+  }
 }());
 
 async function loadRfqPageData() {
@@ -211,7 +224,10 @@ function renderRfqList() {
 }
 
 // ── Form view ─────────────────────────────────────────────────────────────────
-function showRfqForm(rfqId, unitId, sowPn) {
+var _rfqNavCtx = null; // SOW navigation context set by openRfqFromSow
+
+function showRfqForm(rfqId, unitId, sowPn, navCtx) {
+  _rfqNavCtx = navCtx || null;
   document.getElementById('rfqListView').style.display  = 'none';
   document.getElementById('rfqFormView').style.display  = '';
   switchRfqTab('details');
@@ -268,15 +284,14 @@ function _loadRfqSowContext() {
   _rfqSowData = null; _rfqUnitData = null;
   if (!_rfqSowUnitId) return;
 
-  // URL params carry authoritative data set by openRfqFromSow() from the live SOW modal DOM.
-  var urlParams = new URLSearchParams(window.location.search);
-  var urlAddr   = urlParams.get('addr')   || '';
-  var urlAmount = parseFloat(urlParams.get('amount') || '0') || 0;
-  console.log('[rfq] context: unit=' + _rfqSowUnitId + ' sow=' + _rfqSowPn + ' addr=' + urlAddr + ' amount=' + urlAmount);
+  // _rfqNavCtx carries the data read directly from the open SOW modal DOM
+  // by openRfqFromSow() -- always authoritative when coming from a SOW.
+  var navAddr   = (_rfqNavCtx && _rfqNavCtx.addr)   || '';
+  var navAmount = (_rfqNavCtx && _rfqNavCtx.amount)  || 0;
 
   // Find unit from cache (may enrich the address)
   _rfqUnitData = (window.housingUnits || []).find(function(u){ return u && u.id === _rfqSowUnitId; }) || null;
-  var addr = urlAddr
+  var addr = navAddr
     || (_rfqUnitData ? ((_rfqUnitData.num||'') + ' ' + (_rfqUnitData.street||'')).trim() : '')
     || _rfqSowUnitId;
 
@@ -292,8 +307,8 @@ function _loadRfqSowContext() {
     if (!_rfqSowData && sowEntry && sowEntry.items) _rfqSowData = sowEntry;
   }
 
-  // Amount: URL param is authoritative, cache is secondary
-  var raw = urlAmount || (_rfqSowData
+  // Amount: nav context is authoritative (direct from SOW modal DOM), cache is fallback
+  var raw = navAmount || (_rfqSowData
     ? parseFloat(_rfqSowData.amount || _rfqSowData.totalCost || _rfqSowData.total_cost || 0)
     : 0);
   var amt = raw ? '$' + raw.toLocaleString('en-CA', {minimumFractionDigits:2}) : '--';

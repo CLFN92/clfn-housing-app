@@ -6008,14 +6008,16 @@ async function awardRfq(rfqId, contractorId, amount, notes) {
 function openRfqFromSow() {
   var unitId = window._sowUnitId;
   var pn     = window._sowEditingProjectNumber;
-  if (!unitId || !pn) { if (typeof showToast === 'function') showToast('No SOW open -- save the SOW first'); return; }
+  if (!unitId || !pn) {
+    if (typeof showToast === 'function') showToast('Save the SOW first before creating an RFQ');
+    return;
+  }
 
-  // Read amount directly from the open SOW modal form field -- 100% reliable
-  // since the modal is open when this button is clicked.
+  // Read all required data directly from the open SOW modal DOM -- 100% reliable
+  // since the modal is open at the moment the user clicks this button.
   var tcEl   = document.getElementById('sow_total_cost');
   var amount = tcEl ? (parseFloat(tcEl.value) || 0) : 0;
 
-  // Read address from the SOW modal address field or from the unit record
   var addrEl = document.getElementById('sow_address');
   var addr   = (addrEl && addrEl.value.trim()) || '';
   if (!addr) {
@@ -6024,20 +6026,30 @@ function openRfqFromSow() {
     addr = ((unit.num||'') + ' ' + (unit.street||'')).trim();
   }
 
-  // Threshold check -- use the live amount from the form
+  // Threshold check using the live form amount
   var threshold = ((window._appSettings && window._appSettings.rfq_threshold) || 10000);
   var role = window.currentRole || '';
   var meetsThreshold = amount >= threshold;
   if (!meetsThreshold && role !== 'ed' && role !== 'housing_manager') {
-    if (typeof showToast === 'function') showToast('RFQ required only for scopes ≥ $' + threshold.toLocaleString());
+    if (typeof showToast === 'function') showToast('RFQ only required for scopes ≥ $' + threshold.toLocaleString());
     return;
   }
 
-  var params = new URLSearchParams({ unit: unitId, sow: pn });
-  if (amount) params.set('amount', String(amount));
-  if (addr)   params.set('addr',   addr);
-  if (!meetsThreshold) params.set('override', '1');
-  window.location.href = 'rfq.html?' + params.toString();
+  // Store SOW context in sessionStorage as a one-shot navigation token.
+  // This is navigation state only -- NOT persisted RFQ data (that goes to Supabase).
+  // rfq.html reads it once on load then clears it immediately.
+  try {
+    sessionStorage.setItem('rfq_nav_context', JSON.stringify({
+      unitId: unitId,
+      sow:    pn,
+      amount: amount,
+      addr:   addr,
+      override: !meetsThreshold
+    }));
+  } catch(e) { console.warn('[rfq] sessionStorage write failed:', e); }
+
+  // Navigate to rfq.html in new-form mode
+  window.location.href = 'rfq.html?new=1';
 }
 
 window.loadRfqCache         = loadRfqCache;
