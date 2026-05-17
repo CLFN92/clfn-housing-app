@@ -6008,37 +6008,34 @@ async function awardRfq(rfqId, contractorId, amount, notes) {
 function openRfqFromSow() {
   var unitId = window._sowUnitId;
   var pn     = window._sowEditingProjectNumber;
-  if (!unitId) return;
+  if (!unitId || !pn) { if (typeof showToast === 'function') showToast('No SOW open -- save the SOW first'); return; }
 
-  // Find the SOW record from cache (available on renos page)
-  var sow = null;
-  var sowData = window._sowCache && window._sowCache[unitId];
-  if (sowData) {
-    var sowsArr = Array.isArray(sowData.sows) ? sowData.sows
-                : Array.isArray(sowData) ? sowData : null;
-    if (sowsArr && pn) sow = sowsArr.find(function(s){ return s && s.project_number === pn; }) || null;
-    if (!sow && sowsArr && sowsArr.length) sow = sowsArr[0] || null;
+  // Read amount directly from the open SOW modal form field -- 100% reliable
+  // since the modal is open when this button is clicked.
+  var tcEl   = document.getElementById('sow_total_cost');
+  var amount = tcEl ? (parseFloat(tcEl.value) || 0) : 0;
+
+  // Read address from the SOW modal address field or from the unit record
+  var addrEl = document.getElementById('sow_address');
+  var addr   = (addrEl && addrEl.value.trim()) || '';
+  if (!addr) {
+    var units = (typeof housingUnits !== 'undefined' ? housingUnits : []);
+    var unit  = units.find(function(u){ return u && u.id === unitId; }) || {};
+    addr = ((unit.num||'') + ' ' + (unit.street||'')).trim();
   }
 
+  // Threshold check -- use the live amount from the form
   var threshold = ((window._appSettings && window._appSettings.rfq_threshold) || 10000);
   var role = window.currentRole || '';
-  var meetsThreshold = sow && _sowMeetsRfqThreshold(sow);
+  var meetsThreshold = amount >= threshold;
   if (!meetsThreshold && role !== 'ed' && role !== 'housing_manager') {
-    if (typeof showToast === 'function') showToast('RFQ required only for scopes >= $' + threshold.toLocaleString());
+    if (typeof showToast === 'function') showToast('RFQ required only for scopes ≥ $' + threshold.toLocaleString());
     return;
   }
 
-  // Pass key SOW data in URL so rfq.html can populate the form without
-  // needing to re-fetch the cache (amount + address are always authoritative here).
-  var amount = sow ? (parseFloat(sow.amount || sow.totalCost || sow.total_cost || 0) || 0) : 0;
-  var units  = (typeof housingUnits !== 'undefined' ? housingUnits : []);
-  var unit   = units.find(function(u){ return u && u.id === unitId; }) || {};
-  var addr   = ((unit.num||'') + ' ' + (unit.street||'')).trim();
-
-  var params = new URLSearchParams({ unit: unitId });
-  if (pn)     params.set('sow',      pn);
-  if (amount) params.set('amount',   String(amount));
-  if (addr)   params.set('addr',     addr);
+  var params = new URLSearchParams({ unit: unitId, sow: pn });
+  if (amount) params.set('amount', String(amount));
+  if (addr)   params.set('addr',   addr);
   if (!meetsThreshold) params.set('override', '1');
   window.location.href = 'rfq.html?' + params.toString();
 }

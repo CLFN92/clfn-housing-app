@@ -268,10 +268,11 @@ function _loadRfqSowContext() {
   _rfqSowData = null; _rfqUnitData = null;
   if (!_rfqSowUnitId) return;
 
-  // URL params carry authoritative data passed from the live SOW modal
+  // URL params carry authoritative data set by openRfqFromSow() from the live SOW modal DOM.
   var urlParams = new URLSearchParams(window.location.search);
   var urlAddr   = urlParams.get('addr')   || '';
   var urlAmount = parseFloat(urlParams.get('amount') || '0') || 0;
+  console.log('[rfq] context: unit=' + _rfqSowUnitId + ' sow=' + _rfqSowPn + ' addr=' + urlAddr + ' amount=' + urlAmount);
 
   // Find unit from cache (may enrich the address)
   _rfqUnitData = (window.housingUnits || []).find(function(u){ return u && u.id === _rfqSowUnitId; }) || null;
