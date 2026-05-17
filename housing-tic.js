@@ -1843,6 +1843,157 @@
     });
   }
 
+
+  // ── Lease initials pop-out ─────────────────────────────────────────────────
+  // Captured initials live here so both the pop-out and the PDF generator can
+  // read them without relying on live DOM elements.
+  var _leaseInitials = {};
+
+  var _LEASE_INITIAL_CLAUSES = [
+    {
+      id:      'ls_init_drug',
+      label:   'Section 2(c)-(g) — Smoking, Cannabis & Drug Provisions',
+      text:    'The Residence is a smoking-permitted environment. Cannabis cultivation, production, and processing in any quantity is strictly prohibited as a condition of this Agreement regardless of federal legality. Any breach of the cannabis prohibition constitutes immediate grounds for termination without a cure period. Unlawful drug activity — including possession, production, trafficking, or storage of controlled substances — also constitutes immediate grounds for termination. The Tenant acknowledges full liability for all remediation costs arising from smoking damage, cannabis cultivation, or prohibited drug activity on the premises.'
+    },
+    {
+      id:      'ls_init_3_3',
+      label:   'Section 3.3 — First Month\'s Rent',
+      text:    'The Tenant shall pay the first month\'s rent in full on or before the commencement date of this Agreement. No occupancy shall commence until the first month\'s rent is paid in full.'
+    },
+    {
+      id:      'ls_init_3_4a',
+      label:   'Section 3.4 — Late Payment Fee',
+      text:    'Where any rent payment remains unpaid fifteen (15) days past the due date, a late payment fee of $25.00 shall be added to the Tenant\'s account. This fee is in addition to the outstanding rent and is recoverable as arrears.'
+    },
+    {
+      id:      'ls_init_3_4b',
+      label:   'Section 3.4 — NSF Fee',
+      text:    'Where a cheque or pre-authorized debit is returned by the financial institution for insufficient funds, a $45.00 NSF (Non-Sufficient Funds) fee shall be added to the Tenant\'s account, in addition to any charges imposed by the financial institution. Repeated NSF occurrences may result in a change of required payment method.'
+    },
+    {
+      id:      'ls_init_juris',
+      label:   'Section 21 — Acknowledgement of Jurisdiction',
+      text:    'This Agreement is governed by the inherent jurisdiction of Constance Lake First Nation and the Indian Act, R.S.C. 1985, c. I-5. The Ontario Residential Tenancies Act, 2006 does not apply to this Agreement. Any dispute arising under this Agreement shall be addressed through the internal grievance process established by the CLFN Housing Policy, and where unresolved, through the Ontario Superior Court of Justice as a matter of contract law.'
+    }
+  ];
+
+  function _ticOpenInitialsPopout(idx) {
+    idx = idx || 0;
+    var clause = _LEASE_INITIAL_CLAUSES[idx];
+    if (!clause) return;
+    var total  = _LEASE_INITIAL_CLAUSES.length;
+    var isLast = idx === total - 1;
+
+    var existing = document.getElementById('ls_initials_popout');
+    if (existing) existing.remove();
+
+    var pop = document.createElement('div');
+    pop.id = 'ls_initials_popout';
+    pop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10100;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+    var captured = _leaseInitials[clause.id] || '';
+
+    pop.innerHTML =
+        '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:580px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.4);">'
+      // Header
+      + '<div class="modal-hdr"><div>'
+      +   '<div class="lbl-yellow">Required Initial ' + (idx+1) + ' of ' + total + '</div>'
+      +   '<div class="txt-sm-meta" style="font-weight:600;">' + clause.label + '</div>'
+      + '</div></div>'
+      // Progress bar
+      + '<div style="height:4px;background:var(--border);"><div style="height:4px;background:var(--yellow);width:' + Math.round(((idx+1)/total)*100) + '%;transition:width .3s;"></div></div>'
+      // Clause text
+      + '<div style="padding:20px 22px;flex:1;overflow-y:auto;">'
+      +   '<div style="background:var(--bg);border:1px solid var(--border);border-left:3px solid var(--yellow);border-radius:6px;padding:14px 16px;font-size:12.5px;line-height:1.7;color:var(--text);margin-bottom:18px;">' + clause.text + '</div>'
+      // Initial pad
+      +   '<div class="tic-field-lbl" style="margin-bottom:6px;">Tenant Initials</div>'
+      +   '<div class="sig-canvas-wrap">'
+      +     '<div class="tab-bar">'
+      +       '<button type="button" onclick="setSigMethod(\'po_init_' + idx + '\',\'canvas\')" id="po_init_' + idx + '_tab_canvas" class="tab-item active">&#9999;&#65039; Draw</button>'
+      +       '<button type="button" onclick="setSigMethod(\'po_init_' + idx + '\',\'type\')"   id="po_init_' + idx + '_tab_type"   class="tab-item">&#9000;&#65039; Type</button>'
+      +       '<button type="button" onclick="setSigMethod(\'po_init_' + idx + '\',\'wet\')"    id="po_init_' + idx + '_tab_wet"    class="tab-item">&#128396; Wet</button>'
+      +     '</div>'
+      +     '<div id="po_init_' + idx + '_panel_canvas" class="bg-paper">'
+      +       '<canvas id="po_init_' + idx + '" width="400" height="70" style="width:100%;height:70px;display:block;touch-action:none;cursor:crosshair;"></canvas>'
+      +       '<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 10px;border-top:1px solid var(--border);">'
+      +         '<span class="txt-xs-muted">Sign with finger or mouse</span>'
+      +         '<button type="button" onclick="clearSig(\'po_init_' + idx + '\')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button>'
+      +       '</div>'
+      +     '</div>'
+      +     '<div id="po_init_' + idx + '_panel_type" class="sec-hidden">'
+      +       '<input type="text" id="po_init_' + idx + '_typed" placeholder="Type initials (e.g. LS)" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:22px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;"/>'
+      +       '<div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your initials constitutes a legal electronic acknowledgement</div>'
+      +     '</div>'
+      +     '<div id="po_init_' + idx + '_panel_wet" class="sec-hidden">'
+      +       '<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Print this form and collect initials on paper, or use an e-signature service. Note the reference below.</div>'
+      +       '<input type="text" id="po_init_' + idx + '_wet_ref" placeholder="Reference # (optional)" style="width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>'
+      +     '</div>'
+      +   '</div>'
+      + '</div>'
+      // Footer nav
+      + '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">'
+      +   (idx > 0
+          ? '<button type="button" onclick="window._ticInitialSaveAndNav(' + idx + ',-1)" class="btn btn-ghost">&#8592; Back</button>'
+          : '<div></div>')
+      +   '<button type="button" onclick="window._ticInitialSaveAndNav(' + idx + ',1)" class="btn btn-primary">'
+      +     (isLast ? '&#10003; Complete Initials' : 'Next &#8594;')
+      +   '</button>'
+      + '</div>'
+      + '</div>';
+
+    document.body.appendChild(pop);
+
+    setTimeout(function() {
+      if (typeof _initSigPad === 'function') _initSigPad('po_init_' + idx);
+      // If there was a previously captured initial for this clause, show a note
+      if (captured) {
+        var statusEl = document.createElement('div');
+        statusEl.style.cssText = 'font-size:11px;color:var(--success,#15803d);margin-top:8px;';
+        statusEl.textContent = 'Previously captured — draw or type a new initial to replace.';
+        var wrap = document.getElementById('po_init_' + idx + '_panel_canvas');
+        if (wrap) wrap.parentNode.insertBefore(statusEl, wrap.nextSibling);
+      }
+    }, 80);
+  }
+
+  function _ticInitialSaveAndNav(idx, dir) {
+    // Capture the current initial
+    var canvasId = 'po_init_' + idx;
+    var captured = '';
+    if (typeof getSigDataURL === 'function') {
+      captured = getSigDataURL(canvasId);
+    }
+    // Fall back to previously stored value if nothing new was drawn
+    if (!captured) captured = _leaseInitials[_LEASE_INITIAL_CLAUSES[idx].id] || '';
+
+    if (captured) {
+      _leaseInitials[_LEASE_INITIAL_CLAUSES[idx].id] = captured;
+    }
+
+    var total   = _LEASE_INITIAL_CLAUSES.length;
+    var nextIdx = idx + dir;
+
+    // Update the status button in the parent modal
+    var doneCount = Object.keys(_leaseInitials).length;
+    var statusEl  = document.getElementById('ls_initials_status');
+    var btnEl     = document.getElementById('ls_initials_btn');
+    if (statusEl) statusEl.textContent = doneCount + ' of ' + total + ' initials captured';
+    if (btnEl) {
+      btnEl.textContent = doneCount === total ? '✓ All Initials Complete' : 'Review & Initial →';
+      btnEl.style.background = doneCount === total ? 'var(--success,#15803d)' : '';
+    }
+
+    if (nextIdx >= 0 && nextIdx < total) {
+      // Navigate to next/prev clause
+      var pop = document.getElementById('ls_initials_popout');
+      if (pop) pop.remove();
+      _ticOpenInitialsPopout(nextIdx);
+    } else {
+      // Done — close pop-out and return to main modal
+      var pop = document.getElementById('ls_initials_popout');
+      if (pop) pop.remove();
+    }
+  }
   // ── Modal ──────────────────────────────────────────────────────────────
   function _ticOpenLeaseModal() {
     var t   = _ticState.tenant      || {};
@@ -1956,13 +2107,13 @@
       + fld('Monthly Rent ($)',         inp('ls_rent',       rentAmt,              '0.00'))
       + '</div>'
 
-      + secH('Initials Required')
-      + '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;">The tenant must initial beside each clause below. Each initial pad uses the same draw / type / wet options.</div>'
-      + initPad('ls_init_drug',    '<strong>Smoking, Cannabis &amp; Drug Provisions (Section 2c&#8211;g):</strong> Tenant acknowledges full liability for smoking damage, confirms that cannabis cultivation is strictly prohibited regardless of federal legality, and confirms that any breach of the unlawful drug provisions constitutes immediate grounds for termination without a cure period.')
-      + initPad('ls_init_3_3',    '<strong>First Month\'s Rent (Section 3.3):</strong> Tenant shall pay the first month\'s rent in full on or before the commencement date. No occupancy shall commence until the first month\'s rent is paid.')
-      + initPad('ls_init_3_4a',   '<strong>Late Payment Fee (Section 3.4):</strong> Where any rent payment remains unpaid fifteen (15) days past the due date, a late payment fee of $25.00 shall be added to the Tenant\'s account.')
-      + initPad('ls_init_3_4b',   '<strong>NSF Fee (Section 3.4):</strong> Where a cheque or pre-authorized debit is returned for insufficient funds, a $45.00 NSF fee shall be added to the Tenant\'s account, in addition to any charges imposed by the financial institution.')
-      + initPad('ls_init_juris',  '<strong>Acknowledgement of Jurisdiction (Section 21):</strong> This Agreement is governed by the inherent jurisdiction of Constance Lake First Nation and the Indian Act. The Ontario Residential Tenancies Act, 2006 does not apply.')
+      + secH('Required Initials')
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;">The tenant must initial each required clause before the agreement can be generated. A step-by-step pop-out walks through each clause.</div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">'
+      +   '<div><div id="ls_initials_status" style="font-size:13px;font-weight:600;color:var(--text);">0 of 5 initials captured</div>'
+      +   '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Drug use, Section 3.3, Section 3.4 (x2), Jurisdiction</div></div>'
+      +   '<button type="button" id="ls_initials_btn" onclick="window._ticOpenInitialsPopout && window._ticOpenInitialsPopout(0)" class="btn btn-primary">Review &amp; Initial &#8594;</button>'
+      + '</div>'
 
       + secH('Signatures')
       + sigPad('ls_sig_tenant', 'Primary Tenant Signature')
@@ -1981,7 +2132,7 @@
       + '</div>';
 
     document.body.appendChild(modal);
-    var toInit = ['ls_init_drug','ls_init_3_3','ls_init_3_4a','ls_init_3_4b','ls_init_juris','ls_sig_tenant','ls_sig_staff'];
+    var toInit = ['ls_sig_tenant','ls_sig_staff'];
     if (coName) toInit.push('ls_sig_cotenant');
     setTimeout(function() {
       if (typeof _initSigPad === 'function') toInit.forEach(function(id){ _initSigPad(id); });
@@ -2105,11 +2256,11 @@
 
     // Initials / signatures (will be embedded as images or text)
     var initSigs = {
-      'init_drug_ack':    sig('ls_init_drug'),
-      'init_3_3':         sig('ls_init_3_3'),
-      'init_3_4a':        sig('ls_init_3_4a'),
-      'init_3_4b':        sig('ls_init_3_4b'),
-      'ack_jurisdiction': sig('ls_init_juris'),
+      'init_drug_ack':    (_leaseInitials['ls_init_drug']   || sig('ls_init_drug')),
+      'init_3_3':         (_leaseInitials['ls_init_3_3']    || sig('ls_init_3_3')),
+      'init_3_4a':        (_leaseInitials['ls_init_3_4a']   || sig('ls_init_3_4a')),
+      'init_3_4b':        (_leaseInitials['ls_init_3_4b']   || sig('ls_init_3_4b')),
+      'ack_jurisdiction': (_leaseInitials['ls_init_juris']  || sig('ls_init_juris')),
       'sig_landlord':     sig('ls_sig_staff'),
       'sig_tenant1':      sig('ls_sig_tenant'),
       'sig_tenant2':      sig('ls_sig_cotenant'),
@@ -2727,4 +2878,6 @@
   window._ticGenerateHydroOneConsentPdf = _ticGenerateHydroOneConsentPdf;
   window._ticOpenLeaseModal             = _ticOpenLeaseModal;
   window._ticGenerateLeasePdf           = _ticGenerateLeasePdf;
+  window._ticOpenInitialsPopout         = _ticOpenInitialsPopout;
+  window._ticInitialSaveAndNav          = _ticInitialSaveAndNav;
 })();
