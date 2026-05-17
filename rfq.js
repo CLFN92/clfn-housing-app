@@ -99,47 +99,94 @@ function showRfqList() {
 }
 
 function renderRfqList() {
-  var tbody = document.getElementById('rfqTableBody');
+  var tbody  = document.getElementById('rfqTableBody');
+  var thead  = document.getElementById('rfq_thead');
+  var countEl = document.getElementById('rfqTableCount');
   if (!tbody) return;
-  var cache = window._rfqCache || {};
-  var rows  = Object.values(cache).sort(function(a,b){ return (b.created_at||'').localeCompare(a.created_at||''); });
 
-  if (!rows.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No RFQs yet. Click "+ New RFQ" to get started.</td></tr>';
-    return;
+  var cache  = window._rfqCache || {};
+  var units  = (typeof housingUnits !== 'undefined' ? housingUnits : []);
+  var search = ((document.getElementById('rfqSearch')||{}).value || '').toLowerCase().trim();
+
+  // Enrich each row with resolved display values
+  var allRows = Object.values(cache).map(function(rfq) {
+    var unit     = units.find(function(u){ return u && u.id === rfq.sow_unit_id; }) || {};
+    var addr     = ((unit.num||'') + ' ' + (unit.street||'')).trim() || rfq.sow_unit_id || '';
+    var awardCt  = rfq.awarded_contractor_id
+      ? ((window._contractors||[]).find(function(c){ return c && c.id === rfq.awarded_contractor_id; }) || {}).name || rfq.awarded_contractor_id
+      : '';
+    return { rfq: rfq, addr: addr, awardCt: awardCt };
+  });
+
+  // Search filter
+  if (search) {
+    allRows = allRows.filter(function(r) {
+      var hay = [r.rfq.id, r.addr, r.rfq.sow_project_number, r.rfq.status, r.awardCt].filter(Boolean).join(' ').toLowerCase();
+      return hay.indexOf(search) !== -1;
+    });
   }
 
-  tbody.innerHTML = rows.map(function(rfq) {
-    var units = (typeof housingUnits !== 'undefined' ? housingUnits : []);
-    var unit  = units.find(function(u){ return u && u.id === rfq.sow_unit_id; }) || {};
-    var addr  = ((unit.num||'') + ' ' + (unit.street||'')).trim() || rfq.sow_unit_id;
-    var closing = rfq.closes_at ? new Date(rfq.closes_at).toLocaleDateString('en-CA') : '--';
-    var issued  = rfq.issued_at ? new Date(rfq.issued_at).toLocaleDateString('en-CA')  : '--';
-    var recipCount = (rfq.recipient_contractor_ids || []).length;
-    var awardedCt  = rfq.awarded_contractor_id
-      ? ((window._contractors||[]).find(function(c){ return c && c.id === rfq.awarded_contractor_id; }) || {}).name || rfq.awarded_contractor_id
-      : '--';
-    var awardAmt = rfq.award_amount ? '$' + Number(rfq.award_amount).toLocaleString('en-CA',{minimumFractionDigits:2}) : '--';
+  // Default sort: newest first
+  allRows.sort(function(a,b){ return (b.rfq.created_at||'').localeCompare(a.rfq.created_at||''); });
 
-    var statusClass = 'rfq-status-' + (rfq.status || 'draft');
-    var isEditable  = rfq.status === 'draft';
+  // ── Column sort + filter (standard shared-ui.js pattern) ────────────────
+  var _rfqColumns = {
+    id:      { label: 'RFQ #',      accessor: function(r){ return r.rfq.id || ''; } },
+    unit:    { label: 'Unit / SOW', accessor: function(r){ return r.addr; } },
+    status:  { label: 'Status',     accessor: function(r){ return r.rfq.status || 'draft'; } },
+    issued:  { label: 'Issued',     accessor: function(r){ return r.rfq.issued_at || ''; } },
+    closes:  { label: 'Closes',     accessor: function(r){ return r.rfq.closes_at || ''; } },
+    awarded: { label: 'Awarded To', accessor: function(r){ return r.awardCt; } },
+    amount:  { label: 'Award $',    accessor: function(r){ return Number(r.rfq.award_amount) || 0; } }
+  };
+  var _rfqAccessors = {};
+  Object.keys(_rfqColumns).forEach(function(k){ _rfqAccessors[k] = _rfqColumns[k].accessor; });
 
-    return '<tr style="cursor:pointer;" onclick="showRfqForm(\'' + escapeHtml(rfq.id) + '\',null,null)">'
-      + '<td class="js-txt-bold">' + escapeHtml(rfq.id) + '</td>'
-      + '<td>' + escapeHtml(addr) + '<br/><span class="txt-muted-xs">' + escapeHtml(rfq.sow_project_number||'') + '</span></td>'
-      + '<td><span class="rfq-status-pill ' + statusClass + '">' + (rfq.status||'draft') + '</span></td>'
-      + '<td>' + issued + '</td>'
-      + '<td>' + closing + '</td>'
-      + '<td style="text-align:center;">' + recipCount + '</td>'
-      + '<td>' + escapeHtml(awardedCt) + '</td>'
-      + '<td>' + awardAmt + '</td>'
-      + '<td style="white-space:nowrap;" onclick="event.stopPropagation();">'
-      +   (isEditable ? '<button class="btn btn-ghost btn-sm" onclick="showRfqForm(\'' + escapeHtml(rfq.id) + '\',null,null)">Edit</button> ' : '')
-      +   (rfq.status === 'issued' ? '<button class="btn btn-ghost btn-sm" onclick="showAwardModal(\'' + escapeHtml(rfq.id) + '\')">Award</button> ' : '')
-      +   (rfq.status !== 'cancelled' && rfq.status !== 'awarded' ? '<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="cancelRfq(\'' + escapeHtml(rfq.id) + '\')">Cancel</button>' : '')
-      + '</td>'
-      + '</tr>';
-  }).join('');
+  var _rfqState = (typeof tableStateGet === 'function') ? tableStateGet('rfq') : { sort:{key:'',dir:1}, filters:{} };
+
+  if (typeof tableRegisterColumns === 'function') {
+    tableRegisterColumns('rfq', { columns: _rfqColumns, getRows: function(){ return allRows; }, onChange: renderRfqList });
+  }
+
+  var sorted = (typeof tableApplyFilterSort === 'function')
+    ? tableApplyFilterSort(allRows, _rfqAccessors, _rfqState)
+    : allRows;
+
+  if (countEl) countEl.textContent = sorted.length + ' RFQ' + (sorted.length === 1 ? '' : 's');
+
+  // ── Render rows ──────────────────────────────────────────────────────────
+  if (!sorted.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No RFQs match. Click &ldquo;+ New RFQ&rdquo; to get started.</td></tr>';
+  } else {
+    tbody.innerHTML = sorted.map(function(r) {
+      var rfq        = r.rfq;
+      var closing    = rfq.closes_at ? new Date(rfq.closes_at).toLocaleDateString('en-CA') : '--';
+      var issued     = rfq.issued_at ? new Date(rfq.issued_at).toLocaleDateString('en-CA')  : '--';
+      var recipCount = (rfq.recipient_contractor_ids || []).length;
+      var awardAmt   = rfq.award_amount ? '$' + Number(rfq.award_amount).toLocaleString('en-CA',{minimumFractionDigits:2}) : '--';
+      var stCls      = 'rfq-status-' + (rfq.status || 'draft');
+      var isEdit     = rfq.status === 'draft';
+      return '<tr class="clickable" onclick="showRfqForm(\'' + escapeHtml(rfq.id) + '\',null,null)">'
+        + '<td class="js-txt-bold">' + escapeHtml(rfq.id) + '</td>'
+        + '<td>' + escapeHtml(r.addr) + '<br/><span class="txt-muted-xs">' + escapeHtml(rfq.sow_project_number||'') + '</span></td>'
+        + '<td><span class="rfq-status-pill ' + stCls + '">' + escapeHtml(rfq.status||'draft') + '</span></td>'
+        + '<td>' + issued + '</td>'
+        + '<td>' + closing + '</td>'
+        + '<td class="std-cell-center">' + recipCount + '</td>'
+        + '<td>' + escapeHtml(r.awardCt || '--') + '</td>'
+        + '<td>' + awardAmt + '</td>'
+        + '<td class="std-cell-tail" onclick="event.stopPropagation();">'
+        +   (isEdit ? '<button class="btn btn-ghost btn-sm" onclick="showRfqForm(\'' + escapeHtml(rfq.id) + '\',null,null)">Edit</button> ' : '')
+        +   (rfq.status === 'issued' ? '<button class="btn btn-ghost btn-sm" onclick="showAwardModal(\'' + escapeHtml(rfq.id) + '\')">Award</button> ' : '')
+        +   (rfq.status !== 'cancelled' && rfq.status !== 'awarded' ? '<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="cancelRfq(\'' + escapeHtml(rfq.id) + '\')">Cancel</button>' : '')
+        + '</td>'
+        + '</tr>';
+    }).join('');
+  }
+
+  // Wire column-menu sort indicators (standard pattern)
+  if (typeof tableBindColumnMenuClicks  === 'function' && thead) tableBindColumnMenuClicks(thead, 'rfq');
+  if (typeof tableRefreshSortIndicators === 'function' && thead) tableRefreshSortIndicators(thead, 'rfq');
 }
 
 // ── Form view ─────────────────────────────────────────────────────────────────
