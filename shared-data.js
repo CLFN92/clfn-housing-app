@@ -5876,14 +5876,22 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
     + '<div class="ybar"></div>'
     + '<div class="body">'
 
-    + '<div class="sec"><div class="sec-h">Project Details</div><div class="sec-b"><div class="mgrid">'
-    + '<div class="mf"><label>RFQ Number</label><span>' + escapeHtml(rfq.id) + '</span></div>'
-    + '<div class="mf"><label>Issue Date</label><span>' + today + '</span></div>'
-    + '<div class="mf"><label>Project Address</label><span>' + escapeHtml(addr) + '</span></div>'
-    + '<div class="mf"><label>SOW Reference</label><span>' + escapeHtml(rfq.sow_project_number || '--') + '</span></div>'
-    + '<div class="mf"><label>Bid Closing Date &amp; Time</label><span style="font-weight:bold;color:#b91c1c;">' + escapeHtml(closingDisplay) + '</span></div>'
-    + '<div class="mf"><label>CLFN Contact</label><span>' + escapeHtml(contact) + (contactEmail ? ' &lt;' + escapeHtml(contactEmail) + '&gt;' : '') + '</span></div>'
-    + '</div></div></div>'
+    + (function() {
+        var d = rfq.data || {};
+        var issueDate = d.issue_date || today;
+        var startDate = d.target_start_date ? new Date(d.target_start_date + 'T12:00:00').toLocaleDateString('en-CA', {year:'numeric',month:'long',day:'numeric'}) : '--';
+        var endDate   = d.target_completion_date ? new Date(d.target_completion_date + 'T12:00:00').toLocaleDateString('en-CA', {year:'numeric',month:'long',day:'numeric'}) : '--';
+        return '<div class="sec"><div class="sec-h">Project Details</div><div class="sec-b"><div class="mgrid">'
+          + '<div class="mf"><label>RFQ Number</label><span>' + escapeHtml(rfq.id) + '</span></div>'
+          + '<div class="mf"><label>Issue Date</label><span>' + escapeHtml(issueDate) + '</span></div>'
+          + '<div class="mf"><label>Project Address</label><span>' + escapeHtml(addr) + '</span></div>'
+          + '<div class="mf"><label>SOW Reference</label><span>' + escapeHtml(rfq.sow_project_number || '--') + '</span></div>'
+          + '<div class="mf"><label>Target Start Date</label><span>' + escapeHtml(startDate) + '</span></div>'
+          + '<div class="mf"><label>Target Completion Date</label><span>' + escapeHtml(endDate) + '</span></div>'
+          + '<div class="mf"><label>Bid Closing Date &amp; Time</label><span style="font-weight:bold;color:#b91c1c;">' + escapeHtml(closingDisplay) + '</span></div>'
+          + '<div class="mf"><label>CLFN Contact</label><span>' + escapeHtml(contact) + (contactEmail ? ' &lt;' + escapeHtml(contactEmail) + '&gt;' : '') + '</span></div>'
+          + '</div></div></div>';
+      })()
 
     + '<div class="sec"><div class="sec-h">Scope of Work</div>'
     + '<table><thead><tr><th style="width:28%">Category</th><th>Description of Work Required</th></tr></thead>'
@@ -5913,24 +5921,33 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
 
     + (function() {
         var d = rfq.data || {};
-        var sigData  = d.sig_data  || '';
-        var sigName  = d.sig_name  || '';
-        var sigTitle = d.sig_title || '';
-        var sigHtml  = '';
+        var sigData   = d.sig_data  || '';
+        var sigName   = d.sig_name  || '';
+        var sigTitle  = d.sig_title || '';
+        var issueDate = d.issue_date || today;
+        var sigHtml = '';
         if (sigData && sigData.indexOf('data:image/png;base64,') === 0) {
-          sigHtml = '<img src="' + sigData + '" style="max-height:50px;max-width:200px;display:block;margin-bottom:2px;" alt="signature"/>';
+          sigHtml = '<img src="' + sigData + '" style="max-height:52px;max-width:220px;display:block;margin-bottom:4px;" alt="signature"/>';
         } else if (sigData && sigData.indexOf('typed:') === 0) {
-          sigHtml = '<div style="font-family:Georgia,serif;font-style:italic;font-size:18px;color:#111;margin-bottom:2px;">' + escapeHtml(sigData.replace('typed:','')) + '</div>';
+          sigHtml = '<div style="font-family:Georgia,serif;font-style:italic;font-size:18px;color:#111;margin-bottom:4px;min-height:32px;">' + escapeHtml(sigData.replace('typed:','')) + '</div>';
         } else if (sigData && sigData.indexOf('wet:') === 0) {
-          sigHtml = '<div style="font-size:9px;color:#555;margin-bottom:2px;">' + escapeHtml(sigData.replace('wet:','pending') === 'pending' ? 'Wet signature on file' : 'E-sign ref: ' + sigData.replace('wet:','')) + '</div>';
+          var ref = sigData.replace('wet:','');
+          sigHtml = '<div style="font-size:9px;color:#555;margin-bottom:4px;min-height:32px;">' + escapeHtml(ref === 'pending' ? 'Wet signature on file' : 'E-sign ref: ' + ref) + '</div>';
+        } else {
+          sigHtml = '<div style="min-height:44px;border-bottom:1.5px solid #555;margin-bottom:4px;"></div>';
         }
-        return '<div class="sec"><div class="sec-h">Authorization</div><div class="sec-b">'
-          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;padding-top:8px;">'
-          + '<div><div style="font-size:9px;font-weight:bold;text-transform:uppercase;color:#888;margin-bottom:4px;">Issued by</div>'
-          + sigHtml
-          + '<div class="sig-line">' + (sigHtml ? '' : 'Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ') + 'Date: ____________</div>'
-          + '<div style="margin-top:6px;font-size:9px;color:#888;">Print name: ' + escapeHtml(sigName || '____________________________') + '</div>'
-          + '<div style="margin-top:2px;font-size:9px;color:#888;">Title: ' + escapeHtml(sigTitle || '____________________________') + '</div></div>';
+        return '<div class="sec" style="page-break-inside:avoid;">'
+          + '<div class="sec-h">Authorization</div>'
+          + '<div class="sec-b">'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;padding:10px 0 8px;">'
+          // Issued By column
+          + '<div>'
+          +   '<div style="font-size:8.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:8px;">Issued by</div>'
+          +   sigHtml
+          +   '<div style="font-size:9px;color:#444;margin-top:2px;"><strong>Date:</strong> ' + escapeHtml(issueDate) + '</div>'
+          +   '<div style="font-size:9px;color:#444;margin-top:4px;"><strong>Print name:</strong> ' + escapeHtml(sigName || '____________________________') + '</div>'
+          +   '<div style="font-size:9px;color:#444;margin-top:2px;"><strong>Title:</strong> ' + escapeHtml(sigTitle || '____________________________') + '</div>'
+          + '</div>';
       })()
     + '<div><div style="font-size:9px;font-weight:bold;text-transform:uppercase;color:#888;margin-bottom:4px;">On behalf of</div>'
     + '<div style="font-size:11px;font-weight:bold;margin-top:8px;">' + escapeHtml(natDisp) + '</div>'

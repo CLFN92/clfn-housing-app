@@ -256,6 +256,12 @@ async function _fetchAndPopulateSow(unitId, sowPn) {
     if (budgDisp) budgDisp.value = amtStr;
     if (subLbl)   subLbl.textContent = addr;
 
+    // Populate target dates from SOW
+    var tsEl2 = document.getElementById('rfq_target_start');
+    var teEl2 = document.getElementById('rfq_target_end');
+    if (tsEl2 && sow.startDate) tsEl2.value = sow.startDate;
+    if (teEl2 && sow.endDate)   teEl2.value = sow.endDate;
+
     // Update module-level state so scope tab and context are correct
     _rfqSowData   = sow;
     _rfqUnitData  = unit;
@@ -298,6 +304,8 @@ function showRfqForm(rfqId, unitId, sowPn, navCtx) {
     var newId = (typeof generateRfqNumber === 'function') ? generateRfqNumber() : ('RFQ-' + new Date().getFullYear() + '-0001');
     document.getElementById('rfq_number').value = newId;
     document.getElementById('rfq_status_display').value = 'draft';
+    // Default issue date = today
+    document.getElementById('rfq_issue_date').value = new Date().toISOString().slice(0,10);
     // Default closing: 14 days from now
     var closing = new Date(Date.now() + 14*24*60*60*1000);
     document.getElementById('rfq_closes_at').value = closing.toISOString().slice(0,16);
@@ -329,10 +337,16 @@ function _populateFormFields(rfq) {
   var notEl = document.getElementById('rfq_award_notes');
   var snmEl = document.getElementById('rfq_sig_name');
   var sttEl = document.getElementById('rfq_sig_title');
-  if (amtEl) amtEl.value = rfq.award_amount || '';
-  if (notEl) notEl.value = rfq.award_notes  || '';
-  if (snmEl) snmEl.value = d.sig_name       || '';
-  if (sttEl) sttEl.value = d.sig_title      || '';
+  var isoEl = document.getElementById('rfq_issue_date');
+  var tsEl  = document.getElementById('rfq_target_start');
+  var teEl  = document.getElementById('rfq_target_end');
+  if (amtEl) amtEl.value = rfq.award_amount          || '';
+  if (notEl) notEl.value = rfq.award_notes           || '';
+  if (snmEl) snmEl.value = d.sig_name                || '';
+  if (sttEl) sttEl.value = d.sig_title               || '';
+  if (isoEl) isoEl.value = d.issue_date              || new Date().toISOString().slice(0,10);
+  if (tsEl)  tsEl.value  = d.target_start_date       || '';
+  if (teEl)  teEl.value  = d.target_completion_date  || '';
   // Awarded-to dropdown populated after recipients are loaded
   setTimeout(function(){
     _renderAwardedToDropdown();
@@ -540,6 +554,9 @@ function _buildRfqPayload() {
       contact_person:    document.getElementById('rfq_contact').value.trim(),
       contact_email:     document.getElementById('rfq_contact_email').value.trim(),
       submission_method: document.getElementById('rfq_sub_method').value,
+      issue_date:        (document.getElementById('rfq_issue_date')     || {}).value || new Date().toISOString().slice(0,10),
+      target_start_date: (document.getElementById('rfq_target_start')   || {}).value || '',
+      target_completion_date: (document.getElementById('rfq_target_end') || {}).value || '',
       scope_snapshot:    snap,
       sig_name:          (document.getElementById('rfq_sig_name')  || {}).value || '',
       sig_title:         (document.getElementById('rfq_sig_title') || {}).value || '',
