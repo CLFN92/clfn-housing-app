@@ -1371,7 +1371,17 @@
         storageBucket: (typeof STORAGE_BUCKET !== 'undefined') ? STORAGE_BUCKET : 'housing-files',
         getAuthToken:  function(){
           return (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ','');
-        }
+        },
+        // Match the application document page categories exactly
+        categories: [
+          { key:'id',          label:'ID',              icon:'🧾' },
+          { key:'income',      label:'Income / Pay',    icon:'💰' },
+          { key:'reference',   label:'Reference',       icon:'📝' },
+          { key:'housing_hist',label:'Housing History', icon:'🏠' },
+          { key:'medical',     label:'Medical',         icon:'⚕️'  },
+          { key:'migrated',    label:'Migrated',        icon:'📂' },
+          { key:'other',       label:'Other',           icon:'📎' }
+        ]
       });
       _ticDocLibKey = key;
     } catch(err){
