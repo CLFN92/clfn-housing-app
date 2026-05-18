@@ -22,18 +22,6 @@
 var _sowUnitId  = null;
 var _sowItemIdx = 0;
 
-// ── RFQ navigation — global so the onclick attribute can reach it ────────────
-// Passes just the unit ID and project number to rfq.html which fetches the
-// full SOW data from Supabase. No cross-page data passing needed.
-function sowNavigateToRfq() {
-  var u = _sowUnitId;                                // module-scope, always current
-  var p = window._sowEditingProjectNumber || null;   // set in openSowModal
-  if (!u || !p) {
-    if (typeof showToast === 'function') showToast('Save the SOW before creating an RFQ');
-    return;
-  }
-  window.location.href = 'rfq.html?unit=' + encodeURIComponent(u) + '&sow=' + encodeURIComponent(p);
-}
 
 // ── SOW Photos & Documents widget ───────────────────────────────────────────
 // Files list is staged on window._sowFiles while the modal is open; saveSOW()
@@ -725,29 +713,6 @@ function _applySowModalLock(sow){
     );
     rfqBtn.style.display = _rfqShow ? 'flex' : 'none';
 
-    if (_rfqShow) {
-      // Wire onclick directly as a closure — captures _sowUnitId and project
-      // number NOW (module-scoped, always accurate) and reads amount + addr from
-      // the live DOM at click time. No external function dependency.
-      var _rfqUid = _sowUnitId;
-      var _rfqPn  = window._sowEditingProjectNumber || '';
-      rfqBtn.onclick = function() {
-        if (!_rfqUid || !_rfqPn) {
-          if (typeof showToast === 'function') showToast('Save the SOW first');
-          return;
-        }
-        var tcEl   = document.getElementById('sow_total_cost');
-        var amount = tcEl ? (parseFloat(tcEl.value) || 0) : 0;
-        var addrEl = document.getElementById('sow_address');
-        var addr   = addrEl ? addrEl.value.trim() : '';
-        try {
-          sessionStorage.setItem('rfq_nav_context', JSON.stringify({
-            unitId: _rfqUid, sow: _rfqPn, amount: amount, addr: addr
-          }));
-        } catch(e) { console.warn('[rfq] sessionStorage write failed:', e); }
-        window.location.href = 'rfq.html?new=1';
-      };
-    }
   }
 
   // Save button: hidden in read-only mode.

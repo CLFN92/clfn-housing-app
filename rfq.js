@@ -45,10 +45,10 @@ var _rfqAwardingId  = null;
   var sowPn  = params.get('sow');
 
   if (rfqId) {
-    showRfqForm(rfqId, null, null, null);
+    showRfqForm(rfqId, null, null);
   } else if (unitId && sowPn) {
     // New RFQ from SOW — show form immediately then fetch SOW data from Supabase
-    showRfqForm(null, unitId, sowPn, null);
+    showRfqForm(null, unitId, sowPn);
     _fetchAndPopulateSow(unitId, sowPn);
   } else {
     renderRfqList();
@@ -218,8 +218,6 @@ function renderRfqList() {
 }
 
 // ── Form view ─────────────────────────────────────────────────────────────────
-var _rfqNavCtx = null; // SOW navigation context (legacy, kept for compat)
-
 // Fetch the SOW record from Supabase and populate form fields.
 // Called after showRfqForm() so the form is already visible.
 async function _fetchAndPopulateSow(unitId, sowPn) {
@@ -276,8 +274,7 @@ async function _fetchAndPopulateSow(unitId, sowPn) {
   }
 }
 
-function showRfqForm(rfqId, unitId, sowPn, navCtx) {
-  _rfqNavCtx = navCtx || null;
+function showRfqForm(rfqId, unitId, sowPn) {
   document.getElementById('rfqListView').style.display  = 'none';
   document.getElementById('rfqFormView').style.display  = '';
   switchRfqTab('details');
@@ -375,14 +372,9 @@ function _loadRfqSowContext() {
   _rfqSowData = null; _rfqUnitData = null;
   if (!_rfqSowUnitId) return;
 
-  // _rfqNavCtx carries the data read directly from the open SOW modal DOM
-  // by openRfqFromSow() -- always authoritative when coming from a SOW.
-  var navAddr   = (_rfqNavCtx && _rfqNavCtx.addr)   || '';
-  var navAmount = (_rfqNavCtx && _rfqNavCtx.amount)  || 0;
-
   // Find unit from cache (may enrich the address)
   _rfqUnitData = (window.housingUnits || []).find(function(u){ return u && u.id === _rfqSowUnitId; }) || null;
-  var addr = navAddr
+  var addr = ''
     || (_rfqUnitData ? ((_rfqUnitData.num||'') + ' ' + (_rfqUnitData.street||'')).trim() : '')
     || _rfqSowUnitId;
 
@@ -399,7 +391,7 @@ function _loadRfqSowContext() {
   }
 
   // Amount: nav context is authoritative (direct from SOW modal DOM), cache is fallback
-  var raw = navAmount || (_rfqSowData
+  var raw = 0 || (_rfqSowData
     ? parseFloat(_rfqSowData.amount || _rfqSowData.totalCost || _rfqSowData.total_cost || 0)
     : 0);
   var amt = raw ? '$' + raw.toLocaleString('en-CA', {minimumFractionDigits:2}) : '--';
