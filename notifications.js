@@ -2203,8 +2203,26 @@ async function renderConfigPanel() {
   // Pipeline health — recent email_sent rows from the audit log.
   var health = await _renderPipelineHealth();
 
+  var currentThreshold = ((window._appSettings && window._appSettings.rfq_threshold) || 10000);
+
   body.innerHTML =
       '<div class="cfg-section">'
+    +   '<div class="cfg-section-title">RFQ Settings</div>'
+    +   '<div class="cfg-section-sub">Configure the Request for Quotes module. Changes take effect immediately.</div>'
+    +   '<div class="cfg-grid">'
+    +     '<div class="cfg-row">'
+    +       '<div class="cfg-label">RFQ Trigger Threshold ($)</div>'
+    +       '<div class="cfg-value" style="display:flex;align-items:center;gap:8px;">'
+    +         '<input type="number" id="cfg_rfq_threshold" value="' + _ntfEsc(String(currentThreshold)) + '" min="0" step="1000"'
+    +         ' style="width:120px;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;color:var(--text);font-family:DM Sans,sans-serif;background:var(--surface);text-align:right;"/>'
+    +         '<button type="button" class="btn btn-primary btn-sm" onclick="saveRfqThreshold()">Save</button>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div style="font-size:11px;color:var(--muted);margin-top:8px;padding:0 0 4px;">SOW totals at or above this amount will show the RFQ button on the Renovations pipeline. Housing Managers and the ED can override below-threshold SOWs.</div>'
+    + '</div>'
+
+    + '<div class="cfg-section">'
     +   '<div class="cfg-section-title">Email pipeline (Microsoft Graph)</div>'
     +   '<div class="cfg-section-sub">Reference only. Update the actual secrets via the Supabase Dashboard.</div>'
 
@@ -2255,6 +2273,27 @@ function _cfgCopyValue(btn) {
   } catch (e) {
     console.warn('[cfg] copy failed:', e);
   }
+}
+
+// Save the RFQ trigger threshold to housing_settings.
+function saveRfqThreshold() {
+  var role = window.currentRole || window._realRole;
+  if (role !== 'ed') { showToast('Only the Executive Director can change the RFQ threshold'); return; }
+  var inp = document.getElementById('cfg_rfq_threshold');
+  if (!inp) return;
+  var val = parseFloat(inp.value);
+  if (isNaN(val) || val < 0) { showToast('Enter a valid dollar amount'); inp.focus(); return; }
+  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
+    method:  'POST',
+    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+    body:    JSON.stringify({ key: 'rfq_threshold', value: val })
+  }).then(function(r) {
+    if (!r.ok) { showToast('Save failed — check connection'); return; }
+    if (!window._appSettings) window._appSettings = {};
+    window._appSettings.rfq_threshold = val;
+    if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'rfq_threshold_save', 'RFQ threshold set to $' + val.toLocaleString(), role);
+    showToast('RFQ threshold saved — $' + val.toLocaleString());
+  }).catch(function(e) { console.warn('[cfg] rfq threshold save failed:', e); showToast('Save failed'); });
 }
 
 // Pipeline health card — queries housing_audit_log for recent email_sent
