@@ -2425,10 +2425,9 @@ function confirmApprovalAction() {
   // Update scorecard display
   window._currentScorecardApp = applications[idx];
 
-  // TODO (notifications.js): wire the per-action workflow events
-  // (mgr_approved / hm_approved / ed_approved / declined / returned)
-  // into the new pipeline. Add entries to EMAIL_EVENT_REGISTRY and a
-  // notifyApplication<Action>() helper, then call it here based on `action`.
+  if (typeof notifyApplicationStatusChange === 'function') {
+    notifyApplicationStatusChange(applications[idx], action, notes);
+  }
 
   closeApprovalModal();
 

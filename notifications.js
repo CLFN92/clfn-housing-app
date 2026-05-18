@@ -175,6 +175,164 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>If you have any questions, please reply to this email or contact the {nationShort} Housing office.</p>'
               + '<p>Thank you,<br/>{nationShort} Housing</p>'
     }
+  },
+
+  // ── Application workflow status-change events ───────────────────────────
+  {
+    key:                   'application_mgr_recommended',
+    label:                 'Application Recommended by HM',
+    description:           'Sent when the Housing Manager recommends an application to the Executive Director for final approval.',
+    defaultRecipientRoles: ['ed', 'housing_manager'],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['applicantName','applicantId','score','tier','actionNotes','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — Application Recommended for Approval: {applicantName}',
+      bodyHtml: '<p>The Housing Manager has reviewed and recommended the following application for your final approval.</p>'
+              + '<p>Applicant: <strong>{applicantName}</strong> ({applicantId})<br/>'
+              +    'Score: <strong>{score}</strong> &middot; Tier: <strong>{tier}</strong></p>'
+              + '<p>{actionNotes}</p>'
+              + '<p>Please log in to the {nationShort} Housing app to grant final approval or return the file.</p>'
+              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+    }
+  },
+  {
+    key:                   'application_hm_approved',
+    label:                 'File Update Approved by HM',
+    description:           'Sent when the Housing Manager approves a file update (existing tenant).',
+    defaultRecipientRoles: ['housing_manager'],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['applicantName','applicantId','actionNotes','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — File Update Approved: {applicantName}',
+      bodyHtml: '<p>A file update has been reviewed and approved by the Housing Manager.</p>'
+              + '<p>Applicant: <strong>{applicantName}</strong> ({applicantId})</p>'
+              + '<p>{actionNotes}</p>'
+              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+    }
+  },
+  {
+    key:                   'application_ed_approved',
+    label:                 'Application Final Approval (ED)',
+    description:           'Sent when the Executive Director grants final approval.',
+    defaultRecipientRoles: ['housing_manager'],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['applicantName','applicantId','score','tier','actionNotes','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — Final Approval Granted: {applicantName}',
+      bodyHtml: '<p>The Executive Director has granted final approval for the following application.</p>'
+              + '<p>Applicant: <strong>{applicantName}</strong> ({applicantId})<br/>'
+              +    'Score: <strong>{score}</strong> &middot; Tier: <strong>{tier}</strong></p>'
+              + '<p>{actionNotes}</p>'
+              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+    }
+  },
+  {
+    key:                   'application_declined',
+    label:                 'Application Declined',
+    description:           'Sent when an application is declined by the Housing Manager or Executive Director.',
+    defaultRecipientRoles: ['housing_manager'],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['applicantName','applicantId','actionNotes','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — Application Declined: {applicantName}',
+      bodyHtml: '<p>The following application has been declined.</p>'
+              + '<p>Applicant: <strong>{applicantName}</strong> ({applicantId})</p>'
+              + '<p>{actionNotes}</p>'
+              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+    }
+  },
+  {
+    key:                   'application_returned',
+    label:                 'Application Returned for More Information',
+    description:           'Sent when an application is returned for more information by the Housing Manager or Executive Director.',
+    defaultRecipientRoles: ['housing_manager'],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['applicantName','applicantId','actionNotes','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — Application Returned: {applicantName}',
+      bodyHtml: '<p>The following application has been returned for more information.</p>'
+              + '<p>Applicant: <strong>{applicantName}</strong> ({applicantId})</p>'
+              + '<p>{actionNotes}</p>'
+              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+    }
+  },
+
+  // ── Contractor workflow status-change events ────────────────────────────
+  {
+    key:                   'contractor_hm_recommended',
+    label:                 'Contractor Recommended by HM',
+    description:           'Sent when the Housing Manager verifies and recommends a contractor to the Executive Director.',
+    defaultRecipientRoles: ['ed', 'housing_manager'],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['contractorName','contractorTrade','contractorClassification','actionNotes','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — Contractor Recommended for Approval: {contractorName}',
+      bodyHtml: '<p>The Housing Manager has verified and recommended the following contractor for your final approval.</p>'
+              + '<p>Contractor: <strong>{contractorName}</strong><br/>'
+              +    'Trade: <strong>{contractorTrade}</strong><br/>'
+              +    'Classification: <strong>{contractorClassification}</strong></p>'
+              + '<p>{actionNotes}</p>'
+              + '<p>Please log in to the {nationShort} Housing app to grant final approval or return the file.</p>'
+              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+    }
+  },
+  {
+    key:                   'contractor_approved',
+    label:                 'Contractor Approved by ED',
+    description:           'Sent when the Executive Director grants final approval to a contractor.',
+    defaultRecipientRoles: ['housing_manager'],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['contractorName','contractorTrade','contractorClassification','actionNotes','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — Contractor Approved: {contractorName}',
+      bodyHtml: '<p>The Executive Director has granted final approval for the following contractor.</p>'
+              + '<p>Contractor: <strong>{contractorName}</strong><br/>'
+              +    'Trade: <strong>{contractorTrade}</strong><br/>'
+              +    'Classification: <strong>{contractorClassification}</strong></p>'
+              + '<p>{actionNotes}</p>'
+              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+    }
+  },
+  {
+    key:                   'contractor_declined',
+    label:                 'Contractor Application Declined',
+    description:           'Sent when a contractor application is declined.',
+    defaultRecipientRoles: ['housing_manager'],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['contractorName','contractorTrade','actionNotes','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — Contractor Declined: {contractorName}',
+      bodyHtml: '<p>The following contractor application has been declined.</p>'
+              + '<p>Contractor: <strong>{contractorName}</strong><br/>'
+              +    'Trade: <strong>{contractorTrade}</strong></p>'
+              + '<p>{actionNotes}</p>'
+              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+    }
+  },
+  {
+    key:                   'contractor_returned',
+    label:                 'Contractor Application Returned',
+    description:           'Sent when a contractor application is returned for more information.',
+    defaultRecipientRoles: ['housing_manager'],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['contractorName','contractorTrade','actionNotes','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — Contractor Returned: {contractorName}',
+      bodyHtml: '<p>The following contractor application has been returned for more information.</p>'
+              + '<p>Contractor: <strong>{contractorName}</strong><br/>'
+              +    'Trade: <strong>{contractorTrade}</strong></p>'
+              + '<p>{actionNotes}</p>'
+              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+    }
   }
 ];
 
@@ -446,6 +604,119 @@ async function notifyContractorSubmitted(ct) {
     return;
   }
   var rendered = _renderEmailTemplate(eventKey, _emailTokensForContractor(ct));
+  if (!rendered) return;
+
+  await _sendSerially(recipients, function(rcp){
+    return {
+      to:          rcp.email,
+      to_name:     rcp.name || '',
+      subject:     rendered.subject,
+      bodyHtml:    rendered.bodyHtml,
+      event:       eventKey,
+      entity_type: 'contractor',
+      entity_id:   ct.id || '—'
+    };
+  }, eventKey);
+}
+
+// ── Application status-change notifications ────────────────────────────────
+// Maps the action string from confirmApprovalAction() to a registry key,
+// builds tokens, and fans out to configured recipients via _sendSerially.
+// Wired from housing-modals.js confirmApprovalAction() after save + audit.
+
+var _APP_ACTION_EVENT_KEY = {
+  mgr_approved: 'application_mgr_recommended',
+  hm_approved:  'application_hm_approved',
+  ed_approved:  'application_ed_approved',
+  declined:     'application_declined',
+  returned:     'application_returned'
+};
+
+var _APP_ACTION_LABEL = {
+  mgr_approved: 'Recommended to Executive Director',
+  hm_approved:  'File Update Approved',
+  ed_approved:  'Final Approval Granted',
+  declined:     'Declined',
+  returned:     'Returned for More Information'
+};
+
+function _emailTokensForAppAction(app, action, notes) {
+  var base = _emailTokensForApp(app);
+  base.actionLabel = _APP_ACTION_LABEL[action] || action;
+  base.actionNotes = (notes && notes.trim()) ? notes.trim() : '';
+  return base;
+}
+
+async function notifyApplicationStatusChange(app, action, notes) {
+  if (!app || !action) return;
+  var eventKey = _APP_ACTION_EVENT_KEY[action];
+  if (!eventKey) return;
+  var roles = _emailEventRecipientRoles(eventKey).concat(_emailEventCcRoles(eventKey));
+  if (!roles.length) {
+    console.warn('[notify] no recipient roles configured for ' + eventKey);
+    return;
+  }
+  var recipients = await _resolveActiveStaffForRoles(roles);
+  if (!recipients.length) {
+    console.warn('[notify] no active staff in roles ' + roles.join(',') + ' for ' + (app.id || 'app'));
+    return;
+  }
+  var rendered = _renderEmailTemplate(eventKey, _emailTokensForAppAction(app, action, notes));
+  if (!rendered) return;
+
+  await _sendSerially(recipients, function(rcp){
+    return {
+      to:          rcp.email,
+      to_name:     rcp.name || '',
+      subject:     rendered.subject,
+      bodyHtml:    rendered.bodyHtml,
+      event:       eventKey,
+      entity_type: 'application',
+      entity_id:   app.id || '—'
+    };
+  }, eventKey);
+}
+
+// ── Contractor workflow status-change notifications ─────────────────────────
+// Maps the action string from confirmCtAction() to a registry key and sends.
+// Wired from shared-data.js confirmCtAction() after save + audit.
+
+var _CT_ACTION_EVENT_KEY = {
+  hm_recommended: 'contractor_hm_recommended',
+  approved:       'contractor_approved',
+  declined:       'contractor_declined',
+  returned:       'contractor_returned'
+};
+
+var _CT_ACTION_LABEL = {
+  hm_recommended: 'HM Verified and Recommended to ED',
+  approved:       'ED Final Approval Granted',
+  declined:       'Declined',
+  returned:       'Returned for More Information'
+};
+
+function _emailTokensForContractorAction(ct, action, notes) {
+  var base = _emailTokensForContractor(ct);
+  base.actionLabel = _CT_ACTION_LABEL[action] || action;
+  base.actionNotes = (notes && notes.trim()) ? notes.trim() : '';
+  return base;
+}
+
+async function notifyContractorStatusChange(ct, action, notes) {
+  if (!ct || !action) return;
+  var eventKey = _CT_ACTION_EVENT_KEY[action];
+  if (!eventKey) return;
+  var roles = _emailEventRecipientRoles(eventKey).concat(_emailEventCcRoles(eventKey));
+  if (!roles.length) {
+    console.warn('[notify] no recipient roles configured for ' + eventKey);
+    return;
+  }
+  var recipients = await _resolveActiveStaffForRoles(roles);
+  if (!recipients.length) {
+    console.warn('[notify] no active staff in roles ' + roles.join(',') + ' for contractor ' + (ct.id || ct.name || 'unknown'));
+    return;
+  }
+  var rendered = _renderEmailTemplate(eventKey, _emailTokensForContractorAction(ct, action, notes));
   if (!rendered) return;
 
   await _sendSerially(recipients, function(rcp){

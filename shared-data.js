@@ -1903,10 +1903,9 @@ function confirmCtAction() {
     saveContractorWithDraftFallback(ct);
   }
 
-  // TODO (notifications.js): wire contractor-workflow events
-  // (hm_recommended / approved / declined / returned) into the new
-  // pipeline. Add an entry per event to EMAIL_EVENT_REGISTRY and a
-  // notifyContractor<Event>() helper, then call it here.
+  if (typeof notifyContractorStatusChange === 'function') {
+    notifyContractorStatusChange(ct, action, notes);
+  }
 
   var toastLabels = {hm_recommended:'Recommended to ED',approved:'Contractor approved',declined:'Application declined',returned:'Returned for more info'};
   showToast(toastLabels[action]||action);
