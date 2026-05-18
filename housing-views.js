@@ -699,6 +699,7 @@ var _scoresSortKey='score', _scoresSortDir=-1;
 // Initialised once when the user navigates to the Documents step.
 // Re-uses the same DocLibrary factory as the scorecard panel.
 var _step6DocLib = null;
+var _step6DocLibAppId = null; // tracks which app the current lib was built for
 
 function showTenantsForRole() {
   var role = window.currentRole || 'housing_employee_l1';

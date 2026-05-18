@@ -177,7 +177,8 @@ function newApp(){
   // Reset editing state
   currentAppId = null;
   window._appFormReturnTo = null;
-  _step6DocLib = null; // reset so DocLibrary re-mounts for new app ID
+  _step6DocLib = null;       // reset so DocLibrary re-mounts for new app ID
+  _step6DocLibAppId = null;  // companion tracker — must be cleared together
   // Hide Internal Notes tab — re-appears after the first auto-save.
   if (typeof _refreshAppNotesTabVisibility === 'function') _refreshAppNotesTabVisibility();
   var _noteTa = document.getElementById('appNoteBody');     if(_noteTa) _noteTa.value = '';

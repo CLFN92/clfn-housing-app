@@ -580,8 +580,6 @@ function ueRemoveTenant() {
 function _initStep6DocLib() {
   var mount = document.getElementById('step6_doclib_mount');
   if (!mount || !window.DocLibrary) return;
-  // Already mounted for this app — just refresh
-  if (_step6DocLib) { _step6DocLib.refresh(); return; }
   // currentAppId is set by saveApplicationRecord() in goTo() before this runs
   var appId = window.currentAppId || currentAppId;
   if (!appId && typeof generateAppId === 'function') {
@@ -590,6 +588,14 @@ function _initStep6DocLib() {
     window.currentAppId = appId;
   }
   if (!appId) { console.warn('[DocLib] step6: no appId available'); return; }
+  // Reuse the existing DocLib only when it was built for THIS specific app.
+  // If the user opened a different app (editing an existing application), the
+  // old lib still points to the previous app's storage path — reusing it would
+  // silently upload files into the wrong application's folder.
+  if (_step6DocLib && _step6DocLibAppId === appId) { _step6DocLib.refresh(); return; }
+  // Different app or first mount — clear any stale DOM and recreate.
+  mount.innerHTML = '';
+  _step6DocLibAppId = appId;
   _step6DocLib = window.DocLibrary.create(mount, {
     entityType:    'application',
     entityId:      appId,
