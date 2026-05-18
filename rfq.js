@@ -318,32 +318,82 @@ function showRfqForm(rfqId, unitId, sowPn) {
   _loadRfqSowContext();
   updateRecipientBadge();
   _renderAwardedToDropdown();
-  setTimeout(function(){ if (typeof _initSigPad === 'function') _initSigPad('rfq_sig'); }, 80);
+  setTimeout(function(){
+    if (typeof _initSigPad === 'function') {
+      _initSigPad('rfq_sig');
+      _initSigPad('rfq_ct_sig');
+      _initSigPad('rfq_ct_initial');
+      _initSigPad('rfq_witness_sig');
+    }
+  }, 80);
 }
 
 function _populateFormFields(rfq) {
   var d = rfq.data || {};
-  document.getElementById('rfq_number').value          = rfq.id;
-  document.getElementById('rfq_status_display').value  = rfq.status || 'draft';
-  document.getElementById('rfq_closes_at').value       = rfq.closes_at ? rfq.closes_at.slice(0,16) : '';
-  document.getElementById('rfq_contact').value         = d.contact_person || '';
-  document.getElementById('rfq_contact_email').value   = d.contact_email  || '';
-  document.getElementById('rfq_sub_method').value      = d.submission_method || 'email';
-  // Award fields
-  var amtEl = document.getElementById('rfq_award_amount');
-  var notEl = document.getElementById('rfq_award_notes');
-  var snmEl = document.getElementById('rfq_sig_name');
-  var sttEl = document.getElementById('rfq_sig_title');
-  var isoEl = document.getElementById('rfq_issue_date');
-  var tsEl  = document.getElementById('rfq_target_start');
-  var teEl  = document.getElementById('rfq_target_end');
-  if (amtEl) amtEl.value = rfq.award_amount          || '';
-  if (notEl) notEl.value = rfq.award_notes           || '';
-  if (snmEl) snmEl.value = d.sig_name                || '';
-  if (sttEl) sttEl.value = d.sig_title               || '';
-  if (isoEl) isoEl.value = d.issue_date              || new Date().toISOString().slice(0,10);
-  if (tsEl)  tsEl.value  = d.target_start_date       || '';
-  if (teEl)  teEl.value  = d.target_completion_date  || '';
+  function set(id, val) { var el = document.getElementById(id); if (el) el.value = val || ''; }
+
+  set('rfq_number',         rfq.id);
+  set('rfq_status_display', rfq.status || 'draft');
+  set('rfq_closes_at',      rfq.closes_at ? rfq.closes_at.slice(0,16) : '');
+  set('rfq_contact',        d.contact_person || '');
+  set('rfq_contact_email',  d.contact_email  || '');
+  set('rfq_sub_method',     d.submission_method || 'email');
+  set('rfq_issue_date',     d.issue_date || new Date().toISOString().slice(0,10));
+  set('rfq_target_start',   d.target_start_date || '');
+  set('rfq_target_end',     d.target_completion_date || '');
+
+  // Award
+  set('rfq_award_amount', rfq.award_amount || '');
+  set('rfq_award_notes',  rfq.award_notes  || '');
+
+  // Contract Details
+  set('rfq_contract_number',       d.contract_number || '');
+  set('rfq_contract_date',         d.contract_date   || '');
+  set('rfq_contract_start',        d.contract_start  || d.target_start_date || '');
+  set('rfq_substantial_completion',d.substantial_completion_date || '');
+  set('rfq_total_completion',      d.total_completion_date || d.target_completion_date || '');
+  set('rfq_ap_email',              d.ap_email              || '');
+  set('rfq_site_lead_name',        d.site_lead_name        || '');
+  set('rfq_site_lead_phone',       d.site_lead_phone       || '');
+  set('rfq_ct_signatory_name',     d.ct_signatory_name     || '');
+  set('rfq_ct_signatory_title',    d.ct_signatory_title    || '');
+
+  // Scope detail
+  set('rfq_sow_summary',     d.sow_summary     || '');
+  set('rfq_sow_detail',      d.sow_detail      || '');
+  set('rfq_materials_specs', d.materials_specs || '');
+  set('rfq_exclusions',      d.exclusions      || '');
+  set('rfq_clfn_supplied',   d.clfn_supplied   || '');
+
+  // Price breakdown
+  set('rfq_price_materials', d.price_materials || '');
+  set('rfq_price_labour',    d.price_labour    || '');
+  set('rfq_price_equipment', d.price_equipment || '');
+  set('rfq_price_other',     d.price_other     || '');
+  set('rfq_price_tax',       d.price_tax       || '');
+  set('rfq_labour_hours',    d.labour_hours    || '');
+
+  // Milestones
+  var ms = d.milestones || [{},{},{},{}];
+  for (var mi = 1; mi <= 4; mi++) {
+    var m = ms[mi-1] || {};
+    set('rfq_m'+mi+'_name',    m.name    || '');
+    set('rfq_m'+mi+'_pct',     m.pct     || '');
+    set('rfq_m'+mi+'_gross',   m.gross   || '');
+    set('rfq_m'+mi+'_holdback',m.holdback|| '');
+    set('rfq_m'+mi+'_net',     m.net     || '');
+  }
+  set('rfq_holdback_release', d.holdback_release || '');
+
+  // Signatures
+  set('rfq_sig_name',  d.sig_name  || '');
+  set('rfq_sig_title', d.sig_title || '');
+  set('rfq_ct_sig_date',    d.ct_sig_date    || '');
+  set('rfq_witness_name',   d.witness_name   || '');
+  set('rfq_witness_date',   d.witness_date   || '');
+
+  _rfqRecalcPrices();
+
   // Awarded-to dropdown populated after recipients are loaded
   setTimeout(function(){
     _renderAwardedToDropdown();
@@ -531,28 +581,75 @@ function updateRecipientBadge() {
 function _buildRfqPayload() {
   var id   = document.getElementById('rfq_number').value.trim();
   var snap = _rfqScopeItems.filter(function(it){ return !it._hidden && (it.category || it.description); });
+  function fv(elId) { var el = document.getElementById(elId); return el ? el.value.trim() : ''; }
+  function fn(elId) { return parseFloat(fv(elId)) || null; }
+
+  var milestones = [];
+  for (var mi = 1; mi <= 4; mi++) {
+    milestones.push({
+      name:     fv('rfq_m'+mi+'_name'),
+      pct:      fv('rfq_m'+mi+'_pct'),
+      gross:    fv('rfq_m'+mi+'_gross'),
+      holdback: fv('rfq_m'+mi+'_holdback'),
+      net:      fv('rfq_m'+mi+'_net')
+    });
+  }
+
   return {
     id:                      id,
     sow_unit_id:             _rfqSowUnitId || '',
     sow_project_number:      _rfqSowPn || '',
     status:                  _rfqCurrentId ? ((window._rfqCache||{})[_rfqCurrentId] || {}).status || 'draft' : 'draft',
-    closes_at:               document.getElementById('rfq_closes_at').value || null,
+    closes_at:               fv('rfq_closes_at') || null,
     recipient_contractor_ids: Object.keys(_rfqSelectedCts),
-    // Award fields (top-level columns in housing_rfq)
-    awarded_contractor_id: (document.getElementById('rfq_awarded_to')   || {}).value || null,
-    award_amount:          parseFloat((document.getElementById('rfq_award_amount') || {}).value) || null,
-    award_notes:           (document.getElementById('rfq_award_notes')  || {}).value.trim() || null,
+    awarded_contractor_id:   fv('rfq_awarded_to')   || null,
+    award_amount:            fn('rfq_award_amount'),
+    award_notes:             fv('rfq_award_notes')   || null,
     data: {
-      contact_person:    document.getElementById('rfq_contact').value.trim(),
-      contact_email:     document.getElementById('rfq_contact_email').value.trim(),
-      submission_method: document.getElementById('rfq_sub_method').value,
-      issue_date:        (document.getElementById('rfq_issue_date')     || {}).value || new Date().toISOString().slice(0,10),
-      target_start_date: (document.getElementById('rfq_target_start')   || {}).value || '',
-      target_completion_date: (document.getElementById('rfq_target_end') || {}).value || '',
-      scope_snapshot:    snap,
-      sig_name:          (document.getElementById('rfq_sig_name')  || {}).value || '',
-      sig_title:         (document.getElementById('rfq_sig_title') || {}).value || '',
-      sig_data:          (typeof getSigDataURL === 'function') ? getSigDataURL('rfq_sig') : ''
+      contact_person:         fv('rfq_contact'),
+      contact_email:          fv('rfq_contact_email'),
+      submission_method:      fv('rfq_sub_method'),
+      issue_date:             fv('rfq_issue_date') || new Date().toISOString().slice(0,10),
+      target_start_date:      fv('rfq_target_start'),
+      target_completion_date: fv('rfq_target_end'),
+      scope_snapshot:         snap,
+      sig_name:               fv('rfq_sig_name'),
+      sig_title:              fv('rfq_sig_title'),
+      sig_data:               (typeof getSigDataURL === 'function') ? getSigDataURL('rfq_sig') : '',
+      // Contract details
+      contract_number:              fv('rfq_contract_number'),
+      contract_date:                fv('rfq_contract_date'),
+      contract_start:               fv('rfq_contract_start'),
+      substantial_completion_date:  fv('rfq_substantial_completion'),
+      total_completion_date:        fv('rfq_total_completion'),
+      ap_email:                     fv('rfq_ap_email'),
+      site_lead_name:               fv('rfq_site_lead_name'),
+      site_lead_phone:              fv('rfq_site_lead_phone'),
+      ct_signatory_name:            fv('rfq_ct_signatory_name'),
+      ct_signatory_title:           fv('rfq_ct_signatory_title'),
+      // Scope detail
+      sow_summary:     fv('rfq_sow_summary'),
+      sow_detail:      fv('rfq_sow_detail'),
+      materials_specs: fv('rfq_materials_specs'),
+      exclusions:      fv('rfq_exclusions'),
+      clfn_supplied:   fv('rfq_clfn_supplied'),
+      // Price breakdown
+      price_materials: fv('rfq_price_materials'),
+      price_labour:    fv('rfq_price_labour'),
+      price_equipment: fv('rfq_price_equipment'),
+      price_other:     fv('rfq_price_other'),
+      price_tax:       fv('rfq_price_tax'),
+      labour_hours:    fv('rfq_labour_hours'),
+      // Milestones
+      milestones:        milestones,
+      holdback_release:  fv('rfq_holdback_release'),
+      // Contractor & witness signatures
+      ct_sig_data:    (typeof getSigDataURL === 'function') ? getSigDataURL('rfq_ct_sig')      : '',
+      ct_sig_date:    fv('rfq_ct_sig_date'),
+      ct_initial_data:(typeof getSigDataURL === 'function') ? getSigDataURL('rfq_ct_initial')  : '',
+      witness_sig_data:(typeof getSigDataURL==='function')  ? getSigDataURL('rfq_witness_sig') : '',
+      witness_name:   fv('rfq_witness_name'),
+      witness_date:   fv('rfq_witness_date')
     },
     created_by: (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || '',
     updated_at: new Date().toISOString()
@@ -692,4 +789,376 @@ async function confirmAward() {
     var ok = await awardRfq(_rfqAwardingId, ctId, amount, notes);
     if (ok) renderRfqList();
   }
+}
+
+// ── Auto-fill contractor details when awarded-to changes ──────────────────
+function _rfqAutoFillContractor() {
+  var sel = document.getElementById('rfq_awarded_to');
+  if (!sel || !sel.value) return;
+  var ct = (window._contractors || []).find(function(c){ return c && c.id === sel.value; });
+  if (!ct) return;
+  function setIfBlank(id, val) {
+    var el = document.getElementById(id);
+    if (el && !el.value.trim() && val) el.value = val;
+  }
+  // Pre-fill contractor signatory + site lead from contractor record if blank
+  setIfBlank('rfq_ct_signatory_name',  ct.sigCt && ct.sigCt.name  ? ct.sigCt.name  : ct.name  || '');
+  setIfBlank('rfq_ct_signatory_title', ct.sigCt && ct.sigCt.title ? ct.sigCt.title : '');
+}
+
+// ── Price auto-calculation ────────────────────────────────────────────────
+function _rfqRecalcPrices() {
+  function fnum(id) { return parseFloat((document.getElementById(id) || {}).value) || 0; }
+  function setRO(id, val) {
+    var el = document.getElementById(id);
+    if (el) el.value = val ? '$' + val.toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
+  }
+  var mat  = fnum('rfq_price_materials');
+  var lab  = fnum('rfq_price_labour');
+  var eqp  = fnum('rfq_price_equipment');
+  var oth  = fnum('rfq_price_other');
+  var tax  = fnum('rfq_price_tax');
+  var sub  = mat + lab + eqp + oth;
+  var tot  = sub + tax;
+  setRO('rfq_price_subtotal',      sub);
+  setRO('rfq_price_total_incl_tax',tot);
+}
+
+// ── Milestone net auto-calculation ────────────────────────────────────────
+function _rfqCalcMilestone(n) {
+  var gross    = parseFloat((document.getElementById('rfq_m'+n+'_gross')    || {}).value) || 0;
+  var holdback = parseFloat((document.getElementById('rfq_m'+n+'_holdback') || {}).value) || 0;
+  var net      = gross - holdback;
+  var netEl    = document.getElementById('rfq_m'+n+'_net');
+  if (netEl) netEl.value = net > 0 ? '$' + net.toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
+}
+
+// ── Generate Contractor Agreement PDF ────────────────────────────────────
+// Two-path approach identical to _ticGenerateLeasePdf():
+//   1. jsPDF text rendering when a custom body is saved in Settings → Contracts
+//   2. pdf-lib AcroForm fill of templates/contractor-agreement.pdf otherwise
+// Reuses _loadJsPdf, _makePdfDoc, _parseHtmlToBlocks, _renderBlocksToPdf,
+// _substitutePlaceholders (all from notifications.js), and _loadPdfLib.
+async function generateContractorContract() {
+  if (typeof showToast === 'function') showToast('Saving and generating contract PDF…');
+
+  // Save first so the payload is current
+  await saveRfqDraft();
+
+  var rfqId = _rfqCurrentId || document.getElementById('rfq_number').value.trim();
+  var rfq   = (window._rfqCache || {})[rfqId] || {};
+  var d     = rfq.data || {};
+
+  function fv(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+  // Resolve awarded contractor
+  var ctId = fv('rfq_awarded_to') || rfq.awarded_contractor_id;
+  var ct   = (window._contractors || []).find(function(c){ return c && c.id === ctId; }) || {};
+
+  // Resolve unit address
+  var unit = (window.housingUnits || []).find(function(u){ return u && u.id === _rfqSowUnitId; }) || {};
+  var addr = (unit.num || '') + ' ' + (unit.street || '');
+  addr = addr.trim() || _rfqSowUnitId || '';
+
+  // Price totals
+  function numFmt(v) { return v ? '$' + Number(v).toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : ''; }
+  var pMat  = parseFloat(d.price_materials || 0);
+  var pLab  = parseFloat(d.price_labour    || 0);
+  var pEqp  = parseFloat(d.price_equipment || 0);
+  var pOth  = parseFloat(d.price_other     || 0);
+  var pTax  = parseFloat(d.price_tax       || 0);
+  var pSub  = pMat + pLab + pEqp + pOth;
+  var pTot  = pSub + pTax;
+
+  var tokens = {
+    rfqNumber:               rfqId,
+    contractNumber:          d.contract_number          || '',
+    contractDate:            d.contract_date            || '',
+    propertyAddress:         addr,
+    projectType:             (_rfqSowData && (_rfqSowData.condition || _rfqSowData.type)) || '',
+    sowReference:            _rfqSowPn || rfq.sow_project_number || '',
+    quoteNumber:             rfqId,
+    startDate:               d.contract_start           || d.target_start_date       || '',
+    substantialCompletionDate: d.substantial_completion_date || '',
+    totalCompletionDate:     d.total_completion_date    || d.target_completion_date  || '',
+    contractorLegalName:     ct.name    || '',
+    contractorOperatingName: ct.name    || '',
+    contractorAddressLine1:  ct.address || '',
+    contractorAddressLine2:  '',
+    contractorGstHst:        ct.hst     || '',
+    contractorWsib:          ct.wsibNum || '',
+    contractorPhone:         ct.phone   || '',
+    contractorSignatoryName: d.ct_signatory_name  || (ct.sigCt && ct.sigCt.name)  || ct.name || '',
+    contractorSignatoryTitle:d.ct_signatory_title || (ct.sigCt && ct.sigCt.title) || '',
+    contractorSignatoryEmail:ct.email   || '',
+    contractorSiteLead:      d.site_lead_name  || '',
+    contractorSiteLeadPhone: d.site_lead_phone || '',
+    contractPrice:           numFmt(rfq.award_amount),
+    contractPriceExclTax:    d.contract_price_excl_tax ? numFmt(d.contract_price_excl_tax) : numFmt(pSub),
+    apEmail:                 d.ap_email || '',
+    nationName:              (window.NATION_CONFIG && NATION_CONFIG.display_name) || 'Housing Authority',
+    nationShort:             (window.NATION_CONFIG && NATION_CONFIG.short) || '',
+    clfnSignatoryName:       d.sig_name  || '',
+    clfnSignatoryTitle:      d.sig_title || '',
+    sowSummary:              d.sow_summary     || '',
+    sowDetailTable:          d.sow_detail      || '',
+    materialsSpecifications: d.materials_specs || '',
+    exclusionsAssumptions:   d.exclusions      || '',
+    clfnSuppliedItems:       d.clfn_supplied   || '',
+    priceMaterials:          numFmt(pMat),
+    priceLabour:             numFmt(pLab),
+    priceEquipment:          numFmt(pEqp),
+    priceOther:              numFmt(pOth),
+    priceSubtotal:           numFmt(pSub),
+    priceTax:                numFmt(pTax),
+    priceTotalInclTax:       numFmt(pTot),
+    labourHours:             d.labour_hours    || '',
+    holdbackRelease:         numFmt(d.holdback_release)
+  };
+
+  var filename = (tokens.nationShort || 'Housing') + '_Contract_' + rfqId + '.pdf';
+
+  // ── jsPDF path ─────────────────────────────────────────────────────────
+  var savedBody = (typeof getContractBody === 'function') ? getContractBody('contractor_agreement') : '';
+  if (savedBody && savedBody.trim()) {
+    try {
+      if (typeof _loadJsPdf === 'function') await _loadJsPdf();
+      var ctx = _makePdfDoc();
+      var pdf = ctx.pdf;
+
+      var substituted = (typeof _substitutePlaceholders === 'function')
+        ? _substitutePlaceholders(savedBody, tokens) : savedBody;
+      if (typeof _parseHtmlToBlocks === 'function' && typeof _renderBlocksToPdf === 'function') {
+        _renderBlocksToPdf(ctx, _parseHtmlToBlocks(substituted));
+      }
+
+      // Signatures section
+      ctx.needSpace(50); ctx.gap(8);
+      ctx.sectionHeader('Signatures');
+
+      function _addSigBlock(label, sigId, nameVal) {
+        ctx.needSpace(24);
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(60);
+        pdf.text(label, ctx.marginL, ctx.y + 3); ctx.y += 6;
+        var sigData = (typeof getSigDataURL === 'function') ? getSigDataURL(sigId) : '';
+        if (sigData && sigData.indexOf('data:image/png;base64,') === 0) {
+          try { pdf.addImage(sigData, 'PNG', ctx.marginL, ctx.y, 50, 12); } catch(e) {}
+          ctx.y += 14;
+        } else if (sigData && sigData.indexOf('typed:') === 0) {
+          pdf.setFont('helvetica', 'italic'); pdf.setFontSize(14); pdf.setTextColor(20);
+          pdf.text(sigData.replace('typed:',''), ctx.marginL, ctx.y + 4); ctx.y += 8;
+        } else if (sigData && sigData.indexOf('wet:') === 0) {
+          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(80);
+          var ref = sigData.replace('wet:','');
+          pdf.text(ref === 'pending' ? 'Wet signature on file' : 'E-sign: '+ref, ctx.marginL, ctx.y + 4); ctx.y += 8;
+        } else {
+          pdf.setDrawColor(160); pdf.setLineWidth(0.4);
+          pdf.line(ctx.marginL, ctx.y + 8, ctx.marginL + 70, ctx.y + 8); ctx.y += 11;
+        }
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(80);
+        if (nameVal) { pdf.text(nameVal, ctx.marginL, ctx.y + 3); ctx.y += 5; }
+        pdf.setTextColor(0);
+        ctx.y += 3;
+      }
+
+      _addSigBlock('Owner Representative', 'rfq_sig',         tokens.clfnSignatoryName + (tokens.clfnSignatoryTitle ? ', ' + tokens.clfnSignatoryTitle : ''));
+      _addSigBlock('Contractor',           'rfq_ct_sig',       tokens.contractorSignatoryName + (tokens.contractorSignatoryTitle ? ', ' + tokens.contractorSignatoryTitle : ''));
+      _addSigBlock('Witness',              'rfq_witness_sig',  fv('rfq_witness_name'));
+
+      var base64 = ctx.finish();
+      var binStr = atob(base64);
+      var arr = new Uint8Array(binStr.length);
+      for (var bi = 0; bi < binStr.length; bi++) arr[bi] = binStr.charCodeAt(bi);
+      _rfqDownloadAndStore(new Blob([arr], {type:'application/pdf'}), filename, rfq);
+      return;
+    } catch(e) {
+      console.error('[contract] jsPDF generation failed:', e);
+      if (typeof showToast === 'function') showToast('PDF generation failed — see console'); return;
+    }
+  }
+
+  // ── AcroForm fallback ─────────────────────────────────────────────────
+  if (typeof _loadPdfLib !== 'function') {
+    showToast('PDF library not available'); return;
+  }
+  try {
+    await _loadPdfLib();
+  } catch(e) {
+    showToast('PDF library unavailable'); return;
+  }
+
+  var ms = d.milestones || [{},{},{},{}];
+
+  var fieldValues = {
+    contractor_legal_name:          tokens.contractorLegalName,
+    contractor_operating_name:      tokens.contractorOperatingName,
+    contractor_address_line1:       tokens.contractorAddressLine1,
+    contractor_address_line2:       tokens.contractorAddressLine2,
+    contractor_gst_hst_number:      tokens.contractorGstHst,
+    contractor_wsib_number:         tokens.contractorWsib,
+    contractor_signatory_name:      tokens.contractorSignatoryName,
+    contractor_signatory_title:     tokens.contractorSignatoryTitle,
+    contractor_phone:               tokens.contractorPhone,
+    contractor_signatory_email:     tokens.contractorSignatoryEmail,
+    property_address:               tokens.propertyAddress,
+    project_type:                   tokens.projectType,
+    sow_reference:                  tokens.sowReference,
+    quote_number:                   tokens.quoteNumber,
+    contract_number:                tokens.contractNumber,
+    contract_date:                  tokens.contractDate,
+    start_date:                     tokens.startDate,
+    substantial_completion_date:    tokens.substantialCompletionDate,
+    total_completion_date:          tokens.totalCompletionDate,
+    contractor_site_lead_name:      tokens.contractorSiteLead,
+    contractor_site_lead_phone:     tokens.contractorSiteLeadPhone,
+    contract_price_excl_tax:        tokens.contractPriceExclTax,
+    ap_email:                       tokens.apEmail,
+    sow_summary:                    tokens.sowSummary,
+    sow_detail_table:               tokens.sowDetailTable,
+    materials_specifications:       tokens.materialsSpecifications,
+    price_materials_total:          numFmt(pMat),
+    price_labour_total:             numFmt(pLab),
+    price_equipment_total:          numFmt(pEqp),
+    price_other_total:              numFmt(pOth),
+    price_subtotal_excl_tax:        numFmt(pSub),
+    price_tax_total:                numFmt(pTax),
+    price_contract_price_incl_tax:  numFmt(pTot),
+    labour_hours_total:             d.labour_hours || '',
+    exclusions_assumptions:         tokens.exclusionsAssumptions,
+    clfn_supplied_items:            tokens.clfnSuppliedItems,
+    holdback_release_amount:        numFmt(d.holdback_release),
+    sig_clfn_signatory_name:        tokens.clfnSignatoryName,
+    sig_clfn_signatory_title:       tokens.clfnSignatoryTitle,
+    sig_clfn_signature_date:        d.contract_date || new Date().toISOString().slice(0,10),
+    sig_contractor_signatory_name:  tokens.contractorSignatoryName,
+    sig_contractor_signatory_title: tokens.contractorSignatoryTitle,
+    sig_contractor_signature_date:  d.ct_sig_date || '',
+    sig_witness_name:               d.witness_name || '',
+    sig_witness_date:               d.witness_date || '',
+    sched_property_address:         tokens.propertyAddress,
+    sched_project_type:             tokens.projectType,
+    sched_sow_reference:            tokens.sowReference,
+    sched_quote_number:             tokens.quoteNumber
+  };
+
+  // Milestones
+  for (var mi = 1; mi <= 4; mi++) {
+    var m = ms[mi-1] || {};
+    fieldValues['m'+mi+'_name']    = m.name     || '';
+    fieldValues['m'+mi+'_pct']     = m.pct      || '';
+    fieldValues['m'+mi+'_gross']   = m.gross    ? numFmt(m.gross)    : '';
+    fieldValues['m'+mi+'_holdback']= m.holdback ? numFmt(m.holdback) : '';
+    fieldValues['m'+mi+'_net']     = m.net      || '';
+  }
+
+  var sigFields = {
+    sig_clfn_signature:               (typeof getSigDataURL === 'function') ? getSigDataURL('rfq_sig')          : '',
+    sig_contractor_signature:         (typeof getSigDataURL === 'function') ? getSigDataURL('rfq_ct_sig')       : '',
+    sig_witness_signature:            (typeof getSigDataURL === 'function') ? getSigDataURL('rfq_witness_sig')  : '',
+    contractor_acknowledgement_initial:(typeof getSigDataURL === 'function') ? getSigDataURL('rfq_ct_initial')  : ''
+  };
+
+  try {
+    var pdfUrl   = window.location.origin + '/templates/contractor-agreement.pdf';
+    var resp     = await fetch(pdfUrl);
+    if (!resp.ok) throw new Error('Could not fetch contract template: ' + resp.status + '. Copy CLFN_Renovations_Contract_Fillable_v3.pdf to templates/contractor-agreement.pdf');
+    var pdfBytes = await resp.arrayBuffer();
+
+    var PDFLib  = window.PDFLib;
+    var pdfDoc  = await PDFLib.PDFDocument.load(pdfBytes);
+    var form    = pdfDoc.getForm();
+    var pages   = pdfDoc.getPages();
+    var stdFont = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+
+    // Build field-position map
+    var fieldPos = {};
+    var allFields = form.getFields();
+    for (var ffi = 0; ffi < allFields.length; ffi++) {
+      try {
+        var ff  = allFields[ffi];
+        var fw  = ff.acroField.getWidgets();
+        if (!fw.length) continue;
+        var fwR = fw[0].getRectangle();
+        var fwP = fw[0].P();
+        var fpIdx = -1;
+        for (var fpi = 0; fpi < pages.length; fpi++) {
+          if (pages[fpi].ref.objectNumber === fwP.objectNumber) { fpIdx = fpi; break; }
+        }
+        if (fpIdx >= 0) fieldPos[ff.getName()] = { pageIdx: fpIdx, rect: fwR };
+      } catch(e) {}
+    }
+
+    // Draw text values
+    Object.keys(fieldValues).forEach(function(name) {
+      var val = fieldValues[name];
+      if (val == null || val === '') return;
+      var pos = fieldPos[name];
+      if (!pos) return;
+      try {
+        var sz = Math.min(9, pos.rect.height * 0.72);
+        pages[pos.pageIdx].drawText(String(val), {
+          x: pos.rect.x + 2, y: pos.rect.y + pos.rect.height * 0.18,
+          size: sz, font: stdFont, color: PDFLib.rgb(0,0,0), maxWidth: pos.rect.width - 4
+        });
+      } catch(e) { console.warn('[contract] text draw failed for', name, e); }
+    });
+
+    // Embed signatures and initials
+    var sigEntries = Object.keys(sigFields);
+    for (var si = 0; si < sigEntries.length; si++) {
+      var fieldName = sigEntries[si];
+      var sigData   = sigFields[fieldName];
+      if (!sigData) continue;
+      try {
+        var targetField = null;
+        for (var fi = 0; fi < allFields.length; fi++) {
+          if (allFields[fi].getName() === fieldName) { targetField = allFields[fi]; break; }
+        }
+        if (!targetField) continue;
+        var widgets = targetField.acroField.getWidgets();
+        if (!widgets.length) continue;
+        var widget  = widgets[0];
+        var rect    = widget.getRectangle();
+        var pageRef = widget.P();
+        var pageIdx = -1;
+        for (var pi = 0; pi < pages.length; pi++) {
+          if (pages[pi].ref.objectNumber === pageRef.objectNumber) { pageIdx = pi; break; }
+        }
+        if (pageIdx < 0) continue;
+        if (sigData.indexOf('data:image/png;base64,') === 0) {
+          var b64    = sigData.split(',')[1];
+          var raw    = atob(b64);
+          var pngArr = new Uint8Array(raw.length);
+          for (var bi = 0; bi < raw.length; bi++) pngArr[bi] = raw.charCodeAt(bi);
+          var pngImg = await pdfDoc.embedPng(pngArr);
+          pages[pageIdx].drawImage(pngImg, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+          try { targetField.setText(''); } catch(e2) {}
+        } else if (sigData.indexOf('typed:') === 0) {
+          try { targetField.setText(sigData.replace('typed:','')); } catch(e2) {}
+        } else if (sigData.indexOf('wet:') === 0) {
+          var ref = sigData.replace('wet:','');
+          try { targetField.setText(ref === 'pending' ? 'Wet signature on file' : 'E-sign: '+ref); } catch(e2) {}
+        }
+      } catch(e) { console.warn('[contract] sig embed failed for', fieldName, e); }
+    }
+
+    // Flatten
+    pages.forEach(function(page) { try { page.node.delete(PDFLib.PDFName.of('Annots')); } catch(e) {} });
+    try { pdfDoc.catalog.delete(PDFLib.PDFName.of('AcroForm')); } catch(e) {}
+
+    var filledBytes = await pdfDoc.save();
+    _rfqDownloadAndStore(new Blob([filledBytes], {type:'application/pdf'}), filename, rfq);
+
+  } catch(e) {
+    console.error('[contract] AcroForm generation failed:', e);
+    if (typeof showToast === 'function') showToast('Contract PDF failed — ' + e.message);
+  }
+}
+
+function _rfqDownloadAndStore(blob, filename, rfq) {
+  var url  = URL.createObjectURL(blob);
+  var link = document.createElement('a');
+  link.href = url; link.download = filename; link.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+  if (typeof showToast === 'function') showToast('Contract PDF downloaded');
 }

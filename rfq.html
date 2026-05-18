@@ -122,25 +122,25 @@
         </div>
       </div>
 
-      <!-- Award section — lives on the Scope tab -->
+      <!-- Award — lives on the Scope tab -->
       <div class="card card-flush" style="margin-top:16px;">
         <div class="modal-hdr">
           <div>
             <div class="lbl-yellow">Award</div>
-            <div class="txt-sm-meta">Record the winning contractor and amount once bids are received.</div>
+            <div class="txt-sm-meta">Record the winning contractor and amount, then complete the contract details below to generate the Contractor Agreement PDF.</div>
           </div>
         </div>
         <div class="sec-pad">
           <div class="tic-grid-2">
             <div class="f">
               <label>Awarded To</label>
-              <select id="rfq_awarded_to" class="stg-lookup-input">
+              <select id="rfq_awarded_to" class="stg-lookup-input" onchange="_rfqAutoFillContractor()">
                 <option value="">-- Select contractor --</option>
               </select>
             </div>
             <div class="f">
               <label>Award Amount ($)</label>
-              <input type="number" id="rfq_award_amount" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01"/>
+              <input type="number" id="rfq_award_amount" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqRecalcPrices()"/>
             </div>
             <div class="f" style="grid-column:1/-1;">
               <label>Award Notes</label>
@@ -150,19 +150,128 @@
         </div>
       </div>
 
-      <!-- Authorized Signature — lives on the Scope tab -->
+      <!-- Contract Details -->
       <div class="card card-flush" style="margin-top:16px;">
-        <div class="modal-hdr"><div class="lbl-yellow">Authorized Signature</div></div>
+        <div class="modal-hdr"><div class="lbl-yellow">Contract Details</div></div>
+        <div class="sec-pad">
+          <div class="tic-grid-2">
+            <div class="f"><label>Contract Number</label><input type="text" id="rfq_contract_number" class="stg-lookup-input" placeholder="e.g. CON-2026-001"/></div>
+            <div class="f"><label>Contract Date</label><input type="date" id="rfq_contract_date" class="stg-lookup-input"/></div>
+            <div class="f"><label>Start Date</label><input type="date" id="rfq_contract_start" class="stg-lookup-input"/></div>
+            <div class="f"><label>Substantial Completion Date</label><input type="date" id="rfq_substantial_completion" class="stg-lookup-input"/></div>
+            <div class="f"><label>Total Completion Date</label><input type="date" id="rfq_total_completion" class="stg-lookup-input"/></div>
+            <div class="f"><label>AP / Invoices Email</label><input type="email" id="rfq_ap_email" class="stg-lookup-input" placeholder="ap@nation.ca"/></div>
+            <div class="f"><label>Contractor Site Lead</label><input type="text" id="rfq_site_lead_name" class="stg-lookup-input" placeholder="On-site supervisor name"/></div>
+            <div class="f"><label>Site Lead Phone</label><input type="tel" id="rfq_site_lead_phone" class="stg-lookup-input" placeholder="(705) 000-0000"/></div>
+            <div class="f"><label>Contractor Signatory Name</label><input type="text" id="rfq_ct_signatory_name" class="stg-lookup-input" placeholder="Person signing for contractor"/></div>
+            <div class="f"><label>Contractor Signatory Title</label><input type="text" id="rfq_ct_signatory_title" class="stg-lookup-input" placeholder="e.g. Owner, Project Manager"/></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scope Detail -->
+      <div class="card card-flush" style="margin-top:16px;">
+        <div class="modal-hdr"><div class="lbl-yellow">Scope Detail</div></div>
+        <div class="sec-pad">
+          <div class="f" style="margin-bottom:12px;">
+            <label>Scope Summary <span style="font-size:10px;color:var(--muted);">(brief paragraph for the contract body)</span></label>
+            <textarea id="rfq_sow_summary" class="stg-lookup-input" rows="3" placeholder="Brief description of the scope of work…"></textarea>
+          </div>
+          <div class="f" style="margin-bottom:12px;">
+            <label>Detailed Work Packages <span style="font-size:10px;color:var(--muted);">(from bid — line items, quantities, specs)</span></label>
+            <textarea id="rfq_sow_detail" class="stg-lookup-input" rows="5" placeholder="Work package details from the accepted quote…"></textarea>
+          </div>
+          <div class="f" style="margin-bottom:12px;">
+            <label>Materials &amp; Specifications</label>
+            <textarea id="rfq_materials_specs" class="stg-lookup-input" rows="3" placeholder="Material grades, product standards, finishes…"></textarea>
+          </div>
+          <div class="f" style="margin-bottom:12px;">
+            <label>Exclusions &amp; Assumptions</label>
+            <textarea id="rfq_exclusions" class="stg-lookup-input" rows="3" placeholder="What is NOT included, site assumptions…"></textarea>
+          </div>
+          <div class="f">
+            <label>Items Supplied by Nation</label>
+            <textarea id="rfq_clfn_supplied" class="stg-lookup-input" rows="2" placeholder='Items provided by CLFN Housing (or "None")…'></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Price Breakdown -->
+      <div class="card card-flush" style="margin-top:16px;">
+        <div class="modal-hdr"><div class="lbl-yellow">Price Breakdown</div></div>
+        <div class="sec-pad">
+          <div class="tic-grid-2">
+            <div class="f"><label>Materials Total ($)</label><input type="number" id="rfq_price_materials" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqRecalcPrices()"/></div>
+            <div class="f"><label>Labour Total ($)</label><input type="number" id="rfq_price_labour" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqRecalcPrices()"/></div>
+            <div class="f"><label>Equipment Total ($)</label><input type="number" id="rfq_price_equipment" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqRecalcPrices()"/></div>
+            <div class="f"><label>Other Total ($)</label><input type="number" id="rfq_price_other" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqRecalcPrices()"/></div>
+            <div class="f"><label>Subtotal (excl. tax)</label><input type="text" id="rfq_price_subtotal" class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></div>
+            <div class="f"><label>Tax Total ($)</label><input type="number" id="rfq_price_tax" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqRecalcPrices()"/></div>
+            <div class="f"><label>Contract Price (incl. tax)</label><input type="text" id="rfq_price_total_incl_tax" class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></div>
+            <div class="f"><label>Labour Hours (total)</label><input type="number" id="rfq_labour_hours" class="stg-lookup-input" placeholder="0" min="0" step="1"/></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Milestone Payments -->
+      <div class="card card-flush" style="margin-top:16px;">
+        <div class="modal-hdr"><div class="lbl-yellow">Milestone Payments</div></div>
+        <div class="sec-pad">
+          <div style="overflow-x:auto;">
+            <table class="std-table" style="min-width:600px;">
+              <thead><tr>
+                <th style="width:28%;">Milestone</th>
+                <th style="width:10%;">%</th>
+                <th style="width:18%;">Gross ($)</th>
+                <th style="width:18%;">Holdback ($)</th>
+                <th style="width:18%;">Net ($)</th>
+              </tr></thead>
+              <tbody id="rfq_milestone_tbody">
+                <tr>
+                  <td><input type="text"   id="rfq_m1_name"     class="stg-lookup-input" placeholder="e.g. Mobilization"/></td>
+                  <td><input type="number" id="rfq_m1_pct"      class="stg-lookup-input" placeholder="%" min="0" max="100" step="0.1" oninput="_rfqCalcMilestone(1)"/></td>
+                  <td><input type="number" id="rfq_m1_gross"    class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(1)"/></td>
+                  <td><input type="number" id="rfq_m1_holdback" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(1)"/></td>
+                  <td><input type="text"   id="rfq_m1_net"      class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></td>
+                </tr>
+                <tr>
+                  <td><input type="text"   id="rfq_m2_name"     class="stg-lookup-input" placeholder="e.g. 50% complete"/></td>
+                  <td><input type="number" id="rfq_m2_pct"      class="stg-lookup-input" placeholder="%" min="0" max="100" step="0.1" oninput="_rfqCalcMilestone(2)"/></td>
+                  <td><input type="number" id="rfq_m2_gross"    class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(2)"/></td>
+                  <td><input type="number" id="rfq_m2_holdback" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(2)"/></td>
+                  <td><input type="text"   id="rfq_m2_net"      class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></td>
+                </tr>
+                <tr>
+                  <td><input type="text"   id="rfq_m3_name"     class="stg-lookup-input" placeholder="e.g. Substantial completion"/></td>
+                  <td><input type="number" id="rfq_m3_pct"      class="stg-lookup-input" placeholder="%" min="0" max="100" step="0.1" oninput="_rfqCalcMilestone(3)"/></td>
+                  <td><input type="number" id="rfq_m3_gross"    class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(3)"/></td>
+                  <td><input type="number" id="rfq_m3_holdback" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(3)"/></td>
+                  <td><input type="text"   id="rfq_m3_net"      class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></td>
+                </tr>
+                <tr>
+                  <td><input type="text"   id="rfq_m4_name"     class="stg-lookup-input" placeholder="e.g. Final / holdback release"/></td>
+                  <td><input type="number" id="rfq_m4_pct"      class="stg-lookup-input" placeholder="%" min="0" max="100" step="0.1" oninput="_rfqCalcMilestone(4)"/></td>
+                  <td><input type="number" id="rfq_m4_gross"    class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(4)"/></td>
+                  <td><input type="number" id="rfq_m4_holdback" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(4)"/></td>
+                  <td><input type="text"   id="rfq_m4_net"      class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="f" style="margin-top:12px;max-width:260px;">
+            <label>Holdback Release Amount ($)</label>
+            <input type="number" id="rfq_holdback_release" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- CLFN Authorized Signature -->
+      <div class="card card-flush" style="margin-top:16px;">
+        <div class="modal-hdr"><div class="lbl-yellow">Nation Authorized Signature</div></div>
         <div class="sec-pad">
           <div class="tic-grid-2" style="margin-bottom:14px;">
-            <div class="f">
-              <label>Signatory Name</label>
-              <input type="text" id="rfq_sig_name" class="stg-lookup-input" placeholder="Print full name"/>
-            </div>
-            <div class="f">
-              <label>Title</label>
-              <input type="text" id="rfq_sig_title" class="stg-lookup-input" placeholder="e.g. Housing Manager"/>
-            </div>
+            <div class="f"><label>Signatory Name</label><input type="text" id="rfq_sig_name" class="stg-lookup-input" placeholder="Print full name"/></div>
+            <div class="f"><label>Title</label><input type="text" id="rfq_sig_title" class="stg-lookup-input" placeholder="e.g. Housing Manager"/></div>
           </div>
           <div class="sig-canvas-wrap">
             <div class="tab-bar">
@@ -182,8 +291,90 @@
               <div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div>
             </div>
             <div id="rfq_sig_panel_wet" class="sec-hidden">
-              <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Print this form and collect a wet signature, or use an e-signature service and attach the signed copy.</div>
+              <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Print this form and collect a wet signature, or use an e-signature service.</div>
               <input type="text" id="rfq_sig_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contractor Signature -->
+      <div class="card card-flush" style="margin-top:16px;">
+        <div class="modal-hdr"><div class="lbl-yellow">Contractor Signature</div></div>
+        <div class="sec-pad">
+          <div class="f" style="margin-bottom:14px;max-width:260px;">
+            <label>Signature Date</label>
+            <input type="date" id="rfq_ct_sig_date" class="stg-lookup-input"/>
+          </div>
+          <div class="sig-canvas-wrap">
+            <div class="tab-bar">
+              <button type="button" onclick="setSigMethod('rfq_ct_sig','canvas')" id="rfq_ct_sig_tab_canvas" class="tab-item active">&#9999;&#65039; Draw</button>
+              <button type="button" onclick="setSigMethod('rfq_ct_sig','type')"   id="rfq_ct_sig_tab_type"   class="tab-item">&#9000;&#65039; Type</button>
+              <button type="button" onclick="setSigMethod('rfq_ct_sig','wet')"    id="rfq_ct_sig_tab_wet"    class="tab-item">&#128396; Wet / E-Sign</button>
+            </div>
+            <div id="rfq_ct_sig_panel_canvas" class="bg-paper">
+              <canvas id="rfq_ct_sig" width="700" height="100" style="width:100%;height:100px;display:block;touch-action:none;cursor:crosshair;"></canvas>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);">
+                <span class="txt-xs-muted">Sign with finger or mouse</span>
+                <button type="button" onclick="clearSig('rfq_ct_sig')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button>
+              </div>
+            </div>
+            <div id="rfq_ct_sig_panel_type" class="sec-hidden">
+              <input type="text" id="rfq_ct_sig_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;"/>
+            </div>
+            <div id="rfq_ct_sig_panel_wet" class="sec-hidden">
+              <input type="text" id="rfq_ct_sig_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>
+            </div>
+          </div>
+          <div style="margin-top:14px;">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Contractor Acknowledgement Initial</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">The contractor must initial to acknowledge they have read and agree to the terms of this agreement.</div>
+            <div class="sig-canvas-wrap" style="max-width:360px;">
+              <div class="tab-bar">
+                <button type="button" onclick="setSigMethod('rfq_ct_initial','canvas')" id="rfq_ct_initial_tab_canvas" class="tab-item active">&#9999;&#65039; Draw</button>
+                <button type="button" onclick="setSigMethod('rfq_ct_initial','type')"   id="rfq_ct_initial_tab_type"   class="tab-item">&#9000;&#65039; Type</button>
+              </div>
+              <div id="rfq_ct_initial_panel_canvas" class="bg-paper">
+                <canvas id="rfq_ct_initial" width="300" height="60" style="width:100%;height:60px;display:block;touch-action:none;cursor:crosshair;"></canvas>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:3px 10px;border-top:1px solid var(--border);">
+                  <span class="txt-xs-muted">Initial here</span>
+                  <button type="button" onclick="clearSig('rfq_ct_initial')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button>
+                </div>
+              </div>
+              <div id="rfq_ct_initial_panel_type" class="sec-hidden">
+                <input type="text" id="rfq_ct_initial_typed" placeholder="Type initials" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:22px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;"/>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Witness Signature -->
+      <div class="card card-flush" style="margin-top:16px;">
+        <div class="modal-hdr"><div class="lbl-yellow">Witness</div></div>
+        <div class="sec-pad">
+          <div class="tic-grid-2" style="margin-bottom:14px;">
+            <div class="f"><label>Witness Name</label><input type="text" id="rfq_witness_name" class="stg-lookup-input" placeholder="Print full name"/></div>
+            <div class="f"><label>Witness Date</label><input type="date" id="rfq_witness_date" class="stg-lookup-input"/></div>
+          </div>
+          <div class="sig-canvas-wrap">
+            <div class="tab-bar">
+              <button type="button" onclick="setSigMethod('rfq_witness_sig','canvas')" id="rfq_witness_sig_tab_canvas" class="tab-item active">&#9999;&#65039; Draw</button>
+              <button type="button" onclick="setSigMethod('rfq_witness_sig','type')"   id="rfq_witness_sig_tab_type"   class="tab-item">&#9000;&#65039; Type</button>
+              <button type="button" onclick="setSigMethod('rfq_witness_sig','wet')"    id="rfq_witness_sig_tab_wet"    class="tab-item">&#128396; Wet / E-Sign</button>
+            </div>
+            <div id="rfq_witness_sig_panel_canvas" class="bg-paper">
+              <canvas id="rfq_witness_sig" width="700" height="100" style="width:100%;height:100px;display:block;touch-action:none;cursor:crosshair;"></canvas>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);">
+                <span class="txt-xs-muted">Sign with finger or mouse</span>
+                <button type="button" onclick="clearSig('rfq_witness_sig')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button>
+              </div>
+            </div>
+            <div id="rfq_witness_sig_panel_type" class="sec-hidden">
+              <input type="text" id="rfq_witness_sig_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;"/>
+            </div>
+            <div id="rfq_witness_sig_panel_wet" class="sec-hidden">
+              <input type="text" id="rfq_witness_sig_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>
             </div>
           </div>
         </div>
@@ -213,6 +404,7 @@
     <div class="rfq-footer-actions">
       <button type="button" class="btn btn-ghost" onclick="saveRfqDraft()">Save Draft</button>
       <button type="button" class="btn btn-ghost" onclick="previewRfqPdf()">&#128202; Preview RFQ PDF</button>
+      <button type="button" class="btn btn-ghost" onclick="generateContractorContract()">&#128196; Generate Contract</button>
       <button type="button" class="btn btn-primary" id="rfqIssueBtn" onclick="issueRfq()">Issue RFQ &#8594;</button>
     </div>
   </div>

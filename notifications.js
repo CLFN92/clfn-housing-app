@@ -2996,6 +2996,60 @@ var CONTRACTS_DOCS_REGISTRY = [
       + '<p>{tenantName}</p>'
       + '<h3>Co-Tenant Signature</h3>'
       + '<p>{coTenantName}</p>'
+  },
+  {
+    key:         'contractor_agreement',
+    label:       'Contractor Agreement',
+    description: 'Renovation/construction contract issued to the awarded contractor. Supports {token} substitution for project-specific data.',
+    defaultBody:
+        '<h2>{nationName} Housing Program</h2>'
+      + '<h1>Contractor Agreement</h1>'
+      + '<p>Contract Number: <strong>{contractNumber}</strong> &nbsp;&nbsp; Date: <strong>{contractDate}</strong></p>'
+      + '<h3>Parties</h3>'
+      + '<p><strong>Owner:</strong> {nationName} (hereinafter "the Owner" or "the Nation")</p>'
+      + '<p><strong>Contractor:</strong> {contractorLegalName} (hereinafter "the Contractor")<br/>'
+      +    'Operating as: {contractorOperatingName}<br/>'
+      +    'Address: {contractorAddressLine1} {contractorAddressLine2}<br/>'
+      +    'Phone: {contractorPhone} &nbsp; HST/Business #: {contractorGstHst} &nbsp; WSIB #: {contractorWsib}</p>'
+      + '<h3>1. Project</h3>'
+      + '<p>Property: <strong>{propertyAddress}</strong><br/>'
+      +    'Project type: {projectType}<br/>'
+      +    'SOW reference: {sowReference} &nbsp; Quote #: {quoteNumber}</p>'
+      + '<h3>2. Scope of Work</h3>'
+      + '<p>{sowSummary}</p>'
+      + '<p>{sowDetailTable}</p>'
+      + '<h3>3. Materials &amp; Specifications</h3>'
+      + '<p>{materialsSpecifications}</p>'
+      + '<h3>4. Schedule</h3>'
+      + '<p>Start date: <strong>{startDate}</strong><br/>'
+      +    'Substantial completion: <strong>{substantialCompletionDate}</strong><br/>'
+      +    'Total completion: <strong>{totalCompletionDate}</strong></p>'
+      + '<p>On-site lead: {contractorSiteLead} — {contractorSiteLeadPhone}</p>'
+      + '<h3>5. Contract Price</h3>'
+      + '<p>Total contract price (excl. tax): <strong>{contractPriceExclTax}</strong><br/>'
+      +    'Total contract price (incl. tax): <strong>{priceTotalInclTax}</strong></p>'
+      + '<p>Materials: {priceMaterials} &nbsp; Labour: {priceLabour} &nbsp; Equipment: {priceEquipment} &nbsp; Other: {priceOther}<br/>'
+      +    'Subtotal (excl. tax): {priceSubtotal} &nbsp; Tax: {priceTax}<br/>'
+      +    'Labour hours: {labourHours}</p>'
+      + '<h3>6. Exclusions &amp; Assumptions</h3>'
+      + '<p>{exclusionsAssumptions}</p>'
+      + '<h3>7. Items Supplied by Nation</h3>'
+      + '<p>{clfnSuppliedItems}</p>'
+      + '<h3>8. Payment Terms</h3>'
+      + '<p>Invoices must reference this contract number and property address. Accounts payable: {apEmail}. A statutory holdback of 10% is retained until substantial completion and release of lien period. Holdback release amount: {holdbackRelease}.</p>'
+      + '<h3>9. Contractor Obligations</h3>'
+      + '<ol>'
+      + '<li>Perform all work in a good and workmanlike manner in compliance with applicable building codes and the {nationName} Housing Policy.</li>'
+      + '<li>Maintain current WSIB clearance and general liability insurance throughout the project.</li>'
+      + '<li>Not subcontract any portion of the work without prior written consent of the Owner.</li>'
+      + '<li>Comply with all applicable federal, provincial, and {nationName} community by-laws while on reserve.</li>'
+      + '<li>Correct all deficiencies identified during inspection at no additional cost to the Owner.</li>'
+      + '</ol>'
+      + '<h3>10. Jurisdiction</h3>'
+      + '<p>This Agreement is governed by the inherent jurisdiction of {nationName} and applicable federal law.</p>'
+      + '<h3>Signatures</h3>'
+      + '<p>Owner Representative: {clfnSignatoryName}, {clfnSignatoryTitle} — {nationName}</p>'
+      + '<p>Contractor Representative: {contractorSignatoryName}, {contractorSignatoryTitle}</p>'
   }
 ];
 
@@ -3031,7 +3085,49 @@ var _CONTRACT_TOKENS = [
   { token: 'occupant3Relationship',  desc: 'Occupant 3 relationship' },
   { token: 'occupant4Relationship',  desc: 'Occupant 4 relationship' },
   { token: 'occupant5Relationship',  desc: 'Occupant 5 relationship' },
-  { token: 'occupant6Relationship',  desc: 'Occupant 6 relationship' }
+  { token: 'occupant6Relationship',  desc: 'Occupant 6 relationship' },
+  // Contractor agreement tokens
+  { token: 'rfqNumber',                desc: 'RFQ number' },
+  { token: 'contractNumber',           desc: 'Contract number' },
+  { token: 'contractDate',             desc: 'Contract date' },
+  { token: 'propertyAddress',          desc: 'Project property address' },
+  { token: 'projectType',              desc: 'Project type / condition' },
+  { token: 'sowReference',             desc: 'SOW project number' },
+  { token: 'quoteNumber',              desc: 'Quote / RFQ number' },
+  { token: 'startDate',                desc: 'Work start date' },
+  { token: 'substantialCompletionDate',desc: 'Substantial completion date' },
+  { token: 'totalCompletionDate',      desc: 'Total completion date' },
+  { token: 'contractorLegalName',      desc: 'Contractor legal name' },
+  { token: 'contractorOperatingName',  desc: 'Contractor operating name' },
+  { token: 'contractorAddressLine1',   desc: 'Contractor address line 1' },
+  { token: 'contractorAddressLine2',   desc: 'Contractor address line 2' },
+  { token: 'contractorGstHst',         desc: 'Contractor GST/HST number' },
+  { token: 'contractorWsib',           desc: 'Contractor WSIB number' },
+  { token: 'contractorPhone',          desc: 'Contractor phone' },
+  { token: 'contractorSignatoryName',  desc: 'Contractor signatory name' },
+  { token: 'contractorSignatoryTitle', desc: 'Contractor signatory title' },
+  { token: 'contractorSignatoryEmail', desc: 'Contractor signatory email' },
+  { token: 'contractorSiteLead',       desc: 'Site lead name' },
+  { token: 'contractorSiteLeadPhone',  desc: 'Site lead phone' },
+  { token: 'contractPrice',            desc: 'Award / contract price (formatted)' },
+  { token: 'contractPriceExclTax',     desc: 'Contract price excluding tax' },
+  { token: 'apEmail',                  desc: 'Accounts payable email' },
+  { token: 'clfnSignatoryName',        desc: 'CLFN signatory name' },
+  { token: 'clfnSignatoryTitle',       desc: 'CLFN signatory title' },
+  { token: 'sowSummary',               desc: 'Scope of work summary' },
+  { token: 'sowDetailTable',           desc: 'Detailed work packages' },
+  { token: 'materialsSpecifications',  desc: 'Materials and specifications' },
+  { token: 'exclusionsAssumptions',    desc: 'Exclusions and assumptions' },
+  { token: 'clfnSuppliedItems',        desc: 'Items supplied by Nation' },
+  { token: 'priceMaterials',           desc: 'Materials total' },
+  { token: 'priceLabour',              desc: 'Labour total' },
+  { token: 'priceEquipment',           desc: 'Equipment total' },
+  { token: 'priceOther',               desc: 'Other costs total' },
+  { token: 'priceSubtotal',            desc: 'Subtotal (excl. tax, auto-calculated)' },
+  { token: 'priceTax',                 desc: 'Tax total' },
+  { token: 'priceTotalInclTax',        desc: 'Total incl. tax (auto-calculated)' },
+  { token: 'labourHours',              desc: 'Total labour hours' },
+  { token: 'holdbackRelease',          desc: 'Holdback release amount' }
 ];
 
 function _contractDocConfig(docKey) {
