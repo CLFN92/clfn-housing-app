@@ -1362,6 +1362,7 @@
       return;
     }
     try {
+      var _ticUnit = unit;
       _ticDocLib = window.DocLibrary.create(mount, {
         entityType:    'tenant',
         entityId:      unit.id,
@@ -1372,7 +1373,6 @@
         getAuthToken:  function(){
           return (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ','');
         },
-        // Match the application document page categories exactly
         categories: [
           { key:'id',          label:'ID',              icon:'🧾' },
           { key:'income',      label:'Income / Pay',    icon:'💰' },
@@ -1381,7 +1381,100 @@
           { key:'medical',     label:'Medical',         icon:'⚕️'  },
           { key:'migrated',    label:'Migrated',        icon:'📂' },
           { key:'other',       label:'Other',           icon:'📎' }
-        ]
+        ],
+        // Load from BOTH tenant folder and the linked application
+        customLoader: async function() {
+          var allFiles = [];
+          var unitId = _ticUnit && _ticUnit.id;
+
+          // Source 1: tenant-specific docs from Storage
+          try {
+            var tf = await sbListFiles('tenants/' + unitId + '/');
+            (tf || []).filter(function(f){ return f.name && f.name !== '.emptyFolderPlaceholder'; })
+              .forEach(function(f){
+                allFiles.push({
+                  path:    'tenants/' + unitId + '/' + f.name,
+                  name:    f.name,
+                  size:    f.metadata ? (f.metadata.size || 0) : 0,
+                  type:    f.metadata ? (f.metadata.mimetype || '') : '',
+                  category:'other',
+                  addedAt: f.created_at ? f.created_at.slice(0,10) : ''
+                });
+              });
+          } catch(e) { console.warn('[tic docs] tenant files:', e); }
+
+          // Source 2: application documents (app_documents table + storage folder)
+          var app = _ticState.application;
+          if (app && app.id) {
+            var appId = app.id;
+            try {
+              var r2 = await fetch(
+                SUPABASE_URL + '/rest/v1/app_documents?app_id=eq.' + encodeURIComponent(appId) + '&select=*&order=added_at.asc',
+                { headers: HOUSING_HEADERS }
+              );
+              if (r2.ok) {
+                (await r2.json()).forEach(function(row){
+                  if (!allFiles.find(function(x){ return x.path === row.file_path; })) {
+                    allFiles.push({
+                      path:     row.file_path,
+                      name:     row.file_name || row.file_path.split('/').pop(),
+                      size:     row.file_size || 0,
+                      type:     row.file_type || '',
+                      category: row.category  || 'migrated',
+                      addedAt:  (row.added_at || '').slice(0,10),
+                      addedBy:  row.added_by,
+                      source:   'application',
+                      docId:    row.id
+                    });
+                  }
+                });
+              }
+            } catch(e) { console.warn('[tic docs] app_documents:', e); }
+
+            try {
+              var af = await sbListFiles('applications/' + appId + '/');
+              (af || []).filter(function(f){ return f.name && f.name !== '.emptyFolderPlaceholder'; })
+                .forEach(function(f){
+                  var fp = 'applications/' + appId + '/' + f.name;
+                  if (!allFiles.find(function(x){ return x.path === fp; })) {
+                    allFiles.push({
+                      path:    fp,
+                      name:    f.name,
+                      size:    f.metadata ? (f.metadata.size || 0) : 0,
+                      type:    f.metadata ? (f.metadata.mimetype || '') : '',
+                      category:'other',
+                      addedAt: f.created_at ? f.created_at.slice(0,10) : '',
+                      source:  'application'
+                    });
+                  }
+                });
+            } catch(e) { console.warn('[tic docs] application folder:', e); }
+          }
+
+          return allFiles;
+        },
+        // Prevent deletion of application-sourced docs from within the TIC
+        customDelete: async function(file) {
+          if (file && file.source === 'application') {
+            if (typeof showToast === 'function') showToast('This document belongs to the application — manage it from the application form');
+            return;
+          }
+          // Standard delete for tenant-owned docs
+          if (typeof sbDeleteFile === 'function') await sbDeleteFile(file.path);
+          try {
+            await fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
+              method: 'POST',
+              headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'return=minimal'}),
+              body: JSON.stringify({
+                entity_type: 'tenant', entity_id: String(_ticUnit.id),
+                action: 'file_deleted',
+                detail: JSON.stringify({path: file.path, name: file.name}),
+                actor: window.currentRole || 'staff',
+                created_at: new Date().toISOString()
+              })
+            });
+          } catch(e) {}
+        }
       });
       _ticDocLibKey = key;
     } catch(err){
