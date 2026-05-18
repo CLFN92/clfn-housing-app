@@ -2906,3 +2906,571 @@ function _termsParseHtml(html) {
   }
   return result;
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// Contracts & Agreements tab
+// ────────────────────────────────────────────────────────────────────────────
+// Saved to housing_settings key='contracts_agreements' as
+//   { residential_lease: { bodyHtml: '...', initials_clauses: [{id,label,text}] } }
+// Public accessors: getContractBody(key), getContractClauses(key)
+// jsPDF HTML renderer (_parseHtmlToBlocks / _renderBlocksToPdf) is also
+// exported here and called by the rewritten _ticGenerateLeasePdf() in
+// housing-tic.js.
+// ════════════════════════════════════════════════════════════════════════════
+
+var _CONTRACT_DEFAULT_CLAUSES = [
+  {
+    id:    'ls_init_drug',
+    label: 'Section 2(c)–(g) — Smoking, Cannabis & Drug Provisions',
+    text:  'The Residence is a smoking-permitted environment. Cannabis cultivation, production, and processing in any quantity is strictly prohibited as a condition of this Agreement regardless of federal legality. Any breach of the cannabis prohibition constitutes immediate grounds for termination without a cure period. Unlawful drug activity — including possession, production, trafficking, or storage of controlled substances — also constitutes immediate grounds for termination. The Tenant acknowledges full liability for all remediation costs arising from smoking damage, cannabis cultivation, or prohibited drug activity on the premises.'
+  },
+  {
+    id:    'ls_init_3_3',
+    label: "Section 3.3 — First Month's Rent",
+    text:  "The Tenant shall pay the first month's rent in full on or before the commencement date of this Agreement. No occupancy shall commence until the first month's rent is paid in full."
+  },
+  {
+    id:    'ls_init_3_4a',
+    label: 'Section 3.4 — Late Payment Fee',
+    text:  "Where any rent payment remains unpaid fifteen (15) days past the due date, a late payment fee of $25.00 shall be added to the Tenant's account. This fee is in addition to the outstanding rent and is recoverable as arrears."
+  },
+  {
+    id:    'ls_init_3_4b',
+    label: 'Section 3.4 — NSF Fee',
+    text:  "Where a cheque or pre-authorized debit is returned by the financial institution for insufficient funds, a $45.00 NSF (Non-Sufficient Funds) fee shall be added to the Tenant's account, in addition to any charges imposed by the financial institution. Repeated NSF occurrences may result in a change of required payment method."
+  },
+  {
+    id:    'ls_init_juris',
+    label: 'Section 21 — Acknowledgement of Jurisdiction',
+    text:  'This Agreement is governed by the inherent jurisdiction of {nationName} and the Indian Act, R.S.C. 1985, c. I-5. The Ontario Residential Tenancies Act, 2006 does not apply to this Agreement. Any dispute arising under this Agreement shall be addressed through the internal grievance process established by the {nationName} Housing Policy, and where unresolved, through the Ontario Superior Court of Justice as a matter of contract law.'
+  }
+];
+
+var CONTRACTS_DOCS_REGISTRY = [
+  {
+    key:         'residential_lease',
+    label:       'Residential Lease Agreement',
+    description: 'Full lease agreement generated when onboarding a new tenant. Supports {token} substitution for tenant-specific data.',
+    defaultBody:
+        '<h2>{nationName} Housing Program</h2>'
+      + '<h1>Residential Lease Agreement</h1>'
+      + '<p>This Agreement is made on the <strong>{executionDay}</strong> day of <strong>{executionMonth}</strong>, <strong>{executionYear}</strong>.</p>'
+      + '<h3>Parties</h3>'
+      + '<p><strong>Landlord:</strong> {nationName} (hereinafter "the Landlord" or "the Nation")</p>'
+      + '<p><strong>Tenant:</strong> {tenantName} (hereinafter "the Tenant")</p>'
+      + '<p><strong>Co-Tenant:</strong> {coTenantName}</p>'
+      + '<h3>1. Premises</h3>'
+      + '<p>The Landlord hereby leases to the Tenant the residential premises located at Lot {residenceLot}, {residenceStreet} on the reserve lands of {nationName} (the "Residence"). Unit type: {residenceBedBath}. Housing stream: {residenceStream}. Allocation date: {residenceAllocDate}.</p>'
+      + '<h3>2. Term</h3>'
+      + '<p>The tenancy commences on {termStartDate} and continues on a month-to-month basis until terminated in accordance with the {nationName} Housing Policy.</p>'
+      + '<h3>3. Rent</h3>'
+      + '<p>The Tenant shall pay rent of <strong>{rentAmount}</strong> per month, due on or before the first day of each month. Payments shall be made to the {nationName} Housing Department by pre-authorized debit, cheque, or such other method as approved in writing.</p>'
+      + '<h3>4. Authorized Occupants</h3>'
+      + '<p>The following persons are authorized to reside in the Residence in addition to the Tenant: {occupant1Name} {occupant2Name} {occupant3Name} {occupant4Name} {occupant5Name} {occupant6Name}. No other person may occupy the Residence without prior written consent of the Landlord.</p>'
+      + '<h3>5. Tenant Responsibilities</h3>'
+      + '<ol>'
+      + '<li>Maintain the Residence in a clean, safe, and habitable condition.</li>'
+      + '<li>Report any required repairs or maintenance to the {nationName} Housing Department promptly.</li>'
+      + '<li>Not cause or permit damage beyond normal wear and tear.</li>'
+      + '<li>Not sublet or assign the Residence without prior written consent of the Landlord.</li>'
+      + '<li>Comply with the {nationName} Housing Policy, community by-laws, and all applicable laws.</li>'
+      + '<li>Permit the Landlord reasonable access for inspections and repairs with reasonable notice, except in emergencies.</li>'
+      + '</ol>'
+      + '<h3>6. Smoking, Cannabis &amp; Drug Provisions</h3>'
+      + '<p>Cannabis cultivation, production, and processing is strictly prohibited on the premises. Unlawful drug activity constitutes grounds for immediate termination. The Tenant is liable for all remediation costs arising from prohibited activity. <em>(Tenant initials required — see Initials Clauses.)</em></p>'
+      + '<h3>7. Landlord Responsibilities</h3>'
+      + '<ol>'
+      + '<li>Provide the Residence in a habitable condition at commencement of the tenancy.</li>'
+      + '<li>Maintain the structural integrity of the Residence and attend to necessary repairs within a reasonable time.</li>'
+      + '<li>Provide 24 hours notice before entering the Residence except in emergencies.</li>'
+      + '</ol>'
+      + '<h3>8. Termination</h3>'
+      + '<p>Either party may terminate this Agreement by providing written notice in accordance with the {nationName} Housing Policy. The Nation may terminate immediately for material breach including non-payment of rent, unauthorized occupants, damage, or prohibited activity.</p>'
+      + '<h3>9. Recovery of Amounts Owing</h3>'
+      + '<p>The Tenant authorizes {nationName} to recover unpaid rent, damage charges, utility arrears, and other housing-related debts from any Band payments, per capita distributions, honoraria, or program benefits administered by the Nation.</p>'
+      + '<h3>21. Jurisdiction</h3>'
+      + '<p>This Agreement is governed by the inherent jurisdiction of {nationName}. The Ontario Residential Tenancies Act, 2006 does not apply. Disputes shall be resolved through the internal grievance process of the {nationName} Housing Policy. <em>(Tenant initials required — see Initials Clauses.)</em></p>'
+      + '<h3>Landlord Signature</h3>'
+      + '<p>{landlordName}, Housing Manager &mdash; {nationName}</p>'
+      + '<h3>Tenant Signature</h3>'
+      + '<p>{tenantName}</p>'
+      + '<h3>Co-Tenant Signature</h3>'
+      + '<p>{coTenantName}</p>'
+  }
+];
+
+var _CONTRACT_TOKENS = [
+  { token: 'nationName',             desc: 'Nation full name' },
+  { token: 'nationShort',            desc: 'Nation short name' },
+  { token: 'executionDay',           desc: 'Execution day of month' },
+  { token: 'executionMonth',         desc: 'Execution month name' },
+  { token: 'executionYear',          desc: 'Execution year' },
+  { token: 'termStartDate',          desc: 'Lease start date' },
+  { token: 'tenantName',             desc: 'Primary tenant name' },
+  { token: 'coTenantName',           desc: 'Co-tenant name' },
+  { token: 'tenantBandNumber',       desc: 'Tenant band/status number' },
+  { token: 'tenantDOB',              desc: 'Tenant date of birth' },
+  { token: 'tenantPhone',            desc: 'Tenant phone' },
+  { token: 'tenantEmail',            desc: 'Tenant email' },
+  { token: 'tenantEmergencyContact', desc: 'Emergency contact name & phone' },
+  { token: 'residenceLot',           desc: 'Lot number' },
+  { token: 'residenceStreet',        desc: 'Street address' },
+  { token: 'residenceBedBath',       desc: 'Bedroom/bathroom description' },
+  { token: 'residenceStream',        desc: 'Housing stream/program' },
+  { token: 'residenceAllocDate',     desc: 'Allocation date' },
+  { token: 'rentAmount',             desc: 'Monthly rent amount' },
+  { token: 'landlordName',           desc: 'Housing Manager name' },
+  { token: 'occupant1Name',          desc: 'Occupant 1 name' },
+  { token: 'occupant2Name',          desc: 'Occupant 2 name' },
+  { token: 'occupant3Name',          desc: 'Occupant 3 name' },
+  { token: 'occupant4Name',          desc: 'Occupant 4 name' },
+  { token: 'occupant5Name',          desc: 'Occupant 5 name' },
+  { token: 'occupant6Name',          desc: 'Occupant 6 name' },
+  { token: 'occupant1Relationship',  desc: 'Occupant 1 relationship' },
+  { token: 'occupant2Relationship',  desc: 'Occupant 2 relationship' },
+  { token: 'occupant3Relationship',  desc: 'Occupant 3 relationship' },
+  { token: 'occupant4Relationship',  desc: 'Occupant 4 relationship' },
+  { token: 'occupant5Relationship',  desc: 'Occupant 5 relationship' },
+  { token: 'occupant6Relationship',  desc: 'Occupant 6 relationship' }
+];
+
+function _contractDocConfig(docKey) {
+  for (var i = 0; i < CONTRACTS_DOCS_REGISTRY.length; i++) {
+    if (CONTRACTS_DOCS_REGISTRY[i].key === docKey) return CONTRACTS_DOCS_REGISTRY[i];
+  }
+  return null;
+}
+
+function getContractBody(docKey) {
+  var saved = (window._appSettings && window._appSettings.contracts_agreements
+            && window._appSettings.contracts_agreements[docKey]) || {};
+  if (saved.bodyHtml != null && saved.bodyHtml !== '') return saved.bodyHtml;
+  var cfg = _contractDocConfig(docKey);
+  return cfg ? cfg.defaultBody : '';
+}
+
+function getContractClauses(docKey) {
+  var saved = (window._appSettings && window._appSettings.contracts_agreements
+            && window._appSettings.contracts_agreements[docKey]) || {};
+  if (saved.initials_clauses && saved.initials_clauses.length) return saved.initials_clauses;
+  return _CONTRACT_DEFAULT_CLAUSES;
+}
+
+// ── Contracts tab renderer ─────────────────────────────────────────────────
+
+var _contractsSelectedDoc = null;
+
+function renderContractsTab() {
+  var body = document.getElementById('contracts_panel_body');
+  if (!body) return;
+  if (!_contractsSelectedDoc) _contractsSelectedDoc = CONTRACTS_DOCS_REGISTRY[0] && CONTRACTS_DOCS_REGISTRY[0].key;
+
+  body.innerHTML =
+      '<div class="ntf-grid">'
+    +   '<div class="ntf-event-list" id="contracts_doc_list">' + _contractsRenderDocListHtml() + '</div>'
+    +   '<div class="ntf-editor"     id="contracts_editor">'   + _contractsRenderEditorHtml(_contractsSelectedDoc) + '</div>'
+    + '</div>';
+
+  _contractsWireDocListClicks();
+  _contractsWireEditor();
+}
+
+function _contractsRenderDocListHtml() {
+  return CONTRACTS_DOCS_REGISTRY.map(function(doc) {
+    var isActive = doc.key === _contractsSelectedDoc;
+    return '<button type="button" data-contracts-doc="' + _ntfEsc(doc.key) + '" '
+         + 'class="ntf-event-item' + (isActive ? ' is-active' : '') + '">'
+         + '<span class="ntf-dot ntf-dot-on" title="Active"></span>'
+         + '<div class="ntf-event-text">'
+         +   '<div class="ntf-event-label">' + _ntfEsc(doc.label) + '</div>'
+         +   '<div class="ntf-event-desc">'  + _ntfEsc(doc.description || '') + '</div>'
+         + '</div>'
+         + '</button>';
+  }).join('');
+}
+
+function _contractsRenderEditorHtml(docKey) {
+  var cfg = _contractDocConfig(docKey);
+  if (!cfg) return '<div class="empty-state-italic">Select a document from the list to edit it.</div>';
+
+  var saved     = (window._appSettings && window._appSettings.contracts_agreements
+                && window._appSettings.contracts_agreements[docKey]) || {};
+  var bodyHtml  = (saved.bodyHtml != null && saved.bodyHtml !== '') ? saved.bodyHtml : cfg.defaultBody;
+  var clauses   = (saved.initials_clauses && saved.initials_clauses.length)
+                ? saved.initials_clauses : _CONTRACT_DEFAULT_CLAUSES;
+
+  var toolbar =
+      '<div class="ntf-toolbar" role="toolbar">'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="bold"                title="Bold"><b>B</b></button>'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="italic"              title="Italic"><i>I</i></button>'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="underline"           title="Underline"><u>U</u></button>'
+    +   '<span class="ntf-tool-sep"></span>'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="formatBlock-h2"      title="Heading 2">H2</button>'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="formatBlock-h3"      title="Heading 3">H3</button>'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="formatBlock-p"       title="Paragraph">&para;</button>'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="insertUnorderedList" title="Bullet list">&bull;</button>'
+    +   '<button type="button" class="ntf-tool" data-ntf-cmd="insertOrderedList"   title="Numbered list">1.</button>'
+    + '</div>';
+
+  // Token reference chips
+  var tokenChips = _CONTRACT_TOKENS.map(function(t) {
+    return '<span class="contracts-token-chip" title="' + _ntfEsc(t.desc) + '" '
+         + 'onclick="_contractsInsertToken(\'' + _ntfEsc(t.token) + '\')">'
+         + '{' + _ntfEsc(t.token) + '}'
+         + '</span>';
+  }).join('');
+
+  // Clauses editor
+  var clausesHtml = clauses.map(function(cl, i) {
+    return _contractsClauseCardHtml(cl, i);
+  }).join('');
+
+  return ''
+    + '<div class="ntf-editor-header">'
+    +   '<div class="ntf-editor-title">' + _ntfEsc(cfg.label) + '</div>'
+    +   '<div class="ntf-editor-meta">Edit the full agreement text. Use {tokens} for tenant-specific data. Content is rendered to PDF when generating the lease.</div>'
+    + '</div>'
+
+    + '<div class="ntf-field">'
+    +   '<label class="ntf-label">Document Body</label>'
+    +   toolbar
+    +   '<div id="contracts_body" class="ntf-body" contenteditable="true" style="min-height:320px;">' + bodyHtml + '</div>'
+    + '</div>'
+
+    + '<div style="margin:10px 0 6px;">'
+    +   '<details>'
+    +     '<summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);user-select:none;">&#128196; Available {tokens} &mdash; click to insert</summary>'
+    +     '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;">' + tokenChips + '</div>'
+    +   '</details>'
+    + '</div>'
+
+    + '<div style="margin-top:20px;">'
+    +   '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">Initials Clauses</div>'
+    +   '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Each clause is presented to the tenant step-by-step for initialling before the PDF is generated. {tokens} are substituted at generation time.</div>'
+    +   '<div id="contracts_clauses_list">' + clausesHtml + '</div>'
+    +   '<button type="button" class="btn btn-ghost" style="margin-top:10px;" onclick="addContractsClause()">+ Add Clause</button>'
+    + '</div>'
+
+    + '<div class="ntf-actions">'
+    +   '<button type="button" class="btn btn-primary" onclick="saveContractsDoc()">Save</button>'
+    +   '<button type="button" class="btn btn-ghost"   onclick="resetContractsDoc()">Reset to Default</button>'
+    + '</div>';
+}
+
+function _contractsWireDocListClicks() {
+  var list = document.getElementById('contracts_doc_list');
+  if (!list) return;
+  list.querySelectorAll('[data-contracts-doc]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      _contractsSelectedDoc = btn.getAttribute('data-contracts-doc');
+      list.innerHTML = _contractsRenderDocListHtml();
+      var ed = document.getElementById('contracts_editor');
+      if (ed) ed.innerHTML = _contractsRenderEditorHtml(_contractsSelectedDoc);
+      _contractsWireDocListClicks();
+      _contractsWireEditor();
+    });
+  });
+}
+
+function _contractsWireEditor() {
+  var editorEl = document.getElementById('contracts_editor');
+  var bodyEl   = document.getElementById('contracts_body');
+  if (!editorEl || !bodyEl) return;
+
+  editorEl.querySelectorAll('.ntf-tool').forEach(function(btn) {
+    if (btn.getAttribute('data-ntf-bound') === '1') return;
+    btn.setAttribute('data-ntf-bound', '1');
+    btn.addEventListener('mousedown', function(e) { e.preventDefault(); });
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      _ntfRunToolbarCmd(btn.getAttribute('data-ntf-cmd'), bodyEl);
+    });
+  });
+
+  if (!bodyEl.getAttribute('data-paste-wired')) {
+    bodyEl.setAttribute('data-paste-wired', '1');
+    bodyEl.addEventListener('paste', function(e) {
+      e.preventDefault();
+      var html = (e.clipboardData && e.clipboardData.getData('text/html')) || '';
+      if (!html) {
+        var text = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+        html = '<p>' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                           .replace(/\n\n+/g,'</p><p>').replace(/\n/g,'<br>') + '</p>';
+      }
+      document.execCommand('insertHTML', false, _ntfSanitizeBodyHtml(html));
+    });
+  }
+
+  // Store reference to body so _contractsInsertToken can find it
+  window._contractsBodyEl = bodyEl;
+}
+
+function _contractsInsertToken(token) {
+  var bodyEl = window._contractsBodyEl || document.getElementById('contracts_body');
+  if (!bodyEl) return;
+  bodyEl.focus();
+  document.execCommand('insertText', false, '{' + token + '}');
+}
+
+// ── Save / reset ──────────────────────────────────────────────────────────
+
+function _contractsReadClauses() {
+  var clauses = [];
+  var i = 0;
+  while (document.getElementById('contracts_clause_label_' + i)) {
+    var labelEl = document.getElementById('contracts_clause_label_' + i);
+    var textEl  = document.getElementById('contracts_clause_text_'  + i);
+    var idEl    = document.getElementById('contracts_clause_id_'    + i);
+    var label   = (labelEl ? labelEl.value : '').trim();
+    var text    = (textEl  ? textEl.value  : '').trim();
+    var id      = (idEl    ? idEl.value    : '').trim() || ('ls_custom_' + i);
+    if (label || text) {
+      clauses.push({ id: id, label: label, text: text });
+    }
+    i++;
+  }
+  return clauses;
+}
+
+function saveContractsDoc() {
+  var role = window.currentRole || window._realRole;
+  if (role !== 'ed') { showToast('Only the Executive Director can edit contracts'); return; }
+  if (!_contractsSelectedDoc) { showToast('Select a document first'); return; }
+
+  var bodyEl = document.getElementById('contracts_body');
+  if (!bodyEl) { showToast('Editor not ready'); return; }
+
+  var bodyHtml = _ntfSanitizeBodyHtml(bodyEl.innerHTML || '');
+  if (!bodyHtml || bodyHtml === '<br>' || bodyHtml.replace(/<[^>]+>/g, '').trim() === '') {
+    showToast('Document body cannot be empty'); bodyEl.focus(); return;
+  }
+
+  var clauses = _contractsReadClauses();
+  if (!clauses.length) { showToast('Add at least one initials clause'); return; }
+
+  var all  = (window._appSettings && window._appSettings.contracts_agreements) || {};
+  var next = Object.assign({}, all);
+  next[_contractsSelectedDoc] = { bodyHtml: bodyHtml, initials_clauses: clauses };
+
+  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
+    method:  'POST',
+    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+    body:    JSON.stringify({ key: 'contracts_agreements', value: next })
+  }).then(function(r) {
+    if (!r.ok) { showToast('Save failed — check connection'); return; }
+    if (!window._appSettings) window._appSettings = {};
+    window._appSettings.contracts_agreements = next;
+    if (typeof auditEntry === 'function') {
+      auditEntry('SETTINGS', 'contracts_save', 'Contracts & Agreements updated: ' + _contractsSelectedDoc, role);
+    }
+    showToast('✓ Contract saved');
+  }).catch(function(e) {
+    console.warn('[contracts] save failed:', e);
+    showToast('Save failed — see console');
+  });
+}
+
+function resetContractsDoc() {
+  if (!_contractsSelectedDoc) return;
+  var cfg = _contractDocConfig(_contractsSelectedDoc);
+  if (!cfg) return;
+  var bodyEl = document.getElementById('contracts_body');
+  if (bodyEl) bodyEl.innerHTML = cfg.defaultBody;
+  // Re-render clauses section back to defaults
+  var clausesList = document.getElementById('contracts_clauses_list');
+  if (clausesList) {
+    var clauses = _CONTRACT_DEFAULT_CLAUSES;
+    clausesList.innerHTML = clauses.map(function(cl, i) {
+      return _contractsClauseCardHtml(cl, i);
+    }).join('');
+  }
+  showToast('Reverted to default. Click Save to persist.');
+}
+
+function addContractsClause() {
+  var list = document.getElementById('contracts_clauses_list');
+  if (!list) return;
+  var i = list.querySelectorAll('.contracts-clause-card').length;
+  var div = document.createElement('div');
+  div.innerHTML = _contractsClauseCardHtml({ id: '', label: '', text: '' }, i);
+  list.appendChild(div.firstChild);
+}
+
+function removeContractsClause(idx) {
+  var list = document.getElementById('contracts_clauses_list');
+  if (!list) return;
+  var cards = list.querySelectorAll('.contracts-clause-card');
+  if (cards[idx]) cards[idx].remove();
+  // Re-index remaining cards so onclick indices stay correct
+  var remaining = list.querySelectorAll('.contracts-clause-card');
+  remaining.forEach(function(card, newIdx) {
+    card.id = 'contracts_clause_card_' + newIdx;
+    var hdr = card.querySelector('div > div:first-child');
+    if (hdr) hdr.textContent = 'Clause ' + (newIdx + 1);
+    var removeBtn = card.querySelector('button');
+    if (removeBtn) removeBtn.setAttribute('onclick', 'removeContractsClause(' + newIdx + ')');
+    var lbl = card.querySelector('input[type="text"]');
+    if (lbl) lbl.id = 'contracts_clause_label_' + newIdx;
+    var txt = card.querySelector('textarea');
+    if (txt) txt.id = 'contracts_clause_text_' + newIdx;
+  });
+}
+
+function _contractsClauseCardHtml(cl, i) {
+  return '<div class="contracts-clause-card" id="contracts_clause_card_' + i + '">'
+       + '<input type="hidden" id="contracts_clause_id_' + i + '" value="' + _ntfEsc(cl.id || '') + '"/>'
+       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+       +   '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Clause ' + (i + 1) + '</div>'
+       +   '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px;" onclick="removeContractsClause(' + i + ')">Remove</button>'
+       + '</div>'
+       + '<div class="f" style="margin-bottom:8px;">'
+       +   '<label style="font-size:11px;color:var(--muted);margin-bottom:3px;display:block;">Label</label>'
+       +   '<input type="text" id="contracts_clause_label_' + i + '" value="' + _ntfEsc(cl.label || '') + '" '
+       +     'style="width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>'
+       + '</div>'
+       + '<div class="f">'
+       +   '<label style="font-size:11px;color:var(--muted);margin-bottom:3px;display:block;">Clause text</label>'
+       +   '<textarea id="contracts_clause_text_' + i + '" rows="4" '
+       +     'style="width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;resize:vertical;">'
+       +     _ntfEsc(cl.text || '')
+       +   '</textarea>'
+       + '</div>'
+       + '</div>';
+}
+
+// ── jsPDF HTML renderer ────────────────────────────────────────────────────
+// Parses HTML (as produced by the contentEditable body editor) into a
+// flat list of typed blocks, then renders them to a jsPDF ctx created by
+// _makePdfDoc(). Used by _ticGenerateLeasePdf() in housing-tic.js when a
+// saved contract body exists.
+
+function _parseHtmlToBlocks(html) {
+  var blocks = [];
+  if (!html) return blocks;
+  try {
+    var doc  = new DOMParser().parseFromString('<div id="r">' + html + '</div>', 'text/html');
+    var root = doc.getElementById('r');
+    if (!root) return blocks;
+
+    function textOf(node) {
+      return (node.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function processNode(node) {
+      if (!node.tagName) return;
+      var tag = node.tagName.toUpperCase();
+      if (tag === 'H1') {
+        var t = textOf(node); if (t) blocks.push({ type: 'h1', text: t });
+      } else if (tag === 'H2') {
+        var t = textOf(node); if (t) blocks.push({ type: 'h2', text: t });
+      } else if (tag === 'H3' || tag === 'H4') {
+        var t = textOf(node); if (t) blocks.push({ type: 'h3', text: t });
+      } else if (tag === 'P' || tag === 'DIV') {
+        var t = textOf(node); if (t) blocks.push({ type: 'p', text: t });
+      } else if (tag === 'OL') {
+        var counter = 1;
+        node.querySelectorAll('li').forEach(function(li) {
+          var t = textOf(li);
+          if (t) blocks.push({ type: 'li-ol', text: t, num: counter++ });
+        });
+      } else if (tag === 'UL') {
+        node.querySelectorAll('li').forEach(function(li) {
+          var t = textOf(li);
+          if (t) blocks.push({ type: 'li-ul', text: t });
+        });
+      } else if (tag === 'BR') {
+        blocks.push({ type: 'gap' });
+      } else if (tag === 'HR') {
+        blocks.push({ type: 'hr' });
+      }
+    }
+
+    Array.prototype.slice.call(root.childNodes).forEach(processNode);
+  } catch(e) {
+    console.warn('[contracts pdf] HTML parse failed:', e);
+  }
+  return blocks;
+}
+
+function _renderBlocksToPdf(ctx, blocks) {
+  var pdf      = ctx.pdf;
+  var marginL  = ctx.marginL;
+  var contentW = ctx.contentW;
+
+  blocks.forEach(function(block) {
+    if (block.type === 'h1') {
+      ctx.needSpace(16);
+      ctx.gap(4);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(15);
+      pdf.setTextColor(20);
+      var lines = pdf.splitTextToSize(block.text, contentW);
+      pdf.text(lines, marginL, ctx.y);
+      ctx.y += lines.length * 7 + 3;
+
+    } else if (block.type === 'h2') {
+      ctx.needSpace(13);
+      ctx.gap(3);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(12);
+      pdf.setTextColor(30);
+      var lines = pdf.splitTextToSize(block.text, contentW);
+      pdf.text(lines, marginL, ctx.y);
+      ctx.y += lines.length * 6 + 2;
+
+    } else if (block.type === 'h3') {
+      ctx.needSpace(10);
+      ctx.gap(2);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10);
+      pdf.setTextColor(50);
+      var lines = pdf.splitTextToSize(block.text, contentW);
+      pdf.text(lines, marginL, ctx.y);
+      ctx.y += lines.length * 5 + 2;
+
+    } else if (block.type === 'p') {
+      ctx.paragraph(block.text, 9);
+      ctx.gap(1.5);
+
+    } else if (block.type === 'li-ol') {
+      var indent = 5, numW = 9;
+      var textW  = contentW - indent - numW;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(40);
+      var textLines = pdf.splitTextToSize(block.text, textW);
+      var h = textLines.length * 4.5 + 1;
+      ctx.needSpace(h);
+      pdf.text(block.num + '.', marginL + indent, ctx.y + 3.5);
+      pdf.text(textLines,       marginL + indent + numW, ctx.y + 3.5);
+      ctx.y += h;
+
+    } else if (block.type === 'li-ul') {
+      var indent = 5, bulletW = 5;
+      var textW  = contentW - indent - bulletW;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(40);
+      var textLines = pdf.splitTextToSize(block.text, textW);
+      var h = textLines.length * 4.5 + 1;
+      ctx.needSpace(h);
+      pdf.text('•', marginL + indent, ctx.y + 3.5);
+      pdf.text(textLines, marginL + indent + bulletW, ctx.y + 3.5);
+      ctx.y += h;
+
+    } else if (block.type === 'gap') {
+      ctx.gap(3);
+
+    } else if (block.type === 'hr') {
+      ctx.needSpace(5);
+      pdf.setDrawColor(200);
+      pdf.setLineWidth(0.3);
+      pdf.line(marginL, ctx.y + 2, marginL + contentW, ctx.y + 2);
+      pdf.setDrawColor(0);
+      ctx.y += 5;
+    }
+
+    pdf.setTextColor(0);
+    pdf.setFont('helvetica', 'normal');
+  });
+}

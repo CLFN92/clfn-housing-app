@@ -988,6 +988,7 @@
   <button onclick="showSettingsSection('sec_themes');renderThemesPanel();" id="stab_themes" class="tab-btn">&#127912; Themes</button>
   <button onclick="showSettingsSection('sec_notifications')" id="stab_notifications" class="tab-btn" data-roles="ed">&#9993;&#65039; Notifications</button>
   <button onclick="showSettingsSection('sec_terms')" id="stab_terms" class="tab-btn" data-roles="ed">&#128209; Terms &amp; Conditions</button>
+  <button onclick="showSettingsSection('sec_contracts');renderContractsTab();" id="stab_contracts" class="tab-btn" data-roles="ed">&#128196; Contracts</button>
   <button onclick="showSettingsSection('sec_config')" id="stab_config" class="tab-btn" data-roles="ed">&#128295; Config</button>
   <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="tab-btn">&#128203; Audit Log</button>
   <button onclick="showSettingsSection('sec_approval_authority');renderApprovalAuthorityPanel();" id="stab_approval_authority" class="tab-btn">&#128274; Approval Authority</button>
@@ -1225,6 +1226,21 @@
       </div>
     </div>
     <div class="sec-pad" id="terms_panel_body">
+      <div class="empty-state-ctr">Loading&hellip;</div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTRACTS & AGREEMENTS -->
+<div id="sec_contracts" class="settings-section">
+  <div class="card card-flush-gold">
+    <div class="modal-hdr">
+      <div>
+        <div class="lbl-yellow">&#128196; Contracts &amp; Agreements</div>
+        <div class="txt-sm-meta">Edit the full text of lease agreements and other contracts. Supports {token} substitution. Changes take effect immediately on the next lease generated. ED only.</div>
+      </div>
+    </div>
+    <div class="sec-pad" id="contracts_panel_body">
       <div class="empty-state-ctr">Loading&hellip;</div>
     </div>
   </div>

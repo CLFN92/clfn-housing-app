@@ -1952,6 +1952,15 @@
   // read them without relying on live DOM elements.
   var _leaseInitials = {};
 
+  // Returns the effective initials clauses — saved overrides from Settings →
+  // Contracts & Agreements win; falls back to the hardcoded defaults below.
+  function _getEffectiveLeaseClauses() {
+    if (typeof getContractClauses === 'function') {
+      return getContractClauses('residential_lease');
+    }
+    return _LEASE_INITIAL_CLAUSES;
+  }
+
   var _LEASE_INITIAL_CLAUSES = [
     {
       id:      'ls_init_drug',
@@ -1982,9 +1991,10 @@
 
   function _ticOpenInitialsPopout(idx) {
     idx = idx || 0;
-    var clause = _LEASE_INITIAL_CLAUSES[idx];
+    var clauses = _getEffectiveLeaseClauses();
+    var clause  = clauses[idx];
     if (!clause) return;
-    var total  = _LEASE_INITIAL_CLAUSES.length;
+    var total  = clauses.length;
     var isLast = idx === total - 1;
 
     var existing = document.getElementById('ls_initials_popout');
@@ -2067,13 +2077,14 @@
       captured = getSigDataURL(canvasId);
     }
     // Fall back to previously stored value if nothing new was drawn
-    if (!captured) captured = _leaseInitials[_LEASE_INITIAL_CLAUSES[idx].id] || '';
+    var clauses = _getEffectiveLeaseClauses();
+    if (!captured) captured = _leaseInitials[clauses[idx].id] || '';
 
     if (captured) {
-      _leaseInitials[_LEASE_INITIAL_CLAUSES[idx].id] = captured;
+      _leaseInitials[clauses[idx].id] = captured;
     }
 
-    var total   = _LEASE_INITIAL_CLAUSES.length;
+    var total   = clauses.length;
     var nextIdx = idx + dir;
 
     // Update the status button in the parent modal
@@ -2302,15 +2313,11 @@
 
   // ── PDF generator ─────────────────────────────────────────────────────
   async function _ticGenerateLeasePdf() {
-    try { await _loadPdfLib(); } catch(e) { if (typeof showToast==='function') showToast('PDF library unavailable'); return; }
-
     if (typeof showToast === 'function') showToast('Saving changes and generating PDF...');
 
-    // Save edits back to source tables first
     try { await _ticLeaseSaveChanges(); } catch(e) { console.warn('[lease] save-back failed:', e); }
 
     var fv  = function(id){ var e=document.getElementById(id); return e ? (e.value||'').trim() : ''; };
-    var fc  = function(id){ var e=document.getElementById(id); return e ? e.checked : false; };
     var sig = function(id){ return (typeof getSigDataURL==='function') ? getSigDataURL(id) : ''; };
 
     var execDate  = fv('ls_exec_date');
@@ -2319,60 +2326,200 @@
     var execMonth = d ? d.toLocaleString('en-CA',{month:'long'}) : '';
     var execYear  = d ? String(d.getFullYear()) : '';
 
-    var fieldValues = {
-      'execution_day':            execDay,
-      'execution_month':          execMonth,
-      'execution_year':           execYear,
-      'term_start_date':          fv('ls_start_date'),
-      'tenant_primary_name':      fv('ls_t_name'),
-      'tenant_cotenant_name':     fv('ls_co_name'),
-      'tenant_band_number':       fv('ls_t_band'),
-      'tenant_dob':               fv('ls_t_dob'),
-      'tenant_po_box':            '',
-      'tenant_phone':             fv('ls_t_phone'),
-      'tenant_email':             fv('ls_t_email'),
-      'tenant_emergency_contact': fv('ls_t_emerg'),
-      'residence_lot':            fv('ls_r_lot'),
-      'residence_street':         fv('ls_r_street'),
-      'residence_unit_type':      '',
-      'residence_bed_bath':       fv('ls_r_bed'),
-      'residence_stream':         fv('ls_r_stream'),
-      'residence_allocation_date':fv('ls_r_alloc'),
-      'rent_amount':              fv('ls_rent'),
-      'sig_landlord_name':        (_ticState.tenant ? (_ticState.tenant.approved_by || '') : ''),
-      'sig_landlord_title':       'Housing Manager',
-      'sig_landlord_date':        fv('ls_exec_date'),
-      'sig_tenant1_name':         fv('ls_t_name'),
-      'sig_tenant1_date':         fv('ls_exec_date'),
-      'sig_tenant2_name':         fv('ls_co_name'),
-      'sig_tenant2_date':         fv('ls_exec_date'),
+    var tokens = {
+      nationName:             (window.NATION_CONFIG && NATION_CONFIG.display_name) || 'Housing Authority',
+      nationShort:            (window.NATION_CONFIG && NATION_CONFIG.short) || '',
+      executionDay:           execDay,
+      executionMonth:         execMonth,
+      executionYear:          execYear,
+      termStartDate:          fv('ls_start_date'),
+      tenantName:             fv('ls_t_name'),
+      coTenantName:           fv('ls_co_name'),
+      tenantBandNumber:       fv('ls_t_band'),
+      tenantDOB:              fv('ls_t_dob'),
+      tenantPhone:            fv('ls_t_phone'),
+      tenantEmail:            fv('ls_t_email'),
+      tenantEmergencyContact: fv('ls_t_emerg'),
+      residenceLot:           fv('ls_r_lot'),
+      residenceStreet:        fv('ls_r_street'),
+      residenceBedBath:       fv('ls_r_bed'),
+      residenceStream:        fv('ls_r_stream'),
+      residenceAllocDate:     fv('ls_r_alloc'),
+      rentAmount:             fv('ls_rent'),
+      landlordName:           (_ticState.tenant ? (_ticState.tenant.approved_by || '') : ''),
+      occupant1Name:          fv('ls_occ_name_0'), occupant2Name: fv('ls_occ_name_1'),
+      occupant3Name:          fv('ls_occ_name_2'), occupant4Name: fv('ls_occ_name_3'),
+      occupant5Name:          fv('ls_occ_name_4'), occupant6Name: fv('ls_occ_name_5'),
+      occupant1Relationship:  fv('ls_occ_rel_0'),  occupant2Relationship: fv('ls_occ_rel_1'),
+      occupant3Relationship:  fv('ls_occ_rel_2'),  occupant4Relationship: fv('ls_occ_rel_3'),
+      occupant5Relationship:  fv('ls_occ_rel_4'),  occupant6Relationship: fv('ls_occ_rel_5')
     };
 
-    // Occupants
-    for (var oi = 0; oi < 6; oi++) {
-      var idx = oi + 1;
-      fieldValues['occupant_'+idx+'_name']         = fv('ls_occ_name_'+oi);
-      fieldValues['occupant_'+idx+'_relationship']  = fv('ls_occ_rel_'+oi);
-      fieldValues['occupant_'+idx+'_dob']           = fv('ls_occ_dob_'+oi);
-      fieldValues['occupant_'+idx+'_band']          = fv('ls_occ_band_'+oi);
+    // ── jsPDF path — used when a contract body has been saved in Settings ─
+    var savedBody = (typeof getContractBody === 'function') ? getContractBody('residential_lease') : '';
+    if (savedBody && savedBody.trim()) {
+      try {
+        if (typeof _loadJsPdf === 'function') await _loadJsPdf();
+        var ctx = _makePdfDoc();
+        var pdf = ctx.pdf;
+
+        // Substitute tokens then render HTML blocks
+        var substituted = (typeof _substitutePlaceholders === 'function')
+          ? _substitutePlaceholders(savedBody, tokens) : savedBody;
+        var blocks = (typeof _parseHtmlToBlocks === 'function')
+          ? _parseHtmlToBlocks(substituted) : [];
+        if (typeof _renderBlocksToPdf === 'function') _renderBlocksToPdf(ctx, blocks);
+
+        // Signatures section
+        ctx.needSpace(50); ctx.gap(8);
+        ctx.sectionHeader('Signatures');
+
+        function _addSigBlock(label, sigId, nameVal) {
+          ctx.needSpace(24);
+          pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(60);
+          pdf.text(label, ctx.marginL, ctx.y + 3); ctx.y += 6;
+          var sigData = sig(sigId);
+          if (sigData && sigData.indexOf('data:image/png;base64,') === 0) {
+            try { pdf.addImage(sigData, 'PNG', ctx.marginL, ctx.y, 50, 12); } catch(e) {}
+            ctx.y += 14;
+          } else if (sigData && sigData.indexOf('typed:') === 0) {
+            pdf.setFont('helvetica', 'italic'); pdf.setFontSize(14); pdf.setTextColor(20);
+            pdf.text(sigData.replace('typed:',''), ctx.marginL, ctx.y + 4);
+            ctx.y += 8;
+          } else if (sigData && sigData.indexOf('wet:') === 0) {
+            pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(80);
+            var ref = sigData.replace('wet:','');
+            pdf.text(ref === 'pending' ? 'Wet signature on file' : 'E-sign: '+ref, ctx.marginL, ctx.y + 4);
+            ctx.y += 8;
+          } else {
+            pdf.setDrawColor(160); pdf.setLineWidth(0.4);
+            pdf.line(ctx.marginL, ctx.y + 8, ctx.marginL + 70, ctx.y + 8);
+            ctx.y += 11;
+          }
+          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(80);
+          if (nameVal) { pdf.text(nameVal, ctx.marginL, ctx.y + 3); ctx.y += 5; }
+          pdf.text('Date: ' + (execDate || '___________'), ctx.marginL, ctx.y + 3);
+          ctx.y += 7; pdf.setTextColor(0);
+        }
+
+        _addSigBlock('Landlord / Housing Manager', 'ls_sig_staff',    tokens.landlordName);
+        _addSigBlock('Tenant',                     'ls_sig_tenant',   tokens.tenantName);
+        if (tokens.coTenantName) _addSigBlock('Co-Tenant', 'ls_sig_cotenant', tokens.coTenantName);
+
+        // Initials summary
+        var clauses = _getEffectiveLeaseClauses();
+        var withInitials = clauses.filter(function(cl){ return _leaseInitials[cl.id]; });
+        if (withInitials.length) {
+          ctx.needSpace(20); ctx.gap(6);
+          ctx.sectionHeader('Tenant Initials — Required Clauses');
+          withInitials.forEach(function(cl) {
+            var initData = _leaseInitials[cl.id];
+            ctx.needSpace(18);
+            pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(50);
+            var labelLines = pdf.splitTextToSize(cl.label || cl.id, ctx.contentW - 55);
+            pdf.text(labelLines, ctx.marginL, ctx.y + 3);
+            if (initData && initData.indexOf('data:image/png;base64,') === 0) {
+              try { pdf.addImage(initData, 'PNG', ctx.marginL + ctx.contentW - 52, ctx.y - 1, 28, 8); } catch(e) {}
+            } else if (initData && initData.indexOf('typed:') === 0) {
+              pdf.setFont('helvetica', 'italic'); pdf.setFontSize(12); pdf.setTextColor(20);
+              pdf.text(initData.replace('typed:',''), ctx.marginL + ctx.contentW - 52, ctx.y + 4);
+            }
+            ctx.y += Math.max(labelLines.length * 4 + 1, 10);
+            pdf.setTextColor(0);
+          });
+        }
+
+        var base64 = ctx.finish();
+        var binStr = atob(base64);
+        var arr = new Uint8Array(binStr.length);
+        for (var bi = 0; bi < binStr.length; bi++) arr[bi] = binStr.charCodeAt(bi);
+        var blob = new Blob([arr], { type: 'application/pdf' });
+        var nationShort = tokens.nationShort || 'Housing';
+        var tenantSlug  = tokens.tenantName.replace(/\s+/g,'_') || 'Tenant';
+        var filename    = nationShort + '_Occupancy_Agreement_' + tenantSlug + '.pdf';
+
+        var url  = URL.createObjectURL(blob);
+        var link = document.createElement('a');
+        link.href = url; link.download = filename; link.click();
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+
+        var unit = _ticState.unit || {};
+        if (unit.id) {
+          try {
+            var storePath = 'tenants/' + unit.id + '/' + Date.now() + '_' + filename;
+            await window.sbUploadFile(storePath, blob);
+            if (typeof window.sbSaveFileMeta === 'function') {
+              await window.sbSaveFileMeta('tenant', String(unit.id), storePath, filename, blob.size, 'application/pdf');
+            }
+            _ticDocLibKey = null; _ticDocLib = null;
+          } catch(e) { console.warn('[lease] doc library upload failed:', e); }
+        }
+        var mo = document.getElementById('tic_lease_modal');
+        if (mo) mo.remove();
+        if (typeof showToast === 'function') showToast('Occupancy Agreement saved to document library');
+        return;
+      } catch(e) {
+        console.error('[lease] jsPDF generation failed:', e);
+        if (typeof showToast === 'function') showToast('PDF generation failed — see console');
+        return;
+      }
     }
 
-    // Initials / signatures (will be embedded as images or text)
+    // ── AcroForm fallback — used when no contract body has been saved ──────
+    try { await _loadPdfLib(); } catch(e) {
+      if (typeof showToast==='function') showToast('PDF library unavailable'); return;
+    }
+
+    var fieldValues = {
+      'execution_day':             execDay,
+      'execution_month':           execMonth,
+      'execution_year':            execYear,
+      'term_start_date':           tokens.termStartDate,
+      'tenant_primary_name':       tokens.tenantName,
+      'tenant_cotenant_name':      tokens.coTenantName,
+      'tenant_band_number':        tokens.tenantBandNumber,
+      'tenant_dob':                tokens.tenantDOB,
+      'tenant_po_box':             '',
+      'tenant_phone':              tokens.tenantPhone,
+      'tenant_email':              tokens.tenantEmail,
+      'tenant_emergency_contact':  tokens.tenantEmergencyContact,
+      'residence_lot':             tokens.residenceLot,
+      'residence_street':          tokens.residenceStreet,
+      'residence_unit_type':       '',
+      'residence_bed_bath':        tokens.residenceBedBath,
+      'residence_stream':          tokens.residenceStream,
+      'residence_allocation_date': tokens.residenceAllocDate,
+      'rent_amount':               tokens.rentAmount,
+      'sig_landlord_name':         tokens.landlordName,
+      'sig_landlord_title':        'Housing Manager',
+      'sig_landlord_date':         execDate,
+      'sig_tenant1_name':          tokens.tenantName,
+      'sig_tenant1_date':          execDate,
+      'sig_tenant2_name':          tokens.coTenantName,
+      'sig_tenant2_date':          execDate,
+    };
+    for (var oi = 0; oi < 6; oi++) {
+      var oIdx = oi + 1;
+      fieldValues['occupant_'+oIdx+'_name']         = fv('ls_occ_name_'+oi);
+      fieldValues['occupant_'+oIdx+'_relationship']  = fv('ls_occ_rel_'+oi);
+      fieldValues['occupant_'+oIdx+'_dob']           = fv('ls_occ_dob_'+oi);
+      fieldValues['occupant_'+oIdx+'_band']          = fv('ls_occ_band_'+oi);
+    }
+
     var initSigs = {
-      'init_drug_ack':    (_leaseInitials['ls_init_drug']   || sig('ls_init_drug')),
-      'init_3_3':         (_leaseInitials['ls_init_3_3']    || sig('ls_init_3_3')),
-      'init_3_4a':        (_leaseInitials['ls_init_3_4a']   || sig('ls_init_3_4a')),
-      'init_3_4b':        (_leaseInitials['ls_init_3_4b']   || sig('ls_init_3_4b')),
-      'ack_jurisdiction': (_leaseInitials['ls_init_juris']  || sig('ls_init_juris')),
+      'init_drug_ack':    (_leaseInitials['ls_init_drug']  || sig('ls_init_drug')),
+      'init_3_3':         (_leaseInitials['ls_init_3_3']   || sig('ls_init_3_3')),
+      'init_3_4a':        (_leaseInitials['ls_init_3_4a']  || sig('ls_init_3_4a')),
+      'init_3_4b':        (_leaseInitials['ls_init_3_4b']  || sig('ls_init_3_4b')),
+      'ack_jurisdiction': (_leaseInitials['ls_init_juris'] || sig('ls_init_juris')),
       'sig_landlord':     sig('ls_sig_staff'),
       'sig_tenant1':      sig('ls_sig_tenant'),
       'sig_tenant2':      sig('ls_sig_cotenant'),
     };
 
     try {
-      // Load the base fillable PDF
-      var pdfUrl = window.location.origin + '/templates/lease-001.pdf';
-      var resp   = await fetch(pdfUrl);
+      var pdfUrl   = window.location.origin + '/templates/lease-001.pdf';
+      var resp     = await fetch(pdfUrl);
       if (!resp.ok) throw new Error('Could not fetch base PDF: ' + resp.status);
       var pdfBytes = await resp.arrayBuffer();
 
@@ -2380,11 +2527,8 @@
       var pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
       var form   = pdfDoc.getForm();
       var pages  = pdfDoc.getPages();
-
-      // Embed standard font for drawing text directly on pages
       var stdFont = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
 
-      // Build field-position map: fieldName -> { pageIdx, rect }
       var fieldPos = {};
       var allPDFFields = form.getFields();
       for (var ffi = 0; ffi < allPDFFields.length; ffi++) {
@@ -2402,7 +2546,6 @@
         } catch(e) {}
       }
 
-      // Draw text values directly onto pages (pure black on white — no appearance generation)
       Object.keys(fieldValues).forEach(function(name) {
         var val = fieldValues[name];
         if (val == null || val === '') return;
@@ -2411,17 +2554,12 @@
         try {
           var sz = Math.min(9, pos.rect.height * 0.72);
           pages[pos.pageIdx].drawText(String(val), {
-            x: pos.rect.x + 2,
-            y: pos.rect.y + pos.rect.height * 0.18,
-            size: sz,
-            font: stdFont,
-            color: PDFLib.rgb(0, 0, 0),
-            maxWidth: pos.rect.width - 4
+            x: pos.rect.x + 2, y: pos.rect.y + pos.rect.height * 0.18,
+            size: sz, font: stdFont, color: PDFLib.rgb(0,0,0), maxWidth: pos.rect.width - 4
           });
         } catch(e) { console.warn('[lease] text draw failed for', name, ':', e); }
       });
 
-      // Draw an X for the pre-authorized debit checkbox
       var pmtPos = fieldPos['pmt_pad'];
       if (pmtPos) {
         try {
@@ -2429,42 +2567,33 @@
             x: pmtPos.rect.x + pmtPos.rect.width * 0.2,
             y: pmtPos.rect.y + pmtPos.rect.height * 0.1,
             size: Math.min(10, pmtPos.rect.height * 0.8),
-            font: stdFont,
-            color: PDFLib.rgb(0, 0, 0)
+            font: stdFont, color: PDFLib.rgb(0,0,0)
           });
         } catch(e) {}
       }
 
-      // Embed drawn/typed initials and signatures
       var sigEntries = Object.keys(initSigs);
       for (var si = 0; si < sigEntries.length; si++) {
         var fieldName = sigEntries[si];
         var sigData   = initSigs[fieldName];
         if (!sigData) continue;
-
         try {
-          // Find the field and its widget position
           var allFields = form.getFields();
           var targetField = null;
           for (var fi = 0; fi < allFields.length; fi++) {
             if (allFields[fi].getName() === fieldName) { targetField = allFields[fi]; break; }
           }
           if (!targetField) continue;
-
           var widgets = targetField.acroField.getWidgets();
           if (!widgets.length) continue;
-          var widget = widgets[0];
-          var rect   = widget.getRectangle();
-
-          // Find which page this widget belongs to
-          var pageRef  = widget.P();
-          var pageIdx  = -1;
+          var widget  = widgets[0];
+          var rect    = widget.getRectangle();
+          var pageRef = widget.P();
+          var pageIdx = -1;
           for (var pi = 0; pi < pages.length; pi++) {
-            var pRef = pages[pi].ref;
-            if (pRef.objectNumber === pageRef.objectNumber) { pageIdx = pi; break; }
+            if (pages[pi].ref.objectNumber === pageRef.objectNumber) { pageIdx = pi; break; }
           }
           if (pageIdx < 0) continue;
-
           if (sigData.indexOf('data:image/png;base64,') === 0) {
             var b64    = sigData.split(',')[1];
             var raw    = atob(b64);
@@ -2472,40 +2601,31 @@
             for (var bi = 0; bi < raw.length; bi++) pngArr[bi] = raw.charCodeAt(bi);
             var pngImg = await pdfDoc.embedPng(pngArr);
             pages[pageIdx].drawImage(pngImg, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
-            // Clear the field text so the image is the only content
             try { targetField.setText(''); } catch(e2) {}
           } else if (sigData.indexOf('typed:') === 0) {
-            var typed = sigData.replace('typed:', '');
-            try { targetField.setText(typed); } catch(e2) {}
+            try { targetField.setText(sigData.replace('typed:','')); } catch(e2) {}
           } else if (sigData.indexOf('wet:') === 0) {
-            var ref = sigData.replace('wet:', '');
+            var ref = sigData.replace('wet:','');
             try { targetField.setText(ref === 'pending' ? 'Wet signature on file' : 'E-sign: '+ref); } catch(e2) {}
           }
         } catch(e) { console.warn('[lease pdf] sig embed failed for', fieldName, e); }
       }
 
-      // Strip all widget annotations and AcroForm -- produces a plain static
-      // document with no interactive elements and no colored field overlays.
       pages.forEach(function(page) {
         try { page.node.delete(PDFLib.PDFName.of('Annots')); } catch(e) {}
       });
       try { pdfDoc.catalog.delete(PDFLib.PDFName.of('AcroForm')); } catch(e) {}
 
-      // Save and download
-
-      // Save and download
-      var tenantName = fieldValues['tenant_primary_name'] || 'Tenant';
-      var filename   = 'CLFN_Occupancy_Agreement_' + tenantName.replace(/\s+/g,'_') + '.pdf';
+      var tenantName  = tokens.tenantName || 'Tenant';
+      var filename    = 'CLFN_Occupancy_Agreement_' + tenantName.replace(/\s+/g,'_') + '.pdf';
       var filledBytes = await pdfDoc.save();
       var blob = new Blob([filledBytes], { type: 'application/pdf' });
 
-      // Trigger download
       var url  = URL.createObjectURL(blob);
       var link = document.createElement('a');
       link.href = url; link.download = filename; link.click();
       setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
 
-      // Upload to tenant document library
       var unit = _ticState.unit || {};
       if (unit.id) {
         try {

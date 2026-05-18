@@ -353,3 +353,26 @@
   padding-top: 14px;
   border-top: 1px solid var(--border);
 }
+
+/* ── Contracts & Agreements tab ─────────────────────────────────────── */
+.contracts-clause-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+
+.contracts-token-chip {
+  display: inline-block;
+  background: var(--yellow, #F8E41A);
+  color: var(--dark, #1a1a1a);
+  font-size: 11px;
+  font-family: 'DM Mono', monospace, sans-serif;
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity .15s;
+}
+.contracts-token-chip:hover { opacity: .75; }
