@@ -77,7 +77,7 @@
         <thead id="ra_thead">
           <tr>
             <th class="std-th-sortable" data-sort-key="addr">Address</th>
-            <th class="std-th-sortable" data-sort-key="projectNumber" style="width:155px;">Project #</th>
+            <th class="std-th-sortable" data-sort-key="projectNumber" style="width:90px;">Project #</th>
             <th class="std-th-sortable" data-sort-key="priority" style="width:80px;">Priority</th>
             <th class="std-th-sortable" data-sort-key="cost" style="width:80px;">SOW Cost</th>
             <th class="std-th-sortable" data-sort-key="approval" style="width:130px;">Approval Status</th>
@@ -1703,10 +1703,12 @@ function renderRenoApprovalsView() {
         approveBtn = '<button data-ra-approve="'+uid+'"'+dataProj+' data-ra-role="ed" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'+(appr.key==='pending_hm'?'Override →':'✓ Approve')+'</button>';
     }
 
-    // Project # cell — monospace, clickable to open the specific SOW.
+    // Project # cell — strip the address prefix (redundant — first column shows it)
+    // and display just the SOW-NNN suffix for brevity.
+    var pnShort = pn ? pn.replace(/^.*-SOW-/, 'SOW-') : '';
     var pnCell = pn
-      ? '<span style="font-family:ui-monospace,Menlo,Monaco,\'Courier New\',monospace;font-size:11px;font-weight:700;color:var(--text);">'+pn+'</span>'+(locked?' <span title="Completed — locked">🔒</span>':'')
-      : '<span style="font-size:11px;color:var(--muted);font-style:italic;">— no SOW —</span>';
+      ? '<span style="font-family:ui-monospace,Menlo,Monaco,\'Courier New\',monospace;font-size:11px;font-weight:700;color:var(--text);" title="'+pn+'">'+pnShort+'</span>'+(locked?' <span title="Completed — locked">🔒</span>':'')
+      : '<span style="font-size:11px;color:var(--muted);font-style:italic;">—</span>';
 
     return '<tr data-ra-uid="'+uid+'"'+dataProj+' style="border-bottom:1px solid var(--border);cursor:pointer;">'
       +'<td style="padding:10px 14px;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
@@ -1714,7 +1716,7 @@ function renderRenoApprovalsView() {
         +'<div style="font-size:10px;font-weight:500;color:var(--muted);margin-top:1px;">'+u.bedrooms+'bd · '+(u.type&&u.type!=='0'&&u.type!=='nan'?u.type.replace(' unit','').replace('Detached','Det.').replace('Complex','Cplx'):'—')+'</div>'
         +(u.status==='condemned'?' <span style="font-size:9px;background:var(--danger-bg);color:var(--danger);padding:1px 6px;border-radius:6px;font-weight:700;">CONDEMNED</span>':'')
       +'</td>'
-      +'<td style="padding:10px 10px;white-space:nowrap;">'+pnCell+'</td>'
+      +'<td style="padding:10px 10px;word-break:break-word;">'+pnCell+'</td>'
       +'<td style="padding:10px 10px;white-space:nowrap;"><span style="font-size:14px;font-weight:800;color:var(--text);">'+rs.score+'</span> <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:'+tier.bg+';color:'+tier.c+';">'+tier.l+'</span></td>'
       +'<td style="padding:10px 10px;font-size:13px;font-weight:600;">'+costStr+(needsED&&r.cost>0?'<div class="txt-info-bold" style="font-size:9px;">ED auth</div>':'')+'</td>'
       +'<td style="padding:10px 10px;"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+appr.bg+';color:'+appr.c+';white-space:nowrap;">'+appr.label+'</span></td>'
