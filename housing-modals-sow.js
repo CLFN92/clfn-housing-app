@@ -1360,11 +1360,16 @@ function saveSOW(opts){
         var ct = await _resolveContractorForEmail(_sowSnapshot.contractorId);
         if (!ct || !ct.email) return;
         if (typeof showConfirm !== 'function') return;
+        var _esc = function(s){ return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); };
         var result = await showConfirm({
-          title:       'SOW approved — send Work Order?',
-          message:     'Optionally email a Work Order PDF to the assigned contractor for the work that was just approved.',
-          confirmText: 'Done',
-          checkbox:    { label: 'Email Work Order to ' + (ct.name || 'contractor') + ' (' + ct.email + ')', defaultChecked: true }
+          title:   'Send Work Order Email?',
+          message: 'The Scope of Work has been approved. Confirm the contractor details below before sending the Work Order PDF.',
+          detail:  '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px;">Contractor</div>'
+                 + '<div style="font-size:14px;font-weight:700;color:var(--text);">' + _esc(ct.name) + '</div>'
+                 + '<div style="font-size:12px;color:var(--muted);margin-top:3px;">&#128231; ' + _esc(ct.email) + '</div>',
+          confirmText: 'Send Email',
+          cancelText:  'Skip',
+          checkbox:    { label: 'Send work order email to this contractor', defaultChecked: true }
         });
         var ok     = (typeof result === 'object' && result !== null) ? !!result.ok      : !!result;
         var sendIt = (typeof result === 'object' && result !== null) ? !!result.checked : false;

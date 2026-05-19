@@ -190,9 +190,14 @@ window.showConfirm = function(opts) {
     ov.className = 'modal-overlay modal-overlay-centered modal-z-1100 is-open';
     var btnClass    = opts.danger ? 'btn btn-danger' : 'btn btn-primary';
     var hasCheckbox = !!(opts.checkbox && opts.checkbox.label);
+    var detailHtml  = opts.detail
+      ? '<div style="margin-top:12px;background:var(--bg);border:1px solid var(--border);border-left:3px solid var(--yellow);border-radius:7px;padding:11px 14px;">'
+          + opts.detail
+        + '</div>'
+      : '';
     var checkboxHtml = hasCheckbox
       ? '<label style="display:flex;align-items:flex-start;gap:8px;margin-top:12px;font-size:13px;cursor:pointer;line-height:1.4;">' +
-          '<input type="checkbox" data-cn-checkbox' + (opts.checkbox.defaultChecked ? ' checked' : '') + ' style="margin-top:3px;flex-shrink:0;cursor:pointer;"/>' +
+          '<input type="checkbox" data-cn-checkbox' + (opts.checkbox.defaultChecked ? ' checked' : '') + ' style="margin-top:3px;flex-shrink:0;cursor:pointer;accent-color:var(--yellow);"/>' +
           '<span>' + opts.checkbox.label + '</span>' +
         '</label>'
       : '';
@@ -204,6 +209,7 @@ window.showConfirm = function(opts) {
         '</div>' +
         '<div class="modal-body-stack">' +
           '<p class="txt-help m-0">' + (opts.message || 'Are you sure?') + '</p>' +
+          detailHtml +
           checkboxHtml +
         '</div>' +
         '<div class="modal-footer">' +
