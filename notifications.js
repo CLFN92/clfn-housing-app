@@ -58,6 +58,23 @@ var EMAIL_EVENT_REGISTRY = [
     }
   },
   {
+    key:                   'transfer_request_submitted',
+    label:                 'Transfer / New Housing Request Submitted',
+    description:           'Sent when an existing tenant submits a new housing or transfer request.',
+    defaultRecipientRoles: ['housing_manager'],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['applicantName','applicantId','score','tier','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — Transfer Request Submitted: {applicantName}',
+      bodyHtml: '<p>An existing tenant has submitted a new housing / transfer request and requires your review.</p>'
+              + '<p>Tenant: <strong>{applicantName}</strong> ({applicantId})<br/>'
+              +    'Score: <strong>{score}</strong> &middot; Tier: <strong>{tier}</strong></p>'
+              + '<p>Please log in to the {nationShort} Housing app to review and recommend.</p>'
+              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+    }
+  },
+  {
     key:                   'sow_created',
     label:                 'Scope of Work Created',
     description:           'Sent on the first save of a new SOW (not on subsequent edits).',
@@ -506,12 +523,14 @@ async function _sbLoadActiveStaffByRole(role) {
 // window.sendNotification. Best-effort, never throws.
 
 // Wired from finalSubmit() in housing-app.js. Picks the event based on
-// app.appType (existing_tenant → file_update_submitted, else
-// application_submitted) and emails every active staff member whose role
-// is in the event's saved (or default) recipient list.
+// app.appType: existing_tenant → file_update_submitted,
+//              transfer_request → transfer_request_submitted,
+//              else → application_submitted.
 async function notifyApplicationSubmitted(app) {
   if (!app) return;
-  var eventKey = (app.appType === 'existing_tenant') ? 'file_update_submitted' : 'application_submitted';
+  var eventKey = app.appType === 'existing_tenant'  ? 'file_update_submitted'
+               : app.appType === 'transfer_request' ? 'transfer_request_submitted'
+               : 'application_submitted';
   var cfg      = _emailEventConfig(eventKey);
   if (!cfg) return;
   var roles    = _emailEventRecipientRoles(eventKey).concat(_emailEventCcRoles(eventKey));

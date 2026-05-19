@@ -824,7 +824,7 @@ function renderDashTable(){
       +'<td class="col-res col-hide-mobile" class="empty-sub">'+escapeHtml(a.reserve||'—')+'</td>'
       +'<td class="col-arr col-hide-mobile" style="font-size:12px;color:'+(a.hasArrears?'var(--danger)':'var(--muted)')+';font-weight:600;">'+(a.hasArrears?'Yes':'—')+'</td>'
       +'<td><span class="pill '+sp[1]+'"><span class="pill-dot"></span>'+sp[0]+'</span></td>'
-      +'<td class="col-score">'+(a.appType==='existing_tenant'?'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--bg);color:var(--muted);white-space:nowrap;">File Update</span>':(hasScore?'<button class="score-cell-btn" data-score-id="'+aIdEsc+'" onclick="window._openScoreByEl(this)" title="Click to see score breakdown"><span class="score-num">'+a.score+'</span><div class="score-right"><span class="score-tier-badge" style="background:'+tc.bg+';color:'+tc.c+';font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;">'+escapeHtml((a.tier||'').replace(' Priority',''))+'</span>'+scoreMiniBar(a.score)+'</div></button>':'<span class="js-txt-muted-sm">—</span>'))+'</td>'
+      +'<td class="col-score">'+(a.appType==='existing_tenant'?'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--bg);color:var(--muted);white-space:nowrap;">File Update</span>':a.appType==='transfer_request'?'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--info-blue-bg,#eff6ff);color:var(--info-blue,#1d4ed8);white-space:nowrap;">Transfer Req</span>':(hasScore?'<button class="score-cell-btn" data-score-id="'+aIdEsc+'" onclick="window._openScoreByEl(this)" title="Click to see score breakdown"><span class="score-num">'+a.score+'</span><div class="score-right"><span class="score-tier-badge" style="background:'+tc.bg+';color:'+tc.c+';font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;">'+escapeHtml((a.tier||'').replace(' Priority',''))+'</span>'+scoreMiniBar(a.score)+'</div></button>':'<span class="js-txt-muted-sm">—</span>'))+'</td>'
       +'<td style="white-space:nowrap;"><div style="display:flex;gap:4px;align-items:center;">'
       +'<button class="dash-action-btn edit-app-btn" data-id="'+aIdEsc+'" title="Edit" style="padding:5px 8px;">'
       +'<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7\"/><path d=\"M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z\"/></svg>'
@@ -1465,7 +1465,9 @@ function saveApplicationRecord(opts){
 
   // Audit — log save/update events
   var _isNew = (idx < 0);  // idx was set before push
-  var _appType = appObj.appType === 'existing_tenant' ? 'File Update' : 'New Housing';
+  var _appType = appObj.appType === 'existing_tenant'  ? 'File Update'
+              : appObj.appType === 'transfer_request' ? 'Transfer Request'
+              : 'New Housing';
   var _status  = appObj.status || 'draft';
   if(_status === APP_STATUS.DRAFT) {
     // Only log draft saves once (first time)
@@ -1702,8 +1704,11 @@ function openSubmitModal(){
     ? ('Email a PDF copy to ' + applicantEmail + ' and ' + coEmail)
     : ('Email a PDF copy to ' + copyTarget);
 
+  var _submitTitle = isFileUpdate        ? 'Submit file update?'
+                  : (appType === 'transfer_request') ? 'Submit transfer request?'
+                  : 'Submit application?';
   var confirmOpts = {
-    title:       isFileUpdate ? 'Submit file update?' : 'Submit application?',
+    title:       _submitTitle,
     message:     'This will send the application to the Housing Manager for review. You will not be able to edit it after submission.',
     confirmText: 'Confirm Submit'
   };
@@ -1725,11 +1730,14 @@ function finalSubmit(opts){
   opts = opts || {};
   var sendApplicantCopy = opts.sendApplicantCopy === true;
   var appType = (typeof getAppType==='function') ? getAppType() : 'new_housing';
-  var isFileUpdate = (appType === 'existing_tenant');
-  var actionLabel = isFileUpdate ? 'file_update_submitted' : 'application_submitted';
-  var detail = isFileUpdate
-    ? 'File update submitted by applicant — awaiting Housing Manager review'
-    : 'New housing application submitted by applicant — awaiting Housing Manager review';
+  var isFileUpdate      = (appType === 'existing_tenant');
+  var isTransferRequest = (appType === 'transfer_request');
+  var actionLabel = isFileUpdate      ? 'file_update_submitted'
+                  : isTransferRequest ? 'transfer_request_submitted'
+                  : 'application_submitted';
+  var detail = isFileUpdate      ? 'File update submitted by applicant — awaiting Housing Manager review'
+             : isTransferRequest ? 'Transfer / new housing request submitted by existing tenant — awaiting Housing Manager review'
+             : 'New housing application submitted by applicant — awaiting Housing Manager review';
   auditEntry(currentAppId||'new', actionLabel, detail, 'Applicant');
   renderApprovalFlow();
   triggerV2Score();
