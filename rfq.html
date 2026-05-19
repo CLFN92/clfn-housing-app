@@ -173,13 +173,14 @@
       <div class="card card-flush" style="margin-top:16px;">
         <div class="modal-hdr"><div class="lbl-yellow">Scope Detail</div></div>
         <div class="sec-pad">
-          <div class="f" style="margin-bottom:12px;">
-            <label>Scope Summary <span style="font-size:10px;color:var(--muted);">(brief paragraph for the contract body)</span></label>
+          <div class="f" style="margin-bottom:16px;">
+            <label>Scope Summary <span style="font-size:10px;color:var(--muted);">Brief paragraph for the contract body</span></label>
             <textarea id="rfq_sow_summary" class="stg-lookup-input" rows="3" placeholder="Brief description of the scope of work…"></textarea>
           </div>
-          <div class="f" style="margin-bottom:12px;">
-            <label>Detailed Work Packages <span style="font-size:10px;color:var(--muted);">(from bid — line items, quantities, specs)</span></label>
-            <textarea id="rfq_sow_detail" class="stg-lookup-input" rows="5" placeholder="Work package details from the accepted quote…"></textarea>
+          <div style="margin-bottom:16px;">
+            <label style="font-size:12px;font-weight:600;color:var(--text);display:block;margin-bottom:6px;">Work Items <span style="font-size:10px;color:var(--muted);font-weight:400;">Pre-populated from SOW &mdash; edit or add items for the contract</span></label>
+            <div id="rfq_scope_detail_rows"></div>
+            <button type="button" class="btn btn-ghost" style="margin-top:8px;font-size:12px;" onclick="addScopeDetailRow()">+ Add Item</button>
           </div>
           <div class="f" style="margin-bottom:12px;">
             <label>Materials &amp; Specifications</label>
@@ -191,7 +192,7 @@
           </div>
           <div class="f">
             <label>Items Supplied by Nation</label>
-            <textarea id="rfq_clfn_supplied" class="stg-lookup-input" rows="2" placeholder='Items provided by CLFN Housing (or "None")…'></textarea>
+            <textarea id="rfq_clfn_supplied" class="stg-lookup-input" rows="2" placeholder='Items provided by Nation Housing (or "None")…'></textarea>
           </div>
         </div>
       </div>
@@ -205,9 +206,9 @@
             <div class="f"><label>Labour Total ($)</label><input type="number" id="rfq_price_labour" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqRecalcPrices()"/></div>
             <div class="f"><label>Equipment Total ($)</label><input type="number" id="rfq_price_equipment" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqRecalcPrices()"/></div>
             <div class="f"><label>Other Total ($)</label><input type="number" id="rfq_price_other" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqRecalcPrices()"/></div>
-            <div class="f"><label>Subtotal (excl. tax)</label><input type="text" id="rfq_price_subtotal" class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></div>
-            <div class="f"><label>Tax Total ($)</label><input type="number" id="rfq_price_tax" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqRecalcPrices()"/></div>
-            <div class="f"><label>Contract Price (incl. tax)</label><input type="text" id="rfq_price_total_incl_tax" class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></div>
+            <div class="f"><label>Subtotal</label><input type="text" id="rfq_price_subtotal" class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></div>
+            <div class="f"><label>Tax</label><input type="text" id="rfq_price_tax" class="stg-lookup-input" readonly value="$0.00 — First Nations exempt" style="background:var(--bg);color:var(--muted);font-style:italic;"/></div>
+            <div class="f"><label>Contract Price (Total)</label><input type="text" id="rfq_price_total_incl_tax" class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);font-weight:600;"/></div>
             <div class="f"><label>Labour Hours (total)</label><input type="number" id="rfq_labour_hours" class="stg-lookup-input" placeholder="0" min="0" step="1"/></div>
           </div>
         </div>
@@ -217,48 +218,9 @@
       <div class="card card-flush" style="margin-top:16px;">
         <div class="modal-hdr"><div class="lbl-yellow">Milestone Payments</div></div>
         <div class="sec-pad">
-          <div style="overflow-x:auto;">
-            <table class="std-table" style="min-width:600px;">
-              <thead><tr>
-                <th style="width:28%;">Milestone</th>
-                <th style="width:10%;">%</th>
-                <th style="width:18%;">Gross ($)</th>
-                <th style="width:18%;">Holdback ($)</th>
-                <th style="width:18%;">Net ($)</th>
-              </tr></thead>
-              <tbody id="rfq_milestone_tbody">
-                <tr>
-                  <td><input type="text"   id="rfq_m1_name"     class="stg-lookup-input" placeholder="e.g. Mobilization"/></td>
-                  <td><input type="number" id="rfq_m1_pct"      class="stg-lookup-input" placeholder="%" min="0" max="100" step="0.1" oninput="_rfqCalcMilestone(1)"/></td>
-                  <td><input type="number" id="rfq_m1_gross"    class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(1)"/></td>
-                  <td><input type="number" id="rfq_m1_holdback" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(1)"/></td>
-                  <td><input type="text"   id="rfq_m1_net"      class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></td>
-                </tr>
-                <tr>
-                  <td><input type="text"   id="rfq_m2_name"     class="stg-lookup-input" placeholder="e.g. 50% complete"/></td>
-                  <td><input type="number" id="rfq_m2_pct"      class="stg-lookup-input" placeholder="%" min="0" max="100" step="0.1" oninput="_rfqCalcMilestone(2)"/></td>
-                  <td><input type="number" id="rfq_m2_gross"    class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(2)"/></td>
-                  <td><input type="number" id="rfq_m2_holdback" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(2)"/></td>
-                  <td><input type="text"   id="rfq_m2_net"      class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></td>
-                </tr>
-                <tr>
-                  <td><input type="text"   id="rfq_m3_name"     class="stg-lookup-input" placeholder="e.g. Substantial completion"/></td>
-                  <td><input type="number" id="rfq_m3_pct"      class="stg-lookup-input" placeholder="%" min="0" max="100" step="0.1" oninput="_rfqCalcMilestone(3)"/></td>
-                  <td><input type="number" id="rfq_m3_gross"    class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(3)"/></td>
-                  <td><input type="number" id="rfq_m3_holdback" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(3)"/></td>
-                  <td><input type="text"   id="rfq_m3_net"      class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></td>
-                </tr>
-                <tr>
-                  <td><input type="text"   id="rfq_m4_name"     class="stg-lookup-input" placeholder="e.g. Final / holdback release"/></td>
-                  <td><input type="number" id="rfq_m4_pct"      class="stg-lookup-input" placeholder="%" min="0" max="100" step="0.1" oninput="_rfqCalcMilestone(4)"/></td>
-                  <td><input type="number" id="rfq_m4_gross"    class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(4)"/></td>
-                  <td><input type="number" id="rfq_m4_holdback" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestone(4)"/></td>
-                  <td><input type="text"   id="rfq_m4_net"      class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="f" style="margin-top:12px;max-width:260px;">
+          <div id="rfq_milestone_rows"></div>
+          <button type="button" class="btn btn-ghost" style="margin-top:8px;font-size:12px;" onclick="addMilestoneRow()">+ Add Milestone</button>
+          <div class="f" style="margin-top:14px;max-width:260px;">
             <label>Holdback Release Amount ($)</label>
             <input type="number" id="rfq_holdback_release" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01"/>
           </div>
@@ -306,7 +268,7 @@
             <label>Signature Date</label>
             <input type="date" id="rfq_ct_sig_date" class="stg-lookup-input"/>
           </div>
-          <div class="sig-canvas-wrap">
+          <div class="sig-canvas-wrap" style="width:100%;display:block;">
             <div class="tab-bar">
               <button type="button" onclick="setSigMethod('rfq_ct_sig','canvas')" id="rfq_ct_sig_tab_canvas" class="tab-item active">&#9999;&#65039; Draw</button>
               <button type="button" onclick="setSigMethod('rfq_ct_sig','type')"   id="rfq_ct_sig_tab_type"   class="tab-item">&#9000;&#65039; Type</button>

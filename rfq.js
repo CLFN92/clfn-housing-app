@@ -1,14 +1,16 @@
 'use strict';
 
-var _rfqCurrentId   = null;
-var _rfqSowUnitId   = null;
-var _rfqSowPn       = null;
-var _rfqSowData     = null;
-var _rfqUnitData    = null;
-var _rfqScopeItems  = [];
-var _rfqSelectedCts = {};
-var _rfqActiveTab   = 'details';
-var _rfqAwardingId  = null;
+var _rfqCurrentId       = null;
+var _rfqSowUnitId       = null;
+var _rfqSowPn           = null;
+var _rfqSowData         = null;
+var _rfqUnitData        = null;
+var _rfqScopeItems      = [];
+var _rfqSelectedCts     = {};
+var _rfqActiveTab       = 'details';
+var _rfqAwardingId      = null;
+var _rfqScopeDetailRows = [];
+var _rfqMilestoneRows   = [];
 
 // ── Page init (mirrors renos.html IIFE pattern — never loads housing-init.js) ─
 (async function initRfq() {
@@ -279,9 +281,11 @@ function showRfqForm(rfqId, unitId, sowPn) {
   document.getElementById('rfqFormView').style.display  = '';
   switchRfqTab('details');
 
-  _rfqCurrentId  = rfqId || null;
-  _rfqSelectedCts = {};
-  _rfqScopeItems  = [];
+  _rfqCurrentId       = rfqId || null;
+  _rfqSelectedCts     = {};
+  _rfqScopeItems      = [];
+  _rfqScopeDetailRows = [];
+  _rfqMilestoneRows   = [];
 
   if (rfqId) {
     // Editing existing
@@ -312,6 +316,14 @@ function showRfqForm(rfqId, unitId, sowPn) {
     document.getElementById('rfq_contact_email').value = session.email || '';
     document.getElementById('rfqFormHeading').textContent = 'New Request for Quotes';
     document.getElementById('rfqIssueBtn').disabled = false;
+    // Contract defaults
+    var cnEl = document.getElementById('rfq_contract_number');
+    if (cnEl) cnEl.value = generateContractNumber();
+    var cdEl = document.getElementById('rfq_contract_date');
+    if (cdEl) cdEl.value = new Date().toISOString().slice(0,10);
+    var apEl = document.getElementById('rfq_ap_email');
+    if (apEl) apEl.value = 'housing@clfn.on.ca';
+    renderMilestoneRows();
   }
 
   // Load SOW data and unit
@@ -352,7 +364,7 @@ function _populateFormFields(rfq) {
   set('rfq_contract_start',        d.contract_start  || d.target_start_date || '');
   set('rfq_substantial_completion',d.substantial_completion_date || '');
   set('rfq_total_completion',      d.total_completion_date || d.target_completion_date || '');
-  set('rfq_ap_email',              d.ap_email              || '');
+  set('rfq_ap_email',              d.ap_email || 'housing@clfn.on.ca');
   set('rfq_site_lead_name',        d.site_lead_name        || '');
   set('rfq_site_lead_phone',       d.site_lead_phone       || '');
   set('rfq_ct_signatory_name',     d.ct_signatory_name     || '');
@@ -373,16 +385,10 @@ function _populateFormFields(rfq) {
   set('rfq_price_tax',       d.price_tax       || '');
   set('rfq_labour_hours',    d.labour_hours    || '');
 
+  // Scope detail rows
+  _rfqScopeDetailRows = d.scope_detail_rows || [];
   // Milestones
-  var ms = d.milestones || [{},{},{},{}];
-  for (var mi = 1; mi <= 4; mi++) {
-    var m = ms[mi-1] || {};
-    set('rfq_m'+mi+'_name',    m.name    || '');
-    set('rfq_m'+mi+'_pct',     m.pct     || '');
-    set('rfq_m'+mi+'_gross',   m.gross   || '');
-    set('rfq_m'+mi+'_holdback',m.holdback|| '');
-    set('rfq_m'+mi+'_net',     m.net     || '');
-  }
+  _rfqMilestoneRows = (d.milestones || []).filter(function(m){ return m && (m.name || m.gross); });
   set('rfq_holdback_release', d.holdback_release || '');
 
   // Signatures
@@ -459,6 +465,21 @@ function _loadRfqSowContext() {
     var rawItems = _rfqSowData.items || _rfqSowData.lineItems || [];
     _rfqScopeItems = rawItems.map(function(it){ return Object.assign({}, it, {_hidden:false}); });
   }
+
+  // Pre-populate scope detail rows from scope items if not yet set
+  if (!_rfqScopeDetailRows.length && _rfqScopeItems.length) {
+    _rfqScopeDetailRows = _rfqScopeItems
+      .filter(function(it){ return !it._hidden && (it.category || it.description); })
+      .map(function(it){
+        return {
+          category:    it.category    || '',
+          description: it.description || '',
+          notes:       it.amount ? ('$' + Number(it.amount).toLocaleString('en-CA', {minimumFractionDigits:2})) : (it.notes || '')
+        };
+      });
+  }
+  renderScopeDetailRows();
+  renderMilestoneRows();
 }
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
@@ -584,16 +605,8 @@ function _buildRfqPayload() {
   function fv(elId) { var el = document.getElementById(elId); return el ? el.value.trim() : ''; }
   function fn(elId) { return parseFloat(fv(elId)) || null; }
 
-  var milestones = [];
-  for (var mi = 1; mi <= 4; mi++) {
-    milestones.push({
-      name:     fv('rfq_m'+mi+'_name'),
-      pct:      fv('rfq_m'+mi+'_pct'),
-      gross:    fv('rfq_m'+mi+'_gross'),
-      holdback: fv('rfq_m'+mi+'_holdback'),
-      net:      fv('rfq_m'+mi+'_net')
-    });
-  }
+  var milestones     = _readMilestoneRows();
+  var scopeDetailRows = _readScopeDetailRows();
 
   return {
     id:                      id,
@@ -629,7 +642,7 @@ function _buildRfqPayload() {
       ct_signatory_title:           fv('rfq_ct_signatory_title'),
       // Scope detail
       sow_summary:     fv('rfq_sow_summary'),
-      sow_detail:      fv('rfq_sow_detail'),
+      scope_detail_rows: scopeDetailRows,
       materials_specs: fv('rfq_materials_specs'),
       exclusions:      fv('rfq_exclusions'),
       clfn_supplied:   fv('rfq_clfn_supplied'),
@@ -791,6 +804,149 @@ async function confirmAward() {
   }
 }
 
+// ── Contract number generation ────────────────────────────────────────────
+function generateContractNumber() {
+  var year   = new Date().getFullYear();
+  var prefix = 'CON-' + year + '-';
+  var maxSeq = 0;
+  Object.keys(window._rfqCache || {}).forEach(function(id) {
+    var rfq = (window._rfqCache || {})[id];
+    var cn  = rfq && rfq.data && rfq.data.contract_number;
+    if (cn && String(cn).indexOf(prefix) === 0) {
+      var seq = parseInt(String(cn).slice(prefix.length), 10);
+      if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+    }
+  });
+  return prefix + String(maxSeq + 1).padStart(4, '0');
+}
+
+// ── Scope detail dynamic rows ─────────────────────────────────────────────
+function renderScopeDetailRows() {
+  var el = document.getElementById('rfq_scope_detail_rows');
+  if (!el) return;
+  if (!_rfqScopeDetailRows.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:10px 0;font-style:italic;">No items — click "+ Add Item" or link this RFQ to a SOW with scope items.</div>';
+    return;
+  }
+  el.innerHTML = '<div style="overflow-x:auto;">'
+    + '<table class="std-table" style="width:100%;table-layout:fixed;">'
+    + '<thead><tr>'
+    + '<th style="width:22%;">Category</th>'
+    + '<th style="width:38%;">Description</th>'
+    + '<th style="width:32%;">Notes / Specs</th>'
+    + '<th style="width:8%;"></th>'
+    + '</tr></thead><tbody>'
+    + _rfqScopeDetailRows.map(function(row, i) {
+        return '<tr>'
+          + '<td style="padding:4px 6px;"><input type="text" id="rfq_sdr_cat_' + i + '" value="' + escapeHtml(row.category || '') + '" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;" placeholder="Category"/></td>'
+          + '<td style="padding:4px 6px;"><input type="text" id="rfq_sdr_desc_' + i + '" value="' + escapeHtml(row.description || '') + '" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;" placeholder="Description"/></td>'
+          + '<td style="padding:4px 6px;"><input type="text" id="rfq_sdr_notes_' + i + '" value="' + escapeHtml(row.notes || '') + '" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;" placeholder="Specs, notes, amount"/></td>'
+          + '<td style="padding:4px 6px;text-align:center;"><button type="button" onclick="removeScopeDetailRow(' + i + ')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;" title="Remove">&times;</button></td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+
+function addScopeDetailRow(row) {
+  _readScopeDetailRows();
+  _rfqScopeDetailRows.push(row || { category: '', description: '', notes: '' });
+  renderScopeDetailRows();
+}
+
+function removeScopeDetailRow(i) {
+  _readScopeDetailRows();
+  _rfqScopeDetailRows.splice(i, 1);
+  renderScopeDetailRows();
+}
+
+function _readScopeDetailRows() {
+  var rows = [];
+  var i = 0;
+  while (document.getElementById('rfq_sdr_cat_' + i)) {
+    rows.push({
+      category:    (document.getElementById('rfq_sdr_cat_'   + i) || {}).value || '',
+      description: (document.getElementById('rfq_sdr_desc_'  + i) || {}).value || '',
+      notes:       (document.getElementById('rfq_sdr_notes_' + i) || {}).value || ''
+    });
+    i++;
+  }
+  _rfqScopeDetailRows = rows;
+  return rows;
+}
+
+// ── Milestone dynamic rows ────────────────────────────────────────────────
+function renderMilestoneRows() {
+  var el = document.getElementById('rfq_milestone_rows');
+  if (!el) return;
+  if (!_rfqMilestoneRows.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:10px 0;font-style:italic;">No milestones — click "+ Add Milestone" to add payment milestones.</div>';
+    return;
+  }
+  el.innerHTML = '<div style="overflow-x:auto;">'
+    + '<table class="std-table" style="min-width:520px;">'
+    + '<thead><tr>'
+    + '<th style="width:28%;">Milestone</th>'
+    + '<th style="width:10%;">%</th>'
+    + '<th style="width:18%;">Gross ($)</th>'
+    + '<th style="width:18%;">Holdback ($)</th>'
+    + '<th style="width:18%;">Net</th>'
+    + '<th style="width:8%;"></th>'
+    + '</tr></thead><tbody>'
+    + _rfqMilestoneRows.map(function(m, i) {
+        return '<tr>'
+          + '<td style="padding:4px 6px;"><input type="text"   id="rfq_mr_name_' + i + '"     value="' + escapeHtml(m.name    || '') + '" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;" placeholder="e.g. Mobilization"/></td>'
+          + '<td style="padding:4px 6px;"><input type="number" id="rfq_mr_pct_' + i + '"      value="' + escapeHtml(m.pct     || '') + '" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;" placeholder="%" min="0" max="100" step="0.1" oninput="_rfqCalcMilestoneRow(' + i + ')"/></td>'
+          + '<td style="padding:4px 6px;"><input type="number" id="rfq_mr_gross_' + i + '"    value="' + escapeHtml(m.gross   || '') + '" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestoneRow(' + i + ')"/></td>'
+          + '<td style="padding:4px 6px;"><input type="number" id="rfq_mr_holdback_' + i + '" value="' + escapeHtml(m.holdback|| '') + '" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;" placeholder="0.00" min="0" step="0.01" oninput="_rfqCalcMilestoneRow(' + i + ')"/></td>'
+          + '<td style="padding:4px 6px;"><input type="text"   id="rfq_mr_net_' + i + '"      value="' + escapeHtml(m.net     || '') + '" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;background:var(--bg);color:var(--muted);" readonly/></td>'
+          + '<td style="padding:4px 6px;text-align:center;"><button type="button" onclick="removeMilestoneRow(' + i + ')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;" title="Remove">&times;</button></td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+
+function addMilestoneRow() {
+  _readMilestoneRows();
+  _rfqMilestoneRows.push({ name: '', pct: '', gross: '', holdback: '', net: '' });
+  renderMilestoneRows();
+}
+
+function removeMilestoneRow(i) {
+  _readMilestoneRows();
+  _rfqMilestoneRows.splice(i, 1);
+  renderMilestoneRows();
+}
+
+function _rfqCalcMilestoneRow(i) {
+  var gross    = parseFloat((document.getElementById('rfq_mr_gross_'    + i) || {}).value) || 0;
+  var holdback = parseFloat((document.getElementById('rfq_mr_holdback_' + i) || {}).value) || 0;
+  var net = gross - holdback;
+  var netEl = document.getElementById('rfq_mr_net_' + i);
+  if (netEl) netEl.value = net >= 0 ? '$' + net.toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
+  if (_rfqMilestoneRows[i]) {
+    _rfqMilestoneRows[i].gross    = String((document.getElementById('rfq_mr_gross_'    + i) || {}).value || '');
+    _rfqMilestoneRows[i].holdback = String((document.getElementById('rfq_mr_holdback_' + i) || {}).value || '');
+    _rfqMilestoneRows[i].net      = netEl ? netEl.value : '';
+  }
+}
+
+function _readMilestoneRows() {
+  var rows = [];
+  var i = 0;
+  while (document.getElementById('rfq_mr_name_' + i)) {
+    rows.push({
+      name:     (document.getElementById('rfq_mr_name_'     + i) || {}).value || '',
+      pct:      (document.getElementById('rfq_mr_pct_'      + i) || {}).value || '',
+      gross:    (document.getElementById('rfq_mr_gross_'    + i) || {}).value || '',
+      holdback: (document.getElementById('rfq_mr_holdback_' + i) || {}).value || '',
+      net:      (document.getElementById('rfq_mr_net_'      + i) || {}).value || ''
+    });
+    i++;
+  }
+  _rfqMilestoneRows = rows;
+  return rows;
+}
+
 // ── Auto-fill contractor details when awarded-to changes ──────────────────
 function _rfqAutoFillContractor() {
   var sel = document.getElementById('rfq_awarded_to');
@@ -806,31 +962,16 @@ function _rfqAutoFillContractor() {
   setIfBlank('rfq_ct_signatory_title', ct.sigCt && ct.sigCt.title ? ct.sigCt.title : '');
 }
 
-// ── Price auto-calculation ────────────────────────────────────────────────
+// ── Price auto-calculation (tax always $0 for First Nations) ─────────────
 function _rfqRecalcPrices() {
   function fnum(id) { return parseFloat((document.getElementById(id) || {}).value) || 0; }
   function setRO(id, val) {
     var el = document.getElementById(id);
-    if (el) el.value = val ? '$' + val.toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
+    if (el) el.value = '$' + (val || 0).toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
-  var mat  = fnum('rfq_price_materials');
-  var lab  = fnum('rfq_price_labour');
-  var eqp  = fnum('rfq_price_equipment');
-  var oth  = fnum('rfq_price_other');
-  var tax  = fnum('rfq_price_tax');
-  var sub  = mat + lab + eqp + oth;
-  var tot  = sub + tax;
+  var sub = fnum('rfq_price_materials') + fnum('rfq_price_labour') + fnum('rfq_price_equipment') + fnum('rfq_price_other');
   setRO('rfq_price_subtotal',      sub);
-  setRO('rfq_price_total_incl_tax',tot);
-}
-
-// ── Milestone net auto-calculation ────────────────────────────────────────
-function _rfqCalcMilestone(n) {
-  var gross    = parseFloat((document.getElementById('rfq_m'+n+'_gross')    || {}).value) || 0;
-  var holdback = parseFloat((document.getElementById('rfq_m'+n+'_holdback') || {}).value) || 0;
-  var net      = gross - holdback;
-  var netEl    = document.getElementById('rfq_m'+n+'_net');
-  if (netEl) netEl.value = net > 0 ? '$' + net.toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
+  setRO('rfq_price_total_incl_tax',sub); // tax = 0
 }
 
 // ── Generate Contractor Agreement PDF ────────────────────────────────────
@@ -866,9 +1007,8 @@ async function generateContractorContract() {
   var pLab  = parseFloat(d.price_labour    || 0);
   var pEqp  = parseFloat(d.price_equipment || 0);
   var pOth  = parseFloat(d.price_other     || 0);
-  var pTax  = parseFloat(d.price_tax       || 0);
   var pSub  = pMat + pLab + pEqp + pOth;
-  var pTot  = pSub + pTax;
+  var pTot  = pSub; // First Nations — tax always $0
 
   var tokens = {
     rfqNumber:               rfqId,
@@ -901,7 +1041,7 @@ async function generateContractorContract() {
     clfnSignatoryName:       d.sig_name  || '',
     clfnSignatoryTitle:      d.sig_title || '',
     sowSummary:              d.sow_summary     || '',
-    sowDetailTable:          d.sow_detail      || '',
+    sowDetailTable:          (d.scope_detail_rows || []).filter(function(r){ return r.category || r.description; }).map(function(r, i){ return (i+1) + '. ' + [r.category, r.description, r.notes].filter(Boolean).join(' — '); }).join('\n') || '',
     materialsSpecifications: d.materials_specs || '',
     exclusionsAssumptions:   d.exclusions      || '',
     clfnSuppliedItems:       d.clfn_supplied   || '',
@@ -910,7 +1050,7 @@ async function generateContractorContract() {
     priceEquipment:          numFmt(pEqp),
     priceOther:              numFmt(pOth),
     priceSubtotal:           numFmt(pSub),
-    priceTax:                numFmt(pTax),
+    priceTax:                '$0.00',
     priceTotalInclTax:       numFmt(pTot),
     labourHours:             d.labour_hours    || '',
     holdbackRelease:         numFmt(d.holdback_release)
@@ -987,7 +1127,8 @@ async function generateContractorContract() {
     showToast('PDF library unavailable'); return;
   }
 
-  var ms = d.milestones || [{},{},{},{}];
+  var ms = (d.milestones || []).slice(0, 4); // AcroForm has m1-m4 fields
+  while (ms.length < 4) ms.push({});
 
   var fieldValues = {
     contractor_legal_name:          tokens.contractorLegalName,
@@ -1014,14 +1155,14 @@ async function generateContractorContract() {
     contract_price_excl_tax:        tokens.contractPriceExclTax,
     ap_email:                       tokens.apEmail,
     sow_summary:                    tokens.sowSummary,
-    sow_detail_table:               tokens.sowDetailTable,
+    sow_detail_table:               tokens.sowDetailTable, // serialized from dynamic rows
     materials_specifications:       tokens.materialsSpecifications,
     price_materials_total:          numFmt(pMat),
     price_labour_total:             numFmt(pLab),
     price_equipment_total:          numFmt(pEqp),
     price_other_total:              numFmt(pOth),
     price_subtotal_excl_tax:        numFmt(pSub),
-    price_tax_total:                numFmt(pTax),
+    price_tax_total:                '$0.00',
     price_contract_price_incl_tax:  numFmt(pTot),
     labour_hours_total:             d.labour_hours || '',
     exclusions_assumptions:         tokens.exclusionsAssumptions,
