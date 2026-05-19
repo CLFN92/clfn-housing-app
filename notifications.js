@@ -3332,7 +3332,14 @@ function _contractDocConfig(docKey) {
 function getContractBody(docKey) {
   var saved = (window._appSettings && window._appSettings.contracts_agreements
             && window._appSettings.contracts_agreements[docKey]) || {};
-  if (saved.bodyHtml != null && saved.bodyHtml !== '') return saved.bodyHtml;
+  if (saved.bodyHtml != null && saved.bodyHtml !== '') {
+    // Guard against corrupted saves (e.g. body saved before H1/H2/H3 were
+    // whitelisted in the sanitizer — headings were stripped, leaving only
+    // flat text that renders as a blank document). A real contract body
+    // has many hundreds of characters of plain text; < 300 means it's broken.
+    var plainLen = saved.bodyHtml.replace(/<[^>]+>/g, '').trim().length;
+    if (plainLen >= 300) return saved.bodyHtml;
+  }
   var cfg = _contractDocConfig(docKey);
   return cfg ? cfg.defaultBody : '';
 }
@@ -3443,6 +3450,7 @@ function _contractsRenderEditorHtml(docKey) {
     + '<div class="ntf-actions">'
     +   '<button type="button" class="btn btn-primary" onclick="saveContractsDoc()">Save</button>'
     +   '<button type="button" class="btn btn-ghost"   onclick="resetContractsDoc()">Reset to Default</button>'
+    +   '<button type="button" class="btn btn-ghost" style="color:var(--danger,#dc2626);" onclick="clearContractsSavedBody()" title="Remove saved override — generates will use the registry default">Clear Saved Body</button>'
     + '</div>';
 }
 
@@ -3565,7 +3573,6 @@ function resetContractsDoc() {
   if (!cfg) return;
   var bodyEl = document.getElementById('contracts_body');
   if (bodyEl) bodyEl.innerHTML = cfg.defaultBody;
-  // Re-render clauses section back to defaults
   var clausesList = document.getElementById('contracts_clauses_list');
   if (clausesList) {
     var clauses = (cfg && cfg.defaultClauses) ? cfg.defaultClauses : [];
@@ -3574,6 +3581,30 @@ function resetContractsDoc() {
     }).join('');
   }
   showToast('Reverted to default. Click Save to persist.');
+}
+
+// Removes a stale or corrupted saved body from _appSettings so the next
+// Generate uses the registry defaultBody cleanly.
+function clearContractsSavedBody() {
+  if (!_contractsSelectedDoc) return;
+  var all  = (window._appSettings && window._appSettings.contracts_agreements) || {};
+  var next = Object.assign({}, all);
+  if (next[_contractsSelectedDoc]) {
+    next[_contractsSelectedDoc] = Object.assign({}, next[_contractsSelectedDoc], { bodyHtml: '' });
+  }
+  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
+    method:  'POST',
+    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+    body:    JSON.stringify({ key: 'contracts_agreements', value: next })
+  }).then(function(r) {
+    if (!r.ok) { showToast('Clear failed — check connection'); return; }
+    if (!window._appSettings) window._appSettings = {};
+    window._appSettings.contracts_agreements = next;
+    showToast('Saved body cleared — Generate Contract will now use the built-in default.');
+  }).catch(function(e) {
+    console.warn('[contracts] clear failed:', e);
+    showToast('Clear failed — see console');
+  });
 }
 
 function addContractsClause() {
