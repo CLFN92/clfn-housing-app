@@ -1147,6 +1147,11 @@
           <input type="number" id="settings_hm_budget_limit" min="0" step="1000" placeholder="25000" class="stg-limit-input"/>
           <span class="stg-note">then ED approval</span>
         </div>
+        <div class="stg-budget-field">
+          <label>FNCFS Dependent Age</label>
+          <input type="number" id="budget_fncfs_age" min="1" max="25" step="1" placeholder="17" class="stg-limit-input" style="width:70px;"/>
+          <span class="stg-note">years (max for eligibility)</span>
+        </div>
         <button type="button" id="settings_save_budget_btn" onclick="saveBudgetPoolsED()" class="btn btn-primary">Save Budgets</button>
       </div>
     </div>

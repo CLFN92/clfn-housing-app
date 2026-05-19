@@ -1927,13 +1927,17 @@ var DEFAULT_RENO_SCORE_MODEL = [
 
 // ══ RENOVATION BUDGET APPROVAL ═══════════════════════════════════════════════
 
-// Funding rules by funder type
+// Funding rules by funder type.
+// band_rep is eligible for all unit types.
+// fncfs is shown conditionally in the SOW form based on the configured
+// dependent age threshold (Settings → Reno Budget → FNCFS Dependent Age).
 var RENO_FUND_RULES = {
-  'ISC':        { pools:['rrap','band','ofnlp'],         label:'ISC House',         rule:'Eligible: RRAP Funds + Band Funds + OFNLP' },
-  'CMHC_95':    { pools:['cmhc','band','ofnlp'],         label:'CMHC Section 95',   rule:'Eligible: CMHC Replacement Funds + Band Funds + OFNLP' },
-  'CMHC_56':    { pools:['cmhc','band','ofnlp'],         label:'CMHC Section 56.1', rule:'Eligible: CMHC Replacement Funds + Band Funds + OFNLP' },
-  'rent_to_own':{ pools:['rrap','isc','band','ofnlp'],   label:'Rent-to-Own',       rule:'Eligible: RRAP + ISC + Band Funds + OFNLP. Tenant repayment expected.', repayment:true },
-  '':           { pools:['band','ofnlp'],                label:'Band / None',       rule:'Eligible: Band Funds + OFNLP (all units eligible for OFNLP)' },
+  'ISC':        { pools:['rrap','band','ofnlp','band_rep'],         label:'ISC House',       rule:'Eligible: RRAP + Band Funds + OFNLP + Band Rep Funds' },
+  'CMHC_95':    { pools:['cmhc','band','ofnlp','band_rep'],         label:'CMHC Section 95', rule:'Eligible: CMHC + Band Funds + OFNLP + Band Rep Funds' },
+  'section_10': { pools:['rrap','isc','band','ofnlp','band_rep'],   label:'Section 10',      rule:'Eligible: RRAP + ISC + Band Funds + OFNLP + Band Rep Funds', repayment:true },
+  'rent_to_own':{ pools:['rrap','isc','band','ofnlp','band_rep'],   label:'Rent-to-Own',     rule:'Eligible: RRAP + ISC + Band Funds + OFNLP + Band Rep Funds. Tenant repayment expected.', repayment:true },
+  'band_house': { pools:['rrap','isc','band','ofnlp','band_rep'],   label:'Band House',      rule:'Eligible: RRAP + ISC + Band Funds + OFNLP + Band Rep Funds' },
+  '':           { pools:['rrap','isc','band','ofnlp','band_rep'],   label:'Band House',      rule:'Eligible: RRAP + ISC + Band Funds + OFNLP + Band Rep Funds' },
 };
 
 // Critical system SOW categories — must be funded first

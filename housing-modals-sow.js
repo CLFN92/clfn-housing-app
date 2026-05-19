@@ -260,6 +260,12 @@ function _buildSowModalHTML() {
                   '<option value="Critical">Critical — unsafe / condemned</option>' +
                 '</select>' +
               '</div>' +
+              '<div class="f"><label>Fund Source <span id="sow_fund_badge" style="display:none;margin-left:6px;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;vertical-align:middle;"></span></label>' +
+                '<select id="sow_fund_source" onchange="_sowUpdateFundBadge(this.value)">' +
+                  '<option value="">— Select fund source —</option>' +
+                '</select>' +
+                '<div id="sow_fund_rule" style="font-size:10px;color:var(--muted);margin-top:3px;"></div>' +
+              '</div>' +
               '<div class="f"><label>Target Start Date</label><input id="sow_start_date" type="date"/></div>' +
               '<div class="f"><label>Target Completion Date</label><input id="sow_end_date" type="date"/></div>' +
             '</div>' +
@@ -557,6 +563,65 @@ function _updateSowSaveButtonState() {
   if (prog) prog.textContent = allReviewed ? 'All sections reviewed' : (visited + ' of ' + _SOW_TAB_TOTAL + ' sections reviewed');
 }
 
+// ── Fund Source dropdown helpers ─────────────────────────────────────────
+// Populates #sow_fund_source with pools eligible for the unit's funder type
+// (from RENO_FUND_RULES). FNCFS is appended for all units with a note about
+// the configurable dependent-age threshold (set in Settings → Reno Budget).
+function _sowPopulateFundSourceDropdown(unitId, savedFundSource) {
+  var sel = document.getElementById('sow_fund_source');
+  if (!sel) return;
+
+  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length)
+    ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var u      = unitId ? allUnits.find(function(x){ return x && x.id === unitId; }) : null;
+  var funder = u ? (u.funder || '') : '';
+
+  var rules   = (typeof RENO_FUND_RULES !== 'undefined') ? RENO_FUND_RULES : {};
+  var rule    = rules[funder] || rules['band_house'] || rules[''] || { pools:[], rule:'' };
+  var pools   = (typeof BUDGET_POOLS !== 'undefined') ? BUDGET_POOLS : [];
+
+  var budgetData = (typeof loadBudgetData === 'function' && loadBudgetData()) || {};
+  var fncfsAge   = (budgetData.fncfsDependantAge != null) ? budgetData.fncfsDependantAge : 17;
+
+  var html = '<option value="">— Select fund source —</option>';
+  rule.pools.forEach(function(pid) {
+    var pool = pools.find(function(p){ return p.id === pid; });
+    if (!pool || pool.requiresDependants) return; // FNCFS handled below
+    html += '<option value="' + pid + '"' + (savedFundSource === pid ? ' selected' : '') + '>'
+          + pool.icon + ' ' + pool.label + '</option>';
+  });
+
+  // Always offer FNCFS with an eligibility note
+  var fncfs = pools.find(function(p){ return p.id === 'fncfs'; });
+  if (fncfs) {
+    html += '<option value="fncfs"' + (savedFundSource === 'fncfs' ? ' selected' : '') + '>'
+          + fncfs.icon + ' ' + fncfs.label + ' (dependants under ' + fncfsAge + ')</option>';
+  }
+
+  sel.innerHTML = html;
+
+  // Eligibility rule note
+  var ruleEl = document.getElementById('sow_fund_rule');
+  if (ruleEl) ruleEl.textContent = rule.rule || '';
+
+  // Restore badge for already-saved fund source
+  if (savedFundSource) _sowUpdateFundBadge(savedFundSource);
+}
+
+function _sowUpdateFundBadge(poolId) {
+  var badge = document.getElementById('sow_fund_badge');
+  if (!badge) return;
+  if (!poolId) { badge.style.display = 'none'; return; }
+  var pools = (typeof BUDGET_POOLS !== 'undefined') ? BUDGET_POOLS : [];
+  var pool  = pools.find(function(p){ return p.id === poolId; });
+  if (!pool) { badge.style.display = 'none'; return; }
+  badge.textContent    = pool.icon + ' ' + pool.label;
+  badge.style.display  = 'inline-block';
+  badge.style.background = pool.bg || 'var(--bg)';
+  badge.style.color      = pool.color || 'var(--text)';
+  badge.style.border     = '1px solid ' + (pool.color || 'var(--border)');
+}
+
 function openSowModal(unitId, projectNumber) {
   // Mount the consolidated template on first call. Stays idempotent on
   // subsequent opens so element IDs survive between sessions.
@@ -613,6 +678,10 @@ function openSowModal(unitId, projectNumber) {
     resetSow();
     if(label) { var addr=document.getElementById('sow_address'); if(addr) addr.value=label; }
   }
+  // Populate fund source dropdown for this unit's funder type
+  var savedFs = saved ? (saved.fundSource || '') : '';
+  _sowPopulateFundSourceDropdown(unitId, savedFs);
+
   // Auto-populate tenant name from the unit's assigned tenant whenever the
   // field is empty — covers both brand-new SOWs and existing SOWs that were
   // saved before this auto-fill existed (tenantName missing from the payload).
@@ -1140,7 +1209,7 @@ function saveSOW(opts){
     unitId:_sowUnitId, address:get('sow_address'), date:get('sow_date'),
     tenantName:get('sow_tenant_name'),
     preparedBy:get('sow_prepared_by'), contractor:get('sow_contractor'), contractorId:(document.getElementById('sow_contractor_id')||{}).value||'',
-    condition:get('sow_condition'), totalCost:get('sow_total_cost'),
+    condition:get('sow_condition'), fundSource:get('sow_fund_source'), totalCost:get('sow_total_cost'),
     startDate:get('sow_start_date'), endDate:get('sow_end_date'), notes:get('sow_notes'),
     hmName:get('sow_hm_name'), hmDate:get('sow_hm_date'),
     edName:get('sow_ed_name'), edDate:get('sow_ed_date'),

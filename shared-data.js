@@ -2199,7 +2199,7 @@ function exportMatch(format) {
 
 function g(id)  { const e=document.getElementById(id); return e?e.value:''; }
 function getDefaultBudget(){
-  var obj={fiscalYear:'2025-2026',pools:{}};
+  var obj={fiscalYear:'2025-2026', fncfsDependantAge:17, pools:{}};
   BUDGET_POOLS.forEach(function(p){ obj.pools[p.id]={allocated:0,notes:''}; });
   return obj;
 }
@@ -2489,6 +2489,7 @@ function populateSow(data){
   set('sow_address',data.address); set('sow_date',data.date); set('sow_prepared_by',data.preparedBy);
   set('sow_tenant_name',data.tenantName);
   set('sow_contractor',data.contractor); set('sow_condition',data.condition);
+  set('sow_fund_source', data.fundSource);
   var sowHid = document.getElementById('sow_contractor_id'); if(sowHid) sowHid.value = data.contractorId||'';
   set('sow_total_cost',data.totalCost); set('sow_start_date',data.startDate);
   set('sow_end_date',data.endDate); set('sow_notes',data.notes);
@@ -2704,20 +2705,25 @@ function removeRenoPhoto(idx) {
 function renderBudgetPools(){
   var tbody = document.getElementById('budget_pools_tbody');
   if(!tbody) return;
-  var fyEl = document.getElementById('budget_fiscal_year');
-  var data = loadBudgetData() || getDefaultBudget();
-  if(fyEl) fyEl.value = data.fiscalYear || '2025-2026';
+  var fyEl  = document.getElementById('budget_fiscal_year');
+  var ageEl = document.getElementById('budget_fncfs_age');
+  var data  = loadBudgetData() || getDefaultBudget();
+  if(fyEl)  fyEl.value  = data.fiscalYear       || '2025-2026';
+  if(ageEl) ageEl.value = data.fncfsDependantAge != null ? data.fncfsDependantAge : 17;
 
   var total = 0;
   tbody.innerHTML = BUDGET_POOLS.map(function(p){
-    var pool = data.pools[p.id] || {allocated:0, notes:''};
+    var pool  = data.pools[p.id] || {allocated:0, notes:''};
     var alloc = pool.allocated || 0;
     total += alloc;
+    var eligNote = p.requiresDependants
+      ? '<div style="font-size:10px;color:var(--muted);margin-top:2px;">Requires dependants under configured age</div>'
+      : '';
     return '<tr>'
       +'<td>'
         +'<div style="display:flex;align-items:center;gap:10px;">'
           +'<span style="font-size:18px;flex-shrink:0;">'+p.icon+'</span>'
-          +'<span style="font-weight:600;font-size:13px;">'+p.label+'</span>'
+          +'<div><span style="font-weight:600;font-size:13px;">'+p.label+'</span>'+eligNote+'</div>'
         +'</div>'
       +'</td>'
       +'<td style="text-align:right;">'

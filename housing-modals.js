@@ -1447,6 +1447,8 @@ var BUDGET_POOLS = [
   { id:'band',      label:'Band Funds',         icon:'🌲', color:'#15803d', bg:'#f0fdf4' },
   { id:'cmhc',      label:'CMHC',               icon:'🏗️', color:'#92400e', bg:'#fffbeb' },
   { id:'ofnlp',     label:'OFNLP',              icon:'🤝', color:'#0e7490', bg:'#ecfeff' },
+  { id:'fncfs',     label:'FNCFS Funds',        icon:'👶', color:'#be185d', bg:'#fdf2f8', requiresDependants:true },
+  { id:'band_rep',  label:'Band Rep Funds',     icon:'🏡', color:'#4f46e5', bg:'#eef2ff' },
 ];
 
 
@@ -1472,8 +1474,13 @@ function saveBudgetPools(){
       }
     });
   }
-  var fyEl = document.getElementById('budget_fiscal_year');
-  var data = {fiscalYear: fyEl ? fyEl.value : '2025-2026', pools:{}};
+  var fyEl  = document.getElementById('budget_fiscal_year');
+  var ageEl = document.getElementById('budget_fncfs_age');
+  var data = {
+    fiscalYear:          fyEl  ? fyEl.value  : '2025-2026',
+    fncfsDependantAge:   ageEl ? (parseInt(ageEl.value, 10) || 17) : 17,
+    pools:{}
+  };
   BUDGET_POOLS.forEach(function(p){
     var allocEl = document.getElementById('budget_alloc_'+p.id);
     var notesEl = document.getElementById('budget_notes_'+p.id);
