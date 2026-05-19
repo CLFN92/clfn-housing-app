@@ -378,7 +378,7 @@ function _populateFormFields(rfq) {
 
   // Scope detail
   set('rfq_sow_summary',     d.sow_summary     || '');
-  set('rfq_sow_detail',      d.sow_detail      || '');
+  // (sow_detail textarea removed — work items now use dynamic scope detail rows)
   // (materials/exclusions/clfn_supplied now use dynamic rows — loaded above)
 
   // Price breakdown
@@ -1075,26 +1075,11 @@ function _rfqRecalcPrices() {
   setRO('rfq_price_total_incl_tax',sub); // tax = 0
 }
 
-// ── PDF-lib loader (local to rfq.js — _loadPdfLib lives in housing-tic.js) ─
-async function _rfqLoadPdfLib() {
-  if (window.PDFLib && window.PDFLib.PDFDocument) return;
-  await new Promise(function(resolve, reject) {
-    var s = document.createElement('script');
-    s.src     = 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
-    s.onload  = resolve;
-    s.onerror = function(){ reject(new Error('pdf-lib load failed')); };
-    document.head.appendChild(s);
-  });
-}
-
 // ── Generate Contractor Agreement PDF ────────────────────────────────────
-// Two-path approach identical to _ticGenerateLeasePdf():
-//   1. jsPDF text rendering when a custom body is saved in Settings → Contracts
-//   2. pdf-lib AcroForm fill of templates/contractor-agreement.pdf otherwise
-// Reuses _loadJsPdf, _makePdfDoc, _parseHtmlToBlocks, _renderBlocksToPdf,
-// _substitutePlaceholders (all from notifications.js), and _loadPdfLib.
+// Renders the contract body from notifications.js CONTRACTS_DOCS_REGISTRY
+// via jsPDF text primitives. getContractBody() always returns a non-empty
+// body (registry default when no saved override), so no AcroForm fallback.
 async function generateContractorContract() {
-  try {
   if (typeof showToast === 'function') showToast('Generating contract PDF…');
 
   // Build data directly from current form state — don't depend on saveRfqDraft
@@ -1175,12 +1160,12 @@ async function generateContractorContract() {
   var filename = (tokens.nationShort || 'Housing') + '_Contract_' + rfqId + '.pdf';
 
   // ── jsPDF path ─────────────────────────────────────────────────────────
-  // Use getContractBody() which returns the saved override when the ED has edited
-  // the document in Settings → Contracts, or falls back to the registry defaultBody.
-  // This means the jsPDF path always fires — no AcroForm fallback needed.
   var savedBody = (typeof getContractBody === 'function') ? getContractBody('contractor_agreement') : '';
-  if (savedBody && savedBody.trim()) {
-    try {
+  if (!savedBody || !savedBody.trim()) {
+    if (typeof showToast === 'function') showToast('Contract body not found — check Settings → Contracts');
+    return;
+  }
+  try {
       if (typeof _loadJsPdf === 'function') await _loadJsPdf();
       var logoDataUrl = (typeof _fetchLogoForPdf === 'function') ? await _fetchLogoForPdf() : null;
       var ctx = _makePdfDoc({
@@ -1234,201 +1219,18 @@ async function generateContractorContract() {
       var binStr = atob(base64);
       var arr = new Uint8Array(binStr.length);
       for (var bi = 0; bi < binStr.length; bi++) arr[bi] = binStr.charCodeAt(bi);
-      _rfqDownloadAndStore(new Blob([arr], {type:'application/pdf'}), filename, rfq);
-      return;
-    } catch(e) {
-      console.error('[contract] jsPDF generation failed:', e);
-      if (typeof showToast === 'function') showToast('PDF generation failed — see console'); return;
-    }
-  }
-
-  // ── AcroForm fallback ─────────────────────────────────────────────────
-  try {
-    await _rfqLoadPdfLib();
+      _rfqDownloadAndStore(new Blob([arr], {type:'application/pdf'}), filename);
   } catch(e) {
-    console.error('[contract] pdf-lib load failed:', e);
-    if (typeof showToast === 'function') showToast('PDF library failed to load — check your internet connection');
-    return;
-  }
-
-  var ms = (d.milestones || []).slice(0, 4); // AcroForm has m1-m4 fields
-  while (ms.length < 4) ms.push({});
-
-  var fieldValues = {
-    contractor_legal_name:          tokens.contractorLegalName,
-    contractor_operating_name:      tokens.contractorOperatingName,
-    contractor_address_line1:       tokens.contractorAddressLine1,
-    contractor_address_line2:       tokens.contractorAddressLine2,
-    contractor_gst_hst_number:      tokens.contractorGstHst,
-    contractor_wsib_number:         tokens.contractorWsib,
-    contractor_signatory_name:      tokens.contractorSignatoryName,
-    contractor_signatory_title:     tokens.contractorSignatoryTitle,
-    contractor_phone:               tokens.contractorPhone,
-    contractor_signatory_email:     tokens.contractorSignatoryEmail,
-    property_address:               tokens.propertyAddress,
-    project_type:                   tokens.projectType,
-    sow_reference:                  tokens.sowReference,
-    quote_number:                   tokens.quoteNumber,
-    contract_number:                tokens.contractNumber,
-    contract_date:                  tokens.contractDate,
-    start_date:                     tokens.startDate,
-    substantial_completion_date:    tokens.substantialCompletionDate,
-    total_completion_date:          tokens.totalCompletionDate,
-    contractor_site_lead_name:      tokens.contractorSiteLead,
-    contractor_site_lead_phone:     tokens.contractorSiteLeadPhone,
-    contract_price_excl_tax:        tokens.contractPriceExclTax,
-    ap_email:                       tokens.apEmail,
-    sow_summary:                    tokens.sowSummary,
-    sow_detail_table:               tokens.sowDetailTable, // serialized from dynamic rows
-    materials_specifications:       tokens.materialsSpecifications,
-    price_materials_total:          numFmt(pMat),
-    price_labour_total:             numFmt(pLab),
-    price_equipment_total:          numFmt(pEqp),
-    price_other_total:              numFmt(pOth),
-    price_subtotal_excl_tax:        numFmt(pSub),
-    price_tax_total:                '$0.00',
-    price_contract_price_incl_tax:  numFmt(pTot),
-    labour_hours_total:             d.labour_hours || '',
-    exclusions_assumptions:         tokens.exclusionsAssumptions,
-    clfn_supplied_items:            tokens.clfnSuppliedItems,
-    holdback_release_amount:        numFmt(d.holdback_release),
-    sig_clfn_signatory_name:        tokens.clfnSignatoryName,
-    sig_clfn_signatory_title:       tokens.clfnSignatoryTitle,
-    sig_clfn_signature_date:        d.contract_date || new Date().toISOString().slice(0,10),
-    sig_contractor_signatory_name:  tokens.contractorSignatoryName,
-    sig_contractor_signatory_title: tokens.contractorSignatoryTitle,
-    sig_contractor_signature_date:  d.ct_sig_date || '',
-    sig_witness_name:               d.witness_name || '',
-    sig_witness_date:               d.witness_date || '',
-    sched_property_address:         tokens.propertyAddress,
-    sched_project_type:             tokens.projectType,
-    sched_sow_reference:            tokens.sowReference,
-    sched_quote_number:             tokens.quoteNumber
-  };
-
-  // Milestones
-  for (var mi = 1; mi <= 4; mi++) {
-    var m = ms[mi-1] || {};
-    fieldValues['m'+mi+'_name']    = m.name     || '';
-    fieldValues['m'+mi+'_pct']     = m.pct      || '';
-    fieldValues['m'+mi+'_gross']   = m.gross    ? numFmt(m.gross)    : '';
-    fieldValues['m'+mi+'_holdback']= m.holdback ? numFmt(m.holdback) : '';
-    fieldValues['m'+mi+'_net']     = m.net      || '';
-  }
-
-  var sigFields = {
-    sig_clfn_signature:               (typeof getSigDataURL === 'function') ? getSigDataURL('rfq_sig')          : '',
-    sig_contractor_signature:         (typeof getSigDataURL === 'function') ? getSigDataURL('rfq_ct_sig')       : '',
-    sig_witness_signature:            (typeof getSigDataURL === 'function') ? getSigDataURL('rfq_witness_sig')  : '',
-    contractor_acknowledgement_initial:(typeof getSigDataURL === 'function') ? getSigDataURL('rfq_ct_initial')  : ''
-  };
-
-  try {
-    var pdfUrl   = window.location.origin + '/templates/contractor-agreement.pdf';
-    var resp     = await fetch(pdfUrl);
-    if (!resp.ok) throw new Error('Could not fetch contract template: ' + resp.status + '. Copy CLFN_Renovations_Contract_Fillable_v3.pdf to templates/contractor-agreement.pdf');
-    var pdfBytes = await resp.arrayBuffer();
-
-    var PDFLib  = window.PDFLib;
-    var pdfDoc  = await PDFLib.PDFDocument.load(pdfBytes);
-    var form    = pdfDoc.getForm();
-    var pages   = pdfDoc.getPages();
-    var stdFont = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-
-    // Build field-position map
-    var fieldPos = {};
-    var allFields = form.getFields();
-    for (var ffi = 0; ffi < allFields.length; ffi++) {
-      try {
-        var ff  = allFields[ffi];
-        var fw  = ff.acroField.getWidgets();
-        if (!fw.length) continue;
-        var fwR = fw[0].getRectangle();
-        var fwP = fw[0].P();
-        var fpIdx = -1;
-        for (var fpi = 0; fpi < pages.length; fpi++) {
-          if (pages[fpi].ref.objectNumber === fwP.objectNumber) { fpIdx = fpi; break; }
-        }
-        if (fpIdx >= 0) fieldPos[ff.getName()] = { pageIdx: fpIdx, rect: fwR };
-      } catch(e) {}
-    }
-
-    // Draw text values
-    Object.keys(fieldValues).forEach(function(name) {
-      var val = fieldValues[name];
-      if (val == null || val === '') return;
-      var pos = fieldPos[name];
-      if (!pos) return;
-      try {
-        var sz = Math.min(9, pos.rect.height * 0.72);
-        pages[pos.pageIdx].drawText(String(val), {
-          x: pos.rect.x + 2, y: pos.rect.y + pos.rect.height * 0.18,
-          size: sz, font: stdFont, color: PDFLib.rgb(0,0,0), maxWidth: pos.rect.width - 4
-        });
-      } catch(e) { console.warn('[contract] text draw failed for', name, e); }
-    });
-
-    // Embed signatures and initials
-    var sigEntries = Object.keys(sigFields);
-    for (var si = 0; si < sigEntries.length; si++) {
-      var fieldName = sigEntries[si];
-      var sigData   = sigFields[fieldName];
-      if (!sigData) continue;
-      try {
-        var targetField = null;
-        for (var fi = 0; fi < allFields.length; fi++) {
-          if (allFields[fi].getName() === fieldName) { targetField = allFields[fi]; break; }
-        }
-        if (!targetField) continue;
-        var widgets = targetField.acroField.getWidgets();
-        if (!widgets.length) continue;
-        var widget  = widgets[0];
-        var rect    = widget.getRectangle();
-        var pageRef = widget.P();
-        var pageIdx = -1;
-        for (var pi = 0; pi < pages.length; pi++) {
-          if (pages[pi].ref.objectNumber === pageRef.objectNumber) { pageIdx = pi; break; }
-        }
-        if (pageIdx < 0) continue;
-        if (sigData.indexOf('data:image/png;base64,') === 0) {
-          var b64    = sigData.split(',')[1];
-          var raw    = atob(b64);
-          var pngArr = new Uint8Array(raw.length);
-          for (var bi = 0; bi < raw.length; bi++) pngArr[bi] = raw.charCodeAt(bi);
-          var pngImg = await pdfDoc.embedPng(pngArr);
-          pages[pageIdx].drawImage(pngImg, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
-          try { targetField.setText(''); } catch(e2) {}
-        } else if (sigData.indexOf('typed:') === 0) {
-          try { targetField.setText(sigData.replace('typed:','')); } catch(e2) {}
-        } else if (sigData.indexOf('wet:') === 0) {
-          var ref = sigData.replace('wet:','');
-          try { targetField.setText(ref === 'pending' ? 'Wet signature on file' : 'E-sign: '+ref); } catch(e2) {}
-        }
-      } catch(e) { console.warn('[contract] sig embed failed for', fieldName, e); }
-    }
-
-    // Flatten
-    pages.forEach(function(page) { try { page.node.delete(PDFLib.PDFName.of('Annots')); } catch(e) {} });
-    try { pdfDoc.catalog.delete(PDFLib.PDFName.of('AcroForm')); } catch(e) {}
-
-    var filledBytes = await pdfDoc.save();
-    _rfqDownloadAndStore(new Blob([filledBytes], {type:'application/pdf'}), filename, rfq);
-
-  } catch(e) {
-    console.error('[contract] AcroForm generation failed:', e);
-    if (typeof showToast === 'function') showToast('Contract PDF failed — ' + e.message);
-  }
-
-  } catch(outerErr) {
-    console.error('[contract] generate failed:', outerErr);
-    if (typeof showToast === 'function') showToast('Contract generation failed: ' + outerErr.message);
+    console.error('[contract] generation failed:', e);
+    if (typeof showToast === 'function') showToast('Contract PDF failed: ' + e.message);
   }
 }
 
-function _rfqDownloadAndStore(blob, filename, rfq) {
+function _rfqDownloadAndStore(blob, filename) {
   var url  = URL.createObjectURL(blob);
   var link = document.createElement('a');
   link.href = url; link.download = filename; link.click();
   setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
   if (typeof showToast === 'function') showToast('Contract PDF downloaded');
 }
+

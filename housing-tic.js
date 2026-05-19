@@ -1953,41 +1953,12 @@
   var _leaseInitials = {};
 
   // Returns the effective initials clauses — saved overrides from Settings →
-  // Contracts & Agreements win; falls back to the hardcoded defaults below.
+  // Delegates to notifications.js CONTRACTS_DOCS_REGISTRY which is always loaded.
   function _getEffectiveLeaseClauses() {
-    if (typeof getContractClauses === 'function') {
-      return getContractClauses('residential_lease');
-    }
-    return _LEASE_INITIAL_CLAUSES;
+    return (typeof getContractClauses === 'function')
+      ? getContractClauses('residential_lease')
+      : [];
   }
-
-  var _LEASE_INITIAL_CLAUSES = [
-    {
-      id:      'ls_init_drug',
-      label:   'Section 2(c)-(g) — Smoking, Cannabis & Drug Provisions',
-      text:    'The Residence is a smoking-permitted environment. Cannabis cultivation, production, and processing in any quantity is strictly prohibited as a condition of this Agreement regardless of federal legality. Any breach of the cannabis prohibition constitutes immediate grounds for termination without a cure period. Unlawful drug activity — including possession, production, trafficking, or storage of controlled substances — also constitutes immediate grounds for termination. The Tenant acknowledges full liability for all remediation costs arising from smoking damage, cannabis cultivation, or prohibited drug activity on the premises.'
-    },
-    {
-      id:      'ls_init_3_3',
-      label:   'Section 3.3 — First Month\'s Rent',
-      text:    'The Tenant shall pay the first month\'s rent in full on or before the commencement date of this Agreement. No occupancy shall commence until the first month\'s rent is paid in full.'
-    },
-    {
-      id:      'ls_init_3_4a',
-      label:   'Section 3.4 — Late Payment Fee',
-      text:    'Where any rent payment remains unpaid fifteen (15) days past the due date, a late payment fee of $25.00 shall be added to the Tenant\'s account. This fee is in addition to the outstanding rent and is recoverable as arrears.'
-    },
-    {
-      id:      'ls_init_3_4b',
-      label:   'Section 3.4 — NSF Fee',
-      text:    'Where a cheque or pre-authorized debit is returned by the financial institution for insufficient funds, a $45.00 NSF (Non-Sufficient Funds) fee shall be added to the Tenant\'s account, in addition to any charges imposed by the financial institution. Repeated NSF occurrences may result in a change of required payment method.'
-    },
-    {
-      id:      'ls_init_juris',
-      label:   'Section 21 — Acknowledgement of Jurisdiction',
-      text:    'This Agreement is governed by the inherent jurisdiction of Constance Lake First Nation and the Indian Act, R.S.C. 1985, c. I-5. The Ontario Residential Tenancies Act, 2006 does not apply to this Agreement. Any dispute arising under this Agreement shall be addressed through the internal grievance process established by the CLFN Housing Policy, and where unresolved, through the Ontario Superior Court of Justice as a matter of contract law.'
-    }
-  ];
 
   function _ticOpenInitialsPopout(idx) {
     idx = idx || 0;

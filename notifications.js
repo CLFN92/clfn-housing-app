@@ -849,21 +849,26 @@ async function _loadJsPdf() {
 // final page footer and returns the base64 string.
 // Fetches the nation logo (from _appSettings.theme.logo) and returns a data
 // URL suitable for pdf.addImage(). Returns null on any error.
+var _logoDataUrlCache = null;
+
 async function _fetchLogoForPdf() {
+  if (_logoDataUrlCache !== null) return _logoDataUrlCache || null;
   try {
     var logoUrl = window._appSettings && _appSettings.theme && _appSettings.theme.logo;
-    if (!logoUrl) return null;
+    if (!logoUrl) { _logoDataUrlCache = ''; return null; }
     var resp = await fetch(logoUrl);
-    if (!resp.ok) return null;
+    if (!resp.ok) { _logoDataUrlCache = ''; return null; }
     var blob = await resp.blob();
-    return await new Promise(function(resolve) {
+    _logoDataUrlCache = await new Promise(function(resolve) {
       var reader = new FileReader();
       reader.onload  = function(e) { resolve(e.target.result); };
-      reader.onerror = function()  { resolve(null); };
+      reader.onerror = function()  { resolve(''); };
       reader.readAsDataURL(blob);
     });
+    return _logoDataUrlCache || null;
   } catch(e) {
     console.warn('[pdf] logo fetch failed:', e);
+    _logoDataUrlCache = '';
     return null;
   }
 }
