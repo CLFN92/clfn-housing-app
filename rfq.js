@@ -1075,6 +1075,18 @@ function _rfqRecalcPrices() {
   setRO('rfq_price_total_incl_tax',sub); // tax = 0
 }
 
+// ── PDF-lib loader (local to rfq.js — _loadPdfLib lives in housing-tic.js) ─
+async function _rfqLoadPdfLib() {
+  if (window.PDFLib && window.PDFLib.PDFDocument) return;
+  await new Promise(function(resolve, reject) {
+    var s = document.createElement('script');
+    s.src     = 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+    s.onload  = resolve;
+    s.onerror = function(){ reject(new Error('pdf-lib load failed')); };
+    document.head.appendChild(s);
+  });
+}
+
 // ── Generate Contractor Agreement PDF ────────────────────────────────────
 // Two-path approach identical to _ticGenerateLeasePdf():
 //   1. jsPDF text rendering when a custom body is saved in Settings → Contracts
@@ -1082,10 +1094,11 @@ function _rfqRecalcPrices() {
 // Reuses _loadJsPdf, _makePdfDoc, _parseHtmlToBlocks, _renderBlocksToPdf,
 // _substitutePlaceholders (all from notifications.js), and _loadPdfLib.
 async function generateContractorContract() {
-  if (typeof showToast === 'function') showToast('Saving and generating contract PDF…');
-
-  // Save first so the payload is current
+  // Save all Award section data to the RFQ record first, then generate the PDF.
+  // Contract data lives in housing_rfq.data — saving here is what persists it.
+  if (typeof showToast === 'function') showToast('Saving contract data…');
   await saveRfqDraft();
+  if (typeof showToast === 'function') showToast('Generating contract PDF…');
 
   var rfqId = _rfqCurrentId || document.getElementById('rfq_number').value.trim();
   var rfq   = (window._rfqCache || {})[rfqId] || {};
@@ -1222,13 +1235,12 @@ async function generateContractorContract() {
   }
 
   // ── AcroForm fallback ─────────────────────────────────────────────────
-  if (typeof _loadPdfLib !== 'function') {
-    showToast('PDF library not available'); return;
-  }
   try {
-    await _loadPdfLib();
+    await _rfqLoadPdfLib();
   } catch(e) {
-    showToast('PDF library unavailable'); return;
+    console.error('[contract] pdf-lib load failed:', e);
+    if (typeof showToast === 'function') showToast('PDF library failed to load — check your internet connection');
+    return;
   }
 
   var ms = (d.milestones || []).slice(0, 4); // AcroForm has m1-m4 fields

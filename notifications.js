@@ -2995,12 +2995,20 @@ var CONTRACTS_DOCS_REGISTRY = [
       + '<h3>Tenant Signature</h3>'
       + '<p>{tenantName}</p>'
       + '<h3>Co-Tenant Signature</h3>'
-      + '<p>{coTenantName}</p>'
+      + '<p>{coTenantName}</p>',
+    defaultClauses: _CONTRACT_DEFAULT_CLAUSES
   },
   {
     key:         'contractor_agreement',
     label:       'Contractor Agreement',
     description: 'Renovation/construction contract issued to the awarded contractor. Supports {token} substitution for project-specific data.',
+    defaultClauses: [
+      {
+        id:    'ct_ack',
+        label: 'Contractor Acknowledgement',
+        text:  'By initialling below, the Contractor confirms that it is in good standing with WSIB, holds the insurance required under section 11, will comply with the Construction Act and OHSA, and accepts the prompt payment and adjudication framework set out in sections 8 and 10.'
+      }
+    ],
     defaultBody:
         '<h2>{nationName} Housing Program</h2>'
       + '<h1>Contractor Agreement</h1>'
@@ -3149,7 +3157,8 @@ function getContractClauses(docKey) {
   var saved = (window._appSettings && window._appSettings.contracts_agreements
             && window._appSettings.contracts_agreements[docKey]) || {};
   if (saved.initials_clauses && saved.initials_clauses.length) return saved.initials_clauses;
-  return _CONTRACT_DEFAULT_CLAUSES;
+  var cfg = _contractDocConfig(docKey);
+  return (cfg && cfg.defaultClauses) ? cfg.defaultClauses : [];
 }
 
 // ── Contracts tab renderer ─────────────────────────────────────────────────
@@ -3193,7 +3202,7 @@ function _contractsRenderEditorHtml(docKey) {
                 && window._appSettings.contracts_agreements[docKey]) || {};
   var bodyHtml  = (saved.bodyHtml != null && saved.bodyHtml !== '') ? saved.bodyHtml : cfg.defaultBody;
   var clauses   = (saved.initials_clauses && saved.initials_clauses.length)
-                ? saved.initials_clauses : _CONTRACT_DEFAULT_CLAUSES;
+                ? saved.initials_clauses : (cfg.defaultClauses || []);
 
   var toolbar =
       '<div class="ntf-toolbar" role="toolbar">'
@@ -3375,7 +3384,7 @@ function resetContractsDoc() {
   // Re-render clauses section back to defaults
   var clausesList = document.getElementById('contracts_clauses_list');
   if (clausesList) {
-    var clauses = _CONTRACT_DEFAULT_CLAUSES;
+    var clauses = (cfg && cfg.defaultClauses) ? cfg.defaultClauses : [];
     clausesList.innerHTML = clauses.map(function(cl, i) {
       return _contractsClauseCardHtml(cl, i);
     }).join('');
