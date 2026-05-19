@@ -847,11 +847,11 @@ async function _loadJsPdf() {
 // the pdf instance, layout constants, mutable cursor state (ctx.y /
 // ctx.pageNum), and six shared layout primitives. ctx.finish() stamps the
 // final page footer and returns the base64 string.
-// opts (all optional):
-//   nationName     — shown top-left in header
-//   headerTitle    — document title top-right; when present, top margin expands
-//   headerSubtitle — reference line below nation name (e.g. "Contract #: CON-2026-0001")
-//   footerLeft     — left-side footer text (e.g. nation + "Housing — Confidential")
+// opts (all optional — contact fields are auto-read from NATION_CONFIG when present):
+//   nationName     — overrides NATION_CONFIG.display_name
+//   headerTitle    — document title (top-right); triggers header/footer mode
+//   headerSubtitle — reference line (top-right, below title)
+//   footerLeft     — left-side footer text (defaults to "[Nation] Housing — Confidential")
 function _makePdfDoc(opts) {
   opts = opts || {};
   if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF not available');
@@ -859,8 +859,18 @@ function _makePdfDoc(opts) {
   var pageW    = pdf.internal.pageSize.getWidth();
   var pageH    = pdf.internal.pageSize.getHeight();
   var marginL  = 14, marginR = 14, marginB = 18;
-  // Extra top margin when a header is present so content doesn't overlap it
-  var marginT  = opts.headerTitle ? 26 : 14;
+
+  // Read nation contact info from NATION_CONFIG (set in shared-config.js / Nation settings)
+  var nc           = window.NATION_CONFIG || {};
+  var nationName   = opts.nationName   || nc.display_name || nc.name || '';
+  var nationPhone  = nc.phone          || '';
+  var nationEmail  = nc.email          || '';
+  var nationAddr   = nc.mailing_address ? nc.mailing_address.split('\n')[0] : ''; // first line only
+
+  var hasHeader = !!opts.headerTitle;
+  // marginT: base 14mm; +10 for name+rule, +4 per contact line
+  var contactLines = (nationAddr ? 1 : 0) + (nationPhone || nationEmail ? 1 : 0);
+  var marginT  = hasHeader ? (22 + contactLines * 4) : 14;
   var contentW = pageW - marginL - marginR;
 
   var ctx = {
@@ -871,54 +881,63 @@ function _makePdfDoc(opts) {
   };
 
   ctx.drawHeader = function() {
-    if (!opts.headerTitle) return;
-    // Nation name — left, small caps style
+    if (!hasHeader) return;
+    var lx = marginL, rx = pageW - marginR;
+    var y = 8;
+
+    // Left — nation name
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(7.5);
-    pdf.setTextColor(80);
-    pdf.text((opts.nationName || '').toUpperCase(), marginL, 8);
-    // Document title — right, slightly larger
+    pdf.setFontSize(8);
+    pdf.setTextColor(30);
+    pdf.text(nationName.toUpperCase(), lx, y);
+
+    // Right — document title
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(9);
     pdf.setTextColor(20);
-    pdf.text(opts.headerTitle, pageW - marginR, 8, { align: 'right' });
-    // Subtitle / reference line
+    pdf.text(opts.headerTitle, rx, y, { align: 'right' });
+
+    y += 4;
+
+    // Left — mailing address (line 1)
+    if (nationAddr) {
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(100);
+      pdf.text(nationAddr, lx, y);
+      y += 4;
+    }
+
+    // Left — phone | email
+    if (nationPhone || nationEmail) {
+      var contactStr = [nationPhone, nationEmail].filter(Boolean).join('  |  ');
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(100);
+      pdf.text(contactStr, lx, y);
+    }
+
+    // Right — subtitle / reference (second header row)
     if (opts.headerSubtitle) {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7);
-      pdf.setTextColor(120);
-      pdf.text(opts.headerSubtitle, marginL, 13);
+      pdf.setTextColor(110);
+      pdf.text(opts.headerSubtitle, rx, 12, { align: 'right' });
     }
-    // Separator line (yellow)
+
+    // Yellow separator rule
+    var ruleY = marginT - 4;
     pdf.setDrawColor(248, 228, 26);
     pdf.setLineWidth(0.6);
-    pdf.line(marginL, 17, pageW - marginR, 17);
+    pdf.line(lx, ruleY, rx, ruleY);
     pdf.setDrawColor(0);
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(0);
   };
 
-  ctx.drawFooter = function() {
-    // Separator line
-    pdf.setDrawColor(220);
-    pdf.setLineWidth(0.2);
-    pdf.line(marginL, pageH - 12, pageW - marginR, pageH - 12);
-    pdf.setDrawColor(0);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(7.5);
-    pdf.setTextColor(140);
-    // Left text
-    if (opts.footerLeft) {
-      pdf.text(opts.footerLeft, marginL, pageH - 7);
-    }
-    // Page number — right
-    pdf.text('Page ' + ctx.pageNum, pageW - marginR, pageH - 7, { align: 'right' });
-    pdf.setTextColor(0);
-  };
-
+  // Footer is drawn in finish() so total page count is known
   ctx.needSpace = function(h) {
     if (ctx.y + h > pageH - marginB) {
-      ctx.drawFooter();
       pdf.addPage();
       ctx.pageNum++;
       ctx.y = marginT;
@@ -972,7 +991,25 @@ function _makePdfDoc(opts) {
   };
   ctx.gap = function(h) { ctx.y += (h || 3); };
   ctx.finish = function() {
-    ctx.drawFooter();
+    // Draw footer on every page now that total page count is known
+    var total = pdf.internal.getNumberOfPages();
+    var footerLeft = opts.footerLeft || (nationName ? nationName + ' Housing — Confidential' : '');
+    for (var p = 1; p <= total; p++) {
+      pdf.setPage(p);
+      // Separator line
+      pdf.setDrawColor(200);
+      pdf.setLineWidth(0.2);
+      pdf.line(marginL, pageH - 12, pageW - marginR, pageH - 12);
+      pdf.setDrawColor(0);
+      // Left text
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(140);
+      if (footerLeft) pdf.text(footerLeft, marginL, pageH - 7);
+      // Page X of Y — right
+      pdf.text('Page ' + p + ' of ' + total, pageW - marginR, pageH - 7, { align: 'right' });
+      pdf.setTextColor(0);
+    }
     var dataUri = pdf.output('datauristring');
     return dataUri.substring(dataUri.indexOf(',') + 1);
   };

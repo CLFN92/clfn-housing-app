@@ -1183,8 +1183,7 @@ async function generateContractorContract() {
       var ctx = _makePdfDoc({
         nationName:     tokens.nationName,
         headerTitle:    'Contractor Agreement',
-        headerSubtitle: [tokens.contractNumber, tokens.rfqNumber ? 'RFQ: ' + tokens.rfqNumber : '', tokens.propertyAddress].filter(Boolean).join('  —  '),
-        footerLeft:     tokens.nationName + ' Housing — Confidential'
+        headerSubtitle: [tokens.contractNumber, tokens.rfqNumber ? 'RFQ: ' + tokens.rfqNumber : ''].filter(Boolean).join('  |  ')
       });
       var pdf = ctx.pdf;
 

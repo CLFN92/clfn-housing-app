@@ -2364,8 +2364,7 @@
         var ctx = _makePdfDoc({
           nationName:     tokens.nationName,
           headerTitle:    'Residential Lease Agreement',
-          headerSubtitle: ['Tenant: ' + tokens.tenantName, tokens.residenceStreet].filter(Boolean).join('  —  '),
-          footerLeft:     tokens.nationName + ' Housing — Confidential'
+          headerSubtitle: ['Tenant: ' + tokens.tenantName, tokens.residenceStreet].filter(Boolean).join('  —  ')
         });
         var pdf = ctx.pdf;
 
