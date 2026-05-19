@@ -80,6 +80,7 @@
       <button type="button" id="rfqTabBtn_recipients"  class="pill-tab"        onclick="switchRfqTab('recipients')">
         Recipients <span id="rfqRecipientBadge" class="std-pill std-pill-info" style="display:none;margin-left:4px;font-size:10px;"></span>
       </button>
+      <button type="button" id="rfqTabBtn_documents"   class="pill-tab"        onclick="switchRfqTab('documents')">&#128206; Documents</button>
       <button type="button" id="rfqTabBtn_contracting" class="pill-tab"        onclick="switchRfqTab('contracting')">&#128196; Contracting</button>
     </div>
 
@@ -169,6 +170,33 @@
             <input type="text" id="rfq_ct_search" placeholder="Search name or trade&hellip;" class="stg-lookup-input" style="max-width:220px;" oninput="renderContractorCards()"/>
           </div>
           <div id="rfqContractorGrid" class="rfq-contractor-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Documents -->
+    <div id="rfqPanel_documents" style="display:none;">
+      <div class="card card-flush">
+        <div class="modal-hdr">
+          <div>
+            <div class="lbl-yellow">&#128206; RFQ Documents</div>
+            <div class="txt-sm-meta">Upload supporting files for this RFQ (site plans, existing reports, specs, etc.). Check the box next to each file you want <strong>attached to the contractor email</strong> when you issue the RFQ.</div>
+          </div>
+        </div>
+        <div class="sec-pad">
+          <div style="margin-bottom:14px;">
+            <label class="btn btn-ghost" style="cursor:pointer;display:inline-block;">
+              &#128194; Choose Files
+              <input type="file" id="rfq_doc_file_input" multiple style="display:none;" onchange="_rfqUploadDocs(this.files)"/>
+            </label>
+            <span style="font-size:11px;color:var(--muted);margin-left:10px;">PDF, Word, images — max 3 MB per file for email attachment</span>
+          </div>
+          <div id="rfq_doc_list">
+            <div class="rfq-progress-msg">No documents uploaded yet.</div>
+          </div>
+          <div style="margin-top:12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px;">
+            <strong>Note:</strong> Files marked with a checkmark will be attached to each contractor email when the RFQ is issued. Graph API attachment limit is ~3 MB per file. Files exceeding this limit will be skipped — share a link instead for large files.
+          </div>
         </div>
       </div>
     </div>

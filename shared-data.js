@@ -6082,6 +6082,30 @@ async function sendRfqToRecipients(rfq, contractorList) {
     ccRecipients = await _resolveActiveStaffForRoles(ccRoles);
   }
 
+  // Fetch selected document attachments once — re-used for every contractor
+  var attachments = [];
+  var attachedPaths = (rfq.data && rfq.data.attached_doc_paths) || [];
+  if (attachedPaths.length && typeof sbGetFileUrl === 'function') {
+    for (var ai = 0; ai < attachedPaths.length; ai++) {
+      try {
+        var fileUrl = sbGetFileUrl(attachedPaths[ai]);
+        var fResp = await fetch(fileUrl);
+        if (!fResp.ok) { console.warn('[rfq attach] fetch failed:', attachedPaths[ai], fResp.status); continue; }
+        var fBlob = await fResp.blob();
+        if (fBlob.size > 3 * 1024 * 1024) { console.warn('[rfq attach] skipping (>3MB):', attachedPaths[ai]); continue; }
+        var b64 = await new Promise(function(resolve) {
+          var reader = new FileReader();
+          reader.onload  = function(e) { var d = e.target.result; resolve(d.substring(d.indexOf(',') + 1)); };
+          reader.onerror = function()  { resolve(null); };
+          reader.readAsDataURL(fBlob);
+        });
+        if (!b64) continue;
+        var dispName = attachedPaths[ai].split('/').pop().replace(/^\d+_/, '');
+        attachments.push({ name: dispName, contentType: fBlob.type || 'application/octet-stream', contentBytes: b64 });
+      } catch(e) { console.warn('[rfq attach] error:', attachedPaths[ai], e); }
+    }
+  }
+
   var ok = 0, fail = 0, failNames = [];
   for (var i = 0; i < contractorList.length; i++) {
     var ct = contractorList[i];
@@ -6099,6 +6123,7 @@ async function sendRfqToRecipients(rfq, contractorList) {
       bodyHtml: bodyHtml,
       event: 'rfq_invite', entity_type: 'rfq', entity_id: rfq.id
     };
+    if (attachments.length) payload.attachments = attachments;
     // Add CC staff if configured
     if (ccRecipients.length) {
       payload.cc = ccRecipients.map(function(r){ return r.email; }).filter(Boolean).join(',');

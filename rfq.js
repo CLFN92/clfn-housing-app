@@ -14,6 +14,8 @@ var _rfqMilestoneRows    = [];
 var _rfqMaterialsRows    = [];
 var _rfqExclusionsRows   = [];
 var _rfqClfnSuppliedRows = [];
+var _rfqDocFiles         = [];   // cached list from audit log
+var _rfqAttachedPaths    = [];   // paths selected to attach to email
 
 // ── Page init (mirrors renos.html IIFE pattern — never loads housing-init.js) ─
 (async function initRfq() {
@@ -293,6 +295,8 @@ function showRfqForm(rfqId, unitId, sowPn) {
   _rfqExclusionsRows       = [];
   _rfqClfnSuppliedRows     = [];
   _rfqContractingTabInited = false;
+  _rfqDocFiles         = [];
+  _rfqAttachedPaths    = [];
 
   if (rfqId) {
     // Editing existing
@@ -388,6 +392,9 @@ function _populateFormFields(rfq) {
   set('rfq_price_other',     d.price_other     || '');
   set('rfq_price_tax',       d.price_tax       || '');
   set('rfq_labour_hours',    d.labour_hours    || '');
+
+  // Document attachment selection
+  _rfqAttachedPaths = d.attached_doc_paths || [];
 
   // Dynamic row arrays
   _rfqScopeDetailRows  = d.scope_detail_rows   || [];
@@ -494,7 +501,7 @@ var _rfqContractingTabInited = false;
 
 function switchRfqTab(tab) {
   _rfqActiveTab = tab;
-  ['details','scope','recipients','contracting'].forEach(function(t) {
+  ['details','scope','recipients','documents','contracting'].forEach(function(t) {
     var btn = document.getElementById('rfqTabBtn_' + t);
     var panel = document.getElementById('rfqPanel_' + t);
     if (btn)   btn.classList.toggle('active', t === tab);
@@ -502,6 +509,7 @@ function switchRfqTab(tab) {
   });
   if (tab === 'scope')      renderScopeTab();
   if (tab === 'recipients') renderContractorCards();
+  if (tab === 'documents')  renderDocumentsTab();
   if (tab === 'contracting') {
     // Render dynamic row tables now that the container elements are visible
     renderScopeDetailRows();
@@ -672,6 +680,7 @@ function _buildRfqPayload() {
       ct_signatory_name:            fv('rfq_ct_signatory_name'),
       ct_signatory_title:           fv('rfq_ct_signatory_title'),
       // Scope detail
+      attached_doc_paths: _rfqAttachedPaths.slice(),
       sow_summary:        fv('rfq_sow_summary'),
       scope_detail_rows:  scopeDetailRows,
       materials_rows:     materialsRows,
@@ -1090,6 +1099,140 @@ function _rfqRecalcPrices() {
   var sub = fnum('rfq_price_materials') + fnum('rfq_price_labour') + fnum('rfq_price_equipment') + fnum('rfq_price_other');
   setRO('rfq_price_subtotal',      sub);
   setRO('rfq_price_total_incl_tax',sub); // tax = 0
+}
+
+// ── Documents tab ─────────────────────────────────────────────────────────
+
+async function renderDocumentsTab() {
+  var el = document.getElementById('rfq_doc_list');
+  if (!el) return;
+  el.innerHTML = '<div class="rfq-progress-msg">Loading&hellip;</div>';
+
+  var rfqId = _rfqCurrentId || document.getElementById('rfq_number').value.trim();
+  if (!rfqId) {
+    el.innerHTML = '<div class="rfq-progress-msg">Save the RFQ draft first to enable document uploads.</div>';
+    return;
+  }
+
+  try {
+    _rfqDocFiles = (typeof sbLoadFileMeta === 'function') ? await sbLoadFileMeta('rfq', rfqId) : [];
+  } catch(e) {
+    _rfqDocFiles = [];
+  }
+
+  if (!_rfqDocFiles.length) {
+    el.innerHTML = '<div class="rfq-progress-msg">No documents uploaded yet. Click "Choose Files" to add files.</div>';
+    return;
+  }
+
+  el.innerHTML = '<div class="doclib-table-wrap"><table class="std-table">'
+    + '<thead><tr>'
+    +   '<th style="width:40px;text-align:center;">Attach</th>'
+    +   '<th>File</th>'
+    +   '<th style="width:90px;">Size</th>'
+    +   '<th style="width:90px;">Uploaded</th>'
+    +   '<th style="width:60px;"></th>'
+    + '</tr></thead><tbody>'
+    + _rfqDocFiles.map(function(f, i) {
+        var isAttached = _rfqAttachedPaths.indexOf(f.path) !== -1;
+        var sizeKb = f.size ? (f.size / 1024).toFixed(0) + ' KB' : '—';
+        var tooBig = f.size && f.size > 3 * 1024 * 1024;
+        var dispName = f.name || f.path.split('/').pop().replace(/^\d+_/, '');
+        var fileUrl  = (typeof sbGetFileUrl === 'function') ? sbGetFileUrl(f.path) : '#';
+        return '<tr>'
+          + '<td style="text-align:center;padding:8px;">'
+          +   '<input type="checkbox" id="rfq_doc_chk_' + i + '" '
+          +     (isAttached ? 'checked' : '') + ' '
+          +     (tooBig ? 'disabled title="File exceeds 3 MB — cannot attach to email"' : '') + ' '
+          +     'onchange="_rfqToggleAttach(\'' + escapeHtml(f.path).replace(/'/g,"\\'") + '\', this.checked)" '
+          +     'style="width:15px;height:15px;accent-color:var(--yellow);cursor:pointer;"/>'
+          + '</td>'
+          + '<td style="padding:8px 10px;">'
+          +   '<a href="' + escapeHtml(fileUrl) + '" target="_blank" rel="noopener" style="color:var(--text);font-size:12px;font-weight:500;">' + escapeHtml(dispName) + '</a>'
+          +   (tooBig ? '<div style="font-size:10px;color:var(--danger,#dc2626);margin-top:2px;">⚠ Exceeds 3 MB — too large to email; share a link instead</div>' : '')
+          + '</td>'
+          + '<td style="padding:8px 10px;font-size:11px;color:var(--muted);">' + escapeHtml(sizeKb) + '</td>'
+          + '<td style="padding:8px 10px;font-size:11px;color:var(--muted);">' + escapeHtml(f.addedAt || '—') + '</td>'
+          + '<td style="padding:8px;text-align:center;">'
+          +   '<button type="button" onclick="_rfqDeleteDoc(\'' + escapeHtml(f.logId || '') + '\',\'' + escapeHtml(f.path).replace(/'/g,"\\'") + '\')" '
+          +     'title="Remove document" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;color:var(--muted);cursor:pointer;">×</button>'
+          + '</td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+
+async function _rfqUploadDocs(fileList) {
+  if (!fileList || !fileList.length) return;
+  var rfqId = _rfqCurrentId || document.getElementById('rfq_number').value.trim();
+  if (!rfqId) { showToast('Save the RFQ draft first before uploading documents.'); return; }
+  if (typeof sbUploadFile !== 'function' || typeof sbSaveFileMeta !== 'function') {
+    showToast('Storage not available'); return;
+  }
+
+  // Save draft first so the RFQ exists in the DB
+  try { await saveRfqDraft(); } catch(e) { console.warn('[rfq docs] save draft failed:', e); }
+
+  var el = document.getElementById('rfq_doc_list');
+  if (el) el.innerHTML = '<div class="rfq-progress-msg">Uploading&hellip;</div>';
+
+  var failed = [];
+  for (var i = 0; i < fileList.length; i++) {
+    var file = fileList[i];
+    try {
+      var storePath = 'rfq/' + rfqId + '/' + Date.now() + '_' + file.name;
+      await sbUploadFile(storePath, file);
+      await sbSaveFileMeta('rfq', rfqId, storePath, file.name, file.size, file.type);
+    } catch(e) {
+      console.warn('[rfq docs] upload failed:', file.name, e);
+      failed.push(file.name);
+    }
+  }
+
+  // Reset file input
+  var inp = document.getElementById('rfq_doc_file_input');
+  if (inp) inp.value = '';
+
+  if (failed.length) showToast('Upload failed for: ' + failed.join(', '));
+  else showToast('Document' + (fileList.length > 1 ? 's' : '') + ' uploaded');
+
+  renderDocumentsTab();
+}
+
+async function _rfqDeleteDoc(logId, path) {
+  if (!confirm('Remove this document from the RFQ?')) return;
+  var rfqId = _rfqCurrentId || document.getElementById('rfq_number').value.trim();
+  // Remove from attached list
+  _rfqAttachedPaths = _rfqAttachedPaths.filter(function(p){ return p !== path; });
+  // Record deletion in audit log
+  if (typeof sbSaveFileMeta === 'function') {
+    try {
+      await fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
+        method: 'POST',
+        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({
+          entity_type: 'rfq', entity_id: String(rfqId),
+          action: 'file_deleted',
+          detail: JSON.stringify({ path: path }),
+          actor: window.currentRole || 'staff',
+          created_at: new Date().toISOString()
+        })
+      });
+    } catch(e) { console.warn('[rfq docs] delete meta failed:', e); }
+    // Best-effort delete from storage
+    try {
+      await fetch(SUPABASE_URL + '/storage/v1/object/' + STORAGE_BUCKET + '/' + path, {
+        method: 'DELETE',
+        headers: Object.assign({}, HOUSING_HEADERS, { 'apikey': SUPABASE_ANON })
+      });
+    } catch(e) { console.warn('[rfq docs] storage delete failed:', e); }
+  }
+  renderDocumentsTab();
+}
+
+function _rfqToggleAttach(path, checked) {
+  _rfqAttachedPaths = _rfqAttachedPaths.filter(function(p){ return p !== path; });
+  if (checked) _rfqAttachedPaths.push(path);
 }
 
 // ── Generate Contractor Agreement PDF ────────────────────────────────────
