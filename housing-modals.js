@@ -1335,6 +1335,9 @@ function openUnitDetail(unitId) {
   // Scopes of Work table
   udpRenderSowTable(unitId);
 
+  // RFQs & Contracts section
+  if (typeof udpRenderRfqSection === 'function') udpRenderRfqSection(unitId);
+
   // Tenant files preview in detail panel
   udpRenderFilePreviews(unitId);
 

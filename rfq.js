@@ -1235,18 +1235,29 @@ async function generateContractorContract() {
       var binStr = atob(base64);
       var arr = new Uint8Array(binStr.length);
       for (var bi = 0; bi < binStr.length; bi++) arr[bi] = binStr.charCodeAt(bi);
-      _rfqDownloadAndStore(new Blob([arr], {type:'application/pdf'}), filename);
+      var blob = new Blob([arr], {type:'application/pdf'});
+
+      // Download
+      var dlUrl = URL.createObjectURL(blob);
+      var dlLink = document.createElement('a');
+      dlLink.href = dlUrl; dlLink.download = filename; dlLink.click();
+      setTimeout(function(){ URL.revokeObjectURL(dlUrl); }, 3000);
+
+      // Upload to unit document library so it appears on the inventory unit card
+      if (_rfqSowUnitId && typeof window.sbUploadFile === 'function') {
+        try {
+          var storePath = 'tenants/' + _rfqSowUnitId + '/' + Date.now() + '_' + filename;
+          await window.sbUploadFile(storePath, blob);
+          if (typeof window.sbSaveFileMeta === 'function') {
+            await window.sbSaveFileMeta('tenant', String(_rfqSowUnitId), storePath, filename, blob.size, 'application/pdf');
+          }
+        } catch(e) { console.warn('[contract] document library upload failed:', e); }
+      }
+
+      if (typeof showToast === 'function') showToast('Contract PDF saved — also added to unit documents');
   } catch(e) {
     console.error('[contract] generation failed:', e);
     if (typeof showToast === 'function') showToast('Contract PDF failed: ' + e.message);
   }
-}
-
-function _rfqDownloadAndStore(blob, filename) {
-  var url  = URL.createObjectURL(blob);
-  var link = document.createElement('a');
-  link.href = url; link.download = filename; link.click();
-  setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
-  if (typeof showToast === 'function') showToast('Contract PDF downloaded');
 }
 

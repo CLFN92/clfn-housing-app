@@ -5447,6 +5447,46 @@ function udpRenderFilePreviews(unitId){
   });
 }
 
+async function udpRenderRfqSection(unitId) {
+  var el = document.getElementById('udp_rfq_list');
+  if (!el) return;
+  el.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0;">Loading&hellip;</div>';
+  try {
+    var url = SUPABASE_URL + '/rest/v1/housing_rfq?sow_unit_id=eq.' + encodeURIComponent(unitId)
+            + '&select=id,status,award_amount,awarded_contractor_id,data&order=created_at.desc';
+    var r = await fetch(url, { headers: HOUSING_HEADERS });
+    if (!r.ok) { el.innerHTML = '<div style="font-size:11px;color:var(--muted);font-style:italic;">Could not load RFQs.</div>'; return; }
+    var rfqs = await r.json();
+    if (!rfqs.length) {
+      el.innerHTML = '<div style="font-size:11px;color:var(--muted);font-style:italic;">No RFQs for this unit.</div>';
+      return;
+    }
+    var statusLabel = { draft:'Draft', issued:'Issued', awarded:'Awarded', cancelled:'Cancelled' };
+    var statusColor = { draft:'var(--muted)', issued:'var(--info-blue,#1d4ed8)', awarded:'var(--success,#15803d)', cancelled:'var(--danger,#dc2626)' };
+    el.innerHTML = rfqs.map(function(rfq) {
+      var d = rfq.data || {};
+      var ct = rfq.awarded_contractor_id ? (window._contractors || []).find(function(c){ return c && c.id === rfq.awarded_contractor_id; }) : null;
+      var ctName = ct ? ct.name : '';
+      var contractNo = d.contract_number || '';
+      var amount = rfq.award_amount ? '$' + Number(rfq.award_amount).toLocaleString('en-CA', {minimumFractionDigits:2}) : '';
+      var label = statusLabel[rfq.status] || rfq.status;
+      var color = statusColor[rfq.status] || 'var(--muted)';
+      return '<div onclick="window.location.href=\'rfq.html?rfq=' + escapeHtml(rfq.id) + '\'" '
+           + 'style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;background:var(--bg);border-radius:7px;margin-bottom:6px;cursor:pointer;border:1px solid var(--border);" '
+           + 'onmouseover="this.style.borderColor=\'var(--yellow)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
+           + '<div>'
+           +   '<div style="font-size:12px;font-weight:600;color:var(--text);">' + escapeHtml(rfq.id) + (contractNo ? ' &mdash; ' + escapeHtml(contractNo) : '') + '</div>'
+           +   (ctName || amount ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + escapeHtml(ctName) + (ctName && amount ? ' &middot; ' : '') + escapeHtml(amount) + '</div>' : '')
+           + '</div>'
+           + '<span style="font-size:10px;font-weight:700;color:' + color + ';text-transform:uppercase;letter-spacing:.4px;">' + escapeHtml(label) + '</span>'
+           + '</div>';
+    }).join('');
+  } catch(e) {
+    console.warn('[udp rfq]', e);
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted);font-style:italic;">Could not load RFQs.</div>';
+  }
+}
+
 function updateUnitScorePts(id,val){
   var model=getUnitScoreModel();
   var row=model.find(function(r){return r.id===id;});
