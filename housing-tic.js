@@ -2356,15 +2356,16 @@
     };
 
     // ── jsPDF path — used when a contract body has been saved in Settings ─
-    var _ca = window._appSettings && window._appSettings.contracts_agreements;
-    var savedBody = (_ca && _ca.residential_lease && _ca.residential_lease.bodyHtml) ? _ca.residential_lease.bodyHtml.trim() : '';
-    if (savedBody) {
+    var savedBody = (typeof getContractBody === 'function') ? getContractBody('residential_lease') : '';
+    if (savedBody && savedBody.trim()) {
       try {
         if (typeof _loadJsPdf === 'function') await _loadJsPdf();
+        var logoDataUrl = (typeof _fetchLogoForPdf === 'function') ? await _fetchLogoForPdf() : null;
         var ctx = _makePdfDoc({
           nationName:     tokens.nationName,
           headerTitle:    'Residential Lease Agreement',
-          headerSubtitle: ['Tenant: ' + tokens.tenantName, tokens.residenceStreet].filter(Boolean).join('  —  ')
+          headerSubtitle: ['Tenant: ' + tokens.tenantName, tokens.residenceStreet].filter(Boolean).join('  —  '),
+          logoDataUrl:    logoDataUrl
         });
         var pdf = ctx.pdf;
 

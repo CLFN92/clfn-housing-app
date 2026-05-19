@@ -847,6 +847,27 @@ async function _loadJsPdf() {
 // the pdf instance, layout constants, mutable cursor state (ctx.y /
 // ctx.pageNum), and six shared layout primitives. ctx.finish() stamps the
 // final page footer and returns the base64 string.
+// Fetches the nation logo (from _appSettings.theme.logo) and returns a data
+// URL suitable for pdf.addImage(). Returns null on any error.
+async function _fetchLogoForPdf() {
+  try {
+    var logoUrl = window._appSettings && _appSettings.theme && _appSettings.theme.logo;
+    if (!logoUrl) return null;
+    var resp = await fetch(logoUrl);
+    if (!resp.ok) return null;
+    var blob = await resp.blob();
+    return await new Promise(function(resolve) {
+      var reader = new FileReader();
+      reader.onload  = function(e) { resolve(e.target.result); };
+      reader.onerror = function()  { resolve(null); };
+      reader.readAsDataURL(blob);
+    });
+  } catch(e) {
+    console.warn('[pdf] logo fetch failed:', e);
+    return null;
+  }
+}
+
 // opts (all optional — contact fields are auto-read from NATION_CONFIG when present):
 //   nationName     — overrides NATION_CONFIG.display_name
 //   headerTitle    — document title (top-right); triggers header/footer mode
@@ -883,13 +904,26 @@ function _makePdfDoc(opts) {
   ctx.drawHeader = function() {
     if (!hasHeader) return;
     var lx = marginL, rx = pageW - marginR;
-    var y = 8;
+
+    // Logo — top-left, max 20mm wide × 14mm tall
+    var logoOffsetX = 0;
+    if (opts.logoDataUrl) {
+      try {
+        var fmt = opts.logoDataUrl.indexOf('image/png') >= 0 ? 'PNG' : 'JPEG';
+        var logoH = 13, logoW = 20;
+        pdf.addImage(opts.logoDataUrl, fmt, lx, 3, logoW, logoH);
+        logoOffsetX = logoW + 3; // text starts after logo + 3mm gap
+      } catch(e) { console.warn('[pdf header] logo embed failed:', e); }
+    }
+
+    var tx = lx + logoOffsetX; // left text anchor
+    var y  = 8;
 
     // Left — nation name
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(8);
     pdf.setTextColor(30);
-    pdf.text(nationName.toUpperCase(), lx, y);
+    pdf.text(nationName.toUpperCase(), tx, y);
 
     // Right — document title
     pdf.setFont('helvetica', 'bold');
@@ -904,7 +938,7 @@ function _makePdfDoc(opts) {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7);
       pdf.setTextColor(100);
-      pdf.text(nationAddr, lx, y);
+      pdf.text(nationAddr, tx, y);
       y += 4;
     }
 
@@ -914,10 +948,10 @@ function _makePdfDoc(opts) {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7);
       pdf.setTextColor(100);
-      pdf.text(contactStr, lx, y);
+      pdf.text(contactStr, tx, y);
     }
 
-    // Right — subtitle / reference (second header row)
+    // Right — subtitle / reference
     if (opts.headerSubtitle) {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7);
@@ -2270,7 +2304,8 @@ var _NTF_TAG_WHITELIST = {
   P:1, BR:1, DIV:1, SPAN:1,
   STRONG:1, B:1, EM:1, I:1, U:1,
   UL:1, OL:1, LI:1,
-  A:1
+  A:1,
+  H1:1, H2:1, H3:1, H4:1  // allowed in Contracts editor + jsPDF renderer
 };
 function _ntfSanitizeBodyHtml(rawHtml) {
   var doc = new DOMParser().parseFromString('<div id="root">' + rawHtml + '</div>', 'text/html');

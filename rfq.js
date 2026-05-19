@@ -1173,17 +1173,19 @@ async function generateContractorContract() {
   var filename = (tokens.nationShort || 'Housing') + '_Contract_' + rfqId + '.pdf';
 
   // ── jsPDF path ─────────────────────────────────────────────────────────
-  // Only use jsPDF path when ED has explicitly saved a custom body in Settings → Contracts.
-  // getContractBody() always returns the registry default, so check _appSettings directly.
-  var _ca = window._appSettings && window._appSettings.contracts_agreements;
-  var savedBody = (_ca && _ca.contractor_agreement && _ca.contractor_agreement.bodyHtml) ? _ca.contractor_agreement.bodyHtml.trim() : '';
-  if (savedBody) {
+  // Use getContractBody() which returns the saved override when the ED has edited
+  // the document in Settings → Contracts, or falls back to the registry defaultBody.
+  // This means the jsPDF path always fires — no AcroForm fallback needed.
+  var savedBody = (typeof getContractBody === 'function') ? getContractBody('contractor_agreement') : '';
+  if (savedBody && savedBody.trim()) {
     try {
       if (typeof _loadJsPdf === 'function') await _loadJsPdf();
+      var logoDataUrl = (typeof _fetchLogoForPdf === 'function') ? await _fetchLogoForPdf() : null;
       var ctx = _makePdfDoc({
         nationName:     tokens.nationName,
         headerTitle:    'Contractor Agreement',
-        headerSubtitle: [tokens.contractNumber, tokens.rfqNumber ? 'RFQ: ' + tokens.rfqNumber : ''].filter(Boolean).join('  |  ')
+        headerSubtitle: [tokens.contractNumber, tokens.rfqNumber ? 'RFQ: ' + tokens.rfqNumber : ''].filter(Boolean).join('  |  '),
+        logoDataUrl:    logoDataUrl
       });
       var pdf = ctx.pdf;
 
