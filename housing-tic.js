@@ -1708,10 +1708,16 @@
     window.location.href = 'housing.html?openApp=' + encodeURIComponent(appId);
   }
   function _ticFindApplicationForTenant(){
-    // 1) explicit linkage
+    // 1) unit.assignedTo — set by the assign-unit flow and reflects the most
+    //    recent application linked to this unit. Checked before tenant.application_id
+    //    so that existing-tenant file updates (where the tenants row still carries
+    //    an old application_id) resolve to the new file-update application.
+    var unitAppId = (_ticState.unit && _ticState.unit.assignedTo) || '';
+    if(unitAppId) return Promise.resolve(unitAppId);
+    // 2) explicit linkage on the tenants row
     var appId = (_ticState.tenant && _ticState.tenant[TIC_C.application_id]) || '';
     if(appId) return Promise.resolve(appId);
-    // 2) fall back to local cache by name (avoids a network round-trip when possible)
+    // 3) fall back to local cache by name (avoids a network round-trip when possible)
     var name = (_ticState.tenant && _ticState.tenant[TIC_C.full_name])
             || (_ticState.unit && _ticState.unit.assignedName)
             || '';
