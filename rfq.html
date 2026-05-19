@@ -75,11 +75,12 @@
 
     <!-- Tabs -->
     <div class="pill-tabs" style="margin-bottom:16px;">
-      <button type="button" id="rfqTabBtn_details"    class="pill-tab active"  onclick="switchRfqTab('details')">Details</button>
-      <button type="button" id="rfqTabBtn_scope"      class="pill-tab"         onclick="switchRfqTab('scope')">Scope</button>
-      <button type="button" id="rfqTabBtn_recipients" class="pill-tab"         onclick="switchRfqTab('recipients')">
+      <button type="button" id="rfqTabBtn_details"     class="pill-tab active" onclick="switchRfqTab('details')">Details</button>
+      <button type="button" id="rfqTabBtn_scope"       class="pill-tab"        onclick="switchRfqTab('scope')">Scope</button>
+      <button type="button" id="rfqTabBtn_recipients"  class="pill-tab"        onclick="switchRfqTab('recipients')">
         Recipients <span id="rfqRecipientBadge" class="std-pill std-pill-info" style="display:none;margin-left:4px;font-size:10px;"></span>
       </button>
+      <button type="button" id="rfqTabBtn_contracting" class="pill-tab"        onclick="switchRfqTab('contracting')">&#128196; Contracting</button>
     </div>
 
     <!-- TAB: Details -->
@@ -150,8 +151,42 @@
         </div>
       </div>
 
+      <!-- Contract details, scope, pricing, and signatures live on the Contracting tab -->
+    </div>
+
+    <!-- TAB: Recipients -->
+    <div id="rfqPanel_recipients" style="display:none;">
+      <div class="card card-flush">
+        <div class="modal-hdr">
+          <div><div class="lbl-yellow">Select Contractors</div>
+          <div class="txt-sm-meta">Active contractors from the registry. Click a card to select.</div></div>
+        </div>
+        <div class="sec-pad">
+          <div class="rfq-filter-bar">
+            <label><input type="checkbox" id="rfq_filter_active" checked onchange="renderContractorCards()"/> Active only</label>
+            <label><input type="checkbox" id="rfq_filter_trade"  checked onchange="renderContractorCards()"/> Match SOW trades</label>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="selectAllMatchingContractors()">Select all matching</button>
+            <input type="text" id="rfq_ct_search" placeholder="Search name or trade&hellip;" class="stg-lookup-input" style="max-width:220px;" oninput="renderContractorCards()"/>
+          </div>
+          <div id="rfqContractorGrid" class="rfq-contractor-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Contracting -->
+    <div id="rfqPanel_contracting" style="display:none;">
+
+      <!-- Generate Contract action bar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);">Contractor Agreement</div>
+          <div style="font-size:11px;color:var(--muted);">Complete the sections below, then generate the signed PDF.</div>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="generateContractorContract()">&#128196; Generate Contract</button>
+      </div>
+
       <!-- Contract Details -->
-      <div class="card card-flush" style="margin-top:16px;">
+      <div class="card card-flush">
         <div class="modal-hdr"><div class="lbl-yellow">Contract Details</div></div>
         <div class="sec-pad">
           <div class="tic-grid-2">
@@ -210,7 +245,7 @@
             <div class="f"><label>Equipment Total ($)</label><input type="number" id="rfq_price_equipment" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqRecalcPrices()"/></div>
             <div class="f"><label>Other Total ($)</label><input type="number" id="rfq_price_other" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqRecalcPrices()"/></div>
             <div class="f"><label>Subtotal</label><input type="text" id="rfq_price_subtotal" class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></div>
-            <div class="f"><label>Tax</label><input type="text" id="rfq_price_tax" class="stg-lookup-input" readonly value="$0.00 — First Nations exempt" style="background:var(--bg);color:var(--muted);font-style:italic;"/></div>
+            <div class="f"><label>Tax</label><input type="text" id="rfq_price_tax" class="stg-lookup-input" readonly value="$0.00 &mdash; First Nations exempt" style="background:var(--bg);color:var(--muted);font-style:italic;"/></div>
             <div class="f"><label>Contract Price (Total)</label><input type="text" id="rfq_price_total_incl_tax" class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);font-weight:600;"/></div>
             <div class="f"><label>Labour Hours (total)</label><input type="number" id="rfq_labour_hours" class="stg-lookup-input" placeholder="0" min="0" step="1"/></div>
           </div>
@@ -230,7 +265,7 @@
         </div>
       </div>
 
-      <!-- CLFN Authorized Signature -->
+      <!-- Nation Authorized Signature -->
       <div class="card card-flush" style="margin-top:16px;">
         <div class="modal-hdr"><div class="lbl-yellow">Nation Authorized Signature</div></div>
         <div class="sec-pad">
@@ -349,30 +384,10 @@
       </div>
     </div>
 
-    <!-- TAB: Recipients -->
-    <div id="rfqPanel_recipients" style="display:none;">
-      <div class="card card-flush">
-        <div class="modal-hdr">
-          <div><div class="lbl-yellow">Select Contractors</div>
-          <div class="txt-sm-meta">Active contractors from the registry. Click a card to select.</div></div>
-        </div>
-        <div class="sec-pad">
-          <div class="rfq-filter-bar">
-            <label><input type="checkbox" id="rfq_filter_active" checked onchange="renderContractorCards()"/> Active only</label>
-            <label><input type="checkbox" id="rfq_filter_trade"  checked onchange="renderContractorCards()"/> Match SOW trades</label>
-            <button type="button" class="btn btn-ghost btn-sm" onclick="selectAllMatchingContractors()">Select all matching</button>
-            <input type="text" id="rfq_ct_search" placeholder="Search name or trade&hellip;" class="stg-lookup-input" style="max-width:220px;" oninput="renderContractorCards()"/>
-          </div>
-          <div id="rfqContractorGrid" class="rfq-contractor-grid"></div>
-        </div>
-      </div>
-    </div>
-
     <!-- Footer actions -->
     <div class="rfq-footer-actions">
       <button type="button" class="btn btn-ghost" onclick="saveRfqDraft()">Save Draft</button>
       <button type="button" class="btn btn-ghost" onclick="previewRfqPdf()">&#128202; Preview RFQ PDF</button>
-      <button type="button" class="btn btn-ghost" onclick="generateContractorContract()">&#128196; Generate Contract</button>
       <button type="button" class="btn btn-primary" id="rfqIssueBtn" onclick="issueRfq()">Issue RFQ &#8594;</button>
     </div>
   </div>

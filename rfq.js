@@ -284,14 +284,15 @@ function showRfqForm(rfqId, unitId, sowPn) {
   document.getElementById('rfqFormView').style.display  = '';
   switchRfqTab('details');
 
-  _rfqCurrentId       = rfqId || null;
-  _rfqSelectedCts     = {};
-  _rfqScopeItems      = [];
-  _rfqScopeDetailRows  = [];
-  _rfqMilestoneRows    = [];
-  _rfqMaterialsRows    = [];
-  _rfqExclusionsRows   = [];
-  _rfqClfnSuppliedRows = [];
+  _rfqCurrentId            = rfqId || null;
+  _rfqSelectedCts          = {};
+  _rfqScopeItems           = [];
+  _rfqScopeDetailRows      = [];
+  _rfqMilestoneRows        = [];
+  _rfqMaterialsRows        = [];
+  _rfqExclusionsRows       = [];
+  _rfqClfnSuppliedRows     = [];
+  _rfqContractingTabInited = false;
 
   if (rfqId) {
     // Editing existing
@@ -492,9 +493,11 @@ function _loadRfqSowContext() {
 }
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
+var _rfqContractingTabInited = false;
+
 function switchRfqTab(tab) {
   _rfqActiveTab = tab;
-  ['details','scope','recipients'].forEach(function(t) {
+  ['details','scope','recipients','contracting'].forEach(function(t) {
     var btn = document.getElementById('rfqTabBtn_' + t);
     var panel = document.getElementById('rfqPanel_' + t);
     if (btn)   btn.classList.toggle('active', t === tab);
@@ -502,6 +505,26 @@ function switchRfqTab(tab) {
   });
   if (tab === 'scope')      renderScopeTab();
   if (tab === 'recipients') renderContractorCards();
+  if (tab === 'contracting') {
+    // Render dynamic row tables now that the container elements are visible
+    renderScopeDetailRows();
+    renderMaterialsRows();
+    renderExclusionsRows();
+    renderClfnSuppliedRows();
+    renderMilestoneRows();
+    // Sig pads were hidden at form-open time — init them on first visit
+    if (!_rfqContractingTabInited) {
+      _rfqContractingTabInited = true;
+      setTimeout(function(){
+        if (typeof _initSigPad === 'function') {
+          _initSigPad('rfq_sig');
+          _initSigPad('rfq_ct_sig');
+          _initSigPad('rfq_ct_initial');
+          _initSigPad('rfq_witness_sig');
+        }
+      }, 50);
+    }
+  }
 }
 
 // ── Scope tab ─────────────────────────────────────────────────────────────────
