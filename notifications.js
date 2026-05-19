@@ -2659,6 +2659,20 @@ async function renderConfigPanel() {
     +     '<a class="btn btn-primary" href="' + _ntfEsc(secretsUrl) + '" target="_blank" rel="noopener">Open Supabase Edge Function Secrets</a>'
     +     '<a class="btn btn-ghost"   href="' + _ntfEsc(entraUrl)   + '" target="_blank" rel="noopener">Open Entra App Registration</a>'
     +   '</div>'
+    + '</div>'
+
+    + '<div class="cfg-section">'
+    +   '<div class="cfg-section-title">SOW Project Numbering</div>'
+    +   '<div class="cfg-section-sub">Renumber all existing Scope of Work records to the global sequential format (SOW-YYYY-NN). New SOWs already use this format. This is a one-time migration &mdash; preview the changes before confirming.</div>'
+    +   '<div class="cfg-grid" style="margin-top:12px;">'
+    +     '<div class="cfg-row">'
+    +       '<div class="cfg-label">Renumber all SOW projects</div>'
+    +       '<div class="cfg-value">'
+    +         '<button type="button" class="btn btn-ghost" onclick="previewSowRenumber()">&#128203; Preview &amp; Renumber&hellip;</button>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div id="sow_renumber_status" style="font-size:11px;color:var(--muted);margin-top:10px;"></div>'
     + '</div>';
 }
 
@@ -2712,6 +2726,179 @@ function saveRfqThreshold() {
     if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'rfq_threshold_save', 'RFQ threshold set to $' + val.toLocaleString(), role);
     showToast('RFQ threshold saved — $' + val.toLocaleString());
   }).catch(function(e) { console.warn('[cfg] rfq threshold save failed:', e); showToast('Save failed'); });
+}
+
+// ── SOW project renumbering ────────────────────────────────────────────────
+// Collects every SOW across all units, sorts by savedAt, assigns sequential
+// SOW-YYYY-NN numbers, shows a preview, then on confirm:
+//   1. PATCHes each housing_sow row with the updated data JSONB
+//   2. PATCHes housing_rfq rows whose sow_project_number matched an old number
+
+async function previewSowRenumber() {
+  var role = window.currentRole || window._realRole;
+  if (role !== 'ed') { showToast('Only the Executive Director can renumber projects'); return; }
+
+  var statusEl = document.getElementById('sow_renumber_status');
+  if (statusEl) statusEl.textContent = 'Scanning SOW records…';
+
+  // 1. Collect all SOWs from _sowCache
+  var cache = window._sowCache || {};
+  var allSows = []; // { unitId, sow }
+  Object.keys(cache).forEach(function(uid) {
+    var raw = cache[uid];
+    var migrated = typeof _migrateLegacySow === 'function' ? _migrateLegacySow(raw) : (raw || {});
+    var list = migrated.sows || [];
+    list.forEach(function(s) { allSows.push({ unitId: uid, sow: s }); });
+  });
+
+  if (!allSows.length) {
+    if (statusEl) statusEl.textContent = 'No SOW records found in cache. Try refreshing the page first.';
+    return;
+  }
+
+  // 2. Sort by savedAt ascending (oldest first)
+  allSows.sort(function(a, b) {
+    return String(a.sow.savedAt || a.sow.created_at || '').localeCompare(
+           String(b.sow.savedAt || b.sow.created_at || ''));
+  });
+
+  // 3. Build old → new mapping (skip SOWs already in SOW-YYYY-NN format)
+  var year   = new Date().getFullYear();
+  var prefix = 'SOW-' + year + '-';
+  var mapping = []; // { unitId, oldPn, newPn, sow }
+  var counter = 0;
+
+  // Find highest existing new-format number so we don't collide
+  allSows.forEach(function(item) {
+    var pn = String(item.sow.project_number || '');
+    if (pn.indexOf(prefix) === 0) {
+      var n = parseInt(pn.slice(prefix.length), 10);
+      if (!isNaN(n) && n > counter) counter = n;
+    }
+  });
+
+  allSows.forEach(function(item) {
+    var pn = String(item.sow.project_number || '');
+    if (!pn || pn.indexOf(prefix) === 0) return; // skip already-new-format
+    counter++;
+    var newPn = prefix + ('0' + counter).slice(-2);
+    mapping.push({ unitId: item.unitId, oldPn: pn, newPn: newPn, sow: item.sow });
+  });
+
+  if (!mapping.length) {
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--success);">&#10003; All SOW projects are already in the new format.</span>';
+    return;
+  }
+
+  // 4. Show preview modal
+  var previewRows = mapping.slice(0, 50).map(function(m) {
+    var addr = m.sow.address || m.unitId;
+    return '<tr><td style="padding:5px 10px;font-size:11px;color:var(--muted);">' + escapeHtml(addr) + '</td>'
+         + '<td style="padding:5px 10px;font-size:11px;font-family:monospace;">' + escapeHtml(m.oldPn) + '</td>'
+         + '<td style="padding:5px 10px;font-size:11px;font-family:monospace;color:var(--success);font-weight:700;">' + escapeHtml(m.newPn) + '</td></tr>';
+  }).join('');
+  var more = mapping.length > 50 ? '<p style="font-size:11px;color:var(--muted);margin-top:8px;">…and ' + (mapping.length - 50) + ' more.</p>' : '';
+
+  var result = await showConfirm({
+    title:       'Renumber ' + mapping.length + ' SOW project' + (mapping.length === 1 ? '' : 's') + '?',
+    message:     'The following project numbers will be updated. This also updates any linked RFQ records. The operation cannot be undone.'
+               + '<div style="margin-top:12px;max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:7px;">'
+               + '<table style="width:100%;border-collapse:collapse;">'
+               + '<thead><tr>'
+               +   '<th style="padding:5px 10px;font-size:10px;text-align:left;color:var(--muted);background:var(--bg);">Unit</th>'
+               +   '<th style="padding:5px 10px;font-size:10px;text-align:left;color:var(--muted);background:var(--bg);">Old #</th>'
+               +   '<th style="padding:5px 10px;font-size:10px;text-align:left;color:var(--muted);background:var(--bg);">New #</th>'
+               + '</tr></thead>'
+               + '<tbody>' + previewRows + '</tbody></table>'
+               + more + '</div>',
+    confirmText: 'Renumber All',
+    cancelText:  'Cancel',
+    danger:      true
+  });
+
+  if (!result) return;
+  await _executeSowRenumber(mapping, statusEl);
+}
+
+async function _executeSowRenumber(mapping, statusEl) {
+  if (statusEl) statusEl.textContent = 'Updating SOW records…';
+
+  // Build per-unit updated SOW lists
+  var byUnit = {}; // unitId → [updatedSow, ...]
+  var pnMap  = {}; // oldPn → newPn  (for RFQ updates)
+
+  mapping.forEach(function(m) {
+    pnMap[m.oldPn] = m.newPn;
+    if (!byUnit[m.unitId]) {
+      // Copy existing full SOW list for this unit
+      var raw = (window._sowCache && window._sowCache[m.unitId]) || {};
+      var migrated = typeof _migrateLegacySow === 'function' ? _migrateLegacySow(raw) : (raw || {});
+      byUnit[m.unitId] = (migrated.sows || []).map(function(s){ return Object.assign({}, s); });
+    }
+    var list = byUnit[m.unitId];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].project_number === m.oldPn) {
+        list[i] = Object.assign({}, list[i], { project_number: m.newPn });
+        break;
+      }
+    }
+  });
+
+  // Patch each unit's housing_sow row
+  var unitIds   = Object.keys(byUnit);
+  var sowFailed = [];
+  for (var ui = 0; ui < unitIds.length; ui++) {
+    var uid  = unitIds[ui];
+    var sows = byUnit[uid];
+    try {
+      var r = await fetch(SUPABASE_URL + '/rest/v1/housing_sow?unit_id=eq.' + encodeURIComponent(uid), {
+        method:  'PATCH',
+        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body:    JSON.stringify({ data: { sows: sows } })
+      });
+      if (r.ok) {
+        // Update in-memory cache
+        if (window._sowCache) window._sowCache[uid] = { sows: sows };
+      } else {
+        sowFailed.push(uid);
+      }
+    } catch(e) {
+      sowFailed.push(uid);
+    }
+  }
+
+  // Patch housing_rfq rows that reference old project numbers
+  if (statusEl) statusEl.textContent = 'Updating RFQ records…';
+  var rfqFailed = 0;
+  try {
+    var rfqR = await fetch(SUPABASE_URL + '/rest/v1/housing_rfq?select=id,sow_project_number', { headers: HOUSING_HEADERS });
+    if (rfqR.ok) {
+      var rfqs = await rfqR.json();
+      for (var ri = 0; ri < rfqs.length; ri++) {
+        var rfq = rfqs[ri];
+        if (rfq.sow_project_number && pnMap[rfq.sow_project_number]) {
+          try {
+            await fetch(SUPABASE_URL + '/rest/v1/housing_rfq?id=eq.' + encodeURIComponent(rfq.id), {
+              method:  'PATCH',
+              headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+              body:    JSON.stringify({ sow_project_number: pnMap[rfq.sow_project_number] })
+            });
+          } catch(e) { rfqFailed++; }
+        }
+      }
+    }
+  } catch(e) { /* best-effort */ }
+
+  // Report
+  var msg = '&#10003; Renumbered ' + mapping.length + ' SOW project' + (mapping.length === 1 ? '' : 's') + '.';
+  if (sowFailed.length) msg += ' Warning: ' + sowFailed.length + ' unit(s) failed to save — check console.';
+  if (rfqFailed) msg += ' ' + rfqFailed + ' RFQ update(s) failed.';
+  if (statusEl) statusEl.innerHTML = '<span style="color:var(--success);">' + msg + '</span>';
+  if (typeof auditEntry === 'function') {
+    auditEntry('SETTINGS', 'sow_renumber', 'SOW projects renumbered: ' + mapping.length + ' records updated', window.currentRole || 'ed');
+  }
+  showToast('SOW projects renumbered');
+  if (sowFailed.length) console.warn('[renumber] failed units:', sowFailed);
 }
 
 // Pipeline health card — queries housing_audit_log for recent email_sent
