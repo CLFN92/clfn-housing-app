@@ -9,8 +9,11 @@ var _rfqScopeItems      = [];
 var _rfqSelectedCts     = {};
 var _rfqActiveTab       = 'details';
 var _rfqAwardingId      = null;
-var _rfqScopeDetailRows = [];
-var _rfqMilestoneRows   = [];
+var _rfqScopeDetailRows  = [];
+var _rfqMilestoneRows    = [];
+var _rfqMaterialsRows    = [];
+var _rfqExclusionsRows   = [];
+var _rfqClfnSuppliedRows = [];
 
 // ── Page init (mirrors renos.html IIFE pattern — never loads housing-init.js) ─
 (async function initRfq() {
@@ -284,8 +287,11 @@ function showRfqForm(rfqId, unitId, sowPn) {
   _rfqCurrentId       = rfqId || null;
   _rfqSelectedCts     = {};
   _rfqScopeItems      = [];
-  _rfqScopeDetailRows = [];
-  _rfqMilestoneRows   = [];
+  _rfqScopeDetailRows  = [];
+  _rfqMilestoneRows    = [];
+  _rfqMaterialsRows    = [];
+  _rfqExclusionsRows   = [];
+  _rfqClfnSuppliedRows = [];
 
   if (rfqId) {
     // Editing existing
@@ -373,9 +379,7 @@ function _populateFormFields(rfq) {
   // Scope detail
   set('rfq_sow_summary',     d.sow_summary     || '');
   set('rfq_sow_detail',      d.sow_detail      || '');
-  set('rfq_materials_specs', d.materials_specs || '');
-  set('rfq_exclusions',      d.exclusions      || '');
-  set('rfq_clfn_supplied',   d.clfn_supplied   || '');
+  // (materials/exclusions/clfn_supplied now use dynamic rows — loaded above)
 
   // Price breakdown
   set('rfq_price_materials', d.price_materials || '');
@@ -385,10 +389,12 @@ function _populateFormFields(rfq) {
   set('rfq_price_tax',       d.price_tax       || '');
   set('rfq_labour_hours',    d.labour_hours    || '');
 
-  // Scope detail rows
-  _rfqScopeDetailRows = d.scope_detail_rows || [];
-  // Milestones
-  _rfqMilestoneRows = (d.milestones || []).filter(function(m){ return m && (m.name || m.gross); });
+  // Dynamic row arrays
+  _rfqScopeDetailRows  = d.scope_detail_rows   || [];
+  _rfqMaterialsRows    = d.materials_rows      || [];
+  _rfqExclusionsRows   = d.exclusions_rows     || [];
+  _rfqClfnSuppliedRows = d.clfn_supplied_rows  || [];
+  _rfqMilestoneRows    = (d.milestones || []).filter(function(m){ return m && (m.name || m.gross); });
   set('rfq_holdback_release', d.holdback_release || '');
 
   // Signatures
@@ -479,6 +485,9 @@ function _loadRfqSowContext() {
       });
   }
   renderScopeDetailRows();
+  renderMaterialsRows();
+  renderExclusionsRows();
+  renderClfnSuppliedRows();
   renderMilestoneRows();
 }
 
@@ -605,8 +614,11 @@ function _buildRfqPayload() {
   function fv(elId) { var el = document.getElementById(elId); return el ? el.value.trim() : ''; }
   function fn(elId) { return parseFloat(fv(elId)) || null; }
 
-  var milestones     = _readMilestoneRows();
-  var scopeDetailRows = _readScopeDetailRows();
+  var milestones       = _readMilestoneRows();
+  var scopeDetailRows  = _readScopeDetailRows();
+  var materialsRows    = _readMaterialsRows();
+  var exclusionsRows   = _readExclusionsRows();
+  var clfnSuppliedRows = _readClfnSuppliedRows();
 
   return {
     id:                      id,
@@ -641,11 +653,11 @@ function _buildRfqPayload() {
       ct_signatory_name:            fv('rfq_ct_signatory_name'),
       ct_signatory_title:           fv('rfq_ct_signatory_title'),
       // Scope detail
-      sow_summary:     fv('rfq_sow_summary'),
-      scope_detail_rows: scopeDetailRows,
-      materials_specs: fv('rfq_materials_specs'),
-      exclusions:      fv('rfq_exclusions'),
-      clfn_supplied:   fv('rfq_clfn_supplied'),
+      sow_summary:        fv('rfq_sow_summary'),
+      scope_detail_rows:  scopeDetailRows,
+      materials_rows:     materialsRows,
+      exclusions_rows:    exclusionsRows,
+      clfn_supplied_rows: clfnSuppliedRows,
       // Price breakdown
       price_materials: fv('rfq_price_materials'),
       price_labour:    fv('rfq_price_labour'),
@@ -874,6 +886,95 @@ function _readScopeDetailRows() {
   return rows;
 }
 
+// ── Materials & Specifications dynamic rows ───────────────────────────────
+function renderMaterialsRows() {
+  var el = document.getElementById('rfq_materials_rows');
+  if (!el) return;
+  if (!_rfqMaterialsRows.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:8px 0;font-style:italic;">No items — click "+ Add Material".</div>';
+    return;
+  }
+  el.innerHTML = '<div style="overflow-x:auto;"><table class="std-table" style="width:100%;table-layout:fixed;">'
+    + '<thead><tr><th style="width:30%;">Material / Product</th><th style="width:38%;">Specification / Standard</th><th style="width:24%;">Notes</th><th style="width:8%;"></th></tr></thead><tbody>'
+    + _rfqMaterialsRows.map(function(r, i) {
+        return '<tr>'
+          + '<td style="padding:4px 6px;"><input type="text" id="rfq_mat_material_'+i+'" value="'+escapeHtml(r.material||'')+'" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;" placeholder="e.g. IKO Cambridge shingles"/></td>'
+          + '<td style="padding:4px 6px;"><input type="text" id="rfq_mat_spec_'+i+'" value="'+escapeHtml(r.specification||'')+'" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;" placeholder="e.g. ASTM D3462, 30-year"/></td>'
+          + '<td style="padding:4px 6px;"><input type="text" id="rfq_mat_notes_'+i+'" value="'+escapeHtml(r.notes||'')+'" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;" placeholder="Optional"/></td>'
+          + '<td style="padding:4px 6px;text-align:center;"><button type="button" onclick="removeMaterialsRow('+i+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;" title="Remove">&times;</button></td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+function addMaterialsRow() { _readMaterialsRows(); _rfqMaterialsRows.push({material:'',specification:'',notes:''}); renderMaterialsRows(); }
+function removeMaterialsRow(i) { _readMaterialsRows(); _rfqMaterialsRows.splice(i,1); renderMaterialsRows(); }
+function _readMaterialsRows() {
+  var rows = []; var i = 0;
+  while (document.getElementById('rfq_mat_material_'+i)) {
+    rows.push({ material:(document.getElementById('rfq_mat_material_'+i)||{}).value||'', specification:(document.getElementById('rfq_mat_spec_'+i)||{}).value||'', notes:(document.getElementById('rfq_mat_notes_'+i)||{}).value||'' });
+    i++;
+  }
+  _rfqMaterialsRows = rows; return rows;
+}
+
+// ── Exclusions & Assumptions dynamic rows ────────────────────────────────
+function renderExclusionsRows() {
+  var el = document.getElementById('rfq_exclusions_rows');
+  if (!el) return;
+  if (!_rfqExclusionsRows.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:8px 0;font-style:italic;">No exclusions — click "+ Add Exclusion".</div>';
+    return;
+  }
+  el.innerHTML = '<div style="overflow-x:auto;"><table class="std-table" style="width:100%;table-layout:fixed;">'
+    + '<thead><tr><th>Exclusion / Assumption</th><th style="width:8%;"></th></tr></thead><tbody>'
+    + _rfqExclusionsRows.map(function(r, i) {
+        return '<tr>'
+          + '<td style="padding:4px 6px;"><input type="text" id="rfq_excl_text_'+i+'" value="'+escapeHtml(r.text||'')+'" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;" placeholder="e.g. Disposal of hazardous materials is excluded"/></td>'
+          + '<td style="padding:4px 6px;text-align:center;"><button type="button" onclick="removeExclusionRow('+i+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;" title="Remove">&times;</button></td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+function addExclusionRow() { _readExclusionsRows(); _rfqExclusionsRows.push({text:''}); renderExclusionsRows(); }
+function removeExclusionRow(i) { _readExclusionsRows(); _rfqExclusionsRows.splice(i,1); renderExclusionsRows(); }
+function _readExclusionsRows() {
+  var rows = []; var i = 0;
+  while (document.getElementById('rfq_excl_text_'+i)) {
+    rows.push({ text:(document.getElementById('rfq_excl_text_'+i)||{}).value||'' });
+    i++;
+  }
+  _rfqExclusionsRows = rows; return rows;
+}
+
+// ── Items Supplied by Nation dynamic rows ─────────────────────────────────
+function renderClfnSuppliedRows() {
+  var el = document.getElementById('rfq_clfn_supplied_rows');
+  if (!el) return;
+  if (!_rfqClfnSuppliedRows.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:8px 0;font-style:italic;">No items — click "+ Add Item" or leave empty if none.</div>';
+    return;
+  }
+  el.innerHTML = '<div style="overflow-x:auto;"><table class="std-table" style="width:100%;table-layout:fixed;">'
+    + '<thead><tr><th>Item Supplied by Nation</th><th style="width:8%;"></th></tr></thead><tbody>'
+    + _rfqClfnSuppliedRows.map(function(r, i) {
+        return '<tr>'
+          + '<td style="padding:4px 6px;"><input type="text" id="rfq_clfn_item_'+i+'" value="'+escapeHtml(r.item||'')+'" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;" placeholder="e.g. Paint, hardware, fixtures"/></td>'
+          + '<td style="padding:4px 6px;text-align:center;"><button type="button" onclick="removeClfnSuppliedRow('+i+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;" title="Remove">&times;</button></td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+function addClfnSuppliedRow() { _readClfnSuppliedRows(); _rfqClfnSuppliedRows.push({item:''}); renderClfnSuppliedRows(); }
+function removeClfnSuppliedRow(i) { _readClfnSuppliedRows(); _rfqClfnSuppliedRows.splice(i,1); renderClfnSuppliedRows(); }
+function _readClfnSuppliedRows() {
+  var rows = []; var i = 0;
+  while (document.getElementById('rfq_clfn_item_'+i)) {
+    rows.push({ item:(document.getElementById('rfq_clfn_item_'+i)||{}).value||'' });
+    i++;
+  }
+  _rfqClfnSuppliedRows = rows; return rows;
+}
+
 // ── Milestone dynamic rows ────────────────────────────────────────────────
 function renderMilestoneRows() {
   var el = document.getElementById('rfq_milestone_rows');
@@ -1042,9 +1143,9 @@ async function generateContractorContract() {
     clfnSignatoryTitle:      d.sig_title || '',
     sowSummary:              d.sow_summary     || '',
     sowDetailTable:          (d.scope_detail_rows || []).filter(function(r){ return r.category || r.description; }).map(function(r, i){ return (i+1) + '. ' + [r.category, r.description, r.notes].filter(Boolean).join(' — '); }).join('\n') || '',
-    materialsSpecifications: d.materials_specs || '',
-    exclusionsAssumptions:   d.exclusions      || '',
-    clfnSuppliedItems:       d.clfn_supplied   || '',
+    materialsSpecifications: (d.materials_rows    || []).filter(function(r){ return r.material || r.specification; }).map(function(r, i){ return (i+1) + '. ' + [r.material, r.specification, r.notes].filter(Boolean).join(' — '); }).join('\n') || '',
+    exclusionsAssumptions:   (d.exclusions_rows   || []).filter(function(r){ return r.text; }).map(function(r, i){ return (i+1) + '. ' + r.text; }).join('\n') || '',
+    clfnSuppliedItems:       (d.clfn_supplied_rows|| []).filter(function(r){ return r.item; }).map(function(r, i){ return (i+1) + '. ' + r.item; }).join('\n') || 'None',
     priceMaterials:          numFmt(pMat),
     priceLabour:             numFmt(pLab),
     priceEquipment:          numFmt(pEqp),
@@ -1059,8 +1160,11 @@ async function generateContractorContract() {
   var filename = (tokens.nationShort || 'Housing') + '_Contract_' + rfqId + '.pdf';
 
   // ── jsPDF path ─────────────────────────────────────────────────────────
-  var savedBody = (typeof getContractBody === 'function') ? getContractBody('contractor_agreement') : '';
-  if (savedBody && savedBody.trim()) {
+  // Only use jsPDF path when ED has explicitly saved a custom body in Settings → Contracts.
+  // getContractBody() always returns the registry default, so check _appSettings directly.
+  var _ca = window._appSettings && window._appSettings.contracts_agreements;
+  var savedBody = (_ca && _ca.contractor_agreement && _ca.contractor_agreement.bodyHtml) ? _ca.contractor_agreement.bodyHtml.trim() : '';
+  if (savedBody) {
     try {
       if (typeof _loadJsPdf === 'function') await _loadJsPdf();
       var ctx = _makePdfDoc();

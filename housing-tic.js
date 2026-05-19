@@ -2356,8 +2356,9 @@
     };
 
     // ── jsPDF path — used when a contract body has been saved in Settings ─
-    var savedBody = (typeof getContractBody === 'function') ? getContractBody('residential_lease') : '';
-    if (savedBody && savedBody.trim()) {
+    var _ca = window._appSettings && window._appSettings.contracts_agreements;
+    var savedBody = (_ca && _ca.residential_lease && _ca.residential_lease.bodyHtml) ? _ca.residential_lease.bodyHtml.trim() : '';
+    if (savedBody) {
       try {
         if (typeof _loadJsPdf === 'function') await _loadJsPdf();
         var ctx = _makePdfDoc();

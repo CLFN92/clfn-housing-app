@@ -182,17 +182,20 @@
             <div id="rfq_scope_detail_rows"></div>
             <button type="button" class="btn btn-ghost" style="margin-top:8px;font-size:12px;" onclick="addScopeDetailRow()">+ Add Item</button>
           </div>
-          <div class="f" style="margin-bottom:12px;">
-            <label>Materials &amp; Specifications</label>
-            <textarea id="rfq_materials_specs" class="stg-lookup-input" rows="3" placeholder="Material grades, product standards, finishes…"></textarea>
+          <div style="margin-bottom:16px;">
+            <label style="font-size:12px;font-weight:600;color:var(--text);display:block;margin-bottom:6px;">Materials &amp; Specifications <span style="font-size:10px;color:var(--muted);font-weight:400;">Material, standard/grade, notes</span></label>
+            <div id="rfq_materials_rows"></div>
+            <button type="button" class="btn btn-ghost" style="margin-top:8px;font-size:12px;" onclick="addMaterialsRow()">+ Add Material</button>
           </div>
-          <div class="f" style="margin-bottom:12px;">
-            <label>Exclusions &amp; Assumptions</label>
-            <textarea id="rfq_exclusions" class="stg-lookup-input" rows="3" placeholder="What is NOT included, site assumptions…"></textarea>
+          <div style="margin-bottom:16px;">
+            <label style="font-size:12px;font-weight:600;color:var(--text);display:block;margin-bottom:6px;">Exclusions &amp; Assumptions <span style="font-size:10px;color:var(--muted);font-weight:400;">What is NOT included, site conditions assumed</span></label>
+            <div id="rfq_exclusions_rows"></div>
+            <button type="button" class="btn btn-ghost" style="margin-top:8px;font-size:12px;" onclick="addExclusionRow()">+ Add Exclusion</button>
           </div>
-          <div class="f">
-            <label>Items Supplied by Nation</label>
-            <textarea id="rfq_clfn_supplied" class="stg-lookup-input" rows="2" placeholder='Items provided by Nation Housing (or "None")…'></textarea>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--text);display:block;margin-bottom:6px;">Items Supplied by Nation <span style="font-size:10px;color:var(--muted);font-weight:400;">Materials or equipment provided by the housing program</span></label>
+            <div id="rfq_clfn_supplied_rows"></div>
+            <button type="button" class="btn btn-ghost" style="margin-top:8px;font-size:12px;" onclick="addClfnSuppliedRow()">+ Add Item</button>
           </div>
         </div>
       </div>
@@ -288,9 +291,12 @@
               <input type="text" id="rfq_ct_sig_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>
             </div>
           </div>
-          <div style="margin-top:14px;">
-            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Contractor Acknowledgement Initial</div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">The contractor must initial to acknowledge they have read and agree to the terms of this agreement.</div>
+          <div style="margin-top:20px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:10px;">Contractor Acknowledgement</div>
+            <div style="background:var(--bg);border:1px solid var(--border);border-left:3px solid var(--yellow);border-radius:6px;padding:14px 16px;font-size:12.5px;line-height:1.7;color:var(--text);margin-bottom:14px;">
+              By initialling below, the Contractor confirms that it is in good standing with WSIB, holds the insurance required under section 11, will comply with the Construction Act and OHSA, and accepts the prompt payment and adjudication framework set out in sections 8 and 10.
+            </div>
+            <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;">Contractor Initial:</div>
             <div class="sig-canvas-wrap" style="max-width:360px;">
               <div class="tab-bar">
                 <button type="button" onclick="setSigMethod('rfq_ct_initial','canvas')" id="rfq_ct_initial_tab_canvas" class="tab-item active">&#9999;&#65039; Draw</button>
