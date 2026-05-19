@@ -68,19 +68,26 @@ function upsertSowInList(unitId, sow){
 }
 
 function nextProjectNumber(unitId){
-  // Produces "<address>-SOW-NNN" where NNN is one more than the current max on this unit.
-  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
-  var u = allUnits.find(function(x){ return x.id === unitId; });
-  var addr = u ? (u.num + ' ' + u.street).trim() : 'UNIT';
-  var list = getUnitSowList(unitId);
-  var maxN = 0;
-  var re = new RegExp('^' + addr.replace(/[-\/\\^$*+?.()|[\]{}]/g,'\\$&') + '-SOW-(\\d+)$');
-  list.forEach(function(s){
-    var m = re.exec(String(s.project_number || ''));
-    if(m){ var n = parseInt(m[1], 10); if(n > maxN) maxN = n; }
+  // Produces "SOW-YYYY-NN" with a globally unique sequential counter across
+  // all units — scans every entry in _sowCache so each SOW gets a distinct
+  // project number regardless of which unit it belongs to.
+  // unitId is accepted for backward-compatibility but no longer used.
+  var year   = new Date().getFullYear();
+  var prefix = 'SOW-' + year + '-';
+  var maxN   = 0;
+  var cache  = window._sowCache || {};
+  Object.keys(cache).forEach(function(uid) {
+    var list = getUnitSowList(uid);
+    list.forEach(function(s) {
+      var pn = String(s.project_number || '');
+      if (pn.indexOf(prefix) === 0) {
+        var n = parseInt(pn.slice(prefix.length), 10);
+        if (!isNaN(n) && n > maxN) maxN = n;
+      }
+    });
   });
-  var next = ('000' + (maxN + 1)).slice(-3);
-  return addr + '-SOW-' + next;
+  var seq = ('0' + (maxN + 1)).slice(-2); // zero-pad to 2 digits: 01, 02 … 99
+  return prefix + seq;
 }
 
 // ─── SOW archive lifecycle ────────────────────────────────────────────────
