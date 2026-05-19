@@ -1094,15 +1094,17 @@ async function _rfqLoadPdfLib() {
 // Reuses _loadJsPdf, _makePdfDoc, _parseHtmlToBlocks, _renderBlocksToPdf,
 // _substitutePlaceholders (all from notifications.js), and _loadPdfLib.
 async function generateContractorContract() {
-  // Save all Award section data to the RFQ record first, then generate the PDF.
-  // Contract data lives in housing_rfq.data — saving here is what persists it.
-  if (typeof showToast === 'function') showToast('Saving contract data…');
-  await saveRfqDraft();
+  try {
   if (typeof showToast === 'function') showToast('Generating contract PDF…');
+
+  // Build data directly from current form state — don't depend on saveRfqDraft
+  // completing successfully or _rfqCache being up to date. Save is fire-and-forget.
+  var currentPayload = _buildRfqPayload();
+  var d = currentPayload.data || {};
+  if (typeof saveRfqDraft === 'function') saveRfqDraft().catch(function(e){ console.warn('[contract] background save failed:', e); });
 
   var rfqId = _rfqCurrentId || document.getElementById('rfq_number').value.trim();
   var rfq   = (window._rfqCache || {})[rfqId] || {};
-  var d     = rfq.data || {};
 
   function fv(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
 
@@ -1415,6 +1417,11 @@ async function generateContractorContract() {
   } catch(e) {
     console.error('[contract] AcroForm generation failed:', e);
     if (typeof showToast === 'function') showToast('Contract PDF failed — ' + e.message);
+  }
+
+  } catch(outerErr) {
+    console.error('[contract] generate failed:', outerErr);
+    if (typeof showToast === 'function') showToast('Contract generation failed: ' + outerErr.message);
   }
 }
 
