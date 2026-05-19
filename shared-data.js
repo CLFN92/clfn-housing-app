@@ -5840,8 +5840,21 @@ function _sowMeetsRfqThreshold(sow) {
 }
 
 function buildRfqDocumentHtml(rfq, sow, unit) {
-  var natDisp  = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || 'Constance Lake First Nation';
-  var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || 'CLFN';
+  var nc       = window.NATION_CONFIG || {};
+  var natDisp  = nc.display_name || nc.name || 'Constance Lake First Nation';
+  var natShort = nc.short || 'CLFN';
+
+  // Theme — primary color drives header strip, section headers, table headers
+  var theme       = (window._appSettings && window._appSettings.theme) || {};
+  var primary     = theme.primary_color || '#F8E41A';
+  var logoUrl     = theme.logo || '';
+
+  // Nation contact info from Settings → Admin → Nation
+  var natAddress  = nc.mailing_address ? nc.mailing_address.split('\n')[0] : '';
+  var natPhone    = nc.phone    || '';
+  var natEmail    = nc.email    || '';
+  var natWebsite  = nc.website  || '';
+
   var addr     = unit ? ((unit.num || '') + ' ' + (unit.street || '')).trim() : (rfq.sow_unit_id || '--');
   var today    = new Date().toLocaleDateString('en-CA');
   var closingDisplay = rfq.closes_at ? new Date(rfq.closes_at).toLocaleString('en-CA', {dateStyle:'long', timeStyle:'short'}) : '--';
@@ -5888,31 +5901,53 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
     + 'body{font-family:Georgia,serif;font-size:11px;color:#222;background:#fff;}'
     + '@page{size:letter portrait;margin:15mm 15mm 18mm 15mm;}'
     + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}'
-    + '.hdr{background:#000;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;}'
-    + '.hdr-org{font-size:13px;font-weight:bold;color:#F8E41A;letter-spacing:.04em;}'
+    + '.hdr{background:#111;color:#fff;padding:14px 20px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;}'
+    + '.hdr-logo{height:44px;max-width:80px;object-fit:contain;margin-right:12px;}'
+    + '.hdr-left{display:flex;align-items:flex-start;gap:10px;}'
+    + '.hdr-org{font-size:13px;font-weight:bold;letter-spacing:.04em;}'
     + '.hdr-dept{font-size:10px;color:#ccc;margin-top:2px;}'
-    + '.hdr-type{font-size:18px;font-weight:bold;color:#F8E41A;letter-spacing:.05em;}'
-    + '.hdr-num{font-size:10px;color:#aaa;margin-top:3px;}'
-    + '.ybar{background:#F8E41A;height:4px;}'
+    + '.hdr-contact{font-size:9px;color:#aaa;margin-top:4px;line-height:1.6;}'
+    + '.hdr-type{font-size:18px;font-weight:bold;letter-spacing:.05em;text-align:right;}'
+    + '.hdr-num{font-size:10px;color:#aaa;margin-top:3px;text-align:right;}'
+    + '.ybar{height:5px;}'
     + '.body{padding:20px 0 0;}'
     + '.sec{margin-bottom:18px;}'
-    + '.sec-h{font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#fff;background:#000;padding:5px 10px;}'
+    + '.sec-h{font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#fff;padding:5px 10px;}'
     + '.sec-b{border:1px solid #ddd;border-top:none;padding:12px 14px;}'
     + '.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;}'
     + '.mf label{display:block;font-size:8px;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:2px;}'
     + '.mf span{display:block;font-size:11px;color:#222;}'
     + 'table{width:100%;border-collapse:collapse;}'
-    + 'th{background:#000;color:#F8E41A;padding:7px 10px;text-align:left;font-size:9px;font-weight:bold;text-transform:uppercase;}'
+    + 'th{padding:7px 10px;text-align:left;font-size:9px;font-weight:bold;text-transform:uppercase;}'
     + '.cl{list-style:none;padding:0;}'
     + '.cl li{padding:4px 0;font-size:10px;line-height:1.5;}'
     + '.cl li:before{content:"\\2610  ";font-size:12px;}'
     + '.sig-line{margin-top:30px;border-top:1px solid #333;padding-top:5px;font-size:9px;color:#888;}'
-    + '.footer{margin-top:20px;border-top:3px solid #F8E41A;padding-top:8px;display:flex;justify-content:space-between;font-size:8px;color:#888;}'
+    + '.footer{margin-top:20px;padding-top:8px;border-top:3px solid ' + primary + ';display:flex;justify-content:space-between;font-size:8px;color:#888;}'
     + '</style></head><body>'
 
-    + '<div class="hdr"><div><div class="hdr-org">' + escapeHtml(natDisp.toUpperCase()) + '</div><div class="hdr-dept">Housing Department</div></div>'
-    + '<div style="text-align:right;"><div class="hdr-type">REQUEST FOR QUOTES</div><div class="hdr-num">' + escapeHtml(rfq.id) + '</div></div></div>'
-    + '<div class="ybar"></div>'
+    // ── Header ─────────────────────────────────────────────────────────────
+    + '<div class="hdr">'
+    +   '<div class="hdr-left">'
+    +   (logoUrl ? '<img class="hdr-logo" src="' + escapeHtml(logoUrl) + '" alt=""/>' : '')
+    +   '<div>'
+    +     '<div class="hdr-org" style="color:' + primary + ';">' + escapeHtml(natDisp.toUpperCase()) + '</div>'
+    +     '<div class="hdr-dept">Housing Department</div>'
+    +     '<div class="hdr-contact">'
+    +     (natAddress ? escapeHtml(natAddress) + '<br/>' : '')
+    +     (natPhone   ? escapeHtml(natPhone) : '')
+    +     (natPhone && natEmail ? '  &bull;  ' : '')
+    +     (natEmail   ? escapeHtml(natEmail) : '')
+    +     (natWebsite ? '<br/>' + escapeHtml(natWebsite) : '')
+    +     '</div>'
+    +   '</div>'
+    +   '</div>'
+    +   '<div>'
+    +     '<div class="hdr-type" style="color:' + primary + ';">REQUEST FOR QUOTES</div>'
+    +     '<div class="hdr-num">' + escapeHtml(rfq.id) + '</div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="ybar" style="background:' + primary + ';"></div>'
     + '<div class="body">'
 
     + (function() {
@@ -5920,7 +5955,7 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
         var issueDate = d.issue_date || today;
         var startDate = d.target_start_date ? new Date(d.target_start_date + 'T12:00:00').toLocaleDateString('en-CA', {year:'numeric',month:'long',day:'numeric'}) : '--';
         var endDate   = d.target_completion_date ? new Date(d.target_completion_date + 'T12:00:00').toLocaleDateString('en-CA', {year:'numeric',month:'long',day:'numeric'}) : '--';
-        return '<div class="sec"><div class="sec-h">Project Details</div><div class="sec-b"><div class="mgrid">'
+        return '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Project Details</div><div class="sec-b"><div class="mgrid">'
           + '<div class="mf"><label>RFQ Number</label><span>' + escapeHtml(rfq.id) + '</span></div>'
           + '<div class="mf"><label>Issue Date</label><span>' + escapeHtml(issueDate) + '</span></div>'
           + '<div class="mf"><label>Project Address</label><span>' + escapeHtml(addr) + '</span></div>'
@@ -5928,35 +5963,55 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
           + '<div class="mf"><label>Target Start Date</label><span>' + escapeHtml(startDate) + '</span></div>'
           + '<div class="mf"><label>Target Completion Date</label><span>' + escapeHtml(endDate) + '</span></div>'
           + '<div class="mf"><label>Bid Closing Date &amp; Time</label><span style="font-weight:bold;color:#b91c1c;">' + escapeHtml(closingDisplay) + '</span></div>'
-          + '<div class="mf"><label>CLFN Contact</label><span>' + escapeHtml(contact) + (contactEmail ? ' &lt;' + escapeHtml(contactEmail) + '&gt;' : '') + '</span></div>'
+          + '<div class="mf"><label>' + escapeHtml(natShort) + ' Contact</label><span>' + escapeHtml(contact) + (contactEmail ? ' &lt;' + escapeHtml(contactEmail) + '&gt;' : '') + '</span></div>'
           + '</div></div></div>';
       })()
 
-    + '<div class="sec"><div class="sec-h">Scope of Work</div>'
-    + '<table><thead><tr><th style="width:28%">Category</th><th>Description of Work Required</th></tr></thead>'
+    + '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Scope of Work</div>'
+    + '<table><thead><tr>'
+    +   '<th style="width:28%;background:' + primary + ';color:#111;">Category</th>'
+    +   '<th style="background:' + primary + ';color:#111;">Description of Work Required</th>'
+    + '</tr></thead>'
     + '<tbody>' + (scopeRows || '<tr><td colspan="2" style="padding:10px;text-align:center;color:#888;">No line items specified.</td></tr>') + '</tbody>'
     + '</table></div>'
 
-    + '<div class="sec"><div class="sec-h">Contractor Bid Form — Complete and Return</div>'
-    + '<div class="sec-b" style="font-size:9.5px;color:#555;margin-bottom:8px;">Price all line items below in Canadian dollars (CDN), exclusive of HST. Attach additional rows if required.</div>'
-    + '<table><thead><tr><th>Line Item / Description</th><th style="width:18%">Unit Price ($)</th><th style="width:18%">Extended Price ($)</th><th style="width:18%">Notes</th></tr></thead>'
+    + '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Contractor Bid Form — Complete and Return</div>'
+    + '<div class="sec-b">'
+    + '<p style="font-size:9.5px;color:#333;margin-bottom:6px;">Price all line items below in Canadian dollars (CDN), exclusive of HST.</p>'
+    + '<p style="font-size:9px;color:#666;font-style:italic;margin-bottom:10px;">This form has been provided as a read-only document. Please print it, complete all fields by hand, sign where required, and submit the completed form with your supporting documents. You may also attach a separate quote in your own format — this form must still accompany it.</p>'
+    + '<table><thead>'
+    +   '<tr>'
+    +     '<th style="background:' + primary + ';color:#111;">Line Item / Description</th>'
+    +     '<th style="width:18%;background:' + primary + ';color:#111;">Unit Price ($)</th>'
+    +     '<th style="width:18%;background:' + primary + ';color:#111;">Extended Price ($)</th>'
+    +     '<th style="width:16%;background:' + primary + ';color:#111;">Notes</th>'
+    +   '</tr>'
+    +   '<tr style="background:#f5f5f5;">'
+    +     '<td style="padding:3px 10px;"></td>'
+    +     '<td style="padding:3px 10px;font-size:8px;color:#777;font-style:italic;">Price per unit of measure (e.g., per item, per hour, per metre)</td>'
+    +     '<td style="padding:3px 10px;font-size:8px;color:#777;font-style:italic;">Unit Price &times; Quantity = line total</td>'
+    +     '<td style="padding:3px 10px;"></td>'
+    +   '</tr>'
+    + '</thead>'
     + '<tbody>' + (bidRows || '<tr><td colspan="4" style="padding:10px;"></td></tr>') + '</tbody>'
-    + '<tfoot><tr style="background:#F8E41A;"><td colspan="2" style="padding:8px 10px;font-size:11px;font-weight:bold;text-align:right;">TOTAL BID AMOUNT:</td><td style="padding:8px 10px;border:1px solid #ccc;min-width:80px;">&nbsp;</td><td></td></tr></tfoot>'
-    + '</table></div>'
+    + '<tfoot><tr style="background:' + primary + ';"><td colspan="2" style="padding:8px 10px;font-size:11px;font-weight:bold;text-align:right;color:#111;">TOTAL BID AMOUNT:</td><td style="padding:8px 10px;border:1px solid #ccc;min-width:80px;background:#fff;">&nbsp;</td><td style="background:#fff;"></td></tr></tfoot>'
+    + '</table>'
+    + '<p style="font-size:9px;color:#444;margin-top:10px;"><strong>Supporting documents:</strong> Please attach any additional documents to support your bid — shop drawings, product specifications, material substitution notices, alternative scope notes, or any other information relevant to your submission.</p>'
+    + '</div></div>'
 
-    + '<div class="sec"><div class="sec-h">Mandatory Inclusions</div><div class="sec-b">'
+    + '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Mandatory Inclusions</div><div class="sec-b">'
     + '<div style="font-size:9.5px;color:#555;margin-bottom:8px;">The following documents must be included with your bid. Incomplete packages will not be considered.</div>'
     + '<ul class="cl"><li>Current WSIB clearance certificate</li><li>Certificate of general liability insurance (minimum $2,000,000 per occurrence)</li>'
     + '<li>List of at least two comparable completed projects (name, owner, value, completion date)</li>'
     + '<li>Proposed project start date and estimated completion timeline</li>'
     + '<li>Fully completed bid form above with all line items priced</li></ul></div></div>'
 
-    + '<div class="sec"><div class="sec-h">Submission Instructions</div><div class="sec-b" style="font-size:10px;line-height:1.7;">'
+    + '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Submission Instructions</div><div class="sec-b" style="font-size:10px;line-height:1.7;">'
     + '<p>' + subInstr + '</p>'
     + '<p style="margin-top:6px;">Bids must be received by: <strong>' + escapeHtml(closingDisplay) + '</strong>. Late submissions will not be accepted under any circumstances.</p>'
     + '</div></div>'
 
-    + (termsHtml ? '<div class="sec"><div class="sec-h">Terms &amp; Conditions</div><div class="sec-b">' + termsHtml + '</div></div>' : '')
+    + (termsHtml ? '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Terms &amp; Conditions</div><div class="sec-b">' + termsHtml + '</div></div>' : '')
 
     + (function() {
         var d = rfq.data || {};
@@ -5976,7 +6031,7 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
           sigHtml = '<div style="min-height:44px;border-bottom:1.5px solid #555;margin-bottom:4px;"></div>';
         }
         return '<div class="sec" style="page-break-inside:avoid;">'
-          + '<div class="sec-h">Authorization</div>'
+          + '<div class="sec-h" style="background:' + primary + ';color:#111;">Authorization</div>'
           + '<div class="sec-b">'
           + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;padding:10px 0 8px;">'
           // Issued By column
