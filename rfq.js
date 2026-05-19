@@ -16,6 +16,7 @@ var _rfqExclusionsRows   = [];
 var _rfqClfnSuppliedRows = [];
 var _rfqDocFiles         = [];   // cached list from audit log
 var _rfqAttachedPaths    = [];   // paths selected to attach to email
+var _rfqDocLib           = null; // DocLibrary instance for this RFQ
 
 // ── Page init (mirrors renos.html IIFE pattern — never loads housing-init.js) ─
 (async function initRfq() {
@@ -297,6 +298,7 @@ function showRfqForm(rfqId, unitId, sowPn) {
   _rfqContractingTabInited = false;
   _rfqDocFiles         = [];
   _rfqAttachedPaths    = [];
+  _rfqDocLib           = null;
 
   if (rfqId) {
     // Editing existing
@@ -1103,131 +1105,93 @@ function _rfqRecalcPrices() {
 
 // ── Documents tab ─────────────────────────────────────────────────────────
 
-async function renderDocumentsTab() {
-  var el = document.getElementById('rfq_doc_list');
-  if (!el) return;
-  el.innerHTML = '<div class="rfq-progress-msg">Loading&hellip;</div>';
-
+function renderDocumentsTab() {
   var rfqId = _rfqCurrentId || document.getElementById('rfq_number').value.trim();
   if (!rfqId) {
-    el.innerHTML = '<div class="rfq-progress-msg">Save the RFQ draft first to enable document uploads.</div>';
+    var m = document.getElementById('rfq_doc_lib_mount');
+    if (m) m.innerHTML = '<div class="rfq-progress-msg">Save the RFQ draft first to enable document uploads.</div>';
     return;
   }
+
+  // Mount the standard DocLibrary (drag-and-drop, preview, delete)
+  var mount = document.getElementById('rfq_doc_lib_mount');
+  if (mount && window.DocLibrary) {
+    mount.innerHTML = '';
+    _rfqDocLib = window.DocLibrary.create(mount, {
+      entityType:    'rfq',
+      entityId:      rfqId,
+      pathPrefix:    'rfq/' + rfqId,
+      supabaseUrl:   SUPABASE_URL,
+      supabaseAnon:  SUPABASE_ANON,
+      storageBucket: STORAGE_BUCKET,
+      getAuthToken:  function(){ return (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ',''); },
+      auditTable:    'housing_audit_log',
+      getActor:      function(){ return window.currentRole || 'staff'; },
+      categories: [
+        { key:'site_plan', label:'Site Plan',       icon:'📍' },
+        { key:'report',    label:'Report / Study',  icon:'📋' },
+        { key:'spec',      label:'Specification',   icon:'📄' },
+        { key:'photo',     label:'Photo',           icon:'📷' },
+        { key:'other',     label:'Other',           icon:'📎' }
+      ],
+      maxSizeMB: 25
+    });
+  } else if (mount) {
+    mount.innerHTML = '<div class="rfq-progress-msg">Document library not available.</div>';
+  }
+
+  // Render the email-attachment selection list
+  _rfqRefreshAttachList();
+}
+
+async function _rfqRefreshAttachList() {
+  var el = document.getElementById('rfq_doc_attach_section');
+  if (!el) return;
+  var rfqId = _rfqCurrentId || document.getElementById('rfq_number').value.trim();
+  if (!rfqId) { el.innerHTML = ''; return; }
+
+  el.innerHTML = '<div style="border-top:1px solid var(--border);padding-top:14px;">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+    +   '<div style="font-size:12px;font-weight:600;color:var(--text);">&#128231; Attach to contractor email</div>'
+    +   '<button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="_rfqRefreshAttachList()">&#8635; Refresh</button>'
+    + '</div>'
+    + '<div id="rfq_doc_attach_list"><div style="font-size:11px;color:var(--muted);font-style:italic;">Loading&hellip;</div></div>'
+    + '<div style="margin-top:8px;font-size:10px;color:var(--muted);">Checked files will be attached to each contractor email when you issue the RFQ. Max 3 MB per file (Graph API limit). Larger files should be shared via link instead.</div>'
+    + '</div>';
 
   try {
     _rfqDocFiles = (typeof sbLoadFileMeta === 'function') ? await sbLoadFileMeta('rfq', rfqId) : [];
-  } catch(e) {
-    _rfqDocFiles = [];
-  }
+  } catch(e) { _rfqDocFiles = []; }
+
+  var listEl = document.getElementById('rfq_doc_attach_list');
+  if (!listEl) return;
 
   if (!_rfqDocFiles.length) {
-    el.innerHTML = '<div class="rfq-progress-msg">No documents uploaded yet. Click "Choose Files" to add files.</div>';
+    listEl.innerHTML = '<div style="font-size:11px;color:var(--muted);font-style:italic;">No files yet — upload using the document library above, then click Refresh.</div>';
     return;
   }
 
-  el.innerHTML = '<div class="doclib-table-wrap"><table class="std-table">'
-    + '<thead><tr>'
-    +   '<th style="width:40px;text-align:center;">Attach</th>'
-    +   '<th>File</th>'
-    +   '<th style="width:90px;">Size</th>'
-    +   '<th style="width:90px;">Uploaded</th>'
-    +   '<th style="width:60px;"></th>'
-    + '</tr></thead><tbody>'
-    + _rfqDocFiles.map(function(f, i) {
-        var isAttached = _rfqAttachedPaths.indexOf(f.path) !== -1;
-        var sizeKb = f.size ? (f.size / 1024).toFixed(0) + ' KB' : '—';
-        var tooBig = f.size && f.size > 3 * 1024 * 1024;
-        var dispName = f.name || f.path.split('/').pop().replace(/^\d+_/, '');
-        var fileUrl  = (typeof sbGetFileUrl === 'function') ? sbGetFileUrl(f.path) : '#';
-        return '<tr>'
-          + '<td style="text-align:center;padding:8px;">'
-          +   '<input type="checkbox" id="rfq_doc_chk_' + i + '" '
-          +     (isAttached ? 'checked' : '') + ' '
-          +     (tooBig ? 'disabled title="File exceeds 3 MB — cannot attach to email"' : '') + ' '
-          +     'onchange="_rfqToggleAttach(\'' + escapeHtml(f.path).replace(/'/g,"\\'") + '\', this.checked)" '
-          +     'style="width:15px;height:15px;accent-color:var(--yellow);cursor:pointer;"/>'
-          + '</td>'
-          + '<td style="padding:8px 10px;">'
-          +   '<a href="' + escapeHtml(fileUrl) + '" target="_blank" rel="noopener" style="color:var(--text);font-size:12px;font-weight:500;">' + escapeHtml(dispName) + '</a>'
-          +   (tooBig ? '<div style="font-size:10px;color:var(--danger,#dc2626);margin-top:2px;">⚠ Exceeds 3 MB — too large to email; share a link instead</div>' : '')
-          + '</td>'
-          + '<td style="padding:8px 10px;font-size:11px;color:var(--muted);">' + escapeHtml(sizeKb) + '</td>'
-          + '<td style="padding:8px 10px;font-size:11px;color:var(--muted);">' + escapeHtml(f.addedAt || '—') + '</td>'
-          + '<td style="padding:8px;text-align:center;">'
-          +   '<button type="button" onclick="_rfqDeleteDoc(\'' + escapeHtml(f.logId || '') + '\',\'' + escapeHtml(f.path).replace(/'/g,"\\'") + '\')" '
-          +     'title="Remove document" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;color:var(--muted);cursor:pointer;">×</button>'
-          + '</td>'
-          + '</tr>';
-      }).join('')
-    + '</tbody></table></div>';
-}
-
-async function _rfqUploadDocs(fileList) {
-  if (!fileList || !fileList.length) return;
-  var rfqId = _rfqCurrentId || document.getElementById('rfq_number').value.trim();
-  if (!rfqId) { showToast('Save the RFQ draft first before uploading documents.'); return; }
-  if (typeof sbUploadFile !== 'function' || typeof sbSaveFileMeta !== 'function') {
-    showToast('Storage not available'); return;
-  }
-
-  // Save draft first so the RFQ exists in the DB
-  try { await saveRfqDraft(); } catch(e) { console.warn('[rfq docs] save draft failed:', e); }
-
-  var el = document.getElementById('rfq_doc_list');
-  if (el) el.innerHTML = '<div class="rfq-progress-msg">Uploading&hellip;</div>';
-
-  var failed = [];
-  for (var i = 0; i < fileList.length; i++) {
-    var file = fileList[i];
-    try {
-      var storePath = 'rfq/' + rfqId + '/' + Date.now() + '_' + file.name;
-      await sbUploadFile(storePath, file);
-      await sbSaveFileMeta('rfq', rfqId, storePath, file.name, file.size, file.type);
-    } catch(e) {
-      console.warn('[rfq docs] upload failed:', file.name, e);
-      failed.push(file.name);
-    }
-  }
-
-  // Reset file input
-  var inp = document.getElementById('rfq_doc_file_input');
-  if (inp) inp.value = '';
-
-  if (failed.length) showToast('Upload failed for: ' + failed.join(', '));
-  else showToast('Document' + (fileList.length > 1 ? 's' : '') + ' uploaded');
-
-  renderDocumentsTab();
-}
-
-async function _rfqDeleteDoc(logId, path) {
-  if (!confirm('Remove this document from the RFQ?')) return;
-  var rfqId = _rfqCurrentId || document.getElementById('rfq_number').value.trim();
-  // Remove from attached list
-  _rfqAttachedPaths = _rfqAttachedPaths.filter(function(p){ return p !== path; });
-  // Record deletion in audit log
-  if (typeof sbSaveFileMeta === 'function') {
-    try {
-      await fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
-        method: 'POST',
-        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({
-          entity_type: 'rfq', entity_id: String(rfqId),
-          action: 'file_deleted',
-          detail: JSON.stringify({ path: path }),
-          actor: window.currentRole || 'staff',
-          created_at: new Date().toISOString()
-        })
-      });
-    } catch(e) { console.warn('[rfq docs] delete meta failed:', e); }
-    // Best-effort delete from storage
-    try {
-      await fetch(SUPABASE_URL + '/storage/v1/object/' + STORAGE_BUCKET + '/' + path, {
-        method: 'DELETE',
-        headers: Object.assign({}, HOUSING_HEADERS, { 'apikey': SUPABASE_ANON })
-      });
-    } catch(e) { console.warn('[rfq docs] storage delete failed:', e); }
-  }
-  renderDocumentsTab();
+  listEl.innerHTML = _rfqDocFiles.map(function(f) {
+    var isAttached = _rfqAttachedPaths.indexOf(f.path) !== -1;
+    var dispName   = f.name || f.path.split('/').pop().replace(/^\d+_/, '');
+    var sizeKb     = f.size ? Math.round(f.size / 1024) + ' KB' : '';
+    var tooBig     = f.size && f.size > 3 * 1024 * 1024;
+    var safePath   = escapeHtml(f.path).replace(/'/g, "\\'");
+    return '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg);border-radius:7px;margin-bottom:6px;cursor:' + (tooBig ? 'default' : 'pointer') + ';border:1px solid var(--border);">'
+      +   '<input type="checkbox" '
+      +     (isAttached ? 'checked ' : '')
+      +     (tooBig ? 'disabled ' : '')
+      +     'onchange="_rfqToggleAttach(\'' + safePath + '\', this.checked)" '
+      +     'style="width:15px;height:15px;accent-color:var(--yellow);flex-shrink:0;cursor:' + (tooBig ? 'default' : 'pointer') + ';"/>'
+      +   '<div style="min-width:0;flex:1;">'
+      +     '<div style="font-size:12px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(dispName) + '</div>'
+      +     '<div style="font-size:10px;color:var(--muted);margin-top:1px;">'
+      +       escapeHtml(sizeKb)
+      +       (tooBig ? ' &mdash; <span style="color:var(--danger,#dc2626);">&#9888; exceeds 3 MB &mdash; cannot attach to email</span>' : '')
+      +     '</div>'
+      +   '</div>'
+      + '</label>';
+  }).join('');
 }
 
 function _rfqToggleAttach(path, checked) {
