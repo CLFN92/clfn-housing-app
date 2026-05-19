@@ -2361,7 +2361,12 @@
     if (savedBody) {
       try {
         if (typeof _loadJsPdf === 'function') await _loadJsPdf();
-        var ctx = _makePdfDoc();
+        var ctx = _makePdfDoc({
+          nationName:     tokens.nationName,
+          headerTitle:    'Residential Lease Agreement',
+          headerSubtitle: ['Tenant: ' + tokens.tenantName, tokens.residenceStreet].filter(Boolean).join('  —  '),
+          footerLeft:     tokens.nationName + ' Housing — Confidential'
+        });
         var pdf = ctx.pdf;
 
         // Substitute tokens then render HTML blocks

@@ -1180,7 +1180,12 @@ async function generateContractorContract() {
   if (savedBody) {
     try {
       if (typeof _loadJsPdf === 'function') await _loadJsPdf();
-      var ctx = _makePdfDoc();
+      var ctx = _makePdfDoc({
+        nationName:     tokens.nationName,
+        headerTitle:    'Contractor Agreement',
+        headerSubtitle: [tokens.contractNumber, tokens.rfqNumber ? 'RFQ: ' + tokens.rfqNumber : '', tokens.propertyAddress].filter(Boolean).join('  —  '),
+        footerLeft:     tokens.nationName + ' Housing — Confidential'
+      });
       var pdf = ctx.pdf;
 
       var substituted = (typeof _substitutePlaceholders === 'function')
