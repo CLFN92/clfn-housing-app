@@ -109,6 +109,7 @@ function renderV2ScoringEditor() {
   html += sectionHdr('Section A — Housing Need', 70);
 
   html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:10px 0 6px;">Urgent Need / Displacement</div>';
+  html += optRow('Homeless / No Fixed Address', pts(m.urgent_need.homeless, 'urgent_need', 'homeless'));
   html += optRow('Domestic Violence / Intimate Partner Abuse', pts(m.urgent_need.domestic_violence, 'urgent_need', 'domestic_violence'));
   html += optRow('Fire, Flood or Disaster', pts(m.urgent_need.fire_disaster, 'urgent_need', 'fire_disaster'));
   html += optRow('Homelessness / Imminent Eviction', pts(m.urgent_need.homeless_eviction, 'urgent_need', 'homeless_eviction'));
@@ -872,7 +873,7 @@ function buildV2FormSelects() {
         var pts = (r.pts !== undefined ? r.pts : (r.p||0));
         var val = i === 0 ? 'none' : 'level_'+i;
         // Map by position: un1=none, un2=level_2, un3=level_3, un4=level_4
-        val = r.id === 'un1' ? 'none' : r.id === 'un2' ? 'overcrowded' : r.id === 'un3' ? 'eviction' : 'emergency';
+        val = r.id === 'un1' ? 'none' : r.id === 'un2' ? 'overcrowded' : r.id === 'un3' ? 'eviction' : r.id === 'un4' ? 'emergency' : r.id === 'un5' ? 'homeless' : 'none';
         return '<option value="'+val+'">'+ r.label + (pts > 0 ? ' (+'+pts+' pts)' : ' ('+pts+' pts)') +'</option>';
       }).join('');
       if(curVal) unSel.value = curVal;
@@ -1091,7 +1092,7 @@ function calcPersonsOverStandard() {
 
 
 function scoreApplicationLocally(app) {
-  var urgentMap = { domestic_violence:20, fire_disaster:20, homeless_eviction:15, eviction_risk:10, separation:10, none:0 };
+  var urgentMap = { homeless:25, domestic_violence:20, fire_disaster:20, homeless_eviction:15, eviction_risk:10, separation:10, none:0 };
   var urgentPts = urgentMap[app.urgentNeed || 'none'] !== undefined ? urgentMap[app.urgentNeed || 'none'] : 0;
   var healthMap = { severe:15, moderate:10, minor:5, none:0 };
   var healthPts = healthMap[app.healthRisk || 'none'] !== undefined ? healthMap[app.healthRisk || 'none'] : 0;
@@ -1568,6 +1569,7 @@ function renderRubricTableV2(breakdown, targetEl) {
   }
 
   var urgentLabels = {
+    homeless:'Homeless / no fixed address',
     domestic_violence:'Domestic violence (verified)', fire_disaster:'Fire / disaster (verified)',
     homeless_eviction:'Homelessness / eviction', eviction_risk:'Eviction risk from landlord',
     separation:'Separation / divorce', none:'No urgent need'
@@ -1981,7 +1983,7 @@ if (typeof DEFAULT_SCORING_MODEL === 'undefined') {
 // ── DEFAULT_V2_SCORE_MODEL — full default point values ────────────────────────
 window.DEFAULT_V2_SCORE_MODEL = {
   urgent_need: {
-    domestic_violence: 25, fire_disaster: 25, homeless_eviction: 20,
+    homeless: 25, domestic_violence: 25, fire_disaster: 25, homeless_eviction: 20,
     eviction_risk: 15, separation: 10, none: 0
   },
   health_risk: {
@@ -2037,6 +2039,7 @@ if (!window.liveScoreModel || !window.liveScoreModel.length) {
     {id:'un2', cat:'urgent_need',      label:'Overcrowding',                pts: _un.eviction_risk     || 15},
     {id:'un3', cat:'urgent_need',      label:'Eviction / Homelessness Risk',pts: _un.homeless_eviction || 20},
     {id:'un4', cat:'urgent_need',      label:'Emergency (fire / DV)',       pts: _un.domestic_violence || 25},
+    {id:'un5', cat:'urgent_need',      label:'Homeless / No Fixed Address', pts: _un.homeless          || 25},
     {id:'hs1', cat:'health_safety',    label:'None',                        pts: _hr.none              || 0},
     {id:'hs2', cat:'health_safety',    label:'Minor',                       pts: _hr.minor             || 6},
     {id:'hs3', cat:'health_safety',    label:'Moderate',                    pts: _hr.moderate          || 12},
