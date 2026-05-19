@@ -342,7 +342,6 @@ function showRfqForm(rfqId, unitId, sowPn) {
       _initSigPad('rfq_sig');
       _initSigPad('rfq_ct_sig');
       _initSigPad('rfq_ct_initial');
-      _initSigPad('rfq_witness_sig');
     }
   }, 80);
 }
@@ -366,7 +365,7 @@ function _populateFormFields(rfq) {
   set('rfq_award_notes',  rfq.award_notes  || '');
 
   // Contract Details
-  set('rfq_contract_number',       d.contract_number || '');
+  set('rfq_contract_number', d.contract_number || generateContractNumber());
   set('rfq_contract_date',         d.contract_date   || '');
   set('rfq_contract_start',        d.contract_start  || d.target_start_date || '');
   set('rfq_substantial_completion',d.substantial_completion_date || '');
@@ -402,8 +401,6 @@ function _populateFormFields(rfq) {
   set('rfq_sig_name',  d.sig_name  || '');
   set('rfq_sig_title', d.sig_title || '');
   set('rfq_ct_sig_date',    d.ct_sig_date    || '');
-  set('rfq_witness_name',   d.witness_name   || '');
-  set('rfq_witness_date',   d.witness_date   || '');
 
   _rfqRecalcPrices();
 
@@ -520,7 +517,6 @@ function switchRfqTab(tab) {
           _initSigPad('rfq_sig');
           _initSigPad('rfq_ct_sig');
           _initSigPad('rfq_ct_initial');
-          _initSigPad('rfq_witness_sig');
         }
       }, 50);
     }
@@ -691,12 +687,10 @@ function _buildRfqPayload() {
       // Milestones
       milestones:        milestones,
       holdback_release:  fv('rfq_holdback_release'),
-      // Contractor & witness signatures
+      // Contractor signature
       ct_sig_data:    (typeof getSigDataURL === 'function') ? getSigDataURL('rfq_ct_sig')      : '',
       ct_sig_date:    fv('rfq_ct_sig_date'),
       ct_initial_data:(typeof getSigDataURL === 'function') ? getSigDataURL('rfq_ct_initial')  : '',
-      witness_sig_data:(typeof getSigDataURL==='function')  ? getSigDataURL('rfq_witness_sig') : '',
-      witness_name:   fv('rfq_witness_name'),
       witness_date:   fv('rfq_witness_date')
     },
     created_by: (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || '',
@@ -1236,7 +1230,6 @@ async function generateContractorContract() {
 
       _addSigBlock('Owner Representative', 'rfq_sig',         tokens.clfnSignatoryName + (tokens.clfnSignatoryTitle ? ', ' + tokens.clfnSignatoryTitle : ''));
       _addSigBlock('Contractor',           'rfq_ct_sig',       tokens.contractorSignatoryName + (tokens.contractorSignatoryTitle ? ', ' + tokens.contractorSignatoryTitle : ''));
-      _addSigBlock('Witness',              'rfq_witness_sig',  fv('rfq_witness_name'));
 
       var base64 = ctx.finish();
       var binStr = atob(base64);
