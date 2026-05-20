@@ -321,7 +321,8 @@
           </div>
           <div class="f"><label>Phase</label><input id="ue_phase" type="text" placeholder="e.g. 15"/></div>
           <div class="f"><label>Department Number</label><input id="ue_dept_number" type="text" placeholder="e.g. D-042"/></div>
-          <div class="f"><label>Construction Cost (CAD)</label><input id="ue_constructionCost" type="number" min="0" step="any" placeholder="e.g. 250000"/></div>
+          <div class="f"><label>Insured Value (CAD)</label><input id="ue_constructionCost" type="number" min="0" step="any" placeholder="e.g. 250000"/></div>
+          <div class="f"><label>CMHC Value (CAD) <span style="font-size:10px;color:var(--muted);font-weight:400;">CMHC Sec. 95 only</span></label><input id="ue_cmhc_value" type="number" min="0" step="any" placeholder="CMHC Section 95 only" disabled style="background:var(--bg);color:var(--muted);"/></div>
         </div>
       </div>
 
@@ -340,10 +341,13 @@
       <!-- Funder -->
       <div class="grid-c2-10">
         <div class="f"><label>Funder / Program</label>
-          <select id="ue_funder">
+          <select id="ue_funder" onchange="ueFunderChanged()">
             <option value="">Band</option>
             <option value="ISC">ISC</option>
             <option value="CMHC_95">CMHC Section 95</option>
+            <option value="section_10">Section 10</option>
+            <option value="rent_to_own">Rent-to-Own</option>
+            <option value="band_house">Band House</option>
             <option value="Other">Other</option>
           </select>
         </div>

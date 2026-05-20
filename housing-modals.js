@@ -88,6 +88,8 @@ function openUnitEditModal(unitId){
   set('ue_bathrooms',u.bathrooms); set('ue_type',u.type); set('ue_foundation',u.foundation);
   set('ue_funder',u.funder); set('ue_phase',u.phase); set('ue_year',u.year);
   set('ue_dept_number', u.deptNumber);
+  set('ue_cmhc_value', u.cmhcValue);
+  ueFunderChanged();
   set('ue_constructionCost', (u.constructionCost != null ? u.constructionCost : (u.construction_cost != null ? u.construction_cost : '')));
   set('ue_rent', (u.monthlyRent != null ? u.monthlyRent : (u.monthly_rent != null ? u.monthly_rent : '')));
   _gateRentInput('ue_rent');
@@ -178,6 +180,18 @@ function openUnitEditModal(unitId){
   // Check budget routing
   setTimeout(ueUpdateBudgetRouting, 50);
 }
+function ueFunderChanged() {
+  var funder  = (document.getElementById('ue_funder') || {}).value;
+  var cmhcEl  = document.getElementById('ue_cmhc_value');
+  if (!cmhcEl) return;
+  var isCmhc  = (funder === 'CMHC_95');
+  cmhcEl.disabled           = !isCmhc;
+  cmhcEl.style.background   = isCmhc ? '' : 'var(--bg)';
+  cmhcEl.style.color        = isCmhc ? '' : 'var(--muted)';
+  cmhcEl.placeholder        = isCmhc ? 'e.g. 180000' : 'CMHC Section 95 only';
+  if (!isCmhc) cmhcEl.value = '';
+}
+
 function unitEditStatusChange(){
   var status=(document.getElementById('ue_status')||{}).value||'';
   var row=document.getElementById('ue_assign_row');
@@ -279,6 +293,8 @@ function saveUnitEdit(){
   u.bathrooms=get('ue_bathrooms'); u.type=get('ue_type'); u.foundation=get('ue_foundation');
   u.funder=get('ue_funder'); u.phase=get('ue_phase'); u.year=get('ue_year');
   u.deptNumber=get('ue_dept_number');
+  var cmhcRaw = get('ue_cmhc_value');
+  u.cmhcValue = (u.funder === 'CMHC_95' && cmhcRaw !== '') ? (Math.round(Number(cmhcRaw) * 100) / 100) : null;
   var ccRaw = get('ue_constructionCost');
   u.constructionCost = (ccRaw === '' || ccRaw == null) ? null : Math.round(Number(ccRaw) * 100) / 100;
   if(_canEditUnitRent()){
@@ -1295,8 +1311,14 @@ function openUnitDetail(unitId) {
       ['Phase', (u.phase&&u.phase!=='nan')?u.phase:'—'],
       ['Year Built', (u.year&&u.year!=='nan')?u.year:'—'],
       ['Dept #', u.deptNumber||'—'],
-      ['Construction Cost', _ccVal],
+      ['Insured Value', _ccVal],
     ];
+    if(u.funder === 'CMHC_95') {
+      var _cmhcVal = (u.cmhcValue != null && u.cmhcValue !== '')
+        ? '$' + Number(u.cmhcValue).toLocaleString('en-CA', {minimumFractionDigits:0, maximumFractionDigits:2})
+        : '—';
+      fields.push(['CMHC Value', _cmhcVal]);
+    }
     det.innerHTML = fields.map(function(f){
       return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'
         +'<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">'+f[0]+'</div>'
