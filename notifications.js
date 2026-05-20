@@ -2921,6 +2921,10 @@ var _XLSX_2026 = [
 ];
 
 // ── Spreadsheet validation tool ────────────────────────────────────────────
+// Stores last validation results so Apply can use them without re-scanning
+var _xlsxMatchedUpdates  = [];  // [{ unitId, changes:[{field,from,to}], newValues:{} }]
+var _xlsxUnmatchedNew    = [];  // [{ addr, phase, acct, dept, funder, cmhc, insured, type }]
+
 function runXlsxValidation() {
   var out = document.getElementById('xlsx_validation_output');
   if (!out) return;
@@ -2934,15 +2938,16 @@ function runXlsxValidation() {
     return;
   }
 
-  // Aggressive normalisation — strips all punctuation, expands/contracts
-  // common abbreviations, collapses whitespace.
+  // Aggressive normalisation — strips all punctuation, collapses whitespace,
+  // canonicalises common street suffix variants and CLFN-specific names.
   function norm(s) {
     return String(s || '').toLowerCase()
-      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,'')  // strip all punctuation
+      .replace(/[.,\/#!$%\^&\*;:{}=_`~()]/g,'')  // strip punctuation (keep hyphen for now)
       .replace(/\bstreet\b/g,'st').replace(/\broad\b/g,'rd')
       .replace(/\bavenue\b/g,'ave').replace(/\bdrive\b/g,'dr')
       .replace(/\bcourt\b/g,'ct').replace(/\bcres\b/g,'cres')
-      .replace(/machitch/g,'machitch')  // canonical spelling
+      .replace(/ma[\s\-]*chitch/g,'machitch')  // "MaChitch", "Ma Chitch", "Ma-Chitch"
+      .replace(/-/g,' ')                        // remaining hyphens to spaces
       .replace(/\s+/g,' ').trim();
   }
 
@@ -2996,9 +3001,27 @@ function runXlsxValidation() {
     if (newType && newType !== (u.type||''))
       changes.push({ field:'Type', from: u.type||'—', to: newType });
 
-    if (changes.length) matched.push({ addr: addrFull, unitId: u.id, changes: changes });
-    else noChange.push(addrFull);
+    if (changes.length) {
+      // Store new values alongside changes so Apply doesn't have to re-derive
+      var newVals = {};
+      if (phase   && phase   !== (u.phase||''))       newVals.phase          = phase;
+      if (acct    && acct    !== (u.acctNumber||''))   newVals.acctNumber     = acct;
+      if (dept    && dept    !== (u.deptNumber||''))   newVals.deptNumber     = dept;
+      if (insured && Math.abs(parseFloat(insured||0)-parseFloat(u.constructionCost||0))>0.01)
+        newVals.constructionCost = Math.round(parseFloat(insured)*100)/100;
+      if (cmhc    && Math.abs(parseFloat(cmhc||0)-parseFloat(u.cmhcValue||0))>0.01)
+        newVals.cmhcValue = Math.round(parseFloat(cmhc)*100)/100;
+      if (newFunder && newFunder !== (u.funder||''))   newVals.funder         = newFunder;
+      if (newType   && newType   !== (u.type||''))     newVals.type           = newType;
+      matched.push({ addr: addrFull, unitId: u.id, changes: changes, newVals: newVals });
+    } else {
+      noChange.push(addrFull);
+    }
   });
+
+  // Cache results for Apply step
+  _xlsxMatchedUpdates = matched;
+  _xlsxUnmatchedNew   = unmatched;
 
   // Render report
   var html = '<details style="margin-bottom:12px;border:1px solid var(--border);border-radius:7px;padding:8px 12px;">'
@@ -3055,11 +3078,146 @@ function runXlsxValidation() {
       + '</tbody></table></div>';
   }
 
-  html += '<div style="margin-top:12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px;">'
-    + '&#9432; This is a read-only preview. Review the results above before proceeding with any imports.'
-    + '</div>';
+  // Apply buttons — only shown when there is something to do
+  if (matched.length || unmatched.length) {
+    html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">';
+    if (matched.length)
+      html += '<button type="button" class="btn btn-primary" onclick="applyXlsxUpdates()">'
+            + '&#9998; Apply ' + matched.length + ' Updates</button>';
+    if (unmatched.length)
+      html += '<button type="button" class="btn btn-ghost" onclick="applyXlsxNewUnits()">'
+            + '&#43; Add ' + unmatched.length + ' New Units</button>';
+    html += '<span style="font-size:11px;color:var(--muted);align-self:center;">Run validation again after applying to confirm all changes landed.</span>';
+    html += '</div>';
+  }
+
+  html += '<div id="xlsx_apply_status" style="margin-top:10px;font-size:12px;"></div>';
 
   out.innerHTML = html;
+}
+
+// ── Apply updates to existing units ─────────────────────────────────────────
+async function applyXlsxUpdates() {
+  var role = window.currentRole || window._realRole;
+  if (role !== 'ed') { showToast('Only the Executive Director can apply bulk imports'); return; }
+  if (!_xlsxMatchedUpdates.length) { showToast('Run validation first'); return; }
+
+  var statusEl = document.getElementById('xlsx_apply_status');
+  if (statusEl) statusEl.innerHTML = '<span style="color:var(--muted);">Applying updates&hellip; (0 / ' + _xlsxMatchedUpdates.length + ')</span>';
+
+  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length)
+    ? housingUnits : [];
+
+  var ok = 0, fail = 0;
+  for (var i = 0; i < _xlsxMatchedUpdates.length; i++) {
+    var item = _xlsxMatchedUpdates[i];
+    var u = allUnits.find(function(x){ return x && x.id === item.unitId; });
+    if (!u) { fail++; continue; }
+
+    // Apply new values in-memory
+    Object.keys(item.newVals).forEach(function(k){ u[k] = item.newVals[k]; });
+
+    // Persist via the standard unit save helper
+    try {
+      if (typeof saveUnitWithDraftFallback === 'function') {
+        var saved = await saveUnitWithDraftFallback(u);
+        if (saved) ok++; else fail++;
+      } else {
+        // Fallback: direct PATCH
+        var r = await fetch(SUPABASE_URL + '/rest/v1/housing_units?id=eq.' + encodeURIComponent(u.id), {
+          method: 'PATCH',
+          headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+          body: JSON.stringify({ data: Object.assign({}, u) })
+        });
+        if (r.ok) ok++; else fail++;
+      }
+    } catch(e) {
+      console.warn('[xlsx apply]', item.addr, e);
+      fail++;
+    }
+
+    if (statusEl && (i % 10 === 0 || i === _xlsxMatchedUpdates.length - 1)) {
+      statusEl.innerHTML = '<span style="color:var(--muted);">Applying updates&hellip; (' + (i+1) + ' / ' + _xlsxMatchedUpdates.length + ')</span>';
+    }
+  }
+
+  var msg = '&#10003; Applied ' + ok + ' update' + (ok===1?'':'s') + '.';
+  if (fail) msg += ' &#9888; ' + fail + ' failed — check console.';
+  if (statusEl) statusEl.innerHTML = '<span style="color:' + (fail?'var(--warn-amber)':'var(--success)') + ';">' + msg + '</span>';
+  if (typeof auditEntry === 'function')
+    auditEntry('SETTINGS', 'xlsx_import_update', 'Spreadsheet import: ' + ok + ' units updated', role);
+  showToast(ok + ' units updated from 2026 spreadsheet');
+}
+
+// ── Add new units from spreadsheet ──────────────────────────────────────────
+async function applyXlsxNewUnits() {
+  var role = window.currentRole || window._realRole;
+  if (role !== 'ed') { showToast('Only the Executive Director can apply bulk imports'); return; }
+  if (!_xlsxUnmatchedNew.length) { showToast('Run validation first'); return; }
+
+  var statusEl = document.getElementById('xlsx_apply_status');
+  if (statusEl) statusEl.innerHTML = '<span style="color:var(--muted);">Adding new units&hellip; (0 / ' + _xlsxUnmatchedNew.length + ')</span>';
+
+  var ok = 0, fail = 0;
+  for (var i = 0; i < _xlsxUnmatchedNew.length; i++) {
+    var r = _xlsxUnmatchedNew[i];
+    // Parse address into num + street
+    var addrNorm = r.addr.trim().replace(/\.$/, '').replace(/,$/, '');
+    var parts = addrNorm.match(/^([^\s]+)\s+(.+)$/);
+    var num = parts ? parts[1] : '';
+    var street = parts ? parts[2] : addrNorm;
+
+    var newUnit = {
+      id:               'unit_' + Date.now() + '_' + i,
+      num:              num,
+      street:           street,
+      status:           'occupied',
+      phase:            r.phase    || '',
+      acctNumber:       r.acct     || '',
+      deptNumber:       r.dept     || '',
+      funder:           r.funder   || '',
+      constructionCost: r.insured  ? Math.round(parseFloat(r.insured)*100)/100 : null,
+      cmhcValue:        r.cmhc     ? Math.round(parseFloat(r.cmhc)*100)/100    : null,
+      type:             r.type     || '',
+      bedrooms:         3,
+      assignedTo:       '',
+      assignedName:     ''
+    };
+
+    try {
+      var resp = await fetch(SUPABASE_URL + '/rest/v1/housing_units', {
+        method:  'POST',
+        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=representation' }),
+        body:    JSON.stringify({
+          num:    num,
+          street: street,
+          status: 'occupied',
+          data:   newUnit
+        })
+      });
+      if (resp.ok) {
+        var rows = await resp.json();
+        if (rows && rows[0]) {
+          newUnit.id = rows[0].id;
+          if (typeof housingUnits !== 'undefined') housingUnits.push(newUnit);
+        }
+        ok++;
+      } else { fail++; console.warn('[xlsx new]', r.addr, resp.status, await resp.text()); }
+    } catch(e) {
+      console.warn('[xlsx new]', r.addr, e);
+      fail++;
+    }
+
+    if (statusEl && (i % 5 === 0 || i === _xlsxUnmatchedNew.length - 1))
+      statusEl.innerHTML = '<span style="color:var(--muted);">Adding new units&hellip; (' + (i+1) + ' / ' + _xlsxUnmatchedNew.length + ')</span>';
+  }
+
+  var msg2 = '&#10003; Added ' + ok + ' new unit' + (ok===1?'':'s') + '.';
+  if (fail) msg2 += ' &#9888; ' + fail + ' failed — check console.';
+  if (statusEl) statusEl.innerHTML = '<span style="color:' + (fail?'var(--warn-amber)':'var(--success)') + ';">' + msg2 + '</span>';
+  if (typeof auditEntry === 'function')
+    auditEntry('SETTINGS', 'xlsx_import_add', 'Spreadsheet import: ' + ok + ' new units added', role);
+  showToast(ok + ' new units added from 2026 spreadsheet');
 }
 
 function _cfgRow(label, value, opts) {
