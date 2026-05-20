@@ -2965,6 +2965,16 @@ function runXlsxValidation() {
   var dbSample = Object.keys(dbIndex).slice(0,15);
   var xlSample = _XLSX_2026.slice(0,5).map(function(r){ return norm(r[0]); });
 
+  // Special alias: "10 Sagatay Apt N" ↔ "N Elders Complex"
+  // The Elders Complex is at 10 Sagatay; each unit's DB num = the apt number.
+  var sagatayMappings = []; // { xlAddr, aptNum, dbUnit }
+  function sagatayAlias(addrFull) {
+    var m = addrFull.match(/sagatay\s+apt\s+(\d+)/i);
+    if (!m) return null;
+    var aptNum = m[1];
+    return dbIndex[norm(aptNum + ' elders complex')] || null;
+  }
+
   var matched = [], unmatched = [], noChange = [];
 
   _XLSX_2026.forEach(function(row) {
@@ -2973,6 +2983,16 @@ function runXlsxValidation() {
 
     var key = norm(addrFull);
     var u   = dbIndex[key];
+
+    // Sagatay Apt N → Elders Complex fallback
+    if (!u) {
+      var sagatayUnit = sagatayAlias(addrFull);
+      if (sagatayUnit) {
+        var aptMatch = addrFull.match(/apt\s+(\d+)/i);
+        sagatayMappings.push({ xlAddr: addrFull, aptNum: aptMatch ? aptMatch[1] : '?', dbUnit: sagatayUnit });
+        u = sagatayUnit;
+      }
+    }
 
     // Derive DB funder from spreadsheet data
     var newFunder = null;
@@ -3032,6 +3052,27 @@ function runXlsxValidation() {
     + '<div style="color:var(--muted);margin:8px 0 4px;">Spreadsheet addresses (first 5, after normalisation):</div>'
     + xlSample.map(function(k){ return '<div style="color:var(--info-blue,#1d4ed8);">' + escapeHtml(k) + '</div>'; }).join('')
     + '</div></details>'
+
+    // Sagatay Apt ↔ Elders Complex mapping table
+    + (sagatayMappings.length
+      ? '<div style="margin-bottom:14px;">'
+        + '<div style="font-weight:700;font-size:12px;margin-bottom:6px;color:var(--text);">&#127968; Elders Complex (10 Sagatay) — Apt-to-Unit mapping</div>'
+        + '<div style="font-size:11px;color:var(--muted);margin-bottom:8px);">Spreadsheet addresses matched to Elders Complex units by apartment number.</div>'
+        + '<div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">'
+        + '<table class="std-table" style="font-size:11px;"><thead><tr>'
+        + '<th>Spreadsheet address</th><th>Apt #</th><th>Matched DB unit</th><th>DB num</th>'
+        + '</tr></thead><tbody>'
+        + sagatayMappings.map(function(m){
+            return '<tr>'
+              + '<td>' + escapeHtml(m.xlAddr) + '</td>'
+              + '<td style="font-weight:700;">' + escapeHtml(m.aptNum) + '</td>'
+              + '<td>' + escapeHtml((m.dbUnit.num||'') + ' ' + (m.dbUnit.street||'')) + '</td>'
+              + '<td style="color:var(--success);font-weight:700;">' + escapeHtml(m.dbUnit.num||'') + '</td>'
+              + '</tr>';
+          }).join('')
+        + '</tbody></table></div></div>'
+      : '')
+
     + '<div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;">'
     + '<span style="font-weight:700;color:var(--success);">&#10003; ' + matched.length + ' units to update</span>'
     + '<span style="font-weight:700;color:var(--info-blue,#1d4ed8);">&#43; ' + unmatched.length + ' new units</span>'
