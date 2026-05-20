@@ -89,6 +89,7 @@ function openUnitEditModal(unitId){
   set('ue_funder',u.funder); set('ue_phase',u.phase); set('ue_year',u.year);
   set('ue_dept_number', u.deptNumber);
   set('ue_cmhc_value', u.cmhcValue);
+  set('ue_acct_number', u.acctNumber);
   ueFunderChanged();
   set('ue_constructionCost', (u.constructionCost != null ? u.constructionCost : (u.construction_cost != null ? u.construction_cost : '')));
   set('ue_rent', (u.monthlyRent != null ? u.monthlyRent : (u.monthly_rent != null ? u.monthly_rent : '')));
@@ -293,6 +294,7 @@ function saveUnitEdit(){
   u.bathrooms=get('ue_bathrooms'); u.type=get('ue_type'); u.foundation=get('ue_foundation');
   u.funder=get('ue_funder'); u.phase=get('ue_phase'); u.year=get('ue_year');
   u.deptNumber=get('ue_dept_number');
+  u.acctNumber=get('ue_acct_number');
   var cmhcRaw = get('ue_cmhc_value');
   u.cmhcValue = (u.funder === 'CMHC_95' && cmhcRaw !== '') ? (Math.round(Number(cmhcRaw) * 100) / 100) : null;
   var ccRaw = get('ue_constructionCost');
@@ -1311,6 +1313,7 @@ function openUnitDetail(unitId) {
       ['Phase', (u.phase&&u.phase!=='nan')?u.phase:'—'],
       ['Year Built', (u.year&&u.year!=='nan')?u.year:'—'],
       ['Dept #', u.deptNumber||'—'],
+      ['Account #', u.acctNumber||'—'],
       ['Insured Value', _ccVal],
     ];
     if(u.funder === 'CMHC_95') {

@@ -201,6 +201,20 @@
           <div class="f"><label>Department Number</label><input id="ue_dept_number" type="text" placeholder="e.g. D-042"/></div>
           <div class="f"><label>Insured Value (CAD)</label><input id="ue_constructionCost" type="number" min="0" step="any" placeholder="e.g. 250000"/></div>
           <div class="f"><label>CMHC Value (CAD) <span style="font-size:10px;color:var(--muted);font-weight:400;">CMHC Sec. 95 only</span></label><input id="ue_cmhc_value" type="number" min="0" step="any" placeholder="CMHC Section 95 only" disabled style="background:var(--bg);color:var(--muted);"/></div>
+          <div class="f">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+              <label class="m-0">Account Number</label>
+              <span class="tip-host">
+                <button type="button" class="tip-btn" onclick="toggleTip('ue_acct_tip')">?</button>
+                <div id="ue_acct_tip" class="tip-panel">
+                  <div class="tip-panel-title">Account Number</div>
+                  <div class="tip-panel-body">Used for recurring charges such as rent and utilities. This number links the unit to the appropriate billing or payment account.</div>
+                  <button type="button" class="tip-panel-close" onclick="closeTip('ue_acct_tip')">Close &#10005;</button>
+                </div>
+              </span>
+            </div>
+            <input id="ue_acct_number" type="text" placeholder="e.g. ACC-0042"/>
+          </div>
         </div>
       </div>
 
