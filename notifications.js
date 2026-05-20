@@ -2934,22 +2934,31 @@ function runXlsxValidation() {
     return;
   }
 
-  // Normalise an address for fuzzy matching
+  // Aggressive normalisation — strips all punctuation, expands/contracts
+  // common abbreviations, collapses whitespace.
   function norm(s) {
     return String(s || '').toLowerCase()
-      .replace(/\./g,'').replace(/,/g,'').replace(/-/g,' ')
-      .replace(/\bst\b/g,'st').replace(/\brd\b/g,'rd').replace(/\bave\b/g,'ave')
-      .replace(/\bdr\b/g,'dr').replace(/\bln\b/g,'ln').replace(/\blane\b/g,'lane')
-      .replace(/machitch/g,'machitch').replace(/machitch/g,'machitch')
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,'')  // strip all punctuation
+      .replace(/\bstreet\b/g,'st').replace(/\broad\b/g,'rd')
+      .replace(/\bavenue\b/g,'ave').replace(/\bdrive\b/g,'dr')
+      .replace(/\bcourt\b/g,'ct').replace(/\bcres\b/g,'cres')
+      .replace(/machitch/g,'machitch')  // canonical spelling
       .replace(/\s+/g,' ').trim();
   }
 
-  // Build DB lookup by normalised address
+  // Build DB lookup — index on both (num+street) and street alone for fallback
   var dbIndex = {};
   allUnits.forEach(function(u) {
-    var key = norm((u.num||'') + ' ' + (u.street||''));
-    if (key) dbIndex[key] = u;
+    var combined = norm((u.num||'') + ' ' + (u.street||''));
+    if (combined) { dbIndex[combined] = u; }
+    // Also index just the street if num is missing
+    var streetOnly = norm(u.street||'');
+    if (streetOnly && !dbIndex[streetOnly]) dbIndex[streetOnly] = u;
   });
+
+  // Debug: show first 15 DB keys so we can spot format issues
+  var dbSample = Object.keys(dbIndex).slice(0,15);
+  var xlSample = _XLSX_2026.slice(0,5).map(function(r){ return norm(r[0]); });
 
   var matched = [], unmatched = [], noChange = [];
 
@@ -2992,7 +3001,15 @@ function runXlsxValidation() {
   });
 
   // Render report
-  var html = '<div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;">'
+  var html = '<details style="margin-bottom:12px;border:1px solid var(--border);border-radius:7px;padding:8px 12px;">'
+    + '<summary style="cursor:pointer;font-size:11px;font-weight:700;color:var(--muted);">&#128269; Debug: address format check (expand to diagnose mismatches)</summary>'
+    + '<div style="margin-top:8px;font-size:11px;font-family:monospace;">'
+    + '<div style="color:var(--muted);margin-bottom:4px;">DB addresses (first 15, after normalisation):</div>'
+    + dbSample.map(function(k){ return '<div style="color:var(--text);">' + escapeHtml(k) + '</div>'; }).join('')
+    + '<div style="color:var(--muted);margin:8px 0 4px;">Spreadsheet addresses (first 5, after normalisation):</div>'
+    + xlSample.map(function(k){ return '<div style="color:var(--info-blue,#1d4ed8);">' + escapeHtml(k) + '</div>'; }).join('')
+    + '</div></details>'
+    + '<div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;">'
     + '<span style="font-weight:700;color:var(--success);">&#10003; ' + matched.length + ' units to update</span>'
     + '<span style="font-weight:700;color:var(--info-blue,#1d4ed8);">&#43; ' + unmatched.length + ' new units</span>'
     + '<span style="color:var(--muted);">&#8212; ' + noChange.length + ' already match</span>'
