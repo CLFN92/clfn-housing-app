@@ -1294,6 +1294,7 @@ function openUnitDetail(unitId) {
       ['Funder', u.funder||'Band'],
       ['Phase', (u.phase&&u.phase!=='nan')?u.phase:'—'],
       ['Year Built', (u.year&&u.year!=='nan')?u.year:'—'],
+      ['Dept #', u.deptNumber||'—'],
       ['Construction Cost', _ccVal],
     ];
     det.innerHTML = fields.map(function(f){
