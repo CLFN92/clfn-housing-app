@@ -87,6 +87,7 @@ function openUnitEditModal(unitId){
   set('ue_street',u.street); set('ue_num',u.num); set('ue_bedrooms',u.bedrooms);
   set('ue_bathrooms',u.bathrooms); set('ue_type',u.type); set('ue_foundation',u.foundation);
   set('ue_funder',u.funder); set('ue_phase',u.phase); set('ue_year',u.year);
+  set('ue_dept_number', u.deptNumber);
   set('ue_constructionCost', (u.constructionCost != null ? u.constructionCost : (u.construction_cost != null ? u.construction_cost : '')));
   set('ue_rent', (u.monthlyRent != null ? u.monthlyRent : (u.monthly_rent != null ? u.monthly_rent : '')));
   _gateRentInput('ue_rent');
@@ -277,6 +278,7 @@ function saveUnitEdit(){
   u.bedrooms=parseInt(get('ue_bedrooms'))||u.bedrooms;
   u.bathrooms=get('ue_bathrooms'); u.type=get('ue_type'); u.foundation=get('ue_foundation');
   u.funder=get('ue_funder'); u.phase=get('ue_phase'); u.year=get('ue_year');
+  u.deptNumber=get('ue_dept_number');
   var ccRaw = get('ue_constructionCost');
   u.constructionCost = (ccRaw === '' || ccRaw == null) ? null : Math.round(Number(ccRaw) * 100) / 100;
   if(_canEditUnitRent()){
