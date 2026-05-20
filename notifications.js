@@ -2661,7 +2661,388 @@ async function renderConfigPanel() {
     +   '</div>'
     + '</div>'
 
-    + '';
+    + '<div class="cfg-section">'
+    +   '<div class="cfg-section-title">Spreadsheet Import Validation</div>'
+    +   '<div class="cfg-section-sub">Cross-checks the 2026 Tenants &amp; Units spreadsheet against current housing units in memory. Read-only — no changes are made to the database.</div>'
+    +   '<div class="cfg-grid" style="margin-top:12px;">'
+    +     '<div class="cfg-row">'
+    +       '<div class="cfg-label">Validate 2026 spreadsheet</div>'
+    +       '<div class="cfg-value">'
+    +         '<button type="button" class="btn btn-ghost" onclick="runXlsxValidation()">&#128203; Run Validation Report</button>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div id="xlsx_validation_output" style="margin-top:14px;font-size:12px;"></div>'
+    + '</div>';
+}
+
+// ── 2026 Tenants & Units spreadsheet import data ───────────────────────────
+// Fields: [address, phase, acct, dept, funder_xlsx, cmhc, insured]
+// funder_xlsx: "CMHC" → CMHC_95 in DB; "" → keep existing unless category overrides
+// phase "Private Homes" → funder privately_owned
+// phase "Hearst Property/Paramedic Trailers" → type admin_building
+var _XLSX_2026 = [
+  ["29 Mahikan St.","Phase 1","1410","460","CMHC","249189.00","296708.34"],
+  ["35 Nabakhabo St.","Phase 1","1410","460","","","248947.47"],
+  ["21 Nabakhabo St.","Phase 1","1410","460","","","248947.47"],
+  ["17 Nabakhabo St.","Phase 1","1410","460","","","248947.47"],
+  ["19 Nabakhabo St.","Phase 1","1410","460","","","248947.47"],
+  ["9 MaChitch","Boreal","1415","456","","","228214.15"],
+  ["44 Wawaskashoo St.","Boreal","1415","456","","","228214.15"],
+  ["20 MaChitch","Boreal","1415","456","","","228214.15"],
+  ["29 Wawaskashoo St.","Boreal","1415","456","","","228214.15"],
+  ["24 MaChitch","Boreal","1415","456","","","228214.15"],
+  ["11 MaChitch","Boreal","1415","456","","","228214.15"],
+  ["22 MaChitch","Boreal","1415","456","","","228214.15"],
+  ["8 MaChitch","Boreal","1415","456","","","228214.15"],
+  ["6 MaChitch","Boreal","1415","456","","","228214.15"],
+  ["4 MaChitch","Boreal","1415","456","","","228214.15"],
+  ["18 MaChitch","Boreal","1415","456","","","248946.05"],
+  ["16 MaChitch","Boreal","1415","456","","","248946.05"],
+  ["2 Nabakhabo St.","Boreal","1415","456","","","363053.84"],
+  ["14 MaChitch St.","Boreal","1415","456","","","279047.62"],
+  ["54 Wawaskashoo St.","Boreal","1415","456","","","207327.55"],
+  ["56 Wawaskashoo St.","Boreal","1415","456","","","207327.55"],
+  ["58 Wawaskashoo St.","Boreal","1415","456","","","217923.42"],
+  ["12 MaChitch","Boreal","1415","456","","","269524.68"],
+  ["19 Shanwayshoo St.","Boreal","1415","456","","","217923.42"],
+  ["2 MaChitch","Boreal","1415","456","","","207327.55"],
+  ["3 MaChitch","Boreal","1416","457","","","207327.55"],
+  ["51 Wawaskashoo St.","Boreal","1416","457","","",""],
+  ["33B Mahikan St.","Boreal","1416","457","","",""],
+  ["54 Nabakhabo St.","Boreal","1416","457","","",""],
+  ["1 MaChitch","Boreal","1416","457","","","207611.39"],
+  ["7 MaChitch","Boreal","1416","457","","","207611.39"],
+  ["31 Mahikan St.","Boreal","1416","457","","","207327.55"],
+  ["33A Mahikan St.","Boreal","1416","457","","",""],
+  ["22 Nabakhabo St.","Boreal","1416","457","","","193813.78"],
+  ["10 MaChitch","Boreal","1416","457","","","228214.15"],
+  ["1 Wawaskashoo St.","Boreal","1416","457","","",""],
+  ["5 Wawaskashoo St.","Phase 2","1417","466","CMHC","216170.40","257393.23"],
+  ["36 Mahikan St.","Phase 2","1417","466","CMHC","209076.08","248946.05"],
+  ["23 Mahikan St.","Phase 2","1417","466","CMHC","205594.48","244800.52"],
+  ["6 Wawaskashoo St.","Phase 2","1417","466","CMHC","224941.74","267837.23"],
+  ["25 Mahikan St.","Phase 2","1417","466","CMHC","205594.48","244800.52"],
+  ["45 Wawaskashoo St.","Phase 2","1417","466","CMHC","216170.40","257393.23"],
+  ["41A Wawaskashoo St.","Phase 2","1417","466","CMHC","183021.88","217923.42"],
+  ["41B Wawaskashoo St.","Phase 2","1417","466","CMHC","183021.88","217923.42"],
+  ["5 MaChitch","Phase 2","1417","466","CMHC","209076.08","248946.05"],
+  ["4 Nesqua St.","Phase 2","1417","466","CMHC","209076.08","248946.05"],
+  ["10 Sagatay Apt 8","Phase 3","1418","464","","",""],
+  ["10 Sagatay Apt 3","Phase 3","1418","464","","",""],
+  ["10 Sagatay Apt 4","Phase 3","1418","464","","",""],
+  ["10 Sagatay Apt 9","Phase 3","1418","464","","",""],
+  ["10 Sagatay Apt 10","Phase 3","1418","464","","",""],
+  ["10 Sagatay Apt 2","Phase 3","1418","464","","",""],
+  ["10 Sagatay Apt 6","Phase 3","1418","464","","",""],
+  ["10 Sagatay Apt 1","Phase 3","1418","464","","",""],
+  ["10 Sagatay Apt 7","Phase 3","1418","464","","",""],
+  ["10 Sagatay Apt 5","Phase 3","1418","464","","",""],
+  ["13C Mahikan St.","Phase 4","1413","467","","",""],
+  ["13B Mahikan St.","Phase 4","1413","467","","",""],
+  ["15F Mahikan St.","Phase 4","1413","467","","",""],
+  ["30 Shanwayshoo St.","Phase 4","1413","467","CMHC","193727.71","230670.81"],
+  ["2 Shanwayshoo St.","Phase 4","1413","467","","","230670.81"],
+  ["10 Shanwayshoo St.","Phase 4","1413","467","CMHC","193727.71","230670.81"],
+  ["13A Mahikan St.","Phase 4","1413","467","","",""],
+  ["53 Wawaskashoo St.","Phase 4","1413","467","CMHC","213332.43",""],
+  ["15E Mahikan St.","Phase 4","1413","467","","",""],
+  ["15D Mahikan St.","Phase 4","1413","467","","",""],
+  ["16A Wawaskashoo St.","Phase 5","1414","468","","",""],
+  ["18A Wawaskashoo St.","Phase 5","1414","468","","",""],
+  ["18B Wawaskashoo St.","Phase 5","1414","468","","",""],
+  ["16B Wawaskashoo St.","Phase 5","1414","468","","",""],
+  ["2 Nesqua St.","Phase 6","1419","469","CMHC","205723.21","244953.80"],
+  ["27 Musko Rd.","Phase 6","1419","469","CMHC","205723.21","244953.80"],
+  ["8 Nabakhabo St.","Phase 6","1419","469","CMHC","223909.54","266608.19"],
+  ["24 Wawaskashoo St.","Phase 6","1419","469","CMHC","205723.21","244953.80"],
+  ["4 Nabakhabo St.","Phase 6","1419","469","CMHC","205723.21","244953.80"],
+  ["12 Nabakhabo St.","Phase 6","1419","469","CMHC","223909.54","266608.19"],
+  ["10 Nabakhabo St.","Phase 6","1419","469","CMHC","223909.54","266608.19"],
+  ["9 Nabakhabo St.","Phase 6","1419","469","CMHC","223909.54","266608.19"],
+  ["19 Musko Rd.","Phase 6","1419","469","CMHC","205723.21","244953.80"],
+  ["22B Mahikan St.","Phase 7","1409","470","","",""],
+  ["26 Nabakhabo St.","Phase 7","1409","470","CMHC","246093.58","293022.64"],
+  ["16 Nabakhabo St.","Phase 7","1409","470","CMHC","191405.85","227906.18"],
+  ["55 Wawaskashoo St.","Phase 7","1409","470","CMHC","191405.85","227906.18"],
+  ["21 Musko Rd.","Phase 7","1409","470","CMHC","204819.73","243878.03"],
+  ["32 Nabakhabo St.","Phase 7","1409","470","CMHC","246093.58","293022.64"],
+  ["14 Amik St.","Phase 7","1409","470","CMHC","191405.85","227906.18"],
+  ["20A Mahikan St.","Phase 7","1409","470","","",""],
+  ["20B Mahikan St.","Phase 7","1409","470","","",""],
+  ["26 Mahikan St.","Phase 7","1409","470","CMHC","191405.85","227906.18"],
+  ["22A Mahikan St.","Phase 7","1409","470","","",""],
+  ["13A Nabakhabo St.","Phase 8","1408","471","","",""],
+  ["36A Nabakhabo St.","Phase 8","1408","471","","",""],
+  ["36B Nabakhabo St.","Phase 8","1408","471","","",""],
+  ["24B Mahikan St.","Phase 8","1408","471","","",""],
+  ["34B Nabakhabo St.","Phase 8","1408","471","","",""],
+  ["13B Nabakhabo St.","Phase 8","1408","471","","",""],
+  ["24A Mahikan St.","Phase 8","1408","471","","",""],
+  ["34A Nabakhabo St.","Phase 8","1408","471","","",""],
+  ["59 Wawaskashoo St.","Phase 9","1407","472","CMHC","191405.85","227906.18"],
+  ["25 Wawaskashoo St.","Phase 9","1407","472","CMHC","191405.85","227906.18"],
+  ["32 Mahikan St.","Phase 9","1407","472","CMHC","177734.51","211627.78"],
+  ["34 Mahikan St.","Phase 9","1407","472","CMHC","191405.85","227906.18"],
+  ["30 Mahikan St.","Phase 9","1407","472","CMHC","191405.85","227906.18"],
+  ["1 Gotchie's Lane","Phase 10","1406","473","","",""],
+  ["12E Mahikan St.","Phase 10","1406","473","","",""],
+  ["12B Mahikan St.","Phase 10","1406","473","","",""],
+  ["12A Mahikan St.","Phase 10","1406","473","","",""],
+  ["26 Shanwayshoo St.","Phase 10","1406","473","CMHC","154647.00","184137.57"],
+  ["7 Shanwayshoo St.","Phase 10","1406","473","CMHC","154647.00","184137.57"],
+  ["12C Mahikan St.","Phase 10","1406","473","","",""],
+  ["2 Amik St.","Phase 10","1406","473","CMHC","154647.00","184137.57"],
+  ["10D Mahikan St.","Phase 10","1406","473","","",""],
+  ["10F Mahikan St.","Phase 10","1406","473","","",""],
+  ["24 Shanwayshoo St.","Phase 10","1406","473","CMHC","154647.00","184137.57"],
+  ["28 Shanwayshoo St.","Phase 10","1406","473","CMHC","154647.00","184137.57"],
+  ["10 Nesqua St.","Phase 11","1405","474","CMHC","193470.26","230364.26"],
+  ["42 Wawaskashoo St.","Phase 11","1405","474","CMHC","193470.26","230364.26"],
+  ["24 Nabakhabo St.","Phase 11","1405","474","CMHC","193470.26","230364.26"],
+  ["16 Nesqua St.","Phase 11","1405","474","","",""],
+  ["18 Nabakhabo St.","Phase 11","1405","474","CMHC","193470.26","230364.26"],
+  ["57 Wawaskashoo St.","Phase 11","1405","474","CMHC","193470.26","230364.26"],
+  ["14 Shanwayshoo St.","Phase 11","1405","474","CMHC","193470.26","230364.26"],
+  ["25 Shanwayshoo St.","Phase 11","1405","474","CMHC","193470.26","230364.26"],
+  ["8 Nesqua St.","Phase 11","1405","474","CMHC","193470.26","230364.26"],
+  ["9B Mahikan St.","Phase 12","1404","475","","",""],
+  ["9E Mahikan St.","Phase 12","1404","475","","",""],
+  ["9A Mahikan St.","Phase 12","1404","475","","",""],
+  ["9C Mahikan St.","Phase 12","1404","475","","",""],
+  ["9D Mahikan St.","Phase 12","1404","475","","",""],
+  ["10 Amik St.","Phase 13","1403","476","CMHC","178295.91","212296.23"],
+  ["16 Amik St.","Phase 13","1403","476","CMHC","178295.91","212296.23"],
+  ["48 Nabakhabo St.","Phase 13","1403","476","CMHC","178295.91","212296.23"],
+  ["47 Nabakhabo St.","Phase 13","1403","476","CMHC","178295.91","212296.23"],
+  ["4 Amik St.","Phase 13","1403","476","","","212296.23"],
+  ["50 Nabakhabo St.","Phase 14","1402","477","CMHC","214966.56","255959.82"],
+  ["61 Wawaskashoo St.","Phase 14","1402","477","CMHC","214966.56","255959.82"],
+  ["5 Nabakhabo St.","Phase 14","1402","477","CMHC","214966.56","255959.82"],
+  ["12 Amik St.","Phase 14","1402","477","","",""],
+  ["7 Nabakhabo St.","Phase 14","1402","477","CMHC","214966.56","255959.82"],
+  ["38 Nabakhabo St.","Phase 14","1402","477","CMHC","214966.56","255959.82"],
+  ["25 Musko Rd.","Phase 14","1402","477","CMHC","214966.56","255959.82"],
+  ["14 Nabakhabo St.","Phase 14","1402","477","CMHC","214966.56","255959.82"],
+  ["49 Wawaskashoo St.","Phase 15","1401","478","CMHC","214966.56","255959.82"],
+  ["39 Nabakhabo St.","Phase 15","1401","478","CMHC","214966.56","255959.82"],
+  ["23 Musko Rd.","Phase 15","1401","478","CMHC","214966.56","255959.82"],
+  ["65 Wawaskashoo St.","Phase 15","1401","478","CMHC","214966.56","255959.82"],
+  ["50 Shanwayshoo St.","Phase 15","1401","478","CMHC","214966.56",""],
+  ["6 Musko Rd.","Phase 16","1400","479","CMHC","177031.28","210790.44"],
+  ["21 Shanwayshoo St.","Phase 16","1400","479","CMHC","177031.28","210790.44"],
+  ["21 Wawaskashoo St.","Phase 16","1400","479","CMHC","177031.28","210790.44"],
+  ["6 Nesqua St.","Phase 16","1400","479","","",""],
+  ["28 Nabakhabo St.","Phase 16","1400","479","CMHC","177031.28","210790.44"],
+  ["14 Nesqua St.","Phase 16","1400","479","CMHC","177031.28","210790.44"],
+  ["27 Mahikan St.","Phase 16","1400","479","CMHC","177031.28","210790.44"],
+  ["25 Nabakhabo St.","Phase 16","1400","479","CMHC","177031.28","248947.47"],
+  ["36 Shanwayshoo St.","Phase 17","1399","481","CMHC","183354.42","218319.38"],
+  ["64 Wawaskashoo St.","Phase 17","1399","481","","","218319.38"],
+  ["21 Nesqua St.","Phase 17","1399","481","CMHC","183354.42","218319.38"],
+  ["23 Shanwayshoo St.","Phase 17","1399","481","CMHC","183354.42","218319.38"],
+  ["21 Machitch St.","Phase 18","1398","482","CMHC","217369.47","258820.96"],
+  ["17 Machitch St.","Phase 18","1398","482","CMHC","217369.47","258820.96"],
+  ["35 Machitch St.","Phase 18","1398","482","CMHC","217369.47","258820.96"],
+  ["37 Machitch St.","Phase 18","1398","482","CMHC","217369.47","258820.96"],
+  ["23 Machitch St.","Phase 18","1398","482","CMHC","217369.47","230977.36"],
+  ["19 Machitch St.","Phase 18","1398","482","CMHC","217369.47","258820.96"],
+  ["28 Mahikan St.","Phase 18","1398","482","CMHC","217369.47","258820.96"],
+  ["11 Musko Rd.","Phase 18","1398","482","CMHC","217369.47","258820.96"],
+  ["8A Mahikan St.","Phase 19","1397","483","","",""],
+  ["6E Mahikan St.","Phase 19","1397","483","","",""],
+  ["8B Mahikan St.","Phase 19","1397","483","","",""],
+  ["6C Mahikan St.","Phase 19","1397","483","","",""],
+  ["6D Mahikan St.","Phase 19","1397","483","","",""],
+  ["43 Nabakhabo St.","Phase 19","1397","483","CMHC","219392.16","261229.37"],
+  ["8 Shanwayshoo St.","Phase 19","1397","483","","",""],
+  ["9 Amik St.","Phase 19","1397","483","","",""],
+  ["41 Nabakhabo St.","Phase 19","1397","483","CMHC","219392.16","261229.37"],
+  ["49 Nabakhabo St.","Band Housing","1396","480","","",""],
+  ["60 Wawaskashoo St.","Band Housing","1396","480","","",""],
+  ["9 Musko Rd.","Band Housing","1396","480","CMHC","205723.21","244953.80"],
+  ["15 Musko Rd.","Band Housing","1396","480","CMHC","205723.21","244953.80"],
+  ["5 Musko Rd.","Band Housing","1396","480","","",""],
+  ["45 Nabakhabo St.","Band Housing","1396","480","","",""],
+  ["29 Nabakhabo St.","Band Housing","1396","480","","","248947.47"],
+  ["60 Nabakhabo St.","Band Housing","1396","480","","",""],
+  ["27 Nabakhabo St.","Band Housing","1396","480","","","248947.47"],
+  ["23 Wawaskashoo St.","Band Housing","1396","480","","",""],
+  ["13 Musko Rd.","Band Housing","1396","480","CMHC","205723.21","244953.80"],
+  ["3 Musko Rd.","Band Housing","1396","480","","",""],
+  ["8 Wawaskashoo St.","Band Housing","1396","480","CMHC","250000.00",""],
+  ["4 Wawaskashoo St.","Band Housing","1396","480","CMHC","250000.00","297674.00"],
+  ["62 Wawaskashoo St.","Band Housing","1396","480","","",""],
+  ["22 Shanwayshoo St.","Band Housing","1396","480","CMHC","250000.00","297674.00"],
+  ["51 Nabakhabo St.","Band Housing","1396","480","","",""],
+  ["20 Nabakhabo St.","Band Housing","1396","480","","",""],
+  ["50 Wawaskashoo St.","Band Housing","1395","484","CMHC","250000.00","297674.00"],
+  ["48 Wawaskashoo St.","Band Housing","1395","484","CMHC","250000.00","297674.00"],
+  ["46 Wawaskashoo St.","Band Housing","1395","484","CMHC","250000.00","297674.00"],
+  ["30 Nabakhabo St.","Band Housing","1395","484","CMHC","250000.00","297674.00"],
+  ["17 Wawaskashoo St.","Band Housing","1395","484","CMHC","250000.00","297674.00"],
+  ["25 Wawaskashoo St.","Band Housing","1395","484","CMHC","191405.85","227906.18"],
+  ["23 Nabakhabo St.","Band Housing","1395","484","CMHC","250000.00","248947.47"],
+  ["52 Wawaskashoo St.","Band Housing","1395","484","CMHC","250000.00","297674.00"],
+  ["4B Musko Rd.","Band Housing","1394","455","","",""],
+  ["4A Musko Rd.","Band Housing","1394","455","","",""],
+  ["15 Wawaskashoo St.","Band Housing","1394","455","","",""],
+  ["17 Shanwayshoo St.","Band Housing","1394","455","","",""],
+  ["52 Shanwayshoo St.","Band Housing","1394","455","","",""],
+  ["2B Nabakhabo St.","CMHC Phase 21","1393","462","","",""],
+  ["39 Machitch St.","CMHC Phase 21","1393","462","","",""],
+  ["41 Machitch St.","CMHC Phase 21","1393","462","","",""],
+  ["HWY 1865","Hearst Property/Paramedic Trailers","1550","400","","",""],
+  ["19 Wawaskashoo St.","Hearst Property/Paramedic Trailers","1550","400","","",""],
+  ["5 Shanwayshoo St.","Hearst Property/Paramedic Trailers","1550","400","","",""],
+  ["18 Shanwayshoo St.","Hearst Property/Paramedic Trailers","1550","400","","",""],
+  ["20 Shanwayshoo St.","Hearst Property/Paramedic Trailers","1550","400","","",""],
+  ["44 Shanwayshoo St.","Band Housing","","","","",""],
+  ["42 Shanwayshoo St.","Band Housing","","","","",""],
+  ["40 Shanwayshoo St.","Band Housing","","","","",""],
+  ["38B Shanwayshoo St.","Band Housing","","","","",""],
+  ["38A Shanwayshoo St.","Band Housing","","","","",""],
+  ["34 Shanwayshoo St.","Band Housing","","","","",""],
+  ["32 Shanwayshoo St.","Band Housing","","","","",""],
+  ["12 Shanwayshoo St.","Band Housing","","","","",""],
+  ["57 Nabakhabo St.","Band Housing","","","","",""],
+  ["56 Nabakhabo St.","Band Housing","","","","",""],
+  ["17 Musko Rd.","Band Housing","","","","",""],
+  ["8 Musko Rd.","Band Housing","","","","",""],
+  ["6 Nabakhabo St.","Private Homes","","","","",""],
+  ["40 Nabakhabo St.","Private Homes","","","","",""],
+  ["33 Nabakhabo St.","Private Homes","","","","",""],
+  ["31 Nabakhabo St.","Private Homes","","","","",""],
+  ["11 Wawaskashoo St.","Private Homes","","","","",""],
+  ["13 Nabakhabo St.","Private Homes","","","CMHC","246093.58","293022.64"],
+  ["7 Nabakhabo St.","Private Homes","","","CMHC","214966.56","255959.82"],
+  ["26 Machitch St.","Private Homes","","","","",""],
+  ["10 Musko Rd.","Private Homes","","","","",""]
+];
+
+// ── Spreadsheet validation tool ────────────────────────────────────────────
+function runXlsxValidation() {
+  var out = document.getElementById('xlsx_validation_output');
+  if (!out) return;
+  out.innerHTML = '<div style="color:var(--muted);padding:8px 0;">Scanning units&hellip;</div>';
+
+  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length)
+    ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+
+  if (!allUnits.length) {
+    out.innerHTML = '<div style="color:var(--danger);">No unit data in memory — please load the Inventory page first, then return here.</div>';
+    return;
+  }
+
+  // Normalise an address for fuzzy matching
+  function norm(s) {
+    return String(s || '').toLowerCase()
+      .replace(/\./g,'').replace(/,/g,'').replace(/-/g,' ')
+      .replace(/\bst\b/g,'st').replace(/\brd\b/g,'rd').replace(/\bave\b/g,'ave')
+      .replace(/\bdr\b/g,'dr').replace(/\bln\b/g,'ln').replace(/\blane\b/g,'lane')
+      .replace(/machitch/g,'machitch').replace(/machitch/g,'machitch')
+      .replace(/\s+/g,' ').trim();
+  }
+
+  // Build DB lookup by normalised address
+  var dbIndex = {};
+  allUnits.forEach(function(u) {
+    var key = norm((u.num||'') + ' ' + (u.street||''));
+    if (key) dbIndex[key] = u;
+  });
+
+  var matched = [], unmatched = [], noChange = [];
+
+  _XLSX_2026.forEach(function(row) {
+    var addrFull = row[0], phase = row[1], acct = row[2], dept = row[3];
+    var xlFunder = row[4], cmhc = row[5], insured = row[6];
+
+    var key = norm(addrFull);
+    var u   = dbIndex[key];
+
+    // Derive DB funder from spreadsheet data
+    var newFunder = null;
+    if (xlFunder === 'CMHC') newFunder = 'CMHC_95';
+    else if (phase === 'Private Homes') newFunder = 'privately_owned';
+
+    // Derive type override
+    var newType = (phase === 'Hearst Property/Paramedic Trailers') ? 'admin_building' : null;
+
+    if (!u) {
+      unmatched.push({ addr: addrFull, phase: phase, acct: acct, dept: dept, funder: newFunder || '', cmhc: cmhc, insured: insured, type: newType });
+      return;
+    }
+
+    // Compare fields
+    var changes = [];
+    if (phase && phase !== (u.phase||'')) changes.push({ field:'Phase', from: u.phase||'', to: phase });
+    if (acct  && acct  !== (u.acctNumber||''))     changes.push({ field:'Account #', from: u.acctNumber||'', to: acct });
+    if (dept  && dept  !== (u.deptNumber||''))     changes.push({ field:'Dept #',    from: u.deptNumber||'', to: dept });
+    if (insured && Math.abs(parseFloat(insured||0) - parseFloat(u.constructionCost||0)) > 0.01)
+      changes.push({ field:'Insured Value', from: u.constructionCost!=null?'$'+Number(u.constructionCost).toLocaleString('en-CA'):'—', to: '$'+Number(insured).toLocaleString('en-CA') });
+    if (cmhc && Math.abs(parseFloat(cmhc||0) - parseFloat(u.cmhcValue||0)) > 0.01)
+      changes.push({ field:'CMHC Value', from: u.cmhcValue!=null?'$'+Number(u.cmhcValue).toLocaleString('en-CA'):'—', to: '$'+Number(cmhc).toLocaleString('en-CA') });
+    if (newFunder && newFunder !== (u.funder||''))
+      changes.push({ field:'Funder', from: u.funder||'—', to: newFunder });
+    if (newType && newType !== (u.type||''))
+      changes.push({ field:'Type', from: u.type||'—', to: newType });
+
+    if (changes.length) matched.push({ addr: addrFull, unitId: u.id, changes: changes });
+    else noChange.push(addrFull);
+  });
+
+  // Render report
+  var html = '<div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;">'
+    + '<span style="font-weight:700;color:var(--success);">&#10003; ' + matched.length + ' units to update</span>'
+    + '<span style="font-weight:700;color:var(--info-blue,#1d4ed8);">&#43; ' + unmatched.length + ' new units</span>'
+    + '<span style="color:var(--muted);">&#8212; ' + noChange.length + ' already match</span>'
+    + '<span style="color:var(--muted);font-size:11px;">(' + allUnits.length + ' units in DB, ' + _XLSX_2026.length + ' in spreadsheet)</span>'
+    + '</div>';
+
+  if (matched.length) {
+    html += '<div style="font-weight:700;margin-bottom:8px;color:var(--text);">Updates (existing units with changed fields):</div>'
+      + '<div style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">'
+      + '<table class="std-table" style="font-size:11px;"><thead><tr>'
+      + '<th>Address</th><th>Field</th><th>Current value</th><th>New value</th>'
+      + '</tr></thead><tbody>'
+      + matched.map(function(m){
+          return m.changes.map(function(c, ci){
+            return '<tr>'
+              + (ci===0 ? '<td rowspan="'+m.changes.length+'" style="vertical-align:top;font-weight:600;">'+escapeHtml(m.addr)+'</td>' : '')
+              + '<td>'+escapeHtml(c.field)+'</td>'
+              + '<td style="color:var(--muted);">'+escapeHtml(c.from)+'</td>'
+              + '<td style="color:var(--success);font-weight:600;">'+escapeHtml(c.to)+'</td>'
+              + '</tr>';
+          }).join('');
+        }).join('')
+      + '</tbody></table></div>';
+  }
+
+  if (unmatched.length) {
+    html += '<div style="font-weight:700;margin-top:16px;margin-bottom:8px;color:var(--text);">New units (no address match in DB):</div>'
+      + '<div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">'
+      + '<table class="std-table" style="font-size:11px;"><thead><tr>'
+      + '<th>Address</th><th>Phase</th><th>Account #</th><th>Dept #</th><th>Funder</th><th>Insured</th><th>CMHC</th>'
+      + '</tr></thead><tbody>'
+      + unmatched.map(function(r){
+          return '<tr>'
+            + '<td style="font-weight:600;">'+escapeHtml(r.addr)+'</td>'
+            + '<td>'+escapeHtml(r.phase)+'</td>'
+            + '<td>'+escapeHtml(r.acct)+'</td>'
+            + '<td>'+escapeHtml(r.dept)+'</td>'
+            + '<td>'+escapeHtml(r.funder)+'</td>'
+            + '<td>'+escapeHtml(r.insured)+'</td>'
+            + '<td>'+escapeHtml(r.cmhc)+'</td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table></div>';
+  }
+
+  html += '<div style="margin-top:12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px;">'
+    + '&#9432; This is a read-only preview. Review the results above before proceeding with any imports.'
+    + '</div>';
+
+  out.innerHTML = html;
 }
 
 function _cfgRow(label, value, opts) {
