@@ -3793,13 +3793,21 @@ function renderWorklist() {
       + '</div></div>';
   }
 
-  function actionRow(href, cols) {
-    return '<a href="' + esc(href) + '" style="display:flex;align-items:center;gap:10px;padding:10px 14px;'
-      + 'border-top:1px solid var(--border);text-decoration:none;color:inherit;cursor:pointer;'
-      + 'background:var(--surface);" onmouseover="this.style.background=\'var(--bg)\'" '
+  function actionRow(href, cols, btn) {
+    // Row = info columns (clickable link) + yellow action button on the right
+    return '<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;'
+      + 'border-top:1px solid var(--border);background:var(--surface);" '
+      + 'onmouseover="this.style.background=\'var(--bg)\'" '
       + 'onmouseout="this.style.background=\'var(--surface)\'">'
+      + '<a href="' + esc(href) + '" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-decoration:none;color:inherit;">'
       + cols.map(function(c){ return '<span style="' + (c.style||'flex:1;font-size:12px;') + '">' + esc(c.text||'') + '</span>'; }).join('')
-      + '</a>';
+      + '</a>'
+      + '<a href="' + esc((btn && btn.href) || href) + '" '
+      + 'style="flex-shrink:0;background:var(--yellow);color:var(--dark);border-radius:6px;'
+      + 'padding:5px 12px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;'
+      + 'text-decoration:none;white-space:nowrap;display:inline-block;">'
+      + esc((btn && btn.text) || 'Open') + '</a>'
+      + '</div>';
   }
 
   var html = '';
@@ -3807,15 +3815,17 @@ function renderWorklist() {
   // Applications
   if (appItems.length) {
     var statusLabel = { submitted:'Awaiting Review', file_update:'File Update', mgr_approved:'Awaiting ED Approval', returned:'Returned — Action Needed', transfer_request_submitted:'Transfer Request' };
+    var appBtnText = { submitted:'Review', file_update:'Review', mgr_approved:'Approve', returned:'Edit', transfer_request_submitted:'Review' };
     var appRows = appItems.map(function(a) {
-      var name = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
-      var lbl  = statusLabel[a.status] || a.status;
+      var name  = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
+      var lbl   = statusLabel[a.status] || a.status;
       var score = (a.score != null && a.appType !== 'existing_tenant') ? (a.score + ' pts') : '';
-      return actionRow('housing.html?openApp=' + encodeURIComponent(a.id), [
+      var btnHref = 'housing.html?openApp=' + encodeURIComponent(a.id);
+      return actionRow(btnHref, [
         { text: name, style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
         { text: lbl,  style: 'font-size:11px;color:var(--muted);width:170px;flex-shrink:0;' },
         { text: score,style: 'font-size:11px;color:var(--muted);width:55px;text-align:right;flex-shrink:0;' }
-      ]);
+      ], { text: (appBtnText[a.status] || 'Open') + ' →', href: btnHref });
     }).join('');
     var appTotal = apps.filter(function(a){ return !a.archived && (a.status==='submitted'||a.status==='mgr_approved'||a.status==='returned'); }).length;
     html += sectionWrap('📋', 'Applications', appItems.length, 'housing.html?view=worklist', appRows, Math.max(0, appTotal - appItems.length));
@@ -3825,11 +3835,12 @@ function renderWorklist() {
   if (sowItems.length) {
     var sowLabel = { pending_hm:'Awaiting HM Approval', pending_ed:'Awaiting ED Approval' };
     var sowRows = sowItems.map(function(s) {
-      return actionRow('renos.html?sow=' + encodeURIComponent(s.uid), [
+      var sowHref = 'renos.html?sow=' + encodeURIComponent(s.uid);
+      return actionRow(sowHref, [
         { text: s.addr, style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
         { text: s.pn,   style: 'font-size:11px;color:var(--muted);width:120px;flex-shrink:0;' },
         { text: sowLabel[s.status] || s.status, style: 'font-size:11px;color:var(--muted);width:160px;flex-shrink:0;' }
-      ]);
+      ], { text: 'Approve →', href: sowHref });
     }).join('');
     html += sectionWrap('🔨', 'SOWs Pending Approval', sowItems.length, 'renos.html', sowRows, 0);
   }
@@ -3837,12 +3848,13 @@ function renderWorklist() {
   // RFQs
   if (rfqItems.length) {
     var rfqRows = rfqItems.map(function(r) {
-      return actionRow('rfq.html?rfq=' + encodeURIComponent(r.id), [
+      var rfqHref = 'rfq.html?rfq=' + encodeURIComponent(r.id);
+      return actionRow(rfqHref, [
         { text: r.id,   style: 'font-size:12px;font-weight:600;width:130px;flex-shrink:0;' },
         { text: r.addr, style: 'flex:1;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
         { text: r.closes ? 'Closes ' + r.closes : '', style: 'font-size:11px;color:var(--muted);width:100px;flex-shrink:0;' },
         { text: r.recipients + ' contractor' + (r.recipients===1?'':'s'), style: 'font-size:11px;color:var(--muted);width:100px;text-align:right;flex-shrink:0;' }
-      ]);
+      ], { text: 'Award →', href: rfqHref });
     }).join('');
     html += sectionWrap('📊', 'RFQs Open for Bids', rfqItems.length, 'rfq.html', rfqRows, 0);
   }
@@ -3850,12 +3862,14 @@ function renderWorklist() {
   // Contractors
   if (ctItems.length) {
     var ctLabel = { pending_review:'Awaiting HM Verification', hm_recommended:'Awaiting ED Approval' };
+    var ctBtnText = { pending_review: 'Verify →', hm_recommended: 'Approve →' };
     var ctRows = ctItems.map(function(c) {
-      return actionRow('contractors.html?openContractor=' + encodeURIComponent(c.id), [
+      var ctHref = 'contractors.html?openContractor=' + encodeURIComponent(c.id);
+      return actionRow(ctHref, [
         { text: c.name,  style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
         { text: c.trade, style: 'font-size:11px;color:var(--muted);width:120px;flex-shrink:0;' },
         { text: ctLabel[c.status] || c.status, style: 'font-size:11px;color:var(--muted);width:160px;flex-shrink:0;' }
-      ]);
+      ], { text: ctBtnText[c.status] || 'Review →', href: ctHref });
     }).join('');
     html += sectionWrap('👷', 'Contractors Pending Review', ctItems.length, 'contractors.html', ctRows, 0);
   }
@@ -3870,7 +3884,7 @@ function renderWorklist() {
         { text: name,  style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
         { text: score, style: 'font-size:11px;color:var(--muted);width:60px;flex-shrink:0;' },
         { text: tier,  style: 'font-size:11px;color:var(--muted);width:100px;text-align:right;flex-shrink:0;' }
-      ]);
+      ], { text: 'Match →', href: 'housing.html?view=match' });
     }).join('');
     html += sectionWrap('🏠', 'Ready to Match', matchItems.length, 'housing.html?view=match', matchRows, 0);
   }
