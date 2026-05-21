@@ -3943,13 +3943,23 @@ function renderWorklist() {
   if (sowItems.length) {
     var sowStatusLabel = { '':'Awaiting HM Review', draft:'Awaiting HM Review', signed:'Signed — Awaiting HM', submitted:'Awaiting HM Review', hm_approved:'HM Approved — Awaiting ED' };
     var sowRows = sowItems.map(function(s) {
-      var sowHref = 'renos.html?sow=' + encodeURIComponent(s.uid);
-      var btnText = s.status === 'hm_approved' ? 'Final Approve →' : 'Review →';
-      return actionRow(sowHref, [
-        { text: s.addr, style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
-        { text: s.pn || '—', style: 'font-size:11px;color:var(--muted);width:120px;flex-shrink:0;' },
-        { text: sowStatusLabel[s.status] || 'Awaiting Review', style: 'font-size:11px;color:var(--muted);width:180px;flex-shrink:0;' }
-      ], { text: btnText, href: sowHref });
+      // Open the SOW modal in-place on the current page when possible (housing.html
+      // has openSowModal); fall back to navigating to renos.html only when needed.
+      var btnText  = s.status === 'hm_approved' ? 'Final Approve' : 'Approve';
+      var openCall = 'if(typeof openSowModal===\'function\'){openSowModal(\''
+                   + escapeHtml(s.uid).replace(/'/g, "\\'") + '\');}'
+                   + 'else{window.location.href=\'renos.html?sow=' + encodeURIComponent(s.uid) + '\';}';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid var(--border);background:var(--surface);" '
+        + 'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'var(--surface)\'">'
+        + '<div onclick="' + openCall + '" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;">'
+        +   '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(s.addr) + '</span>'
+        +   '<span style="font-size:11px;color:var(--muted);width:120px;flex-shrink:0;">' + escapeHtml(s.pn || '—') + '</span>'
+        +   '<span style="font-size:11px;color:var(--muted);width:180px;flex-shrink:0;">' + escapeHtml(sowStatusLabel[s.status] || 'Awaiting Review') + '</span>'
+        + '</div>'
+        + '<button onclick="' + openCall + '" style="flex-shrink:0;background:var(--yellow);color:var(--dark);border:none;border-radius:6px;'
+        +   'padding:5px 12px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;">'
+        +   escapeHtml(btnText) + '</button>'
+        + '</div>';
     }).join('');
     html += sectionWrap('🔨', 'Renovations Waiting Approval', sowItems.length, 'renos.html', sowRows, 0);
   }
@@ -3974,12 +3984,20 @@ function renderWorklist() {
     var ctStatusLabel = { pending_review:'Awaiting HM Verification', hm_recommended:'HM Verified — Awaiting ED' };
     var ctBtnText     = { pending_review:'Verify →', hm_recommended:'Approve →' };
     var ctRows = ctItems.map(function(c) {
-      var ctHref = 'contractors.html?openContractor=' + encodeURIComponent(c.id);
-      return actionRow(ctHref, [
-        { text: c.name,  style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
-        { text: c.trade, style: 'font-size:11px;color:var(--muted);width:120px;flex-shrink:0;' },
-        { text: ctStatusLabel[c.status] || c.status, style: 'font-size:11px;color:var(--muted);width:180px;flex-shrink:0;' }
-      ], { text: ctBtnText[c.status] || 'Review →', href: ctHref });
+      // Set nav referrer so contractors.html back-button returns here
+      var ctNav = 'if(typeof setNavReferrer===\'function\')setNavReferrer(\'home\');'
+                + 'window.location.href=\'contractors.html?openContractor=' + encodeURIComponent(c.id) + '\';';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid var(--border);background:var(--surface);" '
+        + 'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'var(--surface)\'">'
+        + '<div onclick="' + ctNav + '" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;">'
+        +   '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(c.name) + '</span>'
+        +   '<span style="font-size:11px;color:var(--muted);width:120px;flex-shrink:0;">' + escapeHtml(c.trade) + '</span>'
+        +   '<span style="font-size:11px;color:var(--muted);width:180px;flex-shrink:0;">' + escapeHtml(ctStatusLabel[c.status] || c.status) + '</span>'
+        + '</div>'
+        + '<button onclick="' + ctNav + '" style="flex-shrink:0;background:var(--yellow);color:var(--dark);border:none;border-radius:6px;'
+        +   'padding:5px 12px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;">'
+        +   escapeHtml(ctBtnText[c.status] || 'Review') + '</button>'
+        + '</div>';
     }).join('');
     html += sectionWrap('👷', 'Contractors Waiting Approval', ctItems.length, 'contractors.html', ctRows, 0);
   }

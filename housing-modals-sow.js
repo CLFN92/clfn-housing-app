@@ -187,6 +187,7 @@ function _buildSowModalHTML() {
           '<div class="sow-pn-row"><span class="sow-pn-lbl">Project #</span><span id="sow_project_number_label" class="sow-pn-val"></span></div>' +
         '</div>' +
         '<div class="sow-hdr-actions">' +
+          '<button id="sow_approve_btn" type="button" onclick="sowApproveInline()" class="sow-hdr-btn-success" style="display:none;">✓ Approve</button>' +
           '<button id="sow_mark_complete_btn" type="button" onclick="markSowComplete()" class="sow-hdr-btn-success" style="display:none;">✓ Mark Complete</button>' +
           '<button id="sow_reopen_btn" type="button" onclick="reopenSow()" class="sow-hdr-btn-warn" style="display:none;">↺ Reopen</button>' +
           '<button id="sow_archive_btn" type="button" onclick="archiveCurrentSow()" class="sow-hdr-btn-ghost" style="display:none;">🗄 Archive</button>' +
@@ -747,6 +748,27 @@ function _applySowModalLock(sow){
   var banner = document.getElementById('sow_readonly_banner');
   if(banner) banner.style.display = readOnly ? 'block' : 'none';
 
+  // Inline Approve button — shown when the current user has approval authority
+  // and the SOW is in a state that requires their specific action.
+  var apBtn = document.getElementById('sow_approve_btn');
+  if (apBtn) {
+    var _aRole   = window._realRole || window.currentRole || '';
+    var _canHm   = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('approveSowUnderThreshold', _aRole);
+    var _canEd   = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('approveSowOverThreshold', _aRole);
+    var _sowSt   = sow ? (sow.approval_status || '') : '';
+    var _hasPn   = !!(sow && sow.project_number);
+    var _hasItems= !!(sow && sow.items && sow.items.length);
+    // HM sees button when SOW is unreviewed (not yet hm_approved or higher)
+    var _showHm  = _canHm && !_canEd && _hasPn && _hasItems && !completed &&
+                   (_sowSt === '' || _sowSt === 'draft' || _sowSt === 'signed' || _sowSt === 'submitted');
+    // ED sees button when SOW is at hm_approved (needs ED final) or unreviewed (ED can act direct)
+    var _showEd  = _canEd && _hasPn && _hasItems && !completed &&
+                   (_sowSt === 'hm_approved' || _sowSt === '' || _sowSt === 'draft' || _sowSt === 'signed');
+    var _showAp  = _showHm || _showEd;
+    apBtn.style.display = _showAp ? 'flex' : 'none';
+    apBtn.textContent   = (_sowSt === 'hm_approved') ? '✓ Final Approve' : '✓ Approve';
+  }
+
   // Mark Complete button: only show when SOW is NOT completed AND viewer is HM or ED AND there's a unit/saved SOW.
   var mcBtn = document.getElementById('sow_mark_complete_btn');
   if(mcBtn){
@@ -816,6 +838,39 @@ function _applySowModalLock(sow){
       c.style.opacity = readOnly ? '0.55' : '';
     });
   }
+}
+
+// Inline approval from the SOW modal header — used when HM or ED opens a SOW
+// directly (e.g. from the landing-page worklist) and wants to approve without
+// navigating to the Renos Approvals page.
+function sowApproveInline() {
+  var role   = window._realRole || window.currentRole || '';
+  var canHm  = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role);
+  var canEd  = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('approveSowOverThreshold', role);
+  if (!canHm && !canEd) { if (typeof showToast === 'function') showToast('You do not have SOW approval authority.'); return; }
+
+  var approver = canEd ? 'ed' : 'hm';
+  var today    = new Date().toISOString().split('T')[0];
+  var staffName = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.name) || role;
+
+  var title   = approver === 'ed' ? 'Grant ED Final Approval?' : 'Approve as Housing Manager?';
+  var message = approver === 'ed'
+    ? 'This will record your ED approval on this Scope of Work.'
+    : 'This will record your HM approval and forward the SOW to the Executive Director for final approval.';
+
+  if (typeof showConfirm !== 'function') return;
+  showConfirm({ title: title, message: message, confirmText: 'Approve', danger: false }).then(function(ok) {
+    if (!ok) return;
+    // Set the appropriate approval fields (picked up by saveSOW → approval_status logic)
+    var nmId  = approver === 'ed' ? 'sow_ed_name' : 'sow_hm_name';
+    var dtId  = approver === 'ed' ? 'sow_ed_date' : 'sow_hm_date';
+    var nmEl  = document.getElementById(nmId);
+    var dtEl  = document.getElementById(dtId);
+    if (nmEl) nmEl.value = staffName;
+    if (dtEl) dtEl.value = today;
+    // Trigger save — the save flow detects the approval fields and sets approval_status
+    if (typeof sowSaveClicked === 'function') sowSaveClicked();
+  });
 }
 
 function markSowComplete(){
