@@ -1270,12 +1270,19 @@ async function renderRecentActivity(role) {
   var el = document.getElementById('emp_recent_activity');
   if(!el) return;
 
-  // Load from Supabase if we don't already have entries in memory
+  var myEmail = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.email : '') || '';
+  var myName  = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.name  : '') || '';
+
+  // ── Load activity scoped to the current user ──────────────────────────────
+  // The in-memory auditLog[] is already per-session (only this user's actions
+  // from the current page load). When loading from Supabase use the user-scoped
+  // query so one HM/ED does not see another's recent activity.
   var log = (typeof auditLog !== 'undefined' && auditLog && auditLog.length) ? auditLog.slice() : [];
-  if(!log.length && typeof sbLoadAuditLog === 'function') {
+  if(!log.length) {
     el.innerHTML = '<div style="color:var(--muted);font-style:italic;font-size:13px;">Loading activity…</div>';
     try {
-      var loaded = await sbLoadAuditLog(200);
+      var loader = (typeof sbLoadMyRecentActivity === 'function') ? sbLoadMyRecentActivity : sbLoadAuditLog;
+      var loaded = await loader(150);
       if(Array.isArray(loaded)) {
         log = loaded;
         if(typeof auditLog !== 'undefined') { try { auditLog = loaded.slice(); } catch(e){} }
@@ -1283,17 +1290,29 @@ async function renderRecentActivity(role) {
     } catch(e) { console.warn('[RECENT ACTIVITY] load failed:', e); }
   }
 
+  // ── Per-user filter: only show entries that belong to the current user ────
+  // New entries store email in actor; legacy entries store the role string.
+  // For legacy entries, fall back to name matching when available.
+  function isMyEntry(e) {
+    if (!myEmail && !myName) return true; // no identity — show all (shouldn't happen post-login)
+    if (e.user && e.user === myEmail) return true;  // email match (new entries)
+    if (e.name && myName && e.name === myName) return true; // name match (legacy entries)
+    // Legacy entries with only a role string — include only if from in-memory log
+    // (which is per-session). Supabase-loaded role-string entries are ambiguous;
+    // exclude them to prevent showing another user's actions.
+    if (!myEmail && e.user && e.user.indexOf('@') === -1 && e.name === myName) return true;
+    return false;
+  }
+
   var apps  = (typeof applications !== 'undefined') ? applications : [];
   var units = (typeof housingUnits  !== 'undefined') ? housingUnits  : [];
 
-  // ── Define which events each role sees ─────────────────────────────────────
+  // ── Action-type filters (what kinds of actions are relevant per role) ──────
   var roleFilters = {
     employee: function(e) {
-      // Employees see only their own submissions, draft saves, and signatures
       return ['application_submitted','file_update_submitted','draft_saved','signature_captured'].indexOf(e.action) >= 0;
     },
     housing_manager: function(e) {
-      // HM sees submissions awaiting action, approvals, unit edits, SOW events, reno updates
       return ['application_submitted','file_update_submitted','status_change','status',
               'hm_approved','sow_created','sow_updated','sow_hm_approval','sow_tenant_signed',
               'sow_staff_signed','sow_accountability','unit_edit',
@@ -1302,13 +1321,12 @@ async function renderRecentActivity(role) {
               'settings_budget_save','settings_user_add','settings_user_remove'].indexOf(e.action) >= 0;
     },
     ed: function(e) {
-      // ED sees everything except raw draft saves and individual signature captures
       return e.action !== 'draft_saved' && e.action !== 'signature_captured' && e.action !== 'settings_saved';
     }
   };
 
   var filterFn = roleFilters[role] || roleFilters.employee;
-  var filtered = log.filter(filterFn).slice(0, 40); // more entries since we group them
+  var filtered = log.filter(function(e){ return filterFn(e) && isMyEntry(e); }).slice(0, 40);
 
   if(!filtered.length) {
     el.innerHTML = '<div style="color:var(--muted);font-style:italic;font-size:13px;">No recent activity yet.</div>';

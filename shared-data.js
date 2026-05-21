@@ -636,6 +636,20 @@ async function sbSaveAllUnits(units) {
 }
 
 // ── sbLoadAuditLog ────────────────────────────────────────────────────────────
+function _parseAuditRow(row) {
+  var d = (typeof row.detail === 'object' ? row.detail : null)
+       || (function() { try { return JSON.parse(row.detail || '{}'); } catch(e) { return {}; } })();
+  return {
+    ts:     row.created_at,
+    appId:  row.entity_id,
+    action: row.action,
+    detail: d.detail || d.summary || '',
+    user:   row.actor,
+    name:   d.name || ''   // display name stored in detail JSON by auditEntry()
+  };
+}
+
+// Full audit log load — used by Settings → Audit Log. No user filter.
 async function sbLoadAuditLog(limit) {
   try {
     var r = await fetch(
@@ -643,20 +657,27 @@ async function sbLoadAuditLog(limit) {
       { headers: HOUSING_HEADERS }
     );
     if (!r.ok) return null;
-    var data = await r.json();
-    return data.map(function(row) {
-      var d = (typeof row.detail === 'object' ? row.detail : null)
-           || (function() { try { return JSON.parse(row.detail || '{}'); } catch(e) { return {}; } })();
-      return {
-        ts:     row.created_at,
-        appId:  row.entity_id,
-        action: row.action,
-        detail: d.detail || d.summary || '',
-        user:   row.actor
-      };
-    });
+    return (await r.json()).map(_parseAuditRow);
   } catch(e) {
     console.warn('[SB] load audit log failed:', e);
+    return null;
+  }
+}
+
+// User-scoped load for Recent Activity — filters by the current user's email
+// (stored in actor column for entries created after this fix). Falls back to
+// a broader fetch when no email is available (e.g. legacy role-string entries).
+async function sbLoadMyRecentActivity(limit) {
+  var email = (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || '';
+  try {
+    var qs = email
+      ? '?select=*&actor=eq.' + encodeURIComponent(email) + '&order=created_at.desc&limit=' + (limit || 100)
+      : '?select=*&order=created_at.desc&limit=' + (limit || 100);
+    var r = await fetch(SUPABASE_URL + '/rest/v1/housing_audit_log' + qs, { headers: HOUSING_HEADERS });
+    if (!r.ok) return null;
+    return (await r.json()).map(_parseAuditRow);
+  } catch(e) {
+    console.warn('[SB] load recent activity failed:', e);
     return null;
   }
 }
@@ -1016,7 +1037,11 @@ function sbLookupRFQs(q) {
 //   'SETTINGS'      → 'settings'
 //   anything else   → 'application'
 function auditEntry(appId, action, detail, user) {
-  var actor = user || window.currentRole || 'Staff';
+  // Store the logged-in user's email as the actor so entries can be filtered
+  // per-user. Multiple HMs / EDs are common — role strings alone don't identify
+  // who took the action. Fall back to role string for unauthenticated submissions.
+  var actorEmail = (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || '';
+  var actor = actorEmail || user || window.currentRole || 'Staff';
   var actorName = (window.HOUSING_SESSION && window.HOUSING_SESSION.name) || '';
   // Applicant submissions on housing.html happen before HOUSING_SESSION.name
   // is populated for them — fall back to whatever the applicant typed into the
