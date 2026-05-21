@@ -1167,6 +1167,7 @@ window.archiveCurrentSow = function(){
     // Refresh whichever upstream view is in the DOM.
     if(typeof renderRenoApprovalsView === 'function' && document.getElementById('ra_tbody')) renderRenoApprovalsView();
     if(typeof udpRenderSowTable === 'function' && document.getElementById('udp_sow_table_wrap')) udpRenderSowTable(unitId);
+    if(typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
   });
 };
 

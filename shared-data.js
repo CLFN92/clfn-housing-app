@@ -3732,10 +3732,9 @@ function renderWorklist() {
     Object.keys(sowCache).forEach(function(uid) {
       var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
       list.forEach(function(sow) {
-        if (!sow) return;
+        if (!sow || sow.archived) return;              // skip archived drafts
         var status = sow.approval_status || '';
-        if (status && status !== 'draft') return; // submitted/approved/etc. — skip
-        // Match by preparedBy name (email not stored on SOW)
+        if (status && status !== 'draft') return;       // skip submitted/approved
         var prep = (sow.preparedBy || sow.prepared_by || '').trim();
         if (!prep || (myName && prep !== myName)) return;
         var u = sowUnits.find(function(x){ return x && x.id === uid; });
@@ -3839,6 +3838,44 @@ function renderWorklist() {
     }).slice(0, 6);
   }
 
+  // ── Inline archive helpers (exposed on window so onclick can reach them) ──
+  window._wlArchiveSow = function(uid, pn) {
+    if (typeof showConfirm !== 'function') return;
+    showConfirm({ title: 'Archive this SOW draft?', message: 'Project ' + pn + ' will be hidden. You can restore it from the Unit Detail Panel.', confirmText: 'Archive' }).then(function(ok) {
+      if (!ok) return;
+      if (typeof archiveSow === 'function') archiveSow(uid, pn, window.currentRole || 'staff');
+      if (typeof auditEntry === 'function') auditEntry('SOW:'+uid, 'sow_archived', 'SOW '+pn+' archived from worklist', window.currentRole||'staff');
+      renderWorklist();
+    });
+  };
+  window._wlArchiveApp = function(appId) {
+    if (typeof showConfirm !== 'function') return;
+    var apps2 = (typeof applications !== 'undefined' && applications) ? applications : [];
+    var app = apps2.find(function(a){ return a && a.id === appId; });
+    var name = app ? (((app.fn||'') + ' ' + (app.ln||'')).trim() || appId) : appId;
+    showConfirm({ title: 'Archive this draft application?', message: name + ' will be archived and removed from your worklist.', confirmText: 'Archive' }).then(function(ok) {
+      if (!ok) return;
+      if (app) { app.archived = true; if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(app); }
+      renderWorklist();
+    });
+  };
+  window._wlCancelRfq = function(rfqId) {
+    if (typeof showConfirm !== 'function') return;
+    showConfirm({ title: 'Cancel this draft RFQ?', message: rfqId + ' will be cancelled and removed from your worklist.', confirmText: 'Cancel RFQ', danger: true }).then(function(ok) {
+      if (!ok) return;
+      var rfqCache2 = window._rfqCache || {};
+      var rfq = rfqCache2[rfqId];
+      if (rfq) {
+        rfq.status = 'cancelled';
+        fetch(SUPABASE_URL + '/rest/v1/housing_rfq?id=eq.' + encodeURIComponent(rfqId), {
+          method: 'PATCH', headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'return=minimal'}),
+          body: JSON.stringify({ status: 'cancelled' })
+        }).catch(function(e){ console.warn('[wl rfq cancel]', e); });
+      }
+      renderWorklist();
+    });
+  };
+
   // ── Count + empty state ───────────────────────────────────────────────────
   var draftTotal = draftApps.length + draftSows.length + draftRfqs.length;
   var total = appItems.length + sowItems.length + rfqItems.length + ctItems.length + matchItems.length + draftTotal;
@@ -3892,30 +3929,43 @@ function renderWorklist() {
 
   var html = '';
 
+  // Draft row with Continue + Archive buttons
+  function draftRow(info, continueHref, continueOnclick, archiveOnclick) {
+    var openAction = continueOnclick
+      ? 'onclick="' + continueOnclick + '"'
+      : 'href="' + esc(continueHref) + '"';
+    return '<div style="display:flex;align-items:center;gap:6px;padding:9px 14px;border-top:1px solid var(--border);background:var(--surface);" '
+      + 'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'var(--surface)\'">'
+      + '<a ' + openAction + ' style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-decoration:none;color:inherit;">'
+      + info
+      + '</a>'
+      + '<a ' + openAction + ' style="flex-shrink:0;background:var(--yellow);color:var(--dark);border-radius:6px;padding:5px 11px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;white-space:nowrap;cursor:pointer;display:inline-block;">Continue &#8594;</a>'
+      + '<button onclick="' + archiveOnclick + '" style="flex-shrink:0;background:none;border:1px solid var(--border);border-radius:6px;padding:5px 11px;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--muted);cursor:pointer;white-space:nowrap;" title="Archive">&#128228; Archive</button>'
+      + '</div>';
+  }
+
   // My Drafts — in-progress items the current user hasn't submitted yet
   if (draftTotal > 0) {
     var draftRows = '';
     draftApps.forEach(function(a) {
       var name = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
-      draftRows += actionRow('housing.html?openApp=' + encodeURIComponent(a.id), [
-        { text: name,          style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
-        { text: 'Application', style: 'font-size:11px;color:var(--muted);width:100px;flex-shrink:0;' },
-        { text: 'Draft',       style: 'font-size:11px;color:var(--muted);width:60px;text-align:right;flex-shrink:0;font-style:italic;' }
-      ], { text: 'Continue →', href: 'housing.html?openApp=' + encodeURIComponent(a.id) });
+      var info = '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(name) + '</span>'
+               + '<span style="font-size:11px;color:var(--muted);width:100px;flex-shrink:0;">Application</span>'
+               + '<span style="font-size:11px;color:var(--muted);width:50px;text-align:right;flex-shrink:0;font-style:italic;">Draft</span>';
+      draftRows += draftRow(info, 'housing.html?openApp=' + encodeURIComponent(a.id), null, '_wlArchiveApp(\'' + esc(a.id).replace(/'/g,"\\'") + '\')');
     });
     draftSows.forEach(function(s) {
-      draftRows += actionRow('renos.html?sow=' + encodeURIComponent(s.uid), [
-        { text: s.addr,  style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
-        { text: s.pn || 'SOW', style: 'font-size:11px;color:var(--muted);width:100px;flex-shrink:0;' },
-        { text: 'Draft', style: 'font-size:11px;color:var(--muted);width:60px;text-align:right;flex-shrink:0;font-style:italic;' }
-      ], { text: 'Continue →', href: 'renos.html?sow=' + encodeURIComponent(s.uid) });
+      var sowOpen = 'if(typeof openSowModal===\'function\'){openSowModal(\'' + esc(s.uid).replace(/'/g,"\\'") + '\');}else{window.location.href=\'renos.html?sow=' + encodeURIComponent(s.uid) + '\';}';
+      var info = '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(s.addr) + '</span>'
+               + '<span style="font-size:11px;color:var(--muted);width:100px;flex-shrink:0;">' + esc(s.pn || 'SOW') + '</span>'
+               + '<span style="font-size:11px;color:var(--muted);width:50px;text-align:right;flex-shrink:0;font-style:italic;">Draft</span>';
+      draftRows += draftRow(info, null, sowOpen, '_wlArchiveSow(\'' + esc(s.uid).replace(/'/g,"\\'") + '\',\'' + esc(s.pn).replace(/'/g,"\\'") + '\')');
     });
     draftRfqs.forEach(function(r) {
-      draftRows += actionRow('rfq.html?rfq=' + encodeURIComponent(r.id), [
-        { text: r.id,    style: 'font-size:12px;font-weight:600;width:130px;flex-shrink:0;' },
-        { text: r.addr,  style: 'flex:1;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
-        { text: 'Draft', style: 'font-size:11px;color:var(--muted);width:60px;text-align:right;flex-shrink:0;font-style:italic;' }
-      ], { text: 'Continue →', href: 'rfq.html?rfq=' + encodeURIComponent(r.id) });
+      var info = '<span style="font-size:12px;font-weight:600;width:130px;flex-shrink:0;">' + esc(r.id) + '</span>'
+               + '<span style="flex:1;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(r.addr) + '</span>'
+               + '<span style="font-size:11px;color:var(--muted);width:50px;text-align:right;flex-shrink:0;font-style:italic;">Draft</span>';
+      draftRows += draftRow(info, 'rfq.html?rfq=' + encodeURIComponent(r.id), null, '_wlCancelRfq(\'' + esc(r.id).replace(/'/g,"\\'") + '\')');
     });
     html += sectionWrap('✏️', 'My Drafts', draftTotal, '', draftRows, 0);
   }
