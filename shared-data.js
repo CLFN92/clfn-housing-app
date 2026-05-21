@@ -939,10 +939,11 @@ function sbLookupTenants(q) {
     var name = ((a.fn || '') + ' ' + (a.ln || '')).trim();
     var hay  = (name + ' ' + (a.id || '') + ' ' + (a.email || '') + ' ' + (a.phone || '')).toLowerCase();
     if (hay.indexOf(q) === -1) continue;
+    var statusDisplay = a.status === 'draft' ? '✏️ Draft' : (a.status || '');
     out.push({
       id:    a.id,
       label: name || a.id,
-      meta:  (a.id || '') + (a.status ? ' · ' + a.status : '') + (a.tier ? ' · ' + a.tier : '')
+      meta:  (a.id || '') + (statusDisplay ? ' · ' + statusDisplay : '') + (a.tier ? ' · ' + a.tier : '')
     });
   }
   return out;
@@ -3713,8 +3714,54 @@ function renderWorklist() {
   var isManagement = typeof ROLE !== 'undefined' && ROLE.isManagement(role);
   var canFinal     = typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('finalApproveApp', role);
 
+  var myName = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.name : '') || '';
+  var apps   = (typeof applications !== 'undefined' && applications) ? applications : [];
+
+  // ── 0. My Drafts — items the current user started but hasn't submitted ───
+  // Shown for ALL roles so an employee, HM, or ED can find and continue
+  // their own in-progress work without navigating to another page.
+  var draftApps = apps.filter(function(a) {
+    if (!a || a.archived) return false;
+    return (a.created_by_email || '').toLowerCase() === email && a.status === 'draft';
+  }).slice(0, 8);
+
+  var draftSows = [];
+  if (email || myName) {
+    var sowCache = window._sowCache || {};
+    var sowUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
+    Object.keys(sowCache).forEach(function(uid) {
+      var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
+      list.forEach(function(sow) {
+        if (!sow) return;
+        var status = sow.approval_status || '';
+        if (status && status !== 'draft') return; // submitted/approved/etc. — skip
+        // Match by preparedBy name (email not stored on SOW)
+        var prep = (sow.preparedBy || sow.prepared_by || '').trim();
+        if (!prep || (myName && prep !== myName)) return;
+        var u = sowUnits.find(function(x){ return x && x.id === uid; });
+        var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : uid;
+        draftSows.push({ uid: uid, pn: sow.project_number || '', addr: addr });
+      });
+    });
+    draftSows = draftSows.slice(0, 6);
+  }
+
+  var draftRfqs = [];
+  if (email) {
+    var rfqCache = window._rfqCache || {};
+    var rfqUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
+    Object.keys(rfqCache).forEach(function(rfqId) {
+      var rfq = rfqCache[rfqId];
+      if (!rfq || rfq.status !== 'draft') return;
+      if ((rfq.created_by || '').toLowerCase() !== email) return;
+      var u = rfqUnits.find(function(x){ return x && x.id === rfq.sow_unit_id; });
+      var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : (rfq.sow_unit_id||'');
+      draftRfqs.push({ id: rfqId, addr: addr });
+    });
+    draftRfqs = draftRfqs.slice(0, 6);
+  }
+
   // ── 1. Applications requiring action ────────────────────────────────────
-  var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
   var appItems = apps.filter(function(a) {
     if (!a || a.archived) return false;
     var owner = (a.created_by_email || '').toLowerCase();
@@ -3786,7 +3833,8 @@ function renderWorklist() {
   }
 
   // ── Count + empty state ───────────────────────────────────────────────────
-  var total = appItems.length + sowItems.length + rfqItems.length + ctItems.length + matchItems.length;
+  var draftTotal = draftApps.length + draftSows.length + draftRfqs.length;
+  var total = appItems.length + sowItems.length + rfqItems.length + ctItems.length + matchItems.length + draftTotal;
   var pill = document.getElementById('worklist_count_pill'); if (pill) pill.textContent = total;
   var qa   = document.getElementById('qa_pending_count');   if (qa) qa.textContent = total;
 
@@ -3836,6 +3884,34 @@ function renderWorklist() {
   }
 
   var html = '';
+
+  // My Drafts — in-progress items the current user hasn't submitted yet
+  if (draftTotal > 0) {
+    var draftRows = '';
+    draftApps.forEach(function(a) {
+      var name = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
+      draftRows += actionRow('housing.html?openApp=' + encodeURIComponent(a.id), [
+        { text: name,          style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
+        { text: 'Application', style: 'font-size:11px;color:var(--muted);width:100px;flex-shrink:0;' },
+        { text: 'Draft',       style: 'font-size:11px;color:var(--muted);width:60px;text-align:right;flex-shrink:0;font-style:italic;' }
+      ], { text: 'Continue →', href: 'housing.html?openApp=' + encodeURIComponent(a.id) });
+    });
+    draftSows.forEach(function(s) {
+      draftRows += actionRow('renos.html?sow=' + encodeURIComponent(s.uid), [
+        { text: s.addr,  style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
+        { text: s.pn || 'SOW', style: 'font-size:11px;color:var(--muted);width:100px;flex-shrink:0;' },
+        { text: 'Draft', style: 'font-size:11px;color:var(--muted);width:60px;text-align:right;flex-shrink:0;font-style:italic;' }
+      ], { text: 'Continue →', href: 'renos.html?sow=' + encodeURIComponent(s.uid) });
+    });
+    draftRfqs.forEach(function(r) {
+      draftRows += actionRow('rfq.html?rfq=' + encodeURIComponent(r.id), [
+        { text: r.id,    style: 'font-size:12px;font-weight:600;width:130px;flex-shrink:0;' },
+        { text: r.addr,  style: 'flex:1;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
+        { text: 'Draft', style: 'font-size:11px;color:var(--muted);width:60px;text-align:right;flex-shrink:0;font-style:italic;' }
+      ], { text: 'Continue →', href: 'rfq.html?rfq=' + encodeURIComponent(r.id) });
+    });
+    html += sectionWrap('✏️', 'My Drafts', draftTotal, '', draftRows, 0);
+  }
 
   // Applications
   if (appItems.length) {
