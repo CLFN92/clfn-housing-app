@@ -3772,21 +3772,27 @@ function renderWorklist() {
   }).slice(0, 10);
 
   // ── 2. SOWs pending approval ─────────────────────────────────────────────
+  // ── 2. SOWs awaiting the logged-in user's approval ──────────────────────
+  // Stored approval_status values: ''/'draft'/'signed' = needs HM review,
+  // 'hm_approved' = needs ED final approval. 'ed_approved'/'completed' = done.
   var sowItems = [];
   if (isManagement) {
-    var sowCache = window._sowCache || {};
-    var units = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
-    Object.keys(sowCache).forEach(function(uid) {
+    var sowCache2 = window._sowCache || {};
+    var sowUnitsAll = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
+    Object.keys(sowCache2).forEach(function(uid) {
       var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
       list.forEach(function(sow) {
-        if (!sow || !sow.approval_status) return;
-        var needsHm = sow.approval_status === 'pending_hm';
-        var needsEd = sow.approval_status === 'pending_ed';
+        if (!sow || !sow.items || !sow.items.length) return; // no content
+        var status = sow.approval_status || '';
+        if (status === 'ed_approved' || status === 'completed') return; // already done
+        // HM sees SOWs not yet HM-approved (needs their review)
+        var needsHm = !canFinal && (status === '' || status === 'draft' || status === 'signed' || status === 'submitted');
+        // ED sees SOWs at HM-approved stage (needs ED final), or earlier (ED can act directly)
+        var needsEd = canFinal && (status === 'hm_approved' || status === '' || status === 'draft' || status === 'signed');
         if (!needsHm && !needsEd) return;
-        if (needsEd && !canFinal) return;
-        var u = units.find(function(x){ return x && x.id === uid; });
+        var u = sowUnitsAll.find(function(x){ return x && x.id === uid; });
         var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : uid;
-        sowItems.push({ uid: uid, pn: sow.project_number || '', addr: addr, status: sow.approval_status });
+        sowItems.push({ uid: uid, pn: sow.project_number || '', addr: addr, status: status });
       });
     });
     sowItems = sowItems.slice(0, 8);
@@ -3808,16 +3814,17 @@ function renderWorklist() {
     rfqItems = rfqItems.slice(0, 6);
   }
 
-  // ── 4. Contractors pending review ────────────────────────────────────────
+  // ── 4. Contractors awaiting the logged-in user's approval ────────────────
+  // Contractor status values: 'pending_review' = needs HM verification,
+  // 'hm_recommended' = needs ED approval.
   var ctItems = [];
   if (isManagement) {
     var cts = window._contractors || [];
     cts.forEach(function(ct) {
       if (!ct) return;
-      var needsHm = ct.status === 'pending_review';
-      var needsEd = ct.status === 'hm_recommended';
+      var needsHm = !canFinal && ct.status === 'pending_review';
+      var needsEd = canFinal && (ct.status === 'hm_recommended' || ct.status === 'pending_review');
       if (!needsHm && !needsEd) return;
-      if (needsEd && !canFinal) return;
       ctItems.push({ id: ct.id, name: ct.name || ct.id, trade: ct.trade || '', status: ct.status });
     });
     ctItems = ctItems.slice(0, 6);
@@ -3934,16 +3941,17 @@ function renderWorklist() {
 
   // SOWs
   if (sowItems.length) {
-    var sowLabel = { pending_hm:'Awaiting HM Approval', pending_ed:'Awaiting ED Approval' };
+    var sowStatusLabel = { '':'Awaiting HM Review', draft:'Awaiting HM Review', signed:'Signed — Awaiting HM', submitted:'Awaiting HM Review', hm_approved:'HM Approved — Awaiting ED' };
     var sowRows = sowItems.map(function(s) {
       var sowHref = 'renos.html?sow=' + encodeURIComponent(s.uid);
+      var btnText = s.status === 'hm_approved' ? 'Final Approve →' : 'Review →';
       return actionRow(sowHref, [
         { text: s.addr, style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
-        { text: s.pn,   style: 'font-size:11px;color:var(--muted);width:120px;flex-shrink:0;' },
-        { text: sowLabel[s.status] || s.status, style: 'font-size:11px;color:var(--muted);width:160px;flex-shrink:0;' }
-      ], { text: 'Approve →', href: sowHref });
+        { text: s.pn || '—', style: 'font-size:11px;color:var(--muted);width:120px;flex-shrink:0;' },
+        { text: sowStatusLabel[s.status] || 'Awaiting Review', style: 'font-size:11px;color:var(--muted);width:180px;flex-shrink:0;' }
+      ], { text: btnText, href: sowHref });
     }).join('');
-    html += sectionWrap('🔨', 'SOWs Pending Approval', sowItems.length, 'renos.html', sowRows, 0);
+    html += sectionWrap('🔨', 'Renovations Waiting Approval', sowItems.length, 'renos.html', sowRows, 0);
   }
 
   // RFQs
@@ -3963,16 +3971,17 @@ function renderWorklist() {
   // Contractors
   if (ctItems.length) {
     var ctLabel = { pending_review:'Awaiting HM Verification', hm_recommended:'Awaiting ED Approval' };
-    var ctBtnText = { pending_review: 'Verify →', hm_recommended: 'Approve →' };
+    var ctStatusLabel = { pending_review:'Awaiting HM Verification', hm_recommended:'HM Verified — Awaiting ED' };
+    var ctBtnText     = { pending_review:'Verify →', hm_recommended:'Approve →' };
     var ctRows = ctItems.map(function(c) {
       var ctHref = 'contractors.html?openContractor=' + encodeURIComponent(c.id);
       return actionRow(ctHref, [
         { text: c.name,  style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
         { text: c.trade, style: 'font-size:11px;color:var(--muted);width:120px;flex-shrink:0;' },
-        { text: ctLabel[c.status] || c.status, style: 'font-size:11px;color:var(--muted);width:160px;flex-shrink:0;' }
+        { text: ctStatusLabel[c.status] || c.status, style: 'font-size:11px;color:var(--muted);width:180px;flex-shrink:0;' }
       ], { text: ctBtnText[c.status] || 'Review →', href: ctHref });
     }).join('');
-    html += sectionWrap('👷', 'Contractors Pending Review', ctItems.length, 'contractors.html', ctRows, 0);
+    html += sectionWrap('👷', 'Contractors Waiting Approval', ctItems.length, 'contractors.html', ctRows, 0);
   }
 
   // Match queue
