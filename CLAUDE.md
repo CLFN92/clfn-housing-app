@@ -39,7 +39,7 @@ Order matters: later files reference globals (`SUPABASE_URL`, `HOUSING_SESSION`,
 
 - `shared-config.js` — Supabase URL/anon key, `ROLE` enum, `APP_STATUS` enum, `CLFN_MODULES` (per-nation feature flags), `NATION_CONFIG`
 - `shared-auth.js` — `CLFN_AUTH` state object, `HOUSING_SESSION`, `HOUSING_HEADERS`, `resolveHousingRole()`, `doLogout()`, `_clearLocalClientState()`. Pages register `window._onLogout` for page-specific teardown.
-- `shared-data.js` — Supabase REST wrappers (`sbLoadApplications`, `sbSaveUnit`, `sbLoadAuditLog`, …), role mapping, `auditEntry()` writing to both in-memory `auditLog[]` and `housing_audit_log` table. All functions are fire-and-forget safe (catch + warn, never throw).
+- `shared-data.js` — Supabase REST wrappers (`sbLoadApplications`, `sbSaveUnit`, `sbLoadAuditLog`, …), role mapping, `auditEntry()` writing to both in-memory `auditLog[]` and `housing_audit_log` table. All functions are fire-and-forget safe (catch + warn, never throw). Also owns `renderWorklist()` and all contractor modal/print logic (so contractors.html can call it without loading housing-specific modules).
 - `shared-ui.js` — view show/hide helpers (`hideAllViews`, `_showView`), nav, toast.
 - `approval-authority.js` — single source of truth for who can approve what. Use `APPROVAL_AUTHORITY.can(action, role)` / `.who(action)` / `.get(key)` instead of inline `role === 'ed'` checks. Defaults are merged with overrides from `housing_settings` at login.
 - `scoring.js` — V2 ED-adjustable scoring model (applications + reno scoring).
@@ -50,6 +50,24 @@ The biggest page is split into JS files loaded in this order:
 housing-views.js  →  housing-settings.js  →  housing-modals.js  →  housing-app.js  →  housing-init.js
 ```
 `housing-init.js` runs last and owns DOMContentLoaded / login flow / data load.
+
+### My Worklist (`renderWorklist()` in `shared-data.js`)
+The landing-page action queue is a single function that renders grouped sections for every item type requiring action. It lives in `shared-data.js` (not housing-init.js) so that all pages that load shared-data can trigger a refresh via `if (typeof renderWorklist === 'function') renderWorklist()`.
+
+**Current sections (in order):**
+1. **My Drafts** — draft applications/SOWs/RFQs created by the logged-in user. Each row has two buttons: "Continue →" (yellow) and "Archive" (ghost). Archive helpers are attached to `window` so inline `onclick` strings can reach them: `window._wlArchiveSow(uid, pn)`, `window._wlArchiveApp(appId)`, `window._wlCancelRfq(rfqId)`.
+2. **Applications** — submitted/mgr_approved apps for management; returned apps for the owner.
+3. **Renovations Waiting Approval** — SOWs needing HM or ED sign-off. HM sees `''`/`'draft'`/`'signed'`/`'submitted'`; ED sees `'hm_approved'` (and can also act on earlier statuses). Clicking opens the SOW modal in-place via `openSowModal()` when available, otherwise navigates to renos.html.
+4. **RFQs Open for Bids** — `status === 'issued'` RFQs for management.
+5. **Contractors Waiting Approval** — `pending_review` (HM verifies) → `hm_recommended` (ED approves).
+6. **Inventory Approvals** — units where `unitHmSig` is set but `decision` is blank (HM pending), or `unitEdSig` pending / HM deferred to ED. Links to `inventory.html?unit=<id>` which auto-opens the unit detail panel.
+7. **Ready to Match** — `ed_approved`/`mgr_approved` apps with no assigned unit.
+
+**IMPORTANT — SOW `approval_status` stored values:** The values stored in the database are `''` (empty string, means new/draft), `'draft'`, `'signed'`, `'submitted'`, `'hm_approved'`, `'ed_approved'`, `'completed'`. The labels shown in the renos.html approval table ("Pending HM", "HM Approved", etc.) are **computed from** these stored values — they are never stored. Do not check for `'pending_hm'` or `'pending_ed'` in worklist logic; those strings do not exist in the data.
+
+**`sowApproveInline()`** in `housing-modals-sow.js` — allows HM/ED to approve a SOW from the worklist without leaving the landing page. Shows a confirm dialog, sets the appropriate sig fields (`sow_hm_name`/`sow_hm_date` or `sow_ed_name`/`sow_ed_date`), then calls `sowSaveClicked()` which handles the approval_status transition and triggers a work-order email if applicable. After final approval the modal closes and `renderWorklist()` refreshes the queue.
+
+**Post-save SOW navigation:** After `sowSaveClicked()` completes, the page does NOT show a "Renovation request updated" dialog. Instead it shows a toast and does a smart refresh: if `#worklist_body` exists → `renderWorklist()`; else if reno approvals view is open → `showRenoApprovals()`. This avoids stranding the user on renos.html when approval was triggered from the landing page.
 
 ### Roles & permissions
 Canonical roles (see `shared-config.js` `ROLE` and the role matrix in `PLAN.md` Phase A):
@@ -77,6 +95,40 @@ Canonical roles (see `shared-config.js` `ROLE` and the role matrix in `PLAN.md` 
 ### Tenant data
 - `tenants` is a platform-level table shared by housing + finance, trigger-synced from `housing_units.assigned_name`. Backfill ran at the F2 migration. Don't insert tenant rows by hand for production data — change `housing_units.assigned_name` and the trigger handles it.
 - The current `tenants` schema is slim: housing-specific fields (unit type, rent amount, hydro/gas accounts, autoPay, …) aren't there yet and default to empty/false on load. Phase C will reconcile.
+
+### Housing unit fields
+Unit records (`housing_units`) have these non-obvious fields:
+- `deptNumber` — Department Number (cost-centre for capital budget tracking)
+- `acctNumber` — Account Number for recurring charges (rent, utilities). Has a tooltip in the UI.
+- `insuredValue` — Insured Value (formerly "Construction Cost"). All unit types.
+- `cmhcValue` — CMHC Value. Only enabled when `funder === 'CMHC_95'`; null otherwise. `ueFunderChanged()` in `housing-modals.js` enforces this gate.
+- `unitHmSig` / `unitEdSig` — HM/ED approval decisions on the unit's renovation budget. Each is `{name, date, decision, notes, savedAt}`. Decision values: `'approved'`, `'declined'`, `'deferred'` (HM only — escalates to ED). These are saved only when a name or decision is entered in the unit edit modal; null means no approval has been initiated. The approval blocks in the unit edit modal are shown/hidden by `ueUpdateBudgetRouting()` based on SOW total cost vs. the HM budget limit (`hmBudgetLimit` in settings, default $25k).
+
+### Renovation fund sources (`RENO_FUND_RULES`)
+Defined in both `scoring.js` and `renos.html` (two copies — keep in sync). Current valid pool IDs:
+- `'cmhc_95'` — CMHC Section 95 (all unit types)
+- `'cmhc_56'` — **REMOVED** (do not re-add)
+- `'section_10'` — Section 10 (all unit types)
+- `'band_house'` — Band Housing (formerly the blank `''` key — renamed)
+- `'band_rep'` — Band Rep Funds (all unit types)
+- `'fncfs'` — FNCFS Funds (only homes with dependants under age 17)
+
+Each pool has an `eligible(unit, app)` predicate. `FNCFS` checks `app.children > 0` or `app.dependants > 0`. The fund source dropdown in the SOW modal is built by `_sowPopulateFundSourceDropdown()` which filters to eligible options for the current unit/application pair.
+
+### Application scoring model
+Urgent need categories (in `scoring.js` `DEFAULT_V2_SCORE_MODEL.urgent_need` and `scoreApplicationLocally()`):
+- `overcrowded`, `structural`, `no_running_water`, `mold_health_hazard`, `caregiver`, `homeless` (added — 25 pts)
+
+The scoring model is ED-adjustable via Settings → App Settings → Scoring. Changes persist in `housing_settings` key `'score_model_v2'`.
+
+### SOW project numbers
+Format: `SOW-YYYY-NN` where `NN` is a global sequential counter across all units for that year. `nextProjectNumber()` in `shared-sow.js` scans the entire `_sowCache` to find the highest existing `NN` for the current year and increments it. Numbers are NOT per-unit — a unit can have multiple SOWs but each gets a unique global number.
+
+### Audit log attribution
+`auditEntry(appId, action, detail, user)` stores the logged-in user's **email** (from `HOUSING_SESSION.email`) in the `actor` column, not the role string. `sbLoadMyRecentActivity(limit)` queries with `?actor=eq.<email>` to return only the current user's entries. This means audit entries created before the email-attribution change will not appear in "Recent Activity" (they have role strings instead of emails in the `actor` column).
+
+### Idle timeout
+`_idleLogout()` in `shared-auth.js` clears `sessionStorage` tokens **immediately and synchronously**, then fires `doLogout()` as a detached async (fire-and-forget), then redirects to `index.html?timeout=1` synchronously. Do NOT await any network call before redirecting — the blank-page bug was caused by awaiting the Supabase sign-out before navigation. `auth-login.js` checks `?timeout=1` on load and shows `#timeout-banner`.
 
 ### Email notifications
 - Outbound transactional email goes through a Supabase Edge Function at `supabase/functions/send-notification/index.ts`. The function verifies the caller's JWT, sends via **Microsoft Graph** (`/users/{from}/sendMail`) using OAuth2 client_credentials against the Entra app `CLFN Housing App — Notifications`, and writes an audit row via service_role. FROM is the `housing@clfn.on.ca` shared mailbox; sent items appear in its Sent folder. Application Access Policy NOT yet applied (Mail.Send is tenant-wide; PowerShell snippet ready but hardening item is open).
