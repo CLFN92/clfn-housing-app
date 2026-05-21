@@ -3838,6 +3838,30 @@ function renderWorklist() {
     }).slice(0, 6);
   }
 
+  // ── 6. Inventory / unit approvals pending ────────────────────────────────
+  // Shows units where an HM or ED approval decision has been initiated but
+  // not yet set (decision field is blank). HM sees their pending block;
+  // ED sees ED-pending items and any HM-deferred items.
+  var unitApprItems = [];
+  if (isManagement) {
+    var allUnitsAppr = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
+    allUnitsAppr.forEach(function(u) {
+      if (!u) return;
+      var needsHm = !canFinal && u.unitHmSig && !u.unitHmSig.decision;
+      var needsEd = canFinal && (
+        (u.unitEdSig && !u.unitEdSig.decision) ||
+        (u.unitHmSig && u.unitHmSig.decision === 'deferred')
+      );
+      if (!needsHm && !needsEd) return;
+      var addr = ((u.num||'') + ' ' + (u.street||'')).trim() || u.id;
+      var lbl = needsEd
+        ? (u.unitHmSig && u.unitHmSig.decision === 'deferred' ? 'Deferred to ED' : 'Awaiting ED Decision')
+        : 'Awaiting HM Decision';
+      unitApprItems.push({ id: u.id, addr: addr, lbl: lbl });
+    });
+    unitApprItems = unitApprItems.slice(0, 8);
+  }
+
   // ── Inline archive helpers (exposed on window so onclick can reach them) ──
   window._wlArchiveSow = function(uid, pn) {
     if (typeof showConfirm !== 'function') return;
@@ -3878,7 +3902,7 @@ function renderWorklist() {
 
   // ── Count + empty state ───────────────────────────────────────────────────
   var draftTotal = draftApps.length + draftSows.length + draftRfqs.length;
-  var total = appItems.length + sowItems.length + rfqItems.length + ctItems.length + matchItems.length + draftTotal;
+  var total = appItems.length + sowItems.length + rfqItems.length + ctItems.length + matchItems.length + unitApprItems.length + draftTotal;
   var pill = document.getElementById('worklist_count_pill'); if (pill) pill.textContent = total;
   var qa   = document.getElementById('qa_pending_count');   if (qa) qa.textContent = total;
 
@@ -4050,6 +4074,18 @@ function renderWorklist() {
         + '</div>';
     }).join('');
     html += sectionWrap('👷', 'Contractors Waiting Approval', ctItems.length, 'contractors.html', ctRows, 0);
+  }
+
+  // Inventory approvals
+  if (unitApprItems.length) {
+    var unitApprRows = unitApprItems.map(function(u) {
+      var href = 'inventory.html?unit=' + encodeURIComponent(u.id);
+      return actionRow(href, [
+        { text: u.addr, style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
+        { text: u.lbl,  style: 'font-size:11px;color:var(--muted);width:200px;flex-shrink:0;' }
+      ], { text: 'Review →', href: href });
+    }).join('');
+    html += sectionWrap('🏘️', 'Inventory Approvals', unitApprItems.length, 'inventory.html', unitApprRows, 0);
   }
 
   // Match queue
