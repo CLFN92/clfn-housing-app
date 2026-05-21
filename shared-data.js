@@ -934,12 +934,13 @@ function sbLookupUnits(q) {
   var out = [];
   for (var i = 0; i < units.length && out.length < 20; i++) {
     var u = units[i]; if (!u || u.archived) continue;
-    var hay = ((u.unitNumber || '') + ' ' + (u.address || '') + ' ' + (u.assignedName || '') + ' ' + (u.id || '')).toLowerCase();
+    var addr = ((u.num||'') + ' ' + (u.street||'')).trim();
+    var hay  = (addr + ' ' + (u.assignedName||'') + ' ' + (u.id||'') + ' ' + (u.phase||'') + ' ' + (u.acctNumber||'') + ' ' + (u.status||'')).toLowerCase();
     if (hay.indexOf(q) === -1) continue;
     out.push({
       id:    u.id,
-      label: 'Unit ' + (u.unitNumber || u.id),
-      meta:  (u.address || '') + (u.status ? ' · ' + u.status : '') + (u.assignedName ? ' · ' + u.assignedName : '')
+      label: addr || u.id,
+      meta:  (u.status||'') + (u.assignedName ? ' · ' + u.assignedName : '') + (u.bedrooms ? ' · ' + u.bedrooms + 'bd' : '')
     });
   }
   return out;
@@ -951,18 +952,53 @@ function sbLookupSOWs(q) {
   var cache = window._sowCache || {};
   var units = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
   var out = [];
-  Object.keys(cache).forEach(function (unitId) {
+  Object.keys(cache).forEach(function(unitId) {
     if (out.length >= 20) return;
-    var sow = cache[unitId]; if (!sow) return;
+    // Use getUnitSowList to handle both multi-SOW and legacy flat cache shapes
+    var sows = (typeof getUnitSowList === 'function') ? getUnitSowList(unitId) : [];
+    if (!sows.length) { var _r = cache[unitId]; if (_r && (_r.contractor||_r.project_number)) sows = [_r]; }
     var unit = null;
     for (var i = 0; i < units.length; i++) { if (units[i] && units[i].id === unitId) { unit = units[i]; break; } }
-    var unitLbl = unit ? ('Unit ' + (unit.unitNumber || unit.id)) : unitId;
-    var hay = (unitLbl + ' ' + (sow.id || '') + ' ' + (sow.contractor || '') + ' ' + (sow.scope || '')).toLowerCase();
+    var addr = unit ? ((unit.num||'') + ' ' + (unit.street||'')).trim() : unitId;
+    sows.forEach(function(sow) {
+      if (out.length >= 20 || !sow) return;
+      var pn  = sow.project_number || sow.projectNumber || '';
+      var hay = (addr + ' ' + pn + ' ' + (sow.contractor||'') + ' ' + (sow.approval_status||sow.approvalStatus||'')).toLowerCase();
+      if (hay.indexOf(q) === -1) return;
+      out.push({
+        id:    unitId,
+        label: pn || ('SOW · ' + addr),
+        meta:  addr + (sow.contractor ? ' · ' + sow.contractor : '') + (sow.approval_status ? ' · ' + sow.approval_status : '')
+      });
+    });
+  });
+  return out;
+}
+
+function sbLookupRFQs(q) {
+  q = (q || '').toLowerCase().trim();
+  if (!q) return [];
+  var cache = window._rfqCache || {};
+  var units = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
+  var cts   = window._contractors || [];
+  var out = [];
+  Object.keys(cache).forEach(function(rfqId) {
+    if (out.length >= 20) return;
+    var rfq = cache[rfqId]; if (!rfq) return;
+    var unit = null;
+    for (var i = 0; i < units.length; i++) { if (units[i] && units[i].id === rfq.sow_unit_id) { unit = units[i]; break; } }
+    var addr  = unit ? ((unit.num||'') + ' ' + (unit.street||'')).trim() : (rfq.sow_unit_id||'');
+    var ctName = '';
+    if (rfq.awarded_contractor_id) {
+      var ct = cts.find(function(c){ return c && c.id === rfq.awarded_contractor_id; });
+      if (ct) ctName = ct.name || '';
+    }
+    var hay = (rfqId + ' ' + addr + ' ' + (rfq.sow_project_number||'') + ' ' + ctName + ' ' + (rfq.status||'')).toLowerCase();
     if (hay.indexOf(q) === -1) return;
     out.push({
-      id:    unitId,
-      label: 'SOW · ' + unitLbl,
-      meta:  (sow.contractor || '') + (sow.status ? ' · ' + sow.status : '')
+      id:    rfqId,
+      label: rfqId,
+      meta:  addr + (rfq.status ? ' · ' + rfq.status : '') + (ctName ? ' · ' + ctName : '')
     });
   });
   return out;

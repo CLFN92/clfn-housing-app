@@ -1758,6 +1758,8 @@ async function loadHousingData() {
     var cR = await sbLoadContractors(); if(cR) window._contractors = cR;
     var sowR = await fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=*',{headers:HOUSING_HEADERS});
     if(sowR.ok){var sd=await sowR.json(); sd.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
+    var rfqR = await fetch(SUPABASE_URL+'/rest/v1/housing_rfq?select=*&order=created_at.desc',{headers:HOUSING_HEADERS});
+    if(rfqR.ok){var rd=await rfqR.json(); window._rfqCache={}; rd.forEach(function(r){window._rfqCache[r.id]=r;});}
     var stR = await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=key,value',{headers:HOUSING_HEADERS});
     if(stR.ok){var stD=await stR.json(); window._appSettings={};
       stD.forEach(function(r){window._appSettings[r.key]=r.value;});
@@ -2024,7 +2026,7 @@ function _debounce(fn, ms){
 // ── Quick Lookup ─────────────────────────────────────────────────────────
 // Lookup state lives on window so the tab filter and recently-viewed list
 // can read it without re-querying.
-window._lookupState = window._lookupState || { tab:'all', q:'', results:{tenants:[],units:[],sows:[]} };
+window._lookupState = window._lookupState || { tab:'all', q:'', results:{tenants:[],units:[],sows:[],rfqs:[]} };
 var LOOKUP_RECENT_KEY = 'clfn_landing_recent_lookups';
 
 function _lookupReadRecent(){
@@ -2072,11 +2074,12 @@ function _renderLookupRecent(){
 function _runLookup(q){
   q = (q||'').trim();
   window._lookupState.q = q;
-  var results = { tenants:[], units:[], sows:[] };
+  var results = { tenants:[], units:[], sows:[], rfqs:[] };
   if(q.length >= 1){
     if(typeof sbLookupTenants === 'function') results.tenants = sbLookupTenants(q) || [];
     if(typeof sbLookupUnits   === 'function') results.units   = sbLookupUnits(q)   || [];
     if(typeof sbLookupSOWs    === 'function') results.sows    = sbLookupSOWs(q)    || [];
+    if(typeof sbLookupRFQs    === 'function') results.rfqs    = sbLookupRFQs(q)    || [];
   }
   window._lookupState.results = results;
   _renderLookupCounts();
@@ -2084,13 +2087,14 @@ function _runLookup(q){
 }
 
 function _renderLookupCounts(){
-  var r = window._lookupState.results || {tenants:[],units:[],sows:[]};
-  var total = r.tenants.length + r.units.length + r.sows.length;
+  var r = window._lookupState.results || {tenants:[],units:[],sows:[],rfqs:[]};
+  var total = r.tenants.length + r.units.length + r.sows.length + (r.rfqs||[]).length;
   function set(id,n){ var el=document.getElementById(id); if(el) el.textContent = n; }
   set('lookup_tab_count_all',     total);
   set('lookup_tab_count_tenants', r.tenants.length);
   set('lookup_tab_count_units',   r.units.length);
   set('lookup_tab_count_sows',    r.sows.length);
+  set('lookup_tab_count_rfqs',   (r.rfqs||[]).length);
 }
 
 function _renderLookupResults(){
@@ -2098,11 +2102,12 @@ function _renderLookupResults(){
   if(!host) return;
   var st = window._lookupState;
   if(!st.q){ host.classList.remove('open'); host.innerHTML=''; return; }
-  var r = st.results || {tenants:[],units:[],sows:[]};
+  var r = st.results || {tenants:[],units:[],sows:[],rfqs:[]};
   var rows = [];
   if(st.tab==='all' || st.tab==='tenants') r.tenants.forEach(function(x){ rows.push(_lookupRow('tenant', x)); });
   if(st.tab==='all' || st.tab==='units')   r.units  .forEach(function(x){ rows.push(_lookupRow('unit',   x)); });
   if(st.tab==='all' || st.tab==='sows')    r.sows   .forEach(function(x){ rows.push(_lookupRow('sow',    x)); });
+  if(st.tab==='all' || st.tab==='rfqs')   (r.rfqs||[]).forEach(function(x){ rows.push(_lookupRow('rfq',  x)); });
   host.classList.add('open');
   host.innerHTML = rows.length
     ? rows.join('')
@@ -2112,7 +2117,7 @@ function _renderLookupResults(){
 function _lookupRow(kind, x){
   var label = _esc(x.label || x.id || '');
   var meta  = _esc(x.meta  || '');
-  var initial = kind === 'tenant' ? 'T' : (kind === 'unit' ? 'U' : 'S');
+  var initial = kind === 'tenant' ? 'T' : kind === 'unit' ? 'U' : kind === 'rfq' ? 'R' : 'S';
   return '<div class="lookup-result" data-lookup-kind="'+kind+'" data-lookup-id="'+_esc(x.id||'')+'">'
        + '<span class="lookup-result-icon type-'+kind+'">'+initial+'</span>'
        + '<span class="lookup-result-main">'
@@ -2158,6 +2163,9 @@ function _lookupOpen(kind, id, label){
   } else if(kind==='sow'){
     if (typeof setNavReferrer === 'function') setNavReferrer('home');
     window.location.href = 'renos.html?sow=' + encodeURIComponent(id);
+  } else if(kind==='rfq'){
+    if (typeof setNavReferrer === 'function') setNavReferrer('home');
+    window.location.href = 'rfq.html?rfq=' + encodeURIComponent(id);
   }
 }
 
