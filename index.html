@@ -52,7 +52,7 @@
       </div>
 
       <button id="signin-btn" class="login-btn"
-        onclick="this.disabled=true;this.textContent='Signing in…';startSignIn().catch(function(e){ console.error('Sign-in error:',e); })">
+        onclick="startSignIn()">
         Sign in
       </button>
       <div id="signin-error" class="login-error"></div>
