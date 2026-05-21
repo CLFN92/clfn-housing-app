@@ -2209,20 +2209,48 @@ function _sectionOnExpand(id){
   }
 }
 function _renderWorklistCountPills(){
-  var apps  = (typeof applications !== 'undefined' && applications) ? applications : [];
-  var STATUS = (typeof APP_STATUS !== 'undefined') ? APP_STATUS : { SUBMITTED:'submitted', MGR_APPROVED:'mgr_approved', FILE_UPDATE:'file_update', ED_APPROVED:'ed_approved' };
-  var role = window.currentRole || 'housing_employee_l1';
-  var email = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION.email : '';
-  // Use the shared role-scoped queue so the pill, the View-all label, and
-  // renderWorklist all agree on what "awaiting your approval" means.
-  var queue = (typeof getWorkQueueForRole === 'function') ? getWorkQueueForRole(role, email) : [];
-  var pending = queue.length;
-  var p = document.getElementById('worklist_count_pill'); if(p) p.textContent = pending;
-  var qa = document.getElementById('qa_pending_count');   if(qa) qa.textContent = pending;
-  // "Ready to match" KPI — applicants approved with no unit yet.
-  var ready = apps.filter(function(a){
-    return a && !a.archived && (a.status===STATUS.ED_APPROVED || a.status===STATUS.MGR_APPROVED) && !a.assignedUnit;
-  }).length;
+  // Delegate the full count to renderWorklist which now tallies all entity types.
+  // This keeps the pill, the quick-action label, and the worklist body in sync.
+  if (typeof renderWorklist === 'function') {
+    var body = document.getElementById('worklist_body');
+    // Only re-render if the worklist section is currently expanded (avoid
+    // re-rendering a collapsed section unnecessarily on every data refresh).
+    var sec = document.getElementById('sec-worklist');
+    if (sec && !sec.classList.contains('collapsed')) {
+      renderWorklist();
+    } else {
+      // Section collapsed — just update the count pill without re-rendering.
+      var apps  = (typeof applications !== 'undefined' && applications) ? applications : [];
+      var role  = window._viewAsRole || window._realRole || window.currentRole || 'housing_employee_l1';
+      var email = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.email : '').toLowerCase();
+      var isManagement = typeof ROLE !== 'undefined' && ROLE.isManagement(role);
+      var canFinal     = typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('finalApproveApp', role);
+      var appCount = apps.filter(function(a) {
+        if (!a || a.archived) return false;
+        if ((a.created_by_email||'').toLowerCase() === email && a.status === 'returned') return true;
+        if (isManagement && !canFinal && (a.status === 'submitted' || a.status === 'file_update')) return true;
+        if (canFinal && (a.status === 'mgr_approved' || a.status === 'submitted')) return true;
+        return false;
+      }).length;
+      var sowCount = 0;
+      if (isManagement) {
+        Object.keys(window._sowCache||{}).forEach(function(uid){
+          var list = typeof getUnitSowList === 'function' ? getUnitSowList(uid) : [];
+          list.forEach(function(s){ if(s && (s.approval_status==='pending_hm' || (canFinal && s.approval_status==='pending_ed'))) sowCount++; });
+        });
+      }
+      var rfqCount  = isManagement ? Object.keys(window._rfqCache||{}).filter(function(id){ return (window._rfqCache[id]||{}).status==='issued'; }).length : 0;
+      var ctCount   = isManagement ? (window._contractors||[]).filter(function(c){ return c && (c.status==='pending_review'||(canFinal&&c.status==='hm_recommended')); }).length : 0;
+      var matchCount = isManagement ? apps.filter(function(a){ return a && !a.archived && !a.assignedUnit && (a.status==='ed_approved'||a.status==='mgr_approved'); }).length : 0;
+      var total = appCount + sowCount + rfqCount + ctCount + matchCount;
+      var p  = document.getElementById('worklist_count_pill'); if(p)  p.textContent  = total;
+      var qa = document.getElementById('qa_pending_count');    if(qa) qa.textContent = total;
+    }
+  }
+  // "Ready to match" KPI pill (separate from the worklist count)
+  var apps2 = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var STATUS = (typeof APP_STATUS !== 'undefined') ? APP_STATUS : { ED_APPROVED:'ed_approved', MGR_APPROVED:'mgr_approved' };
+  var ready = apps2.filter(function(a){ return a && !a.archived && (a.status===STATUS.ED_APPROVED || a.status===STATUS.MGR_APPROVED) && !a.assignedUnit; }).length;
   var qr = document.getElementById('qa_ready_count'); if(qr) qr.textContent = ready;
 }
 // ── Quick Action handlers ────────────────────────────────────────────────

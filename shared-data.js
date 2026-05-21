@@ -3676,278 +3676,208 @@ function _refreshAppViews() {
 }
 window._refreshAppViews = _refreshAppViews;
 
+// ── renderWorklist — landing-page action queue ──────────────────────────────
+// Shows ONLY items requiring action across all entity types, grouped by type.
+// Auto-updates when called after any approval/action (all callsites that
+// trigger after status changes already call this function).
 function renderWorklist() {
-  var realRole = window._realRole || window.currentRole || 'housing_employee_l1';
-  var role = window._viewAsRole || realRole;
   var body = document.getElementById('worklist_body');
-  var sub  = document.getElementById('worklist_subtitle');
-  if(!body) return;
+  if (!body) return;
+  var role  = window._viewAsRole || window._realRole || window.currentRole || 'housing_employee_l1';
+  var email = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.email : '').toLowerCase();
+  var isManagement = typeof ROLE !== 'undefined' && ROLE.isManagement(role);
+  var canFinal     = typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('finalApproveApp', role);
 
-  var apps = (typeof applications !== 'undefined') ? applications : [];
+  // ── 1. Applications requiring action ────────────────────────────────────
+  var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var appItems = apps.filter(function(a) {
+    if (!a || a.archived) return false;
+    var owner = (a.created_by_email || '').toLowerCase();
+    if (owner === email && a.status === 'returned') return true;
+    if (isManagement && !canFinal && (a.status === 'submitted' || a.status === 'file_update')) return true;
+    if (canFinal && (a.status === 'mgr_approved' || a.status === 'submitted')) return true;
+    return false;
+  }).slice(0, 10);
 
-  // If no data loaded yet, fetch once. If the fetch completes and the list
-  // is still empty, render the empty state — never loop the fetch.
-  if(!apps.length) {
-    if(window._wlBootFetched) {
-      body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--muted);font-size:13px;">No applications yet.</div>';
-      return;
-    }
-    body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px;">Loading applications…</div>';
-    if(typeof loadAppDataFromSupabase === 'function') {
-      window._wlBootFetched = true;
-      loadAppDataFromSupabase().then(function(){ renderWorklist(); });
-    }
+  // ── 2. SOWs pending approval ─────────────────────────────────────────────
+  var sowItems = [];
+  if (isManagement) {
+    var sowCache = window._sowCache || {};
+    var units = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
+    Object.keys(sowCache).forEach(function(uid) {
+      var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
+      list.forEach(function(sow) {
+        if (!sow || !sow.approval_status) return;
+        var needsHm = sow.approval_status === 'pending_hm';
+        var needsEd = sow.approval_status === 'pending_ed';
+        if (!needsHm && !needsEd) return;
+        if (needsEd && !canFinal) return;
+        var u = units.find(function(x){ return x && x.id === uid; });
+        var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : uid;
+        sowItems.push({ uid: uid, pn: sow.project_number || '', addr: addr, status: sow.approval_status });
+      });
+    });
+    sowItems = sowItems.slice(0, 8);
+  }
+
+  // ── 3. RFQs needing action ───────────────────────────────────────────────
+  var rfqItems = [];
+  if (isManagement) {
+    var rfqCache = window._rfqCache || {};
+    var rfqUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
+    Object.keys(rfqCache).forEach(function(rfqId) {
+      var rfq = rfqCache[rfqId]; if (!rfq) return;
+      if (rfq.status !== 'issued') return;
+      var u = rfqUnits.find(function(x){ return x && x.id === rfq.sow_unit_id; });
+      var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : (rfq.sow_unit_id||'');
+      var closes = rfq.closes_at ? new Date(rfq.closes_at).toLocaleDateString('en-CA') : '';
+      rfqItems.push({ id: rfqId, addr: addr, closes: closes, recipients: (rfq.recipient_contractor_ids||[]).length });
+    });
+    rfqItems = rfqItems.slice(0, 6);
+  }
+
+  // ── 4. Contractors pending review ────────────────────────────────────────
+  var ctItems = [];
+  if (isManagement) {
+    var cts = window._contractors || [];
+    cts.forEach(function(ct) {
+      if (!ct) return;
+      var needsHm = ct.status === 'pending_review';
+      var needsEd = ct.status === 'hm_recommended';
+      if (!needsHm && !needsEd) return;
+      if (needsEd && !canFinal) return;
+      ctItems.push({ id: ct.id, name: ct.name || ct.id, trade: ct.trade || '', status: ct.status });
+    });
+    ctItems = ctItems.slice(0, 6);
+  }
+
+  // ── 5. Approved apps ready to match (no unit assigned) ───────────────────
+  var matchItems = [];
+  if (isManagement) {
+    matchItems = apps.filter(function(a) {
+      if (!a || a.archived || a.assignedUnit) return false;
+      return a.status === 'ed_approved' || a.status === 'mgr_approved';
+    }).slice(0, 6);
+  }
+
+  // ── Count + empty state ───────────────────────────────────────────────────
+  var total = appItems.length + sowItems.length + rfqItems.length + ctItems.length + matchItems.length;
+  var pill = document.getElementById('worklist_count_pill'); if (pill) pill.textContent = total;
+  var qa   = document.getElementById('qa_pending_count');   if (qa) qa.textContent = total;
+
+  if (!total) {
+    body.innerHTML = '<div style="padding:28px 16px;text-align:center;color:var(--muted);font-size:13px;">'
+      + '<div style="font-size:22px;margin-bottom:8px;">&#10003;</div>'
+      + 'Nothing requires your attention right now.</div>';
     return;
   }
 
-  // ── Status map ────────────────────────────────────────────────────────────
-  var SM = {
-    draft:        {label:'Draft',                   c:'#888',    bg:'#f4f4f0'},
-    submitted:    {label:'Awaiting HM Review',      c:'#1d4ed8', bg:'#eff6ff'},
-    file_update:  {label:'File Update',             c:'#1d4ed8', bg:'#eff6ff'},
-    mgr_approved: {label:'Awaiting ED Approval',    c:'#7c3aed', bg:'#faf5ff'},
-    hm_approved:  {label:'File Update Approved',    c:'#15803d', bg:'#f0fdf4'},
-    ed_approved:  {label:'ED Approved',             c:'#15803d', bg:'#f0fdf4'},
-    returned:     {label:'Returned — Action Needed',c:'#b91c1c', bg:'#fef2f2'},
-    declined:     {label:'Declined',                c:'#b91c1c', bg:'#fef2f2'},
-    assigned:     {label:'Assigned',                c:'#15803d', bg:'#f0fdf4'},
-    archived:     {label:'Archived',                c:'#888',    bg:'#f4f4f0'}
-  };
+  // ── Render helpers ────────────────────────────────────────────────────────
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
-  // ── Subtitle ──────────────────────────────────────────────────────────────
-  var subtitles = {
-    employee:        'Track applications you have submitted. Scores are managed by the Housing Manager.',
-    housing_manager: 'Review and action applications across the queue.',
-    ed:              'Final approvals, recommendations, and recently actioned applications.'
-  };
-  if(sub) sub.textContent = subtitles[role] || '';
-
-  // ── Filter apps ───────────────────────────────────────────────────────────
-  // Source set is intentionally broader than the action queue — it
-  // includes every status (incl. Declined, Archived) so the Status
-  // column-menu filter has a complete dropdown to work with. The user
-  // can tick specific statuses to narrow. Management roles see every
-  // application; non-management sees only apps they own. Archived
-  // items stay in the set so they can be found via the Status filter.
-  // The landing-page count pill keeps using isInWorkQueue for the
-  // "items awaiting your action" count.
-  var _myEmail = ((typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION.email : '').toLowerCase();
-  var filtered = apps.filter(function(a){
-    if (!a) return false;
-    if (ROLE.isManagement(role)) return true;
-    var owner = (a.created_by_email || '').toLowerCase();
-    return owner === _myEmail;
-  });
-
-  if(!window._wlSearch) window._wlSearch = '';
-  var search = (window._wlSearch||'').toLowerCase().trim();
-  if(search) {
-    filtered = filtered.filter(function(a){
-      // Scan every visible column on the worklist row.
-      var hay = [
-        a.fn, a.ln, a.id, a.status, a.tier, a.score,
-        a.street, a.city, a.classification,
-        a.assignedAddress, a.reserve
-      ].filter(function(v){ return v != null; }).join(' ').toLowerCase();
-      return hay.indexOf(search) !== -1;
-    });
-  }
-  var showScore = APPROVAL_AUTHORITY.can('viewApplicationScore', role);
-
-  // ── Default sort ──────────────────────────────────────────────────────────
-  // Applied to `filtered` so tableApplyFilterSort preserves it when no
-  // user sort is active (sort.key === ''). Once the user picks a column-
-  // menu sort, that wins.
-  filtered.sort(function(a,b){
-    if(showScore) return (b.score||0)-(a.score||0);
-    return (b.appDate||'').localeCompare(a.appDate||'');
-  });
-
-  // ── Column-menu sort + filter (Phase 2B parity) ───────────────────────────
-  // Layered on top of the queue-scope + search filter. Status menu lists
-  // values from the current queue + search set.
-  var _wlColumns = {
-    applicant: { label: 'Applicant',       accessor: function(a){ return ((a.fn||'')+' '+(a.ln||'')).trim(); } },
-    id:        { label: 'ID',              accessor: function(a){ return a.id || ''; } },
-    addr:      { label: 'Current Address', accessor: function(a){ return a.street || ''; } },
-    date:      { label: 'Date',            accessor: function(a){ return a.appDate || ''; } },
-    status:    { label: 'Status',          accessor: function(a){
-                                              // Archived overrides the underlying status so it appears
-                                              // as its own value in the column-menu filter dropdown.
-                                              if (a.archived) return SM.archived.label;
-                                              var sm = SM[a.status]; return sm ? sm.label : (a.status || '');
-                                            } }
-  };
-  if (showScore) {
-    _wlColumns.score = { label: 'Score', accessor: function(a){ return (typeof a.score === 'number') ? a.score : 0; } };
-  }
-  var _wlAccessors = {};
-  Object.keys(_wlColumns).forEach(function(k){ _wlAccessors[k] = _wlColumns[k].accessor; });
-
-  var _wlState = (typeof tableStateGet === 'function')
-    ? tableStateGet('worklist')
-    : { sort:{key:'',dir:1}, filters:{} };
-
-  // On first open (no saved status filter), hide Archived and Declined by
-  // default. Once the user adjusts via the column menu the choice persists
-  // in sessionStorage and this block is skipped on subsequent renders.
-  if (typeof tableSetColumnFilter === 'function' && _wlState.filters.status === undefined) {
-    tableSetColumnFilter('worklist', 'status', [
-      SM.draft.label, SM.submitted.label, SM.file_update.label,
-      SM.mgr_approved.label, SM.hm_approved.label, SM.ed_approved.label,
-      SM.returned.label, SM.assigned.label
-    ]);
-    _wlState = tableStateGet('worklist');
+  function sectionWrap(icon, label, count, link, rows, extra) {
+    return '<div style="margin-bottom:12px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;'
+      +   'background:var(--bg);border-radius:8px 8px 0 0;border:1px solid var(--border);">'
+      +   '<div style="font-size:12px;font-weight:700;">' + icon + ' ' + esc(label)
+      +     ' <span style="font-size:11px;font-weight:400;color:var(--muted);">(' + count + ')</span></div>'
+      +   (link ? '<a href="' + esc(link) + '" style="font-size:11px;color:var(--text);font-weight:600;'
+      +     'text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:3px 9px;'
+      +     'white-space:nowrap;">View All &#8599;</a>' : '')
+      + '</div>'
+      + '<div style="border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;overflow:hidden;">'
+      + rows
+      + (extra > 0 ? '<div style="padding:7px 14px;font-size:11px;color:var(--muted);text-align:center;'
+      +   'border-top:1px solid var(--border);">+' + extra + ' more — <a href="' + esc(link) + '" '
+      +   'style="color:var(--text);font-weight:600;">View All</a></div>' : '')
+      + '</div></div>';
   }
 
-  if (typeof tableRegisterColumns === 'function') {
-    tableRegisterColumns('worklist', {
-      columns:  _wlColumns,
-      getRows:  function(){ return filtered; },
-      onChange: renderWorklist
-    });
+  function actionRow(href, cols) {
+    return '<a href="' + esc(href) + '" style="display:flex;align-items:center;gap:10px;padding:10px 14px;'
+      + 'border-top:1px solid var(--border);text-decoration:none;color:inherit;cursor:pointer;'
+      + 'background:var(--surface);" onmouseover="this.style.background=\'var(--bg)\'" '
+      + 'onmouseout="this.style.background=\'var(--surface)\'">'
+      + cols.map(function(c){ return '<span style="' + (c.style||'flex:1;font-size:12px;') + '">' + esc(c.text||'') + '</span>'; }).join('')
+      + '</a>';
   }
 
-  var sorted = (typeof tableApplyFilterSort === 'function')
-    ? tableApplyFilterSort(filtered, _wlAccessors, _wlState)
-    : filtered;
+  var html = '';
 
-  var rows = sorted.map(function(a){
-    // Archived takes priority so the row's pill matches what the
-    // column-menu Status filter reports for that row.
-    var sm = (a.archived ? SM.archived : SM[a.status]) || {label:a.status, c:'#888', bg:'#f4f4f0'};
-    var name = ((a.fn||'')+' '+(a.ln||'')).trim()||'—';
-    var tier = a.tier||'';
-    var tc = tier==='Critical Priority'?'#b91c1c':tier==='High Priority'?'#1d4ed8':tier==='Medium Priority'?'#7a6000':'#888';
-    // Branch: what action button to show per status per role
-    var actionBtn = '';
-    var _aIdEsc = escapeHtml(a.id);
-    if(a.status==='returned') {
-      actionBtn = '<button data-wl-edit="'+_aIdEsc+'" onclick="event.stopPropagation();wlEditApp(this)" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Update →</button>';
-    } else if((APPROVAL_AUTHORITY.can('reviewApplication', role)&&(a.status===APP_STATUS.SUBMITTED||a.status===APP_STATUS.FILE_UPDATE)) || (APPROVAL_AUTHORITY.can('finalApproveApp', role)&&a.status===APP_STATUS.MGR_APPROVED)) {
-      // "Approve →" (green, success) matches the Assign button styling —
-      // both are workflow-advancing actions, so they read as a family.
-      // Click still opens the scorecard, where the actual Recommend /
-      // Approve / Decline pills live.
-      actionBtn = '<button data-wl-id="'+_aIdEsc+'" onclick="event.stopPropagation();wlOpenApp(this)" style="background:var(--success);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Approve →</button>';
-    } else if((ROLE.isManagement(role)) && !a.assignedUnit && (
-                a.status===APP_STATUS.ED_APPROVED ||
-                a.status===APP_STATUS.MGR_APPROVED ||
-                a.status===APP_STATUS.HM_APPROVED ||
-                a.status==='assigned'      // data-anomaly: marked assigned but no unit
-              )) {
-      // Assign on the worklist must open the unit-assignment modal — not
-      // the scorecard. wlOpenApp routes approved apps to showScorecard,
-      // which is correct for the row's name/id click but wrong for this
-      // button, so we use a dedicated wlAssignApp helper.
-      // Any approved-flavour status without a unit gets the Assign button —
-      // covers file-update apps that were filed in error against a tenant
-      // who actually needs a unit, plus 'assigned' rows with null unit_id.
-      actionBtn = '<button data-wl-id="'+_aIdEsc+'" onclick="event.stopPropagation();wlAssignApp(this)" style="background:var(--success);border:none;color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>';
-    }
-    // Current street address from the application form (housing.html
-    // #street). Hidden on mobile via col-hide-mobile to keep narrow
-    // viewports readable.
-    var _addr = a.street || '—';
-    // Row actions — mirror the Applications dashboard's icon set so the
-    // worklist becomes feature-equivalent and the dashboard can eventually
-    // be retired. Edit + Print are available to every role (read/own-app
-    // operations); ⋮ stays HM/ED only (write actions live inside it).
-    // All three reuse the .dash-action-btn class for visual consistency.
-    var _wlEditBtn =
-      '<button class="dash-action-btn" data-wl-edit="'+_aIdEsc+'" onclick="event.stopPropagation();wlEditApp(this)" title="Edit">' +
-      '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
-      '</button>';
-    var _wlPrintBtn =
-      '<button class="dash-action-btn" data-wl-preview="'+_aIdEsc+'" onclick="event.stopPropagation();wlPreviewApp(this)" title="Print Preview">' +
-      '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>' +
-      '</button>';
-    var _wlMenuBtn = ROLE.isManagement(role)
-      ? '<button class="dash-action-btn app-menu-btn" onclick="event.stopPropagation();window.openAppMenu(event,\''+_aIdEsc+'\')" title="More options" style="font-size:14px;line-height:1;">⋮</button>'
-      : '';
-    return '<tr style="border-bottom:1px solid var(--border);" data-wl-id="'+_aIdEsc+'">'
-      + '<td onclick="event.stopPropagation();wlOpenApplicantCell(this)" style="padding:11px 14px;font-weight:600;font-size:13px;cursor:pointer;">'+escapeHtml(name)+'</td>'
-      + '<td onclick="event.stopPropagation();wlOpenIdCell(this)" style="padding:11px 14px;font-size:12px;color:var(--muted);cursor:pointer;">'+_aIdEsc+'</td>'
-      + '<td class="col-hide-mobile" style="padding:11px 14px;font-size:12px;color:var(--muted);">'+escapeHtml(_addr)+'</td>'
-      + '<td style="padding:11px 14px;font-size:12px;color:var(--muted);">'+escapeHtml(a.appDate||'—')+'</td>'
-      + '<td style="padding:11px 14px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+sm.bg+';color:'+sm.c+';">'+sm.label+'</span>'
-      + (a.status===APP_STATUS.DRAFT && a.created_by_name ? '<div class="txt-xs-muted" style="margin-top:2px;">by '+escapeHtml(a.created_by_name)+'</div>' : '')
-      + '</td>'
-      + (showScore ? '<td style="padding:11px 14px;text-align:center;"><span style="font-size:16px;font-weight:800;color:var(--text);">'+(typeof a.score==='number'?a.score:'—')+'</span>'+(tier?'<div style="font-size:9px;color:'+tc+';font-weight:700;margin-top:1px;">'+tier.replace(' Priority','')+'</div>':'')+'</td>' : '')
-      // Action cell: icons (Edit / Print / ⋮) + primary action button.
-      // Matches the order used by the Applications dashboard table so the
-      // two surfaces feel identical to the user.
-      + '<td style="padding:11px 14px;text-align:right;white-space:nowrap;">'
-      +   '<div style="display:inline-flex;gap:4px;align-items:center;justify-content:flex-end;">'
-      +     _wlEditBtn + _wlPrintBtn + _wlMenuBtn + actionBtn
-      +   '</div>'
-      + '</td>'
-      + '</tr>';
-  }).join('');
+  // Applications
+  if (appItems.length) {
+    var statusLabel = { submitted:'Awaiting Review', file_update:'File Update', mgr_approved:'Awaiting ED Approval', returned:'Returned — Action Needed', transfer_request_submitted:'Transfer Request' };
+    var appRows = appItems.map(function(a) {
+      var name = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
+      var lbl  = statusLabel[a.status] || a.status;
+      var score = (a.score != null && a.appType !== 'existing_tenant') ? (a.score + ' pts') : '';
+      return actionRow('housing.html?openApp=' + encodeURIComponent(a.id), [
+        { text: name, style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
+        { text: lbl,  style: 'font-size:11px;color:var(--muted);width:170px;flex-shrink:0;' },
+        { text: score,style: 'font-size:11px;color:var(--muted);width:55px;text-align:right;flex-shrink:0;' }
+      ]);
+    }).join('');
+    var appTotal = apps.filter(function(a){ return !a.archived && (a.status==='submitted'||a.status==='mgr_approved'||a.status==='returned'); }).length;
+    html += sectionWrap('📋', 'Applications', appItems.length, 'housing.html?view=worklist', appRows, Math.max(0, appTotal - appItems.length));
+  }
 
-  var emptyMsg = search ? 'No results for "'+escapeHtml(search)+'"'
-                        : 'No applications match the current filters. Click a column header to adjust.';
-  // Column count for the empty-state colspan. Keep in sync with the
-  // <th> count below: Applicant, ID, Address, Date, Status, [Score],
-  // Actions = 6 base + 1 if showScore.
-  var colCount = 6 + (showScore ? 1 : 0);
-  // Always render the full table (incl. headers) — when no rows pass
-  // the column filters, the tbody shows a single empty-state row so
-  // the user can still reach the column-menu to relax the filter.
-  var bodyContent = rows
-    ? rows
-    : '<tr><td colspan="' + colCount + '" '
-    +   'style="padding:32px;text-align:center;color:var(--muted);font-size:13px;font-style:italic;">'
-    +   emptyMsg
-    + '</td></tr>';
+  // SOWs
+  if (sowItems.length) {
+    var sowLabel = { pending_hm:'Awaiting HM Approval', pending_ed:'Awaiting ED Approval' };
+    var sowRows = sowItems.map(function(s) {
+      return actionRow('renos.html?sow=' + encodeURIComponent(s.uid), [
+        { text: s.addr, style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
+        { text: s.pn,   style: 'font-size:11px;color:var(--muted);width:120px;flex-shrink:0;' },
+        { text: sowLabel[s.status] || s.status, style: 'font-size:11px;color:var(--muted);width:160px;flex-shrink:0;' }
+      ]);
+    }).join('');
+    html += sectionWrap('🔨', 'SOWs Pending Approval', sowItems.length, 'renos.html', sowRows, 0);
+  }
 
-  body.innerHTML =
-    // Search bar
-    '<div class="std-search-row std-search-row-wide">'
-    +   '<input id="wl_search_input" class="std-search" type="text" placeholder="🔍 Search name, ID, status, address, score, or tier..." '
-    +   'value="'+escapeHtml(window._wlSearch||'')+'" '
-    +   'oninput="window._wlSearch=this.value;clearTimeout(window._wlST);window._wlST=setTimeout(renderWorklist,200)" />'
-    + '</div>'
-    // Table
-    + '<div class="std-table-card">'
-    +   '<div class="doclib-table-wrap"><table class="std-table">'
-    +     '<thead id="wl_thead"><tr>'
-    +       '<th class="std-th-sortable" data-sort-key="applicant">Applicant'
-    +         '<span class="tip-host">'
-    +           '<button type="button" class="tip-btn" onclick="event.stopPropagation();toggleTip(\'wl_tip_applicant\')">?</button>'
-    +           '<div id="wl_tip_applicant" class="tip-panel">'
-    +             '<div class="tip-panel-title">Applicant column</div>'
-    +             '<div class="tip-panel-body">Click an applicant&#39;s name to open the application. If the applicant is matched to a unit, opens the Tenant Information Card instead.</div>'
-    +             '<button type="button" class="tip-panel-close" onclick="closeTip(\'wl_tip_applicant\')">Close ✕</button>'
-    +           '</div>'
-    +         '</span>'
-    +       '</th>'
-    +       '<th class="std-th-sortable" data-sort-key="id">ID'
-    +         '<span class="tip-host">'
-    +           '<button type="button" class="tip-btn" onclick="event.stopPropagation();toggleTip(\'wl_tip_id\')">?</button>'
-    +           '<div id="wl_tip_id" class="tip-panel">'
-    +             '<div class="tip-panel-title">ID column</div>'
-    +             '<div class="tip-panel-body">Click an Application ID to open the scoring form.</div>'
-    +             '<button type="button" class="tip-panel-close" onclick="closeTip(\'wl_tip_id\')">Close ✕</button>'
-    +           '</div>'
-    +         '</span>'
-    +       '</th>'
-    +       '<th class="std-th-sortable col-hide-mobile" data-sort-key="addr">Current Address</th>'
-    +       '<th class="std-th-sortable" data-sort-key="date">Date</th>'
-    +       '<th class="std-th-sortable" data-sort-key="status">Status</th>'
-    +       (showScore ? '<th class="std-th-sortable" data-sort-key="score" style="text-align:center;">Score</th>' : '')
-    +       '<th></th>'
-    +     '</tr></thead><tbody id="wl_tbody" data-table-page="worklist">' + bodyContent + '</tbody></table></div>'
-    + '</div>';
+  // RFQs
+  if (rfqItems.length) {
+    var rfqRows = rfqItems.map(function(r) {
+      return actionRow('rfq.html?rfq=' + encodeURIComponent(r.id), [
+        { text: r.id,   style: 'font-size:12px;font-weight:600;width:130px;flex-shrink:0;' },
+        { text: r.addr, style: 'flex:1;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
+        { text: r.closes ? 'Closes ' + r.closes : '', style: 'font-size:11px;color:var(--muted);width:100px;flex-shrink:0;' },
+        { text: r.recipients + ' contractor' + (r.recipients===1?'':'s'), style: 'font-size:11px;color:var(--muted);width:100px;text-align:right;flex-shrink:0;' }
+      ]);
+    }).join('');
+    html += sectionWrap('📊', 'RFQs Open for Bids', rfqItems.length, 'rfq.html', rfqRows, 0);
+  }
 
-  // Column-menu click + sort indicators (Phase 2B parity)
-  var _wlThead = document.getElementById('wl_thead');
-  if (typeof tableBindColumnMenuClicks === 'function')   tableBindColumnMenuClicks(_wlThead, 'worklist');
-  if (typeof tableRefreshSortIndicators === 'function') tableRefreshSortIndicators(_wlThead, 'worklist');
+  // Contractors
+  if (ctItems.length) {
+    var ctLabel = { pending_review:'Awaiting HM Verification', hm_recommended:'Awaiting ED Approval' };
+    var ctRows = ctItems.map(function(c) {
+      return actionRow('contractors.html?openContractor=' + encodeURIComponent(c.id), [
+        { text: c.name,  style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
+        { text: c.trade, style: 'font-size:11px;color:var(--muted);width:120px;flex-shrink:0;' },
+        { text: ctLabel[c.status] || c.status, style: 'font-size:11px;color:var(--muted);width:160px;flex-shrink:0;' }
+      ]);
+    }).join('');
+    html += sectionWrap('👷', 'Contractors Pending Review', ctItems.length, 'contractors.html', ctRows, 0);
+  }
 
-  // Re-focus search if it was active
-  if(search) { var si=document.getElementById('wl_search_input'); if(si){ var l=si.value.length; si.focus(); si.setSelectionRange(l,l); } }
+  // Match queue
+  if (matchItems.length) {
+    var matchRows = matchItems.map(function(a) {
+      var name = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
+      var tier  = a.tier ? a.tier.replace(' Priority','') : '';
+      var score = a.score != null ? a.score + ' pts' : '';
+      return actionRow('housing.html?view=match', [
+        { text: name,  style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
+        { text: score, style: 'font-size:11px;color:var(--muted);width:60px;flex-shrink:0;' },
+        { text: tier,  style: 'font-size:11px;color:var(--muted);width:100px;text-align:right;flex-shrink:0;' }
+      ]);
+    }).join('');
+    html += sectionWrap('🏠', 'Ready to Match', matchItems.length, 'housing.html?view=match', matchRows, 0);
+  }
+
+  body.innerHTML = html;
 }
+
 function resetRenoScoreModel() {
   showConfirm({
     title:       'Reset renovation scoring?',
