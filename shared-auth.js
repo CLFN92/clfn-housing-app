@@ -184,16 +184,30 @@ function _resetIdleTimer() {
 
 function _idleLogout() {
   console.log('[CLFN] Idle timeout — signing out');
-  if (typeof showToast === 'function') {
-    try { showToast('You have been signed out due to inactivity.'); } catch(e) {}
+
+  // 1. Immediately clear session tokens so any subsequent housing page loads
+  //    bounce to login without waiting for network.
+  try {
+    ['clfn_housing_token','clfn_housing_role','clfn_housing_name',
+     'clfn_housing_email_session'].forEach(function(k){
+      try { sessionStorage.removeItem(k); } catch(e) {}
+    });
+  } catch(e) {}
+
+  // 2. Fire the full cleanup + Supabase sign-out in the background.
+  //    We don't await it — the redirect below must not block on network.
+  stopIdleTimer();
+  if (typeof doLogout === 'function') {
+    try { doLogout().catch(function(e){ console.warn('[CLFN] idle doLogout:', e); }); } catch(e) {}
   }
-  // doLogout() is async — chain a redirect so the user lands on the login screen
-  // even when the page has no _onLogout handler that surfaces one.
-  Promise.resolve(doLogout()).then(function() {
-    var path = window.location.pathname;
-    var onLogin = /(?:^|\/)index\.html$/.test(path) || path === '/' || path === '';
-    if (!onLogin) window.location.href = 'index.html';
-  });
+
+  // 3. Navigate immediately. Pass ?timeout=1 so the login page can show a
+  //    "session expired" message instead of a generic blank form.
+  var path = window.location.pathname;
+  var onLogin = /(?:^|\/)index\.html$/.test(path) || path === '/' || path === '';
+  if (!onLogin) {
+    window.location.href = 'index.html?timeout=1';
+  }
 }
 
 function startIdleTimer() {

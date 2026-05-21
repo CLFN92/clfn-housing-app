@@ -481,6 +481,17 @@ function initLoginPage() {
   }
 
   showLoginScreen();
+
+  // Show session-timeout banner when redirected here by _idleLogout()
+  try {
+    var urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('timeout') === '1') {
+      var banner = document.getElementById('timeout-banner');
+      if (banner) banner.style.display = 'block';
+      // Strip the param so a refresh doesn't keep showing the banner
+      history.replaceState(null, '', window.location.pathname);
+    }
+  } catch(e) {}
 }
 
 document.addEventListener('DOMContentLoaded', initLoginPage);
