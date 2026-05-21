@@ -115,6 +115,26 @@ Defined in both `scoring.js` and `renos.html` (two copies — keep in sync). Cur
 
 Each pool has an `eligible(unit, app)` predicate. `FNCFS` checks `app.children > 0` or `app.dependants > 0`. The fund source dropdown in the SOW modal is built by `_sowPopulateFundSourceDropdown()` which filters to eligible options for the current unit/application pair.
 
+### RFQ module (`rfq.html` + `rfq.js`)
+RFQs (Requests for Quotes) link a SOW to one or more contractors who are invited to bid.
+
+**Data:** Stored in `housing_rfq` table. Loaded at boot into `window._rfqCache` (keyed by `rfq.id`) in both `housing-init.js` (for the worklist/search) and `rfq.js` (for the full RFQ page). `rfq.data` is a JSON blob holding all the form fields that aren't top-level columns.
+
+**Status flow:** `draft` → `issued` → `awarded` (or `cancelled` at any non-awarded stage). The worklist shows `issued` RFQs. Only `draft` RFQs can be edited. The Issue button is disabled for non-draft RFQs.
+
+**Tabs on `rfq.html`:**
+- **Details** — RFQ number (auto-generated), linked SOW/unit, issue date, closes date, contact info, scope description
+- **Scope** — structured scope-of-work items (checkboxes per category)
+- **Recipients** — contractor selection (`_rfqSelectedCts` keyed by contractor id). Selecting contractors here populates `recipient_contractor_ids[]` on the RFQ record and drives the RFQ letter email.
+- **Documents** (`_rfqDocLib`) — `DocLibrary` instance attached to this RFQ's unit. Files uploaded here also appear on the unit card in inventory. Selected documents can be attached to the RFQ email sent to contractors.
+- **Contracting** — Contract Details (contract number, scope, pricing breakdown, milestone payments), dynamic rows (materials/specs, exclusions, nation-supplied items), signature blocks (nation rep + contractor). **No witness signature block.** Generate Contract button produces a jsPDF document.
+
+**Contract numbers:** Auto-assigned format `CON-YYYY-NNNN` (4-digit sequential). `generateContractNumber()` in `rfq.js` scans `_rfqCache` for the highest existing `CON-{year}-` number and increments. Stored in `rfq.data.contract_number`; the field is readonly in the UI.
+
+**Contracting tab dynamic rows:** Materials & Specifications, Exclusions, and Items Supplied by Nation all use dynamic row arrays (add/remove rows). These live in `rfq.data` as arrays and are rendered by `render*Rows()` functions.
+
+**Generated contract PDF:** Uses jsPDF with the standard nation header (logo + contact info from Settings → Nation) and footer (Page X of Y). Contract body includes all Contracting tab sections. Saved contracts are uploaded to the unit's document library so they appear on the inventory unit card.
+
 ### Application scoring model
 Urgent need categories (in `scoring.js` `DEFAULT_V2_SCORE_MODEL.urgent_need` and `scoreApplicationLocally()`):
 - `overcrowded`, `structural`, `no_running_water`, `mold_health_hazard`, `caregiver`, `homeless` (added — 25 pts)
