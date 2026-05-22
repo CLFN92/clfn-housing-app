@@ -2692,27 +2692,10 @@ async function renderConfigPanel() {
     +   '<div id="duplicate_apps_output" style="margin-top:14px;font-size:12px;"></div>'
     + '</div>'
 
-    + '<div class="cfg-section">'
-    +   '<div class="cfg-section-title">Spreadsheet Import Validation</div>'
-    +   '<div class="cfg-section-sub">Cross-checks the 2026 Tenants &amp; Units spreadsheet against current housing units in memory. Read-only — no changes are made to the database.</div>'
-    +   '<div class="cfg-grid" style="margin-top:12px;">'
-    +     '<div class="cfg-row">'
-    +       '<div class="cfg-label">Validate 2026 spreadsheet</div>'
-    +       '<div class="cfg-value">'
-    +         '<button type="button" class="btn btn-ghost" onclick="runXlsxValidation()">&#128203; Run Validation Report</button>'
-    +       '</div>'
-    +     '</div>'
-    +   '</div>'
-    +   '<div id="xlsx_validation_output" style="margin-top:14px;font-size:12px;"></div>'
-    + '</div>';
+    ;
 }
 
-// ── 2026 Tenants & Units spreadsheet import data ───────────────────────────
-// Fields: [address, phase, acct, dept, funder_xlsx, cmhc, insured]
-// funder_xlsx: "CMHC" → CMHC_95 in DB; "" → keep existing unless category overrides
-// phase "Private Homes" → funder privately_owned
-// phase "Hearst Property/Paramedic Trailers" → type admin_building
-var _XLSX_2026 = [
+var _XLSX_2026_REMOVED = [
   ["29 Mahikan St.","Phase 1","1410","460","CMHC","249189.00","296708.34"],
   ["35 Nabakhabo St.","Phase 1","1410","460","","","248947.47"],
   ["21 Nabakhabo St.","Phase 1","1410","460","","","248947.47"],
@@ -2951,12 +2934,10 @@ var _XLSX_2026 = [
   ["10 Musko Rd.","Private Homes","","","","",""]
 ];
 
-// ── Spreadsheet validation tool ────────────────────────────────────────────
-// Stores last validation results so Apply can use them without re-scanning
-var _xlsxMatchedUpdates  = [];  // [{ unitId, changes:[{field,from,to}], newValues:{} }]
-var _xlsxUnmatchedNew    = [];  // [{ addr, phase, acct, dept, funder, cmhc, insured, type }]
-
-function runXlsxValidation() {
+function runXlsxValidation() { /* removed */ }
+function applyXlsxUpdates()  { /* removed */ }
+function applyXlsxNewUnits() { /* removed */ }
+function _xlsxDeadCode_removed() { // dead — never called
   var out = document.getElementById('xlsx_validation_output');
   if (!out) return;
   out.innerHTML = '<div style="color:var(--muted);padding:8px 0;">Scanning units&hellip;</div>';
@@ -3168,8 +3149,7 @@ function runXlsxValidation() {
   out.innerHTML = html;
 }
 
-// ── Apply updates to existing units ─────────────────────────────────────────
-async function applyXlsxUpdates() {
+async function _applyXlsxUpdates_dead() {
   var role = window.currentRole || window._realRole;
   if (role !== 'ed') { showToast('Only the Executive Director can apply bulk imports'); return; }
   if (!_xlsxMatchedUpdates.length) { showToast('Run validation first'); return; }
@@ -3221,8 +3201,7 @@ async function applyXlsxUpdates() {
   showToast(ok + ' units updated from 2026 spreadsheet');
 }
 
-// ── Add new units from spreadsheet ──────────────────────────────────────────
-async function applyXlsxNewUnits() {
+async function _applyXlsxNewUnits_dead() {
   var role = window.currentRole || window._realRole;
   if (role !== 'ed') { showToast('Only the Executive Director can apply bulk imports'); return; }
   if (!_xlsxUnmatchedNew.length) { showToast('Run validation first'); return; }
