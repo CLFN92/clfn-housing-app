@@ -395,6 +395,7 @@ function renderMatchView(){
     reserve:     { label: 'Reserve',    accessor: function(a){ return a.reserve || '(none)'; } },
     bestUnit:    { label: 'Best Unit',  accessor: function(a){ return _bestUnitAddr(a) || '(no match)'; } },
     status:      { label: 'Status',     accessor: function(a){ return statusLabel[a.status] || a.status || 'Unknown'; } },
+    hasHouse:    { label: 'Has House',  accessor: function(a){ return a.assignedUnit ? 1 : 0; } },
     action:      { label: 'Action',     accessor: function(a){ var ready = !a.assignedUnit && (a.status==='ed_approved'||a.status==='mgr_approved'||a.status==='hm_approved'); return ready ? 1000 + (a.score||0) : (a.score||0); } }
   };
   var _matchAccessors = {};
@@ -482,6 +483,11 @@ function renderMatchView(){
         +(appDateStr?'<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+appDateStr+'</div>':'')
         +(reqs.length?'<div style="margin-top:3px;">'+reqs.join(' ')+'</div>':'')
       +'</td>'
+      +'<td style="padding:12px 14px;white-space:nowrap;">'
+        +(hasUnit
+          ? '<span style="font-size:12px;font-weight:700;color:var(--success);">Yes</span>'
+          : '<span style="font-size:12px;color:var(--muted);">No</span>')
+      +'</td>'
       +'<td style="padding:12px 14px;">'+assignCell+'</td>'
       +'</tr>';
   }).join('');
@@ -498,6 +504,7 @@ function renderMatchView(){
     +'<th class="std-th-sortable" data-sort-key="reserve">Reserve</th>'
     +'<th class="std-th-sortable" data-sort-key="bestUnit">Best Unit Match</th>'
     +'<th class="std-th-sortable" data-sort-key="status">Status</th>'
+    +'<th class="std-th-sortable" data-sort-key="hasHouse">Has House</th>'
     +'<th class="std-th-sortable" data-sort-key="action">Action</th>'
     +'</tr></thead>'
     +'<tbody id="match_tbody" data-table-page="match">'+rows+'</tbody>'
