@@ -395,7 +395,7 @@ function renderMatchView(){
     reserve:     { label: 'Reserve',    accessor: function(a){ return a.reserve || '(none)'; } },
     bestUnit:    { label: 'Best Unit',  accessor: function(a){ return _bestUnitAddr(a) || '(no match)'; } },
     status:      { label: 'Status',     accessor: function(a){ return statusLabel[a.status] || a.status || 'Unknown'; } },
-    action:      { label: 'Action',     accessor: function(a){ return (!a.assignedUnit && (a.status==='ed_approved'||a.status==='mgr_approved'||a.status==='hm_approved')) ? 1 : 0; } }
+    action:      { label: 'Action',     accessor: function(a){ var ready = !a.assignedUnit && (a.status==='ed_approved'||a.status==='mgr_approved'||a.status==='hm_approved'); return ready ? 1000 + (a.score||0) : (a.score||0); } }
   };
   var _matchAccessors = {};
   Object.keys(_matchColumns).forEach(function(k){ _matchAccessors[k] = _matchColumns[k].accessor; });
