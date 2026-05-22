@@ -3343,13 +3343,14 @@ function saveEldersAgeMin() {
   }).catch(function(e) { console.warn('[cfg] elders age min save failed:', e); showToast('Save failed'); });
 }
 
+var _dupAuditRows = []; // retained for CSV export
+
 function runDuplicateAppsAudit() {
   var out = document.getElementById('duplicate_apps_output');
   if (!out) return;
   var allApps = (typeof applications !== 'undefined') ? applications : [];
   var active = allApps.filter(function(a){ return a && !a.archived && a.status !== 'declined'; });
 
-  // Group by email (non-empty)
   var emailMap = {};
   active.forEach(function(a) {
     var e = (a.email||'').trim().toLowerCase();
@@ -3358,7 +3359,6 @@ function runDuplicateAppsAudit() {
     emailMap[e].push(a);
   });
 
-  // Group by fn+ln+dob
   var nameMap = {};
   active.forEach(function(a) {
     var key = (a.fn||'').trim().toLowerCase()+'|'+(a.ln||'').trim().toLowerCase()+'|'+(a.dob||'').trim();
@@ -3367,52 +3367,107 @@ function runDuplicateAppsAudit() {
     nameMap[key].push(a);
   });
 
-  var rows = '';
+  _dupAuditRows = [];
   var seen = {};
-
-  function _appRow(a, badge) {
-    var name = (((a.fn||'')+' '+(a.ln||'')).trim()) || '—';
-    return '<tr>'
-      + '<td style="padding:5px 8px;">' + _ntfEsc(badge) + '</td>'
-      + '<td style="padding:5px 8px;font-weight:600;">' + _ntfEsc(name) + '</td>'
-      + '<td style="padding:5px 8px;color:var(--muted);">' + _ntfEsc(a.id) + '</td>'
-      + '<td style="padding:5px 8px;color:var(--muted);">' + _ntfEsc(a.email||'—') + '</td>'
-      + '<td style="padding:5px 8px;color:var(--muted);">' + _ntfEsc(a.dob||'—') + '</td>'
-      + '<td style="padding:5px 8px;color:var(--muted);">' + _ntfEsc(a.status||'—') + '</td>'
-      + '</tr>';
-  }
 
   Object.keys(emailMap).forEach(function(e) {
     var grp = emailMap[e]; if (grp.length < 2) return;
     grp.forEach(function(a) {
-      rows += _appRow(a, seen[a.id] ? '' : '🔴 Email');
+      _dupAuditRows.push({ app: a, badge: seen[a.id] ? '' : 'Email' });
       seen[a.id] = true;
     });
   });
-
   Object.keys(nameMap).forEach(function(k) {
     var grp = nameMap[k]; if (grp.length < 2) return;
     grp.forEach(function(a) {
       if (seen[a.id]) return;
-      rows += _appRow(a, '🟡 Name+DOB');
+      _dupAuditRows.push({ app: a, badge: 'Name+DOB' });
       seen[a.id] = true;
     });
   });
 
-  if (!rows) {
+  if (!_dupAuditRows.length) {
     out.innerHTML = '<div style="padding:10px 0;color:var(--success);font-weight:600;">&#10003; No duplicate applications found.</div>';
     return;
   }
 
-  out.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-    + '<thead><tr style="border-bottom:1px solid var(--border);">'
-    + '<th style="padding:5px 8px;text-align:left;">Type</th>'
-    + '<th style="padding:5px 8px;text-align:left;">Name</th>'
-    + '<th style="padding:5px 8px;text-align:left;">App ID</th>'
-    + '<th style="padding:5px 8px;text-align:left;">Email</th>'
-    + '<th style="padding:5px 8px;text-align:left;">DOB</th>'
-    + '<th style="padding:5px 8px;text-align:left;">Status</th>'
+  var rows = _dupAuditRows.map(function(r) {
+    var a    = r.app;
+    var name = (((a.fn||'')+' '+(a.ln||'')).trim()) || '—';
+    var badgeHtml = r.badge === 'Email'
+      ? '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;background:#fee2e2;color:#b91c1c;">&#128308; Email</span>'
+      : r.badge === 'Name+DOB'
+      ? '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;background:#fef9c3;color:#854d0e;">&#128993; Name+DOB</span>'
+      : '';
+    var appHref = 'housing.html?openApp=' + encodeURIComponent(a.id);
+    return '<tr style="border-bottom:1px solid var(--border);">'
+      + '<td style="padding:6px 8px;">' + badgeHtml + '</td>'
+      + '<td style="padding:6px 8px;font-weight:600;">'
+      +   '<a href="' + _ntfEsc(appHref) + '" style="color:var(--text);text-decoration:underline;text-underline-offset:2px;">' + _ntfEsc(name) + '</a>'
+      + '</td>'
+      + '<td style="padding:6px 8px;color:var(--muted);font-size:11px;">' + _ntfEsc(a.id) + '</td>'
+      + '<td style="padding:6px 8px;color:var(--muted);">' + _ntfEsc(a.email||'—') + '</td>'
+      + '<td style="padding:6px 8px;color:var(--muted);">' + _ntfEsc(a.dob||'—') + '</td>'
+      + '<td style="padding:6px 8px;color:var(--muted);">' + _ntfEsc(a.status||'—') + '</td>'
+      + '<td style="padding:6px 8px;">'
+      +   '<button onclick="_dupArchiveApp(\'' + _ntfEsc(a.id).replace(/'/g,"\\'") + '\')" '
+      +     'style="font-size:11px;padding:3px 10px;border:1px solid var(--danger-border);color:var(--danger);'
+      +     'background:none;border-radius:6px;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Archive</button>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+
+  out.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+    + '<span style="font-size:12px;font-weight:600;color:var(--danger);">' + _dupAuditRows.length + ' duplicate application' + (_dupAuditRows.length===1?'':'s') + ' found</span>'
+    + '<button onclick="exportDuplicateAppsCSV()" class="btn btn-ghost btn-sm">&#128229; Export CSV</button>'
+    + '</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+    + '<thead><tr style="border-bottom:2px solid var(--border);background:var(--bg);">'
+    + '<th style="padding:6px 8px;text-align:left;font-size:11px;">Type</th>'
+    + '<th style="padding:6px 8px;text-align:left;font-size:11px;">Name</th>'
+    + '<th style="padding:6px 8px;text-align:left;font-size:11px;">App ID</th>'
+    + '<th style="padding:6px 8px;text-align:left;font-size:11px;">Email</th>'
+    + '<th style="padding:6px 8px;text-align:left;font-size:11px;">DOB</th>'
+    + '<th style="padding:6px 8px;text-align:left;font-size:11px;">Status</th>'
+    + '<th style="padding:6px 8px;text-align:left;font-size:11px;">Archive</th>'
     + '</tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+function exportDuplicateAppsCSV() {
+  if (!_dupAuditRows.length) { showToast('Run the audit first'); return; }
+  var lines = [['Type','Name','App ID','Email','DOB','Status'].map(function(h){ return '"'+h+'"'; }).join(',')];
+  _dupAuditRows.forEach(function(r) {
+    var a = r.app;
+    var esc = function(v){ return '"' + String(v==null?'':v).replace(/"/g,'""') + '"'; };
+    lines.push([esc(r.badge), esc(((a.fn||'')+' '+(a.ln||'')).trim()), esc(a.id), esc(a.email||''), esc(a.dob||''), esc(a.status||'')].join(','));
+  });
+  var blob = new Blob([lines.join('\r\n')], { type: 'text/csv' });
+  var url  = URL.createObjectURL(blob);
+  var link = document.createElement('a');
+  link.href = url; link.download = 'duplicate_applications_' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(link); link.click();
+  document.body.removeChild(link); URL.revokeObjectURL(url);
+}
+
+function _dupArchiveApp(appId) {
+  if (typeof showConfirm !== 'function') return;
+  showConfirm({
+    title:       'Archive as Duplicate?',
+    message:     'This will archive application ' + appId + ' and mark it as a duplicate. This can be undone by an administrator.',
+    confirmText: 'Archive',
+    danger:      true
+  }).then(function(ok) {
+    if (!ok) return;
+    var allApps = (typeof applications !== 'undefined') ? applications : [];
+    var app = allApps.find(function(a){ return a && a.id === appId; });
+    if (!app) { showToast('Application not found'); return; }
+    app.archived     = true;
+    app.declineReason = (app.declineReason ? app.declineReason + '; ' : '') + 'Archived as duplicate';
+    if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(app);
+    if (typeof auditEntry === 'function') auditEntry(appId, 'archived_duplicate', 'Application archived as duplicate from audit tool', window.currentRole||'staff');
+    showToast('Application archived');
+    runDuplicateAppsAudit();
+  });
 }
 
 // Pipeline health card — queries housing_audit_log for recent email_sent
