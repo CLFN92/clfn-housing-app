@@ -1682,10 +1682,51 @@ function popReview(){
 // shared.js so we don't depend on per-page submitModal markup (which only
 // existed on match.html — that's why the Submit button on housing.html
 // silently did nothing before this fix).
+// Returns { hard: [apps with exact email match], soft: [apps with name+DOB match] }
+// Excludes the current draft (currentAppId), archived apps, and declined apps.
+function _findDuplicateApplications() {
+  var allApps = (typeof applications !== 'undefined') ? applications : [];
+  var fn    = ((document.getElementById('fn')||{}).value||'').trim().toLowerCase();
+  var ln    = ((document.getElementById('ln')||{}).value||'').trim().toLowerCase();
+  var dob   = ((document.getElementById('dob')||{}).value||'').trim();
+  var email = ((document.getElementById('email')||{}).value||'').trim().toLowerCase();
+  var hard = [], soft = [];
+  allApps.forEach(function(a) {
+    if (!a || a.archived || a.status === 'declined' || a.id === currentAppId) return;
+    var aEmail = (a.email||'').trim().toLowerCase();
+    var aFn    = (a.fn||'').trim().toLowerCase();
+    var aLn    = (a.ln||'').trim().toLowerCase();
+    var aDob   = (a.dob||'').trim();
+    if (email && aEmail && email === aEmail) { hard.push(a); return; }
+    if (fn && ln && dob && fn === aFn && ln === aLn && dob === aDob) soft.push(a);
+  });
+  return { hard: hard, soft: soft };
+}
+
 function openSubmitModal(){
   popReview();
   var appType = (typeof getAppType==='function') ? getAppType() : 'new_housing';
   var isFileUpdate = (appType === 'existing_tenant');
+
+  // ── Duplicate check ───────────────────────────────────────────────────────
+  var _dups = _findDuplicateApplications();
+  if (_dups.hard.length) {
+    var d     = _dups.hard[0];
+    var dName = (((d.fn||'')+' '+(d.ln||'')).trim()) || d.id;
+    showConfirm({
+      title:       'Duplicate Email — Cannot Submit',
+      message:     'An application with this email address already exists:<br><br>'
+                 + '<strong>' + escapeHtml(dName) + '</strong> &nbsp;·&nbsp; ' + escapeHtml(d.id) + ' &nbsp;·&nbsp; ' + escapeHtml(d.status||'unknown') + '<br><br>'
+                 + 'Use a different email address, or archive the existing application before submitting.',
+      confirmText: 'Open Existing',
+      cancelText:  'Close'
+    }).then(function(ok) {
+      if (ok) window.location.href = 'housing.html?openApp=' + encodeURIComponent(d.id);
+    });
+    return;
+  }
+
+  function _proceed() {
 
   // If the applicant supplied an email, surface an inline opt-in to send
   // them a PDF copy along with the submit confirmation. Default ticked
@@ -1724,6 +1765,25 @@ function openSubmitModal(){
     if (!ok) return;
     finalSubmit({ sendApplicantCopy: sendCopy });
   });
+  } // end _proceed
+
+  if (_dups.soft.length) {
+    var softLines = _dups.soft.slice(0, 3).map(function(a) {
+      return '&bull; <strong>' + escapeHtml(((a.fn||'')+' '+(a.ln||'')).trim()||a.id) + '</strong>'
+           + ' &nbsp;(' + escapeHtml(a.id) + ')&nbsp; &mdash; ' + escapeHtml(a.status||'unknown')
+           + (a.appDate ? ' &nbsp;· Applied ' + escapeHtml(a.appDate) : '');
+    }).join('<br>');
+    showConfirm({
+      title:       'Possible Duplicate Application',
+      message:     'An application with the same name and date of birth already exists:<br><br>'
+                 + softLines + '<br><br>Do you want to submit anyway?',
+      confirmText: 'Submit Anyway',
+      danger:      true
+    }).then(function(ok) { if (ok) _proceed(); });
+    return;
+  }
+
+  _proceed();
 }
 
 function finalSubmit(opts){

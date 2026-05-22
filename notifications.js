@@ -2679,6 +2679,20 @@ async function renderConfigPanel() {
     + '</div>'
 
     + '<div class="cfg-section">'
+    +   '<div class="cfg-section-title">Duplicate Application Audit</div>'
+    +   '<div class="cfg-section-sub">Scans active applications for duplicate email addresses (hard conflict) or matching name + date of birth (soft conflict). Archived and declined applications are excluded.</div>'
+    +   '<div class="cfg-grid" style="margin-top:12px;">'
+    +     '<div class="cfg-row">'
+    +       '<div class="cfg-label">Scan for duplicates</div>'
+    +       '<div class="cfg-value">'
+    +         '<button type="button" class="btn btn-ghost" onclick="runDuplicateAppsAudit()">&#128269; Run Audit</button>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div id="duplicate_apps_output" style="margin-top:14px;font-size:12px;"></div>'
+    + '</div>'
+
+    + '<div class="cfg-section">'
     +   '<div class="cfg-section-title">Spreadsheet Import Validation</div>'
     +   '<div class="cfg-section-sub">Cross-checks the 2026 Tenants &amp; Units spreadsheet against current housing units in memory. Read-only — no changes are made to the database.</div>'
     +   '<div class="cfg-grid" style="margin-top:12px;">'
@@ -3348,6 +3362,78 @@ function saveEldersAgeMin() {
     if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'elders_age_min_save', 'Elders minimum age set to ' + val, role);
     showToast('Elders minimum age saved — ' + val + ' yrs');
   }).catch(function(e) { console.warn('[cfg] elders age min save failed:', e); showToast('Save failed'); });
+}
+
+function runDuplicateAppsAudit() {
+  var out = document.getElementById('duplicate_apps_output');
+  if (!out) return;
+  var allApps = (typeof applications !== 'undefined') ? applications : [];
+  var active = allApps.filter(function(a){ return a && !a.archived && a.status !== 'declined'; });
+
+  // Group by email (non-empty)
+  var emailMap = {};
+  active.forEach(function(a) {
+    var e = (a.email||'').trim().toLowerCase();
+    if (!e) return;
+    if (!emailMap[e]) emailMap[e] = [];
+    emailMap[e].push(a);
+  });
+
+  // Group by fn+ln+dob
+  var nameMap = {};
+  active.forEach(function(a) {
+    var key = (a.fn||'').trim().toLowerCase()+'|'+(a.ln||'').trim().toLowerCase()+'|'+(a.dob||'').trim();
+    if (key === '||') return;
+    if (!nameMap[key]) nameMap[key] = [];
+    nameMap[key].push(a);
+  });
+
+  var rows = '';
+  var seen = {};
+
+  function _appRow(a, badge) {
+    var name = (((a.fn||'')+' '+(a.ln||'')).trim()) || '—';
+    return '<tr>'
+      + '<td style="padding:5px 8px;">' + _ntfEsc(badge) + '</td>'
+      + '<td style="padding:5px 8px;font-weight:600;">' + _ntfEsc(name) + '</td>'
+      + '<td style="padding:5px 8px;color:var(--muted);">' + _ntfEsc(a.id) + '</td>'
+      + '<td style="padding:5px 8px;color:var(--muted);">' + _ntfEsc(a.email||'—') + '</td>'
+      + '<td style="padding:5px 8px;color:var(--muted);">' + _ntfEsc(a.dob||'—') + '</td>'
+      + '<td style="padding:5px 8px;color:var(--muted);">' + _ntfEsc(a.status||'—') + '</td>'
+      + '</tr>';
+  }
+
+  Object.keys(emailMap).forEach(function(e) {
+    var grp = emailMap[e]; if (grp.length < 2) return;
+    grp.forEach(function(a) {
+      rows += _appRow(a, seen[a.id] ? '' : '🔴 Email');
+      seen[a.id] = true;
+    });
+  });
+
+  Object.keys(nameMap).forEach(function(k) {
+    var grp = nameMap[k]; if (grp.length < 2) return;
+    grp.forEach(function(a) {
+      if (seen[a.id]) return;
+      rows += _appRow(a, '🟡 Name+DOB');
+      seen[a.id] = true;
+    });
+  });
+
+  if (!rows) {
+    out.innerHTML = '<div style="padding:10px 0;color:var(--success);font-weight:600;">&#10003; No duplicate applications found.</div>';
+    return;
+  }
+
+  out.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+    + '<thead><tr style="border-bottom:1px solid var(--border);">'
+    + '<th style="padding:5px 8px;text-align:left;">Type</th>'
+    + '<th style="padding:5px 8px;text-align:left;">Name</th>'
+    + '<th style="padding:5px 8px;text-align:left;">App ID</th>'
+    + '<th style="padding:5px 8px;text-align:left;">Email</th>'
+    + '<th style="padding:5px 8px;text-align:left;">DOB</th>'
+    + '<th style="padding:5px 8px;text-align:left;">Status</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
 // Pipeline health card — queries housing_audit_log for recent email_sent
