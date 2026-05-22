@@ -394,12 +394,14 @@ function renderMatchView(){
     tier:        { label: 'Tier',       accessor: function(a){ return (a.tier || 'Low Priority').replace(' Priority',''); } },
     reserve:     { label: 'Reserve',    accessor: function(a){ return a.reserve || '(none)'; } },
     bestUnit:    { label: 'Best Unit',  accessor: function(a){ return _bestUnitAddr(a) || '(no match)'; } },
-    status:      { label: 'Status',     accessor: function(a){ return statusLabel[a.status] || a.status || 'Unknown'; } }
+    status:      { label: 'Status',     accessor: function(a){ return statusLabel[a.status] || a.status || 'Unknown'; } },
+    action:      { label: 'Action',     accessor: function(a){ return (!a.assignedUnit && (a.status==='ed_approved'||a.status==='mgr_approved'||a.status==='hm_approved')) ? 1 : 0; } }
   };
   var _matchAccessors = {};
   Object.keys(_matchColumns).forEach(function(k){ _matchAccessors[k] = _matchColumns[k].accessor; });
 
-  var _matchState = (typeof tableStateGet === 'function') ? tableStateGet('match') : { sort:{key:'score',dir:-1}, filters:{} };
+  var _matchState = (typeof tableStateGet === 'function') ? tableStateGet('match') : { sort:{key:'action',dir:-1}, filters:{} };
+  if (_matchState.sort && !_matchState.sort.key) _matchState.sort = { key: 'action', dir: -1 };
 
   if (typeof tableRegisterColumns === 'function') {
     tableRegisterColumns('match', {
@@ -496,7 +498,7 @@ function renderMatchView(){
     +'<th class="std-th-sortable" data-sort-key="reserve">Reserve</th>'
     +'<th class="std-th-sortable" data-sort-key="bestUnit">Best Unit Match</th>'
     +'<th class="std-th-sortable" data-sort-key="status">Status</th>'
-    +'<th>Action</th>'
+    +'<th class="std-th-sortable" data-sort-key="action">Action</th>'
     +'</tr></thead>'
     +'<tbody id="match_tbody" data-table-page="match">'+rows+'</tbody>'
     +'</table></div></div>';
