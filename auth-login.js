@@ -424,14 +424,22 @@ async function startSignIn() {
 // index there).
 function _stampStaffLastLogin(email) {
   if (!email) return;
+  var now = new Date().toISOString();
   try {
+    // Try staff.last_login_at — may silently fail for employees if RLS blocks self-update
     fetch(SUPABASE_URL + '/rest/v1/staff?email=eq.' + encodeURIComponent(email), {
       method:  'PATCH',
       headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
-      body:    JSON.stringify({ last_login_at: new Date().toISOString() })
-    }).catch(function(e){ console.warn('[LAST LOGIN] write failed:', e); });
+      body:    JSON.stringify({ last_login_at: now })
+    }).catch(function(e){ console.warn('[LAST LOGIN] staff patch failed:', e); });
+    // Always write to audit_log — INSERT allowed for all authenticated users
+    fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
+      method:  'POST',
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+      body:    JSON.stringify({ app_id: 'LOGIN', action: 'user_login', detail: 'Signed in', actor: email })
+    }).catch(function(e){ console.warn('[LAST LOGIN] audit write failed:', e); });
   } catch (e) {
-    console.warn('[LAST LOGIN] write threw:', e);
+    console.warn('[LAST LOGIN] threw:', e);
   }
 }
 

@@ -3307,8 +3307,20 @@ async function renderHousingUserTable(){
   try {
     var filter   = window._staffFilter === 'inactive' ? 'inactive' : 'active';
     var activeQ  = filter === 'inactive' ? 'eq.false' : 'eq.true';
-    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?select=*&is_active='+activeQ+'&order=name',{headers:HOUSING_HEADERS});
+    var results = await Promise.all([
+      fetch(SUPABASE_URL+'/rest/v1/staff?select=*&is_active='+activeQ+'&order=name', {headers:HOUSING_HEADERS}),
+      fetch(SUPABASE_URL+'/rest/v1/housing_audit_log?action=eq.user_login&select=actor,created_at&order=created_at.desc&limit=500', {headers:HOUSING_HEADERS})
+    ]);
+    var r = results[0];
     var staff = await r.json();
+    var loginRows = results[1].ok ? await results[1].json() : [];
+    // Build email → most recent login timestamp from audit_log (fallback for users whose
+    // staff.last_login_at PATCH is blocked by RLS)
+    var _loginMap = {};
+    loginRows.forEach(function(row){
+      var actor = (row.actor||'').toLowerCase();
+      if (actor && !_loginMap[actor]) _loginMap[actor] = row.created_at;
+    });
     if(!staff||!staff.length){
       var emptyMsg = filter === 'inactive' ? 'No deactivated staff.' : 'No staff found.';
       tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;">'+emptyMsg+'</td></tr>';
@@ -3369,7 +3381,7 @@ async function renderHousingUserTable(){
       // Last-login cell. Muted "Never" reads as a soft warning prompt for
       // freshly-added staff who haven't signed in yet, without alarming
       // colour. Tooltip carries the absolute timestamp for precise lookup.
-      var lastLogin = u.last_login_at || null;
+      var lastLogin = u.last_login_at || _loginMap[(u.email||'').toLowerCase()] || null;
       var lastLoginCell = '<td style="font-size:12px;color:var(--muted);"'
         + (lastLogin ? ' title="'+escapeHtml(lastLogin)+'"' : '')
         + '>'+escapeHtml(_fmtRelativeTime(lastLogin))+'</td>';
