@@ -347,22 +347,23 @@ function renderMatchView(){
   if(!content) return;
 
   // For each applicant find their best matching vacant unit
+  var _eldersMin = (window._appSettings && window._appSettings.eldersAgeMin) || 65;
   function bestUnit(app){
     var needsBeds = 1;
     if(app.habitants) needsBeds = Math.max(1, 1 + (app.coApp?1:0) + app.habitants.length);
     var needsAccess = app.accessibility && app.accessibility!=='None' && app.accessibility!=='0' && app.accessibility!==0;
     var age = app.dob ? Math.floor((new Date()-new Date(app.dob))/(365.25*24*3600*1000)) : 0;
-    var isElders = age >= 55;
+    var isElders = age >= _eldersMin;
 
-    var scored = vacantUnits.map(function(u){
+    var eligible = isElders ? vacantUnits : vacantUnits.filter(function(u){ return !u.isElders; });
+    var scored = eligible.map(function(u){
       var sc = 0;
-      if(u.bedrooms === needsBeds)      sc += 10;
-      else if(u.bedrooms > needsBeds)   sc += 5;
+      if(u.bedrooms === needsBeds)        sc += 10;
+      else if(u.bedrooms > needsBeds)     sc += 5;
       else if(u.bedrooms === needsBeds-1) sc += 3;
-      if(needsAccess && u.accessible)   sc += 8;
-      if(needsAccess && !u.accessible)  sc -= 4;
-      if(isElders && u.isElders)        sc += 6;
-      if(!isElders && u.isElders)       sc -= 2;
+      if(needsAccess && u.accessible)     sc += 8;
+      if(needsAccess && !u.accessible)    sc -= 4;
+      if(isElders && u.isElders)          sc += 6;
       return {unit:u, score:sc, maxPossible:24};
     }).sort(function(a,b){ return b.score-a.score; });
 
@@ -441,7 +442,7 @@ function renderMatchView(){
     var reqs = [];
     if(needsAccess) reqs.push('<span style="font-size:10px;color:var(--info-blue);">Needs accessible unit</span>');
     var age = app.dob ? Math.floor((new Date()-new Date(app.dob))/(365.25*24*3600*1000)) : 0;
-    if(age>=55) reqs.push('<span style="font-size:10px;color:var(--warn-amber);">Elders eligible</span>');
+    if(age>=_eldersMin) reqs.push('<span style="font-size:10px;color:var(--warn-amber);">Elders eligible</span>');
 
     var sl = statusLabel[app.status] || app.status || '';
     var appDateStr = app.appDate ? 'Applied '+app.appDate : '';

@@ -2622,6 +2622,7 @@ async function renderConfigPanel() {
   var health = await _renderPipelineHealth();
 
   var currentThreshold = ((window._appSettings && window._appSettings.rfq_threshold) || 10000);
+  var currentEldersAge = ((window._appSettings && window._appSettings.eldersAgeMin) || 65);
 
   body.innerHTML =
       '<div class="cfg-section">'
@@ -2638,6 +2639,22 @@ async function renderConfigPanel() {
     +     '</div>'
     +   '</div>'
     +   '<div style="font-size:11px;color:var(--muted);margin-top:8px;padding:0 0 4px;">SOW totals at or above this amount will show the RFQ button on the Renovations pipeline. Housing Managers and the ED can override below-threshold SOWs.</div>'
+    + '</div>'
+
+    + '<div class="cfg-section">'
+    +   '<div class="cfg-section-title">Elders Housing</div>'
+    +   '<div class="cfg-section-sub">Sets the minimum age for matching applicants to Elders-designated units.</div>'
+    +   '<div class="cfg-grid">'
+    +     '<div class="cfg-row">'
+    +       '<div class="cfg-label">Minimum Age (years)</div>'
+    +       '<div class="cfg-value" style="display:flex;align-items:center;gap:8px;">'
+    +         '<input type="number" id="cfg_elders_age_min" value="' + _ntfEsc(String(currentEldersAge)) + '" min="18" max="99" step="1"'
+    +         ' style="width:80px;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:700;color:var(--text);font-family:DM Sans,sans-serif;background:var(--surface);text-align:right;"/>'
+    +         '<button type="button" class="btn btn-primary btn-sm" onclick="saveEldersAgeMin()">Save</button>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div style="font-size:11px;color:var(--muted);margin-top:8px;padding:0 0 4px;">Applicants below this age will not be suggested as a best match for Elders units and cannot be scored as Elders-eligible in the housing match view.</div>'
     + '</div>'
 
     + '<div class="cfg-section">'
@@ -3311,6 +3328,26 @@ function saveRfqThreshold() {
     if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'rfq_threshold_save', 'RFQ threshold set to $' + val.toLocaleString(), role);
     showToast('RFQ threshold saved — $' + val.toLocaleString());
   }).catch(function(e) { console.warn('[cfg] rfq threshold save failed:', e); showToast('Save failed'); });
+}
+
+function saveEldersAgeMin() {
+  var role = window.currentRole || window._realRole;
+  if (role !== 'ed') { showToast('Only the Executive Director can change this setting'); return; }
+  var inp = document.getElementById('cfg_elders_age_min');
+  if (!inp) return;
+  var val = parseInt(inp.value, 10);
+  if (isNaN(val) || val < 18 || val > 99) { showToast('Enter a valid age between 18 and 99'); inp.focus(); return; }
+  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
+    method:  'POST',
+    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+    body:    JSON.stringify({ key: 'eldersAgeMin', value: val })
+  }).then(function(r) {
+    if (!r.ok) { showToast('Save failed — check connection'); return; }
+    if (!window._appSettings) window._appSettings = {};
+    window._appSettings.eldersAgeMin = val;
+    if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'elders_age_min_save', 'Elders minimum age set to ' + val, role);
+    showToast('Elders minimum age saved — ' + val + ' yrs');
+  }).catch(function(e) { console.warn('[cfg] elders age min save failed:', e); showToast('Save failed'); });
 }
 
 // Pipeline health card — queries housing_audit_log for recent email_sent

@@ -503,7 +503,7 @@ function _scoreUnit(u, needsBeds, needsAccess, isElders) {
   if(needsAccess && u.accessible)     sc += 8;
   if(needsAccess && !u.accessible)    sc -= 4;
   if(isElders && u.isElders)          sc += 6;
-  if(!isElders && u.isElders)         sc -= 2;
+  if(!isElders && u.isElders)         sc -= 100; // ineligible — cannot appear as RECOMMENDED
   return sc;
 }
 
@@ -627,7 +627,8 @@ function openAssignModal(appId, suggestedUnitId) {
   var needsBeds   = Math.max(1,1+(app.coApp?1:0)+((app.habitants||[]).length));
   var needsAccess = app.accessibility&&app.accessibility!=='None'&&app.accessibility!=='0'&&app.accessibility!==0;
   var age = app.dob?Math.floor((new Date()-new Date(app.dob))/(365.25*24*3600*1000)):0;
-  var isElders = age >= 55;
+  var _eldersMin = (window._appSettings && window._appSettings.eldersAgeMin) || 65;
+  var isElders = age >= _eldersMin;
 
   // Populate applicant strip
   document.getElementById('am_app_name').textContent  = name;
