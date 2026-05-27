@@ -22,6 +22,12 @@
 /* Finance main has no sidebar — full-width layout */
 .main{display:block;min-height:calc(100vh - 64px);padding:24px 28px;overflow-x:hidden;max-width:1200px;margin:0 auto;width:100%;}
 
+/* Finance does not use housing-specific quick-create actions */
+.app-header-v2 .create-wrap { display: none !important; }
+
+/* Finance landing page — breathing room under the sticky header */
+#page-home { padding-top: 28px !important; }
+
 </style>
 </head>
 <body>
@@ -34,9 +40,9 @@
 
   <!-- Greeting header -->
   <div class="home-greeting">
-    <div class="home-accent-bar"></div>
-    <div id="home_date" class="home-date-line"></div>
-    <h1 class="home-welcome">Welcome back, <span id="home_user_name" style="color:var(--yellow);"></span></h1>
+    <div class="home-greeting-bar"></div>
+    <div id="home_date" class="home-greeting-date"></div>
+    <h1 class="home-welcome">Welcome back, <span id="home_user_name" class="home-name-accent"></span></h1>
     <p class="home-subtitle">Finance activity at a glance.</p>
     <div class="home-quick-actions">
       <button class="btn btn-primary btn-sm" onclick="openModal('modalRentPayment')">&#127968; Record Payment</button>
