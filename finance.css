@@ -30,10 +30,6 @@
 
 /* ── Standard filter row ── */
 
-.std-filter-divider   { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
-.std-filter-spacer    { flex: 1; }
-.std-filter-clear     { background: none; border: none; font-size: 12px; color: var(--muted); cursor: pointer; padding: 4px 8px; font-family: var(--sans); }
-.std-filter-clear:hover { color: var(--text); }
 
 /* ── Standard status pills ── */
 

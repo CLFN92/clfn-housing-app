@@ -338,7 +338,10 @@ body {
 #worklistView, #dashView, .dash-view, #settingsView, .settings-view,
 #inventoryView, #matchView, #tenantsView, #renoApprovalsView,
 #renosView, #contractorsView, #scorecardView,
-#landingView { padding-top: 0 !important; }
+#landingView,
+#page-home, #page-entryforms, #page-tenants, #page-rent,
+#page-arrangements, #page-loans, #page-journal,
+#page-collections, #page-hydro { padding-top: 0 !important; }
 .back-link {
   color: var(--yellow); font-size: 12px; font-weight: 600;
   text-decoration: none; border: 1px solid rgba(248,228,26,.3);
@@ -838,7 +841,10 @@ input:disabled, select:disabled, textarea:disabled {
   /* View containers — sides only, top stays 0 */
   #worklistView, #dashView, #settingsView, #employeeHomeView,
   #inventoryView, #matchView, #tenantsView, #renoApprovalsView,
-  #renosView, #contractorsView, #scorecardView {
+  #renosView, #contractorsView, #scorecardView,
+  #page-home, #page-entryforms, #page-tenants, #page-rent,
+  #page-arrangements, #page-loans, #page-journal,
+  #page-collections, #page-hydro {
     padding-left:   14px !important;
     padding-right:  14px !important;
     padding-bottom: 16px !important;
@@ -898,7 +904,10 @@ input:disabled, select:disabled, textarea:disabled {
   /* View containers tighter */
   #worklistView, #dashView, #settingsView, #employeeHomeView,
   #inventoryView, #matchView, #tenantsView, #renoApprovalsView,
-  #renosView, #contractorsView, #scorecardView {
+  #renosView, #contractorsView, #scorecardView,
+  #page-home, #page-entryforms, #page-tenants, #page-rent,
+  #page-arrangements, #page-loans, #page-journal,
+  #page-collections, #page-hydro {
     padding-left:   10px !important;
     padding-right:  10px !important;
   }
