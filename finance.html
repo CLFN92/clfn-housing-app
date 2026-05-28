@@ -10477,6 +10477,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     // trigger-sync installed by the F2 migration.
     await _bootLoadFinanceData();
 
+    // Populate avatar initials + role badge now that HOUSING_SESSION is confirmed.
+    // Other pages do this in their -init.js boot hooks; finance.html does it here.
+    if (typeof updateHeaderUser === 'function') updateHeaderUser(_currentRole);
+    if (typeof applyRoleVisibility === 'function') applyRoleVisibility(_currentRole);
+
     // In-memory fix for legacy journal entries loaded with status='posted'
     // (old _journalFromRow default before encoded-reference was introduced).
     // Any entry with reference='' (decoded from null) and no approvedBy is
