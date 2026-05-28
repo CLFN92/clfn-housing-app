@@ -119,6 +119,11 @@
         Reconciliation
         <span class="qa-meta">Finance reports</span>
       </button>
+      <button class="qa-btn" onclick="showRunStatementsModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Running Statements
+        <span class="qa-meta">Batch print tenants</span>
+      </button>
     </div>
   </div>
 
@@ -4879,6 +4884,186 @@ function showAutoEngineModal() {
   document.body.appendChild(mo);
   mo.style.display = '';
   mo.classList.add('on');
+}
+
+function showRunStatementsModal() {
+  var existing = document.getElementById('modalRunStatements');
+  if (existing) document.body.removeChild(existing);
+
+  var d = getData();
+  var totals = calcAllTotals(d);
+  var tenants = (d.tenants || []).filter(function(t){
+    var st = t.status || 'active';
+    return t.active !== false && st !== 'former' && st !== 'deceased';
+  }).slice().sort(function(a,b){ return tenantName(a).localeCompare(tenantName(b)); });
+
+  var rows = tenants.map(function(t){
+    var v = totals[t.id] || {};
+    var bal = (v.rent||0) + (v.loan||0) + (v.arrangement||0);
+    var initials = ((t.first||'')[0]||'') + ((t.last||'')[0]||'');
+    return '<label style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);">'+
+      '<input type="checkbox" class="rs-chk" data-tid="'+t.id+'" checked style="width:15px;height:15px;cursor:pointer;flex-shrink:0;" onchange="_rsUpdateCount()"/>'+
+      '<div class="std-row-avatar" style="flex-shrink:0;">'+(initials||'?')+'</div>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:13px;font-weight:600;">'+tenantName(t)+'</div>'+
+        '<div style="font-size:11px;color:var(--muted);">'+(t.unit||'No unit')+'</div>'+
+      '</div>'+
+      '<div style="text-align:right;flex-shrink:0;font-size:13px;">'+
+        (bal > 0 ? '<span class="amt-debit">'+fmt(bal)+'</span>' : '<span style="color:var(--success);font-weight:600;">Nil</span>')+
+      '</div>'+
+    '</label>';
+  }).join('');
+
+  var mo = document.createElement('div');
+  mo.className = 'modal-ov';
+  mo.id = 'modalRunStatements';
+  mo.innerHTML =
+    '<div class="modal modal-lg" style="max-width:560px;">'+
+    '<div class="modal-hdr">'+
+      '<div><h2>&#128438; Running Statements</h2>'+
+      '<p>Select tenants to include in the batch print</p></div>'+
+      '<button class="modal-close" onclick="closeModal(\'modalRunStatements\')">&#x2715;</button>'+
+    '</div>'+
+    '<div class="modal-body" style="padding:0;">'+
+      '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);">'+
+        '<button class="btn btn-ghost btn-sm" onclick="_rsCheckAll(true)">Check All</button>'+
+        '<button class="btn btn-ghost btn-sm" onclick="_rsCheckAll(false)">Uncheck All</button>'+
+        '<span id="rs-count" style="margin-left:auto;font-size:12px;color:var(--muted);">'+tenants.length+' of '+tenants.length+' selected</span>'+
+      '</div>'+
+      '<div style="max-height:380px;overflow-y:auto;">'+
+        (rows || '<div style="padding:30px;text-align:center;color:var(--muted);">No active tenants found.</div>')+
+      '</div>'+
+    '</div>'+
+    '<div class="modal-footer">'+
+      '<button class="btn btn-ghost" onclick="closeModal(\'modalRunStatements\')">Cancel</button>'+
+      '<button class="btn btn-primary" onclick="printBatchStatements()">&#128438; Print Selected</button>'+
+    '</div>'+
+    '</div>';
+
+  document.body.appendChild(mo);
+  mo.style.display = '';
+  mo.classList.add('on');
+}
+
+function _rsCheckAll(checked) {
+  var chks = document.querySelectorAll('.rs-chk');
+  for (var i=0; i<chks.length; i++) chks[i].checked = checked;
+  _rsUpdateCount();
+}
+
+function _rsUpdateCount() {
+  var total = document.querySelectorAll('.rs-chk').length;
+  var selected = document.querySelectorAll('.rs-chk:checked').length;
+  var el = document.getElementById('rs-count');
+  if (el) el.textContent = selected + ' of ' + total + ' selected';
+}
+
+function printBatchStatements() {
+  var checked = document.querySelectorAll('.rs-chk:checked');
+  if (!checked.length) { toast('No tenants selected.'); return; }
+
+  var tids = [];
+  for (var i=0; i<checked.length; i++) tids.push(checked[i].getAttribute('data-tid'));
+
+  var d = getData();
+  var totals = calcAllTotals(d);
+  var nation = (window.NATION_CONFIG && window.NATION_CONFIG.short_name) || '';
+  var printDate = new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
+  var allTxns = getAllTransactions();
+
+  var w = window.open('','_blank','width=900,height=700');
+  if (!w) { toast('Print popup blocked. Please allow popups for this site.'); return; }
+
+  var css =
+    'body{font-family:Georgia,serif;max-width:860px;margin:24px auto;padding:0 20px;font-size:12px;}' +
+    'h1{font-size:20px;margin-bottom:4px;}' +
+    '.sub{color:#888;font-size:12px;margin-bottom:16px;}' +
+    'table{width:100%;border-collapse:collapse;margin-top:12px;}' +
+    'th{background:#111;color:#fff;padding:7px 10px;text-align:left;font-size:11px;}' +
+    'td{padding:7px 10px;border-bottom:1px solid #eee;font-size:12px;vertical-align:middle;}' +
+    '.bal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}' +
+    '.bal-cell{border:1px solid #ddd;border-radius:8px;padding:10px 12px;text-align:center;}' +
+    '.bal-lbl{font-size:10px;text-transform:uppercase;color:#888;margin-bottom:4px;}' +
+    '.bal-val{font-size:18px;font-weight:700;}' +
+    '.dr{color:#b91c1c;font-weight:600;}' +
+    '.cr{color:#15803d;font-weight:600;}' +
+    '.sig{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:32px;}' +
+    '.sig-line{border-bottom:1px solid #333;height:50px;}' +
+    '.sig-lbl{font-size:11px;margin-top:4px;color:#555;}' +
+    '.pg{page-break-after:always;padding-bottom:40px;margin-bottom:40px;}' +
+    '@media print{button{display:none!important;}.pg:last-child{page-break-after:avoid;}}';
+
+  w.document.write('<!DOCTYPE html><html><head><title>Tenant Statements &mdash; '+printDate+'</title><style>'+css+'</style></head><body>');
+
+  for (var j=0; j<tids.length; j++) {
+    var tid = tids[j];
+    var t = getTenant(tid);
+    if (!t) continue;
+    var v = totals[tid] || {};
+    var rentOwe = v.rent || 0;
+    var loanOwe = v.loan || 0;
+    var arrOwe  = v.arrangement || 0;
+    var grandTotal = rentOwe + loanOwe + arrOwe;
+
+    var entries = allTxns.filter(function(e){ return e.tenantId === tid; })
+      .slice().sort(function(a,b){ return a.date.localeCompare(b.date); });
+
+    var tableRows = entries.map(function(r){
+      return '<tr>'+
+        '<td>'+r.date+'</td>'+
+        '<td>'+(r.desc||'&mdash;')+'</td>'+
+        '<td style="text-transform:capitalize;">'+(r.ledger||'rent')+'</td>'+
+        '<td style="text-align:right;">'+(r.charge>0?'<span class="dr">$'+r.charge.toFixed(2)+'</span>':'&mdash;')+'</td>'+
+        '<td style="text-align:right;">'+(r.payment>0?'<span class="cr">$'+r.payment.toFixed(2)+'</span>':'&mdash;')+'</td>'+
+        '<td>'+(r.method||'&mdash;')+'</td>'+
+        '<td>'+(r.status||'&mdash;')+'</td>'+
+      '</tr>';
+    }).join('');
+
+    var isLast = (j === tids.length - 1);
+    w.document.write('<div class="'+(isLast ? '' : 'pg')+'">');
+    w.document.write('<h1>Tenant Statement &mdash; '+tenantName(t)+'</h1>');
+    w.document.write('<div class="sub">'+
+      (t.unit||'No unit')+' &bull; '+(t.type||'').replace(/-/g,' ')+
+      ' &bull; Generated '+printDate+
+      (nation ? ' &bull; '+nation+' Housing' : '')+
+    '</div>');
+    w.document.write(
+      '<div class="bal-grid">'+
+        '<div class="bal-cell"><div class="bal-lbl">Rent Owing</div>'+
+          '<div class="bal-val '+(rentOwe>0?'dr':'cr')+'">$'+rentOwe.toFixed(2)+'</div></div>'+
+        '<div class="bal-cell"><div class="bal-lbl">Arrangements</div>'+
+          '<div class="bal-val '+(arrOwe>0?'dr':'cr')+'">$'+arrOwe.toFixed(2)+'</div></div>'+
+        '<div class="bal-cell"><div class="bal-lbl">Loans</div>'+
+          '<div class="bal-val '+(loanOwe>0?'dr':'cr')+'">$'+loanOwe.toFixed(2)+'</div></div>'+
+        '<div class="bal-cell"><div class="bal-lbl">Total Owing</div>'+
+          '<div class="bal-val '+(grandTotal>0?'dr':'cr')+'">$'+grandTotal.toFixed(2)+'</div></div>'+
+      '</div>'
+    );
+    if (entries.length) {
+      w.document.write(
+        '<table><thead><tr>'+
+          '<th>Date</th><th>Description</th><th>Ledger</th>'+
+          '<th style="text-align:right;">Charge</th>'+
+          '<th style="text-align:right;">Payment</th>'+
+          '<th>Method</th><th>Status</th>'+
+        '</tr></thead><tbody>'+tableRows+'</tbody></table>'
+      );
+    } else {
+      w.document.write('<p style="color:#888;font-style:italic;">No transactions on file.</p>');
+    }
+    w.document.write(
+      '<div class="sig">'+
+        '<div><div class="sig-line"></div><div class="sig-lbl">Tenant Signature</div></div>'+
+        '<div><div class="sig-line"></div><div class="sig-lbl">Housing Manager</div></div>'+
+      '</div>'
+    );
+    w.document.write('</div>');
+  }
+
+  w.document.write('</body></html>');
+  w.document.close();
+  setTimeout(function(){ w.print(); }, 400);
 }
 
 function runEngineFromModal() {
