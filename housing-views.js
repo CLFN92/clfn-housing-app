@@ -1022,6 +1022,139 @@ function _renderLandingKpis(){
   setKpi('kpi_awaiting_match',  awaitingMatch);
 }
 
+function showHousingKpiDrilldown(type) {
+  var apps  = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var units = (typeof housingUnits  !== 'undefined' && housingUnits)  ? housingUnits  : [];
+
+  var STATUS_LABELS = {
+    'submitted':'Pending HM', 'file_update':'File Update', 'mgr_approved':'Mgr Approved',
+    'ed_approved':'ED Approved', 'hm_approved':'HM Approved',
+    'returned':'Returned', 'declined':'Declined', 'assigned':'Assigned'
+  };
+  var URGENT_LABELS = {
+    'homeless':'Homeless','domestic_violence':'Domestic Violence','fire_disaster':'Fire / Disaster',
+    'homeless_eviction':'Homeless / Eviction','eviction_risk':'Eviction Risk','separation':'Separation',
+    'none':'','':''
+  };
+  function tierPill(tier) {
+    var colors = {'Critical Priority':'var(--danger)','High Priority':'#d97706','Medium Priority':'#0891b2'};
+    var c = colors[tier] || 'var(--muted)';
+    return '<span style="font-size:11px;font-weight:700;color:'+c+';">'+(tier||'—')+'</span>';
+  }
+  function daysSince(dateStr) {
+    if (!dateStr) return '—';
+    var d = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+    return d >= 0 ? d + 'd' : '—';
+  }
+  function appRow(a, cols) {
+    var sid = (a.id||'').replace(/'/g,"\\'");
+    return '<tr class="clickable" onclick="_closeHousingKpiDrill();if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">'
+      + cols + '</tr>';
+  }
+
+  var title, html;
+
+  if (type === 'open') {
+    title = 'Open Applications';
+    var rows = apps.filter(function(a){
+      if (!a || a.archived) return false;
+      return a.status==='submitted' || a.status==='file_update' || a.status==='mgr_approved';
+    }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
+    html = '<table class="tbl"><thead><tr>'
+      + '<th>Applicant</th><th>Status</th><th>Tier</th><th class="std-cell-right">Score</th><th>Waiting</th>'
+      + '</tr></thead><tbody>'
+      + (rows.length ? rows.map(function(a){
+          return appRow(a,
+            '<td style="font-weight:600;">'+escapeHtml((a.fn||'')+' '+(a.ln||''))+'</td>'
+            +'<td>'+escapeHtml(STATUS_LABELS[a.status]||a.status||'')+'</td>'
+            +'<td>'+tierPill(a.tier_v2||a.tier)+'</td>'
+            +'<td class="std-cell-right" style="font-weight:700;">'+(a.score||0)+'</td>'
+            +'<td class="std-cell-muted">'+daysSince(a.appDate)+'</td>'
+          );
+        }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No open applications.</td></tr>')
+      + '</tbody></table>';
+
+  } else if (type === 'critical') {
+    title = 'Critical Priority Applications';
+    var rows = apps.filter(function(a){
+      return a && !a.archived && (a.tier==='Critical Priority' || a.tier_v2==='Critical Priority');
+    }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
+    html = '<table class="tbl"><thead><tr>'
+      + '<th>Applicant</th><th class="std-cell-right">Score</th><th>Status</th><th>Urgent Need</th><th>Waiting</th>'
+      + '</tr></thead><tbody>'
+      + (rows.length ? rows.map(function(a){
+          var urgent = URGENT_LABELS[a.urgentNeed] || (a.urgentNeed||'').replace(/_/g,' ') || '—';
+          return appRow(a,
+            '<td style="font-weight:600;">'+escapeHtml((a.fn||'')+' '+(a.ln||''))+'</td>'
+            +'<td class="std-cell-right amt-debit" style="font-weight:700;">'+(a.score||0)+'</td>'
+            +'<td>'+escapeHtml(STATUS_LABELS[a.status]||a.status||'')+'</td>'
+            +'<td>'+escapeHtml(urgent)+'</td>'
+            +'<td class="std-cell-muted">'+daysSince(a.appDate)+'</td>'
+          );
+        }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No critical priority applications.</td></tr>')
+      + '</tbody></table>';
+
+  } else if (type === 'vacant') {
+    title = 'Vacant Units';
+    var rows = units.filter(function(u){ return u && !u.archived && u.status==='vacant'; })
+      .slice().sort(function(a,b){ return ((a.street||'')+(a.num||'')).localeCompare((b.street||'')+(b.num||'')); });
+    html = '<table class="tbl"><thead><tr>'
+      + '<th>Address</th><th class="std-cell-right">Beds</th><th>Type</th><th>Classification</th>'
+      + '</tr></thead><tbody>'
+      + (rows.length ? rows.map(function(u){
+          var sid = (u.id||'').replace(/'/g,"\\'");
+          return '<tr class="clickable" onclick="_closeHousingKpiDrill();window.location.href=\'inventory.html?unit='+sid+'\'">'
+            +'<td style="font-weight:600;">'+escapeHtml((u.num||'')+' '+(u.street||''))+'</td>'
+            +'<td class="std-cell-right">'+(u.bedrooms||'—')+'</td>'
+            +'<td class="std-cell-muted">'+escapeHtml(u.type||'—')+'</td>'
+            +'<td class="std-cell-muted">'+escapeHtml(u.classification||'—')+'</td>'
+            +'</tr>';
+        }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">No vacant units.</td></tr>')
+      + '</tbody></table>';
+
+  } else if (type === 'awaiting') {
+    title = 'Awaiting Match — Approved, No Unit';
+    var rows = apps.filter(function(a){
+      if (!a || a.archived) return false;
+      return (a.status==='ed_approved'||a.status==='mgr_approved') && !a.assignedUnit;
+    }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
+    html = '<table class="tbl"><thead><tr>'
+      + '<th>Applicant</th><th>Tier</th><th class="std-cell-right">Score</th><th>Status</th><th>Waiting</th>'
+      + '</tr></thead><tbody>'
+      + (rows.length ? rows.map(function(a){
+          return appRow(a,
+            '<td style="font-weight:600;">'+escapeHtml((a.fn||'')+' '+(a.ln||''))+'</td>'
+            +'<td>'+tierPill(a.tier_v2||a.tier)+'</td>'
+            +'<td class="std-cell-right" style="font-weight:700;">'+(a.score||0)+'</td>'
+            +'<td>'+escapeHtml(STATUS_LABELS[a.status]||a.status||'')+'</td>'
+            +'<td class="std-cell-muted">'+daysSince(a.appDate)+'</td>'
+          );
+        }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No applications awaiting match.</td></tr>')
+      + '</tbody></table>';
+  }
+
+  var existing = document.getElementById('modalHousingKpiDrill');
+  if (existing) existing.remove();
+  var mo = document.createElement('div');
+  mo.className = 'modal-ov';
+  mo.id = 'modalHousingKpiDrill';
+  mo.innerHTML =
+    '<div class="modal" style="max-width:820px;width:96%;">'
+    + '<div class="modal-hdr"><div><h2>'+title+'</h2></div>'
+    + '<button class="modal-close" onclick="_closeHousingKpiDrill()">&#x2715;</button></div>'
+    + '<div class="modal-body" style="padding:0;"><div class="tbl-wrap">'+html+'</div></div>'
+    + '</div>';
+  mo.addEventListener('click', function(e){ if (e.target === mo) _closeHousingKpiDrill(); });
+  document.body.appendChild(mo);
+  mo.style.display = '';
+  mo.classList.add('on');
+}
+
+function _closeHousingKpiDrill() {
+  var m = document.getElementById('modalHousingKpiDrill');
+  if (m) m.remove();
+}
+
 // Compat shims — old call sites continue to work.
 function showEmployeeHome(){
   if (document.getElementById('landingView')) return showLanding();

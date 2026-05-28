@@ -1861,6 +1861,8 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
   color: var(--text); line-height: 1.05;
 }
 .kpi-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.kpi-card.kpi-clickable { cursor: pointer; transition: var(--tr); }
+.kpi-card.kpi-clickable:hover { border-color: var(--yellow); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.08); }
 
 /* Quick row */
 .quick-row {

@@ -88,22 +88,22 @@
   <!-- KPI strip — housing-only metrics. Populated by _renderLandingKpis() in
        housing-views.js. Hidden when none of the values are available. -->
   <div class="kpi-strip" id="landing_kpi_strip">
-    <div class="kpi-card" data-kpi="open-apps">
+    <div class="kpi-card kpi-clickable" data-kpi="open-apps" onclick="showHousingKpiDrilldown('open')" role="button" tabindex="0">
       <div class="kpi-label">Open Applications</div>
       <div class="kpi-value" id="kpi_open_apps">—</div>
       <div class="kpi-meta">Pending HM or ED review</div>
     </div>
-    <div class="kpi-card kpi-accent-danger" data-kpi="critical">
+    <div class="kpi-card kpi-accent-danger kpi-clickable" data-kpi="critical" onclick="showHousingKpiDrilldown('critical')" role="button" tabindex="0">
       <div class="kpi-label">Critical Priority</div>
       <div class="kpi-value" id="kpi_critical">—</div>
       <div class="kpi-meta">Highest-need applications</div>
     </div>
-    <div class="kpi-card kpi-accent-success" data-kpi="vacant">
+    <div class="kpi-card kpi-accent-success kpi-clickable" data-kpi="vacant" onclick="showHousingKpiDrilldown('vacant')" role="button" tabindex="0">
       <div class="kpi-label">Vacant Units</div>
       <div class="kpi-value" id="kpi_vacant">—</div>
       <div class="kpi-meta">Available for assignment</div>
     </div>
-    <div class="kpi-card kpi-accent-info" data-kpi="awaiting-match">
+    <div class="kpi-card kpi-accent-info kpi-clickable" data-kpi="awaiting-match" onclick="showHousingKpiDrilldown('awaiting')" role="button" tabindex="0">
       <div class="kpi-label">Awaiting Match</div>
       <div class="kpi-value" id="kpi_awaiting_match">—</div>
       <div class="kpi-meta">Approved · no unit yet</div>
