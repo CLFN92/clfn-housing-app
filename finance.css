@@ -335,3 +335,14 @@
   gap: 6px;
   flex: 0 0 auto;
 }
+
+/* ── Clickable KPI cards ── */
+.kpi-card.kpi-clickable {
+  cursor: pointer;
+  transition: var(--tr);
+}
+.kpi-card.kpi-clickable:hover {
+  border-color: var(--yellow);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.08);
+}
