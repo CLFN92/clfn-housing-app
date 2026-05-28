@@ -74,6 +74,9 @@
         <div class="lookup-results" id="fin_search_results"></div>
       </div>
 
+      <!-- Tenant quick-action card — shown after selecting a search result -->
+      <div id="fin_tenant_card" style="display:none;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:12px;"></div>
+
     </div>
 
     <!-- Quick Actions -->
@@ -3261,7 +3264,73 @@ function finSearchSelectResult(type, id) {
   if (el) { el.classList.remove('open'); el.innerHTML = ''; }
   var inp = document.getElementById('fin_search_input');
   if (inp) inp.value = '';
-  if (type === 'tenant') goToTenant(id);
+  if (type !== 'tenant') { goToTenant(id); return; }
+
+  // Show inline quick-action card
+  var d = getData();
+  var t = getTenant(id);
+  if (!t) { goToTenant(id); return; }
+
+  var totals = calcAllTotals(d);
+  var v = totals[id] || {};
+  var rentOwe = v.rent || 0;
+  var loanOwe = v.loan || 0;
+  var arrOwe  = v.arrangement || 0;
+  var grand   = rentOwe + loanOwe + arrOwe;
+  var initials = ((t.first||'')[0]||'') + ((t.last||'')[0]||'');
+  var sid = id.replace(/'/g, "\\'");
+
+  var card = document.getElementById('fin_tenant_card');
+  if (!card) { goToTenant(id); return; }
+
+  card.innerHTML =
+    // Dark header with avatar + name + dismiss
+    '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--dark);color:#fff;">'+
+      '<div class="tsr-avatar">'+(initials||'?')+'</div>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+tenantName(t)+'</div>'+
+        '<div style="font-size:11px;opacity:.65;">'+(t.unit||'No unit')+(t.type?' &bull; '+t.type.replace(/-/g,' '):'')+'</div>'+
+      '</div>'+
+      '<button onclick="_finCardDismiss()" title="Dismiss" style="background:rgba(255,255,255,.12);border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;color:#fff;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;">&#x2715;</button>'+
+    '</div>'+
+    // Balance strip
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);">'+
+      _finBalCell('Rent', rentOwe)+
+      _finBalCell('Arrangement', arrOwe)+
+      _finBalCell('Loans', loanOwe)+
+      _finBalCell('Total', grand)+
+    '</div>'+
+    // Quick-action buttons (2-column grid)
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:10px 12px;background:var(--surface);">'+
+      '<button class="btn btn-primary" style="font-size:12px;grid-column:1/-1;" onclick="goToTenant(\''+sid+'\')">&#128100; Open Account</button>'+
+      '<button class="btn btn-ghost" style="font-size:12px;" onclick="openPaymentForTenant(\''+sid+'\')">&#128179; Record Payment</button>'+
+      '<button class="btn btn-ghost" style="font-size:12px;" onclick="openInvoiceForTenant(\''+sid+'\')">&#128196; Create Invoice</button>'+
+      '<button class="btn btn-ghost" style="font-size:12px;" onclick="openNewArrForTenant(\''+sid+'\')">&#128203; Arrangement</button>'+
+      '<button class="btn btn-ghost" style="font-size:12px;" onclick="openNewLoanForTenant(\''+sid+'\')">&#128176; New Loan</button>'+
+    '</div>';
+
+  card.style.display = 'block';
+}
+
+function _finBalCell(label, amount) {
+  var isOwe = amount > 0;
+  return '<div style="padding:8px 6px;text-align:center;background:var(--surface);">'+
+    '<div style="font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:.4px;margin-bottom:3px;">'+label+'</div>'+
+    '<div style="font-size:13px;font-weight:700;color:'+(isOwe?'var(--danger)':'var(--success)')+';">'+fmt(amount)+'</div>'+
+  '</div>';
+}
+
+function _finCardDismiss() {
+  var card = document.getElementById('fin_tenant_card');
+  if (card) card.style.display = 'none';
+}
+
+function openNewLoanForTenant(tid) {
+  openModal('modalNewLoan');
+  setTimeout(function(){
+    var s = document.getElementById('ln-tenant'); if(s) s.value = tid;
+    if (typeof calcLoan === 'function') calcLoan();
+  }, 80);
 }
 
 
