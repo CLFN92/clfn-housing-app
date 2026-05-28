@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Housing Finance Module</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="shared.css?v=20260526a"/>
-<link rel="stylesheet" href="finance.css?v=20260526a"/>
+<link rel="stylesheet" href="shared.css?v=20260527a"/>
+<link rel="stylesheet" href="finance.css?v=20260527a"/>
 <script src="shared.js"></script>
 <script src="shared-config.js"></script>
 <script src="shared-auth.js"></script>
@@ -35,48 +35,103 @@
 
 <main class="main">
 
-<!-- HOME (tile grid — replaces sidebar nav) -->
+<!-- HOME -->
 <div class="page on" id="page-home">
 
-  <!-- Greeting header -->
+  <!-- Greeting -->
   <div class="home-greeting">
     <div class="home-greeting-bar"></div>
     <div id="home_date" class="home-greeting-date"></div>
     <h1 class="home-welcome">Welcome back, <span id="home_user_name" class="home-name-accent"></span></h1>
     <p class="home-subtitle">Finance activity at a glance.</p>
-    <div class="home-quick-actions">
-      <button class="btn btn-primary btn-sm" onclick="openModal('modalRentPayment')">&#127968; Record Payment</button>
-      <button class="btn btn-ghost btn-sm" onclick="openAddTenant()">+ Add Tenant</button>
+  </div>
+
+  <!-- KPI strip -->
+  <div class="kpi-strip" id="dashStats"></div>
+
+  <!-- Quick row: Finance Search + Quick Actions -->
+  <div class="quick-row">
+
+    <!-- Finance Search -->
+    <div class="lookup-panel">
+      <h3>Finance Search</h3>
+      <div class="lookup-sub">Search tenants, rent ledger, loans, and arrangements.</div>
+
+      <div class="lookup-tabs" id="fin_lookup_tabs">
+        <button class="lookup-tab active" data-fin-tab="all" onclick="finTabSwitch('all')">All</button>
+        <button class="lookup-tab" data-fin-tab="tenants" onclick="finTabSwitch('tenants')">Tenants</button>
+        <button class="lookup-tab" data-fin-tab="ledger" onclick="finTabSwitch('ledger')">Rent</button>
+        <button class="lookup-tab" data-fin-tab="loans" onclick="finTabSwitch('loans')">Loans</button>
+      </div>
+
+      <div class="lookup-search">
+        <svg class="lookup-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="fin_search_input"
+          placeholder="Search by name, unit, or account..."
+          oninput="finHomeSearch(this.value)"
+          onblur="setTimeout(function(){var r=document.getElementById('fin_search_results');if(r)r.classList.remove('open');},220)"
+          autocomplete="off"/>
+        <div class="lookup-results" id="fin_search_results"></div>
+      </div>
+
+      <div class="lookup-recent-label">Top balances</div>
+      <div class="lookup-recent" id="fin_quick_chips"></div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <h3>Quick actions</h3>
+      <button class="qa-btn" onclick="openModal('modalRentPayment')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        Record Payment
+        <span class="qa-meta">Rent or fee</span>
+      </button>
+      <button class="qa-btn" onclick="openAddTenant()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Add Tenant
+        <span class="qa-meta">New account</span>
+      </button>
+      <button class="qa-btn" onclick="openModal('modalBatchInvoice');renderBatchList()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Batch Invoice
+        <span class="qa-meta">Bulk generate</span>
+      </button>
+      <button class="qa-btn" onclick="showPage('arrangements')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Arrangements
+        <span class="qa-meta">Payment plans</span>
+      </button>
+      <button class="qa-btn" onclick="showPage('loans')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Loans
+        <span class="qa-meta">Loan accounts</span>
+      </button>
+      <button class="qa-btn" onclick="jeResetModal();openModal('modalJournalEntry')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Journal Entry
+        <span class="qa-meta">GL posting</span>
+      </button>
     </div>
   </div>
 
-  <!-- Summary stats (previously on Dashboard) -->
-  <div class="stats-grid" id="dashStats" style="margin-bottom:18px;"></div>
-
-  <!-- Role-aware Worklist -->
-  <div id="finance-worklist-wrap" style="display:none;margin-bottom:20px;">
-    <div class="finance-worklist-hdr">
-      <span id="finance-worklist-title">&#9888; Pending Review</span>
-      <span class="finance-worklist-count" id="finance-worklist-count">0</span>
+  <!-- Finance Worklist (collapsible) -->
+  <div class="section collapsed" id="finance-worklist-wrap" style="display:none">
+    <div class="section-header" onclick="_sectionToggle('finance-worklist-wrap')" role="button" tabindex="0">
+      <div class="section-header-left">
+        <button type="button" class="section-toggle" aria-label="Toggle Pending Review" onclick="event.stopPropagation();_sectionToggle('finance-worklist-wrap')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div>
+          <div class="section-title"><span id="finance-worklist-title">&#9888; Pending Review</span> <span class="section-count-pill" id="finance-worklist-count">0</span></div>
+          <div class="section-sub">Items awaiting your approval or action</div>
+        </div>
+      </div>
     </div>
-    <div id="finance-worklist-body"></div>
-  </div>
-
-  <!-- Find-a-Tenant (compact) -->
-  <div style="margin-bottom:18px;">
-    <div class="search-wrap" style="margin:0;position:relative;">
-      <span class="search-icon">&#128269;</span>
-      <input type="text" id="dashTenantSearch"
-        placeholder="Find a tenant by name, unit, phone or email..."
-        oninput="dashSearchTenants(this.value)"
-        onblur="setTimeout(function(){var r=document.getElementById('dashSearchResults');if(r)r.innerHTML='';},200)"
-        autocomplete="off"/>
-      <div id="dashSearchResults" class="tenant-search-results"></div>
+    <div class="section-body">
+      <div id="finance-worklist-body"></div>
     </div>
   </div>
 
-  <!-- Tile grid -->
-  <div id="home_tiles_grid" class="home-tiles-grid"></div>
 </div>
 
 <!-- ENTRY FORMS — dedicated data-entry-only page for restricted roles -->
@@ -3084,143 +3139,138 @@ function openUtilitiesView(){
 }
 
 function renderHome(){
-  // Greeting block: date line, "Welcome back, <n>"
   var dateEl = document.getElementById('home_date');
   if(dateEl){
     var dd = new Date();
-    var dayStr  = dd.toLocaleDateString('en-US',{weekday:'long'});
-    var dateStr = dd.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
-    dateEl.textContent = dayStr + ' · ' + dateStr;
+    dateEl.textContent = dd.toLocaleDateString('en-US',{weekday:'long'}) + ' · ' + dd.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
   }
   var nameEl = document.getElementById('home_user_name');
   if(nameEl){
-    var who = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.name)
-            ? HOUSING_SESSION.name : 'Finance Staff';
-    nameEl.textContent = who;
+    nameEl.textContent = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.name) ? HOUSING_SESSION.name : 'Finance Staff';
   }
-
-  // Render the dashboard stats block (Total Owing, Rent Arrears, Accounts Clear, Collections)
-  // This is what renderDashboard() populates — the function stays because many other
-  // code paths call it after mutations (payments, voids, etc.) to refresh stats.
   if (typeof renderDashboard === 'function') renderDashboard();
+  if (typeof finPopulateQuickChips === 'function') finPopulateQuickChips();
+}
 
-  // Compute live counts from _memStore for the tile stat lines.
+// ── Finance landing page search ────────────────────────────────────────────
+function finTabSwitch(tab) {
+  document.querySelectorAll('#fin_lookup_tabs .lookup-tab').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-fin-tab') === tab);
+  });
+  var inp = document.getElementById('fin_search_input');
+  if (inp && inp.value.trim()) finHomeSearch(inp.value);
+}
+
+function finHomeSearch(query) {
+  var resultsEl = document.getElementById('fin_search_results');
+  if (!resultsEl) return;
+  var q = (query||'').trim().toLowerCase();
+  if (!q) { resultsEl.classList.remove('open'); resultsEl.innerHTML = ''; return; }
+
+  var activeTab = 'all';
+  var tabEl = document.querySelector('#fin_lookup_tabs .lookup-tab.active');
+  if (tabEl) activeTab = tabEl.getAttribute('data-fin-tab') || 'all';
+
   var d = getData();
-  var tenants = d.tenants || [];
-  var active  = tenants.filter(function(t){ return (t.status||'active')==='active' && !t.archived; }).length;
-  var former  = tenants.filter(function(t){ return t.status==='former' && !t.archived; }).length;
+  var results = [];
 
-  var rentEntries = d.rentLedger || [];
-  var openInvoices = rentEntries.filter(function(e){ return e.type==='invoice' && (e.payment||0) === 0 && !e.voided; }).length;
-
-  var loans = d.loanList || [];
-  var approvedLoans = loans.filter(function(l){ return l.status==='approved'; }).length;
-  var pendingLoans  = loans.filter(function(l){ return l.status==='pending-ed' || l.status==='pending'; }).length;
-
-  var arrangements = d.arrangements || [];
-  var activeArr = arrangements.filter(function(a){ return a.status==='approved' || a.status==='active'; }).length;
-
-  var collections = d.collections || [];
-  var openCol = collections.filter(function(c){ return c.status==='approved' || c.status==='pending-ed'; }).length;
-
-  var journal = d.journalEntries || [];
-  var pendingJournal = journal.filter(function(j){ return j.status==='pending-ed' || j.status==='pending'; }).length;
-
-  var hydro = (d.hydroLedger || []).length;
-  var gas   = (d.gasLedger || []).length;
-
-  var auditCount = (d.auditLog || []).length;
-  var txnCount   = rentEntries.length + (d.loanPayments||[]).length + (d.arrPayments||[]).length;
-
-  // Tile builder. Accent color shows as a 3px top border on the card.
-  function stat(label, value, cls){
-    return '<div class="home-tile-stat '+(cls||'')+'"><span>'+label+'</span><b>'+value+'</b></div>';
+  if (activeTab === 'all' || activeTab === 'tenants') {
+    var limit = activeTab === 'all' ? 4 : 8;
+    (d.tenants||[]).filter(function(t){
+      return !t.archived && (
+        tenantName(t).toLowerCase().includes(q) ||
+        (t.unit||'').toLowerCase().includes(q) ||
+        (t.phone||'').toLowerCase().includes(q) ||
+        (t.email||'').toLowerCase().includes(q)
+      );
+    }).slice(0, limit).forEach(function(t){
+      results.push({type:'tenant', id:t.id, iconCls:'type-tenant', iconTxt:'T',
+        title:tenantName(t), sub:(t.unit||'')+(t.type?' · '+t.type.replace(/-/g,' '):''),
+        badge:'Tenant', badgeCls:'badge-tenant'});
+    });
   }
-  function tile(icon, title, clickFn, accent, statsHtml){
-    return '<div class="home-tile" onclick="'+clickFn+'" style="border-top-color:'+accent+';">'
-      + '<div class="home-tile-hdr"><span class="home-tile-icon">'+icon+'</span><span class="home-tile-title">'+title+'</span></div>'
-      + '<div>'+statsHtml+'</div>'
+
+  if (activeTab === 'all' || activeTab === 'ledger') {
+    var limit2 = activeTab === 'all' ? 3 : 8;
+    (d.rentLedger||[]).filter(function(r){
+      var t = getTenant(r.tenantId);
+      return t && !t.archived && (
+        tenantName(t).toLowerCase().includes(q) ||
+        (r.desc||'').toLowerCase().includes(q) ||
+        (r.ref||'').toLowerCase().includes(q)
+      );
+    }).slice(0, limit2).forEach(function(r){
+      var t = getTenant(r.tenantId);
+      if (!t) return;
+      results.push({type:'tenant', id:r.tenantId, iconCls:'type-sow', iconTxt:'$',
+        title:tenantName(t) + ' — ' + (r.type==='payment'?'Payment':'Invoice'),
+        sub:(r.date||'')+(r.desc?' · '+r.desc:''), badge:'Ledger', badgeCls:'badge-sow'});
+    });
+  }
+
+  if (activeTab === 'all' || activeTab === 'loans') {
+    var limit3 = activeTab === 'all' ? 3 : 8;
+    (d.loanList||[]).filter(function(l){
+      var t = getTenant(l.tenantId);
+      return t && !t.archived && (
+        tenantName(t).toLowerCase().includes(q) ||
+        (l.purpose||'').toLowerCase().includes(q)
+      );
+    }).slice(0, limit3).forEach(function(l){
+      var t = getTenant(l.tenantId);
+      if (!t) return;
+      results.push({type:'tenant', id:l.tenantId, iconCls:'type-unit', iconTxt:'L',
+        title:tenantName(t) + ' — Loan',
+        sub:'$'+(l.principal||0).toFixed(2)+' · '+l.status, badge:'Loan', badgeCls:'badge-unit'});
+    });
+  }
+
+  if (!results.length) {
+    resultsEl.classList.add('open');
+    resultsEl.innerHTML = '<div class="lookup-empty">No matches found</div>';
+    return;
+  }
+  resultsEl.classList.add('open');
+  resultsEl.innerHTML = results.map(function(r){
+    var safeId = (r.id||'').replace(/'/g,"\\'");
+    return '<div class="lookup-result" onclick="finSearchSelectResult(\''+r.type+'\',\''+safeId+'\')">'
+      + '<div class="lookup-result-icon '+r.iconCls+'">'+r.iconTxt+'</div>'
+      + '<div class="lookup-result-main">'
+        + '<div class="lookup-result-title">'+r.title+'</div>'
+        + '<div class="lookup-result-sub">'+r.sub+'</div>'
+      + '</div>'
+      + '<span class="lookup-result-badge '+r.badgeCls+'">'+r.badge+'</span>'
       + '</div>';
-  }
+  }).join('');
+}
 
-  var tiles = [];
+function finSearchSelectResult(type, id) {
+  var el = document.getElementById('fin_search_results');
+  if (el) { el.classList.remove('open'); el.innerHTML = ''; }
+  var inp = document.getElementById('fin_search_input');
+  if (inp) inp.value = '';
+  if (type === 'tenant') goToTenant(id);
+}
 
-  // Entry Forms — dedicated data-entry surface for restricted roles.
-  // Shows all "create" actions (payments, invoices, etc.) without exposing
-  // the underlying ledger listings.
-  tiles.push(tile('📝','Entry Forms',"showPage('entryforms')",'#F8E41A',
-    stat('Create Records', '9 forms', 'neutral')
-    + stat('Audit-Logged', 'Yes', 'good')
-  ));
-
-  // Batch — opens Batch Invoice modal (bulk print/generate)
-  tiles.push(tile('🖨️','Batch',"openModal('modalBatchInvoice');renderBatchList();",'#7c3aed',
-    stat('Active Tenants', active, 'info')
-    + stat('Bulk Invoice', 'Ready', 'good')
-  ));
-
-  // Tenants
-  tiles.push(tile('👥','Tenants',"showPage('tenants')",'#0ea5e9',
-    stat('Active', active, 'info')
-    + stat('Former', former, 'neutral')
-    + stat('Total', tenants.length, 'neutral')
-  ));
-
-  // Rent ledger
-  tiles.push(tile('🏠','Rent Ledger',"showPage('rent')",'#F8E41A',
-    stat('Open Invoices', openInvoices, openInvoices>0?'alert':'good')
-    + stat('Total Entries', rentEntries.length, 'neutral')
-  ));
-
-  // Arrangements
-  tiles.push(tile('📋','Arrangements',"showPage('arrangements')",'#7c3aed',
-    stat('Active Plans', activeArr, activeArr>0?'info':'neutral')
-    + stat('Total', arrangements.length, 'neutral')
-  ));
-
-  // Loans
-  tiles.push(tile('💼','Loans',"showPage('loans')",'#15803d',
-    stat('Approved', approvedLoans, 'good')
-    + stat('Pending Approval', pendingLoans, pendingLoans>0?'alert':'neutral')
-    + stat('Total', loans.length, 'neutral')
-  ));
-
-  // Journal
-  tiles.push(tile('📓','Journal Entries',"showPage('journal')",'#6366f1',
-    stat('Pending ED Approval', pendingJournal, pendingJournal>0?'alert':'neutral')
-    + stat('Total Entries', journal.length, 'neutral')
-  ));
-
-  // Utilities — open Transactions page pre-filtered to utility-type entries
-  tiles.push(tile('⚡','Utilities',"openUtilitiesView()",'#f59e0b',
-    stat('Hydro Records', hydro, 'neutral')
-    + stat('Gas Records', gas, 'neutral')
-  ));
-
-  // Collections
-  tiles.push(tile('🚨','Collections',"showPage('collections')",'#dc2626',
-    stat('Open Cases', openCol, openCol>0?'alert':'good')
-    + stat('Total', collections.length, 'neutral')
-  ));
-
-  // Reports
-  tiles.push(tile('📄','Reports',"showPage('reports')",'#64748b',
-    stat('Aging Reports', '—', 'neutral')
-    + stat('Period Summaries', '—', 'neutral')
-  ));
-
-  // Transactions
-  tiles.push(tile('🔄','Transactions',"showPage('transactions')",'#0891b2',
-    stat('Total', txnCount, 'neutral')
-  ));
-
-  // Audit Log
-  tiles.push(tile('👁','Audit Log',"showPage('auditlog')",'#475569',
-    stat('Entries', auditCount, 'neutral')
-  ));
-
-  var grid = document.getElementById('home_tiles_grid');
-  if(grid) grid.innerHTML = tiles.join('');
+function finPopulateQuickChips() {
+  var el = document.getElementById('fin_quick_chips');
+  if (!el) return;
+  var d = getData();
+  var totals = (typeof calcAllTotals === 'function') ? calcAllTotals(d) : {};
+  var tenants = (d.tenants||[]).filter(function(t){ return !t.archived && (t.status||'active')==='active'; });
+  tenants.sort(function(a,b){
+    var oa = totals[a.id]||{}, ob = totals[b.id]||{};
+    return ((ob.rent||0)+(ob.loan||0)+(ob.arrangement||0)) - ((oa.rent||0)+(oa.loan||0)+(oa.arrangement||0));
+  });
+  el.innerHTML = tenants.slice(0,6).map(function(t){
+    var tot = totals[t.id]||{};
+    var owing = (tot.rent||0)+(tot.loan||0)+(tot.arrangement||0);
+    var safeId = (t.id||'').replace(/'/g,"\\'");
+    return '<button class="lookup-chip lookup-chip--tenant" onclick="finSearchSelectResult(\'tenant\',\''+safeId+'\')">'+
+      tenantName(t)+
+      (owing > 0 ? '<span class="lookup-chip-meta"> · '+fmt(owing)+'</span>' : '')+
+    '</button>';
+  }).join('');
 }
 
 // \u2500\u2500 Invoice cache and search \u2500\u2500
@@ -9063,15 +9113,18 @@ function openEditJournalModal(ref, fallbackId) {
   window._jeEditIds = group.map(function(j){ return j.id; });
 }
 
+function kpiCard(lbl, val, sub, accent) {
+  var cls = accent ? ' kpi-accent-'+accent : '';
+  return '<div class="kpi-card'+cls+'">'
+    + '<div class="kpi-label">'+lbl+'</div>'
+    + '<div class="kpi-value">'+val+'</div>'
+    + (sub ? '<div class="kpi-meta">'+sub+'</div>' : '')
+    + '</div>';
+}
+
 function renderDashboard(){
   if (typeof renderFinanceWorklist === 'function') renderFinanceWorklist();
-  // NOTE: #dashSubtitle used to live on the old Dashboard page which was
-  // consolidated into Home. We keep the null-guard in case other callers
-  // (or future markup changes) re-introduce it.
-  var subEl = document.getElementById('dashSubtitle');
-  if (subEl) subEl.textContent = 'Overview - ' + new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
   var d=getData();
-
   var totals=calcAllTotals(d);
   var tR=0,tL=0,tA=0,colCount=0,clearCount=0;
   d.tenants.forEach(function(t){
@@ -9082,15 +9135,10 @@ function renderDashboard(){
   var grand=tR+tL+tA;
   var statsEl = document.getElementById('dashStats');
   if (statsEl) statsEl.innerHTML=
-    statCard('Total Owing',fmt(grand),'All ledgers',grand>0?'danger':'')+
-    statCard('Rent Arrears',fmt(tR),'',tR>0?'danger':'')+
-    statCard('Accounts Clear',clearCount,'of '+d.tenants.length+' tenants','success')+
-    statCard('Collections',colCount+' file'+(colCount!==1?'s':''),'Active',colCount>0?'danger':'');
-  // Close search dropdown on dashboard load
-  var dr = document.getElementById('dashSearchResults');
-  if(dr) dr.style.display='none';
-  var di = document.getElementById('dashTenantSearch');
-  if(di) di.value='';
+    kpiCard('Total Owing', fmt(grand), 'All ledgers', grand>0?'danger':'')+
+    kpiCard('Rent Arrears', fmt(tR), '', tR>0?'danger':'')+
+    kpiCard('Accounts Clear', clearCount, 'of '+d.tenants.length+' tenants', 'success')+
+    kpiCard('Collections', colCount+' file'+(colCount!==1?'s':''), 'Active', colCount>0?'danger':'');
 }
 var _stmtTid = null;
 var _stmtFilter = 'all';
