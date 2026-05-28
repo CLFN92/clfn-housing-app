@@ -155,7 +155,7 @@
 <!-- ENTRY FORMS — dedicated data-entry-only page for restricted roles -->
 <div class="page" id="page-entryforms" style="display:none">
   <div class="page-back-row">
-    <button onclick="showHome()" class="back-btn-yellow">
+    <button onclick="finGoBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back to Home
     </button>
@@ -229,7 +229,7 @@
 <!-- TENANTS -->
 <div class="page" id="page-tenants" style="display:none">
   <div class="page-back-row">
-    <button onclick="showHome()" class="back-btn-yellow">
+    <button onclick="finGoBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back to Home
     </button>
@@ -320,7 +320,7 @@
 <div class="page" id="page-rent" style="display:none">
 
   <div class="page-back-row">
-    <button onclick="showHome()" class="back-btn-yellow">
+    <button onclick="finGoBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back to Home
     </button>
@@ -424,7 +424,7 @@
 <div class="page" id="page-arrangements" style="display:none">
 
   <div class="page-back-row">
-    <button onclick="showHome()" class="back-btn-yellow">
+    <button onclick="finGoBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back to Home
     </button>
@@ -507,7 +507,7 @@
 <div class="page" id="page-loans" style="display:none">
 
   <div class="page-back-row">
-    <button onclick="showHome()" class="back-btn-yellow">
+    <button onclick="finGoBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back to Home
     </button>
@@ -582,7 +582,7 @@
 <div class="page" id="page-journal" style="display:none">
 
   <div class="page-back-row">
-    <button onclick="showHome()" class="back-btn-yellow">
+    <button onclick="finGoBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back to Home
     </button>
@@ -681,7 +681,7 @@
 <div class="page" id="page-reports" style="display:none">
 
   <div class="page-back-row">
-    <button onclick="showHome()" class="back-btn-yellow">
+    <button onclick="finGoBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back to Home
     </button>
@@ -796,7 +796,7 @@
 <div class="page" id="page-collections" style="display:none">
 
   <div class="page-back-row">
-    <button onclick="showHome()" class="back-btn-yellow">
+    <button onclick="finGoBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back to Home
     </button>
@@ -874,7 +874,7 @@
 <div class="page" id="page-transactions" style="display:none">
 
   <div class="page-back-row">
-    <button onclick="showHome()" class="back-btn-yellow">
+    <button onclick="finGoBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back to Home
     </button>
@@ -951,7 +951,7 @@
 <div class="page" id="page-auditlog" style="display:none">
 
   <div class="page-back-row">
-    <button onclick="showHome()" class="back-btn-yellow">
+    <button onclick="finGoBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back to Home
     </button>
@@ -982,7 +982,7 @@
 <div class="page" id="page-statement" style="display:none">
 
   <div class="page-back-row">
-    <button onclick="showHome()" class="back-btn-yellow">
+    <button onclick="finGoBack()" class="back-btn-yellow">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Back to Home
     </button>
@@ -3131,6 +3131,9 @@ function collectionsBadge(tenantId){
 // NAVIGATION
 // showPage defined below
 function showPage(id) {
+  var _curEl = document.querySelector('.page.on');
+  var _curId = _curEl ? _curEl.id.replace('page-','') : 'home';
+  if (_curId !== id && id !== 'home') _prevPage = _curId;
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('on');});
   var pg = document.getElementById('page-'+id); if(pg) pg.classList.add('on');
   // Return to top whenever a new page is shown so users don't land mid-scroll
@@ -3167,12 +3170,29 @@ function showPage(id) {
   if(id==='transactions'){initTxnFilters();renderTransactions();}
   if(id==='auditlog') renderAuditLog();
   if(id==='statement') { /* rendered on demand via goToTenant() */ }
+  // Update back button label on the new page
+  var _bLabels = {home:'Home',tenants:'Tenants',rent:'Rent Ledger',arrangements:'Arrangements',loans:'Loans',journal:'Journal',reports:'Reports',collections:'Collections',transactions:'Transactions',auditlog:'Audit Log',entryforms:'Entry Forms'};
+  var _newPg = document.getElementById('page-'+id);
+  if (_newPg) {
+    var _backBtnEl = _newPg.querySelector('.back-btn-yellow');
+    if (_backBtnEl) {
+      var _cNodes = _backBtnEl.childNodes;
+      for (var _ni = _cNodes.length-1; _ni >= 0; _ni--) {
+        if (_cNodes[_ni].nodeType === 3 && _cNodes[_ni].textContent.trim()) {
+          _cNodes[_ni].textContent = '\n      Back to '+(_bLabels[_prevPage]||'Previous')+'\n    ';
+          break;
+        }
+      }
+    }
+  }
 }
 
 // ── HOME — tile grid landing page ────────────────────────────────────────
 // Replaces the old sidebar-nav dashboard as the default view. Users pick a
 // tile to drill into a specific area. Mirrors housing.html's home.
 function showHome(){ showPage('home'); }
+var _prevPage = 'home';
+function finGoBack(){ showPage(_prevPage || 'home'); }
 
 // Utilities tile → Transactions page pre-filtered to utility ledgers
 function openUtilitiesView(){
@@ -9725,11 +9745,8 @@ function showKpiDrilldown(type) {
 }
 var _stmtTid = null;
 var _stmtFilter = 'all';
-var _stmtPrevPage = 'home';
 
 function goToTenant(tid) {
-  var cur = document.querySelector('.page.on');
-  _stmtPrevPage = cur ? cur.id.replace('page-', '') : 'home';
   _stmtTid = tid;
   _stmtFilter = 'all';
   showPage('statement');
@@ -9737,9 +9754,7 @@ function goToTenant(tid) {
 }
 
 function stmtGoBack() {
-  var prev = _stmtPrevPage || 'home';
-  if (prev === 'home' || prev === 'statement') { showHome(); }
-  else { showPage(prev); }
+  finGoBack();
   if (typeof closeSidebarOnNav === 'function') closeSidebarOnNav();
 }
 
@@ -9754,7 +9769,7 @@ function renderStatementPage(tid) {
   var _backBtn = document.getElementById('stmt-back-btn');
   if (_backBtn) {
     var _pageLabels = {home:'Home',tenants:'Tenants',rent:'Rent Ledger',arrangements:'Arrangements',loans:'Loans',journal:'Journal',reports:'Reports',collections:'Collections',transactions:'Transactions'};
-    _backBtn.innerHTML = '&#8592; Back to ' + (_pageLabels[_stmtPrevPage] || 'Previous');
+    _backBtn.innerHTML = '&#8592; Back to ' + (_pageLabels[_prevPage] || 'Previous');
   }
 
   // Balance bar
