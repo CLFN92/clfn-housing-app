@@ -988,7 +988,7 @@
     </button>
   </div>
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
-    <button class="btn btn-ghost btn-sm" onclick="showPage('tenants');closeSidebarOnNav()" style="padding:6px 12px;">← Back to Tenants</button>
+    <button id="stmt-back-btn" class="btn btn-ghost btn-sm" onclick="stmtGoBack()" style="padding:6px 12px;">&#8592; Back</button>
     <div style="flex:1;min-width:0;">
       <div id="stmt-tenant-name" style="font-size:20px;font-weight:700;"></div>
       <div id="stmt-tenant-sub" style="font-size:12px;color:var(--muted);"></div>
@@ -9594,12 +9594,22 @@ function renderDashboard(){
 }
 var _stmtTid = null;
 var _stmtFilter = 'all';
+var _stmtPrevPage = 'home';
 
 function goToTenant(tid) {
+  var cur = document.querySelector('.page.on');
+  _stmtPrevPage = cur ? cur.id.replace('page-', '') : 'home';
   _stmtTid = tid;
   _stmtFilter = 'all';
   showPage('statement');
   renderStatementPage(tid);
+}
+
+function stmtGoBack() {
+  var prev = _stmtPrevPage || 'home';
+  if (prev === 'home' || prev === 'statement') { showHome(); }
+  else { showPage(prev); }
+  if (typeof closeSidebarOnNav === 'function') closeSidebarOnNav();
 }
 
 function renderStatementPage(tid) {
@@ -9610,6 +9620,11 @@ function renderStatementPage(tid) {
   // Header
   document.getElementById('stmt-tenant-name').textContent = tenantName(t);
   document.getElementById('stmt-tenant-sub').textContent = t.unit + '  \u00B7  ' + t.type.replace(/-/g,' ');
+  var _backBtn = document.getElementById('stmt-back-btn');
+  if (_backBtn) {
+    var _pageLabels = {home:'Home',tenants:'Tenants',rent:'Rent Ledger',arrangements:'Arrangements',loans:'Loans',journal:'Journal',reports:'Reports',collections:'Collections',transactions:'Transactions'};
+    _backBtn.innerHTML = '&#8592; Back to ' + (_pageLabels[_stmtPrevPage] || 'Previous');
+  }
 
   // Balance bar
   var totals = calcAllTotals(d);
