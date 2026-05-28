@@ -74,9 +74,6 @@
         <div class="lookup-results" id="fin_search_results"></div>
       </div>
 
-      <!-- Tenant quick-action card — shown after selecting a search result -->
-      <div id="fin_tenant_card" style="display:none;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:12px;"></div>
-
     </div>
 
     <!-- Quick Actions -->
@@ -126,6 +123,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
         Running Statements
         <span class="qa-meta">Batch print tenants</span>
+      </button>
+      <button class="qa-btn" onclick="showBatchAccountingModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="6" y1="8" x2="18" y2="8"/><line x1="6" y1="12" x2="14" y2="12"/></svg>
+        Batch Accounting
+        <span class="qa-meta">Dry run / live post</span>
       </button>
     </div>
   </div>
@@ -995,7 +997,10 @@
   </div>
 
   <!-- Balance summary bar -->
-  <div id="stmt-balance-bar" style="margin-bottom:16px;"></div>
+  <div id="stmt-balance-bar" style="margin-bottom:12px;"></div>
+
+  <!-- Quick-action strip — populated by renderStatementPage() -->
+  <div id="stmt-quick-actions" style="display:none;margin-bottom:14px;"></div>
 
   <!-- Filter bar -->
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
@@ -3264,66 +3269,9 @@ function finSearchSelectResult(type, id) {
   if (el) { el.classList.remove('open'); el.innerHTML = ''; }
   var inp = document.getElementById('fin_search_input');
   if (inp) inp.value = '';
-  if (type !== 'tenant') { goToTenant(id); return; }
-
-  // Show inline quick-action card
-  var d = getData();
-  var t = getTenant(id);
-  if (!t) { goToTenant(id); return; }
-
-  var totals = calcAllTotals(d);
-  var v = totals[id] || {};
-  var rentOwe = v.rent || 0;
-  var loanOwe = v.loan || 0;
-  var arrOwe  = v.arrangement || 0;
-  var grand   = rentOwe + loanOwe + arrOwe;
-  var initials = ((t.first||'')[0]||'') + ((t.last||'')[0]||'');
-  var sid = id.replace(/'/g, "\\'");
-
-  var card = document.getElementById('fin_tenant_card');
-  if (!card) { goToTenant(id); return; }
-
-  card.innerHTML =
-    // Dark header with avatar + name + dismiss
-    '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--dark);color:#fff;">'+
-      '<div class="tsr-avatar">'+(initials||'?')+'</div>'+
-      '<div style="flex:1;min-width:0;">'+
-        '<div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+tenantName(t)+'</div>'+
-        '<div style="font-size:11px;opacity:.65;">'+(t.unit||'No unit')+(t.type?' &bull; '+t.type.replace(/-/g,' '):'')+'</div>'+
-      '</div>'+
-      '<button onclick="_finCardDismiss()" title="Dismiss" style="background:rgba(255,255,255,.12);border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;color:#fff;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;">&#x2715;</button>'+
-    '</div>'+
-    // Balance strip
-    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);">'+
-      _finBalCell('Rent', rentOwe)+
-      _finBalCell('Arrangement', arrOwe)+
-      _finBalCell('Loans', loanOwe)+
-      _finBalCell('Total', grand)+
-    '</div>'+
-    // Quick-action buttons (2-column grid)
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:10px 12px;background:var(--surface);">'+
-      '<button class="btn btn-primary" style="font-size:12px;grid-column:1/-1;" onclick="goToTenant(\''+sid+'\')">&#128100; Open Account</button>'+
-      '<button class="btn btn-ghost" style="font-size:12px;" onclick="openPaymentForTenant(\''+sid+'\')">&#128179; Record Payment</button>'+
-      '<button class="btn btn-ghost" style="font-size:12px;" onclick="openInvoiceForTenant(\''+sid+'\')">&#128196; Create Invoice</button>'+
-      '<button class="btn btn-ghost" style="font-size:12px;" onclick="openNewArrForTenant(\''+sid+'\')">&#128203; Arrangement</button>'+
-      '<button class="btn btn-ghost" style="font-size:12px;" onclick="openNewLoanForTenant(\''+sid+'\')">&#128176; New Loan</button>'+
-    '</div>';
-
-  card.style.display = 'block';
+  goToTenant(id);
 }
 
-function _finBalCell(label, amount) {
-  var isOwe = amount > 0;
-  return '<div style="padding:8px 6px;text-align:center;background:var(--surface);">'+
-    '<div style="font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:.4px;margin-bottom:3px;">'+label+'</div>'+
-    '<div style="font-size:13px;font-weight:700;color:'+(isOwe?'var(--danger)':'var(--success)')+';">'+fmt(amount)+'</div>'+
-  '</div>';
-}
-
-function _finCardDismiss() {
-  var card = document.getElementById('fin_tenant_card');
-  if (card) card.style.display = 'none';
-}
 
 function openNewLoanForTenant(tid) {
   openModal('modalNewLoan');
@@ -5133,6 +5081,206 @@ function printBatchStatements() {
   w.document.write('</body></html>');
   w.document.close();
   setTimeout(function(){ w.print(); }, 400);
+}
+
+function showBatchAccountingModal() {
+  var existing = document.getElementById('modalBatchAccounting');
+  if (existing) document.body.removeChild(existing);
+
+  var now = today();
+  var defaultMonth = now.slice(0,7);
+
+  var mo = document.createElement('div');
+  mo.className = 'modal-ov';
+  mo.id = 'modalBatchAccounting';
+  mo.innerHTML =
+    '<div class="modal modal-lg">'+
+    '<div class="modal-hdr">'+
+      '<div><h2>&#128202; Batch Accounting</h2><p>Preview and post pending accounting entries in bulk</p></div>'+
+      '<button class="modal-close" onclick="closeModal(\'modalBatchAccounting\')">&#x2715;</button>'+
+    '</div>'+
+    '<div class="modal-body">'+
+      '<div class="ibox yellow">&#9888; <strong>Always run Dry Run first.</strong> Live Post will write entries for all tenants in the selected period.</div>'+
+      '<div class="fg c2" style="gap:14px;margin-top:16px;">'+
+        '<div class="f"><label>Period (Month)</label><input id="ba-month" type="month" value="'+defaultMonth+'"/></div>'+
+        '<div class="f"><label>Entry Type</label>'+
+          '<select id="ba-type">'+
+            '<option value="rent">Rent Charges</option>'+
+            '<option value="arrangement">Arrangement Payments Due</option>'+
+            '<option value="loan">Loan Payments Due</option>'+
+            '<option value="all">All Types</option>'+
+          '</select>'+
+        '</div>'+
+      '</div>'+
+      '<div id="ba-results" style="margin-top:16px;"></div>'+
+    '</div>'+
+    '<div class="modal-footer">'+
+      '<button class="btn btn-ghost" onclick="closeModal(\'modalBatchAccounting\')">Close</button>'+
+      '<button class="btn btn-ghost" onclick="runBatchAccounting(true)">&#128269; Dry Run</button>'+
+      '<button class="btn btn-primary" onclick="if(confirm(\'Post accounting entries for all eligible tenants in this period?\'))runBatchAccounting(false)">&#9654; Live Post</button>'+
+    '</div>'+
+    '</div>';
+  document.body.appendChild(mo);
+  mo.style.display = '';
+  mo.classList.add('on');
+}
+
+function runBatchAccounting(dryRun) {
+  var month = (document.getElementById('ba-month')||{}).value || today().slice(0,7);
+  var type  = (document.getElementById('ba-type')||{}).value  || 'rent';
+  var d = getData();
+  var resultsEl = document.getElementById('ba-results');
+  if (!resultsEl) return;
+
+  // Determine the date range for the selected month
+  var year  = parseInt(month.slice(0,4),10);
+  var mon   = parseInt(month.slice(5,7),10);
+  var monthStart = month + '-01';
+  var monthEndDate = new Date(year, mon, 0);
+  var monthEnd = year+'-'+String(mon).padStart(2,'0')+'-'+String(monthEndDate.getDate()).padStart(2,'0');
+
+  var activeTenants = (d.tenants||[]).filter(function(t){
+    var st = t.status||'active';
+    return t.active !== false && st !== 'former' && st !== 'deceased';
+  });
+
+  var rows = [];
+
+  activeTenants.forEach(function(t){
+    var tid = t.id;
+
+    // Rent charges
+    if (type === 'rent' || type === 'all') {
+      var monthlyRent = parseFloat(t.rentAmount||t.rent||0);
+      if (monthlyRent > 0) {
+        // Check if a rent charge already exists for this month
+        var alreadyCharged = (d.rentLedger||[]).some(function(r){
+          return r.tenantId === tid && r.type === 'invoice' && r.date >= monthStart && r.date <= monthEnd && !r.voids_id;
+        });
+        rows.push({
+          tenant: tenantName(t),
+          unit: t.unit||'',
+          type: 'Rent Charge',
+          period: month,
+          amount: monthlyRent,
+          status: alreadyCharged ? 'already-posted' : 'pending'
+        });
+      }
+    }
+
+    // Arrangement payments due
+    if (type === 'arrangement' || type === 'all') {
+      (d.arrangements||[]).filter(function(a){ return a.tenantId===tid && a.status==='active'; }).forEach(function(a){
+        var due = parseFloat(a.monthlyAmount||0);
+        if (due > 0) {
+          var alreadyPosted = (d.arrPayments||[]).some(function(p){
+            return p.arrId===a.id && p.date >= monthStart && p.date <= monthEnd;
+          });
+          rows.push({
+            tenant: tenantName(t),
+            unit: t.unit||'',
+            type: 'Arrangement Due',
+            period: month,
+            amount: due,
+            status: alreadyPosted ? 'already-posted' : 'pending'
+          });
+        }
+      });
+    }
+
+    // Loan payments due
+    if (type === 'loan' || type === 'all') {
+      (d.loanList||[]).filter(function(l){ return l.tenantId===tid && l.status==='approved'; }).forEach(function(l){
+        var due = parseFloat(l.payment||l.monthlyPayment||0);
+        if (due > 0) {
+          var alreadyPosted = (d.loanPayments||[]).some(function(p){
+            return p.loanId===l.id && p.date >= monthStart && p.date <= monthEnd;
+          });
+          rows.push({
+            tenant: tenantName(t),
+            unit: t.unit||'',
+            type: 'Loan Payment Due',
+            period: month,
+            amount: due,
+            status: alreadyPosted ? 'already-posted' : 'pending'
+          });
+        }
+      });
+    }
+  });
+
+  var pending = rows.filter(function(r){ return r.status === 'pending'; });
+  var posted  = rows.filter(function(r){ return r.status === 'already-posted'; });
+  var totalAmt = pending.reduce(function(s,r){ return s + r.amount; }, 0);
+
+  if (dryRun) {
+    // Show preview only
+    var html = '<div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;">'+
+      '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 14px;font-size:12px;">'+
+        '<strong style="color:var(--success);">'+pending.length+'</strong> entries to post'+
+      '</div>'+
+      '<div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:8px 14px;font-size:12px;">'+
+        '<strong>'+fmt(totalAmt)+'</strong> total amount'+
+      '</div>'+
+      '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px;">'+
+        '<strong>'+posted.length+'</strong> already posted (will be skipped)'+
+      '</div>'+
+    '</div>';
+
+    if (!pending.length) {
+      html += '<div class="ibox" style="color:var(--success);">&#10003; All accounting entries for this period are already posted — nothing to do.</div>';
+    } else {
+      html += '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">'+
+        '<table class="tbl">'+
+          '<thead><tr>'+
+            '<th>Tenant</th><th>Unit</th><th>Type</th><th>Period</th>'+
+            '<th style="text-align:right;">Amount</th><th>Action</th>'+
+          '</tr></thead>'+
+          '<tbody>'+
+          pending.map(function(r){
+            return '<tr>'+
+              '<td style="font-weight:600;">'+r.tenant+'</td>'+
+              '<td>'+r.unit+'</td>'+
+              '<td>'+r.type+'</td>'+
+              '<td>'+r.period+'</td>'+
+              '<td style="text-align:right;font-weight:700;color:var(--danger);">'+fmt(r.amount)+'</td>'+
+              '<td><span class="pill pill-gray" style="font-size:10px;">Will Post</span></td>'+
+            '</tr>';
+          }).join('')+
+          '</tbody>'+
+        '</table>'+
+      '</div>';
+    }
+    resultsEl.innerHTML = html;
+    return;
+  }
+
+  // Live run — post pending entries
+  if (!pending.length) {
+    resultsEl.innerHTML = '<div class="ibox" style="color:var(--success);">&#10003; Nothing to post for this period.</div>';
+    return;
+  }
+
+  var posted2 = 0;
+  var now2 = monthStart; // post on first of month
+  pending.forEach(function(r){
+    var t2 = (d.tenants||[]).find(function(t){ return tenantName(t) === r.tenant && t.unit === r.unit; });
+    if (!t2) return;
+    if (r.type === 'Rent Charge') {
+      var entry = {id:uid(), tenantId:t2.id, date:now2, type:'invoice',
+        desc:'Rent charge — '+month, charge:r.amount, payment:0,
+        ledger:'rent', method:'', status:'pending', enteredBy:(window.HOUSING_SESSION&&window.HOUSING_SESSION.name)||'Batch'};
+      d.rentLedger.push(entry);
+      posted2++;
+    }
+    // Arrangement/Loan due notices are informational — skip auto-posting ledger entries
+  });
+
+  if (posted2 > 0) {
+    saveData(d);
+    toast('Posted '+posted2+' accounting entr'+(posted2===1?'y':'ies')+'.');
+  }
+  resultsEl.innerHTML = '<div class="ibox" style="color:var(--success);">&#10003; Posted '+posted2+' entr'+(posted2===1?'y':'ies')+'. Refresh the ledger to see changes.</div>';
 }
 
 function runEngineFromModal() {
@@ -9488,6 +9636,20 @@ function renderStatementPage(tid) {
       '</div>';
     }).join('')+
   '</div>';
+
+  // Quick-action strip
+  var _qa = document.getElementById('stmt-quick-actions');
+  if (_qa) {
+    var _sid = (tid||'').replace(/'/g,"\\'");
+    _qa.innerHTML =
+      '<div style="display:flex;gap:7px;flex-wrap:wrap;">'+
+        '<button class="btn btn-primary btn-sm" onclick="openPaymentForTenant(\''+_sid+'\')">&#128179; Record Payment</button>'+
+        '<button class="btn btn-ghost btn-sm" onclick="openInvoiceForTenant(\''+_sid+'\')">&#128196; Create Invoice</button>'+
+        '<button class="btn btn-ghost btn-sm" onclick="openNewArrForTenant(\''+_sid+'\')">&#128203; Arrangement</button>'+
+        '<button class="btn btn-ghost btn-sm" onclick="openNewLoanForTenant(\''+_sid+'\')">&#128176; New Loan</button>'+
+      '</div>';
+    _qa.style.display = '';
+  }
 
   // Reset filter buttons
   document.querySelectorAll('.stmt-filter-btn').forEach(function(b){
