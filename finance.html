@@ -74,8 +74,6 @@
         <div class="lookup-results" id="fin_search_results"></div>
       </div>
 
-      <div class="lookup-recent-label">Top balances</div>
-      <div class="lookup-recent" id="fin_quick_chips"></div>
     </div>
 
     <!-- Quick Actions -->
@@ -3149,7 +3147,6 @@ function renderHome(){
     nameEl.textContent = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.name) ? HOUSING_SESSION.name : 'Finance Staff';
   }
   if (typeof renderDashboard === 'function') renderDashboard();
-  if (typeof finPopulateQuickChips === 'function') finPopulateQuickChips();
 }
 
 // ── Finance landing page search ────────────────────────────────────────────
@@ -3252,26 +3249,6 @@ function finSearchSelectResult(type, id) {
   if (type === 'tenant') goToTenant(id);
 }
 
-function finPopulateQuickChips() {
-  var el = document.getElementById('fin_quick_chips');
-  if (!el) return;
-  var d = getData();
-  var totals = (typeof calcAllTotals === 'function') ? calcAllTotals(d) : {};
-  var tenants = (d.tenants||[]).filter(function(t){ return !t.archived && (t.status||'active')==='active'; });
-  tenants.sort(function(a,b){
-    var oa = totals[a.id]||{}, ob = totals[b.id]||{};
-    return ((ob.rent||0)+(ob.loan||0)+(ob.arrangement||0)) - ((oa.rent||0)+(oa.loan||0)+(oa.arrangement||0));
-  });
-  el.innerHTML = tenants.slice(0,6).map(function(t){
-    var tot = totals[t.id]||{};
-    var owing = (tot.rent||0)+(tot.loan||0)+(tot.arrangement||0);
-    var safeId = (t.id||'').replace(/'/g,"\\'");
-    return '<button class="lookup-chip lookup-chip--tenant" onclick="finSearchSelectResult(\'tenant\',\''+safeId+'\')">'+
-      tenantName(t)+
-      (owing > 0 ? '<span class="lookup-chip-meta"> · '+fmt(owing)+'</span>' : '')+
-    '</button>';
-  }).join('');
-}
 
 // \u2500\u2500 Invoice cache and search \u2500\u2500
 var _invoiceCache = {};
