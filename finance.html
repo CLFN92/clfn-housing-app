@@ -395,14 +395,14 @@
       <span class="std-table-count" id="rentLedgerCount">—</span>
     </div>
     <table class="std-table">
-      <thead><tr>
-        <th>Date</th>
-        <th>Description</th>
-        <th class="std-cell-right">Charge</th>
-        <th class="std-cell-right">Payment</th>
+      <thead id="fin_rent_thead"><tr>
+        <th class="std-th-sortable" data-sort-key="date">Date</th>
+        <th class="std-th-sortable" data-sort-key="desc">Description</th>
+        <th class="std-cell-right std-th-sortable" data-sort-key="charge">Charge</th>
+        <th class="std-cell-right std-th-sortable" data-sort-key="payment">Payment</th>
         <th class="std-cell-right">Balance</th>
-        <th>Method</th>
-        <th>Status</th>
+        <th class="std-th-sortable" data-sort-key="method">Method</th>
+        <th class="std-th-sortable" data-sort-key="status">Status</th>
         <th></th>
       </tr></thead>
       <tbody id="rentLedgerBody"></tbody>
@@ -652,15 +652,15 @@
       <span class="std-table-count" id="journalCount">—</span>
     </div>
     <table class="std-table">
-      <thead><tr>
-        <th>Date</th>
-        <th>Tenant</th>
+      <thead id="fin_journal_thead"><tr>
+        <th class="std-th-sortable" data-sort-key="date">Date</th>
+        <th class="std-th-sortable" data-sort-key="tenant">Tenant</th>
         <th>Memo</th>
-        <th>Ledger</th>
-        <th class="std-cell-right">Debit</th>
-        <th class="std-cell-right">Credit</th>
-        <th>Posted By</th>
-        <th>Status</th>
+        <th class="std-th-sortable" data-sort-key="ledger">Ledger</th>
+        <th class="std-cell-right std-th-sortable" data-sort-key="debit">Debit</th>
+        <th class="std-cell-right std-th-sortable" data-sort-key="credit">Credit</th>
+        <th class="std-th-sortable" data-sort-key="postedBy">Posted By</th>
+        <th class="std-th-sortable" data-sort-key="status">Status</th>
       </tr></thead>
       <tbody id="journalBody"></tbody>
     </table>
@@ -845,13 +845,13 @@
       <span class="std-table-count" id="collectionsCount">—</span>
     </div>
     <table class="std-table">
-      <thead><tr>
-        <th>Tenant</th>
-        <th>Date Flagged</th>
-        <th class="std-cell-right">Amount at Referral</th>
-        <th>Agency / Ref</th>
-        <th class="std-cell-right">Current Balance</th>
-        <th>Status</th>
+      <thead id="fin_col_thead"><tr>
+        <th class="std-th-sortable" data-sort-key="tenant">Tenant</th>
+        <th class="std-th-sortable" data-sort-key="dateFlagged">Date Flagged</th>
+        <th class="std-cell-right std-th-sortable" data-sort-key="amountAtReferral">Amount at Referral</th>
+        <th class="std-th-sortable" data-sort-key="agency">Agency / Ref</th>
+        <th class="std-cell-right std-th-sortable" data-sort-key="currentBalance">Current Balance</th>
+        <th class="std-th-sortable" data-sort-key="status">Status</th>
         <th>Notes</th>
         <th></th>
       </tr></thead>
@@ -921,15 +921,15 @@
       <span class="std-table-count" id="txnCount">—</span>
     </div>
     <table class="std-table">
-      <thead><tr>
-        <th>Date</th>
-        <th>Tenant</th>
-        <th>Ledger</th>
+      <thead id="fin_txn_thead"><tr>
+        <th class="std-th-sortable" data-sort-key="date">Date</th>
+        <th class="std-th-sortable" data-sort-key="tenant">Tenant</th>
+        <th class="std-th-sortable" data-sort-key="ledger">Ledger</th>
         <th>Description</th>
-        <th class="std-cell-right">Charge</th>
-        <th class="std-cell-right">Payment</th>
-        <th>Method</th>
-        <th>Status</th>
+        <th class="std-cell-right std-th-sortable" data-sort-key="charge">Charge</th>
+        <th class="std-cell-right std-th-sortable" data-sort-key="payment">Payment</th>
+        <th class="std-th-sortable" data-sort-key="method">Method</th>
+        <th class="std-th-sortable" data-sort-key="status">Status</th>
         <th>Voucher</th>
       </tr></thead>
       <tbody id="transactionsBody"></tbody>
@@ -3488,6 +3488,18 @@ function renderTenantList() {
     'clea':'CLEA','community':'Community Member'
   };
 
+  // Phase 2B: column-menu sort/filter
+  var _tCols = {
+    name:   { label: 'Name',   accessor: function(t){ return tenantName(t); } },
+    unit:   { label: 'Unit',   accessor: function(t){ return t.unit||''; } },
+    type:   { label: 'Type',   accessor: function(t){ return t.type||''; } },
+    status: { label: 'Status', accessor: function(t){ return t.status||'active'; } }
+  };
+  var _tAcc = {}; Object.keys(_tCols).forEach(function(k){ _tAcc[k] = _tCols[k].accessor; });
+  var _tSt = (typeof tableStateGet==='function') ? tableStateGet('fin-tenants') : {sort:{key:'',dir:1},filters:{}};
+  if (typeof tableRegisterColumns==='function') tableRegisterColumns('fin-tenants', {columns:_tCols, getRows:function(){return list;}, onChange:renderTenantList});
+  list = (typeof tableApplyFilterSort==='function') ? tableApplyFilterSort(list, _tAcc, _tSt) : list;
+
   var rows;
   if (!list.length) {
     rows = '<tr class="empty-row"><td colspan="6">No tenants match the current filters. <a href="#" onclick="clearTenantFilters();return false;" style="color:var(--text);text-decoration:underline;">Clear filters</a> to show all.</td></tr>';
@@ -3521,17 +3533,20 @@ function renderTenantList() {
         '<span class="std-table-count">'+list.length+' shown · '+all.length+' total</span>'+
       '</div>'+
       '<table class="std-table">'+
-        '<thead><tr>'+
+        '<thead id="fin_tenants_thead"><tr>'+
           '<th></th>'+
-          '<th>Name</th>'+
-          '<th>Unit</th>'+
-          '<th>Type</th>'+
-          '<th>Status</th>'+
+          '<th class="std-th-sortable" data-sort-key="name">Name</th>'+
+          '<th class="std-th-sortable" data-sort-key="unit">Unit</th>'+
+          '<th class="std-th-sortable" data-sort-key="type">Type</th>'+
+          '<th class="std-th-sortable" data-sort-key="status">Status</th>'+
           '<th></th>'+
         '</tr></thead>'+
         '<tbody>'+rows+'</tbody>'+
       '</table>'+
     '</div>';
+  var _tThead = document.getElementById('fin_tenants_thead');
+  if (_tThead && typeof tableBindColumnMenuClicks==='function') tableBindColumnMenuClicks(_tThead, 'fin-tenants');
+  if (_tThead && typeof tableRefreshSortIndicators==='function') tableRefreshSortIndicators(_tThead, 'fin-tenants');
 }
 
 function renderTenantProfile(tid) {
@@ -7105,7 +7120,21 @@ function renderJournal() {
     return true;
   });
 
-  list.sort(function(a,b){ return b.date.localeCompare(a.date); });
+  // Phase 2B: column-menu sort/filter (sort must come before ref-grouping)
+  var _jCols = {
+    date:     { label: 'Date',      accessor: function(r){ return r.date||''; } },
+    tenant:   { label: 'Tenant',    accessor: function(r){ var t=getTenant(r.tenantId); return t?tenantName(t):''; } },
+    ledger:   { label: 'Ledger',    accessor: function(r){ return r.ledger||'rent'; } },
+    debit:    { label: 'Debit',     accessor: function(r){ return r.charge||0; } },
+    credit:   { label: 'Credit',    accessor: function(r){ return r.payment||0; } },
+    postedBy: { label: 'Posted By', accessor: function(r){ return r.postedBy||r.enteredBy||''; } },
+    status:   { label: 'Status',    accessor: function(r){ return r.status||''; } }
+  };
+  var _jAcc = {}; Object.keys(_jCols).forEach(function(k){ _jAcc[k] = _jCols[k].accessor; });
+  var _jSt = (typeof tableStateGet==='function') ? tableStateGet('fin-journal') : {sort:{key:'',dir:1},filters:{}};
+  if (typeof tableRegisterColumns==='function') tableRegisterColumns('fin-journal', {columns:_jCols, getRows:function(){return list;}, onChange:renderJournal});
+  if (!_jSt.sort.key) list.sort(function(a,b){ return b.date.localeCompare(a.date); });
+  list = (typeof tableApplyFilterSort==='function') ? tableApplyFilterSort(list, _jAcc, _jSt) : list;
 
   // Update meta + count
   var metaEl = document.getElementById('journal_page_meta');
@@ -7208,7 +7237,9 @@ function renderJournal() {
     }).join('');
     return header + subRows;
   }).join('');
-
+  var _jThead = document.getElementById('fin_journal_thead');
+  if (_jThead && typeof tableBindColumnMenuClicks==='function') tableBindColumnMenuClicks(_jThead, 'fin-journal');
+  if (_jThead && typeof tableRefreshSortIndicators==='function') tableRefreshSortIndicators(_jThead, 'fin-journal');
 }
 
 
@@ -7831,6 +7862,22 @@ function renderTransactions() {
     return '<span class="std-pill std-pill-info">'+(st||'—')+'</span>';
   }
 
+  // Phase 2B: column-menu sort/filter
+  var _txnCols = {
+    date:    { label: 'Date',    accessor: function(t){ return t.date||''; } },
+    tenant:  { label: 'Tenant',  accessor: function(t){ var tn=getTenant(t.tenantId); return tn?tenantName(tn):''; } },
+    ledger:  { label: 'Ledger',  accessor: function(t){ return t.ledger||''; } },
+    charge:  { label: 'Charge',  accessor: function(t){ return t.charge||0; } },
+    payment: { label: 'Payment', accessor: function(t){ return t.payment||0; } },
+    method:  { label: 'Method',  accessor: function(t){ return t.method||''; } },
+    status:  { label: 'Status',  accessor: function(t){ return t.status||''; } }
+  };
+  var _txnAcc = {}; Object.keys(_txnCols).forEach(function(k){ _txnAcc[k] = _txnCols[k].accessor; });
+  var _txnSt = (typeof tableStateGet==='function') ? tableStateGet('fin-txn') : {sort:{key:'',dir:1},filters:{}};
+  if (typeof tableRegisterColumns==='function') tableRegisterColumns('fin-txn', {columns:_txnCols, getRows:function(){return txns;}, onChange:renderTransactions});
+  if (!_txnSt.sort.key) txns.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  txns = (typeof tableApplyFilterSort==='function') ? tableApplyFilterSort(txns, _txnAcc, _txnSt) : txns;
+
   var _txnCache = {};
   var rows = txns.map(function(t){
     var tn = getTenant(t.tenantId);
@@ -7861,6 +7908,9 @@ function renderTransactions() {
       bodyEl.innerHTML = rows;
     }
   }
+  var _txnThead = document.getElementById('fin_txn_thead');
+  if (_txnThead && typeof tableBindColumnMenuClicks==='function') tableBindColumnMenuClicks(_txnThead, 'fin-txn');
+  if (_txnThead && typeof tableRefreshSortIndicators==='function') tableRefreshSortIndicators(_txnThead, 'fin-txn');
 }
 
 function renderAuditLog() {
@@ -7944,8 +7994,21 @@ function renderCollections() {
     return true;
   });
 
-  // Sort newest flag first
-  list.sort(function(a,b){ return (b.dateFlagged||'').localeCompare(a.dateFlagged||''); });
+  // Phase 2B: column-menu sort/filter
+  var totals = calcAllTotals(d);
+  var _cCols = {
+    tenant:           { label: 'Tenant',            accessor: function(c){ var t=getTenant(c.tenantId); return t?tenantName(t):''; } },
+    dateFlagged:      { label: 'Date Flagged',       accessor: function(c){ return c.dateFlagged||''; } },
+    amountAtReferral: { label: 'Amount at Referral', accessor: function(c){ return parseFloat(c.amountAtReferral)||0; } },
+    agency:           { label: 'Agency',             accessor: function(c){ return c.agency||''; } },
+    currentBalance:   { label: 'Current Balance',    accessor: function(c){ var b=totals[c.tenantId]||{}; return (b.rent||0)+(b.loan||0)+(b.arrangement||0); } },
+    status:           { label: 'Status',             accessor: function(c){ return c.status||''; } }
+  };
+  var _cAcc = {}; Object.keys(_cCols).forEach(function(k){ _cAcc[k] = _cCols[k].accessor; });
+  var _cSt = (typeof tableStateGet==='function') ? tableStateGet('fin-col') : {sort:{key:'',dir:1},filters:{}};
+  if (typeof tableRegisterColumns==='function') tableRegisterColumns('fin-col', {columns:_cCols, getRows:function(){return list;}, onChange:renderCollections});
+  if (!_cSt.sort.key) list.sort(function(a,b){ return (b.dateFlagged||'').localeCompare(a.dateFlagged||''); });
+  list = (typeof tableApplyFilterSort==='function') ? tableApplyFilterSort(list, _cAcc, _cSt) : list;
 
   // Meta + count
   var metaEl = document.getElementById('col_page_meta');
@@ -7977,9 +8040,6 @@ function renderCollections() {
     return '<span class="std-pill std-pill-info">'+(status||'—')+'</span>';
   }
 
-  // Compute current balance for each tenant using calcAllTotals
-  var totals = calcAllTotals(d);
-
   bodyEl.innerHTML = list.map(function(c){
     var t = getTenant(c.tenantId);
     var bal = totals[c.tenantId] || {};
@@ -8004,6 +8064,9 @@ function renderCollections() {
       '<td class="std-cell-tail">'+actionBtn+'</td>'+
     '</tr>';
   }).join('');
+  var _cThead = document.getElementById('fin_col_thead');
+  if (_cThead && typeof tableBindColumnMenuClicks==='function') tableBindColumnMenuClicks(_cThead, 'fin-col');
+  if (_cThead && typeof tableRefreshSortIndicators==='function') tableRefreshSortIndicators(_cThead, 'fin-col');
 }
 
 // \u2500\u2500 Loan Math \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -9750,6 +9813,20 @@ function renderRentLedger(){
     return true;
   });
 
+  // Phase 2B: column-menu sort/filter (Balance column excluded — it's a running balance)
+  var _rentCols = {
+    date:    { label: 'Date',        accessor: function(r){ return r.date||''; } },
+    desc:    { label: 'Description', accessor: function(r){ return r.desc||''; } },
+    charge:  { label: 'Charge',      accessor: function(r){ return r.charge||0; } },
+    payment: { label: 'Payment',     accessor: function(r){ return r.payment||0; } },
+    method:  { label: 'Method',      accessor: function(r){ return r.method||''; } },
+    status:  { label: 'Status',      accessor: function(r){ return r.status||''; } }
+  };
+  var _rentAcc = {}; Object.keys(_rentCols).forEach(function(k){ _rentAcc[k] = _rentCols[k].accessor; });
+  var _rentSt = (typeof tableStateGet==='function') ? tableStateGet('fin-rent') : {sort:{key:'',dir:1},filters:{}};
+  if (typeof tableRegisterColumns==='function') tableRegisterColumns('fin-rent', {columns:_rentCols, getRows:function(){return rows;}, onChange:renderRentLedger});
+  rows = (typeof tableApplyFilterSort==='function') ? tableApplyFilterSort(rows, _rentAcc, _rentSt) : rows;
+
   var html = rows.map(function(r){
     var isArr=r.type==='arrangement-line';
     var bal = r._runningBalance;
@@ -9773,6 +9850,9 @@ function renderRentLedger(){
     metaEl.textContent = tenantName(t) + ' · ' + (t.unit||'no unit') + ' · Last updated ' + today;
   }
   document.getElementById('rentStats').innerHTML=statCard('Monthly Rent',fmt(t.rent),'','')+statCard('Total Charged',fmt(totalCharged),'','')+statCard('Balance Owing',fmt(balance),'',balance>0?'danger':'success');
+  var _rentThead = document.getElementById('fin_rent_thead');
+  if (_rentThead && typeof tableBindColumnMenuClicks==='function') tableBindColumnMenuClicks(_rentThead, 'fin-rent');
+  if (_rentThead && typeof tableRefreshSortIndicators==='function') tableRefreshSortIndicators(_rentThead, 'fin-rent');
 }
 
 // ARRANGEMENTS
@@ -9878,6 +9958,23 @@ function renderArrangementsPage(){
     return '<span class="std-pill std-pill-info">'+(status||'—')+'</span>';
   }
 
+  // Phase 2B: column-menu sort/filter
+  var _arrCols = {
+    tenant:     { label: 'Tenant',      accessor: function(a){ var t=getTenant(a.tenantId); return t?tenantName(t):''; } },
+    ledger:     { label: 'Ledger',      accessor: function(a){ return (a.ledger||'').toLowerCase(); } },
+    totalOwing: { label: 'Total Owing', accessor: function(a){ return parseFloat(a.totalOwing)||0; } },
+    remaining:  { label: 'Remaining',   accessor: function(a){
+      var pmts=d.arrPayments.filter(function(p){return p.arrId===a.id;});
+      var paid=pmts.reduce(function(s,p){return s+p.amount;},0);
+      return Math.max(0,(parseFloat(a.totalOwing)||0)-paid);
+    }},
+    status:     { label: 'Status',      accessor: function(a){ return a.status||''; } }
+  };
+  var _arrAcc = {}; Object.keys(_arrCols).forEach(function(k){ _arrAcc[k] = _arrCols[k].accessor; });
+  var _arrSt = (typeof tableStateGet==='function') ? tableStateGet('fin-arr') : {sort:{key:'',dir:1},filters:{}};
+  if (typeof tableRegisterColumns==='function') tableRegisterColumns('fin-arr', {columns:_arrCols, getRows:function(){return list;}, onChange:renderArrangementsPage});
+  list = (typeof tableApplyFilterSort==='function') ? tableApplyFilterSort(list, _arrAcc, _arrSt) : list;
+
   var rows;
   if (all.length === 0) {
     rows = '<tr class="empty-row"><td colspan="7">' +
@@ -9917,13 +10014,13 @@ function renderArrangementsPage(){
         '<span class="std-table-count">'+list.length+' shown · '+all.length+' total</span>'+
       '</div>'+
       '<table class="std-table">'+
-        '<thead><tr>'+
-          '<th>Tenant</th>'+
-          '<th>Ledger</th>'+
-          '<th class="std-cell-right">Total Owing</th>'+
-          '<th class="std-cell-right">Remaining</th>'+
+        '<thead id="fin_arr_thead"><tr>'+
+          '<th class="std-th-sortable" data-sort-key="tenant">Tenant</th>'+
+          '<th class="std-th-sortable" data-sort-key="ledger">Ledger</th>'+
+          '<th class="std-cell-right std-th-sortable" data-sort-key="totalOwing">Total Owing</th>'+
+          '<th class="std-cell-right std-th-sortable" data-sort-key="remaining">Remaining</th>'+
           '<th>Progress</th>'+
-          '<th>Status</th>'+
+          '<th class="std-th-sortable" data-sort-key="status">Status</th>'+
           '<th></th>'+
         '</tr></thead>'+
         '<tbody>'+rows+'</tbody>'+
@@ -9973,6 +10070,9 @@ function renderArrangementsPage(){
   }
 
   content.innerHTML = summary + detail;
+  var _arrThead = document.getElementById('fin_arr_thead');
+  if (_arrThead && typeof tableBindColumnMenuClicks==='function') tableBindColumnMenuClicks(_arrThead, 'fin-arr');
+  if (_arrThead && typeof tableRefreshSortIndicators==='function') tableRefreshSortIndicators(_arrThead, 'fin-arr');
 }
 
 // Helper: from the arrangements summary table, clicking a row sets the tenant
@@ -10058,6 +10158,22 @@ function renderLoansPage(){
       return '<span class="std-pill std-pill-info">'+(status||'—')+'</span>';
     }
 
+    // Phase 2B: column-menu sort/filter
+    var _lCols = {
+      tenant:    { label: 'Tenant',    accessor: function(l){ var t=getTenant(l.tenantId); return t?tenantName(t):''; } },
+      purpose:   { label: 'Purpose',   accessor: function(l){ return l.type||''; } },
+      principal: { label: 'Principal', accessor: function(l){ return parseFloat(l.principal)||0; } },
+      remaining: { label: 'Remaining', accessor: function(l){
+        var paid=d.loanPayments.filter(function(p){return p.loanId===l.id&&p.status!=='reversed';}).reduce(function(s,p){return s+p.amount;},0);
+        return Math.max(0,(parseFloat(l.principal)||0)-paid);
+      }},
+      status:    { label: 'Status',    accessor: function(l){ return l.status||''; } }
+    };
+    var _lAcc = {}; Object.keys(_lCols).forEach(function(k){ _lAcc[k] = _lCols[k].accessor; });
+    var _lSt = (typeof tableStateGet==='function') ? tableStateGet('fin-loans') : {sort:{key:'',dir:1},filters:{}};
+    if (typeof tableRegisterColumns==='function') tableRegisterColumns('fin-loans', {columns:_lCols, getRows:function(){return list;}, onChange:renderLoansPage});
+    list = (typeof tableApplyFilterSort==='function') ? tableApplyFilterSort(list, _lAcc, _lSt) : list;
+
     var rows;
     if (all.length === 0) {
       rows = '<tr class="empty-row"><td colspan="7">' +
@@ -10096,18 +10212,21 @@ function renderLoansPage(){
           '<span class="std-table-count">'+list.length+' shown · '+all.length+' total</span>'+
         '</div>'+
         '<table class="std-table">'+
-          '<thead><tr>'+
-            '<th>Tenant</th>'+
-            '<th>Purpose</th>'+
-            '<th class="std-cell-right">Principal</th>'+
-            '<th class="std-cell-right">Remaining</th>'+
+          '<thead id="fin_loans_thead"><tr>'+
+            '<th class="std-th-sortable" data-sort-key="tenant">Tenant</th>'+
+            '<th class="std-th-sortable" data-sort-key="purpose">Purpose</th>'+
+            '<th class="std-cell-right std-th-sortable" data-sort-key="principal">Principal</th>'+
+            '<th class="std-cell-right std-th-sortable" data-sort-key="remaining">Remaining</th>'+
             '<th>Progress</th>'+
-            '<th>Status</th>'+
+            '<th class="std-th-sortable" data-sort-key="status">Status</th>'+
             '<th></th>'+
           '</tr></thead>'+
           '<tbody>'+rows+'</tbody>'+
         '</table>'+
       '</div>';
+    var _lThead = document.getElementById('fin_loans_thead');
+    if (_lThead && typeof tableBindColumnMenuClicks==='function') tableBindColumnMenuClicks(_lThead, 'fin-loans');
+    if (_lThead && typeof tableRefreshSortIndicators==='function') tableRefreshSortIndicators(_lThead, 'fin-loans');
     return;
   }
 
