@@ -579,8 +579,6 @@ function hideAllViews(keepId) {
     if (el) { el.style.display = 'none'; el.style.flex = ''; }
   });
   var spb = document.getElementById('stepProgressBar'); if (spb) spb.style.display = 'none';
-  var sn  = document.getElementById('stepNav');          if (sn)  sn.style.display  = 'none';
-  var apf = document.getElementById('appProgressFoot'); if (apf) apf.style.display = 'none';
 }
 
 // ── _showView ─────────────────────────────────────────────────────────────────

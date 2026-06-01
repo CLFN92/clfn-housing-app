@@ -343,22 +343,6 @@ function goTo(s){
   var _stepCur=document.getElementById('step'+cur); if(_stepCur) _stepCur.classList.remove('on');
   var _stepS=document.getElementById('step'+s); if(_stepS) _stepS.classList.add('on');
 
-  // Map step numbers to sidebar nav indices (step 7 is hidden scoring, step 8 = nav index 7)
-  var _stepToNav = {0:0,1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:7};
-  var _navSteps  = [0,1,2,3,4,5,6,8]; // step number at each nav index
-  const nav=document.querySelectorAll('#stepNav li');
-  var curNavIdx = _stepToNav[cur] !== undefined ? _stepToNav[cur] : cur;
-  var sNavIdx   = _stepToNav[s]   !== undefined ? _stepToNav[s]   : s;
-  if(nav[curNavIdx]) nav[curNavIdx].classList.remove('active');
-  if(nav[curNavIdx] && s > cur) nav[curNavIdx].classList.add('done');
-  if(nav[sNavIdx])  { nav[sNavIdx].classList.add('active'); nav[sNavIdx].classList.remove('done'); }
-  for(let i=0; i<_navSteps.length; i++){
-    if(_navSteps[i] < s){
-      if(nav[i]) nav[i].classList.add('done');
-      const sn=document.getElementById('sn'+i);
-      if(sn) sn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
-    }
-  }
   const pct=Math.round((s/(STEPS-1))*100);
   const pf=document.getElementById('pfill');if(pf)pf.style.width=pct+'%';
   const pp=document.getElementById('pPct');if(pp)pp.textContent=pct+'%';
