@@ -4010,11 +4010,14 @@ function renderWorklist() {
   if (appItems.length) {
     var statusLabel = { submitted:'Awaiting Review', file_update:'File Update', mgr_approved:'Awaiting ED Approval', returned:'Returned — Action Needed', transfer_request_submitted:'Transfer Request' };
     var appBtnText = { submitted:'Review', file_update:'Review', mgr_approved:'Approve', returned:'Edit', transfer_request_submitted:'Review' };
+    var _wlReviewStatuses = ['submitted', 'file_update', 'mgr_approved', 'transfer_request_submitted'];
     var appRows = appItems.map(function(a) {
       var name  = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
       var lbl   = statusLabel[a.status] || a.status;
       var score = (a.score != null && a.appType !== 'existing_tenant') ? (a.score + ' pts') : '';
-      var btnHref = 'housing.html?openApp=' + encodeURIComponent(a.id);
+      var btnHref = (_wlReviewStatuses.indexOf(a.status) >= 0)
+        ? 'housing.html?openScorecard=' + encodeURIComponent(a.id)
+        : 'housing.html?openApp=' + encodeURIComponent(a.id);
       return actionRow(btnHref, [
         { text: name, style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
         { text: lbl,  style: 'font-size:11px;color:var(--muted);width:170px;flex-shrink:0;' },

@@ -1823,6 +1823,12 @@ function initHousingPage() {
 
   // Navigate to requested view from URL param
   var params = new URLSearchParams(window.location.search);
+  // ?openScorecard=APP_ID — open scorecard/approval view directly (worklist Review button)
+  var openScorecardId = params.get('openScorecard');
+  if(openScorecardId){
+    var _scApp = (typeof applications !== 'undefined' ? applications : []).find(function(a){ return a.id === openScorecardId; });
+    if(_scApp && typeof showScorecard === 'function'){ showScorecard(_scApp); return; }
+  }
   // ?openApp=APP_ID — cross-page handoff (e.g. from match.html applicant click)
   var openAppId = params.get('openApp');
   if(openAppId){
