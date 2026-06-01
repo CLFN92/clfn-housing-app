@@ -954,8 +954,23 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 }
 .spb-btn.done { color: rgba(255,255,255,.55); }
 
-/* Separator before the Internal Notes tab */
-.spb-btn-notes { border-left: 1px solid rgba(255,255,255,.1); }
+/* Internal Notes row — independent button below the step tabs */
+.spb-notes-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-top: 1px solid rgba(255,255,255,.07);
+  background: rgba(248,228,26,.04);
+  cursor: pointer;
+  transition: background .15s;
+}
+.spb-notes-row:hover { background: rgba(248,228,26,.09); }
+.spb-notes-row.active { background: rgba(248,228,26,.12); }
+.spb-notes-icon  { font-size: 14px; flex-shrink: 0; }
+.spb-notes-label { font-size: 11px; font-weight: 600; color: rgba(255,255,255,.75); flex: 1; }
+.spb-notes-row.active .spb-notes-label { color: var(--yellow); }
+.spb-notes-chevron { font-size: 16px; color: rgba(255,255,255,.3); line-height: 1; }
 
 .spb-num {
   width: 20px;

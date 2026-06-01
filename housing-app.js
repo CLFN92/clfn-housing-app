@@ -377,8 +377,8 @@ function goTo(s){
     }
   }
 
-  // Leaving the Internal Notes side tab — reset its highlight.
-  var _notesBtn = document.getElementById('spb_11');
+  // Leaving the Internal Notes row — reset its highlight.
+  var _notesBtn = document.getElementById('spb_notes_row');
   if (_notesBtn) _notesBtn.classList.remove('active');
 
   if(s===7){ goTo(8); return; }
@@ -2193,7 +2193,7 @@ function _openAppNotesStep() {
   var _stepN = document.getElementById('step11');
   if (_stepN) _stepN.classList.add('on');
 
-  var btn = document.getElementById('spb_11');
+  var btn = document.getElementById('spb_notes_row');
   if (btn) btn.classList.add('active');
 
   cur = 11;
@@ -2337,14 +2337,14 @@ function _updateNotesTabPreview(notes) {
   var lbl = document.getElementById('spb_lbl_11');
   if (!lbl) return;
   if (!notes || !notes.length) {
-    lbl.innerHTML = 'Notes <span class="spb-lbl-sub">(Internal)</span>';
+    lbl.innerHTML = 'Internal Notes <span class=”spb-lbl-sub”>(Staff Only)</span>';
     return;
   }
   var last = notes[0]; // newest-first
   var raw  = (last.body || '').trim().replace(/\s+/g, ' ');
-  var snippet = raw.length > 32 ? raw.substring(0, 32) + '…' : raw;
+  var snippet = raw.length > 40 ? raw.substring(0, 40) + '…' : raw;
   var count = notes.length;
-  lbl.innerHTML = 'Notes <span class="spb-lbl-sub">'
+  lbl.innerHTML = 'Internal Notes <span class=”spb-lbl-sub”>'
     + count + (count === 1 ? ' note' : ' notes')
     + ' · “' + escapeHtml(snippet) + '”</span>';
 }
@@ -2433,7 +2433,7 @@ function submitAppNote() {
 // session AND (b) the application has been saved at least once (has an id
 // AND is in the in-memory applications array → matches a real DB row).
 function _refreshAppNotesTabVisibility() {
-  var btn = document.getElementById('spb_11');
+  var btn = document.getElementById('spb_notes_row');
   if (!btn) return;
   var staff = _isStaffSession();
   var saved = !!currentAppId
