@@ -2333,6 +2333,22 @@ function _applySignatureLockState(app) {
   else _unlockApplicantSignatures();
 }
 
+function _updateNotesTabPreview(notes) {
+  var lbl = document.getElementById('spb_lbl_11');
+  if (!lbl) return;
+  if (!notes || !notes.length) {
+    lbl.innerHTML = 'Notes <span class="spb-lbl-sub">(Internal)</span>';
+    return;
+  }
+  var last = notes[0]; // newest-first
+  var raw  = (last.body || '').trim().replace(/\s+/g, ' ');
+  var snippet = raw.length > 32 ? raw.substring(0, 32) + '…' : raw;
+  var count = notes.length;
+  lbl.innerHTML = 'Notes <span class="spb-lbl-sub">'
+    + count + (count === 1 ? ' note' : ' notes')
+    + ' · “' + escapeHtml(snippet) + '”</span>';
+}
+
 function renderAppNotes() {
   var listEl  = document.getElementById('appNotesList');
   var countEl = document.getElementById('appNotesCount');
@@ -2346,6 +2362,7 @@ function renderAppNotes() {
   sbLoadAppNotes(currentAppId).then(function(notes) {
     notes = notes || [];
     if (countEl) countEl.textContent = notes.length + (notes.length === 1 ? ' note' : ' notes');
+    _updateNotesTabPreview(notes);
     if (!notes.length) {
       listEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px;">No notes yet. Add the first one above.</div>';
       return;

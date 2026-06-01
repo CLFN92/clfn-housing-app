@@ -955,7 +955,7 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 .spb-btn.done { color: rgba(255,255,255,.55); }
 
 /* Separator before the Internal Notes tab */
-.spb-btn-notes { margin-left: auto; border-left: 1px solid rgba(255,255,255,.1); }
+.spb-btn-notes { border-left: 1px solid rgba(255,255,255,.1); }
 
 .spb-num {
   width: 20px;
