@@ -2240,7 +2240,8 @@ function _roleLabel(r) {
 
 function _shouldLockApplicantSignatures(app) {
   if (!app || !app.status) return false;
-  return app.status !== 'draft';
+  // draft and returned both need editable signatures
+  return app.status !== 'draft' && app.status !== 'returned';
 }
 
 function _lockSignaturePanel(canvasId) {
@@ -2329,8 +2330,32 @@ function _unlockApplicantSignatures() {
 // Apply or remove the lock based on the application's current status. Safe to
 // call on every step transition / modal open — both helpers are idempotent.
 function _applySignatureLockState(app) {
-  if (_shouldLockApplicantSignatures(app)) _lockApplicantSignatures();
+  var shouldLock = _shouldLockApplicantSignatures(app);
+  if (shouldLock) _lockApplicantSignatures();
   else _unlockApplicantSignatures();
+  var bar = document.getElementById('sig_override_bar');
+  if (bar) {
+    var _role = window.currentRole || '';
+    var _isEd = typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('finalApproveApp', _role);
+    bar.style.display = (shouldLock && _isEd) ? '' : 'none';
+  }
+}
+
+function edUnlockSignatures() {
+  var _role = window.currentRole || '';
+  if (!(typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('finalApproveApp', _role))) return;
+  showConfirm({
+    title:   'Override Signature Lock?',
+    message: 'This will unlock the signature blocks so new signatures can be collected. The action will be logged. Continue?',
+    okText:  'Unlock'
+  }).then(function(ok) {
+    if (!ok) return;
+    _unlockApplicantSignatures();
+    var bar = document.getElementById('sig_override_bar');
+    if (bar) bar.style.display = 'none';
+    if (typeof auditEntry === 'function') auditEntry(currentAppId, 'sig_lock_override', 'ED overrode applicant signature lock');
+    if (typeof showToast  === 'function') showToast('Signature lock removed.');
+  });
 }
 
 function _updateNotesTabPreview(notes) {

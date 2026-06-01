@@ -602,6 +602,13 @@
             <span>I consent to <span data-nation="short">CLFN</span> Housing sharing my application information with other <span data-nation="short">CLFN</span> programs in support of my housing application.</span>
           </label>
         </div>
+        <!-- ED signature override bar — shown only when locked + ED role -->
+        <div id="sig_override_bar" style="display:none;padding:10px 18px;background:#fffbeb;border-bottom:1px solid #fcd34d;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span style="font-size:12px;color:#92400e;flex:1;">⚠️ Signatures are locked. As Executive Director you can override the lock to collect new signatures — this action is logged.</span>
+            <button type="button" onclick="edUnlockSignatures()" style="background:none;border:1.5px solid #f59e0b;border-radius:7px;padding:5px 14px;font-size:11px;font-weight:700;color:#92400e;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Unlock Signatures</button>
+          </div>
+        </div>
         <!-- Applicant -->
         <div style="padding:20px;border-bottom:1px solid var(--border);">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--yellow);color:var(--dark);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">1</div><div><div class="txt-sm-bold">Applicant</div><div class="txt-muted-xs">Primary applicant signature</div></div></div>
