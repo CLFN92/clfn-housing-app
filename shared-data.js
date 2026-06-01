@@ -149,7 +149,7 @@ async function sbLoadApplications() {
         tier:             row.tier,
         classification:   row.classification,
         reserve:          row.reserve,
-        archived:         !!row.archived,
+        archived:         (row.archived !== undefined ? !!row.archived : !!(row.data || {}).archived),
         // Unit assignment
         assignedUnit:     row.assigned_unit_id,
         assignedAddress:  row.assigned_address,
@@ -177,7 +177,7 @@ async function sbLoadApplications() {
         // Ownership (RLS — HE-L1 own-draft rule)
         created_by_email:    row.created_by_email     || null,
         // Columns added via migration 2026-04-19
-        spId:                row.sp_id                || null,
+        spId:                row.sp_id != null ? row.sp_id : ((row.data || {}).spId || null),
         noPriorTenancy:      row.no_prior_tenancy     !== undefined ? !!row.no_prior_tenancy : !!(row.data || {}).noPriorTenancy
       });
     });
@@ -234,24 +234,40 @@ async function sbSaveApplication(app) {
     archived:         !!app.archived,
     no_prior_tenancy: (app.noPriorTenancy !== undefined ? !!app.noPriorTenancy : !!(app.no_prior_tenancy !== false))
   };
-  try {
-    var r = await fetch(SUPABASE_URL + '/rest/v1/housing_applications', {
-      method:  'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, {
-        'Prefer': 'resolution=merge-duplicates,return=minimal',
-        'Accept-Profile': 'public',
-        'Content-Profile': 'public'
-      }),
-      body:    JSON.stringify(row)
+  var _appSaveHeaders = Object.assign({}, HOUSING_HEADERS, {
+    'Prefer': 'resolution=merge-duplicates,return=minimal',
+    'Accept-Profile': 'public',
+    'Content-Profile': 'public'
+  });
+  var _doPost = function(rowObj) {
+    return fetch(SUPABASE_URL + '/rest/v1/housing_applications', {
+      method: 'POST', headers: _appSaveHeaders, body: JSON.stringify(rowObj)
     });
+  };
+  try {
+    var r = await _doPost(row);
     if (!r.ok) {
-      var e = await r.text();
-      console.error('[SB] save application '+r.status+' — Supabase says:', e);
+      var errText = await r.text();
+      // If Supabase rejects with "undefined column" (42703), the migration that
+      // adds sp_id / archived / no_prior_tenancy hasn't run yet. Strip those
+      // optional columns and retry — the full app object is still in data jsonb.
+      if (r.status === 400 && errText.indexOf('"42703"') !== -1) {
+        console.warn('[SB] migration columns not in table yet (42703) — retrying without them');
+        var safeRow = Object.assign({}, row);
+        delete safeRow.sp_id;
+        delete safeRow.archived;
+        delete safeRow.no_prior_tenancy;
+        r = await _doPost(safeRow);
+        if (!r.ok) {
+          var e2 = await r.text();
+          console.error('[SB] save application (safe) '+r.status+' — Supabase says:', e2);
+          throw new Error('save failed ('+r.status+'): '+e2);
+        }
+        return true;
+      }
+      console.error('[SB] save application '+r.status+' — Supabase says:', errText);
       console.error('[SB] row keys sent:', Object.keys(row).join(', '));
-      // Throw so the caller's .catch() can surface a visible error. Returning
-      // false here was masking RLS / network failures — users would type a
-      // change, see no error, then find their change gone after reload.
-      throw new Error('save failed ('+r.status+'): '+e);
+      throw new Error('save failed ('+r.status+'): '+errText);
     }
     return true;
   } catch(e) {

@@ -1423,7 +1423,7 @@ function saveApplicationRecord(opts){
   if (typeof saveApplicationWithDraftFallback === 'function') {
     saveApplicationWithDraftFallback(appObj).then(function(ok){
       if(!ok && typeof showToast === 'function') {
-        showToast('Saved locally — will sync when network is available.', { type:'info', duration:3500 });
+        showToast('Cloud sync failed — saved locally. Check your connection or open DevTools (F12) for details.', { type:'warning', duration:6000 });
       }
     });
   } else {
