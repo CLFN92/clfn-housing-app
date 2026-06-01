@@ -914,41 +914,82 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 /* Divider row */
 .row-divider { border-bottom: 1px solid var(--border); }
 
-/* Step progress bar buttons */
+/* Step progress bar — dark tabbed nav strip */
+#stepProgressBar {
+  background: var(--dark);
+  border-bottom: 1px solid var(--dark3);
+}
+.spb-back-row {
+  padding: 8px 14px 6px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.spb-tabs-row {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.spb-tabs-row::-webkit-scrollbar { display: none; }
+
 .spb-btn {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 5px;
-  padding: 10px 8px;
+  gap: 7px;
+  padding: 10px 14px 9px;
   background: none;
   border: none;
+  border-bottom: 2px solid transparent;
   cursor: pointer;
   font-family: 'DM Sans', sans-serif;
-  opacity: .5;
-  transition: opacity .15s;
-  flex: 1;
+  color: rgba(255,255,255,.38);
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+  flex-shrink: 0;
 }
-.spb-btn.active { opacity: 1; }
-.spb-btn:hover  { opacity: .8; }
+.spb-btn:hover { color: rgba(255,255,255,.7); }
+.spb-btn.active {
+  color: #fff;
+  border-bottom-color: var(--yellow);
+}
+.spb-btn.done { color: rgba(255,255,255,.55); }
+
+/* Separator before the Internal Notes tab */
+.spb-btn-notes { margin-left: auto; border-left: 1px solid rgba(255,255,255,.1); }
 
 .spb-num {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: #e5e5e5;
-  color: #999;
+  background: rgba(255,255,255,.1);
+  color: rgba(255,255,255,.4);
   font-size: 10px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: background .15s, color .15s;
 }
 .spb-btn.active .spb-num {
   background: var(--yellow);
-  color: #111;
+  color: var(--dark);
 }
+.spb-btn.done .spb-num {
+  background: rgba(248,228,26,.15);
+  color: var(--yellow);
+}
+
+.spb-lbl {
+  font-size: 11px;
+  font-weight: 600;
+}
+.spb-btn.active .spb-lbl { font-weight: 700; }
+.spb-lbl-sub { font-size: 9px; font-weight: 500; opacity: .7; margin-left: 2px; }
+
+/* Thin yellow progress fill line at the bottom of the strip */
+.spb-fill-bar { height: 2px; background: rgba(255,255,255,.08); }
+.spb-fill-bar-inner { height: 100%; background: var(--yellow); width: 0%; transition: width .3s; }
 
 /* Field row with icon */
 .field-icon-row {

@@ -380,33 +380,22 @@ function goTo(s){
   for(var _si=0; _si<8; _si++) {
     var _btn = document.getElementById('spb_'+_si);
     var _num = document.getElementById('spb_num_'+_si);
-    var _lbl = document.getElementById('spb_lbl_'+_si);
     if(!_btn) continue;
     var _stepNum = _spbSteps[_si];
     var _done    = _stepNum < s && s !== 0;
     var _active  = _stepNum === s;
-    _btn.style.borderTopColor = _active ? '#000' : _done ? '#000' : 'transparent';
-    _btn.style.background     = 'transparent';
+    _btn.classList.toggle('active', _active);
+    _btn.classList.toggle('done', _done && !_active);
     if(_num) {
-      _num.style.background = _active ? 'var(--yellow)' : _done ? '#000' : '#e5e5e5';
-      _num.style.color      = _active ? '#111' : _done ? 'var(--yellow)' : '#999';
-      _num.innerHTML = _done
+      _num.innerHTML = _done && !_active
         ? '<svg viewBox="0 0 10 10" width="10" height="10"><polyline points="1,5 4,8 9,2" stroke="currentColor" stroke-width="2" fill="none"/></svg>'
         : String(_si+1);
-    }
-    if(_lbl) {
-      _lbl.style.color      = _active ? '#111' : _done ? '#555' : '#aaa';
-      _lbl.style.fontWeight = _active ? '700' : '600';
     }
   }
 
   // Leaving the Internal Notes side tab — reset its highlight.
   var _notesBtn = document.getElementById('spb_11');
-  if (_notesBtn) {
-    _notesBtn.style.borderTopColor = 'transparent';
-    var _notesLbl = document.getElementById('spb_lbl_11');
-    if (_notesLbl) _notesLbl.style.color = 'var(--dark)';
-  }
+  if (_notesBtn) _notesBtn.classList.remove('active');
 
   if(s===7){ goTo(8); return; }
   if(s===8){
@@ -2221,11 +2210,7 @@ function _openAppNotesStep() {
   if (_stepN) _stepN.classList.add('on');
 
   var btn = document.getElementById('spb_11');
-  if (btn) {
-    btn.style.borderTopColor = '#000';
-    var lbl = document.getElementById('spb_lbl_11');
-    if (lbl) lbl.style.color = '#111';
-  }
+  if (btn) btn.classList.add('active');
 
   cur = 11;
   window.scrollTo(0, 0);

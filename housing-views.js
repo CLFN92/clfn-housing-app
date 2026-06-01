@@ -42,7 +42,6 @@ function showApp(){
   setNavActive('tab_app');
   if(_al){ _al.style.display='flex'; _al.style.width='100%'; }
   var spb=document.getElementById('stepProgressBar');if(spb)spb.style.display='block';
-  var apf=document.getElementById('appProgressFoot');if(apf)apf.style.display='block';
   var ta=document.getElementById('tab_app');if(ta)ta.classList.add('active');
   // Show sidebar with step nav
     var sn=document.getElementById('stepNav');if(sn)sn.style.display='block';
