@@ -3548,6 +3548,7 @@ function renderRenosView(){
       }
     });
     var _rvTopCats = Object.keys(_rvCatCounts).sort(function(a, b) { return _rvCatCounts[b] - _rvCatCounts[a]; }).slice(0, 3);
+    var _rvTotalItems = Object.keys(_rvCatCounts).reduce(function(s, k) { return s + _rvCatCounts[k]; }, 0);
     function _rvKpiCard(lbl, val, meta, acc) {
       return '<div class="kpi-card' + (acc ? ' kpi-accent-' + acc : '') + '">'
         + '<div class="kpi-label">' + lbl + '</div>'
@@ -3558,9 +3559,9 @@ function renderRenosView(){
     _rvKpiEl.innerHTML =
       _rvKpiCard('Active Renovations', allReno.length, allReno.length === 1 ? '1 unit' : allReno.length + ' units') +
       _rvKpiCard('Total Value', _rvTotalVal > 0 ? formatCurrency(_rvTotalVal) : '—', 'across all requests', 'info') +
-      (_rvTopCats[0] ? _rvKpiCard(_rvTopCats[0], _rvCatCounts[_rvTopCats[0]], _rvCatCounts[_rvTopCats[0]] === 1 ? '1 item' : _rvCatCounts[_rvTopCats[0]] + ' items', 'success') : _rvKpiCard('#1 Category', '—', 'no items yet')) +
-      (_rvTopCats[1] ? _rvKpiCard(_rvTopCats[1], _rvCatCounts[_rvTopCats[1]], _rvCatCounts[_rvTopCats[1]] === 1 ? '1 item' : _rvCatCounts[_rvTopCats[1]] + ' items') : '') +
-      (_rvTopCats[2] ? _rvKpiCard(_rvTopCats[2], _rvCatCounts[_rvTopCats[2]], _rvCatCounts[_rvTopCats[2]] === 1 ? '1 item' : _rvCatCounts[_rvTopCats[2]] + ' items') : '');
+      (_rvTopCats[0] ? _rvKpiCard(_rvTopCats[0], _rvCatCounts[_rvTopCats[0]], 'of ' + _rvTotalItems + ' total items', 'success') : _rvKpiCard('#1 Category', '—', 'no items yet')) +
+      (_rvTopCats[1] ? _rvKpiCard(_rvTopCats[1], _rvCatCounts[_rvTopCats[1]], 'of ' + _rvTotalItems + ' total items') : '') +
+      (_rvTopCats[2] ? _rvKpiCard(_rvTopCats[2], _rvCatCounts[_rvTopCats[2]], 'of ' + _rvTotalItems + ' total items') : '');
   }
 
   var tbody = document.getElementById('renos_tbody');

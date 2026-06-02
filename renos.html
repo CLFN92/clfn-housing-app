@@ -1684,6 +1684,7 @@ function renderRenoApprovalsView() {
       });
     });
     var _raTopCats = Object.keys(_raCatCounts).sort(function(a, b) { return _raCatCounts[b] - _raCatCounts[a]; }).slice(0, 3);
+    var _raTotalItems = Object.keys(_raCatCounts).reduce(function(s, k) { return s + _raCatCounts[k]; }, 0);
     function _raKpiCard(lbl, val, meta, acc) {
       return '<div class="kpi-card' + (acc ? ' kpi-accent-' + acc : '') + '">'
         + '<div class="kpi-label">' + lbl + '</div>'
@@ -1694,9 +1695,9 @@ function renderRenoApprovalsView() {
     _raKpiEl.innerHTML =
       _raKpiCard('Total Requests', rows.length, rows.length === 1 ? '1 maintenance request' : rows.length + ' total') +
       _raKpiCard('Total Value', _raTotalVal > 0 ? '$' + Math.round(_raTotalVal).toLocaleString() : '—', 'across all requests', 'info') +
-      (_raTopCats[0] ? _raKpiCard(_raTopCats[0], _raCatCounts[_raTopCats[0]], _raCatCounts[_raTopCats[0]] === 1 ? '1 item' : _raCatCounts[_raTopCats[0]] + ' items', 'success') : _raKpiCard('#1 Category', '—', 'no items yet')) +
-      (_raTopCats[1] ? _raKpiCard(_raTopCats[1], _raCatCounts[_raTopCats[1]], _raCatCounts[_raTopCats[1]] === 1 ? '1 item' : _raCatCounts[_raTopCats[1]] + ' items') : '') +
-      (_raTopCats[2] ? _raKpiCard(_raTopCats[2], _raCatCounts[_raTopCats[2]], _raCatCounts[_raTopCats[2]] === 1 ? '1 item' : _raCatCounts[_raTopCats[2]] + ' items') : '');
+      (_raTopCats[0] ? _raKpiCard(_raTopCats[0], _raCatCounts[_raTopCats[0]], 'of ' + _raTotalItems + ' total items', 'success') : _raKpiCard('#1 Category', '—', 'no items yet')) +
+      (_raTopCats[1] ? _raKpiCard(_raTopCats[1], _raCatCounts[_raTopCats[1]], 'of ' + _raTotalItems + ' total items') : '') +
+      (_raTopCats[2] ? _raKpiCard(_raTopCats[2], _raCatCounts[_raTopCats[2]], 'of ' + _raTotalItems + ' total items') : '');
   }
 
   // ── Table rows ───────────────────────────────────────────────
