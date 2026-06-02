@@ -2073,11 +2073,6 @@ window.openEditModal = function(appId) {
   if(exRadio)  exRadio.checked  =  isFileUpdate;
   if(typeof onAppTypeChange === 'function') onAppTypeChange();
 
-  // Homeless status
-  tog('homelessToggle', app.homeless);
-  var addrBlkEl = document.getElementById('addrBlk');
-  if (addrBlkEl) addrBlkEl.style.display = app.homeless ? 'none' : '';
-
   // House condition
   tog('hasHouseToggle', app.haveHouse);
   var houseBlk = document.getElementById('homeCondBlk');
@@ -2324,6 +2319,12 @@ window.openEditModal = function(appId) {
   setV2('rent_payment_history', app.rentPaymentHistory || app.rent_payment_history || 'no_history');
   setV2('unit_condition',       app.unitCondition      || app.unit_condition       || 'no_history');
   setV2('tenancy_conduct',      app.tenancyConduct     || app.tenancy_conduct      || 'no_history');
+
+  // Homeless status — restored AFTER V2 fields so auto-populate of urgent_need
+  // correctly sees the already-set dropdown value before deciding to override.
+  var addrBlkEl = document.getElementById('addrBlk');
+  if (addrBlkEl) addrBlkEl.style.display = app.homeless ? 'none' : '';
+  tog('homelessToggle', app.homeless);
 
   // Apply role locks and trigger fresh V2 score
   applyTenancyFieldRoles();

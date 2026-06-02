@@ -58,6 +58,15 @@ window._onLogout = function() {
 function _toggleHomelessAddress(isHomeless) {
   var blk = document.getElementById('addrBlk');
   if (blk) blk.style.display = isHomeless ? 'none' : '';
+  // When homeless is turned on, pre-fill urgent_need if it hasn't been assessed yet.
+  // If staff have already chosen a non-default value, leave it alone.
+  var needEl = document.getElementById('urgent_need');
+  if (needEl) {
+    if (isHomeless && needEl.value === 'none') {
+      needEl.value = 'homeless';
+      if (typeof triggerV2Score === 'function') triggerV2Score();
+    }
+  }
 }
 
 function _saveToggleStates(){
