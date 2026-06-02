@@ -596,12 +596,12 @@ var AUDIT_ACTION_LABELS = {
   'declined':                 '✕ Declined',
   'ed_adjustment':            '⭐ ED Score Adjustment',
   'unit_edit':                '🏠 Unit Saved',
-  'sow_created':              '🔨 SOW Created',
-  'sow_updated':              '🔨 SOW Updated',
-  'sow_tenant_signed':        '✍️ Tenant Signed SOW',
-  'sow_staff_signed':         '✍️ Staff Signed SOW',
-  'sow_hm_approval':          '✅ HM Approved SOW',
-  'sow_ed_approval':          '✅ ED Approved SOW',
+  'sow_created':              '🔨 Request Created',
+  'sow_updated':              '🔨 Request Updated',
+  'sow_tenant_signed':        '✍️ Tenant Signed Request',
+  'sow_staff_signed':         '✍️ Staff Signed Request',
+  'sow_hm_approval':          '✅ HM Approved Request',
+  'sow_ed_approval':          '✅ ED Approved Request',
   'sow_accountability':       '⚠️ Accountability Flagged',
   'settings_scoring_change':  '⚙️ Rubric Value Changed',
   'settings_scoring_add':     '⚙️ Rubric Criteria Added',
@@ -685,7 +685,7 @@ async function renderAuditLog() {
     // Friendly appId display: surface SOW: / SETTINGS prefixes as compact pills.
     var appDisplay = e.appId || '—';
     if (appDisplay.indexOf('SOW:') === 0) {
-      appDisplay = '<span class="audit-pill audit-pill-sow">SOW</span> ' + appDisplay.slice(4);
+      appDisplay = '<span class="audit-pill audit-pill-sow">REQ</span> ' + appDisplay.slice(4);
     } else if (appDisplay === 'SETTINGS') {
       appDisplay = '<span class="audit-pill audit-pill-sys">SYS</span>';
     }

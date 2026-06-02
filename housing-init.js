@@ -1009,7 +1009,7 @@ var _raFilter = '';
 
 function _getRaApprovalStatus(u, sow) {
   var hmLimit = _getHmLimit();
-  if(!sow) return {key:'no_sow', label:'No SOW Filed', bg:'#f4f4f0', c:'#888'};
+  if(!sow) return {key:'no_sow', label:'No Request Filed', bg:'#f4f4f0', c:'#888'};
   var cost = parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))||0;
   var needsED = cost > hmLimit;
   var hmDec = (u.unitHmSig && u.unitHmSig.decision) || '';
@@ -1057,7 +1057,7 @@ function renderRenoApprovalsView() {
       {key:'approved',   label:'Approved',    c:'#15803d', bg:'#f0fdf4'},
       {key:'in_progress',label:'In Progress', c:'#92400e', bg:'#fffbeb'},
       {key:'complete',   label:'Complete',    c:'#15803d', bg:'#f0fdf4'},
-      {key:'no_sow',     label:'No SOW',      c:'#888',    bg:'#f4f4f0'},
+      {key:'no_sow',     label:'No Request',  c:'#888',    bg:'#f4f4f0'},
     ];
     chipsEl.innerHTML = chipDefs.map(function(d){
       var cnt = counts[d.key]||0; if(!cnt) return '';
@@ -1073,6 +1073,34 @@ function renderRenoApprovalsView() {
     var active=_raFilter===tabMap[id];
     el.style.background=active?'var(--yellow)':''; el.style.color=active?'#111':''; el.style.fontWeight=active?'700':'';
   });
+
+  // ── KPI strip ────────────────────────────────────────────────────────────
+  var _raKpiEl = document.getElementById('ra_kpi');
+  if (_raKpiEl) {
+    var _raTotalVal = rows.reduce(function(s, r) { return s + r.cost; }, 0);
+    var _raCatCounts = {};
+    rows.forEach(function(r) {
+      if (!r.sow || !r.sow.items) return;
+      r.sow.items.forEach(function(it) {
+        var c = (it.category || 'Other').trim();
+        if (c) _raCatCounts[c] = (_raCatCounts[c] || 0) + 1;
+      });
+    });
+    var _raTopCats = Object.keys(_raCatCounts).sort(function(a, b) { return _raCatCounts[b] - _raCatCounts[a]; }).slice(0, 3);
+    function _raKpiCard(lbl, val, meta, acc) {
+      return '<div class="kpi-card' + (acc ? ' kpi-accent-' + acc : '') + '">'
+        + '<div class="kpi-label">' + lbl + '</div>'
+        + '<div class="kpi-value">' + val + '</div>'
+        + (meta ? '<div class="kpi-meta">' + meta + '</div>' : '')
+        + '</div>';
+    }
+    _raKpiEl.innerHTML =
+      _raKpiCard('Total Requests', rows.length, rows.length === 1 ? '1 maintenance request' : rows.length + ' total') +
+      _raKpiCard('Total Value', _raTotalVal > 0 ? formatCurrency(_raTotalVal) : '—', 'across all requests', 'info') +
+      (_raTopCats[0] ? _raKpiCard(_raTopCats[0], _raCatCounts[_raTopCats[0]], _raCatCounts[_raTopCats[0]] === 1 ? '1 item' : _raCatCounts[_raTopCats[0]] + ' items', 'success') : _raKpiCard('#1 Category', '—', 'no items yet')) +
+      (_raTopCats[1] ? _raKpiCard(_raTopCats[1], _raCatCounts[_raTopCats[1]], _raCatCounts[_raTopCats[1]] === 1 ? '1 item' : _raCatCounts[_raTopCats[1]] + ' items') : '') +
+      (_raTopCats[2] ? _raKpiCard(_raTopCats[2], _raCatCounts[_raTopCats[2]], _raCatCounts[_raTopCats[2]] === 1 ? '1 item' : _raCatCounts[_raTopCats[2]] + ' items') : '');
+  }
 
   // ── Table rows ───────────────────────────────────────────────
   var tbody = document.getElementById('ra_tbody');
@@ -1112,7 +1140,7 @@ function renderRenoApprovalsView() {
       +'<td class="pad-10"><div style="display:flex;align-items:center;gap:6px;"><div style="width:56px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'var(--success)':'var(--yellow)')+';border-radius:2px;"></div></div><span class="js-lbl-sm">'+pct+'%</span></div></td>'
       +'<td style="padding:10px 14px;width:1%;white-space:nowrap;"><div style="display:flex;gap:5px;align-items:center;">'
         +approveBtn
-        +'<button data-ra-sow="'+uid+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--muted);">SOW</button>'
+        +'<button data-ra-sow="'+uid+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--muted);"> Request</button>'
         +'<button data-ra-prog="'+uid+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;color:var(--muted);">📊</button>'
       +'</div></td>'
       +'</tr>';
@@ -1138,7 +1166,7 @@ function raQuickApprove(unitId, approver) {
   var _qaRole = window.currentRole || 'staff';
   var _needAuthority = approver === 'ed' ? 'approveSowOverThreshold' : 'approveSowUnderThreshold';
   if(!APPROVAL_AUTHORITY.can(_needAuthority, _qaRole)){
-    showToast('You do not have authority to approve this SOW.');
+    showToast('You do not have authority to approve this request.');
     return;
   }
   var units=[];
@@ -1150,17 +1178,17 @@ function raQuickApprove(unitId, approver) {
   var addr=u.num+' '+u.street;
   var label=CLFN_PERMS.roleLabel(approver==='hm' ? ROLE.HOUSING_MANAGER : ROLE.ED);
   showConfirm({
-    title:       'Approve SOW?',
+    title:       'Approve Request?',
     message:     addr + ' &mdash; <strong>' + label + '</strong> approval',
     confirmText: 'Approve'
   }).then(function(ok){
     if (!ok) return;
     if(approver==='hm') {
       u.unitHmSig={name:role,date:today,decision:'approved',savedAt:today};
-      auditEntry('UNIT:'+unitId,'sow_hm_approval',addr+' SOW approved by Housing Manager',role);
+      auditEntry('UNIT:'+unitId,'sow_hm_approval',addr+' request approved by Housing Manager',role);
     } else {
       u.unitEdSig={name:role,date:today,decision:'approved',savedAt:today};
-      auditEntry('UNIT:'+unitId,'sow_ed_approval',addr+' SOW approved by Executive Director',role);
+      auditEntry('UNIT:'+unitId,'sow_ed_approval',addr+' request approved by Executive Director',role);
     }
     // Auto-flip unit status to under_repair on the FIRST approval (mirrors
     // the saveSOW path, but for the inline quick-approve button on the Reno
@@ -1173,7 +1201,7 @@ function raQuickApprove(unitId, approver) {
     units[idx]=u;
     saveUnitWithDraftFallback(u);
     if(typeof housingUnits!=='undefined') housingUnits.splice(0,housingUnits.length,...units);
-    showToast('✓ '+addr+' SOW approved');
+    showToast('✓ '+addr+' request approved');
     renderRenoApprovalsView();
   });
 }
@@ -1181,7 +1209,7 @@ function raQuickApprove(unitId, approver) {
 function exportRenoApprovalsCSV() {
   var units = _getAllRenoUnits();
   var hmLimit = _getHmLimit();
-  var headers = ['Address','Unit Status','Beds','Type','Priority Score','Priority Tier','SOW Cost','ED Auth Required','Approval Status','HM Decision','HM Date','ED Decision','ED Date','Contractor','Progress %'];
+  var headers = ['Address','Unit Status','Beds','Type','Priority Score','Priority Tier','Request Value','ED Auth Required','Approval Status','HM Decision','HM Date','ED Decision','ED Date','Contractor','Progress %'];
   var csvRows = units.map(function(u) {
     var sow=null;sow = getSowData(u.id);
     var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
@@ -1255,7 +1283,7 @@ function exportRenoApprovalsPDF() {
       +'<thead><tr style="background:var(--dark);">'
         +'<th style="padding:8px 10px;text-align:left;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;">Address</th>'
         +'<th style="padding:8px 8px;text-align:center;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:60px;">Score</th>'
-        +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:80px;">SOW Cost</th>'
+        +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:80px;">Request Value</th>'
         +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:100px;">Status</th>'
         +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:110px;">HM Decision</th>'
         +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:110px;">ED Decision</th>'

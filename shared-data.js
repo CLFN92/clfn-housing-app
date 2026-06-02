@@ -1005,7 +1005,7 @@ function sbLookupSOWs(q) {
       if (hay.indexOf(q) === -1) return;
       out.push({
         id:    unitId,
-        label: pn || ('SOW · ' + addr),
+        label: pn || ('Request · ' + addr),
         meta:  addr + (sow.contractor ? ' · ' + sow.contractor : '') + (sow.approval_status ? ' · ' + sow.approval_status : '')
       });
     });
@@ -3046,12 +3046,12 @@ function renderContractorsView(){
         '<div class="ct-kpi-card"><div class="ct-kpi-label">Total Contractors</div>'+
           '<div class="ct-kpi-val">'+kpi.totalContractors+'</div>'+
           '<div class="ct-kpi-sub">'+kpi.approved+' approved · '+kpi.pending+' pending</div></div>' +
-        '<div class="ct-kpi-card"><div class="ct-kpi-label">Total Jobs (SOWs)</div>'+
+        '<div class="ct-kpi-card"><div class="ct-kpi-label">Total Requests</div>'+
           '<div class="ct-kpi-val">'+kpi.totalJobs+'</div>'+
           '<div class="ct-kpi-sub">across all contractors</div></div>' +
         '<div class="ct-kpi-card"><div class="ct-kpi-label">Total Spend</div>'+
           '<div class="ct-kpi-val">'+_ctFmtCurrency(kpi.totalSpend)+'</div>'+
-          '<div class="ct-kpi-sub">cumulative SOW value</div></div>' +
+          '<div class="ct-kpi-sub">cumulative request value</div></div>' +
         '<div class="ct-kpi-card"><div class="ct-kpi-label">Top Trade</div>'+
           '<div class="ct-kpi-val ct-kpi-val-sm">'+escapeHtml(kpi.topTrade || '—')+'</div>'+
           '<div class="ct-kpi-sub">'+(kpi.topTrade ? kpi.topTradeJobs + ' job' + (kpi.topTradeJobs===1?'':'s') : 'no jobs yet')+'</div></div>' +
@@ -3529,6 +3529,40 @@ function renderRenosView(){
     ? tableApplyFilterSort(filtered, _renosAccessors, _renosState)
     : filtered;
 
+  // ── KPI strip ────────────────────────────────────────────────────────────
+  var _rvKpiEl = document.getElementById('rv_kpi');
+  if (_rvKpiEl) {
+    var _rvTotalVal = 0;
+    var _rvCatCounts = {};
+    allReno.forEach(function(u) {
+      var _rvSow = getSowData(u.id);
+      if (_rvSow) {
+        var _rvCost = parseFloat((_rvSow.totalCost || '').toString().replace(/[^0-9.]/g, '')) || 0;
+        _rvTotalVal += _rvCost;
+        if (_rvSow.items) {
+          _rvSow.items.forEach(function(it) {
+            var c = (it.category || 'Other').trim();
+            if (c) _rvCatCounts[c] = (_rvCatCounts[c] || 0) + 1;
+          });
+        }
+      }
+    });
+    var _rvTopCats = Object.keys(_rvCatCounts).sort(function(a, b) { return _rvCatCounts[b] - _rvCatCounts[a]; }).slice(0, 3);
+    function _rvKpiCard(lbl, val, meta, acc) {
+      return '<div class="kpi-card' + (acc ? ' kpi-accent-' + acc : '') + '">'
+        + '<div class="kpi-label">' + lbl + '</div>'
+        + '<div class="kpi-value">' + val + '</div>'
+        + (meta ? '<div class="kpi-meta">' + meta + '</div>' : '')
+        + '</div>';
+    }
+    _rvKpiEl.innerHTML =
+      _rvKpiCard('Active Renovations', allReno.length, allReno.length === 1 ? '1 unit' : allReno.length + ' units') +
+      _rvKpiCard('Total Value', _rvTotalVal > 0 ? formatCurrency(_rvTotalVal) : '—', 'across all requests', 'info') +
+      (_rvTopCats[0] ? _rvKpiCard(_rvTopCats[0], _rvCatCounts[_rvTopCats[0]], _rvCatCounts[_rvTopCats[0]] === 1 ? '1 item' : _rvCatCounts[_rvTopCats[0]] + ' items', 'success') : _rvKpiCard('#1 Category', '—', 'no items yet')) +
+      (_rvTopCats[1] ? _rvKpiCard(_rvTopCats[1], _rvCatCounts[_rvTopCats[1]], _rvCatCounts[_rvTopCats[1]] === 1 ? '1 item' : _rvCatCounts[_rvTopCats[1]] + ' items') : '') +
+      (_rvTopCats[2] ? _rvKpiCard(_rvTopCats[2], _rvCatCounts[_rvTopCats[2]], _rvCatCounts[_rvTopCats[2]] === 1 ? '1 item' : _rvCatCounts[_rvTopCats[2]] + ' items') : '');
+  }
+
   var tbody = document.getElementById('renos_tbody');
   if(!tbody) return;
 
@@ -3546,7 +3580,7 @@ function renderRenosView(){
       var progressCell=sow
         ?'<div style="font-size:12px;font-weight:600;margin-bottom:3px;">'+(prog.status||'No updates yet')+(pct?' — '+pct+'%':'')+'</div>'
           +'<div style="height:4px;width:100px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'var(--success)':'var(--yellow)')+';border-radius:2px;"></div></div>'
-        :'<span class="js-lbl-sm">No SOW filed</span>';
+        :'<span class="js-lbl-sm">No request filed</span>';
       var ctName=sow&&sow.contractor?sow.contractor:'—';
       return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-rpid="'+u.id+'">'
         +'<td style="padding:10px 14px;font-weight:600;font-size:13px;'+(isCondemned?'color:var(--danger);':'')+'">'+u.num+' '+u.street+'</td>'
@@ -3557,7 +3591,7 @@ function renderRenosView(){
         +'<td class="pad-10">'+scoreBadge(u.id)+'</td>'
         +'<td style="padding:10px 14px;text-align:right;white-space:nowrap;">'
           +'<div style="display:flex;gap:5px;justify-content:flex-end;">'
-          +'<button type="button" data-sow-rpid="'+u.id+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;color:var(--muted);">🔨 SOW</button>'
+          +'<button type="button" data-sow-rpid="'+u.id+'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;color:var(--muted);">🔨 Request</button>'
           +'<button type="button" data-rp-rpid="'+u.id+'" style="background:var(--yellow);border:1px solid var(--yellow);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;white-space:nowrap;color:var(--dark);">📊 Progress</button>'
           +'</div>'
         +'</td></tr>';
@@ -3893,7 +3927,7 @@ function renderWorklist() {
   // ── Inline archive helpers (exposed on window so onclick can reach them) ──
   window._wlArchiveSow = function(uid, pn) {
     if (typeof showConfirm !== 'function') return;
-    showConfirm({ title: 'Archive this SOW draft?', message: 'Project ' + pn + ' will be hidden. You can restore it from the Unit Detail Panel.', confirmText: 'Archive' }).then(function(ok) {
+    showConfirm({ title: 'Archive this draft request?', message: 'Project ' + pn + ' will be hidden. You can restore it from the Unit Detail Panel.', confirmText: 'Archive' }).then(function(ok) {
       if (!ok) return;
       if (typeof archiveSow === 'function') archiveSow(uid, pn, window.currentRole || 'staff');
       if (typeof auditEntry === 'function') auditEntry('SOW:'+uid, 'sow_archived', 'SOW '+pn+' archived from worklist', window.currentRole||'staff');
@@ -4009,7 +4043,7 @@ function renderWorklist() {
     draftSows.forEach(function(s) {
       var sowOpen = 'if(typeof openSowModal===\'function\'){openSowModal(\'' + esc(s.uid).replace(/'/g,"\\'") + '\');}else{window.location.href=\'renos.html?sow=' + encodeURIComponent(s.uid) + '\';}';
       var info = '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(s.addr) + '</span>'
-               + '<span style="font-size:11px;color:var(--muted);width:100px;flex-shrink:0;">' + esc(s.pn || 'SOW') + '</span>'
+               + '<span style="font-size:11px;color:var(--muted);width:100px;flex-shrink:0;">' + esc(s.pn || 'Request') + '</span>'
                + '<span style="font-size:11px;color:var(--muted);width:50px;text-align:right;flex-shrink:0;font-style:italic;">Draft</span>';
       draftRows += draftRow(info, null, sowOpen, '_wlArchiveSow(\'' + esc(s.uid).replace(/'/g,"\\'") + '\',\'' + esc(s.pn).replace(/'/g,"\\'") + '\')');
     });

@@ -76,15 +76,15 @@ var EMAIL_EVENT_REGISTRY = [
   },
   {
     key:                   'sow_created',
-    label:                 'Scope of Work Created',
-    description:           'Sent on the first save of a new SOW (not on subsequent edits).',
+    label:                 'Maintenance Request Created',
+    description:           'Sent on the first save of a new maintenance request (not on subsequent edits).',
     defaultRecipientRoles: ['housing_manager'],
     defaultCcRoles:        [],
     wired:                 true,
     placeholders:          ['unitAddress','totalCost','condition','contractor','nationShort','appLink'],
     defaults: {
-      subject:  '{nationShort} Housing — New SOW Created: {unitAddress}',
-      bodyHtml: '<p>A new Scope of Work has been created for <strong>{unitAddress}</strong> and requires your review.</p>'
+      subject:  '{nationShort} Housing — New Maintenance Request: {unitAddress}',
+      bodyHtml: '<p>A new Maintenance Request has been submitted for <strong>{unitAddress}</strong> and requires your review.</p>'
               + '<p>Total cost: <strong>{totalCost}</strong></p>'
               + '<p>Condition: <strong>{condition}</strong></p>'
               + '<p>Contractor: <strong>{contractor}</strong></p>'
@@ -128,17 +128,17 @@ var EMAIL_EVENT_REGISTRY = [
   },
   {
     key:                   'sow_tenant_copy',
-    label:                 'Tenant Copy of SOW (PDF)',
-    description:           'Sent to the tenant on SOW submit (only if the tenant has an email on file and the preparer ticks the inline checkbox). PDF of the SOW is attached.',
+    label:                 'Tenant Copy of Maintenance Request (PDF)',
+    description:           'Sent to the tenant when a request is submitted (only if the tenant has an email on file and the preparer ticks the inline checkbox). PDF of the request is attached.',
     recipientType:         'tenant',
     defaultRecipientRoles: [],
     defaultCcRoles:        [],
     wired:                 true,
     placeholders:          ['tenantName','unitAddress','projectNumber','totalCost','condition','contractor','nationShort','appLink'],
     defaults: {
-      subject:  '{nationShort} Housing — Scope of Work for {unitAddress}',
+      subject:  '{nationShort} Housing — Maintenance Request for {unitAddress}',
       bodyHtml: '<p>Hello {tenantName},</p>'
-              + '<p>A Scope of Work has been prepared for <strong>{unitAddress}</strong> and a copy is attached to this email for your records.</p>'
+              + '<p>A Maintenance Request has been prepared for <strong>{unitAddress}</strong> and a copy is attached to this email for your records.</p>'
               + '<p>Project #: <strong>{projectNumber}</strong><br/>'
               +    'Estimated cost: <strong>{totalCost}</strong><br/>'
               +    'Condition: <strong>{condition}</strong><br/>'
@@ -172,7 +172,7 @@ var EMAIL_EVENT_REGISTRY = [
   {
     key:                   'sow_work_order_to_contractor',
     label:                 'Work Order to Contractor (PDF)',
-    description:           'Sent to the assigned contractor when an HM or ED approves the SOW (only if the contractor has an email on file and the approver ticks the inline checkbox). PDF work order is attached.',
+    description:           'Sent to the assigned contractor when an HM or ED approves the maintenance request (only if the contractor has an email on file and the approver ticks the inline checkbox). PDF work order is attached.',
     recipientType:         'contractor',
     defaultRecipientRoles: [],
     defaultCcRoles:        [],
@@ -1470,7 +1470,7 @@ async function _generateSowPdfBase64() {
   // Header
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(15);
-  pdf.text((short ? short + ' ' : '') + 'Scope of Work', marginL, ctx.y + 5);
+  pdf.text((short ? short + ' ' : '') + 'Maintenance Request', marginL, ctx.y + 5);
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
   pdf.setTextColor(110);
@@ -1511,8 +1511,8 @@ async function _generateSowPdfBase64() {
   row('Target Completion',     fld('sow_end_date'));
   gap();
 
-  // Scope of Work items — table-style rows using the row() helper.
-  sectionHeader('Scope of Work Items');
+  // Work items — table-style rows using the row() helper.
+  sectionHeader('Work Items');
   var items = (typeof collectSowItems === 'function') ? collectSowItems() : [];
   var filtered = items.filter(function(it){ return it.category || it.description || it.cost; });
   if (filtered.length) {
@@ -3564,8 +3564,8 @@ var TERMS_DOCS_REGISTRY = [
   },
   {
     key:         'sow_reno_request',
-    label:       'Scope of Work — Renovation Request Terms',
-    description: 'Printed on the Terms & Conditions section of the Scope of Work document sent to tenants.',
+    label:       'Maintenance Request — Terms & Conditions',
+    description: 'Printed on the Terms & Conditions section of the Maintenance Request sent to tenants.',
     defaultBody: '<p>By submitting this renovation request, I acknowledge and agree to the following:</p>'
                + '<ol>'
                + '<li><strong>Prioritization of Requests.</strong> Renovation requests are assessed and prioritized based on urgency of need, health and safety risk to occupants, and overall unit condition. Immediate hazards — structural, electrical, plumbing, fire safety, or matters affecting habitability — take priority over general maintenance and cosmetic work.</li>'

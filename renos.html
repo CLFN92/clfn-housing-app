@@ -55,7 +55,7 @@
   <div class="page-header-bar">
     <div class="phb-title">
       <h1>Renovation Approvals</h1>
-      <p>SOW approval queue — all units with scope of work filed, by approval status</p>
+      <p>Maintenance request queue — all units with a request filed, by approval status</p>
     </div>
     <div class="phb-actions">
       <button onclick="exportRenoApprovalsCSV()" style="background:none;border:1.5px solid var(--border);color:var(--text);padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="this.style.borderColor='var(--border)'">⬇ CSV</button>
@@ -65,6 +65,7 @@
     </div>
   </div>
 
+  <div id="ra_kpi" class="kpi-strip" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px;"></div>
   <!-- Search -->
   <div class="std-search-row std-search-row-wide">
     <input id="ra_search" class="std-search" type="text" placeholder="🔍 Search address, project #, contractor, status, or cost..." oninput="renderRenoApprovalsView()"/>
@@ -79,7 +80,7 @@
             <th class="std-th-sortable" data-sort-key="addr">Address</th>
             <th class="std-th-sortable" data-sort-key="projectNumber" style="width:90px;">Project #</th>
             <th class="std-th-sortable" data-sort-key="priority" style="width:80px;">Priority</th>
-            <th class="std-th-sortable" data-sort-key="cost" style="width:80px;">SOW Cost</th>
+            <th class="std-th-sortable" data-sort-key="cost" style="width:80px;">Request Value</th>
             <th class="std-th-sortable" data-sort-key="approval" style="width:130px;">Approval Status</th>
             <th class="std-th-sortable" data-sort-key="contractor" style="width:150px;min-width:100px;">Contractor</th>
             <th class="std-th-sortable" data-sort-key="progress" style="width:80px;">Progress</th>
@@ -105,6 +106,7 @@
       <p>Units under repair or condemned — click a unit to view progress</p>
     </div>
   </div>
+  <div id="rv_kpi" class="kpi-strip" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px;"></div>
   <!-- Search -->
   <div class="std-search-row std-search-row-wide">
     <input id="renos_search" class="std-search" type="text" placeholder="🔍 Search address, contractor, status, project #, or bedrooms..." oninput="renderRenosView()"/>
@@ -217,7 +219,7 @@
       <button type="button" onclick="closeRenoProgress()" class="btn-close-dark-30">✕</button>
     </div>
     <!-- Read-only banner: shown when one of the unit's SOWs is Completed and viewer isn't ED -->
-    <div id="rp_readonly_banner" class="banner-strip-success" style="display:none;"><span style="font-size:14px;margin-right:6px;">🔒</span>This unit has a Completed SOW. Progress reports are read-only. Only the Executive Director can reopen the SOW and update progress.</div>
+    <div id="rp_readonly_banner" class="banner-strip-success" style="display:none;"><span style="font-size:14px;margin-right:6px;">🔒</span>This unit has a Completed Maintenance Request. Progress reports are read-only. Only the Executive Director can reopen the request and update progress.</div>
     <div style="padding:24px;display:flex;flex-direction:column;gap:18px;">
 
       <!-- Renovation Priority Score -->
@@ -242,7 +244,7 @@
 
       <!-- SOW summary -->
       <div>
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px;">Scope of Work</div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px;">Maintenance Request</div>
         <div id="rp_sow_summary" style="padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;"></div>
       </div>
 
@@ -492,9 +494,9 @@ function openRenoProgress(unitId) {
   var sumEl = document.getElementById('rp_sow_summary');
   if(sumEl) {
     if(sow && sow.items && sow.items.length) {
-      sumEl.innerHTML = '<div style="font-size:13px;color:var(--text);">SOW filed: '+sow.items.length+' items — <span style="color:var(--yellow);cursor:pointer;" data-opensow="1">View SOW →</span></div>';
+      sumEl.innerHTML = '<div style="font-size:13px;color:var(--text);">Request filed: '+sow.items.length+' items — <span style="color:var(--yellow);cursor:pointer;" data-opensow="1">View Request →</span></div>';
     } else {
-      sumEl.innerHTML = '<div style="font-size:13px;color:var(--muted);">No Scope of Work filed yet. <span style="color:var(--yellow);cursor:pointer;font-weight:700;" data-createsow="1">Create SOW →</span></div>';
+      sumEl.innerHTML = '<div style="font-size:13px;color:var(--muted);">No request filed yet. <span style="color:var(--yellow);cursor:pointer;font-weight:700;" data-createsow="1">Open Request →</span></div>';
     }
     // Wire SOW spans
     if(sumEl){
@@ -662,7 +664,7 @@ function openRenoBudget(unitId) {
   var critCost = critItems.reduce(function(s,it){ return s+(parseFloat(it.cost)||0); }, 0);
   var nonCritCost = totalCost - critCost;
   document.getElementById('rba_summary').innerHTML =
-    _rbaStat('💰 SOW Total', totalCost ? '$'+Math.round(totalCost).toLocaleString() : 'No SOW', '#111')
+    _rbaStat('💰 Request Total', totalCost ? '$'+Math.round(totalCost).toLocaleString() : 'No request', '#111')
    +_rbaStat('🔴 Critical Systems', critCost ? '$'+Math.round(critCost).toLocaleString() : '—', '#b91c1c')
    +_rbaStat('🏠 Funder', rule.label, '#1d4ed8');
 
@@ -1463,11 +1465,11 @@ var DEFAULT_RENO_SCORE_MODEL = [
   {id:'rs_haz_plumbing',  group:'hazard',    factor:'Health & Safety Concerns (additive)', condition:'Plumbing/Sewage',             pts:7,  editable:true,  notes:'Health/sanitation risk'},
   {id:'rs_haz_fire',      group:'hazard',    factor:'Health & Safety Concerns (additive)', condition:'Fire Safety',                 pts:12, editable:true,  notes:'Fire safety risk — high urgency'},
   // SOW Scope (number of line items — additive)
-  {id:'rs_items_5',       group:'scope',     factor:'SOW Scope',      condition:'10+ work items',              pts:8,  editable:true,  notes:'Very broad scope'},
-  {id:'rs_items_4',       group:'scope',     factor:'SOW Scope',      condition:'6 – 9 work items',            pts:5,  editable:true,  notes:'Broad scope'},
-  {id:'rs_items_3',       group:'scope',     factor:'SOW Scope',      condition:'3 – 5 work items',            pts:3,  editable:true,  notes:'Moderate scope'},
-  {id:'rs_items_2',       group:'scope',     factor:'SOW Scope',      condition:'1 – 2 work items',            pts:1,  editable:true,  notes:'Targeted repair'},
-  {id:'rs_items_1',       group:'scope',     factor:'SOW Scope',      condition:'No SOW filed',                pts:0,  editable:false, notes:'No scope of work submitted'},
+  {id:'rs_items_5',       group:'scope',     factor:'Request Scope',      condition:'10+ work items',              pts:8,  editable:true,  notes:'Very broad scope'},
+  {id:'rs_items_4',       group:'scope',     factor:'Request Scope',      condition:'6 – 9 work items',            pts:5,  editable:true,  notes:'Broad scope'},
+  {id:'rs_items_3',       group:'scope',     factor:'Request Scope',      condition:'3 – 5 work items',            pts:3,  editable:true,  notes:'Moderate scope'},
+  {id:'rs_items_2',       group:'scope',     factor:'Request Scope',      condition:'1 – 2 work items',            pts:1,  editable:true,  notes:'Targeted repair'},
+  {id:'rs_items_1',       group:'scope',     factor:'Request Scope',      condition:'No request filed',             pts:0,  editable:false, notes:'No maintenance request submitted'},
   // Occupancy impact
   {id:'rs_occ_displaced', group:'occupancy', factor:'Occupancy',      condition:'Tenant displaced (under repair)', pts:10, editable:true,  notes:'Unit status is under_repair with tenant'},
   {id:'rs_occ_condemned', group:'occupancy', factor:'Occupancy',      condition:'Condemned — uninhabitable',   pts:12, editable:true,  notes:'Unit is condemned'},
@@ -1560,7 +1562,7 @@ function _getRaApprovalStatusForSow(u, sow) {
   // New multi-SOW approval status. Reads sow.approval_status (set by the SOW form on save),
   // and falls back to the old unit-level sig / progress pattern if approval_status is missing.
   var hmLimit = _getHmLimit();
-  if(!sow) return {key:'no_sow', label:'No SOW Filed', bg:'#f4f4f0', c:'#888'};
+  if(!sow) return {key:'no_sow', label:'No Request Filed', bg:'#f4f4f0', c:'#888'};
   // A "completed" SOW is terminal — the renovations are done for that project.
   if(sow.approval_status === 'completed') return {key:'complete', label:'Complete', bg:'#f0fdf4', c:'#15803d'};
   var cost = (typeof sow.amount === 'number' ? sow.amount : parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))) || 0;
@@ -1647,7 +1649,7 @@ function renderRenoApprovalsView() {
     addr:          { label: 'Address',         accessor: function(r){ return ((r.u.num||'')+' '+(r.u.street||'')).trim(); } },
     projectNumber: { label: 'Project #',       accessor: function(r){ return r.projectNumber || '(none)'; } },
     priority:      { label: 'Priority',        accessor: function(r){ return r.rs && r.rs.score || 0; } },
-    cost:          { label: 'SOW Cost',        accessor: function(r){ return r.cost || 0; } },
+    cost:          { label: 'Request Value',   accessor: function(r){ return r.cost || 0; } },
     approval:      { label: 'Approval Status', accessor: function(r){ return (r.appr && r.appr.label) || '(none)'; } },
     contractor:    { label: 'Contractor',      accessor: function(r){ return (r.sow && r.sow.contractor) || '(none)'; } },
     progress:      { label: 'Progress',        accessor: function(r){ return (r.prog && r.prog.overallPct) || 0; } }
@@ -1724,7 +1726,7 @@ function renderRenoApprovalsView() {
       +'<td style="padding:10px 10px;"><div style="display:flex;align-items:center;gap:6px;"><div style="width:56px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'var(--success)':'var(--yellow)')+';border-radius:2px;"></div></div><span style="font-size:11px;color:var(--muted);">'+pct+'%</span></div></td>'
       +'<td style="padding:10px 14px;width:1%;white-space:nowrap;"><div style="display:flex;gap:5px;align-items:center;">'
         +approveBtn
-        +'<button data-ra-sow="'+uid+'"'+dataProj+' style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--muted);">SOW</button>'
+        +'<button data-ra-sow="'+uid+'"'+dataProj+' style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--muted);"> Request</button>'
         +(pn && r.cost >= ((window._appSettings && window._appSettings.rfq_threshold) || 10000)
           ? '<a href="rfq.html?unit='+encodeURIComponent(uid)+'&sow='+encodeURIComponent(pn)+'" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;display:inline-flex;align-items:center;" title="Create Request for Quotes">RFQ</a>'
           : '')
@@ -1819,7 +1821,7 @@ function raQuickApprove(unitId, approver, projectNumber) {
 function exportRenoApprovalsCSV() {
   var units = _getAllRenoUnits();
   var hmLimit = _getHmLimit();
-  var headers = ['Address','Unit Status','Beds','Type','Project #','Priority Score','Priority Tier','SOW Cost','ED Auth Required','Approval Status','Contractor','Progress %'];
+  var headers = ['Address','Unit Status','Beds','Type','Project #','Priority Score','Priority Tier','Request Value','ED Auth Required','Approval Status','Contractor','Progress %'];
   var csvRows = [];
   units.forEach(function(u){
     var rs = calcRenoScore(u.id);
@@ -1935,7 +1937,7 @@ function exportRenoApprovalsPDF() {
         +'<th style="padding:8px 10px;text-align:left;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;">Address</th>'
         +'<th style="padding:8px 8px;text-align:left;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:150px;">Project #</th>'
         +'<th style="padding:8px 8px;text-align:center;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:60px;">Score</th>'
-        +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:80px;">SOW Cost</th>'
+        +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:80px;">Request Value</th>'
         +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:100px;">Status</th>'
         +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:110px;">HM Decision</th>'
         +'<th style="padding:8px 8px;font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;width:110px;">ED Decision</th>'

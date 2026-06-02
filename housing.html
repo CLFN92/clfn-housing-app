@@ -116,19 +116,19 @@
     <!-- Quick Lookup -->
     <div class="lookup-panel">
       <h3>Quick Lookup</h3>
-      <div class="lookup-sub">Search tenants, units, SOWs, or RFQs — jump straight to the record.</div>
+      <div class="lookup-sub">Search tenants, units, maintenance requests, or RFQs — jump straight to the record.</div>
 
       <div class="lookup-tabs" id="lookup_tabs">
         <button class="lookup-tab active" data-lookup-tab="all">All <span class="lookup-tab-count" id="lookup_tab_count_all">—</span></button>
         <button class="lookup-tab" data-lookup-tab="tenants">Tenants <span class="lookup-tab-count" id="lookup_tab_count_tenants">—</span></button>
         <button class="lookup-tab" data-lookup-tab="units">Units <span class="lookup-tab-count" id="lookup_tab_count_units">—</span></button>
-        <button class="lookup-tab" data-lookup-tab="sows" data-roles="ed,housing_manager">SOWs <span class="lookup-tab-count" id="lookup_tab_count_sows">—</span></button>
+        <button class="lookup-tab" data-lookup-tab="sows" data-roles="ed,housing_manager">Requests <span class="lookup-tab-count" id="lookup_tab_count_sows">—</span></button>
         <button class="lookup-tab" data-lookup-tab="rfqs" data-roles="ed,housing_manager,housing_employee_l2">RFQs <span class="lookup-tab-count" id="lookup_tab_count_rfqs">—</span></button>
       </div>
 
       <div class="lookup-search">
         <svg class="lookup-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="lookup_input" placeholder="Search by tenant name, unit number, or SOW ID…" autocomplete="off"/>
+        <input type="text" id="lookup_input" placeholder="Search by tenant name, unit number, or request #…" autocomplete="off"/>
         <div class="lookup-results" id="lookup_results"></div>
       </div>
 
@@ -1114,7 +1114,7 @@
     <div class="modal-hdr">
       <div>
         <div class="lbl-yellow">&#128296; Renovation Priority Scoring</div>
-        <div class="txt-sm-meta">Points used to rank units for renovation &mdash; drawn from unit condition, SOW data, and tenant factors</div>
+        <div class="txt-sm-meta">Points used to rank units for renovation &mdash; drawn from unit condition, request data, and tenant factors</div>
       </div>
       <div class="flex-gap8">
         <button type="button" id="settings_reset_reno_btn" onclick="resetRenoScoreModelED()" class="btn btn-primary">Reset Defaults</button>
@@ -1130,7 +1130,7 @@
       </table>
     </div>
     <div class="sec-pad">
-      <div class="stg-footer-note"><strong>Renovation Priority Score</strong> is calculated per unit from SOW and condition data. Higher scores = higher renovation priority.</div>
+      <div class="stg-footer-note"><strong>Renovation Priority Score</strong> is calculated per unit from request and condition data. Higher scores = higher renovation priority.</div>
     </div>
   </div>
 </div>
@@ -1294,7 +1294,7 @@
     <div class="modal-hdr">
       <div>
         <div class="lbl-yellow">&#128203; Audit Log</div>
-        <div class="txt-sm-meta">Full activity trail &mdash; applications, approvals, unit edits, SOW, and system changes</div>
+        <div class="txt-sm-meta">Full activity trail &mdash; applications, approvals, unit edits, maintenance requests, and system changes</div>
       </div>
       <div class="flex-gap8 flex-wrap">
         <div class="export-dropdown">

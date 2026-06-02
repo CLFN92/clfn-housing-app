@@ -1601,11 +1601,11 @@ function renoSearchFilter(q) {
       +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'
         +'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
         +'<button onclick="event.stopPropagation();closeRenoSearch();openSowModal(\''+uid+'\')" '
-          +'title="Open Scope of Work" '
+          +'title="Open Maintenance Request" '
           +'style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;color:var(--muted);white-space:nowrap;" '
           +'onmouseover="this.style.borderColor=\'var(--yellow)\';this.style.color=\'var(--text)\'" '
           +'onmouseout="this.style.borderColor=\'var(--border)\';this.style.color=\'var(--muted)\'">'
-          +'🔨 SOW'
+          +'🔨 Request'
         +'</button>'
       +'</div>'
       +'</div>';
@@ -1675,9 +1675,9 @@ function openRenoProgress(unitId) {
   var sumEl = document.getElementById('rp_sow_summary');
   if(sumEl) {
     if(sow && sow.items && sow.items.length) {
-      sumEl.innerHTML = '<div class="js-txt-bold2" style="font-weight:400;">SOW filed: '+sow.items.length+' items — <span style="color:var(--yellow);cursor:pointer;" data-opensow="1">View SOW →</span></div>';
+      sumEl.innerHTML = '<div class="js-txt-bold2" style="font-weight:400;">Request filed: '+sow.items.length+' items — <span style="color:var(--yellow);cursor:pointer;" data-opensow="1">View Request →</span></div>';
     } else {
-      sumEl.innerHTML = '<div class="js-txt-muted">No Scope of Work filed yet. <span style="color:var(--yellow);cursor:pointer;font-weight:700;" data-createsow="1">Create SOW →</span></div>';
+      sumEl.innerHTML = '<div class="js-txt-muted">No request filed yet. <span style="color:var(--yellow);cursor:pointer;font-weight:700;" data-createsow="1">Open Request →</span></div>';
     }
     // Wire SOW spans
     if(sumEl){
