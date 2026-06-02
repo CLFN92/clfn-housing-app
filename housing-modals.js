@@ -625,7 +625,7 @@ function _initStep6DocLib() {
     storageBucket: STORAGE_BUCKET,
     getAuthToken:  function(){ return (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ',''); },
     auditTable:    'housing_audit_log',
-    getActor:      function(){ return window.currentRole || 'staff'; },
+    getActor:      function(){ return (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || 'staff'; },
     categories:    [
       { key:'id',          label:'ID',              icon:'\uD83E\uDDFE' },
       { key:'income',      label:'Income / Pay',    icon:'\uD83D\uDCB0' },
@@ -675,7 +675,7 @@ async function scLoadDocs(app) {
     storageBucket: STORAGE_BUCKET,
     getAuthToken:  function(){ return (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ',''); },
     auditTable:    'housing_audit_log',
-    getActor:      function(){ return window.currentRole || 'staff'; },
+    getActor:      function(){ return (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || 'staff'; },
     categories:    _SCORECARD_APP_DOC_CATEGORIES,
     readOnly:      true,  // Upload happens in step 6; scorecard is review-only
     customLoader:  async function() {

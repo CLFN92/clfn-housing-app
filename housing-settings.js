@@ -649,8 +649,13 @@ async function renderAuditLog() {
         } else if (raw && typeof raw === 'object') {
           parsed = raw;
         }
-        var detailText = (parsed && parsed.detail) || (typeof raw === 'string' ? raw : '') || '';
-        var name       = (parsed && parsed.name)   || row.actor_name || '';
+        var isFileMeta = parsed && typeof parsed.path === 'string';
+        var detailText = isFileMeta
+            ? (parsed.name || parsed.path || '—')
+            : ((parsed && parsed.detail) || (typeof raw === 'string' ? raw : '') || '');
+        var name = isFileMeta
+            ? (parsed.actor_name || row.actor_name || '')
+            : ((parsed && parsed.name) || row.actor_name || '');
         return {
           ts:     row.created_at || row.ts || '',
           appId:  row.entity_id  || row.app_id || '',

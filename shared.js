@@ -1070,7 +1070,8 @@ window.DocLibrary = (function(){
     // finance_audit_log. Type differs: housing is text, finance is jsonb.
     // opts.detailAsJson:true sends the object directly (jsonb-friendly);
     // default stringifies (text-friendly). See PLAN.md schema notes.
-    var detailPayload = { path:path, name:name, size:size, type:type, category:category||'other' };
+    var detailPayload = { path:path, name:name, size:size, type:type, category:category||'other',
+                          actor_name: (window.HOUSING_SESSION && window.HOUSING_SESSION.name) || '' };
     return fetch(url, {
       method: 'POST',
       headers: _restHeaders(opts),
@@ -1611,8 +1612,9 @@ window.DocLibrary = (function(){
           entity_type: entityType,
           entity_id: String(entityId),
           action: 'file_uploaded',
-          detail: JSON.stringify({ path: filePath, name: fileName, size: fileSize, type: fileType }),
-          actor: window.currentRole || 'staff',
+          detail: JSON.stringify({ path: filePath, name: fileName, size: fileSize, type: fileType,
+            actor_name: (window.HOUSING_SESSION && window.HOUSING_SESSION.name) || '' }),
+          actor: (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || 'staff',
           created_at: new Date().toISOString()
         })
       });

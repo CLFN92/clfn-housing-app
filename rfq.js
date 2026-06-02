@@ -1126,7 +1126,7 @@ function renderDocumentsTab() {
       storageBucket: STORAGE_BUCKET,
       getAuthToken:  function(){ return (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ',''); },
       auditTable:    'housing_audit_log',
-      getActor:      function(){ return window.currentRole || 'staff'; },
+      getActor:      function(){ return (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || 'staff'; },
       categories: [
         { key:'site_plan', label:'Site Plan',       icon:'📍' },
         { key:'report',    label:'Report / Study',  icon:'📋' },
