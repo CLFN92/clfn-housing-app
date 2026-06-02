@@ -1676,15 +1676,17 @@ function renderRenoApprovalsView() {
   if (_raKpiEl) {
     var _raTotalVal = rows.reduce(function(s, r) { return s + r.cost; }, 0);
     var _raCatCounts = {};
+    var _raCatValues = {};
     rows.forEach(function(r) {
       if (!r.sow || !r.sow.items) return;
       r.sow.items.forEach(function(it) {
         var c = (it.category || 'Other').trim();
-        if (c) _raCatCounts[c] = (_raCatCounts[c] || 0) + 1;
+        if (!c) return;
+        _raCatCounts[c] = (_raCatCounts[c] || 0) + 1;
+        _raCatValues[c] = (_raCatValues[c] || 0) + (parseFloat(it.cost) || 0);
       });
     });
     var _raTopCats = Object.keys(_raCatCounts).sort(function(a, b) { return _raCatCounts[b] - _raCatCounts[a]; }).slice(0, 3);
-    var _raTotalItems = Object.keys(_raCatCounts).reduce(function(s, k) { return s + _raCatCounts[k]; }, 0);
     function _raKpiCard(lbl, val, meta, acc) {
       return '<div class="kpi-card' + (acc ? ' kpi-accent-' + acc : '') + '">'
         + '<div class="kpi-label">' + lbl + '</div>'
@@ -1692,12 +1694,16 @@ function renderRenoApprovalsView() {
         + (meta ? '<div class="kpi-meta">' + meta + '</div>' : '')
         + '</div>';
     }
+    function _raCatMeta(cat) {
+      var v = _raCatValues[cat] || 0;
+      return (v > 0 ? '$' + Math.round(v).toLocaleString() : '—');
+    }
     _raKpiEl.innerHTML =
       _raKpiCard('Total Requests', rows.length, rows.length === 1 ? '1 maintenance request' : rows.length + ' total') +
       _raKpiCard('Total Value', _raTotalVal > 0 ? '$' + Math.round(_raTotalVal).toLocaleString() : '—', 'across all requests', 'info') +
-      (_raTopCats[0] ? _raKpiCard(_raTopCats[0], _raCatCounts[_raTopCats[0]], 'of ' + _raTotalItems + ' total items', 'success') : _raKpiCard('#1 Category', '—', 'no items yet')) +
-      (_raTopCats[1] ? _raKpiCard(_raTopCats[1], _raCatCounts[_raTopCats[1]], 'of ' + _raTotalItems + ' total items') : '') +
-      (_raTopCats[2] ? _raKpiCard(_raTopCats[2], _raCatCounts[_raTopCats[2]], 'of ' + _raTotalItems + ' total items') : '');
+      (_raTopCats[0] ? _raKpiCard(_raTopCats[0], _raCatCounts[_raTopCats[0]], _raCatMeta(_raTopCats[0]), 'success') : _raKpiCard('#1 Category', '—', 'no items yet')) +
+      (_raTopCats[1] ? _raKpiCard(_raTopCats[1], _raCatCounts[_raTopCats[1]], _raCatMeta(_raTopCats[1])) : '') +
+      (_raTopCats[2] ? _raKpiCard(_raTopCats[2], _raCatCounts[_raTopCats[2]], _raCatMeta(_raTopCats[2])) : '');
   }
 
   // ── Table rows ───────────────────────────────────────────────
