@@ -55,6 +55,11 @@ window._onLogout = function() {
 // Registered after page functions are defined (see bottom of script block).
 
 
+function _toggleHomelessAddress(isHomeless) {
+  var blk = document.getElementById('addrBlk');
+  if (blk) blk.style.display = isHomeless ? 'none' : '';
+}
+
 function _saveToggleStates(){
   try{
     var states={};

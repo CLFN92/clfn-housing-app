@@ -190,9 +190,12 @@ function validateStep0() {
   // (validateStep1/2/3/4/5) — pulling them in here would treat dynamic-row
   // fields as static IDs (they aren't) and step-2 co-applicant fields as
   // unconditional (they're gated by the co_status toggle).
+  var isHomeless = !!(document.getElementById('homelessToggle') || {}).checked;
+  var addrIds = ['street', 'city', 'prov', 'postal'];
   (window.APP_REQ_FIELDS || [])
     .filter(function(f){ return f.step === 0 && !f.rowOf; })
     .forEach(function(f){
+      if (isHomeless && addrIds.indexOf(f.id) !== -1) return;
       if (typeof isFieldRequired === 'function' && !isFieldRequired(f.id)) return;
       if (!fld(f.id)) errs.push(f.errorLabel || (f.label + ' is required.'));
     });
@@ -1283,6 +1286,7 @@ function saveApplicationRecord(opts){
     marital:     fsel('marital'),
     phone:       fv('phone'),
     email:       fv('email'),
+    homeless:    fb('homelessToggle'),
     street:      fv('street'),
     city:        fv('city'),
     province:    fsel('prov'),
@@ -1549,10 +1553,13 @@ function popReview(){
   , '👤');
 
   // ── Current Address ───────────────────────────────────────────────────────
-  var addrParts = [fld('street'), fld('city'), fld('prov')].filter(function(p){return p&&p!=='—';});
+  var isHomelessReview = chk('homelessToggle');
   html += section('Current Address',
-    row('Address', addrParts.join(', ')||'—') +
-    row('Postal Code', fld('postal')) +
+    (isHomelessReview
+      ? row('Status', 'Homeless / No Fixed Address')
+      : row('Address', [fld('street'),fld('city'),fld('prov')].filter(function(p){return p&&p!=='—';}).join(', ')||'—') +
+        row('Postal Code', fld('postal'))
+    ) +
     row('Application Date', fld('appDate')) +
     row('Expected Move-in', fld('occDate'))
   , '🏠');

@@ -2073,6 +2073,11 @@ window.openEditModal = function(appId) {
   if(exRadio)  exRadio.checked  =  isFileUpdate;
   if(typeof onAppTypeChange === 'function') onAppTypeChange();
 
+  // Homeless status
+  tog('homelessToggle', app.homeless);
+  var addrBlkEl = document.getElementById('addrBlk');
+  if (addrBlkEl) addrBlkEl.style.display = app.homeless ? 'none' : '';
+
   // House condition
   tog('hasHouseToggle', app.haveHouse);
   var houseBlk = document.getElementById('homeCondBlk');

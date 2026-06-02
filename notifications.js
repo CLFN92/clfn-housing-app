@@ -1127,9 +1127,10 @@ async function _generateApplicationPdfBase64() {
   var fnVal   = fld('fn');
   var lnVal   = fld('ln');
   var fullName= (fnVal + ' ' + lnVal).trim() || '—';
-  var hasCoApp= (document.getElementById('co_status') || {}).value === 'yes';
-  var hasHouse= chk('hasHouseToggle');
-  var hasArr  = chk('arrToggle');
+  var hasCoApp  = (document.getElementById('co_status') || {}).value === 'yes';
+  var hasHouse  = chk('hasHouseToggle');
+  var hasArr    = chk('arrToggle');
+  var isHomeless= chk('homelessToggle');
 
   // ── HEADER ────────────────────────────────────────────────────────
   pdf.setFont('helvetica', 'bold');
@@ -1175,10 +1176,14 @@ async function _generateApplicationPdfBase64() {
 
   // ── 2. CURRENT ADDRESS ────────────────────────────────────────────
   sectionHeader('Current Address');
-  row('Street Address',           fld('street'));
-  row('City',                     fld('city'));
-  row('Province',                 fld('prov'));
-  row('Postal Code',              fld('postal'));
+  if (isHomeless) {
+    row('Status', 'Homeless / No Fixed Address');
+  } else {
+    row('Street Address',  fld('street'));
+    row('City',            fld('city'));
+    row('Province',        fld('prov'));
+    row('Postal Code',     fld('postal'));
+  }
   row('Expected Occupancy Date',  fld('occDate'));
   gap();
 
