@@ -5042,103 +5042,141 @@ function printBatchStatements() {
   var tids = [];
   for (var i=0; i<checked.length; i++) tids.push(checked[i].getAttribute('data-tid'));
 
-  var d = getData();
-  var totals = calcAllTotals(d);
-  var nation = (window.NATION_CONFIG && window.NATION_CONFIG.short_name) || '';
-  var printDate = new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
-  var allTxns = getAllTransactions();
+  var d        = getData();
+  var totals   = calcAllTotals(d);
+  var nc       = window.NATION_CONFIG || {};
+  var today_d  = new Date();
+  var printDate = today_d.toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+  var allTxns  = getAllTransactions();
 
-  var w = window.open('','_blank','width=900,height=700');
-  if (!w) { toast('Print popup blocked. Please allow popups for this site.'); return; }
+  var logoSrc    = sessionStorage.getItem('clfn_logo_cache') || window.CLFN_LOGO_DATA_URL || '';
+  var nationName = nc.display_name || nc.short_name || '';
+  var nationAddr = nc.mailing_address || '';
+  var nationPhone = nc.phone || '';
+  var nationEmail = nc.email || '';
 
-  var css =
-    'body{font-family:Georgia,serif;max-width:860px;margin:24px auto;padding:0 20px;font-size:12px;}' +
-    'h1{font-size:20px;margin-bottom:4px;}' +
-    '.sub{color:#888;font-size:12px;margin-bottom:16px;}' +
-    'table{width:100%;border-collapse:collapse;margin-top:12px;}' +
-    'th{background:#111;color:#fff;padding:7px 10px;text-align:left;font-size:11px;}' +
-    'td{padding:7px 10px;border-bottom:1px solid #eee;font-size:12px;vertical-align:middle;}' +
-    '.bal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}' +
-    '.bal-cell{border:1px solid #ddd;border-radius:8px;padding:10px 12px;text-align:center;}' +
-    '.bal-lbl{font-size:10px;text-transform:uppercase;color:#888;margin-bottom:4px;}' +
-    '.bal-val{font-size:18px;font-weight:700;}' +
-    '.dr{color:#b91c1c;font-weight:600;}' +
-    '.cr{color:#15803d;font-weight:600;}' +
-    '.sig{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:32px;}' +
-    '.sig-line{border-bottom:1px solid #333;height:50px;}' +
-    '.sig-lbl{font-size:11px;margin-top:4px;color:#555;}' +
-    '.pg{page-break-after:always;padding-bottom:40px;margin-bottom:40px;}' +
-    '@media print{button{display:none!important;}.pg:last-child{page-break-after:avoid;}}';
+  var CSS = [
+    '@page{size:letter;margin:38mm 16mm 22mm;}',
+    '@page{@bottom-left{content:"CONFIDENTIAL";font-size:9px;color:#888;}@bottom-right{content:"Page " counter(page);font-size:9px;color:#888;}}',
+    'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#111;margin:0;padding:0;}',
+    '.pg-hdr{position:fixed;top:0;left:0;right:0;background:#111;color:#fff;border-bottom:3px solid #F8E41A;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;gap:16px;}',
+    '.pg-hdr-logo{height:44px;width:auto;}',
+    '.pg-hdr-nation{font-size:11px;line-height:1.5;color:#ddd;}',
+    '.pg-hdr-nation strong{font-size:13px;color:#fff;display:block;}',
+    '.pg-hdr-title{text-align:right;}',
+    '.pg-hdr-title h1{font-size:16px;font-weight:700;color:#F8E41A;margin:0 0 2px;}',
+    '.pg-hdr-title .gen-date{font-size:10px;color:#aaa;}',
+    '.content{padding:0;}',
+    '.stmt{break-before:page;}',
+    '.stmt:first-child{break-before:auto;}',
+    '.section-hdr{background:#111;color:#F8E41A;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:6px 10px;margin:0;}',
+    '.tenant-block{padding:12px 0 14px;}',
+    '.tenant-name{font-size:15px;font-weight:700;margin:0 0 2px;}',
+    '.tenant-meta{font-size:11px;color:#666;}',
+    '.tenant-addr{font-size:11px;color:#444;margin-top:6px;white-space:pre-line;}',
+    '.bal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}',
+    '.bal-cell{border:1px solid #ddd;border-radius:6px;padding:9px 12px;text-align:center;}',
+    '.bal-lbl{font-size:10px;text-transform:uppercase;color:#888;letter-spacing:.4px;margin-bottom:4px;}',
+    '.bal-val{font-size:17px;font-weight:700;}',
+    '.dr{color:#b91c1c;}.cr{color:#15803d;}',
+    'table{width:100%;border-collapse:collapse;}',
+    'th{background:#f0f0f0;padding:6px 10px;text-align:left;font-size:11px;font-weight:700;border-bottom:2px solid #ddd;}',
+    'td{padding:6px 10px;border-bottom:1px solid #eee;font-size:11.5px;vertical-align:middle;}',
+    '.r{text-align:right;}',
+    '.empty{padding:12px 10px;color:#999;font-style:italic;}',
+    '@media print{.no-print{display:none!important;}}',
+  ].join('');
 
-  w.document.write('<!DOCTYPE html><html><head><title>Tenant Statements &mdash; '+printDate+'</title><style>'+css+'</style></head><body>');
+  var logoTag = logoSrc ? '<img src="' + logoSrc + '" class="pg-hdr-logo" alt="">' : '';
+  var nch = '<strong>' + (nationName || 'Housing') + '</strong>';
+  if (nationAddr) nch += '<br>' + nationAddr;
+  if (nationPhone) nch += '<br>' + nationPhone;
+  if (nationEmail) nch += '  &bull;  ' + nationEmail;
 
-  for (var j=0; j<tids.length; j++) {
+  var header = '<div class="pg-hdr">'
+    + '<div style="display:flex;align-items:center;gap:14px;">' + logoTag
+    + '<div class="pg-hdr-nation">' + nch + '</div></div>'
+    + '<div class="pg-hdr-title"><h1>Statement of Account</h1>'
+    + '<div class="gen-date">Generated: ' + printDate + '</div></div></div>';
+
+  var body = '';
+
+  for (var j = 0; j < tids.length; j++) {
     var tid = tids[j];
     var t = getTenant(tid);
     if (!t) continue;
-    var v = totals[tid] || {};
-    var rentOwe = v.rent || 0;
-    var loanOwe = v.loan || 0;
-    var arrOwe  = v.arrangement || 0;
-    var grandTotal = rentOwe + loanOwe + arrOwe;
+    var v        = totals[tid] || {};
+    var rentOwe  = v.rent || 0;
+    var loanOwe  = v.loan || 0;
+    var arrOwe   = v.arrangement || 0;
+    var grandTot = rentOwe + loanOwe + arrOwe;
+
+    // Tenant address
+    var taddr = '';
+    if (t.mailingAddress) {
+      taddr = t.mailingAddress;
+    } else {
+      var tp = [];
+      if (t.street) tp.push(t.street);
+      var tcity = [t.community, t.province, t.postalCode].filter(Boolean).join('  ');
+      if (tcity) tp.push(tcity);
+      taddr = tp.join('\n');
+    }
+    var addrHtml = taddr ? '<div class="tenant-addr">' + taddr.replace(/\n/g, '<br>') + '</div>' : '';
 
     var entries = allTxns.filter(function(e){ return e.tenantId === tid; })
-      .slice().sort(function(a,b){ return a.date.localeCompare(b.date); });
+      .slice().sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); });
 
-    var tableRows = entries.map(function(r){
-      return '<tr>'+
-        '<td>'+r.date+'</td>'+
-        '<td>'+(r.desc||'&mdash;')+'</td>'+
-        '<td style="text-transform:capitalize;">'+(r.ledger||'rent')+'</td>'+
-        '<td style="text-align:right;">'+(r.charge>0?'<span class="dr">$'+r.charge.toFixed(2)+'</span>':'&mdash;')+'</td>'+
-        '<td style="text-align:right;">'+(r.payment>0?'<span class="cr">$'+r.payment.toFixed(2)+'</span>':'&mdash;')+'</td>'+
-        '<td>'+(r.method||'&mdash;')+'</td>'+
-        '<td>'+(r.status||'&mdash;')+'</td>'+
-      '</tr>';
+    var tableRows = entries.map(function(r) {
+      return '<tr>'
+        + '<td class="muted">' + (r.date || '') + '</td>'
+        + '<td>' + (r.desc || '&mdash;') + '</td>'
+        + '<td style="text-transform:capitalize;">' + (r.ledger || 'rent') + '</td>'
+        + '<td class="r">' + (r.charge > 0 ? '<span class="dr">$' + r.charge.toFixed(2) + '</span>' : '&mdash;') + '</td>'
+        + '<td class="r">' + (r.payment > 0 ? '<span class="cr">$' + r.payment.toFixed(2) + '</span>' : '&mdash;') + '</td>'
+        + '<td>' + (r.method || '&mdash;') + '</td>'
+        + '<td>' + (r.status || '&mdash;') + '</td>'
+        + '</tr>';
     }).join('');
 
-    var isLast = (j === tids.length - 1);
-    w.document.write('<div class="'+(isLast ? '' : 'pg')+'">');
-    w.document.write('<h1>Tenant Statement &mdash; '+tenantName(t)+'</h1>');
-    w.document.write('<div class="sub">'+
-      (t.unit||'No unit')+' &bull; '+(t.type||'').replace(/-/g,' ')+
-      ' &bull; Generated '+printDate+
-      (nation ? ' &bull; '+nation+' Housing' : '')+
-    '</div>');
-    w.document.write(
-      '<div class="bal-grid">'+
-        '<div class="bal-cell"><div class="bal-lbl">Rent Owing</div>'+
-          '<div class="bal-val '+(rentOwe>0?'dr':'cr')+'">$'+rentOwe.toFixed(2)+'</div></div>'+
-        '<div class="bal-cell"><div class="bal-lbl">Arrangements</div>'+
-          '<div class="bal-val '+(arrOwe>0?'dr':'cr')+'">$'+arrOwe.toFixed(2)+'</div></div>'+
-        '<div class="bal-cell"><div class="bal-lbl">Loans</div>'+
-          '<div class="bal-val '+(loanOwe>0?'dr':'cr')+'">$'+loanOwe.toFixed(2)+'</div></div>'+
-        '<div class="bal-cell"><div class="bal-lbl">Total Owing</div>'+
-          '<div class="bal-val '+(grandTotal>0?'dr':'cr')+'">$'+grandTotal.toFixed(2)+'</div></div>'+
-      '</div>'
-    );
-    if (entries.length) {
-      w.document.write(
-        '<table><thead><tr>'+
-          '<th>Date</th><th>Description</th><th>Ledger</th>'+
-          '<th style="text-align:right;">Charge</th>'+
-          '<th style="text-align:right;">Payment</th>'+
-          '<th>Method</th><th>Status</th>'+
-        '</tr></thead><tbody>'+tableRows+'</tbody></table>'
-      );
-    } else {
-      w.document.write('<p style="color:#888;font-style:italic;">No transactions on file.</p>');
-    }
-    w.document.write(
-      '<div class="sig">'+
-        '<div><div class="sig-line"></div><div class="sig-lbl">Tenant Signature</div></div>'+
-        '<div><div class="sig-line"></div><div class="sig-lbl">Housing Manager</div></div>'+
-      '</div>'
-    );
-    w.document.write('</div>');
+    body += '<div class="stmt">'
+      + '<div class="tenant-block">'
+      + '<div class="tenant-name">' + tenantName(t) + '</div>'
+      + '<div class="tenant-meta">' + (t.unit || 'No unit') + (t.type ? '  &middot;  ' + (t.type || '').replace(/-/g, ' ') : '') + '</div>'
+      + '<div class="tenant-meta" style="margin-top:2px;">As of ' + printDate + '</div>'
+      + addrHtml
+      + '</div>'
+      + '<div class="section-hdr">Account Summary</div>'
+      + '<div class="bal-grid">'
+      + '<div class="bal-cell"><div class="bal-lbl">Rent Owing</div><div class="bal-val ' + (rentOwe > 0 ? 'dr' : 'cr') + '">$' + rentOwe.toFixed(2) + '</div></div>'
+      + '<div class="bal-cell"><div class="bal-lbl">Arrangements</div><div class="bal-val ' + (arrOwe > 0 ? 'dr' : 'cr') + '">$' + arrOwe.toFixed(2) + '</div></div>'
+      + '<div class="bal-cell"><div class="bal-lbl">Loans</div><div class="bal-val ' + (loanOwe > 0 ? 'dr' : 'cr') + '">$' + loanOwe.toFixed(2) + '</div></div>'
+      + '<div class="bal-cell"><div class="bal-lbl">Total Owing</div><div class="bal-val ' + (grandTot > 0 ? 'dr' : 'cr') + '">$' + grandTot.toFixed(2) + '</div></div>'
+      + '</div>'
+      + '<div class="section-hdr">Transaction History</div>'
+      + (entries.length
+          ? '<table><thead><tr><th>Date</th><th>Description</th><th>Ledger</th><th class="r">Charge</th><th class="r">Payment</th><th>Method</th><th>Status</th></tr></thead><tbody>' + tableRows + '</tbody></table>'
+          : '<p class="empty">No transactions on file.</p>')
+      + '</div>';
   }
 
-  w.document.write('</body></html>');
+  var printBtn = '<div style="margin-top:24px;text-align:center;" class="no-print">'
+    + '<button onclick="window.print()" style="background:#111;color:#F8E41A;border:none;padding:10px 28px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;">&#128424; Print / Save PDF</button>'
+    + '</div>';
+
+  var fullHTML = '<!DOCTYPE html><html><head>'
+    + '<meta charset="UTF-8">'
+    + '<title>Tenant Statements &mdash; ' + printDate + '</title>'
+    + '<style>' + CSS + '</style>'
+    + '</head><body>'
+    + header
+    + '<div class="content">' + body + '</div>'
+    + printBtn
+    + '</body></html>';
+
+  var w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) { toast('Print popup blocked. Please allow popups for this site.'); return; }
+  w.document.write(fullHTML);
   w.document.close();
   setTimeout(function(){ w.print(); }, 400);
 }
