@@ -25,11 +25,15 @@ function renderApprovalAuthorityPanel() {
     return;
   }
 
-  // Only show housing-relevant roles — exclude finance-only roles (cfo, finance_l1)
-  var housingRoles = ['ed', 'housing_manager', 'housing_employee_l2', 'housing_employee_l1'];
-  var allRolesRaw  = APPROVAL_AUTHORITY.allRoles(); // [{value, label}]
-  var allRoles     = allRolesRaw.filter(function(r) {
+  // Housing-only roles for housing groups; all roles for Finance group
+  var housingRoles    = ['ed', 'housing_manager', 'housing_employee_l2', 'housing_employee_l1'];
+  var financeKeys     = ['viewFinanceCard','recordPayment','createInvoice','createArrangement','manageLoan','reverseTransaction'];
+  var allRolesRaw     = APPROVAL_AUTHORITY.allRoles(); // [{value, label}]
+  var allRoles        = allRolesRaw.filter(function(r) {
     return housingRoles.indexOf(r.value || r) !== -1;
+  });
+  var allRolesIncFin  = allRolesRaw.filter(function(r) {
+    return (r.value || r) !== 'super_user';
   });
 
   var groups   = APPROVAL_AUTHORITY.groups;
@@ -80,8 +84,9 @@ function renderApprovalAuthorityPanel() {
           + 'background:var(--surface);text-align:right;"'
           + ' oninput="APPROVAL_AUTHORITY.update(\'' + key + '\', parseFloat(this.value)||0)"/></div>';
       } else {
+        var rolesForKey = financeKeys.indexOf(key) !== -1 ? allRolesIncFin : allRoles;
         html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
-        allRoles.forEach(function(r) {
+        rolesForKey.forEach(function(r) {
           var rVal   = r.value || r;
           var rLabel = r.label || rVal;
           var active = Array.isArray(cur) && cur.indexOf(rVal) !== -1;

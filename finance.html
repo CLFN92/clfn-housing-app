@@ -13,6 +13,8 @@
 <script src="shared-ui.js"></script>
 <script src="shared-data.js"></script>
 <script src="housing-init.js"></script>
+<script src="approval-authority.js"></script>
+<script src="finance-fic.js"></script>
 <style>
 /* ── finance.html page-specific overrides ───────────────────────────────────
    shared.css provides all tokens, layout, and component styles.
@@ -2793,6 +2795,17 @@ async function _bootLoadFinanceData(){
     console.log('[finance] hydrated:',
       _FIN_TABLES.map(function(s){ return s.key + '=' + (results[s.key]||[]).length; }).join(', '));
 
+    // Load housing_settings so APPROVAL_AUTHORITY overrides are respected on this page
+    try {
+      var setR = await _fetchFromSupabase('housing_settings?select=key,value');
+      if (setR.ok) {
+        var setD = await setR.json();
+        if (!window._appSettings) window._appSettings = {};
+        (setD||[]).forEach(function(r){ window._appSettings[r.key] = r.value; });
+        if (typeof initApprovalAuthority === 'function') initApprovalAuthority();
+      }
+    } catch(e) { console.warn('[finance] settings load skipped:', e); }
+
     // Also load housing_units — read-only cache used by the unit picker in
     // Add Tenant modal. Not part of the finance write path; just a lookup.
     try {
@@ -3315,7 +3328,7 @@ function finSearchSelectResult(type, id) {
   if (el) { el.classList.remove('open'); el.innerHTML = ''; }
   var inp = document.getElementById('fin_search_input');
   if (inp) inp.value = '';
-  goToTenant(id);
+  openFinanceCard(id);
 }
 
 
@@ -3457,7 +3470,7 @@ function searchTenants(q) {
     var safeId = (t.id||'').replace(/'/g, "\\'");  // defensive; UUIDs won't contain single quotes but older IDs might
     var unitLabel = (t.unit||'').toString();
     var typeLabel = (t.type||'').toString().replace(/-/g,' ');
-    return '<div class="tenant-search-result" onclick="selectTenantProfile(\''+safeId+'\')">'+
+    return '<div class="tenant-search-result" onclick="openFinanceCard(\''+safeId+'\')">'+
       '<div class="tsr-avatar">'+initials+'</div>'+
       '<div><div class="tsr-name">'+tenantName(t)+'</div>'+
       '<div class="tsr-meta">'+unitLabel+' &middot; '+typeLabel+'</div></div>'+
@@ -3584,7 +3597,7 @@ function renderTenantList() {
       var statusText = st.charAt(0).toUpperCase() + st.slice(1);
       var unitCell = t.unit ? t.unit : '<span class="std-cell-dash">—</span>';
       var typeCell = typeLabels[t.type] || (t.type||'').replace(/-/g,' ') || '<span class="std-cell-dash">—</span>';
-      return '<tr class="clickable" onclick="selectTenantProfile(\''+safeId+'\')">'+
+      return '<tr class="clickable" onclick="openFinanceCard(\''+safeId+'\')">'+
         '<td class="std-row-avatar-cell"><div class="std-row-avatar">'+initials+'</div></td>'+
         '<td class="std-cell-primary">'+tenantName(t)+'</td>'+
         '<td>'+unitCell+'</td>'+
@@ -7330,7 +7343,7 @@ function renderAging() {
     rows = flatRows.map(function(fr){
       var x = fr.row;
       var safeId = (x.tid||'').replace(/'/g, "\\'");
-      return '<tr class="clickable" onclick="goToTenant(\''+safeId+'\')">'+
+      return '<tr class="clickable" onclick="openFinanceCard(\''+safeId+'\')">'+
         '<td class="std-cell-primary">'+x.name+
           (x.unit?'<div style="font-size:11px;color:var(--muted);font-weight:normal;">'+x.unit+'</div>':'')+'</td>'+
         '<td>'+(x.oldest||'<span class="std-cell-dash">—</span>')+'</td>'+
@@ -9672,7 +9685,7 @@ function showKpiDrilldown(type) {
       + '</tr></thead><tbody>'
       + (items.length ? items.map(function(r){
           var sid = (r.t.id||'').replace(/'/g,"\\'");
-          return '<tr class="clickable" onclick="goToTenant(\''+sid+'\');closeModal(\'modalKpiDrilldown\')">'
+          return '<tr class="clickable" onclick="closeModal(\'modalKpiDrilldown\');openFinanceCard(\''+sid+'\')">'
             + '<td style="font-weight:600;">'+tenantName(r.t)+'</td>'
             + '<td>'+(r.t.unit||'&mdash;')+'</td>'
             + '<td class="std-cell-muted">'+(r.t.type||'').replace(/-/g,' ')+'</td>'
@@ -9699,7 +9712,7 @@ function showKpiDrilldown(type) {
       + '</tr></thead><tbody>'
       + (rentItems.length ? rentItems.map(function(r){
           var sid = (r.t.id||'').replace(/'/g,"\\'");
-          return '<tr class="clickable" onclick="goToTenant(\''+sid+'\');closeModal(\'modalKpiDrilldown\')">'
+          return '<tr class="clickable" onclick="closeModal(\'modalKpiDrilldown\');openFinanceCard(\''+sid+'\')">'
             + '<td style="font-weight:600;">'+tenantName(r.t)+'</td>'
             + '<td>'+(r.t.unit||'&mdash;')+'</td>'
             + '<td class="std-cell-muted">'+(r.t.type||'').replace(/-/g,' ')+'</td>'
@@ -9724,7 +9737,7 @@ function showKpiDrilldown(type) {
           var sid = (t.id||'').replace(/'/g,"\\'");
           var v = totals[t.id]||{};
           var bal = (v.rent||0)+(v.loan||0)+(v.arrangement||0);
-          return '<tr class="clickable" onclick="goToTenant(\''+sid+'\');closeModal(\'modalKpiDrilldown\')">'
+          return '<tr class="clickable" onclick="closeModal(\'modalKpiDrilldown\');openFinanceCard(\''+sid+'\')">'
             + '<td style="font-weight:600;">'+tenantName(t)+'</td>'
             + '<td>'+(t.unit||'&mdash;')+'</td>'
             + '<td class="std-cell-muted">'+(t.type||'').replace(/-/g,' ')+'</td>'
@@ -11208,8 +11221,16 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Old entries with reference=null decode as 'posted' which is correct
     // (they predate the multi-line JE feature and have no pending status).
 
-    showPage('home');
-    initTenantSelects();
+    // Check for ?fic=tenantId URL param (e.g. navigated from TIC Finance Card button)
+    var _ficParam = new URLSearchParams(window.location.search).get('fic');
+    if (_ficParam && typeof openFinanceCard === 'function') {
+      showPage('home');
+      initTenantSelects();
+      openFinanceCard(_ficParam);
+    } else {
+      showPage('home');
+      initTenantSelects();
+    }
   document.addEventListener('click', function(e) {
     if (!e.target.closest('.search-wrap') && !e.target.closest('.tenant-search-results')) {
       document.querySelectorAll('.tenant-search-results').forEach(function(el){

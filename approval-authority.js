@@ -109,6 +109,14 @@ var APPROVAL_AUTHORITY = (function() {
     // Who can edit progress percentages and notes on a renovation
     editRenoProgress:         ['ed', 'housing_manager', 'housing_employee_l2'],
 
+    // ── Finance module ────────────────────────────────────────────────────
+    viewFinanceCard:          ['ed', 'housing_manager', 'housing_employee_l2', 'housing_employee_l1', 'cfo', 'finance_l1'],
+    recordPayment:            ['housing_manager', 'cfo', 'finance_l1', 'ed'],
+    createInvoice:            ['housing_manager', 'cfo', 'finance_l1', 'ed'],
+    createArrangement:        ['housing_manager', 'ed'],
+    manageLoan:               ['ed'],
+    reverseTransaction:       ['housing_manager', 'ed'],
+
   };
 
   // ── LIVE CONFIG (defaults + any saved overrides) ──────────────────────
@@ -284,6 +292,12 @@ var APPROVAL_AUTHORITY = (function() {
       manageAllStaffRoles:      'Assign any role to staff',
       viewApplicationScore:     'View application score',
       editRenoProgress:         'Edit renovation progress',
+      viewFinanceCard:          'View Financial Information Card',
+      recordPayment:            'Record rent / arrangement / loan payments',
+      createInvoice:            'Create invoices and charges',
+      createArrangement:        'Create payment arrangements',
+      manageLoan:               'Create and manage loans',
+      reverseTransaction:       'Reverse posted transactions',
     },
 
     /** Group labels for the Settings UI sections */
@@ -297,6 +311,7 @@ var APPROVAL_AUTHORITY = (function() {
       'Inventory':            ['archiveUnit'],
       'Dashboard':            ['accessDashboard'],
       'System':               ['accessSettings','editApprovalAuthority','manageStaff','manageStaffRecord','manageAllStaffRoles'],
+      'Finance':              ['viewFinanceCard','recordPayment','createInvoice','createArrangement','manageLoan','reverseTransaction'],
     },
 
   };

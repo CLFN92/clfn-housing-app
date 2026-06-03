@@ -1807,7 +1807,21 @@
       return;
     }
     if(t.id === 'tic_act_ledger'){
-      if(typeof showToast === 'function') showToast('Rent ledger — coming soon.');
+      var ticTid = _ticState.tenant && (_ticState.tenant.id || _ticState.tenant[TIC_C.tenant_pk]);
+      if(ticTid){
+        window.location.href = 'finance.html?fic=' + encodeURIComponent(ticTid);
+      } else {
+        if(typeof showToast === 'function') showToast('No tenant linked.');
+      }
+      return;
+    }
+    if(t.id === 'tic_act_finance'){
+      var finTid = _ticState.tenant && (_ticState.tenant.id || _ticState.tenant[TIC_C.tenant_pk]);
+      if(finTid){
+        window.location.href = 'finance.html?fic=' + encodeURIComponent(finTid);
+      } else {
+        if(typeof showToast === 'function') showToast('No tenant linked.');
+      }
       return;
     }
     if(t.id === 'tic_act_letter'){
