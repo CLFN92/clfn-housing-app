@@ -122,7 +122,7 @@
         <button class="lookup-tab active" data-lookup-tab="all">All <span class="lookup-tab-count" id="lookup_tab_count_all">—</span></button>
         <button class="lookup-tab" data-lookup-tab="tenants">Tenants <span class="lookup-tab-count" id="lookup_tab_count_tenants">—</span></button>
         <button class="lookup-tab" data-lookup-tab="units">Units <span class="lookup-tab-count" id="lookup_tab_count_units">—</span></button>
-        <button class="lookup-tab" data-lookup-tab="sows" data-roles="ed,housing_manager">Requests <span class="lookup-tab-count" id="lookup_tab_count_sows">—</span></button>
+        <button class="lookup-tab" data-lookup-tab="sows" data-roles="ed,housing_manager,super_user">Requests <span class="lookup-tab-count" id="lookup_tab_count_sows">—</span></button>
         <button class="lookup-tab" data-lookup-tab="rfqs" data-roles="ed,housing_manager,housing_employee_l2">RFQs <span class="lookup-tab-count" id="lookup_tab_count_rfqs">—</span></button>
       </div>
 
@@ -993,10 +993,10 @@
   <button onclick="showSettingsSection('sec_users')" id="stab_users" class="tab-btn active">&#128101; Users</button>
   <button onclick="showSettingsSection('sec_nation');renderNationPanel();" id="stab_nation" class="tab-btn">&#127760; Nation</button>
   <button onclick="showSettingsSection('sec_themes');renderThemesPanel();" id="stab_themes" class="tab-btn">&#127912; Themes</button>
-  <button onclick="showSettingsSection('sec_notifications')" id="stab_notifications" class="tab-btn" data-roles="ed">&#9993;&#65039; Notifications</button>
-  <button onclick="showSettingsSection('sec_terms')" id="stab_terms" class="tab-btn" data-roles="ed">&#128209; Terms &amp; Conditions</button>
-  <button onclick="showSettingsSection('sec_contracts');renderContractsTab();" id="stab_contracts" class="tab-btn" data-roles="ed">&#128196; Contracts</button>
-  <button onclick="showSettingsSection('sec_config')" id="stab_config" class="tab-btn" data-roles="ed">&#128295; Config</button>
+  <button onclick="showSettingsSection('sec_notifications')" id="stab_notifications" class="tab-btn" data-roles="ed,super_user">&#9993;&#65039; Notifications</button>
+  <button onclick="showSettingsSection('sec_terms')" id="stab_terms" class="tab-btn" data-roles="ed,super_user">&#128209; Terms &amp; Conditions</button>
+  <button onclick="showSettingsSection('sec_contracts');renderContractsTab();" id="stab_contracts" class="tab-btn" data-roles="ed,super_user">&#128196; Contracts</button>
+  <button onclick="showSettingsSection('sec_config')" id="stab_config" class="tab-btn" data-roles="ed,super_user">&#128295; Config</button>
   <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="tab-btn">&#128203; Audit Log</button>
   <button onclick="showSettingsSection('sec_approval_authority');renderApprovalAuthorityPanel();" id="stab_approval_authority" class="tab-btn">&#128274; Approval Authority</button>
 </div>
