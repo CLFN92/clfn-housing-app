@@ -3369,6 +3369,7 @@ async function renderHousingUserTable(){
       return;
     }
     var roleColors = {
+      super_user:          {bg:'#1e293b', c:'#f8fafc'},
       ed:                  {bg:'#f0fdf4', c:'#15803d'},
       housing_manager:     {bg:'#eff6ff', c:'#1d4ed8'},
       housing_employee_l2: {bg:'#faf5ff', c:'#7c3aed'},
@@ -3380,6 +3381,7 @@ async function renderHousingUserTable(){
     // Source labels from CLFN_PERMS so display titles stay nation-configurable.
     // Legacy 'employee' key is kept for old DB rows that haven't been normalized.
     var roleLabels = {
+      super_user:          CLFN_PERMS.roleLabel(ROLE.SUPER_USER),
       ed:                  CLFN_PERMS.roleLabel(ROLE.ED),
       housing_manager:     CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER),
       housing_employee_l2: CLFN_PERMS.roleLabel(ROLE.HE_L2),
