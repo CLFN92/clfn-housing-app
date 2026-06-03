@@ -5432,6 +5432,7 @@ function saveRentPayment() {
     // Single save \u2014 all changes at once
     saveData(d2);
     renderDashboard();
+    if (_stmtTid) renderStatementEntries();
     if (document.getElementById('page-tenants').classList.contains('on')) renderTenantProfile(tid);
     generateVoucherFor({date:date,tenantId:tid,ledger:voucherAllocs.length===1?voucherAllocs[0].label.split(' ')[0].toLowerCase():'combined',
       desc:'Payment \u2014 '+voucherLines.join(' | '),charge:0,payment:finalTotal,method:method,status:'posted',id:uid(),
@@ -6295,6 +6296,7 @@ function saveArrangement() {
   saveData(d);
   closeModal('modalNewArrangement');
   renderDashboard();
+  if (_stmtTid) renderStatementEntries();
   if (document.getElementById('page-tenants').classList.contains('on')) renderTenantProfile(tid);
   previewArrangementAgreement(entry);
 }
@@ -6325,6 +6327,7 @@ function saveArrPayment() {
     saveData(d);
     closeModal('modalArrPayment');
     renderDashboard();
+    if (_stmtTid) renderStatementEntries();
     if (document.getElementById('page-tenants').classList.contains('on')) renderTenantProfile(tid);
     generateVoucherFor({date:date,tenantId:tid,ledger:'arrangement',
       desc:'Arrangement Payment'+(a?' \u2014 '+a.ref:''),charge:0,payment:finalAmt,
@@ -6395,6 +6398,7 @@ function saveLoan() {
     null, loan);
   saveData(d);
   renderDashboard();
+  if (_stmtTid) renderStatementEntries();
   // Open the loan agreement immediately
   closeModal('modalNewLoan');
   previewLoanAgreement(null);
@@ -6425,6 +6429,7 @@ function saveLoanPayment() {
     saveData(d);
     closeModal('modalLoanPayment');
     renderDashboard();
+    if (_stmtTid) renderStatementEntries();
     if (document.getElementById('page-tenants').classList.contains('on')) renderTenantProfile(tid);
     generateVoucherFor({date:date,tenantId:tid,ledger:'loans',
       desc:'Loan Payment'+(l?' \u2014 '+l.type:''),charge:0,payment:finalAmt,
@@ -10260,6 +10265,7 @@ function saveInvoice() {
   saveData(d);
   closeModal('modalNewInvoice');
   renderDashboard();
+  if (_stmtTid) renderStatementEntries();
   if (document.getElementById('page-tenants').classList.contains('on')) renderTenantProfile(tid);
   // Show voucher
   openInvoiceVoucher({date:dateStr,tenantId:tid,ledger:gl,desc:finalDesc,
