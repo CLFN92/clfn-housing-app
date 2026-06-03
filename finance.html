@@ -3330,6 +3330,7 @@ function openNewLoanForTenant(tid) {
 
 // \u2500\u2500 Invoice cache and search \u2500\u2500
 var _invoiceCache = {};
+var _entryCache = {};
 function openInvoiceById(invCacheId) {
   var txn = _invoiceCache[invCacheId];
   if (!txn) return;
@@ -3660,7 +3661,7 @@ function renderTenantProfile(tid) {
       '<div style="flex:1;">'+
         '<div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:2px;">Account Flagged \u2014 Collections</div>'+
         '<div style="font-size:12px;color:#7f1d1d;margin-bottom:8px;">Auto-payments suspended. Manual payments only.</div>'+
-        '<button class="btn btn-ghost btn-sm" style="font-size:11px;border-color:var(--danger);color:var(--danger);" onclick="resolveCollectionFromTIC('+JSON.stringify(tid)+')">&#10003; Mark Resolved</button>'+
+        '<button class="btn btn-ghost btn-sm" style="font-size:11px;border-color:var(--danger);color:var(--danger);" onclick="resolveCollectionFromTIC(\''+tid+'\')">&#10003; Mark Resolved</button>'+
       '</div>';
   }
 
@@ -9923,7 +9924,9 @@ function renderStatementEntries() {
     return;
   }
 
+  window._stmtEntryCache = {};
   tbody.innerHTML = entries.map(function(e){
+    window._stmtEntryCache[e.id] = e;
     var isReversed = e.status==='reversed';
     var bal = e.ledger==='rent' && rentBalMap[e.id] !== undefined ? fmt(rentBalMap[e.id]) : '\u2014';
     var balColor = e.ledger==='rent' && rentBalMap[e.id] > 0 ? 'color:var(--danger)' : 'color:var(--success)';
@@ -9931,12 +9934,12 @@ function renderStatementEntries() {
     var canReverse = !isReversed && (e.type==='payment'||e.type==='arr-payment'||e.type==='loan-payment');
     var reverseBtn = '';
     if (canReverse) {
-      if (e.type==='payment') reverseBtn = '<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger);" onclick="stmtReverse(\'rent\','+JSON.stringify(e.id)+')">\u21BA</button>';
-      if (e.type==='arr-payment') reverseBtn = '<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger);" onclick="stmtReverse(\'arr\','+JSON.stringify(e.id)+')">\u21BA</button>';
-      if (e.type==='loan-payment') reverseBtn = '<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger);" onclick="stmtReverse(\'loan\','+JSON.stringify(e.id)+')">\u21BA</button>';
+      if (e.type==='payment') reverseBtn = '<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger);" onclick="stmtReverse(\'rent\',\''+e.id+'\')">&#8634;</button>';
+      if (e.type==='arr-payment') reverseBtn = '<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger);" onclick="stmtReverse(\'arr\',\''+e.id+'\')">&#8634;</button>';
+      if (e.type==='loan-payment') reverseBtn = '<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger);" onclick="stmtReverse(\'loan\',\''+e.id+'\')">&#8634;</button>';
     }
     return '<tr style="'+(isReversed?'opacity:.4;text-decoration:line-through;':'')+(canClick?'cursor:pointer;':'')+'" '+
-      (canClick ? 'onclick="stmtOpenEntry('+JSON.stringify(e)+')" title="Click to view voucher"' : '')+'>'+
+      (canClick ? 'onclick="stmtOpenEntry(\''+e.id+'\')" title="Click to view voucher"' : '')+'>'+
       '<td style="white-space:nowrap;">'+e.date+'</td>'+
       '<td><span style="font-size:11px;background:'+ledgerColors[e.ledger]+'22;color:'+ledgerColors[e.ledger]+';padding:2px 7px;border-radius:10px;font-weight:600;">'+e.ledgerLabel+'</span></td>'+
       '<td style="max-width:220px;white-space:normal;font-size:12px;">'+e.desc+(e.ref?' <span style="color:var(--muted);font-size:10px;">'+e.ref+'</span>':'')+' </td>'+
@@ -9953,7 +9956,9 @@ function renderStatementEntries() {
   }).join('');
 }
 
-function stmtOpenEntry(e) {
+function stmtOpenEntry(eid) {
+  var e = window._stmtEntryCache && window._stmtEntryCache[eid];
+  if (!e) { if (typeof toast === 'function') toast('Entry not found.'); return; }
   // Open the appropriate voucher/invoice viewer
   if (e.type === 'invoice') {
     var cacheKey = 'inv_'+e.id;
