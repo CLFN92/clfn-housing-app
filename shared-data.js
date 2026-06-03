@@ -651,6 +651,32 @@ async function sbSaveAllUnits(units) {
   return true;
 }
 
+// ── sbLoadTenantMovementLog ───────────────────────────────────────────────────
+async function sbLoadTenantMovementLog(unitId) {
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/tenant_movement_log?unit_id=eq.' + encodeURIComponent(String(unitId)) + '&order=move_out_date.desc', {
+      headers: HOUSING_HEADERS
+    });
+    if (!r.ok) return [];
+    return await r.json();
+  } catch(e) {
+    console.warn('[SB] tenant_movement_log by unit failed:', e);
+    return [];
+  }
+}
+async function sbLoadTenantMovementLogByName(tenantName) {
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/tenant_movement_log?tenant_name=eq.' + encodeURIComponent(tenantName) + '&order=move_out_date.desc', {
+      headers: HOUSING_HEADERS
+    });
+    if (!r.ok) return [];
+    return await r.json();
+  } catch(e) {
+    console.warn('[SB] tenant_movement_log by name failed:', e);
+    return [];
+  }
+}
+
 // ── sbLoadAuditLog ────────────────────────────────────────────────────────────
 function _parseAuditRow(row) {
   var d = (typeof row.detail === 'object' ? row.detail : null)

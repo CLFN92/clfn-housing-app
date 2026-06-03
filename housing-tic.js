@@ -112,6 +112,7 @@
     ledger: null,        // rent_ledger row
     notes: [],           // tenant_notes rows
     applicationNotes: [],// housing_application_notes rows — merged into Notes panel
+    movementLog: [],     // tenant_movement_log rows for this tenant (by name)
     activeTab: 'overview',
     prevFocus: null,
     keyHandler: null
@@ -235,13 +236,19 @@
   // Pets all read from _ticState.application (loaded by _ticLoadApplication).
   function _ticLoadAll(tenantId, unit){
     var fk = encodeURIComponent(tenantId);
+    var tenantName = (_ticState.tenant && _ticState.tenant[TIC_C.full_name]) || '';
+    var movLogP = tenantName
+      ? _ticGet('tenant_movement_log?tenant_name=eq.' + encodeURIComponent(tenantName) + '&order=move_out_date.desc')
+      : Promise.resolve([]);
     return Promise.all([
       _ticGet(TIC_T.rent_ledger  + '?' + TIC_C.tenant_fk + '=eq.' + fk + '&select=*&limit=1'),
-      _ticGet(TIC_T.tenant_notes + '?' + TIC_C.tenant_fk + '=eq.' + fk + '&select=*&order=' + TIC_C.created_at + '.desc')
+      _ticGet(TIC_T.tenant_notes + '?' + TIC_C.tenant_fk + '=eq.' + fk + '&select=*&order=' + TIC_C.created_at + '.desc'),
+      movLogP
     ]).then(function(res){
-      _ticState.ledger = _ticIsArray(res[0]) ? (res[0][0] || null) : res[0];
-      _ticState.notes  = _ticIsArray(res[1]) ? res[1] : (res[1] || []);
-      _ticState.unit   = unit || _ticState.unit;
+      _ticState.ledger      = _ticIsArray(res[0]) ? (res[0][0] || null) : res[0];
+      _ticState.notes       = _ticIsArray(res[1]) ? res[1] : (res[1] || []);
+      _ticState.movementLog = _ticIsArray(res[2]) ? res[2] : [];
+      _ticState.unit        = unit || _ticState.unit;
     });
   }
   // Resolves the linked application (full row) and caches it for read-only
@@ -1536,6 +1543,34 @@
          + '</div>';
   }
 
+  // ── Render: Unit History ──────────────────────────────────────────────────
+  function _ticRenderTenancyHistory(){
+    var panel = _ticEl('tic_panel_history');
+    if (!panel) return;
+    var rows = _ticState.movementLog || [];
+    if (!rows.length) {
+      panel.innerHTML = '<div class="tic-empty">No unit history on record for this tenant.</div>';
+      return;
+    }
+    var html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+    rows.forEach(function(r){
+      var mi  = r.move_in_date  ? _ticFmtDate(r.move_in_date)  : '—';
+      var mo  = r.move_out_date ? _ticFmtDate(r.move_out_date) : '—';
+      var dur = r.duration_days != null ? (r.duration_days + ' days') : '—';
+      html += '<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:var(--bg);">'
+        + '<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">'
+        +   _ticEsc(r.unit_address || r.unit_id || 'Unit') + '</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'
+        +   '<div><div class="tic-field-lbl">Move-In</div><div style="font-size:13px;font-weight:600;">' + _ticEsc(mi) + '</div></div>'
+        +   '<div><div class="tic-field-lbl">Move-Out</div><div style="font-size:13px;font-weight:600;">' + _ticEsc(mo) + '</div></div>'
+        +   '<div><div class="tic-field-lbl">Duration</div><div style="font-size:13px;font-weight:600;">' + _ticEsc(dur) + '</div></div>'
+        + '</div>'
+        + '</div>';
+    });
+    html += '</div>';
+    panel.innerHTML = html;
+  }
+
   // ── Tab switching ─────────────────────────────────────────────────────────
   function _ticSwitchTab(name){
     _ticState.activeTab = name;
@@ -1880,8 +1915,9 @@
     // Reset state + UI
     _ticState.tenant = null; _ticState.unit = null; _ticState.application = null;
     _ticState.ledger = null; _ticState.notes = []; _ticState.applicationNotes = [];
+    _ticState.movementLog = [];
     _ticDocLib = null; _ticDocLibKey = null;
-    ['overview','occupants','contact','emergency','references','pets','documents','notes'].forEach(function(n){
+    ['overview','occupants','contact','emergency','references','pets','documents','notes','history'].forEach(function(n){
       var p = _ticEl('tic_panel_' + n); if(p) p.innerHTML = '';
     });
     _ticEl('tic_loading').style.display = '';
@@ -1915,6 +1951,7 @@
         _ticRenderReferences();
         _ticRenderPets();
         _ticRenderNotes();
+        _ticRenderTenancyHistory();
       }).catch(function(err){
         _ticEl('tic_loading').style.display = 'none';
         if(typeof showToast === 'function') showToast('Some tenant data could not be loaded.', { type:'error' });
@@ -1925,6 +1962,7 @@
         _ticRenderReferences();
         _ticRenderPets();
         _ticRenderNotes();
+        _ticRenderTenancyHistory();
       });
     }).catch(function(){
       _ticEl('tic_loading').style.display = 'none';

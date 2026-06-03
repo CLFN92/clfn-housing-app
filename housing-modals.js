@@ -572,8 +572,43 @@ function ueClearTenantSelection() {
   if (nf) nf.style.display = 'none';
 }
 
-function ueRemoveTenant() {
-  // Clear the currently assigned tenant from the unit
+function _showMoveOutDialog(tenantName) {
+  return new Promise(function(resolve) {
+    var ov = document.createElement('div');
+    ov.className = 'modal-overlay modal-overlay-centered modal-z-1100 is-open';
+    var today = new Date().toISOString().split('T')[0];
+    ov.innerHTML =
+      '<div class="modal-body modal-body-sm">' +
+        '<div class="modal-hdr">' +
+          '<div class="modal-hdr-title">Remove Tenant</div>' +
+          '<button type="button" class="btn-close-dark-30" data-cancel>&times;</button>' +
+        '</div>' +
+        '<div class="modal-body-stack">' +
+          '<p class="txt-help m-0">Record move-out date for <strong>' + (tenantName || 'this tenant') + '</strong> before removing them. A history entry will be saved.</p>' +
+          '<div style="margin-top:12px;">' +
+            '<label style="font-size:11.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Move-Out Date</label>' +
+            '<input type="date" id="_ue_moveout_input" value="' + today + '" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>' +
+          '</div>' +
+        '</div>' +
+        '<div class="modal-footer">' +
+          '<button type="button" class="btn btn-ghost" data-cancel>Cancel</button>' +
+          '<button type="button" class="btn btn-danger" data-confirm>Remove Tenant</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    function getDate(){ var el = ov.querySelector('#_ue_moveout_input'); return el ? el.value : today; }
+    function close(ok){
+      var d = ok ? getDate() : null;
+      if (ov.parentNode) ov.parentNode.removeChild(ov);
+      resolve(d);
+    }
+    ov.querySelectorAll('[data-cancel]').forEach(function(b){ b.onclick = function(){ close(false); }; });
+    ov.querySelector('[data-confirm]').onclick = function(){ close(true); };
+    ov.addEventListener('click', function(e){ if (e.target === ov) close(false); });
+  });
+}
+
+function _ueRemoveTenantFields() {
   var toEl = document.getElementById('ue_assignedTo');
   var nmEl = document.getElementById('ue_assignedName');
   var dtEl = document.getElementById('ue_assignedDate');
@@ -586,12 +621,54 @@ function ueRemoveTenant() {
   if (srch) { srch.value = ''; srch.focus(); }
   var sel = document.getElementById('ue_tenant_selected');
   if (sel) { sel.style.display = 'none'; sel.innerHTML = ''; }
-  // Switch status back to vacant suggestion
   var statusEl = document.getElementById('ue_status');
   if (statusEl && statusEl.value === 'occupied') {
     statusEl.value = 'vacant';
     unitEditStatusChange();
   }
+}
+
+async function ueRemoveTenant() {
+  var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var unitId = window._editingUnitId || window._ueCurrentUnitId;
+  var u = unitId ? units.find(function(x){ return String(x.id) === String(unitId); }) : null;
+
+  var tenantName  = (u && u.assignedName) || '';
+  var tenantAppId = (u && u.assignedTo)   || '';
+  var moveIn      = (u && u.assignedDate) || '';
+
+  var moveOut = await _showMoveOutDialog(tenantName);
+  if (moveOut === null) return;
+
+  if (unitId && tenantName) {
+    var addr = (u && u.num && u.street) ? (u.num + ' ' + u.street) : '';
+    var durationDays = null;
+    if (moveIn && moveOut) {
+      var d1 = new Date(moveIn), d2 = new Date(moveOut);
+      if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+        durationDays = Math.round((d2.getTime() - d1.getTime()) / 86400000);
+      }
+    }
+    var actor = (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || 'staff';
+    fetch(SUPABASE_URL + '/rest/v1/tenant_movement_log', {
+      method: 'POST',
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+      body: JSON.stringify({
+        unit_id:       String(unitId),
+        unit_address:  addr || null,
+        tenant_name:   tenantName,
+        application_id: tenantAppId || null,
+        move_in_date:  moveIn || null,
+        move_out_date: moveOut || null,
+        duration_days: durationDays,
+        recorded_by:   actor
+      })
+    }).catch(function(e){ console.warn('[tenantMovement] insert failed:', e); });
+    auditEntry(tenantAppId || String(unitId), 'tenant_vacated',
+      tenantName + ' vacated unit ' + (addr || unitId) + ' (move-out: ' + moveOut + ')', actor);
+  }
+
+  _ueRemoveTenantFields();
   showToast('Tenant removed — remember to Save Changes');
 }
 
@@ -1369,6 +1446,9 @@ function openUnitDetail(unitId) {
   // Tenant files preview in detail panel
   udpRenderFilePreviews(unitId);
 
+  // Tenant history (past tenants at this unit)
+  udpRenderTenantHistory(unitId);
+
   // Show panel — set both inline display AND .is-open class for redundancy.
   // Either alone should be enough; both ensures the modal becomes visible
   // even if some other rule wins specificity on one of the two.
@@ -1377,6 +1457,35 @@ function openUnitDetail(unitId) {
     panel.style.setProperty('display','flex','important');
     panel.classList.add('is-open');
   }
+}
+
+// ── Unit Detail Panel — tenant history ───────────────────────────────
+function udpRenderTenantHistory(unitId) {
+  var sec  = document.getElementById('udp_history_section');
+  var list = document.getElementById('udp_history_list');
+  if (!sec || !list) return;
+  list.innerHTML = '<div class="js-txt-muted-sm">Loading…</div>';
+  sec.style.display = 'block';
+  fetch(SUPABASE_URL + '/rest/v1/tenant_movement_log?unit_id=eq.' + encodeURIComponent(String(unitId)) + '&order=move_out_date.desc', {
+    headers: HOUSING_HEADERS
+  }).then(function(r){ return r.ok ? r.json() : []; })
+    .then(function(rows) {
+      if (!rows || !rows.length) {
+        sec.style.display = 'none';
+        return;
+      }
+      sec.style.display = 'block';
+      list.innerHTML = rows.map(function(r) {
+        var mi  = r.move_in_date  || '—';
+        var mo  = r.move_out_date || '—';
+        var dur = r.duration_days != null ? (r.duration_days + ' days') : '—';
+        return '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;">'
+          + '<div style="font-size:13px;font-weight:600;color:var(--text);">' + (r.tenant_name || '—') + '</div>'
+          + '<div class="js-txt-muted-sm">' + mi + ' → ' + mo + ' &nbsp;·&nbsp; ' + dur + '</div>'
+          + '</div>';
+      }).join('');
+    })
+    .catch(function() { sec.style.display = 'none'; });
 }
 
 // ── Unit Detail Panel — tenant files (read-only preview) ────────────
