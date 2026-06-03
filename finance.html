@@ -5812,75 +5812,131 @@ function getVoucherSigDataURL(k) {
 }
 
 function printVoucherWithSigs(){
-  var authSig=getVoucherSigDataURL('auth'); var verifSig=getVoucherSigDataURL('verif');
-  var authName=(document.getElementById('sig-auth-name')||{}).value||'';
-  var verifName=(document.getElementById('sig-verif-name')||{}).value||'';
-  var leftLabel  = _sigMode==='internal' ? 'Employee / Recorder' : 'Customer / Tenant';
-  var rightLabel = _sigMode==='internal' ? 'Authorizing Officer (Manager/ED)' : 'Employee / Staff';
-  var modeNote   = _sigMode==='internal' ? 'Internal record — no customer present' : 'Customer signed in person';
   var vHtml=document.getElementById('voucherContent').innerHTML;
   var notes=(document.getElementById('voucher-notes')||{}).value||'';
-  // Read lock state from the pair controller (the old _sigLocked global
-  // was removed when the voucher sigs migrated to SigWidget.createPair).
   var isLocked = !!(window._voucherSig && window._voucherSig.isLocked && window._voucherSig.isLocked());
-  var lockedNote=isLocked?'<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 12px;font-size:11px;font-weight:700;color:#15803d;margin-bottom:16px;">✔ Signatures Locked — This voucher is finalized.</div>':'';
+  var lockedNote=isLocked?'<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 12px;font-size:11px;font-weight:700;color:#15803d;margin-bottom:16px;">&#10004; Signatures Locked — This voucher is finalized.</div>':'';
 
-  var sigBlock='<div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:30px;padding-top:20px;border-top:2px solid #000;">';
-  sigBlock+='<div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">'+leftLabel+'</div>';
-  sigBlock+='<div style="font-size:10px;color:#888;margin-bottom:8px;">'+modeNote+'</div>';
-  sigBlock+=(authSig?'<img src="'+authSig+'" style="width:100%;max-height:80px;object-fit:contain;border-bottom:1px solid #333;display:block;"/>':'<div style="height:60px;border-bottom:1px solid #333;"></div>');
-  sigBlock+='<div style="font-size:11px;margin-top:4px;">'+authName+'</div></div>';
-  sigBlock+='<div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">'+rightLabel+'</div>';
-  sigBlock+='<div style="font-size:10px;color:#888;margin-bottom:8px;"></div>';
-  sigBlock+=(verifSig?'<img src="'+verifSig+'" style="width:100%;max-height:80px;object-fit:contain;border-bottom:1px solid #333;display:block;"/>':'<div style="height:60px;border-bottom:1px solid #333;"></div>');
-  sigBlock+='<div style="font-size:11px;margin-top:4px;">'+verifName+'</div></div></div>';
-  if(notes) sigBlock+='<div style="margin-top:16px;font-size:12px;"><strong>Notes:</strong> '+notes+'</div>';
-  var lockedBanner = lockedNote;
+  // Nation branding
+  var nc = window.NATION_CONFIG || {};
+  var logoSrc    = sessionStorage.getItem('clfn_logo_cache') || window.CLFN_LOGO_DATA_URL || '';
+  var nationName = nc.display_name || nc.short_name || '';
+  var nationAddr = nc.mailing_address || '';
+  var nationPhone = nc.phone || '';
+  var nationEmail = nc.email || '';
 
-  // Print stylesheet — inline because iframe/popup contexts don't inherit
-  // parent page CSS. Values mirror the shared.css definitions for voucher-*
-  // and amt-* classes; keep them aligned if shared.css changes.
-  var printCSS =
-    'body{font-family:Georgia,serif;max-width:680px;margin:30px auto;padding:0 20px;font-size:13px;color:#111;}'+
-    '.voucher-hdr{background:#111;color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;border-radius:8px 8px 0 0;}'+
-    '.voucher-body{border:1px solid #ddd;border-top:none;padding:0;}'+
-    '.voucher-row{display:flex;justify-content:space-between;align-items:center;padding:9px 16px;border-bottom:1px solid #eee;font-size:13px;}'+
-    '.lbl{color:#888;font-size:12px;}'+
-    '.voucher-total{background:#111;color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-radius:0 0 8px 8px;}'+
-    '.txn-type-charge{color:#ef4444;font-weight:700;}.txn-type-payment{color:#22c55e;font-weight:700;}'+
-    '.amt-credit{color:#22c55e;font-weight:600;}.amt-debit{color:#ef4444;font-weight:600;}'+
-    '@media print{button{display:none!important;}}';
+  // Tenant address for invoice block
+  var voucherTenantName = '';
+  var voucherTenantAddr = '';
+  if (currentVoucherData) {
+    var vt = getTenant(currentVoucherData.tenantId);
+    if (vt) {
+      voucherTenantName = tenantName(vt);
+      if (vt.mailingAddress) {
+        voucherTenantAddr = vt.mailingAddress;
+      } else {
+        var vaddrParts = [];
+        if (vt.street) vaddrParts.push(vt.street);
+        var vcityLine = [vt.community, vt.province, vt.postalCode].filter(Boolean).join('  ');
+        if (vcityLine) vaddrParts.push(vcityLine);
+        voucherTenantAddr = vaddrParts.join('\n');
+      }
+    }
+  }
 
-  var shortName = (window.NATION_CONFIG && window.NATION_CONFIG.short_name) || '';
-  var printTitle = shortName + ' Voucher';
-  var footer = '<div style="margin-top:20px;text-align:center;font-size:10px;color:#999;">'+
-    shortName+' Housing Finance \u00B7 '+new Date().toLocaleString('en-CA')+'</div>';
-  var printBtn = '<div style="margin-top:16px;text-align:center;" class="no-print">'+
-    '<button onclick="window.print()" style="background:#111;color:#F8E41A;border:none;padding:10px 28px;font-size:14px;font-weight:700;border-radius:6px;cursor:pointer;">\uD83D\uDDA8\uFE0F Print</button></div>';
-  var fullHTML = '<!DOCTYPE html><html><head><title>'+printTitle+'</title><style>'+printCSS+'</style></head><body>'+
-    lockedBanner+vHtml+sigBlock+footer+printBtn+'</body></html>';
+  // Voucher reference and date
+  var voucherRef = currentVoucherData && currentVoucherData.id
+    ? 'VCH-' + currentVoucherData.id.slice(-8).toUpperCase()
+    : 'VCH-' + Date.now().toString().slice(-8);
+  var voucherDate = (currentVoucherData && currentVoucherData.date) || new Date().toLocaleDateString('en-CA');
+  var generatedOn = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  // Primary path: hidden iframe. This is popup-blocker-immune because no
-  // window.open() is used. Previous implementation used window.open and
-  // silently crashed (TypeError on null) when the popup was blocked.
+  var printCSS = [
+    '@page{size:letter;margin:42mm 16mm 22mm;}',
+    '@page{@bottom-left{content:"CONFIDENTIAL";font-size:9px;color:#888;}@bottom-right{content:"Page " counter(page);font-size:9px;color:#888;}}',
+    'body{font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#111;margin:0;padding:0;}',
+    '.pg-hdr{position:fixed;top:0;left:0;right:0;background:#111;color:#fff;border-bottom:3px solid #F8E41A;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;gap:16px;}',
+    '.pg-hdr-logo{height:44px;width:auto;}',
+    '.pg-hdr-nation{font-size:11px;line-height:1.5;color:#ddd;}',
+    '.pg-hdr-nation strong{font-size:13px;color:#fff;display:block;}',
+    '.pg-hdr-title{text-align:right;}',
+    '.pg-hdr-title h1{font-size:16px;font-weight:700;color:#F8E41A;margin:0 0 2px;}',
+    '.pg-hdr-title .gen-date{font-size:10px;color:#aaa;}',
+    '.content{padding:16px 0 0;}',
+    '.inv-meta{display:grid;grid-template-columns:1fr 1fr;gap:20px;border:1px solid #ddd;border-radius:6px;padding:12px 16px;margin-bottom:16px;}',
+    '.inv-meta-lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;}',
+    '.inv-meta-val{font-size:13px;font-weight:700;color:#111;}',
+    '.inv-meta-addr{font-size:11px;color:#444;margin-top:4px;white-space:pre-line;}',
+    '.voucher-hdr{display:none;}',
+    '.voucher{border-radius:0;}',
+    '.voucher-body{border:1px solid #ddd;border-top:none;padding:0;}',
+    '.voucher-row{display:flex;justify-content:space-between;align-items:center;padding:9px 16px;border-bottom:1px solid #eee;font-size:13px;}',
+    '.lbl{color:#888;font-size:12px;}',
+    '.voucher-total{background:#111;color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;}',
+    '.txn-type-charge{color:#ef4444;font-weight:700;}.txn-type-payment{color:#22c55e;font-weight:700;}',
+    '.amt-credit{color:#22c55e;font-weight:600;}.amt-debit{color:#ef4444;font-weight:600;}',
+    '@media print{.no-print{display:none!important;}}',
+  ].join('');
+
+  var logoTag = logoSrc ? '<img src="' + logoSrc + '" class="pg-hdr-logo" alt="">' : '';
+  var nch = '<strong>' + (nationName || 'Housing') + '</strong>';
+  if (nationAddr) nch += '<br>' + nationAddr;
+  if (nationPhone) nch += '<br>' + nationPhone;
+  if (nationEmail) nch += '  &bull;  ' + nationEmail;
+
+  var header = '<div class="pg-hdr">'
+    + '<div style="display:flex;align-items:center;gap:14px;">' + logoTag
+    + '<div class="pg-hdr-nation">' + nch + '</div></div>'
+    + '<div class="pg-hdr-title"><h1>Transaction Voucher</h1>'
+    + '<div class="gen-date">Generated: ' + generatedOn + '</div></div></div>';
+
+  var invMeta = '<div class="inv-meta">'
+    + '<div>'
+    + '<div class="inv-meta-lbl">Voucher Number</div>'
+    + '<div class="inv-meta-val">' + voucherRef + '</div>'
+    + '<div class="inv-meta-lbl" style="margin-top:10px;">Transaction Date</div>'
+    + '<div class="inv-meta-val">' + voucherDate + '</div>'
+    + '</div>'
+    + '<div>'
+    + '<div class="inv-meta-lbl">Billed To</div>'
+    + '<div class="inv-meta-val">' + voucherTenantName + '</div>'
+    + (voucherTenantAddr ? '<div class="inv-meta-addr">' + voucherTenantAddr.replace(/\n/g, '<br>') + '</div>' : '')
+    + '</div>'
+    + '</div>';
+
+  var notesBlock = notes
+    ? '<div style="margin-top:16px;font-size:12px;"><strong>Notes:</strong> ' + notes + '</div>'
+    : '';
+
+  var printBtn = '<div style="margin-top:16px;text-align:center;" class="no-print">'
+    + '<button onclick="window.print()" style="background:#111;color:#F8E41A;border:none;padding:10px 28px;font-size:14px;font-weight:700;border-radius:6px;cursor:pointer;">&#128424; Print</button></div>';
+
+  var fullHTML = '<!DOCTYPE html><html><head>'
+    + '<meta charset="UTF-8">'
+    + '<title>Transaction Voucher</title>'
+    + '<style>' + printCSS + '</style>'
+    + '</head><body>'
+    + header
+    + '<div class="content">'
+    + lockedNote
+    + invMeta
+    + vHtml
+    + notesBlock
+    + printBtn
+    + '</div>'
+    + '</body></html>';
+
   try {
-    // Clean up any stale iframe from a prior print
     var stale = document.getElementById('_voucherPrintFrame');
     if (stale) stale.parentNode.removeChild(stale);
-
     var iframe = document.createElement('iframe');
     iframe.id = '_voucherPrintFrame';
     iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
     document.body.appendChild(iframe);
-
     var doc = iframe.contentDocument || iframe.contentWindow.document;
     doc.open();
     doc.write(fullHTML);
     doc.close();
-
-    // Trigger print once images (signatures) and fonts have loaded.
-    // Use both onload and a fallback setTimeout \u2014 signatures as data URLs
-    // load synchronously but the browser still needs a tick to paint.
     var printed = false;
     function doPrint() {
       if (printed) return;
@@ -5889,26 +5945,19 @@ function printVoucherWithSigs(){
         iframe.contentWindow.focus();
         iframe.contentWindow.print();
       } catch (e) {
-        // If iframe.print fails (rare, cross-origin edge case), fall back to popup
         _voucherFallbackPopup(fullHTML);
       }
-      // Remove iframe shortly after print dialog closes (browsers keep the
-      // dialog modal, so 1500ms is a safe cleanup window)
       setTimeout(function(){
         if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
       }, 1500);
     }
     iframe.onload = doPrint;
-    setTimeout(doPrint, 500); // fallback in case onload doesn't fire
+    setTimeout(doPrint, 500);
   } catch (err) {
-    // Ultimate fallback: new window (may be blocked, user sees our message)
     _voucherFallbackPopup(fullHTML);
   }
 }
 
-// Fallback if the iframe path fails for any reason \u2014 rare but possible
-// in locked-down corporate environments. Handles popup-blocker case
-// gracefully instead of crashing.
 function _voucherFallbackPopup(fullHTML) {
   var w;
   try { w = window.open('', '_blank', 'width=720,height=900'); } catch (e) { w = null; }
@@ -10031,34 +10080,46 @@ function printTenantStatement() {
   var d       = getData();
   var totals  = calcAllTotals(d);
   var v       = totals[tid] || {};
-  var nation  = (window.NATION_CONFIG && window.NATION_CONFIG.short_name) || '';
+  var nc      = window.NATION_CONFIG || {};
   var today   = new Date();
-  var monthYM = today.toISOString().slice(0, 7); // 'YYYY-MM'
-  var monthLabel = today.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
+  var monthYM = today.toISOString().slice(0, 7);
+  var monthLabel  = today.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
   var generatedOn = today.toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  // \u2500\u2500 Account summary data \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  var logoSrc    = sessionStorage.getItem('clfn_logo_cache') || window.CLFN_LOGO_DATA_URL || '';
+  var nationName = nc.display_name || nc.short_name || '';
+  var nationAddr = nc.mailing_address || '';
+  var nationPhone = nc.phone || '';
+  var nationEmail = nc.email || '';
+
+  var tenantAddr = '';
+  if (t.mailingAddress) {
+    tenantAddr = t.mailingAddress;
+  } else {
+    var addrParts = [];
+    if (t.street) addrParts.push(t.street);
+    var cityLine = [t.community, t.province, t.postalCode].filter(Boolean).join('  ');
+    if (cityLine) addrParts.push(cityLine);
+    tenantAddr = addrParts.join('\n');
+  }
+
   var rentOwing = Math.max(0, v.rent || 0);
   var arrOwing  = Math.max(0, v.arrangement || 0);
-
-  // Per-loan rows
   var approvedLoans = (d.loanList || []).filter(function(l){ return l.tenantId === tid && l.status === 'approved'; });
   var loanRows = approvedLoans.map(function(l) {
     var paid = (d.loanPayments || []).filter(function(p){ return p.loanId === l.id && p.status !== 'reversed'; })
       .reduce(function(s, p){ return s + p.amount; }, 0);
     return { label: (l.type || 'Loan'), balance: Math.max(0, (l.principal || 0) - paid) };
   });
-  var loanTotal = loanRows.reduce(function(s, r){ return s + r.balance; }, 0);
+  var loanTotal  = loanRows.reduce(function(s, r){ return s + r.balance; }, 0);
   var grandTotal = rentOwing + arrOwing + loanTotal;
 
-  // \u2500\u2500 Outstanding invoices / charges \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   var outstandingCharges = (d.rentLedger || []).filter(function(r) {
     return r.tenantId === tid && (r.charge || 0) > 0
       && r.status !== 'reversed' && r.status !== 'paid';
   }).slice().sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); });
   var chargeTotal = outstandingCharges.reduce(function(s, r){ return s + (r.charge || 0); }, 0);
 
-  // \u2500\u2500 Payments this month \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   var monthPayments = [];
   (d.rentLedger || []).filter(function(r){
     return r.tenantId === tid && (r.payment || 0) > 0
@@ -10071,29 +10132,39 @@ function printTenantStatement() {
     return arr && arr.tenantId === tid && p.status !== 'reversed' && (p.date || '').slice(0, 7) === monthYM;
   }).forEach(function(p){
     var arr = (d.arrangements || []).find(function(a){ return a.id === p.arrId; });
-    monthPayments.push({ date: p.date, ledger: 'Arrangement', desc: 'Arrangement Payment' + (arr && arr.ref ? ' \u2014 ' + arr.ref : ''), method: p.method || '', amount: p.amount || 0 });
+    monthPayments.push({ date: p.date, ledger: 'Arrangement', desc: 'Arrangement Payment' + (arr && arr.ref ? ' — ' + arr.ref : ''), method: p.method || '', amount: p.amount || 0 });
   });
   (d.loanPayments || []).filter(function(p){
     var loan = (d.loanList || []).find(function(l){ return l.id === p.loanId; });
     return loan && loan.tenantId === tid && p.status !== 'reversed' && (p.date || '').slice(0, 7) === monthYM;
   }).forEach(function(p){
     var loan = (d.loanList || []).find(function(l){ return l.id === p.loanId; });
-    monthPayments.push({ date: p.date, ledger: 'Loan', desc: 'Loan Payment' + (loan && loan.type ? ' \u2014 ' + loan.type : ''), method: p.method || '', amount: p.amount || 0 });
+    monthPayments.push({ date: p.date, ledger: 'Loan', desc: 'Loan Payment' + (loan && loan.type ? ' — ' + loan.type : ''), method: p.method || '', amount: p.amount || 0 });
   });
   monthPayments.sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); });
   var paymentTotal = monthPayments.reduce(function(s, p){ return s + p.amount; }, 0);
 
-  // \u2500\u2500 Build HTML \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   var CSS = [
-    'body{font-family:Arial,Helvetica,sans-serif;max-width:820px;margin:24px auto;padding:0 24px;font-size:12px;color:#111;}',
-    'h1{font-size:19px;font-weight:700;margin:0 0 2px;}',
-    'h2{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;',
-    '   background:#111;color:#F8E41A;padding:6px 10px;margin:24px 0 0;border-radius:4px 4px 0 0;}',
-    '.meta{font-size:11px;color:#666;margin-bottom:4px;}',
-    '.nation{font-size:11px;color:#888;margin-bottom:16px;}',
+    '@page{size:letter;margin:38mm 16mm 22mm;}',
+    '@page{@bottom-left{content:"CONFIDENTIAL";font-size:9px;color:#888;}@bottom-right{content:"Page " counter(page);font-size:9px;color:#888;}}',
+    'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#111;margin:0;padding:0;}',
+    '.pg-hdr{position:fixed;top:0;left:0;right:0;background:#111;color:#fff;border-bottom:3px solid #F8E41A;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;gap:16px;}',
+    '.pg-hdr-logo{height:44px;width:auto;}',
+    '.pg-hdr-nation{font-size:11px;line-height:1.5;color:#ddd;}',
+    '.pg-hdr-nation strong{font-size:13px;color:#fff;display:block;}',
+    '.pg-hdr-title{text-align:right;}',
+    '.pg-hdr-title h1{font-size:16px;font-weight:700;color:#F8E41A;margin:0 0 2px;}',
+    '.pg-hdr-title .gen-date{font-size:10px;color:#aaa;}',
+    '.content{padding:0;}',
+    '.section{break-before:page;}',
+    '.section:first-child{break-before:auto;}',
+    '.section-hdr{background:#111;color:#F8E41A;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:6px 10px;margin:0;}',
+    '.tenant-block{padding:12px 0 14px;}',
+    '.tenant-name{font-size:15px;font-weight:700;margin:0 0 2px;}',
+    '.tenant-meta{font-size:11px;color:#666;}',
+    '.tenant-addr{font-size:11px;color:#444;margin-top:6px;white-space:pre-line;}',
     'table{width:100%;border-collapse:collapse;}',
-    'th{background:#f0f0f0;padding:6px 10px;text-align:left;font-size:11px;font-weight:700;',
-    '   border-bottom:2px solid #ddd;}',
+    'th{background:#f0f0f0;padding:6px 10px;text-align:left;font-size:11px;font-weight:700;border-bottom:2px solid #ddd;}',
     'td{padding:6px 10px;border-bottom:1px solid #eee;font-size:11.5px;vertical-align:middle;}',
     '.r{text-align:right;}',
     '.red{color:#dc2626;font-weight:700;}',
@@ -10102,86 +10173,97 @@ function printTenantStatement() {
     '.sum-row td{background:#f9f9f9;font-weight:700;border-top:2px solid #bbb;}',
     '.grand-row td{background:#111;color:#F8E41A;font-weight:700;font-size:13px;}',
     '.empty{padding:12px 10px;color:#999;font-style:italic;border-bottom:1px solid #eee;}',
-    '.sig{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:36px;}',
-    '.sig-line{border-bottom:1px solid #333;height:44px;}',
-    '.sig-lbl{font-size:10px;color:#666;margin-top:4px;}',
-    '@media print{button{display:none!important;}.no-print{display:none!important;}}',
+    '.pill{background:#e0f2fe;color:#0369a1;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;}',
+    '@media print{.no-print{display:none!important;}}',
   ].join('');
 
-  function row(lbl, val, cls) {
+  var logoTag = logoSrc ? '<img src="' + logoSrc + '" class="pg-hdr-logo" alt="">' : '';
+  var nch = '<strong>' + (nationName || 'Housing') + '</strong>';
+  if (nationAddr) nch += '<br>' + nationAddr;
+  if (nationPhone) nch += '<br>' + nationPhone;
+  if (nationEmail) nch += '  &bull;  ' + nationEmail;
+
+  var header = '<div class="pg-hdr">'
+    + '<div style="display:flex;align-items:center;gap:14px;">' + logoTag
+    + '<div class="pg-hdr-nation">' + nch + '</div></div>'
+    + '<div class="pg-hdr-title"><h1>Statement of Account</h1>'
+    + '<div class="gen-date">Generated: ' + generatedOn + '</div></div></div>';
+
+  var addrHtml = tenantAddr
+    ? '<div class="tenant-addr">' + tenantAddr.replace(/\n/g, '<br>') + '</div>' : '';
+
+  function tenantBlock(subtitle) {
+    return '<div class="tenant-block">'
+      + '<div class="tenant-name">' + tenantName(t) + '</div>'
+      + '<div class="tenant-meta">' + (t.unit || '') + (t.unit && t.type ? '  &middot;  ' : '') + (t.type || '').replace(/-/g, ' ') + '</div>'
+      + (subtitle ? '<div class="tenant-meta" style="margin-top:2px;">' + subtitle + '</div>' : '')
+      + addrHtml + '</div>';
+  }
+
+  function srow(lbl, val, cls) {
     return '<tr><td>' + lbl + '</td><td class="r ' + (cls || '') + '">' + val + '</td></tr>';
   }
 
-  // Account summary table
   var summaryRows = '';
-  summaryRows += row('Monthly Rent', fmt(t.rent || 0));
-  summaryRows += row('Rent Outstanding', fmt(rentOwing), rentOwing > 0 ? 'red' : '');
+  summaryRows += srow('Monthly Rent', fmt(t.rent || 0));
+  summaryRows += srow('Rent Outstanding', fmt(rentOwing), rentOwing > 0 ? 'red' : '');
   if (arrOwing > 0 || (d.arrangements || []).some(function(a){ return a.tenantId === tid; }))
-    summaryRows += row('Arrangement Balance', fmt(arrOwing), arrOwing > 0 ? 'red' : '');
+    summaryRows += srow('Arrangement Balance', fmt(arrOwing), arrOwing > 0 ? 'red' : '');
   loanRows.forEach(function(lr) {
-    summaryRows += row('Loan \u2014 ' + lr.label, fmt(lr.balance), lr.balance > 0 ? 'red' : '');
+    summaryRows += srow('Loan — ' + lr.label, fmt(lr.balance), lr.balance > 0 ? 'red' : '');
   });
   summaryRows += '<tr class="grand-row"><td>Total Owing</td><td class="r">' + fmt(grandTotal) + '</td></tr>';
 
-  // Outstanding charges table
   var chargeRowsHtml = outstandingCharges.length
     ? outstandingCharges.map(function(r) {
-        return '<tr>'
-          + '<td class="muted">' + (r.date || '') + '</td>'
+        return '<tr><td class="muted">' + (r.date || '') + '</td>'
           + '<td>' + (r.desc || '') + '</td>'
           + '<td class="r red">' + fmt(r.charge || 0) + '</td>'
-          + '<td class="muted">' + (r.ref || '\u2014') + '</td>'
-          + '<td>' + (r.status || 'unpaid') + '</td>'
-          + '</tr>';
+          + '<td class="muted">' + (r.ref || '—') + '</td>'
+          + '<td>' + (r.status || 'unpaid') + '</td></tr>';
       }).join('')
       + '<tr class="sum-row"><td colspan="2">Total Outstanding Charges</td>'
       + '<td class="r red">' + fmt(chargeTotal) + '</td><td colspan="2"></td></tr>'
     : '<tr><td colspan="5" class="empty">No outstanding charges.</td></tr>';
 
-  // Payments this month table
   var payRowsHtml = monthPayments.length
     ? monthPayments.map(function(p) {
-        return '<tr>'
-          + '<td class="muted">' + (p.date || '') + '</td>'
-          + '<td><span style="background:#e0f2fe;color:#0369a1;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;">' + p.ledger + '</span></td>'
+        return '<tr><td class="muted">' + (p.date || '') + '</td>'
+          + '<td><span class="pill">' + p.ledger + '</span></td>'
           + '<td>' + (p.desc || '') + '</td>'
           + '<td class="muted">' + (p.method || '') + '</td>'
-          + '<td class="r green">' + fmt(p.amount) + '</td>'
-          + '</tr>';
+          + '<td class="r green">' + fmt(p.amount) + '</td></tr>';
       }).join('')
-      + '<tr class="sum-row"><td colspan="3">Total Payments \u2014 ' + monthLabel + '</td>'
+      + '<tr class="sum-row"><td colspan="3">Total Payments — ' + monthLabel + '</td>'
       + '<td></td><td class="r green">' + fmt(paymentTotal) + '</td></tr>'
     : '<tr><td colspan="5" class="empty">No payments recorded for ' + monthLabel + '.</td></tr>';
 
   var html = '<!DOCTYPE html><html><head>'
     + '<meta charset="UTF-8">'
-    + '<title>Statement \u2014 ' + tenantName(t) + '</title>'
+    + '<title>Statement — ' + tenantName(t) + '</title>'
     + '<style>' + CSS + '</style>'
-    + '</head><body>'
-    + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">'
-    +   '<div>'
-    +     '<h1>Tenant Statement</h1>'
-    +     '<div class="meta">' + tenantName(t) + ' &nbsp;&middot;&nbsp; ' + (t.unit || '') + ' &nbsp;&middot;&nbsp; ' + (t.type || '').replace(/-/g, ' ') + '</div>'
-    +     '<div class="nation">' + nation + ' Housing Finance &nbsp;&middot;&nbsp; Generated ' + generatedOn + '</div>'
-    +   '</div>'
-    + '</div>'
-
-    // Account Summary
-    + '<h2>Account Summary</h2>'
+    + '</head><body>' + header
+    + '<div class="content">'
+    + '<div class="section">'
+    + tenantBlock('As of ' + generatedOn)
+    + '<div class="section-hdr">Account Summary</div>'
     + '<table><tbody>' + summaryRows + '</tbody></table>'
-
-    // Outstanding Invoices & Charges
-    + '<h2>Outstanding Invoices &amp; Charges</h2>'
+    + '</div>'
+    + '<div class="section">'
+    + tenantBlock('Outstanding Invoices &amp; Charges')
+    + '<div class="section-hdr">Outstanding Invoices &amp; Charges</div>'
     + '<table><thead><tr><th>Date</th><th>Description</th><th class="r">Amount</th><th>Reference</th><th>Status</th></tr></thead>'
     + '<tbody>' + chargeRowsHtml + '</tbody></table>'
-
-    // Payments This Month
-    + '<h2>Payments &mdash; ' + monthLabel + '</h2>'
+    + '</div>'
+    + '<div class="section">'
+    + tenantBlock('Payments — ' + monthLabel)
+    + '<div class="section-hdr">Payments — ' + monthLabel + '</div>'
     + '<table><thead><tr><th>Date</th><th>Ledger</th><th>Description</th><th>Method</th><th class="r">Amount</th></tr></thead>'
     + '<tbody>' + payRowsHtml + '</tbody></table>'
-
+    + '</div>'
+    + '</div>'
     + '<div style="margin-top:24px;text-align:center;" class="no-print">'
-    +   '<button onclick="window.print()" style="background:#111;color:#F8E41A;border:none;padding:10px 28px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;">&#128424; Print / Save PDF</button>'
+    + '<button onclick="window.print()" style="background:#111;color:#F8E41A;border:none;padding:10px 28px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;">&#128424; Print / Save PDF</button>'
     + '</div>'
     + '</body></html>';
 
@@ -10191,7 +10273,6 @@ function printTenantStatement() {
   w.document.close();
   setTimeout(function(){ w.print(); }, 400);
 }
-
 
 
 function openNewArrForTenant(tid) {
