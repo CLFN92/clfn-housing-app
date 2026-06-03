@@ -2697,7 +2697,72 @@ async function renderConfigPanel() {
     +   '<div id="duplicate_apps_output" style="margin-top:14px;font-size:12px;"></div>'
     + '</div>'
 
+    + '<div class="cfg-section" style="border:2px dashed var(--warn-amber);background:var(--warn-amber-bg);">'
+    +   '<div class="cfg-section-title" style="color:var(--warn-amber);">&#9888; One-Time Migration — Tenant Move-In Backfill</div>'
+    +   '<div class="cfg-section-sub">Inserts a movement log entry for every currently occupied unit using the existing move-in date. Run once to seed historical data. Delete this panel when done.</div>'
+    +   '<div class="cfg-grid" style="margin-top:12px;">'
+    +     '<div class="cfg-row">'
+    +       '<div class="cfg-label">Backfill current tenants</div>'
+    +       '<div class="cfg-value">'
+    +         '<button type="button" class="btn btn-primary" onclick="backfillTenantMovementLog(this)">&#9654; Run Backfill</button>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div id="backfill_movement_output" style="margin-top:14px;font-size:12px;"></div>'
+    + '</div>'
+
     ;
+}
+
+async function backfillTenantMovementLog(btn) {
+  var out = document.getElementById('backfill_movement_output');
+  if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+  if (out) out.innerHTML = '<span style="color:var(--muted);">Scanning units…</span>';
+
+  var units = (typeof housingUnits !== 'undefined' && housingUnits.length)
+    ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var occupied = units.filter(function(u){ return u.assignedName && u.assignedName.trim(); });
+
+  if (!occupied.length) {
+    if (out) out.innerHTML = '<span style="color:var(--muted);">No occupied units found.</span>';
+    if (btn) { btn.disabled = false; btn.textContent = '▶ Run Backfill'; }
+    return;
+  }
+
+  var actor = (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || 'staff';
+  var inserted = 0, skipped = 0, errors = 0;
+
+  for (var i = 0; i < occupied.length; i++) {
+    var u = occupied[i];
+    var addr = (u.num && u.street) ? (u.num + ' ' + u.street) : '';
+    if (out) out.innerHTML = '<span style="color:var(--muted);">Processing ' + (i + 1) + ' of ' + occupied.length + '…</span>';
+    try {
+      var r = await fetch(SUPABASE_URL + '/rest/v1/tenant_movement_log', {
+        method: 'POST',
+        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({
+          unit_id:        String(u.id),
+          unit_address:   addr || null,
+          tenant_name:    u.assignedName,
+          application_id: u.assignedTo || null,
+          move_in_date:   u.assignedDate || null,
+          move_out_date:  null,
+          duration_days:  null,
+          recorded_by:    actor
+        })
+      });
+      if (r.ok) { inserted++; } else { errors++; }
+    } catch(e) { errors++; }
+  }
+
+  var msg = inserted + ' records inserted';
+  if (errors) msg += ', ' + errors + ' errors';
+  if (skipped) msg += ', ' + skipped + ' skipped';
+  msg += ' (out of ' + occupied.length + ' occupied units)';
+
+  if (out) out.innerHTML = '<span style="color:var(--success,#15803d);font-weight:600;">Done — ' + msg + '</span>';
+  if (btn) { btn.disabled = false; btn.textContent = '▶ Run Backfill'; }
+  if (typeof showToast === 'function') showToast('Backfill complete — ' + msg);
 }
 
 var _XLSX_2026_REMOVED = [
