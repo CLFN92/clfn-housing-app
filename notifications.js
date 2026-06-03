@@ -3546,9 +3546,13 @@ function _dupArchiveApp(appId) {
 async function _renderPipelineHealth() {
   try {
     var sinceIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    // The Edge Function writes detail as "Email -> <recipient> | <subject>".
+    // Filtering by entity_type='notification' misses real sends because the
+    // function uses the passed entity_type (application, sow, etc.) when
+    // available and only falls back to 'notification' when none is provided.
     var url = SUPABASE_URL + '/rest/v1/housing_audit_log'
-            + '?select=created_at,action,detail'
-            + '&entity_type=eq.notification'
+            + '?select=created_at,action,detail,actor'
+            + '&detail=like.' + encodeURIComponent('Email -> %')
             + '&created_at=gte.' + encodeURIComponent(sinceIso)
             + '&order=created_at.desc&limit=50';
     var r = await fetch(url, { headers: HOUSING_HEADERS });
@@ -3562,8 +3566,9 @@ async function _renderPipelineHealth() {
                  : ageMin < 1440 ? (Math.round(ageMin / 60) + ' h ago')
                  : (Math.round(ageMin / 1440) + ' d ago');
     return _healthBlock('ok',
-        '<strong>Last send:</strong> ' + _ntfEsc(when.toLocaleString()) + ' (' + ageLabel + ')<br/>'
-      + _ntfEsc(last.detail || '') + '<br/>'
+        '<strong>Last send:</strong> ' + _ntfEsc(when.toLocaleString()) + ' (' + ageLabel + ')'
+      + (last.actor ? ' &mdash; by ' + _ntfEsc(last.actor) : '') + '<br/>'
+      + '<span style="font-size:11px;color:var(--muted);">' + _ntfEsc(last.action || '') + ' &nbsp;&bull;&nbsp; ' + _ntfEsc(last.detail || '') + '</span><br/>'
       + '<span class="cfg-health-meta">' + rows.length + ' send' + (rows.length === 1 ? '' : 's') + ' in the last 7 days.</span>');
   } catch (e) {
     console.warn('[cfg] pipeline health load failed:', e);
