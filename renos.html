@@ -109,7 +109,7 @@
   <div id="rv_kpi" class="kpi-strip" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px;"></div>
   <!-- Search -->
   <div class="std-search-row std-search-row-wide">
-    <input id="renos_search" class="std-search" type="text" placeholder="🔍 Search address, contractor, status, project #, or bedrooms..." oninput="renderRenosView()"/>
+    <input id="renos_search" class="std-search" type="text" placeholder="🔍 Search address, contractor, status, project #, PO #, or bedrooms..." oninput="renderRenosView()"/>
   </div>
   <div class="std-table-card">
     <div class="doclib-table-wrap">
@@ -494,7 +494,8 @@ function openRenoProgress(unitId) {
   var sumEl = document.getElementById('rp_sow_summary');
   if(sumEl) {
     if(sow && sow.items && sow.items.length) {
-      sumEl.innerHTML = '<div style="font-size:13px;color:var(--text);">Request filed: '+sow.items.length+' items — <span style="color:var(--yellow);cursor:pointer;" data-opensow="1">View Request →</span></div>';
+      var _rpPoLine = sow.poNumber ? '<div style="font-size:12px;color:var(--muted);margin-top:5px;">PO: <strong style="color:var(--text);">'+escapeHtml(sow.poNumber)+'</strong></div>' : '';
+      sumEl.innerHTML = '<div style="font-size:13px;color:var(--text);">Request filed: '+sow.items.length+' item'+(sow.items.length!==1?'s':'')+' — <span style="color:var(--yellow);cursor:pointer;" data-opensow="1">View Request →</span></div>'+_rpPoLine;
     } else {
       sumEl.innerHTML = '<div style="font-size:13px;color:var(--muted);">No request filed yet. <span style="color:var(--yellow);cursor:pointer;font-weight:700;" data-createsow="1">Open Request →</span></div>';
     }

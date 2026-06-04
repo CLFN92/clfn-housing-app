@@ -2591,6 +2591,7 @@ function populateSettings(){
 function populateSow(data){
   var set=function(id,v){ var el=document.getElementById(id); if(el) el.value=v||''; };
   set('sow_address',data.address); set('sow_date',data.date); set('sow_prepared_by',data.preparedBy);
+  set('sow_po_number', data.poNumber);
   set('sow_tenant_name',data.tenantName);
   set('sow_contractor',data.contractor); set('sow_condition',data.condition);
   set('sow_fund_source', data.fundSource);
@@ -3518,7 +3519,7 @@ function renderRenosView(){
       var sow  = getSowData(u.id) || {};
       var hay = [
         u.num, u.street, u.bedrooms, u.type, u.status,
-        sow.contractor, sow.project_number
+        sow.contractor, sow.project_number, sow.poNumber
       ].filter(function(v){ return v != null && v !== ''; }).join(' ').toLowerCase();
       return hay.indexOf(_renoSearch) !== -1;
     });
@@ -4220,7 +4221,7 @@ function resetRenoScoreModel() {
   });
 }
 function resetSow(){
-  ['sow_address','sow_tenant_name','sow_prepared_by','sow_contractor','sow_total_cost',
+  ['sow_address','sow_tenant_name','sow_prepared_by','sow_po_number','sow_contractor','sow_total_cost',
    'sow_notes','sow_hm_name','sow_ed_name',
    'sow_sig_tenant_name','sow_sig_staff_name'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.value='';

@@ -240,6 +240,7 @@ function _buildSowModalHTML() {
               '<div class="f"><label>Date Prepared</label><input id="sow_date" type="date"/></div>' +
               '<div class="f"><label>Current Tenant Name</label><input id="sow_tenant_name" type="text" placeholder="Full name of tenant"/></div>' +
               '<div class="f"><label>Prepared By (Staff)</label><input id="sow_prepared_by" type="text" placeholder="Staff name"/></div>' +
+              '<div class="f"><label>PO Number <span style="font-size:10px;font-weight:400;color:var(--muted);">(from accounting)</span></label><input id="sow_po_number" type="text" placeholder="e.g. PO-2026-0042"/></div>' +
               '<div class="f sow-ct-row"><label>Contractor (if assigned)</label>' +
                 '<input id="sow_contractor" type="text" placeholder="Search contractors…" autocomplete="off"' +
                   ' oninput="sowContractorSearch(this.value)" onfocus="sowContractorSearch(\'\')"' +
@@ -1265,6 +1266,7 @@ function saveSOW(opts){
     unitId:_sowUnitId, address:get('sow_address'), date:get('sow_date'),
     tenantName:get('sow_tenant_name'),
     preparedBy:get('sow_prepared_by'), contractor:get('sow_contractor'), contractorId:(document.getElementById('sow_contractor_id')||{}).value||'',
+    poNumber:get('sow_po_number'),
     condition:get('sow_condition'), fundSource:get('sow_fund_source'), totalCost:get('sow_total_cost'),
     startDate:get('sow_start_date'), endDate:get('sow_end_date'), notes:get('sow_notes'),
     hmName:get('sow_hm_name'), hmDate:get('sow_hm_date'),
