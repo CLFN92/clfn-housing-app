@@ -164,7 +164,9 @@ var EMAIL_EVENT_REGISTRY = [
               + '<strong>Project:</strong> {projectAddress}<br/>'
               + '<strong>Bids close:</strong> {closingDate}</p>'
               + '<p><strong>Insurance Requirement:</strong> Valid WSIB clearance and a minimum of $2,000,000 in general liability insurance are required to be awarded a contract. Proof of both must be submitted with your bid.</p>'
-              + '<p>Your complete bid submission must include: completed bid form, current WSIB clearance certificate, general liability insurance certificate (minimum $2,000,000), at least two comparable project references, and your proposed timeline.</p>'
+              + '<p>If your firm is new to working with {nationShort} Housing, please include at least two comparable project references with complete contact information.</p>'
+              + '<p>If using subcontractors, a complete list must be provided including contact information, valid WSIB clearance certificate, and proof of minimum $2,000,000 general liability insurance for each subcontractor.</p>'
+              + '<p>Your complete bid package must include: completed bid form, current WSIB clearance certificate, general liability insurance certificate (minimum $2,000,000), at least two comparable project references, and your proposed timeline.</p>'
               + '<p>Submission method: {submissionMethod}<br/>Questions: contact {contactPerson} at {contactEmail}.</p>'
               + '<p>Thank you for your interest.<br/>{contactPerson}<br/>{nationShort} Housing Department</p>'
     }
@@ -1755,10 +1757,14 @@ async function _generateRfqPdfBase64(rfq, unit) {
   var contactEmail = d.contact_email || '';
   var subMethod = d.submission_method || 'email';
   var today    = new Date().toLocaleDateString('en-CA');
+  var officePhone  = (window.NATION_CONFIG && window.NATION_CONFIG.phone) || '705-463-4511';
+  var isBldgUnit   = unit && ['admin_building','band_building','commercial_building'].indexOf(unit.type || '') >= 0;
+  var buildingName = (isBldgUnit && unit && unit.buildingName) ? unit.buildingName : '';
 
   // Project details
   sectionHeader('Project Information');
   row('RFQ Number',      rfq.id || '--');
+  if (buildingName)             row('Building Name',    buildingName);
   row('Project Address', addr);
   row('Issue Date',      (d.issue_date || today));
   row('Bids Close',      closing);
@@ -1801,8 +1807,12 @@ async function _generateRfqPdfBase64(rfq, unit) {
                : subMethod === 'office' ? 'Deliver your complete bid package to the ' + (natShort || 'Housing') + ' Department office.'
                : 'Submit by email to ' + (contactEmail || contact) + ' OR deliver to the ' + (natShort || 'Housing') + ' Department office.';
   paragraph(subInstr);
-  paragraph('Your bid package must include: completed bid form, current WSIB clearance certificate, general liability insurance certificate (min. $2,000,000), at least two comparable project references, and your proposed timeline.');
-  if (contact) { gap(2); row('Contact', contact + (contactEmail ? '  ' + contactEmail : '')); }
+  paragraph('If your firm is new to working with ' + (natShort || 'CLFN') + ' Housing, please include at least two comparable project references with complete contact information.');
+  paragraph('If using subcontractors, a complete list must be provided including contact information, valid WSIB clearance certificate, and proof of minimum $2,000,000 general liability insurance for each subcontractor.');
+  paragraph('Your complete bid package must include: completed bid form, current WSIB clearance certificate, general liability insurance certificate (min. $2,000,000), at least two comparable project references, and your proposed timeline.');
+  gap(2);
+  if (contact) row('Contact', contact + (contactEmail ? '  |  ' + contactEmail : ''));
+  row('Office Phone', officePhone);
 
   // Summary / notes
   if (d.sow_summary) { gap(4); sectionHeader('Summary'); paragraph(d.sow_summary); }

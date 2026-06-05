@@ -285,6 +285,14 @@ async function _fetchAndPopulateSow(unitId, sowPn) {
     _rfqSowData   = sow;
     _rfqUnitData  = unit;
 
+    // Show building name for commercial/admin/band buildings
+    var _bldgTypes = ['admin_building','band_building','commercial_building'];
+    var _isBldg    = _bldgTypes.indexOf(unit.type || '') >= 0;
+    var _bldgNameEl  = document.getElementById('rfq_building_name_display');
+    var _bldgNameRow = document.getElementById('rfq_building_name_row');
+    if (_bldgNameEl)  _bldgNameEl.value = (_isBldg && unit.buildingName) ? unit.buildingName : '';
+    if (_bldgNameRow) _bldgNameRow.style.display = (_isBldg && unit.buildingName) ? '' : 'none';
+
     // Pre-populate scope items if not already set
     if (!_rfqScopeItems.length && sow) {
       var items = sow.items || sow.lineItems || [];
