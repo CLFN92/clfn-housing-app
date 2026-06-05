@@ -230,12 +230,25 @@ function renderRfqList() {
 // Called after showRfqForm() so the form is already visible.
 async function _fetchAndPopulateSow(unitId, sowPn) {
   try {
-    var r = await fetch(
-      SUPABASE_URL + '/rest/v1/housing_sow?unit_id=eq.' + encodeURIComponent(unitId) + '&select=data',
-      { headers: HOUSING_HEADERS }
-    );
-    if (!r.ok) return;
-    var rows = await r.json();
+    var rows;
+    var _handoffStr = sessionStorage.getItem('_rfq_sow_handoff');
+    if (_handoffStr) {
+      sessionStorage.removeItem('_rfq_sow_handoff');
+      try {
+        var _ho = JSON.parse(_handoffStr);
+        if (_ho && _ho.project_number === sowPn) {
+          rows = [{ data: { sows: [_ho] } }];
+        }
+      } catch(e) {}
+    }
+    if (!rows) {
+      var r = await fetch(
+        SUPABASE_URL + '/rest/v1/housing_sow?unit_id=eq.' + encodeURIComponent(unitId) + '&select=data',
+        { headers: HOUSING_HEADERS }
+      );
+      if (!r.ok) return;
+      rows = await r.json();
+    }
     if (!rows || !rows.length) return;
 
     var data = rows[0].data || {};

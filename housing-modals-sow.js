@@ -193,7 +193,7 @@ function _buildSowModalHTML() {
           '<button id="sow_archive_btn" type="button" onclick="archiveCurrentSow()" class="sow-hdr-btn-ghost" style="display:none;">🗄 Archive</button>' +
           '<button type="button" onclick="printWorkOrder()" class="sow-hdr-btn-primary">🏗 Work Order</button>' +
           '<button type="button" onclick="printSOW()" class="sow-hdr-btn-ghost">🖨 Full Request</button>' +
-          '<button type="button" id="sow_rfq_btn" onclick="if(_sowUnitId&&window._sowEditingProjectNumber){saveSOW();window.location.href=\'rfq.html?unit=\'+encodeURIComponent(_sowUnitId)+\'&sow=\'+encodeURIComponent(window._sowEditingProjectNumber);}else{if(typeof showToast===\'function\')showToast(\'Save the request first\');}" class="sow-hdr-btn-ghost" style="display:none;">📋 RFQ</button>' +
+          '<button type="button" id="sow_rfq_btn" onclick="if(_sowUnitId&&window._sowEditingProjectNumber){saveSOW();try{var _c=window._sowCache&&window._sowCache[_sowUnitId];var _sa=_c&&Array.isArray(_c.sows)?_c.sows:(_c&&Array.isArray(_c)?_c:[]);var _sh=_sa.find(function(s){return s&&s.project_number===window._sowEditingProjectNumber;})||null;if(_sh)sessionStorage.setItem(\'_rfq_sow_handoff\',JSON.stringify(_sh));}catch(e){}window.location.href=\'rfq.html?unit=\'+encodeURIComponent(_sowUnitId)+\'&sow=\'+encodeURIComponent(window._sowEditingProjectNumber);}else{if(typeof showToast===\'function\')showToast(\'Save the request first\');}" class="sow-hdr-btn-ghost" style="display:none;">📋 RFQ</button>' +
           '<button type="button" onclick="closeSowModal()" class="btn-close-sm">✕</button>' +
         '</div>' +
       '</div>' +
