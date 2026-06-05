@@ -1734,11 +1734,14 @@ async function notifySowTenantCopy(sow, unit) {
 // ── RFQ PDF generator ────────────────────────────────────────────────────
 // Generates the Request for Quotations document as a PDF base64 string.
 // Called by sendRfqToRecipients so it is auto-attached to every contractor
-// email. Accepts the rfq payload object and resolved unit object.
+// email. Mirrors the buildRfqDocumentHtml sections: Project Details, Scope,
+// Bid Form, Mandatory Inclusions, Submission Instructions, T&C, Authorization.
 async function _generateRfqPdfBase64(rfq, unit) {
   await _loadJsPdf();
   var logoDataUrl = await _fetchLogoForPdf();
-  var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
+  var nc       = window.NATION_CONFIG || {};
+  var natShort = nc.short || nc.display_name || '';
+  var natDisp  = nc.display_name || nc.name || natShort;
   var ctx = _makePdfDoc({
     headerTitle:    'Request for Quotations',
     headerSubtitle: rfq.id || '',
@@ -1746,54 +1749,56 @@ async function _generateRfqPdfBase64(rfq, unit) {
   });
   var pdf = ctx.pdf, marginL = ctx.marginL, marginR = ctx.marginR, contentW = ctx.contentW;
   var sectionHeader = ctx.sectionHeader.bind(ctx);
-  var row = ctx.row.bind(ctx);
-  var paragraph = ctx.paragraph.bind(ctx);
-  var gap = ctx.gap.bind(ctx);
+  var row           = ctx.row.bind(ctx);
+  var paragraph     = ctx.paragraph.bind(ctx);
+  var gap           = ctx.gap.bind(ctx);
 
-  var addr     = unit ? ((unit.num || '') + ' ' + (unit.street || '')).trim() : (rfq.sow_unit_id || '--');
-  var d        = rfq.data || {};
-  var closing  = rfq.closes_at ? new Date(rfq.closes_at).toLocaleString('en-CA', { dateStyle: 'long', timeStyle: 'short' }) : '--';
-  var contact  = d.contact_person || '';
-  var contactEmail = d.contact_email || '';
-  var subMethod = d.submission_method || 'email';
-  var today    = new Date().toLocaleDateString('en-CA');
-  var officePhone  = (window.NATION_CONFIG && window.NATION_CONFIG.phone) || '705-463-4511';
+  var addr         = unit ? ((unit.num || '') + ' ' + (unit.street || '')).trim() : (rfq.sow_unit_id || '--');
+  var d            = rfq.data || {};
+  var closing      = rfq.closes_at ? new Date(rfq.closes_at).toLocaleString('en-CA', { dateStyle: 'long', timeStyle: 'short' }) : '--';
+  var contact      = d.contact_person || '';
+  var contactEmail = d.contact_email  || '';
+  var subMethod    = d.submission_method || 'email';
+  var officePhone  = nc.phone || '705-463-4511';
+  var today        = new Date().toLocaleDateString('en-CA');
+  var issueDate    = d.issue_date || today;
   var isBldgUnit   = unit && ['admin_building','band_building','commercial_building'].indexOf(unit.type || '') >= 0;
   var buildingName = (isBldgUnit && unit && unit.buildingName) ? unit.buildingName : '';
+  var startDate    = d.target_start_date       ? new Date(d.target_start_date + 'T12:00:00').toLocaleDateString('en-CA', {year:'numeric',month:'long',day:'numeric'}) : '--';
+  var endDate      = d.target_completion_date  ? new Date(d.target_completion_date + 'T12:00:00').toLocaleDateString('en-CA', {year:'numeric',month:'long',day:'numeric'}) : '--';
+  var items        = (d.scope_snapshot || []).filter(function(it){ return it && !it._hidden && (it.category || it.description); });
 
-  // Project details
-  sectionHeader('Project Information');
-  row('RFQ Number',      rfq.id || '--');
-  if (buildingName)             row('Building Name',    buildingName);
-  row('Project Address', addr);
-  row('Issue Date',      (d.issue_date || today));
-  row('Bids Close',      closing);
-  if (d.target_start_date)      row('Target Start',      d.target_start_date);
-  if (d.target_completion_date) row('Target Completion', d.target_completion_date);
+  // ── 1. Project Details ───────────────────────────────────────────────────
+  sectionHeader('Project Details');
+  row('RFQ Number',             rfq.id || '--');
+  if (buildingName)             row('Building Name',           buildingName);
+  row('Project Address',        addr);
+  row('SOW Reference',          rfq.sow_project_number || '--');
+  row('Issue Date',             issueDate);
+  row('Bid Closing Date & Time', closing);
+  row('Target Start Date',      startDate);
+  row('Target Completion Date', endDate);
+  row((natShort || 'Nation') + ' Contact', contact + (contactEmail ? '  <' + contactEmail + '>' : ''));
   gap(4);
 
-  // Scope of work
-  var items = (d.scope_snapshot || []).filter(function(it){ return it && !it._hidden && (it.category || it.description); });
+  // ── 2. Scope of Work ─────────────────────────────────────────────────────
   if (items.length) {
     sectionHeader('Scope of Work');
-    var colW = [contentW * 0.35, contentW * 0.65];
-    // Column header row — space check matches data rows
+    var colW = [contentW * 0.32, contentW * 0.68];
     ctx.needSpace(8);
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(80);
-    pdf.text('Category',    marginL,          ctx.y + 3);
-    pdf.text('Description', marginL + colW[0], ctx.y + 3);
+    pdf.text('Category',    marginL,           ctx.y + 3);
+    pdf.text('Description of Work Required', marginL + colW[0], ctx.y + 3);
     ctx.y += 5;
     pdf.setDrawColor(200); pdf.line(marginL, ctx.y, marginL + contentW, ctx.y); ctx.y += 3;
     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(20);
     items.forEach(function(it) {
-      var cat  = it.category    || '--';
-      var desc = it.description || '--';
-      var catLines  = pdf.splitTextToSize(cat,  colW[0] - 3);
-      var descLines = pdf.splitTextToSize(desc, colW[1] - 3);
+      var catLines  = pdf.splitTextToSize(it.category || '--',    colW[0] - 3);
+      var descLines = pdf.splitTextToSize(it.description || '--', colW[1] - 3);
       var lines = Math.max(catLines.length, descLines.length);
       var rowH  = lines * 4 + 1;
       ctx.needSpace(rowH + 1.5);
-      pdf.text(catLines,  marginL,          ctx.y + 3);
+      pdf.text(catLines,  marginL,           ctx.y + 3);
       pdf.text(descLines, marginL + colW[0], ctx.y + 3);
       ctx.y += rowH;
       pdf.setDrawColor(230); pdf.line(marginL, ctx.y, marginL + contentW, ctx.y); ctx.y += 1.5;
@@ -1801,21 +1806,138 @@ async function _generateRfqPdfBase64(rfq, unit) {
     gap(4);
   }
 
-  // Submission instructions
-  sectionHeader('How to Submit');
-  var subInstr = subMethod === 'email'  ? 'Email your complete bid package to: ' + (contactEmail || contact)
-               : subMethod === 'office' ? 'Deliver your complete bid package to the ' + (natShort || 'Housing') + ' Department office.'
-               : 'Submit by email to ' + (contactEmail || contact) + ' OR deliver to the ' + (natShort || 'Housing') + ' Department office.';
+  // ── 3. Contractor Bid Form ────────────────────────────────────────────────
+  if (items.length) {
+    sectionHeader('Contractor Bid Form — Complete and Return');
+    paragraph('Price all line items below in CDN dollars, exclusive of HST. Print, complete by hand, sign, and return with your supporting documents.', 8.5);
+    gap(3);
+
+    var c1 = contentW * 0.50, c2 = contentW * 0.17, c3 = contentW * 0.17, c4 = contentW * 0.16;
+    var tX = marginL, hH = 7;
+    ctx.needSpace(hH + 2);
+
+    // Header row (yellow fill)
+    pdf.setFillColor(248, 228, 26);
+    pdf.rect(tX, ctx.y, contentW, hH, 'F');
+    pdf.setDrawColor(160); pdf.setLineWidth(0.3);
+    pdf.rect(tX, ctx.y, contentW, hH);
+    [c1, c1+c2, c1+c2+c3].forEach(function(x){ pdf.line(tX+x, ctx.y, tX+x, ctx.y+hH); });
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.5); pdf.setTextColor(30);
+    pdf.text('Line Item / Description',  tX + 2,         ctx.y + 4.5);
+    pdf.text('Unit Price ($)',            tX + c1 + 2,    ctx.y + 4.5);
+    pdf.text('Extended Price ($)',        tX + c1+c2 + 2, ctx.y + 4.5);
+    pdf.text('Notes',                     tX + c1+c2+c3+2, ctx.y + 4.5);
+    ctx.y += hH;
+
+    // One row per scope item
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(30);
+    items.forEach(function(it) {
+      var txt   = it.description || it.category || '--';
+      var lines = pdf.splitTextToSize(txt, c1 - 4);
+      var rH    = Math.max(lines.length * 4 + 4, 10);
+      ctx.needSpace(rH + 1);
+      pdf.setDrawColor(200); pdf.setLineWidth(0.2);
+      pdf.rect(tX, ctx.y, contentW, rH);
+      [c1, c1+c2, c1+c2+c3].forEach(function(x){ pdf.line(tX+x, ctx.y, tX+x, ctx.y+rH); });
+      pdf.text(lines, tX + 2, ctx.y + 4);
+      ctx.y += rH;
+    });
+
+    // Total row
+    ctx.needSpace(9);
+    pdf.setFillColor(248, 228, 26);
+    pdf.rect(tX, ctx.y, contentW, 9, 'F');
+    pdf.setDrawColor(160); pdf.setLineWidth(0.3);
+    pdf.rect(tX, ctx.y, contentW, 9);
+    [c1, c1+c2, c1+c2+c3].forEach(function(x){ pdf.line(tX+x, ctx.y, tX+x, ctx.y+9); });
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(20);
+    pdf.text('TOTAL BID AMOUNT:', tX + c1 - 2, ctx.y + 5.5, { align: 'right' });
+    ctx.y += 9;
+    gap(4);
+  }
+
+  // ── 4. Mandatory Inclusions ───────────────────────────────────────────────
+  sectionHeader('Mandatory Inclusions');
+  paragraph('The following documents must be included with your bid. Incomplete packages will not be considered.', 8.5);
+  gap(3);
+  var checkList = [
+    'Current WSIB clearance certificate',
+    'Certificate of general liability insurance (minimum $2,000,000 per occurrence)',
+    'List of at least two comparable completed projects (name, owner, value, completion date)',
+    'If new to working with ' + (natShort || 'CLFN') + ' Housing: at least two project references with complete contact information',
+    'If using subcontractors: complete list with contact info, WSIB certificate, and proof of $2M+ liability insurance for each',
+    'Proposed project start date and estimated completion timeline',
+    'Fully completed bid form (above) with all line items priced'
+  ];
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(40);
+  checkList.forEach(function(item) {
+    var lines = pdf.splitTextToSize(item, contentW - 9);
+    var rH = lines.length * 4 + 4;
+    ctx.needSpace(rH);
+    pdf.setDrawColor(80); pdf.setLineWidth(0.4);
+    pdf.rect(marginL, ctx.y + 0.5, 3.5, 3.5);
+    pdf.text(lines, marginL + 7, ctx.y + 3.5);
+    ctx.y += rH;
+  });
+  gap(4);
+
+  // ── 5. Submission Instructions ────────────────────────────────────────────
+  sectionHeader('Submission Instructions');
+  var subInstr = subMethod === 'email'
+    ? 'Email your complete bid package to: ' + (contactEmail || contact)
+    : subMethod === 'office'
+    ? 'Deliver your complete bid package to the ' + (natShort || 'Housing') + ' Department office.'
+    : 'Submit by email to ' + (contactEmail || contact) + ' OR deliver to the ' + (natShort || 'Housing') + ' Department office.';
   paragraph(subInstr);
-  paragraph('If your firm is new to working with ' + (natShort || 'CLFN') + ' Housing, please include at least two comparable project references with complete contact information.');
-  paragraph('If using subcontractors, a complete list must be provided including contact information, valid WSIB clearance certificate, and proof of minimum $2,000,000 general liability insurance for each subcontractor.');
-  paragraph('Your complete bid package must include: completed bid form, current WSIB clearance certificate, general liability insurance certificate (min. $2,000,000), at least two comparable project references, and your proposed timeline.');
+  paragraph('Bids must be received by: ' + closing + '. Late submissions will not be accepted under any circumstances.');
   gap(2);
   if (contact) row('Contact', contact + (contactEmail ? '  |  ' + contactEmail : ''));
   row('Office Phone', officePhone);
+  gap(4);
 
-  // Summary / notes
-  if (d.sow_summary) { gap(4); sectionHeader('Summary'); paragraph(d.sow_summary); }
+  // ── 6. Terms & Conditions (if saved in settings) ──────────────────────────
+  var rawTerms = window._appSettings && window._appSettings.rfq_terms;
+  if (rawTerms) {
+    var termsStr = typeof rawTerms === 'string' ? rawTerms : (rawTerms.bodyHtml || '');
+    var plainTerms = termsStr.replace(/<li[^>]*>/gi, '• ').replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    if (plainTerms) { sectionHeader('Terms & Conditions'); paragraph(plainTerms, 8); gap(4); }
+  }
+
+  // ── 7. Authorization ──────────────────────────────────────────────────────
+  sectionHeader('Authorization');
+  gap(2);
+  var sigData  = d.sig_data  || '';
+  var sigName  = d.sig_name  || '';
+  var sigTitle = d.sig_title || '';
+
+  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100);
+  pdf.text('ISSUED BY', marginL, ctx.y); ctx.y += 5;
+
+  if (sigData && sigData.indexOf('data:image/png;base64,') === 0) {
+    ctx.needSpace(20);
+    try { pdf.addImage(sigData, 'PNG', marginL, ctx.y, 55, 15); ctx.y += 17; } catch(e) { ctx.y += 14; }
+  } else if (sigData && sigData.indexOf('typed:') === 0) {
+    ctx.needSpace(12);
+    pdf.setFont('helvetica', 'italic'); pdf.setFontSize(14); pdf.setTextColor(20);
+    pdf.text(sigData.replace('typed:', ''), marginL, ctx.y + 7); ctx.y += 12;
+  } else {
+    ctx.needSpace(16);
+    pdf.setDrawColor(80); pdf.setLineWidth(0.5);
+    pdf.line(marginL, ctx.y + 12, marginL + contentW * 0.45, ctx.y + 12); ctx.y += 14;
+  }
+
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(60);
+  pdf.text('Date: ' + issueDate, marginL, ctx.y); ctx.y += 5;
+  pdf.text('Print name: ' + (sigName  || '___________________________'), marginL, ctx.y); ctx.y += 5;
+  pdf.text('Title: '      + (sigTitle || '___________________________'), marginL, ctx.y); ctx.y += 6;
+
+  gap(3);
+  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100);
+  pdf.text('ON BEHALF OF', marginL, ctx.y); ctx.y += 5;
+  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11); pdf.setTextColor(20);
+  pdf.text(natDisp, marginL, ctx.y); ctx.y += 5;
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(80);
+  pdf.text('Housing Department', marginL, ctx.y);
 
   return ctx.finish();
 }
