@@ -1399,7 +1399,9 @@ function openUnitDetail(unitId) {
   // Header
   var addr = u.num + ' ' + u.street;
   setText('udp_address', addr);
-  var sub = [u.bedrooms+' bed', u.bathrooms&&u.bathrooms!=='nan'?u.bathrooms+' bath':'', u.type&&u.type!=='nan'?u.type:''].filter(Boolean).join(' · ');
+  var _isBldgType = _UE_BLDG_TYPES.indexOf(u.type) >= 0;
+  var _roomStr = (u.bedrooms != null && u.bedrooms !== '') ? u.bedrooms + (_isBldgType ? (u.bedrooms == 1 ? ' room' : ' rooms') : ' bed') : '';
+  var sub = [_roomStr, u.bathrooms&&u.bathrooms!=='nan'?u.bathrooms+' bath':'', u.type&&u.type!=='nan'?u.type:''].filter(Boolean).join(' · ');
   setText('udp_subtitle', sub);
 
   // Status badge
