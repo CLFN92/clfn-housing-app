@@ -1147,7 +1147,10 @@ function renderDocumentsTab() {
         { key:'photo',     label:'Photo',           icon:'📷' },
         { key:'other',     label:'Other',           icon:'📎' }
       ],
-      maxSizeMB: 25
+      maxSizeMB: 25,
+      onChange: function(action) {
+        if (action === 'upload' || action === 'delete') _rfqRefreshAttachList();
+      }
     });
   } else if (mount) {
     mount.innerHTML = '<div class="rfq-progress-msg">Document library not available.</div>';

@@ -1729,6 +1729,86 @@ async function notifySowTenantCopy(sow, unit) {
   }, eventKey);
 }
 
+// ── RFQ PDF generator ────────────────────────────────────────────────────
+// Generates the Request for Quotations document as a PDF base64 string.
+// Called by sendRfqToRecipients so it is auto-attached to every contractor
+// email. Accepts the rfq payload object and resolved unit object.
+async function _generateRfqPdfBase64(rfq, unit) {
+  await _loadJsPdf();
+  var logoDataUrl = await _fetchLogoForPdf();
+  var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
+  var ctx = _makePdfDoc({
+    headerTitle:    'Request for Quotations',
+    headerSubtitle: rfq.id || '',
+    logoDataUrl:    logoDataUrl || null
+  });
+  var pdf = ctx.pdf, marginL = ctx.marginL, marginR = ctx.marginR, contentW = ctx.contentW;
+  var sectionHeader = ctx.sectionHeader.bind(ctx);
+  var row = ctx.row.bind(ctx);
+  var paragraph = ctx.paragraph.bind(ctx);
+  var gap = ctx.gap.bind(ctx);
+
+  var addr     = unit ? ((unit.num || '') + ' ' + (unit.street || '')).trim() : (rfq.sow_unit_id || '--');
+  var d        = rfq.data || {};
+  var closing  = rfq.closes_at ? new Date(rfq.closes_at).toLocaleString('en-CA', { dateStyle: 'long', timeStyle: 'short' }) : '--';
+  var contact  = d.contact_person || '';
+  var contactEmail = d.contact_email || '';
+  var subMethod = d.submission_method || 'email';
+  var today    = new Date().toLocaleDateString('en-CA');
+
+  // Project details
+  sectionHeader('Project Information');
+  row('RFQ Number',      rfq.id || '--');
+  row('Project Address', addr);
+  row('Issue Date',      (d.issue_date || today));
+  row('Bids Close',      closing);
+  if (d.target_start_date)      row('Target Start',      d.target_start_date);
+  if (d.target_completion_date) row('Target Completion', d.target_completion_date);
+  gap(4);
+
+  // Scope of work
+  var items = (d.scope_snapshot || []).filter(function(it){ return it && !it._hidden && (it.category || it.description); });
+  if (items.length) {
+    sectionHeader('Scope of Work');
+    var colW = [contentW * 0.35, contentW * 0.65];
+    // Header row
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(80);
+    pdf.text('Category',    marginL,          ctx.y);
+    pdf.text('Description', marginL + colW[0], ctx.y);
+    ctx.y += 5;
+    pdf.setDrawColor(200); pdf.line(marginL, ctx.y, marginL + contentW, ctx.y); ctx.y += 3;
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(20);
+    items.forEach(function(it) {
+      var cat  = it.category    || '--';
+      var desc = it.description || '--';
+      var catLines  = pdf.splitTextToSize(cat,  colW[0] - 3);
+      var descLines = pdf.splitTextToSize(desc, colW[1] - 3);
+      var lineH = 5, lines = Math.max(catLines.length, descLines.length);
+      var rowH  = lines * lineH + 4;
+      ctx.needSpace(rowH + 2);
+      pdf.text(catLines,  marginL,          ctx.y);
+      pdf.text(descLines, marginL + colW[0], ctx.y);
+      ctx.y += rowH;
+      pdf.setDrawColor(230); pdf.line(marginL, ctx.y, marginL + contentW, ctx.y); ctx.y += 2;
+    });
+    gap(4);
+  }
+
+  // Submission instructions
+  sectionHeader('How to Submit');
+  var subInstr = subMethod === 'email'  ? 'Email your complete bid package to: ' + (contactEmail || contact)
+               : subMethod === 'office' ? 'Deliver your complete bid package to the ' + (natShort || 'Housing') + ' Department office.'
+               : 'Submit by email to ' + (contactEmail || contact) + ' OR deliver to the ' + (natShort || 'Housing') + ' Department office.';
+  paragraph(subInstr);
+  paragraph('Your bid package must include: completed bid form, current WSIB clearance certificate, general liability insurance certificate (min. $2,000,000), at least two comparable project references, and your proposed timeline.');
+  if (contact) { gap(2); row('Contact', contact + (contactEmail ? '  ' + contactEmail : '')); }
+
+  // Summary / notes
+  if (d.sow_summary) { gap(4); sectionHeader('Summary'); paragraph(d.sow_summary); }
+
+  return ctx.finish();
+}
+
 // ── Work Order PDF generator ──────────────────────────────────────────────
 // Mirrors printWorkOrder's structure (contractor-facing variant of the SOW
 // PDF). Reads from the live SOW modal form fields. Different from the SOW

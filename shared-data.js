@@ -6383,8 +6383,18 @@ async function sendRfqToRecipients(rfq, contractorList) {
     ccRecipients = await _resolveActiveStaffForRoles(ccRoles);
   }
 
-  // Fetch selected document attachments once — re-used for every contractor
+  // Auto-generate the RFQ document as a PDF and prepend to attachments
   var attachments = [];
+  try {
+    if (typeof _generateRfqPdfBase64 === 'function') {
+      var rfqPdfB64 = await _generateRfqPdfBase64(rfq, unit);
+      if (rfqPdfB64) {
+        attachments.push({ name: (rfq.id || 'RFQ') + '_' + addr.replace(/[^a-zA-Z0-9]/g,'_') + '.pdf', contentType: 'application/pdf', contentBytes: rfqPdfB64 });
+      }
+    }
+  } catch(e) { console.warn('[rfq] RFQ PDF generation failed:', e); }
+
+  // Fetch selected document attachments once — re-used for every contractor
   var attachedPaths = (rfq.data && rfq.data.attached_doc_paths) || [];
   if (attachedPaths.length && typeof sbGetFileUrl === 'function') {
     for (var ai = 0; ai < attachedPaths.length; ai++) {
