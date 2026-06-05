@@ -1133,7 +1133,7 @@ function renderDocumentsTab() {
     _rfqDocLib = window.DocLibrary.create(mount, {
       entityType:    'rfq',
       entityId:      rfqId,
-      pathPrefix:    'rfq/' + rfqId,
+      pathPrefix:    'tenants/' + (_rfqSowUnitId || rfqId),
       supabaseUrl:   SUPABASE_URL,
       supabaseAnon:  SUPABASE_ANON,
       storageBucket: STORAGE_BUCKET,
