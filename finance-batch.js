@@ -99,7 +99,7 @@ function _rsSearch(q) {
   var labels = document.querySelectorAll('#rs-list label[data-rs-search]');
   var ql = (q || '').toLowerCase().trim();
   for (var i = 0; i < labels.length; i++) {
-    labels[i].style.display = (!ql || labels[i].getAttribute('data-rs-search').indexOf(ql) >= 0) ? '' : 'none';
+    labels[i].style.display = (!ql || labels[i].getAttribute('data-rs-search').indexOf(ql) >= 0) ? 'flex' : 'none';
   }
   _rsUpdateCount();
 }
