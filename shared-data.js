@@ -3863,8 +3863,8 @@ function renderWorklist() {
     if (!a || a.archived) return false;
     var owner = (a.created_by_email || '').toLowerCase();
     if (owner === email && a.status === 'returned') return true;
-    if (isManagement && !canFinal && (a.status === 'submitted' || a.status === 'file_update')) return true;
-    if (canFinal && (a.status === 'mgr_approved' || a.status === 'submitted')) return true;
+    if (isManagement && !canFinal && (a.status === 'submitted' || a.status === 'file_update' || a.status === 'mgr_approved' || a.status === 'transfer_request_submitted')) return true;
+    if (canFinal && (a.status === 'mgr_approved' || a.status === 'submitted' || a.status === 'file_update' || a.status === 'transfer_request_submitted')) return true;
     return false;
   }).slice(0, 10);
 
@@ -4095,7 +4095,7 @@ function renderWorklist() {
   // Applications
   if (appItems.length) {
     var statusLabel = { submitted:'Awaiting Review', file_update:'File Update', mgr_approved:'Awaiting ED Approval', returned:'Returned — Action Needed', transfer_request_submitted:'Transfer Request' };
-    var appBtnText = { submitted:'Review', file_update:'Review', mgr_approved:'Approve', returned:'Edit', transfer_request_submitted:'Review' };
+    var appBtnText = { submitted:'Review', file_update:'Review', mgr_approved: canFinal ? 'Approve' : 'View', returned:'Edit', transfer_request_submitted:'Review' };
     var _wlReviewStatuses = ['submitted', 'file_update', 'mgr_approved', 'transfer_request_submitted'];
     var appRows = appItems.map(function(a) {
       var name  = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
