@@ -47,7 +47,8 @@ function showRunStatementsModal() {
     var v = totals[t.id] || {};
     var bal = (v.rent||0) + (v.loan||0) + (v.arrangement||0);
     var initials = ((t.first||'')[0]||'') + ((t.last||'')[0]||'');
-    return '<label style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);">'+
+    var searchVal = (tenantName(t) + ' ' + (t.unit||'')).toLowerCase();
+    return '<label data-rs-search="'+searchVal+'" style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);">'+
       '<input type="checkbox" class="rs-chk" data-tid="'+t.id+'" checked style="width:15px;height:15px;cursor:pointer;flex-shrink:0;" onchange="_rsUpdateCount()"/>'+
       '<div class="std-row-avatar" style="flex-shrink:0;">'+(initials||'?')+'</div>'+
       '<div style="flex:1;min-width:0;">'+
@@ -71,12 +72,15 @@ function showRunStatementsModal() {
       '<button class="modal-close" onclick="closeModal(\'modalRunStatements\')">&#x2715;</button>'+
     '</div>'+
     '<div class="modal-body" style="padding:0;">'+
-      '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);">'+
+      '<div style="padding:10px 14px;border-bottom:1px solid var(--border);">'+
+        '<input id="rs-search" type="text" placeholder="🔍 Search by name or unit…" oninput="_rsSearch(this.value)" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;outline:none;"/>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border);">'+
         '<button class="btn btn-ghost btn-sm" onclick="_rsCheckAll(true)">Check All</button>'+
         '<button class="btn btn-ghost btn-sm" onclick="_rsCheckAll(false)">Uncheck All</button>'+
         '<span id="rs-count" style="margin-left:auto;font-size:12px;color:var(--muted);">'+tenants.length+' of '+tenants.length+' selected</span>'+
       '</div>'+
-      '<div style="max-height:380px;overflow-y:auto;">'+
+      '<div id="rs-list" style="max-height:340px;overflow-y:auto;">'+
         (rows || '<div style="padding:30px;text-align:center;color:var(--muted);">No active tenants found.</div>')+
       '</div>'+
     '</div>'+
@@ -91,15 +95,34 @@ function showRunStatementsModal() {
   mo.classList.add('on');
 }
 
+function _rsSearch(q) {
+  var labels = document.querySelectorAll('#rs-list label[data-rs-search]');
+  var ql = (q || '').toLowerCase().trim();
+  for (var i = 0; i < labels.length; i++) {
+    labels[i].style.display = (!ql || labels[i].getAttribute('data-rs-search').indexOf(ql) >= 0) ? '' : 'none';
+  }
+  _rsUpdateCount();
+}
+
 function _rsCheckAll(checked) {
-  var chks = document.querySelectorAll('.rs-chk');
-  for (var i=0; i<chks.length; i++) chks[i].checked = checked;
+  var labels = document.querySelectorAll('#rs-list label[data-rs-search]');
+  for (var i = 0; i < labels.length; i++) {
+    if (labels[i].style.display === 'none') continue;
+    var chk = labels[i].querySelector('.rs-chk');
+    if (chk) chk.checked = checked;
+  }
   _rsUpdateCount();
 }
 
 function _rsUpdateCount() {
-  var total = document.querySelectorAll('.rs-chk').length;
-  var selected = document.querySelectorAll('.rs-chk:checked').length;
+  var labels = document.querySelectorAll('#rs-list label[data-rs-search]');
+  var total = 0, selected = 0;
+  for (var i = 0; i < labels.length; i++) {
+    if (labels[i].style.display === 'none') continue;
+    total++;
+    var chk = labels[i].querySelector('.rs-chk');
+    if (chk && chk.checked) selected++;
+  }
   var el = document.getElementById('rs-count');
   if (el) el.textContent = selected + ' of ' + total + ' selected';
 }
