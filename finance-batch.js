@@ -357,6 +357,17 @@ function runBatchAccounting(dryRun) {
     return t.active !== false && st !== 'former' && st !== 'deceased';
   });
 
+  // Build lookups from housing_units cache (set via Inventory > Edit Unit)
+  var _unitRentById = {};   // unit id  → monthlyRent
+  var _unitRentByName = {}; // assigned_name (lowercase) → monthlyRent (fallback when current_unit_id absent)
+  (window._housingUnits || []).forEach(function(u) {
+    var rent = u.data && u.data.monthlyRent != null ? Number(u.data.monthlyRent) : 0;
+    if (rent > 0) {
+      _unitRentById[u.id] = rent;
+      if (u.assigned_name) _unitRentByName[u.assigned_name.toLowerCase().trim()] = rent;
+    }
+  });
+
   var rows = [];
   var noRentTenants = [];
 
@@ -365,9 +376,16 @@ function runBatchAccounting(dryRun) {
 
     // Rent charges
     if (type === 'rent' || type === 'all') {
+      // Priority: 1) finance tenant profile, 2) housing unit by ID, 3) by assigned_name, 4) last ledger charge
       var monthlyRent = parseFloat(t.rent || 0);
+      if (!monthlyRent && t.currentUnitId) {
+        monthlyRent = _unitRentById[t.currentUnitId] || 0;
+      }
       if (!monthlyRent) {
-        // monthly_rent may not be set on the tenant record — fall back to most recent ledger charge
+        var _nameLc = tenantName(t).toLowerCase().trim();
+        monthlyRent = _unitRentByName[_nameLc] || 0;
+      }
+      if (!monthlyRent) {
         var lastCharge = (d.rentLedger||[])
           .filter(function(r){ return r.tenantId === tid && r.type === 'invoice' && r.charge > 0; })
           .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); })[0];

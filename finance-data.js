@@ -648,7 +648,7 @@ async function _bootLoadFinanceData(){
     // Also load housing_units — read-only cache used by the unit picker in
     // Add Tenant modal. Not part of the finance write path; just a lookup.
     try {
-      var ur = await _fetchFromSupabase('housing_units?select=id,num,street,status,assigned_name&order=street,num&limit=10000');
+      var ur = await _fetchFromSupabase('housing_units?select=id,num,street,status,assigned_name,data&order=street,num&limit=10000');
       if (ur.ok) {
         var urows = await ur.json();
         window._housingUnits = urows || [];
