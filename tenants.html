@@ -154,11 +154,17 @@
         </div>
       </div>
 
+      <!-- Building Name (shown for Admin / Band / Commercial building types) -->
+      <div id="ue_building_name_row" style="display:none;" class="f">
+        <label>Building Name</label>
+        <input id="ue_building_name" type="text" placeholder="e.g. Band Administration Building"/>
+      </div>
+
       <!-- Unit details -->
       <div>
         <div class="lbl-muted" class="mb-12">Unit Details</div>
         <div class="grid-c3-tight">
-          <div class="f"><label>Bedrooms</label>
+          <div class="f"><label id="ue_bedrooms_label">Bedrooms</label>
             <select id="ue_bedrooms">
               <option value="1">1</option><option value="2">2</option><option value="3">3</option>
               <option value="4">4</option><option value="5">5</option><option value="6">6</option>
@@ -168,7 +174,7 @@
           <div class="f"><label>Year Built</label><input id="ue_year" type="text" placeholder="e.g. 1998"/></div>
           <div class="f"><label>Monthly Rent (CAD)</label><input id="ue_rent" type="number" min="0" step="any" placeholder="e.g. 750"/></div>
           <div class="f"><label>Type</label>
-            <select id="ue_type">
+            <select id="ue_type" onchange="ueTypeChanged('ue')">
               <option value="">— Select —</option>
               <option value="detached unit">Detached</option>
               <option value="duplex unit">Duplex</option>
@@ -177,6 +183,9 @@
               <option value="6-plex unit">6-plex</option>
               <option value="complex">Complex</option>
               <option value="mobile unit">Mobile</option>
+              <option value="admin_building">Admin Building</option>
+              <option value="band_building">Band Building</option>
+              <option value="commercial_building">Commercial Building</option>
             </select>
           </div>
           <div class="f"><label>Foundation</label>

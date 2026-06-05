@@ -84,8 +84,11 @@ function openUnitEditModal(unitId){
   if(!u){ showToast('Unit not found: ' + unitId); return; }
   window._editingUnitId = unitId;
   var set = function(id,val){ var el=document.getElementById(id); if(el) el.value=(val===null||val===undefined||val==='nan')?'':String(val); };
-  set('ue_street',u.street); set('ue_num',u.num); set('ue_bedrooms',u.bedrooms);
+  set('ue_street',u.street); set('ue_num',u.num);
   set('ue_bathrooms',u.bathrooms); set('ue_type',u.type); set('ue_foundation',u.foundation);
+  ueTypeChanged('ue');         // swap room options + show building name before setting bedrooms
+  set('ue_bedrooms',u.bedrooms);
+  set('ue_building_name', u.buildingName || '');
   set('ue_funder',u.funder); set('ue_phase',u.phase); set('ue_year',u.year);
   set('ue_dept_number', u.deptNumber);
   set('ue_cmhc_value', u.cmhcValue);
@@ -181,6 +184,32 @@ function openUnitEditModal(unitId){
   // Check budget routing
   setTimeout(ueUpdateBudgetRouting, 50);
 }
+var _UE_BLDG_TYPES = ['admin_building', 'band_building', 'commercial_building'];
+var _UE_ROOM_OPTS_BLDG = '<option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option><option value="12">12</option><option value="15">15</option><option value="20">20</option><option value="25">25</option><option value="30">30</option>';
+var _UE_ROOM_OPTS_RES  = '<option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option>';
+
+function ueTypeChanged(prefix) {
+  var p = prefix || 'ue';
+  var type = (document.getElementById(p + '_type') || {}).value || '';
+  var isBldg = _UE_BLDG_TYPES.indexOf(type) >= 0;
+
+  // Show/hide building name field
+  var nameRow = document.getElementById(p + '_building_name_row');
+  if (nameRow) nameRow.style.display = isBldg ? '' : 'none';
+
+  // Relabel Bedrooms ↔ Rooms
+  var lbl = document.getElementById(p + '_bedrooms_label');
+  if (lbl) lbl.textContent = isBldg ? 'Rooms' : 'Bedrooms';
+
+  // Swap room-count options and restore current value
+  var sel = document.getElementById(p + '_bedrooms');
+  if (sel) {
+    var cur = sel.value;
+    sel.innerHTML = isBldg ? _UE_ROOM_OPTS_BLDG : _UE_ROOM_OPTS_RES;
+    if (cur) sel.value = cur;
+  }
+}
+
 function ueFunderChanged() {
   var funder  = (document.getElementById('ue_funder') || {}).value;
   var cmhcEl  = document.getElementById('ue_cmhc_value');
@@ -292,6 +321,7 @@ function saveUnitEdit(){
   u.street=get('ue_street')||u.street; u.num=get('ue_num')||u.num;
   u.bedrooms=parseInt(get('ue_bedrooms'))||u.bedrooms;
   u.bathrooms=get('ue_bathrooms'); u.type=get('ue_type'); u.foundation=get('ue_foundation');
+  u.buildingName = get('ue_building_name') || null;
   u.funder=get('ue_funder'); u.phase=get('ue_phase'); u.year=get('ue_year');
   u.deptNumber=get('ue_dept_number');
   u.acctNumber=get('ue_acct_number');
@@ -1520,6 +1550,7 @@ function saveNewUnit(){
     bedrooms: parseInt(get('au_bedrooms'))||3,
     bathrooms: get('au_bathrooms')||'1',
     type: get('au_type')||'detached unit',
+    buildingName: get('au_building_name') || null,
     foundation: get('au_foundation')||'',
     funder: get('au_funder')||'',
     phase: get('au_phase')||'',
@@ -1561,11 +1592,12 @@ function _gateRentInput(inputId){
   if(!allowed) el.classList.add('tic-readonly-input'); else el.classList.remove('tic-readonly-input');
 }
 function openAddUnitModal(){
-  var fields = ['au_num','au_street','au_bathrooms','au_year','au_phase','au_notes','au_rent','au_constructionCost'];
+  var fields = ['au_num','au_street','au_bathrooms','au_year','au_phase','au_notes','au_rent','au_constructionCost','au_building_name'];
   fields.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   _gateRentInput('au_rent');
-  var bedEl = document.getElementById('au_bedrooms'); if(bedEl) bedEl.value='3';
   var typeEl = document.getElementById('au_type'); if(typeEl) typeEl.value='';
+  ueTypeChanged('au');  // reset room label + options + hide building name
+  var bedEl = document.getElementById('au_bedrooms'); if(bedEl) bedEl.value='3';
   var fndEl = document.getElementById('au_foundation'); if(fndEl) fndEl.value='';
   var funEl = document.getElementById('au_funder'); if(funEl) funEl.value='';
   var accEl = document.getElementById('au_accessible'); if(accEl) accEl.checked=false;

@@ -138,17 +138,35 @@
     </div>
     <div style="padding:24px;display:flex;flex-direction:column;gap:13px;">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;">
-        <div class="f"><label>Street Address <span class="r">*</span></label><input type="text" id="au_street" placeholder="e.g. Musko Road"/></div>
         <div class="f"><label>Unit Number <span class="r">*</span></label><input type="text" id="au_num" placeholder="e.g. 11"/></div>
-        <div class="f"><label>Bedrooms</label><select id="au_bedrooms"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></div>
+        <div class="f"><label>Street Address <span class="r">*</span></label><input type="text" id="au_street" placeholder="e.g. Musko Road"/></div>
+        <div class="f"><label id="au_bedrooms_label">Bedrooms</label><select id="au_bedrooms"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></div>
         <div class="f"><label>Bathrooms</label><select id="au_bathrooms"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
-        <div class="f"><label>Type</label><select id="au_type"><option value="">— Select —</option><option value="detached unit">Detached</option><option value="duplex unit">Duplex</option><option value="4-plex unit">4-Plex</option><option value="5-plex unit">5-Plex</option><option value="6-plex unit">6-Plex</option><option value="complex">Complex</option><option value="mobile unit">Mobile</option></select></div>
+        <div class="f"><label>Type</label>
+          <select id="au_type" onchange="ueTypeChanged('au')">
+            <option value="">— Select —</option>
+            <option value="detached unit">Detached</option>
+            <option value="duplex unit">Duplex</option>
+            <option value="4-plex unit">4-Plex</option>
+            <option value="5-plex unit">5-Plex</option>
+            <option value="6-plex unit">6-Plex</option>
+            <option value="complex">Complex</option>
+            <option value="mobile unit">Mobile</option>
+            <option value="admin_building">Admin Building</option>
+            <option value="band_building">Band Building</option>
+            <option value="commercial_building">Commercial Building</option>
+          </select>
+        </div>
         <div class="f"><label>Foundation</label><select id="au_foundation"><option value="">— Select —</option><option value="basement">Basement</option><option value="crawlspace">Crawlspace</option><option value="Slab">Slab</option><option value="unknown">Unknown</option></select></div>
         <div class="f"><label>Funder / Program</label><select id="au_funder"><option value="">Band</option><option value="ISC">ISC</option><option value="CMHC_95">CMHC Sec. 95</option><option value="Other">Other</option></select></div>
         <div class="f"><label>Phase</label><input type="text" id="au_phase" placeholder="e.g. 15"/></div>
         <div class="f"><label>Year Built</label><input type="text" id="au_year" placeholder="e.g. 1998"/></div>
         <div class="f"><label>Monthly Rent (CAD)</label><input type="number" id="au_rent" min="0" step="any" placeholder="e.g. 750"/></div>
         <div class="f"><label>Construction Cost (CAD)</label><input type="number" id="au_constructionCost" min="0" step="any" placeholder="e.g. 250000"/></div>
+      </div>
+      <div id="au_building_name_row" style="display:none;" class="f">
+        <label>Building Name</label>
+        <input id="au_building_name" type="text" placeholder="e.g. Band Administration Building"/>
       </div>
       <div style="display:flex;gap:20px;">
         <div class="ftog"><label class="tsw"><input type="checkbox" id="au_accessible"/><span class="tsl"></span></label><label for="au_accessible">Accessible ♿</label></div>
@@ -290,11 +308,17 @@
         </div>
       </div>
 
+      <!-- Building Name (shown for Admin / Band / Commercial building types) -->
+      <div id="ue_building_name_row" style="display:none;" class="f">
+        <label>Building Name</label>
+        <input id="ue_building_name" type="text" placeholder="e.g. Band Administration Building"/>
+      </div>
+
       <!-- Unit details -->
       <div>
         <div class="lbl-muted" class="mb-12">Unit Details</div>
         <div class="grid-c3-tight">
-          <div class="f"><label>Bedrooms</label>
+          <div class="f"><label id="ue_bedrooms_label">Bedrooms</label>
             <select id="ue_bedrooms">
               <option value="1">1</option><option value="2">2</option><option value="3">3</option>
               <option value="4">4</option><option value="5">5</option><option value="6">6</option>
@@ -304,7 +328,7 @@
           <div class="f"><label>Year Built</label><input id="ue_year" type="text" placeholder="e.g. 1998"/></div>
           <div class="f"><label>Monthly Rent (CAD)</label><input id="ue_rent" type="number" min="0" step="any" placeholder="e.g. 750"/></div>
           <div class="f"><label>Type</label>
-            <select id="ue_type">
+            <select id="ue_type" onchange="ueTypeChanged('ue')">
               <option value="">— Select —</option>
               <option value="detached unit">Detached</option>
               <option value="duplex unit">Duplex</option>
@@ -314,6 +338,8 @@
               <option value="complex">Complex</option>
               <option value="mobile unit">Mobile</option>
               <option value="admin_building">Admin Building</option>
+              <option value="band_building">Band Building</option>
+              <option value="commercial_building">Commercial Building</option>
             </select>
           </div>
           <div class="f"><label>Foundation</label>
