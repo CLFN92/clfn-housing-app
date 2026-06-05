@@ -273,6 +273,29 @@ function printBatchStatements() {
   setTimeout(function(){ w.print(); }, 400);
 }
 
+function _renderNoRentList(tenants, isAll) {
+  var label = isAll
+    ? '&#9888; <strong>' + tenants.length + ' active tenant' + (tenants.length === 1 ? '' : 's') + '</strong> have no monthly rent configured — nothing to post.'
+    : '&#9888; <strong>' + tenants.length + ' tenant' + (tenants.length === 1 ? '' : 's') + '</strong> skipped — no monthly rent configured.';
+  var rows = tenants.map(function(t) {
+    var sid = t.id.replace(/'/g, "\\'");
+    return '<tr>'+
+      '<td style="font-weight:600;">' + tenantName(t) + '</td>'+
+      '<td style="color:var(--muted);">' + (t.unit || '—') + '</td>'+
+      '<td><button class="btn btn-ghost btn-sm" onclick="closeModal(\'modalBatchAccounting\');openFinanceCard(\'' + sid + '\')">Set Rent</button></td>'+
+    '</tr>';
+  }).join('');
+  return '<div style="margin-bottom:12px;border:1px solid #fde68a;border-radius:10px;overflow:hidden;">'+
+    '<div style="background:#fffbeb;padding:10px 14px;font-size:12px;">' + label + '</div>'+
+    '<div style="max-height:220px;overflow-y:auto;">'+
+      '<table class="tbl" style="margin:0;">'+
+        '<thead><tr><th>Tenant</th><th>Address / Unit</th><th></th></tr></thead>'+
+        '<tbody>' + rows + '</tbody>'+
+      '</table>'+
+    '</div>'+
+  '</div>';
+}
+
 function showBatchAccountingModal() {
   var existing = document.getElementById('modalBatchAccounting');
   if (existing) document.body.removeChild(existing);
@@ -335,7 +358,7 @@ function runBatchAccounting(dryRun) {
   });
 
   var rows = [];
-  var noRentCount = 0;
+  var noRentTenants = [];
 
   activeTenants.forEach(function(t){
     var tid = t.id;
@@ -363,7 +386,7 @@ function runBatchAccounting(dryRun) {
           status: alreadyCharged ? 'already-posted' : 'pending'
         });
       } else {
-        noRentCount++;
+        noRentTenants.push(t);
       }
     }
 
@@ -429,18 +452,20 @@ function runBatchAccounting(dryRun) {
       '</div>'+
     '</div>';
 
-    if (!rows.length) {
-      // Completely empty — diagnose why
+    // Show missing-rent list if any tenants are unconfigured (all-empty or partial)
+    if (noRentTenants.length && (type === 'rent' || type === 'all')) {
+      html += _renderNoRentList(noRentTenants, !rows.length);
+    }
+
+    if (!rows.length && !noRentTenants.length) {
       if (!activeTenants.length) {
         html += '<div class="ibox" style="color:var(--muted);">No active tenants found in the system.</div>';
-      } else if (noRentCount === activeTenants.length && (type === 'rent' || type === 'all')) {
-        html += '<div class="ibox" style="color:var(--warning);background:#fffbeb;border-color:#fde68a;">&#9888; Found <strong>'+activeTenants.length+'</strong> active tenant'+(activeTenants.length===1?'':'s')+', but none have a monthly rent amount configured.<br>Set the <strong>Monthly Rent</strong> field in each Tenant Profile to generate rent charges.</div>';
       } else {
         html += '<div class="ibox" style="color:var(--muted);">No entries found for the selected type and period.</div>';
       }
-    } else if (!pending.length) {
+    } else if (rows.length && !pending.length) {
       html += '<div class="ibox" style="color:var(--success);">&#10003; All accounting entries for this period are already posted — nothing to do.</div>';
-    } else {
+    } else if (pending.length) {
       html += '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">'+
         '<table class="tbl">'+
           '<thead><tr>'+
