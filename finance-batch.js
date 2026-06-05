@@ -335,6 +335,7 @@ function runBatchAccounting(dryRun) {
   });
 
   var rows = [];
+  var noRentCount = 0;
 
   activeTenants.forEach(function(t){
     var tid = t.id;
@@ -361,6 +362,8 @@ function runBatchAccounting(dryRun) {
           amount: monthlyRent,
           status: alreadyCharged ? 'already-posted' : 'pending'
         });
+      } else {
+        noRentCount++;
       }
     }
 
@@ -426,7 +429,16 @@ function runBatchAccounting(dryRun) {
       '</div>'+
     '</div>';
 
-    if (!pending.length) {
+    if (!rows.length) {
+      // Completely empty — diagnose why
+      if (!activeTenants.length) {
+        html += '<div class="ibox" style="color:var(--muted);">No active tenants found in the system.</div>';
+      } else if (noRentCount === activeTenants.length && (type === 'rent' || type === 'all')) {
+        html += '<div class="ibox" style="color:var(--warning);background:#fffbeb;border-color:#fde68a;">&#9888; Found <strong>'+activeTenants.length+'</strong> active tenant'+(activeTenants.length===1?'':'s')+', but none have a monthly rent amount configured.<br>Set the <strong>Monthly Rent</strong> field in each Tenant Profile to generate rent charges.</div>';
+      } else {
+        html += '<div class="ibox" style="color:var(--muted);">No entries found for the selected type and period.</div>';
+      }
+    } else if (!pending.length) {
       html += '<div class="ibox" style="color:var(--success);">&#10003; All accounting entries for this period are already posted — nothing to do.</div>';
     } else {
       html += '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">'+

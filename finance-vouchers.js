@@ -388,13 +388,15 @@ function _voucherFallbackPopup(fullHTML) {
   setTimeout(function(){ try { w.focus(); w.print(); } catch(e) {} }, 400);
 }
 
-var _origOpenModal2 = openModal;
-openModal = function(id, extra) {
-  _origOpenModal2(id, extra);
-  if (id === 'modalVoucher') {
-    setTimeout(function(){ initVoucherSigs(); }, 100);
-  }
-};
+document.addEventListener('DOMContentLoaded', function() {
+  var _origOpenModal2 = openModal;
+  openModal = function(id, extra) {
+    _origOpenModal2(id, extra);
+    if (id === 'modalVoucher') {
+      setTimeout(function(){ initVoucherSigs(); }, 100);
+    }
+  };
+});
 
 function emailVoucher() {
   if (!currentVoucherData) return;
