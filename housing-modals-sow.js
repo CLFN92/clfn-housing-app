@@ -678,8 +678,8 @@ function openSowModal(unitId, projectNumber) {
     populateSow(saved);
   } else {
     resetSow();
-    if(label) { var addr=document.getElementById('sow_address'); if(addr) addr.value=label; }
   }
+  if(label) { var addr=document.getElementById('sow_address'); if(addr) addr.value=label; }
   // Populate fund source dropdown for this unit's funder type
   var savedFs = saved ? (saved.fundSource || '') : '';
   _sowPopulateFundSourceDropdown(unitId, savedFs);
