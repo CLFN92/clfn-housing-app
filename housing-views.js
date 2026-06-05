@@ -19,6 +19,17 @@
 
 'use strict';
 
+function _fmtUnitType(type) {
+  if (!type || type === '0' || type === 'nan') return '';
+  return type.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+}
+function _roomBedLabel(u) {
+  var n = u ? u.bedrooms : null;
+  if (n == null || n === '') return '';
+  var isBldg = ['admin_building','band_building','commercial_building'].indexOf(u.type) >= 0;
+  return isBldg ? n + (n == 1 ? ' room' : ' rooms') : n + '-bed';
+}
+
 function showDash(){
   var path = window.location.pathname || '';
   var onHousingHome =
@@ -211,7 +222,7 @@ function renderInventoryView(){
     addr:        { label: 'Address',       accessor: function(u){ return ((u.num||'') + ' ' + (u.street||'')).trim(); } },
     bedrooms:    { label: 'Beds',          accessor: function(u){ return parseInt(u.bedrooms, 10) || 0; } },
     bathrooms:   { label: 'Baths',         accessor: function(u){ return parseInt(u.bathrooms, 10) || 0; } },
-    type:        { label: 'Type',          accessor: function(u){ return (u.type && u.type !== '0' && u.type !== 'nan') ? u.type : '(none)'; } },
+    type:        { label: 'Type',          accessor: function(u){ return _fmtUnitType(u.type) || '(none)'; } },
     foundation:  { label: 'Foundation',    accessor: function(u){ return (u.foundation && u.foundation !== '0' && u.foundation !== 'nan') ? u.foundation : '(none)'; } },
     accessible:  { label: 'Accessibility', accessor: function(u){ return u.accessible ? 'Accessible' : 'Non-accessible'; } },
     funder:      { label: 'Funder',        accessor: function(u){ return u.funder || '(none)'; } },
@@ -246,7 +257,7 @@ function renderInventoryView(){
     var addr = u.num+' '+u.street;
     var bath = (u.bathrooms&&u.bathrooms!=='0'&&u.bathrooms!=='nan') ? u.bathrooms : '—';
     var fnd  = (u.foundation&&u.foundation!=='nan'&&u.foundation!=='0') ? u.foundation : '—';
-    var type = (u.type&&u.type!=='0'&&u.type!=='nan') ? u.type : '—';
+    var type = _fmtUnitType(u.type) || '—';
     var funder = u.funder||'—';
     var uid = u.id.replace(/'/g,"\\'");
     return '<tr style="border-bottom:1px solid var(--border);transition:background .12s;" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
@@ -443,7 +454,7 @@ function renderMatchView(){
         +'<div style="height:4px;width:80px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+matchPct+'%;background:'+tCol+';border-radius:3px;"></div></div>'
         +'<span class="js-lbl-sm">'+matchPct+'% match</span>'
         +'</div>'
-        +'<div class="js-lbl-sm">'+best.unit.bedrooms+'bed · '+(best.unit.type||'—')+'</div>'
+        +'<div class="js-lbl-sm">'+_roomBedLabel(best.unit)+' · '+(_fmtUnitType(best.unit.type)||'—')+'</div>'
         +'</div>'
       : '<span class="js-txt-muted-sm">No suitable vacant units</span>';
 
@@ -870,7 +881,7 @@ function unitSearchFilter(q) {
       +'onmouseover="this.style.borderColor=\'var(--yellow)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
       +'<div>'
         +'<div style="font-weight:700;font-size:13px;">'+escapeHtml(u.num)+' '+escapeHtml(u.street)+'</div>'
-        +'<div class="js-lbl-sm">'+escapeHtml(String(u.bedrooms||''))+'-bed · '+escapeHtml(u.type||'—')+'</div>'
+        +'<div class="js-lbl-sm">'+escapeHtml(_roomBedLabel(u))+' · '+escapeHtml(_fmtUnitType(u.type)||'—')+'</div>'
       +'</div>'
       +'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+ss.bg+';color:'+ss.c+';">'+escapeHtml(ss.label)+'</span>'
       +'</div>';
@@ -1111,7 +1122,7 @@ function showHousingKpiDrilldown(type) {
           return '<tr class="clickable" onclick="_closeHousingKpiDrill();window.location.href=\'inventory.html?unit='+sid+'\'">'
             +'<td style="font-weight:600;">'+escapeHtml((u.num||'')+' '+(u.street||''))+'</td>'
             +'<td class="std-cell-right">'+(u.bedrooms||'—')+'</td>'
-            +'<td class="std-cell-muted">'+escapeHtml(u.type||'—')+'</td>'
+            +'<td class="std-cell-muted">'+escapeHtml(_fmtUnitType(u.type)||'—')+'</td>'
             +'<td class="std-cell-muted">'+escapeHtml(u.classification||'—')+'</td>'
             +'</tr>';
         }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">No vacant units.</td></tr>')

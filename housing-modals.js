@@ -1399,9 +1399,7 @@ function openUnitDetail(unitId) {
   // Header
   var addr = u.num + ' ' + u.street;
   setText('udp_address', addr);
-  var _isBldgType = _UE_BLDG_TYPES.indexOf(u.type) >= 0;
-  var _roomStr = (u.bedrooms != null && u.bedrooms !== '') ? u.bedrooms + (_isBldgType ? (u.bedrooms == 1 ? ' room' : ' rooms') : ' bed') : '';
-  var sub = [_roomStr, u.bathrooms&&u.bathrooms!=='nan'?u.bathrooms+' bath':'', u.type&&u.type!=='nan'?u.type:''].filter(Boolean).join(' · ');
+  var sub = [_roomBedLabel(u), u.bathrooms&&u.bathrooms!=='nan'?u.bathrooms+' bath':'', _fmtUnitType(u.type)||''].filter(Boolean).join(' · ');
   setText('udp_subtitle', sub);
 
   // Status badge
@@ -1738,7 +1736,7 @@ function renoSearchFilter(q) {
       +'onmouseover="this.style.borderColor=\'var(--yellow)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
       +'<div style="min-width:0;flex:1;">'
         +'<div style="font-weight:700;font-size:13px;">'+u.num+' '+u.street+'</div>'
-        +'<div class="js-lbl-sm">'+u.bedrooms+'-bed'+(u.type&&u.type!=='0'?' · '+u.type:'')+scoreBadge+'</div>'
+        +'<div class="js-lbl-sm">'+_roomBedLabel(u)+(_fmtUnitType(u.type)?' · '+_fmtUnitType(u.type):'')+scoreBadge+'</div>'
       +'</div>'
       +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'
         +'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'

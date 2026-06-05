@@ -668,7 +668,7 @@ function openSowModal(unitId, projectNumber) {
   if(unitId) {
     var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
     var u = allUnits.find(function(x){ return x.id===unitId; });
-    if(u) label = u.num+' '+u.street+' · '+u.bedrooms+'-bed';
+    if(u) label = u.num+' '+u.street+' · '+_roomBedLabel(u);
   }
   var lbl = document.getElementById('sow_unit_label');
   if(lbl) lbl.textContent = label || 'No unit selected';
