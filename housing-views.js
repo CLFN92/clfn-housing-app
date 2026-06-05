@@ -176,7 +176,8 @@ function renderInventoryView(){
         u.num, u.street, u.status, u.type, u.bedrooms,
         u.assignedName, u.funder, u.foundation,
         (u.accessible ? 'accessible' : ''),
-        (u.isElders ? 'elders' : '')
+        (u.isElders ? 'elders' : ''),
+        (u.monthlyRent != null ? String(u.monthlyRent) : '')
       ].filter(Boolean).join(' ').toLowerCase();
       if (hay.indexOf(_searchLc) === -1) return false;
     }
@@ -189,7 +190,7 @@ function renderInventoryView(){
 
   var tbody = document.getElementById('inv_tbody');
   if(!tbody) return;
-  if(!filtered.length){ tbody.innerHTML='<tr><td colspan="10" style="padding:32px;text-align:center;color:var(--muted);">No units match the current filters.</td></tr>'; return; }
+  if(!filtered.length){ tbody.innerHTML='<tr><td colspan="11" style="padding:32px;text-align:center;color:var(--muted);">No units match the current filters.</td></tr>'; return; }
 
   var statusStyle = {
     vacant:      {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
@@ -215,6 +216,7 @@ function renderInventoryView(){
     accessible:  { label: 'Accessibility', accessor: function(u){ return u.accessible ? 'Accessible' : 'Non-accessible'; } },
     funder:      { label: 'Funder',        accessor: function(u){ return u.funder || '(none)'; } },
     status:      { label: 'Status',        accessor: function(u){ return (statusStyle[u.status]||{}).label || u.status || 'Unknown'; } },
+    rent:        { label: 'Rent',          accessor: function(u){ return (u.monthlyRent != null && u.monthlyRent !== '') ? Number(u.monthlyRent) : -1; } },
     reno_score:  { label: 'Reno Score',    accessor: function(u){ try { return calcRenoScore(u.id).score; } catch(e){ return 0; } } }
   };
   // Build a plain accessor map for tableApplyFilterSort.
@@ -259,6 +261,12 @@ function renderInventoryView(){
       +'<td class="col-hide-tablet" style="padding:9px 10px;font-size:12px;color:var(--muted);">'+funder+'</td>'
       +'<td style="padding:9px 14px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
       +(u.assignedName?' <span class="js-lbl-sm">→ '+u.assignedName+'</span>':'')+'</td>'
+      +(function(){
+        var r = (u.monthlyRent != null && u.monthlyRent !== '') ? Number(u.monthlyRent) : null;
+        return '<td class="col-hide-tablet" style="padding:9px 10px;text-align:right;font-size:13px;font-weight:600;color:var(--text);">'
+          + (r != null ? '$' + r.toFixed(2) : '<span style="color:var(--border);">—</span>')
+          + '</td>';
+      })()
       +(ROLE.isManagement(window.currentRole) ? (function(){
         var _hasSow = !!getSowData(u.id);
         var _hasProg = !!(window._renoProgress && window._renoProgress[u.id]);
@@ -286,7 +294,7 @@ function renderInventoryView(){
 
   // Empty-state path
   if (!_invRows.length) {
-    tbody.innerHTML = '<tr><td colspan="10" style="padding:32px;text-align:center;color:var(--muted);">No units match the current filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="padding:32px;text-align:center;color:var(--muted);">No units match the current filters.</td></tr>';
   } else {
     tbody.innerHTML = _invRows.map(_invRowHtml).join('');
   }
