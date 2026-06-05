@@ -2149,6 +2149,150 @@ async function _resolveActiveStaffForRoles(roles) {
 // can reach them (matches the rest of the app's pattern).
 // ════════════════════════════════════════════════════════════════════════
 
+// ── RFQ HTML Email Builder ───────────────────────────────────────────────────
+// Generates a rich HTML email body that mirrors the Preview RFQ PDF layout:
+// header bar, project info table, scope-of-work table, requirements, contact.
+function _buildRfqEmailHtml(rfq, unit, contractorName) {
+  var d           = rfq.data || {};
+  var nc          = window.NATION_CONFIG || {};
+  var natName     = nc.display_name || nc.name || '';
+  var natShort    = nc.short || natName || 'Housing';
+  var addr        = unit ? ((unit.num || '') + ' ' + (unit.street || '')).trim() : (rfq.sow_unit_id || '--');
+  var isBldg      = unit && ['admin_building','band_building','commercial_building'].indexOf(unit.type || '') >= 0;
+  var buildingName = (isBldg && unit.buildingName) ? unit.buildingName : '';
+  var closing     = rfq.closes_at ? new Date(rfq.closes_at).toLocaleString('en-CA', { dateStyle: 'long', timeStyle: 'short' }) : '--';
+  var contact     = d.contact_person || '';
+  var contactEmail = d.contact_email || '';
+  var subMethod   = d.submission_method || 'email';
+  var officePhone = nc.phone || '705-463-4511';
+  var scope       = (d.scope_snapshot || []).filter(function(it){ return it && !it._hidden && (it.category || it.description); });
+
+  var esc = typeof escapeHtml === 'function' ? escapeHtml : function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+
+  var yellow = '#f8e41a';
+  var dark   = '#1a1a1a';
+  var muted  = '#555555';
+  var border = '#dddddd';
+  var bgLight = '#f5f5f5';
+
+  function infoRow(label, value, last) {
+    var bdr = last ? '' : 'border-bottom:1px solid ' + border + ';';
+    return '<tr>'
+      + '<td style="padding:7px 10px 7px 0;color:' + muted + ';font-size:13px;width:38%;vertical-align:top;' + bdr + '">' + esc(label) + '</td>'
+      + '<td style="padding:7px 0;font-size:13px;vertical-align:top;' + bdr + '">' + esc(value) + '</td>'
+      + '</tr>';
+  }
+  function sectionHead(title) {
+    return '<h3 style="font-size:10px;font-weight:bold;color:' + muted + ';letter-spacing:1.2px;text-transform:uppercase;'
+         + 'margin:24px 0 6px;padding-bottom:5px;border-bottom:3px solid ' + yellow + ';">' + esc(title) + '</h3>';
+  }
+
+  var html = '<div style="font-family:Arial,Helvetica,sans-serif;max-width:680px;margin:0 auto;color:#222;">';
+
+  // ── Header bar ──
+  html += '<div style="background:' + dark + ';padding:16px 22px;">'
+       +   '<div style="font-size:10px;font-weight:bold;color:#aaa;letter-spacing:1.2px;text-transform:uppercase;">' + esc(natName) + ' Housing</div>'
+       +   '<div style="font-size:22px;font-weight:bold;color:' + yellow + ';margin-top:3px;">Request for Quotations</div>'
+       +   '<div style="font-size:12px;color:#ccc;margin-top:2px;">' + esc(rfq.id || '') + '</div>'
+       + '</div>'
+       + '<div style="height:4px;background:' + yellow + ';margin-bottom:4px;"></div>';
+
+  // ── Greeting ──
+  html += '<div style="padding:18px 22px 0;">'
+       +   '<p style="margin:0 0 10px;font-size:14px;">Dear ' + esc(contractorName || 'Contractor') + ',</p>'
+       +   '<p style="margin:0 0 0;font-size:13px;color:#444;">' + esc(natShort) + ' Housing invites your firm to submit a competitive bid for the project detailed below. '
+       +   'The full RFQ package — including bid form, scope of work, and terms — is attached to this email.</p>'
+       + '</div>';
+
+  // ── Project Information ──
+  html += '<div style="padding:0 22px;">' + sectionHead('Project Information')
+       +   '<table style="width:100%;border-collapse:collapse;">';
+  html += infoRow('RFQ Number',   rfq.id || '--');
+  if (buildingName) html += infoRow('Building Name', buildingName);
+  html += infoRow('Project Address', addr);
+  html += infoRow('Issue Date',    d.issue_date || new Date().toLocaleDateString('en-CA'));
+  html += infoRow('Bids Close',   closing);
+  if (d.target_start_date)      html += infoRow('Target Start',      d.target_start_date);
+  if (d.target_completion_date) html += infoRow('Target Completion', d.target_completion_date);
+  html += '</table></div>';
+
+  // ── Scope of Work ──
+  if (scope.length) {
+    html += '<div style="padding:0 22px;">' + sectionHead('Scope of Work')
+         +   '<table style="width:100%;border-collapse:collapse;">'
+         +   '<thead><tr>'
+         +     '<th style="padding:7px 8px 7px 0;text-align:left;background:' + bgLight + ';border-bottom:1px solid #bbb;font-size:12px;color:' + muted + ';width:35%;">Category</th>'
+         +     '<th style="padding:7px 0;text-align:left;background:' + bgLight + ';border-bottom:1px solid #bbb;font-size:12px;color:' + muted + ';">Description</th>'
+         +   '</tr></thead><tbody>';
+    scope.forEach(function(it, i) {
+      var last = (i === scope.length - 1);
+      var bdr  = last ? '' : 'border-bottom:1px solid ' + border + ';';
+      html += '<tr>'
+           + '<td style="padding:7px 8px 7px 0;font-size:13px;vertical-align:top;' + bdr + '">' + esc(it.category || '--') + '</td>'
+           + '<td style="padding:7px 0;font-size:13px;vertical-align:top;' + bdr + '">' + esc(it.description || '--') + '</td>'
+           + '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  // ── Insurance callout ──
+  html += '<div style="padding:0 22px;">'
+       +   '<div style="margin-top:18px;background:#fffbdb;border-left:4px solid ' + yellow + ';padding:10px 14px;font-size:13px;">'
+       +     '<strong>Insurance Requirement:</strong> Valid WSIB clearance and a minimum of $2,000,000 in general liability insurance are required to be awarded a contract. Proof of both must be submitted with your bid.'
+       +   '</div>'
+       + '</div>';
+
+  // ── How to Submit ──
+  var subInstr = subMethod === 'email'
+    ? 'Email your complete bid package to: <strong>' + esc(contactEmail || contact) + '</strong>'
+    : subMethod === 'office'
+    ? 'Deliver your complete bid package to the ' + esc(natShort) + ' Housing Department office.'
+    : 'Submit by email to <strong>' + esc(contactEmail || contact) + '</strong> or deliver to the ' + esc(natShort) + ' Housing Department office.';
+
+  html += '<div style="padding:0 22px;">' + sectionHead('How to Submit')
+       +   '<p style="font-size:13px;margin:0 0 10px;">' + subInstr + '</p>'
+       +   '<p style="font-size:13px;margin:0 0 10px;">If your firm is new to working with ' + esc(natShort) + ' Housing, please include at least two comparable project references with complete contact information.</p>'
+       +   '<p style="font-size:13px;margin:0 0 10px;">If using subcontractors, a complete list must be provided including contact information, valid WSIB clearance certificate, and proof of minimum $2,000,000 general liability insurance for each subcontractor.</p>'
+       +   '<p style="font-size:13px;margin:0 0 6px;">Your complete bid package must include:</p>'
+       +   '<ul style="font-size:13px;margin:0 0 16px;padding-left:20px;">'
+       +     '<li style="margin-bottom:4px;">Completed bid form</li>'
+       +     '<li style="margin-bottom:4px;">Current WSIB clearance certificate</li>'
+       +     '<li style="margin-bottom:4px;">General liability insurance certificate (minimum $2,000,000)</li>'
+       +     '<li style="margin-bottom:4px;">At least two comparable project references</li>'
+       +     '<li>Your proposed timeline</li>'
+       +   '</ul>'
+       + '</div>';
+
+  // ── Contact ──
+  html += '<div style="padding:0 22px;">' + sectionHead('Contact')
+       +   '<table style="width:100%;border-collapse:collapse;">';
+  if (contact) {
+    html += '<tr>'
+         + '<td style="padding:7px 10px 7px 0;color:' + muted + ';font-size:13px;width:38%;border-bottom:1px solid ' + border + ';">Contact Person</td>'
+         + '<td style="padding:7px 0;font-size:13px;border-bottom:1px solid ' + border + ';">'
+         + esc(contact) + (contactEmail ? ' &nbsp;&bull;&nbsp; <a href="mailto:' + esc(contactEmail) + '" style="color:#0066cc;">' + esc(contactEmail) + '</a>' : '')
+         + '</td></tr>';
+  }
+  html += '<tr>'
+       + '<td style="padding:7px 10px 7px 0;color:' + muted + ';font-size:13px;">Office Phone</td>'
+       + '<td style="padding:7px 0;font-size:13px;">' + esc(officePhone) + '</td>'
+       + '</tr>'
+       + '</table>';
+
+  // Closing
+  html += '<p style="font-size:13px;margin:20px 0 0;">Thank you for your interest.</p>'
+       +  '<p style="font-size:13px;margin:6px 0 0;">' + esc(contact || natShort + ' Housing') + '<br/>' + esc(natShort) + ' Housing Department</p>'
+       + '</div>';
+
+  // Footer
+  html += '<div style="margin-top:24px;padding:12px 22px;background:' + bgLight + ';border-top:1px solid ' + border + ';font-size:11px;color:#999;">'
+       +   esc(natName || natShort) + ' Housing &mdash; This email and any attachments are confidential.'
+       + '</div>'
+       + '</div>';
+
+  return html;
+}
+
 // Currently selected event in the editor. Survives across tab re-renders
 // in the same session so a misclick on Reset doesn't bounce the user.
 var _ntfSelectedEvent = null;
