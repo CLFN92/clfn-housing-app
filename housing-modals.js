@@ -1564,7 +1564,6 @@ function saveNewUnit(){
     assignedTo: null, assignedDate: null, assignedName: null
   };
 
-  units.push(newUnit);
   housingUnits.push(newUnit);
   saveUnitWithDraftFallback(newUnit);
   if(_auStagedPhotos.length){ saveUnitPhotos(newId, _auStagedPhotos); _auStagedPhotos=[]; }
