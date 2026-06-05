@@ -341,11 +341,17 @@ function runBatchAccounting(dryRun) {
 
     // Rent charges
     if (type === 'rent' || type === 'all') {
-      var monthlyRent = parseFloat(t.rentAmount||t.rent||0);
+      var monthlyRent = parseFloat(t.rent || 0);
+      if (!monthlyRent) {
+        // monthly_rent may not be set on the tenant record — fall back to most recent ledger charge
+        var lastCharge = (d.rentLedger||[])
+          .filter(function(r){ return r.tenantId === tid && r.type === 'invoice' && r.charge > 0; })
+          .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); })[0];
+        monthlyRent = lastCharge ? lastCharge.charge : 0;
+      }
       if (monthlyRent > 0) {
-        // Check if a rent charge already exists for this month
         var alreadyCharged = (d.rentLedger||[]).some(function(r){
-          return r.tenantId === tid && r.type === 'invoice' && r.date >= monthStart && r.date <= monthEnd && !r.voids_id;
+          return r.tenantId === tid && r.type === 'invoice' && (r.date||'').slice(0,7) === month;
         });
         rows.push({
           tenant: tenantName(t),
@@ -360,11 +366,13 @@ function runBatchAccounting(dryRun) {
 
     // Arrangement payments due
     if (type === 'arrangement' || type === 'all') {
-      (d.arrangements||[]).filter(function(a){ return a.tenantId===tid && a.status==='active'; }).forEach(function(a){
-        var due = parseFloat(a.monthlyAmount||0);
+      (d.arrangements||[]).filter(function(a){
+        return a.tenantId===tid && (a.status==='active' || a.status==='approved');
+      }).forEach(function(a){
+        var due = parseFloat(a.monthlyPayment||0);  // field is monthlyPayment, not monthlyAmount
         if (due > 0) {
           var alreadyPosted = (d.arrPayments||[]).some(function(p){
-            return p.arrId===a.id && p.date >= monthStart && p.date <= monthEnd;
+            return p.arrId===a.id && (p.date||'').slice(0,7) === month;
           });
           rows.push({
             tenant: tenantName(t),
@@ -381,10 +389,11 @@ function runBatchAccounting(dryRun) {
     // Loan payments due
     if (type === 'loan' || type === 'all') {
       (d.loanList||[]).filter(function(l){ return l.tenantId===tid && l.status==='approved'; }).forEach(function(l){
-        var due = parseFloat(l.payment||l.monthlyPayment||0);
+        // l.payment is always 0 (client-computed, not persisted) — calculate from loan terms
+        var due = parseFloat(calcPaymentAmt(l.principal, l.rate, l.term, l.freq||'monthly')) || 0;
         if (due > 0) {
           var alreadyPosted = (d.loanPayments||[]).some(function(p){
-            return p.loanId===l.id && p.date >= monthStart && p.date <= monthEnd;
+            return p.loanId===l.id && (p.date||'').slice(0,7) === month;
           });
           rows.push({
             tenant: tenantName(t),
