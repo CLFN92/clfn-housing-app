@@ -6427,13 +6427,11 @@ async function sendRfqToRecipients(rfq, contractorList) {
     var ct = contractorList[i];
     if (!ct || !ct.email) { fail++; failNames.push((ct && ct.name) || '(no email)'); continue; }
 
-    // Subject from template; body from rich HTML builder (mirrors PDF layout)
-    var subject = rendered ? rendered.subject.replace(/\{contractorName\}/g, ct.name || 'Contractor')
-                           : (rfq.id + ' -- ' + addr + ' -- Bids close ' + closing);
-    var bodyHtml = (typeof _buildRfqEmailHtml === 'function')
-      ? _buildRfqEmailHtml(rfq, unit, ct.name || 'Contractor')
-      : (rendered ? rendered.bodyHtml.replace(/\{contractorName\}/g, ct.name || 'Contractor')
-                  : ('<p>Dear ' + escapeHtml(ct.name || 'Contractor') + ',</p><p>Please see the attached RFQ package.</p>'));
+    // Substitute contractor name into the rendered template
+    var subject  = rendered ? rendered.subject.replace(/\{contractorName\}/g, ct.name || 'Contractor')
+                            : (rfq.id + ' -- ' + addr + ' -- Bids close ' + closing);
+    var bodyHtml = rendered ? rendered.bodyHtml.replace(/\{contractorName\}/g, ct.name || 'Contractor')
+                            : ('<p>Dear ' + escapeHtml(ct.name || 'Contractor') + ',</p><p>Please see the attached RFQ package.</p>');
 
     var payload = {
       to: ct.email, to_name: ct.name || '',
