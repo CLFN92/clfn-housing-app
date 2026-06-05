@@ -6396,25 +6396,30 @@ async function sendRfqToRecipients(rfq, contractorList) {
 
   // Fetch selected document attachments once — re-used for every contractor
   var attachedPaths = (rfq.data && rfq.data.attached_doc_paths) || [];
+  var _attachSkipped = 0;
   if (attachedPaths.length && typeof sbGetFileUrl === 'function') {
+    var _authHdr = (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization']) || '';
     for (var ai = 0; ai < attachedPaths.length; ai++) {
       try {
         var fileUrl = sbGetFileUrl(attachedPaths[ai]);
-        var fResp = await fetch(fileUrl);
-        if (!fResp.ok) { console.warn('[rfq attach] fetch failed:', attachedPaths[ai], fResp.status); continue; }
+        var fResp = await fetch(fileUrl, _authHdr ? { headers: { 'Authorization': _authHdr } } : undefined);
+        if (!fResp.ok) { console.warn('[rfq attach] fetch failed:', attachedPaths[ai], fResp.status); _attachSkipped++; continue; }
         var fBlob = await fResp.blob();
-        if (fBlob.size > 3 * 1024 * 1024) { console.warn('[rfq attach] skipping (>3MB):', attachedPaths[ai]); continue; }
+        if (fBlob.size > 3 * 1024 * 1024) { console.warn('[rfq attach] skipping (>3MB):', attachedPaths[ai]); _attachSkipped++; continue; }
         var b64 = await new Promise(function(resolve) {
           var reader = new FileReader();
           reader.onload  = function(e) { var d = e.target.result; resolve(d.substring(d.indexOf(',') + 1)); };
           reader.onerror = function()  { resolve(null); };
           reader.readAsDataURL(fBlob);
         });
-        if (!b64) continue;
+        if (!b64) { _attachSkipped++; continue; }
         var dispName = attachedPaths[ai].split('/').pop().replace(/^\d+_/, '');
         attachments.push({ name: dispName, contentType: fBlob.type || 'application/octet-stream', contentBytes: b64 });
-      } catch(e) { console.warn('[rfq attach] error:', attachedPaths[ai], e); }
+      } catch(e) { console.warn('[rfq attach] error:', attachedPaths[ai], e); _attachSkipped++; }
     }
+  }
+  if (_attachSkipped > 0 && typeof showToast === 'function') {
+    showToast(_attachSkipped + ' selected attachment' + (_attachSkipped > 1 ? 's' : '') + ' could not be loaded and will be omitted from the email');
   }
 
   var ok = 0, fail = 0, failNames = [];

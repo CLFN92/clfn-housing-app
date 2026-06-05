@@ -159,12 +159,12 @@ var EMAIL_EVENT_REGISTRY = [
     defaults: {
       subject:  '{nationShort} Housing — RFQ {rfqNumber}: {projectAddress} — Bids close {closingDate}',
       bodyHtml: '<p>Dear {contractorName},</p>'
-              + '<p>{nationShort} Housing invites your firm to submit a competitive bid for the project referenced above.</p>'
+              + '<p>{nationShort} Housing invites your firm to submit a competitive bid for the project referenced above. The RFQ package — including the scope of work, bid form, and terms and conditions — is attached to this email.</p>'
               + '<p><strong>RFQ Number:</strong> {rfqNumber}<br/>'
               + '<strong>Project:</strong> {projectAddress}<br/>'
               + '<strong>Bids close:</strong> {closingDate}</p>'
-              + '<p>The full RFQ document — including the scope of work, bid form, and terms and conditions — is available at:<br/>{rfqLink}</p>'
-              + '<p>Your complete bid package must include: completed bid form, current WSIB clearance certificate, general liability insurance certificate (min. $2,000,000), at least two comparable project references, and your proposed timeline.</p>'
+              + '<p><strong>Insurance Requirement:</strong> Valid WSIB clearance and a minimum of $2,000,000 in general liability insurance are required to be awarded a contract. Proof of both must be submitted with your bid.</p>'
+              + '<p>Your complete bid submission must include: completed bid form, current WSIB clearance certificate, general liability insurance certificate (minimum $2,000,000), at least two comparable project references, and your proposed timeline.</p>'
               + '<p>Submission method: {submissionMethod}<br/>Questions: contact {contactPerson} at {contactEmail}.</p>'
               + '<p>Thank you for your interest.<br/>{contactPerson}<br/>{nationShort} Housing Department</p>'
     }
@@ -1771,10 +1771,11 @@ async function _generateRfqPdfBase64(rfq, unit) {
   if (items.length) {
     sectionHeader('Scope of Work');
     var colW = [contentW * 0.35, contentW * 0.65];
-    // Header row
+    // Column header row — space check matches data rows
+    ctx.needSpace(8);
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(80);
-    pdf.text('Category',    marginL,          ctx.y);
-    pdf.text('Description', marginL + colW[0], ctx.y);
+    pdf.text('Category',    marginL,          ctx.y + 3);
+    pdf.text('Description', marginL + colW[0], ctx.y + 3);
     ctx.y += 5;
     pdf.setDrawColor(200); pdf.line(marginL, ctx.y, marginL + contentW, ctx.y); ctx.y += 3;
     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(20);
@@ -1783,13 +1784,13 @@ async function _generateRfqPdfBase64(rfq, unit) {
       var desc = it.description || '--';
       var catLines  = pdf.splitTextToSize(cat,  colW[0] - 3);
       var descLines = pdf.splitTextToSize(desc, colW[1] - 3);
-      var lineH = 5, lines = Math.max(catLines.length, descLines.length);
-      var rowH  = lines * lineH + 4;
-      ctx.needSpace(rowH + 2);
-      pdf.text(catLines,  marginL,          ctx.y);
-      pdf.text(descLines, marginL + colW[0], ctx.y);
+      var lines = Math.max(catLines.length, descLines.length);
+      var rowH  = lines * 4 + 1;
+      ctx.needSpace(rowH + 1.5);
+      pdf.text(catLines,  marginL,          ctx.y + 3);
+      pdf.text(descLines, marginL + colW[0], ctx.y + 3);
       ctx.y += rowH;
-      pdf.setDrawColor(230); pdf.line(marginL, ctx.y, marginL + contentW, ctx.y); ctx.y += 2;
+      pdf.setDrawColor(230); pdf.line(marginL, ctx.y, marginL + contentW, ctx.y); ctx.y += 1.5;
     });
     gap(4);
   }
