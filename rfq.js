@@ -324,6 +324,11 @@ function showRfqForm(rfqId, unitId, sowPn) {
     _populateFormFields(rfq);
     document.getElementById('rfqFormHeading').textContent = rfqId;
     document.getElementById('rfqIssueBtn').disabled = rfq.status !== 'draft';
+    var _unlockBtn = document.getElementById('rfqUnlockBtn');
+    if (_unlockBtn) {
+      var _isEd = (window.currentRole === 'ed');
+      _unlockBtn.style.display = (_isEd && rfq.status === 'issued') ? '' : 'none';
+    }
   } else {
     // New RFQ
     _rfqSowUnitId = unitId || null;
@@ -342,6 +347,8 @@ function showRfqForm(rfqId, unitId, sowPn) {
     document.getElementById('rfq_contact_email').value = session.email || '';
     document.getElementById('rfqFormHeading').textContent = 'New Request for Quotes';
     document.getElementById('rfqIssueBtn').disabled = false;
+    var _unlockBtnNew = document.getElementById('rfqUnlockBtn');
+    if (_unlockBtnNew) _unlockBtnNew.style.display = 'none';
     // Contract defaults
     var cnEl = document.getElementById('rfq_contract_number');
     if (cnEl) cnEl.value = generateContractNumber();
@@ -795,6 +802,35 @@ async function issueRfq() {
     }
     document.getElementById('rfqIssueBtn').disabled = true;
   } catch(e) { console.error('[rfq] issue failed:', e); showToast('Issue failed — see console'); }
+}
+
+// ── Unlock RFQ (ED only) ───────────────────────────────────────────────────────
+async function unlockRfq() {
+  var rfqId = _rfqCurrentId;
+  if (!rfqId) return;
+  var confirmed = await showConfirm({
+    title: 'Unlock ' + rfqId + '?',
+    message: 'This returns the RFQ to draft status so it can be edited. Contractors who already received the issued RFQ should be notified separately.',
+    confirmText: 'Unlock',
+    danger: false
+  });
+  if (!confirmed) return;
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/housing_rfq?id=eq.' + encodeURIComponent(rfqId), {
+      method: 'PATCH',
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
+      body: JSON.stringify({ status: 'draft', issued_at: null, updated_at: new Date().toISOString() })
+    });
+    if (!r.ok) { showToast('Failed to unlock RFQ'); return; }
+    var rows = await r.json();
+    if (rows && rows[0] && window._rfqCache) window._rfqCache[rfqId] = rows[0];
+    if (typeof auditEntry === 'function') auditEntry('RFQ:' + rfqId, 'unlocked', 'RFQ returned to draft', window.currentRole || 'staff');
+    showToast('RFQ unlocked — now in draft');
+    showRfqForm(rfqId, null, null);
+  } catch(e) {
+    console.warn('[rfq] unlock failed:', e);
+    showToast('Failed to unlock RFQ');
+  }
 }
 
 // ── Cancel RFQ ────────────────────────────────────────────────────────────────

@@ -429,6 +429,10 @@ function renderScorecardActions(app) {
 
   // ── Executive Director actions ──
   if(APPROVAL_AUTHORITY.can('finalApproveApp', role)) {
+    if(status === APP_STATUS.FILE_UPDATE) {
+      actions.push({ label: '✅ Approve File Update', cls: 'btn-green', action: 'ed_approved', confirmLabel: 'Approve File Update' });
+      actions.push({ label: '↩️ Return for Info',     cls: 'btn-sec',   action: 'returned',    confirmLabel: 'Return to Submitter' });
+    }
     if(status === APP_STATUS.MGR_APPROVED) {
       actions.push({ label: '✅ Final Approval',  cls: 'btn-green',  action: 'ed_approved', confirmLabel: 'Grant Final Approval' });
       actions.push({ label: '↩️ Return to HM',    cls: 'btn-sec',    action: 'returned',    confirmLabel: 'Return to Housing Manager' });
