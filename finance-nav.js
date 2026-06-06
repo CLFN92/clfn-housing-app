@@ -121,7 +121,7 @@ function finHomeSearch(query) {
       );
     }).slice(0, limit).forEach(function(t){
       results.push({type:'tenant', id:t.id, iconCls:'type-tenant', iconTxt:'T',
-        title:tenantName(t), sub:(t.unit||'')+(t.type?' · '+t.type.replace(/-/g,' '):''),
+        title:tenantNameHtml(t), sub:escapeHtml(t.unit||'')+(t.type?' · '+escapeHtml(t.type.replace(/-/g,' ')):''),
         badge:'Tenant', badgeCls:'badge-tenant'});
     });
   }
@@ -139,8 +139,8 @@ function finHomeSearch(query) {
       var t = getTenant(r.tenantId);
       if (!t) return;
       results.push({type:'tenant', id:r.tenantId, iconCls:'type-sow', iconTxt:'$',
-        title:tenantName(t) + ' — ' + (r.type==='payment'?'Payment':'Invoice'),
-        sub:(r.date||'')+(r.desc?' · '+r.desc:''), badge:'Ledger', badgeCls:'badge-sow'});
+        title:tenantNameHtml(t) + ' — ' + (r.type==='payment'?'Payment':'Invoice'),
+        sub:escapeHtml(r.date||'')+(r.desc?' · '+escapeHtml(r.desc):''), badge:'Ledger', badgeCls:'badge-sow'});
     });
   }
 
@@ -156,8 +156,8 @@ function finHomeSearch(query) {
       var t = getTenant(l.tenantId);
       if (!t) return;
       results.push({type:'tenant', id:l.tenantId, iconCls:'type-unit', iconTxt:'L',
-        title:tenantName(t) + ' — Loan',
-        sub:'$'+(l.principal||0).toFixed(2)+' · '+l.status, badge:'Loan', badgeCls:'badge-unit'});
+        title:tenantNameHtml(t) + ' — Loan',
+        sub:'$'+(l.principal||0).toFixed(2)+' · '+escapeHtml(l.status||''), badge:'Loan', badgeCls:'badge-unit'});
     });
   }
 

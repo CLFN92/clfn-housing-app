@@ -39,6 +39,7 @@ function seedIfEmpty(){
 function fmt(n){return '$'+Number(n||0).toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function today(){return new Date().toISOString().slice(0,10);}
 function tenantName(t){return t.first+' '+t.last;}
+function tenantNameHtml(t){return escapeHtml(tenantName(t));}
 function getTenant(id){return getData().tenants.find(function(t){return t.id===id;})||null;}
 function methodLabel(m){
   var map={cash:'Cash',debit:'Debit',credit:'Credit Card',etransfer:'E-Transfer','online-banking':'Online Banking',cheque:'Cheque',auto:'Auto Payment',eft:'EFT (Auto)',payroll:'Payroll Deduction'};

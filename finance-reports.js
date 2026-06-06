@@ -436,8 +436,8 @@ function renderLoanSchedule() {
       '<span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+pct.toFixed(0)+'%</span>'+
       '</div>';
     return '<tr>'+
-      '<td class="std-cell-primary">'+(t?tenantName(t):'<span class="std-cell-dash">—</span>')+
-        (t&&t.unit?'<div style="font-size:11px;color:var(--muted);font-weight:normal;">'+t.unit+'</div>':'')+'</td>'+
+      '<td class="std-cell-primary">'+(t?tenantNameHtml(t):'<span class="std-cell-dash">—</span>')+
+        (t&&t.unit?'<div style="font-size:11px;color:var(--muted);font-weight:normal;">'+escapeHtml(t.unit)+'</div>':'')+'</td>'+
       '<td>'+(typeLabels[l.type]||l.type||'<span class="std-cell-dash">—</span>')+'</td>'+
       '<td class="std-cell-right">'+fmt(l.principal)+'</td>'+
       '<td class="std-cell-right amt-credit">'+fmt(paid)+'</td>'+
@@ -594,7 +594,7 @@ function renderJournal() {
       var r = first;
       return '<tr>'+
         '<td>'+r.date+'</td>'+
-        '<td class="std-cell-primary">'+(t?tenantName(t):'<span class="std-cell-dash">—</span>')+'</td>'+
+        '<td class="std-cell-primary">'+(t?tenantNameHtml(t):'<span class="std-cell-dash">—</span>')+'</td>'+
         '<td>'+memo+'</td>'+
         '<td style="text-transform:capitalize;">'+(r.ledger||'rent')+'</td>'+
         '<td class="std-cell-right">'+(r.charge>0?'<span class="amt-debit">'+fmt(r.charge)+'</span>':'<span class="std-cell-dash">—</span>')+'</td>'+
@@ -622,7 +622,7 @@ function renderJournal() {
       : '<td></td>';
     var header = '<tr class="je-group-header-row">'+
       '<td>'+first.date+'</td>'+
-      '<td class="std-cell-primary">'+(t?tenantName(t):'<span class="std-cell-dash">—</span>')+'</td>'+
+      '<td class="std-cell-primary">'+(t?tenantNameHtml(t):'<span class="std-cell-dash">—</span>')+'</td>'+
       '<td><span class="je-group-label">📓 '+memo+'</span></td>'+
       '<td><span class="je-group-badge">'+group.length+' lines</span></td>'+
       '<td class="std-cell-right"><span class="amt-debit">'+fmt(totalDR)+'</span></td>'+
@@ -669,7 +669,7 @@ function renderBatchList() {
   el.innerHTML = pending.length
     ? '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">'+pending.length+' tenants without a '+month+' invoice:</div>'+
       pending.map(function(t){return '<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between;">'+
-        '<span>'+tenantName(t)+' \u2014 '+t.unit+'</span><span>'+fmt(t.rent)+'</span></div>';}).join('')
+        '<span>'+tenantNameHtml(t)+' \u2014 '+escapeHtml(t.unit||'')+'</span><span>'+fmt(t.rent)+'</span></div>';}).join('')
     : '<div style="text-align:center;padding:20px;color:var(--muted);">All tenants have invoices for '+month+'.</div>';
 }
 

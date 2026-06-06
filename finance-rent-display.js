@@ -292,7 +292,7 @@ function renderArrangementsPage(){
         '<span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+pct.toFixed(0)+'%</span>'+
         '</div>';
       return '<tr class="clickable" onclick="showArrangementDetail(\''+safeId+'\')">'+
-        '<td class="std-cell-primary">'+(t?tenantName(t):'<span class="std-cell-dash">—</span>')+'</td>'+
+        '<td class="std-cell-primary">'+(t?tenantNameHtml(t):'<span class="std-cell-dash">—</span>')+'</td>'+
         '<td style="text-transform:capitalize;">'+(arr.ledger||'<span class="std-cell-dash">—</span>')+'</td>'+
         '<td class="std-cell-right">'+fmt(arr.totalOwing)+'</td>'+
         '<td class="std-cell-right">'+fmt(remaining)+'</td>'+
@@ -344,7 +344,7 @@ function renderArrangementsPage(){
       }).join('');
       return '<div class="card" style="margin-bottom:16px;margin-top:16px;">'+
         '<div class="ctitle" style="justify-content:space-between;">'+
-          'Payment Arrangement &mdash; '+(t?tenantName(t):'')+'&nbsp;'+statusPill(arr.status)+
+          'Payment Arrangement &mdash; '+(t?tenantNameHtml(t):'')+'&nbsp;'+statusPill(arr.status)+
           (arr.status==='approved'?'<button class="btn btn-primary btn-sm" onclick="openArrPayment(\''+arr.id+'\')">+ Record Payment</button>':'')+'</div>'+
         '<div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">'+
           statCard('Total Owing',fmt(arr.totalOwing),'At arrangement date','')+
@@ -387,7 +387,7 @@ function openArrPayment(arrId){
   var t=arr?getTenant(arr.tenantId):null;
   var paid=d.arrPayments.filter(function(p){return p.arrId===arrId;}).reduce(function(s,p){return s+p.amount;},0);
   var remaining=arr?Math.max(0,arr.totalOwing-paid):0;
-  document.getElementById('arrPaymentInfo').innerHTML='<strong>'+(t?tenantName(t):'')+'</strong> &mdash; '+arr.ref+'<br>Remaining balance: <strong>'+fmt(remaining)+'</strong> &mdash; Monthly amount: <strong>'+fmt(arr.monthlyPayment)+'</strong>';
+  document.getElementById('arrPaymentInfo').innerHTML='<strong>'+(t?tenantNameHtml(t):'')+'</strong> &mdash; '+escapeHtml(arr.ref||'')+'<br>Remaining balance: <strong>'+fmt(remaining)+'</strong> &mdash; Monthly amount: <strong>'+fmt(arr.monthlyPayment)+'</strong>';
   document.getElementById('ap-date').value=today();
   document.getElementById('ap-amount').value=arr.monthlyPayment.toFixed(2);
   document.getElementById('ap-ref').value='';
@@ -490,7 +490,7 @@ function renderLoansPage(){
           '<span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+pct.toFixed(0)+'%</span>'+
           '</div>';
         return '<tr class="clickable" onclick="tenantPickerSelect(\'loan\',\''+safeId+'\')">'+
-          '<td class="std-cell-primary">'+(t?tenantName(t):'<span class="std-cell-dash">—</span>')+'</td>'+
+          '<td class="std-cell-primary">'+(t?tenantNameHtml(t):'<span class="std-cell-dash">—</span>')+'</td>'+
           '<td>'+(typeLabels[l.type]||l.type||'<span class="std-cell-dash">—</span>')+'</td>'+
           '<td class="std-cell-right">'+fmt(l.principal)+'</td>'+
           '<td class="std-cell-right">'+fmt(remaining)+'</td>'+
@@ -542,7 +542,7 @@ function renderLoansPage(){
     if (countAll === 0) {
       content.innerHTML = '<div class="std-table-card" style="text-align:center;padding:40px 30px;color:var(--muted);">' +
         '<div style="font-size:28px;margin-bottom:10px;">&#128188;</div>' +
-        '<div style="font-size:13px;">No loans on file for '+tenantName(t)+'. Use the <strong>+ New Loan</strong> button above to create one.</div>' +
+        '<div style="font-size:13px;">No loans on file for '+tenantNameHtml(t)+'. Use the <strong>+ New Loan</strong> button above to create one.</div>' +
         '</div>';
     } else {
       content.innerHTML = '<div class="std-table-card" style="text-align:center;padding:30px;color:var(--muted);">No loans match the current filters. <a href="#" onclick="clearLoansFilters();return false;" style="color:var(--text);text-decoration:underline;">Clear filters</a> to show all.</div>';

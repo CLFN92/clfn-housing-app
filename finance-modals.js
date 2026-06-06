@@ -22,7 +22,7 @@ function closeModal(id){
 
 function populateModalSelects(id){
   var d=getData();
-  var opts=d.tenants.map(function(t){return '<option value="'+t.id+'">'+tenantName(t)+' - '+t.unit+'</option>';}).join('');
+  var opts=d.tenants.map(function(t){return '<option value="'+t.id+'">'+tenantNameHtml(t)+' - '+escapeHtml(t.unit||'')+'</option>';}).join('');
   var selMap={'modalNewInvoice':'inv-tenant','modalRentPayment':'rp-tenant','modalNewLoan':'ln-tenant','modalUtilityCharge':'uc-tenant','modalUtilityPayment':'up-tenant','modalJournalEntry':'je-tenant','modalNewArrangement':'na-tenant','modalFlagCollections':'col-tenant'};
   var selId=selMap[id];
   if(selId){var el=document.getElementById(selId);if(el)el.innerHTML=opts;}
@@ -37,7 +37,7 @@ function populateModalSelects(id){
 
 function initTenantSelects(){
   var d=getData();
-  var opts=d.tenants.map(function(t){return '<option value="'+t.id+'">'+tenantName(t)+' - '+t.unit+'</option>';}).join('');
+  var opts=d.tenants.map(function(t){return '<option value="'+t.id+'">'+tenantNameHtml(t)+' - '+escapeHtml(t.unit||'')+'</option>';}).join('');
   ['rentTenantSelect','stmtTenantSelect','loanSchedTenantSelect'].forEach(function(sid){
     var el=document.getElementById(sid);
     if(!el)return;
@@ -107,7 +107,7 @@ function tenantPickerSearch(key, q){
       var typeLabel = (t.type||'').replace(/-/g,' ');
       return '<div class="tenant-search-result" onclick="tenantPickerSelect(\''+key+'\',\''+safeId+'\')">'
         + '<div class="tsr-avatar">'+initials+'</div>'
-        + '<div><div class="tsr-name">'+tenantName(t)+'</div>'
+        + '<div><div class="tsr-name">'+tenantNameHtml(t)+'</div>'
         + '<div class="tsr-meta">'+(unitLabel?unitLabel+' · ':'')+typeLabel+'</div></div>'
         + '</div>';
     }).join('');

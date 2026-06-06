@@ -27,7 +27,7 @@ function searchTenants(q) {
     var typeLabel = (t.type||'').toString().replace(/-/g,' ');
     return '<div class="tenant-search-result" onclick="openFinanceCard(\''+safeId+'\')">'+
       '<div class="tsr-avatar">'+initials+'</div>'+
-      '<div><div class="tsr-name">'+tenantName(t)+'</div>'+
+      '<div><div class="tsr-name">'+tenantNameHtml(t)+'</div>'+
       '<div class="tsr-meta">'+unitLabel+' &middot; '+typeLabel+'</div></div>'+
     '</div>';
   }).join('');
@@ -155,7 +155,7 @@ function renderTenantList() {
       var hccBadge = t.homeCare ? '<span class="pill" style="font-size:9px;background:#0891b2;color:#fff;border:none;vertical-align:middle;margin-left:4px;">&#127968; H&amp;CC</span>' : '';
       return '<tr class="clickable" onclick="openFinanceCard(\''+safeId+'\')">'+
         '<td class="std-row-avatar-cell"><div class="std-row-avatar">'+initials+'</div></td>'+
-        '<td class="std-cell-primary">'+tenantName(t)+hccBadge+'</td>'+
+        '<td class="std-cell-primary">'+tenantNameHtml(t)+hccBadge+'</td>'+
         '<td>'+unitCell+'</td>'+
         '<td>'+typeCell+'</td>'+
         '<td><span class="std-pill '+pillClass+'">'+statusText+'</span></td>'+

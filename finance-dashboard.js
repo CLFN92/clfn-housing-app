@@ -49,7 +49,7 @@ function dashSearchTenants(query) {
     var typeLabel = (t.type||'').toString().replace(/-/g,' ');
     return '<div class="tenant-search-result" onclick="dashSelectTenant(\''+safeId+'\')">'+
       '<div class="tsr-avatar">'+initials+'</div>'+
-      '<div><div class="tsr-name">'+tenantName(t)+'</div>'+
+      '<div><div class="tsr-name">'+tenantNameHtml(t)+'</div>'+
       '<div class="tsr-meta">'+unitLabel+' &middot; '+typeLabel+'</div></div>'+
     '</div>';
   }).join('');
@@ -390,7 +390,7 @@ function showKpiDrilldown(type) {
           var v = totals[t.id]||{};
           var bal = (v.rent||0)+(v.loan||0)+(v.arrangement||0);
           return '<tr class="clickable" onclick="closeModal(\'modalKpiDrilldown\');openFinanceCard(\''+sid+'\')">'
-            + '<td style="font-weight:600;">'+tenantName(t)+'</td>'
+            + '<td style="font-weight:600;">'+tenantNameHtml(t)+'</td>'
             + '<td>'+(t.unit||'&mdash;')+'</td>'
             + '<td class="std-cell-muted">'+(t.type||'').replace(/-/g,' ')+'</td>'
             + '<td class="amt-credit" style="font-weight:600;">'+(bal < 0 ? fmt(Math.abs(bal))+' CR' : fmt(0))+'</td>'

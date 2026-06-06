@@ -48,11 +48,11 @@ function showRunStatementsModal() {
     var bal = (v.rent||0) + (v.loan||0) + (v.arrangement||0);
     var initials = ((t.first||'')[0]||'') + ((t.last||'')[0]||'');
     var searchVal = (tenantName(t) + ' ' + (t.unit||'')).toLowerCase();
-    return '<label data-rs-search="'+searchVal+'" style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);">'+
+    return '<label data-rs-search="'+escapeHtml(searchVal)+'" style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);">'+
       '<input type="checkbox" class="rs-chk" data-tid="'+t.id+'" checked style="width:15px;height:15px;cursor:pointer;flex-shrink:0;" onchange="_rsUpdateCount()"/>'+
       '<div class="std-row-avatar" style="flex-shrink:0;">'+(initials||'?')+'</div>'+
       '<div style="flex:1;min-width:0;">'+
-        '<div style="font-size:13px;font-weight:600;">'+tenantName(t)+'</div>'+
+        '<div style="font-size:13px;font-weight:600;">'+tenantNameHtml(t)+'</div>'+
         '<div style="font-size:11px;color:var(--muted);">'+(t.unit||'No unit')+'</div>'+
       '</div>'+
       '<div style="text-align:right;flex-shrink:0;font-size:13px;">'+
@@ -233,7 +233,7 @@ function printBatchStatements() {
 
     body += '<div class="stmt">'
       + '<div class="tenant-block">'
-      + '<div class="tenant-name">' + tenantName(t) + '</div>'
+      + '<div class="tenant-name">' + tenantNameHtml(t) + '</div>'
       + '<div class="tenant-meta">' + (t.unit || 'No unit') + (t.type ? '  &middot;  ' + (t.type || '').replace(/-/g, ' ') : '') + '</div>'
       + '<div class="tenant-meta" style="margin-top:2px;">As of ' + printDate + '</div>'
       + addrHtml
@@ -280,7 +280,7 @@ function _renderNoRentList(tenants, isAll) {
   var rows = tenants.map(function(t) {
     var sid = t.id.replace(/'/g, "\\'");
     return '<tr>'+
-      '<td style="font-weight:600;">' + tenantName(t) + '</td>'+
+      '<td style="font-weight:600;">' + tenantNameHtml(t) + '</td>'+
       '<td style="color:var(--muted);">' + (t.unit || '—') + '</td>'+
       '<td><button class="btn btn-ghost btn-sm" onclick="closeModal(\'modalBatchAccounting\');openFinanceCard(\'' + sid + '\')">Set Rent</button></td>'+
     '</tr>';
