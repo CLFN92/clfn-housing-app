@@ -28,11 +28,12 @@ function _tfResetFields() {
   // Clear every field in the form. Called at the top of openAddTenant.
   ['tf-first','tf-last','tf-dob','tf-band','tf-phone','tf-email',
    'tf-unit','tf-street','tf-community','tf-province','tf-postal','tf-mailing',
-   'tf-rent','tf-open-bal','tf-hydro','tf-gas','tf-notes','tf-edit-name'
+   'tf-rent','tf-open-bal','tf-hydro','tf-gas','tf-notes','tf-edit-name',
   ].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   ['tf-marital','tf-status','tf-type','tf-invpref','tf-autopay-type'
   ].forEach(function(id){ var el=document.getElementById(id); if(el) el.selectedIndex=0; });
   var ap = document.getElementById('tf-autopay'); if (ap) ap.checked = false;
+  var hc = document.getElementById('tf-homecare'); if (hc) hc.checked = false;
   _tfToggleAutopayType();
   // Defaults that differ from empty string:
   var comm = document.getElementById('tf-community');
@@ -104,6 +105,8 @@ function openEditTenant(tid) {
 
   var ap = document.getElementById('tf-autopay');
   if (ap) ap.checked = !!t.autoPay;
+  var hc = document.getElementById('tf-homecare');
+  if (hc) hc.checked = !!t.homeCare;
   set('tf-autopay-type', t.autoPayType || 'eft');
   _tfToggleAutopayType();
 
@@ -137,6 +140,7 @@ function saveTenant() {
   var gasA    = _tfVal('tf-gas');
   var autoPay = _tfChecked('tf-autopay');
   var autoPayType = autoPay ? (_tfVal('tf-autopay-type') || 'eft') : null;
+  var homeCare = _tfChecked('tf-homecare');
   var notes   = _tfVal('tf-notes');
 
   if (!first || !last) { toast('First and last name are required.'); return; }
@@ -163,6 +167,7 @@ function saveTenant() {
     t.type = type; t.rent = rent; t.invPref = invPref;
     t.hydroAcct = hydroA; t.gasAcct = gasA;
     t.autoPay = autoPay; t.autoPayType = autoPayType;
+    t.homeCare = homeCare;
     t.notes = notes;
     t.status = status;
     t.currentUnitId = unitId;
@@ -193,6 +198,7 @@ function saveTenant() {
     type: type, rent: rent, invPref: invPref,
     hydroAcct: hydroA, gasAcct: gasA,
     autoPay: autoPay, autoPayType: autoPayType,
+    homeCare: homeCare,
     notes: notes,
     status: status,
     currentUnitId: unitId,

@@ -169,6 +169,19 @@ function renderTenantProfile(tid) {
     colBadge.textContent = '\u2691 Flag Collections';
     colBadge.onclick = function(){ openModal('modalFlagCollections'); setTimeout(function(){ var s=document.getElementById('col-tenant'); if(s) s.value=tid; },80); };
   }
+  // Home & Community Care flag
+  var hcBadge = nameRow.appendChild(document.createElement('span'));
+  if (t.homeCare) {
+    hcBadge.className = 'pill';
+    hcBadge.style.cssText = 'font-size:10px;cursor:pointer;background:#0891b2;color:#fff;border:none;';
+    hcBadge.innerHTML = '&#127968; H&amp;CC &mdash; <u>Remove</u>';
+    hcBadge.onclick = function(){ toggleHomeCare(tid); };
+  } else {
+    hcBadge.className = 'pill pill-gray';
+    hcBadge.style.cssText = 'font-size:10px;cursor:pointer;border:1px dashed #aaa;';
+    hcBadge.textContent = '&#127968; Flag H&CC';
+    hcBadge.onclick = function(){ toggleHomeCare(tid); };
+  }
   var subEl = nameBlock.appendChild(document.createElement('div'));
   subEl.style.cssText = 'font-size:12px;color:var(--muted);';
   subEl.textContent = (t.unit || 'No unit assigned') + '  \u00B7  ' + (typeLabels[t.type]||t.type||'Unspecified');
@@ -231,12 +244,15 @@ function renderTenantProfile(tid) {
   var finHdr = s1.appendChild(document.createElement('div'));
   finHdr.style.cssText = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px;';
   finHdr.textContent = 'Finance Settings';
-  makeGrid(s1, [
+  var finFields = [
     {lbl:'Monthly Rent',       val:fmt(t.rent)+' / month'},
     {lbl:'Invoice Preference', val:t.invPref==='email'?'\uD83D\uDCE7 Email':'\uD83D\uDDA8\uFE0F Print / Mail'},
     {lbl:'Auto-Pay',           val:t.autoPay?('\u2713 '+(t.autoPayType==='payroll'?'Payroll Deduction':'EFT')):'Manual', color:t.autoPay?'var(--success)':null},
     {lbl:'Tenant Type',        val:typePill(t.type), html:true},
-  ]);
+    {lbl:'Hydro Account #',    val:t.hydroAcct||'Not on file'},
+    {lbl:'Union Gas Account #',val:t.gasAcct||'Not on file'},
+  ];
+  makeGrid(s1, finFields);
 
   if (t.notes) {
     var notesEl = s1.appendChild(document.createElement('div'));
@@ -1294,5 +1310,19 @@ function runAutoEngine(runDate, dryRun) {
   }
 
   return results;
+}
+
+function toggleHomeCare(tid) {
+  var d = getData();
+  var t = d.tenants.find(function(x){ return x.id === tid; });
+  if (!t) return;
+  t.homeCare = !t.homeCare;
+  saveData(d);
+  writeAuditEntry({
+    action: 'update_tenant', entity_type: 'tenant', entity_id: tid, tenant_id: tid,
+    summary: (t.homeCare ? 'Flagged' : 'Removed') + ' Home & Community Care for ' + tenantName(t)
+  });
+  renderTenantProfile(tid);
+  toast(tenantName(t) + (t.homeCare ? ' flagged as H&CC.' : ' H&CC flag removed.'));
 }
 

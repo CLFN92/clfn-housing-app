@@ -265,6 +265,7 @@ function _tenantToRow(t){
     auto_pay_type:       t.autoPayType || null,
     hydro_account:       t.hydroAcct || null,
     gas_account:         t.gasAcct || null,
+    home_care:           !!t.homeCare,
 
     created_by: t.createdBy || _ACTOR(),
     updated_by: _ACTOR()
@@ -303,6 +304,7 @@ function _tenantFromRow(r){
     autoPayType:  r.auto_pay_type || null,
     hydroAcct:    r.hydro_account || '',
     gasAcct:      r.gas_account || '',
+    homeCare:     !!r.home_care,
 
     // Contact
     email: r.email || '', phone: r.phone || '',
