@@ -92,7 +92,8 @@
     author_name:        'author_name',
     phone:              'phone',
     hydro_account:      'hydro_account_number',
-    hydro_meter:        'hydro_meter_number'
+    hydro_meter:        'hydro_meter_number',
+    home_care:          'home_care'
   };
 
   var TIC_SCORE_CAP = 100;
@@ -342,7 +343,17 @@
     _ticEl('tic_strip_movein').textContent = _ticFmtDate(t[TIC_C.move_in_date] || u.assignedDate);
     _ticEl('tic_strip_lease').textContent  = t[TIC_C.lease_type]    || '—';
     _ticEl('tic_strip_status').textContent = t[TIC_C.tenancy_status] || u.status || '—';
-    _ticEl('tic_strip_score').textContent  = (t[TIC_C.scoring_points] != null) ? String(t[TIC_C.scoring_points]) : '—';
+    var hccEl   = _ticEl('tic_strip_hcc');
+    var hccTile = document.getElementById('tic_strip_hcc_tile');
+    var isHcc   = !!t[TIC_C.home_care];
+    if (hccEl) {
+      hccEl.textContent = isHcc ? 'Yes — click to remove' : 'No — click to flag';
+      hccEl.style.color = isHcc ? 'var(--success)' : 'var(--muted)';
+    }
+    if (hccTile) {
+      hccTile.title = isHcc ? 'Click to remove H&CC flag' : 'Click to flag as Home & Community Care';
+      hccTile.style.background = isHcc ? '#f0fdf4' : '';
+    }
   }
 
   // ── Render: Overview ──────────────────────────────────────────────────────
@@ -664,6 +675,24 @@
         if(typeof showToast === 'function') showToast('Save failed: ' + err.message, { type:'error' });
       });
   }
+  function _ticToggleHomeCare(){
+    var t  = _ticState.tenant;
+    var pk = t && t[TIC_C.tenant_pk];
+    if (!pk) return;
+    var newVal = !t[TIC_C.home_care];
+    _ticWrite('PATCH', TIC_T.tenants + '?' + TIC_C.tenant_pk + '=eq.' + encodeURIComponent(pk), { home_care: newVal })
+      .then(function(rows){
+        _ticState.tenant = (rows && rows[0]) || Object.assign({}, t, { home_care: newVal });
+        _ticRenderStrip();
+        _ticAudit('tic_overview_change', (newVal ? 'Flagged' : 'Removed') + ' Home & Community Care');
+        if (typeof showToast === 'function') showToast(newVal ? 'Flagged as Home & Community Care.' : 'H&CC flag removed.');
+      })
+      .catch(function(err){
+        if (typeof showToast === 'function') showToast('Save failed: ' + err.message, { type:'error' });
+      });
+  }
+  window._ticToggleHomeCare = _ticToggleHomeCare;
+
   function _ticOnBodyChange(ev){
     var inp = ev.target;
     if(!inp || !inp.getAttribute) return;
