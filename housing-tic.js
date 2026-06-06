@@ -93,6 +93,7 @@
     phone:              'phone',
     hydro_account:      'hydro_account_number',
     hydro_meter:        'hydro_meter_number',
+    gas_account:        'gas_account',
     home_care:          'home_care'
   };
 
@@ -368,7 +369,6 @@
     { key: TIC_C.wait_list_date,  label: 'Wait List Date',      type: 'date',   readOnly: true },
     { key: TIC_C.lease_type,      label: 'Lease Type',          type: 'select', options: TIC_LEASE_TYPE_OPTIONS },
     { key: TIC_C.band_membership, label: 'Band Membership',     type: 'text' },
-    { key: TIC_C.approved_by,     label: 'Approved By',         type: 'text',   readOnly: true },
     // Unit details
     { key: TIC_C.unit_number,     label: 'Unit Number',         type: 'text',   readOnly: true, group: 'unit' },
     { key: TIC_C.bedrooms,        label: 'Bedrooms',            type: 'number', readOnly: true, group: 'unit' },
@@ -377,7 +377,8 @@
     { key: TIC_C.vulnerability,   label: 'Vulnerability Flags', type: 'multi',  options: TIC_VULN_OPTIONS, group: 'unit' },
     { key: TIC_C.application_id,  label: 'Application Number',  type: 'text',   group: 'meta',      readOnly: true },
     { key: TIC_C.hydro_account,   label: 'Hydro Account #',     type: 'text',   group: 'utilities' },
-    { key: TIC_C.hydro_meter,     label: 'Hydro Meter #',       type: 'text',   group: 'utilities' }
+    { key: TIC_C.hydro_meter,     label: 'Hydro Meter #',       type: 'text',   group: 'utilities' },
+    { key: TIC_C.gas_account,     label: 'Union Gas Account #', type: 'text',   group: 'utilities' }
   ];
 
   function _ticOverviewRowVal(field){
