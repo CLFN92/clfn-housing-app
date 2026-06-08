@@ -39,9 +39,38 @@ window._printThemeStyles = function() {
 // Any field may be missing/empty — that token then keeps its CSS default.
 // Logo data URL is applied to all <img class="hlogo"> + #login-logo elements.
 // ═══════════════════════════════════════════════════════════════════════
-window.THEME_KEYS = ['yellow','dark','text','bg','surface','border','muted'];
+window.THEME_KEYS = ['yellow','dark','text','bg','surface','border','muted','sans','serif'];
 window.THEME_DEFAULTS = { yellow:'#F8E41A', dark:'#111110', text:'#111110',
-                          bg:'#fafaf8', surface:'#ffffff', border:'#e8e6df', muted:'#696960' };
+                          bg:'#fafaf8', surface:'#ffffff', border:'#e8e6df', muted:'#696960',
+                          sans:'DM Sans', serif:'DM Serif Display' };
+
+// Font definitions — maps font name → { css: full font-family stack, google: needs Google Fonts }
+window.FONT_DEFS = {
+  'DM Sans':          { css:"'DM Sans', sans-serif",                       google:true  },
+  'Inter':            { css:"'Inter', sans-serif",                         google:true  },
+  'Roboto':           { css:"'Roboto', sans-serif",                        google:true  },
+  'Open Sans':        { css:"'Open Sans', sans-serif",                     google:true  },
+  'Nunito':           { css:"'Nunito', sans-serif",                        google:true  },
+  'Source Sans 3':    { css:"'Source Sans 3', sans-serif",                 google:true  },
+  'System Default':   { css:"system-ui, -apple-system, sans-serif",        google:false },
+  'DM Serif Display': { css:"'DM Serif Display', serif",                   google:true  },
+  'Playfair Display': { css:"'Playfair Display', serif",                   google:true  },
+  'Lora':             { css:"'Lora', serif",                               google:true  },
+  'Merriweather':     { css:"'Merriweather', serif",                       google:true  },
+  'Georgia':          { css:"Georgia, serif",                              google:false },
+};
+
+// Load a Google Font dynamically — idempotent, no-op if already loaded.
+window._loadGoogleFont = function(name) {
+  if (!name) return;
+  var id = 'gfont-' + name.replace(/\s+/g, '-').toLowerCase();
+  if (document.getElementById(id)) return;
+  var link = document.createElement('link');
+  link.id   = id;
+  link.rel  = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(name) + ':wght@300;400;500;600;700&display=swap';
+  document.head.appendChild(link);
+};
 
 // ═══════════════════════════════════════════════════════════════════════
 // showAlert — centered branded notification with a single OK button.
@@ -83,10 +112,22 @@ window.showAlert = function(opts) {
 window._applyTheme = function(theme) {
   theme = theme || {};
   var root = document.documentElement;
+  var fontKeys = { sans: true, serif: true };
   window.THEME_KEYS.forEach(function(k){
     var val = theme[k];
-    if (val) root.style.setProperty('--' + k, val);
-    else     root.style.removeProperty('--' + k);
+    if (fontKeys[k]) {
+      var def = val && window.FONT_DEFS && window.FONT_DEFS[val];
+      var css = def ? def.css : (val ? ("'" + val + "', " + (k==='serif'?'serif':'sans-serif')) : null);
+      if (css) {
+        if (def && def.google) window._loadGoogleFont(val);
+        root.style.setProperty('--' + k, css);
+      } else {
+        root.style.removeProperty('--' + k);
+      }
+    } else {
+      if (val) root.style.setProperty('--' + k, val);
+      else     root.style.removeProperty('--' + k);
+    }
   });
   // Logo src + transparency — also covers the Themes panel preview thumbnail.
   document.querySelectorAll('img.hlogo, #login-logo, #theme_logo_preview').forEach(function(img){

@@ -743,6 +743,17 @@ function showRenosForRole() {
 // Persisted to housing_settings.theme as { yellow, dark, text, logo }
 // Applied live via _applyTheme() (defined in shared.js)
 // ══════════════════════════════════════════════════════════════
+function _themeSelectRow(key, label, desc, options, currentVal, defaultVal) {
+  var val = currentVal || defaultVal;
+  var opts = options.map(function(o) {
+    return '<option value="'+o.value+'"'+(o.value===val?' selected':'')+'>'+o.label+'</option>';
+  }).join('');
+  return '<div class="theme-row">'
+    + '<label for="theme_'+key+'">'+label+'</label>'
+    + '<select id="theme_'+key+'" class="theme-select" onchange="_themeOnFontChange(\''+key+'\')">'+opts+'</select>'
+    + '<span class="theme-desc">'+desc+'</span>'
+    + '</div>';
+}
 function _themeFieldRow(key, label, desc, currentVal, defaultVal) {
   var val = currentVal || defaultVal;
   return '<div class="theme-row">'
@@ -773,6 +784,17 @@ function renderThemesPanel() {
     + _themeFieldRow('surface', 'Card Surface',         'Card and panel background color',             theme.surface, defaults.surface)
     + _themeFieldRow('border',  'Borders',              'Lines separating sections and cards',         theme.border,  defaults.border)
     + _themeFieldRow('muted',   'Muted Text',           'Secondary labels and helper text',            theme.muted,   defaults.muted)
+    + _themeSelectRow('sans',  'Body Font',            'Used for all body copy, labels, and UI text',
+        [{value:'DM Sans',label:'DM Sans (default)'},{value:'Inter',label:'Inter'},
+         {value:'Roboto',label:'Roboto'},{value:'Open Sans',label:'Open Sans'},
+         {value:'Nunito',label:'Nunito'},{value:'Source Sans 3',label:'Source Sans 3'},
+         {value:'System Default',label:'System Default'}],
+        theme.sans, defaults.sans)
+    + _themeSelectRow('serif', 'Display Font',         'Used for headings and decorative titles',
+        [{value:'DM Serif Display',label:'DM Serif Display (default)'},{value:'Playfair Display',label:'Playfair Display'},
+         {value:'Lora',label:'Lora'},{value:'Merriweather',label:'Merriweather'},
+         {value:'Georgia',label:'Georgia (system)'}],
+        theme.serif, defaults.serif)
     + '<div class="theme-logo-zone upload-zone p-16"'
     +   ' id="theme_logo_zone"'
     +   ' ondragover="photoDragOver(event,\'theme_logo_zone\')"'
@@ -806,6 +828,16 @@ function renderThemesPanel() {
   _themeOnTransparentChange();
 }
 
+// Font select → load font + apply CSS variable live for immediate preview
+function _themeOnFontChange(key) {
+  var sel = document.getElementById('theme_' + key);
+  if (!sel) return;
+  var name = sel.value;
+  var def  = window.FONT_DEFS && window.FONT_DEFS[name];
+  var css  = def ? def.css : ("'" + name + "', " + (key === 'serif' ? 'serif' : 'sans-serif'));
+  if (def && def.google) window._loadGoogleFont(name);
+  document.documentElement.style.setProperty('--' + key, css);
+}
 // Sync hex input → color picker, and apply preview live
 function _themeOnPickerChange(key) {
   var picker = document.getElementById('theme_'+key);
@@ -887,6 +919,8 @@ function _readThemeFromForm() {
     surface:          v('theme_surface_hex') || v('theme_surface'),
     border:           v('theme_border_hex')  || v('theme_border'),
     muted:            v('theme_muted_hex')   || v('theme_muted'),
+    sans:             v('theme_sans'),
+    serif:            v('theme_serif'),
     logo:             window._themeDraftLogo || '',
     logoTransparent:  cb('theme_logo_transparent')
   };

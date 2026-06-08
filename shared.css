@@ -1385,6 +1385,12 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
   background: var(--bg); width: 100%; box-sizing: border-box;
 }
 .theme-row .theme-desc { font-size: 11px; color: var(--muted); }
+.theme-row .theme-select {
+  grid-column: span 2;
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); color: var(--text); font-size: 13px;
+  width: 100%; box-sizing: border-box; cursor: pointer;
+}
 .theme-logo-zone { margin-top: 14px; }
 .theme-logo-preview-wrap {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
