@@ -287,8 +287,8 @@ function renderAging() {
       var x = fr.row;
       var safeId = (x.tid||'').replace(/'/g, "\\'");
       return '<tr class="clickable" onclick="openFinanceCard(\''+safeId+'\')">'+
-        '<td class="std-cell-primary">'+x.name+
-          (x.unit?'<div style="font-size:11px;color:var(--muted);font-weight:normal;">'+x.unit+'</div>':'')+'</td>'+
+        '<td class="std-cell-primary">'+escapeHtml(x.name)+
+          (x.unit?'<div style="font-size:11px;color:var(--muted);font-weight:normal;">'+escapeHtml(x.unit)+'</div>':'')+'</td>'+
         '<td>'+(x.oldest||'<span class="std-cell-dash">—</span>')+'</td>'+
         '<td class="std-cell-right">'+x.days+' days</td>'+
         '<td class="std-cell-right amt-debit"><strong>'+fmt(x.balance)+'</strong></td>'+
