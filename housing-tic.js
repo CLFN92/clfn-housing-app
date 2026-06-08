@@ -1388,7 +1388,7 @@
       + '<div class="export-dropdown">'
       +   '<button type="button" onclick="toggleExportMenu(this)" class="btn btn-primary">&#128196; Generate Forms &#9660;</button>'
       +   '<div class="header-export-menu">'
-      +     '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">CLFN Residential Occupancy Agreement</button>'
+      +     '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">'+((window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN')+' Residential Occupancy Agreement</button>'
       +   '</div>'
       + '</div>'
       + '</div>'
@@ -2256,7 +2256,7 @@
     modal.innerHTML =
         '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:700px;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35);">'
       + '<div class="modal-hdr"><div>'
-      +   '<div class="lbl-yellow">&#128209; CLFN Residential Occupancy Agreement</div>'
+      +   '<div class="lbl-yellow">&#128209; '+((window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN')+' Residential Occupancy Agreement</div>'
       +   '<div class="txt-sm-meta">Review pre-filled details, collect all initials and signatures, then generate.</div>'
       + '</div><button type="button" onclick="document.getElementById(\'tic_lease_modal\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button></div>'
       + '<div style="overflow-y:auto;padding:18px 22px;flex:1;">'
@@ -2682,7 +2682,7 @@
       try { pdfDoc.catalog.delete(PDFLib.PDFName.of('AcroForm')); } catch(e) {}
 
       var tenantName  = tokens.tenantName || 'Tenant';
-      var filename    = 'CLFN_Occupancy_Agreement_' + tenantName.replace(/\s+/g,'_') + '.pdf';
+      var filename    = ((window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN')+'_Occupancy_Agreement_' + tenantName.replace(/\s+/g,'_') + '.pdf';
       var filledBytes = await pdfDoc.save();
       var blob = new Blob([filledBytes], { type: 'application/pdf' });
 

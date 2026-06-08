@@ -1231,7 +1231,8 @@ function exportRenoApprovalsCSV() {
   });
   var csv = [headers.join(',')].concat(csvRows).join('\n');
   var a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
-  a.download='CLFN_Reno_Approvals_'+new Date().toISOString().slice(0,10)+'.csv';
+  var _ns=(window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN';
+  a.download=_ns+'_Reno_Approvals_'+new Date().toISOString().slice(0,10)+'.csv';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
