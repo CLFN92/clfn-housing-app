@@ -9,26 +9,9 @@
  * module in that block can call these without forward-declaration.
  * ============================================================ */
 
-// Toast notification (replaces alert() - works on all platforms)
-// Legacy toast() — kept as a success/info indicator for every existing
-// call site. In F3 we unified styling so it's now green and anchored to
-// the top of the screen (was black, bottom). Error toasts go through
-// _toastError() which uses red + persistent.
 function toast(msg, duration) {
-  var el = document.getElementById('app-toast');
-  if (!el) { console.log(msg); return; }
-  _positionToast(el);
-  el.style.background = '#16a34a';   // green, matches _toastSuccess
-  el.style.color = '#fff';
-  el.textContent = msg;
-  el.style.opacity = '1';
-  el.style.transform = 'translateX(-50%) translateY(0)';
-  clearTimeout(el._t);
-  el._t = setTimeout(function(){
-    el.style.opacity = '0';
-    el.style.transform = 'translateX(-50%) translateY(-20px)';
-    el.style.background = ''; el.style.color = '';
-  }, duration || 2500);
+  if (typeof showToast === 'function') { showToast(msg, {duration: duration || 2500}); return; }
+  console.log(msg);
 }
 
 function seedIfEmpty(){
@@ -36,7 +19,7 @@ function seedIfEmpty(){
   // trigger-sync installed by the F2 migration. Demo/dev data should be
   // inserted directly in Supabase via the SQL editor if needed.
 }
-function fmt(n){return '$'+Number(n||0).toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmt(n){ return formatCurrency(n); }
 function today(){return new Date().toISOString().slice(0,10);}
 function tenantName(t){return t.first+' '+t.last;}
 function tenantNameHtml(t){return escapeHtml(tenantName(t));}

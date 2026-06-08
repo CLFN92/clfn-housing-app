@@ -57,7 +57,7 @@ var FINANCE_HEADERS = {
 // END FINANCE MODULE BOOT
 // ═══════════════════════════════════════════════════════════════════════════
 
-console.log('[CLFN FINANCE] Build: F3A-2026-04-17-deepclone — tenant persistence fix');
+if (window.CLFN_DEBUG) console.log('[CLFN FINANCE] Build: F3A-2026-04-17-deepclone — tenant persistence fix');
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -118,56 +118,13 @@ function _emptyStore(){
 }
 
 // ── Toasts ─────────────────────────────────────────────────────────────────
-// Top-of-screen placement so errors are immediately visible without
-// scrolling. Persistent red toast for failures so the user can't miss
-// them, auto-dismissing green toast for successes.
-function _positionToast(el){
-  // Override whatever bottom positioning the existing toast element has
-  // and anchor it to the top of the viewport.
-  el.style.position = 'fixed';
-  el.style.top = '20px';
-  el.style.bottom = '';               // clear any bottom:20px from old styles
-  el.style.left = '50%';
-  el.style.transform = 'translateX(-50%) translateY(0)';
-  el.style.zIndex = '99999';
-  el.style.padding = '12px 20px';
-  el.style.borderRadius = '8px';
-  el.style.fontSize = '14px';
-  el.style.fontWeight = '500';
-  el.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
-  el.style.maxWidth = 'calc(100vw - 40px)';
-}
 function _toastSuccess(msg){
-  var el = document.getElementById('app-toast');
-  if (!el) { console.log('[finance] ' + msg); return; }
-  _positionToast(el);
-  el.style.background = '#16a34a';
-  el.style.color = '#fff';
-  el.textContent = msg;
-  el.style.opacity = '1';
-  clearTimeout(el._t);
-  el._t = setTimeout(function(){
-    el.style.opacity = '0';
-    el.style.transform = 'translateX(-50%) translateY(-20px)';
-    el.style.background = ''; el.style.color = '';
-  }, 2000);
+  if (typeof showToast === 'function') { showToast(msg); return; }
+  console.log('[finance] ' + msg);
 }
 function _toastError(msg){
-  var el = document.getElementById('app-toast');
-  if (!el) { console.error('[finance] ' + msg); return; }
-  _positionToast(el);
-  el.textContent = '⚠ ' + msg;
-  el.style.background = '#b91c1c';
-  el.style.color = '#fff';
-  el.style.opacity = '1';
-  clearTimeout(el._t);
-  // No auto-dismiss — user must see this. Click dismisses.
-  el.onclick = function(){
-    el.style.opacity = '0';
-    el.style.transform = 'translateX(-50%) translateY(-20px)';
-    el.style.background = ''; el.style.color = '';
-    el.onclick = null;
-  };
+  if (typeof showToast === 'function') { showToast('⚠ ' + msg, {type: 'error', duration: 8000}); return; }
+  console.error('[finance] ' + msg);
 }
 
 // ── Shape mappers ──────────────────────────────────────────────────────────
@@ -633,7 +590,7 @@ async function _bootLoadFinanceData(){
     });
     await Promise.all(fetches);
     _memStore = Object.assign(_emptyStore(), results);
-    console.log('[finance] hydrated:',
+    if (window.CLFN_DEBUG) console.log('[finance] hydrated:',
       _FIN_TABLES.map(function(s){ return s.key + '=' + (results[s.key]||[]).length; }).join(', '));
 
     // Load housing_settings so APPROVAL_AUTHORITY overrides are respected on this page
@@ -842,7 +799,7 @@ function _doSaveData(d){
 
   // 3) Handle outcome. Log per-table report on success; toast red on failure.
   return Promise.all(writePromises).then(function(){
-    console.log('[finance] save OK —', perTableReport.join(', '));
+    if (window.CLFN_DEBUG) console.log('[finance] save OK —', perTableReport.join(', '));
   }).catch(function(err){
     console.error('[finance] save FAILED —', perTableReport.join(', '), err);
     _toastError('Some changes could not be saved. Check console for details.');

@@ -268,3 +268,4 @@ window.NATION_CONFIG = window.NATION_CONFIG || {
   short:        'CLFN',
   role_labels:  {} // empty for CLFN — defaults from CLFN_PERMS.ROLE_LABELS apply
 };
+window.CLFN_DEBUG = false;

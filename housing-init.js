@@ -24,7 +24,7 @@ if (typeof ROLE === 'undefined') {
 }
 
 // ── Build marker ──────────────────────────────────────────────────────────────
-console.log('%c[CLFN HOUSING] Build: F1-2026-04-21', 'background:#F8E41A;color:#111;font-weight:700;padding:4px 8px;');
+if (window.CLFN_DEBUG) console.log('%c[CLFN HOUSING] Build: F1-2026-04-21', 'background:#F8E41A;color:#111;font-weight:700;padding:4px 8px;');
 
 // ── Page-specific role switch hook ────────────────────────────────────────────
 // shared-ui.js switchRole() calls this after updating window.currentRole,
@@ -1471,7 +1471,7 @@ async function loadAppDataFromSupabase() {
     // Apply saved required-field config (Settings → App Settings → Required Fields)
     if (typeof applyRequiredFields === 'function') applyRequiredFields();
 
-    console.info('[CLFN] Loaded '+applications.length+' apps, '+housingUnits.length+' units');
+    if (window.CLFN_DEBUG) console.info('[CLFN] Loaded '+applications.length+' apps, '+housingUnits.length+' units');
 
     // Refresh V2 scoring model and tiers from loaded settings
     try {
@@ -1491,7 +1491,7 @@ async function loadAppDataFromSupabase() {
     // Rescore all apps with live V2 model
     if(applications.length && typeof rescoreAllApplications === 'function') {
       rescoreAllApplications();
-      console.log('[CLFN] Rescored '+applications.length+' applications on V2 model');
+      if (window.CLFN_DEBUG) console.log('[CLFN] Rescored '+applications.length+' applications on V2 model');
     }
 
     // Dashboard view (#dashView) was retired — the worklist below is the
@@ -1828,7 +1828,7 @@ async function loadHousingData() {
     if (typeof applyNationOverrides === 'function')  applyNationOverrides();
     if (typeof applyRequiredFields === 'function')   applyRequiredFields();
     if(applications.length && typeof rescoreAllApplications==='function') rescoreAllApplications();
-    console.log('[CLFN] Loaded '+applications.length+' apps, '+housingUnits.length+' units');
+    if (window.CLFN_DEBUG) console.log('[CLFN] Loaded '+applications.length+' apps, '+housingUnits.length+' units');
   } catch(e){ console.warn('[HOUSING] data load error:',e); console.warn('[CLFN] Could not load data'); }
 }
 
