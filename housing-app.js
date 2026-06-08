@@ -777,7 +777,7 @@ function renderDashTable(){
     var hasScore=typeof a.score==='number';
     var tc=tierColor(a.tier);
     var _clsMap={'Section 95 — Social Housing':['#e8eef5','#1e3a5f'],'Section 95 — Rent to Own':['#eff6ff','#1d4ed8'],'Section 10':['#fdf4ff','#7c3aed'],'Social Housing':['#e8eef5','#1e3a5f'],'Rent to Own':['#eff6ff','#1d4ed8'],'Band House':['#faf5ff','#7c3aed'],'Employee Housing':['#fef9ec','#7a6000'],'Owned':['#f0fdf4','#15803d'],'Rental':['#f4f4f0','#444'],'Non-Social Housing':['#f0fdf4','#15803d']};
-    var _clsStyle=_clsMap[a.classification]||['#f4f4f0','#888'];
+    var _clsStyle=_clsMap[a.classification]||['#f4f4f0','var(--gray)'];
     var clsBg=_clsStyle[0]; var clsColor=_clsStyle[1];
     var statusMap={draft:['Draft','pill-draft'],submitted:['Awaiting HM Review','pill-submitted'],file_update:['File Update — Awaiting HM','pill-submitted'],mgr_approved:['Awaiting ED Approval','pill-mgr'],hm_recommended:['HM Recommended','pill-mgr'],hm_approved:['File Update Approved','pill-approved'],ed_approved:['ED Approved','pill-approved'],declined:['Declined','pill-declined'],returned:['Returned for Info','pill-returned'],housed:['Housed','pill-approved'],assigned:['Assigned','pill-assigned']};
     var sp=statusMap[a.status]||['—','pill-draft'];

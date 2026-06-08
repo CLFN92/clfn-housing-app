@@ -70,21 +70,21 @@ function renderV2ScoringEditor() {
   var t = liveV2Tiers;
 
   function pts(val, cat, key) {
-    var col = val > 0 ? '#15803d' : val < 0 ? '#b91c1c' : '#888';
+    var col = val > 0 ? '#15803d' : val < 0 ? '#b91c1c' : 'var(--gray)';
     var sign = val > 0 ? '+' : '';
     return '<input type="number" value="' + val + '" step="1" min="-30" max="30" data-cat="' + cat + '" data-key="' + key + '" '
       + 'style="width:60px;padding:4px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;'
       + 'color:' + col + ';text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);" '
-      + 'onchange="updateV2ScoreOption(this)" oninput="this.style.color=+this.value>0?\x27#15803d\x27:+this.value<0?\x27#b91c1c\x27:\x27#888\x27"/>';
+      + 'onchange="updateV2ScoreOption(this)" oninput="this.style.color=+this.value>0?\x27#15803d\x27:+this.value<0?\x27#b91c1c\x27:\x27var(--gray)\x27"/>';
   }
 
   function maxPts(cat, key) {
     var val = typeof m[cat] === 'object' && m[cat][key] !== undefined ? m[cat][key] : 0;
-    var col = val > 0 ? '#15803d' : val < 0 ? '#b91c1c' : '#888';
+    var col = val > 0 ? '#15803d' : val < 0 ? '#b91c1c' : 'var(--gray)';
     return '<input type="number" value="' + val + '" step="1" min="0" max="30" data-cat="' + cat + '" data-key="' + key + '" '
       + 'style="width:60px;padding:4px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;'
       + 'color:' + col + ';text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);" '
-      + 'onchange="updateV2ScoreOption(this)" oninput="this.style.color=+this.value>0?\x27#15803d\x27:\x27#888\x27"/>';
+      + 'onchange="updateV2ScoreOption(this)" oninput="this.style.color=+this.value>0?\x27#15803d\x27:\x27var(--gray)\x27"/>';
   }
 
   function sectionHdr(label, maxScore) {
@@ -486,7 +486,7 @@ function renderNationPanel(){
     var licensed = (typeof modApi.isLicensed === 'function') ? modApi.isLicensed(name) : true;
     var statusPill = enabled
       ? pill('Enabled','#15803d','#f0fdf4')
-      : pill('Disabled','#888','#f4f4f0');
+      : pill('Disabled','var(--gray)','#f4f4f0');
     var licensePill = licensed
       ? pill('Licensed','#1d4ed8','#eff6ff')
       : pill('Not Licensed','#b91c1c','#fef2f2');
@@ -739,10 +739,10 @@ function renderScoringModelTable() {
 
     rows.sort(function(a,b){return a.order-b.order;});
     rows.forEach(function(r) {
-      var ptsColor = r.pts > 0 ? '#15803d' : r.pts < 0 ? '#b91c1c' : '#888';
+      var ptsColor = r.pts > 0 ? '#15803d' : r.pts < 0 ? '#b91c1c' : 'var(--gray)';
       var sign = r.pts > 0 ? '+' : '';
       var isAuto = (r.id === 'oc1' || r.id === 'wa1');
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:7px;margin-bottom:3px;background:var(--bg);">'        + '<span style="font-size:13px;color:var(--text);flex:1;">'+r.label+'</span>'        + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'        + (isAuto          ? '<span style="font-size:11px;color:var(--muted);font-style:italic;margin-right:4px;">auto-calculated</span>'            + '<input type="number" value="'+r.pts+'" step="1" min="0" max="10" '            +   'style="width:64px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';text-align:center;font-family:\'DM Sans\',sans-serif;background:var(--surface);" '            +   'data-smid="'+r.id+'" oninput="updateV2ScoreModel(this)"/>'            + '<span class="js-lbl-sm">pts each</span>'          : '<input type="number" value="'+r.pts+'" step="1" min="-20" max="30" '            +   'style="width:64px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';text-align:center;font-family:\'DM Sans\',sans-serif;background:var(--surface);" '            +   'data-smid="'+r.id+'" oninput="updateV2ScoreModel(this)"/>'            + '<span class="js-lbl-sm">pts</span>'        )        + '<button onclick="deleteV2ScoreCriteria(\''+r.id+'\')" title="Remove" style="background:none;border:none;color:#888;cursor:pointer;font-size:14px;padding:2px 4px;" onmouseover="this.style.color=\'#b91c1c\'" onmouseout="this.style.color=\'#888\'">✕</button>'        + '</div>'        + '</div>';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:7px;margin-bottom:3px;background:var(--bg);">'        + '<span style="font-size:13px;color:var(--text);flex:1;">'+r.label+'</span>'        + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'        + (isAuto          ? '<span style="font-size:11px;color:var(--muted);font-style:italic;margin-right:4px;">auto-calculated</span>'            + '<input type="number" value="'+r.pts+'" step="1" min="0" max="10" '            +   'style="width:64px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';text-align:center;font-family:\'DM Sans\',sans-serif;background:var(--surface);" '            +   'data-smid="'+r.id+'" oninput="updateV2ScoreModel(this)"/>'            + '<span class="js-lbl-sm">pts each</span>'          : '<input type="number" value="'+r.pts+'" step="1" min="-20" max="30" '            +   'style="width:64px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';text-align:center;font-family:\'DM Sans\',sans-serif;background:var(--surface);" '            +   'data-smid="'+r.id+'" oninput="updateV2ScoreModel(this)"/>'            + '<span class="js-lbl-sm">pts</span>'        )        + '<button onclick="deleteV2ScoreCriteria(\''+r.id+'\')" title="Remove" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:14px;padding:2px 4px;" onmouseover="this.style.color=\'#b91c1c\'" onmouseout="this.style.color=\'var(--gray)\'">✕</button>'        + '</div>'        + '</div>';
     });
     html += '</div>';
   });
@@ -790,7 +790,7 @@ function updateV2ScoreModel(el) {
   if (!row) return;
   row.pts = val;
   // Colour feedback: green positive, red negative, grey zero
-  el.style.color = val > 0 ? '#15803d' : val < 0 ? '#b91c1c' : '#888';
+  el.style.color = val > 0 ? '#15803d' : val < 0 ? '#b91c1c' : 'var(--gray)';
   // Debounce the save — avoid hitting Supabase on every keystroke
   clearTimeout(el._saveTimer);
   el._saveTimer = setTimeout(function() {
@@ -1227,7 +1227,7 @@ function triggerV2Score() {
         'Medium Priority':    { bg:'#3d3000', color:'#fcd34d' },
         'Low Priority':       { bg:'#3d1515', color:'#f87171' }
       };
-      var tc = tierColors[_tier] || { bg:'#2a2a28', color:'#aaa' };
+      var tc = tierColors[_tier] || { bg:'var(--dark3)', color:'#aaa' };
       tierEl.style.background = tc.bg;
       tierEl.style.color      = tc.color;
     }
@@ -1423,7 +1423,7 @@ function calcScore(){
     var sc = document.getElementById('sc_score_total');
     if(sc) sc.textContent = 'N/A';
     var tierEl = document.getElementById('sc_score_tier');
-    if(tierEl){ tierEl.textContent = 'File Update Only'; tierEl.style.color='#888'; tierEl.style.background='#2a2a28'; }
+    if(tierEl){ tierEl.textContent = 'File Update Only'; tierEl.style.color='var(--gray)'; tierEl.style.background='var(--dark3)'; }
     return;
   }
   let total=0;
@@ -1549,7 +1549,7 @@ function renderRubricTableV2(breakdown, targetEl) {
   function row(label, pts, maxPts, value, note) {
     var pos  = pts > 0;
     var neg  = pts < 0;
-    var col  = pos ? '#15803d' : neg ? '#b91c1c' : '#888';
+    var col  = pos ? '#15803d' : neg ? '#b91c1c' : 'var(--gray)';
     var bg   = pos ? 'rgba(21,128,61,0.15)' : neg ? 'rgba(185,28,28,0.15)' : 'var(--bg)';
     var sign = pts > 0 ? '+' : '';
     var pct  = maxPts > 0 ? Math.round(Math.abs(pts) / maxPts * 100) : 0;

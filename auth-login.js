@@ -126,7 +126,7 @@ async function resendVerification() {
     if (msgEl) { msgEl.textContent = 'No email address on file. Please sign in again.'; msgEl.style.color = '#fca5a5'; msgEl.style.display = ''; }
     return;
   }
-  if (msgEl) { msgEl.textContent = 'Sending…'; msgEl.style.color = '#888'; msgEl.style.display = ''; }
+  if (msgEl) { msgEl.textContent = 'Sending…'; msgEl.style.color = 'var(--gray)'; msgEl.style.display = ''; }
   try {
     var r = await fetch(SUPABASE_URL + '/auth/v1/resend', {
       method:  'POST',
@@ -151,7 +151,7 @@ async function sendPasswordReset() {
     if (msgEl) { msgEl.textContent = 'Enter your email address.'; msgEl.style.color = '#fca5a5'; msgEl.style.background = '#3b0a0a'; msgEl.style.display = ''; }
     return;
   }
-  if (msgEl) { msgEl.textContent = 'Sending reset link…'; msgEl.style.color = '#888'; msgEl.style.background = 'transparent'; msgEl.style.display = ''; }
+  if (msgEl) { msgEl.textContent = 'Sending reset link…'; msgEl.style.color = 'var(--gray)'; msgEl.style.background = 'transparent'; msgEl.style.display = ''; }
   try {
     // redirect_to pins the email link to the page that actually knows how to
     // consume the recovery token (#reset-panel below). Without this, the link

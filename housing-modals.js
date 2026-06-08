@@ -161,7 +161,7 @@ function openUnitEditModal(unitId){
     var _eb = document.getElementById('ue_sig_ed_badge');
     if(_eb && u.unitEdSig.decision) {
       _eb.textContent  = u.unitEdSig.decision === 'approved' ? 'Approved ✓' : u.unitEdSig.decision;
-      _eb.style.background = u.unitEdSig.decision === 'approved' ? '#fffbeb' : '#fffbeb';
+      _eb.style.background = u.unitEdSig.decision === 'approved' ? 'var(--warn-amber-bg)' : 'var(--warn-amber-bg)';
       _eb.style.color      = '#15803d';
     }
   }
@@ -279,7 +279,7 @@ function ueUpdateBudgetRouting() {
   if(indicator) {
     indicator.style.display = 'block';
     if(overBudget) {
-      indicator.style.background = '#fffbeb';
+      indicator.style.background = 'var(--warn-amber-bg)';
       indicator.style.border = '1.5px solid #fde68a';
       indicator.style.color  = '#7a5c00';
       indicator.innerHTML = '<div class="flex-g8">'
@@ -563,8 +563,8 @@ function ueTenantSelect(appId, name, status) {
   var isHMApp   = status === APP_STATUS.HM_APPROVED;      // HM final approval (file-update terminal)
   var isApprovedAtAll = isED || isHMRec || isHMApp;
   var statusLabel = (typeof formatAppStatusLabel === 'function') ? formatAppStatusLabel(status) : status.replace(/_/g,' ');
-  var statusColor = isED ? '#15803d' : isHMApp ? '#15803d' : isHMRec ? '#1d4ed8' : '#92400e';
-  var statusBg    = isED ? '#f0fdf4' : isHMApp ? '#f0fdf4' : isHMRec ? '#eff6ff' : '#fffbeb';
+  var statusColor = isED ? '#15803d' : isHMApp ? '#15803d' : isHMRec ? '#1d4ed8' : 'var(--warn-amber-text)';
+  var statusBg    = isED ? '#f0fdf4' : isHMApp ? '#f0fdf4' : isHMRec ? '#eff6ff' : 'var(--warn-amber-bg)';
 
   // Role-based warning
   var role = window.currentRole || 'housing_employee_l1';
@@ -970,11 +970,11 @@ function printScorecard(){
   var _t = (typeof liveV2Tiers === 'object' && liveV2Tiers) ? liveV2Tiers : {critical:80, high:60, medium:40};
   var tierColor2 = s >= _t.critical ? '#14532d'
                  : s >= _t.high     ? '#1e3a5f'
-                 : s >= _t.medium   ? '#92400e'
+                 : s >= _t.medium   ? 'var(--warn-amber-text)'
                  :                    '#b91c1c';
   var tierBg2    = s >= _t.critical ? '#f0fdf4'
                  : s >= _t.high     ? '#e8eef5'
-                 : s >= _t.medium   ? '#fffbeb'
+                 : s >= _t.medium   ? 'var(--warn-amber-bg)'
                  :                    '#fef2f2';
   // V2 breakdown has a nested structure: sectionA.{urgent,health,...}, sectionB.{rent,condition,...}, arrears, edAdjustment.
   // Flatten it into a flat list of rows with friendly labels.
@@ -1332,7 +1332,7 @@ function openMatchScorecard(appId, unitId) {
 
   // Build rows
   var rows = breakdown.map(function(b){
-    var col = b.pts > 0 ? '#15803d' : b.pts < 0 ? '#b91c1c' : '#888';
+    var col = b.pts > 0 ? '#15803d' : b.pts < 0 ? '#b91c1c' : 'var(--gray)';
     var bar = Math.round(Math.max(0,b.pts)/b.max*100);
     return '<tr class="row-divider">'
       +'<td style="padding:10px 14px;font-size:13px;color:var(--text);">'+b.label+'</td>'
@@ -1390,11 +1390,11 @@ function openUnitDetail(unitId) {
   var statusStyle = {
     vacant:      {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
     occupied:    {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
-    under_repair:{bg:'#fffbeb',c:'#92400e',label:'Under Repair'},
+    under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Under Repair'},
     reserved:    {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
     condemned:   {bg:'#fef2f2',c:'#b91c1c',label:'Condemned'}
   };
-  var ss = statusStyle[u.status] || {bg:'#f0f0ec',c:'#888',label:u.status||'Unknown'};
+  var ss = statusStyle[u.status] || {bg:'#f0f0ec',c:'var(--gray)',label:u.status||'Unknown'};
 
   // Header
   var addr = u.num + ' ' + u.street;
@@ -1613,7 +1613,7 @@ var BUDGET_POOLS = [
   { id:'isc',       label:'ISC Funds',          icon:'🏛️', color:'#1d4ed8', bg:'#eff6ff' },
   { id:'rrap',      label:'RRAP Funds',         icon:'🏠', color:'#7c3aed', bg:'#faf5ff' },
   { id:'band',      label:'Band Funds',         icon:'🌲', color:'#15803d', bg:'#f0fdf4' },
-  { id:'cmhc',      label:'CMHC',               icon:'🏗️', color:'#92400e', bg:'#fffbeb' },
+  { id:'cmhc',      label:'CMHC',               icon:'🏗️', color:'var(--warn-amber-text)', bg:'var(--warn-amber-bg)' },
   { id:'ofnlp',     label:'OFNLP',              icon:'🤝', color:'#0e7490', bg:'#ecfeff' },
   { id:'fncfs',     label:'FNCFS Funds',        icon:'👶', color:'#be185d', bg:'#fdf2f8', requiresDependants:true },
   { id:'band_rep',  label:'Band Rep Funds',     icon:'🏡', color:'#4f46e5', bg:'#eef2ff' },
@@ -1710,7 +1710,7 @@ function renoSearchFilter(q) {
     : renoUnits;
 
   var statusStyle = {
-    under_repair: {bg:'#fffbeb', c:'#92400e', label:'Under Repair'},
+    under_repair: {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'Under Repair'},
     condemned:    {bg:'#fef2f2', c:'#b91c1c', label:'Condemned'}
   };
 
@@ -1725,7 +1725,7 @@ function renoSearchFilter(q) {
   }
 
   container.innerHTML = filtered.map(function(u) {
-    var ss = statusStyle[u.status] || {bg:'#f4f4f0',c:'#888',label:u.status};
+    var ss = statusStyle[u.status] || {bg:'#f4f4f0',c:'var(--gray)',label:u.status};
     var rs = calcRenoScore(u.id);
     var scoreBadge = rs.score
       ? '<span style="font-size:10px;font-weight:700;color:var(--muted);margin-left:6px;">Score: '+rs.score+'</span>'
@@ -1959,7 +1959,7 @@ function atSearchApps(q){
     var isED=a.status===APP_STATUS.ED_APPROVED; var isHM=a.status===APP_STATUS.MGR_APPROVED;
     var isHMApp=a.status===APP_STATUS.HM_APPROVED;
     var statusLabel=(typeof formatAppStatusLabel === 'function') ? formatAppStatusLabel(a.status) : (isED?'ED Approved':isHM?'HM Recommended':a.status.replace(/_/g,' '));
-    var statusCol=isED?'#15803d':isHMApp?'#15803d':isHM?'#1d4ed8':'#888';
+    var statusCol=isED?'#15803d':isHMApp?'#15803d':isHM?'#1d4ed8':'var(--gray)';
     var statusBg=isED?'#f0fdf4':isHMApp?'#f0fdf4':isHM?'#eff6ff':'var(--bg)';
     return '<div onmousedown="atSelectApp(\''+escapeHtml(a.id)+'\',\''+escapeHtml(safeName)+'\',\''+escapeHtml(a.status)+'\') " '
       +'style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;" '

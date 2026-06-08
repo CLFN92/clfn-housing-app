@@ -286,7 +286,7 @@ function _renderNoRentList(tenants, isAll) {
     '</tr>';
   }).join('');
   return '<div style="margin-bottom:12px;border:1px solid #fde68a;border-radius:10px;overflow:hidden;">'+
-    '<div style="background:#fffbeb;padding:10px 14px;font-size:12px;">' + label + '</div>'+
+    '<div style="background:var(--warn-amber-bg);padding:10px 14px;font-size:12px;">' + label + '</div>'+
     '<div style="max-height:220px;overflow-y:auto;">'+
       '<table class="tbl" style="margin:0;">'+
         '<thead><tr><th>Tenant</th><th>Address / Unit</th><th></th></tr></thead>'+

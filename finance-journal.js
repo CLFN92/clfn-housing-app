@@ -252,7 +252,7 @@ function renderPeriodSummary() {
       {lbl:'Total Collected',val:totalCollected,color:'var(--yellow)',sub:'All receipts combined',dark:true},
     ].map(function(tile){
       return '<div style="background:'+(tile.dark?'var(--dark)':'var(--surface)')+';border:1px solid var(--border);border-radius:10px;padding:14px;">'+
-        '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:'+(tile.dark?'#888':'var(--muted)')+';margin-bottom:4px;">'+tile.lbl+'</div>'+
+        '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:'+(tile.dark?'var(--gray)':'var(--muted)')+';margin-bottom:4px;">'+tile.lbl+'</div>'+
         '<div style="font-size:22px;font-weight:700;color:'+tile.color+';">'+fmt(tile.val)+'</div>'+
         '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+tile.sub+'</div>'+
       '</div>';

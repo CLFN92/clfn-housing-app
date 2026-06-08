@@ -1002,10 +1002,10 @@ function udpRenderSowTable(unitId){
   var statusStyles = {
     draft:        {bg:'#f4f4f0', c:'#666',    label:'Draft'},
     signed:       {bg:'#eff6ff', c:'#1d4ed8', label:'Signed'},
-    hm_approved:  {bg:'#fffbeb', c:'#92400e', label:'HM Approved'},
+    hm_approved:  {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'HM Approved'},
     ed_approved:  {bg:'#f0fdf4', c:'#15803d', label:'ED Approved'},
     completed:    {bg:'#f0fdf4', c:'#15803d', label:'Completed'},
-    archived:     {bg:'#f4f4f0', c:'#888',    label:'Archived'}
+    archived:     {bg:'#f4f4f0', c:'var(--gray)',    label:'Archived'}
   };
   // Archive UI gating: HM/ED only. Read-only viewers don't see the button.
   var _udpRole = window.currentRole || 'staff';

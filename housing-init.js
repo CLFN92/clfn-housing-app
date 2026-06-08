@@ -653,11 +653,11 @@ function openAssignModal(appId, suggestedUnitId) {
   document.getElementById('am_app_id').textContent    = app.id;
   var scoreEl = document.getElementById('am_app_score');
   if(scoreEl) scoreEl.textContent = (app.score||0)+' pts · '+(app.tier||'—').replace(' Priority','');
-  var statusColors={ed_approved:'#15803d',hm_approved:'#15803d',mgr_approved:'#1d4ed8',submitted:'#92400e'};
+  var statusColors={ed_approved:'#15803d',hm_approved:'#15803d',mgr_approved:'#1d4ed8',submitted:'var(--warn-amber-text)'};
   var statusEl=document.getElementById('am_app_status');
   if(statusEl){
     statusEl.textContent = (typeof formatAppStatusLabel === 'function') ? formatAppStatusLabel(app.status) : (app.status||'—');
-    statusEl.style.color = statusColors[app.status]||'#888';
+    statusEl.style.color = statusColors[app.status]||'var(--gray)';
   }
   var reqs=[needsBeds+' bed'+(needsBeds!==1?'s':'')+' needed'];
   if(needsAccess) reqs.push('Accessible');
@@ -1013,7 +1013,7 @@ var _raFilter = '';
 
 function _getRaApprovalStatus(u, sow) {
   var hmLimit = _getHmLimit();
-  if(!sow) return {key:'no_sow', label:'No Request Filed', bg:'#f4f4f0', c:'#888'};
+  if(!sow) return {key:'no_sow', label:'No Request Filed', bg:'#f4f4f0', c:'var(--gray)'};
   var cost = parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))||0;
   var needsED = cost > hmLimit;
   var hmDec = (u.unitHmSig && u.unitHmSig.decision) || '';
@@ -1021,12 +1021,12 @@ function _getRaApprovalStatus(u, sow) {
   var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
   var pct = prog ? (prog.overallPct||0) : 0;
   if(pct >= 100) return {key:'complete',    label:'Complete',        bg:'#f0fdf4', c:'#15803d'};
-  if(pct > 0)    return {key:'in_progress', label:'In Progress',     bg:'#fffbeb', c:'#92400e'};
+  if(pct > 0)    return {key:'in_progress', label:'In Progress',     bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)'};
   if(edDec === 'approved')                  return {key:'approved',  label:'ED Approved',     bg:'#f0fdf4', c:'#15803d'};
   if(hmDec === 'approved' && !needsED)      return {key:'approved',  label:'HM Approved',     bg:'#f0fdf4', c:'#15803d'};
   if(hmDec === 'approved' && needsED)       return {key:'pending_ed',label:'Pending ED',       bg:'#eff6ff', c:'#1d4ed8'};
   if(hmDec === 'declined' || edDec === 'declined') return {key:'declined', label:'Declined',  bg:'#fef2f2', c:'#b91c1c'};
-  return {key:'pending_hm', label:'Pending HM', bg:'#fffbeb', c:'#92400e'};
+  return {key:'pending_hm', label:'Pending HM', bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)'};
 }
 
 
@@ -1056,12 +1056,12 @@ function renderRenoApprovalsView() {
     var counts = {};
     rows.forEach(function(r){ counts[r.appr.key]=(counts[r.appr.key]||0)+1; });
     var chipDefs = [
-      {key:'pending_hm', label:'Pending HM',  c:'#92400e', bg:'#fffbeb'},
+      {key:'pending_hm', label:'Pending HM',  c:'var(--warn-amber-text)', bg:'var(--warn-amber-bg)'},
       {key:'pending_ed', label:'Pending ED',  c:'#1d4ed8', bg:'#eff6ff'},
       {key:'approved',   label:'Approved',    c:'#15803d', bg:'#f0fdf4'},
-      {key:'in_progress',label:'In Progress', c:'#92400e', bg:'#fffbeb'},
+      {key:'in_progress',label:'In Progress', c:'var(--warn-amber-text)', bg:'var(--warn-amber-bg)'},
       {key:'complete',   label:'Complete',    c:'#15803d', bg:'#f0fdf4'},
-      {key:'no_sow',     label:'No Request',  c:'#888',    bg:'#f4f4f0'},
+      {key:'no_sow',     label:'No Request',  c:'var(--gray)',    bg:'#f4f4f0'},
     ];
     chipsEl.innerHTML = chipDefs.map(function(d){
       var cnt = counts[d.key]||0; if(!cnt) return '';
@@ -1253,7 +1253,7 @@ function exportRenoApprovalsPDF() {
     var sow=null;sow = getSowData(u.id);
     var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
     var rs=calcRenoScore(u.id);
-    var tier=rs.score>=40?{l:'Critical',c:'#b91c1c'}:rs.score>=25?{l:'High',c:'#92400e'}:rs.score>=12?{l:'Medium',c:'#1d4ed8'}:{l:'Low',c:'#15803d'};
+    var tier=rs.score>=40?{l:'Critical',c:'#b91c1c'}:rs.score>=25?{l:'High',c:'var(--warn-amber-text)'}:rs.score>=12?{l:'Medium',c:'#1d4ed8'}:{l:'Low',c:'#15803d'};
     var appr=_getRaApprovalStatus(u,sow);
     var cost=sow?(parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))||0):0;
     var pct=prog?(prog.overallPct||0):0;

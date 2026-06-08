@@ -178,10 +178,10 @@ function calcLoan() {
     {label:'Principal',               val:principal,     color:'#fff'},
     {label:'Total Interest',          val:totalInterest, color:totalInterest > 0 ? '#f87171' : '#4ade80'},
     {label:'Total Cost of Borrowing', val:totalRepay,    color:'var(--yellow)', bold:true},
-    {label:'Annual Rate (APR)',        val:(rateType==='none' ? '0% (Interest-Free)' : rate.toFixed(2)+'%'), isText:true, color:'#888'},
+    {label:'Annual Rate (APR)',        val:(rateType==='none' ? '0% (Interest-Free)' : rate.toFixed(2)+'%'), isText:true, color:'var(--gray)'},
   ];
   document.getElementById('cr-cob-rows').innerHTML = cobRows.map(function(row){
-    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #2a2a28;">' +
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--dark3);">' +
       '<span style="font-size:12px;color:#aaa;">' + (row.bold ? '<strong>' + row.label + '</strong>' : row.label) + '</span>' +
       '<span style="font-size:' + (row.bold?'15':'13') + 'px;font-weight:' + (row.bold?'700':'500') + ';color:' + row.color + ';">' +
         (row.isText ? row.val : fmt(row.val)) +

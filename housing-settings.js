@@ -66,7 +66,7 @@ function renderApprovalAuthorityPanel() {
       }
       if(isModified && !badgeHtml)
         badgeHtml = ' <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;'
-                  + 'background:#fffbeb;color:#d97706;border:1px solid #fde68a;">Modified</span>';
+                  + 'background:var(--warn-amber-bg);color:#d97706;border:1px solid #fde68a;">Modified</span>';
 
       // Single-row layout: label | pills ... | reset
       html += '<div style="display:grid;grid-template-columns:220px 1fr auto;align-items:center;'
@@ -347,7 +347,7 @@ function onAppTypeChange() {
     var sc = document.getElementById('scorecardPanel');
     if(sc) sc.style.opacity = '0.4';
     var tier = document.getElementById('sc_score_tier');
-    if(tier) { tier.textContent = 'File Update Only'; tier.style.color = '#888'; }
+    if(tier) { tier.textContent = 'File Update Only'; tier.style.color = 'var(--gray)'; }
     var note = document.getElementById('apptype_score_note');
     if(note) note.style.display = 'block';
   }

@@ -635,7 +635,7 @@ function renderLoanDetail(ln, d, t){
 
       // Next payment date banner (approved loans only)
       (!isPending ? '<div style="background:var(--dark2);border-radius:8px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">'+
-        '<div style="font-size:12px;color:#888;">Next Payment Due</div>'+
+        '<div style="font-size:12px;color:var(--gray);">Next Payment Due</div>'+
         '<div style="font-family:\'DM Serif Display\',serif;font-size:16px;color:var(--yellow);" id="ln-next-pay-display">'+nextPayDate+'</div>'+
       '</div>' : '')+
 

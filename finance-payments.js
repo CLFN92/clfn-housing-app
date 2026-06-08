@@ -105,7 +105,7 @@ function openCashDenom(amount, callback) {
   });
   document.getElementById('denomTotalVal').textContent = '$0.00';
   document.getElementById('denomBalanceVal').textContent = '\u2014';
-  document.getElementById('denomBalanceVal').style.color = '#888';
+  document.getElementById('denomBalanceVal').style.color = 'var(--gray)';
   document.getElementById('denomBalanceLbl').textContent = 'Balance';
   var msg = document.getElementById('denomStatusMsg'); if(msg) msg.style.display='none';
   var btn = document.getElementById('denomConfirmBtn'); if(btn){btn.disabled=false;btn.style.opacity='1';}
@@ -133,7 +133,7 @@ function calcDenomTotal() {
   var balLbl = document.getElementById('denomBalanceLbl');
   document.getElementById('denomTotalVal').textContent = fmt(total);
   if (total === 0) {
-    balEl.textContent='\u2014'; balEl.style.color='#888'; balLbl.textContent='Balance';
+    balEl.textContent='\u2014'; balEl.style.color='var(--gray)'; balLbl.textContent='Balance';
     msg.style.display='none'; btn.disabled=true; btn.style.opacity='.45';
   } else if (Math.abs(diff) < 0.01) {
     balEl.textContent='Balanced'; balEl.style.color='#4ade80'; balLbl.textContent='Status';

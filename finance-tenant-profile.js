@@ -112,7 +112,7 @@ function renderTenantProfile(tid) {
     // Inline icon + label on one line for the compact layout
     var labelRow = cell.appendChild(document.createElement('div'));
     labelRow.style.cssText = 'font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:' +
-      (isTotal ? '#888' : 'var(--muted)') + ';margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px;';
+      (isTotal ? 'var(--gray)' : 'var(--muted)') + ';margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px;';
     if (tile.icon) {
       var ic = labelRow.appendChild(document.createElement('span'));
       ic.style.cssText = 'font-size:11px;';

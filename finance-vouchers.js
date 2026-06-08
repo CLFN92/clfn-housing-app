@@ -17,8 +17,8 @@ function openVoucher(txn) {
   var html = '<div class="voucher">'+
     '<div class="voucher-hdr"><div>'+
       '<div style="font-size:16px;color:#fff;">'+(window.NATION_CONFIG && window.NATION_CONFIG.display_name || "")+'</div>'+
-      '<div style="font-size:11px;color:#888;">Housing Finance \u2014 Transaction Voucher</div></div>'+
-      '<div style="text-align:right;"><div style="font-size:11px;color:#888;">Voucher #</div>'+
+      '<div style="font-size:11px;color:var(--gray);">Housing Finance \u2014 Transaction Voucher</div></div>'+
+      '<div style="text-align:right;"><div style="font-size:11px;color:var(--gray);">Voucher #</div>'+
       '<div style="color:var(--yellow);font-weight:700;font-size:13px;">'+voucherNum+'</div></div></div>'+
     '<div class="voucher-body">'+
       '<div class="voucher-row"><span class="lbl">Date</span><span>'+txn.date+'</span></div>'+
@@ -40,7 +40,7 @@ function openVoucher(txn) {
       '<div class="voucher-row"><span class="lbl">Generated</span><span>'+new Date().toLocaleString('en-CA')+'</span></div>'+
     '</div>'+
     '<div class="voucher-total">'+
-      '<span style="font-size:13px;color:#888;">'+(isPayment?'Payment Received':'Charge Posted')+'</span>'+
+      '<span style="font-size:13px;color:var(--gray);">'+(isPayment?'Payment Received':'Charge Posted')+'</span>'+
       '<div style="font-size:26px;color:var(--yellow);">'+fmt(isPayment?txn.payment:txn.charge)+'</div></div>'+
   '</div>';
   document.getElementById('voucherContent').innerHTML = html;
@@ -270,7 +270,7 @@ function printVoucherWithSigs(){
 
   var printCSS = [
     '@page{size:letter;margin:42mm 16mm 22mm;}',
-    '@page{@bottom-left{content:"CONFIDENTIAL";font-size:9px;color:#888;}@bottom-right{content:"Page " counter(page);font-size:9px;color:#888;}}',
+    '@page{@bottom-left{content:"CONFIDENTIAL";font-size:9px;color:var(--gray);}@bottom-right{content:"Page " counter(page);font-size:9px;color:var(--gray);}}',
     'body{font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#111;margin:0;padding:0;}',
     '.pg-hdr{position:fixed;top:0;left:0;right:0;background:#fff;border-bottom:2px solid #F8E41A;padding:10px 16px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;}',
     '.pg-hdr-logo{height:44px;width:auto;}',
@@ -278,17 +278,17 @@ function printVoucherWithSigs(){
     '.pg-hdr-nation strong{font-size:11px;color:#111;display:block;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}',
     '.pg-hdr-title{text-align:right;}',
     '.pg-hdr-title h1{font-size:13px;font-weight:700;color:#111;margin:0 0 2px;}',
-    '.pg-hdr-title .gen-date{font-size:9px;color:#888;}',
+    '.pg-hdr-title .gen-date{font-size:9px;color:var(--gray);}',
     '.content{padding:16px 0 0;}',
     '.inv-meta{display:grid;grid-template-columns:1fr 1fr;gap:20px;border:1px solid #ddd;border-radius:6px;padding:12px 16px;margin-bottom:16px;}',
-    '.inv-meta-lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;}',
+    '.inv-meta-lbl{font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;}',
     '.inv-meta-val{font-size:13px;font-weight:700;color:#111;}',
     '.inv-meta-addr{font-size:11px;color:#444;margin-top:4px;white-space:pre-line;}',
     '.voucher-hdr{display:none;}',
     '.voucher{border-radius:0;}',
     '.voucher-body{border:1px solid #ddd;border-top:none;padding:0;}',
     '.voucher-row{display:flex;justify-content:space-between;align-items:center;padding:9px 16px;border-bottom:1px solid #eee;font-size:13px;}',
-    '.lbl{color:#888;font-size:12px;}',
+    '.lbl{color:var(--gray);font-size:12px;}',
     '.voucher-total{background:#111;color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;}',
     '.txn-type-charge{color:#ef4444;font-weight:700;}.txn-type-payment{color:#22c55e;font-weight:700;}',
     '.amt-credit{color:#22c55e;font-weight:600;}.amt-debit{color:#ef4444;font-weight:600;}',

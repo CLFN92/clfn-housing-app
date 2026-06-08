@@ -46,7 +46,7 @@ function renderStatementPage(tid) {
       {lbl:'Total Owing', val:grand, color:'var(--yellow)', dark:true},
     ].map(function(tile){
       return '<div style="background:'+(tile.dark?'var(--dark)':'var(--surface)')+';border:1px solid var(--border);border-radius:10px;padding:12px 14px;text-align:center;">'+
-        '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:'+(tile.dark?'#888':'var(--muted)')+';margin-bottom:4px;">'+tile.lbl+'</div>'+
+        '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:'+(tile.dark?'var(--gray)':'var(--muted)')+';margin-bottom:4px;">'+tile.lbl+'</div>'+
         '<div style="font-size:20px;font-weight:700;color:'+tile.color+';">'+fmt(tile.val)+'</div>'+
         (tile.sub?'<div style="font-size:11px;color:var(--success);">'+tile.sub+'</div>':'')+
       '</div>';

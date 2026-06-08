@@ -206,10 +206,10 @@ function renderInventoryView(){
   var statusStyle = {
     vacant:      {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
     occupied:    {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
-    under_repair:{bg:'#fffbeb',c:'#92400e',label:'Under Repair'},
+    under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Under Repair'},
     reserved:    {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
     condemned:   {bg:'#fef2f2',c:'#b91c1c',label:'Condemned'},
-    archived:    {bg:'#f4f4f0',c:'#888',   label:'Archived'}
+    archived:    {bg:'#f4f4f0',c:'var(--gray)',   label:'Archived'}
   };
 
   // ── Column-menu sort + filter via the shared scaffolding (Phase 2A) ────
@@ -253,7 +253,7 @@ function renderInventoryView(){
 
   // ─────────────────────────────────────────────────────────────────────
   function _invRowHtml(u){
-    var ss = statusStyle[u.status]||{bg:'#f0f0ec',c:'#888',label:u.status||'Unknown'};
+    var ss = statusStyle[u.status]||{bg:'#f0f0ec',c:'var(--gray)',label:u.status||'Unknown'};
     var addr = u.num+' '+u.street;
     var bath = (u.bathrooms&&u.bathrooms!=='0'&&u.bathrooms!=='nan') ? u.bathrooms : '—';
     var fnd  = (u.foundation&&u.foundation!=='nan'&&u.foundation!=='0') ? u.foundation : '—';
@@ -861,7 +861,7 @@ function unitSearchFilter(q) {
   var statusStyle = {
     vacant:      {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
     occupied:    {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
-    under_repair:{bg:'#fffbeb',c:'#92400e',label:'Under Repair'},
+    under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Under Repair'},
     reserved:    {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
     condemned:   {bg:'#fef2f2',c:'#b91c1c',label:'Condemned'}
   };
@@ -875,7 +875,7 @@ function unitSearchFilter(q) {
   }
 
   container.innerHTML = filtered.map(function(u) {
-    var ss = statusStyle[u.status]||{bg:'#f0f0ec',c:'#888',label:u.status};
+    var ss = statusStyle[u.status]||{bg:'#f0f0ec',c:'var(--gray)',label:u.status};
     return '<div onclick="closeUnitSearch();openUnitEditModal(\''+u.id.replace(/'/g,"\\'")+'\')" '
       +'style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg);transition:border-color .12s;" '
       +'onmouseover="this.style.borderColor=\'var(--yellow)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
@@ -1408,7 +1408,7 @@ function showEmployeeHome(){
     tilesEl.innerHTML = empTiles.map(function(t) {
       var ab = t.accent ? 'background:var(--dark);border:2px solid var(--yellow);' : 'background:var(--surface);border:1px solid var(--border);';
       var lc = t.accent ? 'color:var(--yellow);' : '';
-      var dc = t.accent ? 'color:#888;' : 'color:var(--muted);';
+      var dc = t.accent ? 'color:var(--gray);' : 'color:var(--muted);';
             return '<div onclick="'+t.fn+'" style="'+ab+'border-radius:12px;padding:22px;cursor:pointer;transition:box-shadow .15s;display:flex;flex-direction:column;gap:10px;"'
         +' onmouseover="this.style.boxShadow=&quot;0 4px 16px rgba(0,0,0,0.1)&quot;" onmouseout="this.style.boxShadow=&quot;&quot;">'
         +'<div style="font-size:28px;">'+t.icon+'</div>'
@@ -1507,7 +1507,7 @@ async function renderRecentActivity(role) {
     'ed_adjustment':            {icon:'⭐', color:'#7a5c00', label:'Score Adjusted'},
     'unit_edit':                {icon:'🏠', color:'#7c3aed', label:'Unit Updated'},
     'unit_assigned':            {icon:'🔑', color:'#15803d', label:'Unit Assigned'},
-    'unit_archived':            {icon:'🏚️', color:'#888',    label:'Unit Archived'},
+    'unit_archived':            {icon:'🏚️', color:'var(--gray)',    label:'Unit Archived'},
     'unit_unarchived':          {icon:'📤', color:'#1d4ed8', label:'Unit Restored'},
     'sow_created':              {icon:'🔨', color:'#d97706', label:'Request Created'},
     'sow_updated':              {icon:'🔨', color:'#d97706', label:'Request Updated'},
@@ -1517,7 +1517,7 @@ async function renderRecentActivity(role) {
     'sow_staff_signed':         {icon:'✍️', color:'var(--muted)', label:'Staff Signed Request'},
     'sow_accountability':       {icon:'⚠️', color:'#b91c1c', label:'Accountability Flagged'},
     'ct_submitted':             {icon:'🧰', color:'#15803d', label:'Contractor Application'},
-    'ct_updated':               {icon:'🧰', color:'#888',    label:'Contractor Updated'},
+    'ct_updated':               {icon:'🧰', color:'var(--gray)',    label:'Contractor Updated'},
     'hm_recommended':           {icon:'✅', color:'#1d4ed8', label:'HM Recommended'},
     'approved':                 {icon:'✅', color:'#15803d', label:'Approved'},
     'returned':                 {icon:'↩️', color:'#7c3aed', label:'Returned for Info'},

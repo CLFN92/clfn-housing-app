@@ -1534,7 +1534,7 @@ function _ctRenderFlow(status, ct, prefix) {
     var done = i < currentIdx || (i===2 && status==='approved');
     var active = i === currentIdx && !declined && !returned;
     var bg = done?'#15803d':active?'var(--yellow)':'var(--border)';
-    var col = done?'#fff':active?'#111':'#888';
+    var col = done?'#fff':active?'#111':'var(--gray)';
     var note = i===1&&hmAt?hmAt:i===2&&edAt?edAt:'';
     return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;">'
       +(i>0?'<div style="position:absolute;left:-50%;top:18px;width:100%;height:2px;background:'+(done?'var(--success)':'var(--border)')+'"></div>':'')
@@ -2038,13 +2038,13 @@ function _ctSetCicStatusBanner(ct) {
   var banner = document.getElementById('cic_status_banner');
   if(!banner) return;
   var ctStatusStyle = {
-    pending_review: {bg:'#fffbeb',c:'#92400e',label:'⏳ Pending Housing Manager Review'},
+    pending_review: {bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'⏳ Pending Housing Manager Review'},
     hm_recommended: {bg:'#eff6ff',c:'#1d4ed8',label:'📋 HM Recommended — Awaiting ED Approval'},
     approved:       {bg:'#f0fdf4',c:'#15803d',label:'✅ Approved — Active Contractor'},
     declined:       {bg:'#fef2f2',c:'#b91c1c',label:'❌ Declined'},
     returned:       {bg:'#faf5ff',c:'#7c3aed',label:'↩ Returned for More Information'}
   };
-  var ss = ctStatusStyle[ct.status || 'pending_review'] || {bg:'#f4f4f0',c:'#888',label:ct.status||'Unknown'};
+  var ss = ctStatusStyle[ct.status || 'pending_review'] || {bg:'#f4f4f0',c:'var(--gray)',label:ct.status||'Unknown'};
   banner.textContent = ss.label;
   banner.style.background = ss.bg;
   banner.style.color = ss.c;
@@ -2541,13 +2541,13 @@ function openCtApprovalPanel(idx) {
 
   // Status banner
   var ctStatusStyle = {
-    pending_review: {bg:'#fffbeb',c:'#92400e',label:'⏳ Pending Housing Manager Review'},
+    pending_review: {bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'⏳ Pending Housing Manager Review'},
     hm_recommended: {bg:'#eff6ff',c:'#1d4ed8',label:'📋 HM Recommended — Awaiting ED Approval'},
     approved:       {bg:'#f0fdf4',c:'#15803d',label:'✅ Approved — Active Contractor'},
     declined:       {bg:'#fef2f2',c:'#b91c1c',label:'❌ Declined'},
     returned:       {bg:'#faf5ff',c:'#7c3aed',label:'↩ Returned for More Information'}
   };
-  var ss = ctStatusStyle[ct.status||'pending_review'] || {bg:'#f4f4f0',c:'#888',label:ct.status};
+  var ss = ctStatusStyle[ct.status||'pending_review'] || {bg:'#f4f4f0',c:'var(--gray)',label:ct.status};
   var banner = document.getElementById('ctap_status_banner');
   if(banner){ banner.textContent=ss.label; banner.style.background=ss.bg; banner.style.color=ss.c; }
 
@@ -3485,7 +3485,7 @@ function renderRenoScoreTable() {
   tbody.innerHTML = model.map(function(row) {
     var isNew = row.factor !== prevFactor;
     prevFactor = row.factor;
-    var ptsColor = row.pts > 0 ? '#15803d' : row.pts < 0 ? '#b91c1c' : '#888';
+    var ptsColor = row.pts > 0 ? '#15803d' : row.pts < 0 ? '#b91c1c' : 'var(--gray)';
     return '<tr class="row-divider">'
       +'<td style="padding:9px 12px;font-size:13px;font-weight:600;color:var(--text);">'+(isNew?row.factor:'')+'</td>'
       +'<td style="padding:9px 12px;font-size:13px;color:var(--muted);">'+row.condition+'</td>'
@@ -3493,7 +3493,7 @@ function renderRenoScoreTable() {
         +(row.editable
           ?'<input type="number" data-rsm-id="'+row.id+'" value="'+row.pts+'" step="1" min="-50" max="50"'
             +' style="width:60px;text-align:center;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';background:var(--surface);"'
-            +' onchange="this.style.color=+this.value>0?\'#15803d\':\'#888\'"/>'
+            +' onchange="this.style.color=+this.value>0?\'#15803d\':\'var(--gray)\'"/>'
           :'<span style="font-size:13px;font-weight:700;color:'+ptsColor+';">'+row.pts+'</span>')
       +'</td>'
       +'<td style="padding:9px 12px;font-size:11px;color:var(--muted);">'+row.notes+'</td>'
@@ -3678,7 +3678,7 @@ function renderScoresTable() {
       'Medium Priority': {bg:'#fef9ec',c:'#7a6000'},
       'Low Priority':    {bg:'#fef2f2',c:'#b91c1c'}
     };
-    var tc = map[tier] || {bg:'#f0f0ec',c:'#888'};
+    var tc = map[tier] || {bg:'#f0f0ec',c:'var(--gray)'};
     return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:'+tc.bg+';color:'+tc.c+';">'+tier.replace(' Priority','')+'</span>';
   }
   
@@ -3773,7 +3773,7 @@ function renderUnitScoreTable(){
     var isNew=row.factor!==prevFactor;
     prevFactor=row.factor;
     var rowStyle='border-bottom:1px solid var(--border);'+(isNew&&prevFactor!==model[0].factor?'border-top:2px solid var(--border);':'');
-    var ptsColor=row.pts>0?'#15803d':row.pts<0?'#b91c1c':'#888';
+    var ptsColor=row.pts>0?'#15803d':row.pts<0?'#b91c1c':'var(--gray)';
     var ptsDisplay=(row.pts>0?'+':'')+row.pts;
     return '<tr style="'+rowStyle+'">'
       +'<td style="padding:9px 12px;font-size:13px;font-weight:600;color:var(--text);">'+(isNew?row.factor:'')+'</td>'

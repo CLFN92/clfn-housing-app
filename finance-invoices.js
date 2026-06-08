@@ -34,7 +34,7 @@ function openInvoiceVoucher(txn) {
   var isPaid = (txn.invoiceBalance||0) <= 0.005;
   var isPartial = !isPaid && txn.payments && txn.payments.length > 0;
   var statusLabel = isPaid ? 'PAID IN FULL' : isPartial ? 'PARTIALLY PAID' : 'UNPAID';
-  var statusBg = isPaid ? '#15803d' : isPartial ? '#92400e' : '#dc2626';
+  var statusBg = isPaid ? '#15803d' : isPartial ? 'var(--warn-amber-text)' : '#dc2626';
   var voucherNum = txn.ref || ('INV-'+txn.id.slice(-6).toUpperCase());
   var paymentsHtml = '';
   if (txn.payments && txn.payments.length) {
@@ -49,8 +49,8 @@ function openInvoiceVoucher(txn) {
   var html = '<div class="voucher">' +
     '<div class="voucher-hdr"><div>' +
       '<div style="font-family:var(--serif);font-size:16px;color:#fff;">'+(window.NATION_CONFIG && window.NATION_CONFIG.display_name || "")+'</div>' +
-      '<div style="font-size:11px;color:#888;">Housing Finance \u2014 Rent Invoice</div></div>' +
-      '<div style="text-align:right;"><div style="font-size:11px;color:#888;">Invoice #</div>' +
+      '<div style="font-size:11px;color:var(--gray);">Housing Finance \u2014 Rent Invoice</div></div>' +
+      '<div style="text-align:right;"><div style="font-size:11px;color:var(--gray);">Invoice #</div>' +
       '<div style="color:var(--yellow);font-weight:700;font-size:13px;">'+voucherNum+'</div></div></div>' +
     '<div class="voucher-body">' +
       '<div class="voucher-row"><span class="lbl">Invoice Date</span><span>'+txn.date+'</span></div>' +
