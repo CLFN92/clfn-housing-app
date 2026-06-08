@@ -39,8 +39,9 @@ window._printThemeStyles = function() {
 // Any field may be missing/empty — that token then keeps its CSS default.
 // Logo data URL is applied to all <img class="hlogo"> + #login-logo elements.
 // ═══════════════════════════════════════════════════════════════════════
-window.THEME_KEYS = ['yellow','dark','text'];
-window.THEME_DEFAULTS = { yellow: '#F8E41A', dark: '#111110', text: '#111110' };
+window.THEME_KEYS = ['yellow','dark','text','bg','surface','border','muted'];
+window.THEME_DEFAULTS = { yellow:'#F8E41A', dark:'#111110', text:'#111110',
+                          bg:'#fafaf8', surface:'#ffffff', border:'#e8e6df', muted:'#696960' };
 
 // ═══════════════════════════════════════════════════════════════════════
 // showAlert — centered branded notification with a single OK button.

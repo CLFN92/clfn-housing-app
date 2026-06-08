@@ -766,9 +766,13 @@ function renderThemesPanel() {
   var defaults = window.THEME_DEFAULTS || { yellow:'#F8E41A', dark:'#111110', text:'#111110' };
   var hasLogo = !!theme.logo;
   body.innerHTML =
-      _themeFieldRow('yellow', 'Brand Accent', 'Primary highlight — buttons, badges, links', theme.yellow, defaults.yellow)
-    + _themeFieldRow('dark',   'Header / Dark Surface', 'App header, modal headers, print banners', theme.dark, defaults.dark)
-    + _themeFieldRow('text',   'Body Text', 'Default text color across the app', theme.text, defaults.text)
+      _themeFieldRow('yellow',  'Brand Accent',       'Primary highlight — buttons, badges, links',  theme.yellow,  defaults.yellow)
+    + _themeFieldRow('dark',    'Header / Dark Surface','App header, modal headers, print banners',   theme.dark,    defaults.dark)
+    + _themeFieldRow('text',    'Body Text',            'Default text color across the app',           theme.text,    defaults.text)
+    + _themeFieldRow('bg',      'Page Background',      'Main background behind all cards',            theme.bg,      defaults.bg)
+    + _themeFieldRow('surface', 'Card Surface',         'Card and panel background color',             theme.surface, defaults.surface)
+    + _themeFieldRow('border',  'Borders',              'Lines separating sections and cards',         theme.border,  defaults.border)
+    + _themeFieldRow('muted',   'Muted Text',           'Secondary labels and helper text',            theme.muted,   defaults.muted)
     + '<div class="theme-logo-zone upload-zone p-16"'
     +   ' id="theme_logo_zone"'
     +   ' ondragover="photoDragOver(event,\'theme_logo_zone\')"'
@@ -876,9 +880,13 @@ function _readThemeFromForm() {
   function v(id){ var el=document.getElementById(id); return el ? (el.value||'').trim() : ''; }
   function cb(id){ var el=document.getElementById(id); return !!(el && el.checked); }
   return {
-    yellow:           v('theme_yellow_hex') || v('theme_yellow'),
-    dark:             v('theme_dark_hex')   || v('theme_dark'),
-    text:             v('theme_text_hex')   || v('theme_text'),
+    yellow:           v('theme_yellow_hex')  || v('theme_yellow'),
+    dark:             v('theme_dark_hex')    || v('theme_dark'),
+    text:             v('theme_text_hex')    || v('theme_text'),
+    bg:               v('theme_bg_hex')      || v('theme_bg'),
+    surface:          v('theme_surface_hex') || v('theme_surface'),
+    border:           v('theme_border_hex')  || v('theme_border'),
+    muted:            v('theme_muted_hex')   || v('theme_muted'),
     logo:             window._themeDraftLogo || '',
     logoTransparent:  cb('theme_logo_transparent')
   };
