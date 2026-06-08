@@ -3269,7 +3269,10 @@
   // ════════════════════════════════════════════════════════════════════════════
   // Set Location & Photo (SLP) — Admin Workflow
   // Requires APPROVAL_AUTHORITY.can('setUnitLocation', role).
-  // Leaflet + exifr loaded via CDN in tenants.html <head>.
+  // Self-contained: _slpEnsureModal() dynamically injects the overlay HTML and
+  // lazy-loads Leaflet + exifr on any page that shares housing-tic.js.
+  // tenants.html has the static overlay in DOM and scripts in <head> — both are
+  // detected and skipped so there is no double-load or double-wire.
   // Photos upload to housing-files bucket under units/{id}/photo/.
   // photo_url column stores the path; sbGetFileUrl() resolves it at render time.
   // ════════════════════════════════════════════════════════════════════════════
@@ -3279,10 +3282,104 @@
   var _slpLat    = null;
   var _slpLng    = null;
   var _slpFile   = null;
+  var _slpWired  = false;
   var _CLFN_LAT  = 49.8063;
   var _CLFN_LNG  = -84.1434;
 
-  function _slpInit() {
+  var _SLP_MODAL_HTML = '<div class="slp-modal">'
+    + '<div class="slp-header">'
+    +   '<div><div class="slp-header-label">Admin</div>'
+    +   '<div class="slp-header-title">Set Unit Location &amp; Photo</div></div>'
+    +   '<button class="slp-close" id="slp-close" aria-label="Close">&#x2715;</button>'
+    + '</div>'
+    + '<div class="slp-body">'
+    +   '<div class="slp-photo-col">'
+    +     '<div class="slp-section-label">House Photo</div>'
+    +     '<div class="slp-dropzone" id="slp-dropzone">'
+    +       '<div class="slp-dropzone-inner" id="slp-dropzone-inner">'
+    +         '<span class="slp-dropzone-icon">&#127968;</span>'
+    +         '<p class="slp-dropzone-text">Drop photo here<br>or click to browse</p>'
+    +         '<p class="slp-dropzone-hint">JPEG &middot; PNG &middot; HEIC</p>'
+    +       '</div>'
+    +       '<img class="slp-photo-preview" id="slp-photo-preview" src="" alt="House photo preview" style="display:none;"/>'
+    +       '<input type="file" id="slp-file-input" accept="image/jpeg,image/png,image/heic,image/heif" style="display:none;"/>'
+    +     '</div>'
+    +     '<div class="slp-exif-banner slp-exif-found" id="slp-exif-found" style="display:none;">'
+    +       '<span>&#9989;</span>'
+    +       '<div><strong>GPS found in photo</strong><div id="slp-exif-coords-text">&#8212;</div></div>'
+    +     '</div>'
+    +     '<div class="slp-exif-banner slp-exif-none" id="slp-exif-none" style="display:none;">'
+    +       '<span>&#9888;&#65039;</span>'
+    +       '<div><strong>No GPS in this photo</strong><div>Drop a pin on the map manually.</div></div>'
+    +     '</div>'
+    +     '<button class="slp-remove-photo" id="slp-remove-photo" style="display:none;">&#x2715; Remove photo</button>'
+    +     '<div class="slp-section-label" style="margin-top:20px;">Coordinates</div>'
+    +     '<div class="slp-coords-row">'
+    +       '<div class="slp-coord-field"><label>Latitude</label>'
+    +       '<input type="text" id="slp-lat-display" readonly placeholder="Drop a pin"/></div>'
+    +       '<div class="slp-coord-field"><label>Longitude</label>'
+    +       '<input type="text" id="slp-lng-display" readonly placeholder="Drop a pin"/></div>'
+    +     '</div>'
+    +     '<button class="slp-geolocate-btn" id="slp-geolocate">&#127919; Use my current location</button>'
+    +   '</div>'
+    +   '<div class="slp-map-col">'
+    +     '<div class="slp-section-label">Pin Location'
+    +       '<span class="slp-map-hint">Click map to place pin</span>'
+    +     '</div>'
+    +     '<div id="slp-map"></div>'
+    +     '<p class="slp-map-note">OSM tiles &middot; No address data sent externally</p>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="slp-footer">'
+    +   '<button class="slp-btn-cancel" id="slp-cancel">Cancel</button>'
+    +   '<button class="slp-btn-save" id="slp-save" disabled>Save Location &amp; Photo</button>'
+    + '</div>'
+    + '</div>';
+
+  function _slpLoadScript(src, cb) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = cb;
+    s.onerror = function(){ console.error('[SLP] Script load failed:', src); cb(); };
+    document.head.appendChild(s);
+  }
+
+  function _slpEnsureModal(cb) {
+    var overlay = document.getElementById('slp-overlay');
+    if(!overlay) {
+      if(!document.getElementById('slp-leaflet-css')) {
+        var link = document.createElement('link');
+        link.id   = 'slp-leaflet-css';
+        link.rel  = 'stylesheet';
+        link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+        document.head.appendChild(link);
+      }
+      overlay = document.createElement('div');
+      overlay.className = 'slp-overlay';
+      overlay.id        = 'slp-overlay';
+      overlay.setAttribute('style', 'display:none;');
+      overlay.setAttribute('aria-modal', 'true');
+      overlay.setAttribute('role', 'dialog');
+      overlay.innerHTML = _SLP_MODAL_HTML;
+      document.body.appendChild(overlay);
+    }
+
+    var pending = 0;
+    function done() { if(--pending === 0) { _slpWireEvents(); cb(overlay); } }
+    if(typeof L === 'undefined') {
+      pending++;
+      _slpLoadScript('https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js', done);
+    }
+    if(typeof exifr === 'undefined') {
+      pending++;
+      _slpLoadScript('https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js', done);
+    }
+    if(pending === 0) { _slpWireEvents(); cb(overlay); }
+  }
+
+  function _slpWireEvents() {
+    if(_slpWired) return;
+    _slpWired = true;
     var overlay   = document.getElementById('slp-overlay');
     if(!overlay) return;
     var btnClose  = document.getElementById('slp-close');
@@ -3345,12 +3442,17 @@
     btnSave.addEventListener('click', _slpSave);
   }
 
-  function _slpOpen() {
+  function _slpInit() {
     var overlay = document.getElementById('slp-overlay');
-    if(!overlay) return;
-    overlay.style.display = 'flex';
-    _slpReset();
-    _slpInitMap();
+    if(overlay) _slpWireEvents();
+  }
+
+  function _slpOpen() {
+    _slpEnsureModal(function(overlay) {
+      overlay.style.display = 'flex';
+      _slpReset();
+      _slpInitMap();
+    });
   }
 
   function _slpClose() {
