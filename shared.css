@@ -1391,6 +1391,17 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
   background: var(--bg); color: var(--text); font-size: 13px;
   width: 100%; box-sizing: border-box; cursor: pointer;
 }
+.theme-row .theme-range {
+  grid-column: span 2;
+  display: flex; align-items: center; gap: 10px;
+}
+.theme-row .theme-range input[type="range"] {
+  flex: 1; cursor: pointer; accent-color: var(--yellow);
+}
+.theme-row .theme-range-val {
+  font-size: 12px; color: var(--muted); min-width: 34px; text-align: right;
+  font-family: ui-monospace, Menlo, Monaco, 'Courier New', monospace;
+}
 .theme-logo-zone { margin-top: 14px; }
 .theme-logo-preview-wrap {
   display: flex; flex-direction: column; align-items: center; gap: 10px;

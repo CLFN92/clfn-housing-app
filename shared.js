@@ -39,10 +39,10 @@ window._printThemeStyles = function() {
 // Any field may be missing/empty — that token then keeps its CSS default.
 // Logo data URL is applied to all <img class="hlogo"> + #login-logo elements.
 // ═══════════════════════════════════════════════════════════════════════
-window.THEME_KEYS = ['yellow','dark','text','bg','surface','border','muted','sans','serif'];
+window.THEME_KEYS = ['yellow','dark','text','bg','surface','border','muted','sans','serif','radius'];
 window.THEME_DEFAULTS = { yellow:'#F8E41A', dark:'#111110', text:'#111110',
                           bg:'#fafaf8', surface:'#ffffff', border:'#e8e6df', muted:'#696960',
-                          sans:'DM Sans', serif:'DM Serif Display' };
+                          sans:'DM Sans', serif:'DM Serif Display', radius:'10px' };
 
 // Font definitions — maps font name → { css: full font-family stack, google: needs Google Fonts }
 window.FONT_DEFS = {

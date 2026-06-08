@@ -743,6 +743,17 @@ function showRenosForRole() {
 // Persisted to housing_settings.theme as { yellow, dark, text, logo }
 // Applied live via _applyTheme() (defined in shared.js)
 // ══════════════════════════════════════════════════════════════
+function _themeRangeRow(key, label, desc, min, max, currentVal, defaultVal) {
+  var raw = parseInt(currentVal || defaultVal) || 0;
+  return '<div class="theme-row">'
+    + '<label for="theme_'+key+'">'+label+'</label>'
+    + '<div class="theme-range">'
+    +   '<input type="range" id="theme_'+key+'" min="'+min+'" max="'+max+'" value="'+raw+'" oninput="_themeOnRangeChange(\''+key+'\')"/>'
+    +   '<span class="theme-range-val" id="theme_'+key+'_val">'+raw+'px</span>'
+    + '</div>'
+    + '<span class="theme-desc">'+desc+'</span>'
+    + '</div>';
+}
 function _themeSelectRow(key, label, desc, options, currentVal, defaultVal) {
   var val = currentVal || defaultVal;
   var opts = options.map(function(o) {
@@ -784,6 +795,7 @@ function renderThemesPanel() {
     + _themeFieldRow('surface', 'Card Surface',         'Card and panel background color',             theme.surface, defaults.surface)
     + _themeFieldRow('border',  'Borders',              'Lines separating sections and cards',         theme.border,  defaults.border)
     + _themeFieldRow('muted',   'Muted Text',           'Secondary labels and helper text',            theme.muted,   defaults.muted)
+    + _themeRangeRow('radius',  'Border Radius',        'Roundness of cards, buttons, and inputs (0–24 px)', 0, 24, theme.radius, defaults.radius)
     + _themeSelectRow('sans',  'Body Font',            'Used for all body copy, labels, and UI text',
         [{value:'DM Sans',label:'DM Sans (default)'},{value:'Inter',label:'Inter'},
          {value:'Roboto',label:'Roboto'},{value:'Open Sans',label:'Open Sans'},
@@ -828,6 +840,15 @@ function renderThemesPanel() {
   _themeOnTransparentChange();
 }
 
+// Range slider → update live readout + apply CSS variable immediately
+function _themeOnRangeChange(key) {
+  var slider = document.getElementById('theme_' + key);
+  var valEl  = document.getElementById('theme_' + key + '_val');
+  if (!slider) return;
+  var px = slider.value + 'px';
+  if (valEl) valEl.textContent = px;
+  document.documentElement.style.setProperty('--' + key, px);
+}
 // Font select → load font + apply CSS variable live for immediate preview
 function _themeOnFontChange(key) {
   var sel = document.getElementById('theme_' + key);
@@ -921,6 +942,7 @@ function _readThemeFromForm() {
     muted:            v('theme_muted_hex')   || v('theme_muted'),
     sans:             v('theme_sans'),
     serif:            v('theme_serif'),
+    radius:           (function(){ var el=document.getElementById('theme_radius'); return el ? el.value+'px' : ''; })(),
     logo:             window._themeDraftLogo || '',
     logoTransparent:  cb('theme_logo_transparent')
   };
