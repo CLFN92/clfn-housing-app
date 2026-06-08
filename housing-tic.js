@@ -3485,7 +3485,7 @@
       var u = _ticState.unit || {};
       var startLat = u.latitude  ? parseFloat(u.latitude)  : _CLFN_LAT;
       var startLng = u.longitude ? parseFloat(u.longitude) : _CLFN_LNG;
-      _slpMap = L.map('slp-map', { center: [startLat, startLng], zoom: 15, scrollWheelZoom: true });
+      _slpMap = L.map('slp-map', { center: [startLat, startLng], zoom: 12, scrollWheelZoom: true });
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -3514,7 +3514,7 @@
         _slpUpdateCoords(p.lat, p.lng);
       });
     }
-    _slpMap.setView([lat, lng], Math.max(_slpMap.getZoom(), 17));
+    _slpMap.setView([lat, lng], Math.max(_slpMap.getZoom(), 15));
     _slpUpdateCoords(lat, lng);
   }
 

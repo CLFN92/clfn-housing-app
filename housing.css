@@ -2097,7 +2097,6 @@ body.tic-modal-open       { overflow: hidden; }
 #slp-map {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
   border-radius: 3px;
   border: 1.5px solid var(--border);
 }
