@@ -2095,8 +2095,8 @@ body.tic-modal-open       { overflow: hidden; }
   overflow: hidden;
 }
 #slp-map {
-  flex: 1;
-  min-height: 0;
+  width: 100%;
+  height: clamp(220px, calc(90vh - 300px), 520px);
   border-radius: 3px;
   border: 1.5px solid var(--border);
 }
@@ -2140,8 +2140,7 @@ body.tic-modal-open       { overflow: hidden; }
 @media (max-width: 640px) {
   .slp-body        { flex-direction: column; overflow-y: auto; }
   .slp-photo-col   { width: 100%; border-right: none; border-bottom: 1.5px solid var(--border); }
-  .slp-map-col     { overflow: visible; }
-  #slp-map         { flex: none; height: 280px; }
+  #slp-map         { height: 280px; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════
