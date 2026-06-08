@@ -3480,24 +3480,22 @@
   }
 
   function _slpInitMap() {
-    // Double rAF guarantees we are in a fresh paint cycle — overlay is visible
-    // and the browser has committed the flex layout before Leaflet measures.
-    requestAnimationFrame(function() {
-      requestAnimationFrame(function() {
-        if(typeof L === 'undefined') return;
-        var u = _ticState.unit || {};
-        var startLat = u.latitude  ? parseFloat(u.latitude)  : _CLFN_LAT;
-        var startLng = u.longitude ? parseFloat(u.longitude) : _CLFN_LNG;
-        _slpMap = L.map('slp-map', { center: [startLat, startLng], zoom: 12, scrollWheelZoom: true });
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        }).addTo(_slpMap);
-        _slpMap.invalidateSize({ animate: false });
-        if(u.latitude && u.longitude) _slpPlacePin(startLat, startLng);
-        _slpMap.on('click', function(e){ _slpPlacePin(e.latlng.lat, e.latlng.lng); });
-      });
-    });
+    // setTimeout fires after paint (unlike rAF which fires before) — overlay flex
+    // layout is fully committed before Leaflet measures the container.
+    setTimeout(function() {
+      if(typeof L === 'undefined') return;
+      var u = _ticState.unit || {};
+      var startLat = u.latitude  ? parseFloat(u.latitude)  : _CLFN_LAT;
+      var startLng = u.longitude ? parseFloat(u.longitude) : _CLFN_LNG;
+      _slpMap = L.map('slp-map', { center: [startLat, startLng], zoom: 12, scrollWheelZoom: true });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(_slpMap);
+      if(u.latitude && u.longitude) _slpPlacePin(startLat, startLng);
+      _slpMap.on('click', function(e){ _slpPlacePin(e.latlng.lat, e.latlng.lng); });
+      setTimeout(function(){ if(_slpMap) _slpMap.invalidateSize({ animate: false }); }, 300);
+    }, 50);
   }
 
   function _slpPlacePin(lat, lng) {
