@@ -1577,8 +1577,8 @@
 
             <!-- Unallocated / overpayment -->
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--dark2);">
-              <span style="font-size:12px;color:#888;" id="rp-unalloc-lbl">Unallocated</span>
-              <span style="font-size:16px;font-weight:700;" id="rp-unalloc-val" style="color:#888;">$0.00</span>
+              <span style="font-size:12px;color:var(--gray);" id="rp-unalloc-lbl">Unallocated</span>
+              <span style="font-size:16px;font-weight:700;color:var(--gray);" id="rp-unalloc-val">$0.00</span>
             </div>
           </div>
           <div id="rp-alloc-warning" style="display:none;" class="ibox danger" style="margin-top:8px;"></div>
@@ -1710,19 +1710,19 @@
         <!-- Live result -->
         <div id="arrCalcResult" style="display:none;">
           <div style="background:var(--dark);border-radius:12px;padding:16px 18px;">
-            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;">Repayment Summary</div>
+            <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;">Repayment Summary</div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-              <div style="background:#1a1a18;border-radius:8px;padding:12px 14px;">
-                <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Monthly Payment</div>
+              <div style="background:var(--dark2);border-radius:8px;padding:12px 14px;">
+                <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Monthly Payment</div>
                 <div style="font-size:22px;font-weight:700;color:var(--yellow);" id="arr-monthly-display">-</div>
               </div>
-              <div style="background:#1a1a18;border-radius:8px;padding:12px 14px;">
-                <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Term</div>
+              <div style="background:var(--dark2);border-radius:8px;padding:12px 14px;">
+                <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Term</div>
                 <div style="font-size:22px;font-weight:700;color:#fff;" id="arr-months">-</div>
                 <div style="font-size:11px;color:#666;margin-top:2px;" id="arr-months-sub"></div>
               </div>
-              <div style="background:#1a1a18;border-radius:8px;padding:12px 14px;">
-                <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Payoff Date</div>
+              <div style="background:var(--dark2);border-radius:8px;padding:12px 14px;">
+                <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Payoff Date</div>
                 <div style="font-size:16px;font-weight:700;color:#fff;" id="arr-payoff">-</div>
               </div>
             </div>
@@ -1891,21 +1891,21 @@
         <!-- Live calculator result -->
         <div id="loanCalcResult" style="display:none;">
           <div style="background:var(--dark);border-radius:12px;padding:16px 18px;">
-            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;">Payment Summary</div>
+            <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;">Payment Summary</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-              <div style="background:#1a1a18;border-radius:8px;padding:12px 14px;">
-                <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Payment Amount</div>
+              <div style="background:var(--dark2);border-radius:8px;padding:12px 14px;">
+                <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Payment Amount</div>
                 <div style="font-size:26px;font-weight:700;color:var(--yellow);" id="cr-payment">—</div>
                 <div style="font-size:11px;color:#666;margin-top:2px;" id="cr-freq-lbl">per month</div>
               </div>
-              <div style="background:#1a1a18;border-radius:8px;padding:12px 14px;">
-                <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Total Repayment</div>
+              <div style="background:var(--dark2);border-radius:8px;padding:12px 14px;">
+                <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Total Repayment</div>
                 <div style="font-size:26px;font-weight:700;color:#fff;" id="cr-total">—</div>
                 <div style="font-size:11px;color:#666;margin-top:2px;" id="cr-term-lbl">over — months</div>
               </div>
             </div>
-            <div style="border-top:1px solid #2a2a28;padding-top:12px;">
-              <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Cost of Borrowing</div>
+            <div style="border-top:1px solid var(--dark3);padding-top:12px;">
+              <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Cost of Borrowing</div>
               <div id="cr-cob-rows"></div>
             </div>
           </div>
@@ -2239,16 +2239,16 @@
       <div style="background:var(--dark2);border-radius:10px;padding:16px 18px;margin-top:4px;">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
           <div>
-            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Payment Due</div>
+            <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Payment Due</div>
             <div style="font-family:'DM Serif Display',serif;font-size:20px;color:#fff;" id="denomPaymentDue">$0.00</div>
           </div>
           <div>
-            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Cash Received</div>
+            <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Cash Received</div>
             <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--yellow);" id="denomTotalVal">$0.00</div>
           </div>
           <div id="denomBalanceCol">
-            <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;" id="denomBalanceLbl">Balance</div>
-            <div style="font-family:'DM Serif Display',serif;font-size:20px;color:#888;" id="denomBalanceVal">—</div>
+            <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;" id="denomBalanceLbl">Balance</div>
+            <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--gray);" id="denomBalanceVal">—</div>
           </div>
         </div>
         <div id="denomStatusMsg" style="margin-top:10px;font-size:12px;display:none;padding:8px 10px;border-radius:6px;"></div>
@@ -2278,7 +2278,7 @@
       <div style="margin-top:16px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
 
         <!-- Header with lock badge -->
-        <div style="background:var(--dark2);padding:10px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;display:flex;justify-content:space-between;align-items:center;">
+        <div style="background:var(--dark2);padding:10px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gray);display:flex;justify-content:space-between;align-items:center;">
           <span>Signatures</span>
           <span id="sig-lock-badge" style="display:none;background:#15803d;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;letter-spacing:.4px;">&#128274; Locked</span>
         </div>

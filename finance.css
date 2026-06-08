@@ -48,7 +48,7 @@
 .sig-line             { border-bottom: 1.5px solid var(--text); height: 32px; margin: 16px 0 4px; }
 .htitles              { display: flex; flex-direction: column; gap: 2px; }
 .is-active            { background: var(--yellow) !important; color: #111 !important; }
-.approval-row         { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; font-size: 13px; }
+.approval-row         { background: var(--warn-amber-bg); border: 1px solid #fcd34d; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; font-size: 13px; }
 .clickable            { cursor: pointer; }
 .pill-orange          { background: #fff7ed; color: #c2410c; }
 

@@ -25,7 +25,7 @@
 .rfq-status-pill {
   display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;
 }
-.rfq-status-draft    { background:#f4f4f0; color:#888; }
+.rfq-status-draft    { background:#f4f4f0; color:var(--gray); }
 .rfq-status-issued   { background:#eff6ff; color:#1d4ed8; }
 .rfq-status-closed   { background:#fef2f2; color:#b91c1c; }
 .rfq-status-awarded  { background:#f0fdf4; color:#15803d; }
