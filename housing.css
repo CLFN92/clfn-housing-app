@@ -2091,12 +2091,14 @@ body.tic-modal-open       { overflow: hidden; }
   flex-direction: column;
   padding: 20px;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 #slp-map {
   flex: 1;
+  min-height: 0;
   border-radius: 3px;
   border: 1.5px solid var(--border);
-  min-height: 320px;
 }
 .slp-map-hint { font-size: 10px; font-weight: 400; color: var(--gray); text-transform: none; letter-spacing: 0; }
 .slp-map-note { font-size: 10px; color: var(--gray); font-family: var(--sans); margin-top: 6px; }
@@ -2138,6 +2140,8 @@ body.tic-modal-open       { overflow: hidden; }
 @media (max-width: 640px) {
   .slp-body        { flex-direction: column; overflow-y: auto; }
   .slp-photo-col   { width: 100%; border-right: none; border-bottom: 1.5px solid var(--border); }
+  .slp-map-col     { overflow: visible; }
+  #slp-map         { flex: none; height: 280px; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════
