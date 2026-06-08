@@ -1,28 +1,28 @@
 # geocode-units.ps1
 #
 # Geocodes housing_units rows that have no latitude/longitude set.
-# Uses OpenStreetMap Nominatim — no API key, no Google, OCAP-compliant.
+# Uses OpenStreetMap Nominatim - no API key, no Google, OCAP-compliant.
 #
 # Prerequisites:
-#   - PowerShell 7+
+#   - PowerShell 5.1+ or PowerShell 7+
 #   - Supabase SERVICE ROLE KEY (not the anon key)
 #       Find it: Supabase Dashboard -> Project Settings -> API -> service_role secret
 #
 # Usage:
-#   pwsh geocode-units.ps1 -ServiceRoleKey "eyJ..."
+#   .\geocode-units.ps1 -ServiceRoleKey "eyJ..."
 #   (Script will prompt interactively if -ServiceRoleKey is omitted)
 #
 # Notes:
-#   - Nominatim rate limit is 1 request/second — the script enforces this.
+#   - Nominatim rate limit is 1 request/second - the script enforces this.
 #   - Reserve addresses may not all be in OSM. Unmatched units are listed at
 #     the end so you can set their coordinates manually in Supabase.
-#   - Always verify pins on the map after running — geocoding is approximate.
+#   - Always verify pins on the map after running - geocoding is approximate.
 
 param(
     [string]$ServiceRoleKey = ''
 )
 
-# ── Configuration ─────────────────────────────────────────────────────────────
+# -- Configuration -------------------------------------------------------------
 $SUPABASE_URL     = 'https://fkhzrbalumzeripzolph.supabase.co'
 $SERVICE_ROLE_KEY = $ServiceRoleKey
 $COMMUNITY        = 'Constance Lake First Nation'
@@ -30,7 +30,7 @@ $PROVINCE         = 'Ontario'
 $COUNTRY          = 'Canada'
 $NOMINATIM_UA     = 'CLFN-Housing-App-Geocoder/1.0 (kevin.proctor@clfn.on.ca)'
 
-# ── Prompt for key if not set ─────────────────────────────────────────────────
+# -- Prompt for key if not set -------------------------------------------------
 if (-not $SERVICE_ROLE_KEY) {
     $SERVICE_ROLE_KEY = Read-Host 'Enter Supabase service role key'
 }
@@ -42,7 +42,7 @@ $headers = @{
     'Prefer'        = 'return=minimal'
 }
 
-# ── Fetch units with no coordinates ──────────────────────────────────────────
+# -- Fetch units with no coordinates -------------------------------------------
 Write-Host "`nFetching units with no coordinates..." -ForegroundColor Cyan
 
 $query    = '/rest/v1/housing_units?select=id,num,street&latitude=is.null&limit=1000'
@@ -56,7 +56,7 @@ if (!$units -or $units.Count -eq 0) {
 
 Write-Host "Found $($units.Count) unit(s) to geocode.`n" -ForegroundColor Yellow
 
-# ── Geocode each unit ─────────────────────────────────────────────────────────
+# -- Geocode each unit ---------------------------------------------------------
 $succeeded = @()
 $failed    = @()
 
@@ -65,7 +65,7 @@ foreach ($unit in $units) {
     $street = ($unit.street -as [string]).Trim()
 
     if (-not $num -and -not $street) {
-        Write-Host "  SKIP  id=$($unit.id) — no address on record" -ForegroundColor DarkGray
+        Write-Host "  SKIP  id=$($unit.id) - no address on record" -ForegroundColor DarkGray
         $failed += [PSCustomObject]@{ id=$unit.id; address='(no address)'; reason='Missing num+street' }
         continue
     }
@@ -73,15 +73,15 @@ foreach ($unit in $units) {
     $address = "$num $street".Trim()
     Write-Host "  Geocoding: $address" -ForegroundColor Gray
 
-    # Structured Nominatim query — more reliable than a freetext search
+    # Structured Nominatim query - more reliable than a freetext search
     $nmParams = [System.Web.HttpUtility]::ParseQueryString('')
-    $nmParams['street']       = $address
-    $nmParams['city']         = $COMMUNITY
-    $nmParams['state']        = $PROVINCE
-    $nmParams['country']      = $COUNTRY
-    $nmParams['format']       = 'json'
-    $nmParams['limit']        = '1'
-    $nmParams['addressdetails']= '0'
+    $nmParams['street']        = $address
+    $nmParams['city']          = $COMMUNITY
+    $nmParams['state']         = $PROVINCE
+    $nmParams['country']       = $COUNTRY
+    $nmParams['format']        = 'json'
+    $nmParams['limit']         = '1'
+    $nmParams['addressdetails'] = '0'
     $nmUri = 'https://nominatim.openstreetmap.org/search?' + $nmParams.ToString()
 
     try {
@@ -94,7 +94,7 @@ foreach ($unit in $units) {
             $lng = [double]$geo[0].lon
 
             # Patch the unit row in Supabase
-            $body    = @{ latitude = $lat; longitude = $lng } | ConvertTo-Json
+            $body     = @{ latitude = $lat; longitude = $lng } | ConvertTo-Json
             $patchUri = $SUPABASE_URL + '/rest/v1/housing_units?id=eq.' + [Uri]::EscapeDataString($unit.id)
             Invoke-RestMethod -Uri $patchUri -Headers $headers -Method Patch -Body $body | Out-Null
 
@@ -113,8 +113,8 @@ foreach ($unit in $units) {
     Start-Sleep -Milliseconds 1100
 }
 
-# ── Summary ───────────────────────────────────────────────────────────────────
-Write-Host "`n── Summary ──────────────────────────────────────────────────" -ForegroundColor Cyan
+# -- Summary -------------------------------------------------------------------
+Write-Host "`n-- Summary ----------------------------------------------------------" -ForegroundColor Cyan
 Write-Host "  Geocoded:  $($succeeded.Count)" -ForegroundColor Green
 Write-Host "  Failed:    $($failed.Count)"    -ForegroundColor $(if ($failed.Count -gt 0) { 'Yellow' } else { 'Green' })
 
