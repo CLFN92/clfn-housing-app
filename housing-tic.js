@@ -620,10 +620,20 @@
       +   '</div>'
       + '</div>';
 
+    var photoWrapHtml = '<div class="unit-photo-wrap" id="unit-photo-wrap" style="display:none;">'
+      + '<img class="unit-photo-img" id="unit-photo-img" src="" alt="House photo"/>'
+      + '</div>';
+
+    var canSetLoc = typeof APPROVAL_AUTHORITY !== 'undefined'
+      && APPROVAL_AUTHORITY.can('setUnitLocation', window.currentRole || '');
+    var adminBtnHtml = canSetLoc
+      ? '<button type="button" class="btn-set-location" onclick="window._slpOpen && window._slpOpen()">&#128205; Set Location &amp; Photo</button>'
+      : '';
+
     _ticEl('tic_panel_overview').innerHTML =
       '<div class="tic-overview-columns">'
       + '<div class="tic-overview-main">' + html + '</div>'
-      + '<div class="tic-overview-map">'  + mapHtml + '</div>'
+      + '<div class="tic-overview-map">' + photoWrapHtml + mapHtml + adminBtnHtml + '</div>'
       + '</div>';
 
     _ticInitMap(u);
@@ -652,6 +662,17 @@
     var coordEl  = document.getElementById('map-coords-display');
     var linkEl   = document.getElementById('map-osm-link');
     if(!iframeEl) return;
+
+    var photoWrap = document.getElementById('unit-photo-wrap');
+    var photoImg  = document.getElementById('unit-photo-img');
+    if(photoWrap && photoImg){
+      if(u.photo_url){
+        photoImg.src = (typeof sbGetFileUrl === 'function') ? sbGetFileUrl(u.photo_url) : u.photo_url;
+        photoWrap.style.display = 'block';
+      } else {
+        photoWrap.style.display = 'none';
+      }
+    }
 
     var address = [u.num && u.street ? u.num + ' ' + u.street : (u.address || ''),
                    u.city || ''].filter(Boolean).join(', ');
@@ -3247,6 +3268,258 @@
       if (typeof showToast === 'function') showToast('✓ PDF generated');
     }
   }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // Set Location & Photo (SLP) — Admin Workflow
+  // Requires APPROVAL_AUTHORITY.can('setUnitLocation', role).
+  // Leaflet + exifr loaded via CDN in tenants.html <head>.
+  // Photos upload to housing-files bucket under units/{id}/photo/.
+  // photo_url column stores the path; sbGetFileUrl() resolves it at render time.
+  // ════════════════════════════════════════════════════════════════════════════
+
+  var _slpMap    = null;
+  var _slpMarker = null;
+  var _slpLat    = null;
+  var _slpLng    = null;
+  var _slpFile   = null;
+  var _CLFN_LAT  = 49.8063;
+  var _CLFN_LNG  = -84.1434;
+
+  function _slpInit() {
+    var overlay   = document.getElementById('slp-overlay');
+    if(!overlay) return;
+    var btnClose  = document.getElementById('slp-close');
+    var btnCancel = document.getElementById('slp-cancel');
+    var btnSave   = document.getElementById('slp-save');
+    var btnGeo    = document.getElementById('slp-geolocate');
+    var btnRemove = document.getElementById('slp-remove-photo');
+    var fileInput = document.getElementById('slp-file-input');
+    var dropzone  = document.getElementById('slp-dropzone');
+
+    btnClose.addEventListener('click', _slpClose);
+    btnCancel.addEventListener('click', _slpClose);
+    overlay.addEventListener('click', function(e){ if(e.target === overlay) _slpClose(); });
+
+    dropzone.addEventListener('click', function(){ fileInput.click(); });
+    dropzone.addEventListener('dragover', function(e){ e.preventDefault(); dropzone.classList.add('drag-over'); });
+    dropzone.addEventListener('dragleave', function(){ dropzone.classList.remove('drag-over'); });
+    dropzone.addEventListener('drop', function(e){
+      e.preventDefault();
+      dropzone.classList.remove('drag-over');
+      if(e.dataTransfer.files[0]) _slpHandlePhoto(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', function(){
+      if(fileInput.files[0]) _slpHandlePhoto(fileInput.files[0]);
+    });
+
+    btnRemove.addEventListener('click', function(){
+      _slpFile = null;
+      document.getElementById('slp-photo-preview').style.display   = 'none';
+      document.getElementById('slp-dropzone-inner').style.display   = 'flex';
+      document.getElementById('slp-exif-found').style.display       = 'none';
+      document.getElementById('slp-exif-none').style.display        = 'none';
+      btnRemove.style.display = 'none';
+      fileInput.value = '';
+      _slpCheckSave();
+    });
+
+    btnGeo.addEventListener('click', function(){
+      if(!navigator.geolocation){
+        if(typeof showToast === 'function') showToast('Geolocation not supported on this device.', {type:'error'});
+        return;
+      }
+      btnGeo.textContent = 'Getting location...';
+      btnGeo.disabled = true;
+      navigator.geolocation.getCurrentPosition(
+        function(pos){
+          _slpPlacePin(pos.coords.latitude, pos.coords.longitude);
+          btnGeo.textContent = '🎯 Use my current location';
+          btnGeo.disabled = false;
+        },
+        function(){
+          if(typeof showToast === 'function') showToast('Could not get location. Allow location access in your browser.', {type:'error'});
+          btnGeo.textContent = '🎯 Use my current location';
+          btnGeo.disabled = false;
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    });
+
+    btnSave.addEventListener('click', _slpSave);
+  }
+
+  function _slpOpen() {
+    var overlay = document.getElementById('slp-overlay');
+    if(!overlay) return;
+    overlay.style.display = 'flex';
+    _slpReset();
+    _slpInitMap();
+  }
+
+  function _slpClose() {
+    var overlay = document.getElementById('slp-overlay');
+    if(overlay) overlay.style.display = 'none';
+    if(_slpMap){ _slpMap.remove(); _slpMap = null; _slpMarker = null; }
+  }
+
+  function _slpReset() {
+    _slpLat = null; _slpLng = null; _slpFile = null;
+    var ids = ['slp-photo-preview','slp-dropzone-inner','slp-exif-found','slp-exif-none','slp-remove-photo'];
+    var display = ['none','flex','none','none','none'];
+    for(var i=0;i<ids.length;i++){
+      var el = document.getElementById(ids[i]);
+      if(el) el.style.display = display[i];
+    }
+    var ld = document.getElementById('slp-lat-display');
+    var nd = document.getElementById('slp-lng-display');
+    var bs = document.getElementById('slp-save');
+    var fi = document.getElementById('slp-file-input');
+    if(ld) ld.value = '';
+    if(nd) nd.value = '';
+    if(bs){ bs.disabled = true; bs.textContent = 'Save Location & Photo'; }
+    if(fi) fi.value = '';
+  }
+
+  function _slpInitMap() {
+    setTimeout(function(){
+      if(typeof L === 'undefined') return;
+      var u = _ticState.unit || {};
+      var startLat = u.latitude  ? parseFloat(u.latitude)  : _CLFN_LAT;
+      var startLng = u.longitude ? parseFloat(u.longitude) : _CLFN_LNG;
+      _slpMap = L.map('slp-map', { center: [startLat, startLng], zoom: 15, scrollWheelZoom: true });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(_slpMap);
+      if(u.latitude && u.longitude) _slpPlacePin(startLat, startLng);
+      _slpMap.on('click', function(e){ _slpPlacePin(e.latlng.lat, e.latlng.lng); });
+    }, 120);
+  }
+
+  function _slpPlacePin(lat, lng) {
+    if(!_slpMap) return;
+    var icon = L.divIcon({
+      className: '',
+      html: '<div style="width:18px;height:18px;background:#111110;border:3px solid #F8E41A;'
+          + 'border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.4);"></div>',
+      iconSize: [18,18], iconAnchor: [9,18]
+    });
+    if(_slpMarker){
+      _slpMarker.setLatLng([lat, lng]);
+    } else {
+      _slpMarker = L.marker([lat, lng], { icon: icon, draggable: true }).addTo(_slpMap);
+      _slpMarker.on('dragend', function(){
+        var p = _slpMarker.getLatLng();
+        _slpUpdateCoords(p.lat, p.lng);
+      });
+    }
+    _slpMap.setView([lat, lng], Math.max(_slpMap.getZoom(), 17));
+    _slpUpdateCoords(lat, lng);
+  }
+
+  function _slpUpdateCoords(lat, lng) {
+    _slpLat = lat; _slpLng = lng;
+    var ld = document.getElementById('slp-lat-display');
+    var nd = document.getElementById('slp-lng-display');
+    if(ld) ld.value = parseFloat(lat).toFixed(7);
+    if(nd) nd.value = parseFloat(lng).toFixed(7);
+    _slpCheckSave();
+  }
+
+  function _slpCheckSave() {
+    var bs = document.getElementById('slp-save');
+    if(bs) bs.disabled = !(_slpLat && _slpLng);
+  }
+
+  async function _slpHandlePhoto(file) {
+    _slpFile = file;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var pp = document.getElementById('slp-photo-preview');
+      var di = document.getElementById('slp-dropzone-inner');
+      var br = document.getElementById('slp-remove-photo');
+      if(pp){ pp.src = e.target.result; pp.style.display = 'block'; }
+      if(di) di.style.display = 'none';
+      if(br) br.style.display = 'inline-block';
+    };
+    reader.readAsDataURL(file);
+    try {
+      var gps = await exifr.gps(file);
+      var ef  = document.getElementById('slp-exif-found');
+      var en  = document.getElementById('slp-exif-none');
+      var ec  = document.getElementById('slp-exif-coords-text');
+      if(gps && gps.latitude && gps.longitude){
+        if(ef){ ef.style.display = 'flex'; }
+        if(en) en.style.display = 'none';
+        if(ec) ec.textContent = parseFloat(gps.latitude).toFixed(5) + '° N, '
+                              + Math.abs(parseFloat(gps.longitude)).toFixed(5) + '° W';
+        _slpPlacePin(gps.latitude, gps.longitude);
+      } else {
+        if(ef) ef.style.display = 'none';
+        if(en){ en.style.display = 'flex'; }
+      }
+    } catch(e) {
+      var en2 = document.getElementById('slp-exif-none');
+      if(en2) en2.style.display = 'flex';
+    }
+    _slpCheckSave();
+  }
+
+  async function _slpSave() {
+    var btnSave = document.getElementById('slp-save');
+    if(btnSave){ btnSave.disabled = true; btnSave.textContent = 'Saving...'; }
+    try {
+      var unitId = _ticState.unit && _ticState.unit.id;
+      if(!unitId) throw new Error('No unit loaded');
+
+      var photoPath = null;
+      if(_slpFile){
+        var ts       = Date.now();
+        var safeName = _slpFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        var path     = 'units/' + unitId + '/photo/' + ts + '_' + safeName;
+        var uploaded = await window.sbUploadFile(path, _slpFile);
+        photoPath = uploaded.path;
+      }
+
+      var updates = { latitude: parseFloat(_slpLat), longitude: parseFloat(_slpLng) };
+      if(photoPath) updates.photo_url = photoPath;
+
+      var res = await fetch(
+        window.SUPABASE_URL + '/rest/v1/housing_units?id=eq.' + encodeURIComponent(unitId),
+        {
+          method:  'PATCH',
+          headers: Object.assign({}, window.HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+          body:    JSON.stringify(updates)
+        }
+      );
+      if(!res.ok){ var errTxt = await res.text(); throw new Error(errTxt); }
+
+      _ticState.unit = Object.assign({}, _ticState.unit, updates);
+      if(typeof housingUnits !== 'undefined' && Array.isArray(housingUnits)){
+        for(var i=0;i<housingUnits.length;i++){
+          if(String(housingUnits[i].id) === String(unitId)){
+            housingUnits[i] = Object.assign({}, housingUnits[i], updates);
+            break;
+          }
+        }
+      }
+
+      if(typeof _ticAudit === 'function')
+        _ticAudit('unit_location_set', 'Set GPS coordinates' + (photoPath ? ' and house photo' : '') + ' for unit');
+
+      if(typeof showToast === 'function') showToast('Location saved.');
+      _slpClose();
+      _ticRenderOverview();
+
+    } catch(err) {
+      console.error('[SLP] Save failed:', err);
+      if(typeof showToast === 'function') showToast('Save failed: ' + err.message, {type:'error'});
+      if(btnSave){ btnSave.disabled = false; btnSave.textContent = 'Save Location & Photo'; }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', _slpInit);
+  window._slpOpen = _slpOpen;
 
   window.openTenantCard = openTenantCard;
   window.closeTenantCard = _ticClose;

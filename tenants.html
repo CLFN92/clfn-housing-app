@@ -24,6 +24,11 @@
 <script src="housing-tic.js"></script>
 <script src="housing-app.js"></script>
 <script src="housing-init.js"></script>
+<!-- Leaflet — interactive pin-drop map (SLP modal only) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<!-- exifr — client-side EXIF GPS extraction, no server call -->
+<script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
 
 <style>body{opacity:0;transition:opacity .15s ease;}</style>
 </head><body>
@@ -524,5 +529,68 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script src="tenants-init.js"></script>
 </div><!-- end app-wrapper -->
+
+<!-- ══ Set Location & Photo Modal ══ -->
+<div class="slp-overlay" id="slp-overlay" style="display:none;" aria-modal="true" role="dialog">
+  <div class="slp-modal">
+    <div class="slp-header">
+      <div>
+        <div class="slp-header-label">Admin</div>
+        <div class="slp-header-title">Set Unit Location &amp; Photo</div>
+      </div>
+      <button class="slp-close" id="slp-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="slp-body">
+      <!-- LEFT — Photo upload -->
+      <div class="slp-photo-col">
+        <div class="slp-section-label">House Photo</div>
+        <div class="slp-dropzone" id="slp-dropzone">
+          <div class="slp-dropzone-inner" id="slp-dropzone-inner">
+            <span class="slp-dropzone-icon">&#127968;</span>
+            <p class="slp-dropzone-text">Drop photo here<br>or click to browse</p>
+            <p class="slp-dropzone-hint">JPEG &middot; PNG &middot; HEIC</p>
+          </div>
+          <img class="slp-photo-preview" id="slp-photo-preview" src="" alt="House photo preview" style="display:none;"/>
+          <input type="file" id="slp-file-input" accept="image/jpeg,image/png,image/heic,image/heif" style="display:none;"/>
+        </div>
+        <div class="slp-exif-banner slp-exif-found" id="slp-exif-found" style="display:none;">
+          <span>&#9989;</span>
+          <div><strong>GPS found in photo</strong><div id="slp-exif-coords-text">&#8212;</div></div>
+        </div>
+        <div class="slp-exif-banner slp-exif-none" id="slp-exif-none" style="display:none;">
+          <span>&#9888;&#65039;</span>
+          <div><strong>No GPS in this photo</strong><div>Drop a pin on the map manually.</div></div>
+        </div>
+        <button class="slp-remove-photo" id="slp-remove-photo" style="display:none;">&#x2715; Remove photo</button>
+        <div class="slp-section-label" style="margin-top:20px;">Coordinates</div>
+        <div class="slp-coords-row">
+          <div class="slp-coord-field">
+            <label>Latitude</label>
+            <input type="text" id="slp-lat-display" readonly placeholder="Drop a pin"/>
+          </div>
+          <div class="slp-coord-field">
+            <label>Longitude</label>
+            <input type="text" id="slp-lng-display" readonly placeholder="Drop a pin"/>
+          </div>
+        </div>
+        <button class="slp-geolocate-btn" id="slp-geolocate">&#127919; Use my current location</button>
+      </div>
+      <!-- RIGHT — Interactive map -->
+      <div class="slp-map-col">
+        <div class="slp-section-label">
+          Pin Location
+          <span class="slp-map-hint">Click map to place pin</span>
+        </div>
+        <div id="slp-map"></div>
+        <p class="slp-map-note">OSM tiles &middot; No address data sent externally</p>
+      </div>
+    </div>
+    <div class="slp-footer">
+      <button class="slp-btn-cancel" id="slp-cancel">Cancel</button>
+      <button class="slp-btn-save" id="slp-save" disabled>Save Location &amp; Photo</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

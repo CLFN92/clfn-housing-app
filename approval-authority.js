@@ -94,6 +94,8 @@ var APPROVAL_AUTHORITY = (function() {
     accessDashboard:          ['housing_manager', 'ed'],
     // Who can archive a unit (soft-delete from Inventory)
     archiveUnit:              ['ed'],
+    // Who can set a unit's GPS coordinates and house photo
+    setUnitLocation:          ['housing_manager', 'ed'],
 
     // ── Staff management ──────────────────────────────────────────────────
     // Who can edit / deactivate an existing staff record
@@ -288,6 +290,7 @@ var APPROVAL_AUTHORITY = (function() {
       manageStaff:              'Add / edit staff',
       accessDashboard:          'Access Dashboard view',
       archiveUnit:              'Archive a unit',
+      setUnitLocation:          'Set unit GPS location &amp; house photo',
       manageStaffRecord:        'Edit / deactivate a staff record',
       manageAllStaffRoles:      'Assign any role to staff',
       viewApplicationScore:     'View application score',
@@ -308,7 +311,7 @@ var APPROVAL_AUTHORITY = (function() {
       'SOW & Renovation':     ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow','editRenoProgress'],
       'Contractors':          ['recommendContractor','approveContractor','declineContractor'],
       'Scoring':              ['editScoreModel','applyScoreAdjustment'],
-      'Inventory':            ['archiveUnit'],
+      'Inventory':            ['archiveUnit', 'setUnitLocation'],
       'Dashboard':            ['accessDashboard'],
       'System':               ['accessSettings','editApprovalAuthority','manageStaff','manageStaffRecord','manageAllStaffRoles'],
       'Finance':              ['viewFinanceCard','recordPayment','createInvoice','createArrangement','manageLoan','reverseTransaction'],
