@@ -621,43 +621,33 @@ function approveLoan(loanId) {
 // \u2500\u2500 REVERSALS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function openReversal(entryId, ledger) {
   var d = getData();
-  var entry = d.rentLedger.find(function(r){return r.id===entryId;});
+  var entry = d.rentLedger.find(function(r){ return r.id === entryId; });
   if (!entry) return;
-  var detailEl = document.getElementById('rev-detail');
-  if (detailEl) detailEl.innerHTML =
-    '<div style="background:var(--bg);border-radius:8px;padding:10px 12px;font-size:12px;">'+
-    'Entry: <strong>'+entry.desc+'</strong> &nbsp;\u00B7&nbsp; '+
-    'Amount: <strong>'+fmt(entry.charge||entry.payment)+'</strong> &nbsp;\u00B7&nbsp; '+
-    'Date: '+entry.date+'</div>';
-  document.getElementById('modalReversal').dataset.entryId = entryId;
-  document.getElementById('modalReversal').dataset.ledger = ledger;
-  openModal('modalReversal');
+  if (finIsVoided(entry)) { toast('Entry is already voided.'); return; }
+  showVoidModal({
+    label: 'Void Rent Entry',
+    preview: escapeHtml(entry.desc || '') + ' &nbsp;&middot;&nbsp; ' + fmt(entry.charge || entry.payment) + ' &nbsp;&middot;&nbsp; ' + (entry.date || '')
+  }, function(reason) {
+    voidLedgerEntry('rentLedger', entryId, reason);
+    renderRentLedger();
+    renderDashboard();
+  });
 }
 
-function saveReversal() {
-  var modal  = document.getElementById('modalReversal');
-  var entryId = modal.dataset.entryId;
-  var ledger  = modal.dataset.ledger;
-  var reason  = (document.getElementById('rev-reason')||{}).value||'';
-  if (!entryId) return;
-  var d = getData();
-  var entry = d.rentLedger.find(function(r){return r.id===entryId;});
-  if (!entry) return;
-  entry.status = 'reversed';
-  d.auditLog.push({id:uid(),ts:new Date().toISOString(),user:CURRENT_USER,action:'update',
-    entity:'reversal',entityId:entryId,
-    description:'Entry reversed'+(reason?' \u2014 '+reason:''),
-    before:{status:'posted'},after:{status:'reversed'}});
-  saveData(d);
-  closeModal('modalReversal');
-  renderRentLedger();
-  renderDashboard();
-}
+function saveReversal() { /* replaced by openReversal \u2192 showVoidModal flow */ }
 
 function reverseLoanPayment(pmtId, loanId) {
-  showConfirm('Reverse Payment', 'Reverse this loan payment? This cannot be undone.', function() { _doReverseLoanPmt(pmtId, tid); }); return;
   var d = getData();
-  var p = d.loanPayments.find(function(x){return x.id===pmtId;});
-  if (p) { p.status='reversed'; saveData(d); renderLoanDetail(loanId); renderDashboard(); }
+  var p = d.loanPayments.find(function(x){ return x.id === pmtId; });
+  if (!p) return;
+  if (finIsVoided(p)) { toast('Payment is already voided.'); return; }
+  showVoidModal({
+    label: 'Void Loan Payment',
+    preview: fmt(p.amount) + ' &nbsp;&middot;&nbsp; ' + (p.date || '')
+  }, function(reason) {
+    voidLedgerEntry('loanPayments', pmtId, reason);
+    renderLoansPage();
+    renderDashboard();
+  });
 }
 

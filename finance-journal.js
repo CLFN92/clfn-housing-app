@@ -217,14 +217,14 @@ function renderPeriodSummary() {
   d.tenants.forEach(function(t){
     var tRentCharged=0, tRentPaid=0, tArrPaid=0, tLoanPaid=0;
     dateRanges.forEach(function(ym){
-      d.rentLedger.filter(function(r){return r.tenantId===t.id&&r.date.slice(0,7)===ym&&r.status!=='reversed';}).forEach(function(r){
+      d.rentLedger.filter(function(r){return r.tenantId===t.id&&r.date.slice(0,7)===ym&&!finIsVoided(r);}).forEach(function(r){
         tRentCharged += r.charge||0;
         tRentPaid   += r.payment||0;
       });
-      d.arrPayments.filter(function(p){return p.tenantId===t.id&&p.date.slice(0,7)===ym&&p.status!=='reversed';}).forEach(function(p){
+      d.arrPayments.filter(function(p){return p.tenantId===t.id&&p.date.slice(0,7)===ym&&!finIsVoided(p);}).forEach(function(p){
         tArrPaid += p.amount||0;
       });
-      d.loanPayments.filter(function(p){return p.tenantId===t.id&&p.date.slice(0,7)===ym&&p.status!=='reversed';}).forEach(function(p){
+      d.loanPayments.filter(function(p){return p.tenantId===t.id&&p.date.slice(0,7)===ym&&!finIsVoided(p);}).forEach(function(p){
         tLoanPaid += p.amount||0;
       });
     });
@@ -322,31 +322,31 @@ function renderReconciliation() {
 
   // Prior month closing balance (all entries before this month)
   var priorRentBal = 0;
-  d.rentLedger.filter(function(r){return r.date.slice(0,7)<ym&&r.status!=='reversed';}).forEach(function(r){
+  d.rentLedger.filter(function(r){return r.date.slice(0,7)<ym&&!finIsVoided(r);}).forEach(function(r){
     priorRentBal += (r.charge||0)-(r.payment||0);
   });
 
   // This month activity
   var thisCharged=0, thisRentPaid=0, thisArrPaid=0, thisLoanPaid=0;
-  d.rentLedger.filter(function(r){return r.date.slice(0,7)===ym&&r.status!=='reversed';}).forEach(function(r){
+  d.rentLedger.filter(function(r){return r.date.slice(0,7)===ym&&!finIsVoided(r);}).forEach(function(r){
     thisCharged  += r.charge||0;
     thisRentPaid += r.payment||0;
   });
-  d.arrPayments.filter(function(p){return p.date.slice(0,7)===ym&&p.status!=='reversed';}).forEach(function(p){thisArrPaid+=p.amount||0;});
-  d.loanPayments.filter(function(p){return p.date.slice(0,7)===ym&&p.status!=='reversed';}).forEach(function(p){thisLoanPaid+=p.amount||0;});
+  d.arrPayments.filter(function(p){return p.date.slice(0,7)===ym&&!finIsVoided(p);}).forEach(function(p){thisArrPaid+=p.amount||0;});
+  d.loanPayments.filter(function(p){return p.date.slice(0,7)===ym&&!finIsVoided(p);}).forEach(function(p){thisLoanPaid+=p.amount||0;});
 
   var closingRentBal = priorRentBal + thisCharged - thisRentPaid;
   var totalCollected = thisRentPaid + thisArrPaid + thisLoanPaid;
 
   // Collection by method
   var byMethod = {};
-  d.rentLedger.filter(function(r){return r.date.slice(0,7)===ym&&r.payment>0&&r.status!=='reversed';}).forEach(function(r){
+  d.rentLedger.filter(function(r){return r.date.slice(0,7)===ym&&r.payment>0&&!finIsVoided(r);}).forEach(function(r){
     var m = r.method||'unknown'; byMethod[m]=(byMethod[m]||0)+r.payment;
   });
-  d.arrPayments.filter(function(p){return p.date.slice(0,7)===ym&&p.status!=='reversed';}).forEach(function(p){
+  d.arrPayments.filter(function(p){return p.date.slice(0,7)===ym&&!finIsVoided(p);}).forEach(function(p){
     var m = p.method||'unknown'; byMethod[m]=(byMethod[m]||0)+p.amount;
   });
-  d.loanPayments.filter(function(p){return p.date.slice(0,7)===ym&&p.status!=='reversed';}).forEach(function(p){
+  d.loanPayments.filter(function(p){return p.date.slice(0,7)===ym&&!finIsVoided(p);}).forEach(function(p){
     var m = p.method||'unknown'; byMethod[m]=(byMethod[m]||0)+p.amount;
   });
 

@@ -18,23 +18,23 @@
 <script src="finance-utils.js?v=20260604a"></script>
 <script src="finance-calculator.js?v=20260604a"></script>
 <script src="finance-export.js?v=20260604a"></script>
-<script src="finance-data.js?v=20260605a"></script>
+<script src="finance-data.js?v=20260608a"></script>
   <script src="finance-nav.js?v=20260603a"></script>
-  <script src="finance-invoices.js?v=20260603a"></script>
+  <script src="finance-invoices.js?v=20260608a"></script>
   <script src="finance-tenant-list.js?v=20260603a"></script>
-  <script src="finance-tenant-profile.js?v=20260603a"></script>
+  <script src="finance-tenant-profile.js?v=20260608a"></script>
   <script src="finance-batch.js?v=20260605d"></script>
   <script src="finance-payments.js?v=20260603a"></script>
   <script src="finance-vouchers.js?v=20260604a"></script>
-  <script src="finance-tenant-forms.js?v=20260603a"></script>
-  <script src="finance-journal.js?v=20260603a"></script>
-  <script src="finance-reports.js?v=20260603a"></script>
-  <script src="finance-transactions.js?v=20260603a"></script>
+  <script src="finance-tenant-forms.js?v=20260608a"></script>
+  <script src="finance-journal.js?v=20260608a"></script>
+  <script src="finance-reports.js?v=20260608a"></script>
+  <script src="finance-transactions.js?v=20260608a"></script>
   <script src="finance-pdf.js?v=20260603a"></script>
   <script src="finance-modals.js?v=20260603a"></script>
-  <script src="finance-dashboard.js?v=20260603a"></script>
-  <script src="finance-statement.js?v=20260603a"></script>
-  <script src="finance-rent-display.js?v=20260603a"></script>
+  <script src="finance-dashboard.js?v=20260608a"></script>
+  <script src="finance-statement.js?v=20260608a"></script>
+  <script src="finance-rent-display.js?v=20260608a"></script>
   <script src="finance-init.js?v=20260603a"></script>
 <style>
 /* ── finance.html page-specific overrides ───────────────────────────────────
@@ -55,6 +55,14 @@
 </head>
 <body>
 <div id="app_header_host"></div>
+
+<!-- Finance void-status bar — sticky below the app header, visible on all pages -->
+<div id="fin-void-bar" style="position:sticky;top:64px;z-index:90;background:var(--dark2);border-bottom:1px solid var(--border);padding:5px 28px;display:flex;align-items:center;gap:12px;font-size:12px;color:var(--muted);">
+  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
+    <input type="checkbox" id="fin-show-voided-cb" onchange="finToggleShowVoided(this.checked)" style="cursor:pointer;accent-color:var(--yellow);">
+    <span>Show voided entries</span>
+  </label>
+</div>
 
 <main class="main">
 
@@ -984,6 +992,7 @@
       <option value="create">Create</option>
       <option value="update">Update</option>
       <option value="delete">Delete</option>
+      <option value="void_entry">Void</option>
     </select>
     <label style="font-size:11px;font-weight:700;color:var(--muted);">Search</label>
     <input type="text" id="audit-filter-search" placeholder="Tenant, description..." oninput="renderAuditLog()" style="min-width:180px;"/>
@@ -1109,6 +1118,31 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modalReverseEntry')">Cancel</button>
       <button class="btn btn-danger" onclick="submitReversal()">&#8635; Post Reversal</button>
+    </div>
+  </div>
+</div>
+
+<!-- VOID ENTRY MODAL — shared by all ledger surfaces -->
+<div class="modal-ov" style="display:none" id="modalVoidEntry">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-hdr">
+      <div>
+        <h2 id="void-modal-title">Void Entry</h2>
+        <p>A reversing entry will be posted. This cannot be undone.</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modalVoidEntry')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div id="void-entry-preview" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;min-height:40px;"></div>
+      <div class="f">
+        <label>Reason for voiding <span class="r">*</span></label>
+        <textarea id="void-reason-input" placeholder="Required — will appear in the audit log." style="min-height:80px;resize:vertical;"></textarea>
+      </div>
+      <div id="void-reason-error" style="color:var(--danger);font-size:12px;display:none;margin-top:4px;">A reason is required to void this entry.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalVoidEntry')">Cancel</button>
+      <button class="btn btn-danger" onclick="if(window._voidConfirmAction)window._voidConfirmAction()">&#8635; Void Entry</button>
     </div>
   </div>
 </div>

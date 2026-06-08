@@ -242,19 +242,16 @@ function stmtOpenEntry(eid) {
 }
 
 function stmtReverse(type, entryId) {
-  showConfirm('Reverse Entry', 'Reverse this entry? A reversal will be posted to the ledger.', function() {
-    var d = getData();
-    if (type==='rent') {
-      var r = d.rentLedger.find(function(x){return x.id===entryId;});
-      if (r) { r.status='reversed'; auditLog('update','payment',entryId,'Reversed rent entry',{status:'posted'},{status:'reversed'}); }
-    } else if (type==='arr') {
-      var p = d.arrPayments.find(function(x){return x.id===entryId;});
-      if (p) { p.status='reversed'; auditLog('update','arrPayment',entryId,'Reversed arrangement payment',{status:'posted'},{status:'reversed'}); }
-    } else if (type==='loan') {
-      var lp = d.loanPayments.find(function(x){return x.id===entryId;});
-      if (lp) { lp.status='reversed'; auditLog('update','loanPayment',entryId,'Reversed loan payment',{status:'posted'},{status:'reversed'}); }
-    }
-    saveData(d);
+  var collectionKey = type === 'rent' ? 'rentLedger' : type === 'arr' ? 'arrPayments' : 'loanPayments';
+  var d = getData();
+  var entry = (d[collectionKey]||[]).find(function(x){ return x.id === entryId; });
+  if (!entry) return;
+  var labelMap = {rent:'Void Rent Entry', arr:'Void Arrangement Payment', loan:'Void Loan Payment'};
+  showVoidModal({
+    label: labelMap[type] || 'Void Entry',
+    preview: escapeHtml(entry.desc || '') + (entry.amount ? ' &nbsp;&middot;&nbsp; ' + fmt(entry.amount) : '') + (entry.date ? ' &nbsp;&middot;&nbsp; ' + entry.date : '')
+  }, function(reason) {
+    voidLedgerEntry(collectionKey, entryId, reason);
     renderStatementEntries();
     renderDashboard();
   });

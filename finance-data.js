@@ -164,6 +164,10 @@ function _rentLedgerToRow(e){
   if (e.type === 'opening' || e.type === 'opening_balance') { amt = Number(e.charge||0); etype = 'opening_balance'; }
   else if (e.type === 'invoice') { amt = Number(e.charge||0); etype = 'rent_charge'; }
   else if (e.type === 'payment') { amt = -Number(e.payment||0); etype = 'payment'; }
+  else if (e.type === 'void') {
+    amt = Number(e.charge||0) > 0 ? Number(e.charge) : -Number(e.payment||0);
+    etype = 'void';
+  }
   else if (Number(e.charge||0) > 0) { amt = Number(e.charge); etype = 'adjustment_debit'; }
   else if (Number(e.payment||0) > 0) { amt = -Number(e.payment); etype = 'adjustment_credit'; }
   var tenantId = e.tenantId && e.tenantId !== '' ? e.tenantId : null;
@@ -859,6 +863,186 @@ function _writeAuditEntry(entry) {
 //   writeAuditEntry({action:'approve_loan', entity_type:'loan', entity_id:ln.id,
 //                    tenant_id:ln.tenantId, summary:'Approved $8000 loan for Mary Atlookan'});
 function writeAuditEntry(entry){ return _writeAuditEntry(entry||{}); }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE F3B — Void helpers
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Global flag — toggled by the "Show voided entries" checkbox in the header.
+window._finShowVoided = false;
+
+// True when an entry is voided (original) OR is a reversing entry (voidsId set).
+// Covers both legacy 'reversed' and new 'void' status values.
+function finIsVoided(entry) {
+  var st = entry && entry.status;
+  return st === 'void' || st === 'reversed' || !!(entry && entry.voidsId);
+}
+
+// Re-render the currently visible Finance page when the toggle changes.
+function finToggleShowVoided(checked) {
+  window._finShowVoided = !!checked;
+  var curEl = document.querySelector('.page.on');
+  var pageId = curEl ? curEl.id.replace('page-', '') : '';
+  if (pageId && pageId !== 'home') {
+    if (typeof showPage === 'function') showPage(pageId);
+  } else {
+    if (typeof renderDashboard === 'function') renderDashboard();
+  }
+}
+
+// Show the shared void-reason modal, then call onConfirm(reason).
+// opts: { label, preview }
+function showVoidModal(opts, onConfirm) {
+  var titleEl   = document.getElementById('void-modal-title');
+  var previewEl = document.getElementById('void-entry-preview');
+  var inputEl   = document.getElementById('void-reason-input');
+  var errEl     = document.getElementById('void-reason-error');
+  if (!titleEl) {
+    // Fallback if modal not in DOM
+    var r = prompt((opts && opts.label || 'Void entry') + ' — reason (required):');
+    if (r && r.trim()) onConfirm(r.trim());
+    return;
+  }
+  titleEl.textContent = (opts && opts.label) || 'Void Entry';
+  if (previewEl) previewEl.innerHTML = (opts && opts.preview) || '';
+  if (inputEl)   inputEl.value = '';
+  if (errEl)     errEl.style.display = 'none';
+  window._voidConfirmAction = function() {
+    var reason = (inputEl ? inputEl.value : '').trim();
+    if (!reason) { if (errEl) errEl.style.display = 'block'; return; }
+    if (typeof closeModal === 'function') closeModal('modalVoidEntry');
+    onConfirm(reason);
+  };
+  if (typeof openModal === 'function') openModal('modalVoidEntry');
+  setTimeout(function(){ if (inputEl) inputEl.focus(); }, 80);
+}
+
+// Build a sign-reversed entry for the given collection.
+function _makeReversalEntry(collectionKey, original, reversalId, reason, actor) {
+  var td = (new Date()).toISOString().slice(0, 10);
+  if (collectionKey === 'rentLedger') {
+    return {
+      id: reversalId,
+      tenantId: original.tenantId, unitId: original.unitId || null,
+      date: td,
+      desc: 'VOID: ' + (original.desc || ''),
+      charge: original.payment || 0,
+      payment: original.charge || 0,
+      type: 'void', method: '', status: 'void',
+      voidsId: original.id, voidReason: reason, createdBy: actor
+    };
+  }
+  if (collectionKey === 'loanPayments') {
+    return {
+      id: reversalId,
+      loanId: original.loanId, tenantId: original.tenantId || '',
+      date: td,
+      amount: -(original.amount || 0),
+      method: 'void', notes: 'VOID: ' + reason,
+      status: 'void',
+      voidsId: original.id, voidReason: reason, createdBy: actor
+    };
+  }
+  if (collectionKey === 'arrPayments') {
+    return {
+      id: reversalId,
+      arrId: original.arrId, invoiceId: original.invoiceId || '',
+      tenantId: original.tenantId || '',
+      date: td,
+      amount: -(original.amount || 0),
+      method: 'void', type: 'void',
+      ref: '', notes: 'VOID: ' + reason,
+      status: 'void',
+      voidsId: original.id, voidReason: reason, createdBy: actor
+    };
+  }
+  if (collectionKey === 'journalEntries') {
+    return {
+      id: reversalId,
+      tenantId: original.tenantId || '',
+      date: td,
+      ledger: original.ledger,
+      debit: original.credit || 0, credit: original.debit || 0,
+      charge: original.credit || 0, payment: original.debit || 0,
+      memo: 'VOID: ' + (original.memo || original.desc || ''),
+      desc: 'VOID: ' + (original.memo || original.desc || ''),
+      ref: original.ref || '',
+      postedBy: actor,
+      status: 'void', type: 'journal', method: 'journal',
+      voidsId: original.id, voidReason: reason
+    };
+  }
+  if (collectionKey === 'hydroLedger' || collectionKey === 'gasLedger') {
+    return {
+      id: reversalId,
+      unitId: original.unitId, tenantId: original.tenantId || '',
+      periodStart: original.periodStart, periodEnd: original.periodEnd,
+      date: original.date || td,
+      meterStart: null, meterEnd: null,
+      amount: -(original.amount || 0),
+      amountBilled: -(original.amountBilled || original.amount || 0),
+      amountPaid: 0,
+      notes: 'VOID: ' + (original.notes || reason),
+      status: 'void',
+      voidsId: original.id, voidReason: reason, createdBy: actor
+    };
+  }
+  return null;
+}
+
+// Void a single ledger entry by ID. Marks original status='void', inserts a
+// sign-reversed entry with voidsId pointing back, writes an audit entry, saves.
+function voidLedgerEntry(collectionKey, originalId, reason) {
+  var d = getData();
+  var collection = d[collectionKey];
+  if (!collection) { _toastError('Cannot void: unknown collection ' + collectionKey); return; }
+  var original = collection.find(function(x){ return x.id === originalId; });
+  if (!original) { if (typeof toast === 'function') toast('Entry not found — may already be voided.'); return; }
+  if (finIsVoided(original)) { if (typeof toast === 'function') toast('Entry is already voided.'); return; }
+  var actor = _ACTOR();
+  var now = new Date().toISOString();
+  original.status    = 'void';
+  original.voidReason = reason;
+  original.voidedAt  = now;
+  original.voidedBy  = actor;
+  var reversalId = uid();
+  var reversal = _makeReversalEntry(collectionKey, original, reversalId, reason, actor);
+  if (reversal) collection.push(reversal);
+  writeAuditEntry({
+    action: 'void_entry',
+    entity_type: collectionKey,
+    entity_id: originalId,
+    summary: 'Void: ' + (original.desc || original.memo || collectionKey) + ' — ' + reason,
+    detail: { reason: reason, reversal_id: reversalId, voided_by: actor }
+  });
+  saveData(d);
+}
+
+// Void a journal entry group (all rows sharing the same ref UUID).
+function voidJournalGroup(ref, fallbackId, reason) {
+  var d = getData();
+  var toVoid = (ref && ref !== '')
+    ? (d.journalEntries||[]).filter(function(j){ return j.ref === ref; })
+    : (d.journalEntries||[]).filter(function(j){ return j.id === fallbackId; });
+  if (!toVoid.length) { if (typeof toast === 'function') toast('Journal entry not found.'); return; }
+  if (finIsVoided(toVoid[0])) { if (typeof toast === 'function') toast('Already voided.'); return; }
+  var actor = _ACTOR();
+  var now = new Date().toISOString();
+  var groupVoidRef = uid();
+  toVoid.forEach(function(j) {
+    j.status = 'void'; j.voidReason = reason; j.voidedAt = now; j.voidedBy = actor;
+    var rev = _makeReversalEntry('journalEntries', j, uid(), reason, actor);
+    if (rev) { rev.ref = groupVoidRef; d.journalEntries.push(rev); }
+  });
+  writeAuditEntry({
+    action: 'void_entry',
+    entity_type: 'journalEntries',
+    entity_id: ref || fallbackId,
+    summary: 'Void journal entry group — ' + reason,
+    detail: { reason: reason, ref: ref, line_count: toVoid.length, voided_by: actor }
+  });
+  saveData(d);
+}
 
 // ── loadData / getData — synchronous contract, deep copy ───────────────────
 // These must remain synchronous because 125 call sites depend on that, and

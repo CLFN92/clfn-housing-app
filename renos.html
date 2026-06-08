@@ -1251,7 +1251,7 @@ function canEditProgressFor(unitId){
   if(!APPROVAL_AUTHORITY.can('editRenoProgress', role)) return false;
   // Once a completed SOW exists, only the ED can keep editing progress.
   if(!unitHasCompletedSow(unitId)) return true;
-  return role === ROLE.ED;
+  return CLFN_PERMS.canEditProgressForUnit(role, true);
 }
 
 

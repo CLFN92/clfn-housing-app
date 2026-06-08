@@ -1,7 +1,7 @@
 function calcAllTotals(d){
   var result={};
   d.tenants.forEach(function(t){result[t.id]={rent:0,loan:0,arrangement:0};});
-  d.rentLedger.forEach(function(r){if(result[r.tenantId]&&r.status!=='reversed')result[r.tenantId].rent+=r.charge-r.payment;});
+  d.rentLedger.forEach(function(r){if(result[r.tenantId]&&!finIsVoided(r))result[r.tenantId].rent+=r.charge-r.payment;});
 
   d.loanList.forEach(function(ln){
     if(!result[ln.tenantId])return;
@@ -226,24 +226,15 @@ function declineJournalEntry(ref, fallbackId) {
 }
 
 function voidJournalEntry(ref, fallbackId) {
-  showConfirm('Void Entry', 'Void this journal entry? It will be marked as reversed and removed from all balances.', function() {
-    var d = getData();
-    var toVoid = (ref && ref !== '')
-      ? (d.journalEntries||[]).filter(function(j){ return j.ref === ref; })
-      : (d.journalEntries||[]).filter(function(j){ return j.id === fallbackId; });
-    if (!toVoid.length) return;
-    d.auditLog = d.auditLog || [];
-    var actor = (typeof HOUSING_SESSION !== 'undefined') ? (HOUSING_SESSION.name || HOUSING_SESSION.email) : 'ED';
-    toVoid.forEach(function(j) {
-      var prev = j.status;
-      j.status = 'reversed';
-      j.voidedBy = actor;
-      j.voidedAt = today();
-      d.auditLog.push({id:uid(), ts:new Date().toISOString(), user:CURRENT_USER,
-        action:'update', entity:'journal', entityId:j.id,
-        description:'Journal entry voided by '+actor, before:{status:prev}, after:{status:'reversed'}});
-    });
-    saveData(d);
+  var d = getData();
+  var group = (ref && ref !== '')
+    ? (d.journalEntries||[]).filter(function(j){ return j.ref === ref; })
+    : (d.journalEntries||[]).filter(function(j){ return j.id === fallbackId; });
+  if (!group.length) return;
+  var first = group[0];
+  var preview = escapeHtml((first.memo || first.desc || '') + (group.length > 1 ? ' (' + group.length + ' lines)' : ''));
+  showVoidModal({ label: 'Void Journal Entry', preview: preview }, function(reason) {
+    voidJournalGroup(ref, fallbackId, reason);
     renderFinanceWorklist();
     renderDashboard();
     if (document.getElementById('page-journal') && document.getElementById('page-journal').classList.contains('on')) renderJournal();

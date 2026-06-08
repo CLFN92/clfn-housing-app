@@ -22,7 +22,7 @@ function renderRentLedger(){
     // No tenant selected — show summary of all tenants with balances
     var allEntries = d.rentLedger || [];
     var summaryRows = d.tenants.filter(function(tn){ return !tn.archived; }).map(function(tn) {
-      var entries = allEntries.filter(function(e){ return e.tenantId === tn.id && e.status !== 'reversed'; });
+      var entries = allEntries.filter(function(e){ return e.tenantId === tn.id && !finIsVoided(e); });
       if (!entries.length) return null;
       var charged = entries.reduce(function(s,e){ return s+(e.charge||0); }, 0);
       var paid    = entries.reduce(function(s,e){ return s+(e.payment||0); }, 0);
@@ -93,6 +93,7 @@ function renderRentLedger(){
 
   // Second pass — apply filters for what we render
   var rows = allRows.filter(function(r){
+    if (!window._finShowVoided && finIsVoided(r)) return false;
     if (!passDate(r.date)) return false;
     if (fType && (r.type || '') !== fType) return false;
     if (fStatus) {
@@ -125,8 +126,10 @@ function renderRentLedger(){
 
   var html = rows.map(function(r){
     var isArr=r.type==='arrangement-line';
+    var isVoid=finIsVoided(r);
     var bal = r._runningBalance;
-    return '<tr'+(isArr?' style="background:var(--yellow-light);"':'')+'>'+
+    var trStyle = isArr ? 'background:var(--yellow-light);' : isVoid ? 'opacity:.45;text-decoration:line-through;' : '';
+    return '<tr'+(trStyle?' style="'+trStyle+'"':'')+'>'+
       '<td>'+r.date+'</td>'+
       '<td>'+r.desc+(isArr?' <span class="pill pill-yellow" style="font-size:10px;">Arrangement</span>':'')+'</td>'+
       '<td class="std-cell-right">'+(r.charge>0?'<span class="amt-debit">'+fmt(r.charge)+'</span>':'<span class="std-cell-dash">&mdash;</span>')+'</td>'+
@@ -134,7 +137,7 @@ function renderRentLedger(){
       '<td class="std-cell-right balance-col '+(bal>0?'balance-owed':'balance-clear')+'">'+fmt(bal)+'</td>'+
       '<td style="font-size:12px;">'+methodLabel(r.method)+'</td>'+
       '<td>'+statusPill(r.status)+'</td>'+
-      '<td>'+(r.type==='payment'?'<button class="btn btn-danger btn-sm" onclick="openReversal(\''+r.id+'\',\'rent\')">Rev.</button>':'')+'</td></tr>';
+      '<td>'+(!isVoid && r.type==='payment'?'<button class="btn btn-danger btn-sm" onclick="openReversal(\''+r.id+'\',\'rent\')">Rev.</button>':'')+'</td></tr>';
   }).join('');
 
   if (bodyEl) {
@@ -460,7 +463,7 @@ function renderLoansPage(){
       purpose:   { label: 'Purpose',   accessor: function(l){ return l.type||''; } },
       principal: { label: 'Principal', accessor: function(l){ return parseFloat(l.principal)||0; } },
       remaining: { label: 'Remaining', accessor: function(l){
-        var paid=d.loanPayments.filter(function(p){return p.loanId===l.id&&p.status!=='reversed';}).reduce(function(s,p){return s+p.amount;},0);
+        var paid=d.loanPayments.filter(function(p){return p.loanId===l.id&&!finIsVoided(p);}).reduce(function(s,p){return s+p.amount;},0);
         return Math.max(0,(parseFloat(l.principal)||0)-paid);
       }},
       status:    { label: 'Status',    accessor: function(l){ return l.status||''; } }
@@ -481,7 +484,7 @@ function renderLoansPage(){
     } else {
       rows = list.map(function(l){
         var t = getTenant(l.tenantId);
-        var paid = d.loanPayments.filter(function(p){ return p.loanId === l.id && p.status !== 'reversed'; }).reduce(function(s,p){ return s+p.amount; }, 0);
+        var paid = d.loanPayments.filter(function(p){ return p.loanId === l.id && !finIsVoided(p); }).reduce(function(s,p){ return s+p.amount; }, 0);
         var remaining = Math.max(0, l.principal - paid);
         var pct = l.principal > 0 ? Math.min(100, (paid/l.principal)*100) : 0;
         var safeId = (l.tenantId||'').replace(/'/g, "\\'");
@@ -581,7 +584,7 @@ function switchLoan(loanId){
 
 function renderLoanDetail(ln, d, t){
   var content = document.getElementById('loansContent');
-  var payments = d.loanPayments.filter(function(p){return p.loanId===ln.id && p.status!=='reversed';});
+  var payments = d.loanPayments.filter(function(p){return p.loanId===ln.id && !finIsVoided(p);});
   var allPayments = d.loanPayments.filter(function(p){return p.loanId===ln.id;});
   var totalPaid = payments.reduce(function(s,p){return s+p.amount;},0);
   var remaining = Math.max(0, ln.principal-totalPaid);
@@ -595,7 +598,7 @@ function renderLoanDetail(ln, d, t){
   var nextPayDate = ln.nextPayDate || ln.start || today();
 
   var payRows = allPayments.map(function(p){
-    var isReversed = p.status==='reversed';
+    var isReversed = finIsVoided(p);
     return '<tr style="'+(isReversed?'opacity:.5;':'')+'">' +
       '<td>'+(isReversed?'<s>':'')+p.date+(isReversed?'</s>':'')+'</td>'+
       '<td><span class="'+(isReversed?'':'amt-credit')+'">'+fmt(p.amount)+'</span></td>'+

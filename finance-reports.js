@@ -519,6 +519,7 @@ function renderJournal() {
   else if (fDate === '90')    cutoff = new Date(todayD.getTime() - 90*24*60*60*1000);
 
   list = list.filter(function(r){
+    if (!window._finShowVoided && finIsVoided(r)) return false;
     if (cutoff && new Date(r.date) < cutoff) return false;
     if (fStatus && (r.status||'') !== fStatus) return false;
     // Journal entries don't have their own ledger field; for now we treat them all as 'rent'
@@ -571,7 +572,7 @@ function renderJournal() {
     if (st === 'approved') return '<span class="std-pill std-pill-approved">Approved</span>';
     if (st === 'pending-ed') return '<span class="std-pill std-pill-pending">Pending ED</span>';
     if (st === 'pending') return '<span class="std-pill std-pill-pending">Pending</span>';
-    if (st === 'reversed') return '<span class="std-pill std-pill-voided">Reversed</span>';
+    if (st === 'void' || st === 'reversed') return '<span class="std-pill std-pill-voided">Voided</span>';
     if (st === 'declined') return '<span class="std-pill std-pill-overdue">Declined</span>';
     return '<span class="std-pill std-pill-info">'+(st||'—')+'</span>';
   }
@@ -756,44 +757,45 @@ function saveLoanQuickPayment(loanId, tid, loanType) {
 }
 
 function reverseRentEntry(entryId, tid) {
-  showConfirm('Reverse Payment', 'Reverse this payment? A reversal entry will be posted to the ledger.', function() { _doReverseRentEntry(entryId, tid); });
-}
-function _doReverseRentEntry(entryId, tid) {
   var d = getData();
-  var entry = d.rentLedger.find(function(r){return r.id===entryId;});
+  var entry = d.rentLedger.find(function(r){ return r.id === entryId; });
   if (!entry) return;
-  entry.status = 'reversed';
-  auditLog('update','payment',entryId,'Rent payment reversed: '+fmt(entry.payment)+' on '+entry.date,{status:'posted'},{status:'reversed'});
-  saveData(d);
-  renderTenantProfile(tid);
-  renderDashboard();
+  showVoidModal({
+    label: 'Void Rent Entry',
+    preview: escapeHtml(entry.desc || '') + ' &nbsp;&middot;&nbsp; ' + fmt(entry.payment || entry.charge) + ' &nbsp;&middot;&nbsp; ' + (entry.date || '')
+  }, function(reason) {
+    voidLedgerEntry('rentLedger', entryId, reason);
+    if (typeof renderTenantProfile === 'function') renderTenantProfile(tid);
+    renderDashboard();
+  });
 }
 
 function reverseArrPayment(pmtId, tid) {
-  showConfirm('Reverse Payment', 'Reverse this arrangement payment? This cannot be undone.', function() { _doReverseArrPayment(pmtId, tid); });
-}
-function _doReverseArrPayment(pmtId, tid) {
   var d = getData();
-  var p = d.arrPayments.find(function(x){return x.id===pmtId;});
+  var p = d.arrPayments.find(function(x){ return x.id === pmtId; });
   if (!p) return;
-  p.status = 'reversed';
-  auditLog('update','arrPayment',pmtId,'Arrangement payment reversed: '+fmt(p.amount)+' on '+p.date,{status:'posted'},{status:'reversed'});
-  saveData(d);
-  renderTenantProfile(tid);
-  renderDashboard();
+  showVoidModal({
+    label: 'Void Arrangement Payment',
+    preview: fmt(p.amount) + ' &nbsp;&middot;&nbsp; ' + (p.date || '')
+  }, function(reason) {
+    voidLedgerEntry('arrPayments', pmtId, reason);
+    if (typeof renderTenantProfile === 'function') renderTenantProfile(tid);
+    renderDashboard();
+  });
 }
 
 function reverseLoanPmt(pmtId, tid) {
-  showConfirm('Reverse Payment', 'Reverse this loan payment? This cannot be undone.', function() { _doReverseLoanPmt(pmtId, tid); });
-}
-function _doReverseLoanPmt(pmtId, tid) {
   var d = getData();
-  var p = d.loanPayments.find(function(x){return x.id===pmtId;});
+  var p = d.loanPayments.find(function(x){ return x.id === pmtId; });
   if (!p) return;
-  p.status = 'reversed';
-  auditLog('update','loanPayment',pmtId,'Loan payment reversed: '+fmt(p.amount)+' on '+p.date,{status:'posted'},{status:'reversed'});
-  saveData(d);
-  renderTenantProfile(tid);
-  renderDashboard();
+  showVoidModal({
+    label: 'Void Loan Payment',
+    preview: fmt(p.amount) + ' &nbsp;&middot;&nbsp; ' + (p.date || '')
+  }, function(reason) {
+    voidLedgerEntry('loanPayments', pmtId, reason);
+    if (typeof renderTenantProfile === 'function') renderTenantProfile(tid);
+    renderDashboard();
+  });
 }
+function _doReverseLoanPmt(){} // kept as stub — callers migrated to reverseLoanPmt
 

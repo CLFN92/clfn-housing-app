@@ -78,26 +78,22 @@ function voidCurrentInvoice() {
   if (!currentVoucherData) { toast('No invoice selected.'); return; }
   var txn = currentVoucherData;
   if (!txn.id) { toast('Cannot void \u2014 invoice ID not found.'); return; }
-  var msg = txn.payments && txn.payments.length > 0
-    ? 'This invoice has payments applied. Voiding will reverse the charge. Continue?'
-    : 'Void this invoice for ' + fmt(txn.charge) + '? This cannot be undone.';
-  if (!confirm(msg)) return;
   var d = getData();
   var inv = d.rentLedger.find(function(r){ return r.id === txn.id; });
   if (!inv) { toast('Invoice not found \u2014 it may already be voided.'); return; }
-  inv.status = 'reversed';
-  d.rentLedger.push({
-    id:uid(), tenantId:txn.tenantId, date:today(),
-    desc:'VOID: '+txn.desc, charge:0, payment:txn.charge,
-    type:'reversal', method:'', status:'reversed',
-    ref:'VOID-'+(txn.ref||txn.id.slice(-6))
+  if (finIsVoided(inv)) { toast('Invoice is already voided.'); return; }
+  var hasPayments = txn.payments && txn.payments.length > 0;
+  showVoidModal({
+    label: 'Void Invoice',
+    preview: escapeHtml(txn.desc || '') + ' &nbsp;&middot;&nbsp; ' + fmt(txn.charge)
+      + (hasPayments ? ' &nbsp;<span style="color:var(--danger);">&#9888; This invoice has payments applied.</span>' : '')
+  }, function(reason) {
+    voidLedgerEntry('rentLedger', txn.id, reason);
+    if (typeof closeModal === 'function') closeModal('modalVoucher');
+    renderDashboard();
+    if (document.getElementById('page-rent') && document.getElementById('page-rent').classList.contains('on')) renderRentLedger();
+    setTimeout(function(){ toast('Invoice voided. Reversal credit posted to ledger.'); }, 300);
   });
-  auditLog('update','invoice',txn.id,'Invoice voided: '+txn.desc+' '+fmt(txn.charge),{status:'approved'},{status:'reversed'});
-  saveData(d);
-  document.getElementById('modalVoucher').classList.remove('on');
-  renderDashboard();
-  if (document.getElementById('page-rent').classList.contains('on')) renderRentLedger();
-  setTimeout(function(){ toast('Invoice voided. Reversal credit posted to ledger.'); }, 300);
 }
 
 // ── Invoice form (save / GL / autofill) ───────────────────────────────────

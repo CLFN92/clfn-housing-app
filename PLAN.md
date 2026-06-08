@@ -110,7 +110,7 @@ For now: **embed in each deployment build** as `window.NATION_CONFIG`. Simplest 
 
 ---
 
-## Phase B — Approval Flow Validation  ⏳
+## Phase B — Approval Flow Validation  ✅
 
 - Inventory all raw `role === '...'` checks across 3 HTML files
 - Migrate to `CLFN_PERMS.*` helpers
@@ -251,7 +251,7 @@ finance.html don't need to change.
 
 ---
 
-## Phase F3B — Finance Data Layer Port (session 2 of 2)  ⬜
+## Phase F3B — Finance Data Layer Port (session 2 of 2)  ✅
 
 **Goal:** Surface the void pattern in the UI, replace "Delete" buttons with
 "Void" buttons with reason prompt, add an Audit tab showing voided entries.
@@ -266,7 +266,7 @@ finance.html don't need to change.
 
 ---
 
-## Phase C — Refactor to shared.js  ⬜
+## Phase C — Refactor to shared.js  ✅
 
 ### Pre-flight
 - Snapshot `housing.html.pre-refactor`, `renos.html.pre-refactor`

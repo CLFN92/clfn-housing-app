@@ -738,65 +738,28 @@ function exportTicHistory(tid) {
 // stays the same.
 function voidTicTransaction(ledger, id, tid) {
   if (!id || !ledger) { toast('Cannot void \u2014 missing reference.'); return; }
-  var reason = prompt('Reason for voiding this transaction? (required)');
-  if (reason === null) return; // user cancelled
-  reason = reason.trim();
-  if (!reason) { toast('A reason is required to void a transaction.'); return; }
-
+  var collectionMap = {
+    rent: 'rentLedger', utility: 'rentLedger',
+    arrangement: 'arrPayments',
+    loans: 'loanPayments', loan: 'loanPayments',
+    journal: 'journalEntries'
+  };
+  var collectionKey = collectionMap[ledger];
+  if (!collectionKey) { toast('Cannot void \u2014 unknown ledger type.'); return; }
   var d = getData();
-  var rec = null;
-  var table = null;
-
-  if (ledger === 'rent' || ledger === 'utility') {
-    rec = (d.rentLedger||[]).find(function(x){ return x.id === id; });
-    table = 'rentLedger';
-  } else if (ledger === 'arrangement') {
-    rec = (d.arrPayments||[]).find(function(x){ return x.id === id; });
-    table = 'arrPayments';
-  } else if (ledger === 'loans' || ledger === 'loan') {
-    rec = (d.loanPayments||[]).find(function(x){ return x.id === id; });
-    table = 'loanPayments';
-  } else if (ledger === 'journal') {
-    rec = (d.journalEntries||[]).find(function(x){ return x.id === id; });
-    table = 'journalEntries';
-  }
-
+  var rec = (d[collectionKey]||[]).find(function(x){ return x.id === id; });
   if (!rec) { toast('Transaction not found \u2014 it may have already been voided.'); return; }
-  if (rec.status === 'reversed' || rec.status === 'voided') {
-    toast('Already voided.');
-    return;
-  }
-
-  var before = { status: rec.status || 'posted' };
-  rec.status = 'reversed';
-  rec.voidReason = reason;
-  rec.voidedAt = new Date().toISOString();
-  rec.voidedBy = (typeof CURRENT_USER !== 'undefined' ? CURRENT_USER : '');
-
-  // Audit trail \u2014 use shared auditLog() helper if available, else push direct.
-  if (typeof auditLog === 'function') {
-    auditLog('update', table, id, 'Void from TIC: ' + (rec.desc || ledger) + ' \u2014 ' + reason, before, { status:'reversed' });
-  } else if (d.auditLog) {
-    d.auditLog.push({
-      id: (typeof uid === 'function' ? uid() : String(Date.now())),
-      ts: new Date().toISOString(),
-      user: (typeof CURRENT_USER !== 'undefined' ? CURRENT_USER : ''),
-      action: 'update',
-      entity: table,
-      entityId: id,
-      description: 'Void from TIC: ' + (rec.desc || ledger) + ' \u2014 ' + reason,
-      before: before,
-      after: { status: 'reversed' }
-    });
-  }
-
-  saveData(d);
-  toast('Transaction voided.');
-
-  // Re-render everything that may reflect the change
-  renderTicHistory(tid);
-  if (typeof renderTenantProfile === 'function') renderTenantProfile(tid);
-  if (typeof renderDashboard === 'function') renderDashboard();
+  if (finIsVoided(rec)) { toast('Already voided.'); return; }
+  showVoidModal({
+    label: 'Void Transaction',
+    preview: escapeHtml(rec.desc || rec.memo || ledger) + (rec.amount || rec.charge || rec.payment ? ' &nbsp;&middot;&nbsp; ' + fmt(rec.amount || rec.charge || rec.payment) : '') + (rec.date ? ' &nbsp;&middot;&nbsp; ' + rec.date : '')
+  }, function(reason) {
+    voidLedgerEntry(collectionKey, id, reason);
+    toast('Transaction voided.');
+    renderTicHistory(tid);
+    if (typeof renderTenantProfile === 'function') renderTenantProfile(tid);
+    if (typeof renderDashboard === 'function') renderDashboard();
+  });
 }
 
 // \u2500\u2500 Ledger row actions \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500

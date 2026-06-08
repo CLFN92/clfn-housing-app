@@ -140,38 +140,75 @@ function renderTransactions() {
 }
 
 function renderAuditLog() {
-  var d=getData(); var log=d.auditLog||[];
-  var users=[...new Set(log.map(function(e){return e.user;}))];
-  var uSel=document.getElementById('audit-filter-user'); var curUser=uSel?uSel.value:'all';
-  if(uSel){uSel.innerHTML='<option value="all">All Users</option>'+users.map(function(u){return '<option value="'+u+'"'+(u===curUser?' selected':'')+'>'+u+'</option>';}).join('');}
-  var filterUser=curUser;
-  var filterAction=(document.getElementById('audit-filter-action')||{}).value||'all';
-  var filterSearch=((document.getElementById('audit-filter-search')||{}).value||'').toLowerCase();
-  var filtered=log.filter(function(e){
-    if(filterUser!=='all'&&e.user!==filterUser)return false;
-    if(filterAction!=='all'&&e.action!==filterAction)return false;
-    if(filterSearch&&!JSON.stringify(e).toLowerCase().includes(filterSearch))return false;
-    return true;
-  }).slice().reverse();
-  if(!filtered.length){document.getElementById('auditLogContent').innerHTML='<div class="card" style="text-align:center;padding:40px;color:var(--muted);">No audit entries found.</div>';return;}
-  var html=filtered.map(function(e){
-    var actionIcon={create:'&#10133;',update:'&#9998;',delete:'&#128465;'}[e.action]||'&#9679;';
-    var ts=new Date(e.ts).toLocaleString('en-CA');
-    var diffHtml='';
-    if(e.before&&e.after){
-      var keys=Object.keys(Object.assign({},e.before,e.after));
-      var diffs=keys.filter(function(k){return JSON.stringify(e.before[k])!==JSON.stringify(e.after[k]);})
-        .map(function(k){return k+': '+JSON.stringify(e.before[k])+' \u2192 '+JSON.stringify(e.after[k]);});
-      if(diffs.length)diffHtml='<div class="audit-diff">'+diffs.slice(0,8).join('<br>')+'</div>';
-    } else if(e.after){
-      var snap=Object.entries(e.after).slice(0,6).map(function(kv){return kv[0]+': '+JSON.stringify(kv[1]);}).join(' | ');
-      diffHtml='<div class="audit-diff">'+snap+'</div>';
-    }
-    return '<div class="audit-entry '+e.action+'">'+
-      '<div class="audit-meta">'+actionIcon+' <strong>'+e.user+'</strong> &mdash; '+ts+' &mdash; <span style="text-transform:uppercase;font-size:10px;font-weight:700;letter-spacing:.5px;">'+e.action+' '+e.entity+'</span></div>'+
-      '<div style="font-size:13px;">'+e.description+'</div>'+diffHtml+'</div>';
-  }).join('');
-  document.getElementById('auditLogContent').innerHTML='<div class="card"><div class="ctitle">'+filtered.length+' entries</div>'+html+'</div>';
+  var contentEl = document.getElementById('auditLogContent');
+  if (!contentEl) return;
+  contentEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Loading audit log&hellip;</div>';
+  var nation = (typeof _NATION === 'function') ? _NATION() : 'clfn';
+  var path = 'finance_audit_log?nation_id=eq.' + encodeURIComponent(nation)
+    + '&order=occurred_at.desc&limit=500';
+  _fetchFromSupabase(path)
+    .then(function(resp) {
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      return resp.json();
+    })
+    .then(function(data) {
+      var filterUser   = ((document.getElementById('audit-filter-user')  ||{}).value || 'all');
+      var filterAction = ((document.getElementById('audit-filter-action')||{}).value || 'all');
+      var filterSearch = ((document.getElementById('audit-filter-search')||{}).value || '').toLowerCase();
+      // Populate user dropdown
+      var emails = [];
+      (data||[]).forEach(function(e) {
+        var u = e.actor_email || e.actor_name || '';
+        if (u && emails.indexOf(u) < 0) emails.push(u);
+      });
+      var uSel = document.getElementById('audit-filter-user');
+      if (uSel) {
+        uSel.innerHTML = '<option value="all">All Users</option>'
+          + emails.map(function(u) {
+              return '<option value="'+escapeHtml(u)+'"'+(u===filterUser?' selected':'')+'>'+escapeHtml(u)+'</option>';
+            }).join('');
+      }
+      var filtered = (data||[]).filter(function(e) {
+        var actor = e.actor_email || e.actor_name || '';
+        if (filterUser !== 'all' && actor !== filterUser) return false;
+        if (filterAction !== 'all' && e.action !== filterAction) return false;
+        if (filterSearch && !JSON.stringify(e).toLowerCase().includes(filterSearch)) return false;
+        return true;
+      });
+      if (!filtered.length) {
+        contentEl.innerHTML = '<div class="card" style="text-align:center;padding:40px;color:var(--muted);">No audit entries found.</div>';
+        return;
+      }
+      var actionIcons = {
+        create:'&#10133;', update:'&#9998;', delete:'&#128465;',
+        void_entry:'&#8635;', approve:'&#10003;', decline:'&#10007;', reverse:'&#8617;'
+      };
+      var html = filtered.map(function(e) {
+        var icon = actionIcons[e.action] || '&#9679;';
+        var ts   = new Date(e.occurred_at).toLocaleString('en-CA');
+        var actor = escapeHtml(e.actor_name || e.actor_email || 'Unknown');
+        var role  = e.actor_role ? ' <span style="font-size:10px;color:var(--muted);">('+escapeHtml(e.actor_role)+')</span>' : '';
+        var detailHtml = '';
+        if (e.detail && typeof e.detail === 'object') {
+          var keys = Object.keys(e.detail).slice(0, 5);
+          if (keys.length) {
+            detailHtml = '<div class="audit-diff">'
+              + keys.map(function(k){ return escapeHtml(k)+': '+escapeHtml(JSON.stringify(e.detail[k])); }).join('<br>')
+              + '</div>';
+          }
+        }
+        return '<div class="audit-entry '+(e.action||'')+'">'+
+          '<div class="audit-meta">'+icon+' <strong>'+actor+'</strong>'+role+' &mdash; '+ts+
+          ' &mdash; <span style="text-transform:uppercase;font-size:10px;font-weight:700;letter-spacing:.5px;">'+escapeHtml(e.action||'')+'</span></div>'+
+          '<div style="font-size:13px;">'+escapeHtml(e.summary||'')+'</div>'+
+          detailHtml+
+        '</div>';
+      }).join('');
+      contentEl.innerHTML = '<div class="card"><div class="ctitle">'+filtered.length+' entries</div>'+html+'</div>';
+    })
+    .catch(function(err) {
+      contentEl.innerHTML = '<div class="card" style="text-align:center;padding:40px;color:var(--danger);">Failed to load audit log: '+escapeHtml(err.message)+'</div>';
+    });
 }
 
 function clearCollectionsFilters(){

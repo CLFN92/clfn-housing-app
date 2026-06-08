@@ -591,14 +591,99 @@
          +      _ticField('Clear-By Date',          _ticFmtDate(l[TIC_C.arrangement_clear]))
          +    '</div>'
          + '</div>'
-         + '<div class="tic-section">'
-         +    '<div class="tic-section-h">Utilities</div>'
-         +    '<div class="tic-rows">'
-         +      renderGroup(function(f){ return f.group === 'utilities'; })
-         +    '</div>'
-         + '</div>';
-    _ticEl('tic_panel_overview').innerHTML = html;
+        ;
+
+    var u = _ticState.unit || {};
+    var mapHtml = ''
+      + '<div class="map-widget">'
+      +   '<div class="map-widget-header">'
+      +     '<span class="map-pin-icon">&#128205;</span>'
+      +     '<div>'
+      +       '<div class="map-widget-label">Unit Location</div>'
+      +       '<div class="map-widget-address" id="map-unit-address">&#8212;</div>'
+      +     '</div>'
+      +   '</div>'
+      +   '<div class="map-frame-wrap">'
+      +     '<iframe id="map-iframe" class="map-frame" src="" allowfullscreen loading="lazy" title="Unit location map"></iframe>'
+      +     '<div class="map-no-coords" id="map-no-coords" style="display:none;">'
+      +       '<span>&#128205;</span>'
+      +       '<p>Coordinates not yet set for this unit.<br>Add lat/lng in the unit record to enable the map.</p>'
+      +     '</div>'
+      +   '</div>'
+      +   '<div class="map-widget-footer">'
+      +     '<div class="map-coords" id="map-coords-display">&#8212;</div>'
+      +     '<a class="map-osm-link" id="map-osm-link" href="#" target="_blank" rel="noopener">Open in Map &#8599;</a>'
+      +   '</div>'
+      +   '<div class="map-ocap-notice">'
+      +     '<span>&#128737;</span>'
+      +     '<p><strong>Data stays on-reserve.</strong> Tiles from OpenStreetMap. No data sent to Google or ad networks.</p>'
+      +   '</div>'
+      + '</div>';
+
+    _ticEl('tic_panel_overview').innerHTML =
+      '<div class="tic-overview-columns">'
+      + '<div class="tic-overview-main">' + html + '</div>'
+      + '<div class="tic-overview-map">'  + mapHtml + '</div>'
+      + '</div>';
+
+    _ticInitMap(u);
   }
+
+  function _ticRenderUtilities(){
+    var rows = TIC_OVERVIEW_FIELDS
+      .filter(function(f){ return f.group === 'utilities'; })
+      .map(_ticOverviewRowHtml).join('');
+    var panel = _ticEl('tic_panel_utilities');
+    if(!panel) return;
+    panel.innerHTML =
+      '<div class="tic-section">'
+      + '<div class="tic-section-h">Utilities</div>'
+      + '<div class="tic-rows">' + rows + '</div>'
+      + '</div>';
+  }
+
+  function _ticInitMap(unit){
+    var u   = unit || {};
+    var lat = u.latitude  != null ? parseFloat(u.latitude)  : null;
+    var lng = u.longitude != null ? parseFloat(u.longitude) : null;
+    var addrEl   = document.getElementById('map-unit-address');
+    var iframeEl = document.getElementById('map-iframe');
+    var noCrdEl  = document.getElementById('map-no-coords');
+    var coordEl  = document.getElementById('map-coords-display');
+    var linkEl   = document.getElementById('map-osm-link');
+    if(!iframeEl) return;
+
+    var address = [u.num && u.street ? u.num + ' ' + u.street : (u.address || ''),
+                   u.city || ''].filter(Boolean).join(', ');
+    if(addrEl) addrEl.textContent = address || '—';
+
+    if(!lat || !lng || isNaN(lat) || isNaN(lng)){
+      iframeEl.style.display   = 'none';
+      if(noCrdEl) noCrdEl.style.display  = 'flex';
+      if(linkEl)  linkEl.style.display   = 'none';
+      if(coordEl) coordEl.textContent    = 'No coordinates';
+      return;
+    }
+
+    var OFFSET = 0.005;
+    var bbox = [
+      (lng - OFFSET).toFixed(6),
+      (lat - OFFSET * 0.7).toFixed(6),
+      (lng + OFFSET).toFixed(6),
+      (lat + OFFSET * 0.7).toFixed(6)
+    ].join('%2C');
+    iframeEl.src = 'https://www.openstreetmap.org/export/embed.html'
+      + '?bbox=' + bbox + '&layer=mapnik'
+      + '&marker=' + lat.toFixed(7) + '%2C' + lng.toFixed(7);
+    iframeEl.style.display  = 'block';
+    if(noCrdEl) noCrdEl.style.display  = 'none';
+    if(coordEl) coordEl.textContent    = lat.toFixed(5) + '° N  /  ' + Math.abs(lng).toFixed(5) + '° W';
+    if(linkEl){
+      linkEl.href           = 'https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '&zoom=17';
+      linkEl.style.display  = 'inline-block';
+    }
+  }
+
   function _ticField(label, value){
     var has = (value != null && value !== '' && value !== '—');
     return '<div class="tic-field"><div class="tic-field-lbl">' + _ticEsc(label) + '</div>'
@@ -1614,7 +1699,8 @@
     }
     var p = _ticEl('tic_panel_' + name);
     if(p) p.classList.add('tic-active');
-    if(name === 'documents') _ticRenderDocuments();
+    if(name === 'documents')  _ticRenderDocuments();
+    if(name === 'utilities')  _ticRenderUtilities();
   }
 
   // ── Save handlers ─────────────────────────────────────────────────────────
@@ -1961,7 +2047,7 @@
     _ticState.ledger = null; _ticState.notes = []; _ticState.applicationNotes = [];
     _ticState.movementLog = [];
     _ticDocLib = null; _ticDocLibKey = null;
-    ['overview','occupants','contact','emergency','references','pets','documents','notes','history'].forEach(function(n){
+    ['overview','utilities','occupants','contact','emergency','references','pets','documents','notes','history'].forEach(function(n){
       var p = _ticEl('tic_panel_' + n); if(p) p.innerHTML = '';
     });
     _ticEl('tic_loading').style.display = '';
@@ -1989,6 +2075,7 @@
         _ticRenderHero();
         _ticRenderStrip();
         _ticRenderOverview();
+        _ticRenderUtilities();
         _ticRenderOccupants();
         _ticRenderContact();
         _ticRenderEmergency();
@@ -2000,6 +2087,7 @@
         _ticEl('tic_loading').style.display = 'none';
         if(typeof showToast === 'function') showToast('Some tenant data could not be loaded.', { type:'error' });
         _ticRenderOverview();
+        _ticRenderUtilities();
         _ticRenderOccupants();
         _ticRenderContact();
         _ticRenderEmergency();
