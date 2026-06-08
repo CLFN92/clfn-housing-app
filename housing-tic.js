@@ -3492,7 +3492,9 @@
       }).addTo(_slpMap);
       if(u.latitude && u.longitude) _slpPlacePin(startLat, startLng);
       _slpMap.on('click', function(e){ _slpPlacePin(e.latlng.lat, e.latlng.lng); });
-    }, 120);
+      // Force Leaflet to re-measure after flex layout settles
+      setTimeout(function(){ if(_slpMap) _slpMap.invalidateSize(); }, 100);
+    }, 200);
   }
 
   function _slpPlacePin(lat, lng) {
