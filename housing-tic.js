@@ -3459,6 +3459,8 @@
     var overlay = document.getElementById('slp-overlay');
     if(overlay) overlay.style.display = 'none';
     if(_slpMap){ _slpMap.remove(); _slpMap = null; _slpMarker = null; }
+    var mapEl = document.getElementById('slp-map');
+    if(mapEl){ mapEl.style.height = ''; mapEl.style.flex = ''; }
   }
 
   function _slpReset() {
@@ -3482,6 +3484,20 @@
   function _slpInitMap() {
     setTimeout(function(){
       if(typeof L === 'undefined') return;
+      var mapEl = document.getElementById('slp-map');
+      if(!mapEl) return;
+
+      // Stamp a concrete pixel height so Leaflet never measures a stale flex size.
+      // Read the column's actual rendered height, subtract the label + note rows.
+      var col    = mapEl.parentElement;
+      var labelH = col ? (col.querySelector('.slp-section-label') || {offsetHeight:30}).offsetHeight + 16 : 46;
+      var noteH  = col ? (col.querySelector('.slp-map-note')      || {offsetHeight:16}).offsetHeight + 6  : 22;
+      var pad    = 40;
+      var colH   = col ? col.clientHeight : 0;
+      var mapH   = colH > 100 ? Math.max(colH - labelH - noteH - pad, 220) : 360;
+      mapEl.style.height = mapH + 'px';
+      mapEl.style.flex   = 'none';
+
       var u = _ticState.unit || {};
       var startLat = u.latitude  ? parseFloat(u.latitude)  : _CLFN_LAT;
       var startLng = u.longitude ? parseFloat(u.longitude) : _CLFN_LNG;
@@ -3492,9 +3508,7 @@
       }).addTo(_slpMap);
       if(u.latitude && u.longitude) _slpPlacePin(startLat, startLng);
       _slpMap.on('click', function(e){ _slpPlacePin(e.latlng.lat, e.latlng.lng); });
-      // Force Leaflet to re-measure after flex layout settles
-      setTimeout(function(){ if(_slpMap) _slpMap.invalidateSize(); }, 100);
-    }, 200);
+    }, 400);
   }
 
   function _slpPlacePin(lat, lng) {
