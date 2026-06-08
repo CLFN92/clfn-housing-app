@@ -614,10 +614,6 @@
       +     '<div class="map-coords" id="map-coords-display">&#8212;</div>'
       +     '<a class="map-osm-link" id="map-osm-link" href="#" target="_blank" rel="noopener">Open in Map &#8599;</a>'
       +   '</div>'
-      +   '<div class="map-ocap-notice">'
-      +     '<span>&#128737;</span>'
-      +     '<p><strong>Data stays on-reserve.</strong> Tiles from OpenStreetMap. No data sent to Google or ad networks.</p>'
-      +   '</div>'
       + '</div>';
 
     var photoWrapHtml = '<div class="unit-photo-wrap" id="unit-photo-wrap" style="display:none;">'
@@ -627,7 +623,7 @@
     var canSetLoc = typeof APPROVAL_AUTHORITY !== 'undefined'
       && APPROVAL_AUTHORITY.can('setUnitLocation', window.currentRole || '');
     var adminBtnHtml = canSetLoc
-      ? '<button type="button" class="btn-set-location" onclick="window._slpOpen && window._slpOpen()">&#128205; Set Location &amp; Photo</button>'
+      ? '<button type="button" class="btn-set-location" data-tic-action="slp-open">&#128205; Set Location &amp; Photo</button>'
       : '';
 
     _ticEl('tic_panel_overview').innerHTML =
@@ -1815,6 +1811,7 @@
     var btn = ev.target;
     var act = btn && btn.getAttribute && btn.getAttribute('data-tic-action');
     if(!act) return;
+    if(act === 'slp-open')     { _slpOpen(); return; }
     // Income (employment)
     if(act === 'inc-add')      { _ticResetIncForm(); _ticEl('tic_inc_form').classList.add('tic-open'); return; }
     if(act === 'inc-cancel')   { _ticResetIncForm(); return; }

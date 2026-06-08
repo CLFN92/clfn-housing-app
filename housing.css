@@ -1891,8 +1891,6 @@ body.tic-modal-open       { overflow: hidden; }
 .map-coords               { font-size: 10px; color: var(--muted); font-weight: 600; }
 .map-osm-link             { font-size: 10px; font-weight: 700; color: var(--text); text-decoration: none; border: 1.5px solid var(--border); padding: 3px 8px; border-radius: 3px; white-space: nowrap; transition: background .15s, color .15s; }
 .map-osm-link:hover       { background: var(--dark); color: var(--yellow); border-color: var(--dark); }
-.map-ocap-notice          { background: var(--yellow-light, #fffbe6); border-top: 1px solid var(--border); padding: 7px 16px; display: flex; align-items: flex-start; gap: 8px; font-size: 10px; color: var(--muted); line-height: 1.4; }
-.map-ocap-notice strong   { color: var(--text); }
 
 /* ── Unit house photo (above map widget in overview right column) ── */
 .unit-photo-wrap          { width: 100%; aspect-ratio: 4/3; border-radius: 6px; overflow: hidden; border: 1.5px solid var(--border); background: var(--bg); margin-bottom: 12px; }
