@@ -3605,6 +3605,9 @@
           }
         }
       }
+      // Belt-and-suspenders: also flush via sbSaveUnit so coords land in the
+      // data blob even if the targeted PATCH column grant wasn't applied yet.
+      if(typeof sbSaveUnit === 'function') sbSaveUnit(_ticState.unit).catch(function(){});
 
       if(typeof _ticAudit === 'function')
         _ticAudit('unit_location_set', 'Set GPS coordinates' + (photoPath ? ' and house photo' : '') + ' for unit');

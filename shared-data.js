@@ -569,8 +569,10 @@ async function sbLoadUnits() {
         assignedName:     row.assigned_name,
         assignedDate:     row.assigned_date,
         constructionCost: (row.construction_cost != null) ? Number(row.construction_cost) : null,
-        latitude:         row.latitude  != null ? Number(row.latitude)  : null,
-        longitude:        row.longitude != null ? Number(row.longitude) : null
+        latitude:  row.latitude  != null ? Number(row.latitude)
+                 : (row.data && row.data.latitude  != null ? Number(row.data.latitude)  : null),
+        longitude: row.longitude != null ? Number(row.longitude)
+                 : (row.data && row.data.longitude != null ? Number(row.data.longitude) : null)
       });
     });
   } catch(e) {
@@ -603,6 +605,9 @@ async function sbSaveUnit(u) {
     construction_cost: (u.constructionCost != null && u.constructionCost !== '') ? Number(u.constructionCost) : null,
     data:              u
   };
+  // Only include lat/lng when present — omitting keeps existing DB value intact on merge
+  if (u.latitude  != null) row.latitude  = Number(u.latitude);
+  if (u.longitude != null) row.longitude = Number(u.longitude);
   try {
     var r = await fetch(SUPABASE_URL + '/rest/v1/housing_units', {
       method:  'POST',
@@ -621,7 +626,7 @@ async function sbSaveUnit(u) {
 async function sbSaveAllUnits(units) {
   if (!units || !units.length) return true;
   var rows = units.map(function(u) {
-    return {
+    var r = {
       id:                u.id,
       num:               u.num           || null,
       street:            u.street        || null,
@@ -640,6 +645,9 @@ async function sbSaveAllUnits(units) {
       construction_cost: (u.constructionCost != null && u.constructionCost !== '') ? Number(u.constructionCost) : null,
       data:              u
     };
+    if (u.latitude  != null) r.latitude  = Number(u.latitude);
+    if (u.longitude != null) r.longitude = Number(u.longitude);
+    return r;
   });
   for (var i = 0; i < rows.length; i += 100) {
     var batch = rows.slice(i, i + 100);
