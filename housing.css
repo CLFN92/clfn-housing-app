@@ -1870,11 +1870,15 @@ body.tic-modal-open       { overflow: hidden; }
 
 /* ── TIC overview two-column layout ───────────────────────────────────── */
 .tic-overview-columns     { display: flex; gap: 24px; align-items: flex-start; }
-.tic-overview-main        { flex: 1 1 60%; min-width: 0; }
-.tic-overview-map         { flex: 0 0 320px; max-width: 320px; }
-@media (max-width: 768px) {
+.tic-overview-main        { flex: 1 1 0; min-width: 0; }
+.tic-overview-map         { flex: 0 0 360px; max-width: 360px; }
+@media (max-width: 900px) {
+  .tic-overview-map       { flex: 0 0 300px; max-width: 300px; }
+}
+@media (max-width: 680px) {
   .tic-overview-columns   { flex-direction: column; }
   .tic-overview-map       { flex: 1 1 100%; max-width: 100%; }
+  .map-frame-wrap         { height: 260px; }
 }
 
 /* ── Map widget ───────────────────────────────────────────────────────── */
@@ -1883,7 +1887,7 @@ body.tic-modal-open       { overflow: hidden; }
 .map-pin-icon             { font-size: 16px; margin-top: 2px; flex-shrink: 0; }
 .map-widget-label         { font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--yellow); margin-bottom: 2px; }
 .map-widget-address       { font-family: var(--serif); font-size: 13px; color: #fff; line-height: 1.4; }
-.map-frame-wrap           { position: relative; width: 100%; height: 240px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.map-frame-wrap           { position: relative; width: 100%; height: 280px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .map-frame                { width: 100%; height: 100%; border: none; display: block; }
 .map-no-coords            { position: absolute; inset: 0; background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center; font-size: 12px; color: var(--muted); line-height: 1.5; }
 .map-no-coords span       { font-size: 24px; }
@@ -2138,9 +2142,13 @@ body.tic-modal-open       { overflow: hidden; }
 .slp-btn-save:disabled { background: var(--border); color: var(--gray); cursor: not-allowed; }
 .slp-btn-save:not(:disabled):hover { background: var(--yellow); color: var(--dark); }
 @media (max-width: 640px) {
-  .slp-body        { flex-direction: column; overflow-y: auto; }
-  .slp-photo-col   { width: 100%; border-right: none; border-bottom: 1.5px solid var(--border); }
-  #slp-map         { height: 280px; }
+  .slp-overlay     { padding: 0; align-items: stretch; }
+  .slp-modal       { max-height: 100dvh; border-radius: 0; }
+  /* column-reverse: map-col (2nd in HTML) appears at top, photo-col below */
+  .slp-body        { flex-direction: column-reverse; overflow-y: auto; }
+  .slp-photo-col   { width: 100%; flex-shrink: 0; border-right: none; border-bottom: none; border-top: 1.5px solid var(--border); overflow-y: visible; }
+  .slp-map-col     { flex-shrink: 0; overflow: visible; }
+  #slp-map         { height: 260px; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════

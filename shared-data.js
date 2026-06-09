@@ -568,7 +568,9 @@ async function sbLoadUnits() {
         assignedTo:       row.assigned_to,
         assignedName:     row.assigned_name,
         assignedDate:     row.assigned_date,
-        constructionCost: (row.construction_cost != null) ? Number(row.construction_cost) : null
+        constructionCost: (row.construction_cost != null) ? Number(row.construction_cost) : null,
+        latitude:         row.latitude  != null ? Number(row.latitude)  : null,
+        longitude:        row.longitude != null ? Number(row.longitude) : null
       });
     });
   } catch(e) {
