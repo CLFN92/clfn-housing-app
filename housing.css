@@ -1876,8 +1876,8 @@ body.tic-modal-open       { overflow: hidden; }
   .tic-overview-map       { flex: 0 0 300px; max-width: 300px; }
 }
 @media (max-width: 680px) {
-  .tic-overview-columns   { flex-direction: column; }
-  .tic-overview-map       { flex: 1 1 100%; max-width: 100%; }
+  .tic-overview-columns   { flex-direction: column; align-items: stretch; }
+  .tic-overview-map       { flex: 1 1 100%; max-width: 100%; width: 100%; }
   .map-frame-wrap         { height: 260px; }
   .tic-overlay            { padding: 0; }
   .tic-shell              { max-height: 100dvh; border-radius: 0; }
