@@ -1879,6 +1879,9 @@ body.tic-modal-open       { overflow: hidden; }
   .tic-overview-columns   { flex-direction: column; }
   .tic-overview-map       { flex: 1 1 100%; max-width: 100%; }
   .map-frame-wrap         { height: 260px; }
+  .tic-overlay            { padding: 0; }
+  .tic-shell              { max-height: 100dvh; border-radius: 0; }
+  .tic-body               { padding: 16px; }
 }
 
 /* ── Map widget ───────────────────────────────────────────────────────── */
@@ -2144,10 +2147,10 @@ body.tic-modal-open       { overflow: hidden; }
 @media (max-width: 640px) {
   .slp-overlay     { padding: 0; align-items: stretch; }
   .slp-modal       { max-height: 100dvh; border-radius: 0; }
-  /* column-reverse: map-col (2nd in HTML) appears at top, photo-col below */
-  .slp-body        { flex-direction: column-reverse; overflow-y: auto; }
-  .slp-photo-col   { width: 100%; flex-shrink: 0; border-right: none; border-bottom: none; border-top: 1.5px solid var(--border); overflow-y: visible; }
-  .slp-map-col     { flex-shrink: 0; overflow: visible; }
+  .slp-body        { flex-direction: column; overflow-y: auto; }
+  /* order: -1 pulls map-col (2nd in HTML) to the visual top */
+  .slp-map-col     { order: -1; flex-shrink: 0; overflow: visible; }
+  .slp-photo-col   { width: 100%; flex-shrink: 0; border-right: none; border-top: 1.5px solid var(--border); overflow-y: visible; }
   #slp-map         { height: 260px; }
 }
 
