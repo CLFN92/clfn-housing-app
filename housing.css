@@ -1881,7 +1881,12 @@ body.tic-modal-open       { overflow: hidden; }
   .map-frame-wrap         { height: 260px; }
   .tic-overlay            { padding: 0; }
   .tic-shell              { max-height: 100dvh; border-radius: 0; }
-  .tic-body               { padding: 16px; }
+  /* Remove horizontal body padding so map spans full width;
+     re-apply it to every panel except the overview (which controls its own) */
+  .tic-body               { padding: 16px 0; }
+  .tic-panel              { padding: 0 16px; }
+  #tic_panel_overview     { padding: 0; }
+  .tic-overview-main      { padding: 0 16px; }
 }
 
 /* ── Map widget ───────────────────────────────────────────────────────── */
@@ -1989,7 +1994,7 @@ body.tic-modal-open       { overflow: hidden; }
   min-height: 0;
 }
 .slp-photo-col {
-  width: 300px;
+  width: 220px;
   flex-shrink: 0;
   padding: 20px;
   overflow-y: auto;
@@ -2103,7 +2108,7 @@ body.tic-modal-open       { overflow: hidden; }
 }
 #slp-map {
   width: 100%;
-  height: clamp(220px, calc(90vh - 300px), 520px);
+  height: clamp(280px, calc(90vh - 220px), 620px);
   border-radius: 3px;
   border: 1.5px solid var(--border);
 }
@@ -2149,9 +2154,11 @@ body.tic-modal-open       { overflow: hidden; }
   .slp-modal       { max-height: 100dvh; border-radius: 0; }
   .slp-body        { flex-direction: column; overflow-y: auto; }
   /* order: -1 pulls map-col (2nd in HTML) to the visual top */
-  .slp-map-col     { order: -1; flex-shrink: 0; overflow: visible; }
-  .slp-photo-col   { width: 100%; flex-shrink: 0; border-right: none; border-top: 1.5px solid var(--border); overflow-y: visible; }
-  #slp-map         { height: 260px; }
+  .slp-map-col     { order: -1; flex-shrink: 0; overflow: visible; padding: 14px 16px 8px; }
+  .slp-photo-col   { width: 100%; flex-shrink: 0; border-right: none; border-top: 1.5px solid var(--border); overflow-y: visible; padding: 12px 16px 16px; }
+  #slp-map         { height: clamp(240px, 42dvh, 340px); }
+  /* compact dropzone — user wants photo box much smaller on mobile */
+  .slp-dropzone    { aspect-ratio: unset; height: 110px; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════
