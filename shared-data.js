@@ -662,7 +662,9 @@ async function sbLoadUnits() {
         latitude:  row.latitude  != null ? Number(row.latitude)
                  : (row.data && row.data.latitude  != null ? Number(row.data.latitude)  : null),
         longitude: row.longitude != null ? Number(row.longitude)
-                 : (row.data && row.data.longitude != null ? Number(row.data.longitude) : null)
+                 : (row.data && row.data.longitude != null ? Number(row.data.longitude) : null),
+        hydro_meter_number: row.hydro_meter_number || (row.data && row.data.hydro_meter_number) || null,
+        gas_meter_number:   row.gas_meter_number   || (row.data && row.data.gas_meter_number)   || null
       });
     });
   } catch(e) {
@@ -695,9 +697,11 @@ async function sbSaveUnit(u) {
     construction_cost: (u.constructionCost != null && u.constructionCost !== '') ? Number(u.constructionCost) : null,
     data:              u
   };
-  // Only include lat/lng when present — omitting keeps existing DB value intact on merge
-  if (u.latitude  != null) row.latitude  = Number(u.latitude);
-  if (u.longitude != null) row.longitude = Number(u.longitude);
+  // Only include lat/lng and meter numbers when present — omitting keeps existing DB value intact on merge
+  if (u.latitude           != null) row.latitude           = Number(u.latitude);
+  if (u.longitude          != null) row.longitude          = Number(u.longitude);
+  if (u.hydro_meter_number != null) row.hydro_meter_number = u.hydro_meter_number || null;
+  if (u.gas_meter_number   != null) row.gas_meter_number   = u.gas_meter_number   || null;
   try {
     var r = await fetch(SUPABASE_URL + '/rest/v1/housing_units', {
       method:  'POST',

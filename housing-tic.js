@@ -378,16 +378,17 @@
     { key: TIC_C.vulnerability,   label: 'Vulnerability Flags', type: 'multi',  options: TIC_VULN_OPTIONS, group: 'unit' },
     { key: TIC_C.application_id,  label: 'Application Number',  type: 'text',   group: 'meta',      readOnly: true },
     { key: TIC_C.hydro_account,   label: 'Hydro Account #',     type: 'text',   group: 'utilities' },
-    { key: TIC_C.hydro_meter,     label: 'Hydro Meter #',       type: 'text',   group: 'utilities' },
+    { key: TIC_C.hydro_meter,     label: 'Hydro Meter #',       type: 'text',   group: 'utilities', saveTarget: 'unit' },
     { key: TIC_C.gas_account,     label: 'Union Gas Account #', type: 'text',   group: 'utilities' },
-    { key: TIC_C.gas_meter,       label: 'Gas Meter #',         type: 'text',   group: 'utilities' }
+    { key: TIC_C.gas_meter,       label: 'Gas Meter #',         type: 'text',   group: 'utilities', saveTarget: 'unit' }
   ];
 
   function _ticOverviewRowVal(field){
     var t = _ticState.tenant || {};
     var u = _ticState.unit   || {};
     var a = _ticState.application;
-    var v = t[field.key];
+    // Fields marked saveTarget:'unit' are stored on housing_units, not tenants.
+    var v = field.saveTarget === 'unit' ? u[field.key] : t[field.key];
     // Unit-derived fall-throughs (read-only rows)
     if(field.key === TIC_C.unit_number && (v == null || v === '') && u.num){
       return (u.num + (u.street ? ' ' + u.street : ''));
@@ -753,31 +754,56 @@
       if(prevNorm === newNorm) return;
       if(prevNorm == null && newNorm == null) return;
     }
-    var pk = _ticState.tenant && _ticState.tenant[TIC_C.tenant_pk];
-    if(!pk){
-      if(typeof showToast === 'function') showToast('No tenant record to save.', { type:'error' });
-      return;
-    }
     inp.classList.add('tic-saving');
     var prevForAudit = prevRaw;
-    _ticWrite('PATCH', TIC_T.tenants + '?' + TIC_C.tenant_pk + '=eq.' + encodeURIComponent(pk), body)
-      .then(function(rows){
+
+    var savePromise;
+    if (field.saveTarget === 'unit') {
+      // Save to housing_units instead of tenants
+      var unitId = _ticState.unit && _ticState.unit.id;
+      if (!unitId) {
         inp.classList.remove('tic-saving');
-        var saved = (rows && rows[0]) || Object.assign({}, _ticState.tenant, body);
-        _ticState.tenant = saved;
-        // Re-render hero + strip so the avatar / name / status pills reflect the change.
-        // Don't re-render overview — the user's still potentially typing in another row.
-        _ticRenderHero();
-        _ticRenderStrip();
+        if (typeof showToast === 'function') showToast('No unit record to save.', { type:'error' });
+        return;
+      }
+      savePromise = _ticWrite('PATCH', 'housing_units?id=eq.' + encodeURIComponent(unitId), body)
+        .then(function(rows){
+          var saved = (rows && rows[0]) || Object.assign({}, _ticState.unit, body);
+          _ticState.unit = saved;
+          // Keep the in-memory housingUnits cache in sync so the unit card reflects changes immediately
+          if (window.housingUnits) {
+            var idx = window.housingUnits.findIndex(function(x){ return x.id === unitId; });
+            if (idx !== -1) Object.assign(window.housingUnits[idx], body);
+          }
+        });
+    } else {
+      var pk = _ticState.tenant && _ticState.tenant[TIC_C.tenant_pk];
+      if (!pk) {
+        inp.classList.remove('tic-saving');
+        if (typeof showToast === 'function') showToast('No tenant record to save.', { type:'error' });
+        return;
+      }
+      savePromise = _ticWrite('PATCH', TIC_T.tenants + '?' + TIC_C.tenant_pk + '=eq.' + encodeURIComponent(pk), body)
+        .then(function(rows){
+          var saved = (rows && rows[0]) || Object.assign({}, _ticState.tenant, body);
+          _ticState.tenant = saved;
+          _ticRenderHero();
+          _ticRenderStrip();
+        });
+    }
+
+    savePromise
+      .then(function(){
+        inp.classList.remove('tic-saving');
         var beforeStr = _ticIsArray(prevForAudit) ? prevForAudit.join(', ') : (prevForAudit == null ? '' : String(prevForAudit));
         var afterStr  = _ticIsArray(body[key]) ? body[key].join(', ') : (body[key] == null ? '' : String(body[key]));
         _ticAudit('tic_overview_change', _ticDescribe(field.label, beforeStr, afterStr));
-        if(typeof showToast === 'function') showToast('Saved.');
+        if (typeof showToast === 'function') showToast('Saved.');
       })
       .catch(function(err){
         inp.classList.remove('tic-saving');
         inp.classList.add('tic-input-error');
-        if(typeof showToast === 'function') showToast('Save failed: ' + err.message, { type:'error' });
+        if (typeof showToast === 'function') showToast('Save failed: ' + err.message, { type:'error' });
       });
   }
   function _ticToggleHomeCare(){
