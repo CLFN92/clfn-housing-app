@@ -94,6 +94,7 @@
     hydro_account:      'hydro_account_number',
     hydro_meter:        'hydro_meter_number',
     gas_account:        'gas_account',
+    gas_meter:          'gas_meter_number',
     home_care:          'home_care'
   };
 
@@ -378,7 +379,8 @@
     { key: TIC_C.application_id,  label: 'Application Number',  type: 'text',   group: 'meta',      readOnly: true },
     { key: TIC_C.hydro_account,   label: 'Hydro Account #',     type: 'text',   group: 'utilities' },
     { key: TIC_C.hydro_meter,     label: 'Hydro Meter #',       type: 'text',   group: 'utilities' },
-    { key: TIC_C.gas_account,     label: 'Union Gas Account #', type: 'text',   group: 'utilities' }
+    { key: TIC_C.gas_account,     label: 'Union Gas Account #', type: 'text',   group: 'utilities' },
+    { key: TIC_C.gas_meter,       label: 'Gas Meter #',         type: 'text',   group: 'utilities' }
   ];
 
   function _ticOverviewRowVal(field){
