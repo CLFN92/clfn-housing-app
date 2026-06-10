@@ -55,6 +55,10 @@ var APPROVAL_AUTHORITY = (function() {
     // Who can set / edit a unit's monthly rent amount on the Inventory forms
     assignRentAmount:         ['housing_manager', 'ed'],
 
+    // ── Application signatures ────────────────────────────────────────────
+    // Who can unlock (override) applicant signatures after an app is submitted
+    unlockSignatures:         ['ed'],
+
     // ── SOW / Renovation Budget ───────────────────────────────────────────
     // Dollar threshold — above this, ED approval required
     sowEdThreshold:           25000,
@@ -276,6 +280,7 @@ var APPROVAL_AUTHORITY = (function() {
       overrideMatch:            'Override top match recommendation',
       assignTiedBand:           'Assign within tied score band',
       assignRentAmount:         'Set / edit unit rent amount',
+      unlockSignatures:         'Unlock applicant signatures after submission',
       sowEdThreshold:           'SOW dollar threshold for ED approval ($)',
       approveSowUnderThreshold: 'Approve SOW under threshold',
       approveSowOverThreshold:  'Approve SOW over threshold',
@@ -305,7 +310,7 @@ var APPROVAL_AUTHORITY = (function() {
 
     /** Group labels for the Settings UI sections */
     groups: {
-      'Housing Application':  ['reviewApplication','finalApproveApp','declineApplication','returnApplication','viewApplicationScore'],
+      'Housing Application':  ['reviewApplication','finalApproveApp','declineApplication','returnApplication','unlockSignatures','viewApplicationScore'],
       'File Update':          ['reviewFileUpdate','approveFileUpdate'],
       'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand','assignRentAmount'],
       'SOW & Renovation':     ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow','editRenoProgress'],

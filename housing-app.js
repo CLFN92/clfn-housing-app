@@ -2343,14 +2343,14 @@ function _applySignatureLockState(app) {
   var bar = document.getElementById('sig_override_bar');
   if (bar) {
     var _role = window.currentRole || '';
-    var _isEd = typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('finalApproveApp', _role);
-    bar.style.display = (shouldLock && _isEd) ? '' : 'none';
+    var _canUnlock = typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('unlockSignatures', _role);
+    bar.style.display = (shouldLock && _canUnlock) ? '' : 'none';
   }
 }
 
 function edUnlockSignatures() {
   var _role = window.currentRole || '';
-  if (!(typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('finalApproveApp', _role))) return;
+  if (!(typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('unlockSignatures', _role))) return;
   showConfirm({
     title:   'Override Signature Lock?',
     message: 'This will unlock the signature blocks so new signatures can be collected. The action will be logged. Continue?',
@@ -2360,7 +2360,7 @@ function edUnlockSignatures() {
     _unlockApplicantSignatures();
     var bar = document.getElementById('sig_override_bar');
     if (bar) bar.style.display = 'none';
-    if (typeof auditEntry === 'function') auditEntry(currentAppId, 'sig_lock_override', 'ED overrode applicant signature lock');
+    if (typeof auditEntry === 'function') auditEntry(currentAppId, 'sig_lock_override', _role + ' overrode applicant signature lock');
     if (typeof showToast  === 'function') showToast('Signature lock removed.');
   });
 }
