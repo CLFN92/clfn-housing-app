@@ -1138,7 +1138,7 @@ window.DocLibrary = (function(){
     var base = opts.supabaseUrl + '/rest/v1/' + opts.auditTable +
       '?entity_type=eq.' + encodeURIComponent(opts.entityType) +
       '&entity_id=eq.' + encodeURIComponent(String(opts.entityId)) +
-      '&action=in.(file_uploaded,file_deleted)' +
+      '&action=in.(file_uploaded,file_deleted,file_category_changed)' +
       '&order=created_at.desc&limit=500';
     var tok = (typeof opts.getAuthToken === 'function' && opts.getAuthToken()) || opts.supabaseAnon;
     return fetch(base, {
@@ -1147,10 +1147,20 @@ window.DocLibrary = (function(){
       .then(function(rows){
         if (!Array.isArray(rows)) return [];
         var deletedPaths = {};
+        var categoryOverrides = {}; // path → latest category
+        // Rows are ordered desc — first occurrence of each action per path wins.
+        var seenCatPath = {};
         rows.forEach(function(r){
           if (r.action === 'file_deleted') {
             var d = _parseDetail(r.detail);
             if (d.path) deletedPaths[d.path] = true;
+          }
+          if (r.action === 'file_category_changed') {
+            var d = _parseDetail(r.detail);
+            if (d.path && d.category && !seenCatPath[d.path]) {
+              seenCatPath[d.path] = true;
+              categoryOverrides[d.path] = d.category;
+            }
           }
         });
         var files = [];
@@ -1166,7 +1176,7 @@ window.DocLibrary = (function(){
             name: d.name || d.path.split('/').pop(),
             size: d.size || 0,
             type: d.type || '',
-            category: d.category || 'other',
+            category: categoryOverrides[d.path] || d.category || 'other',
             addedAt: (r.created_at || '').slice(0,10),
             addedBy: r.actor || ''
           });
@@ -1197,6 +1207,24 @@ window.DocLibrary = (function(){
         entity_type: opts.entityType,
         entity_id:   String(opts.entityId),
         action:      'file_deleted',
+        detail:      opts.detailAsJson ? detailPayload : JSON.stringify(detailPayload),
+        actor:       actor,
+        created_at:  new Date().toISOString()
+      })
+    });
+  }
+
+  function _updateCategory(opts, path, name, newCategory) {
+    var url = opts.supabaseUrl + '/rest/v1/' + opts.auditTable;
+    var actor = (typeof opts.getActor === 'function' && opts.getActor()) || 'staff';
+    var detailPayload = { path:path, name:name, category:newCategory };
+    return fetch(url, {
+      method:'POST',
+      headers: _restHeaders(opts),
+      body: JSON.stringify({
+        entity_type: opts.entityType,
+        entity_id:   String(opts.entityId),
+        action:      'file_category_changed',
         detail:      opts.detailAsJson ? detailPayload : JSON.stringify(detailPayload),
         actor:       actor,
         created_at:  new Date().toISOString()
@@ -1306,6 +1334,19 @@ window.DocLibrary = (function(){
         bodyRows = filtered.map(function(f){
           var cat = catByKey[f.category] || { label: f.category || 'Other', icon:'\uD83D\uDCCE' };
           var icon = _iconForType(f.type);
+          var categoryCell;
+          if (opts.readOnly) {
+            categoryCell = '<span class="std-pill std-pill-info">' + (cat.icon?cat.icon+' ':'') + _escHtml(cat.label) + '</span>';
+          } else {
+            var catOpts = opts.categories.map(function(c){
+              return '<option value="'+_escAttr(c.key)+'"'+(c.key===f.category?' selected':'')+'>'+
+                (c.icon?c.icon+' ':'')+_escHtml(c.label)+'</option>';
+            }).join('');
+            categoryCell = '<select class="std-filter-control doclib-cat-edit" '+
+              'data-dl-cat-edit="'+_escAttr(f.path)+'" '+
+              'data-dl-cat-name="'+_escAttr(f.name)+'" '+
+              'style="font-size:12px;padding:3px 6px;min-width:110px;">'+catOpts+'</select>';
+          }
           return '<tr>' +
             '<td style="font-size:16px;width:28px;">'+icon+'</td>' +
             '<td class="std-cell-primary" style="max-width:320px;white-space:normal;word-break:break-word;">' +
@@ -1313,9 +1354,7 @@ window.DocLibrary = (function(){
               '<div style="font-size:11px;color:var(--muted);font-weight:normal;">' +
                 _escHtml(f.addedAt||'') + (f.addedBy?' \u00B7 '+_escHtml(f.addedBy):'') + '</div>' +
             '</td>' +
-            '<td>' +
-              '<span class="std-pill std-pill-info">' + (cat.icon?cat.icon+' ':'') + _escHtml(cat.label) + '</span>' +
-            '</td>' +
+            '<td>'+categoryCell+'</td>' +
             '<td class="std-cell-right std-cell-mono">'+_fmtBytes(f.size)+'</td>' +
             '<td class="std-cell-tail" style="white-space:nowrap;">' +
               '<button class="btn btn-ghost btn-sm" data-dl-view="'+_escAttr(f.path)+'">View</button>' +
@@ -1363,6 +1402,21 @@ window.DocLibrary = (function(){
         };
         fi.onchange = function(){ _handleFiles(fi.files); fi.value = ''; };
       }
+      // Inline category edit
+      root.querySelectorAll('[data-dl-cat-edit]').forEach(function(sel){
+        sel.onchange = function(){
+          var path    = sel.getAttribute('data-dl-cat-edit');
+          var name    = sel.getAttribute('data-dl-cat-name');
+          var newCat  = sel.value;
+          var file    = state.files.find(function(f){ return f.path === path; });
+          if (file) file.category = newCat;
+          _updateCategory(opts, path, name, newCat).catch(function(e){
+            console.warn('[doclib] category update failed:', e);
+            _setError('Could not save category change.');
+          });
+          if (typeof opts.onChange === 'function') opts.onChange('category', file);
+        };
+      });
       // View + delete
       root.querySelectorAll('[data-dl-view]').forEach(function(btn){
         btn.onclick = function(){
