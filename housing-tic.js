@@ -638,17 +638,62 @@
     _ticInitMap(u);
   }
 
+  var _ticUtilDocLib    = null;
+  var _ticUtilDocLibKey = null;
+
   function _ticRenderUtilities(){
+    var panel = _ticEl('tic_panel_utilities');
+    if(!panel) return;
+    var unit = _ticState.unit;
+
+    // Account / meter number fields
     var rows = TIC_OVERVIEW_FIELDS
       .filter(function(f){ return f.group === 'utilities'; })
       .map(_ticOverviewRowHtml).join('');
-    var panel = _ticEl('tic_panel_utilities');
-    if(!panel) return;
+
     panel.innerHTML =
       '<div class="tic-section">'
-      + '<div class="tic-section-h">Utilities</div>'
+      + '<div class="tic-section-h">Account &amp; Meter Numbers</div>'
       + '<div class="tic-rows">' + rows + '</div>'
+      + '</div>'
+      + '<div class="tic-section" style="margin-top:16px;">'
+      + '<div class="tic-section-h">Utility Bills</div>'
+      + '<div id="tic_util_doclib_mount" style="margin-top:8px;"></div>'
       + '</div>';
+
+    // Mount DocLibrary for utility bills
+    if(!unit || !unit.id){
+      var m = _ticEl('tic_util_doclib_mount');
+      if(m) m.innerHTML = '<div class="tic-empty">No unit linked — bill storage unavailable.</div>';
+      return;
+    }
+    var key = String(unit.id);
+    if(_ticUtilDocLibKey === key && _ticUtilDocLib){ return; }
+    if(!window.DocLibrary){
+      var m2 = _ticEl('tic_util_doclib_mount');
+      if(m2) m2.innerHTML = '<div class="tic-pending-inline">Document library not loaded.</div>';
+      return;
+    }
+    var mount = _ticEl('tic_util_doclib_mount');
+    if(!mount) return;
+    _ticUtilDocLibKey = key;
+    _ticUtilDocLib = window.DocLibrary.create(mount, {
+      entityType:    'tenant',
+      entityId:      unit.id,
+      pathPrefix:    'tenants/' + unit.id + '/utility-bills',
+      supabaseUrl:   SUPABASE_URL,
+      supabaseAnon:  (typeof SUPABASE_ANON !== 'undefined') ? SUPABASE_ANON : '',
+      storageBucket: (typeof STORAGE_BUCKET !== 'undefined') ? STORAGE_BUCKET : 'housing-files',
+      auditTable:    'housing_audit_log',
+      getAuthToken:  function(){ return (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ',''); },
+      getActor:      function(){ return (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || 'staff'; },
+      categories: [
+        { key:'hydro_bill', label:'Hydro Bill', icon:'⚡' },
+        { key:'gas_bill',   label:'Gas Bill',   icon:'🔥' },
+        { key:'other',      label:'Other',      icon:'📎' }
+      ],
+      maxSizeMB: 25
+    });
   }
 
   function _ticInitMap(unit){
@@ -2094,6 +2139,7 @@
     _ticState.ledger = null; _ticState.notes = []; _ticState.applicationNotes = [];
     _ticState.movementLog = [];
     _ticDocLib = null; _ticDocLibKey = null;
+    _ticUtilDocLib = null; _ticUtilDocLibKey = null;
     ['overview','utilities','occupants','contact','emergency','references','pets','documents','notes','history'].forEach(function(n){
       var p = _ticEl('tic_panel_' + n); if(p) p.innerHTML = '';
     });
@@ -2652,6 +2698,7 @@
               await window.sbSaveFileMeta('tenant', String(unit.id), storePath, filename, blob.size, 'application/pdf');
             }
             _ticDocLibKey = null; _ticDocLib = null;
+            _ticUtilDocLibKey = null; _ticUtilDocLib = null;
           } catch(e) { console.warn('[lease] doc library upload failed:', e); }
         }
         var mo = document.getElementById('tic_lease_modal');
@@ -2835,6 +2882,7 @@
             await window.sbSaveFileMeta('tenant', String(unit.id), storePath, filename, blob.size, 'application/pdf');
           }
           _ticDocLibKey = null; _ticDocLib = null;
+          _ticUtilDocLibKey = null; _ticUtilDocLib = null;
         } catch(e) { console.warn('[lease] doc library upload failed:', e); }
       }
 
