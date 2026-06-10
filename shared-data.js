@@ -371,19 +371,37 @@ function _rejectIfFalse(promise, label){
     return true;
   });
 }
+// Wrap a save promise with a 10-second hard timeout so weak-but-not-dead
+// connections fail fast rather than hanging until the browser's own TCP timeout
+// (which can be 60+ seconds). The entry stays in the queue and retries on sync.
+var _SAVE_TIMEOUT_MS = 10000;
+function _withSaveTimeout(promise){
+  return new Promise(function(resolve, reject){
+    var timer = setTimeout(function(){
+      reject(new Error('save timed out after ' + (_SAVE_TIMEOUT_MS / 1000) + 's'));
+    }, _SAVE_TIMEOUT_MS);
+    promise.then(function(v){ clearTimeout(timer); resolve(v); },
+                 function(e){ clearTimeout(timer); reject(e); });
+  });
+}
+
 var _SAVE_RETRY = {
-  app:        function(entity){ return sbSaveApplication(entity); },
-  unit:       function(entity){ return _rejectIfFalse(sbSaveUnit(entity), 'sbSaveUnit'); },
-  contractor: function(entity){ return _rejectIfFalse(sbSaveContractor(entity), 'sbSaveContractor'); },
+  app:        function(entity){ return _withSaveTimeout(sbSaveApplication(entity)); },
+  unit:       function(entity){ return _withSaveTimeout(_rejectIfFalse(sbSaveUnit(entity), 'sbSaveUnit')); },
+  contractor: function(entity){ return _withSaveTimeout(_rejectIfFalse(sbSaveContractor(entity), 'sbSaveContractor')); },
   // App notes are append-only POSTs with a fresh server-generated UUID. The
   // queue entity carries the original args; the retry re-fires the insert.
-  app_note:   function(entity){ return sbAddAppNote(entity.app_id, entity.body); },
-  setting:    function(entity){ return _rejectIfFalse(sbSaveSetting(entity.key, entity.value), 'sbSaveSetting'); }
+  app_note:   function(entity){ return _withSaveTimeout(sbAddAppNote(entity.app_id, entity.body)); },
+  setting:    function(entity){ return _withSaveTimeout(_rejectIfFalse(sbSaveSetting(entity.key, entity.value), 'sbSaveSetting')); }
 };
 
 // saveWithDraftFallback — write to localStorage FIRST, then push to Supabase
 // in the background. Never throws. Returns a Promise<bool> indicating whether
 // the cloud sync succeeded. Local copy is always preserved.
+//
+// If the device is offline (navigator.onLine === false) the network attempt is
+// skipped entirely — the entry stays queued for the next online sync, and the
+// save returns instantly instead of hanging until a TCP timeout fires.
 function saveWithDraftFallback(entityType, id, entity){
   if(!entityType || !id || entity == null) return Promise.resolve(false);
   if(typeof _SAVE_RETRY[entityType] !== 'function'){
@@ -392,6 +410,11 @@ function saveWithDraftFallback(entityType, id, entity){
   }
   // Stash locally before touching the network.
   saveQueueAdd(entityType, id, entity, null);
+  // Skip network entirely when offline — sync will run when WiFi reconnects.
+  if(!navigator.onLine){
+    console.log('[save-queue] offline — queued ' + entityType + ':' + id + ' for later sync');
+    return Promise.resolve(false);
+  }
   return _SAVE_RETRY[entityType](entity).then(function(){
     saveQueueRemove(entityType, id);
     return true;
@@ -509,6 +532,14 @@ function syncDraftQueue(){
   _migrateLegacyAppDraftQueue();
   return syncSaveQueue();
 }
+
+// Auto-sync when WiFi reconnects — drains the queue without waiting for the
+// next login. Only fires if the user is already authenticated this session.
+window.addEventListener('online', function(){
+  if(!window.HOUSING_SESSION || !window.HOUSING_SESSION.accessToken) return;
+  console.log('[save-queue] network restored — running sync');
+  syncSaveQueue().catch(function(e){ console.warn('[save-queue] online-sync error:', e); });
+});
 
 // ── sbSaveAllApplications ─────────────────────────────────────────────────────
 // Batch upsert — used during localStorage→Supabase migration and bulk ops.
