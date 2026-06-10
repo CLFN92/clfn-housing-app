@@ -407,6 +407,7 @@ function showTicDetailTab(tid, tab) {
           { key:'gas',     label:'Gas Bill',      icon:'\uD83D\uDD25' },
           { key:'cheque',  label:'Void Cheque',   icon:'\uD83C\uDFE6' },
           { key:'notice',  label:'Notice / Letter', icon:'\uD83D\uDCEC' },
+          { key:'image',   label:'Image',         icon:'\uD83D\uDDBC\uFE0F' },
           { key:'other',   label:'Other',         icon:'\uD83D\uDCCE' }
         ]
       });

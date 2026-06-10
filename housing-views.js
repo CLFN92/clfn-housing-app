@@ -1652,6 +1652,7 @@ var _HOUSING_TENANT_DOC_CATEGORIES = [
   { key:'inspection',  label:'Inspection',      icon:'\uD83D\uDD0D' },
   { key:'insurance',   label:'Insurance',       icon:'\uD83D\uDEE1\uFE0F' },
   { key:'notice',      label:'Notice / Letter', icon:'\uD83D\uDCEC' },
+  { key:'image',       label:'Image',           icon:'\uD83D\uDDBC\uFE0F' },
   { key:'other',       label:'Other',           icon:'\uD83D\uDCCE' }
 ];
 

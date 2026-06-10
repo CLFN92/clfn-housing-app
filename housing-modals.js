@@ -740,6 +740,7 @@ function _initStep6DocLib() {
       { key:'housing_hist',label:'Housing History', icon:'\uD83C\uDFE0' },
       { key:'medical',     label:'Medical',         icon:'\u2695\uFE0F'  },
       { key:'migrated',    label:'Migrated',        icon:'\uD83D\uDCC2' },
+      { key:'image',       label:'Image',           icon:'\uD83D\uDDBC\uFE0F' },
       { key:'other',       label:'Other',           icon:'\uD83D\uDCCE' }
     ],
     maxSizeMB:     25
@@ -754,6 +755,7 @@ var _SCORECARD_APP_DOC_CATEGORIES = [
   { key:'housing_hist',label:'Housing History', icon:'\uD83C\uDFE0' },
   { key:'medical',     label:'Medical',         icon:'\u2695\uFE0F'  },
   { key:'migrated',    label:'Migrated',        icon:'\uD83D\uDCC2' },
+  { key:'image',       label:'Image',           icon:'\uD83D\uDDBC\uFE0F' },
   { key:'other',       label:'Other',           icon:'\uD83D\uDCCE' }
 ];
 

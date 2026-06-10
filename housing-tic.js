@@ -1519,6 +1519,7 @@
           { key:'housing_hist',label:'Housing History', icon:'🏠' },
           { key:'medical',     label:'Medical',         icon:'⚕️'  },
           { key:'migrated',    label:'Migrated',        icon:'📂' },
+          { key:'image',       label:'Image',           icon:'🖼️' },
           { key:'other',       label:'Other',           icon:'📎' }
         ],
         // Load from BOTH tenant folder and the linked application

@@ -1189,6 +1189,7 @@ function renderDocumentsTab() {
         { key:'report',    label:'Report / Study',  icon:'📋' },
         { key:'spec',      label:'Specification',   icon:'📄' },
         { key:'photo',     label:'Photo',           icon:'📷' },
+        { key:'image',     label:'Image',           icon:'🖼️' },
         { key:'other',     label:'Other',           icon:'📎' }
       ],
       maxSizeMB: 25,
