@@ -5848,8 +5848,7 @@ function udpRenderFilePreviews(unitId){
     getAuthToken:  function(){ return (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ',''); },
     auditTable:    'housing_audit_log',
     getActor:      function(){ return (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || 'staff'; },
-    categories:    _HOUSING_TENANT_DOC_CATEGORIES,
-    readOnly:      true
+    categories:    _HOUSING_TENANT_DOC_CATEGORIES
   });
 }
 

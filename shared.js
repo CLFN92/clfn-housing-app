@@ -1333,7 +1333,13 @@ window.DocLibrary = (function(){
       } else {
         bodyRows = filtered.map(function(f){
           var cat = catByKey[f.category] || { label: f.category || 'Other', icon:'\uD83D\uDCCE' };
-          var icon = _iconForType(f.type);
+          var mime = (f.type || '').toLowerCase();
+          var isImage = mime.indexOf('image') === 0 ||
+            /\.(jpg|jpeg|png|gif|webp|heic|heif|bmp|svg)$/i.test(f.name);
+          var icon = isImage
+            ? '<img data-dl-thumb="'+_escAttr(f.path)+'" src="" alt="" '+
+                'style="width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);display:none;">'
+            : '<span style="font-size:16px;">'+_iconForType(f.type)+'</span>';
           var categoryCell;
           if (opts.readOnly) {
             categoryCell = '<span class="std-pill std-pill-info">' + (cat.icon?cat.icon+' ':'') + _escHtml(cat.label) + '</span>';
@@ -1348,7 +1354,7 @@ window.DocLibrary = (function(){
               'style="font-size:12px;padding:3px 6px;min-width:110px;">'+catOpts+'</select>';
           }
           return '<tr>' +
-            '<td style="font-size:16px;width:28px;">'+icon+'</td>' +
+            '<td style="width:44px;padding:6px 4px;">'+icon+'</td>' +
             '<td class="std-cell-primary" style="max-width:320px;white-space:normal;word-break:break-word;">' +
               _escHtml(f.name.replace(/^\d+_/, '')) +
               '<div style="font-size:11px;color:var(--muted);font-weight:normal;">' +
@@ -1402,6 +1408,13 @@ window.DocLibrary = (function(){
         };
         fi.onchange = function(){ _handleFiles(fi.files); fi.value = ''; };
       }
+      // Image thumbnails — lazy-load signed URLs
+      root.querySelectorAll('[data-dl-thumb]').forEach(function(img){
+        var path = img.getAttribute('data-dl-thumb');
+        _signUrl(opts, path).then(function(u){
+          if (u) { img.src = u; img.style.display = 'block'; }
+        }).catch(function(){});
+      });
       // Inline category edit
       root.querySelectorAll('[data-dl-cat-edit]').forEach(function(sel){
         sel.onchange = function(){

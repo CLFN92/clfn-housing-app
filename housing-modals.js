@@ -1383,6 +1383,64 @@ function openMatchScorecard(appId, unitId) {
 // shortcut buttons, file-preview render, and the unit-edit handoff.
 var _currentDetailUnitId = null;
 
+function udpRenderMap(u) {
+  var sec = document.getElementById('udp_map_section');
+  if (!sec) return;
+  var lat = u.latitude  != null ? parseFloat(u.latitude)  : null;
+  var lng = u.longitude != null ? parseFloat(u.longitude) : null;
+  var address = [u.num && u.street ? u.num + ' ' + u.street : '', u.city || ''].filter(Boolean).join(', ');
+
+  sec.innerHTML =
+    '<div class="map-widget">' +
+      '<div class="map-widget-header">' +
+        '<span class="map-pin-icon">&#128205;</span>' +
+        '<div>' +
+          '<div class="map-widget-label">Unit Location</div>' +
+          '<div class="map-widget-address" id="udp_map_address">' + (address || '&mdash;') + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="map-frame-wrap">' +
+        '<iframe id="udp_map_iframe" class="map-frame" src="" allowfullscreen title="Unit location map"></iframe>' +
+        '<div class="map-no-coords" id="udp_map_no_coords" style="display:none;">' +
+          '<span>&#128205;</span>' +
+          '<p>Coordinates not yet set.<br>Edit the unit to add lat/lng and enable the map.</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="map-widget-footer">' +
+        '<div class="map-coords" id="udp_map_coords">&#8212;</div>' +
+        '<a class="map-osm-link" id="udp_map_link" href="#" target="_blank" rel="noopener" style="display:none;">Open in Map &#8599;</a>' +
+      '</div>' +
+    '</div>';
+
+  var iframeEl = document.getElementById('udp_map_iframe');
+  var noCrdEl  = document.getElementById('udp_map_no_coords');
+  var coordEl  = document.getElementById('udp_map_coords');
+  var linkEl   = document.getElementById('udp_map_link');
+
+  if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+    iframeEl.style.display = 'none';
+    if (noCrdEl) noCrdEl.style.display = 'flex';
+    if (coordEl) coordEl.textContent   = 'No coordinates set';
+    return;
+  }
+
+  var OFFSET = 0.005;
+  var bbox = [
+    (lng - OFFSET).toFixed(6), (lat - OFFSET * 0.7).toFixed(6),
+    (lng + OFFSET).toFixed(6), (lat + OFFSET * 0.7).toFixed(6)
+  ].join('%2C');
+  iframeEl.src = 'https://www.openstreetmap.org/export/embed.html'
+    + '?bbox=' + bbox + '&layer=mapnik'
+    + '&marker=' + lat.toFixed(7) + '%2C' + lng.toFixed(7);
+  iframeEl.style.display = 'block';
+  if (noCrdEl) noCrdEl.style.display = 'none';
+  if (coordEl) coordEl.textContent   = lat.toFixed(5) + '° N  /  ' + Math.abs(lng).toFixed(5) + '° W';
+  if (linkEl) {
+    linkEl.href         = 'https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '&zoom=17';
+    linkEl.style.display = 'inline-block';
+  }
+}
+
 function openUnitDetail(unitId) {
   var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
   var u = units.find(function(x){ return x.id === unitId; });
@@ -1474,6 +1532,9 @@ function openUnitDetail(unitId) {
 
   // RFQs & Contracts section
   if (typeof udpRenderRfqSection === 'function') udpRenderRfqSection(unitId);
+
+  // Map
+  udpRenderMap(u);
 
   // Tenant files preview in detail panel
   udpRenderFilePreviews(unitId);
