@@ -395,13 +395,64 @@ var _SAVE_RETRY = {
   setting:    function(entity){ return _withSaveTimeout(_rejectIfFalse(sbSaveSetting(entity.key, entity.value), 'sbSaveSetting')); }
 };
 
+// ── Degraded-mode (slow cell) guard ─────────────────────────────────────────
+// When a save times out on a connected-but-slow network, we flip into degraded
+// mode for _DEGRADED_COOLDOWN_MS. In that window all saves skip the network and
+// queue locally (instant). After the cooldown, one probe fires; if it succeeds
+// we exit degraded mode and normal sync resumes. If it times out we extend
+// another cooldown cycle.
+var _DEGRADED_COOLDOWN_MS  = 30000; // 30 s cooldown after a timeout
+var _degradedUntil         = 0;     // epoch ms — 0 means not degraded
+var _degradedProbeRunning  = false;
+
+function _inDegradedMode(){ return Date.now() < _degradedUntil; }
+
+function _enterDegradedMode(){
+  _degradedUntil = Date.now() + _DEGRADED_COOLDOWN_MS;
+  console.warn('[save-queue] slow network detected — degraded mode for ' + (_DEGRADED_COOLDOWN_MS/1000) + 's');
+  if(typeof showToast === 'function'){
+    showToast('Slow connection — saving locally. Will sync when signal improves.', 'warn');
+  }
+  // Schedule a probe at the end of the cooldown window.
+  setTimeout(_runDegradedProbe, _DEGRADED_COOLDOWN_MS + 100);
+}
+
+function _runDegradedProbe(){
+  if(_degradedProbeRunning) return;
+  if(!navigator.onLine) return; // still fully offline — online event will handle it
+  _degradedProbeRunning = true;
+  var entries = saveQueueGetAll();
+  var probe   = entries.length ? entries[0] : null;
+  var attempt = probe
+    ? _SAVE_RETRY[probe.entityType](probe.entity)
+    : _withSaveTimeout(fetch(
+        (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '') + '/rest/v1/',
+        { method: 'HEAD' }
+      ));
+  attempt.then(function(){
+    _degradedProbeRunning = false;
+    _degradedUntil = 0; // exit degraded mode
+    console.log('[save-queue] probe succeeded — exiting degraded mode');
+    if(typeof showToast === 'function') showToast('Connection restored — syncing saved data.');
+    syncSaveQueue().catch(function(){});
+  }).catch(function(){
+    _degradedProbeRunning = false;
+    // Still slow — extend cooldown and schedule another probe.
+    _degradedUntil = Date.now() + _DEGRADED_COOLDOWN_MS;
+    console.warn('[save-queue] probe timed out — extending degraded mode');
+    setTimeout(_runDegradedProbe, _DEGRADED_COOLDOWN_MS + 100);
+  });
+}
+
 // saveWithDraftFallback — write to localStorage FIRST, then push to Supabase
 // in the background. Never throws. Returns a Promise<bool> indicating whether
 // the cloud sync succeeded. Local copy is always preserved.
 //
-// If the device is offline (navigator.onLine === false) the network attempt is
-// skipped entirely — the entry stays queued for the next online sync, and the
-// save returns instantly instead of hanging until a TCP timeout fires.
+// Skips the network when:
+//   a) navigator.onLine === false (fully offline), or
+//   b) degraded mode is active (previous save timed out on slow cell).
+// In both cases the entry is queued locally and syncs automatically when the
+// connection recovers.
 function saveWithDraftFallback(entityType, id, entity){
   if(!entityType || !id || entity == null) return Promise.resolve(false);
   if(typeof _SAVE_RETRY[entityType] !== 'function'){
@@ -410,9 +461,13 @@ function saveWithDraftFallback(entityType, id, entity){
   }
   // Stash locally before touching the network.
   saveQueueAdd(entityType, id, entity, null);
-  // Skip network entirely when offline — sync will run when WiFi reconnects.
+  // Skip network when fully offline or connection is known-slow.
   if(!navigator.onLine){
     console.log('[save-queue] offline — queued ' + entityType + ':' + id + ' for later sync');
+    return Promise.resolve(false);
+  }
+  if(_inDegradedMode()){
+    console.log('[save-queue] degraded mode — queued ' + entityType + ':' + id + ' for later sync');
     return Promise.resolve(false);
   }
   return _SAVE_RETRY[entityType](entity).then(function(){
@@ -421,6 +476,8 @@ function saveWithDraftFallback(entityType, id, entity){
   }).catch(function(err){
     var msg = (err && err.message) ? err.message : String(err);
     saveQueueAdd(entityType, id, entity, msg);
+    // A timeout on a connected device means slow cell — enter degraded mode.
+    if(msg.indexOf('timed out') !== -1){ _enterDegradedMode(); }
     console.warn('[save-queue] cloud sync failed for ' + entityType + ':' + id + ' — kept in queue:', msg);
     return false;
   });
@@ -535,8 +592,10 @@ function syncDraftQueue(){
 
 // Auto-sync when WiFi reconnects — drains the queue without waiting for the
 // next login. Only fires if the user is already authenticated this session.
+// Also clears degraded mode immediately since we know connectivity is back.
 window.addEventListener('online', function(){
   if(!window.HOUSING_SESSION || !window.HOUSING_SESSION.accessToken) return;
+  _degradedUntil = 0; // full connectivity restored — exit degraded mode
   console.log('[save-queue] network restored — running sync');
   syncSaveQueue().catch(function(e){ console.warn('[save-queue] online-sync error:', e); });
 });
