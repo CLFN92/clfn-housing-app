@@ -57,7 +57,7 @@ var APPROVAL_AUTHORITY = (function() {
 
     // ── Application signatures ────────────────────────────────────────────
     // Who can unlock (override) applicant signatures after an app is submitted
-    unlockSignatures:         ['ed'],
+    unlockSignatures:         ['housing_manager', 'ed'],
 
     // ── SOW / Renovation Budget ───────────────────────────────────────────
     // Dollar threshold — above this, ED approval required

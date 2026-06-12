@@ -2350,7 +2350,7 @@ function _applySignatureLockState(app) {
   }
 }
 
-function edUnlockSignatures() {
+function unlockSignaturesOverride() {
   var _role = window.currentRole || '';
   if (!(typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('unlockSignatures', _role))) return;
   showConfirm({
