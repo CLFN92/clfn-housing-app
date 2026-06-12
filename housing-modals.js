@@ -100,6 +100,9 @@ function openUnitEditModal(unitId){
   set('ue_rent', (u.monthlyRent != null ? u.monthlyRent : (u.monthly_rent != null ? u.monthly_rent : '')));
   _gateRentInput('ue_rent');
   set('ue_status',u.status||'vacant');
+  var urChk = document.getElementById('ue_under_renovation');
+  if(urChk) urChk.checked = !!u.under_renovation;
+  unitEditStatusChange();
   set('ue_assignedDate',u.assignedDate);
   set('ue_notes',u.notes);
   // Populate hidden assignment fields
@@ -227,9 +230,22 @@ function ueFunderChanged() {
 function unitEditStatusChange(){
   var status=(document.getElementById('ue_status')||{}).value||'';
   var row=document.getElementById('ue_assign_row');
-  // Show tenant section for all statuses except archived/condemned/under_repair
-  var hideStatuses = ['archived','condemned','under_repair'];
+  // Show tenant section for all statuses except condemned (or archived)
+  var hideStatuses = ['archived','condemned'];
   if(row) row.style.display = hideStatuses.includes(status) ? 'none' : 'flex';
+  // Condemned units cannot be under renovation — disable and uncheck
+  var urChk = document.getElementById('ue_under_renovation');
+  var urRow = document.getElementById('ue_renovation_row');
+  if(urChk && urRow){
+    if(status === 'condemned'){
+      urChk.checked = false;
+      urChk.disabled = true;
+      urRow.style.opacity = '0.4';
+    } else {
+      urChk.disabled = false;
+      urRow.style.opacity = '';
+    }
+  }
 }
 function closeUnitEditModal(){
   document.getElementById('unitEditModal').style.display='none';
@@ -346,11 +362,8 @@ function saveUnitEdit(){
   // status change — otherwise we'd later "revert" to a stale value the user
   // already overrode. Drop priorStatus whenever the user explicitly picks
   // any status other than under_repair.
-  var _ueStatusBefore = u.status;
   u.status=get('ue_status')||'vacant'; u.accessible=chk('ue_accessible'); u.isElders=chk('ue_isElders');
-  if(u.status !== 'under_repair' && _ueStatusBefore !== u.status){
-    delete u.priorStatus;
-  }
+  u.under_renovation = u.status !== 'condemned' && chk('ue_under_renovation');
   u.notes=get('ue_notes');
   // HM approval
   var hmDec = (document.getElementById('ue_sig_hm_decision')||{}).value||'';
@@ -378,8 +391,8 @@ function saveUnitEdit(){
   if(u.assignedTo && u.status==='vacant'){
     u.status = 'occupied';
   }
-  // If status changed to vacant/repair/condemned, clear assignment
-  if(u.status==='vacant'||u.status==='under_repair'||u.status==='condemned'){
+  // If status is vacant or condemned, clear assignment
+  if(u.status==='vacant'||u.status==='condemned'){
     u.assignedTo=null; u.assignedName=null; u.assignedDate=null;
   }
   // HM approval gate — must have at least mgr_approved to assign tenant.
@@ -1454,7 +1467,7 @@ function openUnitDetail(unitId) {
   var statusStyle = {
     vacant:      {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
     occupied:    {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
-    under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Under Repair'},
+    under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Vacant'},
     reserved:    {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
     condemned:   {bg:'#fef2f2',c:'#b91c1c',label:'Condemned'}
   };
@@ -1469,6 +1482,7 @@ function openUnitDetail(unitId) {
   // Status badge
   var sr = document.getElementById('udp_status_row');
   if(sr) sr.innerHTML = '<span style="font-size:12px;font-weight:700;padding:5px 14px;border-radius:20px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
+    +(u.under_renovation?' <span style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--warn-amber-bg);color:var(--warn-amber-text);border:1px solid var(--warn-amber-border);margin-left:6px;">🔨 Under Renovations</span>':'')
     +(u.isElders?' <span style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--warn-amber-bg);color:var(--warn-amber);border:1px solid var(--warn-amber-border);margin-left:6px;">Elders Unit</span>':'')
     +(u.accessible?' <span style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--info-blue-bg);color:var(--info-blue);margin-left:6px;">♿ Accessible</span>':'');
 
@@ -1770,15 +1784,17 @@ function openRenoNewRequest() {
 
 function renoSearchFilter(q) {
   var allUnits = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-  var renoUnits = allUnits.filter(function(u){ return u.status==='under_repair'||u.status==='condemned'; });
+  var renoUnits = allUnits.filter(function(u){ return u.under_renovation||u.status==='condemned'; });
 
   var filtered = q.trim().length > 0
     ? renoUnits.filter(function(u){ return (u.num+' '+u.street).toLowerCase().includes(q.toLowerCase()); })
     : renoUnits;
 
   var statusStyle = {
-    under_repair: {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'Under Repair'},
-    condemned:    {bg:'#fef2f2', c:'#b91c1c', label:'Condemned'}
+    vacant:    {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
+    occupied:  {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
+    reserved:  {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
+    condemned: {bg:'#fef2f2', c:'#b91c1c', label:'Condemned'}
   };
 
   var container = document.getElementById('reno_search_results');

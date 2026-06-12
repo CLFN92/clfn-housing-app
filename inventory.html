@@ -401,10 +401,15 @@
           <select id="ue_status" onchange="unitEditStatusChange()">
             <option value="vacant">Vacant</option>
             <option value="occupied">Occupied</option>
-            <option value="under_repair">Under Repair</option>
             <option value="reserved">Reserved</option>
             <option value="condemned">Condemned</option>
           </select>
+        </div>
+        <div class="f" id="ue_renovation_row">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="ue_under_renovation" style="width:16px;height:16px;cursor:pointer;">
+            Under Renovations
+          </label>
         </div>
       </div>
 

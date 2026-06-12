@@ -206,7 +206,7 @@ function renderInventoryView(){
   var statusStyle = {
     vacant:      {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
     occupied:    {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
-    under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Under Repair'},
+    under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Vacant'},
     reserved:    {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
     condemned:   {bg:'#fef2f2',c:'#b91c1c',label:'Condemned'},
     archived:    {bg:'#f4f4f0',c:'var(--gray)',   label:'Archived'}
@@ -271,6 +271,7 @@ function renderInventoryView(){
       +'<td style="padding:9px 10px;text-align:center;font-size:14px;">'+(u.accessible?'<span title="Accessible">♿</span>':'<span style="color:var(--border);">—</span>')+'</td>'
       +'<td class="col-hide-tablet" style="padding:9px 10px;font-size:12px;color:var(--muted);">'+funder+'</td>'
       +'<td style="padding:9px 14px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
+      +(u.under_renovation?' <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--warn-amber-bg);color:var(--warn-amber-text);margin-left:4px;">🔨 Reno</span>':'')
       +(u.assignedName?' <span class="js-lbl-sm">→ '+u.assignedName+'</span>':'')+'</td>'
       +(function(){
         var r = (u.monthlyRent != null && u.monthlyRent !== '') ? Number(u.monthlyRent) : null;
@@ -861,7 +862,7 @@ function unitSearchFilter(q) {
   var statusStyle = {
     vacant:      {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
     occupied:    {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
-    under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Under Repair'},
+    under_repair:{bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
     reserved:    {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
     condemned:   {bg:'#fef2f2',c:'#b91c1c',label:'Condemned'}
   };
@@ -1266,7 +1267,7 @@ function showEmployeeHome(){
     var matched     = apps.filter(function(a){return !!a.assignedUnit;}).length;
 
     var tenanted    = units.filter(function(u){return u.status==='occupied'||u.status==='reserved';}).length;
-    var underRepair = units.filter(function(u){return u.status==='under_repair';}).length;
+    var underRepair = units.filter(function(u){return u.under_renovation;}).length;
     var condemned   = units.filter(function(u){return u.status==='condemned';}).length;
     var ctCount = 0;
 
@@ -1326,7 +1327,7 @@ function showEmployeeHome(){
     var sowPendingHM=0, sowPendingED=0, sowApproved=0, sowNoSow=0, sowInProgress=0;
     try {
       var allU=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-      var renoUnits=allU.filter(function(u){return (u.status==='under_repair'||u.status==='condemned')&&!u.archived;});
+      var renoUnits=allU.filter(function(u){return (u.under_renovation||u.status==='condemned')&&!u.archived;});
       var hmLimit2=parseFloat(((window._appSettings||{}).hmBudgetLimit)||25000);
       renoUnits.forEach(function(u){
         var sow=null; sow = getSowData(u.id);

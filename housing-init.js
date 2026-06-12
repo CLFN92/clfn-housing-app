@@ -117,7 +117,7 @@ function searchCurrentUnit(q){
   }
   dd.innerHTML = matches.map(function(u){
     var addr = u.num+' '+u.street;
-    var statusLabel = {occupied:'Occupied',vacant:'Vacant',under_repair:'Under Repair',condemned:'Condemned',reserved:'Reserved'}[u.status]||u.status;
+    var statusLabel = {occupied:'Occupied',vacant:'Vacant',condemned:'Condemned',reserved:'Reserved'}[u.status]||u.status;
     return '<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;" '
       +'data-uid="'+u.id+'" data-label="'+addr+'" onmousedown="selectCurrentUnit(this)">'
       +'<span style="font-weight:600;">'+addr+'</span>'

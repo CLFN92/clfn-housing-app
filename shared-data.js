@@ -651,7 +651,12 @@ async function sbLoadUnits() {
         type:             row.type,
         foundation:       row.foundation,
         funder:           row.funder,
-        status:           row.status,
+        // Backward compat: units that were saved with status='under_repair'
+        // (old model) are migrated in-memory to under_renovation=true.
+        status:           row.status === 'under_repair'
+                            ? ((row.data && row.data.priorStatus) || 'vacant')
+                            : row.status,
+        under_renovation: !!row.under_renovation || row.status === 'under_repair',
         accessible:       !!row.accessible,
         isElders:         !!row.is_elders,
         archived:         !!row.archived,
@@ -688,6 +693,7 @@ async function sbSaveUnit(u) {
     foundation:        u.foundation    || null,
     funder:            u.funder        || null,
     status:            u.status        || 'vacant',
+    under_renovation:  !!u.under_renovation,
     accessible:        !!u.accessible,
     is_elders:         !!u.isElders,
     archived:          !!u.archived,
@@ -3629,9 +3635,8 @@ function renderRenosView(){
   function getRenoProgress(uid){ return window._renoProgress && window._renoProgress[uid] ? window._renoProgress[uid] : {}; }
   var units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
 
-  // Combine under_repair and condemned into one list
   var allReno = units.filter(function(u){
-    return (u.status==='under_repair' || u.status==='condemned') && !u.archived;
+    return (u.under_renovation || u.status==='condemned') && !u.archived;
   });
 
   // Default sort — priority desc. Stays in effect until the user picks
@@ -5632,7 +5637,7 @@ function calcRenoScore(unitId) {
 
   // Occupancy
   if(status === 'condemned')      addPts('rs_occ_condemned', 'Condemned',        _rsm(model,'rs_occ_condemned'));
-  else if(status === 'under_repair') addPts('rs_occ_displaced','Tenant displaced', _rsm(model,'rs_occ_displaced'));
+  else if(u.under_renovation)    addPts('rs_occ_displaced', 'Tenant displaced',  _rsm(model,'rs_occ_displaced'));
   else if(status === 'vacant')    addPts('rs_occ_vacant',    'Vacant',            _rsm(model,'rs_occ_vacant'));
 
   return { score:score, breakdown:breakdown };
@@ -5690,7 +5695,7 @@ function deleteContractor(idx){
 
 function exportRenos(format) {
   var units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-  var rows=units.filter(function(u){return u.status==='under_repair'||u.status==='condemned';});
+  var rows=units.filter(function(u){return u.under_renovation||u.status==='condemned';});
   var headers=['Address','Beds','Type','Foundation','Status','Priority Score','Contractor','SOW Filed','Progress %'];
   var data=rows.map(function(u){
     var rs=calcRenoScore(u.id);
@@ -6088,7 +6093,7 @@ function _getAllRenoUnits() {
   return units.filter(function(u) {
     if(u.archived) return false;
     var hasSow = !!getSowData(u.id);
-    return hasSow || u.status==='under_repair' || u.status==='condemned';
+    return hasSow || u.under_renovation || u.status==='condemned';
   });
 }
 

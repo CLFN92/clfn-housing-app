@@ -125,27 +125,21 @@ function hasActiveSows(unitId){
   });
 }
 
-// ─── Unit-status auto-flip for the renovation lifecycle ────────────────────
-// flipUnitToUnderRepair: when a SOW is first HM/ED-approved we set the unit
-// to 'under_repair' so it surfaces in the Renovations view. The prior status
-// (vacant, occupied, reserved) is preserved on `priorStatus` so we can put
-// the unit back when the SOW completes or is archived. Idempotent — no-op
-// if the unit is already under_repair (or condemned, which we never touch).
+// ─── Unit-renovation auto-flip for the renovation lifecycle ───────────────
+// flipUnitToUnderRepair: when a SOW is first HM/ED-approved, mark the unit
+// as under renovation so it surfaces in the Renovations view. Idempotent —
+// no-op if already flagged or condemned (condemned cannot be under reno).
 function flipUnitToUnderRepair(unit){
-  if(!unit) return false;
-  if(unit.status === 'under_repair' || unit.status === 'condemned') return false;
-  unit.priorStatus = unit.status || 'vacant';
-  unit.status      = 'under_repair';
+  if(!unit || unit.status === 'condemned') return false;
+  if(unit.under_renovation) return false;
+  unit.under_renovation = true;
   return true;
 }
-// revertUnitFromRepair: only acts when the unit is currently under_repair
-// AND there are no remaining active SOWs. Returns the prior status (or
-// 'vacant' if none was captured — happens for units that were already
-// under_repair before this lifecycle was added).
+// revertUnitFromRepair: clears the under_renovation flag when all SOWs are
+// complete. No-op if the flag isn't set.
 function revertUnitFromRepair(unit){
-  if(!unit || unit.status !== 'under_repair') return false;
-  unit.status = unit.priorStatus || 'vacant';
-  delete unit.priorStatus;
+  if(!unit || !unit.under_renovation) return false;
+  unit.under_renovation = false;
   return true;
 }
 
