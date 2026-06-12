@@ -952,12 +952,32 @@ async function sbSaveSetting(key, value) {
     return false;
   }
   try {
+    // Try PATCH first (update existing row). Falls through to INSERT if no row exists.
+    var patchR = await fetch(
+      SUPABASE_URL + '/rest/v1/housing_settings?key=eq.' + encodeURIComponent(key),
+      {
+        method:  'PATCH',
+        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal,count=exact' }),
+        body:    JSON.stringify({ value: value })
+      }
+    );
+    if (patchR.ok) {
+      var cr = patchR.headers.get('Content-Range');
+      // Content-Range: */0 means 0 rows matched — need to INSERT instead
+      var total = cr ? parseInt((cr.split('/')[1] || '').trim()) : -1;
+      if (total !== 0) return true; // patched 1+ rows
+    }
+    // INSERT new row (no existing row for this key)
     var r = await fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
       method:  'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
       body:    JSON.stringify({ key: key, value: value })
     });
-    if (!r.ok) { console.warn('[SB] save setting failed:', await r.text()); return false; }
+    if (!r.ok) {
+      var errBody = await r.text();
+      console.warn('[SB] save setting failed (HTTP ' + r.status + '):', errBody);
+      return false;
+    }
     return true;
   } catch(e) {
     console.warn('[SB] save setting error:', e);

@@ -1827,6 +1827,8 @@ async function loadHousingData() {
     if (typeof _applyTheme === 'function')           _applyTheme((window._appSettings||{}).theme || {});
     if (typeof applyNationOverrides === 'function')  applyNationOverrides();
     if (typeof applyRequiredFields === 'function')   applyRequiredFields();
+    if (typeof initApprovalAuthority === 'function') initApprovalAuthority();
+    if (typeof initModuleEnablement === 'function')  initModuleEnablement();
     if(applications.length && typeof rescoreAllApplications==='function') rescoreAllApplications();
     if (window.CLFN_DEBUG) console.log('[CLFN] Loaded '+applications.length+' apps, '+housingUnits.length+' units');
   } catch(e){ console.warn('[HOUSING] data load error:',e); console.warn('[CLFN] Could not load data'); }

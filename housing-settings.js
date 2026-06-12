@@ -137,19 +137,23 @@ function aaResetAction(key) {
 }
 
 function saveApprovalAuthoritySettings() {
-  if(typeof APPROVAL_AUTHORITY === 'undefined' || !APPROVAL_AUTHORITY.can('editApprovalAuthority', window.currentRole)) {
+  var effectiveRole = window._realRole || window.currentRole;
+  if(typeof APPROVAL_AUTHORITY === 'undefined' || !APPROVAL_AUTHORITY.can('editApprovalAuthority', effectiveRole)) {
     showToast('Only the Executive Director can save approval authority settings.');
     return;
   }
-  var data = APPROVAL_AUTHORITY.serialize();
+  // Save the full live config (role arrays + numeric thresholds) so any
+  // revert-to-default is also captured rather than relying on diffs.
+  var data = Object.assign({}, APPROVAL_AUTHORITY.allRoleEntries(), APPROVAL_AUTHORITY.allThresholds());
+  console.log('[AA] saving approval_authority:', data);
   if(!window._appSettings) window._appSettings = {};
   window._appSettings['approval_authority'] = data;
   saveSettingWithDraftFallback('approval_authority', data).then(function(ok) {
     if(ok) {
       showToast('✓ Approval authority saved');
-      if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'approval_authority_save', 'Approval authority configuration updated', window.currentRole || 'ed');
+      if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'approval_authority_save', 'Approval authority configuration updated', effectiveRole || 'ed');
     } else {
-      showToast('Save failed — check connection');
+      showToast('Save failed — open browser console (F12) for details');
     }
   });
 }
