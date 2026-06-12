@@ -2257,6 +2257,8 @@ function _lockSignaturePanel(canvasId) {
   var wrap = canvas.closest('.sig-canvas-wrap');
   if (!wrap) return;
   if (wrap.getAttribute('data-sig-locked') === '1') return; // idempotent
+  // Only lock panels that actually have a signature.
+  if (typeof getSigDataURL === 'function' && !getSigDataURL(canvasId)) return;
   wrap.setAttribute('data-sig-locked', '1');
 
   // Hide mode tabs.
@@ -2287,7 +2289,7 @@ function _lockSignaturePanel(canvasId) {
     var badge = document.createElement('div');
     badge.className = 'sig-locked-badge';
     badge.style.cssText = 'background:rgba(248,228,26,0.15);border:1px solid var(--yellow);color:var(--dark);padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px;';
-    badge.innerHTML = '🔒 Signed — locked on submission';
+    badge.innerHTML = '🔒 Signed — locked';
     wrap.insertBefore(badge, wrap.firstChild);
   }
 }
