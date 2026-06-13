@@ -143,6 +143,33 @@ window._applyTheme = function(theme) {
       sessionStorage.setItem('clfn_logo_transparent', theme.logoTransparent ? '1' : '');
     }
   } catch(e) {}
+  // Favicon / bookmark icon — keep the tab + saved-link icon on the nation's
+  // logo. Uses the nation's custom theme logo when set, otherwise the default
+  // brand logo. The static /favicon.png in each page <head> is the pre-JS
+  // baseline; this upgrades it once settings are known (and for custom nations).
+  try {
+    var _favSrc = theme.logo || (typeof CLFN_LOGO_DATA_URL === 'string' ? CLFN_LOGO_DATA_URL : '');
+    if (_favSrc && typeof _setFavicon === 'function') _setFavicon(_favSrc);
+  } catch(e) {}
+};
+
+// _setFavicon — point the tab/bookmark icon at `href`. Updates every existing
+// icon <link> in the head (icon, shortcut icon, apple-touch-icon) and creates
+// one if the page somehow has none. Accepts a data URL or a file path.
+window._setFavicon = function(href) {
+  if (!href) return;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  if (!head) return;
+  var nodes = head.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]');
+  if (nodes.length) {
+    for (var i = 0; i < nodes.length; i++) nodes[i].setAttribute('href', href);
+  } else {
+    var l = document.createElement('link');
+    l.setAttribute('rel', 'icon');
+    l.setAttribute('type', 'image/png');
+    l.setAttribute('href', href);
+    head.appendChild(l);
+  }
 };
 
 // ═══════════════════════════════════════════════════════════════════════
