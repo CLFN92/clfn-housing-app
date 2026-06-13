@@ -43,13 +43,17 @@ Order matters: later files reference globals (`SUPABASE_URL`, `HOUSING_SESSION`,
 - `shared-ui.js` — view show/hide helpers (`hideAllViews`, `_showView`), nav, toast.
 - `approval-authority.js` — single source of truth for who can approve what. Use `APPROVAL_AUTHORITY.can(action, role)` / `.who(action)` / `.get(key)` instead of inline `role === 'ed'` checks. Defaults are merged with overrides from `housing_settings` at login.
 - `scoring.js` — V2 ED-adjustable scoring model (applications + reno scoring).
+- `shared.js` — base utilities loaded first on every page. Also hosts the **`DocLibrary`** component (see below) and the raw-`fetch()` Supabase helper layer.
 
 ### housing.html sub-modules
 The biggest page is split into JS files loaded in this order:
 ```
-housing-views.js  →  housing-settings.js  →  housing-modals.js  →  housing-app.js  →  housing-init.js
+housing-views.js → housing-settings.js → housing-modals.js → housing-modals-sow.js → housing-tic.js → housing-app.js → housing-init.js
 ```
-`housing-init.js` runs last and owns DOMContentLoaded / login flow / data load.
+(`notifications.js` is also loaded between `housing-views.js` and `housing-settings.js`.) `housing-init.js` runs last and owns DOMContentLoaded / login flow / data load.
+
+- `housing-modals-sow.js` — SOW (Statement of Work) modal: open/save/approve, work-order email firing, `sowApproveInline()` (see Worklist below).
+- `housing-tic.js` — the **Tenant Information Card (TIC)** full-screen modal (see its own section below). Loaded on both `housing.html` and `tenants.html` so the TIC can be opened from the worklist and from tenant rows.
 
 ### My Worklist (`renderWorklist()` in `shared-data.js`)
 The landing-page action queue is a single function that renders grouped sections for every item type requiring action. It lives in `shared-data.js` (not housing-init.js) so that all pages that load shared-data can trigger a refresh via `if (typeof renderWorklist === 'function') renderWorklist()`.
@@ -76,6 +80,7 @@ Canonical roles (see `shared-config.js` `ROLE` and the role matrix in `PLAN.md` 
 - ED is the only role with override authority and view-as switching (`window._viewAsRole`). `currentRole` is the *effective* role; `_realRole` is the actual authenticated role.
 - Legacy strings (`employee`, `staff`, `hm`, `manager`) are normalized via `CLFN_PERMS.normalizeRole()` — don't hand-write fallbacks for them in new code.
 - For approval gates, prefer `APPROVAL_AUTHORITY.can(...)` over raw role comparisons. Phase B work is migrating remaining inline checks.
+- `unlockSignatures` is an ED-only approval action (in `approval-authority.js`) reserved for unlocking applicant signatures after an application is submitted. The authority is defined but not yet wired to a UI firing point.
 
 ### Multi-nation gating
 - `CLFN_MODULES.isEnabled('renos' | 'finance' | 'contractors' | 'match')` gates nav tiles and entry points. Core modules (applications, inventory, tenants, worklist) cannot be disabled.
@@ -103,6 +108,30 @@ Unit records (`housing_units`) have these non-obvious fields:
 - `insuredValue` — Insured Value (formerly "Construction Cost"). All unit types.
 - `cmhcValue` — CMHC Value. Only enabled when `funder === 'CMHC_95'`; null otherwise. `ueFunderChanged()` in `housing-modals.js` enforces this gate.
 - `unitHmSig` / `unitEdSig` — HM/ED approval decisions on the unit's renovation budget. Each is `{name, date, decision, notes, savedAt}`. Decision values: `'approved'`, `'declined'`, `'deferred'` (HM only — escalates to ED). These are saved only when a name or decision is entered in the unit edit modal; null means no approval has been initiated. The approval blocks in the unit edit modal are shown/hidden by `ueUpdateBudgetRouting()` based on SOW total cost vs. the HM budget limit (`hmBudgetLimit` in settings, default $25k).
+- `latitude` / `longitude` — decimal map coordinates for the unit. Set via the TIC "Set Location & Photo" (SLP) flow or the bulk geocode script (see TIC section). The TIC Overview tab renders an OpenStreetMap embed from these; null shows a "Coordinates not yet set" placeholder.
+- `hydro_meter_number` / `gas_meter_number` — utility meter numbers. These live on `housing_units` (not `tenants`); the hydro/gas **account** numbers still live on `tenants`. Edited from the TIC Utilities tab; fields with `saveTarget: 'unit'` PATCH to `housing_units`.
+
+### Tenant Information Card (TIC) & maps (`housing-tic.js`)
+The TIC is a self-contained IIFE full-screen modal opened via `window.openTenantCard(idOrUnitId)` / closed with `window.closeTenantCard()`. It's triggered from tenant rows on `tenants.html` and from the worklist on `housing.html` (which is why `housing-tic.js` loads on both). Loaded after `housing-modals.js` so the footer "New Work Order" button can hand off to `openSowModal()`.
+
+**Tabs:** Overview, Utilities, Documents, Unit History (and tenant detail fields). `_ticRenderOverview()` / `_ticRenderUtilities()` render the panels; a known footgun is the DocLibrary not mounting until its tab is actually shown (several fixes around tab-switch mounting).
+
+**Field save routing:** TIC fields carry a `saveTarget` (`'unit'` → PATCH `housing_units`; otherwise the `tenants` row). On `'unit'` save success the in-memory `housingUnits[]` cache is kept in sync. Hydro/gas **meter** numbers save to `housing_units`; hydro/gas **account** numbers save to `tenants`.
+
+**Maps — two distinct widgets:**
+- **TIC Overview map (read-only)** — a static OpenStreetMap `export/embed.html` **iframe** built from the unit's `latitude`/`longitude`. No Leaflet on this widget. Requires `frame-src https://www.openstreetmap.org` in CSP (`staticwebapp.config.json`).
+- **Set Location & Photo (SLP) modal (interactive)** — an ED/admin tool to set a unit's pin + photo. Lazy-loads **Leaflet 1.9.4** (cdnjs) and **exifr** (`cdn.jsdelivr.net`) on demand via `_slpLoadScript()`. Coordinates can be set three ways: clicking/dragging the Leaflet pin, the browser Geolocation API, or **EXIF GPS** auto-extracted from an uploaded photo (`exifr.gps(file)`). `_slpSave()` PATCHes `latitude`/`longitude` to `housing_units` and uploads the photo. Self-contained so it works when launched from the worklist.
+
+**Bulk geocoding:** `geocode-units.ps1` (run by the user on Windows, **not** in CI) back-fills coordinates for units missing them. Uses the **OSM Nominatim** API (OCAP-friendly: no Google, no API key), rate-limited to ~1 req/sec, authenticating to Supabase with the **service-role** key (passed via `-ServiceRoleKey`). Unmatched units are listed for manual entry.
+
+### DocLibrary (shared document component, `shared.js`)
+`window.DocLibrary.create(mountEl, opts)` is the reusable per-entity file manager used across the app: application Step 6 docs, the scorecard, TIC tenant + utility-bill docs, unit detail panels, finance tenant profiles, and RFQ documents. Files go to Supabase **Storage** (bucket `STORAGE_BUCKET`, default `'housing-files'`) under an entity-scoped `pathPrefix` (e.g. `units/<id>/utility-bills`); every upload/delete/category-change writes an audit row to `housing_audit_log` (`file_uploaded` / `file_deleted` / `file_category_changed`).
+
+- **Categories** come from `opts.categories` (key/label/icon) and drive the filter chips. An **`Image`** category (`🖼️`) is in every document-type dropdown so photos can be filed alongside PDFs.
+- **Inline category editing:** when not `readOnly`, each file row shows a category `<select>`; changing it calls `_updateCategory()` which re-files the doc and writes the audit row.
+
+### Degraded mode (slow / flaky cell connections, `shared-data.js`)
+Every save promise is wrapped by `_withSaveTimeout()` with a hard **10 s** timeout (`_SAVE_TIMEOUT_MS`). A timeout while the device still reports `navigator.onLine === true` calls `_enterDegradedMode()`, which sets a **30 s** cooldown (`_DEGRADED_COOLDOWN_MS`), queues saves locally via `saveQueueAdd()`, and toasts "Slow connection — saving locally…". During the cooldown all saves skip the network and queue immediately. `_runDegradedProbe()` HEAD-pings Supabase after the cooldown: success exits degraded mode and flushes the queue; another timeout extends the cooldown. The browser `online` event also clears degraded mode immediately and syncs. Implemented with a simple `Promise.race` + `setTimeout` — no `AbortController` or `navigator.connection`.
 
 ### Renovation fund sources (`RENO_FUND_RULES`)
 Defined in both `scoring.js` and `renos.html` (two copies — keep in sync). Current valid pool IDs:
@@ -176,6 +205,7 @@ Format: `SOW-YYYY-NN` where `NN` is a global sequential counter across all units
 
 - **Vanilla JS only.** No bundler, no transpiler, no JSX, no TypeScript. Use ES5-compatible patterns (`var` is fine and matches existing code; arrow functions and `async/await` are used where they already appear).
 - **No new top-level HTML files without a route.** Add an entry to `staticwebapp.config.json` `routes` for any new page, or it'll 404 in production.
+- **External CDNs are CSP-allowlisted, not bundled.** The few third-party libs (jsPDF, Leaflet 1.9.4, exifr) load from `cdnjs.cloudflare.com` / `cdn.jsdelivr.net`, and the TIC Overview map embeds an `openstreetmap.org` iframe. Any new CDN host, connect target, or frame source must be added to the `Content-Security-Policy` header in `staticwebapp.config.json` or the browser will block it. Prefer lazy-loading heavy libs on first use (as the SLP modal does) over global `<script>` tags.
 - **Page layout, tables, pills, forms, and breakpoints are defined in `shared.css`.** Do not duplicate. The full template + class catalog is in `CLFN_PAGE_TEMPLATE.md` — read it before adding a new view. New view IDs must be added to the `shared.css` padding-top list and `housing.css` responsive overrides.
 - **Helper functions called from dynamic renders must live in `shared-data.js`** (not scoped inside page-level functions) so both `housing.html` and `renos.html` can call them.
 - **No `@supabase/supabase-js`** — all Supabase calls are raw `fetch()` to REST/Auth/Storage endpoints (see `shared.js:941`). The `window._sb = null` lines in `housing-init.js`, `contractors.html`, and `renos.html` are dead code — the SDK is never loaded so `_sb` stays null forever. The actual session access token lives at `HOUSING_SESSION.accessToken`. Don't reference `_sb`.
