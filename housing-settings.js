@@ -239,6 +239,9 @@ function showSettingsSection(section) {
   if(section==='sec_reno_score'  && typeof renderRenoScoreTable==='function') renderRenoScoreTable();
   if(section==='sec_budget'      && typeof renderBudgetPools==='function') renderBudgetPools();
   if(section==='sec_audit'       && typeof renderAuditLog==='function') renderAuditLog();
+  // Start/stop the audit log auto-refresh based on whether its tab is active.
+  if(section==='sec_audit') { if(typeof _startAuditAutoRefresh==='function') _startAuditAutoRefresh(); }
+  else                      { if(typeof _stopAuditAutoRefresh==='function')  _stopAuditAutoRefresh();  }
   if(section==='sec_occupancy'   && typeof renderNosTable==='function') renderNosTable();
   if(section==='sec_notifications' && typeof renderNotificationsTab==='function') renderNotificationsTab();
   if(section==='sec_terms'          && typeof renderTermsTab==='function')      renderTermsTab();
@@ -621,7 +624,9 @@ var AUDIT_ACTION_LABELS = {
   'settings_budget_save':     '💰 Budget Saved',
   'settings_user_add':        '👤 User Added',
   'settings_user_remove':     '👤 User Removed',
-  'settings_saved':           '⚙️ Settings Saved'
+  'settings_saved':           '⚙️ Settings Saved',
+  'user_login':               '🔑 Signed In',
+  'user_logout':              '🚪 Signed Out'
 };
 
 // Map an audit row's action to a row-tint class. Empty string = no tint.
@@ -633,10 +638,12 @@ function _auditRowClass(action) {
   return '';
 }
 
-async function renderAuditLog() {
+async function renderAuditLog(silent) {
   var tbody = document.getElementById('audit_log_tbody');
   if(!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="5" class="empty-state-italic">Loading…</td></tr>';
+  // `silent` is passed by the auto-refresh tick so the table doesn't flash a
+  // "Loading…" placeholder every interval.
+  if(!silent) tbody.innerHTML = '<tr><td colspan="5" class="empty-state-italic">Loading…</td></tr>';
 
   // Load from Supabase (shared across all users). The DB column is `detail`
   // (singular) and stores JSON like {"detail":"...","name":"..."}; we parse
@@ -697,6 +704,8 @@ async function renderAuditLog() {
       appDisplay = '<span class="audit-pill audit-pill-sow">REQ</span> ' + appDisplay.slice(4);
     } else if (appDisplay === 'SETTINGS') {
       appDisplay = '<span class="audit-pill audit-pill-sys">SYS</span>';
+    } else if (appDisplay === 'LOGIN' || appDisplay === 'LOGOUT') {
+      appDisplay = '<span class="audit-pill audit-pill-sys">AUTH</span>';
     }
 
     // By column: prefer full name; fall back to role for legacy rows that
@@ -713,6 +722,25 @@ async function renderAuditLog() {
       +'<td class="audit-cell-by">'+byHtml+'</td>'
       +'</tr>';
   }).join('');
+}
+
+// ── Audit log auto-refresh ("dynamic updating") ───────────────────────────────
+// While the Audit Log tab is visible, silently re-pull the log every 15s so new
+// activity (logins, approvals, settings changes from other users) appears
+// without a manual refresh. The tick self-stops when the tab is no longer on
+// screen (offsetParent === null when it or an ancestor is display:none), so the
+// timer never leaks after the user navigates away.
+var _auditAutoTimer = null;
+function _startAuditAutoRefresh() {
+  _stopAuditAutoRefresh();
+  _auditAutoTimer = setInterval(function() {
+    var sec = document.getElementById('sec_audit');
+    if (!sec || sec.offsetParent === null) { _stopAuditAutoRefresh(); return; }
+    if (typeof renderAuditLog === 'function') renderAuditLog(true);
+  }, 15000);
+}
+function _stopAuditAutoRefresh() {
+  if (_auditAutoTimer) { clearInterval(_auditAutoTimer); _auditAutoTimer = null; }
 }
 
 // Export the currently-loaded audit rows. Dispatched from headerExport()

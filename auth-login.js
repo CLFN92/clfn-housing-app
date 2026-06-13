@@ -432,11 +432,21 @@ function _stampStaffLastLogin(email) {
       headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
       body:    JSON.stringify({ last_login_at: now })
     }).catch(function(e){ console.warn('[LAST LOGIN] staff patch failed:', e); });
-    // Always write to audit_log — INSERT allowed for all authenticated users
+    // Always write to audit_log — INSERT allowed for all authenticated users.
+    // Column names must match housing_audit_log (entity_type / entity_id);
+    // an earlier version posted a non-existent `app_id` column, which made
+    // PostgREST reject every login row (400) so sign-ins never appeared.
     fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
       method:  'POST',
       headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
-      body:    JSON.stringify({ app_id: 'LOGIN', action: 'user_login', detail: 'Signed in', actor: email })
+      body:    JSON.stringify({
+        entity_type: 'auth',
+        entity_id:   'LOGIN',
+        action:      'user_login',
+        detail:      JSON.stringify({ detail: 'Signed in', name: (window.HOUSING_SESSION && HOUSING_SESSION.name) || '' }),
+        actor:       email,
+        created_at:  new Date().toISOString()
+      })
     }).catch(function(e){ console.warn('[LAST LOGIN] audit write failed:', e); });
   } catch (e) {
     console.warn('[LAST LOGIN] threw:', e);
