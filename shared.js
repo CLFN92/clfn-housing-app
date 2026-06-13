@@ -143,34 +143,47 @@ window._applyTheme = function(theme) {
       sessionStorage.setItem('clfn_logo_transparent', theme.logoTransparent ? '1' : '');
     }
   } catch(e) {}
-  // Favicon / bookmark icon — keep the tab + saved-link icon on the nation's
-  // logo. Uses the nation's custom theme logo when set, otherwise the default
-  // brand logo. The static /favicon.png in each page <head> is the pre-JS
-  // baseline; this upgrades it once settings are known (and for custom nations).
+  // Favicon / bookmark icon — drive the tab + saved-link icon from the nation's
+  // saved logo (Settings, persisted as theme.logo). No hardcoded brand here; if
+  // the nation hasn't configured a logo yet, the browser default is left as-is.
   try {
-    var _favSrc = theme.logo || (typeof CLFN_LOGO_DATA_URL === 'string' ? CLFN_LOGO_DATA_URL : '');
-    if (_favSrc && typeof _setFavicon === 'function') _setFavicon(_favSrc);
+    if (theme.logo && typeof _setFavicon === 'function') _setFavicon(theme.logo);
   } catch(e) {}
 };
 
-// _setFavicon — point the tab/bookmark icon at `href`. Updates every existing
-// icon <link> in the head (icon, shortcut icon, apple-touch-icon) and creates
-// one if the page somehow has none. Accepts a data URL or a file path.
+// _setFavicon — point the tab/bookmark icon at `href` (a data URL or path).
+// Ensures both an "icon" and an "apple-touch-icon" link exist and updates them,
+// so the browser tab/address bar AND iOS "Add to Home Screen" use the same
+// nation logo. Pages ship no static icon link — this is the only source.
 window._setFavicon = function(href) {
   if (!href) return;
   var head = document.head || document.getElementsByTagName('head')[0];
   if (!head) return;
-  var nodes = head.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]');
-  if (nodes.length) {
-    for (var i = 0; i < nodes.length; i++) nodes[i].setAttribute('href', href);
-  } else {
-    var l = document.createElement('link');
-    l.setAttribute('rel', 'icon');
-    l.setAttribute('type', 'image/png');
-    l.setAttribute('href', href);
-    head.appendChild(l);
-  }
+  ['icon', 'apple-touch-icon'].forEach(function(rel) {
+    var sel = (rel === 'icon')
+      ? 'link[rel="icon"], link[rel="shortcut icon"]'
+      : 'link[rel="apple-touch-icon"]';
+    var nodes = head.querySelectorAll(sel);
+    if (nodes.length) {
+      for (var i = 0; i < nodes.length; i++) nodes[i].setAttribute('href', href);
+    } else {
+      var l = document.createElement('link');
+      l.setAttribute('rel', rel);
+      if (rel === 'icon') l.setAttribute('type', 'image/png');
+      l.setAttribute('href', href);
+      head.appendChild(l);
+    }
+  });
 };
+
+// Apply the nation's saved logo as the favicon as early as possible, from the
+// sessionStorage cache that _applyTheme writes on each load. This avoids a
+// blank icon between page load and the settings fetch on navigations, and keeps
+// everything nation-config-driven (no hardcoded brand image).
+try {
+  var _cachedLogo = sessionStorage.getItem('clfn_logo_cache');
+  if (_cachedLogo) window._setFavicon(_cachedLogo);
+} catch(e) {}
 
 // ═══════════════════════════════════════════════════════════════════════
 // formatPhone — canonical phone-string formatter "(705)-555-0100".
