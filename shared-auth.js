@@ -144,8 +144,40 @@ function _clearLocalClientState() {
 // Signs the user out of Supabase, clears all client state, resets headers,
 // then calls window._onLogout() if registered (page-specific: show login screen,
 // clear data arrays, etc.).
-async function doLogout() {
+// `reason` distinguishes a deliberate sign-out via the logout button (default)
+// from an automatic idle-timeout sign-out ('idle'), so the two are recorded as
+// separate audit events.
+async function doLogout(reason) {
   stopIdleTimer();
+
+  // Audit the sign-out before tearing down the session — the user's token is
+  // still valid in HOUSING_HEADERS at this point. Self-contained direct write
+  // (matching the login write in auth-login.js) because shared-data.js's
+  // auditEntry() isn't loaded on every page that can call doLogout. keepalive:true
+  // lets the request survive the immediate redirect on an idle-timeout logout.
+  try {
+    var _isIdle = (reason === 'idle' || reason === 'timeout');
+    var _logoutEmail = (HOUSING_SESSION && HOUSING_SESSION.email) || '';
+    if (_logoutEmail) {
+      fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
+        method:    'POST',
+        keepalive: true,
+        headers:   Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body:      JSON.stringify({
+          entity_type: 'auth',
+          entity_id:   'LOGOUT',
+          action:      _isIdle ? 'user_logout_timeout' : 'user_logout',
+          detail:      JSON.stringify({
+            detail: _isIdle ? 'Signed out — idle timeout' : 'Signed out — logout button',
+            name:   (HOUSING_SESSION && HOUSING_SESSION.name) || ''
+          }),
+          actor:       _logoutEmail,
+          created_at:  new Date().toISOString()
+        })
+      }).catch(function(e){ console.warn('[auth] logout audit write failed:', e); });
+    }
+  } catch(e) {}
+
   try {
     await fetch(SUPABASE_URL + '/auth/v1/logout', { method: 'POST', headers: HOUSING_HEADERS });
   } catch(e) {}
@@ -198,7 +230,7 @@ function _idleLogout() {
   //    We don't await it — the redirect below must not block on network.
   stopIdleTimer();
   if (typeof doLogout === 'function') {
-    try { doLogout().catch(function(e){ console.warn('[CLFN] idle doLogout:', e); }); } catch(e) {}
+    try { doLogout('idle').catch(function(e){ console.warn('[CLFN] idle doLogout:', e); }); } catch(e) {}
   }
 
   // 3. Navigate immediately. Pass ?timeout=1 so the login page can show a

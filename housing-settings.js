@@ -626,7 +626,26 @@ var AUDIT_ACTION_LABELS = {
   'settings_user_remove':     '👤 User Removed',
   'settings_saved':           '⚙️ Settings Saved',
   'user_login':               '🔑 Signed In',
-  'user_logout':              '🚪 Signed Out'
+  'user_logout':              '🚪 Signed Out',
+  'user_logout_timeout':      '⏱️ Idle Timeout Logout',
+  'file_uploaded':            '📎 File Uploaded',
+  'file_deleted':             '🗑️ File Deleted',
+  'file_category_changed':    '🏷️ File Re-categorized',
+  'unit_assigned':            '🏠 Unit Assigned',
+  'tenant_vacated':           '📤 Tenant Vacated',
+  'unit_status_auto':         '🔄 Unit Status Updated',
+  'tic_overview_change':      '📝 Tenant Detail Edited',
+  'module_toggle':            '🧩 Module Toggled',
+  'nation_updated':           '🏛️ Nation Settings Updated',
+  'approval_authority_save':  '🔐 Approval Authority Updated',
+  'theme_updated':            '🎨 Theme Updated',
+  'theme_reset':              '🎨 Theme Reset',
+  'required_fields_updated':  '📋 Required Fields Updated',
+  'email_template_save':      '✉️ Email Template Saved',
+  'recipient_emailed':        '✉️ Email Sent',
+  'created':                  '📄 RFQ Draft Saved',
+  'issued':                   '📤 RFQ Issued',
+  'awarded':                  '🏆 RFQ Awarded'
 };
 
 // Map an audit row's action to a row-tint class. Empty string = no tint.
