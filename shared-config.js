@@ -202,8 +202,8 @@ window.isSuperUser = function() {
 // housing_settings (key: 'module_enablement').
 window.CLFN_MODULES = {
   CORE: ['applications', 'inventory', 'tenants', 'worklist'],
-  _enabled:  { finance: true, match: true, contractors: true, renovations: true },
-  _licensed: { finance: true, match: true, contractors: true, renovations: true },
+  _enabled:  { finance: true, match: true, contractors: true, renovations: true, rfq: true, mapping: true },
+  _licensed: { finance: true, match: true, contractors: true, renovations: true, rfq: true, mapping: true },
 
   isEnabled: function(mod) {
     if(this.CORE.indexOf(mod) !== -1) return true;
@@ -244,6 +244,9 @@ window.CLFN_MODULES = {
 // Reads the saved overrides from window._appSettings and applies them.
 function initModuleEnablement() {
   try {
+    // Mark hydrated as soon as settings are available, even if this nation
+    // never saved an override (so moduleOn() doesn't re-hydrate every call).
+    if(window._appSettings) window._moduleEnablementHydrated = true;
     var saved = window._appSettings && window._appSettings['module_enablement'];
     if(!saved) return;
     var parsed = (typeof saved === 'string') ? JSON.parse(saved) : saved;
@@ -253,6 +256,19 @@ function initModuleEnablement() {
     console.warn('[CLFN_MODULES] Could not load saved overrides:', e);
   }
 }
+
+// moduleOn(mod) — convenience gate used by feature entry points across pages.
+// Only housing.html calls initModuleEnablement() at login; sub-pages (renos,
+// inventory, tenants, rfq) load _appSettings without hydrating CLFN_MODULES, so
+// this lazily applies the saved overrides on first use. Defaults to true if the
+// registry isn't available yet (fail open — never hide a feature on error).
+window.moduleOn = function(mod) {
+  if(!window._moduleEnablementHydrated && window._appSettings && typeof initModuleEnablement === 'function'){
+    try { initModuleEnablement(); } catch(e) {}
+  }
+  try { return !window.CLFN_MODULES || window.CLFN_MODULES.isEnabled(mod); }
+  catch(e) { return true; }
+};
 
 // ── Nation config ─────────────────────────────────────────────────────────────
 // Per-nation branding + display overrides. The role *keys* ('ed',

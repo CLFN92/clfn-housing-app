@@ -623,19 +623,24 @@
       + '<img class="unit-photo-img" id="unit-photo-img" src="" alt="House photo"/>'
       + '</div>';
 
-    var canSetLoc = typeof APPROVAL_AUTHORITY !== 'undefined'
+    // Mapping module gate — when the nation has the Mapping feature turned off
+    // (Settings → Nation), hide the location/photo column entirely.
+    var mapOn = (typeof moduleOn === 'function') ? moduleOn('mapping') : true;
+
+    var canSetLoc = mapOn
+      && typeof APPROVAL_AUTHORITY !== 'undefined'
       && APPROVAL_AUTHORITY.can('setUnitLocation', window.currentRole || '');
     var adminBtnHtml = canSetLoc
       ? '<button type="button" class="btn-set-location" data-tic-action="slp-open">&#128205; Set Location &amp; Photo</button>'
       : '';
 
     _ticEl('tic_panel_overview').innerHTML =
-      '<div class="tic-overview-columns">'
+      '<div class="tic-overview-columns' + (mapOn ? '' : ' tic-overview-nomap') + '">'
       + '<div class="tic-overview-main">' + html + '</div>'
-      + '<div class="tic-overview-map">' + photoWrapHtml + mapHtml + adminBtnHtml + '</div>'
+      + (mapOn ? '<div class="tic-overview-map">' + photoWrapHtml + mapHtml + adminBtnHtml + '</div>' : '')
       + '</div>';
 
-    _ticInitMap(u);
+    if(mapOn) _ticInitMap(u);
   }
 
   var _ticUtilDocLib    = null;

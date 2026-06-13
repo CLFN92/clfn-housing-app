@@ -470,7 +470,12 @@ function renderNationPanel(){
   var pill = function(label, c, bg){
     return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+';">'+label+'</span>';
   };
+  var MODULE_LABELS = {
+    rfq:     'RFQ (Request for Quotes)',
+    mapping: 'Mapping (Unit Location & Photo)'
+  };
   var humanize = function(name){
+    if(MODULE_LABELS[name]) return MODULE_LABELS[name];
     return name.replace(/_/g,' ').replace(/\b\w/g, function(m){return m.toUpperCase();});
   };
   var coreRow = function(name){

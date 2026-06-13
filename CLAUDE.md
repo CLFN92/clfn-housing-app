@@ -83,7 +83,11 @@ Canonical roles (see `shared-config.js` `ROLE` and the role matrix in `PLAN.md` 
 - `unlockSignatures` is an ED-only approval action (in `approval-authority.js`) reserved for unlocking applicant signatures after an application is submitted. The authority is defined but not yet wired to a UI firing point.
 
 ### Multi-nation gating
-- `CLFN_MODULES.isEnabled('renos' | 'finance' | 'contractors' | 'match')` gates nav tiles and entry points. Core modules (applications, inventory, tenants, worklist) cannot be disabled.
+- Optional modules registered in `CLFN_MODULES._enabled` / `_licensed` (`shared-config.js`): `finance`, `match`, `contractors`, `renovations`, `rfq`, `mapping`. Core modules (applications, inventory, tenants, worklist) cannot be disabled.
+- `CLFN_MODULES.isEnabled(mod)` gates nav tiles and entry points; `isEnabled` is true only when the module is both licensed and enabled (or is CORE). Super users toggle modules in **Settings → Nation → Modules** — the table auto-renders one row per `listOptional()` entry, so registering a new key in `_enabled`/`_licensed` is all that's needed to surface a toggle. State persists to `housing_settings` key `module_enablement` and is audited (`_onModuleToggle` in `scoring.js`).
+- **`moduleOn(mod)`** (in `shared-config.js`) is the convenience gate to use at feature firing points. It fails open (returns `true` if the registry/settings aren't loaded) and **lazily hydrates** saved overrides from `_appSettings` on sub-pages — only `housing.html` calls `initModuleEnablement()` at login, so renos/inventory/tenants/rfq rely on `moduleOn()` (or a manual `initModuleEnablement()` call) to see the persisted state.
+- **`rfq` module** gates every RFQ entry point: worklist "RFQs Open for Bids" + draft RFQs, the RFQ button in Reno Approvals (`renos.html`) and the SOW modal/list (`housing-modals-sow.js`), the "RFQs & Contracts" section on the inventory unit panel (`udpRenderRfqSection`), and a page-level redirect at the top of `rfq.js` (bounces to `housing.html` when off).
+- **`mapping` module** gates the Unit Location & Photo feature: the TIC Overview map widget + "Set Location & Photo" (SLP) button are hidden when off (`_ticRenderOverview` in `housing-tic.js` skips the right-hand column and `_ticInitMap`).
 - Renovations enabling auto-enables Contractors (SOWs reference contractors).
 - Hardcoded `'Constance Lake First Nation'` strings are being replaced with `NATION_CONFIG.display_name` / `short` — finance.html is already fully retrofitted (Phase F1); other pages still have inline strings.
 

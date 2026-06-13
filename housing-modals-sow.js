@@ -799,10 +799,12 @@ function _applySowModalLock(sow){
   var rfqBtn = document.getElementById('sow_rfq_btn');
   if (rfqBtn) {
     var _rfqRole = window.currentRole || '';
-    var _rfqShow = !!sow && !sow.archived && (
-      (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)) ||
-      (_rfqRole === 'housing_manager' || _rfqRole === 'ed')
-    );
+    var _rfqShow = !!sow && !sow.archived
+      && (typeof moduleOn !== 'function' || moduleOn('rfq'))
+      && (
+        (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)) ||
+        (_rfqRole === 'housing_manager' || _rfqRole === 'ed')
+      );
     rfqBtn.style.display = _rfqShow ? 'flex' : 'none';
 
   }
@@ -1060,7 +1062,7 @@ function udpRenderSowTable(unitId){
         +editBtn
         +archiveBtn
         +'<button onclick="udpPrintWorkOrder(\''+esc(unitId)+'\',\''+pn+'\')" title="Print work order" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700;font-family:DM Sans,sans-serif;">Work Order</button>'
-        +(typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)
+        +((typeof moduleOn !== 'function' || moduleOn('rfq')) && typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)
           ? '<a href="rfq.html?unit='+esc(unitId)+'&sow='+esc(pn)+'" style="margin-left:4px;background:#1d4ed8;border:none;color:#fff;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;display:inline-block;">RFQ</a>'
           : '')
       +'</td>'

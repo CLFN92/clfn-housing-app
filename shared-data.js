@@ -3972,7 +3972,7 @@ function renderWorklist() {
   }
 
   var draftRfqs = [];
-  if (email) {
+  if (email && (typeof moduleOn !== 'function' || moduleOn('rfq'))) {
     var rfqCache = window._rfqCache || {};
     var rfqUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     Object.keys(rfqCache).forEach(function(rfqId) {
@@ -4025,7 +4025,7 @@ function renderWorklist() {
 
   // ── 3. RFQs needing action ───────────────────────────────────────────────
   var rfqItems = [];
-  if (isManagement) {
+  if (isManagement && (typeof moduleOn !== 'function' || moduleOn('rfq'))) {
     var rfqCache = window._rfqCache || {};
     var rfqUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     Object.keys(rfqCache).forEach(function(rfqId) {
@@ -5877,6 +5877,13 @@ function udpRenderFilePreviews(unitId){
 }
 
 async function udpRenderRfqSection(unitId) {
+  // RFQ module gate — hide the whole "RFQs & Contracts" section when off.
+  var rfqSection = document.getElementById('udp_rfq_section');
+  if (typeof moduleOn === 'function' && !moduleOn('rfq')) {
+    if (rfqSection) rfqSection.style.display = 'none';
+    return;
+  }
+  if (rfqSection) rfqSection.style.display = '';
   var el = document.getElementById('udp_rfq_list');
   if (!el) return;
   el.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0;">Loading&hellip;</div>';
