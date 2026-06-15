@@ -1787,6 +1787,15 @@ function renoSearchFilter(q) {
     ? renoUnits.filter(function(u){ return (u.num+' '+u.street).toLowerCase().includes(q.toLowerCase()); })
     : renoUnits;
 
+  // Field Employees only see units that have an in-house work order assigned to
+  // them (the logged-in key person).
+  if((window.currentRole||'') === 'field_employee' && typeof sowHiddenFromCurrentFieldEmployee === 'function'){
+    filtered = filtered.filter(function(u){
+      var sows = (typeof getUnitSowList === 'function') ? getUnitSowList(u.id) : [];
+      return sows.some(function(s){ return s && !s.archived && !sowHiddenFromCurrentFieldEmployee(s); });
+    });
+  }
+
   var statusStyle = {
     under_repair: {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'Under Repair'},
     condemned:    {bg:'#fef2f2', c:'#b91c1c', label:'Condemned'}

@@ -3932,6 +3932,21 @@ window._refreshAppViews = _refreshAppViews;
 // Shows ONLY items requiring action across all entity types, grouped by type.
 // Auto-updates when called after any approval/action (all callsites that
 // trigger after status changes already call this function).
+// Field Employees only see in-house work orders assigned to them (the logged-in
+// key person). Returns true when the given SOW should be HIDDEN from the current
+// user; non-field roles always see everything. Nation-agnostic — keys off the
+// SOW's assignment fields and the session email.
+function sowHiddenFromCurrentFieldEmployee(sow){
+  var role = window._viewAsRole || window._realRole || window.currentRole || '';
+  if(role !== 'field_employee') return false;
+  if(!sow) return true;
+  if((sow.assignedTeam || sow.assigned_team || '') !== 'in_house') return true;
+  var email = ((window.HOUSING_SESSION && HOUSING_SESSION.email) || '').toLowerCase();
+  var to    = (sow.assignedTo || sow.assigned_to || '').toLowerCase();
+  return !(email && to && email === to);
+}
+window.sowHiddenFromCurrentFieldEmployee = sowHiddenFromCurrentFieldEmployee;
+
 function renderWorklist() {
   var body = document.getElementById('worklist_body');
   if (!body) return;
@@ -4036,6 +4051,7 @@ function renderWorklist() {
         if (!sow || sow.archived) return;
         var status = sow.approval_status || '';
         if (status !== 'hm_approved' && status !== 'ed_approved') return; // approved, not completed
+        if (sowHiddenFromCurrentFieldEmployee(sow)) return;               // in-house + assigned to me
         var u = fsUnits.find(function(x){ return x && x.id === uid; });
         var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : uid;
         fieldSowItems.push({ uid: uid, pn: sow.project_number || '', addr: addr, status: status });

@@ -241,6 +241,16 @@ function _buildSowModalHTML() {
               '<div class="f"><label>Current Tenant Name</label><input id="sow_tenant_name" type="text" placeholder="Full name of tenant"/></div>' +
               '<div class="f"><label>Prepared By (Staff)</label><input id="sow_prepared_by" type="text" placeholder="Staff name"/></div>' +
               '<div class="f"><label>PO Number <span style="font-size:10px;font-weight:400;color:var(--muted);">(from accounting)</span></label><input id="sow_po_number" type="text" placeholder="e.g. PO-2026-0042"/></div>' +
+              '<div class="f sow-assign-row"><label>Assigned To</label>' +
+                '<select id="sow_assigned_team" onchange="sowAssignTeamChanged()">' +
+                  '<option value="">— Select —</option>' +
+                  '<option value="in_house" id="sow_assign_inhouse_opt">In-house Crew</option>' +
+                  '<option value="contractor">External Contractor</option>' +
+                '</select>' +
+                '<select id="sow_assigned_to" style="margin-top:6px;display:none;">' +
+                  '<option value="">— Select field employee —</option>' +
+                '</select>' +
+              '</div>' +
               '<div class="f sow-ct-row"><label>Contractor (if assigned)</label>' +
                 '<input id="sow_contractor" type="text" placeholder="Search contractors…" autocomplete="off"' +
                   ' oninput="sowContractorSearch(this.value)" onfocus="sowContractorSearch(\'\')"' +
@@ -738,6 +748,57 @@ function openSowModal(unitId, projectNumber) {
 // ── SOW completion state control ──────────────────────────────────────────
 // Applies read-only lock when a SOW is completed AND the viewer isn't the ED.
 // Also toggles the Mark Complete / Reopen buttons based on status + permissions.
+// Toggle the field-employee dropdown (in-house) vs the contractor row based on
+// the selected assignment team. Field Employees never see the contractor row.
+function sowAssignTeamChanged(){
+  var team  = (document.getElementById('sow_assigned_team')||{}).value || '';
+  var feSel = document.getElementById('sow_assigned_to');
+  var ctRow = document.querySelector('.sow-ct-row');
+  var isField = (window.currentRole === 'field_employee');
+  if(feSel) feSel.style.display = (team === 'in_house') ? '' : 'none';
+  if(ctRow) ctRow.style.display = (team === 'contractor' && !isField) ? '' : 'none';
+}
+window.sowAssignTeamChanged = sowAssignTeamChanged;
+
+// Fill the "Assigned To" field-employee dropdown from active staff whose role is
+// field_employee. Uses _staffCache when present, otherwise fetches once and
+// caches in window._fieldEmployeeCache. selectedEmail pre-selects the saved value.
+function _sowPopulateFieldEmployees(selectedEmail){
+  var sel = document.getElementById('sow_assigned_to');
+  if(!sel) return;
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+  var norm = (window.CLFN_PERMS && CLFN_PERMS.normalizeRole) ? CLFN_PERMS.normalizeRole : function(r){ return String(r||'').toLowerCase(); };
+  var want = (selectedEmail || '').toLowerCase();
+  function build(list){
+    var opts = ['<option value="">— Select field employee —</option>'];
+    (list||[]).forEach(function(s){
+      var email = (s.email||'').toLowerCase();
+      var name  = s.name || s.email || email;
+      if(!email) return;
+      opts.push('<option value="'+esc(email)+'" data-name="'+esc(name)+'"'+(email===want?' selected':'')+'>'+esc(name)+'</option>');
+    });
+    sel.innerHTML = opts.join('');
+  }
+  if(Array.isArray(window._fieldEmployeeCache)){ build(window._fieldEmployeeCache); return; }
+  var fromStaff = [];
+  if(window._staffCache){
+    Object.keys(window._staffCache).forEach(function(id){
+      var s = window._staffCache[id];
+      if(s && s.is_active !== false && norm(s.role) === 'field_employee') fromStaff.push(s);
+    });
+  }
+  if(fromStaff.length){ window._fieldEmployeeCache = fromStaff; build(fromStaff); return; }
+  try {
+    fetch(SUPABASE_URL + '/rest/v1/staff?is_active=eq.true&select=id,name,email,role,department&order=name', { headers: HOUSING_HEADERS })
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(rows){
+        var fes = (rows||[]).filter(function(s){ return norm(s.role) === 'field_employee'; });
+        window._fieldEmployeeCache = fes;
+        build(fes);
+      }).catch(function(){ build([]); });
+  } catch(e){ build([]); }
+}
+
 function _applySowModalLock(sow){
   var modal = document.getElementById('sowModal');
   if(!modal) return;
@@ -749,9 +810,32 @@ function _applySowModalLock(sow){
   var banner = document.getElementById('sow_readonly_banner');
   if(banner) banner.style.display = readOnly ? 'block' : 'none';
 
-  // Field Employees are in-house labour — no contractor step on work orders.
-  var _ctRow = document.querySelector('.sow-ct-row');
-  if(_ctRow) _ctRow.style.display = (window.currentRole === 'field_employee') ? 'none' : '';
+  // ── Work-order assignment (in-house crew vs contractor) ───────────────────
+  var _aRoleAssign = window.currentRole || '';
+  var _canAssign = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('assignWorkOrder', _aRoleAssign);
+  var _teamSel   = document.getElementById('sow_assigned_team');
+  var _feSel     = document.getElementById('sow_assigned_to');
+
+  // Nation-driven in-house label — no hardcoded nation name.
+  var _inhouseOpt = document.getElementById('sow_assign_inhouse_opt');
+  if(_inhouseOpt){
+    var _natShort = (window.NATION_CONFIG && (NATION_CONFIG.short || NATION_CONFIG.display_name)) || '';
+    _inhouseOpt.textContent = (_natShort ? _natShort + ' Housing' : 'In-house') + ' (crew)';
+  }
+
+  // Load saved assignment; infer 'contractor' for legacy SOWs with a contractor.
+  var _savedTeam = (sow && (sow.assignedTeam || sow.assigned_team)) || '';
+  var _savedTo   = (sow && (sow.assignedTo   || sow.assigned_to))   || '';
+  if(!_savedTeam && sow && (sow.contractorId || sow.contractor)) _savedTeam = 'contractor';
+  if(_teamSel) _teamSel.value = _savedTeam;
+  _sowPopulateFieldEmployees(_savedTo);
+
+  // Only roles with assignWorkOrder authority can edit the assignment.
+  if(_teamSel) _teamSel.disabled = !_canAssign || readOnly;
+  if(_feSel)   _feSel.disabled   = !_canAssign || readOnly;
+
+  // Show/hide field-employee dropdown vs contractor row based on team.
+  sowAssignTeamChanged();
 
   // Inline Approve button — shown when the current user has approval authority
   // and the SOW is in a state that requires their specific action.
@@ -993,6 +1077,10 @@ function udpRenderSowTable(unitId){
   var wrap = document.getElementById('udp_sow_table_wrap');
   if(!wrap) return;
   var list = getUnitSowList(unitId);
+  // Field Employees only see in-house work orders assigned to them.
+  if(typeof sowHiddenFromCurrentFieldEmployee === 'function'){
+    list = list.filter(function(s){ return !sowHiddenFromCurrentFieldEmployee(s); });
+  }
   if(!list.length){
     wrap.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:12px;font-style:italic;background:var(--bg);">No maintenance requests yet. Click <strong style="color:var(--text);">New Request</strong> to create one.</div>';
     return;
@@ -1272,6 +1360,9 @@ function saveSOW(opts){
     unitId:_sowUnitId, address:get('sow_address'), date:get('sow_date'),
     tenantName:get('sow_tenant_name'),
     preparedBy:get('sow_prepared_by'), contractor:get('sow_contractor'), contractorId:(document.getElementById('sow_contractor_id')||{}).value||'',
+    assignedTeam:(document.getElementById('sow_assigned_team')||{}).value||'',
+    assignedTo:(document.getElementById('sow_assigned_team')||{}).value==='in_house' ? ((document.getElementById('sow_assigned_to')||{}).value||'') : '',
+    assignedToName:(function(){ var s=document.getElementById('sow_assigned_to'); if(!s||((document.getElementById('sow_assigned_team')||{}).value)!=='in_house') return ''; var o=s.options[s.selectedIndex]; return (o&&o.getAttribute('data-name'))||''; })(),
     poNumber:get('sow_po_number'),
     condition:get('sow_condition'), fundSource:get('sow_fund_source'), totalCost:get('sow_total_cost'),
     startDate:get('sow_start_date'), endDate:get('sow_end_date'), notes:get('sow_notes'),
@@ -1296,6 +1387,11 @@ function saveSOW(opts){
     files: (window._sowFiles || []).slice(),
     savedAt:new Date().toISOString()
   };
+  // Reconcile assignment: in-house work has no contractor; contractor work has
+  // no field-employee assignee. Prevents a stale contractor email firing on an
+  // in-house job, and keeps the Field Employee filter clean.
+  if(data.assignedTeam === 'in_house'){ data.contractor = ''; data.contractorId = ''; }
+  else if(data.assignedTeam === 'contractor'){ data.assignedTo = ''; data.assignedToName = ''; }
   // ── Multi-SOW fields ───────────────────────────────────────────────────
   // Stamp the project number (either the one being edited or a fresh one for new SOWs).
   data.project_number = window._sowEditingProjectNumber || (_sowUnitId ? nextProjectNumber(_sowUnitId) : 'NO-UNIT-SOW-001');

@@ -68,6 +68,9 @@ var APPROVAL_AUTHORITY = (function() {
     approveSowOverThreshold:  ['ed'],
     // Who can lock a completed SOW
     lockSow:                  ['ed'],
+    // Who can assign a work order to the in-house field crew (a key person).
+    // Field Employees only see work orders assigned to them.
+    assignWorkOrder:          ['housing_manager', 'ed'],
 
     // ── Contractor approvals ──────────────────────────────────────────────
     // Who can recommend a contractor to ED. HE-L2 included so senior
@@ -286,6 +289,7 @@ var APPROVAL_AUTHORITY = (function() {
       approveSowUnderThreshold: 'Approve SOW under threshold',
       approveSowOverThreshold:  'Approve SOW over threshold',
       lockSow:                  'Lock completed SOW',
+      assignWorkOrder:          'Assign work order to field crew',
       recommendContractor:      'Approve contractor (first stage — HM)',
       approveContractor:        'Final contractor approval',
       declineContractor:        'Decline contractor',
@@ -314,7 +318,7 @@ var APPROVAL_AUTHORITY = (function() {
       'Housing Application':  ['reviewApplication','finalApproveApp','declineApplication','returnApplication','unlockSignatures','viewApplicationScore'],
       'File Update':          ['reviewFileUpdate','approveFileUpdate'],
       'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand','assignRentAmount'],
-      'SOW & Renovation':     ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow','editRenoProgress'],
+      'SOW & Renovation':     ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow','assignWorkOrder','editRenoProgress'],
       'Contractors':          ['recommendContractor','approveContractor','declineContractor'],
       'Scoring':              ['editScoreModel','applyScoreAdjustment'],
       'Inventory':            ['archiveUnit', 'setUnitLocation'],
