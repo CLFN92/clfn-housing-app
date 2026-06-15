@@ -1763,7 +1763,7 @@ function renderRenoApprovalsView() {
       +'<td style="padding:10px 14px;width:1%;white-space:nowrap;"><div style="display:flex;gap:5px;align-items:center;">'
         +approveBtn
         +'<button data-ra-sow="'+uid+'"'+dataProj+' style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--muted);"> Request</button>'
-        +((typeof moduleOn !== 'function' || moduleOn('rfq')) && pn && r.cost >= ((window._appSettings && window._appSettings.rfq_threshold) || 10000)
+        +((typeof moduleOn !== 'function' || moduleOn('rfq')) && pn && appr.key !== 'approved' && r.cost >= ((window._appSettings && window._appSettings.rfq_threshold) || 10000)
           ? '<a href="rfq.html?unit='+encodeURIComponent(uid)+'&sow='+encodeURIComponent(pn)+'" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;display:inline-flex;align-items:center;" title="Create Request for Quotes">RFQ</a>'
           : '')
         +'<button data-ra-prog="'+uid+'"'+dataProj+' style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;color:var(--muted);">📊</button>'
