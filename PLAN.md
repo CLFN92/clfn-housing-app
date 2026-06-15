@@ -89,6 +89,7 @@ For now: **embed in each deployment build** as `window.NATION_CONFIG`. Simplest 
 | `housing_manager` | Full | Full | HM-level, Mark Complete | |
 | `housing_employee_l2` | Full edit | Full | None | No signatures, no approvals |
 | `housing_employee_l1` | Read-only + create new apps (own drafts only) | None | None | |
+| `field_employee` | Inventory + Renovations only: create/edit SOWs, complete work orders, edit progress. No apps; TIC read-only; no contractor step | None | Mark Complete only (no HM/ED approvals) | Maintenance crew / in-house labour |
 | `cfo` | None | Full | None | Finance owner |
 | `finance_l1` | None | Data-entry | None | No approvals |
 

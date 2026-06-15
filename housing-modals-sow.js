@@ -749,6 +749,10 @@ function _applySowModalLock(sow){
   var banner = document.getElementById('sow_readonly_banner');
   if(banner) banner.style.display = readOnly ? 'block' : 'none';
 
+  // Field Employees are in-house labour — no contractor step on work orders.
+  var _ctRow = document.querySelector('.sow-ct-row');
+  if(_ctRow) _ctRow.style.display = (window.currentRole === 'field_employee') ? 'none' : '';
+
   // Inline Approve button — shown when the current user has approval authority
   // and the SOW is in a state that requires their specific action.
   var apBtn = document.getElementById('sow_approve_btn');

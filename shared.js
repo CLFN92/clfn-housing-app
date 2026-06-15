@@ -408,6 +408,10 @@ window.showPrompt = function(opts) {
     HM:         'housing_manager',
     HE_L2:      'housing_employee_l2',
     HE_L1:      'housing_employee_l1',
+    // Maintenance crew. Executes approved renovation work: edits/completes
+    // SOWs & work orders and updates progress. No application, approval,
+    // finance, tenant-edit, or settings access. See approval-authority.js.
+    FIELD_EMPLOYEE: 'field_employee',
     CFO:        'cfo',
     FINANCE_L1: 'finance_l1',
     // Cross-department admin tier — same authority as ED everywhere, no
@@ -432,6 +436,7 @@ window.showPrompt = function(opts) {
     'housing_manager':      'Housing Manager',
     'housing_employee_l2':  'Housing Employee L2',
     'housing_employee_l1':  'Housing Employee L1',
+    'field_employee':       'Field Employee',
     'cfo':                  'CFO',
     'finance_l1':           'Finance Clerk L1',
     'super_user':           'Super User'
@@ -494,7 +499,7 @@ window.showPrompt = function(opts) {
   function hasHousingAccess(role){
     var r = assertRole(role, 'hasHousingAccess');
     return r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2 || r === ROLES.HE_L1
-        || r === ROLES.SUPER_USER;
+        || r === ROLES.FIELD_EMPLOYEE || r === ROLES.SUPER_USER;
   }
 
   function hasFinanceAccess(role){
@@ -508,6 +513,9 @@ window.showPrompt = function(opts) {
 
   function canCreateApp(role){
     var r = assertRole(role, 'canCreateApp');
+    // Field Employees (maintenance crew) have housing access for renovations
+    // but never create or touch applications.
+    if(r === ROLES.FIELD_EMPLOYEE) return false;
     return hasHousingAccess(r);
   }
 
@@ -554,7 +562,9 @@ window.showPrompt = function(opts) {
   }
   function canMarkSowComplete(role){
     var r = assertRole(role, 'canMarkSowComplete');
-    return _isEdTier(r) || r === ROLES.HM;
+    // Field Employees execute the work, so they close out (complete) work
+    // orders. Authorizing/approving a SOW stays with HM/ED.
+    return _isEdTier(r) || r === ROLES.HM || r === ROLES.FIELD_EMPLOYEE;
   }
   function canReopenSow(role){
     var r = assertRole(role, 'canReopenSow');

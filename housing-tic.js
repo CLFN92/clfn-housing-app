@@ -190,8 +190,16 @@
       })
       .catch(function(err){ return { _ticError: true, _err: String(err) }; });
   }
+  // Field Employees (maintenance crew) get a read-only Tenant Information Card —
+  // they need the unit/tenant context to do a work order but must not edit tenant
+  // data. Edits are blocked at the entry points (_ticOnBodyChange / toggles) for
+  // clean UX; this is the hard backstop on the write path.
+  function _ticReadOnlyRole(){
+    return (window.currentRole || '') === 'field_employee';
+  }
   function _ticWrite(method, path, body){
     if(!_ticReady()) return Promise.reject(new Error('supabase config not loaded'));
+    if(_ticReadOnlyRole()) return Promise.reject(new Error('read-only role'));
     var hdrs = Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=representation' });
     return fetch(SUPABASE_URL + '/rest/v1/' + path, {
       method: method,
@@ -695,6 +703,7 @@
         auditTable:    'housing_audit_log',
         getAuthToken:  function(){ return (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ',''); },
         getActor:      function(){ return (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || 'staff'; },
+        readOnly: _ticReadOnlyRole(),
         categories: [
           { key:'hydro_bill', label:'Hydro Bill', icon:'⚡' },
           { key:'gas_bill',   label:'Gas Bill',   icon:'🔥' },
@@ -861,6 +870,10 @@
       });
   }
   function _ticToggleHomeCare(){
+    if(_ticReadOnlyRole()){
+      if(typeof showToast === 'function') showToast('Read-only access — editing tenant details is disabled for your role.');
+      return;
+    }
     var t  = _ticState.tenant;
     var pk = t && t[TIC_C.tenant_pk];
     if (!pk) return;
@@ -881,6 +894,10 @@
   function _ticOnBodyChange(ev){
     var inp = ev.target;
     if(!inp || !inp.getAttribute) return;
+    if(_ticReadOnlyRole()){
+      if(typeof showToast === 'function') showToast('Read-only access — editing tenant details is disabled for your role.');
+      return;
+    }
     // Income Type change → toggle Employer field visibility (no save fires).
     if(inp.id === 'tic_inc_type'){ _ticIncApplyDynamic(); return; }
     var row = inp.closest && inp.closest('.tic-row');
@@ -1594,6 +1611,7 @@
         getAuthToken:  function(){
           return (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ','');
         },
+        readOnly: _ticReadOnlyRole(),
         categories: [
           { key:'id',          label:'ID',              icon:'🧾' },
           { key:'income',      label:'Income / Pay',    icon:'💰' },

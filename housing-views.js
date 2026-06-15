@@ -1398,13 +1398,24 @@ function showEmployeeHome(){
     // ── Employee: simple tiles ──
     tilesEl.style.gridTemplateColumns = 'repeat(auto-fill,minmax(200px,1fr))';
     var mods2 = window.CLFN_MODULES;
-    var empTiles = [
-      {icon:'📝', label:'New Application', desc:'Start a new housing application', fn:'newApp()', accent:true, module:'applications'},
-      {icon:'📋', label:'My Worklist',     desc:'Track applications you have submitted', fn:'showWorklist()', module:'applications'},
-      {icon:'👥', label:'Tenants',         desc:'Search and update tenant records',   fn:'showTenantsForRole()', module:'tenants'},
-      {icon:'🔨', label:'Renovations',     desc:'Renovation progress and requests',   fn:'showRenosForRole()', module:'renovations'},
-      {icon:'🧰', label:'Contractors',     desc:'Browse contractor directory',         fn:'showContractorsForRole()', module:'contractors'}
-    ].filter(function(t){ return !t.module || !mods2 || mods2.isEnabled(t.module); });
+    var empTiles;
+    if (role === ROLE.FIELD_EMPLOYEE) {
+      // Maintenance crew: inventory + the renovation work queue only. No
+      // applications, tenants edit, contractors, finance, or settings.
+      empTiles = [
+        {icon:'🏠', label:'Inventory',   desc:'View units and complete work',        fn:'showInventory()',     module:'inventory'},
+        {icon:'🔨', label:'Work Orders', desc:'SOWs, work orders & progress reports', fn:'showRenosForRole()', module:'renovations'}
+      ];
+    } else {
+      empTiles = [
+        {icon:'📝', label:'New Application', desc:'Start a new housing application', fn:'newApp()', accent:true, module:'applications'},
+        {icon:'📋', label:'My Worklist',     desc:'Track applications you have submitted', fn:'showWorklist()', module:'applications'},
+        {icon:'👥', label:'Tenants',         desc:'Search and update tenant records',   fn:'showTenantsForRole()', module:'tenants'},
+        {icon:'🔨', label:'Renovations',     desc:'Renovation progress and requests',   fn:'showRenosForRole()', module:'renovations'},
+        {icon:'🧰', label:'Contractors',     desc:'Browse contractor directory',         fn:'showContractorsForRole()', module:'contractors'}
+      ];
+    }
+    empTiles = empTiles.filter(function(t){ return !t.module || !mods2 || mods2.isEnabled(t.module); });
     tilesEl.innerHTML = empTiles.map(function(t) {
       var ab = t.accent ? 'background:var(--dark);border:2px solid var(--yellow);' : 'background:var(--surface);border:1px solid var(--border);';
       var lc = t.accent ? 'color:var(--yellow);' : '';

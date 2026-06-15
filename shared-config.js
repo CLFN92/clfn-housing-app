@@ -126,6 +126,7 @@ window.ROLE = {
   HOUSING_MANAGER: 'housing_manager',
   HE_L2:           'housing_employee_l2',
   HE_L1:           'housing_employee_l1',
+  FIELD_EMPLOYEE:  'field_employee',
   CFO:             'cfo',
   FINANCE_L1:      'finance_l1',
   SUPER_USER:      'super_user',
@@ -134,7 +135,8 @@ window.ROLE = {
   },
   hasAccess: function(r) {
     return r === 'ed' || r === 'housing_manager' || r === 'super_user' ||
-           r === 'housing_employee_l2' || r === 'housing_employee_l1';
+           r === 'housing_employee_l2' || r === 'housing_employee_l1' ||
+           r === 'field_employee';
   }
 };
 
@@ -147,6 +149,7 @@ window.ROLE_FORCED_DEPT = {
   housing_manager:     'Housing',
   housing_employee_l2: 'Housing',
   housing_employee_l1: 'Housing',
+  field_employee:      'Housing',
   cfo:                 'Finance',
   finance_l1:          'Finance'
 };

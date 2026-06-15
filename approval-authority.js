@@ -112,8 +112,9 @@ var APPROVAL_AUTHORITY = (function() {
     viewApplicationScore:     ['ed', 'housing_manager', 'housing_employee_l2', 'cfo', 'finance_l1'],
 
     // ── Renovation Progress ───────────────────────────────────────────────
-    // Who can edit progress percentages and notes on a renovation
-    editRenoProgress:         ['ed', 'housing_manager', 'housing_employee_l2'],
+    // Who can edit progress percentages and notes on a renovation. Includes the
+    // Field Employee (maintenance crew) who performs and reports the work.
+    editRenoProgress:         ['ed', 'housing_manager', 'housing_employee_l2', 'field_employee'],
 
     // ── Finance module ────────────────────────────────────────────────────
     viewFinanceCard:          ['ed', 'housing_manager', 'housing_employee_l2', 'housing_employee_l1', 'cfo', 'finance_l1'],

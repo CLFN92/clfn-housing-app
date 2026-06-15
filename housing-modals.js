@@ -79,6 +79,11 @@ function contractorSearchFilter(q) {
 
 // ── Placeholder renderers (to be built out) ──
 function openUnitEditModal(unitId){
+  // Field Employees view inventory read-only — block the unit edit modal.
+  if((window.currentRole || '') === 'field_employee'){
+    if(typeof showToast === 'function') showToast('Read-only — Field Employees cannot edit unit records.');
+    return;
+  }
   var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
   var u = units.find(function(x){ return x.id === unitId; });
   if(!u){ showToast('Unit not found: ' + unitId); return; }
@@ -312,6 +317,12 @@ function ueUpdateBudgetRouting() {
 
 
 function saveUnitEdit(){
+  // Field Employees (maintenance crew) view inventory but never edit unit
+  // records (funder, budget, identity). Backstop in case the edit UI is reached.
+  if((window.currentRole || '') === 'field_employee'){
+    if(typeof showToast === 'function') showToast('Read-only — Field Employees cannot edit unit records.');
+    return;
+  }
   var unitId=window._editingUnitId;
   var units=(typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
   var idx=units.findIndex(function(x){ return x.id===unitId; });

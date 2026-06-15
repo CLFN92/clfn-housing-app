@@ -75,7 +75,9 @@ The landing-page action queue is a single function that renders grouped sections
 
 ### Roles & permissions
 Canonical roles (see `shared-config.js` `ROLE` and the role matrix in `PLAN.md` Phase A):
-`ed`, `housing_manager`, `housing_employee_l2`, `housing_employee_l1`, `cfo`, `finance_l1`.
+`ed`, `housing_manager`, `housing_employee_l2`, `housing_employee_l1`, `field_employee`, `cfo`, `finance_l1`.
+
+- **`field_employee`** — maintenance crew (in-house labour). Renovations-execution role: accesses **Inventory** + **Renovations** only, can create/edit SOWs, **complete work orders**, and edit **progress reports** (`editRenoProgress`). Excluded from applications (`canCreateApp`/`canEditApp` false), all approvals, finance, settings, and tenant edits — the **TIC is read-only** for this role (gated in `_ticWrite`/`_ticOnBodyChange`). No contractor step on its work orders (`.sow-ct-row` hidden). Granted housing access via `hasHousingAccess`/`ROLE.hasAccess`; **not** in `ROLE.isManagement`. Home tiles are a dedicated Field-Employee set in `showEmployeeHome`.
 
 - ED is the only role with override authority and view-as switching (`window._viewAsRole`). `currentRole` is the *effective* role; `_realRole` is the actual authenticated role.
 - Legacy strings (`employee`, `staff`, `hm`, `manager`) are normalized via `CLFN_PERMS.normalizeRole()` — don't hand-write fallbacks for them in new code.
