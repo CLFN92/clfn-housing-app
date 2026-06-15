@@ -748,6 +748,24 @@ function openSowModal(unitId, projectNumber) {
 // ── SOW completion state control ──────────────────────────────────────────
 // Applies read-only lock when a SOW is completed AND the viewer isn't the ED.
 // Also toggles the Mark Complete / Reopen buttons based on status + permissions.
+// True when a SOW is approved for RFQ purposes — completed, ED-approved, or
+// HM-approved when ED isn't required (cost within the HM limit). Mirrors the
+// renos approval table's 'approved' state. Once approved, requesting quotes is
+// moot, so RFQ entry points hide.
+function _sowIsApproved(sow){
+  if(!sow) return false;
+  var st = sow.approval_status || '';
+  if(st === 'completed' || st === 'ed_approved') return true;
+  if(st === 'hm_approved'){
+    var cost = (typeof sow.amount === 'number' ? sow.amount
+              : parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))) || 0;
+    var hmLimit = (typeof _getHmLimit === 'function') ? _getHmLimit() : 25000;
+    return cost <= hmLimit;
+  }
+  return false;
+}
+window._sowIsApproved = _sowIsApproved;
+
 // Toggle the field-employee dropdown (in-house) vs the contractor row based on
 // the selected assignment team. Field Employees never see the contractor row.
 function sowAssignTeamChanged(){
@@ -888,6 +906,7 @@ function _applySowModalLock(sow){
   if (rfqBtn) {
     var _rfqRole = window.currentRole || '';
     var _rfqShow = !!sow && !sow.archived
+      && !_sowIsApproved(sow)
       && (typeof moduleOn !== 'function' || moduleOn('rfq'))
       && (
         (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)) ||
@@ -1154,7 +1173,7 @@ function udpRenderSowTable(unitId){
         +editBtn
         +archiveBtn
         +'<button onclick="udpPrintWorkOrder(\''+esc(unitId)+'\',\''+pn+'\')" title="Print work order" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700;font-family:DM Sans,sans-serif;">Work Order</button>'
-        +((typeof moduleOn !== 'function' || moduleOn('rfq')) && typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)
+        +((typeof moduleOn !== 'function' || moduleOn('rfq')) && !_sowIsApproved(sow) && typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)
           ? '<a href="rfq.html?unit='+esc(unitId)+'&sow='+esc(pn)+'" style="margin-left:4px;background:#1d4ed8;border:none;color:#fff;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;display:inline-block;">RFQ</a>'
           : '')
       +'</td>'
