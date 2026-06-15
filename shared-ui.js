@@ -797,6 +797,15 @@ function applyNationOverrides() {
         {}, window.NATION_CONFIG.socials || {}, parsed.socials
       );
     }
+    // Auto sign-out window — drive the idle-logout timer from saved config.
+    // Default (15 min) stays in shared-auth.js; this overrides it when set and
+    // re-arms the watcher so the change applies immediately (not just next login).
+    var idleMin = parseInt(parsed.idle_timeout_minutes, 10);
+    if (idleMin >= 1 && idleMin <= 1440) {
+      window.NATION_CONFIG.idle_timeout_minutes = idleMin;
+      window.IDLE_TIMEOUT_MS = idleMin * 60 * 1000;
+      if (typeof startIdleTimer === 'function') { try { startIdleTimer(); } catch(e) {} }
+    }
     applyBrandingToHeader();
   } catch (e) {
     console.warn('[applyNationOverrides] failed:', e);
