@@ -2171,6 +2171,9 @@
       var p = _ticEl('tic_panel_' + n); if(p) p.innerHTML = '';
     });
     _ticEl('tic_loading').style.display = '';
+    // Read-only roles (Field Employee) get a greyed, non-editable card. Saves are
+    // already blocked in JS; this class drives the visual disabled state in CSS.
+    modal.classList.toggle('tic-readonly', _ticReadOnlyRole());
     _ticSwitchTab('overview');
     _ticOpen();
 

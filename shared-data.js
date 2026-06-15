@@ -4023,6 +4023,27 @@ function renderWorklist() {
     sowItems = sowItems.slice(0, 8);
   }
 
+  // ── 2b. Field Employee: approved work orders to execute ──────────────────
+  // Maintenance crew queue — SOWs that HM/ED have approved and that aren't yet
+  // completed, i.e. the work the crew can go do now and then mark complete.
+  var fieldSowItems = [];
+  if (role === 'field_employee') {
+    var fsCache = window._sowCache || {};
+    var fsUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
+    Object.keys(fsCache).forEach(function(uid) {
+      var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
+      list.forEach(function(sow) {
+        if (!sow || sow.archived) return;
+        var status = sow.approval_status || '';
+        if (status !== 'hm_approved' && status !== 'ed_approved') return; // approved, not completed
+        var u = fsUnits.find(function(x){ return x && x.id === uid; });
+        var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : uid;
+        fieldSowItems.push({ uid: uid, pn: sow.project_number || '', addr: addr, status: status });
+      });
+    });
+    fieldSowItems = fieldSowItems.slice(0, 12);
+  }
+
   // ── 3. RFQs needing action ───────────────────────────────────────────────
   var rfqItems = [];
   if (isManagement && (typeof moduleOn !== 'function' || moduleOn('rfq'))) {
@@ -4265,6 +4286,27 @@ function renderWorklist() {
         + '</div>';
     }).join('');
     html += sectionWrap('🔨', 'Renovations Waiting Approval', sowItems.length, 'renos.html', sowRows, 0);
+  }
+
+  // Field Employee — approved work orders to complete
+  if (fieldSowItems.length) {
+    var fsRows = fieldSowItems.map(function(s) {
+      var openCall = 'if(typeof openSowModal===\'function\'){openSowModal(\''
+                   + escapeHtml(s.uid).replace(/'/g, "\\'") + '\');}'
+                   + 'else{window.location.href=\'renos.html?sow=' + encodeURIComponent(s.uid) + '\';}';
+      var statLbl = (s.status === 'ed_approved') ? 'Approved — Ready to Work' : 'HM Approved — Ready to Work';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid var(--border);background:var(--surface);" '
+        + 'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'var(--surface)\'">'
+        + '<div onclick="' + openCall + '" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;">'
+        +   '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(s.addr) + '</span>'
+        +   '<span style="font-size:11px;color:var(--muted);width:120px;flex-shrink:0;">' + escapeHtml(s.pn || '—') + '</span>'
+        +   '<span style="font-size:11px;color:var(--muted);width:180px;flex-shrink:0;">' + escapeHtml(statLbl) + '</span>'
+        + '</div>'
+        + '<button onclick="' + openCall + '" style="flex-shrink:0;background:var(--yellow);color:var(--dark);border:none;border-radius:6px;'
+        +   'padding:5px 12px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;">Open →</button>'
+        + '</div>';
+    }).join('');
+    html += sectionWrap('🔧', 'Work Orders to Complete', fieldSowItems.length, 'renos.html', fsRows, 0);
   }
 
   // RFQs
