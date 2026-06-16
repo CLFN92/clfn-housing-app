@@ -360,7 +360,15 @@ needs its own Azure account; we host the one SPA and route by subdomain.
 - Remaining N0 polish: finish replacing hardcoded `'CLFN'`/`'Constance Lake…'`
   strings with `NATION_CONFIG` (Phase 2/3 carryover).
 
-### N1 — Repeatable provisioning  ⬜
+### N1 — Repeatable provisioning  ⏳ (scaffold shipped)
+Framework shipped under `supabase/`: `config.toml`, `seed.sql` (light — storage
+bucket; settings use in-code defaults), `migrations/README.md` (schema-capture
+process), and `README.md` (the full per-nation provisioning runbook incl.
+per-nation email provider). **Remaining (needs the live DB + Supabase CLI, run
+by the user):** `supabase db dump` CLFN → commit `migrations/0001_init_schema.sql`,
+then adopt "every schema change is a new numbered migration." Also pending:
+provider-abstraction in `send-notification` so non-M365 nations can email.
+
 The hand-run SQL-editor workflow breaks at nation #2. Make a nation's backend a
 **versioned, reproducible bundle**:
 - **Versioned schema** via Supabase CLI migrations (numbered SQL) — single source

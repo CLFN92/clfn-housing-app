@@ -1,0 +1,20 @@
+# Supabase CLI project config — multi-nation provisioning.
+# https://supabase.com/docs/guides/cli/config
+#
+# This folder versions the database schema so every nation's Supabase project is
+# provisioned identically (Phase N1 in PLAN.md). `project_id` is whichever
+# project this working copy is currently LINKED to (`supabase link --project-ref
+# <ref>`). When provisioning a new nation you link to *that* nation's project ref
+# before `supabase db push`. The value below is the lead nation (CLFN).
+
+project_id = "fkhzrbalumzeripzolph"
+
+[db]
+# Supabase default. If a `supabase db dump` reports a different server version,
+# update this to match so local + remote agree.
+major_version = 15
+
+[storage]
+# The app stores tenant files, photos, contractor docs and SOW attachments here.
+# Created per nation by supabase/seed.sql (see that file).
+enabled = true
