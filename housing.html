@@ -99,20 +99,25 @@
       <div class="kpi-value" id="kpi_vacant">—</div>
       <div class="kpi-meta">Available for assignment</div>
     </div>
-    <div class="kpi-card kpi-clickable" data-kpi="new-apps" onclick="showHousingKpiDrilldown('new_apps')" role="button" tabindex="0">
-      <div class="kpi-label">New Applications</div>
-      <div class="kpi-value" id="kpi_new_apps">—</div>
-      <div class="kpi-meta">Seeking a new unit</div>
-    </div>
-    <div class="kpi-card kpi-clickable" data-kpi="file-updates" onclick="showHousingKpiDrilldown('file_updates')" role="button" tabindex="0">
-      <div class="kpi-label">File Updates</div>
-      <div class="kpi-value" id="kpi_file_updates">—</div>
-      <div class="kpi-meta">Existing tenant · file update</div>
-    </div>
-    <div class="kpi-card kpi-clickable" data-kpi="house-requests" onclick="showHousingKpiDrilldown('house_requests')" role="button" tabindex="0">
-      <div class="kpi-label">House Requests</div>
-      <div class="kpi-value" id="kpi_house_requests">—</div>
-      <div class="kpi-meta">Existing tenant · transfer</div>
+    <div class="kpi-card" data-kpi="app-types" style="display:flex;flex-direction:column;">
+      <div class="kpi-label">Applications by Type</div>
+      <div style="display:flex;flex-direction:column;margin-top:6px;">
+        <div onclick="showHousingKpiDrilldown('new_apps')" role="button" tabindex="0" title="Seeking a new unit"
+             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:12px;color:var(--text);">New Applications</span>
+          <span style="font-size:17px;font-weight:800;color:var(--text);" id="kpi_new_apps">—</span>
+        </div>
+        <div onclick="showHousingKpiDrilldown('file_updates')" role="button" tabindex="0" title="Existing tenant · file update"
+             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:12px;color:var(--text);">File Update</span>
+          <span style="font-size:17px;font-weight:800;color:var(--text);" id="kpi_file_updates">—</span>
+        </div>
+        <div onclick="showHousingKpiDrilldown('house_requests')" role="button" tabindex="0" title="Existing tenant · transfer"
+             style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:6px 0;">
+          <span style="font-size:12px;color:var(--text);">Existing House Request</span>
+          <span style="font-size:17px;font-weight:800;color:var(--text);" id="kpi_house_requests">—</span>
+        </div>
+      </div>
     </div>
   </div>
 
