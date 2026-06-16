@@ -304,6 +304,41 @@ finance.html don't need to change.
 
 ---
 
+## Phase G — SMS / Text Notifications  ⬜
+
+Extends the existing email pipeline (Edge Function → Microsoft Graph) with an SMS
+channel so workflow notifications (starting with **work-order-assigned to a field
+employee**, mirroring `sow_assigned_to_field_employee`) can also go out as a text.
+Email infrastructure is done; this is a **net-new integration**, not a tweak.
+
+### Why it's a separate project (not a quick add)
+- **Microsoft Graph cannot send SMS** — Graph is email-only. A different provider is required.
+- New **Edge Function** (`send-sms`) — the email function can't be reused; SMS is a different API/auth.
+- **Provider + cost** — pick one of:
+  - **Azure Communication Services (ACS) SMS** — same cloud as the rest of the stack, but needs a provisioned toll-free/short-code number (US/CA registration/verification, can take days–weeks) and per-message billing.
+  - **Twilio** — fastest to stand up; per-message + per-number cost; separate vendor.
+- **Phone numbers on staff records** — add a `mobile`/`sms` field to the `staff` table + the Settings → Users add/edit form. (Field employees need a mobile on file.)
+- **Consent / CASL** — Canada's anti-spam law wants documented consent. Transactional work assignments to staff are usually covered by an employment agreement, but it should be a deliberate **per-person opt-in** flag on the staff record, and texts should be transactional only (no marketing).
+- **Delivery + audit** — log each send (success/failure) to `housing_audit_log`; surface failures (no silent drops). Handle provider error codes, opt-outs (STOP keyword), and rate limits.
+
+### Design sketch (when picked up)
+- **Channel registry**: extend the notification model so an event can target `email`, `sms`, or both. Add a per-event SMS toggle + a short SMS body template (160-char-aware; SMS is plain text, no HTML) in **Settings → Notifications**.
+- **Recipient resolution**: SMS recipient = the assignee's `mobile` (for `sow_assigned_to_field_employee`); reuse the existing recipient resolvers, swapping email→mobile.
+- **Edge Function `send-sms`**: verifies caller JWT, sends via the chosen provider (secrets in Project Settings → Edge Functions), writes an audit row via service_role. ASCII-only source rule still applies.
+- **Client wrapper**: `window.sendSms(opts)` mirroring `sendNotification`; per-event helpers call it alongside (or instead of) the email helper based on the channel config.
+- **Opt-out**: store STOP/opt-out state on the staff record; the function skips opted-out numbers.
+
+### Open decisions before building
+1. Provider: **ACS** (same cloud, slower number provisioning) vs **Twilio** (fastest, separate vendor)?
+2. Scope of v1: just the **work-order-assigned** event, or all workflow events with a per-event SMS toggle?
+3. Who pays / budget for per-message cost, and expected monthly volume?
+4. Consent capture: opt-in checkbox on the staff/Users form + policy text?
+
+### Effort / risk
+Medium-large. The engineering is moderate; the **number provisioning, billing, and consent/compliance** are the long poles. No impact on existing email until enabled.
+
+---
+
 ## Rollback points
 - Pre-refactor snapshots (Phase C)
 
