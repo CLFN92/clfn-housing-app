@@ -1022,12 +1022,6 @@ function _renderLandingKpis(){
     return u && !u.archived && u.status === 'vacant';
   }).length;
 
-  var awaitingMatch = apps.filter(function(a){
-    if(!a || a.archived) return false;
-    var approved = a.status === STATUS.ED_APPROVED || a.status === STATUS.MGR_APPROVED;
-    return approved && !a.assignedUnit;
-  }).length;
-
   // Application-type breakdown (active = non-archived, not declined):
   //   new_housing      → New Applications (seeking a new unit)
   //   existing_tenant  → File Updates
@@ -1044,7 +1038,6 @@ function _renderLandingKpis(){
 
   setKpi('kpi_open_apps',       openApps);
   setKpi('kpi_vacant',          vacant);
-  setKpi('kpi_awaiting_match',  awaitingMatch);
   setKpi('kpi_new_apps',        newApps);
   setKpi('kpi_file_updates',    fileUpdates);
   setKpi('kpi_house_requests',  houseRequests);
@@ -1118,26 +1111,6 @@ function showHousingKpiDrilldown(type) {
             +'<td class="std-cell-muted">'+escapeHtml(u.classification||'—')+'</td>'
             +'</tr>';
         }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">No vacant units.</td></tr>')
-      + '</tbody></table>';
-
-  } else if (type === 'awaiting') {
-    title = 'Awaiting Match — Approved, No Unit';
-    var rows = apps.filter(function(a){
-      if (!a || a.archived) return false;
-      return (a.status==='ed_approved'||a.status==='mgr_approved') && !a.assignedUnit;
-    }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
-    html = '<table class="tbl"><thead><tr>'
-      + '<th>Applicant</th><th>Tier</th><th class="std-cell-right">Score</th><th>Status</th><th>Waiting</th>'
-      + '</tr></thead><tbody>'
-      + (rows.length ? rows.map(function(a){
-          return appRow(a,
-            '<td style="font-weight:600;">'+escapeHtml((a.fn||'')+' '+(a.ln||''))+'</td>'
-            +'<td>'+tierPill(a.tier_v2||a.tier)+'</td>'
-            +'<td class="std-cell-right" style="font-weight:700;">'+(a.score||0)+'</td>'
-            +'<td>'+escapeHtml(STATUS_LABELS[a.status]||a.status||'')+'</td>'
-            +'<td class="std-cell-muted">'+daysSince(a.appDate)+'</td>'
-          );
-        }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No applications awaiting match.</td></tr>')
       + '</tbody></table>';
 
   } else if (type === 'new_apps' || type === 'file_updates' || type === 'house_requests') {
