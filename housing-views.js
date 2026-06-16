@@ -1032,10 +1032,27 @@ function _renderLandingKpis(){
     return approved && !a.assignedUnit;
   }).length;
 
+  // Application-type breakdown (active = non-archived, not declined):
+  //   new_housing      → New Applications (seeking a new unit)
+  //   existing_tenant  → File Updates
+  //   transfer_request → House Requests (existing tenant transfer)
+  function _activeOfType(pred){
+    return apps.filter(function(a){
+      if(!a || a.archived || a.status === 'declined') return false;
+      return pred(a.appType || 'new_housing');
+    }).length;
+  }
+  var newApps       = _activeOfType(function(t){ return t !== 'existing_tenant' && t !== 'transfer_request'; });
+  var fileUpdates   = _activeOfType(function(t){ return t === 'existing_tenant'; });
+  var houseRequests = _activeOfType(function(t){ return t === 'transfer_request'; });
+
   setKpi('kpi_open_apps',       openApps);
   setKpi('kpi_critical',        critical);
   setKpi('kpi_vacant',          vacant);
   setKpi('kpi_awaiting_match',  awaitingMatch);
+  setKpi('kpi_new_apps',        newApps);
+  setKpi('kpi_file_updates',    fileUpdates);
+  setKpi('kpi_house_requests',  houseRequests);
 }
 
 function showHousingKpiDrilldown(type) {
@@ -1146,6 +1163,31 @@ function showHousingKpiDrilldown(type) {
             +'<td class="std-cell-muted">'+daysSince(a.appDate)+'</td>'
           );
         }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No applications awaiting match.</td></tr>')
+      + '</tbody></table>';
+
+  } else if (type === 'new_apps' || type === 'file_updates' || type === 'house_requests') {
+    var _typeCfg = {
+      new_apps:       { title:'New Applications',                          pred:function(t){ return t!=='existing_tenant' && t!=='transfer_request'; }, empty:'No active new applications.' },
+      file_updates:   { title:'File Updates — Existing Tenant',            pred:function(t){ return t==='existing_tenant'; },   empty:'No active file updates.' },
+      house_requests: { title:'House Requests — Existing Tenant Transfer', pred:function(t){ return t==='transfer_request'; },  empty:'No active house requests.' }
+    }[type];
+    title = _typeCfg.title;
+    var rows = apps.filter(function(a){
+      if (!a || a.archived || a.status==='declined') return false;
+      return _typeCfg.pred(a.appType || 'new_housing');
+    }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
+    html = '<table class="tbl"><thead><tr>'
+      + '<th>Applicant</th><th>Status</th><th>Tier</th><th class="std-cell-right">Score</th><th>Waiting</th>'
+      + '</tr></thead><tbody>'
+      + (rows.length ? rows.map(function(a){
+          return appRow(a,
+            '<td style="font-weight:600;">'+escapeHtml((a.fn||'')+' '+(a.ln||''))+'</td>'
+            +'<td>'+escapeHtml(STATUS_LABELS[a.status]||a.status||'')+'</td>'
+            +'<td>'+tierPill(a.tier_v2||a.tier)+'</td>'
+            +'<td class="std-cell-right" style="font-weight:700;">'+(a.score||0)+'</td>'
+            +'<td class="std-cell-muted">'+daysSince(a.appDate)+'</td>'
+          );
+        }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">'+_typeCfg.empty+'</td></tr>')
       + '</tbody></table>';
   }
 
