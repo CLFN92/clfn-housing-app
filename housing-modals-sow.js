@@ -241,22 +241,17 @@ function _buildSowModalHTML() {
               '<div class="f"><label>Current Tenant Name</label><input id="sow_tenant_name" type="text" placeholder="Full name of tenant"/></div>' +
               '<div class="f"><label>Prepared By (Staff)</label><input id="sow_prepared_by" type="text" placeholder="Staff name"/></div>' +
               '<div class="f"><label>PO Number <span style="font-size:10px;font-weight:400;color:var(--muted);">(from accounting)</span></label><input id="sow_po_number" type="text" placeholder="e.g. PO-2026-0042"/></div>' +
-              '<div class="f sow-assign-row"><label>Assigned To</label>' +
-                '<select id="sow_assigned_team" onchange="sowAssignTeamChanged()">' +
-                  '<option value="">— Select —</option>' +
-                  '<option value="in_house" id="sow_assign_inhouse_opt">In-house Crew</option>' +
-                  '<option value="contractor">External Contractor</option>' +
-                '</select>' +
-                '<select id="sow_assigned_to" style="margin-top:6px;display:none;">' +
-                  '<option value="">— Select field employee —</option>' +
-                '</select>' +
-              '</div>' +
-              '<div class="f sow-ct-row"><label>Contractor (if assigned)</label>' +
-                '<input id="sow_contractor" type="text" placeholder="Search contractors…" autocomplete="off"' +
+              '<div class="f sow-ct-row"><label>Assigned To</label>' +
+                '<input id="sow_contractor" type="text" placeholder="Search — your Housing Dept or a contractor…" autocomplete="off"' +
                   ' oninput="sowContractorSearch(this.value)" onfocus="sowContractorSearch(\'\')"' +
                   ' onblur="setTimeout(function(){var d=document.getElementById(\'sow_ct_dropdown\');if(d)d.style.display=\'none\';},180)"/>' +
                 '<input type="hidden" id="sow_contractor_id"/>' +
+                '<input type="hidden" id="sow_assigned_team"/>' +
                 '<div id="sow_ct_dropdown"></div>' +
+                // Employee sub-menu — revealed when the in-house Housing Dept is picked.
+                '<select id="sow_assigned_to" style="margin-top:6px;display:none;">' +
+                  '<option value="">— Select field employee —</option>' +
+                '</select>' +
               '</div>' +
             '</div>' +
           '</div>' +
@@ -766,17 +761,6 @@ function _sowIsApproved(sow){
 }
 window._sowIsApproved = _sowIsApproved;
 
-// Toggle the field-employee dropdown (in-house) vs the contractor row based on
-// the selected assignment team. Field Employees never see the contractor row.
-function sowAssignTeamChanged(){
-  var team  = (document.getElementById('sow_assigned_team')||{}).value || '';
-  var feSel = document.getElementById('sow_assigned_to');
-  var ctRow = document.querySelector('.sow-ct-row');
-  var isField = (window.currentRole === 'field_employee');
-  if(feSel) feSel.style.display = (team === 'in_house') ? '' : 'none';
-  if(ctRow) ctRow.style.display = (team === 'contractor' && !isField) ? '' : 'none';
-}
-window.sowAssignTeamChanged = sowAssignTeamChanged;
 
 // Fill the "Assigned To" field-employee dropdown from active staff whose role is
 // field_employee. Uses _staffCache when present, otherwise fetches once and
@@ -828,32 +812,39 @@ function _applySowModalLock(sow){
   var banner = document.getElementById('sow_readonly_banner');
   if(banner) banner.style.display = readOnly ? 'block' : 'none';
 
-  // ── Work-order assignment (in-house crew vs contractor) ───────────────────
+  // ── Work-order assignment (in-house Housing Dept vs contractor) ───────────
+  // The "Assigned To" field is one picker (sow_contractor): the search lists the
+  // nation's own Housing Department first, then external contractors. Picking the
+  // Housing Dept reveals the field-employee sub-menu.
   var _aRoleAssign = window.currentRole || '';
   var _canAssign = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('assignWorkOrder', _aRoleAssign);
-  var _teamSel   = document.getElementById('sow_assigned_team');
-  var _feSel     = document.getElementById('sow_assigned_to');
-
-  // Nation-driven in-house label — no hardcoded nation name.
-  var _inhouseOpt = document.getElementById('sow_assign_inhouse_opt');
-  if(_inhouseOpt){
-    var _natShort = (window.NATION_CONFIG && (NATION_CONFIG.short || NATION_CONFIG.display_name)) || '';
-    _inhouseOpt.textContent = (_natShort ? _natShort + ' Housing' : 'In-house') + ' (crew)';
-  }
+  var _ctInp   = document.getElementById('sow_contractor');
+  var _ctHid   = document.getElementById('sow_contractor_id');
+  var _teamHid = document.getElementById('sow_assigned_team');
+  var _feSel   = document.getElementById('sow_assigned_to');
 
   // Load saved assignment; infer 'contractor' for legacy SOWs with a contractor.
   var _savedTeam = (sow && (sow.assignedTeam || sow.assigned_team)) || '';
   var _savedTo   = (sow && (sow.assignedTo   || sow.assigned_to))   || '';
-  if(!_savedTeam && sow && (sow.contractorId || sow.contractor)) _savedTeam = 'contractor';
-  if(_teamSel) _teamSel.value = _savedTeam;
-  _sowPopulateFieldEmployees(_savedTo);
+  var _savedCtr  = (sow && sow.contractor) || '';
+  var _savedCtrId= (sow && (sow.contractorId || sow.contractor_id)) || '';
+  if(!_savedTeam && (_savedCtrId || _savedCtr)) _savedTeam = 'contractor';
 
-  // Only roles with assignWorkOrder authority can edit the assignment.
-  if(_teamSel) _teamSel.disabled = !_canAssign || readOnly;
-  if(_feSel)   _feSel.disabled   = !_canAssign || readOnly;
+  if(_teamHid) _teamHid.value = _savedTeam;
+  if(_savedTeam === 'in_house'){
+    if(_ctInp) _ctInp.value = (typeof sowInHouseLabel === 'function') ? sowInHouseLabel() : 'Housing Department';
+    if(_ctHid) _ctHid.value = '';
+    if(typeof _sowPopulateFieldEmployees === 'function') _sowPopulateFieldEmployees(_savedTo);
+    if(_feSel) _feSel.style.display = '';
+  } else {
+    if(_ctInp) _ctInp.value = _savedCtr || '';
+    if(_ctHid) _ctHid.value = _savedCtrId || '';
+    if(_feSel) _feSel.style.display = 'none';
+  }
 
-  // Show/hide field-employee dropdown vs contractor row based on team.
-  sowAssignTeamChanged();
+  // Only roles with assignWorkOrder authority can change the assignment.
+  if(_ctInp) _ctInp.disabled = !_canAssign || readOnly;
+  if(_feSel) _feSel.disabled = !_canAssign || readOnly;
 
   // Inline Approve button — shown when the current user has approval authority
   // and the SOW is in a state that requires their specific action.

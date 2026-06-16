@@ -5376,28 +5376,48 @@ function sowAddNewContractor() {
   // the post-save re-render of the contractors list view.
   window._sowAfterContractorSave = true;
 }
+// Nation-driven label for the in-house Housing Department option. No hardcoded
+// nation name — derived from NATION_CONFIG (Settings → Nation).
+function sowInHouseLabel() {
+  var s = (window.NATION_CONFIG && (NATION_CONFIG.short || NATION_CONFIG.display_name)) || '';
+  return (s ? s + ' Housing Department' : 'Housing Department');
+}
+window.sowInHouseLabel = sowInHouseLabel;
+
 function sowContractorSearch(q) {
   var dd = document.getElementById('sow_ct_dropdown');
   if(!dd) return;
-  var contractors = [];
   var contractors = window._contractors || [];
   var term = (q||'').toLowerCase().trim();
   var matches = term
     ? contractors.filter(function(c){ return (c.name||'').toLowerCase().includes(term)||(c.trade||'').toLowerCase().includes(term); })
     : contractors;
 
-  var rows = matches.map(function(c){
+  var rows = [];
+  // In-house Housing Department always offered first (it's the nation's own crew).
+  // Shown unless the search term clearly doesn't match "housing"/the nation name.
+  var inh = sowInHouseLabel();
+  if(!term || inh.toLowerCase().indexOf(term) !== -1 || 'housing department in-house crew'.indexOf(term) !== -1){
+    rows.push('<div data-ct-inhouse="1" onmousedown="sowSelectInHouse(this)" '
+      +'style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);background:#fffdf2;" '
+      +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'#fffdf2\'">'
+      +'<div style="font-weight:700;">&#127968; '+inh+'</div>'
+      +'<div class="js-lbl-sm">In-house crew — assign a field employee</div>'
+      +'</div>');
+  }
+
+  rows = rows.concat(matches.map(function(c){
     return '<div data-ct-name="'+c.name+'" data-ct-id="'+(c.id||'')+'" onmousedown="sowSelectContractor(this)" '
       +'style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" '
       +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
       +'<div style="font-weight:600;">'+c.name+'</div>'
       +(c.trade?'<div class="js-lbl-sm">'+c.trade+'</div>':'')
       +'</div>';
-  });
+  }));
 
-  if(!matches.length) {
+  if(!matches.length && term) {
     rows.push('<div style="padding:9px 14px;font-size:12px;color:var(--muted);">'
-      +(term?'No contractor matching "'+q+'" found.':'No contractors added yet.')+'</div>');
+      +'No contractor matching "'+q+'" found.</div>');
   }
   rows.push('<div onmousedown="sowAddNewContractor()" style="padding:9px 14px;cursor:pointer;font-size:12px;font-weight:700;color:var(--yellow);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;" '
     +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
@@ -5413,11 +5433,34 @@ function sowSelectContractor(el) {
   var id   = el.getAttribute('data-ct-id');
   var inp  = document.getElementById('sow_contractor');
   var hid  = document.getElementById('sow_contractor_id');
+  var team = document.getElementById('sow_assigned_team');
+  var feSel= document.getElementById('sow_assigned_to');
   if(inp) inp.value = name;
   if(hid) hid.value = id;
+  if(team) team.value = 'contractor';
+  // External contractor — no field-employee sub-menu.
+  if(feSel){ feSel.value = ''; feSel.style.display = 'none'; }
   var dd = document.getElementById('sow_ct_dropdown');
   if(dd) dd.style.display = 'none';
 }
+// In-house Housing Department picked — flag the work as in-house and reveal the
+// field-employee sub-menu so a key person can be assigned.
+function sowSelectInHouse(el) {
+  var inp  = document.getElementById('sow_contractor');
+  var hid  = document.getElementById('sow_contractor_id');
+  var team = document.getElementById('sow_assigned_team');
+  var feSel= document.getElementById('sow_assigned_to');
+  if(inp) inp.value = (typeof sowInHouseLabel === 'function') ? sowInHouseLabel() : 'Housing Department';
+  if(hid) hid.value = '';
+  if(team) team.value = 'in_house';
+  var dd = document.getElementById('sow_ct_dropdown');
+  if(dd) dd.style.display = 'none';
+  if(typeof _sowPopulateFieldEmployees === 'function') {
+    _sowPopulateFieldEmployees((feSel && feSel.value) || '');
+  }
+  if(feSel) feSel.style.display = '';
+}
+window.sowSelectInHouse = sowSelectInHouse;
 function triggerPrint() {
   if(!_printPanelDoc) return;
   // Use a hidden iframe — no popup blocker, panel stays visible
