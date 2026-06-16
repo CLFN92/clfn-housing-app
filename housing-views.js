@@ -1018,10 +1018,6 @@ function _renderLandingKpis(){
         || a.status === STATUS.MGR_APPROVED;
   }).length;
 
-  var critical = apps.filter(function(a){
-    return a && !a.archived && (a.tier === 'Critical Priority' || a.tier_v2 === 'Critical Priority');
-  }).length;
-
   var vacant = units.filter(function(u){
     return u && !u.archived && u.status === 'vacant';
   }).length;
@@ -1047,7 +1043,6 @@ function _renderLandingKpis(){
   var houseRequests = _activeOfType(function(t){ return t === 'transfer_request'; });
 
   setKpi('kpi_open_apps',       openApps);
-  setKpi('kpi_critical',        critical);
   setKpi('kpi_vacant',          vacant);
   setKpi('kpi_awaiting_match',  awaitingMatch);
   setKpi('kpi_new_apps',        newApps);
@@ -1105,26 +1100,6 @@ function showHousingKpiDrilldown(type) {
             +'<td class="std-cell-muted">'+daysSince(a.appDate)+'</td>'
           );
         }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No open applications.</td></tr>')
-      + '</tbody></table>';
-
-  } else if (type === 'critical') {
-    title = 'Critical Priority Applications';
-    var rows = apps.filter(function(a){
-      return a && !a.archived && (a.tier==='Critical Priority' || a.tier_v2==='Critical Priority');
-    }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
-    html = '<table class="tbl"><thead><tr>'
-      + '<th>Applicant</th><th class="std-cell-right">Score</th><th>Status</th><th>Urgent Need</th><th>Waiting</th>'
-      + '</tr></thead><tbody>'
-      + (rows.length ? rows.map(function(a){
-          var urgent = URGENT_LABELS[a.urgentNeed] || (a.urgentNeed||'').replace(/_/g,' ') || '—';
-          return appRow(a,
-            '<td style="font-weight:600;">'+escapeHtml((a.fn||'')+' '+(a.ln||''))+'</td>'
-            +'<td class="std-cell-right amt-debit" style="font-weight:700;">'+(a.score||0)+'</td>'
-            +'<td>'+escapeHtml(STATUS_LABELS[a.status]||a.status||'')+'</td>'
-            +'<td>'+escapeHtml(urgent)+'</td>'
-            +'<td class="std-cell-muted">'+daysSince(a.appDate)+'</td>'
-          );
-        }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No critical priority applications.</td></tr>')
       + '</tbody></table>';
 
   } else if (type === 'vacant') {
