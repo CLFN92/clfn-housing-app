@@ -1,30 +1,23 @@
 /* ============================================================================
  * reno-questionnaire.js — Dynamic Renovation / Maintenance Questionnaire
  *
- * A guided, branching wizard that staff use to capture a complete scope of work
- * without missing detail. Flow per issue:
- *   Unit → Trade → Room → Component → Issue → Severity → Details
- * Every question is button-driven with a standard option set plus "Other…"
- * (free text). Multiple issues can be added, then an overall Notes section.
- * On submit it opens the standard SOW (Maintenance Request) modal pre-populated
- * — each captured issue becomes a SOW work item (category = trade).
+ * A guided, branching wizard staff use to capture a complete scope of work.
+ * Flow per issue:  Unit → Trade → Room → Component → Issue(s) → Severity → Details
+ * Every question is button-driven from a data tree with an auto "Other…" free
+ * text option, a Back button on every step, and multi-select at the Issue step
+ * (e.g. a toilet that is both "Leaking at base" AND "Will not flush").
+ * Multiple issues accumulate, then an overall Notes step. On submit it opens the
+ * standard SOW (Maintenance Request) modal pre-populated (one work item per
+ * issue) and can email a copy of the request to the tenant — entering and
+ * saving the tenant's email to their record when none is on file.
  *
- * Public entry points:
- *   window.openRenoQuestionnaire(prefillUnitId?)
- *   window.closeRenoQuestionnaire()
- *
- * Self-contained: injects its own modal into <body>, uses event delegation
- * (no inline onclick) so option values with quotes/apostrophes are safe.
- * Depends on globals already loaded on housing.html: housingUnits[],
- * openSowModal(), addSowItem(), recalcSowTotal(), NATION_CONFIG.
+ * Public:  window.openRenoQuestionnaire(prefillUnitId?) / window.closeRenoQuestionnaire()
+ * Self-contained IIFE; one delegated click handler (no inline onclick).
  * ========================================================================== */
 (function(){
   'use strict';
 
-  // ── Question tree ──────────────────────────────────────────────────────────
-  // trades[].cat MUST match a value in SOW_CATEGORIES (housing-modals-sow.js)
-  // so the generated SOW items map onto a real category. Add freely — the UI is
-  // fully data-driven; "Other" is appended to every option list automatically.
+  // ── Question tree (trades[].cat MUST match SOW_CATEGORIES) ─────────────────
   var ROOMS = ['Kitchen','Bathroom','Bedroom','Living Room','Hallway / Stairs',
                'Basement','Laundry','Utility / Mechanical','Exterior','Whole Unit'];
 
@@ -69,10 +62,10 @@
       { label:'Heat Pump / AC',    issues:['No heat','No cooling','Noisy','Leaking','Not turning on'] }
     ]},
     { cat:'Flooring', icon:'🪵', components:[
-      { label:'Subfloor',     issues:['Soft / rotted','Squeaking','Uneven / sagging','Water damage'] },
+      { label:'Subfloor',      issues:['Soft / rotted','Squeaking','Uneven / sagging','Water damage'] },
       { label:'Finished Floor',issues:['Damaged / cracked','Lifting / peeling','Water damage','Worn out','Buckling'] },
-      { label:'Carpet',       issues:['Stained','Torn / worn','Odour','Loose / tripping'] },
-      { label:'Tile',         issues:['Cracked','Loose','Grout failing'] }
+      { label:'Carpet',        issues:['Stained','Torn / worn','Odour','Loose / tripping'] },
+      { label:'Tile',          issues:['Cracked','Loose','Grout failing'] }
     ]},
     { cat:'Interior Walls / Drywall', icon:'🧱', components:[
       { label:'Drywall',          issues:['Hole','Crack','Water damage','Mould','Nail pops'] },
@@ -130,30 +123,33 @@
     ]}
   ];
 
+  // step → previous step (drives the universal Back button)
+  var BACK = { trade:'unit', room:'trade', component:'room', issue:'component', severity:'issue', details:'severity', review:'trade' };
+
   // ── State ──────────────────────────────────────────────────────────────────
   var S = null;
-  function _reset(unitId, unitLabel){
+  function _freshDraft(){ return { trade:null, room:'', component:'', issues:[], severity:'', details:'' }; }
+  function _reset(unitId, unitLabel, tenantName){
     S = {
-      unitId: unitId || '', unitLabel: unitLabel || '',
+      unitId: unitId || '', unitLabel: unitLabel || '', tenantName: tenantName || '',
       step: unitId ? 'trade' : 'unit',
-      draft: { trade:null, room:'', component:'', issue:'', severity:'', details:'' },
+      draft: _freshDraft(),
       issues: [],
-      notes: ''
+      notes: '',
+      emailTenant: false, tenantEmail: '', tenantEmailOnFile: false, tenantResolved: false
     };
   }
 
-  // ── Modal shell (injected once) ─────────────────────────────────────────────
+  // ── Modal shell ─────────────────────────────────────────────────────────────
   function _ensure(){
     if(document.getElementById('renoQModal')) return;
     var ov = document.createElement('div');
-    ov.id = 'renoQModal';
-    ov.className = 'modal-ov';
-    ov.style.display = 'none';
+    ov.id = 'renoQModal'; ov.className = 'modal-ov'; ov.style.display = 'none';
     ov.innerHTML =
       '<div class="modal" style="max-width:760px;width:96%;max-height:92vh;display:flex;flex-direction:column;">'
       + '<div class="modal-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'
       +   '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);">Renovation Questionnaire</div>'
-      +   '<h2 id="rq_title" style="margin:2px 0 0;">New Maintenance Scope</h2>'
+      +   '<h2 style="margin:2px 0 0;">New Maintenance Scope</h2>'
       +   '<div id="rq_unit_label" style="font-size:12px;color:var(--muted);margin-top:2px;"></div></div>'
       +   '<button class="modal-close" data-rq-close="1" aria-label="Close">&#x2715;</button>'
       + '</div>'
@@ -162,35 +158,38 @@
       + '<div id="rq_footer" class="modal-ftr" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;border-top:1px solid var(--border);"></div>'
       + '</div>';
     document.body.appendChild(ov);
-    // Single delegated click handler for the whole modal.
     ov.addEventListener('click', _onClick);
     ov.addEventListener('keydown', function(e){ if(e.key === 'Escape') close(); });
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────────
   function _esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function _curTrade(){ return S.draft.trade; }
+  function _curComponent(){ var t=_curTrade(); if(!t) return null; return (t.components||[]).filter(function(c){ return c.label === S.draft.component; })[0]; }
 
   function _optButton(field, val, color){
     var style = 'text-align:left;padding:11px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);'
-      + 'cursor:pointer;font-size:13px;font-weight:600;font-family:var(--sans);color:var(--text);transition:border-color .12s,background .12s;'
+      + 'cursor:pointer;font-size:13px;font-weight:600;font-family:var(--sans);color:var(--text);'
       + (color ? 'border-left:4px solid '+color+';' : '');
     return '<button class="rq-opt" data-rq-pick="'+field+'" data-rq-val="'+_esc(val)+'" style="'+style+'" '
       + 'onmouseover="this.style.borderColor=\'var(--yellow)\';this.style.background=\'var(--bg)\'" '
       + 'onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'var(--surface)\'">'+_esc(val)+'</button>';
   }
+  function _otherButton(field){
+    return '<button class="rq-opt-other" data-rq-other="'+field+'" style="text-align:left;padding:11px 14px;border:1px dashed var(--border);border-radius:10px;'
+      + 'background:var(--bg);cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);font-family:var(--sans);">✏️ Other…</button>';
+  }
+  function _grid(inner){ return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:9px;">'+inner+'</div>'; }
   function _optGrid(field, values, colors){
-    var btns = values.map(function(v,i){ return _optButton(field, v, colors ? colors[i] : ''); });
-    // Always offer Other…
-    btns.push('<button class="rq-opt-other" data-rq-other="'+field+'" style="text-align:left;padding:11px 14px;border:1px dashed var(--border);border-radius:10px;'
-      + 'background:var(--bg);cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);font-family:var(--sans);">✏️ Other…</button>');
-    return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:9px;">'+btns.join('')+'</div>';
+    return _grid(values.map(function(v,i){ return _optButton(field, v, colors ? colors[i] : ''); }).join('') + _otherButton(field));
   }
   function _stepTitle(t,sub){
     return '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:3px;">'+_esc(t)+'</div>'
       + (sub ? '<div style="font-size:12px;color:var(--muted);margin-bottom:14px;">'+_esc(sub)+'</div>' : '<div style="margin-bottom:12px;"></div>');
   }
-  function _curTrade(){ return TRADES.filter(function(t){ return t.cat === (S.draft.trade && S.draft.trade.cat); })[0] || S.draft.trade; }
-  function _curComponent(){ var t=_curTrade(); if(!t) return null; return (t.components||[]).filter(function(c){ return c.label === S.draft.component; })[0]; }
+  function _backBtn(){
+    return BACK[S.step] ? '<button class="btn btn-ghost" data-rq-back="1">← Back</button>' : '<span></span>';
+  }
 
   function render(){
     var body = document.getElementById('rq_body');
@@ -200,17 +199,16 @@
     if(!body) return;
     if(ul) ul.textContent = S.unitLabel || '';
 
-    // Breadcrumb of the in-progress issue
     var crumbs = [];
-    if(S.draft.trade)     crumbs.push(S.draft.trade.cat);
-    if(S.draft.room)      crumbs.push(S.draft.room);
-    if(S.draft.component) crumbs.push(S.draft.component);
-    if(S.draft.issue)     crumbs.push(S.draft.issue);
+    if(S.draft.trade)        crumbs.push(S.draft.trade.cat);
+    if(S.draft.room)         crumbs.push(S.draft.room);
+    if(S.draft.component)    crumbs.push(S.draft.component);
+    if(S.draft.issues.length)crumbs.push(S.draft.issues.join(', '));
     if(bc) bc.innerHTML = crumbs.length
       ? crumbs.map(function(c){ return '<span style="background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:2px 10px;">'+_esc(c)+'</span>'; }).join('<span>›</span>')
       : '';
 
-    var html = '', footHtml = '';
+    var html = '', footRight = '';
 
     if(S.step === 'unit'){
       html = _stepTitle('Which unit is this for?','Search by address or unit number.')
@@ -220,16 +218,12 @@
     }
     else if(S.step === 'trade'){
       html = _stepTitle('What needs work?','Pick the trade / area. You can add more than one issue.')
-        + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:9px;">'
-        + TRADES.map(function(t){
+        + _grid(TRADES.map(function(t){
             return '<button class="rq-opt" data-rq-trade="'+_esc(t.cat)+'" style="text-align:left;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);cursor:pointer;font-size:13px;font-weight:600;font-family:var(--sans);color:var(--text);" '
               + 'onmouseover="this.style.borderColor=\'var(--yellow)\';this.style.background=\'var(--bg)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'var(--surface)\'">'
               + '<span style="font-size:18px;margin-right:8px;">'+t.icon+'</span>'+_esc(t.cat)+'</button>';
-          }).join('')
-        + '</div>';
-      if(S.issues.length){
-        footHtml = '<button class="btn btn-ghost" data-rq-step="review">← Review '+S.issues.length+' issue'+(S.issues.length>1?'s':'')+'</button>';
-      }
+          }).join(''));
+      if(S.issues.length) footRight = '<button class="btn btn-ghost" data-rq-step="review">Review '+S.issues.length+' issue'+(S.issues.length>1?'s':'')+' →</button>';
     }
     else if(S.step === 'room'){
       html = _stepTitle('Which room / area?', S.draft.trade.cat) + _optGrid('room', ROOMS);
@@ -241,21 +235,31 @@
     }
     else if(S.step === 'issue'){
       var comp = _curComponent();
-      html = _stepTitle('What is the issue?', S.draft.component)
-        + _optGrid('issue', (comp && comp.issues) ? comp.issues : ['Describe in details']);
+      var opts = (comp && comp.issues) ? comp.issues.slice() : ['Describe in details'];
+      // include any custom (Other) issues already chosen so they show selected
+      S.draft.issues.forEach(function(v){ if(opts.indexOf(v) === -1) opts.push(v); });
+      html = _stepTitle('What is wrong? (select all that apply)', S.draft.component)
+        + _grid(opts.map(function(v){
+            var on = S.draft.issues.indexOf(v) !== -1;
+            return '<button class="rq-toggle" data-rq-toggle="'+_esc(v)+'" style="text-align:left;padding:11px 14px;border:2px solid '+(on?'var(--yellow)':'var(--border)')+';border-radius:10px;'
+              + 'background:'+(on?'var(--bg)':'var(--surface)')+';cursor:pointer;font-size:13px;font-weight:600;font-family:var(--sans);color:var(--text);display:flex;align-items:center;gap:8px;">'
+              + '<span style="display:inline-flex;width:16px;height:16px;border-radius:4px;border:1px solid '+(on?'var(--yellow)':'var(--border)')+';background:'+(on?'var(--yellow)':'transparent')+';align-items:center;justify-content:center;font-size:11px;color:var(--dark);">'+(on?'✓':'')+'</span>'
+              + _esc(v)+'</button>';
+          }).join('') + _otherButton('issue'));
+      footRight = '<button class="btn btn-primary" data-rq-step="severity"'+(S.draft.issues.length?'':' disabled')+'>Next →</button>';
     }
     else if(S.step === 'severity'){
-      html = _stepTitle('How urgent is it?', S.draft.component + ' — ' + S.draft.issue)
+      html = _stepTitle('How urgent is it?', S.draft.component + ' — ' + S.draft.issues.join(', '))
         + _optGrid('severity', SEVERITY.map(function(s){ return s.v; }), SEVERITY.map(function(s){ return s.c; }));
     }
     else if(S.step === 'details'){
       html = _stepTitle('Add detail','Describe exactly what you see — location, quantity, how long, any safety concern. The more detail, the better the scope of work.')
-        + '<textarea id="rq_details" rows="4" placeholder="e.g. Two-handle faucet on the main-floor bathroom sink drips constantly and the cabinet below shows water staining. Tenant reports ~2 weeks." '
+        + '<textarea id="rq_details" rows="4" placeholder="e.g. Main-floor bathroom faucet drips constantly and the cabinet below shows water staining. Tenant reports ~2 weeks." '
         + 'style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box;resize:vertical;font-family:var(--sans);">'+_esc(S.draft.details)+'</textarea>';
-      footHtml = '<button class="btn btn-ghost" data-rq-step="severity">← Back</button>'
-        + '<button class="btn btn-primary" data-rq-additem="1">✓ Add this issue</button>';
+      footRight = '<button class="btn btn-primary" data-rq-additem="1">✓ Add this issue</button>';
     }
     else if(S.step === 'review'){
+      if(!S.tenantResolved) _resolveTenant();
       html = _stepTitle('Review & submit', S.issues.length + ' issue' + (S.issues.length===1?'':'s') + ' captured for ' + (S.unitLabel||'this unit') + '.');
       html += '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">';
       if(!S.issues.length){
@@ -273,17 +277,56 @@
       }
       html += '</div>';
       html += '<button class="btn btn-ghost" data-rq-step="trade" style="margin-bottom:16px;">+ Add another issue</button>';
+
       html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px;">Overall notes (optional)</div>';
       html += '<textarea id="rq_notes" rows="3" placeholder="Anything else the crew / contractor should know — access, tenant availability, materials on hand…" '
-        + 'style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box;resize:vertical;font-family:var(--sans);">'+_esc(S.notes)+'</textarea>';
-      footHtml = '<button class="btn btn-ghost" data-rq-step="trade">← Add issue</button>'
-        + '<button class="btn btn-primary" data-rq-submit="1"'+(S.issues.length?'':' disabled')+'>📋 Create Maintenance Request</button>';
+        + 'style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box;resize:vertical;font-family:var(--sans);margin-bottom:14px;">'+_esc(S.notes)+'</textarea>';
+
+      // ── Email to tenant ──
+      html += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface);">'
+        + '<label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;">'
+        +   '<input type="checkbox" data-rq-emailtoggle="1"'+(S.emailTenant?' checked':'')+' style="margin-top:2px;width:16px;height:16px;"/>'
+        +   '<span style="font-size:13px;font-weight:600;color:var(--text);">📧 Email a copy of this request to the tenant'
+        +     (S.tenantName ? ' <span style="color:var(--muted);font-weight:400;">('+_esc(S.tenantName)+')</span>' : '')+'</span>'
+        + '</label>';
+      if(S.emailTenant){
+        if(!S.tenantName){
+          html += '<div style="font-size:12px;color:var(--danger);margin-top:8px;">No tenant is assigned to this unit, so there is no one to email.</div>';
+        } else if(!S.tenantResolved){
+          html += '<div style="font-size:12px;color:var(--muted);margin-top:8px;">Looking up tenant email…</div>';
+        } else if(S.tenantEmailOnFile){
+          html += '<div style="font-size:12px;color:var(--muted);margin-top:8px;">Will send to <strong>'+_esc(S.tenantEmail)+'</strong>.</div>';
+        } else {
+          html += '<div style="margin-top:10px;">'
+            + '<div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;">No email on file for this tenant — enter one to send (it will be saved to their record):</div>'
+            + '<input id="rq_tenant_email" type="email" value="'+_esc(S.tenantEmail)+'" placeholder="tenant@example.com" '
+            + 'style="width:100%;padding:9px 12px;border:1px solid var(--yellow);border-radius:8px;font-size:13px;box-sizing:border-box;font-family:var(--sans);"/>'
+            + '</div>';
+        }
+      }
+      html += '</div>';
+
+      footRight = '<button class="btn btn-primary" data-rq-submit="1"'+(S.issues.length?'':' disabled')+'>📋 Create Maintenance Request</button>';
     }
 
     body.innerHTML = html;
-    if(foot) foot.innerHTML = footHtml || '<span style="font-size:11px;color:var(--muted);">'+(S.issues.length? S.issues.length+' issue'+(S.issues.length>1?'s':'')+' so far':'')+'</span>';
+    if(foot) foot.innerHTML = _backBtn() + (footRight || '<span style="font-size:11px;color:var(--muted);">'+(S.issues.length? S.issues.length+' issue'+(S.issues.length>1?'s':'')+' so far':'')+'</span>');
 
     if(S.step === 'unit'){ _wireUnitSearch(); }
+  }
+
+  // ── Tenant email resolution ─────────────────────────────────────────────────
+  function _resolveTenant(){
+    if(S.tenantResolved) return;
+    var u = _units().filter(function(x){ return x && x.id === S.unitId; })[0];
+    S.tenantName = (u && u.assignedName) || S.tenantName || '';
+    if(!S.tenantName || typeof _resolveTenantEmailForUnit !== 'function'){ S.tenantResolved = true; return; }
+    _resolveTenantEmailForUnit(u).then(function(email){
+      S.tenantEmail = email || '';
+      S.tenantEmailOnFile = !!email;
+      S.tenantResolved = true;
+      if(S.step === 'review') render();
+    }).catch(function(){ S.tenantResolved = true; if(S.step === 'review') render(); });
   }
 
   // ── Unit search ─────────────────────────────────────────────────────────────
@@ -299,7 +342,7 @@
       if(term) list = list.filter(function(u){ return _unitLabel(u).toLowerCase().indexOf(term) !== -1; });
       list = list.slice(0, 60);
       res.innerHTML = list.length ? list.map(function(u){
-        return '<button class="rq-unit" data-rq-unit="'+_esc(u.id)+'" data-rq-unit-label="'+_esc(_unitLabel(u))+'" '
+        return '<button class="rq-unit" data-rq-unit="'+_esc(u.id)+'" data-rq-unit-label="'+_esc(_unitLabel(u))+'" data-rq-unit-tenant="'+_esc(u.assignedName||'')+'" '
           + 'style="text-align:left;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;font-size:13px;font-family:var(--sans);color:var(--text);" '
           + 'onmouseover="this.style.borderColor=\'var(--yellow)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
           + '<span style="font-weight:600;">'+_esc(_unitLabel(u))+'</span>'
@@ -313,42 +356,59 @@
     setTimeout(function(){ inp.focus(); }, 60);
   }
 
+  // ── Capture text inputs before navigating away ──────────────────────────────
+  function _capture(){
+    if(S.step === 'details'){ var d=document.getElementById('rq_details'); if(d) S.draft.details = d.value; }
+    if(S.step === 'review'){
+      var n=document.getElementById('rq_notes'); if(n) S.notes = n.value;
+      var te=document.getElementById('rq_tenant_email'); if(te && !S.tenantEmailOnFile) S.tenantEmail = (te.value||'').trim();
+    }
+  }
+
   // ── Click delegation ────────────────────────────────────────────────────────
   function _onClick(e){
-    var el = e.target.closest('[data-rq-close],[data-rq-trade],[data-rq-pick],[data-rq-other],[data-rq-unit],[data-rq-step],[data-rq-additem],[data-rq-del],[data-rq-submit]');
+    var el = e.target.closest('[data-rq-close],[data-rq-trade],[data-rq-pick],[data-rq-toggle],[data-rq-other],[data-rq-unit],[data-rq-step],[data-rq-back],[data-rq-additem],[data-rq-del],[data-rq-submit],[data-rq-emailtoggle]');
     if(!el) return;
     if(el.hasAttribute('data-rq-close')){ close(); return; }
+
     if(el.hasAttribute('data-rq-unit')){
       S.unitId = el.getAttribute('data-rq-unit');
       S.unitLabel = el.getAttribute('data-rq-unit-label') || '';
+      S.tenantName = el.getAttribute('data-rq-unit-tenant') || '';
+      S.tenantResolved = false; S.tenantEmail=''; S.tenantEmailOnFile=false;
       S.step = 'trade'; render(); return;
     }
     if(el.hasAttribute('data-rq-trade')){
       var cat = el.getAttribute('data-rq-trade');
+      S.draft = _freshDraft();
       S.draft.trade = TRADES.filter(function(t){ return t.cat === cat; })[0] || { cat:cat, components:[] };
-      S.draft.room=''; S.draft.component=''; S.draft.issue=''; S.draft.severity=''; S.draft.details='';
       S.step = 'room'; render(); return;
+    }
+    if(el.hasAttribute('data-rq-toggle')){ // multi-select issue
+      var v = el.getAttribute('data-rq-toggle');
+      var ix = S.draft.issues.indexOf(v);
+      if(ix === -1) S.draft.issues.push(v); else S.draft.issues.splice(ix,1);
+      render(); return;
     }
     if(el.hasAttribute('data-rq-pick')){ _pick(el.getAttribute('data-rq-pick'), el.getAttribute('data-rq-val')); return; }
     if(el.hasAttribute('data-rq-other')){ _other(el.getAttribute('data-rq-other')); return; }
-    if(el.hasAttribute('data-rq-step')){
-      var step = el.getAttribute('data-rq-step');
-      if(step === 'review'){ S.notes = (document.getElementById('rq_notes')||{}).value || S.notes; }
-      S.step = step; render(); return;
-    }
+    if(el.hasAttribute('data-rq-emailtoggle')){ _capture(); S.emailTenant = !!el.checked; if(S.emailTenant) _resolveTenant(); render(); return; }
+    if(el.hasAttribute('data-rq-back')){ _capture(); var p = BACK[S.step]; if(p){ S.step = p; render(); } return; }
+    if(el.hasAttribute('data-rq-step')){ _capture(); S.step = el.getAttribute('data-rq-step'); render(); return; }
     if(el.hasAttribute('data-rq-additem')){ _addItem(); return; }
-    if(el.hasAttribute('data-rq-del')){ S.issues.splice(parseInt(el.getAttribute('data-rq-del'),10),1); render(); return; }
+    if(el.hasAttribute('data-rq-del')){ _capture(); S.issues.splice(parseInt(el.getAttribute('data-rq-del'),10),1); render(); return; }
     if(el.hasAttribute('data-rq-submit')){ _submit(); return; }
   }
 
-  // Advance the wizard when a standard option is picked.
+  // single-select advance (room/component/severity)
   function _pick(field, val){
     S.draft[field] = val;
-    var next = { room:'component', component:'issue', issue:'severity', severity:'details' }[field];
+    var next = { room:'component', component:'issue', severity:'details' }[field];
     if(next){ S.step = next; render(); }
   }
 
-  // "Other…" — replace the option grid with a free-text input + Continue.
+  // "Other…" — free text. For the multi-select issue step it ADDS to the list;
+  // for single-select steps it sets the value and advances.
   function _other(field){
     var body = document.getElementById('rq_body');
     if(!body) return;
@@ -357,11 +417,15 @@
     wrap.style.marginTop = '12px';
     wrap.innerHTML = '<input id="rq_other_input" type="text" placeholder="Describe the '+_esc(label)+'…" '
       + 'style="width:100%;padding:10px 12px;border:1px solid var(--yellow);border-radius:8px;font-size:13px;box-sizing:border-box;font-family:var(--sans);margin-bottom:8px;"/>'
-      + '<button class="btn btn-primary" id="rq_other_go">Continue →</button>';
+      + '<button class="btn btn-primary" id="rq_other_go">'+(field==='issue'?'Add':'Continue →')+'</button>';
     body.appendChild(wrap);
     var inp = document.getElementById('rq_other_input');
     var go  = document.getElementById('rq_other_go');
-    function commit(){ var v=(inp.value||'').trim(); if(!v){ inp.focus(); return; } _pick(field, v); }
+    function commit(){
+      var v=(inp.value||'').trim(); if(!v){ inp.focus(); return; }
+      if(field === 'issue'){ if(S.draft.issues.indexOf(v) === -1) S.draft.issues.push(v); render(); }
+      else { _pick(field, v); }
+    }
     go.addEventListener('click', commit);
     inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); commit(); } });
     inp.focus();
@@ -369,7 +433,7 @@
 
   function _buildDescription(d){
     var head = [d.room, d.component].filter(Boolean).join(' — ');
-    var line = head + (d.issue ? ': ' + d.issue : '');
+    var line = head + (d.issues.length ? ': ' + d.issues.join(', ') : '');
     if(d.severity) line += ' [' + d.severity.split(' — ')[0] + ']';
     if(d.details)  line += ' — ' + d.details;
     return line.trim();
@@ -380,42 +444,80 @@
     S.draft.details = det.trim();
     var d = S.draft;
     S.issues.push({
-      trade: d.trade.cat, room: d.room, component: d.component, issue: d.issue,
-      severity: d.severity, details: d.details,
-      description: _buildDescription(d)
+      trade: d.trade.cat, room: d.room, component: d.component, issues: d.issues.slice(),
+      severity: d.severity, details: d.details, description: _buildDescription(d)
     });
-    // reset draft for the next issue
-    S.draft = { trade:null, room:'', component:'', issue:'', severity:'', details:'' };
+    S.draft = _freshDraft();
     S.step = 'review'; render();
   }
 
-  // ── Submit → populate the standard SOW (Maintenance Request) modal ──────────
+  // ── Submit → SOW modal + optional tenant email ──────────────────────────────
+  function _saveTenantEmail(name, email){
+    try {
+      if(typeof SUPABASE_URL === 'undefined' || typeof HOUSING_HEADERS === 'undefined') return;
+      fetch(SUPABASE_URL + '/rest/v1/tenants?full_name=eq.' + encodeURIComponent(name), {
+        method: 'PATCH',
+        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ email: email })
+      }).catch(function(e){ console.warn('[reno-q] tenant email save failed:', e); });
+    } catch(e){ console.warn('[reno-q] tenant email save threw:', e); }
+  }
+  function _emailTenantCopy(unitLabel, tenantName, issues, notes, email){
+    if(typeof window.sendNotification !== 'function') return;
+    var natShort = (window.NATION_CONFIG && (NATION_CONFIG.short || NATION_CONFIG.display_name)) || 'Housing';
+    var rows = issues.map(function(it){
+      return '<li><strong>'+_esc(it.trade)+' — '+_esc(it.room)+':</strong> '+_esc(it.description)+'</li>';
+    }).join('');
+    var html = '<p>Hello'+(tenantName?' '+_esc(tenantName):'')+',</p>'
+      + '<p>A maintenance request has been started for your home'+(unitLabel?' at <strong>'+_esc(unitLabel)+'</strong>':'')+'. Here is a summary of what was reported:</p>'
+      + '<ul>'+rows+'</ul>'
+      + (notes ? '<p><strong>Notes:</strong> '+_esc(notes)+'</p>' : '')
+      + '<p>The '+_esc(natShort)+' Housing team will review and schedule the work. If any detail is incorrect, please reply to this email.</p>'
+      + '<p>Thank you,<br/>'+_esc(natShort)+' Housing</p>';
+    window.sendNotification({
+      to: email,
+      subject: natShort + ' Housing — Maintenance Request' + (unitLabel ? ': ' + unitLabel : ''),
+      bodyHtml: html
+    }).then(function(){
+      if(typeof showToast === 'function') showToast('Copy emailed to the tenant.');
+    }).catch(function(err){
+      console.warn('[reno-q] tenant email failed:', err);
+      if(typeof showToast === 'function') showToast('Could not email the tenant: ' + (err && err.message || err), { type:'error' });
+    });
+  }
+
   function _submit(){
-    S.notes = (document.getElementById('rq_notes')||{}).value || S.notes;
+    _capture();
     if(!S.issues.length){ if(typeof showToast==='function') showToast('Add at least one issue first.'); return; }
     if(typeof openSowModal !== 'function'){ if(typeof showToast==='function') showToast('Maintenance Request form is not available on this page.', {type:'error'}); return; }
+
+    // Tenant email handling
+    if(S.emailTenant && S.tenantName){
+      var email = (S.tenantEmailOnFile ? S.tenantEmail : (S.tenantEmail||'')).trim();
+      if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+        if(typeof showToast==='function') showToast('Enter a valid tenant email, or untick the email option.', { type:'error' });
+        return;
+      }
+      if(!S.tenantEmailOnFile) _saveTenantEmail(S.tenantName, email);   // save new email to the tenant record
+      _emailTenantCopy(S.unitLabel, S.tenantName, S.issues.slice(), S.notes, email);
+    }
+
     var unitId = S.unitId, issues = S.issues.slice(), notes = S.notes;
     close();
-    // Force a brand-new SOW for the unit, then fill it once mounted.
     window._sowForceNew = true;
     openSowModal(unitId);
     setTimeout(function(){
       try {
-        // Clear the single empty default row the modal may have added, then add ours.
         var cont = document.getElementById('sow_items');
         if(cont){
-          // Remove blank rows so we don't leave an empty line above the captured items.
           Array.prototype.slice.call(cont.querySelectorAll('div[id^="sow_item_"]')).forEach(function(row){
             var desc=(row.querySelector('[data-sow="description"]')||{}).value||'';
             var cat =(row.querySelector('[data-sow="category"]')||{}).value||'';
             if(!desc && !cat) row.remove();
           });
         }
-        issues.forEach(function(it){
-          if(typeof addSowItem === 'function') addSowItem({ category: it.trade, description: it.description });
-        });
+        issues.forEach(function(it){ if(typeof addSowItem === 'function') addSowItem({ category: it.trade, description: it.description }); });
         if(typeof recalcSowTotal === 'function') recalcSowTotal();
-        // Merge notes
         var n = document.getElementById('sow_notes');
         if(n){
           var add = 'Captured via Renovation Questionnaire.' + (notes ? '\n' + notes : '');
@@ -429,12 +531,12 @@
   // ── Public API ──────────────────────────────────────────────────────────────
   function open(prefillUnitId){
     _ensure();
-    var unitId = '', unitLabel = '';
+    var unitId = '', unitLabel = '', tenantName = '';
     if(prefillUnitId){
       var u = _units().filter(function(x){ return x && x.id === prefillUnitId; })[0];
-      if(u){ unitId = u.id; unitLabel = _unitLabel(u); }
+      if(u){ unitId = u.id; unitLabel = _unitLabel(u); tenantName = u.assignedName || ''; }
     }
-    _reset(unitId, unitLabel);
+    _reset(unitId, unitLabel, tenantName);
     var ov = document.getElementById('renoQModal');
     if(ov){ ov.style.display = 'flex'; document.body.classList.add('modal-open'); }
     render();
