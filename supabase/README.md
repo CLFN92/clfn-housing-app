@@ -38,13 +38,21 @@ in-code defaults until the ED customises them.
 supabase functions deploy send-notification --project-ref <NEW_PROJECT_REF>
 ```
 Then set this nation's **email provider** secrets in Project Settings → Edge
-Functions → Secrets:
-- **If the nation has Microsoft 365:** `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`,
-  `GRAPH_CLIENT_SECRET`, `GRAPH_FROM_USER` (their shared mailbox).
-- **If not (no M365):** use the platform's generic email path (SMTP / Resend /
-  SendGrid / Azure Communication Services) — `send-notification` selects the
-  provider from these secrets. (Provider-abstraction in `send-notification` is a
-  Phase N1 task; until then M365 is the only wired path.)
+Functions → Secrets. `send-notification` selects the provider from
+`EMAIL_PROVIDER` (default `graph`), so nations without M365 just pick a different
+provider — no code change:
+- **Microsoft 365** (`EMAIL_PROVIDER=graph`, the default): `GRAPH_TENANT_ID`,
+  `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET`, `GRAPH_FROM_USER` (their shared mailbox).
+- **Resend** (`EMAIL_PROVIDER=resend`): `RESEND_API_KEY`, `EMAIL_FROM`
+  (verified sender email), `EMAIL_FROM_NAME` (optional).
+- **SendGrid** (`EMAIL_PROVIDER=sendgrid`): `SENDGRID_API_KEY`, `EMAIL_FROM`,
+  `EMAIL_FROM_NAME` (optional).
+- Optional for any provider: `EMAIL_REPLY_TO` (reply-to override) and
+  `EMAIL_BRAND` (footer brand). The client also passes `reply_to`/`brand` from
+  `NATION_CONFIG`, so secrets are only needed to override.
+
+Redeploying the function does not change CLFN: `EMAIL_PROVIDER` defaults to
+`graph` and the Graph path is unchanged.
 
 ### 5. Create the first ED / super_user
 - Create the user in **Supabase Auth** (email + temp password / invite).

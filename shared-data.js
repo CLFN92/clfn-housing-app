@@ -1925,6 +1925,15 @@ window.sendNotification = async function(opts) {
   if(!opts || !opts.to || !opts.subject || (!opts.message && !opts.html && !opts.bodyHtml)) {
     throw new Error('sendNotification: requires to + subject + (message|html|bodyHtml)');
   }
+  // Nation branding for the email footer + reply-to. The send-notification Edge
+  // Function reads these (falling back to its own secret/default), so each
+  // nation's mail is branded without per-nation code. Harmless on the legacy
+  // function (extra payload fields are ignored).
+  try {
+    var _nc = window.NATION_CONFIG || {};
+    if(opts.brand == null){ var _s = _nc.short || _nc.display_name; if(_s) opts.brand = _s + ' Housing'; }
+    if(opts.reply_to == null && _nc.email) opts.reply_to = _nc.email;
+  } catch(e) {}
   var session = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION : null;
   var token   = session && session.accessToken;
   if(!token) throw new Error('sendNotification: no access token (not signed in)');

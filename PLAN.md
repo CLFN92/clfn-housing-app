@@ -364,10 +364,14 @@ needs its own Azure account; we host the one SPA and route by subdomain.
 Framework shipped under `supabase/`: `config.toml`, `seed.sql` (light — storage
 bucket; settings use in-code defaults), `migrations/README.md` (schema-capture
 process), and `README.md` (the full per-nation provisioning runbook incl.
-per-nation email provider). **Remaining (needs the live DB + Supabase CLI, run
-by the user):** `supabase db dump` CLFN → commit `migrations/0001_init_schema.sql`,
-then adopt "every schema change is a new numbered migration." Also pending:
-provider-abstraction in `send-notification` so non-M365 nations can email.
+per-nation email provider). **Email provider abstraction shipped:** `send-notification` now selects the
+provider via the `EMAIL_PROVIDER` secret (`graph` default / `resend` / `sendgrid`),
+and the client passes nation `brand`/`reply_to` from `NATION_CONFIG`. So a nation
+without M365 just sets `EMAIL_PROVIDER=resend|sendgrid` + that provider's secrets.
+CLFN unchanged (defaults to `graph`). **Remaining (needs the live DB + Supabase
+CLI, run by the user):** `supabase db dump` CLFN → commit
+`migrations/0001_init_schema.sql`, then adopt "every schema change is a new
+numbered migration."
 
 The hand-run SQL-editor workflow breaks at nation #2. Make a nation's backend a
 **versioned, reproducible bundle**:
