@@ -96,9 +96,7 @@ var APPROVAL_AUTHORITY = (function() {
     // Who can add/edit staff
     manageStaff:              ['housing_manager', 'ed'],
 
-    // ── Dashboard & inventory ─────────────────────────────────────────────
-    // Who can access the management Dashboard view
-    accessDashboard:          ['housing_manager', 'ed'],
+    // ── Inventory ─────────────────────────────────────────────────────────
     // Who can archive a unit (soft-delete from Inventory)
     archiveUnit:              ['ed'],
     // Who can set a unit's GPS coordinates and house photo
@@ -298,7 +296,6 @@ var APPROVAL_AUTHORITY = (function() {
       accessSettings:           'Access settings page',
       editApprovalAuthority:    'Edit approval authorities',
       manageStaff:              'Add / edit staff',
-      accessDashboard:          'Access Dashboard view',
       archiveUnit:              'Archive a unit',
       setUnitLocation:          'Set unit GPS location &amp; house photo',
       manageStaffRecord:        'Edit / deactivate a staff record',
@@ -322,7 +319,6 @@ var APPROVAL_AUTHORITY = (function() {
       'Contractors':          ['recommendContractor','approveContractor','declineContractor'],
       'Scoring':              ['editScoreModel','applyScoreAdjustment'],
       'Inventory':            ['archiveUnit', 'setUnitLocation'],
-      'Dashboard':            ['accessDashboard'],
       'System':               ['accessSettings','editApprovalAuthority','manageStaff','manageStaffRecord','manageAllStaffRoles'],
       'Finance':              ['viewFinanceCard','recordPayment','createInvoice','createArrangement','manageLoan','reverseTransaction'],
     },
