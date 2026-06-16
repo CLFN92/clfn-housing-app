@@ -1551,6 +1551,21 @@ function saveSOW(opts){
     })();
   }
 
+  // Work Order email to the assigned in-house field employee — fires on SUBMIT
+  // when the work is assigned in-house with a key person. De-duped so editing
+  // an already-submitted SOW with the same assignee doesn't re-notify.
+  if (_saveMode === 'submit' && data.assignedTeam === 'in_house' && data.assignedTo
+      && typeof notifyWorkOrderToFieldEmployee === 'function') {
+    var _prevAssignee = (existingForStatus && (existingForStatus.assignedTo || '')).toLowerCase();
+    var _prevSubmitted = existingForStatus && existingForStatus.approval_status && existingForStatus.approval_status !== 'draft';
+    var _alreadyNotified = _prevSubmitted && _prevAssignee === (data.assignedTo || '').toLowerCase();
+    if (!_alreadyNotified) {
+      var _allUnitsFE = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+      var _unitFE = _sowUnitId ? _allUnitsFE.find(function(x){ return x.id === _sowUnitId; }) : null;
+      notifyWorkOrderToFieldEmployee(data, _unitFE);
+    }
+  }
+
   // Tenant signature captured
   if(data.tenantSig && (data.tenantSig.name || data.tenantSig.image)) {
     auditEntry('SOW:'+(_sowUnitId||'?'), 'sow_tenant_signed',
