@@ -1531,6 +1531,8 @@ window.DocLibrary = (function(){
           deleteFlow
             .then(function(){
               state.files = state.files.filter(function(f){ return f.path !== p; });
+              // Stop tracking it as a pending upload so refresh() won't re-add it.
+              if (state.pendingUploads) delete state.pendingUploads[p];
               if (typeof opts.onChange === 'function') opts.onChange('delete', file);
               render();
             })
@@ -1582,6 +1584,26 @@ window.DocLibrary = (function(){
             }
           });
         }).then(function(){
+          // Optimistic insert — show the file immediately rather than waiting for
+          // the audit-log re-read, which can race the just-written file_uploaded
+          // row (the "uploaded but doesn't show at first" symptom). Tracked in
+          // state.pendingUploads and reconciled by refresh() once the server
+          // read confirms it.
+          var optimistic = {
+            path:     path,
+            name:     f.name,
+            size:     f.size,
+            type:     f.type || '',
+            category: state.uploadCategory || 'other',
+            addedAt:  new Date().toISOString().slice(0,10),
+            addedBy:  (typeof opts.getActor === 'function' && opts.getActor()) || ''
+          };
+          state.pendingUploads = state.pendingUploads || {};
+          state.pendingUploads[path] = optimistic;
+          if (!state.files.some(function(x){ return x.path === path; })) {
+            state.files.unshift(optimistic);
+          }
+          render();
           if (typeof opts.onChange === 'function') {
             opts.onChange('upload', { path:path, name:f.name, category:state.uploadCategory });
           }
@@ -1611,7 +1633,19 @@ window.DocLibrary = (function(){
         ? opts.customLoader()
         : _loadMeta(opts);
       return Promise.resolve(loader).then(function(files){
-        state.files = Array.isArray(files) ? files : [];
+        var serverFiles = Array.isArray(files) ? files : [];
+        // Reconcile optimistic uploads: keep any just-uploaded file the server
+        // read doesn't yet reflect (read-after-write race), and stop tracking a
+        // pending file once the server confirms it. Guarantees an upload never
+        // flickers away between the optimistic insert and the server catching up.
+        var pend = state.pendingUploads || {};
+        var serverPaths = {};
+        serverFiles.forEach(function(x){ if (x && x.path) serverPaths[x.path] = true; });
+        Object.keys(pend).forEach(function(p){
+          if (serverPaths[p]) { delete pend[p]; }      // confirmed persisted
+          else { serverFiles.unshift(pend[p]); }        // not visible yet — keep showing
+        });
+        state.files = serverFiles;
         state.loading = false;
         render();
       }).catch(function(){
