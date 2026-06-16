@@ -339,6 +339,77 @@ Medium-large. The engineering is moderate; the **number provisioning, billing, a
 
 ---
 
+## Phase N — Multi-Nation Onboarding & Control Panel
+
+Turns the single-tenant CLFN app into the multi-nation platform. Architecture is
+locked in Phase A0 (**database-per-nation**, **subdomain-per-nation**, superuser
+tooling in a **separate codebase**). Hosting is platform-side — a nation never
+needs its own Azure account; we host the one SPA and route by subdomain.
+
+### N0 — App nation-awareness  ✅ (shipped)
+- `shared-config.js` now carries a **`NATIONS_DIRECTORY`** (hostname → `{id,
+  display_name, short, supabase_url, supabase_anon, role_labels,
+  modules_licensed}`) and `window.resolveNation()`. At boot it resolves the
+  current host (full host → subdomain label → `_default`) and sets
+  `SUPABASE_URL` / `SUPABASE_ANON` / `NATION_CONFIG`, and applies per-nation
+  module **licensing** onto `CLFN_MODULES._licensed`.
+- Anon keys are publishable, so the directory is safe client-side. CLFN is
+  `_default` → byte-identical until other nations are added. Adding a nation =
+  adding a directory entry (later swappable for a fetched `nations.json` — same
+  shape, no resolver change).
+- Remaining N0 polish: finish replacing hardcoded `'CLFN'`/`'Constance Lake…'`
+  strings with `NATION_CONFIG` (Phase 2/3 carryover).
+
+### N1 — Repeatable provisioning  ⬜
+The hand-run SQL-editor workflow breaks at nation #2. Make a nation's backend a
+**versioned, reproducible bundle**:
+- **Versioned schema** via Supabase CLI migrations (numbered SQL) — single source
+  of truth for every nation DB: tables, RLS, triggers, functions.
+- **Seed pack** — default `housing_settings` (scoring model, approval authority,
+  NOS table, module licensing), storage bucket, nation identity row.
+- **Edge functions + secrets per project** — deploy `send-notification` (and
+  future `send-sms`) and set Graph/SMS secrets per nation.
+- **🔖 Email provider per nation** — current email is Microsoft Graph against
+  CLFN's M365 mailbox. **Not every nation has M365.** Make the email channel a
+  per-nation config: M365/Graph, or a generic SMTP/provider (e.g. Resend,
+  SendGrid, Azure Communication Services). The `send-notification` function reads
+  the nation's provider config; `from`/credentials become per-nation secrets.
+- **First admin user** — create the nation's ED/super_user so they can log in.
+- **Runbook** — documented manual steps end-to-end before automating.
+
+### N2 — Control Panel MVP  ⬜ (separate repo — has a backend)
+Superuser tool to onboard/manage nations. **Not** a static SPA and **not** this
+repo: it holds the **Supabase Management API token** + per-project **service-role
+keys**, so it must run server-side and stay secured. Screens:
+- **Nations list** — status (active / provisioning / suspended), subdomain,
+  licensed modules, user count, last activity.
+- **Add-Nation wizard** — create Supabase project (Management API) → apply
+  migrations (N1) → seed → set email provider → create first ED → register in the
+  directory/`nations.json` → configure subdomain (wildcard DNS / SWA custom
+  domain) → verify. Per-step progress + rollback.
+- **Per-nation config & licensing** — branding, role labels, contact, and which
+  modules they pay for (`modules_licensed`). (Distinct from the in-app ED on/off
+  toggle, which is `_enabled`.)
+- **Lifecycle** — suspend / reactivate, key rotation, delete with safeguards.
+
+### N3 — Scale  ⬜
+- **Fan-out migration runner** — apply a new schema version across all nation
+  projects, with status/version tracking per nation.
+- **Billing/licensing** wired to `_licensed`; **observability** (per-nation
+  health, usage, audit); per-nation region/backup policy.
+
+### Open decisions
+1. Config delivery: embedded `NATIONS_DIRECTORY` (now) vs fetched `nations.json`
+   vs a config endpoint — resolver supports all three; pick when nation #2 is near.
+2. Subdomain strategy: wildcard `*.host` (one deployment serves all) vs per-nation
+   deployment — wildcard + directory is the cheapest path.
+3. Email: per-nation M365 vs a generic provider as the platform default for
+   nations without M365.
+4. Migration tooling: adopt Supabase CLI migrations now so the schema is versioned
+   before onboarding anyone (foundational for N1+).
+
+---
+
 ## Rollback points
 - Pre-refactor snapshots (Phase C)
 

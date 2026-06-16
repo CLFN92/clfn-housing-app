@@ -5,9 +5,44 @@
  *     Copy the "anon public" key
  * ============================================================ */
 
-// ── Supabase connection ───────────────────────────────────────────────────────
-window.SUPABASE_URL    = 'https://fkhzrbalumzeripzolph.supabase.co';
-window.SUPABASE_ANON   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo';
+// ── Multi-nation directory + resolver ─────────────────────────────────────────
+// The platform serves multiple First Nations from one deployment. Each nation
+// maps a hostname (subdomain) to its OWN Supabase project + branding + licensed
+// modules — data is physically isolated per nation (database-per-nation). Anon
+// keys are *publishable*, so shipping this client-side is safe. The lead nation
+// (CLFN) is `_default`, used for localhost / preview / any unmapped host, so
+// existing behaviour is unchanged until other nations are added here.
+//   • Add a nation → add an entry keyed by its full hostname and/or subdomain.
+//   • This object can later be replaced by a fetched `nations.json` (same shape)
+//     without touching the resolver. See PLAN.md "Multi-Nation" phase.
+window.NATIONS_DIRECTORY = window.NATIONS_DIRECTORY || {
+  _default: {
+    id:            'clfn',
+    display_name:  'Constance Lake First Nation',
+    short:         'CLFN',
+    supabase_url:  'https://fkhzrbalumzeripzolph.supabase.co',
+    supabase_anon: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo',
+    role_labels:   {},
+    modules_licensed: null   // null → all optional modules licensed (defaults apply)
+  }
+  // Example additional nation (one entry per hostname AND/OR subdomain label):
+  // 'nation2.housingapp.ca': {
+  //   id:'nation2', display_name:'Second Nation', short:'N2',
+  //   supabase_url:'https://xxxxxxxx.supabase.co', supabase_anon:'<publishable anon key>',
+  //   role_labels:{}, modules_licensed:{ finance:false, match:true }
+  // }
+};
+window.resolveNation = function(){
+  var host = (typeof location !== 'undefined' && location.hostname || '').toLowerCase();
+  var dir  = window.NATIONS_DIRECTORY || {};
+  var sub  = host.split('.')[0];               // leftmost label, e.g. "clfn" in clfn.app.ca
+  return dir[host] || dir[sub] || dir._default || null;
+};
+window._NATION = window.resolveNation();
+
+// ── Supabase connection (resolved per nation) ─────────────────────────────────
+window.SUPABASE_URL    = (window._NATION && window._NATION.supabase_url)  || 'https://fkhzrbalumzeripzolph.supabase.co';
+window.SUPABASE_ANON   = (window._NATION && window._NATION.supabase_anon) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo';
 // Storage bucket for tenant files, photos, contractor docs, SOW attachments.
 // Required by SbStorage helpers and the DocLibrary factory.
 window.STORAGE_BUCKET  = 'housing-files';
@@ -280,11 +315,30 @@ window.moduleOn = function(mod) {
 // override any subset of the defaults from CLFN_PERMS.ROLE_LABELS for this
 // nation. Example for a nation that calls their ED "Lands Director":
 //   role_labels: { ed: 'Lands Director', housing_manager: 'Housing Lead' }
-window.NATION_CONFIG = window.NATION_CONFIG || {
-  id:           'clfn',
-  name:         'Constance Lake First Nation',
-  display_name: 'Constance Lake First Nation',
-  short:        'CLFN',
-  role_labels:  {} // empty for CLFN — defaults from CLFN_PERMS.ROLE_LABELS apply
-};
+// Built from the resolved nation (window._NATION); falls back to CLFN so the
+// lead nation is byte-identical. Per-nation overrides from housing_settings
+// (nation_config_override) are still merged on top at login via
+// applyNationOverrides().
+window.NATION_CONFIG = window.NATION_CONFIG || (function(){
+  var n = window._NATION || {};
+  var disp = n.display_name || 'Constance Lake First Nation';
+  return {
+    id:           n.id    || 'clfn',
+    name:         disp,
+    display_name: disp,
+    short:        n.short || 'CLFN',
+    role_labels:  n.role_labels || {} // empty for CLFN — CLFN_PERMS.ROLE_LABELS defaults apply
+  };
+})();
+
+// Apply per-nation module licensing from the directory (which paid-for modules
+// this nation has). null → leave the all-licensed defaults in place.
+(function(){
+  var lic = window._NATION && window._NATION.modules_licensed;
+  if(lic && typeof lic === 'object' && window.CLFN_MODULES && window.CLFN_MODULES._licensed){
+    Object.keys(lic).forEach(function(k){
+      if(window.CLFN_MODULES._licensed[k] !== undefined) window.CLFN_MODULES._licensed[k] = !!lic[k];
+    });
+  }
+})();
 window.CLFN_DEBUG = false;
