@@ -657,7 +657,10 @@ function openSowModal(unitId, projectNumber) {
   //   - If no projectNumber AND the unit has zero SOWs, create a new one with a
   //     freshly-auto-incremented project number.
   var existingList = unitId ? (typeof getUnitSowList === 'function' ? getUnitSowList(unitId) : []) : [];
-  if(!projectNumber && existingList.length > 0){
+  // window._sowForceNew (set by the Reno Questionnaire) forces a brand-new SOW
+  // even when the unit already has requests. One-shot — cleared on read.
+  var _forceNew = !!window._sowForceNew; window._sowForceNew = false;
+  if(!projectNumber && !_forceNew && existingList.length > 0){
     // Pick the most recent SOW for this unit so unit-detail click opens it.
     var sortedByDate = existingList.slice().sort(function(a, b){
       return (b.created_at || '').localeCompare(a.created_at || '');

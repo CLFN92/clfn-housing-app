@@ -178,6 +178,9 @@ Urgent need categories (in `scoring.js` `DEFAULT_V2_SCORE_MODEL.urgent_need` and
 
 The scoring model is ED-adjustable via Settings → App Settings → Scoring. Changes persist in `housing_settings` key `'score_model_v2'`.
 
+### Renovation Questionnaire (`reno-questionnaire.js`)
+A guided, branching wizard staff use to capture a complete scope of work, launched from the **"Renovation Questionnaire" Quick Action** on the landing page (`data-qa="reno-questionnaire"` → `_runQuickAction` in housing-init.js → `window.openRenoQuestionnaire()`). Self-contained IIFE: injects its own `#renoQModal` into `<body>` and uses one delegated click handler (no inline onclick) so option values with apostrophes like "Won't flush" are safe. Flow per issue: **Unit → Trade → Room → Component → Issue → Severity → Details**; every question is button-driven from the data tree (`TRADES`/`ROOMS`/`SEVERITY`) with an auto-appended **"Other…"** free-text option and full back-stepping. Multiple issues accumulate, then an overall Notes step. `TRADES[].cat` values **must** match `SOW_CATEGORIES` (housing-modals-sow.js). On submit it sets `window._sowForceNew` (a one-shot flag read in `openSowModal` that bypasses the "open most recent SOW" behaviour so a fresh request is created), opens the SOW modal for the unit, and — after a short mount delay — calls `addSowItem({category, description})` per captured issue (description built from room/component/issue/severity/details) plus merges the notes into `sow_notes`. Only loaded on `housing.html`. Extend by editing the `TRADES` data tree — the UI is fully data-driven.
+
 ### SOW project numbers
 Format: `SOW-YYYY-NN` where `NN` is a global sequential counter across all units for that year. `nextProjectNumber()` in `shared-sow.js` scans the entire `_sowCache` to find the highest existing `NN` for the current year and increments it. Numbers are NOT per-unit — a unit can have multiple SOWs but each gets a unique global number.
 
