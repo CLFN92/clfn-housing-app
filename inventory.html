@@ -405,12 +405,13 @@
             <option value="condemned">Condemned</option>
           </select>
         </div>
-        <div class="f" id="ue_renovation_row">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" id="ue_under_renovation" style="width:16px;height:16px;cursor:pointer;">
-            Under Renovations
-          </label>
-        </div>
+      </div>
+      <div id="ue_renovation_row" style="background:var(--warn-amber-bg);border:1px solid var(--warn-amber-border);border-radius:8px;padding:10px 14px;margin-top:2px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;">
+          <input type="checkbox" id="ue_under_renovation" style="width:17px;height:17px;cursor:pointer;accent-color:var(--yellow);">
+          <span>🔨 Under Renovations</span>
+          <span style="font-size:11px;font-weight:400;color:var(--warn-amber-text);margin-left:4px;">— applies alongside the occupancy status above (not available when Condemned)</span>
+        </label>
       </div>
 
       <!-- Assignment (shown only for occupied/reserved) -->
