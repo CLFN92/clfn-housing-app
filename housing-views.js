@@ -23,6 +23,20 @@ function _fmtUnitType(type) {
   if (!type || type === '0' || type === 'nan') return '';
   return type.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
 }
+
+var _FUNDER_LABELS = {
+  'ISC':              'ISC',
+  'CMHC_95':         'CMHC Sec. 95',
+  'section_10':      'Section 10',
+  'rent_to_own':     'Rent-to-Own',
+  'band_house':      'Band House',
+  'privately_owned': 'Privately Owned',
+  'Other':           'Other',
+};
+function _fmtFunder(val) {
+  if (!val) return '';
+  return _FUNDER_LABELS[val] || val.replace(/_/g, ' ');
+}
 function _roomBedLabel(u) {
   var n = u ? u.bedrooms : null;
   if (n == null || n === '') return '';
@@ -225,7 +239,7 @@ function renderInventoryView(){
     type:        { label: 'Type',          accessor: function(u){ return _fmtUnitType(u.type) || '(none)'; } },
     foundation:  { label: 'Foundation',    accessor: function(u){ return (u.foundation && u.foundation !== '0' && u.foundation !== 'nan') ? u.foundation : '(none)'; } },
     accessible:  { label: 'Accessibility', accessor: function(u){ return u.accessible ? 'Accessible' : 'Non-accessible'; } },
-    funder:      { label: 'Funder',        accessor: function(u){ return u.funder || '(none)'; } },
+    funder:      { label: 'Funder',        accessor: function(u){ return _fmtFunder(u.funder) || '(none)'; } },
     status:      { label: 'Status',        accessor: function(u){ return (statusStyle[u.status]||{}).label || u.status || 'Unknown'; } },
     rent:        { label: 'Rent',          accessor: function(u){ return (u.monthlyRent != null && u.monthlyRent !== '') ? Number(u.monthlyRent) : -1; } },
     reno_score:  { label: 'Reno Score',    accessor: function(u){ try { return calcRenoScore(u.id).score; } catch(e){ return 0; } } }
@@ -258,7 +272,7 @@ function renderInventoryView(){
     var bath = (u.bathrooms&&u.bathrooms!=='0'&&u.bathrooms!=='nan') ? u.bathrooms : '—';
     var fnd  = (u.foundation&&u.foundation!=='nan'&&u.foundation!=='0') ? u.foundation : '—';
     var type = _fmtUnitType(u.type) || '—';
-    var funder = u.funder||'—';
+    var funder = _fmtFunder(u.funder)||'—';
     var uid = u.id.replace(/'/g,"\\'");
     return '<tr style="border-bottom:1px solid var(--border);transition:background .12s;" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
       +'<td style="padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="openUnitDetail(\''+uid+'\')">'+'<span style="text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;">'+addr+'</span>'
