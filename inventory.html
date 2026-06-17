@@ -24,7 +24,14 @@
 <script src="housing-app.js"></script>
 <script src="housing-init.js"></script>
 
-<style>body{opacity:0;transition:opacity .15s ease;}</style>
+<style>body{opacity:0;transition:opacity .15s ease;}
+.ue-status-pill{border:1.5px solid var(--border);border-radius:20px;padding:5px 16px;font-size:12px;font-weight:600;background:none;cursor:pointer;color:var(--muted);transition:all .15s;font-family:DM Sans,sans-serif;}
+.ue-status-pill:hover{border-color:var(--yellow);color:var(--text);}
+.ue-status-pill.active{background:var(--yellow);border-color:var(--yellow);color:var(--dark);}
+.ue-status-pill[data-status="condemned"].active{background:#fef2f2;border-color:#f87171;color:#b91c1c;}
+#ue_reno_pill.active{background:var(--warn-amber-bg);border-color:var(--warn-amber-border)!important;color:var(--warn-amber-text);border-style:solid!important;}
+#ue_reno_pill:disabled{opacity:.35;cursor:not-allowed;}
+</style>
 </head><body>
 <!-- ─── APPROVAL ACTION MODAL ─── -->
 <div id="approvalModal" class="modal-overlay modal-overlay-centered modal-z-800">
@@ -398,20 +405,20 @@
           </select>
         </div>
         <div class="f"><label>Status</label>
-          <select id="ue_status" onchange="unitEditStatusChange()">
-            <option value="vacant">Vacant</option>
-            <option value="occupied">Occupied</option>
-            <option value="reserved">Reserved</option>
-            <option value="condemned">Condemned</option>
-          </select>
+          <input type="hidden" id="ue_status" value="vacant">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:2px;">
+            <button type="button" class="ue-status-pill" data-status="vacant"    onclick="ueStatusPillClick('vacant')">Vacant</button>
+            <button type="button" class="ue-status-pill" data-status="occupied"  onclick="ueStatusPillClick('occupied')">Occupied</button>
+            <button type="button" class="ue-status-pill" data-status="reserved"  onclick="ueStatusPillClick('reserved')">Reserved</button>
+            <button type="button" class="ue-status-pill" data-status="condemned" onclick="ueStatusPillClick('condemned')">Condemned</button>
+          </div>
+          <div style="margin-top:8px;">
+            <button type="button" id="ue_reno_pill" onclick="ueRenoPillClick()" style="display:flex;align-items:center;gap:8px;border:1.5px dashed var(--border);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;background:none;cursor:pointer;color:var(--muted);transition:all .15s;">
+              🔨 Under Renovations
+            </button>
+            <input type="checkbox" id="ue_under_renovation" style="display:none;">
+          </div>
         </div>
-      </div>
-      <div id="ue_renovation_row" style="background:var(--warn-amber-bg);border:1px solid var(--warn-amber-border);border-radius:8px;padding:10px 14px;margin-top:2px;">
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;">
-          <input type="checkbox" id="ue_under_renovation" style="width:17px;height:17px;cursor:pointer;accent-color:var(--yellow);">
-          <span>🔨 Under Renovations</span>
-          <span style="font-size:11px;font-weight:400;color:var(--warn-amber-text);margin-left:4px;">— applies alongside the occupancy status above (not available when Condemned)</span>
-        </label>
       </div>
 
       <!-- Assignment (shown only for occupied/reserved) -->

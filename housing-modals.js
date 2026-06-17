@@ -99,10 +99,8 @@ function openUnitEditModal(unitId){
   set('ue_constructionCost', (u.constructionCost != null ? u.constructionCost : (u.construction_cost != null ? u.construction_cost : '')));
   set('ue_rent', (u.monthlyRent != null ? u.monthlyRent : (u.monthly_rent != null ? u.monthly_rent : '')));
   _gateRentInput('ue_rent');
-  set('ue_status',u.status||'vacant');
-  var urChk = document.getElementById('ue_under_renovation');
-  if(urChk) urChk.checked = !!u.under_renovation;
-  unitEditStatusChange();
+  _ueSetStatus(u.status||'vacant');
+  _ueSetUnderRenovation(!!u.under_renovation);
   set('ue_assignedDate',u.assignedDate);
   set('ue_notes',u.notes);
   // Populate hidden assignment fields
@@ -227,6 +225,40 @@ function ueFunderChanged() {
   if (!isCmhc) cmhcEl.value = '';
 }
 
+// ── Status pill helpers ───────────────────────────────────────────────────────
+function ueStatusPillClick(val) {
+  var inp = document.getElementById('ue_status');
+  if (inp) inp.value = val;
+  document.querySelectorAll('.ue-status-pill').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-status') === val);
+  });
+  unitEditStatusChange();
+}
+
+function ueRenoPillClick() {
+  var chk = document.getElementById('ue_under_renovation');
+  var pill = document.getElementById('ue_reno_pill');
+  if (!chk || (pill && pill.disabled)) return;
+  chk.checked = !chk.checked;
+  if (pill) pill.classList.toggle('active', chk.checked);
+}
+
+function _ueSetStatus(val) {
+  var inp = document.getElementById('ue_status');
+  if (inp) inp.value = val || 'vacant';
+  document.querySelectorAll('.ue-status-pill').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-status') === (val || 'vacant'));
+  });
+  unitEditStatusChange();
+}
+
+function _ueSetUnderRenovation(val) {
+  var chk = document.getElementById('ue_under_renovation');
+  var pill = document.getElementById('ue_reno_pill');
+  if (chk) chk.checked = !!val;
+  if (pill) pill.classList.toggle('active', !!val);
+}
+
 function unitEditStatusChange(){
   var status=(document.getElementById('ue_status')||{}).value||'';
   var row=document.getElementById('ue_assign_row');
@@ -235,16 +267,13 @@ function unitEditStatusChange(){
   if(row) row.style.display = hideStatuses.includes(status) ? 'none' : 'flex';
   // Condemned units cannot be under renovation — disable and uncheck
   var urChk = document.getElementById('ue_under_renovation');
-  var urRow = document.getElementById('ue_renovation_row');
-  if(urChk && urRow){
-    if(status === 'condemned'){
-      urChk.checked = false;
-      urChk.disabled = true;
-      urRow.style.opacity = '0.4';
-    } else {
-      urChk.disabled = false;
-      urRow.style.opacity = '';
-    }
+  var pill  = document.getElementById('ue_reno_pill');
+  if(status === 'condemned'){
+    if(urChk){ urChk.checked = false; urChk.disabled = true; }
+    if(pill){ pill.classList.remove('active'); pill.disabled = true; }
+  } else {
+    if(urChk) urChk.disabled = false;
+    if(pill){ pill.disabled = false; pill.classList.toggle('active', !!urChk && urChk.checked); }
   }
 }
 function closeUnitEditModal(){
@@ -670,8 +699,7 @@ function _ueRemoveTenantFields() {
   if (sel) { sel.style.display = 'none'; sel.innerHTML = ''; }
   var statusEl = document.getElementById('ue_status');
   if (statusEl && statusEl.value === 'occupied') {
-    statusEl.value = 'vacant';
-    unitEditStatusChange();
+    _ueSetStatus('vacant');
   }
 }
 
