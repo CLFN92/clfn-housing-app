@@ -238,7 +238,7 @@ function ueStatusPillClick(val) {
 function ueRenoPillClick() {
   var chk = document.getElementById('ue_under_renovation');
   var pill = document.getElementById('ue_reno_pill');
-  if (!chk || (pill && pill.disabled)) return;
+  if (!chk || (pill && pill.classList.contains('ue-reno-locked'))) return;
   chk.checked = !chk.checked;
   if (pill) pill.classList.toggle('active', chk.checked);
 }
@@ -269,11 +269,10 @@ function unitEditStatusChange(){
   var urChk = document.getElementById('ue_under_renovation');
   var pill  = document.getElementById('ue_reno_pill');
   if(status === 'condemned'){
-    if(urChk){ urChk.checked = false; urChk.disabled = true; }
-    if(pill){ pill.classList.remove('active'); pill.disabled = true; }
+    if(urChk) urChk.checked = false;
+    if(pill){ pill.classList.remove('active'); pill.classList.add('ue-reno-locked'); }
   } else {
-    if(urChk) urChk.disabled = false;
-    if(pill){ pill.disabled = false; pill.classList.toggle('active', !!urChk && urChk.checked); }
+    if(pill){ pill.classList.remove('ue-reno-locked'); pill.classList.toggle('active', !!urChk && urChk.checked); }
   }
 }
 function closeUnitEditModal(){
