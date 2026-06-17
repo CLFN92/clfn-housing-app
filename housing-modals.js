@@ -2981,10 +2981,13 @@ function confirmApprovalAction() {
 
   showToast((statusDesc[action] || action) + ' — ' + ((app.fn||'') + ' ' + (app.ln||'')).trim());
 
-  // Refresh the scorecard action buttons
-  renderScorecardActions(applications[idx]);
-
-  // Refresh dashboard if visible
-  if(typeof updateDashStats === 'function') updateDashStats();
-  if(typeof renderDashTable === 'function') renderDashTable();
+  // Return to the refreshed landing page after any approval/decision action
+  if(typeof showDash === 'function') {
+    showDash();
+  } else {
+    // Fallback: refresh scorecard buttons and dashboard in place
+    if(typeof renderScorecardActions === 'function') renderScorecardActions(applications[idx]);
+    if(typeof updateDashStats === 'function') updateDashStats();
+    if(typeof renderDashTable === 'function') renderDashTable();
+  }
 }
