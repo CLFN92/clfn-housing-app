@@ -1662,7 +1662,10 @@ function popReview(){
 // shared.js so we don't depend on per-page submitModal markup (which only
 // existed on match.html — that's why the Submit button on housing.html
 // silently did nothing before this fix).
-// Returns { hard: [apps with exact email match], soft: [apps with name+DOB match] }
+// Returns { hard, soft, nameOnly }
+//   hard     — exact email match (blocks submission)
+//   soft     — same first name + last name + date of birth (warns, requires confirmation)
+//   nameOnly — same first name + last name only, DOB absent or different (warns, requires confirmation)
 // Excludes the current draft (currentAppId), archived apps, and declined apps.
 function _findDuplicateApplications() {
   var allApps = (typeof applications !== 'undefined') ? applications : [];
@@ -1670,7 +1673,7 @@ function _findDuplicateApplications() {
   var ln    = ((document.getElementById('ln')||{}).value||'').trim().toLowerCase();
   var dob   = ((document.getElementById('dob')||{}).value||'').trim();
   var email = ((document.getElementById('email')||{}).value||'').trim().toLowerCase();
-  var hard = [], soft = [];
+  var hard = [], soft = [], nameOnly = [];
   allApps.forEach(function(a) {
     if (!a || a.archived || a.status === 'declined' || a.id === currentAppId) return;
     var aEmail = (a.email||'').trim().toLowerCase();
@@ -1678,9 +1681,12 @@ function _findDuplicateApplications() {
     var aLn    = (a.ln||'').trim().toLowerCase();
     var aDob   = (a.dob||'').trim();
     if (email && aEmail && email === aEmail) { hard.push(a); return; }
-    if (fn && ln && dob && fn === aFn && ln === aLn && dob === aDob) soft.push(a);
+    if (fn && ln && fn === aFn && ln === aLn) {
+      if (dob && aDob && dob === aDob) soft.push(a);
+      else nameOnly.push(a);
+    }
   });
-  return { hard: hard, soft: soft };
+  return { hard: hard, soft: soft, nameOnly: nameOnly };
 }
 
 function openSubmitModal(){
@@ -1757,6 +1763,23 @@ function openSubmitModal(){
       title:       'Possible Duplicate Application',
       message:     'An application with the same name and date of birth already exists:<br><br>'
                  + softLines + '<br><br>Do you want to submit anyway?',
+      confirmText: 'Submit Anyway',
+      danger:      true
+    }).then(function(ok) { if (ok) _proceed(); });
+    return;
+  }
+
+  if (_dups.nameOnly.length) {
+    var nameLines = _dups.nameOnly.slice(0, 3).map(function(a) {
+      return '&bull; <strong>' + escapeHtml(((a.fn||'')+' '+(a.ln||'')).trim()||a.id) + '</strong>'
+           + ' &nbsp;(' + escapeHtml(a.id) + ')&nbsp; &mdash; ' + escapeHtml(a.status||'unknown')
+           + (a.appDate ? ' &nbsp;· Applied ' + escapeHtml(a.appDate) : '');
+    }).join('<br>');
+    showConfirm({
+      title:       'Applicant Name Already Exists',
+      message:     'An application with the same name already exists:<br><br>'
+                 + nameLines + '<br><br>'
+                 + 'Please confirm this is a different person before submitting.',
       confirmText: 'Submit Anyway',
       danger:      true
     }).then(function(ok) { if (ok) _proceed(); });
