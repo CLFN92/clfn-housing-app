@@ -2707,6 +2707,12 @@ function confirmApprovalAction() {
   if(typeof updateDashStats === 'function') updateDashStats();
   if(typeof renderMatchView === 'function' && document.getElementById('matchView') && document.getElementById('matchView').style.display !== 'none') renderMatchView();
 
+  // Refresh the landing-page worklist + KPIs so an actioned application leaves
+  // the worklist immediately (previously it lingered until you navigated away
+  // and back, because the home view was never re-rendered after the action).
+  if(typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
+  if(typeof _renderLandingKpis === 'function') _renderLandingKpis();
+
   // Status label descriptions
   var statusDesc = {
     mgr_approved: 'Recommended to Executive Director',
