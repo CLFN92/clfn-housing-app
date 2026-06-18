@@ -1475,7 +1475,7 @@ function saveSOW(opts){
       var _prev = existingForStatus ? existingForStatus.approval_status : null;
       if(_u && typeof maybeAutoFlipUnitForSow === 'function' && maybeAutoFlipUnitForSow(_u, data, _prev)){
         saveUnitWithDraftFallback(_u);
-        var _newStatus = _u.status === 'under_repair' ? 'Under Repair' : (_u.status || 'updated');
+        var _newStatus = _u.under_renovation ? 'Under Renovations' : (_u.status || 'updated');
         auditEntry('UNIT:'+_sowUnitId, 'unit_status_auto', (_u.num+' '+_u.street).trim()+' → '+_newStatus+' (SOW '+(data.project_number||'')+' '+(data.approval_status==='completed'?'completed':'approved')+')', _saveRole);
       }
     } catch(e){ console.warn('[SOW] auto-flip threw:', e); }

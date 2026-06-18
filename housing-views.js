@@ -23,6 +23,20 @@ function _fmtUnitType(type) {
   if (!type || type === '0' || type === 'nan') return '';
   return type.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
 }
+
+var _FUNDER_LABELS = {
+  'ISC':              'ISC',
+  'CMHC_95':         'CMHC Sec. 95',
+  'section_10':      'Section 10',
+  'rent_to_own':     'Rent-to-Own',
+  'band_house':      'Band House',
+  'privately_owned': 'Privately Owned',
+  'Other':           'Other',
+};
+function _fmtFunder(val) {
+  if (!val) return '';
+  return _FUNDER_LABELS[val] || val.replace(/_/g, ' ');
+}
 function _roomBedLabel(u) {
   var n = u ? u.bedrooms : null;
   if (n == null || n === '') return '';
@@ -206,7 +220,7 @@ function renderInventoryView(){
   var statusStyle = {
     vacant:      {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
     occupied:    {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
-    under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Under Repair'},
+    under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Vacant'},
     reserved:    {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
     condemned:   {bg:'#fef2f2',c:'#b91c1c',label:'Condemned'},
     archived:    {bg:'#f4f4f0',c:'var(--gray)',   label:'Archived'}
@@ -225,7 +239,7 @@ function renderInventoryView(){
     type:        { label: 'Type',          accessor: function(u){ return _fmtUnitType(u.type) || '(none)'; } },
     foundation:  { label: 'Foundation',    accessor: function(u){ return (u.foundation && u.foundation !== '0' && u.foundation !== 'nan') ? u.foundation : '(none)'; } },
     accessible:  { label: 'Accessibility', accessor: function(u){ return u.accessible ? 'Accessible' : 'Non-accessible'; } },
-    funder:      { label: 'Funder',        accessor: function(u){ return u.funder || '(none)'; } },
+    funder:      { label: 'Funder',        accessor: function(u){ return _fmtFunder(u.funder) || '(none)'; } },
     status:      { label: 'Status',        accessor: function(u){ return (statusStyle[u.status]||{}).label || u.status || 'Unknown'; } },
     rent:        { label: 'Rent',          accessor: function(u){ return (u.monthlyRent != null && u.monthlyRent !== '') ? Number(u.monthlyRent) : -1; } },
     reno_score:  { label: 'Reno Score',    accessor: function(u){ try { return calcRenoScore(u.id).score; } catch(e){ return 0; } } }
@@ -258,7 +272,7 @@ function renderInventoryView(){
     var bath = (u.bathrooms&&u.bathrooms!=='0'&&u.bathrooms!=='nan') ? u.bathrooms : '—';
     var fnd  = (u.foundation&&u.foundation!=='nan'&&u.foundation!=='0') ? u.foundation : '—';
     var type = _fmtUnitType(u.type) || '—';
-    var funder = u.funder||'—';
+    var funder = _fmtFunder(u.funder)||'—';
     var uid = u.id.replace(/'/g,"\\'");
     return '<tr style="border-bottom:1px solid var(--border);transition:background .12s;" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
       +'<td style="padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="openUnitDetail(\''+uid+'\')">'+'<span style="text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;">'+addr+'</span>'
@@ -271,6 +285,7 @@ function renderInventoryView(){
       +'<td style="padding:9px 10px;text-align:center;font-size:14px;">'+(u.accessible?'<span title="Accessible">♿</span>':'<span style="color:var(--border);">—</span>')+'</td>'
       +'<td class="col-hide-tablet" style="padding:9px 10px;font-size:12px;color:var(--muted);">'+funder+'</td>'
       +'<td style="padding:9px 14px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
+      +(u.under_renovation?' <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--warn-amber-bg);color:var(--warn-amber-text);margin-left:4px;">🔨 Reno</span>':'')
       +(u.assignedName?' <span class="js-lbl-sm">→ '+u.assignedName+'</span>':'')+'</td>'
       +(function(){
         var r = (u.monthlyRent != null && u.monthlyRent !== '') ? Number(u.monthlyRent) : null;
@@ -861,7 +876,7 @@ function unitSearchFilter(q) {
   var statusStyle = {
     vacant:      {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
     occupied:    {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
-    under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Under Repair'},
+    under_repair:{bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
     reserved:    {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
     condemned:   {bg:'#fef2f2',c:'#b91c1c',label:'Condemned'}
   };
@@ -1043,6 +1058,8 @@ function _renderLandingKpis(){
   setKpi('kpi_house_requests',  houseRequests);
 }
 
+var _kpiDrillData = null; // { title, headers, rows, colWidths, filename }
+
 function showHousingKpiDrilldown(type) {
   var apps  = (typeof applications !== 'undefined' && applications) ? applications : [];
   var units = (typeof housingUnits  !== 'undefined' && housingUnits)  ? housingUnits  : [];
@@ -1067,13 +1084,19 @@ function showHousingKpiDrilldown(type) {
     var d = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
     return d >= 0 ? d + 'd' : '—';
   }
+  function daysSinceRaw(dateStr) {
+    if (!dateStr) return '';
+    var d = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+    return d >= 0 ? d + ' days' : '';
+  }
   function appRow(a, cols) {
     var sid = (a.id||'').replace(/'/g,"\\'");
     return '<tr class="clickable" onclick="_closeHousingKpiDrill();if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">'
       + cols + '</tr>';
   }
 
-  var title, html;
+  var title, html, exportHeaders, exportRows, exportColWidths;
+  var today = new Date().toISOString().slice(0,10);
 
   if (type === 'open') {
     title = 'Open Applications';
@@ -1081,6 +1104,12 @@ function showHousingKpiDrilldown(type) {
       if (!a || a.archived) return false;
       return a.status==='submitted' || a.status==='file_update' || a.status==='mgr_approved';
     }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
+    exportHeaders = ['Applicant','App ID','Status','Tier','Score','Days Waiting'];
+    exportColWidths = [28,16,14,22,8,12];
+    exportRows = rows.map(function(a){
+      return [(a.fn||'')+' '+(a.ln||''), a.id||'', STATUS_LABELS[a.status]||a.status||'',
+              a.tier_v2||a.tier||'', a.score||0, daysSinceRaw(a.appDate)];
+    });
     html = '<table class="tbl"><thead><tr>'
       + '<th>Applicant</th><th>Status</th><th>Tier</th><th class="std-cell-right">Score</th><th>Waiting</th>'
       + '</tr></thead><tbody>'
@@ -1099,6 +1128,13 @@ function showHousingKpiDrilldown(type) {
     title = 'Vacant Units';
     var rows = units.filter(function(u){ return u && !u.archived && u.status==='vacant'; })
       .slice().sort(function(a,b){ return ((a.street||'')+(a.num||'')).localeCompare((b.street||'')+(b.num||'')); });
+    exportHeaders = ['Address','Bedrooms','Type','Classification','Accessible','Elders Unit'];
+    exportColWidths = [28,10,16,20,12,12];
+    exportRows = rows.map(function(u){
+      return [(u.num||'')+' '+(u.street||''), u.bedrooms||'',
+              _fmtUnitType(u.type)||'', u.classification||'',
+              u.accessible?'Yes':'', u.isElders?'Yes':''];
+    });
     html = '<table class="tbl"><thead><tr>'
       + '<th>Address</th><th class="std-cell-right">Beds</th><th>Type</th><th>Classification</th>'
       + '</tr></thead><tbody>'
@@ -1124,6 +1160,12 @@ function showHousingKpiDrilldown(type) {
       if (!a || a.archived || a.status==='declined') return false;
       return _typeCfg.pred(a.appType || 'new_housing');
     }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
+    exportHeaders = ['Applicant','App ID','Tier','Score','Status','Days Waiting'];
+    exportColWidths = [28,16,22,8,14,12];
+    exportRows = rows.map(function(a){
+      return [(a.fn||'')+' '+(a.ln||''), a.id||'', a.tier_v2||a.tier||'',
+              a.score||0, STATUS_LABELS[a.status]||a.status||'', daysSinceRaw(a.appDate)];
+    });
     html = '<table class="tbl"><thead><tr>'
       + '<th>Applicant</th><th>Status</th><th>Tier</th><th class="std-cell-right">Score</th><th>Waiting</th>'
       + '</tr></thead><tbody>'
@@ -1139,15 +1181,38 @@ function showHousingKpiDrilldown(type) {
       + '</tbody></table>';
   }
 
+  _kpiDrillData = {
+    title:     title,
+    headers:   exportHeaders,
+    rows:      exportRows,
+    colWidths: exportColWidths,
+    filename:  'CLFN_' + (title||type).replace(/[^a-zA-Z0-9]+/g,'_') + '_' + today
+  };
+
   var existing = document.getElementById('modalHousingKpiDrill');
   if (existing) existing.remove();
   var mo = document.createElement('div');
   mo.className = 'modal-ov';
   mo.id = 'modalHousingKpiDrill';
   mo.innerHTML =
-    '<div class="modal" style="max-width:820px;width:96%;">'
-    + '<div class="modal-hdr"><div><h2>'+title+'</h2></div>'
-    + '<button class="modal-close" onclick="_closeHousingKpiDrill()">&#x2715;</button></div>'
+    '<div class="modal" style="max-width:860px;width:96%;">'
+    + '<div class="modal-hdr">'
+    +   '<div><h2>' + title + '</h2>'
+    +   (exportRows && exportRows.length ? '<div style="font-size:11px;opacity:.7;margin-top:2px;">' + exportRows.length + ' record' + (exportRows.length===1?'':'s') + '</div>' : '')
+    +   '</div>'
+    +   '<div class="flex-gap8 flex-wrap" style="align-items:center;">'
+    +     '<button class="btn btn-ghost-dark" onclick="_kpiDrillPrint()">&#128438; Print</button>'
+    +     '<div class="export-dropdown">'
+    +       '<button onclick="toggleExportMenu(this)" class="btn btn-primary">&#128196; Export</button>'
+    +       '<div class="header-export-menu">'
+    +         '<button onclick="_kpiDrillExport(\'pdf\')"   class="header-export-item">Save as PDF</button>'
+    +         '<button onclick="_kpiDrillExport(\'excel\')" class="header-export-item">Excel (.xlsx)</button>'
+    +         '<button onclick="_kpiDrillExport(\'csv\')"   class="header-export-item">CSV</button>'
+    +       '</div>'
+    +     '</div>'
+    +     '<button class="modal-close" onclick="_closeHousingKpiDrill()">&#x2715;</button>'
+    +   '</div>'
+    + '</div>'
     + '<div class="modal-body" style="padding:0;"><div class="tbl-wrap">'+html+'</div></div>'
     + '</div>';
   mo.addEventListener('click', function(e){ if (e.target === mo) _closeHousingKpiDrill(); });
@@ -1159,6 +1224,42 @@ function showHousingKpiDrilldown(type) {
 function _closeHousingKpiDrill() {
   var m = document.getElementById('modalHousingKpiDrill');
   if (m) m.remove();
+}
+
+function _kpiDrillExport(format) {
+  if (!_kpiDrillData || !_kpiDrillData.rows) return;
+  if (typeof _doExport === 'function') {
+    _doExport(format, _kpiDrillData.headers, _kpiDrillData.rows,
+              _kpiDrillData.filename, _kpiDrillData.colWidths, false);
+  }
+}
+
+function _kpiDrillPrint() {
+  if (!_kpiDrillData) return;
+  var d = _kpiDrillData;
+  var nation = (window.NATION_CONFIG && window.NATION_CONFIG.display_name) || 'CLFN Housing';
+  var dateStr = new Date().toLocaleDateString('en-CA', {year:'numeric',month:'long',day:'numeric'});
+  var thead = '<tr>' + d.headers.map(function(h){ return '<th>'+h+'</th>'; }).join('') + '</tr>';
+  var tbody = (d.rows && d.rows.length)
+    ? d.rows.map(function(r){ return '<tr>' + r.map(function(c){ return '<td>'+(c==null?'':c)+'</td>'; }).join('') + '</tr>'; }).join('')
+    : '<tr><td colspan="'+d.headers.length+'" style="text-align:center;padding:20px;color:#666;">No records.</td></tr>';
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+d.title+'</title>'
+    + '<style>'
+    + 'body{font-family:Arial,sans-serif;font-size:12px;color:#111;margin:24px;}'
+    + 'h1{font-size:16px;margin:0 0 2px;}p{margin:0 0 14px;font-size:11px;color:#555;}'
+    + 'table{width:100%;border-collapse:collapse;}'
+    + 'th{background:#111;color:#fff;padding:6px 8px;text-align:left;font-size:11px;}'
+    + 'td{padding:5px 8px;border-bottom:1px solid #e5e5e5;font-size:11px;}'
+    + 'tr:nth-child(even) td{background:#f9f9f9;}'
+    + '@media print{body{margin:12px;}}'
+    + '</style></head><body>'
+    + '<h1>'+d.title+'</h1>'
+    + '<p>'+nation+' &mdash; Generated '+dateStr+(d.rows?' &mdash; '+d.rows.length+' record'+(d.rows.length===1?'':'s'):'')+'</p>'
+    + '<table><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table>'
+    + '<script>window.onload=function(){window.print();}<\/script>'
+    + '</body></html>';
+  var w = window.open('', '_blank', 'width=960,height=700');
+  if (w) { w.document.write(html); w.document.close(); }
 }
 
 // Compat shims — old call sites continue to work.
@@ -1256,7 +1357,7 @@ function showEmployeeHome(){
     var matched     = apps.filter(function(a){return !!a.assignedUnit;}).length;
 
     var tenanted    = units.filter(function(u){return u.status==='occupied'||u.status==='reserved';}).length;
-    var underRepair = units.filter(function(u){return u.status==='under_repair';}).length;
+    var underRepair = units.filter(function(u){return u.under_renovation;}).length;
     var condemned   = units.filter(function(u){return u.status==='condemned';}).length;
     var ctCount = 0;
 
@@ -1316,7 +1417,7 @@ function showEmployeeHome(){
     var sowPendingHM=0, sowPendingED=0, sowApproved=0, sowNoSow=0, sowInProgress=0;
     try {
       var allU=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-      var renoUnits=allU.filter(function(u){return (u.status==='under_repair'||u.status==='condemned')&&!u.archived;});
+      var renoUnits=allU.filter(function(u){return (u.under_renovation||u.status==='condemned')&&!u.archived;});
       var hmLimit2=parseFloat(((window._appSettings||{}).hmBudgetLimit)||25000);
       renoUnits.forEach(function(u){
         var sow=null; sow = getSowData(u.id);

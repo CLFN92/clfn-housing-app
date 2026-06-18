@@ -117,7 +117,7 @@ function searchCurrentUnit(q){
   }
   dd.innerHTML = matches.map(function(u){
     var addr = u.num+' '+u.street;
-    var statusLabel = {occupied:'Occupied',vacant:'Vacant',under_repair:'Under Repair',condemned:'Condemned',reserved:'Reserved'}[u.status]||u.status;
+    var statusLabel = {occupied:'Occupied',vacant:'Vacant',condemned:'Condemned',reserved:'Reserved'}[u.status]||u.status;
     return '<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;" '
       +'data-uid="'+u.id+'" data-label="'+addr+'" onmousedown="selectCurrentUnit(this)">'
       +'<span style="font-weight:600;">'+addr+'</span>'
@@ -446,7 +446,9 @@ function renderScorecardActions(app) {
     }
   }
 
-  if(!actions.length) { bar.style.display = 'none'; return; }
+  var canAssignSecondary = status === 'assigned' && APPROVAL_AUTHORITY.can('assignUnit', role);
+
+  if(!actions.length && !canAssignSecondary) { bar.style.display = 'none'; return; }
 
   bar.style.display = 'block';
   btns.innerHTML = actions.map(function(a) {
@@ -454,6 +456,47 @@ function renderScorecardActions(app) {
       + 'onclick="openApprovalModal(\'' + a.action + '\',\'' + (a.confirmLabel||a.label) + '\',' + (a.needsNotes?'true':'false') + ')">'
       + a.label + '</button>';
   }).join('');
+
+  // Secondary unit assign button — available once primary unit is assigned
+  if (canAssignSecondary) {
+    var secBtn = document.createElement('button');
+    secBtn.className = 'btn btn-primary';
+    secBtn.style.fontSize = '13px';
+    secBtn.textContent = '🏢 Assign Secondary Unit';
+    secBtn.onclick = function() { openAssignModal(app.id); };
+    btns.appendChild(secBtn);
+  }
+
+  // Secondary units strip — list any additional units this tenant holds
+  var secStrip = document.getElementById('sc_secondary_units');
+  if (secStrip) {
+    var secIds = app.secondaryUnits || [];
+    var secAddrs = app.secondaryAddresses || [];
+    if (secIds.length) {
+      var allUnits2 = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+      var secCards = secIds.map(function(uid, i) {
+        var su = allUnits2.find(function(x){ return x.id === uid; });
+        var addr2 = su ? su.num+' '+su.street : (secAddrs[i] || uid);
+        var typeLabel = su ? (_fmtUnitType(su.type)||'—') : '—';
+        var funderLabel = su ? (_fmtFunder(su.funder)||'—') : '—';
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">'
+          +'<div>'
+            +'<div style="font-size:13px;font-weight:700;color:var(--text);">'+addr2+'</div>'
+            +'<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+typeLabel+' · '+funderLabel+'</div>'
+          +'</div>'
+          +'<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:var(--info-blue-bg);color:var(--info-blue);">Secondary</span>'
+          +'</div>';
+      }).join('');
+      secStrip.innerHTML = '<div class="sc-surface sc-action-bar" style="margin-top:0;">'
+        +'<div class="lbl-muted mb-12">Secondary Units</div>'
+        +'<div style="display:flex;flex-direction:column;gap:8px;">'+secCards+'</div>'
+        +'</div>';
+      secStrip.style.display = 'block';
+    } else {
+      secStrip.style.display = 'none';
+      secStrip.innerHTML = '';
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -507,11 +550,21 @@ var _amAppId = null;
 var _amBestUnitId = null;
 var _amSelectedUnitId = null;
 var _amAllScored = [];
+var _amSecondaryScored = []; // commercial / privately-owned units shown in secondary section
 // Search/filter state for the assign-unit modal — kept module-level so
 // amFilterUnits() can re-render with the captured role/needsAccess context.
 var _amSearchQuery = '';
 var _amCurrentRole = '';
 var _amCurrentNeedsAccess = false;
+
+// Secondary-eligible unit definition — commercial / band buildings or privately-owned funder.
+// These units can be assigned to a tenant who already holds a primary band unit.
+var _SECONDARY_FUNDERS = ['privately_owned'];
+var _SECONDARY_TYPES   = ['commercial_building', 'admin_building', 'band_building'];
+function _isSecondaryEligibleUnit(u) {
+  if (!u) return false;
+  return _SECONDARY_FUNDERS.indexOf(u.funder) !== -1 || _SECONDARY_TYPES.indexOf(u.type) !== -1;
+}
 
 function _scoreUnit(u, needsBeds, needsAccess, isElders) {
   var sc = 0;
@@ -640,7 +693,8 @@ function openAssignModal(appId, suggestedUnitId) {
   if(!app){ showToast('Application not found'); return; }
   var role = window.currentRole || 'housing_employee_l1';
 
-  var vacantUnits = allUnits.filter(function(u){ return u.status==='vacant' && !u.archived; });
+  // Primary pool: vacant units that are NOT secondary-eligible (band/ISC/CMHC housing)
+  var vacantUnits = allUnits.filter(function(u){ return u.status==='vacant' && !u.archived && !_isSecondaryEligibleUnit(u); });
   var name = ((app.fn||'')+' '+(app.ln||'')).trim();
   var needsBeds   = Math.max(1,1+(app.coApp?1:0)+((app.habitants||[]).length));
   var needsAccess = app.accessibility&&app.accessibility!=='None'&&app.accessibility!=='0'&&app.accessibility!==0;
@@ -670,10 +724,18 @@ function openAssignModal(appId, suggestedUnitId) {
     roleBadge.textContent = role=== ROLE.ED ? 'Executive Director — can override' : role=== ROLE.HOUSING_MANAGER ? 'Housing Manager — notes required' : 'Staff';
   }
 
-  // Score and rank all vacant units
+  // Score and rank all primary-pool vacant units
   _amAllScored = vacantUnits.map(function(u){
     return { unit:u, score:_scoreUnit(u, needsBeds, needsAccess, isElders), maxPossible:24 };
   }).sort(function(a,b){ return b.score-a.score; });
+
+  // Secondary pool: commercial / privately-owned units that are currently unassigned.
+  // A tenant can hold any number of these in addition to their primary unit.
+  _amSecondaryScored = allUnits.filter(function(u){
+    return !u.archived && _isSecondaryEligibleUnit(u) && !u.assignedTo;
+  }).sort(function(a, b){
+    return ((a.num||'') + ' ' + (a.street||'')).localeCompare((b.num||'') + ' ' + (b.street||''));
+  });
 
   // Capture context for filter re-renders + reset search input
   _amCurrentRole = role;
@@ -723,57 +785,83 @@ function amFilterUnits(q) {
 function amRenderUnitList(role, needsAccess) {
   var list = document.getElementById('am_unit_list');
   if(!list) return;
-  if(!_amAllScored.length){
-    list.innerHTML='<div class="empty-state-ctr">No vacant units available.</div>';
-    return;
-  }
-  // Determine recommendation context from the FULL ranked list so badges
-  // attach to the absolute-top units regardless of what's filtered out.
-  var topUnitId = _amAllScored[0].unit.id;
-  var topScore  = _amAllScored[0].score;
-  // Filter view by search query (matches num + street)
+
   var q = _amSearchQuery;
-  var visible = q
-    ? _amAllScored.filter(function(obj){
-        var hay = (obj.unit.num + ' ' + obj.unit.street).toLowerCase();
-        return hay.indexOf(q) !== -1;
-      })
-    : _amAllScored;
-  if(!visible.length){
-    list.innerHTML='<div class="empty-state-ctr">No units match your search.</div>';
-    return;
+  function _matchesQ(u) {
+    if (!q) return true;
+    return ((u.num||'') + ' ' + (u.street||'')).toLowerCase().indexOf(q) !== -1;
   }
-  list.innerHTML = visible.map(function(obj){
-    var u = obj.unit;
-    var pct = Math.round(Math.max(0, obj.score) / obj.maxPossible * 100);
-    var isTop = u.id === topUnitId;
-    var isAccMismatch = needsAccess && !u.accessible;
-    var barColor = isAccMismatch ? 'var(--danger)' : pct >= 70 ? 'var(--success)' : pct >= 40 ? 'var(--warn-amber)' : 'var(--muted)';
-    var badges = [];
-    var isTiedUnit = obj.score >= topScore - 1;
-    if(isTop) badges.push('<span style="font-size:9px;font-weight:800;padding:1px 7px;border-radius:10px;background:var(--yellow);color:var(--dark);">★ RECOMMENDED</span>');
-    else if(isTiedUnit) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:rgba(248,228,26,0.15);color:var(--warn-amber);border:1px solid var(--yellow);">≈ TIED MATCH</span>');
-    if(isAccMismatch) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:var(--danger-bg);color:var(--danger);">⚠ Not accessible</span>');
-    if(u.accessible && !isAccMismatch) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:var(--info-blue-bg);color:var(--info-blue);">♿ Accessible</span>');
-    if(u.isElders) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:var(--warn-amber-bg);color:var(--warn-amber);">Elders Unit</span>');
-    return '<div data-unit-id="'+u.id+'" style="padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;">'
-      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;">'
-        +'<div>'
-          +'<div style="font-size:13px;font-weight:700;color:var(--text);">'+u.num+' '+u.street+'</div>'
-          +'<div style="font-size:11px;color:var(--muted);margin-top:1px;">'+u.bedrooms+' bed · '+(u.type||'—')+(u.funder?' · '+u.funder:'')+'</div>'
+
+  var html = '';
+
+  // ── Primary section: vacant band/ISC/CMHC units ranked by match ──────────
+  var visiblePrimary = _amAllScored.filter(function(obj){ return _matchesQ(obj.unit); });
+  if (visiblePrimary.length) {
+    var topUnitId = _amAllScored[0].unit.id;
+    var topScore  = _amAllScored[0].score;
+    html += '<div style="padding:8px 16px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);">Primary Units — Ranked by Match</div>';
+    html += visiblePrimary.map(function(obj){
+      var u = obj.unit;
+      var pct = Math.round(Math.max(0, obj.score) / obj.maxPossible * 100);
+      var isTop = u.id === topUnitId;
+      var isAccMismatch = needsAccess && !u.accessible;
+      var barColor = isAccMismatch ? 'var(--danger)' : pct >= 70 ? 'var(--success)' : pct >= 40 ? 'var(--warn-amber)' : 'var(--muted)';
+      var badges = [];
+      var isTiedUnit = obj.score >= topScore - 1;
+      if(isTop) badges.push('<span style="font-size:9px;font-weight:800;padding:1px 7px;border-radius:10px;background:var(--yellow);color:var(--dark);">★ RECOMMENDED</span>');
+      else if(isTiedUnit) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:rgba(248,228,26,0.15);color:var(--warn-amber);border:1px solid var(--yellow);">≈ TIED MATCH</span>');
+      if(isAccMismatch) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:var(--danger-bg);color:var(--danger);">⚠ Not accessible</span>');
+      if(u.accessible && !isAccMismatch) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:var(--info-blue-bg);color:var(--info-blue);">♿ Accessible</span>');
+      if(u.isElders) badges.push('<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;background:var(--warn-amber-bg);color:var(--warn-amber);">Elders Unit</span>');
+      return '<div data-unit-id="'+u.id+'" style="padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;">'
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;">'
+          +'<div>'
+            +'<div style="font-size:13px;font-weight:700;color:var(--text);">'+u.num+' '+u.street+'</div>'
+            +'<div style="font-size:11px;color:var(--muted);margin-top:1px;">'+u.bedrooms+' bed · '+(_fmtUnitType(u.type)||'—')+(u.funder?' · '+_fmtFunder(u.funder):'')+'</div>'
+          +'</div>'
+          +'<div style="text-align:right;flex-shrink:0;">'
+            +'<div style="font-size:16px;font-weight:800;color:'+barColor+';">'+pct+'%</div>'
+            +'<div class="js-lbl-xs">match</div>'
+          +'</div>'
         +'</div>'
-        +'<div style="text-align:right;flex-shrink:0;">'
-          +'<div style="font-size:16px;font-weight:800;color:'+barColor+';">'+pct+'%</div>'
-          +'<div class="js-lbl-xs">match</div>'
+        +'<div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:6px;">'
+          +'<div style="height:100%;width:'+pct+'%;background:'+barColor+';border-radius:2px;transition:width .3s;"></div>'
         +'</div>'
-      +'</div>'
-      +'<div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:6px;">'
-        +'<div style="height:100%;width:'+pct+'%;background:'+barColor+';border-radius:2px;transition:width .3s;"></div>'
-      +'</div>'
-      +(badges.length?'<div style="display:flex;gap:4px;flex-wrap:wrap;">'+badges.join('')+'</div>':'')
+        +(badges.length?'<div style="display:flex;gap:4px;flex-wrap:wrap;">'+badges.join('')+'</div>':'')
+        +'</div>';
+    }).join('');
+  }
+
+  // ── Secondary section: commercial / privately-owned units ─────────────────
+  var visibleSecondary = _amSecondaryScored.filter(function(u){ return _matchesQ(u); });
+  if (visibleSecondary.length) {
+    html += '<div style="padding:8px 16px 4px;margin-top:'+(visiblePrimary.length?'8px':'0')+';font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-top:'+(visiblePrimary.length?'1px solid var(--border)':'none')+';">'
+      +'Secondary Units — Commercial &amp; Private'
+      +'<span style="margin-left:8px;font-size:9px;font-weight:600;padding:1px 7px;border-radius:8px;background:var(--info-blue-bg);color:var(--info-blue);">Can hold multiple</span>'
       +'</div>';
-  }).join('');
-  // Wire click events
+    html += visibleSecondary.map(function(u){
+      var statusLabel = u.status ? u.status.charAt(0).toUpperCase() + u.status.slice(1) : 'Unknown';
+      var typeLabel = _fmtUnitType(u.type) || '—';
+      var funderLabel = _fmtFunder(u.funder) || '—';
+      return '<div data-unit-id="'+u.id+'" data-secondary="1" style="padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+          +'<div>'
+            +'<div style="font-size:13px;font-weight:700;color:var(--text);">'+u.num+' '+u.street+'</div>'
+            +'<div style="font-size:11px;color:var(--muted);margin-top:1px;">'+typeLabel+' · '+funderLabel+'</div>'
+          +'</div>'
+          +'<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--muted);white-space:nowrap;">'+statusLabel+'</span>'
+        +'</div>'
+        +'</div>';
+    }).join('');
+  }
+
+  if (!visiblePrimary.length && !visibleSecondary.length) {
+    html = '<div class="empty-state-ctr">' + (q ? 'No units match your search.' : 'No available units.') + '</div>';
+  }
+
+  list.innerHTML = html;
+
+  // Wire click events for all unit cards (primary + secondary)
   list.querySelectorAll('[data-unit-id]').forEach(function(el){
     el.addEventListener('click', function(){
       amSelectUnit(el.getAttribute('data-unit-id'));
@@ -786,6 +874,30 @@ function amRenderUnitList(role, needsAccess) {
 function amSelectUnit(unitId) {
   _amSelectedUnitId = unitId;
   var role = window.currentRole || 'housing_employee_l1';
+
+  // Highlight selected card (covers both primary and secondary cards)
+  document.querySelectorAll('[data-unit-id]').forEach(function(el){
+    var isThis = el.getAttribute('data-unit-id') === unitId;
+    el.classList.toggle('am-selected', isThis);
+    el.style.background   = isThis ? 'rgba(248,228,26,0.08)' : '';
+    el.style.outline      = isThis ? '2px solid var(--yellow)' : '';
+    el.style.outlineOffset = isThis ? '-2px' : '';
+  });
+
+  // Secondary unit path — skip match/override logic entirely
+  var isSecondary = _amSecondaryScored.some(function(u){ return u.id === unitId; });
+  if (isSecondary) {
+    var ow2 = document.getElementById('am_override_wrap');
+    var onLabel2 = document.getElementById('am_notes_label');
+    var onReq2   = document.getElementById('am_notes_req_star');
+    if(ow2) ow2.style.display = 'block';
+    if(onLabel2) { onLabel2.textContent = 'Assignment Notes (optional)'; onLabel2.style.color = 'var(--text)'; }
+    if(onReq2)   onReq2.style.display = 'none';
+    var cb2 = document.getElementById('am_confirm_btn');
+    if(cb2){ cb2.textContent='✓ Assign Secondary Unit'; cb2.disabled=false; cb2.style.opacity='1'; cb2.style.cursor='pointer'; cb2.style.background='var(--yellow)'; cb2.style.color='#111'; }
+    var warn2 = document.getElementById('am_warn'); if(warn2) warn2.style.display='none';
+    return;
+  }
 
   // Tie detection: units within 1 point of the top score are "tied" / equally recommended
   var topScore = _amAllScored.length > 0 ? _amAllScored[0].score : 0;
@@ -804,15 +916,6 @@ function amSelectUnit(unitId) {
   allUnits = housingUnits.slice();
   if(!allUnits.length)allUnits=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
   var u=allUnits.find(function(x){return x.id===unitId;});
-
-  // Highlight selected card
-  document.querySelectorAll('[data-unit-id]').forEach(function(el){
-    var isThis = el.getAttribute('data-unit-id') === unitId;
-    el.classList.toggle('am-selected', isThis);
-    el.style.background = isThis ? 'rgba(248,228,26,0.08)' : '';
-    el.style.outline = isThis ? '2px solid var(--yellow)' : '';
-    el.style.outlineOffset = isThis ? '-2px' : '';
-  });
 
   // Notes field:
   //   HM — always required, label reflects whether tied or not
@@ -939,7 +1042,52 @@ function confirmAssignment() {
 
   var app=allApps[appIdx]; var u=allUnits[unitIdx];
   var name=((app.fn||'')+' '+(app.ln||'')).trim();
+  var addr = u.num+' '+u.street;
+  var today = new Date().toISOString().split('T')[0];
 
+  // ── Secondary unit path ─────────────────────────────────────────────────
+  if (_isSecondaryEligibleUnit(u)) {
+    // Gate: tenant must be approved or already have a primary unit assigned
+    var _secOk = app.status === APP_STATUS.ED_APPROVED ||
+                 app.status === APP_STATUS.MGR_APPROVED ||
+                 app.status === APP_STATUS.HM_APPROVED  ||
+                 app.status === 'assigned';
+    if (!_secOk) {
+      showToast('Application must be approved or assigned before adding a secondary unit');
+      return;
+    }
+    // Write unit — do NOT change the unit's status
+    u.assignedTo = app.id; u.assignedName = name; u.assignedDate = moveIn;
+    u.tenantApprovedBy = CLFN_PERMS.roleLabel(role === ROLE.ED ? ROLE.ED : ROLE.HOUSING_MANAGER);
+    u.tenantApprovedAt = today;
+    if(overrideNotes) u.assignmentOverrideNotes = overrideNotes;
+    allUnits[unitIdx] = u;
+    // Write application — append to secondaryUnits; do NOT change app.status
+    allApps[appIdx].secondaryUnits = (allApps[appIdx].secondaryUnits || []).concat(unitId);
+    allApps[appIdx].secondaryAddresses = (allApps[appIdx].secondaryAddresses || []).concat(addr);
+    if(overrideNotes) allApps[appIdx].assignmentOverrideNotes = overrideNotes;
+
+    saveUnitWithDraftFallback(allUnits.find(function(x){return x.id===unitId;})||{}).then(function(ok){
+      if(!ok) showToast('Secondary unit saved locally — will sync when network is available.', { type:'info', duration:3500 });
+    });
+    saveApplicationWithDraftFallback(allApps[appIdx]).then(function(ok){
+      if(!ok) showToast('Assignment saved locally — will sync when network is available.', { type:'info', duration:3500 });
+    });
+    if(typeof housingUnits!=='undefined') housingUnits.splice(0, housingUnits.length, ...allUnits);
+
+    auditEntry(app.id, 'secondary_unit_assigned', name+' secondary unit assigned: '+addr+(moveIn?' (move-in '+moveIn+')':'')+(overrideNotes?' — '+overrideNotes:''), role);
+    auditEntry(u.id,   'secondary_unit_assigned', addr+' secondary-assigned to '+name+' ('+app.id+')', role);
+
+    closeAssignModal();
+    if(typeof renderMatchView === 'function') renderMatchView();
+    if(typeof renderDashTable === 'function') renderDashTable();
+    if(typeof updateDashStats === 'function') updateDashStats();
+    if(typeof renderWorklist  === 'function') renderWorklist();
+    showToast('✓ '+name+' — secondary unit '+addr+' assigned');
+    return;
+  }
+
+  // ── Primary unit path ───────────────────────────────────────────────────
   // Role gate — any approved-flavour status is acceptable for assignment,
   // regardless of role. ED retains higher authority and can assign past any
   // approved state; HM can assign past their own approval. The earlier
@@ -961,14 +1109,14 @@ function confirmAssignment() {
   // Tenant stays in current unit until physical move
   u.status = isTransferReq ? 'reserved' : 'occupied';
   u.tenantApprovedBy=CLFN_PERMS.roleLabel(role=== ROLE.ED ? ROLE.ED : ROLE.HOUSING_MANAGER);
-  u.tenantApprovedAt=new Date().toISOString().split('T')[0];
+  u.tenantApprovedAt=today;
   if(overrideNotes) u.assignmentOverrideNotes = overrideNotes;
   if(isTransferReq) u.transferPending = true;
   allUnits[unitIdx]=u;
 
   // Write application
   allApps[appIdx].assignedUnit=unitId;
-  allApps[appIdx].assignedAddress=(u.num+' '+u.street).trim();
+  allApps[appIdx].assignedAddress=addr;
   allApps[appIdx].status='assigned';
   if(isTransferReq) allApps[appIdx].transferPending = true;
   if(overrideNotes) allApps[appIdx].assignmentOverrideNotes = overrideNotes;
@@ -983,10 +1131,10 @@ function confirmAssignment() {
   if(typeof housingUnits!=='undefined') housingUnits.splice(0, housingUnits.length, ...allUnits);
 
   // Audit
-  var auditDetail = name+' assigned to '+u.num+' '+u.street+(moveIn?' (move-in '+moveIn+')':'')
+  var auditDetail = name+' assigned to '+addr+(moveIn?' (move-in '+moveIn+')':'')
     +(isEdOverride2?' — OVERRIDE: '+overrideNotes:(overrideNotes?' — Notes: '+overrideNotes:''));
   auditEntry(app.id,'unit_assigned',auditDetail,role);
-  auditEntry(u.id,  'unit_assigned',u.num+' '+u.street+' assigned to '+name+' ('+app.id+')'+(isEdOverride2?' — OVERRIDE':''),role);
+  auditEntry(u.id,  'unit_assigned',addr+' assigned to '+name+' ('+app.id+')'+(isEdOverride2?' — OVERRIDE':''),role);
 
   closeAssignModal();
   if(typeof renderMatchView === 'function') renderMatchView();
@@ -997,7 +1145,7 @@ function confirmAssignment() {
   // no longer surfaces in the assignment queue. Without this call the row
   // lingered until the next manual page reload.
   if(typeof renderWorklist === 'function') renderWorklist();
-  showToast('✓ '+name+' assigned to '+u.num+' '+u.street+(isEdOverride2?' (override)':''));
+  showToast('✓ '+name+' assigned to '+addr+(isEdOverride2?' (override)':''));
 }
 
 

@@ -104,7 +104,8 @@ function openUnitEditModal(unitId){
   set('ue_constructionCost', (u.constructionCost != null ? u.constructionCost : (u.construction_cost != null ? u.construction_cost : '')));
   set('ue_rent', (u.monthlyRent != null ? u.monthlyRent : (u.monthly_rent != null ? u.monthly_rent : '')));
   _gateRentInput('ue_rent');
-  set('ue_status',u.status||'vacant');
+  _ueSetStatus(u.status||'vacant');
+  _ueSetUnderRenovation(!!u.under_renovation);
   set('ue_assignedDate',u.assignedDate);
   set('ue_notes',u.notes);
   // Populate hidden assignment fields
@@ -229,12 +230,55 @@ function ueFunderChanged() {
   if (!isCmhc) cmhcEl.value = '';
 }
 
+// ── Status pill helpers ───────────────────────────────────────────────────────
+function ueStatusPillClick(val) {
+  var inp = document.getElementById('ue_status');
+  if (inp) inp.value = val;
+  document.querySelectorAll('.ue-status-pill').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-status') === val);
+  });
+  unitEditStatusChange();
+}
+
+function ueRenoPillClick() {
+  var chk = document.getElementById('ue_under_renovation');
+  var pill = document.getElementById('ue_reno_pill');
+  if (!chk || (pill && pill.classList.contains('ue-reno-locked'))) return;
+  chk.checked = !chk.checked;
+  if (pill) pill.classList.toggle('active', chk.checked);
+}
+
+function _ueSetStatus(val) {
+  var inp = document.getElementById('ue_status');
+  if (inp) inp.value = val || 'vacant';
+  document.querySelectorAll('.ue-status-pill').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-status') === (val || 'vacant'));
+  });
+  unitEditStatusChange();
+}
+
+function _ueSetUnderRenovation(val) {
+  var chk = document.getElementById('ue_under_renovation');
+  var pill = document.getElementById('ue_reno_pill');
+  if (chk) chk.checked = !!val;
+  if (pill) pill.classList.toggle('active', !!val);
+}
+
 function unitEditStatusChange(){
   var status=(document.getElementById('ue_status')||{}).value||'';
   var row=document.getElementById('ue_assign_row');
-  // Show tenant section for all statuses except archived/condemned/under_repair
-  var hideStatuses = ['archived','condemned','under_repair'];
+  // Show tenant section for all statuses except condemned (or archived)
+  var hideStatuses = ['archived','condemned'];
   if(row) row.style.display = hideStatuses.includes(status) ? 'none' : 'flex';
+  // Condemned units cannot be under renovation — disable and uncheck
+  var urChk = document.getElementById('ue_under_renovation');
+  var pill  = document.getElementById('ue_reno_pill');
+  if(status === 'condemned'){
+    if(urChk) urChk.checked = false;
+    if(pill){ pill.classList.remove('active'); pill.classList.add('ue-reno-locked'); }
+  } else {
+    if(pill){ pill.classList.remove('ue-reno-locked'); pill.classList.toggle('active', !!urChk && urChk.checked); }
+  }
 }
 function closeUnitEditModal(){
   document.getElementById('unitEditModal').style.display='none';
@@ -357,11 +401,8 @@ function saveUnitEdit(){
   // status change — otherwise we'd later "revert" to a stale value the user
   // already overrode. Drop priorStatus whenever the user explicitly picks
   // any status other than under_repair.
-  var _ueStatusBefore = u.status;
   u.status=get('ue_status')||'vacant'; u.accessible=chk('ue_accessible'); u.isElders=chk('ue_isElders');
-  if(u.status !== 'under_repair' && _ueStatusBefore !== u.status){
-    delete u.priorStatus;
-  }
+  u.under_renovation = u.status !== 'condemned' && chk('ue_under_renovation');
   u.notes=get('ue_notes');
   // HM approval
   var hmDec = (document.getElementById('ue_sig_hm_decision')||{}).value||'';
@@ -389,8 +430,8 @@ function saveUnitEdit(){
   if(u.assignedTo && u.status==='vacant'){
     u.status = 'occupied';
   }
-  // If status changed to vacant/repair/condemned, clear assignment
-  if(u.status==='vacant'||u.status==='under_repair'||u.status==='condemned'){
+  // If status is vacant or condemned, clear assignment
+  if(u.status==='vacant'||u.status==='condemned'){
     u.assignedTo=null; u.assignedName=null; u.assignedDate=null;
   }
   // HM approval gate — must have at least mgr_approved to assign tenant.
@@ -668,8 +709,7 @@ function _ueRemoveTenantFields() {
   if (sel) { sel.style.display = 'none'; sel.innerHTML = ''; }
   var statusEl = document.getElementById('ue_status');
   if (statusEl && statusEl.value === 'occupied') {
-    statusEl.value = 'vacant';
-    unitEditStatusChange();
+    _ueSetStatus('vacant');
   }
 }
 
@@ -1404,6 +1444,15 @@ function udpRenderMap(u) {
   var lat = u.latitude  != null ? parseFloat(u.latitude)  : null;
   var lng = u.longitude != null ? parseFloat(u.longitude) : null;
   var address = [u.num && u.street ? u.num + ' ' + u.street : '', u.city || ''].filter(Boolean).join(', ');
+  var canSetLoc = typeof APPROVAL_AUTHORITY !== 'undefined'
+    && APPROVAL_AUTHORITY.can('setUnitLocation', window.currentRole || '');
+  var locBtn = canSetLoc
+    ? '<button onclick="udpOpenLocationPicker(' + JSON.stringify(u.id) + ')" '
+        + 'style="background:none;border:1.5px solid var(--yellow);border-radius:7px;padding:4px 12px;'
+        + 'font-size:11px;font-weight:700;color:var(--dark);cursor:pointer;font-family:DM Sans,sans-serif;">'
+        + (lat && lng ? '&#128205; Edit Location' : '&#128205; Set Location')
+        + '</button>'
+    : '';
 
   sec.innerHTML =
     '<div class="map-widget">' +
@@ -1413,12 +1462,13 @@ function udpRenderMap(u) {
           '<div class="map-widget-label">Unit Location</div>' +
           '<div class="map-widget-address" id="udp_map_address">' + (address || '&mdash;') + '</div>' +
         '</div>' +
+        '<div style="margin-left:auto;">' + locBtn + '</div>' +
       '</div>' +
       '<div class="map-frame-wrap">' +
         '<iframe id="udp_map_iframe" class="map-frame" src="" allowfullscreen title="Unit location map"></iframe>' +
         '<div class="map-no-coords" id="udp_map_no_coords" style="display:none;">' +
           '<span>&#128205;</span>' +
-          '<p>Coordinates not yet set.<br>Edit the unit to add lat/lng and enable the map.</p>' +
+          '<p>No coordinates set.' + (canSetLoc ? '<br>Use <strong>Set Location</strong> above to pin this unit.' : '') + '</p>' +
         '</div>' +
       '</div>' +
       '<div class="map-widget-footer">' +
@@ -1456,6 +1506,235 @@ function udpRenderMap(u) {
   }
 }
 
+// ── Unit Card Location Picker ─────────────────────────────────────────────────
+// Self-contained Leaflet picker scoped to inventory / unit card context.
+// Parallels the TIC's SLP modal but lives here so inventory.html can use it
+// without loading housing-tic.js.
+var _udpLocMap    = null;
+var _udpLocMarker = null;
+var _udpLocLat    = null;
+var _udpLocLng    = null;
+var _udpLocUnitId = null;
+var _udpLocWired  = false;
+var _UDPLOC_CLFN_LAT = 49.8063;
+var _UDPLOC_CLFN_LNG = -84.1434;
+
+function udpOpenLocationPicker(unitId) {
+  if (!unitId) return;
+  var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var u = units.find(function(x){ return String(x.id) === String(unitId); });
+  if (!u) return;
+  _udpLocUnitId = unitId;
+  _udpLocLat = u.latitude  ? parseFloat(u.latitude)  : null;
+  _udpLocLng = u.longitude ? parseFloat(u.longitude) : null;
+
+  _udpLocEnsureModal(function(overlay) {
+    overlay.style.display = 'flex';
+    _udpLocResetState(u);
+    _udpLocInitMap(u);
+  });
+}
+
+function _udpLocLoadScript(src, cb) {
+  if (document.querySelector('script[src="' + src + '"]')) { cb(); return; }
+  var s = document.createElement('script');
+  s.src = src; s.onload = cb;
+  s.onerror = function(){ console.error('[UDP-Loc] Script load failed:', src); cb(); };
+  document.head.appendChild(s);
+}
+
+function _udpLocEnsureModal(cb) {
+  var overlay = document.getElementById('udp-loc-overlay');
+  if (!overlay) {
+    if (!document.getElementById('udp-loc-leaflet-css')) {
+      var link = document.createElement('link');
+      link.id = 'udp-loc-leaflet-css'; link.rel = 'stylesheet';
+      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+      document.head.appendChild(link);
+    }
+    overlay = document.createElement('div');
+    overlay.id = 'udp-loc-overlay';
+    overlay.setAttribute('style', 'display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.55);align-items:center;justify-content:center;');
+    overlay.innerHTML =
+      '<div style="background:var(--card);border-radius:12px;width:min(760px,96vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">' +
+        '<div style="background:var(--dark);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:12px 12px 0 0;">' +
+          '<div><div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;opacity:.6;margin-bottom:2px;">Admin</div>' +
+          '<div style="font-size:16px;font-weight:700;">Set Unit Location</div></div>' +
+          '<button id="udp-loc-close" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:4px 8px;opacity:.8;" aria-label="Close">&#x2715;</button>' +
+        '</div>' +
+        '<div style="display:flex;gap:0;flex:1;overflow:hidden;">' +
+          '<div style="width:200px;min-width:160px;padding:16px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:12px;">' +
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">Coordinates</div>' +
+            '<div>' +
+              '<label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Latitude</label>' +
+              '<input id="udp-loc-lat" type="text" readonly placeholder="Click map" style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:13px;background:var(--bg);color:var(--text);">' +
+            '</div>' +
+            '<div>' +
+              '<label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Longitude</label>' +
+              '<input id="udp-loc-lng" type="text" readonly placeholder="Click map" style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:13px;background:var(--bg);color:var(--text);">' +
+            '</div>' +
+            '<button id="udp-loc-geolocate" style="background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text);">&#127919; Use my location</button>' +
+          '</div>' +
+          '<div style="flex:1;display:flex;flex-direction:column;">' +
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding:10px 12px 4px;">Map — click to place pin</div>' +
+            '<div id="udp-loc-map" style="flex:1;min-height:300px;"></div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">' +
+          '<button id="udp-loc-cancel" style="background:none;border:1.5px solid var(--border);border-radius:7px;padding:7px 18px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text);">Cancel</button>' +
+          '<button id="udp-loc-save" disabled style="background:var(--yellow);border:none;border-radius:7px;padding:7px 20px;font-size:13px;font-weight:700;cursor:pointer;color:var(--dark);opacity:.5;">Save Location</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+  }
+
+  var pending = 0;
+  function done() { if (--pending === 0) { _udpLocWireEvents(); cb(overlay); } }
+  if (typeof L === 'undefined') {
+    pending++;
+    _udpLocLoadScript('https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js', done);
+  }
+  if (pending === 0) { _udpLocWireEvents(); cb(overlay); }
+}
+
+function _udpLocWireEvents() {
+  if (_udpLocWired) return;
+  _udpLocWired = true;
+  var overlay = document.getElementById('udp-loc-overlay');
+  if (!overlay) return;
+  document.getElementById('udp-loc-close').onclick  = _udpLocClose;
+  document.getElementById('udp-loc-cancel').onclick = _udpLocClose;
+  document.getElementById('udp-loc-save').onclick   = _udpLocSave;
+  document.getElementById('udp-loc-geolocate').onclick = function() {
+    if (!navigator.geolocation) { if (typeof showToast === 'function') showToast('Geolocation not supported.', {type:'error'}); return; }
+    var btn = document.getElementById('udp-loc-geolocate');
+    if (btn) { btn.disabled = true; btn.textContent = 'Locating…'; }
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        _udpLocPlacePin(pos.coords.latitude, pos.coords.longitude);
+        if (btn) { btn.disabled = false; btn.textContent = '🎯 Use my location'; }
+      },
+      function() {
+        if (typeof showToast === 'function') showToast('Could not get location.', {type:'error'});
+        if (btn) { btn.disabled = false; btn.textContent = '🎯 Use my location'; }
+      }
+    );
+  };
+  overlay.addEventListener('click', function(e){ if (e.target === overlay) _udpLocClose(); });
+}
+
+function _udpLocResetState(u) {
+  _udpLocLat = null; _udpLocLng = null;
+  var latEl = document.getElementById('udp-loc-lat');
+  var lngEl = document.getElementById('udp-loc-lng');
+  if (latEl) latEl.value = u && u.latitude  ? parseFloat(u.latitude).toFixed(7)  : '';
+  if (lngEl) lngEl.value = u && u.longitude ? parseFloat(u.longitude).toFixed(7) : '';
+  if (u && u.latitude && u.longitude) {
+    _udpLocLat = parseFloat(u.latitude);
+    _udpLocLng = parseFloat(u.longitude);
+  }
+  _udpLocCheckSave();
+  if (_udpLocMap) { _udpLocMap.remove(); _udpLocMap = null; _udpLocMarker = null; }
+}
+
+function _udpLocInitMap(u) {
+  setTimeout(function() {
+    if (typeof L === 'undefined') return;
+    var startLat = u.latitude  ? parseFloat(u.latitude)  : _UDPLOC_CLFN_LAT;
+    var startLng = u.longitude ? parseFloat(u.longitude) : _UDPLOC_CLFN_LNG;
+    _udpLocMap = L.map('udp-loc-map', { center: [startLat, startLng], zoom: 13, scrollWheelZoom: true });
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(_udpLocMap);
+    if (u.latitude && u.longitude) _udpLocPlacePin(startLat, startLng);
+    _udpLocMap.on('click', function(e){ _udpLocPlacePin(e.latlng.lat, e.latlng.lng); });
+    setTimeout(function(){ if (_udpLocMap) _udpLocMap.invalidateSize({ animate: false }); }, 300);
+  }, 60);
+}
+
+function _udpLocPlacePin(lat, lng) {
+  if (!_udpLocMap) return;
+  var icon = L.divIcon({
+    className: '',
+    html: '<div style="width:12px;height:12px;background:#111110;border:2px solid #F8E41A;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,.4);"></div>',
+    iconSize: [12,12], iconAnchor: [6,12]
+  });
+  if (_udpLocMarker) {
+    _udpLocMarker.setLatLng([lat, lng]);
+  } else {
+    _udpLocMarker = L.marker([lat, lng], { icon: icon, draggable: true }).addTo(_udpLocMap);
+    _udpLocMarker.on('dragend', function(){
+      var p = _udpLocMarker.getLatLng();
+      _udpLocSetCoords(p.lat, p.lng);
+    });
+  }
+  _udpLocMap.setView([lat, lng], Math.max(_udpLocMap.getZoom(), 15));
+  _udpLocSetCoords(lat, lng);
+}
+
+function _udpLocSetCoords(lat, lng) {
+  _udpLocLat = lat; _udpLocLng = lng;
+  var latEl = document.getElementById('udp-loc-lat');
+  var lngEl = document.getElementById('udp-loc-lng');
+  if (latEl) latEl.value = parseFloat(lat).toFixed(7);
+  if (lngEl) lngEl.value = parseFloat(lng).toFixed(7);
+  _udpLocCheckSave();
+}
+
+function _udpLocCheckSave() {
+  var btn = document.getElementById('udp-loc-save');
+  if (!btn) return;
+  var ok = !!(typeof _udpLocLat === 'number' && typeof _udpLocLng === 'number');
+  btn.disabled = !ok;
+  btn.style.opacity = ok ? '1' : '.5';
+}
+
+function _udpLocClose() {
+  var overlay = document.getElementById('udp-loc-overlay');
+  if (overlay) overlay.style.display = 'none';
+  if (_udpLocMap) { _udpLocMap.remove(); _udpLocMap = null; _udpLocMarker = null; }
+}
+
+async function _udpLocSave() {
+  var btn = document.getElementById('udp-loc-save');
+  if (!_udpLocLat || !_udpLocLng) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    var updates = { latitude: parseFloat(_udpLocLat), longitude: parseFloat(_udpLocLng) };
+    var res = await fetch(
+      window.SUPABASE_URL + '/rest/v1/housing_units?id=eq.' + encodeURIComponent(_udpLocUnitId),
+      { method: 'PATCH', headers: Object.assign({}, window.HOUSING_HEADERS, { 'Prefer': 'return=minimal' }), body: JSON.stringify(updates) }
+    );
+    if (!res.ok) { var t = await res.text(); throw new Error(t); }
+
+    // Update in-memory unit
+    var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+    for (var i = 0; i < units.length; i++) {
+      if (String(units[i].id) === String(_udpLocUnitId)) {
+        Object.assign(units[i], updates);
+        break;
+      }
+    }
+    if (typeof sbSaveUnit === 'function') {
+      var u2 = units.find(function(x){ return String(x.id) === String(_udpLocUnitId); });
+      if (u2) sbSaveUnit(u2).catch(function(){});
+    }
+    if (typeof auditEntry === 'function') auditEntry('UNIT:' + _udpLocUnitId, 'unit_location_set', 'GPS coordinates set via unit card');
+    if (typeof showToast === 'function') showToast('Location saved.');
+    _udpLocClose();
+    // Re-render the map section if the detail panel is still showing this unit
+    if (_currentDetailUnitId === _udpLocUnitId) {
+      var u3 = units.find(function(x){ return String(x.id) === String(_udpLocUnitId); });
+      if (u3) udpRenderMap(u3);
+    }
+  } catch(err) {
+    console.error('[UDP-Loc] Save failed:', err);
+    if (typeof showToast === 'function') showToast('Save failed: ' + err.message, {type:'error'});
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Location'; }
+  }
+}
+
 function openUnitDetail(unitId) {
   var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
   var u = units.find(function(x){ return x.id === unitId; });
@@ -1465,7 +1744,7 @@ function openUnitDetail(unitId) {
   var statusStyle = {
     vacant:      {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
     occupied:    {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
-    under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Under Repair'},
+    under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Vacant'},
     reserved:    {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
     condemned:   {bg:'#fef2f2',c:'#b91c1c',label:'Condemned'}
   };
@@ -1480,6 +1759,7 @@ function openUnitDetail(unitId) {
   // Status badge
   var sr = document.getElementById('udp_status_row');
   if(sr) sr.innerHTML = '<span style="font-size:12px;font-weight:700;padding:5px 14px;border-radius:20px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
+    +(u.under_renovation?' <span style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--warn-amber-bg);color:var(--warn-amber-text);border:1px solid var(--warn-amber-border);margin-left:6px;">🔨 Under Renovations</span>':'')
     +(u.isElders?' <span style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--warn-amber-bg);color:var(--warn-amber);border:1px solid var(--warn-amber-border);margin-left:6px;">Elders Unit</span>':'')
     +(u.accessible?' <span style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--info-blue-bg);color:var(--info-blue);margin-left:6px;">♿ Accessible</span>':'');
 
@@ -1781,7 +2061,7 @@ function openRenoNewRequest() {
 
 function renoSearchFilter(q) {
   var allUnits = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-  var renoUnits = allUnits.filter(function(u){ return u.status==='under_repair'||u.status==='condemned'; });
+  var renoUnits = allUnits.filter(function(u){ return u.under_renovation||u.status==='condemned'; });
 
   var filtered = q.trim().length > 0
     ? renoUnits.filter(function(u){ return (u.num+' '+u.street).toLowerCase().includes(q.toLowerCase()); })
@@ -1797,8 +2077,10 @@ function renoSearchFilter(q) {
   }
 
   var statusStyle = {
-    under_repair: {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'Under Repair'},
-    condemned:    {bg:'#fef2f2', c:'#b91c1c', label:'Condemned'}
+    vacant:    {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
+    occupied:  {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
+    reserved:  {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
+    condemned: {bg:'#fef2f2', c:'#b91c1c', label:'Condemned'}
   };
 
   var container = document.getElementById('reno_search_results');
@@ -2725,10 +3007,13 @@ function confirmApprovalAction() {
 
   showToast((statusDesc[action] || action) + ' — ' + ((app.fn||'') + ' ' + (app.ln||'')).trim());
 
-  // Refresh the scorecard action buttons
-  renderScorecardActions(applications[idx]);
-
-  // Refresh dashboard if visible
-  if(typeof updateDashStats === 'function') updateDashStats();
-  if(typeof renderDashTable === 'function') renderDashTable();
+  // Return to the refreshed landing page after any approval/decision action
+  if(typeof showDash === 'function') {
+    showDash();
+  } else {
+    // Fallback: refresh scorecard buttons and dashboard in place
+    if(typeof renderScorecardActions === 'function') renderScorecardActions(applications[idx]);
+    if(typeof updateDashStats === 'function') updateDashStats();
+    if(typeof renderDashTable === 'function') renderDashTable();
+  }
 }

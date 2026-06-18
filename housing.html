@@ -413,7 +413,7 @@
             <select id="currentUnitStatus" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:DM Sans,sans-serif;">
               <option value="">— Select —</option>
               <option value="occupied">Occupied — Living there now</option>
-              <option value="under_repair">Under Repair — Temporarily displaced</option>
+
               <option value="condemned">Condemned / Uninhabitable</option>
               <option value="reserved">Reserved — Moving out soon</option>
             </select>
@@ -613,7 +613,7 @@
         <div id="sig_override_bar" style="display:none;padding:10px 18px;background:var(--warn-amber-bg);border-bottom:1px solid #fcd34d;">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
             <span style="font-size:12px;color:var(--warn-amber-text);flex:1;">⚠️ Signatures are locked. As Executive Director you can override the lock to collect new signatures — this action is logged.</span>
-            <button type="button" onclick="edUnlockSignatures()" style="background:none;border:1.5px solid #f59e0b;border-radius:7px;padding:5px 14px;font-size:11px;font-weight:700;color:var(--warn-amber-text);cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Unlock Signatures</button>
+            <button type="button" onclick="unlockSignaturesOverride()" style="background:none;border:1.5px solid #f59e0b;border-radius:7px;padding:5px 14px;font-size:11px;font-weight:700;color:var(--warn-amber-text);cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">Unlock Signatures</button>
           </div>
         </div>
         <!-- Applicant -->
@@ -925,6 +925,8 @@
       <div class="lbl-muted mb-12">Approval Actions</div>
       <div id="sc_action_buttons"></div>
     </div>
+    <!-- ── SECONDARY UNITS STRIP (shown when tenant holds additional units) ── -->
+    <div id="sc_secondary_units" style="display:none;"></div>
     <div class="card sc-ed-panel">
       <div class="sc-ed-panel-hdr" onclick="var b=document.getElementById('sc_ed_panel_body');b.style.display=b.style.display==='none'?'block':'none';">
         <div class="ctitle m-0">&#11088; ED Adjustment Factor <span class="sc-ed-panel-sub">&mdash; Executive Director only</span></div>
