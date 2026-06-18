@@ -1287,6 +1287,22 @@ body.is-sow-only .modal-overlay { visibility: visible; }
   font-size: 13px;
 }
 
+/* The global `.f input` rule (full width + padding + border, meant for text
+   fields) also lands on these inline checkboxes, breaking the layout on narrow
+   screens. Reset them back to native checkboxes so they sit beside their label. */
+.check-row input[type="checkbox"],
+.check-row-sm input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  accent-color: var(--yellow);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.check-row-sm { flex: 0 0 auto; }
+
 /* Score input cell */
 .score-input {
   width: 72px;
