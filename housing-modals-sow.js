@@ -624,6 +624,88 @@ function _sowUpdateFundBadge(poolId) {
   badge.style.border     = '1px solid ' + (pool.color || 'var(--border)');
 }
 
+// ── SOW Picker — shown when a unit has multiple active maintenance requests ──
+// Lets the user choose which request to open, or start a new one.
+function _openSowPicker(unitId, activeList, allList) {
+  var _PICK_ID = 'sowPickerOverlay';
+  var existing = document.getElementById(_PICK_ID);
+  if (existing) existing.parentNode.removeChild(existing);
+
+  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var u = allUnits.find(function(x){ return x.id === unitId; });
+  var unitLabel = u ? u.num + ' ' + u.street : unitId;
+
+  var statusStyles = {
+    '':           {bg:'#f4f4f0', c:'#666',                    label:'Draft'},
+    draft:        {bg:'#f4f4f0', c:'#666',                    label:'Draft'},
+    signed:       {bg:'#eff6ff', c:'#1d4ed8',                 label:'Signed'},
+    submitted:    {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'Submitted'},
+    hm_approved:  {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'HM Approved'},
+    ed_approved:  {bg:'#f0fdf4', c:'#15803d',                 label:'ED Approved'},
+  };
+
+  function _sowCard(sow) {
+    var ss = statusStyles[sow.approval_status || ''] || {bg:'#f4f4f0', c:'#666', label: sow.approval_status || 'Draft'};
+    var pn = sow.project_number || '—';
+    var date = (sow.created_at || sow.date || '').slice(0, 10) || '—';
+    var amount = (sow.amount != null && sow.amount !== '') ? (typeof formatCurrency === 'function' ? formatCurrency(sow.amount) : '$' + sow.amount) : '—';
+    var scope = (sow.scope || sow.description || '').slice(0, 80) + ((sow.scope || sow.description || '').length > 80 ? '…' : '');
+    var contractor = sow.contractor || sow.contractorName || '';
+    return '<div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;background:var(--surface);display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<div style="flex:1;min-width:0;">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
+          + '<span style="font-size:11px;font-family:ui-monospace,monospace;font-weight:700;color:var(--text);">' + pn + '</span>'
+          + '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:' + ss.bg + ';color:' + ss.c + ';">' + ss.label + '</span>'
+          + '<span style="font-size:10px;color:var(--muted);">' + date + '</span>'
+        + '</div>'
+        + (contractor ? '<div style="font-size:11px;color:var(--muted);margin-bottom:2px;">👷 ' + contractor + '</div>' : '')
+        + (scope ? '<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + scope + '</div>' : '')
+        + '<div style="font-size:12px;font-weight:700;color:var(--text);margin-top:4px;">' + amount + '</div>'
+      + '</div>'
+      + '<button data-pick-pn="' + pn + '" style="flex-shrink:0;background:var(--yellow);border:none;color:var(--dark);padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Open →</button>'
+      + '</div>';
+  }
+
+  var overlay = document.createElement('div');
+  overlay.id = _PICK_ID;
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1100;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = '<div style="background:var(--card);border-radius:14px;max-width:520px;width:100%;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35);">'
+    + '<div style="background:var(--dark);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:14px 14px 0 0;">'
+      + '<div>'
+        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5);margin-bottom:3px;">Maintenance Requests</div>'
+        + '<div style="font-size:15px;font-weight:700;color:#fff;">' + unitLabel + '</div>'
+      + '</div>'
+      + '<button id="sowPickerClose" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;padding:4px 8px;line-height:1;">✕</button>'
+    + '</div>'
+    + '<div style="padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">'
+      + activeList.slice().sort(function(a,b){ return (b.created_at||'').localeCompare(a.created_at||''); }).map(_sowCard).join('')
+    + '</div>'
+    + '<div style="padding:14px 16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">'
+      + '<span style="font-size:11px;color:var(--muted);">' + activeList.length + ' active request' + (activeList.length !== 1 ? 's' : '') + '</span>'
+      + '<button id="sowPickerNew" style="background:none;border:1.5px solid var(--border);color:var(--text);padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">+ New Request</button>'
+    + '</div>'
+    + '</div>';
+
+  document.body.appendChild(overlay);
+
+  function _closePicker() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+
+  overlay.addEventListener('click', function(e){ if (e.target === overlay) _closePicker(); });
+  document.getElementById('sowPickerClose').addEventListener('click', _closePicker);
+  document.getElementById('sowPickerNew').addEventListener('click', function(){
+    _closePicker();
+    // '_new' sentinel bypasses the picker and forces a fresh SOW
+    openSowModal(unitId, '_new');
+  });
+  overlay.querySelectorAll('[data-pick-pn]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pn = btn.getAttribute('data-pick-pn');
+      _closePicker();
+      openSowModal(unitId, pn);
+    });
+  });
+}
+
 function openSowModal(unitId, projectNumber) {
   // Mount the consolidated template on first call. Stays idempotent on
   // subsequent opens so element IDs survive between sessions.
@@ -651,9 +733,20 @@ function openSowModal(unitId, projectNumber) {
   //     expect "open the SOW for this unit" and fall back gracefully for multi-SOW.
   //   - If no projectNumber AND the unit has zero SOWs, create a new one with a
   //     freshly-auto-incremented project number.
+  // '_new' sentinel from the picker — force a blank new SOW, skip all existing-SOW logic.
+  var _forceNew = (projectNumber === '_new');
+  if (_forceNew) projectNumber = null;
+
   var existingList = unitId ? (typeof getUnitSowList === 'function' ? getUnitSowList(unitId) : []) : [];
+  var activeList = existingList.filter(function(s){ return !s.archived && s.approval_status !== 'completed'; });
+  if(!_forceNew && !projectNumber && activeList.length > 1){
+    // Multiple active requests — show a picker so the user can choose which one
+    // to open (or create a new one). This is the multi-contractor scenario.
+    _openSowPicker(unitId, activeList, existingList);
+    return;
+  }
   if(!projectNumber && existingList.length > 0){
-    // Pick the most recent SOW for this unit so unit-detail click opens it.
+    // Single active (or all completed/archived) — open the most recent.
     var sortedByDate = existingList.slice().sort(function(a, b){
       return (b.created_at || '').localeCompare(a.created_at || '');
     });
