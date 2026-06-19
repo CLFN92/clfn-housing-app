@@ -1033,24 +1033,29 @@ function _renderLandingKpis(){
         || a.status === STATUS.MGR_APPROVED;
   }).length;
 
-  var critical = apps.filter(function(a){
-    return a && !a.archived && (a.tier === 'Critical Priority' || a.tier_v2 === 'Critical Priority');
-  }).length;
-
   var vacant = units.filter(function(u){
     return u && !u.archived && u.status === 'vacant';
   }).length;
 
-  var awaitingMatch = apps.filter(function(a){
-    if(!a || a.archived) return false;
-    var approved = a.status === STATUS.ED_APPROVED || a.status === STATUS.MGR_APPROVED;
-    return approved && !a.assignedUnit;
-  }).length;
+  // Application-type breakdown (active = non-archived, not declined):
+  //   new_housing      → New Applications (seeking a new unit)
+  //   existing_tenant  → File Updates
+  //   transfer_request → House Requests (existing tenant transfer)
+  function _activeOfType(pred){
+    return apps.filter(function(a){
+      if(!a || a.archived || a.status === 'declined') return false;
+      return pred(a.appType || 'new_housing');
+    }).length;
+  }
+  var newApps       = _activeOfType(function(t){ return t !== 'existing_tenant' && t !== 'transfer_request'; });
+  var fileUpdates   = _activeOfType(function(t){ return t === 'existing_tenant'; });
+  var houseRequests = _activeOfType(function(t){ return t === 'transfer_request'; });
 
   setKpi('kpi_open_apps',       openApps);
-  setKpi('kpi_critical',        critical);
   setKpi('kpi_vacant',          vacant);
-  setKpi('kpi_awaiting_match',  awaitingMatch);
+  setKpi('kpi_new_apps',        newApps);
+  setKpi('kpi_file_updates',    fileUpdates);
+  setKpi('kpi_house_requests',  houseRequests);
 }
 
 var _kpiDrillData = null; // { title, headers, rows, colWidths, filename }
@@ -1119,33 +1124,6 @@ function showHousingKpiDrilldown(type) {
         }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No open applications.</td></tr>')
       + '</tbody></table>';
 
-  } else if (type === 'critical') {
-    title = 'Critical Priority Applications';
-    var rows = apps.filter(function(a){
-      return a && !a.archived && (a.tier==='Critical Priority' || a.tier_v2==='Critical Priority');
-    }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
-    exportHeaders = ['Applicant','App ID','Score','Status','Urgent Need','Days Waiting'];
-    exportColWidths = [28,16,8,14,22,12];
-    exportRows = rows.map(function(a){
-      var urgent = URGENT_LABELS[a.urgentNeed] || (a.urgentNeed||'').replace(/_/g,' ') || '';
-      return [(a.fn||'')+' '+(a.ln||''), a.id||'', a.score||0,
-              STATUS_LABELS[a.status]||a.status||'', urgent, daysSinceRaw(a.appDate)];
-    });
-    html = '<table class="tbl"><thead><tr>'
-      + '<th>Applicant</th><th class="std-cell-right">Score</th><th>Status</th><th>Urgent Need</th><th>Waiting</th>'
-      + '</tr></thead><tbody>'
-      + (rows.length ? rows.map(function(a){
-          var urgent = URGENT_LABELS[a.urgentNeed] || (a.urgentNeed||'').replace(/_/g,' ') || '—';
-          return appRow(a,
-            '<td style="font-weight:600;">'+escapeHtml((a.fn||'')+' '+(a.ln||''))+'</td>'
-            +'<td class="std-cell-right amt-debit" style="font-weight:700;">'+(a.score||0)+'</td>'
-            +'<td>'+escapeHtml(STATUS_LABELS[a.status]||a.status||'')+'</td>'
-            +'<td>'+escapeHtml(urgent)+'</td>'
-            +'<td class="std-cell-muted">'+daysSince(a.appDate)+'</td>'
-          );
-        }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No critical priority applications.</td></tr>')
-      + '</tbody></table>';
-
   } else if (type === 'vacant') {
     title = 'Vacant Units';
     var rows = units.filter(function(u){ return u && !u.archived && u.status==='vacant'; })
@@ -1171,11 +1149,16 @@ function showHousingKpiDrilldown(type) {
         }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">No vacant units.</td></tr>')
       + '</tbody></table>';
 
-  } else if (type === 'awaiting') {
-    title = 'Awaiting Match — Approved, No Unit';
+  } else if (type === 'new_apps' || type === 'file_updates' || type === 'house_requests') {
+    var _typeCfg = {
+      new_apps:       { title:'New Applications',                          pred:function(t){ return t!=='existing_tenant' && t!=='transfer_request'; }, empty:'No active new applications.' },
+      file_updates:   { title:'File Updates — Existing Tenant',            pred:function(t){ return t==='existing_tenant'; },   empty:'No active file updates.' },
+      house_requests: { title:'House Requests — Existing Tenant Transfer', pred:function(t){ return t==='transfer_request'; },  empty:'No active house requests.' }
+    }[type];
+    title = _typeCfg.title;
     var rows = apps.filter(function(a){
-      if (!a || a.archived) return false;
-      return (a.status==='ed_approved'||a.status==='mgr_approved') && !a.assignedUnit;
+      if (!a || a.archived || a.status==='declined') return false;
+      return _typeCfg.pred(a.appType || 'new_housing');
     }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
     exportHeaders = ['Applicant','App ID','Tier','Score','Status','Days Waiting'];
     exportColWidths = [28,16,22,8,14,12];
@@ -1184,17 +1167,17 @@ function showHousingKpiDrilldown(type) {
               a.score||0, STATUS_LABELS[a.status]||a.status||'', daysSinceRaw(a.appDate)];
     });
     html = '<table class="tbl"><thead><tr>'
-      + '<th>Applicant</th><th>Tier</th><th class="std-cell-right">Score</th><th>Status</th><th>Waiting</th>'
+      + '<th>Applicant</th><th>Status</th><th>Tier</th><th class="std-cell-right">Score</th><th>Waiting</th>'
       + '</tr></thead><tbody>'
       + (rows.length ? rows.map(function(a){
           return appRow(a,
             '<td style="font-weight:600;">'+escapeHtml((a.fn||'')+' '+(a.ln||''))+'</td>'
+            +'<td>'+escapeHtml(STATUS_LABELS[a.status]||a.status||'')+'</td>'
             +'<td>'+tierPill(a.tier_v2||a.tier)+'</td>'
             +'<td class="std-cell-right" style="font-weight:700;">'+(a.score||0)+'</td>'
-            +'<td>'+escapeHtml(STATUS_LABELS[a.status]||a.status||'')+'</td>'
             +'<td class="std-cell-muted">'+daysSince(a.appDate)+'</td>'
           );
-        }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No applications awaiting match.</td></tr>')
+        }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">'+_typeCfg.empty+'</td></tr>')
       + '</tbody></table>';
   }
 
@@ -1506,13 +1489,24 @@ function showEmployeeHome(){
     // ── Employee: simple tiles ──
     tilesEl.style.gridTemplateColumns = 'repeat(auto-fill,minmax(200px,1fr))';
     var mods2 = window.CLFN_MODULES;
-    var empTiles = [
-      {icon:'📝', label:'New Application', desc:'Start a new housing application', fn:'newApp()', accent:true, module:'applications'},
-      {icon:'📋', label:'My Worklist',     desc:'Track applications you have submitted', fn:'showWorklist()', module:'applications'},
-      {icon:'👥', label:'Tenants',         desc:'Search and update tenant records',   fn:'showTenantsForRole()', module:'tenants'},
-      {icon:'🔨', label:'Renovations',     desc:'Renovation progress and requests',   fn:'showRenosForRole()', module:'renovations'},
-      {icon:'🧰', label:'Contractors',     desc:'Browse contractor directory',         fn:'showContractorsForRole()', module:'contractors'}
-    ].filter(function(t){ return !t.module || !mods2 || mods2.isEnabled(t.module); });
+    var empTiles;
+    if (role === ROLE.FIELD_EMPLOYEE) {
+      // Maintenance crew: inventory + the renovation work queue only. No
+      // applications, tenants edit, contractors, finance, or settings.
+      empTiles = [
+        {icon:'🏠', label:'Inventory',   desc:'View units and complete work',        fn:'showInventory()',     module:'inventory'},
+        {icon:'🔨', label:'Work Orders', desc:'SOWs, work orders & progress reports', fn:'showRenosForRole()', module:'renovations'}
+      ];
+    } else {
+      empTiles = [
+        {icon:'📝', label:'New Application', desc:'Start a new housing application', fn:'newApp()', accent:true, module:'applications'},
+        {icon:'📋', label:'My Worklist',     desc:'Track applications you have submitted', fn:'showWorklist()', module:'applications'},
+        {icon:'👥', label:'Tenants',         desc:'Search and update tenant records',   fn:'showTenantsForRole()', module:'tenants'},
+        {icon:'🔨', label:'Renovations',     desc:'Renovation progress and requests',   fn:'showRenosForRole()', module:'renovations'},
+        {icon:'🧰', label:'Contractors',     desc:'Browse contractor directory',         fn:'showContractorsForRole()', module:'contractors'}
+      ];
+    }
+    empTiles = empTiles.filter(function(t){ return !t.module || !mods2 || mods2.isEnabled(t.module); });
     tilesEl.innerHTML = empTiles.map(function(t) {
       var ab = t.accent ? 'background:var(--dark);border:2px solid var(--yellow);' : 'background:var(--surface);border:1px solid var(--border);';
       var lc = t.accent ? 'color:var(--yellow);' : '';

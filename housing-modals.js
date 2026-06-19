@@ -79,6 +79,11 @@ function contractorSearchFilter(q) {
 
 // ── Placeholder renderers (to be built out) ──
 function openUnitEditModal(unitId){
+  // Field Employees view inventory read-only — block the unit edit modal.
+  if((window.currentRole || '') === 'field_employee'){
+    if(typeof showToast === 'function') showToast('Read-only — Field Employees cannot edit unit records.');
+    return;
+  }
   var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
   var u = units.find(function(x){ return x.id === unitId; });
   if(!u){ showToast('Unit not found: ' + unitId); return; }
@@ -356,6 +361,12 @@ function ueUpdateBudgetRouting() {
 
 
 function saveUnitEdit(){
+  // Field Employees (maintenance crew) view inventory but never edit unit
+  // records (funder, budget, identity). Backstop in case the edit UI is reached.
+  if((window.currentRole || '') === 'field_employee'){
+    if(typeof showToast === 'function') showToast('Read-only — Field Employees cannot edit unit records.');
+    return;
+  }
   var unitId=window._editingUnitId;
   var units=(typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
   var idx=units.findIndex(function(x){ return x.id===unitId; });
@@ -2056,6 +2067,15 @@ function renoSearchFilter(q) {
     ? renoUnits.filter(function(u){ return (u.num+' '+u.street).toLowerCase().includes(q.toLowerCase()); })
     : renoUnits;
 
+  // Field Employees only see units that have an in-house work order assigned to
+  // them (the logged-in key person).
+  if((window.currentRole||'') === 'field_employee' && typeof sowHiddenFromCurrentFieldEmployee === 'function'){
+    filtered = filtered.filter(function(u){
+      var sows = (typeof getUnitSowList === 'function') ? getUnitSowList(u.id) : [];
+      return sows.some(function(s){ return s && !s.archived && !sowHiddenFromCurrentFieldEmployee(s); });
+    });
+  }
+
   var statusStyle = {
     vacant:    {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
     occupied:  {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
@@ -2968,6 +2988,12 @@ function confirmApprovalAction() {
   if(typeof renderDashTable === 'function') renderDashTable();
   if(typeof updateDashStats === 'function') updateDashStats();
   if(typeof renderMatchView === 'function' && document.getElementById('matchView') && document.getElementById('matchView').style.display !== 'none') renderMatchView();
+
+  // Refresh the landing-page worklist + KPIs so an actioned application leaves
+  // the worklist immediately (previously it lingered until you navigated away
+  // and back, because the home view was never re-rendered after the action).
+  if(typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
+  if(typeof _renderLandingKpis === 'function') _renderLandingKpis();
 
   // Status label descriptions
   var statusDesc = {

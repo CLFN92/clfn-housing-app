@@ -89,6 +89,7 @@ For now: **embed in each deployment build** as `window.NATION_CONFIG`. Simplest 
 | `housing_manager` | Full | Full | HM-level, Mark Complete | |
 | `housing_employee_l2` | Full edit | Full | None | No signatures, no approvals |
 | `housing_employee_l1` | Read-only + create new apps (own drafts only) | None | None | |
+| `field_employee` | Inventory + Renovations only: create/edit SOWs, complete work orders, edit progress. Sees only in-house work orders assigned to them (`assignedTeam=in_house` + `assignedTo=their email`). No apps; TIC read-only; no contractor step | None | Mark Complete only (no HM/ED approvals) | Maintenance crew / in-house labour. Assignment gated by `assignWorkOrder` authority |
 | `cfo` | None | Full | None | Finance owner |
 | `finance_l1` | None | Data-entry | None | No approvals |
 
@@ -300,6 +301,124 @@ finance.html don't need to change.
 - Input validation on Save paths
 - Module-enablement bypass prevention
 - RLS deferred (user choice Q4=D3)
+
+---
+
+## Phase G — SMS / Text Notifications  ⬜
+
+Extends the existing email pipeline (Edge Function → Microsoft Graph) with an SMS
+channel so workflow notifications (starting with **work-order-assigned to a field
+employee**, mirroring `sow_assigned_to_field_employee`) can also go out as a text.
+Email infrastructure is done; this is a **net-new integration**, not a tweak.
+
+### Why it's a separate project (not a quick add)
+- **Microsoft Graph cannot send SMS** — Graph is email-only. A different provider is required.
+- New **Edge Function** (`send-sms`) — the email function can't be reused; SMS is a different API/auth.
+- **Provider + cost** — pick one of:
+  - **Azure Communication Services (ACS) SMS** — same cloud as the rest of the stack, but needs a provisioned toll-free/short-code number (US/CA registration/verification, can take days–weeks) and per-message billing.
+  - **Twilio** — fastest to stand up; per-message + per-number cost; separate vendor.
+- **Phone numbers on staff records** — add a `mobile`/`sms` field to the `staff` table + the Settings → Users add/edit form. (Field employees need a mobile on file.)
+- **Consent / CASL** — Canada's anti-spam law wants documented consent. Transactional work assignments to staff are usually covered by an employment agreement, but it should be a deliberate **per-person opt-in** flag on the staff record, and texts should be transactional only (no marketing).
+- **Delivery + audit** — log each send (success/failure) to `housing_audit_log`; surface failures (no silent drops). Handle provider error codes, opt-outs (STOP keyword), and rate limits.
+
+### Design sketch (when picked up)
+- **Channel registry**: extend the notification model so an event can target `email`, `sms`, or both. Add a per-event SMS toggle + a short SMS body template (160-char-aware; SMS is plain text, no HTML) in **Settings → Notifications**.
+- **Recipient resolution**: SMS recipient = the assignee's `mobile` (for `sow_assigned_to_field_employee`); reuse the existing recipient resolvers, swapping email→mobile.
+- **Edge Function `send-sms`**: verifies caller JWT, sends via the chosen provider (secrets in Project Settings → Edge Functions), writes an audit row via service_role. ASCII-only source rule still applies.
+- **Client wrapper**: `window.sendSms(opts)` mirroring `sendNotification`; per-event helpers call it alongside (or instead of) the email helper based on the channel config.
+- **Opt-out**: store STOP/opt-out state on the staff record; the function skips opted-out numbers.
+
+### Open decisions before building
+1. Provider: **ACS** (same cloud, slower number provisioning) vs **Twilio** (fastest, separate vendor)?
+2. Scope of v1: just the **work-order-assigned** event, or all workflow events with a per-event SMS toggle?
+3. Who pays / budget for per-message cost, and expected monthly volume?
+4. Consent capture: opt-in checkbox on the staff/Users form + policy text?
+
+### Effort / risk
+Medium-large. The engineering is moderate; the **number provisioning, billing, and consent/compliance** are the long poles. No impact on existing email until enabled.
+
+---
+
+## Phase N — Multi-Nation Onboarding & Control Panel
+
+Turns the single-tenant CLFN app into the multi-nation platform. Architecture is
+locked in Phase A0 (**database-per-nation**, **subdomain-per-nation**, superuser
+tooling in a **separate codebase**). Hosting is platform-side — a nation never
+needs its own Azure account; we host the one SPA and route by subdomain.
+
+### N0 — App nation-awareness  ✅ (shipped)
+- `shared-config.js` now carries a **`NATIONS_DIRECTORY`** (hostname → `{id,
+  display_name, short, supabase_url, supabase_anon, role_labels,
+  modules_licensed}`) and `window.resolveNation()`. At boot it resolves the
+  current host (full host → subdomain label → `_default`) and sets
+  `SUPABASE_URL` / `SUPABASE_ANON` / `NATION_CONFIG`, and applies per-nation
+  module **licensing** onto `CLFN_MODULES._licensed`.
+- Anon keys are publishable, so the directory is safe client-side. CLFN is
+  `_default` → byte-identical until other nations are added. Adding a nation =
+  adding a directory entry (later swappable for a fetched `nations.json` — same
+  shape, no resolver change).
+- Remaining N0 polish: finish replacing hardcoded `'CLFN'`/`'Constance Lake…'`
+  strings with `NATION_CONFIG` (Phase 2/3 carryover).
+
+### N1 — Repeatable provisioning  ⏳ (scaffold shipped)
+Framework shipped under `supabase/`: `config.toml`, `seed.sql` (light — storage
+bucket; settings use in-code defaults), `migrations/README.md` (schema-capture
+process), and `README.md` (the full per-nation provisioning runbook incl.
+per-nation email provider). **Email provider abstraction shipped:** `send-notification` now selects the
+provider via the `EMAIL_PROVIDER` secret (`graph` default / `resend` / `sendgrid`),
+and the client passes nation `brand`/`reply_to` from `NATION_CONFIG`. So a nation
+without M365 just sets `EMAIL_PROVIDER=resend|sendgrid` + that provider's secrets.
+CLFN unchanged (defaults to `graph`). **Remaining (needs the live DB + Supabase
+CLI, run by the user):** `supabase db dump` CLFN → commit
+`migrations/0001_init_schema.sql`, then adopt "every schema change is a new
+numbered migration."
+
+The hand-run SQL-editor workflow breaks at nation #2. Make a nation's backend a
+**versioned, reproducible bundle**:
+- **Versioned schema** via Supabase CLI migrations (numbered SQL) — single source
+  of truth for every nation DB: tables, RLS, triggers, functions.
+- **Seed pack** — default `housing_settings` (scoring model, approval authority,
+  NOS table, module licensing), storage bucket, nation identity row.
+- **Edge functions + secrets per project** — deploy `send-notification` (and
+  future `send-sms`) and set Graph/SMS secrets per nation.
+- **🔖 Email provider per nation** — current email is Microsoft Graph against
+  CLFN's M365 mailbox. **Not every nation has M365.** Make the email channel a
+  per-nation config: M365/Graph, or a generic SMTP/provider (e.g. Resend,
+  SendGrid, Azure Communication Services). The `send-notification` function reads
+  the nation's provider config; `from`/credentials become per-nation secrets.
+- **First admin user** — create the nation's ED/super_user so they can log in.
+- **Runbook** — documented manual steps end-to-end before automating.
+
+### N2 — Control Panel MVP  ⬜ (separate repo — has a backend)
+Superuser tool to onboard/manage nations. **Not** a static SPA and **not** this
+repo: it holds the **Supabase Management API token** + per-project **service-role
+keys**, so it must run server-side and stay secured. Screens:
+- **Nations list** — status (active / provisioning / suspended), subdomain,
+  licensed modules, user count, last activity.
+- **Add-Nation wizard** — create Supabase project (Management API) → apply
+  migrations (N1) → seed → set email provider → create first ED → register in the
+  directory/`nations.json` → configure subdomain (wildcard DNS / SWA custom
+  domain) → verify. Per-step progress + rollback.
+- **Per-nation config & licensing** — branding, role labels, contact, and which
+  modules they pay for (`modules_licensed`). (Distinct from the in-app ED on/off
+  toggle, which is `_enabled`.)
+- **Lifecycle** — suspend / reactivate, key rotation, delete with safeguards.
+
+### N3 — Scale  ⬜
+- **Fan-out migration runner** — apply a new schema version across all nation
+  projects, with status/version tracking per nation.
+- **Billing/licensing** wired to `_licensed`; **observability** (per-nation
+  health, usage, audit); per-nation region/backup policy.
+
+### Open decisions
+1. Config delivery: embedded `NATIONS_DIRECTORY` (now) vs fetched `nations.json`
+   vs a config endpoint — resolver supports all three; pick when nation #2 is near.
+2. Subdomain strategy: wildcard `*.host` (one deployment serves all) vs per-nation
+   deployment — wildcard + directory is the cheapest path.
+3. Email: per-nation M365 vs a generic provider as the platform default for
+   nations without M365.
+4. Migration tooling: adopt Supabase CLI migrations now so the schema is versioned
+   before onboarding anyone (foundational for N1+).
 
 ---
 

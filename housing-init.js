@@ -2463,6 +2463,8 @@ function _renderWorklistCountPills(){
 function _runQuickAction(action){
   if(action === 'new-app'){
     if(typeof newApp === 'function') newApp();
+  } else if(action === 'reno-questionnaire'){
+    if(typeof openRenoQuestionnaire === 'function') openRenoQuestionnaire();
   } else if(action === 'approve-queue'){
     if(typeof showWorklist === 'function') showWorklist();
   } else if(action === 'run-match'){

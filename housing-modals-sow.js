@@ -241,12 +241,17 @@ function _buildSowModalHTML() {
               '<div class="f"><label>Current Tenant Name</label><input id="sow_tenant_name" type="text" placeholder="Full name of tenant"/></div>' +
               '<div class="f"><label>Prepared By (Staff)</label><input id="sow_prepared_by" type="text" placeholder="Staff name"/></div>' +
               '<div class="f"><label>PO Number <span style="font-size:10px;font-weight:400;color:var(--muted);">(from accounting)</span></label><input id="sow_po_number" type="text" placeholder="e.g. PO-2026-0042"/></div>' +
-              '<div class="f sow-ct-row"><label>Contractor (if assigned)</label>' +
-                '<input id="sow_contractor" type="text" placeholder="Search contractors…" autocomplete="off"' +
+              '<div class="f sow-ct-row"><label>Assigned To</label>' +
+                '<input id="sow_contractor" type="text" placeholder="Search — your Housing Dept or a contractor…" autocomplete="off"' +
                   ' oninput="sowContractorSearch(this.value)" onfocus="sowContractorSearch(\'\')"' +
                   ' onblur="setTimeout(function(){var d=document.getElementById(\'sow_ct_dropdown\');if(d)d.style.display=\'none\';},180)"/>' +
                 '<input type="hidden" id="sow_contractor_id"/>' +
+                '<input type="hidden" id="sow_assigned_team"/>' +
                 '<div id="sow_ct_dropdown"></div>' +
+                // Employee sub-menu — revealed when the in-house Housing Dept is picked.
+                '<select id="sow_assigned_to" style="margin-top:6px;display:none;">' +
+                  '<option value="">— Select field employee —</option>' +
+                '</select>' +
               '</div>' +
             '</div>' +
           '</div>' +
@@ -624,88 +629,6 @@ function _sowUpdateFundBadge(poolId) {
   badge.style.border     = '1px solid ' + (pool.color || 'var(--border)');
 }
 
-// ── SOW Picker — shown when a unit has multiple active maintenance requests ──
-// Lets the user choose which request to open, or start a new one.
-function _openSowPicker(unitId, activeList, allList) {
-  var _PICK_ID = 'sowPickerOverlay';
-  var existing = document.getElementById(_PICK_ID);
-  if (existing) existing.parentNode.removeChild(existing);
-
-  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
-  var u = allUnits.find(function(x){ return x.id === unitId; });
-  var unitLabel = u ? u.num + ' ' + u.street : unitId;
-
-  var statusStyles = {
-    '':           {bg:'#f4f4f0', c:'#666',                    label:'Draft'},
-    draft:        {bg:'#f4f4f0', c:'#666',                    label:'Draft'},
-    signed:       {bg:'#eff6ff', c:'#1d4ed8',                 label:'Signed'},
-    submitted:    {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'Submitted'},
-    hm_approved:  {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'HM Approved'},
-    ed_approved:  {bg:'#f0fdf4', c:'#15803d',                 label:'ED Approved'},
-  };
-
-  function _sowCard(sow) {
-    var ss = statusStyles[sow.approval_status || ''] || {bg:'#f4f4f0', c:'#666', label: sow.approval_status || 'Draft'};
-    var pn = sow.project_number || '—';
-    var date = (sow.created_at || sow.date || '').slice(0, 10) || '—';
-    var amount = (sow.amount != null && sow.amount !== '') ? (typeof formatCurrency === 'function' ? formatCurrency(sow.amount) : '$' + sow.amount) : '—';
-    var scope = (sow.scope || sow.description || '').slice(0, 80) + ((sow.scope || sow.description || '').length > 80 ? '…' : '');
-    var contractor = sow.contractor || sow.contractorName || '';
-    return '<div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;background:var(--surface);display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<div style="flex:1;min-width:0;">'
-        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
-          + '<span style="font-size:11px;font-family:ui-monospace,monospace;font-weight:700;color:var(--text);">' + pn + '</span>'
-          + '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:' + ss.bg + ';color:' + ss.c + ';">' + ss.label + '</span>'
-          + '<span style="font-size:10px;color:var(--muted);">' + date + '</span>'
-        + '</div>'
-        + (contractor ? '<div style="font-size:11px;color:var(--muted);margin-bottom:2px;">👷 ' + contractor + '</div>' : '')
-        + (scope ? '<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + scope + '</div>' : '')
-        + '<div style="font-size:12px;font-weight:700;color:var(--text);margin-top:4px;">' + amount + '</div>'
-      + '</div>'
-      + '<button data-pick-pn="' + pn + '" style="flex-shrink:0;background:var(--yellow);border:none;color:var(--dark);padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Open →</button>'
-      + '</div>';
-  }
-
-  var overlay = document.createElement('div');
-  overlay.id = _PICK_ID;
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1100;display:flex;align-items:center;justify-content:center;padding:20px;';
-  overlay.innerHTML = '<div style="background:var(--card);border-radius:14px;max-width:520px;width:100%;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35);">'
-    + '<div style="background:var(--dark);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:14px 14px 0 0;">'
-      + '<div>'
-        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5);margin-bottom:3px;">Maintenance Requests</div>'
-        + '<div style="font-size:15px;font-weight:700;color:#fff;">' + unitLabel + '</div>'
-      + '</div>'
-      + '<button id="sowPickerClose" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;padding:4px 8px;line-height:1;">✕</button>'
-    + '</div>'
-    + '<div style="padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">'
-      + activeList.slice().sort(function(a,b){ return (b.created_at||'').localeCompare(a.created_at||''); }).map(_sowCard).join('')
-    + '</div>'
-    + '<div style="padding:14px 16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">'
-      + '<span style="font-size:11px;color:var(--muted);">' + activeList.length + ' active request' + (activeList.length !== 1 ? 's' : '') + '</span>'
-      + '<button id="sowPickerNew" style="background:none;border:1.5px solid var(--border);color:var(--text);padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">+ New Request</button>'
-    + '</div>'
-    + '</div>';
-
-  document.body.appendChild(overlay);
-
-  function _closePicker() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
-
-  overlay.addEventListener('click', function(e){ if (e.target === overlay) _closePicker(); });
-  document.getElementById('sowPickerClose').addEventListener('click', _closePicker);
-  document.getElementById('sowPickerNew').addEventListener('click', function(){
-    _closePicker();
-    // '_new' sentinel bypasses the picker and forces a fresh SOW
-    openSowModal(unitId, '_new');
-  });
-  overlay.querySelectorAll('[data-pick-pn]').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      var pn = btn.getAttribute('data-pick-pn');
-      _closePicker();
-      openSowModal(unitId, pn);
-    });
-  });
-}
-
 function openSowModal(unitId, projectNumber) {
   // Mount the consolidated template on first call. Stays idempotent on
   // subsequent opens so element IDs survive between sessions.
@@ -733,20 +656,12 @@ function openSowModal(unitId, projectNumber) {
   //     expect "open the SOW for this unit" and fall back gracefully for multi-SOW.
   //   - If no projectNumber AND the unit has zero SOWs, create a new one with a
   //     freshly-auto-incremented project number.
-  // '_new' sentinel from the picker — force a blank new SOW, skip all existing-SOW logic.
-  var _forceNew = (projectNumber === '_new');
-  if (_forceNew) projectNumber = null;
-
   var existingList = unitId ? (typeof getUnitSowList === 'function' ? getUnitSowList(unitId) : []) : [];
-  var activeList = existingList.filter(function(s){ return !s.archived && s.approval_status !== 'completed'; });
-  if(!_forceNew && !projectNumber && activeList.length > 1){
-    // Multiple active requests — show a picker so the user can choose which one
-    // to open (or create a new one). This is the multi-contractor scenario.
-    _openSowPicker(unitId, activeList, existingList);
-    return;
-  }
-  if(!projectNumber && existingList.length > 0){
-    // Single active (or all completed/archived) — open the most recent.
+  // window._sowForceNew (set by the Reno Questionnaire) forces a brand-new SOW
+  // even when the unit already has requests. One-shot — cleared on read.
+  var _forceNew = !!window._sowForceNew; window._sowForceNew = false;
+  if(!projectNumber && !_forceNew && existingList.length > 0){
+    // Pick the most recent SOW for this unit so unit-detail click opens it.
     var sortedByDate = existingList.slice().sort(function(a, b){
       return (b.created_at || '').localeCompare(a.created_at || '');
     });
@@ -831,6 +746,64 @@ function openSowModal(unitId, projectNumber) {
 // ── SOW completion state control ──────────────────────────────────────────
 // Applies read-only lock when a SOW is completed AND the viewer isn't the ED.
 // Also toggles the Mark Complete / Reopen buttons based on status + permissions.
+// True when a SOW is approved for RFQ purposes — completed, ED-approved, or
+// HM-approved when ED isn't required (cost within the HM limit). Mirrors the
+// renos approval table's 'approved' state. Once approved, requesting quotes is
+// moot, so RFQ entry points hide.
+function _sowIsApproved(sow){
+  if(!sow) return false;
+  var st = sow.approval_status || '';
+  if(st === 'completed' || st === 'ed_approved') return true;
+  if(st === 'hm_approved'){
+    var cost = (typeof sow.amount === 'number' ? sow.amount
+              : parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))) || 0;
+    var hmLimit = (typeof _getHmLimit === 'function') ? _getHmLimit() : 25000;
+    return cost <= hmLimit;
+  }
+  return false;
+}
+window._sowIsApproved = _sowIsApproved;
+
+
+// Fill the "Assigned To" field-employee dropdown from active staff whose role is
+// field_employee. Uses _staffCache when present, otherwise fetches once and
+// caches in window._fieldEmployeeCache. selectedEmail pre-selects the saved value.
+function _sowPopulateFieldEmployees(selectedEmail){
+  var sel = document.getElementById('sow_assigned_to');
+  if(!sel) return;
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+  var norm = (window.CLFN_PERMS && CLFN_PERMS.normalizeRole) ? CLFN_PERMS.normalizeRole : function(r){ return String(r||'').toLowerCase(); };
+  var want = (selectedEmail || '').toLowerCase();
+  function build(list){
+    var opts = ['<option value="">— Select field employee —</option>'];
+    (list||[]).forEach(function(s){
+      var email = (s.email||'').toLowerCase();
+      var name  = s.name || s.email || email;
+      if(!email) return;
+      opts.push('<option value="'+esc(email)+'" data-name="'+esc(name)+'"'+(email===want?' selected':'')+'>'+esc(name)+'</option>');
+    });
+    sel.innerHTML = opts.join('');
+  }
+  if(Array.isArray(window._fieldEmployeeCache)){ build(window._fieldEmployeeCache); return; }
+  var fromStaff = [];
+  if(window._staffCache){
+    Object.keys(window._staffCache).forEach(function(id){
+      var s = window._staffCache[id];
+      if(s && s.is_active !== false && norm(s.role) === 'field_employee') fromStaff.push(s);
+    });
+  }
+  if(fromStaff.length){ window._fieldEmployeeCache = fromStaff; build(fromStaff); return; }
+  try {
+    fetch(SUPABASE_URL + '/rest/v1/staff?is_active=eq.true&select=id,name,email,role,department&order=name', { headers: HOUSING_HEADERS })
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(rows){
+        var fes = (rows||[]).filter(function(s){ return norm(s.role) === 'field_employee'; });
+        window._fieldEmployeeCache = fes;
+        build(fes);
+      }).catch(function(){ build([]); });
+  } catch(e){ build([]); }
+}
+
 function _applySowModalLock(sow){
   var modal = document.getElementById('sowModal');
   if(!modal) return;
@@ -841,6 +814,40 @@ function _applySowModalLock(sow){
   // Banner
   var banner = document.getElementById('sow_readonly_banner');
   if(banner) banner.style.display = readOnly ? 'block' : 'none';
+
+  // ── Work-order assignment (in-house Housing Dept vs contractor) ───────────
+  // The "Assigned To" field is one picker (sow_contractor): the search lists the
+  // nation's own Housing Department first, then external contractors. Picking the
+  // Housing Dept reveals the field-employee sub-menu.
+  var _aRoleAssign = window.currentRole || '';
+  var _canAssign = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('assignWorkOrder', _aRoleAssign);
+  var _ctInp   = document.getElementById('sow_contractor');
+  var _ctHid   = document.getElementById('sow_contractor_id');
+  var _teamHid = document.getElementById('sow_assigned_team');
+  var _feSel   = document.getElementById('sow_assigned_to');
+
+  // Load saved assignment; infer 'contractor' for legacy SOWs with a contractor.
+  var _savedTeam = (sow && (sow.assignedTeam || sow.assigned_team)) || '';
+  var _savedTo   = (sow && (sow.assignedTo   || sow.assigned_to))   || '';
+  var _savedCtr  = (sow && sow.contractor) || '';
+  var _savedCtrId= (sow && (sow.contractorId || sow.contractor_id)) || '';
+  if(!_savedTeam && (_savedCtrId || _savedCtr)) _savedTeam = 'contractor';
+
+  if(_teamHid) _teamHid.value = _savedTeam;
+  if(_savedTeam === 'in_house'){
+    if(_ctInp) _ctInp.value = (typeof sowInHouseLabel === 'function') ? sowInHouseLabel() : 'Housing Department';
+    if(_ctHid) _ctHid.value = '';
+    if(typeof _sowPopulateFieldEmployees === 'function') _sowPopulateFieldEmployees(_savedTo);
+    if(_feSel) _feSel.style.display = '';
+  } else {
+    if(_ctInp) _ctInp.value = _savedCtr || '';
+    if(_ctHid) _ctHid.value = _savedCtrId || '';
+    if(_feSel) _feSel.style.display = 'none';
+  }
+
+  // Only roles with assignWorkOrder authority can change the assignment.
+  if(_ctInp) _ctInp.disabled = !_canAssign || readOnly;
+  if(_feSel) _feSel.disabled = !_canAssign || readOnly;
 
   // Inline Approve button — shown when the current user has approval authority
   // and the SOW is in a state that requires their specific action.
@@ -892,10 +899,13 @@ function _applySowModalLock(sow){
   var rfqBtn = document.getElementById('sow_rfq_btn');
   if (rfqBtn) {
     var _rfqRole = window.currentRole || '';
-    var _rfqShow = !!sow && !sow.archived && (
-      (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)) ||
-      (_rfqRole === 'housing_manager' || _rfqRole === 'ed')
-    );
+    var _rfqShow = !!sow && !sow.archived
+      && !_sowIsApproved(sow)
+      && (typeof moduleOn !== 'function' || moduleOn('rfq'))
+      && (
+        (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)) ||
+        (_rfqRole === 'housing_manager' || _rfqRole === 'ed')
+      );
     rfqBtn.style.display = _rfqShow ? 'flex' : 'none';
 
   }
@@ -1080,6 +1090,10 @@ function udpRenderSowTable(unitId){
   var wrap = document.getElementById('udp_sow_table_wrap');
   if(!wrap) return;
   var list = getUnitSowList(unitId);
+  // Field Employees only see in-house work orders assigned to them.
+  if(typeof sowHiddenFromCurrentFieldEmployee === 'function'){
+    list = list.filter(function(s){ return !sowHiddenFromCurrentFieldEmployee(s); });
+  }
   if(!list.length){
     wrap.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:12px;font-style:italic;background:var(--bg);">No maintenance requests yet. Click <strong style="color:var(--text);">New Request</strong> to create one.</div>';
     return;
@@ -1153,7 +1167,7 @@ function udpRenderSowTable(unitId){
         +editBtn
         +archiveBtn
         +'<button onclick="udpPrintWorkOrder(\''+esc(unitId)+'\',\''+pn+'\')" title="Print work order" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700;font-family:DM Sans,sans-serif;">Work Order</button>'
-        +(typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)
+        +((typeof moduleOn !== 'function' || moduleOn('rfq')) && !_sowIsApproved(sow) && typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)
           ? '<a href="rfq.html?unit='+esc(unitId)+'&sow='+esc(pn)+'" style="margin-left:4px;background:#1d4ed8;border:none;color:#fff;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;display:inline-block;">RFQ</a>'
           : '')
       +'</td>'
@@ -1359,6 +1373,9 @@ function saveSOW(opts){
     unitId:_sowUnitId, address:get('sow_address'), date:get('sow_date'),
     tenantName:get('sow_tenant_name'),
     preparedBy:get('sow_prepared_by'), contractor:get('sow_contractor'), contractorId:(document.getElementById('sow_contractor_id')||{}).value||'',
+    assignedTeam:(document.getElementById('sow_assigned_team')||{}).value||'',
+    assignedTo:(document.getElementById('sow_assigned_team')||{}).value==='in_house' ? ((document.getElementById('sow_assigned_to')||{}).value||'') : '',
+    assignedToName:(function(){ var s=document.getElementById('sow_assigned_to'); if(!s||((document.getElementById('sow_assigned_team')||{}).value)!=='in_house') return ''; var o=s.options[s.selectedIndex]; return (o&&o.getAttribute('data-name'))||''; })(),
     poNumber:get('sow_po_number'),
     condition:get('sow_condition'), fundSource:get('sow_fund_source'), totalCost:get('sow_total_cost'),
     startDate:get('sow_start_date'), endDate:get('sow_end_date'), notes:get('sow_notes'),
@@ -1383,6 +1400,11 @@ function saveSOW(opts){
     files: (window._sowFiles || []).slice(),
     savedAt:new Date().toISOString()
   };
+  // Reconcile assignment: in-house work has no contractor; contractor work has
+  // no field-employee assignee. Prevents a stale contractor email firing on an
+  // in-house job, and keeps the Field Employee filter clean.
+  if(data.assignedTeam === 'in_house'){ data.contractor = ''; data.contractorId = ''; }
+  else if(data.assignedTeam === 'contractor'){ data.assignedTo = ''; data.assignedToName = ''; }
   // ── Multi-SOW fields ───────────────────────────────────────────────────
   // Stamp the project number (either the one being edited or a fresh one for new SOWs).
   data.project_number = window._sowEditingProjectNumber || (_sowUnitId ? nextProjectNumber(_sowUnitId) : 'NO-UNIT-SOW-001');
@@ -1530,6 +1552,21 @@ function saveSOW(opts){
         console.warn('[notify] work-order prompt threw:', e);
       }
     })();
+  }
+
+  // Work Order email to the assigned in-house field employee — fires on SUBMIT
+  // when the work is assigned in-house with a key person. De-duped so editing
+  // an already-submitted SOW with the same assignee doesn't re-notify.
+  if (_saveMode === 'submit' && data.assignedTeam === 'in_house' && data.assignedTo
+      && typeof notifyWorkOrderToFieldEmployee === 'function') {
+    var _prevAssignee = (existingForStatus && (existingForStatus.assignedTo || '')).toLowerCase();
+    var _prevSubmitted = existingForStatus && existingForStatus.approval_status && existingForStatus.approval_status !== 'draft';
+    var _alreadyNotified = _prevSubmitted && _prevAssignee === (data.assignedTo || '').toLowerCase();
+    if (!_alreadyNotified) {
+      var _allUnitsFE = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+      var _unitFE = _sowUnitId ? _allUnitsFE.find(function(x){ return x.id === _sowUnitId; }) : null;
+      notifyWorkOrderToFieldEmployee(data, _unitFE);
+    }
   }
 
   // Tenant signature captured

@@ -402,6 +402,7 @@ function renderNationPanel(){
     // Editable form — display name, short name, logo upload, save.
     var inputStyle = 'width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;';
     var lblStyle   = 'display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;';
+    var idleMin    = parseInt(cfg.idle_timeout_minutes, 10) || 15;
 
     identEl.innerHTML =
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;">'
@@ -452,6 +453,18 @@ function renderNationPanel(){
       +     '<div class="js-lbl-sm" style="margin-top:6px;">Stored for use in future public-facing pages. Leave any field blank to skip it.</div>'
       +   '</div>'
 
+      // ── Session / auto sign-out section ────────────────────────────
+      +   '<div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:12px;">'
+      +     '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;">Session</div>'
+      +     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">'
+      +       '<div>'
+      +         '<label style="'+lblStyle+'">Auto Sign-Out After (minutes idle)</label>'
+      +         '<input id="nation_input_idle_minutes" type="number" min="1" max="1440" step="1" value="'+idleMin+'" style="'+inputStyle+'" placeholder="15"/>'
+      +         '<div class="js-lbl-sm" style="margin-top:4px;">Inactivity before a user is signed out. The timer resets on any tap or scroll, so active use never triggers it. Field crews on phones/iPads may want a longer window (e.g. 60+).</div>'
+      +       '</div>'
+      +     '</div>'
+      +   '</div>'
+
       +   '<div style="grid-column:1/-1;display:flex;gap:8px;align-items:center;border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">'
       +     '<button type="button" onclick="saveNationSettings()" class="btn btn-primary">Save Nation Settings</button>'
       +     '<div class="js-lbl-sm">Hosting <code style="font-family:Consolas,Monaco,monospace;">'+escapeHtml(host)+'</code> · ID <code style="font-family:Consolas,Monaco,monospace;">'+idVal+'</code></div>'
@@ -470,7 +483,12 @@ function renderNationPanel(){
   var pill = function(label, c, bg){
     return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+';">'+label+'</span>';
   };
+  var MODULE_LABELS = {
+    rfq:     'RFQ (Request for Quotes)',
+    mapping: 'Mapping (Unit Location & Photo)'
+  };
   var humanize = function(name){
+    if(MODULE_LABELS[name]) return MODULE_LABELS[name];
     return name.replace(/_/g,' ').replace(/\b\w/g, function(m){return m.toUpperCase();});
   };
   var coreRow = function(name){
@@ -662,6 +680,12 @@ function saveNationSettings() {
     if (val) socials[k] = val;
   });
 
+  // Auto sign-out window (minutes idle). Clamp to a sane 1..1440 range and
+  // fall back to the 15-minute default for blank/garbage input.
+  var idleMin = parseInt(v('nation_input_idle_minutes'), 10);
+  if (!idleMin || idleMin < 1) idleMin = 15;
+  if (idleMin > 1440) idleMin = 1440;
+
   // Persist nation identity + contact + social overrides.
   var override = {
     display_name:    disp,
@@ -671,7 +695,8 @@ function saveNationSettings() {
     website:         v('nation_input_website'),
     phone:           v('nation_input_phone'),
     email:           emailVal,
-    socials:         socials
+    socials:         socials,
+    idle_timeout_minutes: idleMin
   };
   if (!window._appSettings) window._appSettings = {};
   window._appSettings.nation_config_override = override;

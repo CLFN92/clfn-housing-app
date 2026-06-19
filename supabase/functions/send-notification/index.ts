@@ -1,43 +1,56 @@
 // ========================================================================
-// send-notification - CLFN Housing transactional email Edge Function
+// send-notification - Housing transactional email Edge Function
 // ------------------------------------------------------------------------
-// POST { to, to_name, subject, message, html?, event?, entity_type?, entity_id? }
+// POST { to, to_name, subject, message, html?, bodyHtml?, reply_to?, brand?,
+//        event?, entity_type?, entity_id?, attachments? }
 //
-// Sends via Microsoft Graph (graph.microsoft.com/v1.0/users/{from}/sendMail)
-// using OAuth2 client_credentials flow against the Entra app
-// "CLFN Housing App - Notifications". The Mail.Send Application permission
-// is admin-consented at the tenant level and scoped to ONLY the
-// housing@clfn.on.ca shared mailbox via Exchange's Application Access
-// Policy. Sent items appear in the housing@clfn.on.ca Sent folder.
+// Multi-nation: the email PROVIDER is selectable per nation via the
+// EMAIL_PROVIDER secret, so nations without Microsoft 365 can still send.
+//   EMAIL_PROVIDER = "graph"    (default) - Microsoft Graph / M365 mailbox
+//                  | "resend"             - Resend HTTP API
+//                  | "sendgrid"           - SendGrid HTTP API
 //
-// Requires an authenticated Supabase user (Authorization: Bearer <jwt>) -
-// keeps the function from being abused by anonymous callers. Logs each
-// send to housing_audit_log via the service-role key (best-effort, never
-// fails the send).
+// Requires an authenticated Supabase user (Authorization: Bearer <jwt>) so the
+// function can't be abused by anonymous callers. Logs each send to
+// housing_audit_log via the service-role key (best-effort, never fails a send).
 //
-// Secrets expected in the Supabase Edge Function environment:
-//   GRAPH_TENANT_ID            (required - Entra tenant GUID)
-//   GRAPH_CLIENT_ID            (required - Entra app client ID)
-//   GRAPH_CLIENT_SECRET        (required - client secret VALUE, not the ID)
-//   GRAPH_FROM_USER            (required - UPN of the shared mailbox to
-//                              send as, e.g. housing@clfn.on.ca)
-//   SUPABASE_URL               (auto-injected)
-//   SUPABASE_ANON_KEY          (auto-injected)
-//   SUPABASE_SERVICE_ROLE_KEY  (auto-injected - needed for audit insert)
+// Secrets (set per nation in Project Settings -> Edge Functions -> Secrets):
+//   EMAIL_PROVIDER    optional, default "graph"
+//   EMAIL_REPLY_TO    optional reply-to override (default housing@clfn.on.ca)
+//   EMAIL_BRAND       optional footer brand     (default "CLFN Housing")
+//   -- Graph (when EMAIL_PROVIDER=graph) --
+//   GRAPH_TENANT_ID, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET, GRAPH_FROM_USER
+//   -- Resend (when EMAIL_PROVIDER=resend) --
+//   RESEND_API_KEY, EMAIL_FROM (sender email), EMAIL_FROM_NAME (optional)
+//   -- SendGrid (when EMAIL_PROVIDER=sendgrid) --
+//   SENDGRID_API_KEY, EMAIL_FROM (sender email), EMAIL_FROM_NAME (optional)
+//   -- auto-injected --
+//   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 // ========================================================================
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const EMAIL_PROVIDER       = (Deno.env.get("EMAIL_PROVIDER") || "graph").toLowerCase();
+const EMAIL_REPLY_TO       = Deno.env.get("EMAIL_REPLY_TO");
+const EMAIL_BRAND          = Deno.env.get("EMAIL_BRAND");
+const EMAIL_FROM           = Deno.env.get("EMAIL_FROM");
+const EMAIL_FROM_NAME      = Deno.env.get("EMAIL_FROM_NAME");
+
 const GRAPH_TENANT_ID      = Deno.env.get("GRAPH_TENANT_ID");
 const GRAPH_CLIENT_ID      = Deno.env.get("GRAPH_CLIENT_ID");
 const GRAPH_CLIENT_SECRET  = Deno.env.get("GRAPH_CLIENT_SECRET");
 const GRAPH_FROM_USER      = Deno.env.get("GRAPH_FROM_USER");
+
+const RESEND_API_KEY       = Deno.env.get("RESEND_API_KEY");
+const SENDGRID_API_KEY     = Deno.env.get("SENDGRID_API_KEY");
+
 const SUPABASE_URL         = Deno.env.get("SUPABASE_URL");
 const SUPABASE_ANON_KEY    = Deno.env.get("SUPABASE_ANON_KEY");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-const REPLY_TO = "housing@clfn.on.ca";
+const DEFAULT_REPLY_TO = "housing@clfn.on.ca";
+const DEFAULT_BRAND    = "CLFN Housing";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin":  "*",
@@ -45,8 +58,17 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// In-memory Graph token cache. Edge Function instances reuse a token
-// across invocations until it expires. 60s safety buffer.
+type Attachment = { name: string; contentType: string; contentBytes: string };
+type OutMessage = {
+  to: string;
+  to_name?: string;
+  subject: string;
+  emailHtml: string;
+  replyTo: string;
+  attachments?: Attachment[];
+};
+
+// ----- Microsoft Graph (M365) ------------------------------------------------
 let _cachedToken: { access_token: string; expires_at: number } | null = null;
 
 async function getGraphToken(): Promise<string> {
@@ -54,9 +76,7 @@ async function getGraphToken(): Promise<string> {
   if (_cachedToken && _cachedToken.expires_at - 60 > now) {
     return _cachedToken.access_token;
   }
-  const tokenUrl = "https://login.microsoftonline.com/"
-                 + GRAPH_TENANT_ID
-                 + "/oauth2/v2.0/token";
+  const tokenUrl = "https://login.microsoftonline.com/" + GRAPH_TENANT_ID + "/oauth2/v2.0/token";
   const body = new URLSearchParams({
     client_id:     GRAPH_CLIENT_ID!,
     client_secret: GRAPH_CLIENT_SECRET!,
@@ -72,13 +92,89 @@ async function getGraphToken(): Promise<string> {
   if (!r.ok || !data.access_token) {
     throw new Error("Token endpoint " + r.status + ": " + JSON.stringify(data));
   }
-  _cachedToken = {
-    access_token: data.access_token,
-    expires_at:   now + (data.expires_in || 3600),
-  };
+  _cachedToken = { access_token: data.access_token, expires_at: now + (data.expires_in || 3600) };
   return data.access_token;
 }
 
+async function sendViaGraph(m: OutMessage): Promise<void> {
+  const token = await getGraphToken();
+  const sendUrl = "https://graph.microsoft.com/v1.0/users/" + encodeURIComponent(GRAPH_FROM_USER!) + "/sendMail";
+  const graphAttachments = (m.attachments && m.attachments.length)
+    ? m.attachments.map((a) => ({
+        "@odata.type": "#microsoft.graph.fileAttachment",
+        name:          a.name,
+        contentType:   a.contentType,
+        contentBytes:  a.contentBytes,
+      }))
+    : undefined;
+  const graphMessage: Record<string, unknown> = {
+    subject:      m.subject,
+    body:         { contentType: "HTML", content: m.emailHtml },
+    toRecipients: [{ emailAddress: { address: m.to, name: m.to_name || undefined } }],
+    replyTo:      [{ emailAddress: { address: m.replyTo } }],
+  };
+  if (graphAttachments) graphMessage.attachments = graphAttachments;
+  const r = await fetch(sendUrl, {
+    method:  "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body:    JSON.stringify({ message: graphMessage, saveToSentItems: true }),
+  });
+  if (r.status !== 202) {
+    throw new Error("Graph " + r.status + ": " + (await r.text()));
+  }
+}
+
+// ----- Resend ----------------------------------------------------------------
+async function sendViaResend(m: OutMessage): Promise<void> {
+  const from = EMAIL_FROM_NAME ? (EMAIL_FROM_NAME + " <" + EMAIL_FROM + ">") : EMAIL_FROM!;
+  const body: Record<string, unknown> = {
+    from,
+    to:       [m.to],
+    subject:  m.subject,
+    html:     m.emailHtml,
+    reply_to: m.replyTo,
+  };
+  if (m.attachments && m.attachments.length) {
+    body.attachments = m.attachments.map((a) => ({ filename: a.name, content: a.contentBytes }));
+  }
+  const r = await fetch("https://api.resend.com/emails", {
+    method:  "POST",
+    headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json" },
+    body:    JSON.stringify(body),
+  });
+  if (!r.ok) {
+    throw new Error("Resend " + r.status + ": " + (await r.text()));
+  }
+}
+
+// ----- SendGrid --------------------------------------------------------------
+async function sendViaSendgrid(m: OutMessage): Promise<void> {
+  const body: Record<string, unknown> = {
+    personalizations: [{ to: [{ email: m.to, name: m.to_name || undefined }] }],
+    from:    { email: EMAIL_FROM!, name: EMAIL_FROM_NAME || undefined },
+    reply_to:{ email: m.replyTo },
+    subject: m.subject,
+    content: [{ type: "text/html", value: m.emailHtml }],
+  };
+  if (m.attachments && m.attachments.length) {
+    body.attachments = m.attachments.map((a) => ({
+      content:     a.contentBytes,
+      filename:    a.name,
+      type:        a.contentType,
+      disposition: "attachment",
+    }));
+  }
+  const r = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method:  "POST",
+    headers: { Authorization: "Bearer " + SENDGRID_API_KEY, "Content-Type": "application/json" },
+    body:    JSON.stringify(body),
+  });
+  if (r.status !== 202 && !r.ok) {
+    throw new Error("SendGrid " + r.status + ": " + (await r.text()));
+  }
+}
+
+// ----- helpers ---------------------------------------------------------------
 function escapeHtml(s: unknown): string {
   return String(s ?? "")
     .replace(/&/g, "&amp;")
@@ -95,18 +191,34 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
+function providerEnvMissing(): string[] {
+  const missing: string[] = [];
+  if (EMAIL_PROVIDER === "graph") {
+    if (!GRAPH_TENANT_ID)     missing.push("GRAPH_TENANT_ID");
+    if (!GRAPH_CLIENT_ID)     missing.push("GRAPH_CLIENT_ID");
+    if (!GRAPH_CLIENT_SECRET) missing.push("GRAPH_CLIENT_SECRET");
+    if (!GRAPH_FROM_USER)     missing.push("GRAPH_FROM_USER");
+  } else if (EMAIL_PROVIDER === "resend") {
+    if (!RESEND_API_KEY) missing.push("RESEND_API_KEY");
+    if (!EMAIL_FROM)     missing.push("EMAIL_FROM");
+  } else if (EMAIL_PROVIDER === "sendgrid") {
+    if (!SENDGRID_API_KEY) missing.push("SENDGRID_API_KEY");
+    if (!EMAIL_FROM)       missing.push("EMAIL_FROM");
+  }
+  return missing;
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST")    return jsonResponse({ error: "Method not allowed" }, 405);
 
-  // Env sanity
-  const missing: string[] = [];
-  if (!GRAPH_TENANT_ID)     missing.push("GRAPH_TENANT_ID");
-  if (!GRAPH_CLIENT_ID)     missing.push("GRAPH_CLIENT_ID");
-  if (!GRAPH_CLIENT_SECRET) missing.push("GRAPH_CLIENT_SECRET");
-  if (!GRAPH_FROM_USER)     missing.push("GRAPH_FROM_USER");
+  // Provider env sanity
+  if (["graph", "resend", "sendgrid"].indexOf(EMAIL_PROVIDER) === -1) {
+    return jsonResponse({ error: "Unknown EMAIL_PROVIDER: " + EMAIL_PROVIDER }, 500);
+  }
+  const missing = providerEnvMissing();
   if (missing.length) {
-    return jsonResponse({ error: "Graph env not configured", missing }, 500);
+    return jsonResponse({ error: "Email provider env not configured (" + EMAIL_PROVIDER + ")", missing }, 500);
   }
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     return jsonResponse({ error: "Supabase env not configured" }, 500);
@@ -139,7 +251,11 @@ serve(async (req: Request) => {
   const event       = payload.event       as string | undefined;
   const entity_type = payload.entity_type as string | undefined;
   const entity_id   = payload.entity_id   as string | undefined;
-  const attachments = payload.attachments as Array<{ name: string; contentType: string; contentBytes: string }> | undefined;
+  const attachments = payload.attachments as Attachment[] | undefined;
+
+  // Nation-driven branding/reply-to: payload override -> secret -> default.
+  const replyTo = (payload.reply_to as string) || EMAIL_REPLY_TO || DEFAULT_REPLY_TO;
+  const brand   = (payload.brand    as string) || EMAIL_BRAND    || DEFAULT_BRAND;
 
   if (!to || !subject || (!message && !html && !bodyHtml)) {
     return jsonResponse({
@@ -149,13 +265,9 @@ serve(async (req: Request) => {
 
   // Compose body - three modes, in priority order:
   //   1. `html`     - caller supplies a complete document, used as-is
-  //   2. `bodyHtml` - caller supplies inner content (rich text), wrapped
-  //                   in the branded shell. NOT escaped (caller's HTML
-  //                   should already be sanitized client-side before send).
+  //   2. `bodyHtml` - caller supplies inner content (rich text), wrapped in the
+  //                   branded shell. NOT escaped (sanitized client-side).
   //   3. `message`  - plain text, escaped + wrapped in the branded shell
-  //
-  // The branded shell is the same for `bodyHtml` and `message` so the
-  // recipient experience is consistent regardless of authoring path.
   const innerHtml = bodyHtml
     ? bodyHtml
     : '<div style="font-size:14px;line-height:1.6;color:#333;white-space:pre-wrap;">'
@@ -167,77 +279,22 @@ serve(async (req: Request) => {
     + '<h2 style="font-size:18px;margin:0 0 16px;color:#111;">' + escapeHtml(subject) + '</h2>'
     + innerHtml
     + '<hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0;"/>'
-    + '<p style="font-size:12px;color:#888;margin:0;">CLFN Housing - automated notification. Reply to this email to reach the housing team.</p>'
+    + '<p style="font-size:12px;color:#888;margin:0;">' + escapeHtml(brand) + ' - automated notification. Reply to this email to reach the housing team.</p>'
     + '</div>'
   );
 
-  // Acquire Graph token
-  let token: string;
-  try { token = await getGraphToken(); }
-  catch (e) {
-    return jsonResponse({
-      error:  "Failed to acquire Graph token",
-      detail: (e as Error).message,
-    }, 502);
-  }
+  const outMessage: OutMessage = { to, to_name, subject, emailHtml, replyTo, attachments };
 
-  // Send via Graph sendMail. Returns 202 Accepted with empty body on success.
-  const sendUrl = "https://graph.microsoft.com/v1.0/users/"
-                + encodeURIComponent(GRAPH_FROM_USER!)
-                + "/sendMail";
-
-  // Build Graph file attachments from the caller's spec.
-  // Each item: { name, contentType, contentBytes (base64) }.
-  const graphAttachments = (attachments && attachments.length)
-    ? attachments.map(function(a){
-        return {
-          "@odata.type":  "#microsoft.graph.fileAttachment",
-          name:           a.name,
-          contentType:    a.contentType,
-          contentBytes:   a.contentBytes,
-        };
-      })
-    : undefined;
-
-  const graphMessage: Record<string, unknown> = {
-    subject,
-    body:         { contentType: "HTML", content: emailHtml },
-    toRecipients: [{ emailAddress: { address: to, name: to_name || undefined } }],
-    replyTo:      [{ emailAddress: { address: REPLY_TO } }],
-  };
-  if (graphAttachments) graphMessage.attachments = graphAttachments;
-
-  const graphBody = {
-    message:         graphMessage,
-    saveToSentItems: true,
-  };
-
+  // Send via the configured provider
   try {
-    const r = await fetch(sendUrl, {
-      method:  "POST",
-      headers: {
-        Authorization:  "Bearer " + token,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(graphBody),
-    });
-    if (r.status !== 202) {
-      const detail = await r.text();
-      return jsonResponse({
-        error:  "Graph rejected the request",
-        status: r.status,
-        detail,
-      }, r.status);
-    }
+    if (EMAIL_PROVIDER === "graph")         await sendViaGraph(outMessage);
+    else if (EMAIL_PROVIDER === "resend")   await sendViaResend(outMessage);
+    else                                    await sendViaSendgrid(outMessage);
   } catch (e) {
-    return jsonResponse({
-      error:  "Graph network error",
-      detail: (e as Error).message,
-    }, 502);
+    return jsonResponse({ error: "Send failed (" + EMAIL_PROVIDER + ")", detail: (e as Error).message }, 502);
   }
 
-  // Audit log (best-effort, server-side). Service-role insert can't be
-  // spoofed by a malicious client. A failed audit insert never fails the send.
+  // Audit log (best-effort, server-side, service-role).
   if (SUPABASE_SERVICE_KEY) {
     try {
       const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);

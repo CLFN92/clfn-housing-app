@@ -42,6 +42,15 @@ var _rfqDocLib           = null; // DocLibrary instance for this RFQ
 
   try { await loadRfqPageData(); } catch(e) { console.error('[RFQ] data load failed:', e); }
 
+  // RFQ module gate — sub-pages don't run the login hydration, so apply saved
+  // module overrides now and bounce back to the dashboard if RFQ is turned off.
+  if (typeof initModuleEnablement === 'function') initModuleEnablement();
+  if (window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('rfq')) {
+    if (typeof showToast === 'function') showToast('The RFQ module is turned off for your nation.');
+    window.location.href = 'housing.html';
+    return;
+  }
+
   if (typeof _applyTheme          === 'function') _applyTheme((window._appSettings||{}).theme || {});
   if (typeof applyNationOverrides  === 'function') applyNationOverrides();
   // Mark RFQ as the active nav item (housing-init.js renders the nav)

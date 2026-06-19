@@ -195,6 +195,28 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>Thank you,<br/>{nationShort} Housing</p>'
     }
   },
+  {
+    key:                   'sow_assigned_to_field_employee',
+    label:                 'Work Order Assigned to Field Employee',
+    description:           'Sent to the assigned in-house field employee when a maintenance request is submitted with them assigned. Goes to the employee\'s email on file (silent skip if none).',
+    recipientType:         'field_employee',
+    defaultRecipientRoles: [],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['employeeName','unitAddress','projectNumber','tenantName','totalCost','startDate','endDate','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — Work Order Assigned: {unitAddress} ({projectNumber})',
+      bodyHtml: '<p>Hello {employeeName},</p>'
+              + '<p>A maintenance work order has been assigned to you.</p>'
+              + '<p>Unit address: <strong>{unitAddress}</strong><br/>'
+              +    'Project #: <strong>{projectNumber}</strong><br/>'
+              +    'Tenant: <strong>{tenantName}</strong><br/>'
+              +    'Target start: <strong>{startDate}</strong><br/>'
+              +    'Target completion: <strong>{endDate}</strong></p>'
+              + '<p>Please review the work order in the Housing app and update progress as you complete the work.</p>'
+              + '<p>Thank you,<br/>{nationShort} Housing</p>'
+    }
+  },
 
   // ── Application workflow status-change events ───────────────────────────
   {
@@ -2215,6 +2237,46 @@ async function notifyWorkOrderToContractor(sow, unit, contractor) {
   }, eventKey);
 }
 
+// Tokens for the in-house field-employee work-order email — reuses the work
+// order token set and adds the assignee's name.
+function _emailTokensForFieldWorkOrder(sow, unit) {
+  var base = _emailTokensForWorkOrder(sow, unit, null);
+  base.employeeName = (sow && sow.assignedToName) || '—';
+  return base;
+}
+
+// Email the assigned in-house field employee that a work order is theirs.
+// Recipient = sow.assignedTo (the field employee's email), plus any CC roles.
+// Silent skip when there's no assignee / invalid email. Fire-and-forget.
+async function notifyWorkOrderToFieldEmployee(sow, unit) {
+  if (!sow) return;
+  var eventKey = 'sow_assigned_to_field_employee';
+  var to = (sow.assignedTo || '').trim().toLowerCase();
+  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    console.log('[notify] sow_assigned_to_field_employee skipped - no assignee email for SOW ' + (sow.project_number || '—'));
+    return;
+  }
+  var seen = {}; var emails = [to]; seen[to] = true;
+  var extraRoles = _emailEventRecipientRoles(eventKey).concat(_emailEventCcRoles(eventKey));
+  if (extraRoles.length) {
+    var extra = await _resolveActiveStaffForRoles(extraRoles);
+    extra.forEach(function(r){ var c = (r.email||'').trim().toLowerCase(); if (c && !seen[c]) { seen[c] = true; emails.push(c); } });
+  }
+  var rendered = _renderEmailTemplate(eventKey, _emailTokensForFieldWorkOrder(sow, unit));
+  if (!rendered) return;
+  await _sendSerially(emails.map(function(e){ return { email: e }; }), function(rcp){
+    return {
+      to:          rcp.email,
+      to_name:     (rcp.email === to ? (sow.assignedToName || '') : ''),
+      subject:     rendered.subject,
+      bodyHtml:    rendered.bodyHtml,
+      event:       eventKey,
+      entity_type: 'sow',
+      entity_id:   sow.project_number || '—'
+    };
+  }, eventKey);
+}
+
 // Returns the recipient role list for an event — saved override if the
 // ED has set one, otherwise the registry default. Always returns an
 // array (possibly empty).
@@ -2512,6 +2574,12 @@ function _ntfRenderEditorHtml(eventKey) {
       +   'Always sends to the <strong>assigned contractor&#39;s email</strong> from their contractor record '
       +   '(silent skip if no email is on file).'
       + '</div>';
+  } else if (cfg.recipientType === 'field_employee') {
+    primaryBlock +=
+        '<div class="ntf-recipients-fixed">'
+      +   'Always sends to the <strong>assigned field employee&#39;s email</strong> (the in-house crew member assigned the work order; '
+      +   'silent skip if none is assigned or no email is on file).'
+      + '</div>';
   } else if (cfg.recipientType === 'rfq_contractor') {
     primaryBlock +=
         '<div class="ntf-recipients-fixed">'
@@ -2559,7 +2627,7 @@ function _ntfRenderEditorHtml(eventKey) {
     +   '</div>'
     + '</div>'
     + '<div class="ntf-field">'
-    +   '<label class="ntf-label">Recipients' + (cfg.recipientType === 'applicant' || cfg.recipientType === 'tenant' || cfg.recipientType === 'contractor'
+    +   '<label class="ntf-label">Recipients' + (cfg.recipientType === 'applicant' || cfg.recipientType === 'tenant' || cfg.recipientType === 'contractor' || cfg.recipientType === 'field_employee'
           ? ''
           : ' <span class="ntf-label-hint">(active staff in any ticked role)</span>') + '</label>'
     +   primaryBlock
@@ -2923,7 +2991,7 @@ function _ntfReadEditorState() {
       if (cb.checked) ccRoles.push(cb.getAttribute('data-ntf-cc-role'));
     });
   }
-  var isImplicitRecipient = cfg && (cfg.recipientType === 'applicant' || cfg.recipientType === 'tenant' || cfg.recipientType === 'contractor' || cfg.recipientType === 'rfq_contractor');
+  var isImplicitRecipient = cfg && (cfg.recipientType === 'applicant' || cfg.recipientType === 'tenant' || cfg.recipientType === 'contractor' || cfg.recipientType === 'rfq_contractor' || cfg.recipientType === 'field_employee');
   if (!isImplicitRecipient && !roles.length) {
     showToast('Pick at least one recipient role');
     return null;

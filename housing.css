@@ -1287,6 +1287,22 @@ body.is-sow-only .modal-overlay { visibility: visible; }
   font-size: 13px;
 }
 
+/* The global `.f input` rule (full width + padding + border, meant for text
+   fields) also lands on these inline checkboxes, breaking the layout on narrow
+   screens. Reset them back to native checkboxes so they sit beside their label. */
+.check-row input[type="checkbox"],
+.check-row-sm input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  accent-color: var(--yellow);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.check-row-sm { flex: 0 0 auto; }
+
 /* Score input cell */
 .score-input {
   width: 72px;
@@ -1822,6 +1838,23 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 .tic-textarea             { width: 100%; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: 13px; font-family: var(--sans); resize: vertical; min-height: 70px; box-sizing: border-box; }
 .tic-textarea:focus       { outline: none; border-color: var(--yellow); }
 .tic-input-error          { border-color: var(--danger); }
+
+/* Read-only Tenant Information Card (Field Employee role). Saves are blocked in
+   JS; this greys out and disables the editing affordances so the card visibly
+   reads as view-only. Tab navigation, close, export, and the New Work Order
+   footer button stay active. */
+.tic-readonly input,
+.tic-readonly select,
+.tic-readonly textarea,
+.tic-readonly [data-tic-action$="-add"],
+.tic-readonly [data-tic-action$="-edit"],
+.tic-readonly [data-tic-action$="-save"],
+.tic-readonly [data-tic-action$="-delete"] {
+  opacity: .5 !important;
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+  background: var(--bg) !important;
+}
 
 .tic-pet-grid             { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .tic-pet-card             { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; gap: 12px; align-items: flex-start; }

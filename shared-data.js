@@ -1931,6 +1931,15 @@ window.sendNotification = async function(opts) {
   if(!opts || !opts.to || !opts.subject || (!opts.message && !opts.html && !opts.bodyHtml)) {
     throw new Error('sendNotification: requires to + subject + (message|html|bodyHtml)');
   }
+  // Nation branding for the email footer + reply-to. The send-notification Edge
+  // Function reads these (falling back to its own secret/default), so each
+  // nation's mail is branded without per-nation code. Harmless on the legacy
+  // function (extra payload fields are ignored).
+  try {
+    var _nc = window.NATION_CONFIG || {};
+    if(opts.brand == null){ var _s = _nc.short || _nc.display_name; if(_s) opts.brand = _s + ' Housing'; }
+    if(opts.reply_to == null && _nc.email) opts.reply_to = _nc.email;
+  } catch(e) {}
   var session = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION : null;
   var token   = session && session.accessToken;
   if(!token) throw new Error('sendNotification: no access token (not signed in)');
@@ -3937,6 +3946,21 @@ window._refreshAppViews = _refreshAppViews;
 // Shows ONLY items requiring action across all entity types, grouped by type.
 // Auto-updates when called after any approval/action (all callsites that
 // trigger after status changes already call this function).
+// Field Employees only see in-house work orders assigned to them (the logged-in
+// key person). Returns true when the given SOW should be HIDDEN from the current
+// user; non-field roles always see everything. Nation-agnostic — keys off the
+// SOW's assignment fields and the session email.
+function sowHiddenFromCurrentFieldEmployee(sow){
+  var role = window._viewAsRole || window._realRole || window.currentRole || '';
+  if(role !== 'field_employee') return false;
+  if(!sow) return true;
+  if((sow.assignedTeam || sow.assigned_team || '') !== 'in_house') return true;
+  var email = ((window.HOUSING_SESSION && HOUSING_SESSION.email) || '').toLowerCase();
+  var to    = (sow.assignedTo || sow.assigned_to || '').toLowerCase();
+  return !(email && to && email === to);
+}
+window.sowHiddenFromCurrentFieldEmployee = sowHiddenFromCurrentFieldEmployee;
+
 function renderWorklist() {
   var body = document.getElementById('worklist_body');
   if (!body) return;
@@ -3977,7 +4001,7 @@ function renderWorklist() {
   }
 
   var draftRfqs = [];
-  if (email) {
+  if (email && (typeof moduleOn !== 'function' || moduleOn('rfq'))) {
     var rfqCache = window._rfqCache || {};
     var rfqUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     Object.keys(rfqCache).forEach(function(rfqId) {
@@ -4028,9 +4052,31 @@ function renderWorklist() {
     sowItems = sowItems.slice(0, 8);
   }
 
+  // ── 2b. Field Employee: approved work orders to execute ──────────────────
+  // Maintenance crew queue — SOWs that HM/ED have approved and that aren't yet
+  // completed, i.e. the work the crew can go do now and then mark complete.
+  var fieldSowItems = [];
+  if (role === 'field_employee') {
+    var fsCache = window._sowCache || {};
+    var fsUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
+    Object.keys(fsCache).forEach(function(uid) {
+      var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
+      list.forEach(function(sow) {
+        if (!sow || sow.archived) return;
+        var status = sow.approval_status || '';
+        if (status !== 'hm_approved' && status !== 'ed_approved') return; // approved, not completed
+        if (sowHiddenFromCurrentFieldEmployee(sow)) return;               // in-house + assigned to me
+        var u = fsUnits.find(function(x){ return x && x.id === uid; });
+        var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : uid;
+        fieldSowItems.push({ uid: uid, pn: sow.project_number || '', addr: addr, status: status });
+      });
+    });
+    fieldSowItems = fieldSowItems.slice(0, 12);
+  }
+
   // ── 3. RFQs needing action ───────────────────────────────────────────────
   var rfqItems = [];
-  if (isManagement) {
+  if (isManagement && (typeof moduleOn !== 'function' || moduleOn('rfq'))) {
     var rfqCache = window._rfqCache || {};
     var rfqUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     Object.keys(rfqCache).forEach(function(rfqId) {
@@ -4270,6 +4316,27 @@ function renderWorklist() {
         + '</div>';
     }).join('');
     html += sectionWrap('🔨', 'Renovations Waiting Approval', sowItems.length, 'renos.html', sowRows, 0);
+  }
+
+  // Field Employee — approved work orders to complete
+  if (fieldSowItems.length) {
+    var fsRows = fieldSowItems.map(function(s) {
+      var openCall = 'if(typeof openSowModal===\'function\'){openSowModal(\''
+                   + escapeHtml(s.uid).replace(/'/g, "\\'") + '\');}'
+                   + 'else{window.location.href=\'renos.html?sow=' + encodeURIComponent(s.uid) + '\';}';
+      var statLbl = (s.status === 'ed_approved') ? 'Approved — Ready to Work' : 'HM Approved — Ready to Work';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid var(--border);background:var(--surface);" '
+        + 'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'var(--surface)\'">'
+        + '<div onclick="' + openCall + '" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;">'
+        +   '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(s.addr) + '</span>'
+        +   '<span style="font-size:11px;color:var(--muted);width:120px;flex-shrink:0;">' + escapeHtml(s.pn || '—') + '</span>'
+        +   '<span style="font-size:11px;color:var(--muted);width:180px;flex-shrink:0;">' + escapeHtml(statLbl) + '</span>'
+        + '</div>'
+        + '<button onclick="' + openCall + '" style="flex-shrink:0;background:var(--yellow);color:var(--dark);border:none;border-radius:6px;'
+        +   'padding:5px 12px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;">Open →</button>'
+        + '</div>';
+    }).join('');
+    html += sectionWrap('🔧', 'Work Orders to Complete', fieldSowItems.length, 'renos.html', fsRows, 0);
   }
 
   // RFQs
@@ -5323,28 +5390,48 @@ function sowAddNewContractor() {
   // the post-save re-render of the contractors list view.
   window._sowAfterContractorSave = true;
 }
+// Nation-driven label for the in-house Housing Department option. No hardcoded
+// nation name — derived from NATION_CONFIG (Settings → Nation).
+function sowInHouseLabel() {
+  var s = (window.NATION_CONFIG && (NATION_CONFIG.short || NATION_CONFIG.display_name)) || '';
+  return (s ? s + ' Housing Department' : 'Housing Department');
+}
+window.sowInHouseLabel = sowInHouseLabel;
+
 function sowContractorSearch(q) {
   var dd = document.getElementById('sow_ct_dropdown');
   if(!dd) return;
-  var contractors = [];
   var contractors = window._contractors || [];
   var term = (q||'').toLowerCase().trim();
   var matches = term
     ? contractors.filter(function(c){ return (c.name||'').toLowerCase().includes(term)||(c.trade||'').toLowerCase().includes(term); })
     : contractors;
 
-  var rows = matches.map(function(c){
+  var rows = [];
+  // In-house Housing Department always offered first (it's the nation's own crew).
+  // Shown unless the search term clearly doesn't match "housing"/the nation name.
+  var inh = sowInHouseLabel();
+  if(!term || inh.toLowerCase().indexOf(term) !== -1 || 'housing department in-house crew'.indexOf(term) !== -1){
+    rows.push('<div data-ct-inhouse="1" onmousedown="sowSelectInHouse(this)" '
+      +'style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);background:#fffdf2;" '
+      +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'#fffdf2\'">'
+      +'<div style="font-weight:700;">&#127968; '+inh+'</div>'
+      +'<div class="js-lbl-sm">In-house crew — assign a field employee</div>'
+      +'</div>');
+  }
+
+  rows = rows.concat(matches.map(function(c){
     return '<div data-ct-name="'+c.name+'" data-ct-id="'+(c.id||'')+'" onmousedown="sowSelectContractor(this)" '
       +'style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" '
       +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
       +'<div style="font-weight:600;">'+c.name+'</div>'
       +(c.trade?'<div class="js-lbl-sm">'+c.trade+'</div>':'')
       +'</div>';
-  });
+  }));
 
-  if(!matches.length) {
+  if(!matches.length && term) {
     rows.push('<div style="padding:9px 14px;font-size:12px;color:var(--muted);">'
-      +(term?'No contractor matching "'+q+'" found.':'No contractors added yet.')+'</div>');
+      +'No contractor matching "'+q+'" found.</div>');
   }
   rows.push('<div onmousedown="sowAddNewContractor()" style="padding:9px 14px;cursor:pointer;font-size:12px;font-weight:700;color:var(--yellow);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;" '
     +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
@@ -5360,11 +5447,34 @@ function sowSelectContractor(el) {
   var id   = el.getAttribute('data-ct-id');
   var inp  = document.getElementById('sow_contractor');
   var hid  = document.getElementById('sow_contractor_id');
+  var team = document.getElementById('sow_assigned_team');
+  var feSel= document.getElementById('sow_assigned_to');
   if(inp) inp.value = name;
   if(hid) hid.value = id;
+  if(team) team.value = 'contractor';
+  // External contractor — no field-employee sub-menu.
+  if(feSel){ feSel.value = ''; feSel.style.display = 'none'; }
   var dd = document.getElementById('sow_ct_dropdown');
   if(dd) dd.style.display = 'none';
 }
+// In-house Housing Department picked — flag the work as in-house and reveal the
+// field-employee sub-menu so a key person can be assigned.
+function sowSelectInHouse(el) {
+  var inp  = document.getElementById('sow_contractor');
+  var hid  = document.getElementById('sow_contractor_id');
+  var team = document.getElementById('sow_assigned_team');
+  var feSel= document.getElementById('sow_assigned_to');
+  if(inp) inp.value = (typeof sowInHouseLabel === 'function') ? sowInHouseLabel() : 'Housing Department';
+  if(hid) hid.value = '';
+  if(team) team.value = 'in_house';
+  var dd = document.getElementById('sow_ct_dropdown');
+  if(dd) dd.style.display = 'none';
+  if(typeof _sowPopulateFieldEmployees === 'function') {
+    _sowPopulateFieldEmployees((feSel && feSel.value) || '');
+  }
+  if(feSel) feSel.style.display = '';
+}
+window.sowSelectInHouse = sowSelectInHouse;
 function triggerPrint() {
   if(!_printPanelDoc) return;
   // Use a hidden iframe — no popup blocker, panel stays visible
@@ -5882,6 +5992,13 @@ function udpRenderFilePreviews(unitId){
 }
 
 async function udpRenderRfqSection(unitId) {
+  // RFQ module gate — hide the whole "RFQs & Contracts" section when off.
+  var rfqSection = document.getElementById('udp_rfq_section');
+  if (typeof moduleOn === 'function' && !moduleOn('rfq')) {
+    if (rfqSection) rfqSection.style.display = 'none';
+    return;
+  }
+  if (rfqSection) rfqSection.style.display = '';
   var el = document.getElementById('udp_rfq_list');
   if (!el) return;
   el.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0;">Loading&hellip;</div>';

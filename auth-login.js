@@ -432,12 +432,10 @@ function _stampStaffLastLogin(email) {
       headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
       body:    JSON.stringify({ last_login_at: now })
     }).catch(function(e){ console.warn('[LAST LOGIN] staff patch failed:', e); });
-    // Always write to audit_log — INSERT allowed for all authenticated users
-    fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
-      method:  'POST',
-      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
-      body:    JSON.stringify({ app_id: 'LOGIN', action: 'user_login', detail: 'Signed in', actor: email })
-    }).catch(function(e){ console.warn('[LAST LOGIN] audit write failed:', e); });
+    // The "Signed In" audit row is written by _recordSessionLogin() (in
+    // shared-auth.js), which resolveHousingRole() already invoked just before
+    // this call. Centralizing it there means session *resumes* are captured
+    // too — not only fresh credential sign-ins — without writing a duplicate.
   } catch (e) {
     console.warn('[LAST LOGIN] threw:', e);
   }

@@ -94,6 +94,13 @@ async function resolveHousingRole() {
 
       // Session is real — start the idle-logout watcher
       if (typeof startIdleTimer === 'function') startIdleTimer();
+
+      // Record the sign-in once per browser session. This runs on every page's
+      // boot, but the flag inside makes it idempotent — so a session *resume*
+      // (token already in sessionStorage, app handed off straight to
+      // housing.html without re-entering credentials) is captured too, not just
+      // fresh sign-ins through startSignIn().
+      _recordSessionLogin();
     } else {
       HOUSING_SESSION.role = 'housing_employee_l1';
       window.currentRole   = 'housing_employee_l1';
@@ -106,6 +113,39 @@ async function resolveHousingRole() {
     window._booting = false;
   }
 }
+
+// ── _recordSessionLogin ──────────────────────────────────────────────────────
+// Writes a single "Signed In" audit row per browser session. Guarded by the
+// sessionStorage flag `clfn_login_audited` so the many resolveHousingRole()
+// calls across page navigations within one session don't each write a row. The
+// flag clears on browser close (sessionStorage is per-session) and on logout
+// (see _clearLocalClientState / _idleLogout), so the next session start records
+// a fresh login. Self-contained direct write (keepalive so it survives the
+// sign-in redirect) — mirrors the logout write in doLogout().
+function _recordSessionLogin() {
+  try {
+    if (sessionStorage.getItem('clfn_login_audited') === '1') return;
+  } catch(e) {}
+  var email = (HOUSING_SESSION && HOUSING_SESSION.email) || '';
+  if (!email) return;
+  try { sessionStorage.setItem('clfn_login_audited', '1'); } catch(e) {}
+  try {
+    fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
+      method:    'POST',
+      keepalive: true,
+      headers:   Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+      body:      JSON.stringify({
+        entity_type: 'auth',
+        entity_id:   'LOGIN',
+        action:      'user_login',
+        detail:      JSON.stringify({ detail: 'Signed in', name: (HOUSING_SESSION && HOUSING_SESSION.name) || '' }),
+        actor:       email,
+        created_at:  new Date().toISOString()
+      })
+    }).catch(function(e){ console.warn('[auth] login audit write failed:', e); });
+  } catch(e) {}
+}
+window._recordSessionLogin = _recordSessionLogin;
 
 // ── _clearLocalClientState ───────────────────────────────────────────────────
 // Wipes all client-side state: localStorage keys, sessionStorage keys,
@@ -123,7 +163,7 @@ function _clearLocalClientState() {
   // sessionStorage
   try {
     ['clfn_housing_token','clfn_housing_role','clfn_housing_name','clfn_housing_email_session',
-     'clfn_logo_cache','clfn_logo_transparent']
+     'clfn_logo_cache','clfn_logo_transparent','clfn_login_audited']
       .forEach(function(k) { try { sessionStorage.removeItem(k); } catch(e) {} });
   } catch(e) {}
 
@@ -144,8 +184,40 @@ function _clearLocalClientState() {
 // Signs the user out of Supabase, clears all client state, resets headers,
 // then calls window._onLogout() if registered (page-specific: show login screen,
 // clear data arrays, etc.).
-async function doLogout() {
+// `reason` distinguishes a deliberate sign-out via the logout button (default)
+// from an automatic idle-timeout sign-out ('idle'), so the two are recorded as
+// separate audit events.
+async function doLogout(reason) {
   stopIdleTimer();
+
+  // Audit the sign-out before tearing down the session — the user's token is
+  // still valid in HOUSING_HEADERS at this point. Self-contained direct write
+  // (matching the login write in auth-login.js) because shared-data.js's
+  // auditEntry() isn't loaded on every page that can call doLogout. keepalive:true
+  // lets the request survive the immediate redirect on an idle-timeout logout.
+  try {
+    var _isIdle = (reason === 'idle' || reason === 'timeout');
+    var _logoutEmail = (HOUSING_SESSION && HOUSING_SESSION.email) || '';
+    if (_logoutEmail) {
+      fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
+        method:    'POST',
+        keepalive: true,
+        headers:   Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body:      JSON.stringify({
+          entity_type: 'auth',
+          entity_id:   'LOGOUT',
+          action:      _isIdle ? 'user_logout_timeout' : 'user_logout',
+          detail:      JSON.stringify({
+            detail: _isIdle ? 'Signed out — idle timeout' : 'Signed out — logout button',
+            name:   (HOUSING_SESSION && HOUSING_SESSION.name) || ''
+          }),
+          actor:       _logoutEmail,
+          created_at:  new Date().toISOString()
+        })
+      }).catch(function(e){ console.warn('[auth] logout audit write failed:', e); });
+    }
+  } catch(e) {}
+
   try {
     await fetch(SUPABASE_URL + '/auth/v1/logout', { method: 'POST', headers: HOUSING_HEADERS });
   } catch(e) {}
@@ -189,7 +261,7 @@ function _idleLogout() {
   //    bounce to login without waiting for network.
   try {
     ['clfn_housing_token','clfn_housing_role','clfn_housing_name',
-     'clfn_housing_email_session'].forEach(function(k){
+     'clfn_housing_email_session','clfn_login_audited'].forEach(function(k){
       try { sessionStorage.removeItem(k); } catch(e) {}
     });
   } catch(e) {}
@@ -198,7 +270,7 @@ function _idleLogout() {
   //    We don't await it — the redirect below must not block on network.
   stopIdleTimer();
   if (typeof doLogout === 'function') {
-    try { doLogout().catch(function(e){ console.warn('[CLFN] idle doLogout:', e); }); } catch(e) {}
+    try { doLogout('idle').catch(function(e){ console.warn('[CLFN] idle doLogout:', e); }); } catch(e) {}
   }
 
   // 3. Navigate immediately. Pass ?timeout=1 so the login page can show a

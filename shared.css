@@ -1887,6 +1887,10 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .quick-row {
   display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 28px;
 }
+/* Grid items default to min-width:auto, so a wide child (long address chip,
+   tab bar, worklist row) can stretch the column past the viewport and overflow
+   the page on mobile. Let them shrink instead. */
+.quick-row > * { min-width: 0; }
 
 /* Lookup panel */
 .lookup-panel {
@@ -1901,12 +1905,15 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
   display: flex; gap: 4px; margin-bottom: 10px;
   background: var(--bg); padding: 4px; border-radius: 8px;
   border: 1px solid var(--border); width: fit-content;
+  max-width: 100%; overflow-x: auto; scrollbar-width: none;
 }
+.lookup-tabs::-webkit-scrollbar { display: none; }
 .lookup-tab {
   padding: 6px 12px; border-radius: 6px;
   font-size: 12px; font-weight: 600; color: var(--muted);
   background: transparent; border: none; cursor: pointer;
   display: flex; align-items: center; gap: 6px; font-family: inherit;
+  flex-shrink: 0; white-space: nowrap;
 }
 .lookup-tab:hover { color: var(--dark); }
 .lookup-tab.active { background: var(--dark); color: #fff; }

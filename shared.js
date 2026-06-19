@@ -143,7 +143,47 @@ window._applyTheme = function(theme) {
       sessionStorage.setItem('clfn_logo_transparent', theme.logoTransparent ? '1' : '');
     }
   } catch(e) {}
+  // Favicon / bookmark icon — drive the tab + saved-link icon from the nation's
+  // saved logo (Settings, persisted as theme.logo). No hardcoded brand here; if
+  // the nation hasn't configured a logo yet, the browser default is left as-is.
+  try {
+    if (theme.logo && typeof _setFavicon === 'function') _setFavicon(theme.logo);
+  } catch(e) {}
 };
+
+// _setFavicon — point the tab/bookmark icon at `href` (a data URL or path).
+// Ensures both an "icon" and an "apple-touch-icon" link exist and updates them,
+// so the browser tab/address bar AND iOS "Add to Home Screen" use the same
+// nation logo. Pages ship no static icon link — this is the only source.
+window._setFavicon = function(href) {
+  if (!href) return;
+  var head = document.head || document.getElementsByTagName('head')[0];
+  if (!head) return;
+  ['icon', 'apple-touch-icon'].forEach(function(rel) {
+    var sel = (rel === 'icon')
+      ? 'link[rel="icon"], link[rel="shortcut icon"]'
+      : 'link[rel="apple-touch-icon"]';
+    var nodes = head.querySelectorAll(sel);
+    if (nodes.length) {
+      for (var i = 0; i < nodes.length; i++) nodes[i].setAttribute('href', href);
+    } else {
+      var l = document.createElement('link');
+      l.setAttribute('rel', rel);
+      if (rel === 'icon') l.setAttribute('type', 'image/png');
+      l.setAttribute('href', href);
+      head.appendChild(l);
+    }
+  });
+};
+
+// Apply the nation's saved logo as the favicon as early as possible, from the
+// sessionStorage cache that _applyTheme writes on each load. This avoids a
+// blank icon between page load and the settings fetch on navigations, and keeps
+// everything nation-config-driven (no hardcoded brand image).
+try {
+  var _cachedLogo = sessionStorage.getItem('clfn_logo_cache');
+  if (_cachedLogo) window._setFavicon(_cachedLogo);
+} catch(e) {}
 
 // ═══════════════════════════════════════════════════════════════════════
 // formatPhone — canonical phone-string formatter "(705)-555-0100".
@@ -368,6 +408,10 @@ window.showPrompt = function(opts) {
     HM:         'housing_manager',
     HE_L2:      'housing_employee_l2',
     HE_L1:      'housing_employee_l1',
+    // Maintenance crew. Executes approved renovation work: edits/completes
+    // SOWs & work orders and updates progress. No application, approval,
+    // finance, tenant-edit, or settings access. See approval-authority.js.
+    FIELD_EMPLOYEE: 'field_employee',
     CFO:        'cfo',
     FINANCE_L1: 'finance_l1',
     // Cross-department admin tier — same authority as ED everywhere, no
@@ -392,6 +436,7 @@ window.showPrompt = function(opts) {
     'housing_manager':      'Housing Manager',
     'housing_employee_l2':  'Housing Employee L2',
     'housing_employee_l1':  'Housing Employee L1',
+    'field_employee':       'Field Employee',
     'cfo':                  'CFO',
     'finance_l1':           'Finance Clerk L1',
     'super_user':           'Super User'
@@ -454,7 +499,7 @@ window.showPrompt = function(opts) {
   function hasHousingAccess(role){
     var r = assertRole(role, 'hasHousingAccess');
     return r === ROLES.ED || r === ROLES.HM || r === ROLES.HE_L2 || r === ROLES.HE_L1
-        || r === ROLES.SUPER_USER;
+        || r === ROLES.FIELD_EMPLOYEE || r === ROLES.SUPER_USER;
   }
 
   function hasFinanceAccess(role){
@@ -468,6 +513,9 @@ window.showPrompt = function(opts) {
 
   function canCreateApp(role){
     var r = assertRole(role, 'canCreateApp');
+    // Field Employees (maintenance crew) have housing access for renovations
+    // but never create or touch applications.
+    if(r === ROLES.FIELD_EMPLOYEE) return false;
     return hasHousingAccess(r);
   }
 
@@ -514,7 +562,9 @@ window.showPrompt = function(opts) {
   }
   function canMarkSowComplete(role){
     var r = assertRole(role, 'canMarkSowComplete');
-    return _isEdTier(r) || r === ROLES.HM;
+    // Field Employees execute the work, so they close out (complete) work
+    // orders. Authorizing/approving a SOW stays with HM/ED.
+    return _isEdTier(r) || r === ROLES.HM || r === ROLES.FIELD_EMPLOYEE;
   }
   function canReopenSow(role){
     var r = assertRole(role, 'canReopenSow');
@@ -1481,6 +1531,8 @@ window.DocLibrary = (function(){
           deleteFlow
             .then(function(){
               state.files = state.files.filter(function(f){ return f.path !== p; });
+              // Stop tracking it as a pending upload so refresh() won't re-add it.
+              if (state.pendingUploads) delete state.pendingUploads[p];
               if (typeof opts.onChange === 'function') opts.onChange('delete', file);
               render();
             })
@@ -1532,6 +1584,26 @@ window.DocLibrary = (function(){
             }
           });
         }).then(function(){
+          // Optimistic insert — show the file immediately rather than waiting for
+          // the audit-log re-read, which can race the just-written file_uploaded
+          // row (the "uploaded but doesn't show at first" symptom). Tracked in
+          // state.pendingUploads and reconciled by refresh() once the server
+          // read confirms it.
+          var optimistic = {
+            path:     path,
+            name:     f.name,
+            size:     f.size,
+            type:     f.type || '',
+            category: state.uploadCategory || 'other',
+            addedAt:  new Date().toISOString().slice(0,10),
+            addedBy:  (typeof opts.getActor === 'function' && opts.getActor()) || ''
+          };
+          state.pendingUploads = state.pendingUploads || {};
+          state.pendingUploads[path] = optimistic;
+          if (!state.files.some(function(x){ return x.path === path; })) {
+            state.files.unshift(optimistic);
+          }
+          render();
           if (typeof opts.onChange === 'function') {
             opts.onChange('upload', { path:path, name:f.name, category:state.uploadCategory });
           }
@@ -1561,7 +1633,19 @@ window.DocLibrary = (function(){
         ? opts.customLoader()
         : _loadMeta(opts);
       return Promise.resolve(loader).then(function(files){
-        state.files = Array.isArray(files) ? files : [];
+        var serverFiles = Array.isArray(files) ? files : [];
+        // Reconcile optimistic uploads: keep any just-uploaded file the server
+        // read doesn't yet reflect (read-after-write race), and stop tracking a
+        // pending file once the server confirms it. Guarantees an upload never
+        // flickers away between the optimistic insert and the server catching up.
+        var pend = state.pendingUploads || {};
+        var serverPaths = {};
+        serverFiles.forEach(function(x){ if (x && x.path) serverPaths[x.path] = true; });
+        Object.keys(pend).forEach(function(p){
+          if (serverPaths[p]) { delete pend[p]; }      // confirmed persisted
+          else { serverFiles.unshift(pend[p]); }        // not visible yet — keep showing
+        });
+        state.files = serverFiles;
         state.loading = false;
         render();
       }).catch(function(){

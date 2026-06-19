@@ -68,6 +68,9 @@ var APPROVAL_AUTHORITY = (function() {
     approveSowOverThreshold:  ['ed'],
     // Who can lock a completed SOW
     lockSow:                  ['ed'],
+    // Who can assign a work order to the in-house field crew (a key person).
+    // Field Employees only see work orders assigned to them.
+    assignWorkOrder:          ['housing_manager', 'ed'],
 
     // ── Contractor approvals ──────────────────────────────────────────────
     // Who can recommend a contractor to ED. HE-L2 included so senior
@@ -93,9 +96,7 @@ var APPROVAL_AUTHORITY = (function() {
     // Who can add/edit staff
     manageStaff:              ['housing_manager', 'ed'],
 
-    // ── Dashboard & inventory ─────────────────────────────────────────────
-    // Who can access the management Dashboard view
-    accessDashboard:          ['housing_manager', 'ed'],
+    // ── Inventory ─────────────────────────────────────────────────────────
     // Who can archive a unit (soft-delete from Inventory)
     archiveUnit:              ['ed'],
     // Who can set a unit's GPS coordinates and house photo
@@ -112,8 +113,9 @@ var APPROVAL_AUTHORITY = (function() {
     viewApplicationScore:     ['ed', 'housing_manager', 'housing_employee_l2', 'cfo', 'finance_l1'],
 
     // ── Renovation Progress ───────────────────────────────────────────────
-    // Who can edit progress percentages and notes on a renovation
-    editRenoProgress:         ['ed', 'housing_manager', 'housing_employee_l2'],
+    // Who can edit progress percentages and notes on a renovation. Includes the
+    // Field Employee (maintenance crew) who performs and reports the work.
+    editRenoProgress:         ['ed', 'housing_manager', 'housing_employee_l2', 'field_employee'],
 
     // ── Finance module ────────────────────────────────────────────────────
     viewFinanceCard:          ['ed', 'housing_manager', 'housing_employee_l2', 'housing_employee_l1', 'cfo', 'finance_l1'],
@@ -285,6 +287,7 @@ var APPROVAL_AUTHORITY = (function() {
       approveSowUnderThreshold: 'Approve SOW under threshold',
       approveSowOverThreshold:  'Approve SOW over threshold',
       lockSow:                  'Lock completed SOW',
+      assignWorkOrder:          'Assign work order to field crew',
       recommendContractor:      'Approve contractor (first stage — HM)',
       approveContractor:        'Final contractor approval',
       declineContractor:        'Decline contractor',
@@ -293,7 +296,6 @@ var APPROVAL_AUTHORITY = (function() {
       accessSettings:           'Access settings page',
       editApprovalAuthority:    'Edit approval authorities',
       manageStaff:              'Add / edit staff',
-      accessDashboard:          'Access Dashboard view',
       archiveUnit:              'Archive a unit',
       setUnitLocation:          'Set unit GPS location &amp; house photo',
       manageStaffRecord:        'Edit / deactivate a staff record',
@@ -313,11 +315,10 @@ var APPROVAL_AUTHORITY = (function() {
       'Housing Application':  ['reviewApplication','finalApproveApp','declineApplication','returnApplication','unlockSignatures','viewApplicationScore'],
       'File Update':          ['reviewFileUpdate','approveFileUpdate'],
       'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand','assignRentAmount'],
-      'SOW & Renovation':     ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow','editRenoProgress'],
+      'SOW & Renovation':     ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow','assignWorkOrder','editRenoProgress'],
       'Contractors':          ['recommendContractor','approveContractor','declineContractor'],
       'Scoring':              ['editScoreModel','applyScoreAdjustment'],
       'Inventory':            ['archiveUnit', 'setUnitLocation'],
-      'Dashboard':            ['accessDashboard'],
       'System':               ['accessSettings','editApprovalAuthority','manageStaff','manageStaffRecord','manageAllStaffRoles'],
       'Finance':              ['viewFinanceCard','recordPayment','createInvoice','createArrangement','manageLoan','reverseTransaction'],
     },
