@@ -1735,14 +1735,22 @@ window.DocLibrary = (function(){
 
   // Get a signed URL for a file (valid 1 hour)
   async function sbGetSignedUrl(path) {
-    // Prefer Supabase JS client if available — handles encoding cleanly
+    // POST to Supabase Storage sign endpoint — returns a URL valid for 1 hour
+    // that can be opened directly in a browser tab without auth headers.
     try {
-      if (window._sb) {
-        var r = await window._sb.storage.from(window.STORAGE_BUCKET).createSignedUrl(path, 3600);
-        if (r.data && r.data.signedUrl) return r.data.signedUrl;
+      var signUrl = window.SUPABASE_URL + '/storage/v1/object/sign/' + window.STORAGE_BUCKET + '/' + path;
+      var res = await fetch(signUrl, {
+        method: 'POST',
+        headers: Object.assign({}, sbStorageHeaders(), { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ expiresIn: 3600 })
+      });
+      if (res.ok) {
+        var d = await res.json();
+        var rel = d && (d.signedURL || d.signedUrl);
+        if (rel) return window.SUPABASE_URL + '/storage/v1' + rel;
       }
-    } catch(e) { console.warn('createSignedUrl error:', e); }
-    // Fallback: authenticated URL with token param
+    } catch(e) { console.warn('[sbGetSignedUrl] sign failed:', e); }
+    // Last resort: authenticated URL (requires auth header — won't open in new tab)
     return sbGetFileUrl(path);
   }
 

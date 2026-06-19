@@ -68,14 +68,13 @@ function renderSowFiles() {
     var icon  = _sowFileIcon(f.name, f.type);
     var size  = _sowFmtSize(f.size);
     var added = f.addedAt || '';
-    var url   = (typeof sbGetFileUrl === 'function') ? sbGetFileUrl(f.path) : '#';
-    var pathAttr = (f.path || '').replace(/"/g, '&quot;');
+    var pathAttr = (f.path || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     return '<div class="file-row">'
       + '<span class="file-icon">' + icon + '</span>'
       + '<span class="file-name">' + (f.name || f.path || '—') + '</span>'
       + '<span class="file-meta">' + size + (added ? ' &middot; ' + added : '') + '</span>'
       + '<span class="file-actions">'
-        + '<a href="' + url + '" target="_blank" rel="noopener" title="Download">Download</a>'
+        + '<button type="button" class="file-download" onclick="_sowDownloadFile(\'' + pathAttr + '\')" title="Download">Download</button>'
         + '<button type="button" class="file-delete" onclick="removeSowFile(\'' + pathAttr + '\')" title="Remove">&times;</button>'
       + '</span>'
       + '</div>';
@@ -126,6 +125,19 @@ function sowFileDrop(e) {
   if (!dt || !dt.files || !dt.files.length) return;
   // Reuse handleSowFileUpload by faking an input shape
   handleSowFileUpload({ files: dt.files, value: '' });
+}
+async function _sowDownloadFile(path) {
+  if (!path) return;
+  try {
+    var url = (typeof sbGetSignedUrl === 'function')
+      ? await sbGetSignedUrl(path)
+      : null;
+    if (url) { window.open(url, '_blank', 'noopener'); }
+    else { showToast('Could not generate download link.'); }
+  } catch(e) {
+    console.warn('[SOW FILE] download failed:', e);
+    showToast('Download failed: ' + (e.message || 'unknown error'));
+  }
 }
 async function removeSowFile(path) {
   if (!path) return;
