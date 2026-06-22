@@ -601,44 +601,49 @@ function generateInspectionPDF() {
 
 // ── Page init ────────────────────────────────────────────────────────────────
 (async function initInspectionsPage() {
-  var token = sessionStorage.getItem('clfn_housing_token');
-  if (!token) { window.location.href = 'index.html'; return; }
+  try {
+    var token = sessionStorage.getItem('clfn_housing_token');
+    if (!token) { window.location.href = 'index.html'; return; }
 
-  if (window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('inspections')) {
-    window.location.href = 'housing.html'; return;
+    var savedRole  = sessionStorage.getItem('clfn_housing_role')          || 'housing_employee_l1';
+    var savedName  = sessionStorage.getItem('clfn_housing_name')          || '';
+    var savedEmail = sessionStorage.getItem('clfn_housing_email_session') || '';
+    if (typeof HOUSING_HEADERS !== 'undefined') HOUSING_HEADERS['Authorization'] = 'Bearer ' + token;
+    if (typeof HOUSING_SESSION !== 'undefined') {
+      HOUSING_SESSION.accessToken = token;
+      HOUSING_SESSION.role        = savedRole;
+      HOUSING_SESSION.name        = savedName;
+      HOUSING_SESSION.email       = savedEmail;
+    }
+    window.currentRole = savedRole;
+    window._realRole   = savedRole;
+
+    if (typeof resolveHousingRole === 'function') {
+      try { await resolveHousingRole(); } catch(e) { console.warn('[inspections] role resolve:', e); }
+    }
+    var role = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.role) || savedRole;
+    window.currentRole = role;
+    window._realRole   = role;
+
+    if (typeof initModuleEnablement         === 'function') try { initModuleEnablement(); } catch(e) {}
+    if (window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('inspections')) {
+      window.location.href = 'housing.html'; return;
+    }
+
+    if (typeof updateHeaderUser             === 'function') updateHeaderUser(role);
+    if (typeof updateRoleSwitcherVisibility === 'function') updateRoleSwitcherVisibility();
+    if (typeof renderHeaderNav              === 'function') renderHeaderNav();
+    if (typeof applyRoleVisibility          === 'function') applyRoleVisibility(role);
+    if (typeof setHeaderNavActive           === 'function') setHeaderNavActive('inspections');
+
+    if (typeof loadHousingData === 'function') {
+      try { await loadHousingData(); } catch(e) { console.warn('[inspections] data load:', e); }
+    }
+    try { await _inspLoad(); } catch(e) { console.warn('[inspections] insp load:', e); }
+    renderInspectionsList();
+  } catch(e) {
+    console.error('[inspections] init error:', e);
+  } finally {
+    document.body.style.opacity = '1';
   }
-
-  var savedRole  = sessionStorage.getItem('clfn_housing_role')          || 'housing_employee_l1';
-  var savedName  = sessionStorage.getItem('clfn_housing_name')          || '';
-  var savedEmail = sessionStorage.getItem('clfn_housing_email_session') || '';
-  if (typeof HOUSING_HEADERS  !== 'undefined') HOUSING_HEADERS['Authorization'] = 'Bearer ' + token;
-  if (typeof HOUSING_SESSION  !== 'undefined') {
-    HOUSING_SESSION.accessToken = token;
-    HOUSING_SESSION.role        = savedRole;
-    HOUSING_SESSION.name        = savedName;
-    HOUSING_SESSION.email       = savedEmail;
-  }
-  window.currentRole = savedRole;
-  window._realRole   = savedRole;
-
-  if (HOUSING_SESSION.email && typeof resolveHousingRole === 'function') {
-    try { await resolveHousingRole(); } catch(e) { console.warn('[inspections] role resolve:', e); }
-  }
-  var role = HOUSING_SESSION.role || savedRole;
-  window.currentRole = role;
-  window._realRole   = role;
-
-  if (typeof updateHeaderUser          === 'function') updateHeaderUser(role);
-  if (typeof updateRoleSwitcherVisibility === 'function') updateRoleSwitcherVisibility();
-  if (typeof renderHeaderNav           === 'function') renderHeaderNav();
-  if (typeof applyRoleVisibility       === 'function') applyRoleVisibility(role);
-  if (typeof setHeaderNavActive        === 'function') setHeaderNavActive('inspections');
-
-  if (typeof loadHousingData === 'function') {
-    try { await loadHousingData(); } catch(e) { console.warn('[inspections] data load:', e); }
-  }
-  await _inspLoad();
-  renderInspectionsList();
-
-  document.body.style.opacity = '1';
 }());
