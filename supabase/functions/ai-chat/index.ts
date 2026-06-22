@@ -81,23 +81,28 @@ Write 2–4 sentences. Be professional, clear, and compassionate. Reference spec
   // Chat mode
   const role = ctx?.role ?? 'staff'
   const appsJson = ctx?.apps?.length
-    ? '\n\nApplications:\n' + JSON.stringify(ctx.apps.slice(0, 30))
-    : ''
+    ? `\n\n## Housing Applications (${ctx.apps.length} total)\nEach record is one application submitted by a community member.\n` + JSON.stringify(ctx.apps.slice(0, 30))
+    : '\n\n## Housing Applications\nNo application data available.'
   const unitsJson = ctx?.units?.length
-    ? '\n\nHousing units:\n' + JSON.stringify(ctx.units.slice(0, 30))
-    : ''
+    ? `\n\n## Housing Units (${ctx.units.length} total)\nThis is the complete list of CLFN housing units — use this for unit counts and availability.\n` + JSON.stringify(ctx.units.slice(0, 30))
+    : '\n\n## Housing Units\nNo unit data available.'
   const sowsJson = ctx?.sows?.length
-    ? '\n\nScopes of Work (SOWs) — one per unit, includes contractor, status, line-item count, and total cost:\n' + JSON.stringify(ctx.sows)
+    ? `\n\n## Scopes of Work / SOWs (${ctx.sows.length} records)\nSOWs are renovation/maintenance work orders attached to specific units. A SOW existing for a unit does NOT mean that is the full count of units — use the Housing Units section for unit counts.\n` + JSON.stringify(ctx.sows)
     : ''
   const contractorsJson = ctx?.contractors?.length
-    ? '\n\nContractors:\n' + JSON.stringify(ctx.contractors.slice(0, 30))
+    ? `\n\n## Contractors (${ctx.contractors.length} total)\n` + JSON.stringify(ctx.contractors.slice(0, 30))
     : ''
 
   return `You are an AI assistant for the Constance Lake First Nation (CLFN) Housing Department. You help housing staff answer questions about applications, housing units, scopes of work (SOWs), contractors, and housing policy.
 
-Staff role: ${role}${appsJson}${unitsJson}${sowsJson}${contractorsJson}
+Staff role: ${role}
+${appsJson}${unitsJson}${sowsJson}${contractorsJson}
 
-Answer concisely and professionally. Use the data above to answer questions directly — perform calculations, totals, and lookups as needed. If specific data is missing from the context, say so clearly rather than guessing.`
+Rules:
+- For unit counts, ALWAYS use the Housing Units section — never use SOW count as a proxy for units.
+- For application counts or status breakdowns, use the Housing Applications section.
+- Perform calculations (totals, counts, averages) directly from the data above.
+- Answer concisely. If data is missing or incomplete, say so clearly.`
 }
 
 function buildMessages(message: string, history: any[]): any[] {
