@@ -109,17 +109,24 @@ function aiSendMessage() {
 
   // Flatten SOW cache (keyed by unit_id) into an array for context
   var sowList = [];
-  var sowCache = window._sowCache || {};
-  Object.keys(sowCache).forEach(function(uid) {
-    var d = sowCache[uid];
-    if (!d) return;
-    var items = d.items || d.sow_items || d.line_items || [];
-    var total = items.reduce(function(s, i) { return s + (parseFloat(i.cost || i.amount || 0)); }, 0);
-    sowList.push({ unit_id: uid, contractor: d.contractor_name || d.contractor || '', status: d.status || '', total: total, item_count: items.length });
-  });
+  try {
+    var sowCache = window._sowCache || {};
+    Object.keys(sowCache).forEach(function(uid) {
+      var d = sowCache[uid];
+      if (!d || typeof d !== 'object') return;
+      var items = Array.isArray(d.items) ? d.items
+                : Array.isArray(d.sow_items) ? d.sow_items
+                : Array.isArray(d.line_items) ? d.line_items : [];
+      var total = items.reduce(function(s, i) {
+        return s + (parseFloat(i.cost || i.amount || i.total || 0) || 0);
+      }, 0);
+      sowList.push({ unit_id: uid, contractor: d.contractor_name || d.contractor || '',
+                     status: d.status || '', total: total, item_count: items.length });
+    });
+  } catch(e) { console.warn('[AI] SOW build error:', e); }
 
   var ctx = {
-    role:        window._effectiveRole || '',
+    role:        window._effectiveRole || window.currentRole || '',
     apps:        (window.applications  || []).map(function(a) {
       return { id: a.id, fn: a.fn, ln: a.ln, status: a.status,
                score: a.total_score, bedrooms: a.bed_req };
@@ -133,6 +140,14 @@ function aiSendMessage() {
       return { name: c.name, trade: c.trade, phone: c.phone, email: c.email, status: c.status };
     }),
   };
+
+  console.log('[AI] Context sent →', {
+    apps: ctx.apps.length,
+    units: ctx.units.length,
+    sows: ctx.sows.length,
+    contractors: ctx.contractors.length,
+    role: ctx.role,
+  });
 
   _aiCall({
     type:    'chat',
