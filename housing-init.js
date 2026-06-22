@@ -2670,6 +2670,7 @@ document.addEventListener('DOMContentLoaded', function(){
     var navBtn = t.closest('.app-header-v2 .app-nav-item[data-nav]');
     if(navBtn){
       e.preventDefault();
+      if(navBtn.classList.contains('nav-group-toggle')) return; // handled by toggleNavGroup onclick
       var key = navBtn.getAttribute('data-nav');
       var item = HEADER_NAV.filter(function(x){ return x.key===key; })[0];
       _closeNavDrawer();
