@@ -87,22 +87,32 @@ Write 2–4 sentences. Be professional, clear, and compassionate. Reference spec
     ? `\n\n## Housing Units (${ctx.units.length} total)\nThis is the complete list of CLFN housing units — use this for unit counts and availability.\n` + JSON.stringify(ctx.units.slice(0, 30))
     : '\n\n## Housing Units\nNo unit data available.'
   const sowsJson = ctx?.sows?.length
-    ? `\n\n## Scopes of Work / SOWs (${ctx.sows.length} records)\nSOWs are renovation/maintenance work orders attached to specific units. A SOW existing for a unit does NOT mean that is the full count of units — use the Housing Units section for unit counts.\n` + JSON.stringify(ctx.sows)
+    ? `\n\n## Scopes of Work / SOWs — ${ctx.sows.length} records\nIn this system, SOWs (Scopes of Work) ARE the maintenance and renovation work orders. When staff say "maintenance request", "work order", or "repair job", they mean a SOW. Each SOW is linked to a housing unit and has a contractor, status, and cost breakdown.\n` + JSON.stringify(ctx.sows)
+    : ''
+  const rfqsJson = ctx?.rfqs?.length
+    ? `\n\n## RFQs / Requests for Quotes — ${ctx.rfqs.length} records\nRFQs are procurement requests sent to contractors for pricing on work. They are related to SOWs.\n` + JSON.stringify(ctx.rfqs.slice(0, 30))
     : ''
   const contractorsJson = ctx?.contractors?.length
-    ? `\n\n## Contractors (${ctx.contractors.length} total)\n` + JSON.stringify(ctx.contractors.slice(0, 30))
+    ? `\n\n## Contractors — ${ctx.contractors.length} total\n` + JSON.stringify(ctx.contractors.slice(0, 30))
     : ''
 
-  return `You are an AI assistant for the Constance Lake First Nation (CLFN) Housing Department. You help housing staff answer questions about applications, housing units, scopes of work (SOWs), contractors, and housing policy.
+  return `You are an AI assistant for the Constance Lake First Nation (CLFN) Housing Department. You help housing staff answer questions about applications, housing units, maintenance work orders (SOWs), contractors, and housing policy.
+
+IMPORTANT terminology for this system:
+- "Maintenance request" = SOW (Scope of Work)
+- "Work order" = SOW
+- "Renovation job" = SOW
+- "RFQ" = Request for Quotes (sent to contractors for pricing)
+- There is no separate "maintenance request" table — SOWs are the maintenance system.
 
 Staff role: ${role}
-${appsJson}${unitsJson}${sowsJson}${contractorsJson}
+${appsJson}${unitsJson}${sowsJson}${rfqsJson}${contractorsJson}
 
 Rules:
-- For unit counts, ALWAYS use the Housing Units section — never use SOW count as a proxy for units.
-- For application counts or status breakdowns, use the Housing Applications section.
+- For unit counts, use the Housing Units section — not the SOW count.
+- For maintenance/work order questions, use the SOWs section.
 - Perform calculations (totals, counts, averages) directly from the data above.
-- Answer concisely. If data is missing or incomplete, say so clearly.`
+- Answer concisely and confidently from the data. Do not tell staff to "check another system" if the data is here.`
 }
 
 function buildMessages(message: string, history: any[]): any[] {

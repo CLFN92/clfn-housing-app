@@ -136,6 +136,11 @@ function aiSendMessage() {
                bedrooms: u.bedrooms, status: u.status };
     }),
     sows:        sowList,
+    rfqs:        Object.keys(window._rfqCache || {}).map(function(id) {
+      var r = window._rfqCache[id];
+      return { id: id, unit_id: r.unit_id, status: r.status, contractor: r.contractor_name || '',
+               total: r.total_amount || r.total || 0, created_at: r.created_at };
+    }),
     contractors: (window._contractors || []).map(function(c) {
       return { name: c.name, trade: c.trade, phone: c.phone, email: c.email, status: c.status };
     }),
