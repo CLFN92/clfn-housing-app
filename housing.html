@@ -45,7 +45,10 @@
         <div id="approvalModal_unit_display" style="padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:7px;font-size:13px;font-weight:600;color:var(--text);"></div>
       </div>
       <div class="mb-16">
-        <label class="lbl-muted lbl-block-mb">Notes <span id="approvalModal_notes_req" class="txt-required"></span></label>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <label class="lbl-muted">Notes <span id="approvalModal_notes_req" class="txt-required"></span></label>
+          <button id="ai_draft_btn" onclick="aiDraftNote()" style="background:none;border:1px solid #444;color:#ccc;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;display:flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='#444';this.style.color='#ccc'"><span style="color:var(--yellow)">✦</span> Draft with AI</button>
+        </div>
         <textarea id="approvalModal_notes" rows="4" placeholder="Add notes visible to the applicant and staff..."
           style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;font-family:DM Sans,sans-serif;resize:vertical;"></textarea>
       </div>
@@ -1463,5 +1466,26 @@
      (housing-init.js). The dashboard's "Assign →" buttons trigger
      openAssignModal which mounts the template into this host. -->
 <div id="assignModalHost"></div>
+
+<!-- ─── AI CHAT PANEL ─── -->
+<div id="ai_chat_panel" style="display:none;position:fixed;bottom:24px;right:24px;width:360px;max-height:520px;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,0.5);z-index:1200;flex-direction:column;overflow:hidden;">
+  <div style="background:var(--dark);padding:14px 18px;border-bottom:2px solid var(--yellow);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="color:var(--yellow);font-size:16px;">✦</span>
+      <div>
+        <div style="font-family:'DM Serif Display',serif;font-size:15px;color:#fff;">AI Assistant</div>
+        <div style="font-size:11px;color:#666;">Constance Lake First Nation</div>
+      </div>
+    </div>
+    <button onclick="closeAIChat()" style="background:none;border:1px solid #444;color:#ccc;width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.borderColor='#888'" onmouseout="this.style.borderColor='#444'">✕</button>
+  </div>
+  <div id="ai_chat_messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;"></div>
+  <div style="padding:12px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;">
+    <textarea id="ai_chat_input" rows="1" placeholder="Ask anything about applications, units, or policy…" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);font-family:DM Sans,sans-serif;resize:none;outline:none;line-height:1.4;max-height:80px;overflow-y:auto;" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"></textarea>
+    <button id="ai_chat_send" onclick="aiSendMessage()" style="background:var(--yellow);border:none;color:#111;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;flex-shrink:0;align-self:flex-end;">Send</button>
+  </div>
+</div>
+
+<script src="ai-assistant.js"></script>
 </body>
 </html>
