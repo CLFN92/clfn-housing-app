@@ -181,11 +181,79 @@
     }
   }
 
-  var SUGGESTIONS = [
-    'How many vacant units do we have?',
-    'List applications awaiting review',
-    'Show open work orders'
+  // Role-aware starter prompts. Mix of a how-to and a data question so staff
+  // discover both abilities. The effective role is known client-side via
+  // window.currentRole (falls back to the session role).
+  function currentRoleNorm() {
+    var r = (window.currentRole
+      || (window.HOUSING_SESSION && HOUSING_SESSION.role)
+      || '').toString().toLowerCase().trim();
+    if (r === 'hm' || r === 'manager') return 'housing_manager';
+    if (r === 'employee' || r === 'staff') return 'housing_employee_l1';
+    return r;
+  }
+  var SUGGEST_BY_ROLE = {
+    field_employee: [
+      'How do I complete a maintenance request?',
+      'Show my work orders to complete',
+      'How do I add a progress report?'
+    ],
+    housing_manager: [
+      'How do I approve an application?',
+      'List applications awaiting review',
+      'How do I assign a work order?',
+      'How many vacant units do we have?'
+    ],
+    housing_employee_l2: [
+      'How do I do an application?',
+      'List applications awaiting review',
+      'How do I create a maintenance request?'
+    ],
+    housing_employee_l1: [
+      'How do I do an application?',
+      'How do I create a maintenance request?',
+      'How many vacant units do we have?'
+    ],
+    ed: [
+      'List applications awaiting my approval',
+      'How do I approve a renovation?',
+      'Show recent activity in the audit log',
+      'How many vacant units do we have?'
+    ],
+    super_user: [
+      'How do I add a staff user?',
+      'List applications awaiting approval',
+      'How do I turn a module on or off?',
+      'Show recent activity in the audit log'
+    ],
+    cfo: [
+      'How do I record a rent payment?',
+      'Show units with assigned tenants',
+      'How do I create an invoice?'
+    ],
+    finance_l1: [
+      'How do I record a rent payment?',
+      'Show units with assigned tenants',
+      'How do I set up a payment arrangement?'
+    ]
+  };
+  var SUGGEST_DEFAULT = [
+    'How do I do an application?',
+    'How do I complete a maintenance request?',
+    'How many vacant units do we have?'
   ];
+  function suggestionsFor() {
+    return SUGGEST_BY_ROLE[currentRoleNorm()] || SUGGEST_DEFAULT;
+  }
+  // (Re)render the starter chips for the current role into #haSuggest.
+  function renderSuggestions() {
+    var box = document.getElementById('haSuggest');
+    if (!box) return;
+    box.style.display = '';
+    box.innerHTML = suggestionsFor().map(function (s) {
+      return '<span class="ha-chip" data-ha-suggest="' + esc(s) + '">' + esc(s) + '</span>';
+    }).join('');
+  }
 
   function buildPanel() {
     var panel = document.createElement('div');
@@ -200,9 +268,7 @@
       '</div>' +
       '<div id="haBody"></div>' +
       '<div id="haFoot">' +
-        '<div id="haSuggest">' +
-          SUGGESTIONS.map(function (s) { return '<span class="ha-chip" data-ha-suggest="' + esc(s) + '">' + esc(s) + '</span>'; }).join('') +
-        '</div>' +
+        '<div id="haSuggest"></div>' +
         '<form id="haForm">' +
           '<textarea id="haInput" rows="1" placeholder="Ask about applications, units, tenants..."></textarea>' +
           '<button id="haSend" type="submit">Send</button>' +
@@ -257,6 +323,8 @@
     if (!p) return;
     p.classList.add('ha-open');
     OPEN = true;
+    // Render role-aware starter chips only while the conversation is empty.
+    if (!history.length) renderSuggestions();
     if (!history.length && !bodyEl().children.length) {
       var who = (window.HOUSING_SESSION && HOUSING_SESSION.name) ? (', ' + HOUSING_SESSION.name.split(' ')[0]) : '';
       addMsg('bot', 'Hi' + who + '! Ask me about applications, units, tenants, work orders, contractors, or the audit log. I can only read data, not change it.');
