@@ -149,13 +149,11 @@ function openInspectionModal(id) {
   var units = window.housingUnits || [];
   var today = new Date().toISOString().split('T')[0];
 
-  // Build unit select options
-  var unitOpts = '<option value="">— Select unit —</option>'
-    + units.filter(function(u){ return !u.archived; }).map(function(u){
-        var addr = (u.num ? u.num + ' ' + u.street : u.id);
-        var sel  = insp && insp.unit_id === u.id ? ' selected' : '';
-        return '<option value="' + _esc(u.id) + '" data-addr="' + _esc(addr) + '"' + sel + '>' + _esc(addr) + '</option>';
-      }).join('');
+  // Build unit data for searchable combobox
+  var unitList = units.filter(function(u){ return !u.archived; }).map(function(u){
+    return { id: u.id, addr: (u.num ? u.num + ' ' + u.street : u.id) };
+  }).sort(function(a,b){ return a.addr.localeCompare(b.addr); });
+  var preAddr = insp ? (insp.unit_address || insp.unit_id || '') : '';
 
   var typeOpts = INSP_TYPES.map(function(t){
     return '<option value="' + t + '"' + (insp && insp.type === t ? ' selected' : '') + '>' + t + '</option>';
@@ -218,7 +216,7 @@ function openInspectionModal(id) {
     // ── Details
     + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--border);">Inspection Details</div>'
     + '<div class="tic-grid-2" style="margin-bottom:16px;">'
-    +   '<div class="f"><label class="tic-field-lbl">Unit</label><select id="insp_unit" class="tic-input" onchange="_inspUnitChanged(this)">' + unitOpts + '</select></div>'
+    +   '<div class="f"><label class="tic-field-lbl">Unit</label><div class="insp-combo-wrap" id="insp_unit_wrap"><input id="insp_unit_search" type="text" class="tic-input" autocomplete="off" placeholder="Search address…" value="' + _esc(preAddr) + '" oninput="_inspUnitFilter(this)" onfocus="_inspUnitOpenDrop()"/><input type="hidden" id="insp_unit" value="' + _esc(insp ? insp.unit_id||'' : '') + '"/><div id="insp_unit_drop" class="insp-combo-drop"></div></div></div>'
     +   '<div class="f"><label class="tic-field-lbl">Type</label><select id="insp_type" class="tic-input">' + typeOpts + '</select></div>'
     +   '<div class="f"><label class="tic-field-lbl">Inspection Date</label><input id="insp_date" type="date" class="tic-input" value="' + _esc(insp ? insp.inspection_date : today) + '"/></div>'
     +   '<div class="f"><label class="tic-field-lbl">Overall Status</label><select id="insp_status" class="tic-input">' + statusOpts + '</select></div>'
@@ -262,9 +260,53 @@ function openInspectionModal(id) {
   _inspUpdateSectionSummaries();
 }
 
-function _inspUnitChanged(sel) {
-  var opt = sel.options[sel.selectedIndex];
-  sel.dataset.addr = opt ? (opt.getAttribute('data-addr') || '') : '';
+// ── Unit searchable combobox ──────────────────────────────────────────────────
+function _inspUnitOpenDrop() {
+  _inspUnitRenderDrop(document.getElementById('insp_unit_search') ? document.getElementById('insp_unit_search').value : '');
+  setTimeout(function(){
+    document.addEventListener('click', _inspUnitOutsideClick, { once: true, capture: true });
+  }, 0);
+}
+
+function _inspUnitFilter(input) {
+  _inspUnitRenderDrop(input.value);
+  // Clear selection when user types
+  document.getElementById('insp_unit').value = '';
+}
+
+function _inspUnitRenderDrop(query) {
+  var drop = document.getElementById('insp_unit_drop');
+  if (!drop) return;
+  var units = window.housingUnits || [];
+  var list = units.filter(function(u){ return !u.archived; }).map(function(u){
+    return { id: u.id, addr: (u.num ? u.num + ' ' + u.street : u.id) };
+  }).sort(function(a,b){ return a.addr.localeCompare(b.addr); });
+  var q = (query || '').toLowerCase().trim();
+  if (q) list = list.filter(function(u){ return u.addr.toLowerCase().indexOf(q) !== -1; });
+  if (!list.length) {
+    drop.innerHTML = '<div class="insp-combo-empty">No units found</div>';
+  } else {
+    drop.innerHTML = list.map(function(u){
+      return '<div class="insp-combo-item" onmousedown="_inspUnitSelect(\'' + _esc(u.id) + '\',\'' + _esc(u.addr) + '\')">' + _esc(u.addr) + '</div>';
+    }).join('');
+  }
+  drop.style.display = 'block';
+}
+
+function _inspUnitSelect(id, addr) {
+  document.getElementById('insp_unit').value = id;
+  var search = document.getElementById('insp_unit_search');
+  if (search) search.value = addr;
+  var drop = document.getElementById('insp_unit_drop');
+  if (drop) drop.style.display = 'none';
+}
+
+function _inspUnitOutsideClick(e) {
+  var wrap = document.getElementById('insp_unit_wrap');
+  if (!wrap || !wrap.contains(e.target)) {
+    var drop = document.getElementById('insp_unit_drop');
+    if (drop) drop.style.display = 'none';
+  }
 }
 
 function closeInspectionModal() {
@@ -395,9 +437,8 @@ function _inspCollectChecklist() {
 
 // ── Save ─────────────────────────────────────────────────────────────────────
 async function saveInspection() {
-  var unitSel = document.getElementById('insp_unit');
-  var unitId  = unitSel ? unitSel.value : '';
-  var unitAddr = unitSel ? (unitSel.options[unitSel.selectedIndex] ? unitSel.options[unitSel.selectedIndex].getAttribute('data-addr') : '') : '';
+  var unitId   = (document.getElementById('insp_unit') || {}).value || '';
+  var unitAddr = (document.getElementById('insp_unit_search') || {}).value || '';
   if (!unitId) { if(typeof showToast==='function') showToast('Please select a unit.', {type:'error'}); return; }
 
   var date    = (document.getElementById('insp_date')       || {}).value || '';
