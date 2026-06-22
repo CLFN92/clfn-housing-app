@@ -32,6 +32,21 @@ function _inspHeaders() {
   return Object.assign({}, window.HOUSING_HEADERS || {}, { 'Content-Type': 'application/json' });
 }
 
+async function _inspLoadUnits() {
+  try {
+    var r = await fetch(
+      window.SUPABASE_URL + '/rest/v1/housing_units?select=id,num,street,archived&order=street,num&limit=9999',
+      { headers: _inspHeaders() }
+    );
+    if (!r.ok) return;
+    var data = await r.json();
+    window.housingUnits = (window.housingUnits && window.housingUnits.length ? window.housingUnits : null)
+      || data.map(function(row) {
+        return { id: row.id, num: row.num, street: row.street, archived: !!row.archived };
+      });
+  } catch(e) { console.warn('[Inspections] units load:', e); }
+}
+
 async function _inspLoad() {
   try {
     var r = await fetch(
@@ -711,6 +726,7 @@ function generateInspectionPDF() {
     var view = document.getElementById('inspectionsView');
     if (view) view.style.display = 'flex';
 
+    try { await _inspLoadUnits(); } catch(e) { console.warn('[inspections] units load:', e); }
     try { await _inspLoad(); } catch(e) { console.warn('[inspections] insp load:', e); }
     renderInspectionsList();
   } catch(e) {
