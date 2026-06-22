@@ -1833,7 +1833,8 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 .tic-row-val              { flex: 1; font-size: 13px; color: var(--text); }
 .tic-row-actions          { display: flex; gap: 6px; }
 
-.tic-input                { width: 100%; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: 13px; font-family: var(--sans); box-sizing: border-box; }
+.tic-input                { width: 100%; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: 13px; font-family: var(--sans); box-sizing: border-box; -webkit-appearance: none; }
+.tic-input[type="date"]   { font-family: var(--sans); }
 .tic-input:focus          { outline: none; border-color: var(--yellow); }
 .tic-textarea             { width: 100%; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: 13px; font-family: var(--sans); resize: vertical; min-height: 70px; box-sizing: border-box; }
 .tic-textarea:focus       { outline: none; border-color: var(--yellow); }
