@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>{NATION_SHORT} Housing — Inspections</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="shared.css"/>
+<link rel="stylesheet" href="housing.css"/>
+<link rel="stylesheet" href="inspections.css"/>
+
+<script src="shared.js"></script>
+<script src="shared-config.js"></script>
+<script src="shared-auth.js"></script>
+<script src="shared-ui.js"></script>
+<script src="approval-authority.js"></script>
+<script src="shared-data.js"></script>
+<script src="notifications.js"></script>
+<script src="scoring.js"></script>
+<script src="housing-views.js"></script>
+<script src="housing-settings.js"></script>
+<script src="housing-modals.js"></script>
+<script src="shared-sow.js"></script>
+<script src="housing-modals-sow.js"></script>
+<script src="housing-app.js"></script>
+<script src="housing-init.js"></script>
+<script src="ai-assistant.js"></script>
+
+<style>body{ opacity:0; transition:opacity .15s ease; }</style>
+</head>
+<body>
+
+<div id="app_header_host"></div>
+
+<div class="app-wrapper" id="appWrapper">
+  <div class="content-area">
+    <div id="inspectionsView" class="page-view-wide">
+
+      <div class="page-back-row">
+        <button onclick="history.back()" class="back-btn-yellow">&#8592; Back</button>
+      </div>
+
+      <div class="page-header-bar">
+        <div class="phb-title">
+          <h1>Inspections</h1>
+          <p>Unit condition inspections, checklists, and repair tracking</p>
+        </div>
+        <div class="phb-actions">
+          <button class="btn btn-primary" onclick="openInspectionModal(null)">+ New Inspection</button>
+        </div>
+      </div>
+
+      <!-- KPI strip -->
+      <div class="insp-kpi-strip" id="insp_kpi_strip"></div>
+
+      <!-- Filters -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+        <input id="insp_filter_unit" type="text" class="tic-input" style="max-width:220px;"
+          placeholder="Search by address…"
+          oninput="window._inspUnitFilter=this.value;renderInspectionsList()"/>
+        <select id="insp_filter_type" class="tic-input" style="max-width:170px;"
+          onchange="window._inspTypeFilter=this.value;renderInspectionsList()">
+          <option value="">All types</option>
+          <option>Move-In</option>
+          <option>Move-Out</option>
+          <option>Annual</option>
+          <option>Routine</option>
+          <option>Emergency</option>
+        </select>
+        <select id="insp_filter_status" class="tic-input" style="max-width:170px;"
+          onchange="window._inspStatusFilter=this.value;renderInspectionsList()">
+          <option value="">All statuses</option>
+          <option value="pass">Pass</option>
+          <option value="fail">Fail</option>
+          <option value="needs_repair">Needs Repair</option>
+          <option value="pending">Pending</option>
+        </select>
+        <button class="btn btn-ghost" onclick="
+          document.getElementById('insp_filter_unit').value='';
+          document.getElementById('insp_filter_type').value='';
+          document.getElementById('insp_filter_status').value='';
+          window._inspUnitFilter='';window._inspTypeFilter='';window._inspStatusFilter='';
+          renderInspectionsList();">Clear</button>
+      </div>
+
+      <!-- Table -->
+      <div class="card" style="overflow:hidden;">
+        <div class="insp-table-wrap">
+          <table class="insp-table">
+            <thead>
+              <tr>
+                <th>Unit</th>
+                <th>Type</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Inspector</th>
+                <th>Repairs</th>
+                <th>Photos</th>
+              </tr>
+            </thead>
+            <tbody id="insp_tbody">
+              <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted);">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /inspectionsView -->
+  </div>
+</div>
+
+<!-- Inspection modal -->
+<div id="insp_modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2000;align-items:center;justify-content:center;padding:16px;"></div>
+
+<!-- Toast host (shared) -->
+<div id="toast_host" style="position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;"></div>
+
+<script src="inspections-init.js"></script>
+</body>
+</html>

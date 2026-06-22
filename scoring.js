@@ -486,7 +486,8 @@ function renderNationPanel(){
   var MODULE_LABELS = {
     rfq:          'RFQ (Request for Quotes)',
     mapping:      'Mapping (Unit Location & Photo)',
-    ai_assistant: 'AI Assistant (Chat + Draft Notes)'
+    ai_assistant: 'AI Assistant (Chat + Draft Notes)',
+    inspections:  'Inspections (Unit Condition Reports)'
   };
   var humanize = function(name){
     if(MODULE_LABELS[name]) return MODULE_LABELS[name];
