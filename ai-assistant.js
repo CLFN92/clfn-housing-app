@@ -155,7 +155,7 @@ function _appendAIMessage(role, text, id) {
     'max-width:85%;padding:9px 13px;border-radius:12px;font-size:13px;',
     'line-height:1.5;white-space:pre-wrap;word-break:break-word;',
     isUser
-      ? 'background:var(--yellow);color:#111;border-bottom-right-radius:3px;'
+      ? 'background:var(--yellow);color:#fff;border-bottom-right-radius:3px;'
       : 'background:#1e1e1c;border:1px solid var(--border);color:var(--text);border-bottom-left-radius:3px;',
   ].join('');
   bubble.textContent = text;
