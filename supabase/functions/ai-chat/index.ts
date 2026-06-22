@@ -80,39 +80,52 @@ Write 2–4 sentences. Be professional, clear, and compassionate. Reference spec
 
   // Chat mode
   const role = ctx?.role ?? 'staff'
+
   const appsJson = ctx?.apps?.length
-    ? `\n\n## Housing Applications (${ctx.apps.length} total)\nEach record is one application submitted by a community member.\n` + JSON.stringify(ctx.apps.slice(0, 30))
+    ? `\n\n## Housing Applications (${ctx.apps.length} total)\nEach record is one application. Fields: id, fn/ln (name), status, score, tier (priority tier), bedrooms (requested), household_size, app_type, assignedUnit/assignedAddress (if placed), submittedAt.\n` + JSON.stringify(ctx.apps.slice(0, 50))
     : '\n\n## Housing Applications\nNo application data available.'
+
   const unitsJson = ctx?.units?.length
-    ? `\n\n## Housing Units (${ctx.units.length} total)\nThis is the complete list of CLFN housing units — use this for unit counts and availability.\n` + JSON.stringify(ctx.units.slice(0, 30))
+    ? `\n\n## Housing Units (${ctx.units.length} total)\nComplete list of CLFN housing units — use this for unit counts and availability questions. Fields: id, address, bedrooms, bathrooms, type, status (vacant/occupied/reserved/condemned), accessible, isElders, funder, assignedTo/assignedName.\n` + JSON.stringify(ctx.units.slice(0, 60))
     : '\n\n## Housing Units\nNo unit data available.'
+
   const sowsJson = ctx?.sows?.length
-    ? `\n\n## Scopes of Work / SOWs — ${ctx.sows.length} records\nIn this system, SOWs (Scopes of Work) ARE the maintenance and renovation work orders. When staff say "maintenance request", "work order", or "repair job", they mean a SOW. Each SOW is linked to a housing unit and has a contractor, status, and cost breakdown.\n` + JSON.stringify(ctx.sows)
-    : ''
+    ? `\n\n## Scopes of Work / SOWs — ${ctx.sows.length} records\nIn this system, SOWs (Scopes of Work) ARE the maintenance and renovation work orders. When staff say "maintenance request", "work order", or "repair job", they mean a SOW. Each SOW is linked to a housing unit.\n` + JSON.stringify(ctx.sows)
+    : '\n\n## Scopes of Work / SOWs\nNo SOW/maintenance data loaded yet.'
+
   const rfqsJson = ctx?.rfqs?.length
-    ? `\n\n## RFQs / Requests for Quotes — ${ctx.rfqs.length} records\nRFQs are procurement requests sent to contractors for pricing on work. They are related to SOWs.\n` + JSON.stringify(ctx.rfqs.slice(0, 30))
+    ? `\n\n## RFQs / Requests for Quotes — ${ctx.rfqs.length} records\nRFQs are procurement requests sent to contractors for pricing on upcoming work.\n` + JSON.stringify(ctx.rfqs.slice(0, 30))
     : ''
+
   const contractorsJson = ctx?.contractors?.length
-    ? `\n\n## Contractors — ${ctx.contractors.length} total\n` + JSON.stringify(ctx.contractors.slice(0, 30))
+    ? `\n\n## Contractors — ${ctx.contractors.length} on file\n` + JSON.stringify(ctx.contractors.slice(0, 30))
     : ''
 
-  return `You are an AI assistant for the Constance Lake First Nation (CLFN) Housing Department. You help housing staff answer questions about applications, housing units, maintenance work orders (SOWs), contractors, and housing policy.
+  const renoJson = ctx?.renoProgress?.length
+    ? `\n\n## Renovation Progress — ${ctx.renoProgress.length} units with active renos\noverallPct is % complete (0–100).\n` + JSON.stringify(ctx.renoProgress)
+    : ''
 
-IMPORTANT terminology for this system:
-- "Maintenance request" = SOW (Scope of Work)
-- "Work order" = SOW
-- "Renovation job" = SOW
-- "RFQ" = Request for Quotes (sent to contractors for pricing)
-- There is no separate "maintenance request" table — SOWs are the maintenance system.
+  // Compute quick summary stats for the prompt
+  const vacantCount = (ctx?.units || []).filter((u: any) => u.status === 'vacant').length
+  const pendingApps = (ctx?.apps  || []).filter((a: any) => !['assigned','declined','archived'].includes(a.status)).length
+
+  return `You are an AI assistant for the Constance Lake First Nation (CLFN) Housing Department. You help housing staff answer questions about applications, housing units, maintenance work orders (SOWs), renovations, contractors, and housing policy.
 
 Staff role: ${role}
-${appsJson}${unitsJson}${sowsJson}${rfqsJson}${contractorsJson}
+Quick stats: ${ctx?.units?.length ?? 0} total units (${vacantCount} vacant), ${ctx?.apps?.length ?? 0} applications (${pendingApps} pending), ${ctx?.sows?.length ?? 0} SOWs on file.
+
+IMPORTANT terminology for this system:
+- "Maintenance request" / "work order" / "repair job" = SOW (Scope of Work) — there is no separate maintenance table
+- "RFQ" = Request for Quotes (sent to contractors for pricing)
+- "Tier" on an application = priority tier (e.g. Emergency, High, Medium, Low)
+${appsJson}${unitsJson}${sowsJson}${rfqsJson}${contractorsJson}${renoJson}
 
 Rules:
-- For unit counts, use the Housing Units section — not the SOW count.
-- For maintenance/work order questions, use the SOWs section.
+- For unit counts, ALWAYS use the Housing Units section — never use the SOW count.
+- For maintenance/repair questions, use the SOWs section.
 - Perform calculations (totals, counts, averages) directly from the data above.
-- Answer concisely and confidently from the data. Do not tell staff to "check another system" if the data is here.`
+- Answer concisely and confidently. Do not tell staff to check another system if the data is present here.
+- If data for a specific record is not shown (e.g. only first 50 apps are included), say so clearly.`
 }
 
 function buildMessages(message: string, history: any[]): any[] {

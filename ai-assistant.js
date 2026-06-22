@@ -128,12 +128,22 @@ function aiSendMessage() {
   var ctx = {
     role:        window._effectiveRole || window.currentRole || '',
     apps:        (window.applications  || []).map(function(a) {
-      return { id: a.id, fn: a.fn, ln: a.ln, status: a.status,
-               score: a.total_score, bedrooms: a.bed_req };
+      return {
+        id: a.id, fn: a.fn, ln: a.ln, status: a.status,
+        score: a.score || a.total_score, tier: a.tier,
+        bedrooms: a.bed_req || a.bedrooms, household_size: a.household_size || a.adults,
+        app_type: a.app_type || a.type,
+        assignedUnit: a.assignedUnit, assignedAddress: a.assignedAddress,
+        submittedAt: a.submittedAt,
+      };
     }),
     units:       (window.housingUnits  || []).map(function(u) {
-      return { id: u.id, address: u.address || u.unit_address,
-               bedrooms: u.bedrooms, status: u.status };
+      return {
+        id: u.id, address: (u.num ? u.num + ' ' + u.street : u.address || u.unit_address),
+        bedrooms: u.bedrooms, bathrooms: u.bathrooms, type: u.type,
+        status: u.status, accessible: u.accessible, isElders: u.isElders,
+        funder: u.funder, assignedTo: u.assignedTo, assignedName: u.assignedName,
+      };
     }),
     sows:        sowList,
     rfqs:        Object.keys(window._rfqCache || {}).map(function(id) {
@@ -144,15 +154,14 @@ function aiSendMessage() {
     contractors: (window._contractors || []).map(function(c) {
       return { name: c.name, trade: c.trade, phone: c.phone, email: c.email, status: c.status };
     }),
+    renoProgress: (function() {
+      var rp = window._renoProgress || {};
+      return Object.keys(rp).map(function(uid) {
+        var d = rp[uid];
+        return { unit_id: uid, overallPct: d.overallPct || 0, phases: d.phases || [] };
+      });
+    }()),
   };
-
-  console.log('[AI] Context sent →', {
-    apps: ctx.apps.length,
-    units: ctx.units.length,
-    sows: ctx.sows.length,
-    contractors: ctx.contractors.length,
-    role: ctx.role,
-  });
 
   _aiCall({
     type:    'chat',
