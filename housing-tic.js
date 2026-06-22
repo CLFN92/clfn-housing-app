@@ -95,7 +95,9 @@
     hydro_meter:        'hydro_meter_number',
     gas_account:        'gas_account',
     gas_meter:          'gas_meter_number',
-    home_care:          'home_care'
+    home_care:          'home_care',
+    lease_start_date:   'lease_start_date',
+    lease_end_date:     'lease_end_date'
   };
 
   var TIC_SCORE_CAP = 100;
@@ -353,6 +355,19 @@
     _ticEl('tic_strip_movein').textContent = _ticFmtDate(t[TIC_C.move_in_date] || u.assignedDate);
     _ticEl('tic_strip_lease').textContent  = t[TIC_C.lease_type]    || '—';
     _ticEl('tic_strip_status').textContent = t[TIC_C.tenancy_status] || u.status || '—';
+
+    // Lease end date — highlight if expiring within 90 days or already expired
+    var leaseEndEl = _ticEl('tic_strip_lease_end');
+    if (leaseEndEl) {
+      var leaseEnd = t[TIC_C.lease_end_date];
+      leaseEndEl.textContent = leaseEnd ? _ticFmtDate(leaseEnd) : '—';
+      leaseEndEl.style.color = '';
+      if (leaseEnd) {
+        var daysLeft = Math.ceil((new Date(leaseEnd) - new Date()) / 86400000);
+        if (daysLeft < 0)  leaseEndEl.style.color = 'var(--danger,#ef4444)';
+        else if (daysLeft <= 90) leaseEndEl.style.color = 'var(--warn-amber-text,#b45309)';
+      }
+    }
     var hccEl   = _ticEl('tic_strip_hcc');
     var hccTile = document.getElementById('tic_strip_hcc_tile');
     var isHcc   = !!t[TIC_C.home_care];
@@ -381,8 +396,10 @@
     // Unit details
     { key: TIC_C.unit_number,     label: 'Unit Number',         type: 'text',   readOnly: true, group: 'unit' },
     { key: TIC_C.bedrooms,        label: 'Bedrooms',            type: 'number', readOnly: true, group: 'unit' },
-    { key: TIC_C.move_in_date,    label: 'Move-In Date',        type: 'date',   group: 'unit' },
-    { key: TIC_C.tenancy_status,  label: 'Tenancy Status',      type: 'select', options: TIC_TENANCY_OPTIONS, group: 'unit' },
+    { key: TIC_C.move_in_date,      label: 'Move-In Date',        type: 'date',   group: 'unit' },
+    { key: TIC_C.lease_start_date,  label: 'Lease Start Date',    type: 'date',   group: 'unit' },
+    { key: TIC_C.lease_end_date,    label: 'Lease End Date',      type: 'date',   group: 'unit' },
+    { key: TIC_C.tenancy_status,    label: 'Tenancy Status',      type: 'select', options: TIC_TENANCY_OPTIONS, group: 'unit' },
     { key: TIC_C.vulnerability,   label: 'Vulnerability Flags', type: 'multi',  options: TIC_VULN_OPTIONS, group: 'unit' },
     { key: TIC_C.application_id,  label: 'Application Number',  type: 'text',   group: 'meta',      readOnly: true },
     { key: TIC_C.hydro_account,   label: 'Hydro Account #',     type: 'text',   group: 'utilities' },
@@ -2394,7 +2411,8 @@
     if (emergRef.phone) emerg += (emerg ? ' ' : '') + emergRef.phone;
     var habitants = (app.habitants || []).filter(function(h){ return h && (h.fn || h.ln); });
     var rentAmt   = l[TIC_C.monthly_rent] != null ? String(l[TIC_C.monthly_rent]) : '';
-    var startDate = t[TIC_C.move_in_date] || (u && u.assignedDate) || '';
+    var startDate = t[TIC_C.lease_start_date] || t[TIC_C.move_in_date] || (u && u.assignedDate) || '';
+    var endDate   = t[TIC_C.lease_end_date]   || '';
 
     var existing = document.getElementById('tic_lease_modal');
     if (existing) existing.remove();
@@ -2475,7 +2493,8 @@
       + secH('Parties &amp; Dates')
       + '<div class="tic-grid-2">'
       + fld('Execution Date',           inp('ls_exec_date',  today,                '', 'date'))
-      + fld('Commencement Date',        inp('ls_start_date', startDate,            '', 'date'))
+      + fld('Lease Start Date',         inp('ls_start_date', startDate,            '', 'date'))
+      + fld('Lease End Date',           inp('ls_end_date',   endDate,              'Leave blank if month-to-month', 'date'))
       + fld('Primary Tenant Name',      inp('ls_t_name',     tenantName,           'Full legal name'))
       + fld('Co-Tenant Name',           inp('ls_co_name',    coName,               'Leave blank if none'))
       + fld('Band Membership #',        inp('ls_t_band',     app.band||'',         'Band number'))
@@ -2557,9 +2576,14 @@
     var pk = t[TIC_C.tenant_pk];
     if (pk) {
       var tPatch = {};
-      var nStream = fv('ls_r_stream'), nMovein = fv('ls_start_date') || fv('ls_r_alloc');
-      if (nStream && nStream !== (t[TIC_C.housing_stream]||'')) { tPatch[TIC_C.housing_stream] = nStream; t[TIC_C.housing_stream] = nStream; }
-      if (nMovein && nMovein !== (t[TIC_C.move_in_date]||''))   { tPatch[TIC_C.move_in_date]  = nMovein; t[TIC_C.move_in_date]  = nMovein; }
+      var nStream = fv('ls_r_stream');
+      var nMovein = fv('ls_r_alloc');
+      var nLeaseStart = fv('ls_start_date');
+      var nLeaseEnd   = fv('ls_end_date') || null;
+      if (nStream     && nStream     !== (t[TIC_C.housing_stream]  ||'')) { tPatch[TIC_C.housing_stream]   = nStream;     t[TIC_C.housing_stream]   = nStream; }
+      if (nMovein     && nMovein     !== (t[TIC_C.move_in_date]    ||'')) { tPatch[TIC_C.move_in_date]     = nMovein;     t[TIC_C.move_in_date]     = nMovein; }
+      if (nLeaseStart && nLeaseStart !== (t[TIC_C.lease_start_date]||'')) { tPatch[TIC_C.lease_start_date] = nLeaseStart; t[TIC_C.lease_start_date] = nLeaseStart; }
+      if (nLeaseEnd !== (t[TIC_C.lease_end_date]||null))                  { tPatch[TIC_C.lease_end_date]   = nLeaseEnd;   t[TIC_C.lease_end_date]   = nLeaseEnd; }
       if (Object.keys(tPatch).length) {
         try { await _ticWrite('PATCH', TIC_T.tenants+'?'+TIC_C.tenant_pk+'=eq.'+encodeURIComponent(pk), tPatch); }
         catch(e) { console.warn('[lease] tenant patch failed:', e); }
