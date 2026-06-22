@@ -484,8 +484,9 @@ function renderNationPanel(){
     return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+';">'+label+'</span>';
   };
   var MODULE_LABELS = {
-    rfq:     'RFQ (Request for Quotes)',
-    mapping: 'Mapping (Unit Location & Photo)'
+    rfq:          'RFQ (Request for Quotes)',
+    mapping:      'Mapping (Unit Location & Photo)',
+    ai_assistant: 'AI Assistant (Chat + Draft Notes)'
   };
   var humanize = function(name){
     if(MODULE_LABELS[name]) return MODULE_LABELS[name];
@@ -598,6 +599,7 @@ function _onModuleToggle(modName, nowOn) {
   // currently on the landing (or legacy employeeHomeView, sub-page only) so
   // module enable/disable changes show up immediately in the nav strip.
   renderNationPanel();
+  if (typeof _syncAIHeaderBtn === 'function') _syncAIHeaderBtn();
   var landingEl = document.getElementById('landingView');
   var ehv       = document.getElementById('employeeHomeView');
   var onHome = (landingEl && landingEl.style.display !== 'none' && landingEl.style.display !== '')

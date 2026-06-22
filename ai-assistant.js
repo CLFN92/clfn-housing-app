@@ -32,6 +32,9 @@ function _aiCall(payload) {
 // ── Draft Note ───────────────────────────────────────────────────────────────
 // Called by the "Draft with AI" button inside the approval modal.
 function aiDraftNote() {
+  if (window.CLFN_MODULES && !CLFN_MODULES.isEnabled('ai_assistant')) {
+    showToast('AI Assistant is disabled for this nation.', { type: 'error' }); return;
+  }
   var app = window._currentScorecardApp;
   if (!app) { showToast('No application selected.', { type: 'error' }); return; }
 
@@ -65,6 +68,7 @@ function aiDraftNote() {
 
 // ── Chat Panel: open / close / toggle ────────────────────────────────────────
 function openAIChat() {
+  if (window.CLFN_MODULES && !CLFN_MODULES.isEnabled('ai_assistant')) return;
   var panel = document.getElementById('ai_chat_panel');
   if (panel) panel.style.display = 'flex';
   _aiPanelOpen = true;

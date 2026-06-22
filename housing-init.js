@@ -1635,6 +1635,7 @@ async function loadAppDataFromSupabase() {
     if(typeof initApprovalAuthority === 'function') initApprovalAuthority();
     // Initialise module enable/license state from loaded settings
     if(typeof initModuleEnablement === 'function') initModuleEnablement();
+    _syncAIHeaderBtn();
 
     // Rescore all apps with live V2 model
     if(applications.length && typeof rescoreAllApplications === 'function') {
@@ -1977,6 +1978,7 @@ async function loadHousingData() {
     if (typeof applyRequiredFields === 'function')   applyRequiredFields();
     if (typeof initApprovalAuthority === 'function') initApprovalAuthority();
     if (typeof initModuleEnablement === 'function')  initModuleEnablement();
+    _syncAIHeaderBtn();
     if(applications.length && typeof rescoreAllApplications==='function') rescoreAllApplications();
     if (window.CLFN_DEBUG) console.log('[CLFN] Loaded '+applications.length+' apps, '+housingUnits.length+' units');
   } catch(e){ console.warn('[HOUSING] data load error:',e); console.warn('[CLFN] Could not load data'); }
@@ -2142,6 +2144,15 @@ function renderAppHeader(){
   }
   // Apply nation branding now that markup exists.
   if(typeof applyBrandingToHeader === 'function') applyBrandingToHeader();
+}
+
+// Show or hide the AI header button based on the ai_assistant module state.
+// Called after initModuleEnablement() and from _onModuleToggle.
+function _syncAIHeaderBtn() {
+  var btn = document.getElementById('header_ai_btn');
+  if (!btn) return;
+  var on = window.CLFN_MODULES && CLFN_MODULES.isEnabled('ai_assistant');
+  btn.style.display = on ? 'flex' : 'none';
 }
 
 // HEADER_NAV — single source of truth for the primary nav strip.
