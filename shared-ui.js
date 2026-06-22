@@ -857,6 +857,199 @@ function edGuard(featureName, callback) {
   return false;
 }
 
+// ── clfnSearchSelect — reusable searchable combobox ─────────────────────────
+// Usage:
+//   clfnSearchSelect({
+//     wrap:        Element,          // container element to render into
+//     items:       [{id, label}],    // option list
+//     value:       '',               // initial selected id
+//     placeholder: 'Search…',
+//     onChange:    function(id, label) {}
+//   })
+// Returns { getValue, setValue, destroy }
+//
+// Renders a text input + body-portal dropdown so overflow:hidden parents
+// cannot clip the list. Arrow keys / Enter / Escape for keyboard nav.
+(function(){
+  var _ESC = typeof escapeHtml === 'function' ? escapeHtml : function(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  };
+
+  function _portal() {
+    var d = document.getElementById('clfn-ss-portal');
+    if (!d) {
+      d = document.createElement('div');
+      d.id = 'clfn-ss-portal';
+      document.body.appendChild(d);
+    }
+    return d;
+  }
+
+  window.clfnSearchSelect = function(opts) {
+    var wrap        = opts.wrap;
+    var items       = opts.items || [];
+    var placeholder = opts.placeholder || 'Search…';
+    var onChange    = opts.onChange || function(){};
+    var selectedId  = opts.value || '';
+    var selectedLabel = '';
+
+    // Find initial label
+    if (selectedId) {
+      var found = items.find(function(it){ return it.id === selectedId; });
+      if (found) selectedLabel = found.label;
+    }
+
+    // Build input
+    wrap.innerHTML = '';
+    wrap.className = (wrap.className || '') + ' clfn-ss-wrap';
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'tic-input clfn-ss-input';
+    input.placeholder = placeholder;
+    input.autocomplete = 'off';
+    input.value = selectedLabel;
+    wrap.appendChild(input);
+
+    // Caret icon
+    var caret = document.createElement('span');
+    caret.className = 'clfn-ss-caret';
+    caret.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><polyline points="6 9 12 15 18 9"/></svg>';
+    wrap.appendChild(caret);
+
+    // Portal dropdown
+    var drop = document.createElement('div');
+    drop.className = 'clfn-ss-drop';
+    _portal().appendChild(drop);
+
+    var activeIdx = -1;
+    var isOpen = false;
+
+    function getFiltered(q) {
+      var query = (q || '').toLowerCase().trim();
+      return query
+        ? items.filter(function(it){ return it.label.toLowerCase().indexOf(query) !== -1; })
+        : items.slice();
+    }
+
+    function position() {
+      var r = input.getBoundingClientRect();
+      drop.style.left  = r.left + 'px';
+      drop.style.top   = (r.bottom + 2) + 'px';
+      drop.style.width = r.width + 'px';
+    }
+
+    function renderDrop(filtered) {
+      activeIdx = -1;
+      if (!filtered.length) {
+        drop.innerHTML = '<div class="clfn-ss-empty">No results</div>';
+      } else {
+        drop.innerHTML = filtered.map(function(it, i){
+          var sel = it.id === selectedId ? ' clfn-ss-selected' : '';
+          return '<div class="clfn-ss-item' + sel + '" data-idx="' + i + '" data-id="' + _ESC(it.id) + '" data-label="' + _ESC(it.label) + '">' + _ESC(it.label) + '</div>';
+        }).join('');
+      }
+      // Scroll selected item into view
+      var sel = drop.querySelector('.clfn-ss-selected');
+      if (sel) sel.scrollIntoView({ block: 'nearest' });
+    }
+
+    function open() {
+      position();
+      renderDrop(getFiltered(input.value));
+      drop.style.display = 'block';
+      isOpen = true;
+      input.select();
+    }
+
+    function close() {
+      drop.style.display = 'none';
+      isOpen = false;
+      activeIdx = -1;
+      // Restore display label
+      input.value = selectedLabel;
+    }
+
+    function selectItem(id, label) {
+      selectedId    = id;
+      selectedLabel = label;
+      input.value   = label;
+      drop.style.display = 'none';
+      isOpen = false;
+      activeIdx = -1;
+      onChange(id, label);
+    }
+
+    function highlightIdx(i, items) {
+      var rows = drop.querySelectorAll('.clfn-ss-item');
+      rows.forEach(function(r){ r.classList.remove('clfn-ss-active'); });
+      if (i >= 0 && i < rows.length) {
+        rows[i].classList.add('clfn-ss-active');
+        rows[i].scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    input.addEventListener('focus', function(){ open(); });
+    input.addEventListener('click', function(){ if(!isOpen) open(); });
+
+    input.addEventListener('input', function(){
+      selectedId = ''; selectedLabel = '';
+      position();
+      var f = getFiltered(input.value);
+      renderDrop(f);
+      drop.style.display = 'block';
+      isOpen = true;
+    });
+
+    input.addEventListener('keydown', function(e){
+      if (!isOpen) { open(); return; }
+      var rows = drop.querySelectorAll('.clfn-ss-item');
+      if (e.key === 'ArrowDown')  { e.preventDefault(); activeIdx = Math.min(activeIdx + 1, rows.length - 1); highlightIdx(activeIdx, rows); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); highlightIdx(activeIdx, rows); }
+      else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (activeIdx >= 0 && rows[activeIdx]) {
+          selectItem(rows[activeIdx].getAttribute('data-id'), rows[activeIdx].getAttribute('data-label'));
+        }
+      }
+      else if (e.key === 'Escape') { close(); }
+    });
+
+    drop.addEventListener('mousedown', function(e){
+      var item = e.target.closest('.clfn-ss-item');
+      if (item) { e.preventDefault(); selectItem(item.getAttribute('data-id'), item.getAttribute('data-label')); }
+    });
+
+    document.addEventListener('click', function outsideClick(e){
+      if (!wrap.contains(e.target) && !drop.contains(e.target)) {
+        if (isOpen) close();
+      } else if (isOpen) {
+        // Keep listening
+        document.addEventListener('click', outsideClick, { once: true });
+      }
+    }, { once: true });
+
+    caret.addEventListener('mousedown', function(e){
+      e.preventDefault();
+      if (isOpen) close(); else { input.focus(); open(); }
+    });
+
+    return {
+      getValue: function(){ return selectedId; },
+      getLabel: function(){ return selectedLabel; },
+      setValue: function(id, label){
+        selectedId = id; selectedLabel = label || id;
+        input.value = selectedLabel;
+      },
+      destroy: function(){
+        if (drop.parentNode) drop.parentNode.removeChild(drop);
+        wrap.innerHTML = '';
+      }
+    };
+  };
+}());
+
 // ── Tip popover toggle (shared) ─────────────────────────────────────────────
 // Drives the `.tip-panel` open/close state used on form fields and table
 // headers. Wired into markup via onclick="toggleTip('id')" or closeTip('id').

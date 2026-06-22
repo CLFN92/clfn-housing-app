@@ -231,7 +231,7 @@ function openInspectionModal(id) {
     // ── Details
     + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--border);">Inspection Details</div>'
     + '<div class="tic-grid-2" style="margin-bottom:16px;">'
-    +   '<div class="f"><label class="tic-field-lbl">Unit</label><div class="insp-combo-wrap" id="insp_unit_wrap"><input id="insp_unit_search" type="text" class="tic-input" autocomplete="off" placeholder="Search address…" value="' + _esc(preAddr) + '" oninput="_inspUnitFilter(this)" onfocus="_inspUnitOpenDrop(this)"/><input type="hidden" id="insp_unit" value="' + _esc(insp ? insp.unit_id||'' : '') + '"/></div></div>'
+    +   '<div class="f"><label class="tic-field-lbl">Unit</label><div id="insp_unit_wrap"></div></div>'
     +   '<div class="f"><label class="tic-field-lbl">Type</label><select id="insp_type" class="tic-input">' + typeOpts + '</select></div>'
     +   '<div class="f"><label class="tic-field-lbl">Inspection Date</label><input id="insp_date" type="date" class="tic-input" value="' + _esc(insp ? insp.inspection_date : today) + '"/></div>'
     +   '<div class="f"><label class="tic-field-lbl">Overall Status</label><select id="insp_status" class="tic-input">' + statusOpts + '</select></div>'
@@ -272,86 +272,29 @@ function openInspectionModal(id) {
     + '</div>';
 
   modal.style.display = 'flex';
+
+  // Wire unit searchable select
+  var unitItems = (window.housingUnits || [])
+    .filter(function(u){ return !u.archived; })
+    .map(function(u){ return { id: u.id, label: ((u.num||'') + (u.num&&u.street?' ':'') + (u.street||'')) || u.id }; })
+    .sort(function(a,b){ return a.label.localeCompare(b.label); });
+  var unitWrap = document.getElementById('insp_unit_wrap');
+  if (unitWrap && typeof clfnSearchSelect === 'function') {
+    window._inspUnitSS = clfnSearchSelect({
+      wrap:        unitWrap,
+      items:       unitItems,
+      value:       insp ? insp.unit_id || '' : '',
+      placeholder: 'Search address…',
+      onChange:    function(id, label) { window._inspUnitSS._selectedId = id; window._inspUnitSS._selectedLabel = label; }
+    });
+  }
+
   _inspUpdateSectionSummaries();
 }
 
-// ── Unit searchable combobox (body-portal to escape modal overflow:auto) ──────
-function _inspUnitGetDrop() {
-  var drop = document.getElementById('insp_unit_drop');
-  if (!drop) {
-    drop = document.createElement('div');
-    drop.id = 'insp_unit_drop';
-    drop.className = 'insp-combo-drop';
-    document.body.appendChild(drop);
-  }
-  return drop;
-}
-
-function _inspUnitPositionDrop(input) {
-  var drop = _inspUnitGetDrop();
-  var rect = input.getBoundingClientRect();
-  drop.style.position = 'fixed';
-  drop.style.left   = rect.left + 'px';
-  drop.style.top    = (rect.bottom + 2) + 'px';
-  drop.style.width  = rect.width + 'px';
-  drop.style.zIndex = '9999';
-}
-
-function _inspUnitOpenDrop(input) {
-  _inspUnitPositionDrop(input);
-  _inspUnitRenderDrop(input.value, input);
-  setTimeout(function(){
-    document.addEventListener('click', _inspUnitOutsideClick, { once: true, capture: true });
-  }, 0);
-}
-
-function _inspUnitFilter(input) {
-  _inspUnitPositionDrop(input);
-  _inspUnitRenderDrop(input.value, input);
-  document.getElementById('insp_unit').value = '';
-}
-
-function _inspUnitRenderDrop(query, input) {
-  var drop = _inspUnitGetDrop();
-  var units = window.housingUnits || [];
-  var list = units.filter(function(u){ return !u.archived; }).map(function(u){
-    return { id: u.id, addr: ((u.num || '') + (u.num && u.street ? ' ' : '') + (u.street || '') || u.id) };
-  }).sort(function(a,b){ return a.addr.localeCompare(b.addr); });
-  var q = (query || '').toLowerCase().trim();
-  if (q) list = list.filter(function(u){ return u.addr.toLowerCase().indexOf(q) !== -1; });
-  if (!list.length) {
-    drop.innerHTML = '<div class="insp-combo-empty">No units found</div>';
-  } else {
-    drop.innerHTML = list.map(function(u){
-      return '<div class="insp-combo-item" onmousedown="_inspUnitSelect(\'' + _esc(u.id) + '\',\'' + _esc(u.addr) + '\')">' + _esc(u.addr) + '</div>';
-    }).join('');
-  }
-  drop.style.display = 'block';
-}
-
-function _inspUnitSelect(id, addr) {
-  document.getElementById('insp_unit').value = id;
-  var search = document.getElementById('insp_unit_search');
-  if (search) search.value = addr;
-  var drop = document.getElementById('insp_unit_drop');
-  if (drop) drop.style.display = 'none';
-}
-
-function _inspUnitCloseDrop() {
-  var drop = document.getElementById('insp_unit_drop');
-  if (drop) drop.style.display = 'none';
-}
-
-function _inspUnitOutsideClick(e) {
-  var wrap = document.getElementById('insp_unit_wrap');
-  var drop = document.getElementById('insp_unit_drop');
-  if ((!wrap || !wrap.contains(e.target)) && (!drop || !drop.contains(e.target))) {
-    _inspUnitCloseDrop();
-  }
-}
 
 function closeInspectionModal() {
-  _inspUnitCloseDrop();
+  if (window._inspUnitSS) { window._inspUnitSS.destroy(); window._inspUnitSS = null; }
   var modal = document.getElementById('insp_modal');
   if (modal) modal.style.display = 'none';
   window._inspEditId        = null;
@@ -479,8 +422,8 @@ function _inspCollectChecklist() {
 
 // ── Save ─────────────────────────────────────────────────────────────────────
 async function saveInspection() {
-  var unitId   = (document.getElementById('insp_unit') || {}).value || '';
-  var unitAddr = (document.getElementById('insp_unit_search') || {}).value || '';
+  var unitId   = window._inspUnitSS ? window._inspUnitSS.getValue() : '';
+  var unitAddr = window._inspUnitSS ? window._inspUnitSS.getLabel() : '';
   if (!unitId) { if(typeof showToast==='function') showToast('Please select a unit.', {type:'error'}); return; }
 
   var date    = (document.getElementById('insp_date')       || {}).value || '';
