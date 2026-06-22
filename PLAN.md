@@ -304,6 +304,47 @@ finance.html don't need to change.
 
 ---
 
+## Phase AI — Housing Assistant (natural-language staff chat)  ✅ (MVP shipped)
+
+A read-only conversational assistant for **staff** that answers questions about
+housing data ("how many vacant units?", "list applications awaiting review",
+"show open work orders"). Same security spine as email: the browser talks to an
+Edge Function, never to Anthropic; the API key lives only in function secrets.
+
+### What shipped
+- **Edge Function `supabase/functions/ai-assistant/index.ts`** — verifies the
+  caller's Supabase JWT, resolves their role from the `staff` table (must be
+  active staff), then runs a Claude tool-use loop. Claude is given **one
+  read-only tool, `query_database`**, against a **per-table role allowlist**
+  with hard caps (max 50 rows, 6 tool turns). Field employees are force-filtered
+  to their own in-house work orders; finance tables gated to ED/CFO/Finance;
+  applications hidden from field employees. No write tools exist — the assistant
+  physically cannot mutate data. ASCII-only source (Edge Function rule).
+  - Secrets: `ANTHROPIC_API_KEY` (required), `ANTHROPIC_MODEL`
+    (optional, default `claude-sonnet-4-6`). Auto-injected: `SUPABASE_*`.
+- **Client widget `ai-assistant.js`** — self-contained IIFE (mirrors
+  `reno-questionnaire.js`): floating button + chat panel, injects its own scoped
+  styles, posts conversation history to `/functions/v1/ai-assistant` with the
+  user's access token. Gated by `signedIn()` + `moduleOn('ai_assistant')`.
+  Loaded on all 8 staff pages.
+- **Module toggle** — registered `ai_assistant` in `CLFN_MODULES`
+  (`_enabled`/`_licensed`), so it auto-surfaces a Settings → Nation → Modules row
+  and is per-nation licensable.
+
+### Deploy step (manual, like send-notification)
+Deploy the function via the Supabase Dashboard or `supabase functions deploy
+ai-assistant`, and set the `ANTHROPIC_API_KEY` secret. No client CSP change is
+needed — the browser only calls the Supabase functions host (already allowlisted)
+and the Anthropic call is server-side.
+
+### Possible follow-ups (not built)
+- Aggregate/count helpers (PostgREST `count`) so big-number questions don't pull rows.
+- Streaming responses for snappier UX.
+- Per-role suggested-question sets; an audit row per assistant query.
+- Wider data coverage (finance ledgers, scoring rationale) once column names confirmed.
+
+---
+
 ## Phase G — SMS / Text Notifications  ⬜
 
 Extends the existing email pipeline (Edge Function → Microsoft Graph) with an SMS
@@ -426,6 +467,15 @@ keys**, so it must run server-side and stay secured. Screens:
 - Pre-refactor snapshots (Phase C)
 
 ## Follow-ups parked
+- **Tenant / community-member portal** (saved for later). Limited-access surface
+  for non-staff users (applicants: apply + check status; tenants: view unit/rent,
+  submit maintenance, docs). **Hard prerequisite: real Supabase RLS** scoping every
+  tenant-readable table to `auth.uid()` — the current model trusts the client
+  (anon key + client-side gating), which is safe for vetted staff but unsafe for
+  untrusted logins. Needs `auth_user_id` linkage on tenants/applications + a
+  staff-invite/claim onboarding flow to prevent impersonation, and a separate
+  minimal portal surface (own subdomain) rather than the staff SPA. Open decisions:
+  audience-first, MVP scope, surface, onboarding. (See discussion 2026-06.)
 - Finance module actual UI
 - Supabase RLS
 - Nation config distribution mechanism (CDN vs shared Supabase)
