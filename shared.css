@@ -1656,7 +1656,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .app-header-v2 .hbrand-sub   { color: var(--txt-on-dark); font-size: 11px; display: block; margin-top: 1px; white-space: nowrap; }
 .app-header-v2 .app-nav {
   display: flex; gap: 2px; flex: 1; margin-left: 8px;
-  overflow: hidden; min-width: 0;
+  overflow: visible; min-width: 0;
 }
 .app-header-v2 .app-nav-item {
   display: flex; align-items: center; gap: 8px;
