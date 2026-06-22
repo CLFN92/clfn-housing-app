@@ -639,6 +639,10 @@ function generateInspectionPDF() {
     if (typeof loadHousingData === 'function') {
       try { await loadHousingData(); } catch(e) { console.warn('[inspections] data load:', e); }
     }
+    // Show the view (page-view-wide is display:none by default)
+    var view = document.getElementById('inspectionsView');
+    if (view) view.style.display = 'flex';
+
     try { await _inspLoad(); } catch(e) { console.warn('[inspections] insp load:', e); }
     renderInspectionsList();
   } catch(e) {
