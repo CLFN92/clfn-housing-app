@@ -216,7 +216,7 @@ function openInspectionModal(id) {
     // ── Details
     + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--border);">Inspection Details</div>'
     + '<div class="tic-grid-2" style="margin-bottom:16px;">'
-    +   '<div class="f"><label class="tic-field-lbl">Unit</label><div class="insp-combo-wrap" id="insp_unit_wrap"><input id="insp_unit_search" type="text" class="tic-input" autocomplete="off" placeholder="Search address…" value="' + _esc(preAddr) + '" oninput="_inspUnitFilter(this)" onfocus="_inspUnitOpenDrop()"/><input type="hidden" id="insp_unit" value="' + _esc(insp ? insp.unit_id||'' : '') + '"/><div id="insp_unit_drop" class="insp-combo-drop"></div></div></div>'
+    +   '<div class="f"><label class="tic-field-lbl">Unit</label><div class="insp-combo-wrap" id="insp_unit_wrap"><input id="insp_unit_search" type="text" class="tic-input" autocomplete="off" placeholder="Search address…" value="' + _esc(preAddr) + '" oninput="_inspUnitFilter(this)" onfocus="_inspUnitOpenDrop(this)"/><input type="hidden" id="insp_unit" value="' + _esc(insp ? insp.unit_id||'' : '') + '"/></div></div>'
     +   '<div class="f"><label class="tic-field-lbl">Type</label><select id="insp_type" class="tic-input">' + typeOpts + '</select></div>'
     +   '<div class="f"><label class="tic-field-lbl">Inspection Date</label><input id="insp_date" type="date" class="tic-input" value="' + _esc(insp ? insp.inspection_date : today) + '"/></div>'
     +   '<div class="f"><label class="tic-field-lbl">Overall Status</label><select id="insp_status" class="tic-input">' + statusOpts + '</select></div>'
@@ -260,26 +260,47 @@ function openInspectionModal(id) {
   _inspUpdateSectionSummaries();
 }
 
-// ── Unit searchable combobox ──────────────────────────────────────────────────
-function _inspUnitOpenDrop() {
-  _inspUnitRenderDrop(document.getElementById('insp_unit_search') ? document.getElementById('insp_unit_search').value : '');
+// ── Unit searchable combobox (body-portal to escape modal overflow:auto) ──────
+function _inspUnitGetDrop() {
+  var drop = document.getElementById('insp_unit_drop');
+  if (!drop) {
+    drop = document.createElement('div');
+    drop.id = 'insp_unit_drop';
+    drop.className = 'insp-combo-drop';
+    document.body.appendChild(drop);
+  }
+  return drop;
+}
+
+function _inspUnitPositionDrop(input) {
+  var drop = _inspUnitGetDrop();
+  var rect = input.getBoundingClientRect();
+  drop.style.position = 'fixed';
+  drop.style.left   = rect.left + 'px';
+  drop.style.top    = (rect.bottom + 2) + 'px';
+  drop.style.width  = rect.width + 'px';
+  drop.style.zIndex = '9999';
+}
+
+function _inspUnitOpenDrop(input) {
+  _inspUnitPositionDrop(input);
+  _inspUnitRenderDrop(input.value, input);
   setTimeout(function(){
     document.addEventListener('click', _inspUnitOutsideClick, { once: true, capture: true });
   }, 0);
 }
 
 function _inspUnitFilter(input) {
-  _inspUnitRenderDrop(input.value);
-  // Clear selection when user types
+  _inspUnitPositionDrop(input);
+  _inspUnitRenderDrop(input.value, input);
   document.getElementById('insp_unit').value = '';
 }
 
-function _inspUnitRenderDrop(query) {
-  var drop = document.getElementById('insp_unit_drop');
-  if (!drop) return;
+function _inspUnitRenderDrop(query, input) {
+  var drop = _inspUnitGetDrop();
   var units = window.housingUnits || [];
   var list = units.filter(function(u){ return !u.archived; }).map(function(u){
-    return { id: u.id, addr: (u.num ? u.num + ' ' + u.street : u.id) };
+    return { id: u.id, addr: ((u.num || '') + (u.num && u.street ? ' ' : '') + (u.street || '') || u.id) };
   }).sort(function(a,b){ return a.addr.localeCompare(b.addr); });
   var q = (query || '').toLowerCase().trim();
   if (q) list = list.filter(function(u){ return u.addr.toLowerCase().indexOf(q) !== -1; });
@@ -301,15 +322,21 @@ function _inspUnitSelect(id, addr) {
   if (drop) drop.style.display = 'none';
 }
 
+function _inspUnitCloseDrop() {
+  var drop = document.getElementById('insp_unit_drop');
+  if (drop) drop.style.display = 'none';
+}
+
 function _inspUnitOutsideClick(e) {
   var wrap = document.getElementById('insp_unit_wrap');
-  if (!wrap || !wrap.contains(e.target)) {
-    var drop = document.getElementById('insp_unit_drop');
-    if (drop) drop.style.display = 'none';
+  var drop = document.getElementById('insp_unit_drop');
+  if ((!wrap || !wrap.contains(e.target)) && (!drop || !drop.contains(e.target))) {
+    _inspUnitCloseDrop();
   }
 }
 
 function closeInspectionModal() {
+  _inspUnitCloseDrop();
   var modal = document.getElementById('insp_modal');
   if (modal) modal.style.display = 'none';
   window._inspEditId        = null;

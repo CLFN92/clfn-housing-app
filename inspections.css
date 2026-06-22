@@ -3,10 +3,10 @@
 /* Unit searchable combobox */
 .insp-combo-wrap { position: relative; }
 .insp-combo-drop {
-  display: none; position: absolute; top: calc(100% + 2px); left: 0; right: 0;
+  display: none;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.15);
-  z-index: 400; max-height: 220px; overflow-y: auto;
+  border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  max-height: 220px; overflow-y: auto;
 }
 .insp-combo-item {
   padding: 9px 13px; font-size: 13px; cursor: pointer;
