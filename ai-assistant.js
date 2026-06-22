@@ -107,15 +107,30 @@ function aiSendMessage() {
   if (sendBtn) sendBtn.disabled = true;
   _appendAIMessage('assistant', '…', 'ai_typing_msg');
 
+  // Flatten SOW cache (keyed by unit_id) into an array for context
+  var sowList = [];
+  var sowCache = window._sowCache || {};
+  Object.keys(sowCache).forEach(function(uid) {
+    var d = sowCache[uid];
+    if (!d) return;
+    var items = d.items || d.sow_items || d.line_items || [];
+    var total = items.reduce(function(s, i) { return s + (parseFloat(i.cost || i.amount || 0)); }, 0);
+    sowList.push({ unit_id: uid, contractor: d.contractor_name || d.contractor || '', status: d.status || '', total: total, item_count: items.length });
+  });
+
   var ctx = {
-    role:  window._effectiveRole || '',
-    apps:  (window.applications  || []).map(function(a) {
+    role:        window._effectiveRole || '',
+    apps:        (window.applications  || []).map(function(a) {
       return { id: a.id, fn: a.fn, ln: a.ln, status: a.status,
                score: a.total_score, bedrooms: a.bed_req };
     }),
-    units: (window.housingUnits  || []).map(function(u) {
+    units:       (window.housingUnits  || []).map(function(u) {
       return { id: u.id, address: u.address || u.unit_address,
                bedrooms: u.bedrooms, status: u.status };
+    }),
+    sows:        sowList,
+    contractors: (window._contractors || []).map(function(c) {
+      return { name: c.name, trade: c.trade, phone: c.phone, email: c.email, status: c.status };
     }),
   };
 
@@ -160,7 +175,7 @@ function _appendAIMessage(role, text, id) {
     'line-height:1.5;white-space:pre-wrap;word-break:break-word;',
     isUser
       ? 'background:var(--yellow);color:#fff;border-bottom-right-radius:3px;'
-      : 'background:#1e1e1c;border:1px solid var(--border);color:var(--text);border-bottom-left-radius:3px;',
+      : 'background:#2f3033;border:1px solid #444;color:#e8e8e5;border-bottom-left-radius:3px;',
   ].join('');
   bubble.textContent = text;
 

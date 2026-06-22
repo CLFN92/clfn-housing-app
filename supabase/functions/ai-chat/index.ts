@@ -81,17 +81,23 @@ Write 2–4 sentences. Be professional, clear, and compassionate. Reference spec
   // Chat mode
   const role = ctx?.role ?? 'staff'
   const appsJson = ctx?.apps?.length
-    ? '\n\nApplication records (up to 20):\n' + JSON.stringify(ctx.apps.slice(0, 20))
+    ? '\n\nApplications:\n' + JSON.stringify(ctx.apps.slice(0, 30))
     : ''
   const unitsJson = ctx?.units?.length
-    ? '\n\nHousing units (up to 20):\n' + JSON.stringify(ctx.units.slice(0, 20))
+    ? '\n\nHousing units:\n' + JSON.stringify(ctx.units.slice(0, 30))
+    : ''
+  const sowsJson = ctx?.sows?.length
+    ? '\n\nScopes of Work (SOWs) — one per unit, includes contractor, status, line-item count, and total cost:\n' + JSON.stringify(ctx.sows)
+    : ''
+  const contractorsJson = ctx?.contractors?.length
+    ? '\n\nContractors:\n' + JSON.stringify(ctx.contractors.slice(0, 30))
     : ''
 
-  return `You are an AI assistant for the Constance Lake First Nation (CLFN) Housing Department. You help housing staff answer questions about applications, tenants, housing units, and housing policy.
+  return `You are an AI assistant for the Constance Lake First Nation (CLFN) Housing Department. You help housing staff answer questions about applications, housing units, scopes of work (SOWs), contractors, and housing policy.
 
-Staff role: ${role}${appsJson}${unitsJson}
+Staff role: ${role}${appsJson}${unitsJson}${sowsJson}${contractorsJson}
 
-Answer concisely and professionally. Reference specific data when it helps. If you lack sufficient data to answer, say so clearly.`
+Answer concisely and professionally. Use the data above to answer questions directly — perform calculations, totals, and lookups as needed. If specific data is missing from the context, say so clearly rather than guessing.`
 }
 
 function buildMessages(message: string, history: any[]): any[] {
