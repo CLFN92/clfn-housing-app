@@ -107,6 +107,8 @@ function openUnitEditModal(unitId){
   _ueSetStatus(u.status||'vacant');
   _ueSetUnderRenovation(!!u.under_renovation);
   set('ue_assignedDate',u.assignedDate);
+  set('ue_last_inspection', u.lastInspectionDate || '');
+  set('ue_next_inspection', u.nextInspectionDue  || '');
   set('ue_notes',u.notes);
   // Populate hidden assignment fields
   var toEl = document.getElementById('ue_assignedTo');
@@ -403,6 +405,8 @@ function saveUnitEdit(){
   // any status other than under_repair.
   u.status=get('ue_status')||'vacant'; u.accessible=chk('ue_accessible'); u.isElders=chk('ue_isElders');
   u.under_renovation = u.status !== 'condemned' && chk('ue_under_renovation');
+  u.lastInspectionDate = get('ue_last_inspection') || null;
+  u.nextInspectionDue  = get('ue_next_inspection')  || null;
   u.notes=get('ue_notes');
   // HM approval
   var hmDec = (document.getElementById('ue_sig_hm_decision')||{}).value||'';

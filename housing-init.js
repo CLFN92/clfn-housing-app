@@ -1548,7 +1548,9 @@ async function loadAppDataFromSupabase() {
           bathrooms:row.bathrooms, type:row.type, foundation:row.foundation,
           funder:row.funder, status:row.status, accessible:!!row.accessible,
           isElders:!!row.is_elders, archived:!!row.archived,
-          assignedTo:row.assigned_to, assignedName:row.assigned_name, assignedDate:row.assigned_date
+          assignedTo:row.assigned_to, assignedName:row.assigned_name, assignedDate:row.assigned_date,
+          lastInspectionDate:row.last_inspection_date || null,
+          nextInspectionDue:row.next_inspection_due   || null
         });
       });
     } else {
