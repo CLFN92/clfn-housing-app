@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Working agreement — commits & pushes
+**Always ask for explicit confirmation before committing or pushing.** Make the changes and summarize what changed, then wait for the user's go-ahead — do not auto-commit or auto-push, even when a task looks complete. This applies to every branch (including `main`).
+
 ## Project Overview
 
 Multi-tenant SaaS housing management platform for First Nations. First customer is **Constance Lake First Nation (CLFN)**; the architecture is being prepared to onboard additional nations (database-per-nation, subdomain-per-nation, per-nation module licensing). Superuser admin tooling lives in a **separate codebase** and is out of scope here.
