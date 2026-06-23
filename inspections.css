@@ -139,6 +139,65 @@
   box-sizing: border-box;
 }
 
+/* Dynamic / custom rows */
+.insp-cl-rows { display: flex; flex-direction: column; }
+.insp-cl-item-main { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.insp-cl-item-label-inp {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: var(--sans);
+  background: var(--surface);
+  color: var(--text);
+  box-sizing: border-box;
+}
+.insp-cl-item-remove {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 5px;
+}
+.insp-cl-item-remove:hover { color: #b91c1c; }
+.insp-cl-addrow {
+  align-self: flex-start;
+  margin-top: 6px;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--sans);
+  padding: 5px 11px;
+  cursor: pointer;
+}
+.insp-cl-addrow:hover { color: var(--text); border-color: var(--muted); }
+
+/* AI draft-notes button */
+.insp-ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--sans);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.insp-ai-btn:hover { border-color: var(--yellow); color: var(--yellow); }
+.insp-ai-btn:disabled { opacity: .6; cursor: default; }
+
 /* SOW prompt banner */
 .insp-sow-prompt {
   display: flex;

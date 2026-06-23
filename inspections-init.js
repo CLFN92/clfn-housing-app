@@ -8,7 +8,7 @@
 // ── State ────────────────────────────────────────────────────────────────────
 window._inspections       = [];   // all inspection records
 window._inspEditId        = null; // id of inspection being edited (null = new)
-window._inspPendingPhotos = [];   // staged photos not yet uploaded
+window._inspDocEntityId   = null; // entity scope for the document library
 window._inspUnitFilter    = '';
 window._inspTypeFilter    = '';
 window._inspStatusFilter  = '';
@@ -61,9 +61,8 @@ async function _inspLoad() {
   }
 }
 
-async function _inspSave(record) {
-  var isNew = !record.id;
-  var url   = window.SUPABASE_URL + '/rest/v1/inspections';
+async function _inspSave(record, isNew) {
+  var url = window.SUPABASE_URL + '/rest/v1/inspections';
   var method, headers;
   if (isNew) {
     method  = 'POST';
@@ -71,15 +70,12 @@ async function _inspSave(record) {
   } else {
     method  = 'PATCH';
     url    += '?id=eq.' + encodeURIComponent(record.id);
-    headers = Object.assign({}, _inspHeaders(), { 'Prefer': 'return=minimal' });
+    headers = Object.assign({}, _inspHeaders(), { 'Prefer': 'return=representation' });
   }
   var r = await fetch(url, { method: method, headers: headers, body: JSON.stringify(record) });
   if (!r.ok) throw new Error(await r.text());
-  if (isNew) {
-    var rows = await r.json();
-    return rows[0];
-  }
-  return record;
+  var rows = await r.json();
+  return (rows && rows[0]) || record;
 }
 
 async function _inspDelete(id) {
@@ -156,10 +152,38 @@ function _esc(s) {
 }
 
 // ── Modal: open ──────────────────────────────────────────────────────────────
+function _inspUuid() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
+    var r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8); return v.toString(16);
+  });
+}
+
+// One checklist row (default or custom). Custom rows have an editable label +
+// a remove button; default rows have a fixed label. DOM-driven, so collection
+// no longer depends on template indexes.
+function _inspRatingBtns(rating) {
+  function b(r, lbl) {
+    return '<button type="button" class="' + (rating === r ? 'active-' + r : '') + '" onclick="_inspSetRating(this,\'' + r + '\')">' + lbl + '</button>';
+  }
+  return b('pass','✓ Pass') + b('fail','✗ Fail') + b('repair','⚠ Repair') + b('na','N/A');
+}
+function _inspItemRow(item, rating, note, isCustom) {
+  var main = isCustom
+    ? '<div class="insp-cl-item-main"><input class="insp-cl-item-label-inp" type="text" placeholder="Custom item…" value="' + _esc(item || '') + '"/>'
+        + '<button type="button" class="insp-cl-item-remove" title="Remove row" onclick="_inspRemoveRow(this)">✕</button></div>'
+    : '<div class="insp-cl-item-main"><div class="insp-cl-item-label">' + _esc(item) + '</div></div>';
+  return '<div class="insp-cl-item' + (isCustom ? ' insp-cl-item-custom' : '') + '">'
+    + main
+    + '<div class="insp-cl-rating">' + _inspRatingBtns(rating) + '</div>'
+    + '<input class="insp-cl-item-note-inp" type="text" placeholder="Notes (optional)" value="' + _esc(note || '') + '"/>'
+    + '</div>';
+}
+
 function openInspectionModal(id) {
   var insp = id ? (window._inspections || []).find(function(i){ return i.id === id; }) : null;
-  window._inspEditId        = id || null;
-  window._inspPendingPhotos = [];
+  window._inspEditId      = id || null;
+  window._inspDocEntityId = id || _inspUuid();   // scope for the document library
 
   var units = window.housingUnits || [];
   var today = new Date().toISOString().split('T')[0];
@@ -185,38 +209,34 @@ function openInspectionModal(id) {
     try { savedChecklist = typeof insp.checklist === 'string' ? JSON.parse(insp.checklist) : insp.checklist; } catch(e){}
   }
 
-  // Build checklist HTML
+  // Build checklist HTML — default template rows, then any saved custom rows
+  // for the section, then an "Add row" button.
   var clHtml = INSP_CHECKLIST_TEMPLATE.map(function(sec, si) {
-    var items = sec.items.map(function(item, ii) {
-      var key     = sec.section + '|' + item;
-      var saved   = savedChecklist.find(function(x){ return x.key === key; }) || {};
-      var rating  = saved.rating || '';
-      var note    = saved.notes  || '';
-      var btnPass   = '<button type="button" class="' + (rating==='pass'  ?'active-pass':'')   + '" onclick="_inspSetRating(this,\'pass\')"   data-key="' + _esc(key) + '">✓ Pass</button>';
-      var btnFail   = '<button type="button" class="' + (rating==='fail'  ?'active-fail':'')   + '" onclick="_inspSetRating(this,\'fail\')"   data-key="' + _esc(key) + '">✗ Fail</button>';
-      var btnRepair = '<button type="button" class="' + (rating==='repair'?'active-repair':'') + '" onclick="_inspSetRating(this,\'repair\')" data-key="' + _esc(key) + '">⚠ Repair</button>';
-      var btnNA     = '<button type="button" class="' + (rating==='na'    ?'active-na':'')     + '" onclick="_inspSetRating(this,\'na\')"     data-key="' + _esc(key) + '">N/A</button>';
-      return '<div class="insp-cl-item">'
-        + '<div><div class="insp-cl-item-label">' + _esc(item) + '</div></div>'
-        + '<div class="insp-cl-rating">' + btnPass + btnFail + btnRepair + btnNA + '</div>'
-        + '<input class="insp-cl-item-note-inp" type="text" placeholder="Notes (optional)" data-key="' + _esc(key) + '" value="' + _esc(note) + '"/>'
-        + '</div>';
+    var defaultRows = sec.items.map(function(item) {
+      var saved = savedChecklist.find(function(x){ return x.section === sec.section && x.item === item; })
+               || savedChecklist.find(function(x){ return x.key === sec.section + '|' + item; })
+               || {};
+      return _inspItemRow(item, saved.rating || '', saved.notes || '', false);
     }).join('');
-    return '<div class="insp-cl-section">'
+    var customRows = savedChecklist.filter(function(x){
+      return (x.section === sec.section) && sec.items.indexOf(x.item) === -1;
+    }).map(function(x){
+      return _inspItemRow(x.item, x.rating || '', x.notes || '', true);
+    }).join('');
+    return '<div class="insp-cl-section" data-section="' + _esc(sec.section) + '">'
       + '<div class="insp-cl-section-hdr" onclick="_inspToggleSection(this)">'
       +   '<span>' + _esc(sec.section) + '</span>'
       +   '<span style="font-size:11px;color:var(--muted);" id="insp_sec_summary_' + si + '"></span>'
       + '</div>'
-      + '<div class="insp-cl-section-body">' + items + '</div>'
+      + '<div class="insp-cl-section-body">'
+      +   '<div class="insp-cl-rows">' + defaultRows + customRows + '</div>'
+      +   '<button type="button" class="insp-cl-addrow" onclick="_inspAddCustomRow(this)">+ Add row</button>'
+      + '</div>'
       + '</div>';
   }).join('');
 
-  // Photos
-  var savedPhotos = [];
-  if (insp && insp.photos) {
-    try { savedPhotos = typeof insp.photos === 'string' ? JSON.parse(insp.photos) : insp.photos; } catch(e){}
-  }
-  var photoHtml = _inspRenderPhotoGrid(savedPhotos, []);
+  // AI draft-notes available only when the assistant is loaded + module on.
+  var aiNotesOn = (typeof _aiCall === 'function') && (!window.CLFN_MODULES || window.CLFN_MODULES.isEnabled('ai_assistant'));
 
   var modal = document.getElementById('insp_modal');
   modal.innerHTML =
@@ -243,18 +263,16 @@ function openInspectionModal(id) {
     + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin:16px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--border);">Inspection Checklist</div>'
     + '<div class="insp-checklist" id="insp_checklist">' + clHtml + '</div>'
 
-    // ── General notes
-    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin:16px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--border);">General Notes</div>'
+    // ── General notes (with AI draft assist)
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--border);">'
+    +   '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);">General Notes</span>'
+    +   (aiNotesOn ? '<button type="button" id="insp_ai_notes_btn" class="insp-ai-btn" onclick="_inspDraftNotes()"><span style="color:var(--yellow);">✦</span> Draft with AI</button>' : '')
+    + '</div>'
     + '<textarea id="insp_notes" class="tic-input" rows="4" style="resize:vertical;min-height:80px;width:100%;box-sizing:border-box;" placeholder="Overall observations, recommendations…">' + _esc(insp ? insp.general_notes : '') + '</textarea>'
 
-    // ── Photos
-    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin:16px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--border);">Photos</div>'
-    + '<div id="insp_photo_grid">' + photoHtml + '</div>'
-    + '<label style="display:inline-flex;align-items:center;gap:7px;margin-top:8px;cursor:pointer;font-size:12px;color:var(--muted);border:1px dashed var(--border);border-radius:7px;padding:8px 14px;">'
-    +   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
-    +   'Add photos'
-    +   '<input type="file" accept="image/*" multiple style="display:none;" onchange="_inspHandlePhotos(this)"/>'
-    + '</label>'
+    // ── Photos & documents (standard upload widget)
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin:16px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--border);">Photos &amp; Documents</div>'
+    + '<div id="insp_doclib"></div>'
 
     + '</div>'
 
@@ -289,6 +307,26 @@ function openInspectionModal(id) {
     });
   }
 
+  // Standard document library for photos/reports, scoped to this inspection.
+  var docMount = document.getElementById('insp_doclib');
+  if (docMount && window.DocLibrary) {
+    docMount.innerHTML = '';
+    window._inspDocLib = window.DocLibrary.create(docMount, {
+      entityType:    'inspection',
+      entityId:      window._inspDocEntityId,
+      pathPrefix:    'inspections/' + window._inspDocEntityId + '/photos',
+      supabaseUrl:   SUPABASE_URL,
+      supabaseAnon:  SUPABASE_ANON,
+      storageBucket: STORAGE_BUCKET,
+      getAuthToken:  function(){ return (window.HOUSING_HEADERS && window.HOUSING_HEADERS['Authorization'] || '').replace('Bearer ',''); },
+      auditTable:    'housing_audit_log',
+      getActor:      function(){ return (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || 'staff'; },
+      categories:    [{ key:'photo', label:'Photo', icon:'📷' }, { key:'report', label:'Report', icon:'📄' }, { key:'other', label:'Other', icon:'📎' }]
+    });
+  } else if (docMount) {
+    docMount.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:11px;">Document library unavailable.</div>';
+  }
+
   _inspUpdateSectionSummaries();
 }
 
@@ -297,8 +335,9 @@ function closeInspectionModal() {
   if (window._inspUnitSS) { window._inspUnitSS.destroy(); window._inspUnitSS = null; }
   var modal = document.getElementById('insp_modal');
   if (modal) modal.style.display = 'none';
-  window._inspEditId        = null;
-  window._inspPendingPhotos = [];
+  window._inspEditId      = null;
+  window._inspDocEntityId = null;
+  window._inspDocLib      = null;
 }
 
 // ── Checklist interaction ────────────────────────────────────────────────────
@@ -317,17 +356,35 @@ function _inspToggleSection(hdr) {
   body.style.display = body.style.display === 'none' ? '' : 'none';
 }
 
+// Append a blank custom row to a section.
+function _inspAddCustomRow(btn) {
+  var body = btn.closest('.insp-cl-section-body');
+  var rows = body ? body.querySelector('.insp-cl-rows') : null;
+  if (!rows) return;
+  var tmp = document.createElement('div');
+  tmp.innerHTML = _inspItemRow('', '', '', true);
+  var row = tmp.firstChild;
+  rows.appendChild(row);
+  var inp = row.querySelector('.insp-cl-item-label-inp');
+  if (inp) inp.focus();
+  _inspUpdateSectionSummaries();
+}
+
+// Remove a custom row.
+function _inspRemoveRow(btn) {
+  var row = btn.closest('.insp-cl-item');
+  if (row && row.parentNode) row.parentNode.removeChild(row);
+  _inspUpdateSectionSummaries();
+}
+
 function _inspUpdateSectionSummaries() {
-  INSP_CHECKLIST_TEMPLATE.forEach(function(sec, si) {
+  document.querySelectorAll('#insp_checklist .insp-cl-section').forEach(function(section, si) {
     var el = document.getElementById('insp_sec_summary_' + si);
     if (!el) return;
-    var section   = document.querySelectorAll('.insp-cl-section')[si];
-    if (!section) return;
-    var btns    = section.querySelectorAll('.insp-cl-rating button.active-pass, .insp-cl-rating button.active-fail, .insp-cl-rating button.active-repair, .insp-cl-rating button.active-na');
+    var total   = section.querySelectorAll('.insp-cl-item').length;
+    var rated   = section.querySelectorAll('.insp-cl-rating button.active-pass, .insp-cl-rating button.active-fail, .insp-cl-rating button.active-repair, .insp-cl-rating button.active-na').length;
     var repairs = section.querySelectorAll('.insp-cl-rating button.active-repair').length;
     var fails   = section.querySelectorAll('.insp-cl-rating button.active-fail').length;
-    var rated   = btns.length;
-    var total   = sec.items.length;
     var txt     = rated + '/' + total + ' rated';
     if (repairs) txt += ' · ' + repairs + ' repair';
     if (fails)   txt += ' · ' + fails + ' fail';
@@ -336,84 +393,71 @@ function _inspUpdateSectionSummaries() {
   });
 }
 
-// ── Photos ───────────────────────────────────────────────────────────────────
-function _inspRenderPhotoGrid(savedPhotos, pending) {
-  var html = '';
-  (savedPhotos || []).forEach(function(p, i) {
-    var src = typeof sbGetFileUrl === 'function' ? sbGetFileUrl(p.path) : p.path;
-    html += '<div class="insp-photo-thumb">'
-      + '<img src="' + _esc(src) + '" alt="photo"/>'
-      + '<button type="button" onclick="_inspRemoveSavedPhoto(' + i + ')" title="Remove">✕</button>'
-      + '</div>';
+// ── AI: draft general notes ──────────────────────────────────────────────────
+async function _inspDraftNotes() {
+  if (typeof _aiCall !== 'function') {
+    if (typeof showToast === 'function') showToast('AI assistant unavailable.', {type:'error'}); return;
+  }
+  if (window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('ai_assistant')) {
+    if (typeof showToast === 'function') showToast('AI Assistant is disabled for this nation.', {type:'error'}); return;
+  }
+  var unitLabel = window._inspUnitSS ? (window._inspUnitSS.getLabel() || '') : '';
+  var type      = (document.getElementById('insp_type')   || {}).value || '';
+  var status    = (document.getElementById('insp_status') || {}).value || '';
+  var checklist = _inspCollectChecklist();
+  var findings  = checklist.map(function(it){
+    return '- [' + it.section + '] ' + it.item + ': ' + (it.rating || 'not rated') + (it.notes ? ' (' + it.notes + ')' : '');
   });
-  (pending || []).forEach(function(p, i) {
-    html += '<div class="insp-photo-thumb">'
-      + '<img src="' + _esc(p.data) + '" alt="pending photo"/>'
-      + '<button type="button" onclick="_inspRemovePendingPhoto(' + i + ')" title="Remove">✕</button>'
-      + '</div>';
-  });
-  return '<div class="insp-photo-grid">' + html + '</div>';
-}
+  var msg = 'You are drafting the GENERAL NOTES field of a housing unit inspection report. '
+    + 'Write 2 to 4 concise, professional sentences summarizing the overall unit condition, '
+    + 'explicitly calling out any items marked fail or repair and recommending follow-up where needed. '
+    + 'Output ONLY the note text - no preamble, no heading, no bullet list.\n\n'
+    + 'Unit: ' + (unitLabel || 'N/A') + '\n'
+    + 'Inspection type: ' + (type || 'N/A') + '\n'
+    + 'Overall status: ' + (status || 'N/A') + '\n'
+    + 'Checklist findings:\n' + (findings.length ? findings.join('\n') : '(no items rated yet)');
 
-function _inspHandlePhotos(input) {
-  var files = Array.from(input.files || []).filter(function(f){ return f.type.startsWith('image/'); });
-  if (!files.length) return;
-  var pending = window._inspPendingPhotos;
-  var readers = files.map(function(f) {
-    return new Promise(function(resolve) {
-      var r = new FileReader();
-      r.onload = function(e) { pending.push({ file: f, data: e.target.result }); resolve(); };
-      r.readAsDataURL(f);
-    });
-  });
-  Promise.all(readers).then(function() {
-    var insp = window._inspEditId ? (window._inspections||[]).find(function(i){ return i.id === window._inspEditId; }) : null;
-    var saved = insp && insp.photos ? (typeof insp.photos === 'string' ? JSON.parse(insp.photos) : insp.photos) : [];
-    var grid = document.getElementById('insp_photo_grid');
-    if (grid) grid.innerHTML = _inspRenderPhotoGrid(saved, pending);
-  });
-  input.value = '';
-}
-
-function _inspRemovePendingPhoto(idx) {
-  window._inspPendingPhotos.splice(idx, 1);
-  var insp = window._inspEditId ? (window._inspections||[]).find(function(i){ return i.id === window._inspEditId; }) : null;
-  var saved = insp && insp.photos ? (typeof insp.photos === 'string' ? JSON.parse(insp.photos) : insp.photos) : [];
-  var grid = document.getElementById('insp_photo_grid');
-  if (grid) grid.innerHTML = _inspRenderPhotoGrid(saved, window._inspPendingPhotos);
-}
-
-function _inspRemoveSavedPhoto(idx) {
-  var insp = window._inspEditId ? (window._inspections||[]).find(function(i){ return i.id === window._inspEditId; }) : null;
-  if (!insp) return;
-  var photos = insp.photos ? (typeof insp.photos === 'string' ? JSON.parse(insp.photos) : insp.photos) : [];
-  photos.splice(idx, 1);
-  insp.photos = photos;
-  var grid = document.getElementById('insp_photo_grid');
-  if (grid) grid.innerHTML = _inspRenderPhotoGrid(photos, window._inspPendingPhotos);
+  var btn  = document.getElementById('insp_ai_notes_btn');
+  var orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Drafting…'; }
+  try {
+    var data = await _aiCall({ type:'chat', message: msg, context: { role: window.currentRole || '' }, history: [] });
+    if (data && data.error) throw new Error(data.error);
+    var reply = (data && data.reply) || '';
+    var ta = document.getElementById('insp_notes');
+    if (ta && reply.trim()) { ta.value = reply.trim(); ta.focus(); }
+    else if (typeof showToast === 'function') showToast('No draft returned.', {type:'info'});
+  } catch(e) {
+    if (typeof showToast === 'function') showToast('AI draft failed: ' + e.message, {type:'error'});
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+  }
 }
 
 // ── Collect checklist from DOM ────────────────────────────────────────────────
+// DOM-driven so default + custom rows are both captured. Item name comes from
+// the fixed label (default rows) or the editable input (custom rows).
 function _inspCollectChecklist() {
   var items = [];
-  var sections = document.querySelectorAll('#insp_checklist .insp-cl-section');
-  sections.forEach(function(sec, si) {
-    var sectionName = INSP_CHECKLIST_TEMPLATE[si] ? INSP_CHECKLIST_TEMPLATE[si].section : '';
-    sec.querySelectorAll('.insp-cl-item').forEach(function(row, ii) {
-      var itemName = INSP_CHECKLIST_TEMPLATE[si] ? (INSP_CHECKLIST_TEMPLATE[si].items[ii] || '') : '';
-      var key      = sectionName + '|' + itemName;
+  document.querySelectorAll('#insp_checklist .insp-cl-section').forEach(function(sec) {
+    var sectionName = sec.getAttribute('data-section') || '';
+    sec.querySelectorAll('.insp-cl-item').forEach(function(row) {
+      var labelInp = row.querySelector('.insp-cl-item-label-inp');
+      var labelDiv = row.querySelector('.insp-cl-item-label');
+      var itemName = labelInp ? labelInp.value.trim() : (labelDiv ? labelDiv.textContent.trim() : '');
+      if (!itemName) return; // skip blank custom rows
       var activeBtn = row.querySelector('.insp-cl-rating button[class*="active"]');
-      var rating   = '';
+      var rating    = '';
       if (activeBtn) {
-        if (activeBtn.classList.contains('active-pass'))   rating = 'pass';
-        if (activeBtn.classList.contains('active-fail'))   rating = 'fail';
-        if (activeBtn.classList.contains('active-repair')) rating = 'repair';
-        if (activeBtn.classList.contains('active-na'))     rating = 'na';
+        if (activeBtn.classList.contains('active-pass'))        rating = 'pass';
+        else if (activeBtn.classList.contains('active-fail'))   rating = 'fail';
+        else if (activeBtn.classList.contains('active-repair')) rating = 'repair';
+        else if (activeBtn.classList.contains('active-na'))     rating = 'na';
       }
       var noteInp = row.querySelector('.insp-cl-item-note-inp');
       var notes   = noteInp ? noteInp.value.trim() : '';
       if (rating || notes) {
-        items.push({ key: key, section: sectionName, item: itemName, rating: rating, notes: notes });
+        items.push({ key: sectionName + '|' + itemName, section: sectionName, item: itemName, rating: rating, notes: notes });
       }
     });
   });
@@ -436,40 +480,28 @@ async function saveInspection() {
 
   var checklist = _inspCollectChecklist();
 
-  // Upload pending photos
-  var existingInsp = window._inspEditId ? (window._inspections||[]).find(function(i){ return i.id === window._inspEditId; }) : null;
-  var photos = existingInsp && existingInsp.photos ? (typeof existingInsp.photos === 'string' ? JSON.parse(existingInsp.photos) : existingInsp.photos) : [];
-  if (window._inspPendingPhotos && window._inspPendingPhotos.length && typeof sbUploadAndSave === 'function') {
-    var tempId = window._inspEditId || ('insp-' + Date.now());
-    for (var i = 0; i < window._inspPendingPhotos.length; i++) {
-      try {
-        var rec = await sbUploadAndSave('inspection', tempId, window._inspPendingPhotos[i].file, 'inspections/' + tempId + '/photos');
-        photos.push(rec);
-      } catch(e) { console.warn('[Inspections] photo upload failed:', e); }
-    }
-    window._inspPendingPhotos = [];
-  }
-
+  var isNew  = !window._inspEditId;
   var record = {
-    unit_id:        unitId,
-    unit_address:   unitAddr,
-    type:           type,
+    id:              window._inspDocEntityId,   // matches the document-library scope
+    unit_id:         unitId,
+    unit_address:    unitAddr,
+    type:            type,
     inspection_date: date,
-    inspector_name: inspector,
-    inspector_role: role,
-    overall_status: status,
-    checklist:      checklist,
-    general_notes:  notes,
-    photos:         photos,
-    created_by:     (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || '',
+    inspector_name:  inspector,
+    inspector_role:  role,
+    overall_status:  status,
+    checklist:       checklist,
+    general_notes:   notes,
+    created_by:      (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || '',
   };
-  if (window._inspEditId) record.id = window._inspEditId;
+  // Photos/documents are managed live by the document library (Supabase Storage
+  // + audit log), so the legacy `photos` column is intentionally left untouched.
 
   var saveBtn = document.querySelector('#insp_modal .btn-primary');
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
 
   try {
-    var saved = await _inspSave(record);
+    var saved = await _inspSave(record, isNew);
 
     // Update local cache
     var idx = (window._inspections||[]).findIndex(function(i){ return i.id === (window._inspEditId || saved.id); });
@@ -581,12 +613,16 @@ function generateInspectionPDF() {
     // Checklist table
     var checklist = insp.checklist ? (typeof insp.checklist === 'string' ? JSON.parse(insp.checklist) : insp.checklist) : [];
     var tableRows = [];
+    var fmtRating = function(r){ r = r || '—'; return r.charAt(0).toUpperCase() + r.slice(1).replace('_',' '); };
     INSP_CHECKLIST_TEMPLATE.forEach(function(sec) {
+      // Default template items
       sec.items.forEach(function(item) {
-        var key  = sec.section + '|' + item;
-        var cl   = checklist.find(function(x){ return x.key === key; }) || {};
-        var r    = cl.rating || '—';
-        tableRows.push([sec.section, item, r.charAt(0).toUpperCase()+r.slice(1).replace('_',' '), cl.notes||'']);
+        var cl = checklist.find(function(x){ return (x.section === sec.section && x.item === item) || x.key === sec.section + '|' + item; }) || {};
+        tableRows.push([sec.section, item, fmtRating(cl.rating), cl.notes || '']);
+      });
+      // Custom rows added to this section
+      checklist.filter(function(x){ return x.section === sec.section && sec.items.indexOf(x.item) === -1; }).forEach(function(x){
+        tableRows.push([sec.section, x.item, fmtRating(x.rating), x.notes || '']);
       });
     });
 
