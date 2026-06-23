@@ -1548,7 +1548,9 @@ async function loadAppDataFromSupabase() {
           bathrooms:row.bathrooms, type:row.type, foundation:row.foundation,
           funder:row.funder, status:row.status, accessible:!!row.accessible,
           isElders:!!row.is_elders, archived:!!row.archived,
-          assignedTo:row.assigned_to, assignedName:row.assigned_name, assignedDate:row.assigned_date
+          assignedTo:row.assigned_to, assignedName:row.assigned_name, assignedDate:row.assigned_date,
+          lastInspectionDate:row.last_inspection_date || null,
+          nextInspectionDue:row.next_inspection_due   || null
         });
       });
     } else {
@@ -1635,6 +1637,7 @@ async function loadAppDataFromSupabase() {
     if(typeof initApprovalAuthority === 'function') initApprovalAuthority();
     // Initialise module enable/license state from loaded settings
     if(typeof initModuleEnablement === 'function') initModuleEnablement();
+    _syncAIHeaderBtn();
 
     // Rescore all apps with live V2 model
     if(applications.length && typeof rescoreAllApplications === 'function') {
@@ -1977,6 +1980,7 @@ async function loadHousingData() {
     if (typeof applyRequiredFields === 'function')   applyRequiredFields();
     if (typeof initApprovalAuthority === 'function') initApprovalAuthority();
     if (typeof initModuleEnablement === 'function')  initModuleEnablement();
+    _syncAIHeaderBtn();
     if(applications.length && typeof rescoreAllApplications==='function') rescoreAllApplications();
     if (window.CLFN_DEBUG) console.log('[CLFN] Loaded '+applications.length+' apps, '+housingUnits.length+' units');
   } catch(e){ console.warn('[HOUSING] data load error:',e); console.warn('[CLFN] Could not load data'); }
@@ -2108,6 +2112,10 @@ function renderAppHeader(){
     +       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
     +       '<span>Settings</span>'
     +     '</button>'
+    +     '<button id="header_ai_btn" class="header-settings" onclick="toggleAIChat()" title="AI Assistant">'
+    +       '<span style="color:var(--yellow);font-size:15px;line-height:1;">✦</span>'
+    +       '<span>AI</span>'
+    +     '</button>'
     +     '<div class="create-wrap">'
     +       '<button class="btn-create" id="header_create_btn" type="button">'
     +         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>'
@@ -2140,6 +2148,15 @@ function renderAppHeader(){
   if(typeof applyBrandingToHeader === 'function') applyBrandingToHeader();
 }
 
+// Show or hide the AI header button based on the ai_assistant module state.
+// Called after initModuleEnablement() and from _onModuleToggle.
+function _syncAIHeaderBtn() {
+  var btn = document.getElementById('header_ai_btn');
+  if (!btn) return;
+  var on = window.CLFN_MODULES && CLFN_MODULES.isEnabled('ai_assistant');
+  btn.style.display = on ? 'flex' : 'none';
+}
+
 // HEADER_NAV — single source of truth for the primary nav strip.
 // Each entry: { key, label, svg, run, module?, drawerOnly? }
 //   key        — data-nav attribute (matches landingView active marking)
@@ -2150,9 +2167,15 @@ window.HEADER_NAV = [
   { key:'home',         label:'Home',         module:null,           svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>',                                                                                                                                                                                                                run:function(){ if(typeof showLanding==='function') showLanding(); else if(typeof showEmployeeHome==='function') showEmployeeHome(); } },
   { key:'inventory',    label:'Inventory',    module:'inventory',    svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>',                                                                                                                                            run:function(){ if(typeof showInventory==='function') showInventory(); } },
   { key:'match',        label:'Match',        module:'match',        svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',                                                                                                                       run:function(){ if(typeof showMatch==='function') showMatch(); } },
-  { key:'renovations',  label:'Renovations',  module:'renovations',  svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',                                                                                              run:function(){ if(typeof showRenos==='function') showRenos(); } },
-  { key:'rfq', label:'RFQ', module:'renovations', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>', run:function(){ window.location.href='rfq.html'; } },
-  { key:'contractors',  label:'Contractors',  module:'contractors',  svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',                                                                                                                                                                                  run:function(){ if(typeof showContractorsForRole==='function') showContractorsForRole(); else if(typeof showContractors==='function') showContractors(); } },
+  { key:'operations', label:'Operations', isGroup:true,
+    svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+    children: [
+      { key:'renovations', label:'Renovations', module:'renovations', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>', run:function(){ if(typeof showRenos==='function') showRenos(); } },
+      { key:'rfq',         label:'RFQ',         module:'renovations', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>', run:function(){ window.location.href='rfq.html'; } },
+      { key:'contractors', label:'Contractors', module:'contractors',  svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', run:function(){ if(typeof showContractorsForRole==='function') showContractorsForRole(); else if(typeof showContractors==='function') showContractors(); } },
+      { key:'inspections', label:'Inspections', module:'inspections',  svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>', run:function(){ window.location.href='inspections.html'; } },
+    ]
+  },
   { key:'tenants',      label:'Tenants',      module:'tenants',      svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',                                                                                                       run:function(){ if(typeof showTenants==='function') showTenants(); } },
   { key:'finance',      label:'Finance',      module:'finance',      roles:'ed,cfo,finance_l1,super_user', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',                                                                                                                                                               run:function(){ if(typeof showFinance==='function') showFinance(); else window.location.href='finance.html'; } },
   { key:'settings',     label:'Settings',     module:null,           drawerOnly:true, roles:'ed,housing_manager,super_user', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>', run:function(){ if(typeof showSettings==='function') showSettings(); else window.location.href='housing.html?view=settings'; } }
@@ -2172,12 +2195,59 @@ function renderHeaderNav(){
       html += '<div class="nav-divider"></div>';
       hadDivider = true;
     }
-    var cls = 'app-nav-item' + (item.drawerOnly ? ' in-drawer-only' : '');
-    var roles = item.roles ? ' data-roles="'+item.roles+'"' : '';
-    html += '<button class="'+cls+'" data-nav="'+item.key+'"'+roles+'>'+item.svg+' '+item.label+'</button>';
+    if(item.isGroup && item.children){
+      // Filter children by module enablement
+      var visibleChildren = item.children.filter(function(c){
+        return !c.module || !window.CLFN_MODULES || CLFN_MODULES.isEnabled(c.module);
+      });
+      if(!visibleChildren.length) return;
+      var dropItems = visibleChildren.map(function(c){
+        return '<button class="nav-dropdown-item" data-nav="'+c.key+'" onclick="('+c.run.toString()+')();closeNavDropdowns()">'+c.svg+' '+c.label+'</button>';
+      }).join('');
+      html += '<div class="nav-group" data-group="'+item.key+'">'
+            + '<button class="app-nav-item nav-group-toggle" data-nav="'+item.key+'" onclick="toggleNavGroup(\''+item.key+'\')">'
+            + item.svg+' '+item.label
+            + '<svg class="nav-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><polyline points="6 9 12 15 18 9"/></svg>'
+            + '</button>'
+            + '<div class="nav-dropdown" id="navdrop_'+item.key+'">'+dropItems+'</div>'
+            + '</div>';
+    } else {
+      var cls = 'app-nav-item' + (item.drawerOnly ? ' in-drawer-only' : '');
+      var roles = item.roles ? ' data-roles="'+item.roles+'"' : '';
+      html += '<button class="'+cls+'" data-nav="'+item.key+'"'+roles+'>'+item.svg+' '+item.label+'</button>';
+    }
   });
   nav.innerHTML = html;
+  // Wire flat nav buttons (non-group items)
+  nav.querySelectorAll('.app-nav-item:not(.nav-group-toggle)').forEach(function(btn){
+    var key = btn.getAttribute('data-nav');
+    var item = HEADER_NAV.find(function(n){ return n.key === key; });
+    if(item && item.run) btn.addEventListener('click', item.run);
+  });
   setHeaderNavActive(_currentNavKey());
+}
+
+function toggleNavGroup(groupKey){
+  var drop = document.getElementById('navdrop_'+groupKey);
+  if(!drop) return;
+  var grp = drop.closest('.nav-group');
+  var open = drop.classList.toggle('open');
+  if(grp) grp.classList.toggle('group-open', open);
+  if(open){
+    document.addEventListener('click', _navGroupOutsideClick, { once: true, capture: true });
+  }
+}
+
+function closeNavDropdowns(){
+  document.querySelectorAll('.nav-dropdown.open').forEach(function(d){
+    d.classList.remove('open');
+    var grp = d.closest('.nav-group');
+    if(grp) grp.classList.remove('group-open');
+  });
+}
+
+function _navGroupOutsideClick(e){
+  if(!e.target.closest('.nav-group')) closeNavDropdowns();
 }
 
 // _currentNavKey — best-effort detection of which nav tab should be active
@@ -2188,10 +2258,11 @@ function _currentNavKey(){
   if(vis('worklistView'))     return 'worklist';
   if(vis('inventoryView'))    return 'inventory';
   if(vis('matchView'))        return 'match';
-  if(vis('renosView'))        return 'renovations';
-  if(vis('contractorsView'))  return 'contractors';
-  if(window.location.pathname.indexOf('rfq.html') !== -1)     return 'rfq';
-  if(window.location.pathname.indexOf('finance.html') !== -1) return 'finance';
+  if(vis('renosView'))        return 'operations';
+  if(vis('contractorsView'))  return 'operations';
+  if(window.location.pathname.indexOf('rfq.html')          !== -1) return 'operations';
+  if(window.location.pathname.indexOf('inspections.html')  !== -1) return 'operations';
+  if(window.location.pathname.indexOf('finance.html')      !== -1) return 'finance';
   if(vis('tenantsView'))      return 'tenants';
   if(vis('settingsView'))     return 'settings';
   return 'home';
@@ -2599,6 +2670,7 @@ document.addEventListener('DOMContentLoaded', function(){
     var navBtn = t.closest('.app-header-v2 .app-nav-item[data-nav]');
     if(navBtn){
       e.preventDefault();
+      if(navBtn.classList.contains('nav-group-toggle')) return; // handled by toggleNavGroup onclick
       var key = navBtn.getAttribute('data-nav');
       var item = HEADER_NAV.filter(function(x){ return x.key===key; })[0];
       _closeNavDrawer();

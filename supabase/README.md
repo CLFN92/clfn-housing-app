@@ -54,17 +54,18 @@ provider — no code change:
 Redeploying the function does not change CLFN: `EMAIL_PROVIDER` defaults to
 `graph` and the Graph path is unchanged.
 
-Deploy the **Housing Assistant** function the same way and set its key:
+Deploy the **AI Assistant** function (`ai-chat`) the same way and set its key:
 ```bash
-supabase functions deploy ai-assistant --project-ref <NEW_PROJECT_REF>
+supabase functions deploy ai-chat --project-ref <NEW_PROJECT_REF>
 ```
 - Required secret: `ANTHROPIC_API_KEY`.
-- Optional: `ANTHROPIC_MODEL` (default `claude-sonnet-4-6`).
 - `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` are
-  auto-injected. The function is read-only and role-scoped (see PLAN.md Phase AI).
+  auto-injected. The function requires a **valid user JWT + active-staff** role
+  (see PLAN.md Phase AI), so deploy the function and the SPA **together** — the
+  hardened function rejects clients that still send the anon key.
   Disable the assistant for a nation by turning the `ai_assistant` module off in
-  Settings → Nation → Modules (or omit the secret — the function returns a 500
-  the widget surfaces as an error).
+  Settings → Nation → Modules (or omit the secret — the function returns an error
+  the widget surfaces).
 
 ### 5. Create the first ED / super_user
 - Create the user in **Supabase Auth** (email + temp password / invite).

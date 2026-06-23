@@ -704,10 +704,12 @@ async function sbSaveUnit(u) {
     data:              u
   };
   // Only include lat/lng and meter numbers when present — omitting keeps existing DB value intact on merge
-  if (u.latitude           != null) row.latitude           = Number(u.latitude);
-  if (u.longitude          != null) row.longitude          = Number(u.longitude);
-  if (u.hydro_meter_number != null) row.hydro_meter_number = u.hydro_meter_number || null;
-  if (u.gas_meter_number   != null) row.gas_meter_number   = u.gas_meter_number   || null;
+  if (u.latitude            != null) row.latitude            = Number(u.latitude);
+  if (u.longitude           != null) row.longitude           = Number(u.longitude);
+  if (u.hydro_meter_number  != null) row.hydro_meter_number  = u.hydro_meter_number  || null;
+  if (u.gas_meter_number    != null) row.gas_meter_number    = u.gas_meter_number    || null;
+  if (u.lastInspectionDate  !== undefined) row.last_inspection_date = u.lastInspectionDate || null;
+  if (u.nextInspectionDue   !== undefined) row.next_inspection_due  = u.nextInspectionDue  || null;
   try {
     var r = await fetch(SUPABASE_URL + '/rest/v1/housing_units', {
       method:  'POST',

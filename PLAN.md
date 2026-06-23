@@ -304,44 +304,66 @@ finance.html don't need to change.
 
 ---
 
-## Phase AI — Housing Assistant (natural-language staff chat)  ✅ (MVP shipped)
+## Phase AI — Housing AI Assistant (staff chat + draft-note assist)  ✅ (shipped)
 
-A read-only conversational assistant for **staff** that answers questions about
-housing data ("how many vacant units?", "list applications awaiting review",
-"show open work orders"). Same security spine as email: the browser talks to an
-Edge Function, never to Anthropic; the API key lives only in function secrets.
+A conversational assistant for **staff**: a floating **chat panel** (questions
+about applications, units, SOWs/maintenance, renovations, contractors,
+inspections, policy, and how-to) plus a **"Draft with AI"** button that writes
+approval-decision notes. Backed by the single **`ai-chat`** Edge Function.
 
 ### What shipped
-- **Edge Function `supabase/functions/ai-assistant/index.ts`** — verifies the
-  caller's Supabase JWT, resolves their role from the `staff` table (must be
-  active staff), then runs a Claude tool-use loop. Claude is given **one
-  read-only tool, `query_database`**, against a **per-table role allowlist**
-  with hard caps (max 50 rows, 6 tool turns). Field employees are force-filtered
-  to their own in-house work orders; finance tables gated to ED/CFO/Finance;
-  applications hidden from field employees. No write tools exist — the assistant
-  physically cannot mutate data. ASCII-only source (Edge Function rule).
-  - Secrets: `ANTHROPIC_API_KEY` (required), `ANTHROPIC_MODEL`
-    (optional, default `claude-sonnet-4-6`). Auto-injected: `SUPABASE_*`.
-- **Client widget `ai-assistant.js`** — self-contained IIFE (mirrors
-  `reno-questionnaire.js`): floating button + chat panel, injects its own scoped
-  styles, posts conversation history to `/functions/v1/ai-assistant` with the
-  user's access token. Gated by `signedIn()` + `moduleOn('ai_assistant')`.
-  Loaded on all 8 staff pages.
-- **Module toggle** — registered `ai_assistant` in `CLFN_MODULES`
-  (`_enabled`/`_licensed`), so it auto-surfaces a Settings → Nation → Modules row
-  and is per-nation licensable.
+- **Edge Function `supabase/functions/ai-chat/index.ts`** — context-stuffing
+  design: the client supplies the data context (it does not query tables). Calls
+  Claude (`claude-sonnet-4-6`, no tools). Two modes: `chat` and `draft`. A
+  `HOW_TO` block in the system prompt answers procedural questions, tailored to
+  the caller's role.
+  - **Hardened (2026-06):** requires a **valid Supabase user JWT** (client sends
+    `HOUSING_SESSION.accessToken`, not the anon key) and **active-staff** role
+    resolution from the `staff` table (403 otherwise); the verified role
+    overrides any client-supplied role. Stops anon-key abuse of the paid
+    Anthropic call. `ANTHROPIC_API_KEY` lives only in function secrets.
+    ASCII-only source.
+- **Client `ai-assistant.js`** — gathers in-memory data (`applications`,
+  `housingUnits`, `_sowCache`, `_rfqCache`, `_contractors`, `_renoProgress`),
+  trims/flattens it, and POSTs as `context`. Globals: `toggleAIChat()`,
+  `openAIChat()`, `aiSendMessage()`, `aiDraftNote()`. Loaded on `housing.html`
+  + `inspections.html`. Header button synced by `_syncAIHeaderBtn`
+  (`housing-init.js`); chat panel HTML in `housing.html`.
+- **Module toggle** — `ai_assistant` in `CLFN_MODULES` (label "AI Assistant
+  (Chat + Draft Notes)"), per-nation licensable.
 
 ### Deploy step (manual, like send-notification)
-Deploy the function via the Supabase Dashboard or `supabase functions deploy
-ai-assistant`, and set the `ANTHROPIC_API_KEY` secret. No client CSP change is
-needed — the browser only calls the Supabase functions host (already allowlisted)
-and the Anthropic call is server-side.
+`supabase functions deploy ai-chat` and set `ANTHROPIC_API_KEY`. The function +
+client must be deployed **together** (the hardened function rejects callers that
+send the anon key instead of a user token). No client CSP change needed.
+
+### Note on the two implementations
+A second design (`ai-assistant` Edge Function, server-side `query_database`
+tool-use with per-table role scoping) was built in a parallel session. Decision:
+keep `ai-chat` (it has the draft-note feature) + harden it; the `ai-assistant`
+function was retired. If precise/large-data list queries become a need, fold the
+read-only `query_database` tool onto `ai-chat` as an extra capability rather than
+rebuilding.
 
 ### Possible follow-ups (not built)
-- Aggregate/count helpers (PostgREST `count`) so big-number questions don't pull rows.
-- Streaming responses for snappier UX.
-- Per-role suggested-question sets; an audit row per assistant query.
-- Wider data coverage (finance ledgers, scoring rationale) once column names confirmed.
+- Add the read-only `query_database` tool for exact/large-data pulls (the context
+  is truncated to ~50 apps / 60 units of detail; aggregate counts stay accurate).
+- Streaming responses; per-role suggested-question chips; an audit row per query.
+
+---
+
+## Phase INSP — Inspections module  ✅ (shipped 2026-06)
+
+Unit-condition inspections: standalone page (`inspections.html` +
+`inspections-init.js` + `inspections.css`) reached via the **Operations** nav
+dropdown (which also groups Renovations / RFQ / Contractors). New `inspections`
+table (typed Move-In/Move-Out/Annual/Routine/Emergency, room-by-room checklist
+JSONB, photos, pass/fail/needs-repair, PDF, and **SOW creation** from findings).
+Adds `housing_units.last_inspection_date` / `next_inspection_due` and
+`tenants.lease_start_date` / `lease_end_date`. Introduced the reusable
+`clfnSearchSelect` combobox (body-portaled to avoid modal clipping). Gated by the
+`inspections` module. Migrations: `supabase/migrations/20260622_*.sql` (run by the
+user in the SQL editor).
 
 ---
 
