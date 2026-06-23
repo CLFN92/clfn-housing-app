@@ -25,16 +25,22 @@ function renderApprovalAuthorityPanel() {
     return;
   }
 
-  // Housing-only roles for housing groups; all roles for Finance group
-  var housingRoles    = ['ed', 'housing_manager', 'housing_employee_l2', 'housing_employee_l1'];
-  var financeKeys     = ['viewFinanceCard','recordPayment','createInvoice','createArrangement','manageLoan','reverseTransaction'];
-  var allRolesRaw     = APPROVAL_AUTHORITY.allRoles(); // [{value, label}]
-  var allRoles        = allRolesRaw.filter(function(r) {
-    return housingRoles.indexOf(r.value || r) !== -1;
-  });
-  var allRolesIncFin  = allRolesRaw.filter(function(r) {
-    return (r.value || r) !== 'super_user';
-  });
+  // Role pill sets per authority GROUP. Field Employees (maintenance crew) are
+  // relevant to operational approvals — SOW/renovation, contractors, inspections —
+  // and housing applications, but NOT to finance. Finance adds CFO + Finance Clerk.
+  var _aaRoleLabel = function(v) {
+    if (window.CLFN_PERMS && CLFN_PERMS.ROLE_LABELS && CLFN_PERMS.ROLE_LABELS[v]) return CLFN_PERMS.ROLE_LABELS[v];
+    var fb = { ed:'Executive Director', housing_manager:'Housing Manager', housing_employee_l2:'Housing Employee L2',
+               housing_employee_l1:'Housing Employee L1', field_employee:'Field Employee', cfo:'CFO', finance_l1:'Finance Clerk L1' };
+    return fb[v] || v;
+  };
+  var _aaRoleSet = function(values) { return values.map(function(v){ return { value: v, label: _aaRoleLabel(v) }; }); };
+  var MGMT_ROLES   = ['ed', 'housing_manager', 'housing_employee_l2', 'housing_employee_l1'];
+  var rolesMgmt    = _aaRoleSet(MGMT_ROLES);
+  var rolesFinance = _aaRoleSet(MGMT_ROLES.concat(['cfo', 'finance_l1']));
+  var rolesField   = _aaRoleSet(MGMT_ROLES.concat(['field_employee']));
+  // Groups where Field Employee is a selectable role.
+  var FIELD_GROUPS = ['Housing Application', 'SOW & Renovation', 'Contractors', 'Inspections'];
 
   var groups   = APPROVAL_AUTHORITY.groups;
   var labels   = APPROVAL_AUTHORITY.labels;
@@ -43,6 +49,9 @@ function renderApprovalAuthorityPanel() {
   var html = '';
   Object.keys(groups).forEach(function(groupName) {
     var keys = groups[groupName];
+    // Pick the role pill set for this group.
+    var rolesForGroup = groupName === 'Finance' ? rolesFinance
+                      : (FIELD_GROUPS.indexOf(groupName) !== -1 ? rolesField : rolesMgmt);
     html += '<div style="margin-bottom:24px;">';
     html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;'
           + 'color:var(--yellow);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:4px;">'
@@ -84,7 +93,7 @@ function renderApprovalAuthorityPanel() {
           + 'background:var(--surface);text-align:right;"'
           + ' oninput="APPROVAL_AUTHORITY.update(\'' + key + '\', parseFloat(this.value)||0)"/></div>';
       } else {
-        var rolesForKey = financeKeys.indexOf(key) !== -1 ? allRolesIncFin : allRoles;
+        var rolesForKey = rolesForGroup;
         html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
         rolesForKey.forEach(function(r) {
           var rVal   = r.value || r;
