@@ -102,6 +102,10 @@ var APPROVAL_AUTHORITY = (function() {
     // Who can set a unit's GPS coordinates and house photo
     setUnitLocation:          ['housing_manager', 'ed'],
 
+    // ── Inspections ───────────────────────────────────────────────────────
+    // Who can approve / sign off a completed unit inspection report
+    approveInspection:        ['housing_manager', 'ed'],
+
     // ── Staff management ──────────────────────────────────────────────────
     // Who can edit / deactivate an existing staff record
     manageStaffRecord:        ['ed'],
@@ -298,6 +302,7 @@ var APPROVAL_AUTHORITY = (function() {
       manageStaff:              'Add / edit staff',
       archiveUnit:              'Archive a unit',
       setUnitLocation:          'Set unit GPS location &amp; house photo',
+      approveInspection:        'Approve inspection report',
       manageStaffRecord:        'Edit / deactivate a staff record',
       manageAllStaffRoles:      'Assign any role to staff',
       viewApplicationScore:     'View application score',
@@ -319,6 +324,7 @@ var APPROVAL_AUTHORITY = (function() {
       'Contractors':          ['recommendContractor','approveContractor','declineContractor'],
       'Scoring':              ['editScoreModel','applyScoreAdjustment'],
       'Inventory':            ['archiveUnit', 'setUnitLocation'],
+      'Inspections':          ['approveInspection'],
       'System':               ['accessSettings','editApprovalAuthority','manageStaff','manageStaffRecord','manageAllStaffRoles'],
       'Finance':              ['viewFinanceCard','recordPayment','createInvoice','createArrangement','manageLoan','reverseTransaction'],
     },

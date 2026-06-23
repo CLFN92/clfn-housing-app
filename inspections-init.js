@@ -120,6 +120,7 @@ function renderInspectionsList() {
   }
   tbody.innerHTML = list.map(function(insp) {
     var badge   = _inspBadge(insp.overall_status);
+    var apprMark = insp.approved_by ? ' <span title="Approved by ' + _esc(insp.approved_by) + '" style="color:#15803d;font-weight:700;">✓</span>' : '';
     var items   = insp.checklist ? JSON.parse(typeof insp.checklist === 'string' ? insp.checklist : JSON.stringify(insp.checklist)) : [];
     var repairs = items.filter(function(it){ return it.rating === 'repair'; }).length;
     var photoCount = (insp.photos ? (typeof insp.photos === 'string' ? JSON.parse(insp.photos) : insp.photos) : []).length;
@@ -127,7 +128,7 @@ function renderInspectionsList() {
       + '<td><div style="font-weight:600;font-size:13px;">' + _esc(insp.unit_address || insp.unit_id) + '</div></td>'
       + '<td>' + _esc(insp.type || '—') + '</td>'
       + '<td>' + _esc(insp.inspection_date || '—') + '</td>'
-      + '<td>' + badge + '</td>'
+      + '<td>' + badge + apprMark + '</td>'
       + '<td>' + _esc(insp.inspector_name || '—') + '</td>'
       + '<td>' + (repairs > 0 ? '<span style="color:var(--warn-amber-text,#b45309);font-weight:600;">' + repairs + ' item' + (repairs===1?'':'s') + '</span>' : '<span style="color:var(--muted);">—</span>') + '</td>'
       + '<td>' + (photoCount > 0 ? '<span style="color:var(--muted);">📷 '+photoCount+'</span>' : '<span style="color:var(--muted);">—</span>') + '</td>'
@@ -238,6 +239,19 @@ function openInspectionModal(id) {
   // AI draft-notes available only when the assistant is loaded + module on.
   var aiNotesOn = (typeof _aiCall === 'function') && (!window.CLFN_MODULES || window.CLFN_MODULES.isEnabled('ai_assistant'));
 
+  // Approval gate: only roles granted 'approveInspection' (Settings > Approval
+  // Authority) can approve / sign off the report (stamps approved_by/approved_at).
+  var canApproveInsp = (typeof APPROVAL_AUTHORITY === 'undefined') || APPROVAL_AUTHORITY.can('approveInspection', window.currentRole);
+  var inspApprovedBy = insp && insp.approved_by ? insp.approved_by : '';
+  var inspApprovedAt = insp && insp.approved_at ? String(insp.approved_at).slice(0, 10) : '';
+  var apprBanner = '';
+  if (inspApprovedBy) {
+    apprBanner = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:9px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:12px;color:#15803d;font-weight:600;">'
+      + '✓ Approved by ' + _esc(inspApprovedBy) + (inspApprovedAt ? ' on ' + _esc(inspApprovedAt) : '') + '</div>';
+  } else if (!canApproveInsp) {
+    apprBanner = '<div style="margin-bottom:16px;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted);">Report not yet approved — awaiting sign-off by an authorized approver.</div>';
+  }
+
   var modal = document.getElementById('insp_modal');
   modal.innerHTML =
     '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:740px;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35);">'
@@ -259,6 +273,9 @@ function openInspectionModal(id) {
     +   '<div class="f"><label class="tic-field-lbl">Inspector Role</label><input id="insp_role" type="text" class="tic-input" value="' + _esc(insp ? insp.inspector_role : (window.currentRole||'')) + '" placeholder="Role"/></div>'
     + '</div>'
 
+    // ── Approval status banner
+    + apprBanner
+
     // ── Checklist
     + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin:16px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--border);">Inspection Checklist</div>'
     + '<div class="insp-checklist" id="insp_checklist">' + clHtml + '</div>'
@@ -278,9 +295,11 @@ function openInspectionModal(id) {
 
     // ── Footer
     + '<div class="modal-footer" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 22px;border-top:1px solid var(--border);">'
-    +   '<div style="display:flex;gap:8px;">'
+    +   '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
     +     (insp ? '<button type="button" class="btn btn-ghost" onclick="_inspConfirmDelete()">Delete</button>' : '')
     +     (insp ? '<button type="button" class="btn btn-ghost" onclick="generateInspectionPDF()">⬇ PDF</button>' : '')
+    +     (canApproveInsp && !inspApprovedBy ? '<button type="button" class="btn" style="background:#15803d;color:#fff;border:1px solid #15803d;" onclick="saveInspection(\'approve\')">✓ Approve Report</button>' : '')
+    +     (canApproveInsp && inspApprovedBy ? '<button type="button" class="btn btn-ghost" onclick="saveInspection(\'revoke\')">Revoke Approval</button>' : '')
     +   '</div>'
     +   '<div style="display:flex;gap:8px;">'
     +     '<button type="button" class="btn btn-ghost" onclick="closeInspectionModal()">Cancel</button>'
@@ -465,7 +484,7 @@ function _inspCollectChecklist() {
 }
 
 // ── Save ─────────────────────────────────────────────────────────────────────
-async function saveInspection() {
+async function saveInspection(approveAction) {
   var unitId   = window._inspUnitSS ? window._inspUnitSS.getValue() : '';
   var unitAddr = window._inspUnitSS ? window._inspUnitSS.getLabel() : '';
   if (!unitId) { if(typeof showToast==='function') showToast('Please select a unit.', {type:'error'}); return; }
@@ -479,6 +498,13 @@ async function saveInspection() {
   if (!date) { if(typeof showToast==='function') showToast('Please enter an inspection date.', {type:'error'}); return; }
 
   var checklist = _inspCollectChecklist();
+
+  // Approval is gated by the approveInspection authority (Settings > Approval Authority).
+  var canApproveInsp = (typeof APPROVAL_AUTHORITY === 'undefined') || APPROVAL_AUTHORITY.can('approveInspection', window.currentRole);
+  if ((approveAction === 'approve' || approveAction === 'revoke') && !canApproveInsp) {
+    if (typeof showToast === 'function') showToast('You are not authorized to approve inspection reports.', {type:'error'});
+    return;
+  }
 
   var isNew  = !window._inspEditId;
   var record = {
@@ -494,6 +520,16 @@ async function saveInspection() {
     general_notes:   notes,
     created_by:      (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || '',
   };
+  // Approval sign-off. On a normal save the approved_* columns are omitted so a
+  // PATCH leaves any existing approval untouched; they're only written when an
+  // authorized approver explicitly approves or revokes.
+  if (approveAction === 'approve') {
+    record.approved_by = (window.HOUSING_SESSION && (window.HOUSING_SESSION.name || window.HOUSING_SESSION.email)) || window.currentRole || 'staff';
+    record.approved_at = new Date().toISOString();
+  } else if (approveAction === 'revoke') {
+    record.approved_by = null;
+    record.approved_at = null;
+  }
   // Photos/documents are managed live by the document library (Supabase Storage
   // + audit log), so the legacy `photos` column is intentionally left untouched.
 
@@ -517,7 +553,7 @@ async function saveInspection() {
       }
     }
 
-    if(typeof showToast==='function') showToast('Inspection saved.');
+    if(typeof showToast==='function') showToast(approveAction === 'approve' ? 'Inspection approved.' : approveAction === 'revoke' ? 'Approval revoked.' : 'Inspection saved.');
 
     // Check if any items need repair — prompt to create SOW
     var repairItems = checklist.filter(function(it){ return it.rating === 'repair'; });
@@ -701,6 +737,8 @@ function generateInspectionPDF() {
     if (typeof loadHousingData === 'function') {
       try { await loadHousingData(); } catch(e) { console.warn('[inspections] data load:', e); }
     }
+    // Pick up any ED-customised approval-authority overrides (e.g. approveInspection).
+    if (typeof initApprovalAuthority === 'function') { try { initApprovalAuthority(); } catch(e) {} }
     // Show the view (page-view-wide is display:none by default)
     var view = document.getElementById('inspectionsView');
     if (view) view.style.display = 'flex';
