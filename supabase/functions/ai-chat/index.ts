@@ -54,31 +54,33 @@ function normRole(r: string): string {
 }
 
 // ----- per-table read access + column hints ---------------------------------
+// Only tables that are RELATIONALLY queryable are listed. Some have a `data`
+// jsonb that holds extra form fields - filter on the named top-level columns and
+// use select=* to inspect the rest. NOTE: housing_sow is intentionally absent -
+// it stores one row per unit with all SOW details nested in a `data` jsonb array,
+// so it is not row-per-SOW queryable; answer SOW/work-order questions from the
+// client-supplied context instead.
 type TableDef = { roles: string[]; cols: string }
 const TABLES: Record<string, TableDef> = {
   housing_units: {
     roles: ALL,
-    cols: 'id, unit_number, address, status (vacant|occupied), unit_type, bedrooms, assigned_name (current tenant), funder, dept_number, acct_number, insured_value, latitude, longitude, last_inspection_date, next_inspection_due',
+    cols: 'id, num (unit number), street, status (vacant|occupied), assigned_name (current tenant), archived, latitude, longitude, last_inspection_date, next_inspection_due. Other fields (bedrooms, type, funder, insured_value) live in a `data` jsonb - use select=* to read them.',
   },
-  applications: {
+  housing_applications: {
     roles: MGMT,
-    cols: 'id, applicant_name, status, application_type (new|file_update|house_request), score, household_size, children, dependants, created_by_email, assigned_unit, created_at',
+    cols: 'id, status, score, tier, app_type, urgent_need, health_risk, assigned_unit_id, assigned_address, submitted_at, created_by_email, archived. Applicant name and household details live in a `data` jsonb (filter on these top-level columns; names are also in the loaded context).',
   },
   tenants: {
     roles: ALL,
     cols: 'id, full_name, email, phone, hydro_account, gas_account, lease_start_date, lease_end_date',
   },
-  housing_sow: {
+  housing_contractors: {
     roles: ALL,
-    cols: "id, project_number, unit_id, status, approval_status ('' new|draft|signed|submitted|hm_approved|ed_approved|completed), total_cost, category, assigned_team (in_house|contractor), assigned_to (email), assigned_to_name, created_at",
-  },
-  contractors: {
-    roles: ALL,
-    cols: 'id, name, email, status, trade',
+    cols: 'id, name, email, status. Other fields may live in a `data` jsonb - use select=* to inspect.',
   },
   housing_rfq: {
     roles: MGMT,
-    cols: 'id, rfq_number, status (draft|issued|awarded|cancelled), sow_id, unit_id, closes_date',
+    cols: 'id, rfq_number, status (draft|issued|awarded|cancelled), unit_id, sow_id, created_at. Most form fields live in a `data` jsonb.',
   },
   inspections: {
     roles: ALL,
@@ -114,9 +116,6 @@ function tableAccess(role: string, table: string): { ok: boolean; forced: string
     if (def.roles.indexOf(role) === -1) {
       return { ok: false, forced: [], reason: "Your role is not permitted to read the '" + table + "' table." }
     }
-    if (table === 'housing_sow' && role === 'field_employee') {
-      return { ok: true, forced: ['assigned_team=eq.in_house'] }
-    }
     return { ok: true, forced: [] }
   }
   if (table.indexOf('finance_') === 0) {
@@ -143,9 +142,6 @@ async function runQuery(role: string, email: string, input: Record<string, unkno
   params.push('select=' + encodeURIComponent(select))
 
   for (const f of access.forced) params.push(f)
-  if (table === 'housing_sow' && role === 'field_employee') {
-    params.push('assigned_to=eq.' + encodeURIComponent(email))
-  }
 
   const filters = Array.isArray(input.filters) ? input.filters : []
   for (const f of filters as Array<Record<string, unknown>>) {
@@ -495,7 +491,7 @@ returned by the tool - never invent records, names, numbers, or statuses.
 ${HOW_TO}
 Rules:
 - For unit counts, ALWAYS use the Housing Units section (or query_database) - never the SOW count.
-- For maintenance/repair questions, use the SOWs section or query housing_sow.
+- For maintenance/repair/work-order (SOW) questions, use the SOWs section from the loaded context (the housing_sow table is not directly queryable).
 - For "how do I ..." questions, use the How-to knowledge above and tailor to the staff role.
 - Perform calculations (totals, counts, averages) directly from the data.
 - Answer concisely and confidently. Do not tell staff to check another system if the data is available here or via the tool.
