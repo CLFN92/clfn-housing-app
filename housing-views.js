@@ -1001,6 +1001,11 @@ function showLanding() {
   // KPI strip — housing-only metrics from the in-memory caches.
   _renderLandingKpis();
 
+  // Refresh the action worklist so freshly created/submitted items (e.g. a new
+  // application just submitted) appear immediately on return to the landing page,
+  // instead of only after a full reload / re-login.
+  if (typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
+
   // Recent Activity — kick off the role-aware render so the count pill
   // (#recent_count_pill) reflects today's events on first paint, not just
   // after the user expands the section. The body update happens against

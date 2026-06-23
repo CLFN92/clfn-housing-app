@@ -1726,6 +1726,12 @@ function saveSOW(opts){
   } else if (typeof showRenoApprovals === 'function' && document.getElementById('renoApprovalsView')) {
     showRenoApprovals();
   }
+  // Inventory unit detail panel: refresh its in-place SOW table. The panel may be
+  // hidden but is still in the DOM, so the new/edited request shows up without
+  // the user having to close and re-open the unit.
+  if (typeof udpRenderSowTable === 'function' && _sowUnitId && document.getElementById('udp_sow_table_wrap')) {
+    udpRenderSowTable(_sowUnitId);
+  }
 }
 
 
