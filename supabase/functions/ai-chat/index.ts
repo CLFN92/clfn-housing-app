@@ -6,8 +6,13 @@
 // signed-in user's access token, NOT the public anon key) and the user must be
 // active staff in the `staff` table. This stops anonymous abuse of the function
 // (it calls the paid Anthropic API) and makes the assistant role-aware from the
-// verified role rather than trusting a client-supplied one. The function does
-// not query housing tables itself - the client supplies the data context.
+// verified role rather than trusting a client-supplied one.
+//
+// Data: the client supplies an in-memory data `context` (apps/units/SOWs/etc).
+// In chat mode the assistant ALSO has a read-only `query_database` tool for
+// precise/large-data lookups beyond what the client loaded. The tool reads via
+// the service-role key but is gated by a per-table role allowlist + forced row
+// filters, with hard caps. There are NO write tools.
 //
 // Source must stay ASCII-only (dashboard editor parser breaks on non-ASCII).
 
@@ -19,6 +24,10 @@ const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')
 const SUPABASE_ANON_KEY    = Deno.env.get('SUPABASE_ANON_KEY')
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
+const MODEL          = 'claude-sonnet-4-6'
+const MAX_ROW_LIMIT  = 50   // hard cap on rows returned per query
+const MAX_TOOL_TURNS = 6    // hard cap on the tool-use loop
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -29,6 +38,197 @@ function json(body: Record<string, unknown>, status = 200): Response {
     status,
     headers: { ...CORS, 'Content-Type': 'application/json' },
   })
+}
+
+// ----- role groups (super_user inherits ed everywhere) -----------------------
+const MGMT    = ['ed', 'super_user', 'housing_manager', 'housing_employee_l2', 'housing_employee_l1']
+const FINANCE = ['ed', 'super_user', 'cfo', 'finance_l1']
+const ALL     = MGMT.concat(['field_employee', 'cfo', 'finance_l1'])
+
+function normRole(r: string): string {
+  const v = (r || '').toLowerCase().trim()
+  if (v === 'hm' || v === 'manager') return 'housing_manager'
+  if (v === 'employee' || v === 'staff') return 'housing_employee_l1'
+  if (v === 'executive_director' || v === 'executivedirector') return 'ed'
+  return v
+}
+
+// ----- per-table read access + column hints ---------------------------------
+type TableDef = { roles: string[]; cols: string }
+const TABLES: Record<string, TableDef> = {
+  housing_units: {
+    roles: ALL,
+    cols: 'id, unit_number, address, status (vacant|occupied), unit_type, bedrooms, assigned_name (current tenant), funder, dept_number, acct_number, insured_value, latitude, longitude, last_inspection_date, next_inspection_due',
+  },
+  applications: {
+    roles: MGMT,
+    cols: 'id, applicant_name, status, application_type (new|file_update|house_request), score, household_size, children, dependants, created_by_email, assigned_unit, created_at',
+  },
+  tenants: {
+    roles: ALL,
+    cols: 'id, full_name, email, phone, hydro_account, gas_account, lease_start_date, lease_end_date',
+  },
+  housing_sow: {
+    roles: ALL,
+    cols: "id, project_number, unit_id, status, approval_status ('' new|draft|signed|submitted|hm_approved|ed_approved|completed), total_cost, category, assigned_team (in_house|contractor), assigned_to (email), assigned_to_name, created_at",
+  },
+  contractors: {
+    roles: ALL,
+    cols: 'id, name, email, status, trade',
+  },
+  housing_rfq: {
+    roles: MGMT,
+    cols: 'id, rfq_number, status (draft|issued|awarded|cancelled), sow_id, unit_id, closes_date',
+  },
+  inspections: {
+    roles: ALL,
+    cols: 'id, unit_id, unit_address, type (Move-In|Move-Out|Annual|Routine|Emergency), inspection_date, inspector_name, overall_status (pending|pass|fail|needs_repair), sow_created, created_at',
+  },
+  housing_audit_log: {
+    roles: ['ed', 'super_user', 'housing_manager'],
+    cols: 'id, entity_type, entity_id, action, detail, actor (email), created_at',
+  },
+  staff: {
+    roles: ['ed', 'super_user', 'housing_manager'],
+    cols: 'id, name, email, role, department, is_active',
+  },
+}
+
+const SAFE_OPS = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'in', 'is', 'not']
+
+function schemaHintFor(role: string): string {
+  const lines: string[] = []
+  for (const t of Object.keys(TABLES)) {
+    if (TABLES[t].roles.indexOf(role) !== -1) lines.push('  ' + t + ': ' + TABLES[t].cols)
+  }
+  if (FINANCE.indexOf(role) !== -1) {
+    lines.push('  finance_* : finance ledger/loan/invoice tables (use select=*&limit=3 to learn columns)')
+  }
+  return lines.join('\n') || '  (no tables available for this role)'
+}
+
+// Decide if a role may read a given table; apply forced filters for narrow roles.
+function tableAccess(role: string, table: string): { ok: boolean; forced: string[]; reason?: string } {
+  const def = TABLES[table]
+  if (def) {
+    if (def.roles.indexOf(role) === -1) {
+      return { ok: false, forced: [], reason: "Your role is not permitted to read the '" + table + "' table." }
+    }
+    if (table === 'housing_sow' && role === 'field_employee') {
+      return { ok: true, forced: ['assigned_team=eq.in_house'] }
+    }
+    return { ok: true, forced: [] }
+  }
+  if (table.indexOf('finance_') === 0) {
+    if (FINANCE.indexOf(role) === -1) {
+      return { ok: false, forced: [], reason: 'Finance data is restricted to ED, CFO, and Finance roles.' }
+    }
+    return { ok: true, forced: [] }
+  }
+  return { ok: false, forced: [], reason: "Unknown or non-readable table: '" + table + "'." }
+}
+
+// Run one whitelisted read query against PostgREST with the service-role key.
+async function runQuery(role: string, email: string, input: Record<string, unknown>): Promise<{ rows?: unknown[]; error?: string }> {
+  const table = String(input.table || '').trim()
+  if (!table || !/^[a-z0-9_]+$/.test(table)) return { error: 'Invalid table name.' }
+  const access = tableAccess(role, table)
+  if (!access.ok) return { error: access.reason || 'Access denied.' }
+  if (!SUPABASE_SERVICE_KEY) return { error: 'Server not configured for data queries.' }
+
+  const params: string[] = []
+
+  let select = String(input.select || '*').trim()
+  if (!/^[a-z0-9_,*().: ]+$/i.test(select)) select = '*'
+  params.push('select=' + encodeURIComponent(select))
+
+  for (const f of access.forced) params.push(f)
+  if (table === 'housing_sow' && role === 'field_employee') {
+    params.push('assigned_to=eq.' + encodeURIComponent(email))
+  }
+
+  const filters = Array.isArray(input.filters) ? input.filters : []
+  for (const f of filters as Array<Record<string, unknown>>) {
+    const col = String(f.column || '').trim()
+    const op  = String(f.op || 'eq').trim().toLowerCase()
+    const val = f.value == null ? '' : String(f.value)
+    if (!/^[a-z0-9_]+$/.test(col)) return { error: 'Invalid filter column: ' + col }
+    if (SAFE_OPS.indexOf(op) === -1) return { error: 'Unsupported filter op: ' + op }
+    params.push(encodeURIComponent(col) + '=' + op + '.' + encodeURIComponent(val))
+  }
+
+  if (input.order) {
+    const ord = String(input.order).trim()
+    if (/^[a-z0-9_]+(\.(asc|desc))?$/i.test(ord)) params.push('order=' + ord)
+  }
+
+  let limit = parseInt(String(input.limit || '20'), 10)
+  if (isNaN(limit) || limit < 1) limit = 20
+  if (limit > MAX_ROW_LIMIT) limit = MAX_ROW_LIMIT
+  params.push('limit=' + limit)
+
+  const url = SUPABASE_URL + '/rest/v1/' + table + '?' + params.join('&')
+  try {
+    const r = await fetch(url, {
+      headers: {
+        apikey: SUPABASE_SERVICE_KEY,
+        Authorization: 'Bearer ' + SUPABASE_SERVICE_KEY,
+        Accept: 'application/json',
+      },
+    })
+    const text = await r.text()
+    if (!r.ok) return { error: 'Query failed (' + r.status + '): ' + text.slice(0, 500) }
+    let rows: unknown[]
+    try { rows = JSON.parse(text) } catch { return { error: 'Could not parse query result.' } }
+    return { rows }
+  } catch (e) {
+    return { error: 'Query error: ' + (e as Error).message }
+  }
+}
+
+const QUERY_TOOL = {
+  name: 'query_database',
+  description: 'Read rows from an allowed housing table (read-only). Use for exact counts, complete lists, or records not in the loaded context. Returns up to ' + MAX_ROW_LIMIT + ' rows as JSON.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      table:  { type: 'string', description: 'Table name to read from.' },
+      select: { type: 'string', description: 'Comma-separated columns, or * for all. Default *.' },
+      filters: {
+        type: 'array',
+        description: 'Row filters, ANDed together.',
+        items: {
+          type: 'object',
+          properties: {
+            column: { type: 'string' },
+            op:     { type: 'string', description: 'One of eq, neq, gt, gte, lt, lte, like, ilike, in, is, not. Default eq.' },
+            value:  { type: 'string' },
+          },
+          required: ['column', 'value'],
+        },
+      },
+      order: { type: 'string', description: 'e.g. created_at.desc' },
+      limit: { type: 'integer', description: 'Max rows (1-' + MAX_ROW_LIMIT + ').' },
+    },
+    required: ['table'],
+  },
+}
+
+async function callClaude(system: string, messages: unknown[], tools?: unknown[]): Promise<Record<string, unknown>> {
+  const payload: Record<string, unknown> = { model: MODEL, max_tokens: 1500, system, messages }
+  if (tools && tools.length) payload.tools = tools
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_KEY!,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify(payload),
+  })
+  const data = await r.json()
+  if (!r.ok) throw new Error(JSON.stringify(data).slice(0, 600))
+  return data
 }
 
 serve(async (req) => {
@@ -48,16 +248,17 @@ serve(async (req) => {
     if (authErr || !user) return json({ error: 'Unauthorized', detail: authErr?.message }, 401)
 
     // --- Resolve the verified, authoritative staff role (active staff only) ---
+    const email = (user.email || '').toLowerCase()
     let role = ''
     if (SUPABASE_SERVICE_KEY) {
       const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
       const { data: rows } = await admin
         .from('staff')
         .select('role')
-        .eq('email', (user.email || '').toLowerCase())
+        .eq('email', email)
         .eq('is_active', true)
         .limit(1)
-      if (rows && rows.length) role = rows[0].role || ''
+      if (rows && rows.length) role = normRole(rows[0].role || '')
     }
     if (!role) return json({ error: 'AI assistant is available to active housing staff only.' }, 403)
 
@@ -68,25 +269,44 @@ serve(async (req) => {
     const context = body.context || {}
     context.role = role  // trust the verified role, never the client-supplied one
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1500,
-        system: buildSystem(type, context),
-        messages: buildMessages(message, history),
-      }),
-    })
+    // --- Draft mode: single call, no tools ---
+    if (type === 'draft') {
+      const data = await callClaude(buildSystem('draft', context), buildMessages(message, history))
+      return json({ reply: (data.content as any)?.[0]?.text || '(no response)' })
+    }
 
-    if (!response.ok) return json({ error: await response.text() }, 502)
+    // --- Chat mode: tool-use loop with the read-only query_database tool ---
+    const system = buildSystem('chat', context)
+    const messages = buildMessages(message, history)
+    let turns = 0
+    while (turns < MAX_TOOL_TURNS) {
+      turns++
+      const resp = await callClaude(system, messages, [QUERY_TOOL])
+      const content = (resp.content as Array<Record<string, unknown>>) || []
+      messages.push({ role: 'assistant', content })
 
-    const data = await response.json()
-    return json({ reply: data.content?.[0]?.text || '(no response)' })
+      if (resp.stop_reason !== 'tool_use') {
+        const text = content.filter((b) => b.type === 'text').map((b) => b.text as string).join('\n').trim()
+        return json({ reply: text || '(no response)' })
+      }
+
+      const toolResults: unknown[] = []
+      for (const block of content) {
+        if (block.type !== 'tool_use') continue
+        let resultText: string
+        if (block.name === 'query_database') {
+          const qr = await runQuery(role, email, (block.input as Record<string, unknown>) || {})
+          resultText = qr.error
+            ? 'ERROR: ' + qr.error
+            : 'Returned ' + (qr.rows || []).length + ' row(s):\n' + JSON.stringify(qr.rows).slice(0, 12000)
+        } else {
+          resultText = "ERROR: unknown tool '" + block.name + "'."
+        }
+        toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultText })
+      }
+      messages.push({ role: 'user', content: toolResults })
+    }
+    return json({ reply: "I couldn't finish that lookup. Try narrowing the question." })
   } catch (err) {
     return json({ error: (err as Error).message }, 500)
   }
@@ -261,14 +481,24 @@ IMPORTANT terminology for this system:
 - "RFQ" = Request for Quotes (sent to contractors for pricing)
 - "Tier" on an application = priority tier (e.g. Emergency, High, Medium, Low)
 ${appsJson}${unitsJson}${sowsJson}${rfqsJson}${contractorsJson}${renoJson}
+
+## query_database tool
+You also have a read-only query_database tool for precise or large-data lookups
+that go beyond the loaded context above - exact counts, complete lists, or
+records not on the current page. Tables you may query for this role (with columns):
+${schemaHintFor(role)}
+Use ilike with *term* for fuzzy text matches (e.g. applicant_name=ilike.*smith*).
+Vacant units: housing_units status=eq.vacant. If unsure of a table's columns, run
+select=* with limit=3. Prefer the loaded context for quick questions; use the tool
+when you need exact or complete data. Only state facts present in the context or
+returned by the tool - never invent records, names, numbers, or statuses.
 ${HOW_TO}
 Rules:
-- For unit counts, ALWAYS use the Housing Units section - never use the SOW count.
-- For maintenance/repair questions, use the SOWs section.
+- For unit counts, ALWAYS use the Housing Units section (or query_database) - never the SOW count.
+- For maintenance/repair questions, use the SOWs section or query housing_sow.
 - For "how do I ..." questions, use the How-to knowledge above and tailor to the staff role.
-- Perform calculations (totals, counts, averages) directly from the data above.
-- Answer concisely and confidently. Do not tell staff to check another system if the data is present here.
-- If data for a specific record is not shown (e.g. only first 50 apps are included), say so clearly.
+- Perform calculations (totals, counts, averages) directly from the data.
+- Answer concisely and confidently. Do not tell staff to check another system if the data is available here or via the tool.
 - This is sensitive community data governed by OCAP principles - keep answers grounded in the records and do not speculate about individuals.`
 }
 

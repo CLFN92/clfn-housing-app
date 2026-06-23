@@ -313,10 +313,12 @@ approval-decision notes. Backed by the single **`ai-chat`** Edge Function.
 
 ### What shipped
 - **Edge Function `supabase/functions/ai-chat/index.ts`** — context-stuffing
-  design: the client supplies the data context (it does not query tables). Calls
-  Claude (`claude-sonnet-4-6`, no tools). Two modes: `chat` and `draft`. A
-  `HOW_TO` block in the system prompt answers procedural questions, tailored to
-  the caller's role.
+  design: the client supplies the data context. Calls Claude
+  (`claude-sonnet-4-6`). Two modes: `chat` and `draft`. Chat mode also exposes a
+  read-only **`query_database`** tool (per-table role allowlist + forced filters,
+  caps `MAX_ROW_LIMIT=50` / `MAX_TOOL_TURNS=6`, no write tools) for exact counts /
+  full lists / records not in the loaded context. A `HOW_TO` block answers
+  procedural questions, tailored to the caller's role.
   - **Hardened (2026-06):** requires a **valid Supabase user JWT** (client sends
     `HOUSING_SESSION.accessToken`, not the anon key) and **active-staff** role
     resolution from the `staff` table (403 otherwise); the verified role
@@ -339,15 +341,12 @@ send the anon key instead of a user token). No client CSP change needed.
 
 ### Note on the two implementations
 A second design (`ai-assistant` Edge Function, server-side `query_database`
-tool-use with per-table role scoping) was built in a parallel session. Decision:
-keep `ai-chat` (it has the draft-note feature) + harden it; the `ai-assistant`
-function was retired. If precise/large-data list queries become a need, fold the
-read-only `query_database` tool onto `ai-chat` as an extra capability rather than
-rebuilding.
+tool-use) was built in a parallel session. Decision: keep `ai-chat` (draft-note
+feature) + harden it + **fold its `query_database` tool onto `ai-chat`** (done);
+the standalone `ai-assistant` function was retired. So `ai-chat` is now best of
+both: context-stuffing for speed + the read-only role-scoped tool for exact data.
 
 ### Possible follow-ups (not built)
-- Add the read-only `query_database` tool for exact/large-data pulls (the context
-  is truncated to ~50 apps / 60 units of detail; aggregate counts stay accurate).
 - Streaming responses; per-role suggested-question chips; an audit row per query.
 
 ---
