@@ -446,6 +446,17 @@ function renderScorecardActions(app) {
     }
   }
 
+  // A user holding both HM (reviewApplication) and ED (finalApproveApp)
+  // authority would otherwise see the shared actions (Return for Info, Decline,
+  // Approve File Update) twice — once from each block. Dedupe by visible label,
+  // keeping the first occurrence, so each action shows once.
+  var _seenLbl = {};
+  actions = actions.filter(function(a){
+    if (_seenLbl[a.label]) return false;
+    _seenLbl[a.label] = true;
+    return true;
+  });
+
   var canAssignSecondary = status === 'assigned' && APPROVAL_AUTHORITY.can('assignUnit', role);
 
   if(!actions.length && !canAssignSecondary) { bar.style.display = 'none'; return; }
