@@ -1890,7 +1890,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
     margin: 2px 0 4px 0; padding: 4px;
   }
   .app-header-v2 .nav-dropdown-item { padding: 10px 16px; }
-  .app-header-v2 .header-settings { display: none !important; }
+  .app-header-v2 #header_settings_btn { display: none !important; }
   .app-header-v2 .header-actions { padding-left: 12px; gap: 8px; }
 }
 @media (max-width: 600px) {
