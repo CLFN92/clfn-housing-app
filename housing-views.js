@@ -666,8 +666,15 @@ function renderTenantsView(){
   }).join('');
   tbody.querySelectorAll('[data-tuid]').forEach(function(row){
     row.addEventListener('click',function(e){
-      if(e.target.closest('[data-sow-uid]') || e.target.closest('[data-tic-uid]')) return;
-      openUnitEditModal(row.getAttribute('data-tuid'));
+      if(e.target.closest('[data-sow-uid]') || e.target.closest('[data-tic-uid]')
+         || e.target.closest('[data-files-uid]') || e.target.closest('[data-reno-sow]')) return;
+      var uid = row.getAttribute('data-tuid');
+      // Clicking a tenant row opens their Tenant Information Card (from which the
+      // application can be opened/updated). If the unit has no tenant assigned
+      // yet, fall back to the unit editor.
+      var u = (window.housingUnits||[]).find(function(x){ return String(x.id) === String(uid); });
+      if(u && u.assignedName && typeof openTenantCard === 'function') openTenantCard(uid);
+      else openUnitEditModal(uid);
     });
   });
   tbody.querySelectorAll('[data-sow-uid]').forEach(function(btn){
