@@ -47,7 +47,7 @@ function escapeHtml(v) {
 // opts.type      — 'default' (default) | 'error'
 function showToast(msg, opts) {
   opts = opts || {};
-  var duration = opts.duration || 2800;
+  var duration = opts.duration || 5000;
   var position = opts.position || 'top';
   var isError  = opts.type === 'error';
   var isInfo   = opts.type === 'info';
@@ -61,7 +61,7 @@ function showToast(msg, opts) {
     if (s) return s;
     s = document.createElement('div');
     s.id = stackId;
-    var posCss = position === 'bottom' ? 'bottom:24px;top:auto;' : 'top:20px;';
+    var posCss = position === 'bottom' ? 'bottom:24px;top:auto;' : 'top:33vh;';
     s.style.cssText = [
       'position:fixed;', posCss,
       'left:50%;transform:translateX(-50%);',

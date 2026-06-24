@@ -802,6 +802,17 @@
 #sc_ed_save_msg    { font-size: 12px; color: #15803d; display: none; align-items: center; gap: 4px; }
 #sc_docs_section   { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 
+/* Scorecard — phone layout: stack the hero, shrink the score, full-width actions */
+@media (max-width: 640px) {
+  .sc-hero          { flex-direction: column; align-items: stretch; padding: 16px 18px; gap: 14px; }
+  .sc-hero-right    { text-align: left; }
+  .sc-tier-badge    { display: inline-block; }
+  .sc-score-num     { font-size: 42px; }
+  .sc-bar-block     { min-width: 0; }
+  #sc_action_buttons          { flex-direction: column; }
+  #sc_action_buttons .btn     { width: 100%; justify-content: center; }
+}
+
 /* ══════════════════════════════════════════════════════════════
    ADD TENANT MODAL
    ══════════════════════════════════════════════════════════════ */
