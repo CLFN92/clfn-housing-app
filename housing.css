@@ -1174,10 +1174,11 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 }
 .modal-drawer-item:last-child { border-bottom: none; }
 .modal-drawer-item.active {
-  background: var(--bg);
+  background: var(--yellow-mid, #fef08a);
+  color: #1a1a1a;
   font-weight: 700;
-  border-left: 3px solid var(--yellow);
-  padding-left: 13px; /* 16 - 3 to keep label aligned with the others */
+  border-left: 4px solid var(--yellow);
+  padding-left: 12px; /* 16 - 4 to keep label aligned with the others */
 }
 .modal-drawer-item:not(.visited)::before {
   content: '';
