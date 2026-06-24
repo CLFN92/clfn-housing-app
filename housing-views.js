@@ -1201,7 +1201,7 @@ function showHousingKpiDrilldown(type) {
   mo.id = 'modalHousingKpiDrill';
   mo.innerHTML =
     '<div class="modal" style="max-width:860px;width:96%;">'
-    + '<div class="modal-hdr">'
+    + '<div class="modal-hdr modal-hdr-stack">'
     +   '<div><h2>' + title + '</h2>'
     +   (exportRows && exportRows.length ? '<div style="font-size:11px;opacity:.7;margin-top:2px;">' + exportRows.length + ' record' + (exportRows.length===1?'':'s') + '</div>' : '')
     +   '</div>'

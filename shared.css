@@ -692,6 +692,13 @@ input:disabled, select:disabled, textarea:disabled {
 .modal-hdr.compact  { padding: 10px 16px; }
 .modal-hdr.spacious { padding: 16px 24px; }
 .modal-hdr.icon-row { justify-content: flex-start; border-radius: 14px 14px 0 0; border-bottom-width: 3px; }
+/* Phones: stack the title above a single right-aligned action cluster (Print /
+   Export / close) so the buttons don't wrap awkwardly next to a long title. */
+@media (max-width: 640px) {
+  .modal-hdr.modal-hdr-stack { flex-wrap: wrap; row-gap: 10px; }
+  .modal-hdr.modal-hdr-stack > div:first-child { flex: 1 1 100%; }
+  .modal-hdr.modal-hdr-stack .flex-gap8 { margin-left: auto; flex-wrap: nowrap; }
+}
 .modal-hdr h2, .modal-hdr .modal-hdr-title {
   font-family: var(--serif); font-size: 17px; color: #fff;
   font-weight: 400; margin: 0 0 2px; line-height: 1.2;
