@@ -226,7 +226,7 @@
       if(_ticIsArray(rows) && rows.length) return { tenant: rows[0], byUnit: false };
       // Treat as unit id: find unit in housingUnits, then look up tenant by assigned_name.
       var unit = _ticFindUnitById(idOrUnitId);
-      if(!unit) return { tenant: null, byUnit: false, unit: null };
+      if(!unit) return _ticResolveApplicant(idOrUnitId);   // maybe an application id
       if(!unit.assignedName) return { tenant: null, byUnit: true, unit: unit };
       return _ticGet(TIC_T.tenants + '?' + TIC_C.full_name + '=eq.' + encodeURIComponent(unit.assignedName) + '&select=*')
         .then(function(rows2){
@@ -242,6 +242,40 @@
       for(var i=0;i<src.length;i++){ if(String(src[i].id) === String(id)) return src[i]; }
     } catch(e){}
     return null;
+  }
+  function _ticFindAppById(id){
+    try {
+      var src = (typeof applications !== 'undefined' && applications) ? applications : [];
+      for(var i=0;i<src.length;i++){ if(String(src[i].id) === String(id)) return src[i]; }
+    } catch(e){}
+    return null;
+  }
+  // Virtual (un-saved) tenant built from an application. Has no tenant_pk, so the
+  // first field edit creates the real tenants row (status 'applicant').
+  function _ticVirtualTenantFromApp(app){
+    var nm = ((app.fn||'') + ' ' + (app.ln||'')).trim() || app.applicant_name || 'Applicant';
+    var vt = {};
+    vt[TIC_C.full_name]      = nm;
+    vt[TIC_C.application_id] = app.id;
+    vt[TIC_C.email]          = app.email || '';
+    vt.status = 'applicant';
+    vt._virtual = true;
+    return vt;
+  }
+  // Open a card by application id: reuse a tenants row already linked to the
+  // application, else a virtual tenant that create-on-edit will persist.
+  function _ticResolveApplicant(id){
+    var app = _ticFindAppById(id);
+    if(!app) return Promise.resolve({ tenant: null, byUnit: false, unit: null });
+    return _ticGet(TIC_T.tenants + '?' + TIC_C.application_id + '=eq.' + encodeURIComponent(app.id) + '&select=*&order=created_at.desc')
+      .then(function(rows){
+        if(_ticIsArray(rows) && rows.length){
+          var trow = rows[0];
+          // If they're housed, surface their unit too (rent/utilities/history).
+          return { tenant: trow, byUnit:false, unit: _ticFindUnitById(trow.current_unit_id) || null };
+        }
+        return { tenant: _ticVirtualTenantFromApp(app), byUnit:false, unit:null, virtual:true };
+      });
   }
 
   // ── Per-tab parallel loaders ──────────────────────────────────────────────
@@ -867,17 +901,34 @@
     } else {
       var pk = _ticState.tenant && _ticState.tenant[TIC_C.tenant_pk];
       if (!pk) {
-        inp.classList.remove('tic-saving');
-        if (typeof showToast === 'function') showToast('No tenant record to save.', { type:'error' });
-        return;
-      }
-      savePromise = _ticWrite('PATCH', TIC_T.tenants + '?' + TIC_C.tenant_pk + '=eq.' + encodeURIComponent(pk), body)
-        .then(function(rows){
-          var saved = (rows && rows[0]) || Object.assign({}, _ticState.tenant, body);
+        // Applicant with no tenant row yet — create one (status 'applicant',
+        // linked by application_id), then this and future edits PATCH it.
+        var t0 = _ticState.tenant || {};
+        var insert = Object.assign({
+          full_name:      t0[TIC_C.full_name] || '',
+          status:         'applicant',
+          application_id: t0[TIC_C.application_id] || null
+        }, body);
+        if (!insert.full_name) {
+          inp.classList.remove('tic-saving');
+          if (typeof showToast === 'function') showToast('No name on file to create a record.', { type:'error' });
+          return;
+        }
+        savePromise = _ticWrite('POST', TIC_T.tenants, insert).then(function(rows){
+          var saved = (rows && rows[0]) || insert;
           _ticState.tenant = saved;
           _ticRenderHero();
           _ticRenderStrip();
         });
+      } else {
+        savePromise = _ticWrite('PATCH', TIC_T.tenants + '?' + TIC_C.tenant_pk + '=eq.' + encodeURIComponent(pk), body)
+          .then(function(rows){
+            var saved = (rows && rows[0]) || Object.assign({}, _ticState.tenant, body);
+            _ticState.tenant = saved;
+            _ticRenderHero();
+            _ticRenderStrip();
+          });
+      }
     }
 
     savePromise
