@@ -109,6 +109,8 @@ var APPROVAL_AUTHORITY = (function() {
     // ── Tenants ───────────────────────────────────────────────────────────
     // Who can add to / lift from the BCR (banished, housing-ineligible) list
     manageBcr:                ['housing_manager', 'ed'],
+    // Who can merge duplicate tenant records into one person
+    mergeTenants:             ['housing_manager', 'ed'],
 
     // ── Staff management ──────────────────────────────────────────────────
     // Who can edit / deactivate an existing staff record
@@ -308,6 +310,7 @@ var APPROVAL_AUTHORITY = (function() {
       setUnitLocation:          'Set unit GPS location &amp; house photo',
       approveInspection:        'Approve inspection report',
       manageBcr:                'Manage BCR / ineligibility list',
+      mergeTenants:             'Merge duplicate tenant records',
       manageStaffRecord:        'Edit / deactivate a staff record',
       manageAllStaffRoles:      'Assign any role to staff',
       viewApplicationScore:     'View application score',
@@ -330,7 +333,7 @@ var APPROVAL_AUTHORITY = (function() {
       'Scoring':              ['editScoreModel','applyScoreAdjustment'],
       'Inventory':            ['archiveUnit', 'setUnitLocation'],
       'Inspections':          ['approveInspection'],
-      'Tenants':              ['manageBcr'],
+      'Tenants':              ['manageBcr','mergeTenants'],
       'System':               ['accessSettings','editApprovalAuthority','manageStaff','manageStaffRecord','manageAllStaffRoles'],
       'Finance':              ['viewFinanceCard','recordPayment','createInvoice','createArrangement','manageLoan','reverseTransaction'],
     },

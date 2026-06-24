@@ -1255,6 +1255,101 @@ function _bcrLift(id){
 }
 window._bcrLift = _bcrLift;
 
+// ── Tenant merge (person identity, Phase T3) ─────────────────────────────────
+// The sync trigger creates a new tenants row per assignment, so one person can
+// have several rows. merged_into points a duplicate at the canonical row.
+async function sbLoadAllTenants(){
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/tenants?select=id,full_name,status,current_unit_id,application_id,merged_into,created_at&order=full_name,created_at',
+      { headers: HOUSING_HEADERS });
+    if (r.ok) return await r.json();
+  } catch (e) { console.warn('[merge] load tenants failed:', e); }
+  return [];
+}
+window.sbLoadAllTenants = sbLoadAllTenants;
+
+async function sbMergeTenants(canonicalId, dupIds){
+  for (var i = 0; i < dupIds.length; i++) {
+    if (dupIds[i] === canonicalId) continue;
+    var r = await fetch(SUPABASE_URL + '/rest/v1/tenants?id=eq.' + encodeURIComponent(dupIds[i]), {
+      method: 'PATCH',
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+      body: JSON.stringify({ merged_into: canonicalId, updated_at: new Date().toISOString() })
+    });
+    if (!r.ok) throw new Error(await r.text());
+  }
+  if (typeof auditEntry === 'function') auditEntry(canonicalId, 'tenants_merged', dupIds.length + ' duplicate tenant record(s) merged');
+  return true;
+}
+window.sbMergeTenants = sbMergeTenants;
+
+window.openTenantMergeManager = function(){
+  if (typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('mergeTenants', window.currentRole)) {
+    if (typeof showToast === 'function') showToast('Only authorized staff can merge tenant records.', { type:'error' });
+    return;
+  }
+  var ex = document.getElementById('modalTenantMerge'); if (ex) ex.remove();
+  var mo = document.createElement('div');
+  mo.className = 'modal-ov'; mo.id = 'modalTenantMerge';
+  mo.innerHTML =
+    '<div class="modal" style="max-width:680px;width:96%;">'
+    + '<div class="modal-hdr"><div><h2>Merge Duplicate Tenants</h2>'
+    +   '<div style="font-size:11px;opacity:.7;margin-top:2px;">Same person, multiple records. Pick the record to keep; the others point to it (reversible).</div></div>'
+    +   '<button class="modal-close" onclick="var m=document.getElementById(\'modalTenantMerge\');if(m)m.remove();">&#x2715;</button></div>'
+    + '<div class="modal-body" style="padding:16px 20px;"><div id="merge_body">Loading&hellip;</div></div>'
+    + '</div>';
+  mo.addEventListener('click', function(e){ if (e.target === mo) mo.remove(); });
+  document.body.appendChild(mo); mo.style.display = ''; mo.classList.add('on');
+  _mergeReload();
+};
+
+function _mergeReload(){
+  var body = document.getElementById('merge_body'); if (!body) return;
+  body.innerHTML = 'Loading&hellip;';
+  sbLoadAllTenants().then(function(rows){
+    var groups = {};
+    rows.forEach(function(t){
+      if (t.merged_into) return;                 // already merged away
+      var k = (t.full_name || '').trim().toLowerCase();
+      if (!k) return;
+      (groups[k] = groups[k] || []).push(t);
+    });
+    var dups = Object.keys(groups).map(function(k){ return groups[k]; }).filter(function(g){ return g.length > 1; });
+    window._mergeGroups = dups;
+    if (!dups.length) { body.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;font-size:13px;">No duplicate tenant records found.</div>'; return; }
+    body.innerHTML = dups.map(function(g, gi){
+      var canonIdx = 0; for (var i = 0; i < g.length; i++){ if (g[i].status === 'active'){ canonIdx = i; break; } }
+      var rowsHtml = g.map(function(t, ri){
+        var unit = '';
+        try { var u = (window.housingUnits||[]).find(function(x){ return x.id === t.current_unit_id; }); unit = u ? (u.num + ' ' + u.street) : (t.current_unit_id ? ('unit ' + t.current_unit_id) : ''); } catch(e){}
+        var meta = [t.status, unit, (t.created_at||'').slice(0,10)].filter(Boolean).join(' · ');
+        return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;cursor:pointer;">'
+          + '<input type="radio" name="merge_canon_' + gi + '" value="' + _bcrEsc(t.id) + '"' + (ri === canonIdx ? ' checked' : '') + '/>'
+          + '<span><strong>' + _bcrEsc(t.full_name||'') + '</strong> <span style="color:var(--muted);font-size:11px;">' + _bcrEsc(meta) + '</span></span></label>';
+      }).join('');
+      return '<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:12px;">'
+        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">' + _bcrEsc(g[0].full_name||'') + ' &mdash; ' + g.length + ' records</div>'
+        + rowsHtml
+        + '<div style="text-align:right;margin-top:8px;"><button class="btn btn-primary" onclick="_mergeDoGroup(' + gi + ')">Merge into selected</button></div>'
+        + '</div>';
+    }).join('');
+  });
+}
+
+function _mergeDoGroup(gi){
+  var g = (window._mergeGroups || [])[gi]; if (!g) return;
+  var sel = document.querySelector('input[name="merge_canon_' + gi + '"]:checked');
+  var canonicalId = sel ? sel.value : null;
+  if (!canonicalId) { if (typeof showToast === 'function') showToast('Pick a record to keep.', { type:'error' }); return; }
+  var dupIds = g.map(function(t){ return t.id; }).filter(function(id){ return id !== canonicalId; });
+  if (!dupIds.length) return;
+  if (!window.confirm('Merge ' + dupIds.length + ' record(s) into the selected one? History is kept; reversible by clearing merged_into.')) return;
+  sbMergeTenants(canonicalId, dupIds)
+    .then(function(){ _mergeReload(); if (typeof showToast === 'function') showToast('Records merged.'); })
+    .catch(function(e){ if (typeof showToast === 'function') showToast('Merge failed: ' + e.message, { type:'error' }); });
+}
+window._mergeDoGroup = _mergeDoGroup;
+
 function sbLookupUnits(q) {
   q = (q || '').toLowerCase().trim();
   if (!q) return [];

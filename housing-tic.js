@@ -228,7 +228,7 @@
       var unit = _ticFindUnitById(idOrUnitId);
       if(!unit) return _ticResolveApplicant(idOrUnitId);   // maybe an application id
       if(!unit.assignedName) return { tenant: null, byUnit: true, unit: unit };
-      return _ticGet(TIC_T.tenants + '?' + TIC_C.full_name + '=eq.' + encodeURIComponent(unit.assignedName) + '&select=*')
+      return _ticGet(TIC_T.tenants + '?' + TIC_C.full_name + '=eq.' + encodeURIComponent(unit.assignedName) + '&merged_into=is.null&select=*')
         .then(function(rows2){
           if(_ticIsArray(rows2) && rows2.length) return { tenant: rows2[0], byUnit: true, unit: unit };
           return { tenant: null, byUnit: true, unit: unit };
