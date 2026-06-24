@@ -203,6 +203,17 @@ function _appendAIMessage(role, text, id) {
     'margin-bottom:8px;';
   if (id) wrap.id = id;
 
+  // Assistant replies may include ```chart {json}``` blocks — pull them out and
+  // render real charts; the bubble keeps the surrounding prose.
+  var charts = [];
+  var displayText = text;
+  if (!isUser && typeof text === 'string') {
+    displayText = text.replace(/```chart\s*([\s\S]*?)```/g, function (_m, json) {
+      try { charts.push(JSON.parse(json.trim())); return ''; }
+      catch (e) { return _m; }   // leave unparseable blocks as text
+    }).trim();
+  }
+
   var bubble = document.createElement('div');
   bubble.style.cssText = [
     'max-width:85%;padding:9px 13px;border-radius:12px;font-size:13px;',
@@ -211,11 +222,67 @@ function _appendAIMessage(role, text, id) {
       ? 'background:var(--yellow);color:#fff;border-bottom-right-radius:3px;'
       : 'background:#2f3033;border:1px solid #444;color:#e8e8e5;border-bottom-left-radius:3px;',
   ].join('');
-  bubble.textContent = text;
+  bubble.textContent = displayText;
 
-  wrap.appendChild(bubble);
+  if (displayText || !charts.length) wrap.appendChild(bubble);
+  charts.forEach(function (spec) { _aiRenderChart(wrap, spec); });
+
   msgs.appendChild(wrap);
   msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ── Charts (lazy-loaded Chart.js, CSP-allowed cdnjs) ──────────────────────────
+function _aiLoadChartJs(cb) {
+  if (window.Chart) { cb(); return; }
+  if (window._aiChartCbs) { window._aiChartCbs.push(cb); return; }
+  window._aiChartCbs = [cb];
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+  s.onload  = function () { (window._aiChartCbs || []).forEach(function (f) { try { f(); } catch (e) {} }); window._aiChartCbs = null; };
+  s.onerror = function () { window._aiChartCbs = null; };
+  document.head.appendChild(s);
+}
+
+var _AI_CHART_PALETTE = ['#F8E41A','#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4','#ec4899','#84cc16','#f97316','#94a3b8','#14b8a6'];
+
+function _aiRenderChart(wrap, spec) {
+  if (!spec || !spec.type) return;
+  var holder = document.createElement('div');
+  holder.style.cssText = 'background:#fff;border:1px solid #444;border-radius:10px;padding:10px;margin-top:8px;width:85%;max-width:100%;box-sizing:border-box;';
+  var canvas = document.createElement('canvas');
+  canvas.style.cssText = 'width:100%;max-height:280px;';
+  holder.appendChild(canvas);
+  wrap.appendChild(holder);
+  _aiLoadChartJs(function () {
+    if (!window.Chart) { holder.textContent = 'Chart unavailable.'; return; }
+    var isPie = spec.type === 'pie' || spec.type === 'doughnut';
+    var labels = spec.labels || [];
+    try {
+      var datasets = (spec.datasets || []).map(function (d, i) {
+        var color = isPie
+          ? labels.map(function (_l, k) { return _AI_CHART_PALETTE[k % _AI_CHART_PALETTE.length]; })
+          : _AI_CHART_PALETTE[i % _AI_CHART_PALETTE.length];
+        return Object.assign({
+          backgroundColor: color,
+          borderColor: isPie ? '#fff' : color,
+          borderWidth: isPie ? 1 : (spec.type === 'line' ? 2 : 1),
+          fill: spec.type === 'line' ? false : undefined
+        }, d);
+      });
+      new window.Chart(canvas.getContext('2d'), {
+        type: spec.type,
+        data: { labels: labels, datasets: datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            title:  { display: !!spec.title, text: spec.title || '', color: '#111' },
+            legend: { display: isPie || (spec.datasets || []).length > 1, labels: { color: '#333' } }
+          },
+          scales: isPie ? {} : { x: { ticks: { color: '#333' } }, y: { ticks: { color: '#333' }, beginAtZero: true } }
+        }
+      });
+    } catch (e) { holder.textContent = 'Could not render chart.'; }
+  });
 }
 
 // ── Keyboard: Enter to send ───────────────────────────────────────────────────

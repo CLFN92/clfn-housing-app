@@ -86,6 +86,14 @@ const TABLES: Record<string, TableDef> = {
     roles: ALL,
     cols: 'id, unit_id, unit_address, type (Move-In|Move-Out|Annual|Routine|Emergency), inspection_date, inspector_name, overall_status (pending|pass|fail|needs_repair), sow_created, created_at',
   },
+  housing_application_notes: {
+    roles: MGMT,
+    cols: 'id, app_id (application), body, author_email, created_at. Dedicated application notes - use this (NOT the audit log) to count/list notes on applications.',
+  },
+  tenant_notes: {
+    roles: ALL,
+    cols: 'id, tenant_id, note_body, author_email, created_at. Dedicated tenant notes - use this (NOT the audit log) to count/list notes on tenants.',
+  },
   housing_audit_log: {
     roles: ['ed', 'super_user', 'housing_manager'],
     cols: 'id, entity_type, entity_id, action, detail, actor (email), created_at',
@@ -489,9 +497,24 @@ select=* with limit=3. Prefer the loaded context for quick questions; use the to
 when you need exact or complete data. Only state facts present in the context or
 returned by the tool - never invent records, names, numbers, or statuses.
 ${HOW_TO}
+## Charts / visual reports
+When the user asks to show / chart / graph / visualize something, or wants a
+breakdown, trend, or comparison, append a fenced code block tagged "chart"
+containing ONLY JSON describing it, for example:
+\`\`\`chart
+{"type":"bar","title":"Applications by status","labels":["Submitted","Approved","Declined"],"datasets":[{"label":"Count","data":[12,5,2]}]}
+\`\`\`
+- type is one of: bar, line, pie, doughnut.
+- Compute the numbers yourself from the loaded context or query_database results
+  (e.g. count audit-log logins per day). Use at most ~12 labels; group or top-N
+  if there are more.
+- Put a 1-2 sentence plain-text summary BEFORE the chart block.
+- Only include a chart when a visual genuinely helps; otherwise answer in text.
+
 Rules:
 - For unit counts, ALWAYS use the Housing Units section (or query_database) - never the SOW count.
 - For maintenance/repair/work-order (SOW) questions, use the SOWs section from the loaded context (the housing_sow table is not directly queryable).
+- The audit log (housing_audit_log) records ACTIONS (who did what, when), NOT records. For "how many / list X" about records - notes, applications, tenants, units, inspections, contractors, RFQs - query the dedicated table for X (e.g. housing_application_notes + tenant_notes for notes). Do not answer record-count questions from the audit log.
 - For "how do I ..." questions, use the How-to knowledge above and tailor to the staff role.
 - Perform calculations (totals, counts, averages) directly from the data.
 - Answer concisely and confidently. Do not tell staff to check another system if the data is available here or via the tool.
