@@ -63,6 +63,105 @@ window.CLFN_AUTH = {
   }
 };
 
+// ── Access-token refresh ─────────────────────────────────────────────────────
+// The Supabase access token (JWT) expires (default ~1h). Without refreshing it,
+// long sessions — and especially mobile devices that sleep and wake — start
+// failing authenticated calls (e.g. Storage uploads: 403 "exp claim timestamp
+// check failed"). We keep the refresh_token + expiry and proactively refresh
+// before expiry, on boot, and whenever the tab regains focus. Fail-safe: a
+// failed refresh never disturbs the existing (possibly stale) session.
+var _TOKEN_REFRESH_BUFFER_MS = 120000; // refresh ~2 min before expiry
+var _tokenRefreshTimer = null;
+
+function _hydrateTokenMeta() {
+  try {
+    if (!HOUSING_SESSION.refreshToken) {
+      var rt = sessionStorage.getItem('clfn_housing_refresh');
+      if (rt) HOUSING_SESSION.refreshToken = rt;
+    }
+    if (!HOUSING_SESSION.tokenExp) {
+      var ex = parseInt(sessionStorage.getItem('clfn_housing_token_exp') || '0', 10);
+      if (ex) HOUSING_SESSION.tokenExp = ex;
+    }
+  } catch (e) {}
+}
+
+// Apply a token payload ({access_token, refresh_token, expires_in}) to the
+// session + headers + sessionStorage. Returns true on success.
+function _applyTokenPayload(data) {
+  if (!data || !data.access_token) return false;
+  HOUSING_SESSION.accessToken = data.access_token;
+  HOUSING_HEADERS['Authorization'] = 'Bearer ' + data.access_token;
+  if (data.refresh_token) HOUSING_SESSION.refreshToken = data.refresh_token;
+  HOUSING_SESSION.tokenExp = Date.now() + ((data.expires_in || 3600) * 1000);
+  try {
+    sessionStorage.setItem('clfn_housing_token', data.access_token);
+    if (data.refresh_token) sessionStorage.setItem('clfn_housing_refresh', data.refresh_token);
+    sessionStorage.setItem('clfn_housing_token_exp', String(HOUSING_SESSION.tokenExp));
+  } catch (e) {}
+  return true;
+}
+window._applyTokenPayload = _applyTokenPayload;
+
+async function refreshHousingToken() {
+  _hydrateTokenMeta();
+  var rt = HOUSING_SESSION.refreshToken;
+  if (!rt || typeof SUPABASE_URL === 'undefined') return false;
+  try {
+    var r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
+      method:  'POST',
+      headers: { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ refresh_token: rt })
+    });
+    if (!r.ok) { console.warn('[auth] token refresh failed:', r.status); return false; }
+    var data = await r.json();
+    if (!_applyTokenPayload(data)) return false;
+    scheduleTokenRefresh();
+    return true;
+  } catch (e) {
+    console.warn('[auth] token refresh error:', e);
+    return false;
+  }
+}
+window.refreshHousingToken = refreshHousingToken;
+
+// Arm a one-shot timer to refresh shortly before the token expires.
+function scheduleTokenRefresh() {
+  _hydrateTokenMeta();
+  if (_tokenRefreshTimer) { clearTimeout(_tokenRefreshTimer); _tokenRefreshTimer = null; }
+  if (!HOUSING_SESSION.refreshToken || !HOUSING_SESSION.tokenExp) return;
+  var delay = HOUSING_SESSION.tokenExp - Date.now() - _TOKEN_REFRESH_BUFFER_MS;
+  if (delay < 0) delay = 0;
+  if (delay > 86400000) delay = 86400000; // setTimeout sanity cap
+  _tokenRefreshTimer = setTimeout(function () { refreshHousingToken(); }, delay);
+}
+window.scheduleTokenRefresh = scheduleTokenRefresh;
+
+function stopTokenRefresh() {
+  if (_tokenRefreshTimer) { clearTimeout(_tokenRefreshTimer); _tokenRefreshTimer = null; }
+}
+
+// Ensure the access token is usable right now; refresh if expired/near-expiry.
+async function ensureFreshToken() {
+  _hydrateTokenMeta();
+  if (!HOUSING_SESSION.refreshToken) return false;
+  if (!HOUSING_SESSION.tokenExp || (HOUSING_SESSION.tokenExp - Date.now()) < _TOKEN_REFRESH_BUFFER_MS) {
+    return await refreshHousingToken();
+  }
+  return true;
+}
+window.ensureFreshToken = ensureFreshToken;
+
+// Refresh when the tab/app regains focus — covers mobile devices whose timers
+// are frozen while asleep, so the token is fresh before the user acts.
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && HOUSING_SESSION && HOUSING_SESSION.email) {
+      ensureFreshToken();
+    }
+  });
+}
+
 // ── resolveHousingRole ───────────────────────────────────────────────────────
 // Called after navigation to a housing/renos page to re-establish the role
 // from the staff table using the stored session token.
@@ -70,6 +169,10 @@ window.CLFN_AUTH = {
 async function resolveHousingRole() {
   window._booting = true;
   try {
+    // Refresh the access token first if it's expired/near-expiry, then keep it
+    // fresh for the rest of this page's lifetime. Prevents "exp claim" 403s.
+    try { await ensureFreshToken(); } catch (e) {}
+    scheduleTokenRefresh();
     var r = await fetch(
       SUPABASE_URL + '/rest/v1/staff?select=role,department,name&email=eq.' +
       encodeURIComponent(HOUSING_SESSION.email) + '&is_active=eq.true',
@@ -162,7 +265,8 @@ function _clearLocalClientState() {
 
   // sessionStorage
   try {
-    ['clfn_housing_token','clfn_housing_role','clfn_housing_name','clfn_housing_email_session',
+    ['clfn_housing_token','clfn_housing_refresh','clfn_housing_token_exp',
+     'clfn_housing_role','clfn_housing_name','clfn_housing_email_session',
      'clfn_logo_cache','clfn_logo_transparent','clfn_login_audited']
       .forEach(function(k) { try { sessionStorage.removeItem(k); } catch(e) {} });
   } catch(e) {}
@@ -189,6 +293,7 @@ function _clearLocalClientState() {
 // separate audit events.
 async function doLogout(reason) {
   stopIdleTimer();
+  if (typeof stopTokenRefresh === 'function') stopTokenRefresh();
 
   // Audit the sign-out before tearing down the session — the user's token is
   // still valid in HOUSING_HEADERS at this point. Self-contained direct write
@@ -260,7 +365,8 @@ function _idleLogout() {
   // 1. Immediately clear session tokens so any subsequent housing page loads
   //    bounce to login without waiting for network.
   try {
-    ['clfn_housing_token','clfn_housing_role','clfn_housing_name',
+    ['clfn_housing_token','clfn_housing_refresh','clfn_housing_token_exp',
+     'clfn_housing_role','clfn_housing_name',
      'clfn_housing_email_session','clfn_login_audited'].forEach(function(k){
       try { sessionStorage.removeItem(k); } catch(e) {}
     });

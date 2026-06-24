@@ -381,9 +381,15 @@ async function startSignIn() {
     saveRememberedEmail(email, remember);
     HOUSING_SESSION.email       = email;
     HOUSING_SESSION.name        = (data.user.user_metadata && data.user.user_metadata.full_name) || email;
-    HOUSING_SESSION.accessToken = data.access_token;
-    HOUSING_HEADERS['Authorization'] = 'Bearer ' + data.access_token;
-    try { sessionStorage.setItem('clfn_housing_token', data.access_token); } catch(e) {}
+    // Store the access token AND the refresh token + expiry, so the session can
+    // refresh itself before the access token expires (see shared-auth.js).
+    if (typeof _applyTokenPayload === 'function') {
+      _applyTokenPayload(data);
+    } else {
+      HOUSING_SESSION.accessToken = data.access_token;
+      HOUSING_HEADERS['Authorization'] = 'Bearer ' + data.access_token;
+      try { sessionStorage.setItem('clfn_housing_token', data.access_token); } catch(e) {}
+    }
 
     // Resolve role from the staff table — this is the real authorization gate
     await resolveHousingRole();
