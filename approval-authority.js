@@ -106,6 +106,10 @@ var APPROVAL_AUTHORITY = (function() {
     // Who can approve / sign off a completed unit inspection report
     approveInspection:        ['housing_manager', 'ed'],
 
+    // ── Tenants ───────────────────────────────────────────────────────────
+    // Who can add to / lift from the BCR (banished, housing-ineligible) list
+    manageBcr:                ['housing_manager', 'ed'],
+
     // ── Staff management ──────────────────────────────────────────────────
     // Who can edit / deactivate an existing staff record
     manageStaffRecord:        ['ed'],
@@ -303,6 +307,7 @@ var APPROVAL_AUTHORITY = (function() {
       archiveUnit:              'Archive a unit',
       setUnitLocation:          'Set unit GPS location &amp; house photo',
       approveInspection:        'Approve inspection report',
+      manageBcr:                'Manage BCR / ineligibility list',
       manageStaffRecord:        'Edit / deactivate a staff record',
       manageAllStaffRoles:      'Assign any role to staff',
       viewApplicationScore:     'View application score',
@@ -325,6 +330,7 @@ var APPROVAL_AUTHORITY = (function() {
       'Scoring':              ['editScoreModel','applyScoreAdjustment'],
       'Inventory':            ['archiveUnit', 'setUnitLocation'],
       'Inspections':          ['approveInspection'],
+      'Tenants':              ['manageBcr'],
       'System':               ['accessSettings','editApprovalAuthority','manageStaff','manageStaffRecord','manageAllStaffRoles'],
       'Finance':              ['viewFinanceCard','recordPayment','createInvoice','createArrangement','manageLoan','reverseTransaction'],
     },

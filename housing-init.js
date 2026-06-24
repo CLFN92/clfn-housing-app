@@ -1970,6 +1970,7 @@ async function loadHousingData() {
     if(sowR.ok){var sd=await sowR.json(); sd.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
     var rfqR = await fetch(SUPABASE_URL+'/rest/v1/housing_rfq?select=*&order=created_at.desc',{headers:HOUSING_HEADERS});
     if(rfqR.ok){var rd=await rfqR.json(); window._rfqCache={}; rd.forEach(function(r){window._rfqCache[r.id]=r;});}
+    if(typeof sbLoadBcrRegistry === 'function'){ try { await sbLoadBcrRegistry(); } catch(e){} }
     var stR = await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=key,value',{headers:HOUSING_HEADERS});
     if(stR.ok){var stD=await stR.json(); window._appSettings={};
       stD.forEach(function(r){window._appSettings[r.key]=r.value;});

@@ -325,6 +325,14 @@
     if(status) badges.push('<span class="std-pill std-pill-info">' + _ticEsc(status) + '</span>');
     var band   = t[TIC_C.band_membership];
     if(band) badges.push('<span class="std-pill std-pill-info">' + _ticEsc(band) + '</span>');
+    // BCR / ineligibility flag — prominent so staff see it before any action.
+    if(typeof bcrLookup === 'function'){
+      var _bcr = bcrLookup(name);
+      if(_bcr){
+        badges.unshift('<span class="std-pill" style="background:#7f1d1d;color:#fff;font-weight:700;">⛔ BCR’d — ineligible'
+          + (_bcr.bcrd_date ? ' (' + _ticEsc(_bcr.bcrd_date) + ')' : '') + '</span>');
+      }
+    }
     _ticEl('tic_hero_badges').innerHTML = badges.join('');
   }
   function _ticRenderStrip(){

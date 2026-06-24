@@ -2397,6 +2397,19 @@ function saveAddTenant(){
   var idx=units.findIndex(function(u){return u.id===unitId;});
   if(idx===-1){ showErr('Unit not found.'); return; }
 
+  // BCR / ineligibility gate — warn before housing a banished person.
+  if (typeof bcrLookup === 'function') {
+    var _bcrRec = bcrLookup(tenantName);
+    if (_bcrRec && !window.confirm(
+        tenantName + ' is on the BCR (banishment) list'
+        + (_bcrRec.bcrd_date ? ' as of ' + _bcrRec.bcrd_date : '')
+        + ' and is NOT eligible for housing.'
+        + (_bcrRec.reason ? '\n\nReason: ' + _bcrRec.reason : '')
+        + '\n\nAssign a unit to them anyway?')) {
+      return;
+    }
+  }
+
   units[idx].assignedName=tenantName;
   units[idx].assignedTo=appId;
   units[idx].assignedDate=date;
@@ -2915,6 +2928,20 @@ function confirmApprovalAction() {
 
   var app = window._currentScorecardApp;
   if(!app) { closeApprovalModal(); return; }
+
+  // BCR / ineligibility gate — warn before approving/assigning a banished person.
+  if (typeof bcrLookup === 'function' && ['mgr_approved','hm_approved','ed_approved','assigned'].indexOf(action) !== -1) {
+    var _bcrNm  = ((app.fn||'') + ' ' + (app.ln||'')).trim() || app.applicant_name || '';
+    var _bcrRec = bcrLookup(_bcrNm);
+    if (_bcrRec && !window.confirm(
+        _bcrNm + ' is on the BCR (banishment) list'
+        + (_bcrRec.bcrd_date ? ' as of ' + _bcrRec.bcrd_date : '')
+        + ' and is NOT eligible for housing.'
+        + (_bcrRec.reason ? '\n\nReason: ' + _bcrRec.reason : '')
+        + '\n\nProceed with this approval anyway?')) {
+      return;
+    }
+  }
 
   // Find and update the application
   var idx = applications.findIndex(function(a){ return a.id === app.id; });
