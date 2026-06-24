@@ -2113,7 +2113,7 @@ function renderAppHeader(){
     +       '<span>Settings</span>'
     +     '</button>'
     +     '<button id="header_ai_btn" class="header-settings" onclick="toggleAIChat()" title="AI Assistant">'
-    +       '<span style="color:var(--yellow);font-size:15px;line-height:1;">✦</span>'
+    +       '<span class="ai-ico" style="color:var(--yellow);font-size:15px;line-height:1;">✦</span>'
     +       '<span>AI</span>'
     +     '</button>'
     +     '<div class="create-wrap">'

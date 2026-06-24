@@ -1733,6 +1733,11 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 }
 .app-header-v2 .header-settings:hover { background: var(--dark2); color: #fff; }
 .app-header-v2 .header-settings svg { width: 14px; height: 14px; }
+/* The AI button's icon is a text glyph (.ai-ico span), not an <svg>, so it would
+   be hidden by the mobile ".header-settings span { display:none }" label-collapse
+   rule. Keep it visible so the AI button shows its icon on phones (like the
+   Settings gear svg does). */
+.app-header-v2 .header-settings .ai-ico { display: inline-flex !important; align-items: center; }
 .app-header-v2 .create-wrap { position: relative; }
 .app-header-v2 .btn-create {
   display: flex; align-items: center; gap: 8px;
