@@ -227,6 +227,16 @@ function _appendAIMessage(role, text, id) {
   if (displayText || !charts.length) wrap.appendChild(bubble);
   charts.forEach(function (spec) { _aiRenderChart(wrap, spec); });
 
+  // Export-to-PDF affordance on substantive assistant replies (reports etc.).
+  if (!isUser && id !== 'ai_typing_msg' && ((displayText && displayText.length > 60) || charts.length)) {
+    var pdfBtn = document.createElement('button');
+    pdfBtn.type = 'button';
+    pdfBtn.textContent = '⬇ Export PDF';
+    pdfBtn.style.cssText = 'align-self:flex-start;margin-top:6px;background:none;border:1px solid #555;color:#aaa;border-radius:6px;font-size:11px;font-weight:700;padding:3px 9px;cursor:pointer;font-family:DM Sans,sans-serif;';
+    pdfBtn.addEventListener('click', function(){ _aiExportReplyPdf(text); });
+    wrap.appendChild(pdfBtn);
+  }
+
   msgs.appendChild(wrap);
   msgs.scrollTop = msgs.scrollHeight;
 }
@@ -283,6 +293,130 @@ function _aiRenderChart(wrap, spec) {
       });
     } catch (e) { holder.textContent = 'Could not render chart.'; }
   });
+}
+
+// ── Export an assistant reply as a branded PDF ───────────────────────────────
+function _aiLoadScript(src, cb){ var s=document.createElement('script'); s.src=src; s.onload=cb; s.onerror=cb; document.head.appendChild(s); }
+function _aiLoadPdfLibs(cb){
+  if (window._aiPdfReady) { cb(); return; }
+  _aiLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function(){
+    _aiLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js', function(){
+      window._aiPdfReady = true; cb();
+    });
+  });
+}
+// Render a chart spec to a PNG data URL via an offscreen Chart.js canvas.
+function _aiChartToImage(spec, cb){
+  _aiLoadChartJs(function(){
+    if (!window.Chart) { cb(null); return; }
+    try {
+      var canvas = document.createElement('canvas'); canvas.width = 700; canvas.height = 350;
+      var isPie = spec.type === 'pie' || spec.type === 'doughnut';
+      var labels = spec.labels || [];
+      var datasets = (spec.datasets || []).map(function (d, i) {
+        var color = isPie ? labels.map(function (_l, k) { return _AI_CHART_PALETTE[k % _AI_CHART_PALETTE.length]; }) : _AI_CHART_PALETTE[i % _AI_CHART_PALETTE.length];
+        return Object.assign({ backgroundColor: color, borderColor: isPie ? '#fff' : color, borderWidth: 1 }, d);
+      });
+      var chart = new window.Chart(canvas.getContext('2d'), {
+        type: spec.type, data: { labels: labels, datasets: datasets },
+        options: { animation: false, responsive: false, plugins: { title: { display: !!spec.title, text: spec.title || '' }, legend: { display: isPie || (spec.datasets || []).length > 1 } } }
+      });
+      var img = canvas.toDataURL('image/png'); chart.destroy(); cb(img);
+    } catch (e) { cb(null); }
+  });
+}
+function _aiPdfClean(s){
+  return String(s == null ? '' : s)
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{FE0F}]/gu, '')
+    .replace(/\*\*/g, '').replace(/`/g, '').replace(/•/g, '').trim();
+}
+function _aiExportReplyPdf(md){
+  if (typeof md !== 'string' || !md.trim()) return;
+  var chartSpecs = [];
+  var work = md.replace(/```chart\s*([\s\S]*?)```/g, function (_m, json) {
+    try { chartSpecs.push(JSON.parse(json.trim())); return '\n@@CHART' + (chartSpecs.length - 1) + '@@\n'; }
+    catch (e) { return ''; }
+  }).replace(/```[\s\S]*?```/g, '');   // drop other code fences (ASCII bars etc.)
+  _aiLoadPdfLibs(function () {
+    if (!(window.jspdf && window.jspdf.jsPDF)) { showToast('PDF library failed to load.', { type:'error' }); return; }
+    var images = new Array(chartSpecs.length).fill(null);
+    var pending = chartSpecs.length;
+    if (!pending) { _aiBuildReplyPdf(work, images); return; }
+    chartSpecs.forEach(function (spec, i) {
+      _aiChartToImage(spec, function (img) { images[i] = img; if (--pending === 0) _aiBuildReplyPdf(work, images); });
+    });
+  });
+}
+function _aiBuildReplyPdf(work, chartImages){
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'letter' });
+  var pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
+  var margin = 16, y = 16, contentW = pageW - margin * 2;
+  var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'CLFN';
+  var tm = work.match(/^#\s+(.+)$/m); var title = tm ? _aiPdfClean(tm[1]) : 'Report';
+  var today = new Date().toISOString().slice(0, 10);
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(20);
+  doc.text(nation + ' Housing', margin, y); y += 7;
+  doc.setFontSize(16); doc.text(title, margin, y); y += 6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(120);
+  doc.text('Generated ' + today, margin, y); y += 3;
+  doc.setDrawColor(220); doc.line(margin, y, pageW - margin, y); y += 6;
+  doc.setTextColor(25);
+
+  function ensure(h){ if (y + h > pageH - 16) { doc.addPage(); y = 16; } }
+  var lines = work.split('\n'), i = 0;
+  while (i < lines.length){
+    var raw = (lines[i] || '').trim();
+    if (!raw){ i++; continue; }
+    var cm = raw.match(/^@@CHART(\d+)@@$/);
+    if (cm){
+      var img = chartImages[parseInt(cm[1], 10)];
+      if (img){ var iw = Math.min(contentW, 150), ih = iw * 0.5; ensure(ih + 4); try { doc.addImage(img, 'PNG', margin, y, iw, ih); } catch(e){} y += ih + 5; }
+      i++; continue;
+    }
+    if (raw.charAt(0) === '|'){
+      var tbl = [];
+      while (i < lines.length && (lines[i]||'').trim().charAt(0) === '|'){
+        var cells = (lines[i]||'').trim().replace(/^\||\|$/g, '').split('|').map(function (c){ return _aiPdfClean(c); });
+        if (!cells.every(function (c){ return /^:?-{2,}:?$/.test(c) || c === ''; })) tbl.push(cells);
+        i++;
+      }
+      if (tbl.length){
+        ensure(12);
+        doc.autoTable({ startY:y, head:[tbl[0]], body:tbl.slice(1), theme:'striped',
+          styles:{ fontSize:8, cellPadding:2 },
+          headStyles:{ fillColor:[17,17,15], textColor:[248,228,26], fontStyle:'bold', fontSize:8 },
+          margin:{ left:margin, right:margin } });
+        y = doc.lastAutoTable.finalY + 5;
+      }
+      continue;
+    }
+    var h = raw.match(/^(#{1,3})\s+(.+)$/);
+    if (h){
+      var lvl = h[1].length, sz = lvl === 1 ? 14 : lvl === 2 ? 12 : 10.5;
+      ensure(sz * 0.6 + 4); y += lvl === 1 ? 2 : 3;
+      doc.setFont('helvetica','bold'); doc.setFontSize(sz); doc.text(_aiPdfClean(h[2]), margin, y);
+      y += sz * 0.5; doc.setFont('helvetica','normal'); doc.setFontSize(10);
+      i++; continue;
+    }
+    var isList = /^[-*]\s+/.test(raw) || /^\d+\.\s+/.test(raw);
+    var isQuote = raw.charAt(0) === '>';
+    var txt = _aiPdfClean(raw.replace(/^[-*>]\s*/, '').replace(/^\d+\.\s*/, ''));
+    if (!txt){ i++; continue; }
+    doc.setFont('helvetica', isQuote ? 'italic' : 'normal'); doc.setFontSize(10);
+    var wrapped = doc.splitTextToSize((isList ? '• ' : '') + txt, contentW);
+    ensure(wrapped.length * 5); doc.text(wrapped, margin, y); y += wrapped.length * 5 + 1;
+    doc.setFont('helvetica','normal');
+    i++;
+  }
+  var pages = doc.internal.getNumberOfPages();
+  for (var p = 1; p <= pages; p++){
+    doc.setPage(p); doc.setFontSize(8); doc.setTextColor(150);
+    doc.text(nation + ' Housing', margin, pageH - 8);
+    doc.text('Page ' + p + ' of ' + pages, pageW - margin, pageH - 8, { align:'right' });
+  }
+  doc.save(nation.replace(/[^a-zA-Z0-9]+/g, '_') + '_Report_' + today + '.pdf');
 }
 
 // ── Keyboard: Enter to send ───────────────────────────────────────────────────
