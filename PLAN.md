@@ -484,6 +484,68 @@ keys**, so it must run server-side and stay secured. Screens:
 
 ---
 
+## Phase T — Tenant/Person model & BCR eligibility  ⬜
+
+Evolve `tenants` from a **unit-derived** record into a **person-centric** one that
+persists across the full lifecycle (applicant → housed → unassigned → BCR'd),
+and add a **BCR'd** status that makes a person ineligible for housing.
+
+### Why (current-state findings)
+- `tenants` rows are **auto-synced from `housing_units.assigned_name`** by a DB
+  trigger (the trigger is **not in the repo** — it's run via the SQL editor).
+  The table is slim (name, email, phone, lease dates, hydro/gas accounts); there
+  is **no status, eligibility, or BCR concept** anywhere.
+- The TIC (`openTenantCard` / `_ticResolveTenant` in `housing-tic.js`) can open by
+  tenant id **or** unit→`assigned_name`, but in practice tenant rows only exist
+  for currently-assigned people, so the TIC is effectively **unit-linked**.
+- **Applicants** live in `housing_applications` (separate) with no tenant row →
+  **no TIC**.
+- **On unassign:** the unit's `assigned_name` is cleared and a
+  `tenant_movement_log` row records the move-out (name + unit + `move_out_date`,
+  written from `housing-modals.js`). What happens to the tenant **row** depends on
+  the DB trigger — **confirm whether it deletes/blanks the tenant** (which would
+  drop the TIC + notes/lease/docs, leaving only the movement-log breadcrumb).
+  **This is the first thing to verify.**
+
+### Target model
+- Person (tenant) becomes a **first-class record with a lifecycle/status**,
+  decoupled from the unit trigger. Unit assignment becomes a **link** (one of
+  possibly many over time), not the thing that creates/destroys the person.
+- New fields on `tenants`: **`status`** (`applicant` | `active` | `former` |
+  `bcrd`), **`bcrd_date`**, and a BCR **reason/notes**.
+- **TIC for everyone** — applicants and former tenants, not just current
+  occupants (it already opens by id; the gap is that records don't persist for
+  non-assigned people).
+- **BCR eligibility gate** surfaced at: **application approval**
+  (housing-modals.js `confirmApprovalAction`), the **Match** flow (match.html),
+  and the **assign-to-unit** action — "Ineligible — BCR'd on [date]". A person
+  BCR'd from the community is not eligible for a house.
+
+### Open decisions (before building)
+1. **BCR enforcement:** hard block (cannot apply/be assigned) vs. flag-and-warn
+   with an **ED override**? (Banishment is usually a hard block.)
+2. **What BCR'd blocks:** unit assignment only, application submission, or both?
+3. **Person scope:** unify applicants + tenants into one person record, or keep
+   applications separate but add a shared **person link** + BCR status that
+   applies across both? (Full refactor vs. additive.)
+4. **Status set:** confirm canonical values (applicant / active / former / bcrd /
+   deceased?).
+5. **Keying:** applications + `tenant_movement_log` are **name-keyed** today; a
+   reliable BCR check + persistent history really wants a stable **person id**
+   linking application ↔ tenant ↔ assignments.
+
+### Phased path (low-risk → structural)
+- **T1 (additive):** add `status` + `bcrd_date` (+ reason) to `tenants`; show a
+  clear **"BCR'd / ineligible"** banner in the TIC; add a **name-based** BCR check
+  that at least **warns** in Match + approval. Migration: ALTER `tenants`.
+- **T2:** decouple `tenants` from the unit trigger so records **persist on
+  unassign** (→ `former`) and the TIC opens for applicants + former tenants.
+  Requires reworking the DB trigger (link/unlink instead of create/delete).
+- **T3:** introduce a stable **person id** and link applications ↔ tenants ↔
+  assignments; move the BCR check from name-based to id-based.
+
+---
+
 ## Rollback points
 - Pre-refactor snapshots (Phase C)
 
