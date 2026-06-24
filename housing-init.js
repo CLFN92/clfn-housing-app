@@ -2439,9 +2439,15 @@ function _lookupOpen(kind, id, label){
         window.location.href = 'tenants.html?tic=' + encodeURIComponent(unitId);
       }
     } else {
-      // No unit assigned yet — open the application instead.
-      if(typeof window.openEditModal === 'function') window.openEditModal(id);
-      else {
+      // No unit yet (applicant) — open their Tenant Information Card, built from
+      // the application (Phase T2). From there the 'View Application' button
+      // opens the application to update it. Falls back to the application form
+      // only if the TIC isn't available on this page.
+      if(typeof window.openTenantCard === 'function' && document.getElementById('ticModal')){
+        window.openTenantCard(id);
+      } else if(typeof window.openEditModal === 'function'){
+        window.openEditModal(id);
+      } else {
         if (typeof setNavReferrer === 'function') setNavReferrer('home');
         window.location.href = 'housing.html?openApp=' + encodeURIComponent(id);
       }
