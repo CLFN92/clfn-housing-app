@@ -235,6 +235,55 @@ async function callClaude(system: string, messages: unknown[], tools?: unknown[]
   return data
 }
 
+// Write one append-only audit row per AI interaction. Server-side (service-role)
+// so it cannot be bypassed by a tampered client. Columns mirror the rest of the
+// app's auditEntry(): actor = verified email; detail is a JSON string carrying
+// the staff name (for the audit "By" column) plus the question, mode, role, and
+// which tables the read-only query tool touched. Best-effort: never throws into
+// the request path. Awaited before responding so the insert completes before the
+// function instance is reclaimed.
+async function writeAiAudit(opts: {
+  email: string
+  name: string
+  role: string
+  mode: string
+  question: string
+  replyChars: number
+  tables: string[]
+  turns: number
+}): Promise<void> {
+  if (!SUPABASE_SERVICE_KEY || !SUPABASE_URL) return
+  try {
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    const q = (opts.question || '').slice(0, 2000)
+    // `detail` is the human-readable summary the audit-log UI shows in its
+    // Detail column (_parseAuditRow reads d.detail); the rest are structured
+    // fields kept for the AI's own usage reports and compliance review.
+    const summary = (opts.mode === 'draft' ? 'AI draft note: ' : 'AI question: ') + q
+      + (opts.tables && opts.tables.length ? ' [queried: ' + opts.tables.join(', ') + ']' : '')
+    const detail: Record<string, unknown> = {
+      detail: summary,
+      name: opts.name || opts.email,
+      mode: opts.mode,
+      role: opts.role,
+      question: q,
+      reply_chars: opts.replyChars,
+      tables_queried: opts.tables,
+      turns: opts.turns,
+    }
+    await admin.from('housing_audit_log').insert({
+      entity_type: 'ai',
+      entity_id: 'AI',
+      action: opts.mode === 'draft' ? 'ai_draft' : 'ai_query',
+      detail: JSON.stringify(detail),
+      actor: opts.email,
+      created_at: new Date().toISOString(),
+    })
+  } catch (e) {
+    console.warn('[ai-audit] insert failed:', (e as Error).message)
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -254,15 +303,19 @@ serve(async (req) => {
     // --- Resolve the verified, authoritative staff role (active staff only) ---
     const email = (user.email || '').toLowerCase()
     let role = ''
+    let actorName = ''
     if (SUPABASE_SERVICE_KEY) {
       const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
       const { data: rows } = await admin
         .from('staff')
-        .select('role')
+        .select('role, name')
         .eq('email', email)
         .eq('is_active', true)
         .limit(1)
-      if (rows && rows.length) role = normRole(rows[0].role || '')
+      if (rows && rows.length) {
+        role = normRole(rows[0].role || '')
+        actorName = rows[0].name || ''
+      }
     }
     if (!role) return json({ error: 'AI assistant is available to active housing staff only.' }, 403)
 
@@ -276,12 +329,15 @@ serve(async (req) => {
     // --- Draft mode: single call, no tools ---
     if (type === 'draft') {
       const data = await callClaude(buildSystem('draft', context), buildMessages(message, history))
-      return json({ reply: (data.content as any)?.[0]?.text || '(no response)' })
+      const reply = (data.content as any)?.[0]?.text || '(no response)'
+      await writeAiAudit({ email, name: actorName, role, mode: 'draft', question: message || '', replyChars: reply.length, tables: [], turns: 1 })
+      return json({ reply })
     }
 
     // --- Chat mode: tool-use loop with the read-only query_database tool ---
     const system = buildSystem('chat', context)
     const messages = buildMessages(message, history)
+    const tablesQueried: string[] = []
     let turns = 0
     while (turns < MAX_TOOL_TURNS) {
       turns++
@@ -291,7 +347,9 @@ serve(async (req) => {
 
       if (resp.stop_reason !== 'tool_use') {
         const text = content.filter((b) => b.type === 'text').map((b) => b.text as string).join('\n').trim()
-        return json({ reply: text || '(no response)' })
+        const reply = text || '(no response)'
+        await writeAiAudit({ email, name: actorName, role, mode: 'chat', question: message || '', replyChars: reply.length, tables: tablesQueried, turns })
+        return json({ reply })
       }
 
       const toolResults: unknown[] = []
@@ -299,7 +357,10 @@ serve(async (req) => {
         if (block.type !== 'tool_use') continue
         let resultText: string
         if (block.name === 'query_database') {
-          const qr = await runQuery(role, email, (block.input as Record<string, unknown>) || {})
+          const input = (block.input as Record<string, unknown>) || {}
+          const tbl = String(input.table || '')
+          if (tbl && tablesQueried.indexOf(tbl) === -1) tablesQueried.push(tbl)
+          const qr = await runQuery(role, email, input)
           resultText = qr.error
             ? 'ERROR: ' + qr.error
             : 'Returned ' + (qr.rows || []).length + ' row(s):\n' + JSON.stringify(qr.rows).slice(0, 12000)
@@ -310,6 +371,7 @@ serve(async (req) => {
       }
       messages.push({ role: 'user', content: toolResults })
     }
+    await writeAiAudit({ email, name: actorName, role, mode: 'chat', question: message || '', replyChars: 0, tables: tablesQueried, turns })
     return json({ reply: "I couldn't finish that lookup. Try narrowing the question." })
   } catch (err) {
     return json({ error: (err as Error).message }, 500)
