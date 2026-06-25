@@ -388,6 +388,77 @@ function _idleLogout() {
   }
 }
 
+// Session/token-expiry teardown. When an authenticated Supabase call comes back
+// 401 and the token can't be refreshed, the session is dead and the user is
+// otherwise stranded on a page making failing calls. Mirror _idleLogout exactly
+// (synchronous token clear -> detached sign-out -> immediate redirect; never
+// await network before navigating) so they land on the login screen with the
+// same "session expired" banner (?timeout=1). This is distinct from the slow-
+// connection save timeout, which intentionally stays in the offline queue.
+function _handleSessionExpired() {
+  console.log('[CLFN] Session expired - signing out');
+  try {
+    ['clfn_housing_token','clfn_housing_refresh','clfn_housing_token_exp',
+     'clfn_housing_role','clfn_housing_name',
+     'clfn_housing_email_session','clfn_login_audited'].forEach(function(k){
+      try { sessionStorage.removeItem(k); } catch(e) {}
+    });
+  } catch(e) {}
+  stopIdleTimer();
+  if (typeof doLogout === 'function') {
+    try { doLogout('expired').catch(function(e){ console.warn('[CLFN] expired doLogout:', e); }); } catch(e) {}
+  }
+  var path = window.location.pathname;
+  var onLogin = /(?:^|\/)index\.html$/.test(path) || path === '/' || path === '';
+  if (!onLogin) {
+    window.location.href = 'index.html?timeout=1';
+  }
+}
+window._handleSessionExpired = _handleSessionExpired;
+
+// Global 401 interceptor. Any authenticated Supabase REST / Storage / Edge
+// Function call that returns 401 means the JWT is dead (PostgREST returns 403,
+// not 401, for RLS/permission denials, so this won't fire on those). Try ONE
+// token refresh; if it succeeds the session self-heals silently, if it fails
+// the session is genuinely expired -> _handleSessionExpired() bounces to login.
+// Guards: only Supabase URLs, never /auth/v1/ (so login + refresh failures don't
+// trip it and there's no redirect loop), and only when we believed we had a
+// session. Slow-save TIMEOUTS never reach here -- they reject locally and the
+// degraded-mode/offline queue handles them.
+(function(){
+  if (typeof window === 'undefined' || !window.fetch || window._authFetchWrapped) return;
+  window._authFetchWrapped = true;
+  var _origFetch = window.fetch.bind(window);
+  var _handling = false;
+  window.fetch = function(input, init){
+    return _origFetch(input, init).then(function(resp){
+      try {
+        if (resp && resp.status === 401 && !_handling
+            && typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) {
+          var url = (typeof input === 'string') ? input : (input && input.url) || '';
+          var isSb   = url.indexOf(SUPABASE_URL) === 0;
+          var isAuth = url.indexOf('/auth/v1/') !== -1;
+          var haveSession = !!(typeof HOUSING_SESSION !== 'undefined'
+                               && HOUSING_SESSION && HOUSING_SESSION.accessToken);
+          if (isSb && !isAuth && haveSession) {
+            _handling = true;
+            (typeof refreshHousingToken === 'function'
+               ? refreshHousingToken() : Promise.resolve(false))
+              .then(function(ok){
+                if (ok) { _handling = false; }            // recovered silently
+                else if (typeof _handleSessionExpired === 'function') _handleSessionExpired();
+              })
+              .catch(function(){
+                if (typeof _handleSessionExpired === 'function') _handleSessionExpired();
+              });
+          }
+        }
+      } catch(e){}
+      return resp;
+    });
+  };
+})();
+
 function startIdleTimer() {
   if (!HOUSING_SESSION || !HOUSING_SESSION.email) return;
   if (!_idleListenersAttached) {
