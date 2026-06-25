@@ -213,6 +213,9 @@ function _appendAIMessage(role, text, id) {
       catch (e) { return _m; }   // leave unparseable blocks as text
     }).trim();
   }
+  // No explicit chart blocks? Derive charts from any count/breakdown tables so
+  // visuals appear without needing the ai-chat function redeploy.
+  if (!isUser && !charts.length) charts = _aiDeriveChartSpecs(text).slice(0, 8);
 
   var bubble = document.createElement('div');
   bubble.style.cssText = [
@@ -330,24 +333,77 @@ function _aiPdfClean(s){
     .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{FE0F}]/gu, '')
     .replace(/\*\*/g, '').replace(/`/g, '').replace(/•/g, '').trim();
 }
+// Parse a number out of a markdown cell (handles $, %, commas).
+function _aiParseNum(s){ if (s == null) return null; var m = String(s).replace(/[$,%\s]/g,'').match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; }
+// Markdown tables in order, each tagged with the nearest preceding heading.
+function _aiMarkdownTables(md){
+  var lines = String(md||'').split('\n'), out = [], lastHeading = '', i = 0;
+  while (i < lines.length){
+    var raw = (lines[i]||'').trim();
+    var h = raw.match(/^#{1,6}\s+(.+)$/);
+    if (h){ lastHeading = _aiPdfClean(h[1]); i++; continue; }
+    if (raw.charAt(0) === '|'){
+      var tbl = [];
+      while (i < lines.length && (lines[i]||'').trim().charAt(0) === '|'){
+        var cells = (lines[i]||'').trim().replace(/^\||\|$/g,'').split('|').map(function(c){ return c.trim(); });
+        if (!cells.every(function(c){ return /^:?-{2,}:?$/.test(c) || c===''; })) tbl.push(cells);
+        i++;
+      }
+      if (tbl.length >= 2) out.push({ header: tbl[0], rows: tbl.slice(1), title: lastHeading });
+      continue;
+    }
+    i++;
+  }
+  return out;
+}
+// Turn a count/breakdown table into a bar-chart spec (or null if it isn't one).
+function _aiTableToChartSpec(header, rows, title){
+  if (!header || header.length < 2 || !rows || rows.length < 2) return null;
+  var valCol = -1, valHeader = '';
+  for (var c = 1; c < header.length; c++){
+    if (/%|percent/i.test(header[c]||'')) continue;
+    var nums = 0;
+    rows.forEach(function(r){ if (_aiParseNum(r[c]) != null) nums++; });
+    if (nums >= Math.ceil(rows.length * 0.6)) { valCol = c; valHeader = header[c]; break; }
+  }
+  if (valCol === -1) return null;
+  var labels = [], data = [];
+  rows.forEach(function(r){
+    var label = _aiPdfClean(r[0]||'');
+    if (!label || /^total\b/i.test(label)) return;
+    var v = _aiParseNum(r[valCol]);
+    if (v == null) return;
+    labels.push(label); data.push(v);
+  });
+  if (labels.length < 2 || labels.length > 14) return null;
+  return { type:'bar', title: _aiPdfClean(title || header[0] || ''), labels: labels, datasets: [{ label: _aiPdfClean(valHeader) || 'Count', data: data }] };
+}
+function _aiDeriveChartSpecs(md){
+  return _aiMarkdownTables(md).map(function(t){ return _aiTableToChartSpec(t.header, t.rows, t.title); }).filter(Boolean);
+}
+
 function _aiExportReplyPdf(md){
   if (typeof md !== 'string' || !md.trim()) return;
-  var chartSpecs = [];
+  var explicit = [];
   var work = md.replace(/```chart\s*([\s\S]*?)```/g, function (_m, json) {
-    try { chartSpecs.push(JSON.parse(json.trim())); return '\n@@CHART' + (chartSpecs.length - 1) + '@@\n'; }
+    try { explicit.push(JSON.parse(json.trim())); return '\n@@CHART' + (explicit.length - 1) + '@@\n'; }
     catch (e) { return ''; }
   }).replace(/```[\s\S]*?```/g, '');   // drop other code fences (ASCII bars etc.)
+  // If the model didn't emit explicit charts, derive one per count table.
+  var tableSpecs = explicit.length ? [] : _aiDeriveChartSpecs(work);
   _aiLoadPdfLibs(function () {
-    if (!(window.jspdf && window.jspdf.jsPDF)) { showToast('PDF library failed to load.', { type:'error' }); return; }
-    var images = new Array(chartSpecs.length).fill(null);
-    var pending = chartSpecs.length;
-    if (!pending) { _aiBuildReplyPdf(work, images); return; }
-    chartSpecs.forEach(function (spec, i) {
-      _aiChartToImage(spec, function (img) { images[i] = img; if (--pending === 0) _aiBuildReplyPdf(work, images); });
+    if (!(window.jspdf && window.jspdf.jsPDF)) { if (typeof showToast==='function') showToast('PDF library failed to load.', { type:'error' }); return; }
+    var allSpecs = explicit.concat(tableSpecs);
+    var images = new Array(allSpecs.length).fill(null);
+    var pending = allSpecs.length;
+    function go(){ _aiBuildReplyPdf(work, images.slice(0, explicit.length), images.slice(explicit.length)); }
+    if (!pending) { go(); return; }
+    allSpecs.forEach(function (spec, i) {
+      _aiChartToImage(spec, function (img) { images[i] = img; if (--pending === 0) go(); });
     });
   });
 }
-function _aiBuildReplyPdf(work, chartImages){
+function _aiBuildReplyPdf(work, explicitImages, tableImages){
   var jsPDF = window.jspdf.jsPDF;
   var doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'letter' });
   var pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
@@ -365,13 +421,13 @@ function _aiBuildReplyPdf(work, chartImages){
   doc.setTextColor(25);
 
   function ensure(h){ if (y + h > pageH - 16) { doc.addPage(); y = 16; } }
-  var lines = work.split('\n'), i = 0;
+  var lines = work.split('\n'), i = 0, _tblCount = 0;
   while (i < lines.length){
     var raw = (lines[i] || '').trim();
     if (!raw){ i++; continue; }
     var cm = raw.match(/^@@CHART(\d+)@@$/);
     if (cm){
-      var img = chartImages[parseInt(cm[1], 10)];
+      var img = explicitImages[parseInt(cm[1], 10)];
       if (img){ var iw = Math.min(contentW, 150), ih = iw * 0.5; ensure(ih + 4); try { doc.addImage(img, 'PNG', margin, y, iw, ih); } catch(e){} y += ih + 5; }
       i++; continue;
     }
@@ -389,6 +445,11 @@ function _aiBuildReplyPdf(work, chartImages){
           headStyles:{ fillColor:[17,17,15], textColor:[248,228,26], fontStyle:'bold', fontSize:8 },
           margin:{ left:margin, right:margin } });
         y = doc.lastAutoTable.finalY + 5;
+        // Derived chart for this count table (when the model didn't emit one).
+        if (tableImages && tableImages.length && _aiTableToChartSpec(tbl[0], tbl.slice(1), '')) {
+          var tci = tableImages[_tblCount++];
+          if (tci){ var tw = Math.min(contentW, 140), th = tw * 0.5; ensure(th + 4); try { doc.addImage(tci, 'PNG', margin, y, tw, th); } catch(e){} y += th + 5; }
+        }
       }
       continue;
     }
