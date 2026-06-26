@@ -2053,6 +2053,19 @@
   function _ticGoToApplication(appId){
     window.location.href = 'housing.html?openApp=' + encodeURIComponent(appId);
   }
+  // The unit currently assigned to this tenant, resolved from the unit object or
+  // the tenant's unit_id / current_unit_id. '' = no unit assigned.
+  function _ticAssignedUnitId(){
+    return (_ticState.unit && _ticState.unit.id)
+        || (_ticState.tenant && (_ticState.tenant.unit_id || _ticState.tenant.current_unit_id))
+        || '';
+  }
+  // Show the "View Unit" footer button only when the tenant has an assigned
+  // unit; hide it otherwise.
+  function _ticSyncFooter(){
+    var btn = _ticEl('tic_act_view_unit');
+    if(btn) btn.style.display = _ticAssignedUnitId() ? '' : 'none';
+  }
   function _ticFindApplicationForTenant(){
     // 1) unit.assignedTo — set by the assign-unit flow and reflects the most
     //    recent application linked to this unit. Checked before tenant.application_id
@@ -2101,6 +2114,16 @@
         }
         _ticGoToApplication(appId);
       });
+      return;
+    }
+    if(t.id === 'tic_act_view_unit'){
+      var vuUnitId = _ticAssignedUnitId();
+      if(!vuUnitId){
+        if(typeof showToast === 'function') showToast('No unit assigned to this tenant.');
+        return;
+      }
+      _ticClose();
+      window.location.href = 'inventory.html?unit=' + encodeURIComponent(vuUnitId);
       return;
     }
     if(t.id === 'tic_act_new_wo'){
@@ -2241,6 +2264,7 @@
     _ticState.tenant = null; _ticState.unit = null; _ticState.application = null;
     _ticState.ledger = null; _ticState.notes = []; _ticState.applicationNotes = [];
     _ticState.movementLog = [];
+    _ticSyncFooter();   // hide View Unit until the assigned unit resolves
     _ticDocLib = null; _ticDocLibKey = null;
     _ticUtilDocLib = null; _ticUtilDocLibKey = null;
     ['overview','utilities','occupants','contact','emergency','references','pets','documents','notes','history'].forEach(function(n){
@@ -2265,6 +2289,7 @@
 
       _ticRenderHero();
       _ticRenderStrip();
+      _ticSyncFooter();
 
       var pkValue = _ticState.tenant ? _ticState.tenant[TIC_C.tenant_pk] : null;
       var loadAll = pkValue ? _ticLoadAll(pkValue, _ticState.unit) : Promise.resolve();
