@@ -68,7 +68,7 @@ const TABLES: Record<string, TableDef> = {
   },
   housing_applications: {
     roles: MGMT,
-    cols: 'id, status, score, tier, app_type, urgent_need, health_risk, assigned_unit_id, assigned_address, submitted_at, created_by_email, archived. Applicant name and household details live in a `data` jsonb (filter on these top-level columns; names are also in the loaded context).',
+    cols: 'id, status, score, tier, app_type, urgent_need, health_risk, assigned_unit_id, assigned_address, submitted_at, created_by_email, archived. Applicant name and household details live in a `data` jsonb (filter on these top-level columns; names are also in the loaded context). app_type is one of: new_housing (applicant seeking a new unit; scored and ranked), existing_tenant (a file update only -- NOT scored, never on Match), transfer_request (a current CLFN tenant who already has a house on reserve applying for a DIFFERENT unit; scored and ranked; this is the "On Rez" / transfer case shown on the Match page).',
   },
   tenants: {
     roles: ALL,
@@ -424,7 +424,23 @@ ED approves, per Settings > Approval Authority. Tip: the approval note box has a
 "Draft with AI" button that writes a professional decision note for you.
 
 Match an applicant to a unit: approved applications with no unit show in "Ready
-to Match"; use the Match page to assign a vacant unit.
+to Match"; use the Match page to assign a vacant unit. The Match page lists only
+SCORED applications that have cleared approval (status mgr_approved, hm_approved,
+or ed_approved) and have no assigned_unit_id yet. Two app_types are scored and
+appear there: new_housing and transfer_request (existing_tenant file updates are
+never on Match).
+
+"On Rez" / transfer applicants: an applicant who already has a house on reserve
+and is applying for a new/different one is a transfer -- app_type =
+'transfer_request'. The Match page flags these with an "On Rez" badge. To count
+"how many on the Match list have the On Rez flag" (or "have a house on rez and
+are looking for a new house"), count housing_applications where
+app_type = 'transfer_request' AND status in (mgr_approved, hm_approved,
+ed_approved) AND assigned_unit_id is null AND archived = false. Do NOT answer
+this from the applicants' self-reported reserve / haveHouse fields in the data
+jsonb -- those are unrelated to the Match On Rez flag and will give the wrong
+count (e.g. they include declined or never-approved applications that never
+appear on Match).
 
 Inspections: open the Inspections page (under the Operations nav) > "New
 Inspection". Pick the unit and type (Move-In, Move-Out, Annual, Routine,
