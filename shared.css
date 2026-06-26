@@ -1911,6 +1911,16 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
   .app-header-v2 .hlogo-v2 { width: 34px; height: 34px; font-size: 18px; }
   .app-header-v2 .btn-create { padding: 8px 12px; font-size: 12px; }
   .app-header-v2 .btn-create-label { display: none; }
+  /* Collapse the Export button to icon-only so the right-side actions fit. */
+  .app-header-v2 .btn-export-v2 span { display: none; }
+  .app-header-v2 .btn-export-v2 { padding: 7px 9px; }
+  /* Let the brand shrink/truncate so the actions cluster -- and especially the
+     account avatar -- is never pushed off the right edge of the screen. The
+     actions stay at full size; the brand title ellipsizes instead. */
+  .app-header-v2 .hbrand { min-width: 0; flex-shrink: 1; }
+  .app-header-v2 .hbrand > div { min-width: 0; overflow: hidden; }
+  .app-header-v2 .hbrand-title { overflow: hidden; text-overflow: ellipsis; }
+  .app-header-v2 .header-actions { gap: 6px; padding-left: 8px; flex-shrink: 0; }
 }
 
 /* ── LANDING PAGE COMPONENTS (shared: housing + finance) ────────────────────

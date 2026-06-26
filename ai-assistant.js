@@ -71,9 +71,48 @@ function aiDraftNote() {
   });
 }
 
+// ── Chat Panel: self-inject ──────────────────────────────────────────────────
+// housing.html ships the panel as static markup, but the assistant button is in
+// the shared header on every page that loads housing-init.js. Self-inject the
+// panel (idempotent) so the AI works on any page that loads this script, not
+// just the ones with the static markup -- mirrors how the TIC / reno
+// questionnaire inject their own modals.
+function _ensureAIPanel() {
+  if (document.getElementById('ai_chat_panel')) return;
+  if (!document.body) return;
+  var natSub = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
+  var wrap = document.createElement('div');
+  wrap.id = 'ai_chat_panel';
+  wrap.style.cssText = 'display:none;position:fixed;bottom:24px;right:24px;width:360px;max-height:520px;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,0.5);z-index:1200;flex-direction:column;overflow:hidden;';
+  wrap.innerHTML = ''
+    + '<div style="background:var(--dark);padding:14px 18px;border-bottom:2px solid var(--yellow);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">'
+    +   '<div style="display:flex;align-items:center;gap:8px;">'
+    +     '<span style="color:var(--yellow);font-size:16px;">✦</span>'
+    +     '<div>'
+    +       '<div style="font-family:\'DM Serif Display\',serif;font-size:15px;color:#fff;">AI Assistant</div>'
+    +       '<div style="font-size:11px;color:#666;">' + natSub + '</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<button onclick="closeAIChat()" style="background:none;border:1px solid #444;color:#ccc;width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;">✕</button>'
+    + '</div>'
+    + '<div id="ai_chat_messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;"></div>'
+    + '<div style="padding:12px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;">'
+    +   '<textarea id="ai_chat_input" rows="1" placeholder="Ask anything about applications, units, or policy..." style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);font-family:DM Sans,sans-serif;resize:none;outline:none;line-height:1.4;max-height:80px;overflow-y:auto;" oninput="this.style.height=\'auto\';this.style.height=Math.min(this.scrollHeight,80)+\'px\'"></textarea>'
+    +   '<button id="ai_chat_send" onclick="aiSendMessage()" style="background:var(--yellow);border:none;color:#111;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;flex-shrink:0;align-self:flex-end;">Send</button>'
+    + '</div>';
+  document.body.appendChild(wrap);
+  // Bind Enter-to-send on the freshly injected input (the static-panel binding
+  // in the DOMContentLoaded handler below only catches housing.html's markup).
+  var inp = wrap.querySelector('#ai_chat_input');
+  if (inp) inp.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiSendMessage(); }
+  });
+}
+
 // ── Chat Panel: open / close / toggle ────────────────────────────────────────
 function openAIChat() {
   if (window.CLFN_MODULES && !CLFN_MODULES.isEnabled('ai_assistant')) return;
+  _ensureAIPanel();
   var panel = document.getElementById('ai_chat_panel');
   if (panel) panel.style.display = 'flex';
   _aiPanelOpen = true;
