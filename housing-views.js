@@ -392,6 +392,12 @@ function renderMatchView(){
     // This application already resulted in a placement -> it's done, not a
     // pending match.
     if(a.status==='assigned' || !!a.assignedUnit) return false;
+    // Match shows only applications that have cleared approval and are awaiting
+    // placement. Not-yet-approved (submitted / Pending HM), returned, and
+    // declined applications are hidden from the queue.
+    if(a.status!==APP_STATUS.MGR_APPROVED
+       && a.status!==APP_STATUS.HM_APPROVED
+       && a.status!==APP_STATUS.ED_APPROVED) return false;
     // The Application Type decides who gets matched. Two of the three types are
     // SCORED + RANKED and so belong on Match:
     //   new_housing      - applicant seeking a new unit
@@ -449,6 +455,7 @@ function renderMatchView(){
   };
   var statusLabel = {
     'submitted':    'Pending HM',
+    'hm_approved':  'HM Approved',
     'ed_approved':  'ED Approved',
     'mgr_approved': 'Mgr Approved',
     'assigned':     'Assigned'
