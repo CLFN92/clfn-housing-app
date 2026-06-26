@@ -2253,11 +2253,11 @@ function addSowItem(data){
   div.style.cssText='display:grid;grid-template-columns:160px 1fr 110px auto;gap:8px;align-items:start;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;';
   div.innerHTML='<select data-sow="category" style="font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);"><option value="">Category</option>'+catOpts+'</select>'
     +'<input data-sow="description" type="text" placeholder="Describe the work required…" value="'+(data&&data.description?data.description.replace(/"/g,'&quot;'):'')+'" style="font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);"/>'
-    +'<div style="display:flex;flex-direction:column;gap:3px;">'
-    +'<input data-sow="cost" type="number" placeholder="Est. $" min="0" step="100" value="'+(data&&data.cost?parseFloat((data.cost||'').replace(/[^0-9.]/g,''))||'':'')+'" style="font-size:11px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);" oninput="recalcSowTotal()" title="Internal estimate (not shown on work order)"/>'
-    +'<input data-sow="quote" type="number" placeholder="Quote $" min="0" step="100" value="'+(data&&data.quote?parseFloat((data.quote||'').replace(/[^0-9.]/g,''))||'':'')+'" style="font-size:11px;padding:5px 6px;border:1px solid var(--info-blue);border-radius:6px;background:var(--info-blue-bg);color:var(--text);" title="Contractor quoted price (shown on work order)"/>'
-    +'<div style="font-size:9px;color:var(--muted);text-align:center;line-height:1.2;">Est / Quote</div>'
-    +'</div>'
+    +'<input data-sow="cost" type="number" placeholder="Est. $" min="0" step="100" value="'+(data&&data.cost?parseFloat((data.cost||'').replace(/[^0-9.]/g,''))||'':'')+'" style="font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);" oninput="recalcSowTotal()" title="Estimated cost"/>'
+    // Quote is captured via the RFQ / contracting flow, not on this form. Keep
+    // any existing value in a hidden field so editing + re-saving an old SOW
+    // does not wipe a previously entered quote.
+    +'<input data-sow="quote" type="hidden" value="'+(data&&data.quote?parseFloat((data.quote||'').replace(/[^0-9.]/g,''))||'':'')+'"/>'
     +'<button type="button" data-sow-del="'+idx+'" style="background:none;border:1px solid var(--danger-border);color:var(--danger);border-radius:6px;padding:6px 8px;cursor:pointer;font-size:12px;">✕</button>';
   cont.appendChild(div);
   div.querySelector('[data-sow-del]').addEventListener('click',function(){
