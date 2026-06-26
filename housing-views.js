@@ -349,21 +349,61 @@ function renderMatchView(){
   var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
   var vacantUnits = allUnits.filter(function(u){ return u.status==='vacant' && !u.archived; });
 
+  // Tenancy is authoritative on the UNIT (housing_units.assigned_name) and is
+  // NOT reliably synced back onto the application record: assignedUnit/status
+  // are only written when a unit is assigned to a tenant whose assignedTo ===
+  // the application id (see housing-modals.js saveUnitEdit). So an applicant can
+  // be housed in reality while their application still looks unassigned --
+  // backfilled/legacy tenants, names typed directly, existing-tenant
+  // assignments, or a duplicate approved app. Map current tenancy (unit address)
+  // by linked app-id and by tenant name so the Match view can both flag housed
+  // applicants and decide who genuinely belongs in the queue.
+  var _mNorm = function(s){ return (s||'').toString().toLowerCase().replace(/\s+/g,' ').trim(); };
+  var _housedAddrByAppId = {};
+  var _housedAddrByName  = {};
+  allUnits.forEach(function(u){
+    if(u.archived) return;
+    var occupied = u.status==='occupied' || u.status==='reserved' || !!u.assignedName;
+    if(!occupied) return;
+    var addr = ((u.num||'') + ' ' + (u.street||'')).trim();
+    if(u.assignedTo)   _housedAddrByAppId[u.assignedTo] = addr;
+    if(u.assignedName) _housedAddrByName[_mNorm(u.assignedName)] = addr;
+  });
+  // Address of the applicant's CURRENT home, when housed via a unit that is not
+  // this application's own assignment (i.e. a real, separate tenancy). '' = not
+  // currently housed elsewhere. Used to flag transfer/upgrade applicants.
+  function _currentTenancyAddr(a){
+    return _housedAddrByAppId[a.id]
+        || _housedAddrByName[_mNorm((a.fn||'')+' '+(a.ln||''))]
+        || '';
+  }
+
   // Search-bar pre-filter. All other filtering happens via the column-menu
   // popovers (see tableApplyFilterSort below).
   var search = (document.getElementById('match_search')||{}).value||'';
   var _searchLc = (search || '').toLowerCase().trim();
   var filtered = allApps.filter(function(a){
     if(a.archived) return false;
-    // File-update applications normally don't belong on Match — they're
-    // updates to an existing tenant's record, not housing requests. BUT a
-    // file update WITHOUT an assignedUnit is a data anomaly and should
-    // surface so a unit can be attached.
-    if(a.appType === 'existing_tenant' && a.assignedUnit) return false;
+    // Existing-tenant FILE UPDATES are record updates, not housing requests, and
+    // are never scored/ranked -> they must never appear on Match, regardless of
+    // unit or status.
+    if(a.appType === 'existing_tenant') return false;
     if(a.status===APP_STATUS.DRAFT||a.status===APP_STATUS.ARCHIVED||a.status===APP_STATUS.FILE_UPDATE) return false;
-    // Hide already-housed applicants from the Match list by default.
-    var isHoused = a.status==='assigned' || !!a.assignedUnit;
-    if(isHoused) return false;
+    // This application already resulted in a placement -> it's done, not a
+    // pending match.
+    if(a.status==='assigned' || !!a.assignedUnit) return false;
+    // The Application Type decides who gets matched. Two of the three types are
+    // SCORED + RANKED and so belong on Match:
+    //   new_housing      - applicant seeking a new unit
+    //   transfer_request - current tenant applying for a different unit
+    // (existing_tenant "file update" is NOT scored and is excluded above by the
+    // file_update status.) A scored applicant who is currently housed (a
+    // transfer) stays in the queue and is flagged with the "On Rez" identifier
+    // in the row. A housed person surfacing via any OTHER, non-scored record
+    // (e.g. a stale existing-tenant anomaly) is suppressed -- they already have
+    // a home and aren't being ranked.
+    var _scored = (a.appType === 'new_housing' || a.appType === 'transfer_request');
+    if(_currentTenancyAddr(a) && !_scored) return false;
     if(_searchLc){
       var hay = [
         a.fn, a.ln, a.id, a.tier, a.status, a.reserve,
@@ -426,7 +466,7 @@ function renderMatchView(){
     reserve:     { label: 'Reserve',    accessor: function(a){ return a.reserve || '(none)'; } },
     bestUnit:    { label: 'Best Unit',  accessor: function(a){ return _bestUnitAddr(a) || '(no match)'; } },
     status:      { label: 'Status',     accessor: function(a){ return statusLabel[a.status] || a.status || 'Unknown'; } },
-    hasHouse:    { label: 'Has House',  accessor: function(a){ return a.assignedUnit ? 1 : 0; } },
+    hasHouse:    { label: 'Has House',  accessor: function(a){ return (a.assignedUnit || a.appType==='transfer_request' || _currentTenancyAddr(a)) ? 1 : 0; } },
     action:      { label: 'Action',     accessor: function(a){ var ready = !a.assignedUnit && (a.status==='ed_approved'||a.status==='mgr_approved'||a.status==='hm_approved'); return ready ? 1000 + (a.score||0) : (a.score||0); } }
   };
   var _matchAccessors = {};
@@ -455,6 +495,8 @@ function renderMatchView(){
   var rows = _matchRows.map(function(app, i){
     var best = bestUnit(app);
     var name = ((app.fn||'')+' '+(app.ln||'')).trim();
+    var curAddr = _currentTenancyAddr(app);   // current home address, if resolvable
+    var isTransfer = (app.appType === 'transfer_request') || !!curAddr;  // current tenant moving
     var tCol = tierColor[app.tier] || '#6b7280';
     var tier = (app.tier||'Low Priority').replace(' Priority','');
     var needsBeds = 1;
@@ -486,6 +528,7 @@ function renderMatchView(){
     // that has cleared approval (mgr/ed/hm) — or is marked 'assigned' due to
     // a data anomaly — gets the Assign button so a unit can be attached.
     var hasUnit    = !!app.assignedUnit;
+    var hasHouseReal = hasUnit || isTransfer;   // real tenancy, incl. transfer applicants
     var isAssigned = hasUnit;
     var canAssign  = !hasUnit && (
                        app.status === APP_STATUS.ED_APPROVED ||
@@ -504,6 +547,7 @@ function renderMatchView(){
       +'<td style="padding:12px 10px;cursor:pointer;" onclick="openAppFromMatch(\''+app.id+'\');">'
         +'<div style="font-weight:700;font-size:13px;color:var(--text);text-decoration:underline;text-underline-offset:2px;">'+name+'</div>'
         +'<div class="js-lbl-sm">'+app.id+'</div>'
+        +(isTransfer?'<div style="margin-top:4px;"><span style="display:inline-block;font-size:10px;font-weight:700;background:var(--warn-amber);color:#111;padding:1px 7px;border-radius:4px;white-space:nowrap;">🏠 On Rez'+(curAddr?' · '+curAddr:'')+'</span> <span style="font-size:10px;color:var(--muted);font-weight:600;">transfer</span></div>':'')
       +'</td>'
       +'<td style="padding:12px 10px;white-space:nowrap;font-size:18px;font-weight:800;color:'+tCol+';">'+(app.score||0)+'</td>'
       +'<td style="padding:12px 10px;white-space:nowrap;font-size:11px;font-weight:700;color:'+tCol+';">'+tier+'</td>'
@@ -515,8 +559,8 @@ function renderMatchView(){
         +(reqs.length?'<div style="margin-top:3px;">'+reqs.join(' ')+'</div>':'')
       +'</td>'
       +'<td style="padding:12px 14px;white-space:nowrap;">'
-        +(hasUnit
-          ? '<span style="font-size:12px;font-weight:700;color:var(--success);">Yes</span>'
+        +(hasHouseReal
+          ? '<span style="font-size:12px;font-weight:700;color:var(--success);">Yes</span>'+(curAddr?'<div class="js-lbl-sm">'+curAddr+'</div>':'')
           : '<span style="font-size:12px;color:var(--muted);">No</span>')
       +'</td>'
       +'<td style="padding:12px 14px;">'+assignCell+'</td>'
