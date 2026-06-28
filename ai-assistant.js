@@ -297,11 +297,85 @@ function _aiLoadChartJs(cb) {
 
 var _AI_CHART_PALETTE = ['#F8E41A','#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4','#ec4899','#84cc16','#f97316','#94a3b8','#14b8a6'];
 
+// ── Word cloud (notes/theme analytics) ───────────────────────────────────────
+// wordcloud2.js is lazy-loaded from cdnjs (already CSP-allowlisted). The AI
+// emits {"type":"wordcloud","title":"...","words":[{"text":"leak","weight":12}]}
+// and we render it to a canvas (and to PNG for the PDF export).
+function _aiLoadWordCloud(cb) {
+  if (window.WordCloud) { cb(); return; }
+  if (window._aiWcCbs) { window._aiWcCbs.push(cb); return; }
+  window._aiWcCbs = [cb];
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.0/wordcloud2.min.js';
+  s.onload  = function () { (window._aiWcCbs || []).forEach(function (f) { try { f(); } catch (e) {} }); window._aiWcCbs = null; };
+  s.onerror = function () { window._aiWcCbs = null; };
+  document.head.appendChild(s);
+}
+// Normalize a wordcloud spec's words into wordcloud2's [word, weight] list.
+function _aiWordList(spec) {
+  var words = spec.words || spec.list || [];
+  var out = [];
+  words.forEach(function (w) {
+    if (Array.isArray(w)) { if (w[0]) out.push([String(w[0]), Number(w[1]) || 1]); }
+    else if (w && typeof w === 'object') {
+      var t = w.text || w.word || w.label;
+      var wt = w.weight || w.count || w.value || 1;
+      if (t) out.push([String(t), Number(wt) || 1]);
+    }
+  });
+  return out;
+}
+// Draw a word cloud onto `canvas`. cb (optional) fires when rendering finishes
+// (used by the PDF exporter, since wordcloud2 draws asynchronously).
+function _aiDrawWordCloud(canvas, spec, cb) {
+  _aiLoadWordCloud(function () {
+    if (!window.WordCloud) { if (cb) cb(false); return; }
+    var list = _aiWordList(spec);
+    if (!list.length) { if (cb) cb(false); return; }
+    var maxW = list.reduce(function (m, p) { return Math.max(m, p[1]); }, 1);
+    var pal = _AI_CHART_PALETTE, ci = 0;
+    var minFont = 13, maxFont = Math.min(64, Math.max(28, canvas.width / 9));
+    if (cb) {
+      var done = false;
+      var finish = function (ok) { if (done) return; done = true; if (cb) cb(ok); };
+      canvas.addEventListener('wordcloudstop', function h() { canvas.removeEventListener('wordcloudstop', h); finish(true); });
+      setTimeout(function () { finish(true); }, 1200); // fallback if the event never fires
+    }
+    try {
+      window.WordCloud(canvas, {
+        list: list,
+        gridSize: Math.round(canvas.width / 90),
+        weightFactor: function (w) { return minFont + (w / maxW) * (maxFont - minFont); },
+        fontFamily: 'DM Sans, Helvetica, sans-serif',
+        color: function () { return pal[(ci++) % pal.length]; },
+        backgroundColor: '#ffffff',
+        rotateRatio: 0.3, rotationSteps: 2,
+        drawOutOfBound: false, shrinkToFit: true
+      });
+    } catch (e) { if (cb) cb(false); }
+  });
+}
+
 function _aiRenderChart(wrap, spec) {
   if (!spec || !spec.type) return;
   var holder = document.createElement('div');
   holder.style.cssText = 'background:#fff;border:1px solid #444;border-radius:10px;padding:10px;margin-top:8px;width:85%;max-width:100%;box-sizing:border-box;';
   var canvas = document.createElement('canvas');
+  // Word cloud uses wordcloud2.js, not Chart.js.
+  if (spec.type === 'wordcloud') {
+    if (spec.title) {
+      var wcTitle = document.createElement('div');
+      wcTitle.textContent = spec.title;
+      wcTitle.style.cssText = 'font-weight:700;color:#111;font-size:13px;margin-bottom:6px;text-align:center;';
+      holder.appendChild(wcTitle);
+    }
+    canvas.width = 560; canvas.height = 300;
+    canvas.style.cssText = 'width:100%;height:auto;max-height:300px;';
+    holder.appendChild(canvas);
+    wrap.appendChild(holder);
+    _aiDrawWordCloud(canvas, spec, null);
+    return;
+  }
   canvas.style.cssText = 'width:100%;max-height:280px;';
   holder.appendChild(canvas);
   wrap.appendChild(holder);
@@ -349,6 +423,15 @@ function _aiLoadPdfLibs(cb){
 }
 // Render a chart spec to a PNG data URL via an offscreen Chart.js canvas.
 function _aiChartToImage(spec, cb){
+  // Word cloud renders via wordcloud2.js (asynchronous — wait for completion).
+  if (spec && spec.type === 'wordcloud') {
+    var wcCanvas = document.createElement('canvas'); wcCanvas.width = 700; wcCanvas.height = 360;
+    _aiDrawWordCloud(wcCanvas, spec, function (ok) {
+      if (!ok) { cb(null); return; }
+      try { cb(wcCanvas.toDataURL('image/png')); } catch (e) { cb(null); }
+    });
+    return;
+  }
   _aiLoadChartJs(function(){
     if (!window.Chart) { cb(null); return; }
     try {

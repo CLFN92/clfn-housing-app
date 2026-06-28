@@ -582,10 +582,21 @@ containing ONLY JSON describing it, for example:
 \`\`\`chart
 {"type":"bar","title":"Applications by status","labels":["Submitted","Approved","Declined"],"datasets":[{"label":"Count","data":[12,5,2]}]}
 \`\`\`
-- type is one of: bar, line, pie, doughnut.
+- type is one of: bar, line, pie, doughnut, wordcloud.
 - Compute the numbers yourself from the loaded context or query_database results
   (e.g. count audit-log logins per day). Use at most ~12 labels; group or top-N
   if there are more.
+- WORD CLOUD (best for note / theme analytics): when asked for a word cloud, or
+  for the common themes / frequent terms in notes, query the notes table(s)
+  (housing_application_notes.body and tenant_notes.note_body), read the bodies,
+  extract meaningful words (lowercase, strip punctuation, DROP common English
+  stopwords and generic filler like the/and/for/with/this/that/tenant/unit/note/
+  request), tally how often each remaining word appears, and emit the top ~40 as:
+  {"type":"wordcloud","title":"Common themes in notes","words":[{"text":"leak","weight":12},{"text":"furnace","weight":9},{"text":"roof","weight":7}]}
+  weight = frequency. The query tool returns up to 50 rows, so base the cloud on
+  the notes you can read and say how many notes it covers (e.g. "from the 50 most
+  recent notes"). Word clouds are only for free-text fields (notes), not for
+  status/category counts -- use a bar/pie chart for those.
 - Put a 1-2 sentence plain-text summary BEFORE the chart block.
 - Only include a chart when a visual genuinely helps; otherwise answer in text.
 
