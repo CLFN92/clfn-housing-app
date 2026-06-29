@@ -52,7 +52,7 @@ function exportTenants(){
   var d = getData();
   var typeLabels = {
     'band-on':'Band On-Reserve','band-off':'Band Off-Reserve','band-staff':'Band Office Staff',
-    'clea':'CLEA','community':'Community Member'
+    'clea':'CLEA','community':'Community Member','business':'Business','department':'Department'
   };
   // Reuse the same filter logic as renderTenantList
   var fStatus = (document.getElementById('tfilt_status')||{}).value || '';

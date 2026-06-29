@@ -97,6 +97,7 @@ function openEditTenant(tid) {
   set('tf-postal',    t.postalCode);
   set('tf-mailing',   t.mailingAddress);
   set('tf-type',      t.type || 'community');
+  set('tf-contact',   t.contact || '');
   set('tf-rent',      (t.rent != null ? t.rent : ''));
   set('tf-invpref',   t.invPref || 'email');
   set('tf-hydro',     t.hydroAcct);
@@ -134,6 +135,7 @@ function saveTenant() {
   var postal    = _tfVal('tf-postal');
   var mailing   = _tfVal('tf-mailing');
   var type    = _tfVal('tf-type') || 'community';
+  var contact = _tfVal('tf-contact');
   var rent    = parseFloat(_tfVal('tf-rent')) || 0;
   var invPref = _tfVal('tf-invpref') || 'email';
   var hydroA  = _tfVal('tf-hydro');
@@ -164,7 +166,7 @@ function saveTenant() {
     t.phone = phone; t.email = email;
     t.unit = unit; t.street = street; t.community = community;
     t.province = province; t.postalCode = postal; t.mailingAddress = mailing;
-    t.type = type; t.rent = rent; t.invPref = invPref;
+    t.type = type; t.contact = contact; t.rent = rent; t.invPref = invPref;
     t.hydroAcct = hydroA; t.gasAcct = gasA;
     t.autoPay = autoPay; t.autoPayType = autoPayType;
     t.homeCare = homeCare;
@@ -195,7 +197,7 @@ function saveTenant() {
     phone: phone, email: email,
     unit: unit, street: street, community: community,
     province: province, postalCode: postal, mailingAddress: mailing,
-    type: type, rent: rent, invPref: invPref,
+    type: type, contact: contact, rent: rent, invPref: invPref,
     hydroAcct: hydroA, gasAcct: gasA,
     autoPay: autoPay, autoPayType: autoPayType,
     homeCare: homeCare,

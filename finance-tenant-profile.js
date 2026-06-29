@@ -9,7 +9,7 @@ function renderTenantProfile(tid) {
   if (!initials) initials = '?';
   var inCol = isInCollections(tid);
   var isActive = t.active !== false; // default active
-  var typeLabels = {'band-on':'Band On-Reserve','band-off':'Band Off-Reserve','band-staff':'Band Office Staff','clea':'CLEA','community':'Community Member'};
+  var typeLabels = {'band-on':'Band On-Reserve','band-off':'Band Off-Reserve','band-staff':'Band Office Staff','clea':'CLEA','community':'Community Member','business':'Business','department':'Department'};
 
   // Approved loans balance
   var loanBal = 0;

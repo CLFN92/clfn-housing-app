@@ -220,6 +220,7 @@ function _tenantToRow(t){
 
     // Finance settings (added F3A)
     tenant_type:         t.type || null,
+    contact_person:      t.contact || null,
     monthly_rent:        Number(t.rent || 0),
     invoice_preference:  t.invPref || null,
     auto_pay:            !!t.autoPay,
@@ -259,6 +260,7 @@ function _tenantFromRow(r){
     // Finance settings
     unit:         unitDisplay,
     type:         r.tenant_type || 'community',
+    contact:      r.contact_person || '',
     rent:         Number(r.monthly_rent || 0),
     invPref:      r.invoice_preference || 'email',
     autoPay:      !!r.auto_pay,

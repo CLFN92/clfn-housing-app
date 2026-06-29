@@ -122,7 +122,7 @@ function renderTenantList() {
 
   var typeLabels = {
     'band-on':'Band On-Reserve','band-off':'Band Off-Reserve','band-staff':'Band Office Staff',
-    'clea':'CLEA','community':'Community Member'
+    'clea':'CLEA','community':'Community Member','business':'Business','department':'Department'
   };
 
   // Phase 2B: column-menu sort/filter

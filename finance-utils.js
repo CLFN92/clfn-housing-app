@@ -29,7 +29,7 @@ function methodLabel(m){
   return map[m]||m||'';
 }
 function typePill(type){
-  var map={'band-on':'<span class="pill pill-blue">Band On-Reserve</span>','band-off':'<span class="pill pill-gray">Band Off-Reserve</span>','band-staff':'<span class="pill pill-yellow">Band Staff</span>','clea':'<span class="pill pill-green">CLEA</span>','community':'<span class="pill pill-gray">Community</span>'};
+  var map={'band-on':'<span class="pill pill-blue">Band On-Reserve</span>','band-off':'<span class="pill pill-gray">Band Off-Reserve</span>','band-staff':'<span class="pill pill-yellow">Band Staff</span>','clea':'<span class="pill pill-green">CLEA</span>','community':'<span class="pill pill-gray">Community</span>','business':'<span class="pill pill-blue">Business</span>','department':'<span class="pill pill-yellow">Department</span>'};
   return map[type]||type;
 }
 function statusPill(s){

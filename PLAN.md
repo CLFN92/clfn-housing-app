@@ -546,6 +546,48 @@ and add a **BCR'd** status that makes a person ineligible for housing.
 
 ---
 
+## Phase CM — Commercial / Business Tenancy  ⬜
+Lets the Nation place **businesses and departments** into commercial/admin/band
+buildings, with a simple (non-scored) application and an admin-review approval —
+parallel to the residential housing pipeline, reusing the same plumbing.
+
+### Decisions (locked 2026-06)
+- **Not scored.** Commercial applications are reviewed/approved by staff on
+  availability + fit (discretionary), NOT ranked by a need score.
+- **New application type** `commercial` in the existing applications pipeline
+  (alongside `new_housing` / `transfer_request` / `existing_tenant`), routed to a
+  SHORT commercial form — not the 8-step residential wizard.
+- **Stored as a tenant** with `tenant_type` of `business` or `department` (+ org
+  contact field) on the existing `tenants` table, so it flows into Finance,
+  billing, the TIC, and unit assignment like any tenant.
+- Commercial buildings already exist as unit types (`commercial_building`,
+  `admin_building`, `band_building` — `_SECONDARY_TYPES`); reuse them.
+
+### CM1 — Business/Department tenant  (in progress)
+- `tenant_type` gains `business` / `department`; a `contact_person` field added.
+- Recognized in every type label / pill (finance utils, profile, list, export)
+  and selectable + editable in the Finance tenant form. For these, `full_name`
+  holds the org/department name; `contact_person` holds the human contact.
+- Schema: `alter table tenants add column if not exists contact_person text;`
+  plus widen any `tenant_type` CHECK to include `business`/`department`.
+
+### CM2 — Simple commercial application  (planned)
+- "Business / Department" card on the Application Type step → short commercial
+  form (org/dept name, contact, space type & size, intended use, preferred
+  building, desired start/end, notes). Submit → `app_type='commercial'`,
+  unscored, into an admin review queue. Approve / decline (no ranking).
+- Schema: allow `commercial` in any `housing_applications.app_type` CHECK.
+
+### CM3 — Commercial matching + tenancy  (planned)
+- Availability-based view pairing approved commercial applications with vacant
+  commercial/admin/band buildings; assign → create/link the business tenant onto
+  the unit (reuses the existing secondary-unit assignment path).
+
+### CM4 — Commercial occupancy agreement  (later)
+- A `commercial_lease` document in the multi-doc lease generator.
+
+---
+
 ## Rollback points
 - Pre-refactor snapshots (Phase C)
 
