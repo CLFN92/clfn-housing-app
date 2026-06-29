@@ -1665,7 +1665,7 @@
       + '<div class="export-dropdown">'
       +   '<button type="button" onclick="toggleExportMenu(this)" class="btn btn-primary">&#128196; Generate Forms &#9660;</button>'
       +   '<div class="header-export-menu">'
-      +     '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">'+((window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN')+' Residential Occupancy Agreement</button>'
+      +     '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">'+((window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN')+' Residential Occupancy Agreement</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'temporary_lease\')" class="header-export-item">Temporary Occupancy Agreement (Fixed Term)</button>'
       +   '</div>'
       + '</div>'
       + '</div>'
@@ -2352,11 +2352,26 @@
   // read them without relying on live DOM elements.
   var _leaseInitials = {};
 
+  // Which agreement the lease modal/generator is currently working with. The
+  // standard month-to-month lease is 'residential_lease'; the fixed-term
+  // temporary occupancy agreement is 'temporary_lease'. Both share the same
+  // modal, initials pop-out, and jsPDF generator -- only the body, clause set,
+  // title, and filename differ (all keyed off this).
+  var _ticLeaseDocKey = 'residential_lease';
+  var _LEASE_TITLES = {
+    residential_lease: 'Residential Lease Agreement',
+    temporary_lease:   'Temporary Residential Occupancy Agreement (Fixed Term)'
+  };
+  var _LEASE_FILE_SLUGS = {
+    residential_lease: 'Occupancy_Agreement',
+    temporary_lease:   'Temporary_Occupancy_Agreement'
+  };
+
   // Returns the effective initials clauses — saved overrides from Settings →
   // Delegates to notifications.js CONTRACTS_DOCS_REGISTRY which is always loaded.
   function _getEffectiveLeaseClauses() {
     return (typeof getContractClauses === 'function')
-      ? getContractClauses('residential_lease')
+      ? getContractClauses(_ticLeaseDocKey)
       : [];
   }
 
@@ -2480,7 +2495,14 @@
     }
   }
   // ── Modal ──────────────────────────────────────────────────────────────
-  function _ticOpenLeaseModal() {
+  function _ticOpenLeaseModal(docKey) {
+    _ticLeaseDocKey = (docKey === 'temporary_lease') ? 'temporary_lease' : 'residential_lease';
+    var isTemp = _ticLeaseDocKey === 'temporary_lease';
+    _leaseInitials = {};   // fresh initials per agreement open (clause sets differ)
+    var _docTitle   = _LEASE_TITLES[_ticLeaseDocKey] || 'Residential Lease Agreement';
+    var _clauseList = _getEffectiveLeaseClauses();
+    var _clauseN    = _clauseList.length;
+    var _clauseNames = _clauseList.map(function(c){ return (c.label || c.id || '').replace(/^Section\s+[0-9.]+\s+[—-]\s+/, ''); }).join(', ');
     var t   = _ticState.tenant      || {};
     var u   = _ticState.unit        || {};
     var app = _ticState.application || {};
@@ -2569,7 +2591,7 @@
     modal.innerHTML =
         '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:700px;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35);">'
       + '<div class="modal-hdr"><div>'
-      +   '<div class="lbl-yellow">&#128209; '+((window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN')+' Residential Occupancy Agreement</div>'
+      +   '<div class="lbl-yellow">&#128209; '+((window.NATION_CONFIG&&window.NATION_CONFIG.short)||'')+' '+_ticEsc(_docTitle)+'</div>'
       +   '<div class="txt-sm-meta">Review pre-filled details, collect all initials and signatures, then generate.</div>'
       + '</div><button type="button" onclick="document.getElementById(\'tic_lease_modal\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button></div>'
       + '<div style="overflow-y:auto;padding:18px 22px;flex:1;">'
@@ -2578,7 +2600,7 @@
       + '<div class="tic-grid-2">'
       + fld('Execution Date',           inp('ls_exec_date',  today,                '', 'date'))
       + fld('Lease Start Date',         inp('ls_start_date', startDate,            '', 'date'))
-      + fld('Lease End Date',           inp('ls_end_date',   endDate,              'Leave blank if month-to-month', 'date'))
+      + fld(isTemp ? 'End Date (required)' : 'Lease End Date', inp('ls_end_date', endDate, isTemp ? 'Fixed-term end date' : 'Leave blank if month-to-month', 'date'))
       + fld('Primary Tenant Name',      inp('ls_t_name',     tenantName,           'Full legal name'))
       + fld('Co-Tenant Name',           inp('ls_co_name',    coName,               'Leave blank if none'))
       + fld('Band Membership #',        inp('ls_t_band',     app.band||'',         'Band number'))
@@ -2597,8 +2619,8 @@
       + secH('Required Initials')
       + '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;">The tenant must initial each required clause before the agreement can be generated. A step-by-step pop-out walks through each clause.</div>'
       + '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">'
-      +   '<div><div id="ls_initials_status" style="font-size:13px;font-weight:600;color:var(--text);">0 of 5 initials captured</div>'
-      +   '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Drug use, Section 3.3, Section 3.4 (x2), Jurisdiction</div></div>'
+      +   '<div><div id="ls_initials_status" style="font-size:13px;font-weight:600;color:var(--text);">0 of ' + _clauseN + ' initials captured</div>'
+      +   '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + _ticEsc(_clauseNames) + '</div></div>'
       +   '<button type="button" id="ls_initials_btn" onclick="window._ticOpenInitialsPopout && window._ticOpenInitialsPopout(0)" class="btn btn-primary">Review &amp; Initial &#8594;</button>'
       + '</div>'
 
@@ -2711,6 +2733,7 @@
       executionMonth:         execMonth,
       executionYear:          execYear,
       termStartDate:          fv('ls_start_date'),
+      termEndDate:            fv('ls_end_date'),
       tenantName:             fv('ls_t_name'),
       coTenantName:           fv('ls_co_name'),
       tenantBandNumber:       fv('ls_t_band'),
@@ -2734,14 +2757,14 @@
     };
 
     // ── jsPDF path — used when a contract body has been saved in Settings ─
-    var savedBody = (typeof getContractBody === 'function') ? getContractBody('residential_lease') : '';
+    var savedBody = (typeof getContractBody === 'function') ? getContractBody(_ticLeaseDocKey) : '';
     if (savedBody && savedBody.trim()) {
       try {
         if (typeof _loadJsPdf === 'function') await _loadJsPdf();
         var logoDataUrl = (typeof _fetchLogoForPdf === 'function') ? await _fetchLogoForPdf() : null;
         var ctx = _makePdfDoc({
           nationName:     tokens.nationName,
-          headerTitle:    'Residential Lease Agreement',
+          headerTitle:    _LEASE_TITLES[_ticLeaseDocKey] || 'Residential Lease Agreement',
           headerSubtitle: ['Tenant: ' + tokens.tenantName, tokens.residenceStreet].filter(Boolean).join('  —  '),
           logoDataUrl:    logoDataUrl
         });
@@ -2786,16 +2809,17 @@
           ctx.y += 7; pdf.setTextColor(0);
         }
 
+        var _partyLabel = _ticLeaseDocKey === 'temporary_lease' ? 'Occupant' : 'Tenant';
         _addSigBlock('Landlord / Housing Manager', 'ls_sig_staff',    tokens.landlordName);
-        _addSigBlock('Tenant',                     'ls_sig_tenant',   tokens.tenantName);
-        if (tokens.coTenantName) _addSigBlock('Co-Tenant', 'ls_sig_cotenant', tokens.coTenantName);
+        _addSigBlock(_partyLabel,                  'ls_sig_tenant',   tokens.tenantName);
+        if (tokens.coTenantName) _addSigBlock('Co-' + _partyLabel, 'ls_sig_cotenant', tokens.coTenantName);
 
         // Initials summary
         var clauses = _getEffectiveLeaseClauses();
         var withInitials = clauses.filter(function(cl){ return _leaseInitials[cl.id]; });
         if (withInitials.length) {
           ctx.needSpace(20); ctx.gap(6);
-          ctx.sectionHeader('Tenant Initials — Required Clauses');
+          ctx.sectionHeader(_partyLabel + ' Initials — Required Clauses');
           withInitials.forEach(function(cl) {
             var initData = _leaseInitials[cl.id];
             ctx.needSpace(18);
@@ -2820,7 +2844,7 @@
         var blob = new Blob([arr], { type: 'application/pdf' });
         var nationShort = tokens.nationShort || 'Housing';
         var tenantSlug  = tokens.tenantName.replace(/\s+/g,'_') || 'Tenant';
-        var filename    = nationShort + '_Occupancy_Agreement_' + tenantSlug + '.pdf';
+        var filename    = nationShort + '_' + (_LEASE_FILE_SLUGS[_ticLeaseDocKey] || 'Occupancy_Agreement') + '_' + tenantSlug + '.pdf';
 
         var url  = URL.createObjectURL(blob);
         var link = document.createElement('a');

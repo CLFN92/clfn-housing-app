@@ -4402,6 +4402,78 @@ var CONTRACTS_DOCS_REGISTRY = [
     defaultClauses: _CONTRACT_DEFAULT_CLAUSES
   },
   {
+    key:         'temporary_lease',
+    label:       'Temporary Residential Occupancy Agreement (Fixed Term)',
+    description: 'Temporary, fixed-term occupancy agreement with a defined start and end date and no automatic renewal. Generated from the TIC alongside the standard lease. Supports {token} substitution.',
+    defaultClauses: [
+      {
+        id:    'tl_init_vacate',
+        label: 'Section 2 — Fixed Term & Obligation to Vacate',
+        text:  'This is a temporary, fixed-term occupancy that ends on the end date specified in section 2 of this Agreement. The Occupant acknowledges that there is no automatic renewal and no security of tenure or expectation of permanent or continued housing beyond that date, and agrees to vacate and surrender the Residence on or before the end date unless a written extension is signed by the Housing Manager before that date.'
+      },
+      {
+        id:    'tl_init_drug',
+        label: 'Section 8 — Smoking, Cannabis & Drug Provisions',
+        text:  'Cannabis cultivation, production, and processing in any quantity is strictly prohibited on the premises as a condition of this Agreement regardless of federal legality. Any breach of the cannabis prohibition constitutes immediate grounds for termination without a cure period. Unlawful drug activity — including possession, production, trafficking, or storage of controlled substances — also constitutes immediate grounds for termination. The Occupant acknowledges full liability for all remediation costs arising from cannabis cultivation or prohibited drug activity on the premises.'
+      },
+      {
+        id:    'tl_init_juris',
+        label: 'Section 12 — Acknowledgement of Jurisdiction',
+        text:  'This Agreement is governed by the inherent jurisdiction of {nationName} and the Indian Act, R.S.C. 1985, c. I-5. The Ontario Residential Tenancies Act, 2006 does not apply to this Agreement. Any dispute arising under this Agreement shall be addressed through the internal grievance process established by the {nationName} Housing Policy.'
+      }
+    ],
+    defaultBody:
+        '<h2>{nationName} Housing Program</h2>'
+      + '<h1>Temporary Residential Occupancy Agreement (Fixed Term)</h1>'
+      + '<p>This Temporary Agreement is made on the <strong>{executionDay}</strong> day of <strong>{executionMonth}</strong>, <strong>{executionYear}</strong>.</p>'
+      + '<h3>Parties</h3>'
+      + '<p><strong>Landlord:</strong> {nationName} (hereinafter "the Landlord" or "the Nation")</p>'
+      + '<p><strong>Occupant:</strong> {tenantName} (hereinafter "the Occupant")</p>'
+      + '<p><strong>Co-Occupant:</strong> {coTenantName}</p>'
+      + '<h3>1. Premises</h3>'
+      + '<p>The Landlord grants the Occupant temporary occupancy of the residential premises located at Lot {residenceLot}, {residenceStreet} on the reserve lands of {nationName} (the "Residence"). Unit type: {residenceBedBath}. Housing stream: {residenceStream}.</p>'
+      + '<h3>2. Temporary Term (Fixed)</h3>'
+      + '<p>This is a temporary, fixed-term occupancy. It commences on <strong>{termStartDate}</strong> and ends on <strong>{termEndDate}</strong>. The Occupant agrees to vacate and surrender the Residence on or before the end date. This Agreement does not automatically renew and creates no tenancy, security of tenure, or expectation of permanent or continued housing beyond the end date. <em>(Occupant initials required.)</em></p>'
+      + '<h3>3. Renewal or Extension</h3>'
+      + '<p>Any extension of the term is at the sole discretion of the Nation and is valid only if made in writing and signed by the Housing Manager before the end date. Absent a signed extension, this Agreement terminates on {termEndDate}.</p>'
+      + '<h3>4. Overholding</h3>'
+      + '<p>If the Occupant remains in the Residence after {termEndDate} without a signed extension, the continued occupancy is unauthorized (overholding), does not create a tenancy, and the Occupant shall pay an occupancy fee at the rate in section 5 for each day of overholding, in addition to any costs the Nation incurs to recover possession.</p>'
+      + '<h3>5. Occupancy Fee</h3>'
+      + '<p>The Occupant shall pay an occupancy fee of <strong>{rentAmount}</strong> per month (pro-rated for any partial month) for the term, due on or before the first day of each month, payable to the {nationName} Housing Department.</p>'
+      + '<h3>6. Authorized Occupants</h3>'
+      + '<p>The following persons are authorized to reside in the Residence in addition to the Occupant: {occupant1Name} {occupant2Name} {occupant3Name} {occupant4Name} {occupant5Name} {occupant6Name}. No other person may occupy the Residence without prior written consent of the Landlord.</p>'
+      + '<h3>7. Occupant Responsibilities</h3>'
+      + '<ol>'
+      + '<li>Maintain the Residence in a clean, safe, and habitable condition.</li>'
+      + '<li>Report any required repairs or maintenance to the {nationName} Housing Department promptly.</li>'
+      + '<li>Not cause or permit damage beyond normal wear and tear.</li>'
+      + '<li>Not sublet, assign, or transfer occupancy of the Residence.</li>'
+      + '<li>Comply with the {nationName} Housing Policy, community by-laws, and all applicable laws.</li>'
+      + '<li>Permit the Landlord reasonable access for inspections and repairs with reasonable notice, except in emergencies.</li>'
+      + '<li>Surrender the Residence on the end date in the same condition as received (reasonable wear and tear excepted) and return all keys.</li>'
+      + '</ol>'
+      + '<h3>8. Smoking, Cannabis &amp; Drug Provisions</h3>'
+      + '<p>Cannabis cultivation, production, and processing is strictly prohibited on the premises. Unlawful drug activity constitutes grounds for immediate termination. The Occupant is liable for all remediation costs arising from prohibited activity. <em>(Occupant initials required.)</em></p>'
+      + '<h3>9. Landlord Responsibilities</h3>'
+      + '<ol>'
+      + '<li>Provide the Residence in a habitable condition at commencement.</li>'
+      + '<li>Maintain the structural integrity of the Residence and attend to necessary repairs within a reasonable time.</li>'
+      + '<li>Provide 24 hours notice before entering the Residence except in emergencies.</li>'
+      + '</ol>'
+      + '<h3>10. Early Termination</h3>'
+      + '<p>The Nation may terminate this Agreement before the end date for material breach, including non-payment of the occupancy fee, unauthorized occupants, damage, or prohibited activity, by providing written notice in accordance with the {nationName} Housing Policy.</p>'
+      + '<h3>11. Recovery of Amounts Owing</h3>'
+      + '<p>The Occupant authorizes {nationName} to recover unpaid occupancy fees, damage charges, utility arrears, and other housing-related debts from any Band payments, per capita distributions, honoraria, or program benefits administered by the Nation.</p>'
+      + '<h3>12. Jurisdiction</h3>'
+      + '<p>This Agreement is governed by the inherent jurisdiction of {nationName}. The Ontario Residential Tenancies Act, 2006 does not apply. Disputes shall be resolved through the internal grievance process of the {nationName} Housing Policy. <em>(Occupant initials required.)</em></p>'
+      + '<h3>Landlord Signature</h3>'
+      + '<p>{landlordName}, Housing Manager &mdash; {nationName}</p>'
+      + '<h3>Occupant Signature</h3>'
+      + '<p>{tenantName}</p>'
+      + '<h3>Co-Occupant Signature</h3>'
+      + '<p>{coTenantName}</p>'
+  },
+  {
     key:         'contractor_agreement',
     label:       'Contractor Agreement',
     description: 'Renovation/construction contract issued to the awarded contractor. Supports {token} substitution for project-specific data.',
