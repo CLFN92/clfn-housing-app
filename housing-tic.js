@@ -1939,6 +1939,33 @@
         if(typeof showToast === 'function') showToast('Save failed: ' + err.message, { type:'error' });
       });
   }
+  // Ensure a real tenants row exists for the current card and resolve its pk.
+  // Applicant TICs open with a VIRTUAL tenant (no pk); child records like notes
+  // need a valid tenant_id, so the first such write creates the row (status
+  // 'applicant', linked by application_id). Mirrors the create-on-save in
+  // _ticSaveField. Rejects if there's no name to create a record from.
+  function _ticEnsureTenantRow(){
+    var t0 = _ticState.tenant || {};
+    var pk = t0[TIC_C.tenant_pk];
+    if (pk) return Promise.resolve(pk);
+    var name = t0[TIC_C.full_name] || '';
+    if (!name) return Promise.reject(new Error('No name on file to create a record.'));
+    var insert = {
+      full_name:      name,
+      status:         'applicant',
+      application_id: t0[TIC_C.application_id] || null
+    };
+    return _ticWrite('POST', TIC_T.tenants, insert).then(function(rows){
+      var saved = (rows && rows[0]) || insert;
+      _ticState.tenant = saved;
+      if (typeof _ticRenderHero  === 'function') _ticRenderHero();
+      if (typeof _ticRenderStrip === 'function') _ticRenderStrip();
+      var newPk = saved[TIC_C.tenant_pk];
+      if (!newPk) throw new Error('Could not create the tenant record.');
+      return newPk;
+    });
+  }
+
   function _ticSaveNote(){
     var inp = _ticEl('tic_note_input');
     var body = (inp && inp.value || '').trim();
@@ -1949,13 +1976,16 @@
     var author = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.name)
                ? HOUSING_SESSION.name
                : (sessionStorage.getItem('clfn_housing_name') || 'Unknown');
-    var payload = {};
-    payload[TIC_C.tenant_fk]   = _ticState.tenant[TIC_C.tenant_pk];
-    payload[TIC_C.note_body]   = body;
-    payload[TIC_C.author_name] = author;
-    payload[TIC_C.created_at]  = new Date().toISOString();
-    _ticWrite('POST', TIC_T.tenant_notes, payload)
-      .then(function(rows){
+    // Ensure a tenant row (and thus a tenant_id) exists before inserting the
+    // note — applicant TICs have no tenant row until the first write, which
+    // previously caused a null tenant_id not-null violation.
+    _ticEnsureTenantRow().then(function(pk){
+      var payload = {};
+      payload[TIC_C.tenant_fk]   = pk;
+      payload[TIC_C.note_body]   = body;
+      payload[TIC_C.author_name] = author;
+      payload[TIC_C.created_at]  = new Date().toISOString();
+      return _ticWrite('POST', TIC_T.tenant_notes, payload).then(function(rows){
         var added = (rows && rows[0]) || payload;
         _ticState.notes.unshift(added);
         var list = _ticEl('tic_notes_list');
@@ -1966,10 +1996,11 @@
         if(inp) inp.value = '';
         _ticAudit('tic_note_add', 'Added note (' + body.length + ' chars)');
         if(typeof showToast === 'function') showToast('Note added.');
-      })
-      .catch(function(err){
-        if(typeof showToast === 'function') showToast('Save failed: ' + err.message, { type:'error' });
       });
+    })
+    .catch(function(err){
+      if(typeof showToast === 'function') showToast('Save failed: ' + err.message, { type:'error' });
+    });
   }
 
   // ── Inline-edit for Contact rows ──────────────────────────────────────────
