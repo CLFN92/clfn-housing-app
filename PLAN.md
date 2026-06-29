@@ -593,6 +593,15 @@ parallel to the residential housing pipeline, reusing the same plumbing.
   permitted-use/insurance/jurisdiction initials, {contactPerson} token).
   Generated from the TIC agreements menu like the residential + temporary leases.
 
+### CM5 — Commercial-tailored TIC  (done)
+- `_ticApplyCommercialMode()` in housing-tic.js: when the tenant is
+  business/department (tenant_type) or the linked application is `commercial`,
+  hide the residential-only tabs (Occupants, Emergency Contacts, Pets) and keep
+  Overview, Contact, Unit History, Documents, **Utilities (hydro/gas)**, Notes.
+  Re-applied on every open (restores the full tab set for residential tenants).
+- The application gained Monthly Rent / Fee + Department Number fields, which on
+  assignment flow to the tenant monthly_rent and the building deptNumber.
+
 ---
 
 ## Rollback points

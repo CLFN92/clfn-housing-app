@@ -2097,6 +2097,34 @@
     var btn = _ticEl('tic_act_view_unit');
     if(btn) btn.style.display = _ticAssignedUnitId() ? '' : 'none';
   }
+
+  // CM5 — commercial-tailored TIC. For a business/department tenant (or a
+  // commercial application), hide the residential-only tabs (Occupants,
+  // Emergency Contacts, Pets) but KEEP Utilities so hydro/gas info is captured,
+  // plus Overview, Contact, Documents, Unit History, Notes. Re-run on every open
+  // so it restores the tabs for ordinary residential tenants.
+  function _ticIsCommercial(){
+    var t = _ticState.tenant || {};
+    var app = _ticState.application || {};
+    var ty = t.tenant_type || t.type || '';
+    return ty === 'business' || ty === 'department' || (app && app.appType === 'commercial');
+  }
+  function _ticApplyCommercialMode(){
+    var modal = _ticEl('ticModal');
+    if(!modal) return;
+    var isComm = _ticIsCommercial();
+    modal.classList.toggle('tic-commercial', !!isComm);
+    var hide = { occupants:1, emergency:1, pets:1 };   // residential-only
+    var tabs = modal.querySelectorAll('.tic-tabs [data-tic-tab]');
+    var activeHidden = false;
+    for(var i=0;i<tabs.length;i++){
+      var name = tabs[i].getAttribute('data-tic-tab');
+      var hideIt = isComm && !!hide[name];
+      tabs[i].style.display = hideIt ? 'none' : '';
+      if(hideIt && tabs[i].classList.contains('tic-active')) activeHidden = true;
+    }
+    if(activeHidden && typeof _ticSwitchTab === 'function') _ticSwitchTab('overview');
+  }
   function _ticFindApplicationForTenant(){
     // 1) unit.assignedTo — set by the assign-unit flow and reflects the most
     //    recent application linked to this unit. Checked before tenant.application_id
@@ -2296,6 +2324,7 @@
     _ticState.ledger = null; _ticState.notes = []; _ticState.applicationNotes = [];
     _ticState.movementLog = [];
     _ticSyncFooter();   // hide View Unit until the assigned unit resolves
+    _ticApplyCommercialMode();   // restore all tabs until the tenant resolves
     _ticDocLib = null; _ticDocLibKey = null;
     _ticUtilDocLib = null; _ticUtilDocLibKey = null;
     ['overview','utilities','occupants','contact','emergency','references','pets','documents','notes','history'].forEach(function(n){
@@ -2321,6 +2350,7 @@
       _ticRenderHero();
       _ticRenderStrip();
       _ticSyncFooter();
+      _ticApplyCommercialMode();
 
       var pkValue = _ticState.tenant ? _ticState.tenant[TIC_C.tenant_pk] : null;
       var loadAll = pkValue ? _ticLoadAll(pkValue, _ticState.unit) : Promise.resolve();
@@ -2338,6 +2368,7 @@
         _ticRenderPets();
         _ticRenderNotes();
         _ticRenderTenancyHistory();
+        _ticApplyCommercialMode();   // application may now be loaded (appType signal)
       }).catch(function(err){
         _ticEl('tic_loading').style.display = 'none';
         if(typeof showToast === 'function') showToast('Some tenant data could not be loaded.', { type:'error' });
