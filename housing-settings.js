@@ -47,6 +47,26 @@ function renderApprovalAuthorityPanel() {
   var defaults = APPROVAL_AUTHORITY.defaults;
 
   var html = '';
+
+  // ── Approval threshold (HM budget limit) ─────────────────────────────────
+  // The dollar threshold that controls HM-final vs ED-escalation routing for
+  // maintenance requests (SOWs) and unit renovation budgets. Reads/writes the
+  // single _appSettings.hmBudgetLimit setting (same value the Renovation Budget
+  // panel uses); saved immediately on change.
+  var _curLimit = (typeof _getHmLimit === 'function')
+    ? _getHmLimit() : (((window._appSettings||{}).hmBudgetLimit) || 25000);
+  html += '<div style="margin-bottom:24px;padding:14px 16px;background:var(--bg);border:1px solid var(--border);border-left:3px solid var(--yellow);border-radius:8px;">'
+        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--yellow);margin-bottom:8px;">Approval Threshold</div>'
+        + '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">'
+        +   '<div style="display:flex;align-items:center;gap:6px;">'
+        +     '<span style="font-size:15px;font-weight:700;color:var(--text);">$</span>'
+        +     '<input id="aa_hm_budget_limit" type="number" min="0" step="1000" value="' + _curLimit + '" onchange="aaSaveBudgetLimit(this)"'
+        +       ' style="width:140px;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:14px;font-weight:700;color:var(--text);font-family:DM Sans,sans-serif;background:var(--surface);text-align:right;"/>'
+        +   '</div>'
+        +   '<div style="font-size:12px;color:var(--muted);flex:1;min-width:240px;line-height:1.5;">Maintenance requests and unit renovation budgets <strong>at or under</strong> this amount are approved by the Housing Manager (final). <strong>Over</strong> it, they require Executive Director final approval. Saved immediately.</div>'
+        + '</div>'
+        + '</div>';
+
   Object.keys(groups).forEach(function(groupName) {
     var keys = groups[groupName];
     // Pick the role pill set for this group.
@@ -139,6 +159,34 @@ function aaToggleRole(btn) {
   APPROVAL_AUTHORITY.update(key, next);
   renderApprovalAuthorityPanel();
 }
+
+// Save the approval threshold (HM budget limit) from the Approval Authority
+// panel. Writes the single _appSettings.hmBudgetLimit value, keeps the
+// Renovation Budget panel input in sync, persists immediately, and audits.
+function aaSaveBudgetLimit(el) {
+  var v = parseFloat(el && el.value);
+  if (isNaN(v) || v < 0) { v = 25000; if (el) el.value = v; }
+  var s = window._appSettings || {};
+  var prev = s.hmBudgetLimit;
+  s.hmBudgetLimit = v;
+  window._appSettings = s;
+  var other = document.getElementById('settings_hm_budget_limit'); // Renovation Budget panel
+  if (other) other.value = v;
+  if (typeof saveSettingWithDraftFallback === 'function') {
+    saveSettingWithDraftFallback('app_settings', s).then(function(ok){
+      if (!ok) {
+        s.hmBudgetLimit = prev; window._appSettings = s;
+        if (typeof showToast === 'function') showToast('Could not save approval threshold — retry.', { type:'error' });
+      } else if (typeof showToast === 'function') {
+        showToast('Approval threshold saved: $' + v.toLocaleString());
+      }
+    });
+  }
+  if (typeof auditEntry === 'function') {
+    auditEntry('SETTINGS', 'settings_budget_save', 'Approval threshold (HM budget limit) set to $' + v, window.currentRole || 'staff');
+  }
+}
+window.aaSaveBudgetLimit = aaSaveBudgetLimit;
 
 function aaResetAction(key) {
   APPROVAL_AUTHORITY.reset(key);
