@@ -3601,15 +3601,29 @@ function renderCtFilePreview(bucket){
       +'<button type="button" data-bucket="'+escapeHtml(bucket)+'" data-idx="'+i+'" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:0 2px;">✕</button></div>';
   }).join('');
   // Filename click → open the file. Staged uploads still have the base64
-  // data URL in memory; saved-and-reloaded files have a storage path that
-  // scViewFile() can fetch with the auth header.
+  // data URL in memory; saved-and-reloaded files have a storage path opened
+  // via a signed URL (sbGetSignedUrl).
   container.querySelectorAll('span[data-open-bucket]').forEach(function(el){
     el.onclick=function(){
       var bk = el.getAttribute('data-open-bucket');
       var idx = parseInt(el.getAttribute('data-open-idx'));
       var rec = (window._ctFiles||{})[bk] && window._ctFiles[bk][idx];
       if(!rec) return;
-      if(rec.path && typeof scViewFile === 'function'){ scViewFile(rec.path); return; }
+      // Saved-and-reloaded files have a storage path (no in-memory data URL).
+      // Fetch a short-lived signed URL and open it. Open the tab synchronously
+      // (preserves the click user-gesture so the browser doesn't block it),
+      // then point it at the signed URL once it resolves.
+      if(rec.path && typeof sbGetSignedUrl === 'function'){
+        var w = window.open('', '_blank');
+        sbGetSignedUrl(rec.path).then(function(url){
+          if(!url){ if(w) w.close(); if(typeof showToast==='function') showToast('Could not open file.', { type:'error' }); return; }
+          if(w) w.location.href = url; else window.open(url, '_blank');
+        }).catch(function(e){
+          if(w) w.close();
+          if(typeof showToast==='function') showToast('Could not open file: ' + (e && e.message || e), { type:'error' });
+        });
+        return;
+      }
       if(rec.data){
         try {
           var w = window.open();
