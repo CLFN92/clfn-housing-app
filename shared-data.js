@@ -2000,6 +2000,18 @@ function _doExport(format, headers, data, filename, colWidths, pdfLandscape) {
 function _getHmLimit() {
   try { return parseFloat((window._appSettings||{}).hmBudgetLimit)||25000; } catch(e) { return 25000; }
 }
+// A maintenance request (SOW) needs ED final approval ONLY when its cost
+// exceeds the HM budget limit. At or under the limit, HM approval is final and
+// the request does not route to the Executive Director. Single source of truth
+// for the worklist, the SOW modal, and the renos approvals table.
+function sowRequiresEdApproval(sow) {
+  if (!sow) return false;
+  var cost = (typeof sow.amount === 'number')
+    ? sow.amount
+    : parseFloat(String(sow.totalCost || '').replace(/[^0-9.\-]/g, '')) || 0;
+  return cost > _getHmLimit();
+}
+window.sowRequiresEdApproval = sowRequiresEdApproval;
 function _getPoolSpent(pid) {
   // Sum all previously approved reno budgets for this pool
   var total = 0;
@@ -4270,8 +4282,13 @@ function renderWorklist() {
         if (status === 'ed_approved' || status === 'completed') return; // already done
         // HM sees SOWs not yet HM-approved (needs their review)
         var needsHm = !canFinal && (status === '' || status === 'draft' || status === 'signed' || status === 'submitted');
-        // ED sees SOWs at HM-approved stage (needs ED final), or earlier (ED can act directly)
-        var needsEd = canFinal && (status === 'hm_approved' || status === '' || status === 'draft' || status === 'signed');
+        // ED sees SOWs at HM-approved stage ONLY when the cost is over the HM
+        // budget limit (under the limit, HM approval is final and ED is not in
+        // the chain) -- or earlier-stage SOWs the ED chooses to act on directly.
+        var needsEd = canFinal && (
+          (status === 'hm_approved' && sowRequiresEdApproval(sow)) ||
+          status === '' || status === 'draft' || status === 'signed' || status === 'submitted'
+        );
         if (!needsHm && !needsEd) return;
         var u = sowUnitsAll.find(function(x){ return x && x.id === uid; });
         var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : uid;

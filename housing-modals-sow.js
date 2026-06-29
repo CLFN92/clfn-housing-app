@@ -964,9 +964,12 @@ function _applySowModalLock(sow){
     // HM sees button when SOW is unreviewed (not yet hm_approved or higher)
     var _showHm  = _canHm && !_canEd && _hasPn && _hasItems && !completed &&
                    (_sowSt === '' || _sowSt === 'draft' || _sowSt === 'signed' || _sowSt === 'submitted');
-    // ED sees button when SOW is at hm_approved (needs ED final) or unreviewed (ED can act direct)
+    // ED sees button when SOW is at hm_approved AND over the budget limit (needs
+    // ED final), or unreviewed (ED can act directly). Under-limit hm_approved is
+    // already final, so no ED button.
+    var _needsEd = (typeof sowRequiresEdApproval === 'function') && sowRequiresEdApproval(sow);
     var _showEd  = _canEd && _hasPn && _hasItems && !completed &&
-                   (_sowSt === 'hm_approved' || _sowSt === '' || _sowSt === 'draft' || _sowSt === 'signed');
+                   ((_sowSt === 'hm_approved' && _needsEd) || _sowSt === '' || _sowSt === 'draft' || _sowSt === 'signed');
     var _showAp  = _showHm || _showEd;
     apBtn.style.display = _showAp ? 'flex' : 'none';
     apBtn.textContent   = (_sowSt === 'hm_approved') ? '✓ Final Approve' : '✓ Approve';
@@ -1059,10 +1062,24 @@ function sowApproveInline() {
   var today    = new Date().toISOString().split('T')[0];
   var staffName = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.name) || role;
 
-  var title   = approver === 'ed' ? 'Grant ED Final Approval?' : 'Approve as Housing Manager?';
+  // Does this request still need ED final approval? Only if its cost is over the
+  // HM budget limit. Under the limit, HM approval is final (no ED step).
+  var _apTotalEl = document.getElementById('sow_total_cost');
+  var _apCost = _apTotalEl ? (parseFloat(String(_apTotalEl.value).replace(/[^0-9.\-]/g, '')) || 0) : 0;
+  if (!_apCost && _sowUnitId && window._sowEditingProjectNumber && typeof getSowByProjectNumber === 'function') {
+    var _apSow = getSowByProjectNumber(_sowUnitId, window._sowEditingProjectNumber);
+    if (_apSow && typeof _apSow.amount === 'number') _apCost = _apSow.amount;
+  }
+  var _apNeedsEd = (typeof sowRequiresEdApproval === 'function') && sowRequiresEdApproval({ amount: _apCost });
+
+  var title   = approver === 'ed'
+    ? 'Grant ED Final Approval?'
+    : (_apNeedsEd ? 'Approve as Housing Manager?' : 'Approve Maintenance Request?');
   var message = approver === 'ed'
     ? 'This will record your ED approval on this Maintenance Request.'
-    : 'This will record your HM approval and forward the request to the Executive Director for final approval.';
+    : (_apNeedsEd
+        ? 'This request is over the budget limit, so this records your HM approval and forwards it to the Executive Director for final approval.'
+        : 'This records your approval. The request will be approved and ready for the work order — no further sign-off is required.');
 
   if (typeof showConfirm !== 'function') return;
   showConfirm({ title: title, message: message, confirmText: 'Approve', danger: false }).then(function(ok) {
