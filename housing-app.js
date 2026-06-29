@@ -800,7 +800,7 @@ function renderDashTable(){
       +'<td class="col-res col-hide-mobile" class="empty-sub">'+escapeHtml(a.reserve||'—')+'</td>'
       +'<td class="col-arr col-hide-mobile" style="font-size:12px;color:'+(a.hasArrears?'var(--danger)':'var(--muted)')+';font-weight:600;">'+(a.hasArrears?'Yes':'—')+'</td>'
       +'<td><span class="pill '+sp[1]+'"><span class="pill-dot"></span>'+sp[0]+'</span></td>'
-      +'<td class="col-score">'+(a.appType==='existing_tenant'?'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--bg);color:var(--muted);white-space:nowrap;">File Update</span>':a.appType==='transfer_request'?'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--info-blue-bg,#eff6ff);color:var(--info-blue,#1d4ed8);white-space:nowrap;">Transfer Req</span>':(hasScore?'<button class="score-cell-btn" data-score-id="'+aIdEsc+'" onclick="window._openScoreByEl(this)" title="Click to see score breakdown"><span class="score-num">'+a.score+'</span><div class="score-right"><span class="score-tier-badge" style="background:'+tc.bg+';color:'+tc.c+';font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;">'+escapeHtml((a.tier||'').replace(' Priority',''))+'</span>'+scoreMiniBar(a.score)+'</div></button>':'<span class="js-txt-muted-sm">—</span>'))+'</td>'
+      +'<td class="col-score">'+(a.appType==='commercial'?'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;background:#ede9fe;color:#6d28d9;white-space:nowrap;">Commercial</span>':a.appType==='existing_tenant'?'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--bg);color:var(--muted);white-space:nowrap;">File Update</span>':a.appType==='transfer_request'?'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--info-blue-bg,#eff6ff);color:var(--info-blue,#1d4ed8);white-space:nowrap;">Transfer Req</span>':(hasScore?'<button class="score-cell-btn" data-score-id="'+aIdEsc+'" onclick="window._openScoreByEl(this)" title="Click to see score breakdown"><span class="score-num">'+a.score+'</span><div class="score-right"><span class="score-tier-badge" style="background:'+tc.bg+';color:'+tc.c+';font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;">'+escapeHtml((a.tier||'').replace(' Priority',''))+'</span>'+scoreMiniBar(a.score)+'</div></button>':'<span class="js-txt-muted-sm">—</span>'))+'</td>'
       +'<td style="white-space:nowrap;"><div style="display:flex;gap:4px;align-items:center;">'
       +'<button class="dash-action-btn edit-app-btn" data-id="'+aIdEsc+'" title="Edit" style="padding:5px 8px;">'
       +'<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7\"/><path d=\"M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z\"/></svg>'
@@ -827,6 +827,7 @@ function wireDashTable(){
     var scTd=e.target.closest('[data-sc-id]');
     if(scTd && !e.target.closest('button')){
       var scId=scTd.getAttribute('data-sc-id');
+      if(_appIsCommercial(scId) && typeof openCommercialApp === 'function'){ openCommercialApp(scId); return; }
       if(scId && typeof window.openEditModal === 'function') window.openEditModal(scId);
       return;
     }
@@ -873,7 +874,9 @@ function wireDashTable(){
       return;
     }
     var eBtn=e.target.closest('.edit-app-btn');
-    if(eBtn){var id=eBtn.getAttribute('data-id');if(id)window.openEditModal(id);}
+    if(eBtn){var id=eBtn.getAttribute('data-id');
+      if(_appIsCommercial(id) && typeof openCommercialApp === 'function'){ openCommercialApp(id); return; }
+      if(id)window.openEditModal(id);}
     var mBtn=e.target.closest('.app-menu-btn');
     if(mBtn){
       var mid=mBtn.getAttribute('data-id');
@@ -1162,6 +1165,13 @@ function liveSync(){
 // opts.draft: true → treat as autosave; status stays 'draft' until the user
 //                    explicitly submits. Never downgrades an already-submitted
 //                    or approved application back to draft.
+// True when the application id belongs to a commercial (business/department)
+// application — routed to the commercial modal instead of the residential one.
+function _appIsCommercial(id){
+  var a = (typeof applications !== 'undefined' ? applications : []).find(function(x){ return x.id === id; });
+  return !!(a && a.appType === 'commercial');
+}
+
 function saveApplicationRecord(opts){
   var appType = typeof getAppType === 'function' ? getAppType() : 'new_housing';
   var isFileUpdate = (appType === 'existing_tenant');

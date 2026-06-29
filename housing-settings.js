@@ -362,6 +362,16 @@ function prefillTransferFromTenant() {
 }
 
 function onAppTypeChange() {
+  // Business / Department uses its own short, non-scored modal — not the
+  // residential wizard. Launch it and revert the radio to New Housing so the
+  // residential form is left in a valid state behind the modal.
+  var commEl = document.getElementById('apptype_commercial');
+  if (commEl && commEl.checked) {
+    var newEl = document.getElementById('apptype_new');
+    if (newEl) newEl.checked = true;
+    if (typeof openCommercialApp === 'function') openCommercialApp();
+    return onAppTypeChange();
+  }
   var isExisting = !!(document.getElementById('apptype_existing') && document.getElementById('apptype_existing').checked);
   var isTransfer = !!(document.getElementById('apptype_transfer') && document.getElementById('apptype_transfer').checked);
   var isNew      = !isExisting && !isTransfer;
@@ -383,6 +393,7 @@ function onAppTypeChange() {
   styleLabel('apptype_new_label',      isNew);
   styleLabel('apptype_existing_label', isExisting);
   styleLabel('apptype_transfer_label', isTransfer);
+  styleLabel('apptype_commercial_label', false);
 
   // Show/hide scoring sections
   var hnCard = document.getElementById('v2_housing_need_card');

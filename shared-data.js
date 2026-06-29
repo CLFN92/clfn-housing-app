@@ -4273,6 +4273,9 @@ function renderWorklist() {
   // ── 1. Applications requiring action ────────────────────────────────────
   var appItems = apps.filter(function(a) {
     if (!a || a.archived) return false;
+    // Commercial (business/department) applications are non-scored and reviewed
+    // from the Applications list, not this scored worklist queue.
+    if (a.appType === 'commercial') return false;
     var owner = (a.created_by_email || '').toLowerCase();
     if (owner === email && a.status === 'returned') return true;
     if (isManagement && !canFinal && (a.status === 'submitted' || a.status === 'file_update' || a.status === 'mgr_approved' || a.status === 'transfer_request_submitted')) return true;
