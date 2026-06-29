@@ -588,8 +588,10 @@ parallel to the residential housing pipeline, reusing the same plumbing.
   (`tenant_type` business/department) via the existing secondary-unit
   assignment path. Reuses the unit edit modal's assignment mechanism.
 
-### CM4 — Commercial occupancy agreement  (later)
-- A `commercial_lease` document in the multi-doc lease generator.
+### CM4 — Commercial occupancy agreement  (done)
+- A `commercial_lease` document in the multi-doc lease generator (fixed-term,
+  permitted-use/insurance/jurisdiction initials, {contactPerson} token).
+  Generated from the TIC agreements menu like the residential + temporary leases.
 
 ---
 

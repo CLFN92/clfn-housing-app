@@ -4474,6 +4474,62 @@ var CONTRACTS_DOCS_REGISTRY = [
       + '<p>{coTenantName}</p>'
   },
   {
+    key:         'commercial_lease',
+    label:       'Commercial Occupancy & Lease Agreement',
+    description: 'Fixed-term lease for a business or department occupying a commercial / admin / band building. Generated from the TIC alongside the residential agreements. Supports {token} substitution.',
+    defaultClauses: [
+      {
+        id:    'cl_init_insurance',
+        label: 'Section 6 — Insurance & Liability',
+        text:  'The Tenant shall, at its own expense, maintain commercial general liability insurance of not less than $2,000,000 per occurrence naming the Nation as an additional insured, and shall provide proof of coverage before occupancy and on renewal. The Tenant is liable for all loss, damage, or claims arising from its use of the Premises and shall indemnify the Nation accordingly.'
+      },
+      {
+        id:    'cl_init_use',
+        label: 'Section 3 — Permitted Use & Compliance',
+        text:  'The Tenant shall use the Premises solely for the business or operational purpose approved by the Nation and for no other purpose without prior written consent. The Tenant shall comply with the Nation Housing/Lands Policy, community by-laws, all applicable laws, health and safety requirements, and any required business licensing.'
+      },
+      {
+        id:    'cl_init_juris',
+        label: 'Section 13 — Acknowledgement of Jurisdiction',
+        text:  'This Agreement is governed by the inherent jurisdiction of {nationName} and the Indian Act, R.S.C. 1985, c. I-5. The Ontario Residential Tenancies Act, 2006 does not apply to this Agreement. Any dispute arising under this Agreement shall be addressed through the internal process established by the Nation.'
+      }
+    ],
+    defaultBody:
+        '<h2>{nationName} &mdash; Lands &amp; Housing</h2>'
+      + '<h1>Commercial Occupancy &amp; Lease Agreement</h1>'
+      + '<p>This Agreement is made on the <strong>{executionDay}</strong> day of <strong>{executionMonth}</strong>, <strong>{executionYear}</strong>.</p>'
+      + '<h3>Parties</h3>'
+      + '<p><strong>Landlord:</strong> {nationName} (hereinafter "the Landlord" or "the Nation")</p>'
+      + '<p><strong>Tenant:</strong> {tenantName} (the business or department named herein, hereinafter "the Tenant")</p>'
+      + '<p><strong>Authorized Contact:</strong> {contactPerson}</p>'
+      + '<h3>1. Premises</h3>'
+      + '<p>The Landlord leases to the Tenant the premises located at Lot {residenceLot}, {residenceStreet} on the reserve lands of {nationName} (the "Premises").</p>'
+      + '<h3>2. Term (Fixed)</h3>'
+      + '<p>This is a fixed-term lease commencing on <strong>{termStartDate}</strong> and ending on <strong>{termEndDate}</strong>. It does not renew automatically; any renewal or extension is valid only if made in writing and signed by both parties before the end date.</p>'
+      + '<h3>3. Permitted Use &amp; Compliance</h3>'
+      + '<p>The Tenant shall use the Premises solely for the approved business or operational purpose, and shall comply with the Nation\'s policies, community by-laws, all applicable laws, health and safety requirements, and any required licensing. <em>(Tenant initials required.)</em></p>'
+      + '<h3>4. Rent / Occupancy Fee</h3>'
+      + '<p>The Tenant shall pay <strong>{rentAmount}</strong> per month, due on or before the first day of each month, payable to the {nationName} Lands &amp; Housing Department.</p>'
+      + '<h3>5. Utilities &amp; Maintenance</h3>'
+      + '<p>Unless otherwise agreed in writing, the Tenant is responsible for the utilities and the interior upkeep of the Premises and shall keep it clean, safe, and in good repair. The Landlord maintains the structural integrity of the building.</p>'
+      + '<h3>6. Insurance &amp; Liability</h3>'
+      + '<p>The Tenant shall maintain commercial general liability insurance of not less than $2,000,000 naming the Nation as an additional insured, provide proof before occupancy, and indemnify the Nation for loss or damage arising from its use of the Premises. <em>(Tenant initials required.)</em></p>'
+      + '<h3>7. Assignment &amp; Alterations</h3>'
+      + '<p>The Tenant shall not assign, sublet, or transfer occupancy of the Premises, and shall not make structural alterations, without the prior written consent of the Landlord.</p>'
+      + '<h3>8. Default &amp; Termination</h3>'
+      + '<p>The Landlord may terminate this Agreement for non-payment, prohibited use, lapse of required insurance, or any material breach, by written notice in accordance with the Nation\'s policy.</p>'
+      + '<h3>9. Surrender at End of Term</h3>'
+      + '<p>On the end date (or earlier termination) the Tenant shall vacate the Premises, remove its property, return all keys, and leave the Premises in the same condition as received, reasonable wear and tear excepted.</p>'
+      + '<h3>10. Recovery of Amounts Owing</h3>'
+      + '<p>The Tenant authorizes {nationName} to recover unpaid rent/occupancy fees, damage charges, utility arrears, and other amounts owing under this Agreement through its established processes.</p>'
+      + '<h3>13. Jurisdiction</h3>'
+      + '<p>This Agreement is governed by the inherent jurisdiction of {nationName}. The Ontario Residential Tenancies Act, 2006 does not apply. Disputes shall be resolved through the internal process established by the Nation. <em>(Tenant initials required.)</em></p>'
+      + '<h3>Landlord Signature</h3>'
+      + '<p>{landlordName} &mdash; {nationName}</p>'
+      + '<h3>Tenant Signature</h3>'
+      + '<p>{tenantName} (per {contactPerson})</p>'
+  },
+  {
     key:         'contractor_agreement',
     label:       'Contractor Agreement',
     description: 'Renovation/construction contract issued to the awarded contractor. Supports {token} substitution for project-specific data.',

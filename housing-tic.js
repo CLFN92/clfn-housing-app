@@ -1665,7 +1665,7 @@
       + '<div class="export-dropdown">'
       +   '<button type="button" onclick="toggleExportMenu(this)" class="btn btn-primary">&#128196; Generate Forms &#9660;</button>'
       +   '<div class="header-export-menu">'
-      +     '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">'+((window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN')+' Residential Occupancy Agreement</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'temporary_lease\')" class="header-export-item">Temporary Occupancy Agreement (Fixed Term)</button>'
+      +     '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">'+((window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN')+' Residential Occupancy Agreement</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'temporary_lease\')" class="header-export-item">Temporary Occupancy Agreement (Fixed Term)</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'commercial_lease\')" class="header-export-item">Commercial Occupancy &amp; Lease Agreement</button>'
       +   '</div>'
       + '</div>'
       + '</div>'
@@ -2391,11 +2391,13 @@
   var _ticLeaseDocKey = 'residential_lease';
   var _LEASE_TITLES = {
     residential_lease: 'Residential Lease Agreement',
-    temporary_lease:   'Temporary Residential Occupancy Agreement (Fixed Term)'
+    temporary_lease:   'Temporary Residential Occupancy Agreement (Fixed Term)',
+    commercial_lease:  'Commercial Occupancy & Lease Agreement'
   };
   var _LEASE_FILE_SLUGS = {
     residential_lease: 'Occupancy_Agreement',
-    temporary_lease:   'Temporary_Occupancy_Agreement'
+    temporary_lease:   'Temporary_Occupancy_Agreement',
+    commercial_lease:  'Commercial_Lease_Agreement'
   };
 
   // Returns the effective initials clauses — saved overrides from Settings →
@@ -2527,8 +2529,8 @@
   }
   // ── Modal ──────────────────────────────────────────────────────────────
   function _ticOpenLeaseModal(docKey) {
-    _ticLeaseDocKey = (docKey === 'temporary_lease') ? 'temporary_lease' : 'residential_lease';
-    var isTemp = _ticLeaseDocKey === 'temporary_lease';
+    _ticLeaseDocKey = ({ temporary_lease:1, commercial_lease:1 }[docKey]) ? docKey : 'residential_lease';
+    var isTemp = _ticLeaseDocKey !== 'residential_lease';   // fixed-term docs need an end date
     _leaseInitials = {};   // fresh initials per agreement open (clause sets differ)
     var _docTitle   = _LEASE_TITLES[_ticLeaseDocKey] || 'Residential Lease Agreement';
     var _clauseList = _getEffectiveLeaseClauses();
@@ -2765,6 +2767,7 @@
       executionYear:          execYear,
       termStartDate:          fv('ls_start_date'),
       termEndDate:            fv('ls_end_date'),
+      contactPerson:          (_ticState.tenant && (_ticState.tenant.contact_person || _ticState.tenant.contactPerson)) || '',
       tenantName:             fv('ls_t_name'),
       coTenantName:           fv('ls_co_name'),
       tenantBandNumber:       fv('ls_t_band'),
