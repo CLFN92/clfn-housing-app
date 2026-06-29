@@ -578,10 +578,15 @@ parallel to the residential housing pipeline, reusing the same plumbing.
   unscored, into an admin review queue. Approve / decline (no ranking).
 - Schema: allow `commercial` in any `housing_applications.app_type` CHECK.
 
-### CM3 — Commercial matching + tenancy  (planned)
-- Availability-based view pairing approved commercial applications with vacant
-  commercial/admin/band buildings; assign → create/link the business tenant onto
-  the unit (reuses the existing secondary-unit assignment path).
+### CM3 — Assignment (NO matching model)  (done)
+- **Decision (2026-06):** commercial space is **assignment-only** — there is NO
+  matching/availability-ranking view. An approved commercial application is
+  assigned directly to a commercial/admin/band building.
+- Minimal "Assign to Building" action on an approved commercial application:
+  pick a commercial/admin/band unit → set its `assigned_name` to the org/dept
+  name + link the application, creating the business/department tenant
+  (`tenant_type` business/department) via the existing secondary-unit
+  assignment path. Reuses the unit edit modal's assignment mechanism.
 
 ### CM4 — Commercial occupancy agreement  (later)
 - A `commercial_lease` document in the multi-doc lease generator.

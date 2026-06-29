@@ -128,16 +128,18 @@ function openCommercialApp(id){
     : 'Business / Department Application';
   document.getElementById('ca_body').innerHTML = _caRenderBody(existing || {});
 
-  // Footer: submit (new) OR review actions (existing, mgmt only).
+  // Footer: submit (new) OR review/assign actions (existing, mgmt only).
   var footer = document.getElementById('ca_footer');
-  var review = existing && existing.status !== 'declined' && existing.status !== 'ed_approved' && _caIsMgmt();
+  var review    = existing && existing.status === 'submitted' && _caIsMgmt();
+  var canAssign = existing && existing.status === 'ed_approved' && !existing.assignedUnit && _caIsMgmt();
   footer.innerHTML =
       '<button type="button" onclick="closeCommercialApp()" class="btn btn-ghost">Close</button>'
+    + (canAssign ? '<button type="button" onclick="openCommercialAssign()" class="btn btn-primary">Assign to Building →</button>' : '')
     + (existing
         ? (review
             ? '<button type="button" onclick="commercialAppDecision(\'decline\')" class="btn btn-ghost" style="color:var(--danger);border-color:var(--danger);">Decline</button>'
               + '<button type="button" onclick="commercialAppDecision(\'approve\')" class="btn btn-primary">Approve</button>'
-            : '<button type="button" onclick="submitCommercialApp()" class="btn btn-primary">Save Changes</button>')
+            : (canAssign ? '' : '<button type="button" onclick="submitCommercialApp()" class="btn btn-primary">Save Changes</button>'))
         : '<button type="button" onclick="submitCommercialApp()" class="btn btn-primary">Submit Application</button>');
 
   modal.style.display = 'flex';
@@ -250,7 +252,87 @@ function _caPersist(app, okMsg, auditAction){
   });
 }
 
-window.openCommercialApp     = openCommercialApp;
-window.closeCommercialApp    = closeCommercialApp;
-window.submitCommercialApp   = submitCommercialApp;
-window.commercialAppDecision = commercialAppDecision;
+// ── Assign to Building (CM3 — assignment only, no matching model) ────────────
+function _caTypeLabel(t){ return (typeof _fmtUnitType === 'function') ? (_fmtUnitType(t) || t) : (t || ''); }
+
+function openCommercialAssign(){
+  var app = _caEditId ? (typeof applications !== 'undefined' ? applications : []).find(function(a){ return a.id === _caEditId; }) : null;
+  if (!app) return;
+  if (!_caIsMgmt()) { if (typeof showToast==='function') showToast('You do not have authority to assign.', { type:'error' }); return; }
+
+  var units = _caCommercialUnits().slice().sort(function(a,b){ return (a.status==='vacant'?0:1) - (b.status==='vacant'?0:1); });
+  var opts = '<option value="">— Select a building —</option>' + units.map(function(u){
+    var addr = ((u.num||'') + ' ' + (u.street||'')).trim() || u.id;
+    return '<option value="' + _caEsc(u.id) + '">' + _caEsc(addr) + ' (' + _caEsc(_caTypeLabel(u.type)) + ' · ' + _caEsc(u.status || 'vacant') + ')</option>';
+  }).join('');
+  var today = new Date().toISOString().slice(0,10);
+  var selStyle = 'width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);';
+
+  document.getElementById('ca_title').textContent = 'Assign ' + (app.orgName || 'Applicant') + ' to a Building';
+  document.getElementById('ca_body').innerHTML =
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5;">Assign this approved ' + _caEsc((app.classification||'business').toLowerCase()) + ' to a commercial, admin, or band building. This sets the building\'s occupant and records the tenant as a ' + (app.kind === 'department' ? 'department' : 'business') + '.</div>'
+    + _caField('Building', '<select id="ca_assign_unit" style="' + selStyle + '">' + opts + '</select>', true)
+    + _caField('Move-in / Start Date', _caInput('ca_assign_date', app.desiredStart || today, '', 'date'));
+  document.getElementById('ca_footer').innerHTML =
+      '<button type="button" onclick="openCommercialApp(\'' + _caEsc(app.id) + '\')" class="btn btn-ghost">&larr; Back</button>'
+    + '<button type="button" onclick="confirmAssignCommercial()" class="btn btn-primary">Assign</button>';
+}
+
+function confirmAssignCommercial(){
+  var app = _caEditId ? (typeof applications !== 'undefined' ? applications : []).find(function(a){ return a.id === _caEditId; }) : null;
+  if (!app) return;
+  var unitId = (document.getElementById('ca_assign_unit') || {}).value || '';
+  var date   = (document.getElementById('ca_assign_date') || {}).value || new Date().toISOString().slice(0,10);
+  if (!unitId) { if (typeof showToast==='function') showToast('Select a building.', { type:'error' }); return; }
+  var src  = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var unit = src.find(function(u){ return u.id === unitId; });
+  if (!unit) { if (typeof showToast==='function') showToast('Building not found.', { type:'error' }); return; }
+  var addr = ((unit.num||'') + ' ' + (unit.street||'')).trim();
+  var org  = app.orgName || app.fn || 'Business';
+
+  // 1) Put the org onto the building (the sync trigger creates a tenant row by name).
+  unit.assignedName = org;
+  unit.assignedTo   = app.id;
+  unit.assignedDate = date;
+  if (unit.status === 'vacant') unit.status = 'occupied';
+  var unitSave = (typeof saveUnitWithDraftFallback === 'function') ? saveUnitWithDraftFallback(unit) : Promise.resolve(true);
+
+  // 2) Once the unit save commits (trigger has created the tenant), type that
+  //    tenant as business/department + contact + link the application.
+  Promise.resolve(unitSave).then(function(){
+    setTimeout(function(){
+      _caPatchTenant(org, {
+        tenant_type:    app.kind === 'department' ? 'department' : 'business',
+        contact_person: app.contactPerson || null,
+        application_id: app.id
+      });
+    }, 700);
+  });
+
+  // 3) Link the application and mark it assigned.
+  var upApp = Object.assign({}, app, {
+    assignedUnit: unit.id, assignedAddress: addr, status: 'assigned', assignedAt: new Date().toISOString()
+  });
+  _caPersist(upApp, 'Assigned ' + org + ' to ' + (addr || 'the building') + '.', 'commercial_app_assigned');
+  if (typeof renderInventoryView === 'function') renderInventoryView();
+  if (typeof renderTenantsView  === 'function') renderTenantsView();
+}
+
+function _caPatchTenant(orgName, fields){
+  try {
+    if (typeof SUPABASE_URL === 'undefined' || !window.HOUSING_HEADERS) return;
+    var qs = 'full_name=eq.' + encodeURIComponent(orgName) + '&merged_into=is.null';
+    fetch(SUPABASE_URL + '/rest/v1/tenants?' + qs, {
+      method:  'PATCH',
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+      body:    JSON.stringify(fields)
+    }).catch(function(e){ console.warn('[commercial] tenant type patch failed:', e); });
+  } catch(e){ console.warn('[commercial] tenant patch threw:', e); }
+}
+
+window.openCommercialApp      = openCommercialApp;
+window.closeCommercialApp     = closeCommercialApp;
+window.submitCommercialApp    = submitCommercialApp;
+window.commercialAppDecision  = commercialAppDecision;
+window.openCommercialAssign   = openCommercialAssign;
+window.confirmAssignCommercial = confirmAssignCommercial;
