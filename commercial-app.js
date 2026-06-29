@@ -102,6 +102,8 @@ function _caRenderBody(app){
     +   _caField('Contact Email', _caInput('ca_email', app.contactEmail, 'Email', 'email'))
     +   _caField('Space Type', '<select id="ca_space" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">' + spaceOpts + '</select>')
     +   _caField('Approx. Size Needed', _caInput('ca_size', app.sizeNeeded, 'e.g. 1,200 sq ft or 3 rooms'))
+    +   _caField('Monthly Rent / Fee ($)', _caInput('ca_rent', app.rentAmount, '0.00', 'number'))
+    +   _caField('Department Number', _caInput('ca_dept', app.deptNumber, 'Cost centre / dept no.'))
     +   _caField('Preferred Building', '<select id="ca_unit" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);">' + unitOpts + '</select>')
     +   _caField('Desired Start', _caInput('ca_start', app.desiredStart, '', 'date'), true)
     +   _caField('Desired End (optional)', _caInput('ca_end', app.desiredEnd, 'Leave blank if ongoing', 'date'))
@@ -162,6 +164,8 @@ function _caCollect(){
     contactEmail:  v('ca_email'),
     spaceType:     v('ca_space'),
     sizeNeeded:    v('ca_size'),
+    rentAmount:    v('ca_rent'),
+    deptNumber:    v('ca_dept'),
     preferredUnit: v('ca_unit'),
     desiredStart:  v('ca_start'),
     desiredEnd:    v('ca_end'),
@@ -294,19 +298,22 @@ function confirmAssignCommercial(){
   unit.assignedName = org;
   unit.assignedTo   = app.id;
   unit.assignedDate = date;
+  if (app.deptNumber) unit.deptNumber = app.deptNumber;   // cost-centre on the building
   if (unit.status === 'vacant') unit.status = 'occupied';
   var unitSave = (typeof saveUnitWithDraftFallback === 'function') ? saveUnitWithDraftFallback(unit) : Promise.resolve(true);
 
   // 2) Once the unit save commits (trigger has created the tenant), type that
-  //    tenant as business/department + contact + link the application.
+  //    tenant as business/department + contact + rent + link the application.
+  var _rent = parseFloat(String(app.rentAmount || '').replace(/[^0-9.\-]/g, ''));
+  var _tFields = {
+    tenant_type:    app.kind === 'department' ? 'department' : 'business',
+    contact_person: app.contactPerson || null,
+    application_id: app.id,
+    current_unit_id: unit.id
+  };
+  if (!isNaN(_rent)) _tFields.monthly_rent = _rent;
   Promise.resolve(unitSave).then(function(){
-    setTimeout(function(){
-      _caPatchTenant(org, {
-        tenant_type:    app.kind === 'department' ? 'department' : 'business',
-        contact_person: app.contactPerson || null,
-        application_id: app.id
-      });
-    }, 700);
+    setTimeout(function(){ _caPatchTenant(org, _tFields); }, 700);
   });
 
   // 3) Link the application and mark it assigned.
