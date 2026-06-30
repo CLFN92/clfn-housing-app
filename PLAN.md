@@ -614,12 +614,15 @@ internet.
   for the immutable CDN PDF/chart libs, Supabase never cached. Device must open
   the app online once to populate the cache. Signatures are already client-side.
 
-### O2 — Offline save of the signed form  (planned)
-- `sbUploadFile()` is a direct Storage upload that fails offline. Queue the
-  generated PDF blob + storage path + doc-library metadata in **IndexedDB** when
-  offline (localStorage is too small for PDFs), and flush on reconnect (reuse the
-  existing `online` event / degraded-mode probe). Generic, so it covers any form
-  (lease, work order, inspection).
+### O2 — Offline save of the signed form  (done)
+- `uploadFileResilient(path, blob, meta)` + `flushOfflineFiles()` in `shared.js`:
+  an **IndexedDB** queue (`clfn_offline_files`) that stashes the PDF blob + the
+  `file_uploaded` metadata when offline/degraded/on-failure, and flushes on the
+  `online` event, on load (3s), and on degraded-mode recovery. Generic drop-in
+  for the `sbUploadFile` + `sbSaveFileMeta` pair.
+- Wired into the **TIC lease/agreement generator** (the signed form) with an
+  offline-aware toast. The same helper can be dropped into other uploaders
+  (DocLibrary, work order, inspections) as a follow-up.
 
 ---
 

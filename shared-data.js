@@ -435,6 +435,7 @@ function _runDegradedProbe(){
     console.log('[save-queue] probe succeeded — exiting degraded mode');
     if(typeof showToast === 'function') showToast('Connection restored — syncing saved data.');
     syncSaveQueue().catch(function(){});
+    if(typeof window.flushOfflineFiles === 'function') window.flushOfflineFiles();   // O2: sync queued PDFs/files
   }).catch(function(){
     _degradedProbeRunning = false;
     // Still slow — extend cooldown and schedule another probe.

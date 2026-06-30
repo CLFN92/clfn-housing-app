@@ -1843,6 +1843,97 @@ window.DocLibrary = (function(){
     } catch(e) { console.warn('File meta save failed:', e); }
   }
 
+  // ── Offline file queue (Phase O2) ─────────────────────────────────────────
+  // sbUploadFile is a direct Storage upload that fails with no internet, so a
+  // generated/signed form (PDF) can't reach the document library offline. Wrap
+  // it: when offline / degraded / on failure, stash the blob + metadata in
+  // IndexedDB (too big for localStorage) and flush on reconnect. The doc-library
+  // "metadata" is a file_uploaded audit row written by sbSaveFileMeta.
+  function _offFileDB() {
+    return new Promise(function(resolve, reject){
+      try {
+        var rq = indexedDB.open('clfn_offline_files', 1);
+        rq.onupgradeneeded = function(){ var db = rq.result; if (!db.objectStoreNames.contains('files')) db.createObjectStore('files', { keyPath:'id', autoIncrement:true }); };
+        rq.onsuccess = function(){ resolve(rq.result); };
+        rq.onerror   = function(){ reject(rq.error); };
+      } catch(e){ reject(e); }
+    });
+  }
+  function _offFilePut(rec) {
+    return _offFileDB().then(function(db){ return new Promise(function(resolve, reject){
+      var tx = db.transaction('files','readwrite');
+      tx.objectStore('files').add(Object.assign({ queuedAt: Date.now() }, rec));
+      tx.oncomplete = function(){ resolve(true); };
+      tx.onerror    = function(){ reject(tx.error); };
+    }); });
+  }
+  function _offFileAll() {
+    return _offFileDB().then(function(db){ return new Promise(function(resolve, reject){
+      var tx = db.transaction('files','readonly'); var r = tx.objectStore('files').getAll();
+      r.onsuccess = function(){ resolve(r.result || []); };
+      r.onerror   = function(){ reject(r.error); };
+    }); });
+  }
+  function _offFileDel(id) {
+    return _offFileDB().then(function(db){ return new Promise(function(resolve){
+      var tx = db.transaction('files','readwrite'); tx.objectStore('files').delete(id);
+      tx.oncomplete = function(){ resolve(true); }; tx.onerror = function(){ resolve(false); };
+    }); });
+  }
+  function _offFileDegraded(){ return (typeof window._inDegradedMode === 'function') && window._inDegradedMode(); }
+
+  // Upload a file + write its file_uploaded audit row; if offline / degraded /
+  // it fails, queue it for later. Resolves { queued: boolean }. Drop-in for the
+  // sbUploadFile + sbSaveFileMeta pair.
+  async function uploadFileResilient(path, blob, meta) {
+    meta = meta || {};
+    async function doIt(){
+      await sbUploadFile(path, blob);
+      await sbSaveFileMeta(meta.entityType, meta.entityId, path, meta.filename,
+        (meta.size != null ? meta.size : (blob && blob.size)),
+        meta.contentType || (blob && blob.type) || 'application/octet-stream');
+    }
+    if ((typeof navigator !== 'undefined' && navigator.onLine === false) || _offFileDegraded()) {
+      try { await _offFilePut({ path: path, blob: blob, meta: meta }); } catch(e){ console.warn('[offline-file] queue failed:', e); }
+      return { queued: true };
+    }
+    try { await doIt(); return { queued: false }; }
+    catch(e) {
+      try { await _offFilePut({ path: path, blob: blob, meta: meta }); } catch(e2){ console.warn('[offline-file] queue failed:', e2); }
+      return { queued: true };
+    }
+  }
+
+  var _offFileFlushing = false;
+  async function flushOfflineFiles() {
+    if (_offFileFlushing) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _offFileFlushing = true;
+    var uploaded = 0;
+    try {
+      var items = await _offFileAll();
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i], m = it.meta || {};
+        try {
+          await sbUploadFile(it.path, it.blob);
+          await sbSaveFileMeta(m.entityType, m.entityId, it.path, m.filename, m.size, m.contentType || 'application/octet-stream');
+          await _offFileDel(it.id);
+          uploaded++;
+        } catch(e){ console.warn('[offline-file] flush item kept (will retry):', e); }
+      }
+    } catch(e){ console.warn('[offline-file] flush failed:', e); }
+    _offFileFlushing = false;
+    if (uploaded && typeof window.showToast === 'function') {
+      window.showToast('Synced ' + uploaded + ' saved file' + (uploaded > 1 ? 's' : '') + ' to the server.');
+    }
+  }
+  if (typeof window !== 'undefined') {
+    window.uploadFileResilient = uploadFileResilient;
+    window.flushOfflineFiles   = flushOfflineFiles;
+    try { window.addEventListener('online', flushOfflineFiles); } catch(e){}
+    try { window.addEventListener('load', function(){ setTimeout(flushOfflineFiles, 3000); }); } catch(e){}
+  }
+
   // Load file list for an entity from audit log (filters out deleted).
   // Column is `detail` (singular, text). Uses a tolerant parser in case
   // of jsonb drift later.
