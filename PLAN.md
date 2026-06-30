@@ -604,6 +604,25 @@ parallel to the residential housing pipeline, reusing the same plumbing.
 
 ---
 
+## Phase O — Offline form generation  (O1 done, O2 planned)
+Let staff open the app, GENERATE a form, capture signatures, and save it with no
+internet.
+
+### O1 — PWA offline shell  (done)
+- `sw.js` service worker (registered from `shared.js`) + `manifest.json`.
+  Network-first for our own files (fresh online, cached offline), cache-first
+  for the immutable CDN PDF/chart libs, Supabase never cached. Device must open
+  the app online once to populate the cache. Signatures are already client-side.
+
+### O2 — Offline save of the signed form  (planned)
+- `sbUploadFile()` is a direct Storage upload that fails offline. Queue the
+  generated PDF blob + storage path + doc-library metadata in **IndexedDB** when
+  offline (localStorage is too small for PDFs), and flush on reconnect (reuse the
+  existing `online` event / degraded-mode probe). Generic, so it covers any form
+  (lease, work order, inspection).
+
+---
+
 ## Rollback points
 - Pre-refactor snapshots (Phase C)
 

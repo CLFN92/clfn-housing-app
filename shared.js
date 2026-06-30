@@ -185,6 +185,27 @@ try {
   if (_cachedLogo) window._setFavicon(_cachedLogo);
 } catch(e) {}
 
+// ── PWA / offline (Phase O1) ──────────────────────────────────────────────
+// Register the service worker (sw.js) so the app shell + PDF libraries are
+// cached and staff can open the app and generate/sign forms with no internet,
+// and inject the web-app manifest link so it can be installed to a device home
+// screen. Both are best-effort and never block boot.
+(function(){
+  try {
+    if (!document.querySelector('link[rel="manifest"]')) {
+      var l = document.createElement('link');
+      l.rel = 'manifest';
+      l.href = 'manifest.json';
+      (document.head || document.documentElement).appendChild(l);
+    }
+  } catch(e){}
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js').catch(function(e){ console.warn('[sw] register failed:', e); });
+    });
+  }
+})();
+
 // ═══════════════════════════════════════════════════════════════════════
 // formatPhone — canonical phone-string formatter "(705)-555-0100".
 // Strips non-digits, caps at 10 digits, and emits the parens + dash form
