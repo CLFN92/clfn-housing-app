@@ -2560,6 +2560,12 @@
   }
   // ── Modal ──────────────────────────────────────────────────────────────
   function _ticOpenLeaseModal(docKey) {
+    // An agreement requires a linked unit — its address/details come from the
+    // unit card. No unit = no agreement.
+    if (!(_ticState.unit && _ticState.unit.id)) {
+      if (typeof showToast === 'function') showToast('Assign a unit to this tenant before creating an agreement.', { type:'error' });
+      return;
+    }
     _ticLeaseDocKey = ({ temporary_lease:1, commercial_lease:1 }[docKey]) ? docKey : 'residential_lease';
     var isTemp = _ticLeaseDocKey !== 'residential_lease';   // fixed-term docs need an end date
     _leaseInitials = {};   // fresh initials per agreement open (clause sets differ)
@@ -2656,18 +2662,9 @@
         + '</div></div>';
     }
 
-    var occRows = '';
-    for (var i = 0; i < 6; i++) {
-      var h = habitants[i] || {};
-      var nm = ((h.fn||'') + ' ' + (h.ln||'')).trim();
-      occRows += '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 60px;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);">'
-        + '<div style="font-size:10px;color:var(--muted);grid-column:1/-1;font-weight:600;padding-bottom:2px;">Occupant ' + (i+1) + '</div>'
-        + inp('ls_occ_name_'+i, nm, 'Full name')
-        + inp('ls_occ_rel_'+i,  h.relationship||'', 'Relationship')
-        + inp('ls_occ_dob_'+i,  h.dob||'', 'DOB', 'date')
-        + inp('ls_occ_band_'+i, '', 'Y/N')
-        + '</div>';
-    }
+    // Authorized occupants come straight from the application's household
+    // members (no editable Schedule A section in the form); the generator reads
+    // _ticState.application.habitants directly into the occupant tokens.
 
     var modal = document.createElement('div');
     modal.id = 'tic_lease_modal';
@@ -2713,10 +2710,6 @@
       + (coName ? sigPad('ls_sig_cotenant', 'Co-Tenant Signature') : '')
       + sigPad('ls_sig_staff', 'Housing Staff / Landlord Signature')
 
-      + secH('Authorized Occupants &#8212; Schedule A')
-      + '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Pre-filled from the Occupants tab. Edit as needed.</div>'
-      + occRows
-
       + '</div>'
       + '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;">'
       + '<button type="button" onclick="document.getElementById(\'tic_lease_modal\').remove()" class="btn btn-ghost">Cancel</button>'
@@ -2740,14 +2733,8 @@
     var fv  = function(id){ var e=document.getElementById(id); return e ? (e.value||'').trim() : ''; };
 
     if (app && app.id) {
-      var newHabs = [];
-      for (var i = 0; i < 6; i++) {
-        var nm = fv('ls_occ_name_'+i), rel = fv('ls_occ_rel_'+i), dob = fv('ls_occ_dob_'+i);
-        if (!nm && !rel) continue;
-        var parts = nm.split(/\s+/);
-        newHabs.push({ fn: parts[0]||'', ln: parts.slice(1).join(' ')||'', relationship: rel, dob: dob });
-      }
-      app.habitants = newHabs;
+      // Occupants are no longer edited on this form (no Schedule A section) —
+      // they live on the application, so we leave app.habitants untouched.
       var coFull = fv('ls_co_name');
       if (coFull) {
         app.hasCoApp = true;
@@ -2810,6 +2797,11 @@
     var execMonth = d ? d.toLocaleString('en-CA',{month:'long'}) : '';
     var execYear  = d ? String(d.getFullYear()) : '';
 
+    // Authorized occupants come from the application's household members.
+    var _occ = ((_ticState.application && _ticState.application.habitants) || []).filter(function(h){ return h && (h.fn || h.ln); });
+    var _occName = function(i){ return _occ[i] ? ((_occ[i].fn||'') + ' ' + (_occ[i].ln||'')).trim() : ''; };
+    var _occRel  = function(i){ return _occ[i] ? (_occ[i].relationship || '') : ''; };
+
     var tokens = {
       nationName:             (window.NATION_CONFIG && NATION_CONFIG.display_name) || 'Housing Authority',
       nationShort:            (window.NATION_CONFIG && NATION_CONFIG.short) || '',
@@ -2833,12 +2825,12 @@
       residenceAllocDate:     fv('ls_r_alloc'),
       rentAmount:             fv('ls_rent'),
       landlordName:           (_ticState.tenant ? (_ticState.tenant.approved_by || '') : ''),
-      occupant1Name:          fv('ls_occ_name_0'), occupant2Name: fv('ls_occ_name_1'),
-      occupant3Name:          fv('ls_occ_name_2'), occupant4Name: fv('ls_occ_name_3'),
-      occupant5Name:          fv('ls_occ_name_4'), occupant6Name: fv('ls_occ_name_5'),
-      occupant1Relationship:  fv('ls_occ_rel_0'),  occupant2Relationship: fv('ls_occ_rel_1'),
-      occupant3Relationship:  fv('ls_occ_rel_2'),  occupant4Relationship: fv('ls_occ_rel_3'),
-      occupant5Relationship:  fv('ls_occ_rel_4'),  occupant6Relationship: fv('ls_occ_rel_5')
+      occupant1Name:          _occName(0), occupant2Name: _occName(1),
+      occupant3Name:          _occName(2), occupant4Name: _occName(3),
+      occupant5Name:          _occName(4), occupant6Name: _occName(5),
+      occupant1Relationship:  _occRel(0),  occupant2Relationship: _occRel(1),
+      occupant3Relationship:  _occRel(2),  occupant4Relationship: _occRel(3),
+      occupant5Relationship:  _occRel(4),  occupant6Relationship: _occRel(5)
     };
 
     // ── jsPDF path — used when a contract body has been saved in Settings ─
