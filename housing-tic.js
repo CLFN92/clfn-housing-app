@@ -2580,7 +2580,27 @@
     var emerg = ((emergRef.fn||'') + ' ' + (emergRef.ln||'')).trim();
     if (emergRef.phone) emerg += (emerg ? ' ' : '') + emergRef.phone;
     var habitants = (app.habitants || []).filter(function(h){ return h && (h.fn || h.ln); });
-    var rentAmt   = l[TIC_C.monthly_rent] != null ? String(l[TIC_C.monthly_rent]) : '';
+    // Applicant details — prefer the application, fall back to the tenant record
+    // so existing tenants (whose application may not be loaded) still prefill.
+    var _has = function(v){ return v != null && v !== ''; };
+    var tBand  = app.band  || t.band_number   || '';
+    var tDob   = app.dob   || t.date_of_birth || '';
+    var tPhone = app.phone || t.phone || '';
+    var tEmail = app.email || t.email || '';
+    // Rent must appear on EVERY agreement: ledger -> unit card -> tenant -> app.
+    var rentAmt = _has(l[TIC_C.monthly_rent]) ? String(l[TIC_C.monthly_rent])
+                : (u && _has(u.monthlyRent))  ? String(u.monthlyRent)
+                : (u && _has(u.monthly_rent)) ? String(u.monthly_rent)
+                : (t && _has(t.monthly_rent)) ? String(t.monthly_rent)
+                : (app && _has(app.rentAmount)) ? String(app.rentAmount)
+                : (app && _has(app.rent)) ? String(app.rent)
+                : '';
+    // Unit details come from the unit card.
+    var bedBath = u
+      ? [ (u.bedrooms ? String(u.bedrooms) + ' bed' : ''),
+          (u.bathrooms && u.bathrooms !== '0' && u.bathrooms !== 'nan' ? String(u.bathrooms) + ' bath' : '') ]
+          .filter(Boolean).join(' / ')
+      : '';
     var startDate = t[TIC_C.lease_start_date] || t[TIC_C.move_in_date] || (u && u.assignedDate) || '';
     var endDate   = t[TIC_C.lease_end_date]   || '';
 
@@ -2667,14 +2687,14 @@
       + fld(isTemp ? 'End Date (required)' : 'Lease End Date', inp('ls_end_date', endDate, isTemp ? 'Fixed-term end date' : 'Leave blank if month-to-month', 'date'))
       + fld('Primary Tenant Name',      inp('ls_t_name',     tenantName,           'Full legal name'))
       + fld('Co-Tenant Name',           inp('ls_co_name',    coName,               'Leave blank if none'))
-      + fld('Band Membership #',        inp('ls_t_band',     app.band||'',         'Band number'))
-      + fld('Date of Birth (Primary)',  inp('ls_t_dob',      app.dob||'',          'YYYY-MM-DD', 'date'))
-      + fld('Telephone',                inp('ls_t_phone',    app.phone||'',        'Phone'))
-      + fld('Email',                    inp('ls_t_email',    app.email||'',        'Email'))
+      + fld('Band Membership #',        inp('ls_t_band',     tBand,                'Band number'))
+      + fld('Date of Birth (Primary)',  inp('ls_t_dob',      tDob,                 'YYYY-MM-DD', 'date'))
+      + fld('Telephone',                inp('ls_t_phone',    tPhone,               'Phone'))
+      + fld('Email',                    inp('ls_t_email',    tEmail,               'Email'))
       + fld('Emergency Contact',        inp('ls_t_emerg',    emerg,                'Name and phone'))
       + fld('Lot Number',               inp('ls_r_lot',      u.num||'',            'Lot'))
       + fld('Street Name',              inp('ls_r_street',   u.street||'',         'Street'))
-      + fld('Bedrooms / Bathrooms',     inp('ls_r_bed',      u.bedrooms ? String(u.bedrooms)+' bed' : '', 'e.g. 3 bed / 1 bath'))
+      + fld('Bedrooms / Bathrooms',     inp('ls_r_bed',      bedBath,              'e.g. 3 bed / 1 bath'))
       + fld('Funding Stream',           inp('ls_r_stream',   t[TIC_C.housing_stream]||'', 'e.g. Section 95'))
       + fld('Allocation Date',          inp('ls_r_alloc',    t[TIC_C.move_in_date]||u.assignedDate||'', '', 'date'))
       + fld('Monthly Rent ($)',         inp('ls_rent',       rentAmt,              '0.00'))
@@ -2917,12 +2937,23 @@
         setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
 
         var unit = _ticState.unit || {};
+        var _leaseQueued = false;
         if (unit.id) {
           try {
             var storePath = 'tenants/' + unit.id + '/' + Date.now() + '_' + filename;
-            await window.sbUploadFile(storePath, blob);
-            if (typeof window.sbSaveFileMeta === 'function') {
-              await window.sbSaveFileMeta('tenant', String(unit.id), storePath, filename, blob.size, 'application/pdf');
+            // Resilient: uploads now if online, otherwise queues to IndexedDB and
+            // syncs on reconnect — so the signed agreement saves with no internet.
+            if (typeof window.uploadFileResilient === 'function') {
+              var _up = await window.uploadFileResilient(storePath, blob, {
+                entityType: 'tenant', entityId: String(unit.id), filename: filename,
+                size: blob.size, contentType: 'application/pdf'
+              });
+              _leaseQueued = !!(_up && _up.queued);
+            } else {
+              await window.sbUploadFile(storePath, blob);
+              if (typeof window.sbSaveFileMeta === 'function') {
+                await window.sbSaveFileMeta('tenant', String(unit.id), storePath, filename, blob.size, 'application/pdf');
+              }
             }
             _ticDocLibKey = null; _ticDocLib = null;
             _ticUtilDocLibKey = null; _ticUtilDocLib = null;
@@ -2930,7 +2961,9 @@
         }
         var mo = document.getElementById('tic_lease_modal');
         if (mo) mo.remove();
-        if (typeof showToast === 'function') showToast('Occupancy Agreement saved to document library');
+        if (typeof showToast === 'function') showToast(_leaseQueued
+          ? 'Agreement saved on this device — it will upload to the document library when you are back online.'
+          : 'Occupancy Agreement saved to document library');
         return;
       } catch(e) {
         console.error('[lease] jsPDF generation failed:', e);
