@@ -912,6 +912,18 @@ function closeAwardModal() {
   _rfqAwardingId = null;
 }
 
+// Returns a list of eligibility problems for awarding to this contractor
+// (empty = good to go): not approved, or expired WSIB / insurance.
+function _rfqContractorEligibility(ct) {
+  if (!ct) return ['not found in the contractor registry'];
+  var issues = [];
+  if ((ct.status || '') !== 'approved') issues.push('not approved (status: ' + (ct.status || 'unknown').replace(/_/g,' ') + ')');
+  var today = new Date().toISOString().slice(0,10);
+  if (ct.wsibExpiry && ct.wsibExpiry < today) issues.push('WSIB expired ' + ct.wsibExpiry);
+  if (ct.insExpiry  && ct.insExpiry  < today) issues.push('insurance expired ' + ct.insExpiry);
+  return issues;
+}
+
 async function confirmAward() {
   var ctId   = document.getElementById('award_ct_id').value;
   var amount = document.getElementById('award_amount').value;
@@ -922,6 +934,18 @@ async function confirmAward() {
   // awardRfq() was being handed null.
   var rfqId = _rfqAwardingId;
   var ct    = (window._contractors || []).find(function(c){ return c && c.id === ctId; });
+
+  // Eligibility warning (not a hard block — ED can override): flag awarding to
+  // an un-approved contractor or one with expired WSIB / insurance.
+  var _elig = _rfqContractorEligibility(ct);
+  if (_elig.length && typeof showConfirm === 'function') {
+    var _go = await showConfirm({
+      title:       'Contractor eligibility',
+      message:     ((ct && ct.name) || 'This contractor') + ' is ' + _elig.join('; ') + '. Award anyway?',
+      confirmText: 'Award anyway', cancelText: 'Cancel'
+    });
+    if (!_go) return;   // leave the award modal open so they can pick another
+  }
   closeAwardModal();
   if (typeof awardRfq !== 'function') return;
   var ok = await awardRfq(rfqId, ctId, amount, notes);
@@ -1328,11 +1352,74 @@ function _rfqToggleAttach(path, checked) {
   if (checked) _rfqAttachedPaths.push(path);
 }
 
+// ── Contract readiness gate ──────────────────────────────────────────────
+// Don't produce a blank / half-signed contract. Mirrors the TIC lease gate:
+// require an awarded contractor, a price, key dates, and both signatures.
+function _rfqContractMissing() {
+  var missing = [];
+  var fv  = function(id){ var el=document.getElementById(id); return el ? (el.value||'').trim() : ''; };
+  var sig = function(id){ return (typeof getSigDataURL==='function') ? getSigDataURL(id) : ''; };
+  var rfqId = _rfqCurrentId || fv('rfq_number');
+  var rfq   = (window._rfqCache || {})[rfqId] || {};
+  if (!(fv('rfq_awarded_to') || rfq.awarded_contractor_id)) missing.push('Awarded contractor (select on the Contracting tab)');
+  var priceOk = (parseFloat(rfq.award_amount)||0) > 0
+    || ['rfq_price_materials','rfq_price_labour','rfq_price_equipment','rfq_price_other']
+         .some(function(id){ return (parseFloat(fv(id))||0) > 0; });
+  if (!priceOk) missing.push('Contract price (award amount or price breakdown)');
+  if (!fv('rfq_contract_date')) missing.push('Contract date');
+  if (!fv('rfq_total_completion') && !fv('rfq_target_end')) missing.push('Completion date');
+  return missing;
+}
+// Signatures are a SOFT check — contracts are often generated first, then
+// signed on paper / re-generated. Returns which sig blocks are still blank.
+function _rfqContractMissingSigs() {
+  var sig = function(id){ return (typeof getSigDataURL==='function') ? getSigDataURL(id) : ''; };
+  var out = [];
+  if (!sig('rfq_sig'))    out.push('Owner / Nation representative');
+  if (!sig('rfq_ct_sig')) out.push('Contractor');
+  return out;
+}
+function _rfqShowChecklist(title, items) {
+  var existing = document.getElementById('rfq_checklist_modal');
+  if (existing) existing.remove();
+  var rows = items.map(function(it){
+    return '<div style="display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);">'
+      + '<span style="color:var(--danger,#dc2626);font-size:14px;line-height:1.3;">&#9711;</span>'
+      + '<span style="font-size:12.5px;color:var(--text);line-height:1.5;">' + escapeHtml(it) + '</span></div>';
+  }).join('');
+  var m = document.createElement('div');
+  m.id = 'rfq_checklist_modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:11000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  m.innerHTML =
+      '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:440px;box-shadow:0 8px 40px rgba(0,0,0,.4);">'
+    + '<div class="modal-hdr"><div><div class="lbl-yellow">&#9888;&#65039; ' + escapeHtml(title) + '</div>'
+    +   '<div class="txt-sm-meta">Complete these before generating the contract:</div></div></div>'
+    + '<div style="padding:14px 22px 4px;">' + rows + '</div>'
+    + '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">'
+    +   '<button type="button" onclick="document.getElementById(\'rfq_checklist_modal\').remove()" class="btn btn-primary">Got it</button>'
+    + '</div></div>';
+  document.body.appendChild(m);
+}
+
 // ── Generate Contractor Agreement PDF ────────────────────────────────────
 // Renders the contract body from notifications.js CONTRACTS_DOCS_REGISTRY
 // via jsPDF text primitives. getContractBody() always returns a non-empty
 // body (registry default when no saved override), so no AcroForm fallback.
 async function generateContractorContract() {
+  // Readiness gate — hard-block on missing contract essentials.
+  var _missing = _rfqContractMissing();
+  if (_missing.length) { _rfqShowChecklist('Not ready to generate', _missing); return; }
+  // Signatures are soft — allow generating an unsigned copy to sign on paper.
+  var _noSigs = _rfqContractMissingSigs();
+  if (_noSigs.length && typeof showConfirm === 'function') {
+    var _goSig = await showConfirm({
+      title:       'Generate without signatures?',
+      message:     'No signature captured for: ' + _noSigs.join(', ') + '. Generate the contract anyway (e.g. to sign on paper)? You can re-generate after signing.',
+      confirmText: 'Generate anyway', cancelText: 'Cancel'
+    });
+    if (!_goSig) return;
+  }
+
   if (typeof showToast === 'function') showToast('Generating contract PDF…');
 
   // Build data directly from current form state — don't depend on saveRfqDraft

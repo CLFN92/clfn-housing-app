@@ -6696,9 +6696,12 @@ function generateRfqNumber() {
 
 function _sowMeetsRfqThreshold(sow) {
   var threshold = ((window._appSettings && window._appSettings.rfq_threshold) || 10000);
-  var amt = parseFloat((sow && (sow.amount || sow.totalCost || sow.total_cost)) || 0) || 0;
+  // Accept .cost too so the renos.html approval table (which carries r.cost)
+  // shares this single threshold rule instead of an inline copy.
+  var amt = parseFloat((sow && (sow.amount || sow.totalCost || sow.total_cost || sow.cost)) || 0) || 0;
   return amt >= threshold;
 }
+window._sowMeetsRfqThreshold = _sowMeetsRfqThreshold;
 
 function buildRfqDocumentHtml(rfq, sow, unit) {
   var nc       = window.NATION_CONFIG || {};
