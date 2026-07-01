@@ -974,6 +974,11 @@ var SOW_CATEGORIES = [
 // Reads signature data from a signature pad (canvas/type/wet tri-state)
 
 
+// SOW categories that flag a request as safety-critical. Defined here because
+// renos.html does not load scoring.js (which also declares it, unused there);
+// renderRenoApprovalsView referenced it and threw a ReferenceError without this.
+var CRITICAL_SOW_CATS = ['Heating / HVAC','Electrical','Roofing','Windows & Doors','Plumbing'];
+
 // Funding-program rules used by the renovation budget approval flow
 var RENO_FUND_RULES = {
   'ISC':        { pools:['rrap','band','ofnlp','band_rep'],         label:'ISC House',       rule:'Eligible: RRAP + Band Funds + OFNLP + Band Rep Funds' },

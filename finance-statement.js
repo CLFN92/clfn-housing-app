@@ -491,12 +491,10 @@ function openArrPaymentForTenant(arrId) {
   openModal('modalArrPayment');
 }
 
-function openNewLoanForTenant(tid) {
-  openModal('modalNewLoan');
-  setTimeout(function(){
-    var s = document.getElementById('ln-tenant'); if(s) s.value = tid;
-  }, 60);
-}
+// openNewLoanForTenant is defined in finance-nav.js (loaded earlier) with the
+// calcLoan() call. A duplicate used to live here and — because this file loads
+// later — silently shadowed the nav.js version, dropping the loan calc. Removed;
+// do not re-add. See DEAD_CODE_AUDIT.md.
 
 function openLoanPaymentForTenant(loanId) {
   var d = getData();

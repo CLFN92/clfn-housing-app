@@ -2444,14 +2444,14 @@ function _updateNotesTabPreview(notes) {
   var lbl = document.getElementById('spb_lbl_11');
   if (!lbl) return;
   if (!notes || !notes.length) {
-    lbl.innerHTML = 'Internal Notes <span class=”spb-lbl-sub”>(Staff Only)</span>';
+    lbl.innerHTML = 'Internal Notes <span class="spb-lbl-sub">(Staff Only)</span>';
     return;
   }
   var last = notes[0]; // newest-first
   var raw  = (last.body || '').trim().replace(/\s+/g, ' ');
   var snippet = raw.length > 40 ? raw.substring(0, 40) + '…' : raw;
   var count = notes.length;
-  lbl.innerHTML = 'Internal Notes <span class=”spb-lbl-sub”>'
+  lbl.innerHTML = 'Internal Notes <span class="spb-lbl-sub">'
     + count + (count === 1 ? ' note' : ' notes')
     + ' · “' + escapeHtml(snippet) + '”</span>';
 }

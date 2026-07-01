@@ -576,25 +576,25 @@ function _inspPromptSOW(insp, repairItems) {
   var msg = repairItems.length + ' item' + (repairItems.length===1?'':'s') + ' marked as needing repair. Create a Scope of Work (SOW) for this unit?';
   if (!confirm(msg)) return;
 
-  // Build SOW line items from repair checklist items
-  var lineItems = repairItems.map(function(it) {
-    return { category: it.section, description: it.item + (it.notes ? ': ' + it.notes : ''), quote: 0, cost: 0 };
-  });
-
-  // Pre-populate the SOW cache for this unit and open the SOW modal
-  if (!window._sowCache) window._sowCache = {};
-  window._sowCache[insp.unit_id] = window._sowCache[insp.unit_id] || {};
-  var existing = window._sowCache[insp.unit_id];
-  // Merge new items with any existing SOW items
-  existing.items = (existing.items || []).concat(lineItems);
-  existing.inspectionRef = insp.id;
-
-  if (typeof openSOWModal === 'function') {
-    openSOWModal(insp.unit_id);
-    if(typeof showToast==='function') showToast('Repair items pre-loaded into the SOW.');
-  } else {
-    if(typeof showToast==='function') showToast('SOW pre-loaded. Open the unit\'s Scope of Work to review.', {type:'info'});
+  if (typeof openSowModal !== 'function') {
+    if(typeof showToast==='function') showToast('Open the unit\'s Scope of Work to create the repair request.', {type:'info'});
+    return;
   }
+
+  // Hand the repair items to the SOW modal via the shared seed path (same as the
+  // reno questionnaire): force a fresh SOW and let openSowModal apply the seed
+  // in-flow. Do NOT write window._sowCache directly — that cache holds each
+  // unit's SOW *record data* (`{sows:[...]}`), not `{items}`, so the old code
+  // both used the wrong function name (openSOWModal) and could clobber real data.
+  window._sowForceNew = true;
+  window._sowSeed = {
+    items: repairItems.map(function(it) {
+      return { category: it.section, description: it.item + (it.notes ? ': ' + it.notes : '') };
+    }),
+    notes: 'Generated from inspection' + (insp.id ? ' ' + insp.id : '') + '.'
+  };
+  openSowModal(insp.unit_id);
+  if(typeof showToast==='function') showToast('Repair items pre-loaded into the SOW.');
 }
 
 // ── Delete ───────────────────────────────────────────────────────────────────

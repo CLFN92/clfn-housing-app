@@ -31,8 +31,12 @@ window.applications = window.applications || [];
 window.housingUnits = window.housingUnits || [];
 
 // ── Mutable model references (populated from Supabase on login) ───────────────
+// Default priority-tier thresholds — single source for init, the fallbacks
+// below, and resetV2TiersED() (which previously referenced an undefined
+// DEFAULT_V2_TIERS and threw on "Reset Defaults").
+var DEFAULT_V2_TIERS = { critical: 80, high: 60, medium: 40 };
 window.liveV2ScoreModel = window.liveV2ScoreModel || {};
-window.liveV2Tiers      = window.liveV2Tiers      || { critical: 80, high: 60, medium: 40 };
+window.liveV2Tiers      = window.liveV2Tiers      || Object.assign({}, DEFAULT_V2_TIERS);
 window.liveScoreModel   = window.liveScoreModel   || null;
 
 // ── V2 Scoring Model Defaults ──────────────────────────────────────────
