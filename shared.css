@@ -2161,7 +2161,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
    Replaces transient stacked toasts. One box in the top-right; messages stay
    until the user closes them (individually or via "Clear all"). */
 #clfn_msgbox {
-  position: fixed; top: 76px; right: 16px; z-index: 100000;
+  position: fixed; top: 88px; right: 16px; z-index: 100000;
   width: 340px; max-width: calc(100vw - 24px);
   background: #111; color: #f4f4f0; border: 1px solid #333;
   border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.5);
@@ -2204,5 +2204,5 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 }
 .clfn-msg-x:hover { opacity: 1; }
 @media (max-width: 640px) {
-  #clfn_msgbox { top: 62px; right: 8px; left: 8px; width: auto; }
+  #clfn_msgbox { top: 88px; right: 8px; left: 8px; width: auto; }
 }
