@@ -2369,6 +2369,13 @@
         _ticRenderNotes();
         _ticRenderTenancyHistory();
         _ticApplyCommercialMode();   // application may now be loaded (appType signal)
+        // Auto-open the agreement modal when arriving via the "Generate Agreement"
+        // hand-off from a just-completed unit assignment (set in confirmAssignment).
+        var _autoLease = window._ticAutoLease;
+        window._ticAutoLease = null;
+        if (_autoLease && _ticState.unit && _ticState.unit.id) {
+          setTimeout(function(){ _ticOpenLeaseModal(_autoLease); }, 300);
+        }
       }).catch(function(err){
         _ticEl('tic_loading').style.display = 'none';
         if(typeof showToast === 'function') showToast('Some tenant data could not be loaded.', { type:'error' });

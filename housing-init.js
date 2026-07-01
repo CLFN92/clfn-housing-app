@@ -1157,6 +1157,19 @@ function confirmAssignment() {
   // lingered until the next manual page reload.
   if(typeof renderWorklist === 'function') renderWorklist();
   showToast('✓ '+name+' assigned to '+addr+(isEdOverride2?' (override)':''));
+
+  // Hand-off: the tenant is now housed -> offer to generate the occupancy
+  // agreement right away. Opening their TIC with the _ticAutoLease flag set
+  // auto-opens the agreement modal, pre-filled from the application + unit.
+  if(typeof showConfirm === 'function' && typeof openTenantCard === 'function'){
+    showConfirm({
+      title:   'Assigned — generate the agreement?',
+      message: name + ' is assigned to ' + addr + '. Generate the occupancy agreement now?',
+      confirmText: 'Generate Agreement →', cancelText: 'Later'
+    }).then(function(ok){
+      if(ok){ window._ticAutoLease = 'residential_lease'; openTenantCard(u.id); }
+    });
+  }
 }
 
 

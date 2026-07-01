@@ -3038,6 +3038,20 @@ function confirmApprovalAction() {
 
   showToast((statusDesc[action] || action) + ' — ' + ((app.fn||'') + ' ' + (app.ln||'')).trim());
 
+  // Hand-off: final approval of a scored applicant with no unit -> offer to jump
+  // straight to Match so an approved applicant doesn't sit in limbo.
+  var _fa = applications[idx];
+  if (action === 'ed_approved' && _fa && (_fa.appType === 'new_housing' || _fa.appType === 'transfer_request')
+      && !_fa.assignedUnit && typeof showConfirm === 'function') {
+    showConfirm({
+      title:   'Approved — ready to match',
+      message: ((_fa.fn||'') + ' ' + (_fa.ln||'')).trim() + ' is approved and awaiting a unit. Go to the Match page to assign one?',
+      confirmText: 'Go to Match →', cancelText: 'Later'
+    }).then(function(ok){
+      if (ok) { if (typeof showMatch === 'function') showMatch(); else window.location.href = 'match.html'; }
+    });
+  }
+
   // Return to the refreshed landing page after any approval/decision action
   if(typeof showDash === 'function') {
     showDash();
