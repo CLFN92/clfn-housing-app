@@ -2420,6 +2420,10 @@
   // Captured initials live here so both the pop-out and the PDF generator can
   // read them without relying on live DOM elements.
   var _leaseInitials = {};
+  // Captured signatures + initials survive a modal close/reopen so staff don't
+  // lose work when they close the agreement to check a detail. Keyed by
+  // docKey|unitId so different agreements (and different units) don't collide.
+  var _leaseDraft = {};
 
   // Which agreement the lease modal/generator is currently working with. The
   // standard month-to-month lease is 'residential_lease'; the fixed-term
@@ -2565,6 +2569,96 @@
       if (pop) pop.remove();
     }
   }
+  // ── Readiness gate ─────────────────────────────────────────────────────
+  // Returns a list of everything still required before the agreement can be
+  // generated (initials, signatures, and — for fixed-term docs — an end date).
+  function _ticLeaseMissing() {
+    var missing = [];
+    var fv  = function(id){ var e=document.getElementById(id); return e ? (e.value||'').trim() : ''; };
+    var sig = function(id){ return (typeof getSigDataURL==='function') ? getSigDataURL(id) : ''; };
+    var isTemp = _ticLeaseDocKey !== 'residential_lease';
+    if (isTemp && !fv('ls_end_date')) missing.push('End date (required for a fixed-term agreement)');
+    var clauses  = _getEffectiveLeaseClauses();
+    var initDone = 0;
+    clauses.forEach(function(c){ if (_leaseInitials[c.id]) initDone++; });
+    if (clauses.length && initDone < clauses.length) {
+      missing.push('Tenant initials (' + initDone + ' of ' + clauses.length + ' captured)');
+    }
+    if (!sig('ls_sig_tenant')) missing.push('Primary tenant signature');
+    if (fv('ls_co_name') && document.getElementById('ls_sig_cotenant') && !sig('ls_sig_cotenant')) {
+      missing.push('Co-tenant signature');
+    }
+    if (!sig('ls_sig_staff')) missing.push('Housing staff / landlord signature');
+    return missing;
+  }
+
+  function _ticShowLeaseChecklist(items) {
+    var existing = document.getElementById('ls_checklist_modal');
+    if (existing) existing.remove();
+    var rows = items.map(function(it){
+      return '<div style="display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);">'
+        + '<span style="color:var(--danger,#dc2626);font-size:14px;line-height:1.3;">&#9711;</span>'
+        + '<span style="font-size:12.5px;color:var(--text);line-height:1.5;">' + _ticEsc(it) + '</span></div>';
+    }).join('');
+    var m = document.createElement('div');
+    m.id = 'ls_checklist_modal';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10200;display:flex;align-items:center;justify-content:center;padding:16px;';
+    m.innerHTML =
+        '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:440px;box-shadow:0 8px 40px rgba(0,0,0,.4);">'
+      + '<div class="modal-hdr"><div>'
+      +   '<div class="lbl-yellow">&#9888;&#65039; Not ready to generate</div>'
+      +   '<div class="txt-sm-meta">Complete these before generating the agreement:</div>'
+      + '</div></div>'
+      + '<div style="padding:14px 22px 4px;">' + rows + '</div>'
+      + '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">'
+      +   '<button type="button" onclick="document.getElementById(\'ls_checklist_modal\').remove()" class="btn btn-primary">Got it</button>'
+      + '</div></div>';
+    document.body.appendChild(m);
+  }
+
+  // ── Draft persistence (survive close/reopen) ───────────────────────────
+  function _ticLeaseDraftKey() {
+    var u = _ticState.unit || {};
+    return _ticLeaseDocKey + '|' + (u.id || '');
+  }
+  function _ticSnapshotLeaseDraft() {
+    if (!document.getElementById('tic_lease_modal')) return;
+    var sigs = {};
+    ['ls_sig_tenant','ls_sig_cotenant','ls_sig_staff'].forEach(function(id){
+      if (!document.getElementById(id) && !document.getElementById(id+'_typed')) return;
+      var v = (typeof getSigDataURL==='function') ? getSigDataURL(id) : '';
+      if (v) sigs[id] = v;
+    });
+    _leaseDraft[_ticLeaseDraftKey()] = {
+      initials: JSON.parse(JSON.stringify(_leaseInitials || {})),
+      sigs: sigs
+    };
+  }
+  function _ticRestoreSig(id, val) {
+    if (!val) return;
+    if (val.indexOf('typed:') === 0) {
+      var t = document.getElementById(id+'_typed');
+      if (t) { t.value = val.slice(6); if (typeof setSigMethod==='function') setSigMethod(id,'type'); }
+      return;
+    }
+    if (val.indexOf('wet:') === 0) {
+      var w = document.getElementById(id+'_wet_ref');
+      if (w) { var r = val.slice(4); w.value = (r==='pending' ? '' : r); if (typeof setSigMethod==='function') setSigMethod(id,'wet'); }
+      return;
+    }
+    var canvas = document.getElementById(id);
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var img = new Image();
+    img.onload = function(){ ctx.drawImage(img, 0, 0, canvas.width, canvas.height); canvas.classList.add('has-sig'); };
+    img.src = val;
+  }
+  function _ticCloseLeaseModal() {
+    try { _ticSnapshotLeaseDraft(); } catch(e) { console.warn('[lease] draft snapshot failed:', e); }
+    var m = document.getElementById('tic_lease_modal');
+    if (m) m.remove();
+  }
+
   // ── Modal ──────────────────────────────────────────────────────────────
   function _ticOpenLeaseModal(docKey) {
     // An agreement requires a linked unit — its address/details come from the
@@ -2575,10 +2669,14 @@
     }
     _ticLeaseDocKey = ({ temporary_lease:1, commercial_lease:1 }[docKey]) ? docKey : 'residential_lease';
     var isTemp = _ticLeaseDocKey !== 'residential_lease';   // fixed-term docs need an end date
-    _leaseInitials = {};   // fresh initials per agreement open (clause sets differ)
     var _docTitle   = _LEASE_TITLES[_ticLeaseDocKey] || 'Residential Lease Agreement';
     var _clauseList = _getEffectiveLeaseClauses();
     var _clauseN    = _clauseList.length;
+    // Restore any captured initials/signatures from a prior open of THIS
+    // agreement (keyed by docKey|unitId) so closing to check a detail is safe.
+    var _draft = _leaseDraft[_ticLeaseDraftKey()];
+    _leaseInitials = (_draft && _draft.initials) ? _draft.initials : {};
+    var _initDone  = _clauseList.filter(function(c){ return _leaseInitials[c.id]; }).length;
     var _clauseNames = _clauseList.map(function(c){ return (c.label || c.id || '').replace(/^Section\s+[0-9.]+\s+[—-]\s+/, ''); }).join(', ');
     var t   = _ticState.tenant      || {};
     var u   = _ticState.unit        || {};
@@ -2601,13 +2699,14 @@
     var tPhone = app.phone || t.phone || '';
     var tEmail = app.email || t.email || '';
     // Rent must appear on EVERY agreement: ledger -> unit card -> tenant -> app.
-    var rentAmt = _has(l[TIC_C.monthly_rent]) ? String(l[TIC_C.monthly_rent])
-                : (u && _has(u.monthlyRent))  ? String(u.monthlyRent)
-                : (u && _has(u.monthly_rent)) ? String(u.monthly_rent)
-                : (t && _has(t.monthly_rent)) ? String(t.monthly_rent)
-                : (app && _has(app.rentAmount)) ? String(app.rentAmount)
-                : (app && _has(app.rent)) ? String(app.rent)
-                : '';
+    // Track the source so staff can see (and trust or override) where it came from.
+    var rentAmt = '', rentSrc = '';
+    if      (_has(l[TIC_C.monthly_rent]))  { rentAmt = String(l[TIC_C.monthly_rent]);  rentSrc = 'rent ledger'; }
+    else if (u && _has(u.monthlyRent))     { rentAmt = String(u.monthlyRent);          rentSrc = 'unit card'; }
+    else if (u && _has(u.monthly_rent))    { rentAmt = String(u.monthly_rent);         rentSrc = 'unit card'; }
+    else if (t && _has(t.monthly_rent))    { rentAmt = String(t.monthly_rent);         rentSrc = 'tenant record'; }
+    else if (app && _has(app.rentAmount))  { rentAmt = String(app.rentAmount);         rentSrc = 'application'; }
+    else if (app && _has(app.rent))        { rentAmt = String(app.rent);               rentSrc = 'application'; }
     // Unit details come from the unit card.
     var bedBath = u
       ? [ (u.bedrooms ? String(u.bedrooms) + ' bed' : ''),
@@ -2681,7 +2780,7 @@
       + '<div class="modal-hdr"><div>'
       +   '<div class="lbl-yellow">&#128209; '+((window.NATION_CONFIG&&window.NATION_CONFIG.short)||'')+' '+_ticEsc(_docTitle)+'</div>'
       +   '<div class="txt-sm-meta">Review pre-filled details, collect all initials and signatures, then generate.</div>'
-      + '</div><button type="button" onclick="document.getElementById(\'tic_lease_modal\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button></div>'
+      + '</div><button type="button" onclick="window._ticCloseLeaseModal && window._ticCloseLeaseModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button></div>'
       + '<div style="overflow-y:auto;padding:18px 22px;flex:1;">'
 
       + secH('Parties &amp; Dates')
@@ -2701,15 +2800,19 @@
       + fld('Bedrooms / Bathrooms',     inp('ls_r_bed',      bedBath,              'e.g. 3 bed / 1 bath'))
       + fld('Funding Stream',           inp('ls_r_stream',   t[TIC_C.housing_stream]||'', 'e.g. Section 95'))
       + fld('Allocation Date',          inp('ls_r_alloc',    t[TIC_C.move_in_date]||u.assignedDate||'', '', 'date'))
-      + fld('Monthly Rent ($)',         inp('ls_rent',       rentAmt,              '0.00'))
+      + '<div class="tic-field"><label class="tic-field-lbl">Monthly Rent ($)</label>' + inp('ls_rent', rentAmt, '0.00')
+      +   (rentSrc
+            ? '<div style="font-size:10px;color:var(--muted);margin-top:3px;">Prefilled from ' + rentSrc + ' &mdash; edit if incorrect</div>'
+            : '<div style="font-size:10px;color:var(--danger,#dc2626);margin-top:3px;">No rent on file &mdash; enter the monthly rent</div>')
+      + '</div>'
       + '</div>'
 
       + secH('Required Initials')
       + '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;">The tenant must initial each required clause before the agreement can be generated. A step-by-step pop-out walks through each clause.</div>'
       + '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">'
-      +   '<div><div id="ls_initials_status" style="font-size:13px;font-weight:600;color:var(--text);">0 of ' + _clauseN + ' initials captured</div>'
+      +   '<div><div id="ls_initials_status" style="font-size:13px;font-weight:600;color:var(--text);">' + _initDone + ' of ' + _clauseN + ' initials captured</div>'
       +   '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + _ticEsc(_clauseNames) + '</div></div>'
-      +   '<button type="button" id="ls_initials_btn" onclick="window._ticOpenInitialsPopout && window._ticOpenInitialsPopout(0)" class="btn btn-primary">Review &amp; Initial &#8594;</button>'
+      +   '<button type="button" id="ls_initials_btn" onclick="window._ticOpenInitialsPopout && window._ticOpenInitialsPopout(0)" class="btn btn-primary"' + (_clauseN && _initDone === _clauseN ? ' style="background:var(--success,#15803d);"' : '') + '>' + (_clauseN && _initDone === _clauseN ? '&#10003; All Initials Complete' : 'Review &amp; Initial &#8594;') + '</button>'
       + '</div>'
 
       + secH('Signatures')
@@ -2719,7 +2822,7 @@
 
       + '</div>'
       + '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;">'
-      + '<button type="button" onclick="document.getElementById(\'tic_lease_modal\').remove()" class="btn btn-ghost">Cancel</button>'
+      + '<button type="button" onclick="window._ticCloseLeaseModal && window._ticCloseLeaseModal()" class="btn btn-ghost">Cancel</button>'
       + '<button type="button" onclick="window._ticGenerateLeasePdf && window._ticGenerateLeasePdf()" class="btn btn-primary">Generate PDF</button>'
       + '</div>'
       + '</div>';
@@ -2729,6 +2832,10 @@
     if (coName) toInit.push('ls_sig_cotenant');
     setTimeout(function() {
       if (typeof _initSigPad === 'function') toInit.forEach(function(id){ _initSigPad(id); });
+      // Re-apply signatures captured before a close/reopen of this agreement.
+      if (_draft && _draft.sigs) {
+        Object.keys(_draft.sigs).forEach(function(id){ _ticRestoreSig(id, _draft.sigs[id]); });
+      }
     }, 80);
   }
 
@@ -2791,6 +2898,11 @@
 
   // ── PDF generator ─────────────────────────────────────────────────────
   async function _ticGenerateLeasePdf() {
+    // Readiness gate — don't generate a half-signed agreement. Surface a
+    // checklist of everything still required and stop.
+    var _missing = _ticLeaseMissing();
+    if (_missing.length) { _ticShowLeaseChecklist(_missing); return; }
+
     if (typeof showToast === 'function') showToast('Saving changes and generating PDF...');
 
     try { await _ticLeaseSaveChanges(); } catch(e) { console.warn('[lease] save-back failed:', e); }
@@ -3970,4 +4082,5 @@
   window._ticGenerateLeasePdf           = _ticGenerateLeasePdf;
   window._ticOpenInitialsPopout         = _ticOpenInitialsPopout;
   window._ticInitialSaveAndNav          = _ticInitialSaveAndNav;
+  window._ticCloseLeaseModal            = _ticCloseLeaseModal;
 })();
