@@ -40,56 +40,19 @@ function escapeHtml(v) {
     .replace(/'/g, '&#39;');
 }
 
-// ── showToast ────────────────────────────────────────────────────────────────
-// Unified toast for all pages.
-// opts.duration  — ms before dismissal (default 2800)
-// opts.position  — 'top' (default) | 'bottom'
-// opts.type      — 'default' (default) | 'error'
+// ── showToast → message box ───────────────────────────────────────────────────
+// Messages no longer pop as transient stacked toasts (multiple firing at once
+// is confusing and easy to miss). Instead they collect in ONE dismissible
+// message box in the corner. Nothing auto-times-out — the user closes each
+// message, or clears them all. Same call signature as before so every existing
+// showToast(...) call keeps working.
+//   opts.type — 'error' | 'info' | 'default'   (styles the row)
+//   opts.duration / opts.position — accepted but ignored (kept for compat)
 function showToast(msg, opts) {
   opts = opts || {};
-  var duration = opts.duration || 5000;
-  var position = opts.position || 'top';
-  var isError  = opts.type === 'error';
-  var isInfo   = opts.type === 'info';
-
-  // Reuse a single fixed-position stack so multiple toasts queue vertically
-  // instead of stacking on top of each other at the same coordinates. Without
-  // this, two errors fired back-to-back are completely unreadable.
-  function _ensureStack() {
-    var stackId = position === 'bottom' ? '_clfn_toast_stack_b' : '_clfn_toast_stack_t';
-    var s = document.getElementById(stackId);
-    if (s) return s;
-    s = document.createElement('div');
-    s.id = stackId;
-    var posCss = position === 'bottom' ? 'bottom:24px;top:auto;' : 'top:33vh;';
-    s.style.cssText = [
-      'position:fixed;', posCss,
-      'left:50%;transform:translateX(-50%);',
-      'display:flex;flex-direction:' + (position === 'bottom' ? 'column-reverse' : 'column') + ';gap:8px;',
-      'align-items:center;z-index:99999;pointer-events:none;',
-      'max-width:calc(100vw - 24px);'
-    ].join('');
-    return s;
-  }
-
-  var t = document.createElement('div');
-  t.textContent = msg;
-  var colors = isError
-    ? 'background:#3b0a0a;color:#fca5a5;border:1.5px solid #7f1d1d;'
-    : isInfo
-      ? 'background:#0b1d3b;color:#bfdbfe;border:1.5px solid #1d4ed8;'
-      : 'background:#111;color:#F8E41A;';
-  t.style.cssText = [
-    colors,
-    'padding:10px 22px;border-radius:8px;',
-    'font-size:13px;font-weight:600;font-family:DM Sans,sans-serif;',
-    'box-shadow:0 4px 24px rgba(0,0,0,0.5);',
-    'max-width:100%;text-align:center;pointer-events:auto;',
-    // Multi-line allowed so long PostgREST errors aren't truncated.
-    'white-space:pre-wrap;word-break:break-word;'
-  ].join('');
-  // Tap-to-dismiss on touch devices.
-  t.addEventListener('click', function(){ if(t.parentNode) t.remove(); });
+  var type = (opts.type === 'error' || opts.type === 'info') ? opts.type : 'default';
+  var text = (msg === null || msg === undefined) ? '' : String(msg);
+  if (!text) return;
 
   function _mount() {
     if (!document.body) {
@@ -100,16 +63,86 @@ function showToast(msg, opts) {
       }
       return;
     }
-    var stack = _ensureStack();
-    if (!stack.parentNode) document.body.appendChild(stack);
-    stack.appendChild(t);
-    setTimeout(function() {
-      if (t.parentNode) t.remove();
-      if (stack.parentNode && !stack.children.length) stack.remove();
-    }, duration);
+    _msgboxAdd(text, type);
   }
   _mount();
 }
+
+// Create (once) the fixed message-box shell with a header + "Clear all" button.
+function _msgboxEnsure() {
+  var box = document.getElementById('clfn_msgbox');
+  if (box) return box;
+  box = document.createElement('div');
+  box.id = 'clfn_msgbox';
+  box.setAttribute('role', 'status');
+  box.setAttribute('aria-live', 'polite');
+  box.innerHTML =
+      '<div id="clfn_msgbox_hdr">'
+    +   '<span id="clfn_msgbox_title">Notifications</span>'
+    +   '<button type="button" id="clfn_msgbox_clear" aria-label="Clear all messages">Clear all &times;</button>'
+    + '</div>'
+    + '<div id="clfn_msgbox_body"></div>';
+  document.body.appendChild(box);
+  box.querySelector('#clfn_msgbox_clear').addEventListener('click', function(){
+    var b = box.querySelector('#clfn_msgbox_body');
+    if (b) b.innerHTML = '';
+    box.style.display = 'none';
+  });
+  return box;
+}
+
+// Append a message row (newest on top). Identical repeated messages collapse to
+// a single row with a count badge instead of piling up duplicates.
+function _msgboxAdd(text, type) {
+  var box  = _msgboxEnsure();
+  var body = box.querySelector('#clfn_msgbox_body');
+  if (!body) return;
+
+  // Dedupe: bump the count on an existing identical row and float it to the top.
+  var rows = body.children;
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].getAttribute('data-msg') === text) {
+      var badge = rows[i].querySelector('.clfn-msg-count');
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'clfn-msg-count';
+        badge.textContent = '1';
+        rows[i].insertBefore(badge, rows[i].querySelector('.clfn-msg-x'));
+      }
+      badge.textContent = String((parseInt(badge.textContent, 10) || 1) + 1);
+      body.insertBefore(rows[i], body.firstChild);
+      box.style.display = '';
+      return;
+    }
+  }
+
+  var row = document.createElement('div');
+  row.className = 'clfn-msg-item clfn-msg-' + type;
+  row.setAttribute('data-msg', text);
+
+  var span = document.createElement('span');
+  span.className = 'clfn-msg-text';
+  span.textContent = text;
+
+  var x = document.createElement('button');
+  x.type = 'button';
+  x.className = 'clfn-msg-x';
+  x.setAttribute('aria-label', 'Dismiss');
+  x.innerHTML = '&times;';
+  x.addEventListener('click', function(){
+    row.remove();
+    if (!body.children.length) box.style.display = 'none';
+  });
+
+  row.appendChild(span);
+  row.appendChild(x);
+  body.insertBefore(row, body.firstChild);
+  box.style.display = '';
+
+  // Backstop against a runaway loop flooding the DOM — keep the newest 40.
+  while (body.children.length > 40) body.removeChild(body.lastChild);
+}
+window.showToast = showToast;
 
 
 // ── pushNav ───────────────────────────────────────────────────────────────────

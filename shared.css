@@ -2156,3 +2156,53 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 @media (max-width: 600px) {
   .kpi-strip  { grid-template-columns: 1fr; }
 }
+
+/* ── Message box (persistent, dismissible notifications) ──────────────────────
+   Replaces transient stacked toasts. One box in the top-right; messages stay
+   until the user closes them (individually or via "Clear all"). */
+#clfn_msgbox {
+  position: fixed; top: 76px; right: 16px; z-index: 100000;
+  width: 340px; max-width: calc(100vw - 24px);
+  background: #111; color: #f4f4f0; border: 1px solid #333;
+  border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  font-family: 'DM Sans', sans-serif; overflow: hidden;
+}
+#clfn_msgbox_hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; background: #000; border-bottom: 1px solid #333;
+}
+#clfn_msgbox_title {
+  font-size: 11px; font-weight: 700; letter-spacing: .5px;
+  text-transform: uppercase; color: #F8E41A;
+}
+#clfn_msgbox_clear {
+  background: none; border: none; color: #999; font-size: 11px;
+  font-weight: 600; cursor: pointer; font-family: inherit;
+}
+#clfn_msgbox_clear:hover { color: #fff; }
+#clfn_msgbox_body { max-height: 60vh; overflow-y: auto; }
+.clfn-msg-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 10px 12px; border-bottom: 1px solid #222;
+  border-left: 3px solid #F8E41A;
+  font-size: 13px; font-weight: 500; line-height: 1.4;
+}
+.clfn-msg-item:last-child { border-bottom: none; }
+.clfn-msg-default { border-left-color: #F8E41A; color: #f4f4f0; }
+.clfn-msg-error   { border-left-color: #ef4444; color: #fca5a5; background: #1a0a0a; }
+.clfn-msg-info    { border-left-color: #3b82f6; color: #bfdbfe; background: #0a1020; }
+.clfn-msg-text    { flex: 1 1 auto; white-space: pre-wrap; word-break: break-word; }
+.clfn-msg-count {
+  flex: 0 0 auto; align-self: center;
+  background: rgba(255,255,255,.15); color: #fff;
+  border-radius: 10px; font-size: 10px; font-weight: 700; padding: 1px 7px;
+}
+.clfn-msg-x {
+  flex: 0 0 auto; background: none; border: none; color: inherit;
+  opacity: .55; font-size: 18px; line-height: 1; cursor: pointer;
+  padding: 0 2px; font-family: inherit;
+}
+.clfn-msg-x:hover { opacity: 1; }
+@media (max-width: 640px) {
+  #clfn_msgbox { top: 62px; right: 8px; left: 8px; width: auto; }
+}
