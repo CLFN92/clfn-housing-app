@@ -897,8 +897,15 @@ var _logoDataUrlCache = null;
 async function _fetchLogoForPdf() {
   if (_logoDataUrlCache !== null) return _logoDataUrlCache || null;
   try {
-    var logoUrl = window._appSettings && _appSettings.theme && _appSettings.theme.logo;
+    // Prefer the per-nation theme logo; fall back to the cached logo, then the
+    // embedded default-nation logo (same chain the finance PDFs use) so the
+    // header is branded even when no theme logo is configured on this page.
+    var logoUrl = (window._appSettings && _appSettings.theme && _appSettings.theme.logo) || null;
+    if (!logoUrl) { try { logoUrl = sessionStorage.getItem('clfn_logo_cache'); } catch(e) {} }
+    if (!logoUrl) logoUrl = window.CLFN_LOGO_DATA_URL || null;
     if (!logoUrl) { _logoDataUrlCache = ''; return null; }
+    // Already a data URL (embedded / cached) — use directly, no fetch needed.
+    if (logoUrl.indexOf('data:') === 0) { _logoDataUrlCache = logoUrl; return logoUrl; }
     var resp = await fetch(logoUrl);
     if (!resp.ok) { _logoDataUrlCache = ''; return null; }
     var blob = await resp.blob();
@@ -3917,18 +3924,10 @@ var CONTRACTS_DOCS_REGISTRY = [
       + '<p>{exclusionsAssumptions}</p>'
       + '<h3>Items Supplied by Nation</h3>'
       + '<p>{clfnSuppliedItems}</p>'
-      + '<h2>SCHEDULE B - MILESTONE PAYMENT SCHEDULE</h2>'
-      + '<p>Total Contract Price: {contractPriceExclTax} (excluding tax)</p>'
-      + '<p>Accounts Payable / Invoice Submission: {apEmail}</p>'
-      + '<p>Each milestone payment is subject to a 10% statutory holdback as required by the Construction Act.</p>'
-      + '<h2>SIGNATURES</h2>'
-      + '<p>IN WITNESS WHEREOF the parties have executed this Agreement as of the date first written above.</p>'
-      + '<h3>Owner - {nationName}</h3>'
-      + '<p>Signed by: {clfnSignatoryName}, {clfnSignatoryTitle}</p>'
-      + '<h3>Contractor - {contractorLegalName}</h3>'
-      + '<p>Signed by: {contractorSignatoryName}, {contractorSignatoryTitle}</p>'
-      + '<h3>Witness</h3>'
-      + '<p>Name: ___________________________</p>'
+      // Schedule B (milestone payment table), the Contractor Acknowledgement,
+      // and the Signatures block are appended dynamically by the contract
+      // generator (generateContractorContract in rfq.js) — the milestone table
+      // and captured signature/initial images can't be expressed as {tokens}.
   }
 ];
 

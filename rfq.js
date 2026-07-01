@@ -1728,8 +1728,9 @@ function _rfqContractMissing() {
 function _rfqContractMissingSigs() {
   var sig = function(id){ return (typeof getSigDataURL==='function') ? getSigDataURL(id) : ''; };
   var out = [];
-  if (!sig('rfq_sig'))    out.push('Owner / Nation representative');
-  if (!sig('rfq_ct_sig')) out.push('Contractor');
+  if (!sig('rfq_sig'))         out.push('Owner / Nation representative signature');
+  if (!sig('rfq_ct_sig'))      out.push('Contractor signature');
+  if (!sig('rfq_ct_initial'))  out.push('Contractor acknowledgement initial');
   return out;
 }
 function _rfqShowChecklist(title, items) {
@@ -1874,6 +1875,11 @@ async function generateContractorContract() {
 
       var substituted = (typeof _substitutePlaceholders === 'function')
         ? _substitutePlaceholders(savedBody, tokens) : savedBody;
+      // Defense against saved template overrides that still carry the old
+      // Schedule B stub / Signatures block: cut the body at the first of those
+      // headings so we don't duplicate the dynamic Schedule B + Signatures below.
+      var _cut = substituted.search(/<h2>\s*(SCHEDULE B|SIGNATURES)/i);
+      if (_cut >= 0) substituted = substituted.slice(0, _cut);
       if (typeof _parseHtmlToBlocks === 'function' && typeof _renderBlocksToPdf === 'function') {
         _renderBlocksToPdf(ctx, _parseHtmlToBlocks(substituted));
       }
@@ -1935,6 +1941,28 @@ async function generateContractorContract() {
         + '. The holdback shall be released ' + _hbDays + ' days after the date of Substantial Completion'
         + (_hbDate ? ' (on or about ' + _hbDate + ')' : '')
         + ', following expiry of the applicable lien period under the Construction Act and provided no liens have been preserved.', 9);
+
+      // ── Contractor Acknowledgement (initialled) ──
+      h2Heading('Contractor Acknowledgement');
+      ctx.paragraph('By initialling below, the Contractor confirms that it is in good standing with WSIB, holds the insurance required under this Agreement, will comply with the Construction Act and the Occupational Health and Safety Act (OHSA), and accepts the prompt payment and adjudication framework set out in this Agreement.', 9);
+      ctx.needSpace(18);
+      pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(60);
+      pdf.text('Contractor Initials:', ctx.marginL, ctx.y + 4);
+      var _ix = ctx.marginL + 34;
+      var _initData = (typeof getSigDataURL === 'function') ? getSigDataURL('rfq_ct_initial') : '';
+      if (_initData && _initData.indexOf('data:image/png;base64,') === 0) {
+        try { pdf.addImage(_initData, 'PNG', _ix, ctx.y - 1, 24, 9); } catch(e) {}
+      } else if (_initData && _initData.indexOf('typed:') === 0) {
+        pdf.setFont('helvetica', 'italic'); pdf.setFontSize(13); pdf.setTextColor(20);
+        pdf.text(_initData.replace('typed:', ''), _ix, ctx.y + 4);
+      } else if (_initData && _initData.indexOf('wet:') === 0) {
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(80);
+        pdf.text('Initialled (on file)', _ix, ctx.y + 4);
+      } else {
+        pdf.setDrawColor(160); pdf.setLineWidth(0.4); pdf.line(_ix, ctx.y + 5, _ix + 30, ctx.y + 5);
+      }
+      pdf.setTextColor(0);
+      ctx.y += 12;
 
       // Signatures section
       ctx.needSpace(50); ctx.gap(8);
