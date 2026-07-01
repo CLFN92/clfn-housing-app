@@ -735,12 +735,25 @@ intake). Fixes shipped in tiers. Files: `reno-questionnaire.js`,
   the winner), **serialized** (sequential await in a detached task) to respect
   the Graph ~4-concurrent throttle.
 
-### Tier 4 — Structural de-dup  ⬜ (not built)
-Collapse `renos.html`'s duplicate `openSowModal`/`saveSOW`/`raQuickApprove` onto
-the shared implementation; move RFQ (`RFQ-YYYY-NNNN`) + contract (`CON-YYYY-NNNN`)
-numbering to a **server-side sequence** to kill the concurrent max-scan race +
-the destructive `merge-duplicates` upsert on `id`; trim the triple-confirm
-approve chain (`sowApproveInline` → tenant-copy → work-order). Higher risk.
+### Tier 4 — Structural de-dup  ✅ (shipped 2026-07)
+- **Removed dead duplicate SOW code** from `renos.html`: its inline
+  `openSowModal`/`saveSOW` (legacy single-SOW `saveSowData` model) were **dead**
+  — `housing-modals-sow.js` loads *after* the page's inline script, so the shared
+  multi-SOW versions already override them. Replaced with a breadcrumb comment
+  (−149 lines). `raQuickApprove` **kept** — it writes the unit reno-budget
+  `unitHmSig`/`unitEdSig`, a *distinct* approval from `sowApproveInline`'s SOW
+  `approval_status` (not a true duplicate; the audit conflated them).
+- **RFQ numbering race** — fixed **client-side** (no migration): the first save
+  of a new RFQ is now a **collision-safe insert** (plain POST, errors on a
+  duplicate id) instead of the destructive `merge-duplicates` upsert; on a 409 it
+  **bumps the number and retries** (≤6×). Edits keep the upsert. 🔖 A true
+  **server-side Postgres sequence** (fully prevents duplicate numbers; needs a
+  Supabase migration) remains available if wanted. `CON-` contract numbers are
+  not a PK, so they carry no overwrite risk (left best-effort).
+- **Trimmed the triple-confirm approve chain**: `sowApproveInline` now calls
+  `saveSOW()` directly instead of via `sowSaveClicked()`, skipping the
+  submit-mode "email tenant PDF copy" prompt (approving ≠ submitting). Inline
+  approval is now two contextual dialogs (approve → work-order email).
 
 🔖 Deferred bigger idea (needs RLS first, like the tenant portal): a
 **contractor-facing** bid-submission surface instead of staff-entered bids.
