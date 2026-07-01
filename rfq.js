@@ -7,6 +7,7 @@ var _rfqSowData         = null;
 var _rfqUnitData        = null;
 var _rfqScopeItems      = [];
 var _rfqSelectedCts     = {};
+var _rfqBids            = {};   // staff-entered bids: { [contractorId]: {amount, notes, received_at} }
 var _rfqActiveTab       = 'details';
 var _rfqAwardingId      = null;
 var _rfqScopeDetailRows  = [];
@@ -334,6 +335,7 @@ function showRfqForm(rfqId, unitId, sowPn) {
 
   _rfqCurrentId            = rfqId || null;
   _rfqSelectedCts          = {};
+  _rfqBids                 = {};
   _rfqScopeItems           = [];
   _rfqScopeDetailRows      = [];
   _rfqMilestoneRows        = [];
@@ -353,6 +355,7 @@ function showRfqForm(rfqId, unitId, sowPn) {
     _rfqSowPn     = rfq.sow_project_number;
     (rfq.recipient_contractor_ids || []).forEach(function(id){ _rfqSelectedCts[id] = true; });
     _rfqScopeItems = (rfq.data && rfq.data.scope_snapshot) ? JSON.parse(JSON.stringify(rfq.data.scope_snapshot)) : [];
+    _rfqBids = (rfq.data && rfq.data.bids) ? JSON.parse(JSON.stringify(rfq.data.bids)) : {};
     _populateFormFields(rfq);
     document.getElementById('rfqFormHeading').textContent = rfqId;
     document.getElementById('rfqIssueBtn').disabled = rfq.status !== 'draft';
@@ -562,7 +565,7 @@ function switchRfqTab(tab) {
     if (panel) panel.style.display = (t === tab) ? '' : 'none';
   });
   if (tab === 'scope')      renderScopeTab();
-  if (tab === 'recipients') renderContractorCards();
+  if (tab === 'recipients') { renderContractorCards(); renderBidsSection(); }
   if (tab === 'documents')  renderDocumentsTab();
   if (tab === 'contracting') {
     // Render dynamic row tables now that the container elements are visible
@@ -661,7 +664,66 @@ function toggleContractor(ctId) {
   else _rfqSelectedCts[ctId] = true;
   _renderAwardedToDropdown();
   renderContractorCards();
+  renderBidsSection();
   updateRecipientBadge();
+}
+
+// ── Bids Received (staff-entered tendering) ────────────────────────────────
+function renderBidsSection() {
+  var mount = document.getElementById('rfqBidsMount');
+  if (!mount) return;
+  var ids = Object.keys(_rfqSelectedCts);
+  if (!ids.length) {
+    mount.innerHTML = '<div class="rfq-progress-msg">Select contractors above to record their bids.</div>';
+    return;
+  }
+  var rows = ids.map(function(id){
+    var ct  = (window._contractors || []).find(function(c){ return c && c.id === id; }) || { id:id, name:id };
+    var bid = _rfqBids[id] || {};
+    return { id:id, ct:ct, amount:(bid.amount != null ? bid.amount : ''), notes:bid.notes||'', received:bid.received_at||'' };
+  });
+  var lowest = null;
+  rows.forEach(function(r){ var a = parseFloat(r.amount); if (!isNaN(a) && a > 0 && (lowest === null || a < lowest)) lowest = a; });
+  rows.sort(function(a,b){
+    var av = parseFloat(a.amount), bv = parseFloat(b.amount);
+    var ah = !isNaN(av) && av > 0, bh = !isNaN(bv) && bv > 0;
+    if (ah && bh) return av - bv;
+    if (ah) return -1; if (bh) return 1;
+    return (a.ct.name||'').localeCompare(b.ct.name||'');
+  });
+  var html = '<table class="rfq-scope-table"><thead><tr>'
+    + '<th>Contractor</th><th style="width:135px;">Bid Amount ($)</th><th>Notes</th><th style="width:135px;">Received</th><th style="width:96px;"></th>'
+    + '</tr></thead><tbody>';
+  rows.forEach(function(r){
+    var av = parseFloat(r.amount); var isLow = !isNaN(av) && av > 0 && lowest !== null && av === lowest;
+    var idEsc = escapeHtml(r.id);
+    html += '<tr' + (isLow ? ' style="background:var(--success-bg,#f0fdf4);"' : '') + '>'
+      + '<td style="padding:6px 10px;font-size:12px;font-weight:600;">' + escapeHtml(r.ct.name||r.id)
+      +   (isLow ? ' <span style="font-size:10px;color:#15803d;font-weight:700;">LOWEST</span>' : '') + '</td>'
+      + '<td style="padding:4px 8px;"><input type="number" min="0" step="0.01" value="' + escapeHtml(String(r.amount)) + '" oninput="_rfqSetBid(\'' + idEsc + '\',\'amount\',this.value)" onchange="renderBidsSection()" class="stg-lookup-input" style="width:118px;" placeholder="0.00"/></td>'
+      + '<td style="padding:4px 8px;"><input type="text" value="' + escapeHtml(r.notes) + '" oninput="_rfqSetBid(\'' + idEsc + '\',\'notes\',this.value)" class="stg-lookup-input" placeholder="Optional"/></td>'
+      + '<td style="padding:4px 8px;"><input type="date" value="' + escapeHtml(r.received) + '" oninput="_rfqSetBid(\'' + idEsc + '\',\'received_at\',this.value)" class="stg-lookup-input"/></td>'
+      + '<td style="padding:4px 8px;"><button type="button" class="btn btn-primary btn-sm" onclick="_rfqAwardFromBid(\'' + idEsc + '\')"' + ((isNaN(av)||av<=0) ? ' disabled style="opacity:.5;"' : '') + '>Award &rarr;</button></td>'
+      + '</tr>';
+  });
+  html += '</tbody></table>';
+  mount.innerHTML = html;
+}
+
+function _rfqSetBid(id, field, val) {
+  if (!_rfqBids[id]) _rfqBids[id] = {};
+  _rfqBids[id][field] = val;
+}
+
+async function _rfqAwardFromBid(id) {
+  var bid = _rfqBids[id] || {};
+  var amt = parseFloat(bid.amount) || 0;
+  if (!(amt > 0)) { showToast('Enter a bid amount first'); return; }
+  if (!_rfqCurrentId) { showToast('Save and issue the RFQ before awarding'); return; }
+  // Persist the recorded bids first so the award (and the regret emails to the
+  // other bidders) see them in the cached RFQ record.
+  if (typeof saveRfqDraft === 'function') { try { await saveRfqDraft(); } catch(e){ console.warn('[rfq] pre-award save failed:', e); } }
+  showAwardModal(_rfqCurrentId, { contractorId:id, amount:amt, notes:bid.notes || '' });
 }
 
 function selectAllMatchingContractors() {
@@ -719,6 +781,8 @@ function _buildRfqPayload() {
       target_start_date:      fv('rfq_target_start'),
       target_completion_date: fv('rfq_target_end'),
       scope_snapshot:         snap,
+      bids:                   _rfqBids,
+
       sig_name:               fv('rfq_sig_name'),
       sig_title:              fv('rfq_sig_title'),
       sig_data:               (typeof getSigDataURL === 'function') ? getSigDataURL('rfq_sig') : '',
@@ -883,7 +947,8 @@ async function cancelRfq(rfqId) {
 }
 
 // ── Award modal ───────────────────────────────────────────────────────────────
-function showAwardModal(rfqId) {
+// prefill (optional): { contractorId, amount, notes } — used by "Award from bid".
+function showAwardModal(rfqId, prefill) {
   _rfqAwardingId = rfqId;
   var rfq = (window._rfqCache || {})[rfqId];
   if (!rfq) return;
@@ -891,8 +956,11 @@ function showAwardModal(rfqId) {
     return (window._contractors || []).find(function(c){ return c && c.id === id; });
   }).filter(Boolean);
 
+  var bids = Object.assign({}, (rfq.data && rfq.data.bids) || {}, _rfqBids || {});
   var opts = cts.map(function(ct){
-    return '<option value="' + escapeHtml(ct.id) + '">' + escapeHtml(ct.name) + '</option>';
+    var b = bids[ct.id]; var amt = b && parseFloat(b.amount);
+    var suffix = (amt && amt > 0) ? '  (bid $' + amt.toLocaleString('en-CA', {minimumFractionDigits:2}) + ')' : '';
+    return '<option value="' + escapeHtml(ct.id) + '">' + escapeHtml(ct.name) + suffix + '</option>';
   }).join('');
 
   document.getElementById('rfqAwardBody').innerHTML =
@@ -902,6 +970,12 @@ function showAwardModal(rfqId) {
     + '<input type="number" id="award_amount" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01"/></div>'
     + '<div class="f"><label>Notes (optional)</label>'
     + '<textarea id="award_notes" class="stg-lookup-input" rows="2" placeholder="Any notes for the award decision..."></textarea></div>';
+
+  if (prefill) {
+    var sel = document.getElementById('award_ct_id'); if (sel && prefill.contractorId) sel.value = prefill.contractorId;
+    var amt = document.getElementById('award_amount'); if (amt && prefill.amount != null) amt.value = prefill.amount;
+    var nt  = document.getElementById('award_notes');  if (nt && prefill.notes) nt.value = prefill.notes;
+  }
 
   var modal = document.getElementById('rfqAwardModal');
   modal.style.display = 'flex';

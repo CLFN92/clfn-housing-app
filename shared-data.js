@@ -7051,6 +7051,32 @@ async function awardRfq(rfqId, contractorId, amount, notes) {
         event: 'rfq_award', entity_type: 'rfq', entity_id: rfqId
       }).catch(function(e){ console.warn('[rfq] award notify failed:', e); });
     }
+    // Regret notices to the OTHER bidders (recorded a bid, not the winner).
+    // Serialized (sequential await) in a detached task so we don't block the
+    // award and don't trip the Graph ~4-concurrent sendMail throttle.
+    var _bids = (rfq.data && rfq.data.bids) || {};
+    var _loserIds = Object.keys(_bids).filter(function(bid){ return bid !== contractorId; });
+    if (_loserIds.length && typeof window.sendNotification === 'function') {
+      (async function(){
+        var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || 'Housing';
+        for (var i = 0; i < _loserIds.length; i++) {
+          var loser = (window._contractors || []).find(function(c){ return c && c.id === _loserIds[i]; });
+          if (!loser || !loser.email) continue;
+          try {
+            await window.sendNotification({
+              to: loser.email, to_name: loser.name || '',
+              subject: rfq.id + ' -- Request for Quotes Outcome',
+              bodyHtml: '<p>Dear ' + escapeHtml(loser.name || 'Contractor') + ',</p>'
+                + '<p>Thank you for submitting a quote for <strong>' + escapeHtml(rfq.id) + '</strong>'
+                + (addr ? ' (' + escapeHtml(addr) + ')' : '') + '. After review, the contract has been awarded to '
+                + 'another bidder on this occasion. We appreciate your interest and encourage you to quote on future opportunities.</p>'
+                + '<p>Sincerely,<br/>' + escapeHtml(natShort) + ' Housing</p>',
+              event: 'rfq_regret', entity_type: 'rfq', entity_id: rfqId
+            });
+          } catch(e){ console.warn('[rfq] regret notify failed:', e); }
+        }
+      })();
+    }
     if (typeof showToast === 'function') showToast('RFQ ' + rfqId + ' awarded');
     return true;
   } catch(e) { console.warn('[rfq] award failed:', e); if (typeof showToast === 'function') showToast('Award failed -- see console'); return false; }
