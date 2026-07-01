@@ -2013,6 +2013,52 @@ function sowRequiresEdApproval(sow) {
   return cost > _getHmLimit();
 }
 window.sowRequiresEdApproval = sowRequiresEdApproval;
+
+// ── Assignment: single source of truth ──────────────────────────────────
+// One rule for "is this application approved enough to be placed in a unit?"
+// Shared by the Match queue (row inclusion), confirmAssignment, the unit-edit
+// tenant gate, and the Add-Tenant modal so the four can no longer drift with
+// different checks and different error messages.
+function appAssignabilityStatus(app){
+  if(!app) return { ok:false, reason:'Application not found' };
+  if(app.archived) return { ok:false, reason:'Application is archived' };
+  var s = app.status || '';
+  var ok = (s === 'ed_approved' || s === 'mgr_approved' || s === 'hm_approved');
+  if(ok) return { ok:true, reason:'' };
+  var lbl = (typeof formatAppStatusLabel === 'function') ? formatAppStatusLabel(s) : String(s).replace(/_/g,' ');
+  return { ok:false, reason:'Approval required before assigning — application is: ' + lbl };
+}
+function appIsAssignable(app){ return appAssignabilityStatus(app).ok; }
+window.appAssignabilityStatus = appAssignabilityStatus;
+window.appIsAssignable = appIsAssignable;
+
+// Whenever a unit is assigned to an application, mirror the tenancy back onto
+// the application record (assignedUnit / assignedAddress / status='assigned').
+// This is the "always write back" rule: without it, applicants housed through
+// paths that only wrote the unit side keep leaking onto Match as if unhoused
+// (the Cheryl Neegan class of bug). Safe no-op when the sides already agree.
+function writeTenancyToApplication(unit){
+  if(!unit || !unit.assignedTo) return null;
+  var apps = (typeof applications !== 'undefined') ? applications : [];
+  var app = apps.find(function(a){ return a && a.id === unit.assignedTo; });
+  if(!app) return null;
+  var addr = ((unit.num||'') + ' ' + (unit.street||'')).trim();
+  var changed = false;
+  if(app.assignedUnit !== unit.id){        app.assignedUnit    = unit.id; changed = true; }
+  if(app.assignedAddress !== addr){         app.assignedAddress = addr;    changed = true; }
+  if(app.status !== 'assigned'){
+    app.status     = 'assigned';
+    app.assignedAt = app.assignedAt || unit.assignedDate || new Date().toISOString();
+    changed = true;
+  }
+  if(changed){
+    if(typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(app);
+    else if(typeof sbSaveApplication === 'function') sbSaveApplication(app).catch(function(e){ console.warn('[tenancy] app write-back failed:', e); });
+  }
+  return app;
+}
+window.writeTenancyToApplication = writeTenancyToApplication;
+
 function _getPoolSpent(pid) {
   // Sum all previously approved reno budgets for this pool
   var total = 0;

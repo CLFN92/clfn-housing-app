@@ -394,8 +394,12 @@ function renderMatchView(){
     if(a.status==='assigned' || !!a.assignedUnit) return false;
     // Match shows only applications that have cleared approval and are awaiting
     // placement. Not-yet-approved (submitted / Pending HM), returned, and
-    // declined applications are hidden from the queue.
-    if(a.status!==APP_STATUS.MGR_APPROVED
+    // declined applications are hidden from the queue. The approval rule is the
+    // shared appIsAssignable() so Match, confirmAssignment, the unit-edit gate,
+    // and the Add-Tenant modal stay in lockstep.
+    if(typeof appIsAssignable === 'function'){
+      if(!appIsAssignable(a)) return false;
+    } else if(a.status!==APP_STATUS.MGR_APPROVED
        && a.status!==APP_STATUS.HM_APPROVED
        && a.status!==APP_STATUS.ED_APPROVED) return false;
     // The Application Type decides who gets matched. Two of the three types are

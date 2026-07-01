@@ -447,19 +447,15 @@ function saveUnitEdit(){
     var linkedApp2 = apps2.find(function(a){return a.id===u.assignedTo;});
     var role2 = window.currentRole||'housing_employee_l1';
     if(linkedApp2) {
-      var appStatus = linkedApp2.status||'';
-      // Any approved-flavour status is fine for assignment, regardless of
-      // role — ED can assign hm_approved file updates, HM can assign past
-      // ed_approved, etc. The earlier role-strict gate blocked the ED from
-      // assigning hm_approved apps even though ED is the higher authority.
-      var isApproved = appStatus === APP_STATUS.ED_APPROVED ||
-                       appStatus === APP_STATUS.MGR_APPROVED ||
-                       appStatus === APP_STATUS.HM_APPROVED;
-      if(!isApproved) {
-        var _label = (role2 === ROLE.ED)
-          ? CLFN_PERMS.roleLabel(ROLE.ED)
-          : CLFN_PERMS.roleLabel(ROLE.HOUSING_MANAGER);
-        showToast('⚠ ' + _label + ' approval required before assigning tenant. Application is: ' + (typeof formatAppStatusLabel === 'function' ? formatAppStatusLabel(appStatus) : appStatus.replace(/_/g,' ')));
+      // Shared approval rule (appAssignabilityStatus) — same check the Match
+      // queue, confirmAssignment and the Add-Tenant modal use, so the four
+      // never drift. Any approved-flavour status is fine regardless of role;
+      // ED can assign hm_approved file updates, HM can assign past ed_approved.
+      var _as = (typeof appAssignabilityStatus === 'function')
+        ? appAssignabilityStatus(linkedApp2)
+        : { ok:false, reason:'Approval required before assigning' };
+      if(!_as.ok) {
+        showToast('⚠ ' + _as.reason);
         return;
       }
       // Write back HM approval flag on unit
@@ -2410,15 +2406,30 @@ function saveAddTenant(){
     }
   }
 
+  // Shared approval gate — the Add-Tenant modal used to write the unit with no
+  // approval check, so an un-approved app could be housed here and (below) the
+  // app was never written back, leaking the tenant onto Match. Enforce the same
+  // rule as every other assignment path.
+  if(linkedApp && typeof appAssignabilityStatus === 'function'){
+    var _as = appAssignabilityStatus(linkedApp);
+    if(!_as.ok){ showErr('⚠ ' + _as.reason); return; }
+  }
+
   units[idx].assignedName=tenantName;
   units[idx].assignedTo=appId;
   units[idx].assignedDate=date;
   units[idx].status=status;
   saveUnitWithDraftFallback(units[idx]);
+  // Always write the tenancy back onto the application so the applicant drops
+  // out of the Match queue and every status view reflects the placement.
+  if(typeof writeTenancyToApplication === 'function') writeTenancyToApplication(units[idx]);
 
   closeAddTenantModal();
   if(typeof renderTenantsView==='function') renderTenantsView();
   if(typeof renderInventoryView==='function') renderInventoryView();
+  if(typeof renderMatchView==='function') renderMatchView();
+  if(typeof renderDashTable==='function') renderDashTable();
+  if(typeof renderWorklist==='function') renderWorklist();
   showToast('✓ '+tenantName+' assigned to '+units[idx].num+' '+units[idx].street);
 }
 

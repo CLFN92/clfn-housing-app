@@ -1104,14 +1104,10 @@ function confirmAssignment() {
   // approved state; HM can assign past their own approval. The earlier
   // strict gate blocked file_update apps (hm_approved) even when the ED
   // already had the assign authority.
-  var _isApproved = app.status === APP_STATUS.ED_APPROVED ||
-                    app.status === APP_STATUS.MGR_APPROVED ||
-                    app.status === APP_STATUS.HM_APPROVED;
-  if(!_isApproved){
-    var _gateLbl = (role === ROLE.ED) ? 'ED' : 'HM';
-    showToast(_gateLbl + ' approval required — status: ' + (typeof formatAppStatusLabel === 'function' ? formatAppStatusLabel(app.status) : app.status.replace(/_/g,' ')));
-    return;
-  }
+  var _as = (typeof appAssignabilityStatus === 'function')
+    ? appAssignabilityStatus(app)
+    : { ok: (app.status === APP_STATUS.ED_APPROVED || app.status === APP_STATUS.MGR_APPROVED || app.status === APP_STATUS.HM_APPROVED), reason:'Approval required before assigning' };
+  if(!_as.ok){ showToast(_as.reason); return; }
 
   // Write unit
   var isTransferReq = (app.appType === 'transfer_request');
