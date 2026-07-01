@@ -690,6 +690,63 @@ still restores its radio as New Housing (skip only applies during creation).
 
 ---
 
+## Phase RF — Maintenance → SOW → RFQ → Contract flow polish  ✅ (Tiers 1-3 shipped 2026-07)
+A deep review (3 audit agents) of the **maintenance request → SOW → RFQ →
+tendering → contracting** chain found it was three disconnected islands linked
+only by URL navigation + manual re-entry, with a hollow tendering middle (no bid
+intake). Fixes shipped in tiers. Files: `reno-questionnaire.js`,
+`housing-modals-sow.js`, `rfq.js`, `rfq.html`, `renos.html`, `shared-data.js`.
+
+### Tier 1 — Kill the re-keying (data flows across the chain)  (done)
+- **Questionnaire → SOW**: replaced the fragile 220 ms DOM-scrape race with a
+  structured `window._sowSeed` payload applied in-flow by `_applySowSeed()` in
+  `openSowModal`. Also maps the data that used to be lost to a text blob:
+  worst **severity → Overall Condition**, and hazard keywords → the **Health &
+  Safety checkboxes** (`_severityToCondition` / `_issuesToHsFlags`).
+- **SOW → RFQ**: the RFQ **Scope Summary** auto-generates from the SOW work
+  items for a new RFQ (`_fetchAndPopulateSow`), never overwriting a saved value.
+- **Award → Contract**: after awarding, a **"Set up contract →"** hand-off
+  re-opens the RFQ on the Contracting tab; `_rfqSeedContractFromAward` selects
+  the awarded contractor (fills signatory) + seeds the contract price from the
+  award amount. Fixed a latent bug: `confirmAward` closed the modal (nulling
+  `_rfqAwardingId`) before passing it to `awardRfq`.
+
+### Tier 2 — Guardrails  (done)
+- **Contract readiness gate** (`_rfqContractMissing` + `_rfqShowChecklist`):
+  `generateContractorContract` hard-blocks on missing awarded contractor / price
+  / contract date / completion date; missing signatures are a **soft** confirm
+  (contracts are often signed on paper then re-generated).
+- **Contractor eligibility warning** (`_rfqContractorEligibility`): `confirmAward`
+  warns (not blocks — ED override) when awarding to an un-approved contractor or
+  one with expired WSIB / insurance.
+- **Unified RFQ threshold**: `_sowMeetsRfqThreshold` (shared-data.js) extended to
+  read `.cost`; the `renos.html` approval table uses it instead of an inline copy.
+
+### Tier 3 — The tendering middle (staff-entered bids)  (done)
+- **Bid intake** lives in `rfq.data.bids` (keyed by contractor id:
+  `{amount, notes, received_at}`) — **no schema change**. `_rfqBids` state,
+  reset on open / loaded on edit / persisted via `_buildRfqPayload`.
+- **"Bids Received" card** on the Recipients tab (`renderBidsSection`):
+  per-contractor amount/notes/received inputs, sorted ascending with the
+  **lowest bid highlighted** (comparison view), each with an **"Award →"** button.
+- **Award-from-bid** (`_rfqAwardFromBid`): saves first, then opens the award modal
+  **prefilled** with the contractor + quoted amount (no free-typing).
+- **Regret emails**: `awardRfq` emails a decline to the other bidders (excluding
+  the winner), **serialized** (sequential await in a detached task) to respect
+  the Graph ~4-concurrent throttle.
+
+### Tier 4 — Structural de-dup  ⬜ (not built)
+Collapse `renos.html`'s duplicate `openSowModal`/`saveSOW`/`raQuickApprove` onto
+the shared implementation; move RFQ (`RFQ-YYYY-NNNN`) + contract (`CON-YYYY-NNNN`)
+numbering to a **server-side sequence** to kill the concurrent max-scan race +
+the destructive `merge-duplicates` upsert on `id`; trim the triple-confirm
+approve chain (`sowApproveInline` → tenant-copy → work-order). Higher risk.
+
+🔖 Deferred bigger idea (needs RLS first, like the tenant portal): a
+**contractor-facing** bid-submission surface instead of staff-entered bids.
+
+---
+
 ## Rollback points
 - Pre-refactor snapshots (Phase C)
 
