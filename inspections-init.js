@@ -631,7 +631,7 @@ function generateInspectionPDF() {
 
   loadjsPDF(function() {
     var doc = new window.jspdf.jsPDF({ orientation:'portrait', unit:'mm', format:'letter' });
-    var nation = (window.NATION_CONFIG && window.NATION_CONFIG.short) || 'CLFN';
+    var nation = nationShort();
     var y = 16;
 
     doc.setFontSize(14); doc.setFont('helvetica','bold');

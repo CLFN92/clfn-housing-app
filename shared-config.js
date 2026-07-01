@@ -437,3 +437,12 @@ var RENO_FUND_RULES = {
 
 // Critical system SOW categories — must be funded first
 var CRITICAL_SOW_CATS = ['Heating / HVAC','Electrical','Roofing','Windows & Doors','Plumbing'];
+
+// Single accessor for the nation's short identifier. Replaces a fallback that
+// hardcoded 'CLFN' in ~13 places (a HARD-RULE violation). NATION_CONFIG.short is
+// set at boot (see NATIONS_DIRECTORY resolver above, where the CLFN default
+// legitimately lives); this generic 'Housing' fallback only applies pre-boot /
+// if config is missing, and keeps 'CLFN' out of consumer code.
+window.nationShort = function nationShort(){
+  return (window.NATION_CONFIG && window.NATION_CONFIG.short) || 'Housing';
+};

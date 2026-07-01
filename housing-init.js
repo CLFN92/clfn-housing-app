@@ -1391,7 +1391,7 @@ function exportRenoApprovalsCSV() {
   });
   var csv = [headers.join(',')].concat(csvRows).join('\n');
   var a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
-  var _ns=(window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN';
+  var _ns=nationShort();
   a.download=_ns+'_Reno_Approvals_'+new Date().toISOString().slice(0,10)+'.csv';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
@@ -1616,7 +1616,7 @@ async function submitAddHousingStaff() {
     var firstName = name.split(' ')[0];
     // Default password format includes the nation short code so it's recognizable
     // to staff but rotated per-nation when shipping to a new tenant.
-    var defaultPassword = (window.NATION_CONFIG && NATION_CONFIG.short || 'CLFN')+firstName+'2026!';
+    var defaultPassword = nationShort()+firstName+'2026!';
 
     // Step 1: Create Supabase Auth account
     var signupR = await fetch(SUPABASE_URL+'/auth/v1/signup',{

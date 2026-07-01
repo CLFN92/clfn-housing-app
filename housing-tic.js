@@ -1664,7 +1664,7 @@
       + '<div class="export-dropdown">'
       +   '<button type="button" onclick="toggleExportMenu(this)" class="btn btn-primary">&#128196; Generate Forms &#9660;</button>'
       +   '<div class="header-export-menu">'
-      +     '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">'+((window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN')+' Residential Occupancy Agreement</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'temporary_lease\')" class="header-export-item">Temporary Occupancy Agreement (Fixed Term)</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'commercial_lease\')" class="header-export-item">Commercial Occupancy &amp; Lease Agreement</button>'
+      +     '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">'+(nationShort())+' Residential Occupancy Agreement</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'temporary_lease\')" class="header-export-item">Temporary Occupancy Agreement (Fixed Term)</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'commercial_lease\')" class="header-export-item">Commercial Occupancy &amp; Lease Agreement</button>'
       +   '</div>'
       + '</div>'
       + '</div>'
@@ -3256,7 +3256,7 @@
       try { pdfDoc.catalog.delete(PDFLib.PDFName.of('AcroForm')); } catch(e) {}
 
       var tenantName  = tokens.tenantName || 'Tenant';
-      var filename    = ((window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN')+'_Occupancy_Agreement_' + tenantName.replace(/\s+/g,'_') + '.pdf';
+      var filename    = (nationShort())+'_Occupancy_Agreement_' + tenantName.replace(/\s+/g,'_') + '.pdf';
       var filledBytes = await pdfDoc.save();
       var blob = new Blob([filledBytes], { type: 'application/pdf' });
 

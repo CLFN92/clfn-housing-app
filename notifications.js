@@ -433,7 +433,7 @@ function _emailAppLink() {
 }
 
 function _emailNationShort() {
-  return (window.NATION_CONFIG && NATION_CONFIG.short) || 'CLFN';
+  return nationShort();
 }
 
 // Build the placeholder token map from an application object.
@@ -1147,7 +1147,7 @@ async function _generateApplicationPdfBase64() {
   var today   = new Date().toLocaleDateString('en-CA');
   var appId   = (typeof currentAppId !== 'undefined' && currentAppId) ? currentAppId : '—';
   var nation  = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
-  var short   = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
+  var short   = nationShort();
   var fnVal   = fld('fn');
   var lnVal   = fld('ln');
   var fullName= (fnVal + ' ' + lnVal).trim() || '—';
@@ -1218,7 +1218,7 @@ async function _generateApplicationPdfBase64() {
     row('Home Condition',       fld('homeCondition'));
     row('Est. Renovation Cost', dollarQ('#homeCondBlk input[type="number"]'));
   }
-  row('Arrears Owed to ' + (short || 'CLFN'), yn(hasArr));
+  row('Arrears Owed to ' + short, yn(hasArr));
   var arrNums  = document.querySelectorAll('#arrBlk input[type="number"]');
   var arrDates = document.querySelectorAll('#arrBlk input[type="date"]');
   var arrSel   = document.querySelector('#arrBlk select');
@@ -1332,12 +1332,12 @@ async function _generateApplicationPdfBase64() {
   var terms        = _tParsed.items.length ? _tParsed.items : [
     'All information provided in this application is true, accurate, and complete to the best of my knowledge.',
     'I understand that providing false or misleading information may result in immediate disqualification and removal from the housing waitlist.',
-    'I consent to ' + (short || 'CLFN') + ' collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation (PIPEDA).',
-    'I understand that my application will be scored according to the ' + (short || 'CLFN') + ' Housing Scoring Rubric and that priority is determined by score, not date of application alone.',
-    'I agree to notify the ' + (short || 'CLFN') + ' Housing Department within 30 days of any change in household composition, income, address, or contact information.',
-    'I understand that acceptance into ' + (short || 'CLFN') + ' housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by ' + (short || 'CLFN') + ' prior to occupancy.',
-    'I agree to comply with all ' + (short || 'CLFN') + ' Housing policies, lease agreements, and community by-laws as a condition of tenancy.',
-    'I authorize ' + (short || 'CLFN') + ' to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.'
+    'I consent to ' + short + ' collecting, using, and sharing my personal information for the purpose of assessing this application, in accordance with applicable privacy legislation (PIPEDA).',
+    'I understand that my application will be scored according to the ' + short + ' Housing Scoring Rubric and that priority is determined by score, not date of application alone.',
+    'I agree to notify the ' + short + ' Housing Department within 30 days of any change in household composition, income, address, or contact information.',
+    'I understand that acceptance into ' + short + ' housing is conditional upon satisfying all outstanding arrears or entering into a formal payment arrangement approved by ' + short + ' prior to occupancy.',
+    'I agree to comply with all ' + short + ' Housing policies, lease agreements, and community by-laws as a condition of tenancy.',
+    'I authorize ' + short + ' to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.'
   ];
 
   paragraph(termsIntro);
@@ -1371,7 +1371,7 @@ async function _generateApplicationPdfBase64() {
     pdf.setFontSize(8.5);
     pdf.setTextColor(40);
     var cLines = pdf.splitTextToSize(
-      'The applicant has consented to ' + (short || 'CLFN')
+      'The applicant has consented to ' + short
       + ' Housing sharing relevant information from this application with other '
       + (nation || 'CLFN')
       + ' programs and departments — including Health, Education, Wellness, Ontario Works, and Finance — in support of this housing application.',
@@ -1487,7 +1487,7 @@ async function _generateSowPdfBase64() {
 
   var today    = new Date().toLocaleDateString('en-CA');
   var nation   = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
-  var short    = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
+  var short    = nationShort();
   var projNum  = (window._sowEditingProjectNumber) || '—';
   var unitAddr = fld('sow_address') || '—';
 
@@ -1762,7 +1762,7 @@ async function _generateRfqPdfBase64(rfq, unit) {
   await _loadJsPdf();
   var logoDataUrl = await _fetchLogoForPdf();
   var nc       = window.NATION_CONFIG || {};
-  var natShort = nc.short || nc.display_name || '';
+  var natShort = nationShort();
   var natDisp  = nc.display_name || nc.name || natShort;
   var ctx = _makePdfDoc({
     headerTitle:    'Request for Quotations',
@@ -1886,7 +1886,7 @@ async function _generateRfqPdfBase64(rfq, unit) {
     'Current WSIB clearance certificate',
     'Certificate of general liability insurance (minimum $2,000,000 per occurrence)',
     'List of at least two comparable completed projects (name, owner, value, completion date)',
-    'If new to working with ' + (natShort || 'CLFN') + ' Housing: at least two project references with complete contact information',
+    'If new to working with ' + natShort + ' Housing: at least two project references with complete contact information',
     'If using subcontractors: complete list with contact info, WSIB certificate, and proof of $2M+ liability insurance for each',
     'Proposed project start date and estimated completion timeline',
     'Fully completed bid form (above) with all line items priced'
@@ -1997,7 +1997,7 @@ async function _generateWorkOrderPdfBase64() {
 
   var today    = new Date().toLocaleDateString('en-CA');
   var nation   = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
-  var short    = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
+  var short    = nationShort();
   var projNum  = (window._sowEditingProjectNumber) || '—';
   var unitAddr = fld('sow_address') || '—';
 
@@ -2087,7 +2087,7 @@ async function _generateWorkOrderPdfBase64() {
   } else {
     paragraph(
       'The contractor is authorized to perform only the work described above. '
-      + 'Any additional work or changes to scope must be approved in writing by ' + (short || 'CLFN')
+      + 'Any additional work or changes to scope must be approved in writing by ' + short
       + ' Housing before work commences. Invoices must reference this Work Order and unit address. '
       + 'Payment is subject to satisfactory completion and inspection.'
     );
@@ -2127,7 +2127,7 @@ async function _generateWorkOrderPdfBase64() {
     pdf.setTextColor(0);
   }
   sigBox(marginL,                'Contractor Representative');
-  sigBox(marginL + sigW + sigGap,(short || 'CLFN') + ' Housing — Authorized Signatory');
+  sigBox(marginL + sigW + sigGap,short + ' Housing — Authorized Signatory');
   ctx.y += sigBlockH + 4;
 
   return ctx.finish();

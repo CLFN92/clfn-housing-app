@@ -1896,7 +1896,7 @@ function _doExport(format, headers, data, filename, colWidths, pdfLandscape) {
     loadjsPDF(function(){
       var doc = new window.jspdf.jsPDF({orientation: pdfLandscape?'landscape':'portrait', unit:'mm', format:'a4'});
       doc.setFontSize(13); doc.setFont('helvetica','bold');
-      var _ncShort = (window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN';
+      var _ncShort = nationShort();
       doc.text(_ncShort+' — '+filename.replace(/^[A-Za-z]+_/,'').replace(/_/g,' '), 14, 16);
       doc.setFontSize(8); doc.setFont('helvetica','normal');
       doc.text('Exported: '+new Date().toLocaleDateString('en-CA')+'  |  '+data.length+' records', 14, 22);
@@ -2610,7 +2610,7 @@ function exportContractors(format) {
     var people=(ct.people||[]).map(function(p){return p.name+(p.phone?' ('+formatPhone(p.phone)+')':'');}).join('; ');
     return[ct.name||'',ct.trade||'',ct.phone?formatPhone(ct.phone):'',ct.email||'',ct.address||'',ct.hst||'',ct.wsibNum||'',ct.wsibExpiry||'',ct.insProvider||'',ct.insExpiry||'',people];
   });
-  var _ns1=(window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN';
+  var _ns1=nationShort();
   _doExport(format,headers,data,_ns1+'_Contractors_'+new Date().toISOString().slice(0,10),[28,18,14,24,24,14,14,14,20,14,24],true);
 }
 function exportInventory(format) {
@@ -2629,7 +2629,7 @@ function exportInventory(format) {
   });
   var headers=['Address','Beds','Baths','Type','Foundation','Accessible','Funder','Status','Tenant','Phase'];
   var data=rows.map(function(u){return[u.num+' '+u.street,u.bedrooms,(u.bathrooms&&u.bathrooms!=='0'&&u.bathrooms!=='nan')?u.bathrooms:'',(u.type&&u.type!=='0'&&u.type!=='nan')?u.type:'',(u.foundation&&u.foundation!=='nan'&&u.foundation!=='0')?u.foundation:'',u.accessible?'Yes':'No',u.funder||'',u.status,u.assignedName||'',(u.phase&&u.phase!=='nan'&&u.phase!=='0')?u.phase:''];});
-  var _ns2=(window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN';
+  var _ns2=nationShort();
   _doExport(format,headers,data,_ns2+'_Housing_Inventory_'+new Date().toISOString().slice(0,10),[28,6,6,18,14,10,12,14,22,8],true);
 }
 function exportMatch(format) {
@@ -2646,7 +2646,7 @@ function exportMatch(format) {
   });
   var headers=['App ID','Name','Score','Tier','Status','Classification','Band Member','Reserve','Bedrooms Needed','Accessibility','Arrears'];
   var data=rows.map(function(a){return[a.id,(a.fn||'')+' '+(a.ln||''),a.score||0,a.tier||'',a.status,a.classification||'',a.band?'Yes':'No',a.reserve||'',a.bedNeed||'',(a.accessibility?'Yes':'No'),(a.hasArrears?'Yes':'No')];});
-  var _ns3=(window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN';
+  var _ns3=nationShort();
   _doExport(format,headers,data,_ns3+'_Match_'+new Date().toISOString().slice(0,10),[16,22,10,16,14,20,12,14,14,12,10],true);
 }
 
@@ -5899,7 +5899,7 @@ function exportRenos(format) {
     var prog=null;prog = (window._renoProgress && window._renoProgress[u.id]) || {};
     return[u.num+' '+u.street,u.bedrooms,(u.type&&u.type!=='0'&&u.type!=='nan')?u.type:'',(u.foundation&&u.foundation!=='0'&&u.foundation!=='nan')?u.foundation:'',u.status,rs.score||0,(prog.contractor||sow&&sow.contractor||''),(sow?'Yes':'No'),(prog.progress||0)+'%'];
   });
-  var _ns4=(window.NATION_CONFIG&&window.NATION_CONFIG.short)||'CLFN';
+  var _ns4=nationShort();
   _doExport(format,headers,data,_ns4+'_Renovations_'+new Date().toISOString().slice(0,10),[30,8,16,14,14,14,22,10,12],true);
 }
 
@@ -6480,7 +6480,7 @@ window._sowMeetsRfqThreshold = _sowMeetsRfqThreshold;
 function buildRfqDocumentHtml(rfq, sow, unit) {
   var nc       = window.NATION_CONFIG || {};
   var natDisp  = nc.display_name || nc.name || 'Constance Lake First Nation';
-  var natShort = nc.short || 'CLFN';
+  var natShort = nationShort();
 
   // Theme — primary color drives header strip, section headers, table headers
   var theme       = (window._appSettings && window._appSettings.theme) || {};
@@ -6699,7 +6699,7 @@ async function sendRfqToRecipients(rfq, contractorList) {
   var contact     = (rfq.data && rfq.data.contact_person) || '';
   var contactEmail = (rfq.data && rfq.data.contact_email) || '';
   var subMethod   = (rfq.data && rfq.data.submission_method) || 'email';
-  var natShort    = (window.NATION_CONFIG && NATION_CONFIG.short) || 'CLFN';
+  var natShort    = nationShort();
 
   // Use the saved template from Settings > Notifications > RFQ Invitation
   var rendered = null;
