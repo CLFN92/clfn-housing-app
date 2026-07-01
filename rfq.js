@@ -680,7 +680,7 @@ function renderBidsSection() {
   var rows = ids.map(function(id){
     var ct  = (window._contractors || []).find(function(c){ return c && c.id === id; }) || { id:id, name:id };
     var bid = _rfqBids[id] || {};
-    return { id:id, ct:ct, amount:(bid.amount != null ? bid.amount : ''), notes:bid.notes||'', received:bid.received_at||'' };
+    return { id:id, ct:ct, amount:(bid.amount != null ? bid.amount : ''), notes:bid.notes||'', received:bid.received_at||'', docPath:bid.doc_path||'', docName:bid.doc_name||'' };
   });
   var lowest = null;
   rows.forEach(function(r){ var a = parseFloat(r.amount); if (!isNaN(a) && a > 0 && (lowest === null || a < lowest)) lowest = a; });
@@ -692,17 +692,22 @@ function renderBidsSection() {
     return (a.ct.name||'').localeCompare(b.ct.name||'');
   });
   var html = '<table class="rfq-scope-table"><thead><tr>'
-    + '<th>Contractor</th><th style="width:135px;">Bid Amount ($)</th><th>Notes</th><th style="width:135px;">Received</th><th style="width:96px;"></th>'
+    + '<th>Contractor</th><th style="width:135px;">Bid Amount ($)</th><th>Notes</th><th style="width:130px;">Received</th><th style="width:170px;">Quote File</th><th style="width:96px;"></th>'
     + '</tr></thead><tbody>';
   rows.forEach(function(r){
     var av = parseFloat(r.amount); var isLow = !isNaN(av) && av > 0 && lowest !== null && av === lowest;
     var idEsc = escapeHtml(r.id);
+    var fileCell = r.docPath
+      ? '<a href="#" onclick="_rfqViewBidFile(\'' + idEsc + '\');return false;" title="View attached quote" style="font-size:12px;color:var(--info-blue,#1d4ed8);text-decoration:none;">&#128206; ' + escapeHtml(r.docName || 'Quote') + '</a>'
+        + ' <button type="button" onclick="_rfqRemoveBidFile(\'' + idEsc + '\')" title="Remove file" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 2px;">&times;</button>'
+      : '<input type="file" onchange="_rfqAttachBidFile(\'' + idEsc + '\', this)" style="font-size:11px;max-width:158px;"/>';
     html += '<tr' + (isLow ? ' style="background:var(--success-bg,#f0fdf4);"' : '') + '>'
       + '<td style="padding:6px 10px;font-size:12px;font-weight:600;">' + escapeHtml(r.ct.name||r.id)
       +   (isLow ? ' <span style="font-size:10px;color:#15803d;font-weight:700;">LOWEST</span>' : '') + '</td>'
       + '<td style="padding:4px 8px;"><input type="number" min="0" step="0.01" value="' + escapeHtml(String(r.amount)) + '" oninput="_rfqSetBid(\'' + idEsc + '\',\'amount\',this.value)" onchange="renderBidsSection()" class="stg-lookup-input" style="width:118px;" placeholder="0.00"/></td>'
       + '<td style="padding:4px 8px;"><input type="text" value="' + escapeHtml(r.notes) + '" oninput="_rfqSetBid(\'' + idEsc + '\',\'notes\',this.value)" class="stg-lookup-input" placeholder="Optional"/></td>'
       + '<td style="padding:4px 8px;"><input type="date" value="' + escapeHtml(r.received) + '" oninput="_rfqSetBid(\'' + idEsc + '\',\'received_at\',this.value)" class="stg-lookup-input"/></td>'
+      + '<td style="padding:4px 8px;">' + fileCell + '</td>'
       + '<td style="padding:4px 8px;"><button type="button" class="btn btn-primary btn-sm" onclick="_rfqAwardFromBid(\'' + idEsc + '\')"' + ((isNaN(av)||av<=0) ? ' disabled style="opacity:.5;"' : '') + '>Award &rarr;</button></td>'
       + '</tr>';
   });
@@ -713,6 +718,57 @@ function renderBidsSection() {
 function _rfqSetBid(id, field, val) {
   if (!_rfqBids[id]) _rfqBids[id] = {};
   _rfqBids[id][field] = val;
+}
+
+// ── Bid quote-file attach (stored on rfq.data.bids[id].doc_path) ────────────
+async function _rfqAttachBidFile(id, inputEl) {
+  var file = inputEl && inputEl.files && inputEl.files[0];
+  if (!file) return;
+  if (typeof window.sbUploadFile !== 'function') { showToast('File upload is not available on this page'); return; }
+  var rfqId = _rfqCurrentId || (document.getElementById('rfq_number') || {}).value || 'draft';
+  var safe  = String(file.name).replace(/[^\w.\-]+/g, '_');
+  var path  = 'rfq/' + rfqId + '/bids/' + id + '_' + safe;
+  showToast('Uploading ' + file.name + '…');
+  try {
+    await window.sbUploadFile(path, file);
+    if (!_rfqBids[id]) _rfqBids[id] = {};
+    _rfqBids[id].doc_path = path;
+    _rfqBids[id].doc_name = file.name;
+    renderBidsSection();
+    // Persist the reference so it survives a reload (only when the RFQ has a
+    // linked SOW/unit — otherwise saveRfqDraft would toast "No SOW linked").
+    if (_rfqSowUnitId && typeof saveRfqDraft === 'function') {
+      try { await saveRfqDraft(); } catch(e) { console.warn('[rfq] post-attach save failed:', e); }
+    }
+    showToast('✓ Quote attached for ' + (( (window._contractors||[]).find(function(c){return c&&c.id===id;})||{}).name || 'contractor'));
+  } catch(e) {
+    console.warn('[rfq] bid file upload failed:', e);
+    showToast('Upload failed — see console', { type: 'error' });
+  }
+  if (inputEl) inputEl.value = '';   // allow re-selecting the same file
+}
+
+function _rfqViewBidFile(id) {
+  var bid = _rfqBids[id] || {};
+  if (!bid.doc_path) return;
+  if (typeof window.sbGetSignedUrl !== 'function') { showToast('Cannot open file'); return; }
+  // Open the tab synchronously (before the await) so the browser doesn't block it.
+  var w = window.open('', '_blank');
+  window.sbGetSignedUrl(bid.doc_path).then(function(url) {
+    if (w) w.location = url; else window.location = url;
+  }).catch(function(e) {
+    console.warn('[rfq] sign bid file failed:', e);
+    if (w) w.close();
+    showToast('Could not open the file', { type: 'error' });
+  });
+}
+
+function _rfqRemoveBidFile(id) {
+  if (!_rfqBids[id]) return;
+  delete _rfqBids[id].doc_path;
+  delete _rfqBids[id].doc_name;
+  renderBidsSection();
+  if (_rfqSowUnitId && typeof saveRfqDraft === 'function') { try { saveRfqDraft(); } catch(e) {} }
 }
 
 async function _rfqAwardFromBid(id) {
