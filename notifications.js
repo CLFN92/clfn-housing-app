@@ -1027,10 +1027,22 @@ function _makePdfDoc(opts) {
   // Footer is drawn in finish() so total page count is known
   ctx.needSpace = function(h) {
     if (ctx.y + h > pageH - marginB) {
+      // Callers typically set their font/size/color BEFORE needSpace and draw
+      // AFTER it. drawHeader() (run on the new page) changes the font state, so
+      // without restoring it the text would render in the header's leftover
+      // font — e.g. a body paragraph that crosses a page break printing at the
+      // 7pt header size. Save and restore around the page break.
+      var _fs = null, _f = null, _tc = null;
+      try { _fs = pdf.getFontSize(); } catch(e) {}
+      try { _f  = pdf.getFont(); } catch(e) {}
+      try { _tc = pdf.getTextColor(); } catch(e) {}
       pdf.addPage();
       ctx.pageNum++;
       ctx.y = marginT;
       ctx.drawHeader();
+      try { if (_f) pdf.setFont(_f.fontName, _f.fontStyle); } catch(e) {}
+      try { if (_fs != null) pdf.setFontSize(_fs); } catch(e) {}
+      try { if (_tc != null) pdf.setTextColor(_tc); } catch(e) {}
     }
   };
   ctx.sectionHeader = function(title) {
