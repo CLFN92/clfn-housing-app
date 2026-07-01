@@ -422,7 +422,7 @@ function _populateFormFields(rfq) {
   set('rfq_target_end',     d.target_completion_date || '');
 
   // Award
-  set('rfq_award_amount', rfq.award_amount || '');
+  set('rfq_award_amount', rfq.award_amount ? _rfqFmtMoney(rfq.award_amount) : '');
   set('rfq_award_notes',  rfq.award_notes  || '');
 
   // Contract Details
@@ -578,6 +578,7 @@ function switchRfqTab(tab) {
     renderClfnSuppliedRows();
     renderMilestoneRows();
     _rfqRecalcPrices();   // compute subtotal/total/holdback + refresh milestones from the loaded prices
+    _rfqRenderAwardedContractorInfo();   // show the awarded contractor's on-file details
     // Sig pads were hidden at form-open time — init them on first visit
     if (!_rfqContractingTabInited) {
       _rfqContractingTabInited = true;
@@ -701,14 +702,17 @@ function renderBidsSection() {
   rows.forEach(function(r){
     var av = parseFloat(r.amount); var isLow = !isNaN(av) && av > 0 && lowest !== null && av === lowest;
     var idEsc = escapeHtml(r.id);
+    var amtDisp = (r.amount === '' || r.amount == null || isNaN(av)) ? '' : _rfqFmtMoney(av);
     var fileCell = r.docPath
       ? '<a href="#" onclick="_rfqViewBidFile(\'' + idEsc + '\');return false;" title="View attached quote" style="font-size:12px;color:var(--info-blue,#1d4ed8);text-decoration:none;">&#128206; ' + escapeHtml(r.docName || 'Quote') + '</a>'
         + ' <button type="button" onclick="_rfqRemoveBidFile(\'' + idEsc + '\')" title="Remove file" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 2px;">&times;</button>'
-      : '<input type="file" onchange="_rfqAttachBidFile(\'' + idEsc + '\', this)" style="font-size:11px;max-width:158px;"/>';
+      : '<label ondragover="event.preventDefault();this.style.borderColor=\'var(--yellow)\';" ondragleave="this.style.borderColor=\'var(--border)\';" ondrop="_rfqDropBidFile(event,\'' + idEsc + '\')" title="Drop a file here or click to choose" style="display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px dashed var(--border);border-radius:6px;font-size:11px;color:var(--muted);cursor:pointer;max-width:158px;">'
+        + '<input type="file" onchange="_rfqAttachBidFile(\'' + idEsc + '\', this)" style="display:none;"/>'
+        + '<span>&#128206; Drop or choose</span></label>';
     html += '<tr' + (isLow ? ' style="background:var(--success-bg,#f0fdf4);"' : '') + '>'
       + '<td style="padding:6px 10px;font-size:12px;font-weight:600;">' + escapeHtml(r.ct.name||r.id)
       +   (isLow ? ' <span style="font-size:10px;color:#15803d;font-weight:700;">LOWEST</span>' : '') + '</td>'
-      + '<td style="padding:4px 8px;"><input type="number" min="0" step="0.01" value="' + escapeHtml(String(r.amount)) + '" oninput="_rfqSetBid(\'' + idEsc + '\',\'amount\',this.value)" onchange="renderBidsSection()" class="stg-lookup-input" style="width:118px;" placeholder="0.00"/></td>'
+      + '<td style="padding:4px 8px;"><input type="text" inputmode="decimal" value="' + escapeHtml(amtDisp) + '" onfocus="_rfqCurrencyFocus(this)" oninput="_rfqSetBidAmount(\'' + idEsc + '\',this.value)" onblur="_rfqCurrencyBlur(this)" onchange="renderBidsSection()" class="stg-lookup-input" style="width:118px;" placeholder="$0.00"/></td>'
       + '<td style="padding:4px 8px;"><input type="text" value="' + escapeHtml(r.notes) + '" oninput="_rfqSetBid(\'' + idEsc + '\',\'notes\',this.value)" class="stg-lookup-input" placeholder="Optional"/></td>'
       + '<td style="padding:4px 8px;"><input type="date" value="' + escapeHtml(r.received) + '" oninput="_rfqSetBid(\'' + idEsc + '\',\'received_at\',this.value)" class="stg-lookup-input"/></td>'
       + '<td style="padding:4px 8px;">' + fileCell + '</td>'
@@ -722,6 +726,22 @@ function renderBidsSection() {
 function _rfqSetBid(id, field, val) {
   if (!_rfqBids[id]) _rfqBids[id] = {};
   _rfqBids[id][field] = val;
+}
+
+// Store the bid amount as a clean number (empty stays empty) so sort/award/PDF
+// logic keeps working; the cell displays it formatted as $###,###.00.
+function _rfqSetBidAmount(id, raw) {
+  var clean = String(raw || '').replace(/[$,\s]/g, '');
+  _rfqSetBid(id, 'amount', clean === '' ? '' : (parseFloat(clean) || 0));
+}
+
+// Drag-and-drop onto a bid row's file dropzone.
+function _rfqDropBidFile(e, id) {
+  e.preventDefault();
+  if (e.currentTarget) e.currentTarget.style.borderColor = 'var(--border)';
+  var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (!file) return;
+  _rfqAttachBidFile(id, { files: [file], value: '' });   // reuse the upload path
 }
 
 // ── Bid quote-file attach (stored on rfq.data.bids[id].doc_path) ────────────
@@ -831,7 +851,7 @@ function _buildRfqPayload() {
     closes_at:               fv('rfq_closes_at') || null,
     recipient_contractor_ids: Object.keys(_rfqSelectedCts),
     awarded_contractor_id:   fv('rfq_awarded_to')   || null,
-    award_amount:            fn('rfq_award_amount'),
+    award_amount:            _rfqParseNum(fv('rfq_award_amount')) || null,
     award_notes:             fv('rfq_award_notes')   || null,
     data: {
       contact_person:         fv('rfq_contact'),
@@ -1459,18 +1479,69 @@ function _readMilestoneRows() {
 }
 
 // ── Auto-fill contractor details when awarded-to changes ──────────────────
+// When a contractor is picked in the Scope-tab Award card, prepopulate as much
+// of the Contracting page as possible: signatory + site lead from the record,
+// the read-only contractor-detail panel, and the contract amount into pricing.
 function _rfqAutoFillContractor() {
   var sel = document.getElementById('rfq_awarded_to');
-  if (!sel || !sel.value) return;
-  var ct = (window._contractors || []).find(function(c){ return c && c.id === sel.value; });
-  if (!ct) return;
-  function setIfBlank(id, val) {
-    var el = document.getElementById(id);
-    if (el && !el.value.trim() && val) el.value = val;
+  var ct  = (sel && sel.value) ? (window._contractors || []).find(function(c){ return c && c.id === sel.value; }) : null;
+  if (ct) {
+    var setIfBlank = function(id, val){ var el = document.getElementById(id); if (el && !el.value.trim() && val) el.value = val; };
+    setIfBlank('rfq_ct_signatory_name',  ct.sigCt && ct.sigCt.name  ? ct.sigCt.name  : ct.name  || '');
+    setIfBlank('rfq_ct_signatory_title', ct.sigCt && ct.sigCt.title ? ct.sigCt.title : '');
+    setIfBlank('rfq_site_lead_phone',    ct.phone || '');
   }
-  // Pre-fill contractor signatory + site lead from contractor record if blank
-  setIfBlank('rfq_ct_signatory_name',  ct.sigCt && ct.sigCt.name  ? ct.sigCt.name  : ct.name  || '');
-  setIfBlank('rfq_ct_signatory_title', ct.sigCt && ct.sigCt.title ? ct.sigCt.title : '');
+  _rfqRenderAwardedContractorInfo();
+  _rfqSeedPriceFromAward();
+}
+
+// Seed the contract price from the Award Amount when the breakdown is still
+// empty (agreed lump sum -> Other line; staff can redistribute). No-op once any
+// price line has a value, so it never clobbers manual entry.
+function _rfqSeedPriceFromAward() {
+  var amt = _rfqParseNum((document.getElementById('rfq_award_amount') || {}).value);
+  if (!(amt > 0)) return;
+  var ids = ['rfq_price_materials','rfq_price_labour','rfq_price_equipment','rfq_price_subcontractors','rfq_price_other'];
+  var anyFilled = ids.some(function(id){ var el = document.getElementById(id); return el && _rfqParseNum(el.value) > 0; });
+  var other = document.getElementById('rfq_price_other');
+  if (!anyFilled && other) {
+    other.value = _rfqFmtMoney(amt);
+    if (typeof _rfqRecalcPrices === 'function') _rfqRecalcPrices();
+  }
+}
+
+// Read-only summary of the awarded contractor's on-file details (the ones that
+// print on the contract but have no form field), shown at the top of Contract
+// Details so staff can verify before generating.
+function _rfqRenderAwardedContractorInfo() {
+  var box = document.getElementById('rfq_awarded_ct_info');
+  if (!box) return;
+  var sel = document.getElementById('rfq_awarded_to');
+  var ct  = (sel && sel.value) ? (window._contractors || []).find(function(c){ return c && c.id === sel.value; }) : null;
+  if (!ct) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  var today = new Date().toISOString().slice(0,10);
+  var row = function(label, val){
+    return val ? '<div style="display:flex;gap:8px;"><span style="min-width:96px;color:var(--muted);">' + label + '</span><span style="color:var(--text);">' + escapeHtml(String(val)) + '</span></div>' : '';
+  };
+  var expiring = function(num, exp){
+    if (!num) return '';
+    var s = String(num);
+    if (exp) s += ' (exp ' + exp + (exp < today ? ' — EXPIRED' : '') + ')';
+    return s;
+  };
+  var phone = ct.phone ? ((typeof formatPhone === 'function') ? formatPhone(ct.phone) : ct.phone) : '';
+  box.style.display = '';
+  box.innerHTML = '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.7;margin-bottom:14px;">'
+    + '<div style="font-weight:700;color:var(--text);margin-bottom:4px;">&#127981; Awarded Contractor</div>'
+    + row('Name', ct.name)
+    + row('Trade', ct.trade)
+    + row('Address', ct.address)
+    + row('Phone', phone)
+    + row('Email', ct.email)
+    + row('GST/HST #', ct.hst)
+    + row('WSIB #', expiring(ct.wsibNum, ct.wsibExpiry))
+    + row('Insurance', ct.insProvider ? (ct.insProvider + (ct.insExpiry ? ' (exp ' + ct.insExpiry + (ct.insExpiry < today ? ' — EXPIRED' : '') + ')' : '')) : '')
+    + '</div>';
 }
 
 // ── Currency helpers ($###,###.00) ───────────────────────────────────────

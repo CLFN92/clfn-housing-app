@@ -143,7 +143,7 @@
             </div>
             <div class="f">
               <label>Award Amount ($)</label>
-              <input type="number" id="rfq_award_amount" class="stg-lookup-input" placeholder="0.00" min="0" step="0.01" oninput="_rfqRecalcPrices()"/>
+              <input type="text" inputmode="decimal" id="rfq_award_amount" class="stg-lookup-input" placeholder="$0.00" onfocus="_rfqCurrencyFocus(this)" onblur="_rfqCurrencyBlur(this);_rfqSeedPriceFromAward()"/>
             </div>
             <div class="f" style="grid-column:1/-1;">
               <label>Award Notes</label>
@@ -218,6 +218,7 @@
       <div class="card card-flush">
         <div class="modal-hdr"><div class="lbl-yellow">Contract Details</div></div>
         <div class="sec-pad">
+          <div id="rfq_awarded_ct_info" style="display:none;"></div>
           <div class="tic-grid-2">
             <div class="f"><label>Contract Number <span style="font-size:10px;color:var(--muted);">auto-assigned</span></label><input type="text" id="rfq_contract_number" class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/></div>
             <div class="f"><label>Contractor Quote #</label><input type="text" id="rfq_ct_quote_number" class="stg-lookup-input" placeholder="Contractor's quote reference #"/></div>
