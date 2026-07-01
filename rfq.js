@@ -328,6 +328,60 @@ async function _fetchAndPopulateSow(unitId, sowPn) {
   }
 }
 
+// ── Edit permission ──────────────────────────────────────────────────────────
+// Only the Housing Manager and Executive Director may edit an RFQ. Everyone
+// else sees the full record read-only (all info visible, nothing editable).
+function _rfqCanEdit() {
+  var r = (window.CLFN_PERMS && CLFN_PERMS.normalizeRole)
+        ? CLFN_PERMS.normalizeRole(window.currentRole)
+        : (window.currentRole || '');
+  return r === 'ed' || r === 'housing_manager';
+}
+
+// Lock or unlock the whole RFQ form based on _rfqCanEdit(). Disables every
+// input/select/textarea and every button except navigation (tabs, Back to
+// List, Preview PDF). Restores state cleanly when an editor opens it. Safe to
+// call repeatedly (after each dynamic re-render / tab switch).
+function _rfqApplyReadOnly() {
+  var ro = !_rfqCanEdit();
+  window._rfqReadOnly = ro;
+  var form = document.getElementById('rfqFormView');
+  if (!form) return;
+  form.classList.toggle('rfq-readonly', ro);
+
+  form.querySelectorAll('input, select, textarea').forEach(function(c) {
+    if (ro) {
+      if (!c.hasAttribute('data-ro-was')) c.setAttribute('data-ro-was', c.disabled ? '1' : '0');
+      c.disabled = true;
+    } else if (c.hasAttribute('data-ro-was')) {
+      if (c.getAttribute('data-ro-was') === '0') c.disabled = false;
+      c.removeAttribute('data-ro-was');
+    }
+  });
+
+  form.querySelectorAll('button').forEach(function(b) {
+    if (b.closest('.pill-tabs') || b.closest('.tab-bar') || b.hasAttribute('data-rfq-keep')) return;
+    if (ro) {
+      if (!b.hasAttribute('data-ro-was')) b.setAttribute('data-ro-was', b.disabled ? '1' : '0');
+      b.disabled = true;
+    } else if (b.hasAttribute('data-ro-was')) {
+      if (b.getAttribute('data-ro-was') === '0') b.disabled = false;
+      b.removeAttribute('data-ro-was');
+    }
+  });
+
+  // Banner
+  var banner = document.getElementById('rfqReadOnlyBanner');
+  if (ro && !banner) {
+    banner = document.createElement('div');
+    banner.id = 'rfqReadOnlyBanner';
+    banner.innerHTML = '🔒 View only — only the Housing Manager or Executive Director can edit this RFQ.';
+    form.insertBefore(banner, form.firstChild);
+  } else if (!ro && banner) {
+    banner.remove();
+  }
+}
+
 function showRfqForm(rfqId, unitId, sowPn) {
   document.getElementById('rfqListView').style.display  = 'none';
   document.getElementById('rfqFormView').style.display  = '';
@@ -404,7 +458,9 @@ function showRfqForm(rfqId, unitId, sowPn) {
       _initSigPad('rfq_ct_sig');
       _initSigPad('rfq_ct_initial');
     }
+    _rfqApplyReadOnly();
   }, 80);
+  _rfqApplyReadOnly();
 }
 
 function _populateFormFields(rfq) {
@@ -593,6 +649,8 @@ function switchRfqTab(tab) {
       }, 50);
     }
   }
+  // Re-apply read-only after any tab render re-creates fields/buttons.
+  _rfqApplyReadOnly();
 }
 
 // ── Scope tab ─────────────────────────────────────────────────────────────────
@@ -912,6 +970,7 @@ function _buildRfqPayload() {
 
 // ── Save draft ────────────────────────────────────────────────────────────────
 async function saveRfqDraft() {
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
   var payload = _buildRfqPayload();
   if (!payload.sow_unit_id) { showToast('No SOW linked to this RFQ'); return; }
   try {
@@ -976,6 +1035,7 @@ function previewRfqPdf() {
 
 // ── Issue RFQ ─────────────────────────────────────────────────────────────────
 async function issueRfq() {
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
   var payload = _buildRfqPayload();
   // Validate
   if (!payload.sow_unit_id)                         { showToast('No SOW linked'); return; }
@@ -1019,6 +1079,7 @@ async function issueRfq() {
 
 // ── Unlock RFQ (ED only) ───────────────────────────────────────────────────────
 async function unlockRfq() {
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
   var rfqId = _rfqCurrentId;
   if (!rfqId) return;
   var confirmed = await showConfirm({
@@ -1048,6 +1109,7 @@ async function unlockRfq() {
 
 // ── Cancel RFQ ────────────────────────────────────────────────────────────────
 async function cancelRfq(rfqId) {
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
   var confirmed = await showConfirm({ title: 'Cancel ' + rfqId + '?', message: 'This marks the RFQ as cancelled. It cannot be re-issued.', confirmText: 'Cancel RFQ', danger: true });
   if (!confirmed) return;
   try {
@@ -1116,6 +1178,7 @@ function _rfqContractorEligibility(ct) {
 }
 
 async function confirmAward() {
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
   var ctId   = document.getElementById('award_ct_id').value;
   var amount = document.getElementById('award_amount').value;
   var notes  = document.getElementById('award_notes').value.trim();
@@ -1166,6 +1229,7 @@ async function confirmAward() {
 // the Scope Award card, marks the linked SOW approved, and jumps to Contracting
 // WITHOUT issuing the RFQ or emailing anyone.
 async function _rfqManualAward() {
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
   var ctId = (document.getElementById('rfq_awarded_to') || {}).value || '';
   var amt  = _rfqParseNum((document.getElementById('rfq_award_amount') || {}).value);
   if (!ctId)       { showToast('Select the awarded contractor above (Awarded To)'); return; }
@@ -1645,6 +1709,7 @@ function renderDocumentsTab() {
     _rfqDocLib = window.DocLibrary.create(mount, {
       entityType:    'rfq',
       entityId:      rfqId,
+      readOnly:      !_rfqCanEdit(),   // viewers see docs but can't upload/delete
       pathPrefix:    'tenants/' + (_rfqSowUnitId || rfqId),
       supabaseUrl:   SUPABASE_URL,
       supabaseAnon:  SUPABASE_ANON,
@@ -1790,6 +1855,7 @@ function _rfqShowChecklist(title, items) {
 // via jsPDF text primitives. getContractBody() always returns a non-empty
 // body (registry default when no saved override), so no AcroForm fallback.
 async function generateContractorContract() {
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can generate a contract'); return; }
   // Readiness gate — hard-block on missing contract essentials.
   var _missing = _rfqContractMissing();
   if (_missing.length) { _rfqShowChecklist('Not ready to generate', _missing); return; }
@@ -2039,18 +2105,34 @@ async function generateContractorContract() {
       dlLink.href = dlUrl; dlLink.download = filename; dlLink.click();
       setTimeout(function(){ URL.revokeObjectURL(dlUrl); }, 3000);
 
-      // Upload to unit document library so it appears on the inventory unit card
+      // Upload once to Storage, then file it in BOTH document libraries:
+      //  - the unit's (entity 'tenant') so it appears on the inventory unit card
+      //  - this RFQ's (entity 'rfq') so it appears on the RFQ Documents tab
+      // Both DocLibraries read the same tenants/<unitId> path prefix, so a
+      // single stored object surfaces in both once each meta row is written.
+      var savedToRfq = false;
       if (_rfqSowUnitId && typeof window.sbUploadFile === 'function') {
         try {
           var storePath = 'tenants/' + _rfqSowUnitId + '/' + Date.now() + '_' + filename;
           await window.sbUploadFile(storePath, blob);
           if (typeof window.sbSaveFileMeta === 'function') {
             await window.sbSaveFileMeta('tenant', String(_rfqSowUnitId), storePath, filename, blob.size, 'application/pdf');
+            if (_rfqCurrentId) {
+              await window.sbSaveFileMeta('rfq', String(_rfqCurrentId), storePath, filename, blob.size, 'application/pdf');
+              savedToRfq = true;
+            }
           }
+          // Refresh the RFQ Documents tab so the contract shows immediately.
+          if (savedToRfq && _rfqDocLib && typeof _rfqDocLib.refresh === 'function') _rfqDocLib.refresh();
+          if (savedToRfq && typeof _rfqRefreshAttachList === 'function') _rfqRefreshAttachList();
         } catch(e) { console.warn('[contract] document library upload failed:', e); }
       }
 
-      if (typeof showToast === 'function') showToast('Contract PDF saved — also added to unit documents');
+      if (typeof showToast === 'function') {
+        showToast(savedToRfq
+          ? 'Contract PDF saved — added to RFQ and unit documents'
+          : 'Contract PDF saved — also added to unit documents');
+      }
   } catch(e) {
     console.error('[contract] generation failed:', e);
     if (typeof showToast === 'function') showToast('Contract PDF failed: ' + e.message);
