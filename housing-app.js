@@ -282,6 +282,29 @@ function _isHmOrEdRole(){
 function _goAfterPets(){ goTo(_isHmOrEdRole() ? 9 : 6); }
 function _goBeforeDocuments(){ goTo(_isHmOrEdRole() ? 10 : 5); }
 
+// ── Conditional wizard flow ──────────────────────────────────────────────
+// File updates (existing_tenant) and transfer requests already have a full
+// tenant file on record, so the applicant wizard skips Income (1),
+// References/Emergency Contacts (4) and Pets (5) for them. goTo() jumps over
+// these steps; the progress pills and the two forward-button labels that would
+// otherwise point at a skipped step are kept in sync by _syncWizardNavFlow().
+function _appSkippedSteps(){
+  var at = (typeof getAppType === 'function') ? getAppType() : 'new_housing';
+  return (at === 'existing_tenant' || at === 'transfer_request') ? {1:true, 4:true, 5:true} : {};
+}
+function _syncWizardNavFlow(){
+  var skip = _appSkippedSteps();
+  [1,4,5].forEach(function(i){
+    var b = document.getElementById('spb_'+i);
+    if(b) b.style.display = skip[i] ? 'none' : '';
+  });
+  var n0 = document.getElementById('nav_next_0');
+  if(n0) n0.innerHTML = skip[1] ? 'Next: Co-Applicant &rarr;' : 'Next: Employment &amp; Income &rarr;';
+  var n3 = document.getElementById('nav_next_3');
+  if(n3) n3.innerHTML = skip[4] ? 'Next: Documents &rarr;' : 'Next: Emergency Contacts &rarr;';
+}
+window._syncWizardNavFlow = _syncWizardNavFlow;
+
 // Internal-notes step is a side panel, not part of the wizard flow. We skip
 // the validation/auto-save/progress-bar machinery for it.
 function _isStaffSession(){
@@ -298,6 +321,20 @@ function goTo(s){
   // (saved-state restore, deep link, programmatic), forward them to the next
   // visible step in the flow.
   if((s === 9 || s === 10) && !_isHmOrEdRole()) { return goTo(6); }
+
+  // Keep the progress pills + forward-button labels in sync with the current
+  // application type, then skip any step that doesn't apply (file update /
+  // transfer). Never land on a skipped step — jump in the direction of travel.
+  _syncWizardNavFlow();
+  var _skip = _appSkippedSteps();
+  if(_skip[s] && s !== cur){
+    var _dir = (s >= cur) ? 1 : -1;
+    var _t = s + _dir;
+    while(_t > 0 && _t < 8 && _skip[_t]) _t += _dir;
+    if(_t < 0) _t = 0;
+    if(_t > 8) _t = 8;
+    return goTo(_t);
+  }
 
   // ── Run validation BEFORE any DOM changes ──
   if(cur===0 && s>0){

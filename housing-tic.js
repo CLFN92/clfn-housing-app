@@ -2569,10 +2569,22 @@
       if (pop) pop.remove();
     }
   }
+  // Capture the inline initials pads (ls_init_<i>) into _leaseInitials, keyed
+  // by clause id so the PDF generators (which read _leaseInitials[clause.id])
+  // and the draft snapshot stay unchanged. Called before any read of initials.
+  function _ticCaptureInlineInitials() {
+    var clauses = _getEffectiveLeaseClauses();
+    clauses.forEach(function(c, i){
+      var v = (typeof getSigDataURL === 'function') ? getSigDataURL('ls_init_' + i) : '';
+      if (v) _leaseInitials[c.id] = v;
+    });
+  }
+
   // ── Readiness gate ─────────────────────────────────────────────────────
   // Returns a list of everything still required before the agreement can be
   // generated (initials, signatures, and — for fixed-term docs — an end date).
   function _ticLeaseMissing() {
+    _ticCaptureInlineInitials();
     var missing = [];
     var fv  = function(id){ var e=document.getElementById(id); return e ? (e.value||'').trim() : ''; };
     var sig = function(id){ return (typeof getSigDataURL==='function') ? getSigDataURL(id) : ''; };
@@ -2623,6 +2635,7 @@
   }
   function _ticSnapshotLeaseDraft() {
     if (!document.getElementById('tic_lease_modal')) return;
+    _ticCaptureInlineInitials();
     var sigs = {};
     ['ls_sig_tenant','ls_sig_cotenant','ls_sig_staff'].forEach(function(id){
       if (!document.getElementById(id) && !document.getElementById(id+'_typed')) return;
@@ -2676,8 +2689,6 @@
     // agreement (keyed by docKey|unitId) so closing to check a detail is safe.
     var _draft = _leaseDraft[_ticLeaseDraftKey()];
     _leaseInitials = (_draft && _draft.initials) ? _draft.initials : {};
-    var _initDone  = _clauseList.filter(function(c){ return _leaseInitials[c.id]; }).length;
-    var _clauseNames = _clauseList.map(function(c){ return (c.label || c.id || '').replace(/^Section\s+[0-9.]+\s+[—-]\s+/, ''); }).join(', ');
     var t   = _ticState.tenant      || {};
     var u   = _ticState.unit        || {};
     var app = _ticState.application || {};
@@ -2808,12 +2819,15 @@
       + '</div>'
 
       + secH('Required Initials')
-      + '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;">The tenant must initial each required clause before the agreement can be generated. A step-by-step pop-out walks through each clause.</div>'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">'
-      +   '<div><div id="ls_initials_status" style="font-size:13px;font-weight:600;color:var(--text);">' + _initDone + ' of ' + _clauseN + ' initials captured</div>'
-      +   '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + _ticEsc(_clauseNames) + '</div></div>'
-      +   '<button type="button" id="ls_initials_btn" onclick="window._ticOpenInitialsPopout && window._ticOpenInitialsPopout(0)" class="btn btn-primary"' + (_clauseN && _initDone === _clauseN ? ' style="background:var(--success,#15803d);"' : '') + '>' + (_clauseN && _initDone === _clauseN ? '&#10003; All Initials Complete' : 'Review &amp; Initial &#8594;') + '</button>'
-      + '</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;">The tenant initials each required clause below. Every clause must be initialed before the agreement can be generated.</div>'
+      + (_clauseN
+          ? _clauseList.map(function(c, i){
+              return '<div style="margin-bottom:16px;">'
+                + '<div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px;">' + (i+1) + '. ' + _ticEsc(c.label || c.id || ('Clause ' + (i+1))) + '</div>'
+                + initPad('ls_init_' + i, c.text || '')
+                + '</div>';
+            }).join('')
+          : '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;">No required initials for this agreement.</div>')
 
       + secH('Signatures')
       + sigPad('ls_sig_tenant', 'Primary Tenant Signature')
@@ -2830,11 +2844,19 @@
     document.body.appendChild(modal);
     var toInit = ['ls_sig_tenant','ls_sig_staff'];
     if (coName) toInit.push('ls_sig_cotenant');
+    _clauseList.forEach(function(c, i){ toInit.push('ls_init_' + i); });
     setTimeout(function() {
       if (typeof _initSigPad === 'function') toInit.forEach(function(id){ _initSigPad(id); });
-      // Re-apply signatures captured before a close/reopen of this agreement.
+      // Re-apply signatures + initials captured before a close/reopen of this
+      // agreement. Signatures are keyed by pad id; initials are stored by
+      // clause id, so map each clause back to its inline pad (ls_init_<i>).
       if (_draft && _draft.sigs) {
         Object.keys(_draft.sigs).forEach(function(id){ _ticRestoreSig(id, _draft.sigs[id]); });
+      }
+      if (_draft && _draft.initials) {
+        _clauseList.forEach(function(c, i){
+          if (_draft.initials[c.id]) _ticRestoreSig('ls_init_' + i, _draft.initials[c.id]);
+        });
       }
     }, 80);
   }

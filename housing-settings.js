@@ -426,6 +426,10 @@ function onAppTypeChange() {
     var note = document.getElementById('apptype_score_note');
     if(note) note.style.display = 'block';
   }
+
+  // File updates + transfers skip Income/References/Pets — sync the wizard
+  // progress pills and forward-button labels to the chosen type.
+  if(typeof _syncWizardNavFlow === 'function') _syncWizardNavFlow();
 }
 
 // ── Transfer request: search and pre-populate from existing tenant record ──
