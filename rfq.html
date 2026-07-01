@@ -224,7 +224,7 @@
             <div class="f"><label>Contractor Quote #</label><input type="text" id="rfq_ct_quote_number" class="stg-lookup-input" placeholder="Contractor's quote reference #"/></div>
             <div class="f"><label>Contract Date</label><input type="date" id="rfq_contract_date" class="stg-lookup-input"/></div>
             <div class="f"><label>Start Date</label><input type="date" id="rfq_contract_start" class="stg-lookup-input"/></div>
-            <div class="f"><label>Substantial Completion Date</label><input type="date" id="rfq_substantial_completion" class="stg-lookup-input"/></div>
+            <div class="f"><label>Substantial Completion Date</label><input type="date" id="rfq_substantial_completion" class="stg-lookup-input" oninput="_rfqUpdateHoldbackReleaseDate()"/></div>
             <div class="f"><label>Total Completion Date</label><input type="date" id="rfq_total_completion" class="stg-lookup-input"/></div>
             <div class="f"><label>AP / Invoices Email</label><input type="email" id="rfq_ap_email" class="stg-lookup-input" placeholder="ap@nation.ca"/></div>
             <div class="f"><label>Contractor Site Lead</label><input type="text" id="rfq_site_lead_name" class="stg-lookup-input" placeholder="On-site supervisor name"/></div>
@@ -291,9 +291,16 @@
           <div id="rfq_milestone_rows"></div>
           <button type="button" class="btn btn-ghost" style="margin-top:8px;font-size:12px;" onclick="addMilestoneRow()">+ Add Milestone</button>
           <div id="rfq_milestone_summary" style="margin-top:10px;font-size:12px;color:var(--muted);"></div>
-          <div class="f" style="margin-top:14px;max-width:280px;">
-            <label>Holdback Release Amount ($) <span style="font-size:10px;color:var(--muted);">10% of contract price</span></label>
-            <input type="text" id="rfq_holdback_release" class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/>
+          <div class="tic-grid-2" style="margin-top:14px;max-width:560px;">
+            <div class="f">
+              <label>Holdback Release Amount ($) <span style="font-size:10px;color:var(--muted);">10% of contract price</span></label>
+              <input type="text" id="rfq_holdback_release" class="stg-lookup-input" readonly style="background:var(--bg);color:var(--muted);"/>
+            </div>
+            <div class="f">
+              <label>Holdback Released (days after Substantial Completion)</label>
+              <input type="number" id="rfq_holdback_days" class="stg-lookup-input" placeholder="60" min="0" step="1" oninput="_rfqUpdateHoldbackReleaseDate()"/>
+              <div id="rfq_holdback_release_date" style="font-size:10px;color:var(--muted);margin-top:3px;"></div>
+            </div>
           </div>
         </div>
       </div>

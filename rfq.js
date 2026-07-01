@@ -463,6 +463,7 @@ function _populateFormFields(rfq) {
   _rfqClfnSuppliedRows = d.clfn_supplied_rows  || [];
   _rfqMilestoneRows    = (d.milestones || []).filter(function(m){ return m && (m.name || m.gross); });
   setMoney('rfq_holdback_release', d.holdback_release);  // recomputed by _rfqRecalcPrices on tab open
+  set('rfq_holdback_days', (d.holdback_days != null && d.holdback_days !== '') ? d.holdback_days : '60');  // default 60-day lien period
 
   // Signatures
   set('rfq_sig_name',  d.sig_name  || '');
@@ -579,6 +580,7 @@ function switchRfqTab(tab) {
     renderMilestoneRows();
     _rfqRecalcPrices();   // compute subtotal/total/holdback + refresh milestones from the loaded prices
     _rfqRenderAwardedContractorInfo();   // show the awarded contractor's on-file details
+    _rfqUpdateHoldbackReleaseDate();     // compute the holdback release date from substantial completion
     // Sig pads were hidden at form-open time — init them on first visit
     if (!_rfqContractingTabInited) {
       _rfqContractingTabInited = true;
@@ -894,8 +896,9 @@ function _buildRfqPayload() {
       price_tax:       fv('rfq_price_tax'),
       labour_hours:    fv('rfq_labour_hours'),
       // Milestones
-      milestones:        milestones,
-      holdback_release:  _rfqParseNum(fv('rfq_holdback_release')),
+      milestones:          milestones,
+      holdback_release:    _rfqParseNum(fv('rfq_holdback_release')),
+      holdback_days:       fv('rfq_holdback_days'),
       // Contractor signature
       ct_sig_data:    (typeof getSigDataURL === 'function') ? getSigDataURL('rfq_ct_sig')      : '',
       ct_sig_date:    fv('rfq_ct_sig_date'),
@@ -1510,6 +1513,29 @@ function _rfqSeedPriceFromAward() {
   }
 }
 
+// Holdback release timing: N days after Substantial Completion -> a date.
+function _rfqAddDays(dateStr, days) {
+  if (!dateStr) return '';
+  var d = new Date(dateStr + 'T12:00:00');
+  if (isNaN(d.getTime())) return '';
+  d.setDate(d.getDate() + (parseInt(days, 10) || 0));
+  return d.toISOString().slice(0, 10);
+}
+function _rfqUpdateHoldbackReleaseDate() {
+  var out = document.getElementById('rfq_holdback_release_date');
+  if (!out) return;
+  var sc   = (document.getElementById('rfq_substantial_completion') || {}).value || '';
+  var days = (document.getElementById('rfq_holdback_days') || {}).value || '';
+  if (sc && days !== '') {
+    var rd = _rfqAddDays(sc, days);
+    out.textContent = rd ? ('Est. release date: ' + rd) : '';
+  } else if (!sc && days !== '') {
+    out.textContent = 'Set a Substantial Completion Date to compute the release date.';
+  } else {
+    out.textContent = '';
+  }
+}
+
 // Read-only summary of the awarded contractor's on-file details (the ones that
 // print on the contract but have no form field), shown at the top of Contract
 // Details so staff can verify before generating.
@@ -1852,9 +1878,67 @@ async function generateContractorContract() {
         _renderBlocksToPdf(ctx, _parseHtmlToBlocks(substituted));
       }
 
+      // Section heading that matches the body template's <h2> (12pt bold) so the
+      // appended Schedule B / Signatures sections are consistent with the body
+      // rather than the smaller uppercase sectionHeader style.
+      function h2Heading(text) {
+        ctx.needSpace(13); ctx.gap(3);
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(12); pdf.setTextColor(30);
+        var hl = pdf.splitTextToSize(String(text), ctx.contentW);
+        pdf.text(hl, ctx.marginL, ctx.y);
+        ctx.y += hl.length * 6 + 2;
+        pdf.setTextColor(0);
+      }
+
+      // ── Schedule B — Milestone Payment Schedule + holdback release terms ──
+      var _ms = (d.milestones || []).filter(function(m){ return m && (m.name || parseFloat(m.gross)); });
+      h2Heading('Schedule B — Milestone Payment Schedule');
+      if (_ms.length) {
+        var cW = ctx.contentW, mL = ctx.marginL;
+        var cols = [
+          { w:0.34, label:'Milestone',      align:'left'  },
+          { w:0.10, label:'%',              align:'right' },
+          { w:0.19, label:'Gross',          align:'right' },
+          { w:0.19, label:'Holdback (10%)', align:'right' },
+          { w:0.18, label:'Net Payable',    align:'right' }
+        ];
+        var xs = [], xacc = mL; cols.forEach(function(c){ xs.push(xacc); xacc += c.w * cW; });
+        var cellX = function(i){ return cols[i].align === 'right' ? xs[i] + cols[i].w * cW - 1 : xs[i]; };
+        ctx.needSpace(8);
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(90);
+        cols.forEach(function(c, i){ pdf.text(c.label, cellX(i), ctx.y + 3, { align: c.align }); });
+        ctx.y += 5; pdf.setDrawColor(210); pdf.setLineWidth(0.2); pdf.line(mL, ctx.y, mL + cW, ctx.y); ctx.y += 1;
+        var sumG = 0, sumH = 0, sumN = 0;
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(30);
+        _ms.forEach(function(m){
+          ctx.needSpace(6);
+          var g = parseFloat(m.gross) || 0, h = parseFloat(m.holdback) || 0, n = parseFloat(m.net) || 0;
+          sumG += g; sumH += h; sumN += n;
+          var vals = [ m.name || '—', (m.pct ? (Math.round(parseFloat(m.pct) * 10) / 10 + '%') : ''), numFmt(g) || '$0.00', numFmt(h) || '$0.00', numFmt(n) || '$0.00' ];
+          cols.forEach(function(c, i){ pdf.text(pdf.splitTextToSize(String(vals[i]), c.w * cW - 2), cellX(i), ctx.y + 3, { align: c.align }); });
+          ctx.y += 5.5;
+        });
+        ctx.needSpace(7);
+        pdf.setDrawColor(210); pdf.line(mL, ctx.y, mL + cW, ctx.y); ctx.y += 1;
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(20);
+        pdf.text('Total', cellX(0), ctx.y + 3, { align: 'left' });
+        pdf.text(numFmt(sumG) || '$0.00', cellX(2), ctx.y + 3, { align: 'right' });
+        pdf.text(numFmt(sumH) || '$0.00', cellX(3), ctx.y + 3, { align: 'right' });
+        pdf.text(numFmt(sumN) || '$0.00', cellX(4), ctx.y + 3, { align: 'right' });
+        ctx.y += 6; pdf.setTextColor(0);
+      } else {
+        ctx.paragraph('Payment shall be made as a single lump sum upon Substantial Completion, subject to the holdback provisions below.', 9);
+      }
+      var _hbDays = d.holdback_days || '60';
+      var _hbDate = (typeof _rfqAddDays === 'function') ? _rfqAddDays(d.substantial_completion_date || d.total_completion_date || '', _hbDays) : '';
+      ctx.paragraph('Statutory holdback (10% of the value of each progress payment): ' + (numFmt(d.holdback_release) || '$0.00')
+        + '. The holdback shall be released ' + _hbDays + ' days after the date of Substantial Completion'
+        + (_hbDate ? ' (on or about ' + _hbDate + ')' : '')
+        + ', following expiry of the applicable lien period under the Construction Act and provided no liens have been preserved.', 9);
+
       // Signatures section
       ctx.needSpace(50); ctx.gap(8);
-      ctx.sectionHeader('Signatures');
+      h2Heading('Signatures');
 
       function _addSigBlock(label, sigId, nameVal) {
         ctx.needSpace(24);
