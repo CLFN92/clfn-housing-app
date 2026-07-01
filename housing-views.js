@@ -184,9 +184,7 @@ function renderInventoryView(){
   var showRenoCol = (ROLE.isManagement(window.currentRole));
   var th = document.getElementById('inv_reno_score_th');
   if(th) th.style.display = showRenoCol ? '' : 'none';
-  var units = [];
-  units = housingUnits.slice();
-  if(!units.length) units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var units = getAllUnits().slice();
   var search = (document.getElementById('inv_search')||{}).value||'';
   var _searchLc = (search || '').toLowerCase().trim();
   // Pre-filter (search bar only — every other filter is now in the column-
@@ -346,7 +344,7 @@ function renderInventoryView(){
 
 function renderMatchView(){
   var allApps = (typeof applications !== 'undefined' ? applications : []);
-  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var allUnits = getAllUnits();
   var vacantUnits = allUnits.filter(function(u){ return u.status==='vacant' && !u.archived; });
 
   // Tenancy is authoritative on the UNIT (housing_units.assigned_name) and is
@@ -628,8 +626,7 @@ function renderTenantsView(){
     allUnits = _stored ? JSON.parse(_stored) : [];
   } catch(e) {}
   if (!allUnits.length) {
-    allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length)
-      ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+    allUnits = getAllUnits();
   }
   var units = allUnits.filter(function(u){return (u.status==='occupied'||u.status==='reserved') && !u.archived;});
   var search = ((document.getElementById('tenant_search')||{}).value||'').toLowerCase().trim();
@@ -847,8 +844,7 @@ function tenantSearchFilter(q) {
     allUnits = stored ? JSON.parse(stored) : [];
   } catch(e) {}
   if (!allUnits.length) {
-    allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length)
-      ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+    allUnits = getAllUnits();
   }
 
   var allApps = (typeof applications !== 'undefined') ? applications : [];
@@ -930,7 +926,7 @@ function closeUnitSearch() {
 }
 
 function unitSearchFilter(q) {
-  var allUnits = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var allUnits = getAllUnits();
   var filtered = q.trim().length > 0
     ? allUnits.filter(function(u){ return (u.num+' '+u.street).toLowerCase().includes(q.toLowerCase()); })
     : allUnits.slice(0,20);
@@ -1483,7 +1479,7 @@ function showEmployeeHome(){
     // Reno approval workflow stats
     var sowPendingHM=0, sowPendingED=0, sowApproved=0, sowNoSow=0, sowInProgress=0;
     try {
-      var allU=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+      var allU=getAllUnits();
       var renoUnits=allU.filter(function(u){return (u.under_renovation||u.status==='condemned')&&!u.archived;});
       var hmLimit2=parseFloat(((window._appSettings||{}).hmBudgetLimit)||25000);
       renoUnits.forEach(function(u){

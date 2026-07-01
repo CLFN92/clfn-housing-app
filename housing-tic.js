@@ -237,8 +237,7 @@
   }
   function _ticFindUnitById(id){
     try {
-      var src = (typeof housingUnits !== 'undefined' && housingUnits.length)
-        ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+      var src = getAllUnits();
       for(var i=0;i<src.length;i++){ if(String(src[i].id) === String(id)) return src[i]; }
     } catch(e){}
     return null;

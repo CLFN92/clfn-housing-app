@@ -1981,7 +1981,7 @@ window.writeTenancyToApplication = writeTenancyToApplication;
 function _getPoolSpent(pid) {
   // Sum all previously approved reno budgets for this pool
   var total = 0;
-  var allUnits = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var allUnits = getAllUnits();
   allUnits.forEach(function(u){
     try{
       var approval = (window._renoBudget && window._renoBudget[u.id]) || null;
@@ -2614,7 +2614,7 @@ function exportContractors(format) {
   _doExport(format,headers,data,_ns1+'_Contractors_'+new Date().toISOString().slice(0,10),[28,18,14,24,24,14,14,14,20,14,24],true);
 }
 function exportInventory(format) {
-  var units = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var units = getAllUnits();
   var search=(document.getElementById('inv_search')||{}).value||'';
   var fStatus=(document.getElementById('inv_filter_status')||{}).value||'';
   var fType=(document.getElementById('inv_filter_type')||{}).value||'';
@@ -2652,6 +2652,16 @@ function exportMatch(format) {
 
 
 function g(id)  { const e=document.getElementById(id); return e?e.value:''; }
+// Single source for "the units array on this page". Replaces a defensive idiom
+// that was copy-pasted ~25x. Returns the live `housingUnits` reference when it
+// has entries, else the legacy fallback (empty on pages without unit data).
+// Callers that MUTATE the result must use getAllUnits().slice() to keep a copy.
+function getAllUnits(){
+  return (typeof housingUnits !== 'undefined' && housingUnits && housingUnits.length)
+    ? housingUnits
+    : (window.HOUSING_UNITS_DATA || []);
+}
+window.getAllUnits = getAllUnits;
 function getDefaultBudget(){
   var obj={fiscalYear:'2025-2026', fncfsDependantAge:17, pools:{}};
   BUDGET_POOLS.forEach(function(p){ obj.pools[p.id]={allocated:0,notes:''}; });
@@ -3863,7 +3873,7 @@ function renderRenoScoreTable() {
 function renderRenosView(){
   /* getSowData defined globally below */
   function getRenoProgress(uid){ return window._renoProgress && window._renoProgress[uid] ? window._renoProgress[uid] : {}; }
-  var units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var units=getAllUnits();
 
   var allReno = units.filter(function(u){
     return (u.under_renovation || u.status==='condemned') && !u.archived;
@@ -5735,7 +5745,7 @@ function calcRenoScore(unitId) {
   var score = 0;
   var breakdown = [];
 
-  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
+  var allUnits = getAllUnits();
   var u = allUnits.find(function(x){ return x.id === unitId; });
   if(!u) return {score:0, breakdown:[]};
 
@@ -5880,7 +5890,7 @@ function ctRemovePerson(idx) {
 
 
 function exportRenos(format) {
-  var units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var units=getAllUnits();
   var rows=units.filter(function(u){return u.under_renovation||u.status==='condemned';});
   var headers=['Address','Beds','Type','Foundation','Status','Priority Score','Contractor','SOW Filed','Progress %'];
   var data=rows.map(function(u){
@@ -6280,9 +6290,7 @@ function showRenos(){
 }
 
 function _getAllRenoUnits() {
-  var units = [];
-  units = housingUnits.slice();
-  if(!units.length) units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var units = getAllUnits().slice();
   return units.filter(function(u) {
     if(u.archived) return false;
     var hasSow = !!getSowData(u.id);
@@ -6374,7 +6382,7 @@ function showScorecard(app){
 
 function openTenantFilesPanel(unitId){
   _tenantFilesUnitId = unitId;
-  var allUnits = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var allUnits = getAllUnits();
   var u = allUnits.find(function(x){ return x.id===unitId; });
   var title = document.getElementById('tfp_title');
   if(title) title.textContent = u ? u.num+' '+u.street+(u.assignedName?' — '+u.assignedName:'') : unitId;

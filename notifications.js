@@ -3000,8 +3000,7 @@ async function backfillTenantMovementLog(btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
   if (out) out.innerHTML = '<span style="color:var(--muted);">Scanning units…</span>';
 
-  var units = (typeof housingUnits !== 'undefined' && housingUnits.length)
-    ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var units = getAllUnits();
   var occupied = units.filter(function(u){ return u.assignedName && u.assignedName.trim(); });
 
   if (!occupied.length) {

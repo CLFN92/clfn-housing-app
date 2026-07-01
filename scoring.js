@@ -1602,7 +1602,7 @@ function archiveApplication(appId) {
 
 // Archive a UNIT (demolition) — bundles all docs, marks archived, auto-archives linked apps
 function archiveUnit(unitId) {
-  var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var units = getAllUnits();
   var u = units.find(function(x){ return x.id === unitId; });
   if(!u) { showToast('Unit not found'); return; }
   var role = window.currentRole || 'staff';
@@ -1662,7 +1662,7 @@ function archiveUnit(unitId) {
 
 // Restore a UNIT from archive
 function unarchiveUnit(unitId) {
-  var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var units = getAllUnits();
   var u = units.find(function(x){ return x.id === unitId; });
   if(!u) { showToast('Unit not found'); return; }
   var role = window.currentRole || 'staff';

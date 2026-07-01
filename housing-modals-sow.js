@@ -590,8 +590,7 @@ function _sowPopulateFundSourceDropdown(unitId, savedFundSource) {
   var sel = document.getElementById('sow_fund_source');
   if (!sel) return;
 
-  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length)
-    ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var allUnits = getAllUnits();
   var u      = unitId ? allUnits.find(function(x){ return x && x.id === unitId; }) : null;
   var funder = u ? (u.funder || '') : '';
 
@@ -648,7 +647,7 @@ function _openSowPicker(unitId, activeList) {
   var existing = document.getElementById(_PICK_ID);
   if (existing) existing.parentNode.removeChild(existing);
 
-  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var allUnits = getAllUnits();
   var u = allUnits.find(function(x){ return x.id === unitId; });
   var unitLabel = u ? u.num + ' ' + u.street : unitId;
 
@@ -776,7 +775,7 @@ function openSowModal(unitId, projectNumber) {
   window._sowWasPreviouslySaved = isEdit && !!saved;
   var label = '';
   if(unitId) {
-    var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
+    var allUnits = getAllUnits();
     var u = allUnits.find(function(x){ return x.id===unitId; });
     if(u) label = u.num+' '+u.street+' · '+_roomBedLabel(u);
   }
@@ -801,7 +800,7 @@ function openSowModal(unitId, projectNumber) {
   if(unitId) {
     var tnEl = document.getElementById('sow_tenant_name');
     if(tnEl && !tnEl.value) {
-      var allUnits2 = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
+      var allUnits2 = getAllUnits();
       var u2 = allUnits2.find(function(x){ return x.id===unitId; });
       if(u2 && u2.assignedName) tnEl.value = u2.assignedName;
     }
@@ -1501,7 +1500,7 @@ async function sowSaveClicked() {
   if (mode !== 'submit') { saveSOW(); return; }
 
   var unitId = _sowUnitId;
-  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var allUnits = getAllUnits();
   var unit = unitId ? allUnits.find(function(x){ return x.id === unitId; }) : null;
 
   // Tenant email lookup is best-effort. If the helper is missing (older
@@ -1671,7 +1670,7 @@ function saveSOW(opts){
   // fire-and-forget pattern as notifyApplicationConfirmation in
   // housing-app.js finalSubmit.
   if (sendTenantCopy && typeof notifySowTenantCopy === 'function') {
-    var _allUnitsT = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+    var _allUnitsT = getAllUnits();
     var _unitT = _sowUnitId ? _allUnitsT.find(function(x){ return x.id === _sowUnitId; }) : null;
     notifySowTenantCopy(data, _unitT);
   }
@@ -1690,7 +1689,7 @@ function saveSOW(opts){
   if (_nowApproved && !_prevApproved && data.contractorId
       && typeof notifyWorkOrderToContractor === 'function'
       && typeof _resolveContractorForEmail === 'function') {
-    var _allUnitsW = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+    var _allUnitsW = getAllUnits();
     var _unitW = _sowUnitId ? _allUnitsW.find(function(x){ return x.id === _sowUnitId; }) : null;
     var _sowSnapshot = data;
     (async function(){
@@ -1728,7 +1727,7 @@ function saveSOW(opts){
     var _prevSubmitted = existingForStatus && existingForStatus.approval_status && existingForStatus.approval_status !== 'draft';
     var _alreadyNotified = _prevSubmitted && _prevAssignee === (data.assignedTo || '').toLowerCase();
     if (!_alreadyNotified) {
-      var _allUnitsFE = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+      var _allUnitsFE = getAllUnits();
       var _unitFE = _sowUnitId ? _allUnitsFE.find(function(x){ return x.id === _sowUnitId; }) : null;
       notifyWorkOrderToFieldEmployee(data, _unitFE);
     }

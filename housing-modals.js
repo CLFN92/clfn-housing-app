@@ -84,7 +84,7 @@ function openUnitEditModal(unitId){
     if(typeof showToast === 'function') showToast('Read-only — Field Employees cannot edit unit records.');
     return;
   }
-  var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var units = getAllUnits();
   var u = units.find(function(x){ return x.id === unitId; });
   if(!u){ showToast('Unit not found: ' + unitId); return; }
   window._editingUnitId = unitId;
@@ -370,7 +370,7 @@ function saveUnitEdit(){
     return;
   }
   var unitId=window._editingUnitId;
-  var units=(typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var units=getAllUnits();
   var idx=units.findIndex(function(x){ return x.id===unitId; });
   if(idx===-1){ showToast('Unit not found'); return; }
   var get=function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
@@ -714,7 +714,7 @@ function _ueRemoveTenantFields() {
 }
 
 async function ueRemoveTenant() {
-  var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var units = getAllUnits();
   var unitId = window._editingUnitId || window._ueCurrentUnitId;
   var u = unitId ? units.find(function(x){ return String(x.id) === String(unitId); }) : null;
 
@@ -1348,7 +1348,7 @@ function previewFromDash(app){
 
 function openMatchScorecard(appId, unitId) {
   var app  = (typeof applications !== 'undefined' ? applications : []).find(function(a){ return a.id===appId; });
-  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
+  var allUnits = getAllUnits();
   var unit = allUnits.find(function(u){ return u.id===unitId; });
   if(!app || !unit) return;
 
@@ -1521,7 +1521,7 @@ var _UDPLOC_CLFN_LNG = -84.1434;
 
 function udpOpenLocationPicker(unitId) {
   if (!unitId) return;
-  var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var units = getAllUnits();
   var u = units.find(function(x){ return String(x.id) === String(unitId); });
   if (!u) return;
   _udpLocUnitId = unitId;
@@ -1709,7 +1709,7 @@ async function _udpLocSave() {
     if (!res.ok) { var t = await res.text(); throw new Error(t); }
 
     // Update in-memory unit
-    var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+    var units = getAllUnits();
     for (var i = 0; i < units.length; i++) {
       if (String(units[i].id) === String(_udpLocUnitId)) {
         Object.assign(units[i], updates);
@@ -1736,7 +1736,7 @@ async function _udpLocSave() {
 }
 
 function openUnitDetail(unitId) {
-  var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var units = getAllUnits();
   var u = units.find(function(x){ return x.id === unitId; });
   if(!u) return;
   _currentDetailUnitId = unitId;
@@ -2056,7 +2056,7 @@ function openRenoNewRequest() {
 }
 
 function renoSearchFilter(q) {
-  var allUnits = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var allUnits = getAllUnits();
   var renoUnits = allUnits.filter(function(u){ return u.under_renovation||u.status==='condemned'; });
 
   var filtered = q.trim().length > 0
@@ -2164,7 +2164,7 @@ function openUnitEditFromDetail() {
 }
 
 function openRenoProgress(unitId) {
-  var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
+  var allUnits = getAllUnits();
   var u = allUnits.find(function(x){ return x.id === unitId; });
   if(!u) return;
   var _rpUnitId = unitId;
@@ -2262,7 +2262,7 @@ function openRenoProgress(unitId) {
 }
 
 function openAddTenantModal(){
-  var units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var units=getAllUnits();
   var sel=document.getElementById('at_unit');
   if(!sel) return;
   // Only vacant/reserved units available for assignment
@@ -2385,7 +2385,7 @@ function saveAddTenant(){
   var linkedApp=apps.find(function(a){ return a.id===appId; });
   var tenantName=linkedApp?(((linkedApp.fn||'')+' '+(linkedApp.ln||'')).trim()||'Unknown'):'Unknown';
 
-  var units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var units=getAllUnits();
   var idx=units.findIndex(function(u){return u.id===unitId;});
   if(idx===-1){ showErr('Unit not found.'); return; }
 

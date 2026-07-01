@@ -37,7 +37,7 @@ function _caIsMgmt(){
 
 // Vacant commercial/admin/band buildings, for the "preferred building" picker.
 function _caCommercialUnits(){
-  var src = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var src = getAllUnits();
   var sec = (window._SECONDARY_TYPES) || ['commercial_building','admin_building','band_building'];
   return src.filter(function(u){ return u && !u.archived && sec.indexOf(u.type) !== -1; });
 }
@@ -288,7 +288,7 @@ function confirmAssignCommercial(){
   var unitId = (document.getElementById('ca_assign_unit') || {}).value || '';
   var date   = (document.getElementById('ca_assign_date') || {}).value || new Date().toISOString().slice(0,10);
   if (!unitId) { if (typeof showToast==='function') showToast('Select a building.', { type:'error' }); return; }
-  var src  = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+  var src  = getAllUnits();
   var unit = src.find(function(u){ return u.id === unitId; });
   if (!unit) { if (typeof showToast==='function') showToast('Building not found.', { type:'error' }); return; }
   var addr = ((unit.num||'') + ' ' + (unit.street||'')).trim();

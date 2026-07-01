@@ -106,7 +106,7 @@ function searchCurrentUnit(q){
     var _s = JSON.stringify(housingUnits);
     allUnits = _s ? JSON.parse(_s) : [];
   } catch(e) {}
-  if(!allUnits.length) allUnits = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  if(!allUnits.length) allUnits = getAllUnits();
   // For "current house on reserve" search: show occupied, under_repair, condemned — the unit the person lives in
   var matches = allUnits.filter(function(u){
     return (u.num+' '+u.street).toLowerCase().includes(q.toLowerCase());
@@ -140,7 +140,7 @@ function selectCurrentUnit(el){
   var det   = document.getElementById('currentUnitSelectedDetail');
   if(nm)  nm.textContent  = label;
   // Find unit detail
-  var allUnits = (typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var allUnits = getAllUnits();
   var u = allUnits.find(function(x){ return x.id===id; });
   if(det) det.textContent = u ? u.bedrooms+'-bedroom · '+u.type : '';
   if(sel) sel.style.display='block';
@@ -484,7 +484,7 @@ function renderScorecardActions(app) {
     var secIds = app.secondaryUnits || [];
     var secAddrs = app.secondaryAddresses || [];
     if (secIds.length) {
-      var allUnits2 = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA || []);
+      var allUnits2 = getAllUnits();
       var secCards = secIds.map(function(uid, i) {
         var su = allUnits2.find(function(x){ return x.id === uid; });
         var addr2 = su ? su.num+' '+su.street : (secAddrs[i] || uid);
@@ -697,9 +697,7 @@ function openAssignModal(appId, suggestedUnitId) {
   _ensureAssignModal();
   _amAppId = appId; _amBestUnitId = suggestedUnitId || ''; _amSelectedUnitId = null;
   var allApps  = (typeof applications !== 'undefined' ? applications : []);
-  var allUnits = [];
-  allUnits = housingUnits.slice();
-  if(!allUnits.length) allUnits=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var allUnits = getAllUnits().slice();
   var app = allApps.find(function(a){ return a.id===appId; });
   if(!app){ showToast('Application not found'); return; }
   var role = window.currentRole || 'housing_employee_l1';
@@ -923,9 +921,7 @@ function amSelectUnit(unitId) {
   var app=allApps.find(function(a){return a.id===_amAppId;});
   var needsAccess = app&&app.accessibility&&app.accessibility!=='None'&&app.accessibility!=='0'&&app.accessibility!==0;
 
-  var allUnits=[];
-  allUnits = housingUnits.slice();
-  if(!allUnits.length)allUnits=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var allUnits = getAllUnits().slice();
   var u=allUnits.find(function(x){return x.id===unitId;});
 
   // Notes field:
@@ -1042,9 +1038,7 @@ function confirmAssignment() {
   }
 
   var allApps=(typeof applications!=='undefined'?applications:[]);
-  var allUnits=[];
-  allUnits = housingUnits.slice();
-  if(!allUnits.length)allUnits=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var allUnits = getAllUnits().slice();
 
   var appIdx=allApps.findIndex(function(a){return a.id===_amAppId;});
   var unitIdx=allUnits.findIndex(function(u){return u.id===unitId;});
@@ -1341,9 +1335,7 @@ function raQuickApprove(unitId, approver) {
     showToast('You do not have authority to approve this request.');
     return;
   }
-  var units=[];
-  units = housingUnits.slice();
-  if(!units.length)units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
+  var units = getAllUnits().slice();
   var idx=units.findIndex(function(u){return u.id===unitId;});
   if(idx<0){showToast('Unit not found');return;}
   var u=units[idx]; var role=window.currentRole||'staff'; var today=new Date().toISOString().split('T')[0];
