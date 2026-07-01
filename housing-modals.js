@@ -1884,10 +1884,6 @@ function udpRenderTenantHistory(unitId) {
 // direction.
 var _udpFilesLib = null;
 
-function udpOpenFilesModal() {
-  if (!_currentDetailUnitId) return;
-  if (typeof openTenantFilesPanel === 'function') openTenantFilesPanel(_currentDetailUnitId);
-}
 
 
 function saveNewUnit(){

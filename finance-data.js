@@ -118,10 +118,6 @@ function _emptyStore(){
 }
 
 // ── Toasts ─────────────────────────────────────────────────────────────────
-function _toastSuccess(msg){
-  if (typeof showToast === 'function') { showToast(msg); return; }
-  console.log('[finance] ' + msg);
-}
 function _toastError(msg){
   if (typeof showToast === 'function') { showToast('⚠ ' + msg, {type: 'error', duration: 8000}); return; }
   console.error('[finance] ' + msg);

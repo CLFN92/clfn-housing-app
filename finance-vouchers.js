@@ -217,16 +217,6 @@ function clearVoucherSig(k) {
 // clearSig(k) for canvas pads is in shared-data.js; finance pair-widget clears via clearVoucherSig(k)
 
 // Returns a PNG data URL for pad 'auth' or 'verif', regardless of method.
-// Draw \u2192 the canvas; Type \u2192 italic-rendered name; Wet \u2192 null.
-// Preserves legacy signature expected by printVoucherWithSigs/emailVoucher.
-function getVoucherSigDataURL(k) {
-  var pair = window._voucherSig;
-  if (!pair) return null;
-  var w = (k === 'auth') ? pair.left : (k === 'verif') ? pair.right : null;
-  if (!w) return null;
-  var url = w.getDataURL();
-  return url || null;
-}
 
 function printVoucherWithSigs(){
   var vHtml=document.getElementById('voucherContent').innerHTML;

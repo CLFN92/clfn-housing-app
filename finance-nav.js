@@ -60,20 +60,9 @@ function showPage(id) {
 // ── HOME — tile grid landing page ────────────────────────────────────────
 // Replaces the old sidebar-nav dashboard as the default view. Users pick a
 // tile to drill into a specific area. Mirrors housing.html's home.
-function showHome(){ showPage('home'); }
 var _prevPage = 'home';
 function finGoBack(){ showPage(_prevPage || 'home'); }
 
-// Utilities tile → Transactions page pre-filtered to utility ledgers
-function openUtilitiesView(){
-  showPage('transactions');
-  // Apply the filter after the page's init runs (showPage kicks off initTxnFilters).
-  setTimeout(function(){
-    var lf = document.getElementById('txn-filter-ledger');
-    if (lf) { lf.value = 'utility'; }
-    if (typeof renderTransactions === 'function') renderTransactions();
-  }, 120);
-}
 
 function renderHome(){
   var dateEl = document.getElementById('home_date');

@@ -764,31 +764,6 @@ async function sbSaveAllUnits(units) {
   return true;
 }
 
-// ── sbLoadTenantMovementLog ───────────────────────────────────────────────────
-async function sbLoadTenantMovementLog(unitId) {
-  try {
-    var r = await fetch(SUPABASE_URL + '/rest/v1/tenant_movement_log?unit_id=eq.' + encodeURIComponent(String(unitId)) + '&order=move_out_date.desc', {
-      headers: HOUSING_HEADERS
-    });
-    if (!r.ok) return [];
-    return await r.json();
-  } catch(e) {
-    console.warn('[SB] tenant_movement_log by unit failed:', e);
-    return [];
-  }
-}
-async function sbLoadTenantMovementLogByName(tenantName) {
-  try {
-    var r = await fetch(SUPABASE_URL + '/rest/v1/tenant_movement_log?tenant_name=eq.' + encodeURIComponent(tenantName) + '&order=move_out_date.desc', {
-      headers: HOUSING_HEADERS
-    });
-    if (!r.ok) return [];
-    return await r.json();
-  } catch(e) {
-    console.warn('[SB] tenant_movement_log by name failed:', e);
-    return [];
-  }
-}
 
 // ── sbLoadAuditLog ────────────────────────────────────────────────────────────
 function _parseAuditRow(row) {
@@ -1043,62 +1018,6 @@ async function sbSaveContractor(ct) {
   }
 }
 
-// ── getWorkQueueForRole ──────────────────────────────────────────────────────
-// Single source of truth for "applications awaiting your action" — used by the
-// landing-page count pill, the Worklist alert chip, and the View-all label.
-//
-// Every role sees their own drafts and returned items so they can finish them.
-// On top of that:
-//   - HM sees: status='submitted' or 'file_update' (waiting for HM review)
-//   - ED sees: status='mgr_approved' (HM recommended, awaits ED) and 'submitted'
-//             (ED can act directly without HM)
-//   - HE-L1 / HE-L2 sees only their own work in flight
-//
-// Returns the filtered array (in the same order as `applications`).
-function getWorkQueueForRole(role, email) {
-  var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
-  return apps.filter(function(a){ return isInWorkQueue(a, role, email); });
-}
-
-// Per-app predicate. Same authority rules as getWorkQueueForRole — extracted
-// so chip filters and one-off checks can share the logic.
-function isInWorkQueue(a, role, email) {
-  if(!a || a.archived) return false;
-  var STATUS = (typeof APP_STATUS !== 'undefined') ? APP_STATUS : {
-    DRAFT:'draft', SUBMITTED:'submitted', FILE_UPDATE:'file_update',
-    MGR_APPROVED:'mgr_approved', ED_APPROVED:'ed_approved'
-  };
-  email = (email || (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.email : '') || '').toLowerCase();
-  role  = role  || (window.currentRole || 'housing_employee_l1');
-  var canReview       = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('reviewApplication', role);
-  var canFinalApprove = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('finalApproveApp',   role);
-  var canAssign       = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('assignUnit',        role);
-  var owner = (a.created_by_email || '').toLowerCase();
-  var isMine = !!email && owner === email;
-  // Anyone always sees their own drafts and returned items.
-  if(isMine && (a.status === STATUS.DRAFT || a.status === 'returned')) return true;
-  // ED queue — apps awaiting final approval, plus submitted (ED can act direct)
-  if(canFinalApprove && (a.status === STATUS.MGR_APPROVED || a.status === STATUS.SUBMITTED)) return true;
-  // HM queue (only when not also ED — the ED branch already covered above)
-  if(canReview && !canFinalApprove && (a.status === STATUS.SUBMITTED || a.status === STATUS.FILE_UPDATE)) return true;
-  // Assignment queue — apps that have cleared approval and are awaiting a
-  // unit. HM/ED with assignUnit authority should see them here so My Queue
-  // shows everything they can act on, not just things needing approval.
-  // The row's action button (shared-data.js:3161) already renders "Assign →"
-  // for these rows; this just brings them into the queue.
-  //
-  // hm_approved (file-update terminal) and 'assigned'-with-null-unit (data
-  // anomaly) are included so file updates filed against a tenant who
-  // actually needs a unit don't disappear from the queue, and so rows
-  // marked assigned but missing their unit_id can be repaired.
-  if(canAssign && !a.assignedUnit && (
-       a.status === STATUS.ED_APPROVED ||
-       a.status === STATUS.MGR_APPROVED ||
-       a.status === 'hm_approved' ||
-       a.status === 'assigned'
-     )) return true;
-  return false;
-}
 
 // ── sbLookup* ─────────────────────────────────────────────────────────────────
 // Synchronous lookups against the in-memory caches. Used by the landing-page
@@ -1498,11 +1417,11 @@ function auditEntry(appId, action, detail, user) {
  * Sections:
  *  A. Field helpers          — g(), fv(), fb(), fmtCurrency()
  *  B. Navigation utilities   — goBack variants, showDash, showWorklist...
- *  C. Worklist rendering     — renderWorklist, wlSection, wlEmpty...
+ *  C. Worklist rendering     — renderWorklist, wlOpenApp...
  *  D. Contractor workflow    — open/close/save/render contractor modals
  *  E. SOW (Scope of Work)    — modal, save, collect, recalc
  *  F. Reno + Budget          — renderRenosView, budget pools, RBA
- *  G. Scoring                — renderScoresTable, unit score model
+ *  G. Scoring                — unit score model, RBA scoring
  *  H. Staff management       — lookupUser, renderHousingUserTable
  *  I. Exports + Print        — exportInventory, exportRenos, triggerPrint
  *  J. Photos + Files         — removeRenoPhoto, scLoadDocs
@@ -4094,71 +4013,6 @@ function renderRenosView(){
   if (typeof tableRefreshSortIndicators === 'function') tableRefreshSortIndicators(_renosThead, 'renos');
 }
 
-function renderScoresTable() {
-  var fTier    = document.getElementById('scFilterTier')    ? document.getElementById('scFilterTier').value    : '';
-  var fReserve = document.getElementById('scFilterReserve') ? document.getElementById('scFilterReserve').value : '';
-  var list = applications.filter(function(a) {
-    return (!fTier||a.tier===fTier) && (!fReserve||a.reserve===fReserve);
-  });
-  var sk=_scoresSortKey, sd=_scoresSortDir;
-  list.sort(function(a,b) {
-    var av = sk==='score' ? (a.score||0) : (a.tier||'');
-    var bv = sk==='score' ? (b.score||0) : (b.tier||'');
-    return av<bv ? sd : av>bv ? -sd : 0;
-  });
-
-  var CATS=['waitlist','reserve','band','income','relation','ages','access','moveIn','homeCond','renos','arrears','payment'];
-
-  
-  function tierBadge(tier) {
-    if(!tier) return '—';
-    var map = {
-      'Critical Priority': {bg:'#f0fdf4',c:'#15803d'},
-      'High Priority':   {bg:'#e8eef5',c:'#1e3a5f'},
-      'Medium Priority': {bg:'#fef9ec',c:'#7a6000'},
-      'Low Priority':    {bg:'#fef2f2',c:'#b91c1c'}
-    };
-    var tc = map[tier] || {bg:'#f0f0ec',c:'var(--gray)'};
-    return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:'+tc.bg+';color:'+tc.c+';">'+tier.replace(' Priority','')+'</span>';
-  }
-  
-
-  var tbody = document.getElementById('scoresTableBody');
-  if(!tbody) return;
-  if(!list.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--muted);">No applications match.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = list.map(function(a) {
-    var bd  = a.scoreBreakdown || {};
-    var barW = Math.min(100, Math.round(((a.score||0)/25)*100));
-    var barC = !a.score ? '#ccc' : a.score<=5 ? '#b91c1c' : a.score<=10 ? '#d97706' : a.score<=15 ? '#3b82f6' : '#15803d';
-    return '<tr class="sc-tr" style="cursor:pointer;" data-sc-id="'+escapeHtml(a.id)+'">'
-      + '<td class="sc-td" style="padding:10px 16px;">'
-      +   '<div style="font-weight:600;font-size:13px;">'+escapeHtml(((a.fn||'')+' '+(a.ln||'')).trim())+'</div>'
-      +   '<div class="js-lbl-sm">'+escapeHtml(a.id)+'</div>'
-      + '</td>'
-      + '<td class="sc-td" style="text-align:center;padding:10px 16px;">'
-      +   '<div style="font-size:20px;font-weight:700;color:var(--text);line-height:1;">'+(a.score!==null&&a.score!==undefined?a.score:'—')+'</div>'
-      +   '<div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px;width:40px;margin-inline:auto;">'
-      +     '<div style="height:100%;width:'+barW+'%;background:'+barC+';border-radius:2px;"></div>'
-      +   '</div>'
-      + '</td>'
-      + '<td class="sc-td" style="padding:10px 16px;">'+tierBadge(a.tier)+'</td>'
-      + CATS.map(function(c){ return '<td class="sc-td" style="text-align:center;padding:10px 12px;">'+pts(bd[c])+'</td>'; }).join('')
-      + '<td class="sc-td" style="padding:10px 16px;">'+statusPill(a.status)+'</td>'
-      + '</tr>';
-  }).join('');
-
-  // Wire row clicks via delegation (avoids stale indexOf references)
-  tbody.querySelectorAll('.sc-tr').forEach(function(tr) {
-    tr.addEventListener('click', function() {
-      var app = (typeof applications!=='undefined'?applications:[]).find(function(a){ return a.id===tr.getAttribute('data-sc-id'); });
-      if(app) showScorecard(app);
-    });
-  });
-}
 function renderSowAuditLog(unitId) {
   var tbody = document.getElementById('sow_audit_tbody');
   if(!tbody) return;
@@ -5820,27 +5674,9 @@ function userLookupDebounce(){
   clearTimeout(window._userLookupTimer);
   window._userLookupTimer = setTimeout(lookupUser, 400);
 }
-function wlEditApp(el) {
-  var id = el.getAttribute('data-wl-edit') || (el.closest('[data-wl-edit]') && el.closest('[data-wl-edit]').getAttribute('data-wl-edit'));
-  if(!id) return;
-  if(typeof window.openEditModal === 'function') window.openEditModal(id);
-}
-// Worklist Print/Preview button — resolves the row's app id, finds the
-// record, and hands off to previewFromDash (the same flow the dashboard
-// table's print icon uses).
-function wlPreviewApp(el) {
-  var id = el.getAttribute('data-wl-preview') || (el.closest('[data-wl-preview]') && el.closest('[data-wl-preview]').getAttribute('data-wl-preview'));
-  if(!id) return;
-  var apps = typeof applications !== 'undefined' ? applications : [];
-  var app = apps.find(function(x){ return x.id === id; });
-  if(!app) { showToast('Application not found'); return; }
-  if(typeof previewFromDash === 'function') previewFromDash(app);
-  else showToast('Print preview not available on this page');
-}
-function wlEmpty(msg, sub) {
-  return '<div class="empty-state-ctr">'+msg
-    +(sub?'<div style="font-size:12px;margin-top:4px;">'+sub+'</div>':'')+'</div>';
-}
+// (removed dead worklist helpers wlEditApp / wlPreviewApp / wlEmpty — the
+//  current renderWorklist builds its own markup and calls none of them. See
+//  DEAD_CODE_AUDIT.md.)
 function wlOpenApp(el) {
   var id = el.getAttribute('data-wl-id') || (el.closest('[data-wl-id]') && el.closest('[data-wl-id]').getAttribute('data-wl-id'));
   if(!id) return;
@@ -5856,47 +5692,9 @@ function wlOpenApp(el) {
     if(true) showScorecard(app);
   }
 }
-// Worklist Assign button — routes the row's app id straight into the
-// unit-assignment modal. Skips wlOpenApp's status-based dispatch, which
-// would have sent approved apps to the scorecard. Suggested-unit is left
-// blank; openAssignModal ranks all vacant units internally.
-function wlAssignApp(el) {
-  var id = el.getAttribute('data-wl-id') || (el.closest('[data-wl-id]') && el.closest('[data-wl-id]').getAttribute('data-wl-id'));
-  if(!id) return;
-  if(typeof openAssignModal === 'function') openAssignModal(id, '');
-  else showToast('Assign modal not available on this page');
-}
-function wlOpenApplicantCell(el) {
-  var host = el.closest('[data-wl-id]');
-  var id = host && host.getAttribute('data-wl-id');
-  if(!id) return;
-  var apps = typeof applications !== 'undefined' ? applications : [];
-  var app = apps.find(function(x){ return x.id === id; });
-  if(!app) return;
-  if(app.assignedUnit && typeof window.openTenantCard === 'function') {
-    window.openTenantCard(app.assignedUnit);
-    return;
-  }
-  if(typeof window.openEditModal === 'function') window.openEditModal(id);
-}
-function wlOpenIdCell(el) {
-  var host = el.closest('[data-wl-id]');
-  var id = host && host.getAttribute('data-wl-id');
-  if(!id) return;
-  var apps = typeof applications !== 'undefined' ? applications : [];
-  var app = apps.find(function(x){ return x.id === id; });
-  if(!app) return;
-  if(typeof showScorecard === 'function') showScorecard(app);
-}
-function wlSection(title, count, content) {
-  var badge = count !== null ? ' <span style="font-size:12px;font-weight:700;background:var(--yellow);color:var(--dark);padding:1px 8px;border-radius:10px;margin-left:6px;">'+(count||0)+'</span>' : '';
-  return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;">'
-    + '<div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;">'
-    + '<span style="font-size:13px;font-weight:700;">'+title+'</span>'+badge
-    + '</div>'
-    + '<div>'+(content||wlEmpty('None', ''))+'</div>'
-    + '</div>';
-}
+// (removed dead worklist helpers wlAssignApp / wlOpenApplicantCell /
+//  wlOpenIdCell / wlSection — superseded when renderWorklist was rewritten.
+//  See DEAD_CODE_AUDIT.md.)
 /* ════════════════════════════════════════════════════════════════════════════
  * SHARED DOMAIN FUNCTIONS — BATCH 2
  * Diverged-but-equivalent (housing.html version used — most complete).
@@ -6080,38 +5878,6 @@ function ctRemovePerson(idx) {
   ctRenderPeople(people);
 }
 
-function deleteContractor(idx){
-  var contractors = (window._contractors || []).slice();
-  // Capture the contractor BEFORE removing it from the array (bug: original code spliced first and then read the wrong index)
-  var delCt = contractors[idx];
-  if(!delCt) { showToast('Contractor not found.'); return; }
-  contractors.splice(idx,1);
-  window._contractors = contractors;
-  renderContractorsView();
-  // Delete from Supabase, surface failures to the user so they know to retry
-  if(delCt.id) {
-    fetch(SUPABASE_URL+'/rest/v1/housing_contractors?id=eq.'+encodeURIComponent(delCt.id), { method:'DELETE', headers:HOUSING_HEADERS })
-      .then(function(r){
-        if(!r.ok) {
-          // Roll back the UI change so the user sees the contractor re-appear and can retry
-          contractors.splice(idx, 0, delCt);
-          window._contractors = contractors;
-          renderContractorsView();
-          showToast('Could not remove contractor — ' + (r.status===401||r.status===403 ? 'permission denied' : 'server error '+r.status));
-          return;
-        }
-        showToast('Contractor removed.');
-      })
-      .catch(function(e){
-        contractors.splice(idx, 0, delCt);
-        window._contractors = contractors;
-        renderContractorsView();
-        showToast('Could not remove contractor — ' + (e.message||'network error'));
-      });
-  } else {
-    showToast('Contractor removed.');
-  }
-}
 
 function exportRenos(format) {
   var units=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);

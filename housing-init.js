@@ -5,7 +5,7 @@
  * Load order: ... housing-app.js → THIS FILE (last before inline)
  *
  * Covers: showDashboard, login/logout, session restore,
- *   loadAppDataFromSupabase, loadHousingData, initHousingPage,
+ *   loadHousingData, initHousingPage,
  *   staff management modal, email notifications, sign-in flow
  * ============================================================ */
 
@@ -1404,7 +1404,6 @@ function exportRenoApprovalsCSV() {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
-function exportRenoApprovalsExcel() { exportRenoApprovalsCSV(); } // alias — CSV opens in Excel
 
 function exportRenoApprovalsPDF() {
   var units = _getAllRenoUnits();
@@ -1500,185 +1499,6 @@ window._renoBudget    = window._renoBudget    || {};  // keyed by unit_id
 window._unitPhotos    = window._unitPhotos    || {};  // keyed by unit_id
 window._appSettings   = window._appSettings   || {};
 
-// ── Load all data from Supabase into in-memory arrays ────────────────────────
-async function loadAppDataFromSupabase() {
-  try {
-    // Applications
-    // Fetch ALL applications using pagination (Supabase defaults to 100 rows per page)
-    var allAppsData = [];
-    var appsOffset = 0;
-    var appsPageSize = 1000;
-    while(true) {
-      var appsR = await fetch(
-        SUPABASE_URL+'/rest/v1/housing_applications?select=*&order=submitted_at.desc&limit='+appsPageSize+'&offset='+appsOffset,
-        { headers: HOUSING_HEADERS }
-      );
-      if(!appsR.ok) break;
-      var page = await appsR.json();
-      if(!Array.isArray(page) || !page.length) break;
-      allAppsData = allAppsData.concat(page);
-      if(page.length < appsPageSize) break; // last page
-      appsOffset += appsPageSize;
-    }
-    if(allAppsData.length) {
-      applications = allAppsData.map(function(row){
-        return Object.assign({},row.data||{},{
-          id:row.id, status:row.status, score:row.score, tier:row.tier,
-          classification:row.classification, reserve:row.reserve,
-          archived:!!row.archived, assignedUnit:row.assigned_unit_id,
-          assignedAddress:row.assigned_address, submittedAt:row.submitted_at,
-          created_by_email: row.created_by_email || null
-        });
-      });
-    } else {
-      // Supabase returned no rows — fall back to localStorage so existing
-      // data isn't lost during the transition period. Once apps are saved
-      // to Supabase this branch won't be hit.
-      try {
-        var lsApps = JSON.parse(localStorage.getItem('clfn_applications')||'[]');
-        if(lsApps.length) {
-          applications = lsApps;
-          console.log('[CLFN] Loaded '+lsApps.length+' applications from localStorage fallback');
-        }
-      } catch(e) { console.warn('[CLFN] localStorage fallback failed:', e); }
-    }
-
-    // Housing units
-    // Fetch all units with pagination
-    var allUnitsData = [];
-    var unitsOffset = 0;
-    while(true) {
-      var unitsR = await fetch(
-        SUPABASE_URL+'/rest/v1/housing_units?select=*&order=street,num&limit=1000&offset='+unitsOffset,
-        { headers: HOUSING_HEADERS }
-      );
-      if(!unitsR.ok) break;
-      var uPage = await unitsR.json();
-      if(!Array.isArray(uPage) || !uPage.length) break;
-      allUnitsData = allUnitsData.concat(uPage);
-      if(uPage.length < 1000) break;
-      unitsOffset += 1000;
-    }
-    var unitsR = { ok: allUnitsData.length > 0 }; // compatibility shim
-    if(unitsR.ok){
-      var unitsData=allUnitsData;
-      housingUnits=unitsData.map(function(row){
-        return Object.assign({},row.data||{},{
-          id:row.id, num:row.num, street:row.street, bedrooms:row.bedrooms,
-          bathrooms:row.bathrooms, type:row.type, foundation:row.foundation,
-          funder:row.funder, status:row.status, accessible:!!row.accessible,
-          isElders:!!row.is_elders, archived:!!row.archived,
-          assignedTo:row.assigned_to, assignedName:row.assigned_name, assignedDate:row.assigned_date,
-          lastInspectionDate:row.last_inspection_date || null,
-          nextInspectionDue:row.next_inspection_due   || null
-        });
-      });
-    } else {
-      // Fallback to localStorage during transition period
-      try {
-        var lsUnits = JSON.parse(localStorage.getItem('clfn_housing_units')||'[]');
-        if(lsUnits.length) {
-          housingUnits = lsUnits;
-          console.log('[CLFN] Loaded '+lsUnits.length+' units from localStorage fallback');
-        }
-      } catch(e) { console.warn('[CLFN] localStorage units fallback failed:', e); }
-    }
-
-    // Reconcile any drift between unit.assignedTo and app.assignedUnit so
-    // older records pre-dating the saveUnitEdit status-flip fix surface
-    // correctly on Match / Tenants / Inventory views.
-    if(typeof reconcileAssignments === 'function') reconcileAssignments();
-
-    // Settings
-    var setR = await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=*',{headers:HOUSING_HEADERS});
-    if(setR.ok){
-      var setData=await setR.json();
-      setData.forEach(function(row){ if(!window._appSettings) window._appSettings={}; window._appSettings[row.key]=row.value; });
-    }
-    // Apply saved brand theme (Settings → Admin → Themes)
-    if (typeof _applyTheme === 'function') _applyTheme((window._appSettings||{}).theme || {});
-    // Apply saved nation overrides (Settings → Nation) — display name, short, logo
-    if (typeof applyNationOverrides === 'function') applyNationOverrides();
-    // Apply saved required-field config (Settings → App Settings → Required Fields)
-    if (typeof applyRequiredFields === 'function') applyRequiredFields();
-
-    // Load contractors
-    try {
-      var ctR = await fetch(SUPABASE_URL+'/rest/v1/housing_contractors?select=*&order=created_at',{headers:HOUSING_HEADERS});
-      if(ctR.ok){var ctData=await ctR.json();window._contractors=ctData.map(function(r){return Object.assign({},r.data||{},{id:r.id,name:r.name,trade:r.trade,status:r.status});});}
-    } catch(e){console.warn('Contractors load:',e);}
-    // Load SOW cache
-    try {
-      var sowR=await fetch(SUPABASE_URL+'/rest/v1/housing_sow?select=unit_id,data',{headers:HOUSING_HEADERS});
-      if(sowR.ok){var sd=await sowR.json();window._sowCache={};sd.forEach(function(r){window._sowCache[r.unit_id]=r.data;});}
-    } catch(e){console.warn('SOW cache:',e);}
-    // Load RFQ cache
-    if (typeof loadRfqCache === 'function') { try { await loadRfqCache(); } catch(e) { console.warn('RFQ cache:', e); } }
-    // Load reno progress cache
-    try {
-      var rpR=await fetch(SUPABASE_URL+'/rest/v1/housing_reno_progress?select=unit_id,data',{headers:HOUSING_HEADERS});
-      if(rpR.ok){var rpd=await rpR.json();window._renoProgress={};rpd.forEach(function(r){window._renoProgress[r.unit_id]=r.data;});}
-    } catch(e){console.warn('Reno progress:',e);}
-    // Load reno budget cache
-    try {
-      var rbR=await fetch(SUPABASE_URL+'/rest/v1/housing_reno_budget?select=unit_id,data',{headers:HOUSING_HEADERS});
-      if(rbR.ok){var rbd=await rbR.json();window._renoBudget={};rbd.forEach(function(r){window._renoBudget[r.unit_id]=r.data;});}
-    } catch(e){console.warn('Reno budget:',e);}
-    // Load unit photos cache
-    try {
-      var upR=await fetch(SUPABASE_URL+'/rest/v1/housing_unit_photos?select=*&order=added_at',{headers:HOUSING_HEADERS});
-      if(upR.ok){var upd=await upR.json();window._unitPhotos={};upd.forEach(function(r){if(!window._unitPhotos[r.unit_id])window._unitPhotos[r.unit_id]=[];window._unitPhotos[r.unit_id].push(r);});}
-    } catch(e){console.warn('Unit photos:',e);}
-    // Load settings cache
-    try {
-      var asR=await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=key,value',{headers:HOUSING_HEADERS});
-      if(asR.ok){var asd=await asR.json();window._appSettings={};asd.forEach(function(r){window._appSettings[r.key]=r.value;});}
-    } catch(e){console.warn('Settings:',e);}
-    // Apply saved brand theme (Settings → Admin → Themes)
-    if (typeof _applyTheme === 'function') _applyTheme((window._appSettings||{}).theme || {});
-    // Apply saved nation overrides (Settings → Nation) — display name, short, logo
-    if (typeof applyNationOverrides === 'function') applyNationOverrides();
-    // Apply saved required-field config (Settings → App Settings → Required Fields)
-    if (typeof applyRequiredFields === 'function') applyRequiredFields();
-
-    if (window.CLFN_DEBUG) console.info('[CLFN] Loaded '+applications.length+' apps, '+housingUnits.length+' units');
-
-    // Refresh V2 scoring model and tiers from loaded settings
-    try {
-      if(window._appSettings && window._appSettings['scoring_model_v2']) {
-        window.liveV2ScoreModel = window._appSettings['scoring_model_v2'];
-      }
-      if(window._appSettings && window._appSettings['scoring_tiers_v2']) {
-        window.liveV2Tiers = window._appSettings['scoring_tiers_v2'];
-      }
-    } catch(e) {}
-
-    // Initialise approval authority overrides from loaded settings
-    if(typeof initApprovalAuthority === 'function') initApprovalAuthority();
-    // Initialise module enable/license state from loaded settings
-    if(typeof initModuleEnablement === 'function') initModuleEnablement();
-    _syncAIHeaderBtn();
-
-    // Rescore all apps with live V2 model
-    if(applications.length && typeof rescoreAllApplications === 'function') {
-      rescoreAllApplications();
-      if (window.CLFN_DEBUG) console.log('[CLFN] Rescored '+applications.length+' applications on V2 model');
-    }
-
-    // Dashboard view (#dashView) was retired — the worklist below is the
-    // only application list now, so we skip the old re-render block.
-    // Re-render worklist if its section is currently expanded on the landing.
-    // (The standalone worklistView is gone — Phase B folded it into landingView.)
-    var sec = document.getElementById('sec-worklist');
-    if(sec && !sec.classList.contains('collapsed')) {
-      if(typeof renderWorklist === 'function') renderWorklist();
-    }
-    if(typeof _renderWorklistCountPills === 'function') _renderWorklistCountPills();
-  } catch(e) {
-    console.error('[CLFN Housing] loadAppData failed:',e);
-    console.warn('[CLFN] Could not load data — using cached version');
-  }
-}
 
 // ── Check for existing session on page load ────────────────────────────────
 // (session restore handled by initHousing IIFE above)

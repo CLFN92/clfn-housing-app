@@ -67,22 +67,7 @@ function applyBrandingToHeader() {
   if (nameEl) nameEl.textContent = cfg.display_short || cfg.display_name || 'Housing';
 }
 
-function applyRoleToHeader() {
-  var role = ROLES[_currentRole];
-  if(!role){
-    // Defensive: unknown role in session → show neutral badge and disable UI.
-    console.warn('[finance] Unknown role in session:', _currentRole);
-    return;
-  }
-  var lbl = document.getElementById('hdr-role-label');
-  var btn = document.getElementById('hdr-user-btn');
-  var nameEl = document.getElementById('hdr-user-name');
-  if (lbl) lbl.textContent = role.label;
-  if (btn) { btn.style.background = role.color; btn.style.color = role.textColor; }
-  if (nameEl) nameEl.textContent = (HOUSING_SESSION && HOUSING_SESSION.name) ? HOUSING_SESSION.name : role.label;
-}
 
-function financeSignOut() { doLogout(); }
 
 function applyPermissions() {
   // Show/hide nav items based on role

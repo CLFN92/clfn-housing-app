@@ -466,43 +466,9 @@ function openNewArrForTenant(tid) {
   }, 60);
 }
 
-function openArrPaymentForTenant(arrId) {
-  currentArrId = arrId;
-  var d = getData();
-  var arr = d.arrangements.find(function(a){return a.id===arrId;});
-  var t = arr ? getTenant(arr.tenantId) : null;
-  var paid = d.arrPayments.filter(function(p){return p.arrId===arrId;}).reduce(function(s,p){return s+p.amount;},0);
-  var remaining = arr ? Math.max(0,arr.totalOwing-paid) : 0;
-  var infoEl = document.getElementById('arrPaymentInfo');
-  if (infoEl) {
-    infoEl.style.display = 'flex';
-    infoEl.innerHTML = '<strong>'+(t?tenantName(t):'')+'</strong> &nbsp;&middot;&nbsp; '+arr.ref+' &nbsp;&middot;&nbsp; Remaining: <strong>'+fmt(remaining)+'</strong>';
-  }
-  document.getElementById('ap-date').value = today();
-  document.getElementById('ap-amount').value = arr ? arr.monthlyPayment.toFixed(2) : '';
-  // Populate ap-tenant select
-  populateModalSelects('modalArrPayment');
-  setTimeout(function(){
-    var ts = document.getElementById('ap-tenant'); if(ts && arr) ts.value = arr.tenantId;
-    var as = document.getElementById('ap-arr-select');
-    if (as) { as.innerHTML = '<option value="'+arrId+'">'+arr.ref+'</option>'; as.value = arrId; }
-    if (t && t.autoPay) { var m = document.getElementById('ap-method'); if(m) m.value='auto'; }
-  }, 60);
-  openModal('modalArrPayment');
-}
 
 // openNewLoanForTenant is defined in finance-nav.js (loaded earlier) with the
 // calcLoan() call. A duplicate used to live here and — because this file loads
 // later — silently shadowed the nav.js version, dropping the loan calc. Removed;
 // do not re-add. See DEAD_CODE_AUDIT.md.
 
-function openLoanPaymentForTenant(loanId) {
-  var d = getData();
-  var ln = d.loanList.find(function(l){return l.id===loanId;});
-  var t = ln ? getTenant(ln.tenantId) : null;
-  document.getElementById('lpay-loan').innerHTML = '<option value="'+loanId+'">'+(t?tenantName(t):'')+' \u2014 '+(ln?ln.type:'')+'</option>';
-  document.getElementById('lpay-date').value = today();
-  if (ln) document.getElementById('lpay-amount').value = ln.payment.toFixed(2);
-  if (t && t.autoPay) document.getElementById('lpay-method').value = 'auto';
-  openModal('modalLoanPayment');
-}

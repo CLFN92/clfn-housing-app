@@ -23,37 +23,6 @@ function statCard(lbl,val,sub,cls){
 }
 
 // DASHBOARD
-function dashSearchTenants(query) {
-  var resultsEl = document.getElementById('dashSearchResults');
-  if (!resultsEl) return;
-  var q = query.trim().toLowerCase();
-  if (!q) { resultsEl.style.display='none'; return; }
-  var d = getData();
-  var matches = d.tenants.filter(function(t){
-    return (tenantName(t).toLowerCase().includes(q) ||
-            (t.unit||'').toLowerCase().includes(q) ||
-            (t.phone||'').toLowerCase().includes(q) ||
-            (t.email||'').toLowerCase().includes(q));
-  }).slice(0, 8);
-  if (!matches.length) {
-    resultsEl.style.display='block';
-    resultsEl.innerHTML='<div class="tenant-search-result" style="cursor:default;color:var(--muted);">No tenants found</div>';
-    return;
-  }
-  resultsEl.style.display='block';
-  resultsEl.innerHTML = matches.map(function(t){
-    var initials = ((t.first||'')[0]||'') + ((t.last||'')[0]||'');
-    if (!initials) initials = '?';
-    var safeId = (t.id||'').replace(/'/g, "\\'");
-    var unitLabel = (t.unit||'').toString();
-    var typeLabel = (t.type||'').toString().replace(/-/g,' ');
-    return '<div class="tenant-search-result" onclick="dashSelectTenant(\''+safeId+'\')">'+
-      '<div class="tsr-avatar">'+initials+'</div>'+
-      '<div><div class="tsr-name">'+tenantNameHtml(t)+'</div>'+
-      '<div class="tsr-meta">'+unitLabel+' &middot; '+typeLabel+'</div></div>'+
-    '</div>';
-  }).join('');
-}
 
 function dashSelectTenant(tid) {
   // Navigate to tenants page and load this profile directly

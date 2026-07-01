@@ -20,41 +20,47 @@ These are wired-but-broken today, not merely dead.
 
 ## 🟠 Dead code — grep-verified zero-caller, safe to delete (~1,500 lines)
 
-Not yet removed (this pass fixed only the live bugs). Each is grep-verified to have no live caller.
+**Batch 2 status (removed 2026-07): ~1,567 lines deleted across 13 files.** Every symbol was re-grep-verified against the whole repo immediately before deletion; each file was re-parsed with `node --check` after. Removed: the notifications.js XLSX block + `_buildRfqEmailHtml`; the shared-data.js worklist/work-queue/movement-log/`deleteContractor`/`renderScoresTable` cluster; the finance-reports quick-payment/reverse subsystem + the finance-misc functions; `loadAppDataFromSupabase` + `exportRenoApprovalsExcel`; the scoring.js V1 editor cluster + `NOS_BED_LABELS` + `SP_APPLICATIONS`; `wireDashTable` / `handleFiles` / `udpOpenFilesModal`.
+
+> ⚠️ **Audit correction:** the scoring.js entry below originally listed `_openScoreByEl`, `_openScoreById`, and `scoreMiniBar` as dead. Re-verification found them **LIVE** — the dashboard score cell (`housing-app.js` `renderDashTable`) emits `data-score-id` + `onclick="window._openScoreByEl(this)"` and calls `scoreMiniBar`. They were **kept**. (The scoring scanner didn't have housing-app.js in scope.)
+
+**Deferred (low-value, left for a later pass to avoid churn/risk):** write-only vars (`_amBestUnitId`, `_saveToggleStates` write side, `_rfqActiveTab`, `_rfqDocLib`, `witness_date`), the duplicate `_ctApprovalIdx`/`_ctPendingAction` redeclarations, the `window.closeTenantCard` alias (harmless documented public API), the `[data-transfer-appid]` dead handler, and the `showEmployeeHome` legacy branch (conditionally reachable on sub-pages — not fully dead).
+
+Items below with `[x]` were removed in Batch 2; `[ ]` remain deferred. Each is grep-verified to have no live caller.
 
 ### notifications.js (~720 lines — biggest single win)
-- [ ] `_xlsxDeadCode_removed` + `_applyXlsxUpdates_dead` + `_applyXlsxNewUnits_dead` + `runXlsxValidation/applyXlsxUpdates/applyXlsxNewUnits` stubs + `_XLSX_2026_REMOVED` (~3193–3768) — entire removed XLSX-import subsystem; the only `onclick=` strings referencing it are emitted inside its own dead HTML builder.
-- [ ] `_buildRfqEmailHtml` (~2339–2483) — superseded by `_generateRfqPdfBase64`.
+- [x] `_xlsxDeadCode_removed` + `_applyXlsxUpdates_dead` + `_applyXlsxNewUnits_dead` + `runXlsxValidation/applyXlsxUpdates/applyXlsxNewUnits` stubs + `_XLSX_2026_REMOVED` (~3193–3768) — entire removed XLSX-import subsystem; the only `onclick=` strings referencing it are emitted inside its own dead HTML builder.
+- [x] `_buildRfqEmailHtml` (~2339–2483) — superseded by `_generateRfqPdfBase64`.
 
 ### shared-data.js (~200 lines)
-- [ ] Legacy worklist helpers: `wlSection`, `wlEmpty`, `wlEditApp`, `wlPreviewApp`, `wlAssignApp`, `wlOpenApplicantCell`, `wlOpenIdCell` (keep `wlOpenApp` — still live).
-- [ ] `getWorkQueueForRole` + `isInWorkQueue`.
-- [ ] `deleteContractor` — orphaned handler that DELETEs a contractor row from Supabase with no UI path (removal goes through archive). Removing it also closes an unused live DB-delete capability.
-- [ ] `sbLoadTenantMovementLog` + `sbLoadTenantMovementLogByName`.
-- [ ] `renderScoresTable` (~65 lines).
+- [x] Legacy worklist helpers: `wlSection`, `wlEmpty`, `wlEditApp`, `wlPreviewApp`, `wlAssignApp`, `wlOpenApplicantCell`, `wlOpenIdCell` (keep `wlOpenApp` — still live).
+- [x] `getWorkQueueForRole` + `isInWorkQueue`.
+- [x] `deleteContractor` — orphaned handler that DELETEs a contractor row from Supabase with no UI path (removal goes through archive). Removing it also closes an unused live DB-delete capability.
+- [x] `sbLoadTenantMovementLog` + `sbLoadTenantMovementLogByName`.
+- [x] `renderScoresTable` (~65 lines).
 
 ### housing-init.js (~200 lines)
-- [ ] `loadAppDataFromSupabase` (~180 lines — superseded by `loadHousingData`).
-- [ ] `exportRenoApprovalsExcel` (alias, never invoked).
+- [x] `loadAppDataFromSupabase` (~180 lines — superseded by `loadHousingData`).
+- [x] `exportRenoApprovalsExcel` (alias, never invoked).
 - [ ] `_amBestUnitId` (write-only), `_saveToggleStates` write side (`_toggleStates` sessionStorage never read).
 - [ ] Duplicate `_ctApprovalIdx` / `_ctPendingAction` redeclarations (logic lives in shared-data.js).
 
 ### finance-reports.js (~120 lines) + finance misc (~80)
-- [ ] Quick-payment/reverse subsystem: `saveRentQuickPayment`, `saveArrQuickPayment`, `saveLoanQuickPayment`, `reverseRentEntry`, `reverseArrPayment`, `reverseLoanPmt`, `_doReverseLoanPmt`.
-- [ ] `finance-statement.js` `openArrPaymentForTenant`, `openLoanPaymentForTenant`.
-- [ ] `finance-dashboard.js` `dashSearchTenants` (renders into a `#dashSearchResults` element that exists nowhere).
-- [ ] `finance-init.js` `applyRoleToHeader`, `financeSignOut`.
-- [ ] `finance-nav.js` `showHome`, `openUtilitiesView`.
-- [ ] `finance-vouchers.js` `getVoucherSigDataURL`; `finance-data.js` `_toastSuccess`.
+- [x] Quick-payment/reverse subsystem: `saveRentQuickPayment`, `saveArrQuickPayment`, `saveLoanQuickPayment`, `reverseRentEntry`, `reverseArrPayment`, `reverseLoanPmt`, `_doReverseLoanPmt`.
+- [x] `finance-statement.js` `openArrPaymentForTenant`, `openLoanPaymentForTenant`.
+- [x] `finance-dashboard.js` `dashSearchTenants` (renders into a `#dashSearchResults` element that exists nowhere).
+- [x] `finance-init.js` `applyRoleToHeader`, `financeSignOut`.
+- [x] `finance-nav.js` `showHome`, `openUtilitiesView`.
+- [x] `finance-vouchers.js` `getVoucherSigDataURL`; `finance-data.js` `_toastSuccess`.
 
 ### scoring.js (~150 lines)
-- [ ] V1 scoring-editor cluster: `renderScoringModelTable`, `deleteV2ScoreCriteria`, `updateV2ScoreModel`, `saveScoringModel`, `SCORING_CAT_LABELS` (live editor is `renderV2ScoringEditor`).
-- [ ] `_openScoreByEl` / `_openScoreById` (no `data-score-id` element emitted anywhere).
-- [ ] `scoreMiniBar`, `NOS_BED_LABELS`, `SP_APPLICATIONS` const (shadowed by `window.SP_APPLICATIONS`, itself always undefined).
+- [x] V1 scoring-editor cluster: `renderScoringModelTable`, `deleteV2ScoreCriteria`, `updateV2ScoreModel`, `saveScoringModel`, `SCORING_CAT_LABELS` (live editor is `renderV2ScoringEditor`).
+- [~] `_openScoreByEl` / `_openScoreById` / `scoreMiniBar` — **NOT dead, KEPT** (audit error; the dashboard score cell in `housing-app.js` uses all three — see the correction note above).
+- [x] `NOS_BED_LABELS`, `SP_APPLICATIONS` const (shadowed by `window.SP_APPLICATIONS`, itself always undefined). _(`scoreMiniBar`, previously grouped here, was kept — see above.)_
 
 ### housing-app / modals / tic / views / settings / rfq (~150 lines)
-- [ ] `housing-app.js` `wireDashTable` (retired `#dashView`), `handleFiles`.
-- [ ] `housing-modals.js` `udpOpenFilesModal`.
+- [x] `housing-app.js` `wireDashTable` (retired `#dashView`), `handleFiles`.
+- [x] `housing-modals.js` `udpOpenFilesModal`.
 - [ ] `housing-tic.js` `window.closeTenantCard` dead alias (internal uses `_ticClose`).
 - [ ] `housing-settings.js` `[data-transfer-appid]` delegated handler (rows render `data-tid`; never matches).
 - [ ] `housing-views.js` gutted comment scaffolds (968–985, 1805–1829); `showEmployeeHome` legacy tile-grid branch (mostly unreachable on housing.html).

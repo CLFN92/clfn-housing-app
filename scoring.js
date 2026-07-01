@@ -20,7 +20,6 @@
  *   scoreApplicationLocally(app) — score a saved application
  *   tierColor(tier)       — returns {bg,c} for a priority tier
  *   renderV2ScoringEditor()  — render the V2 scoring editor UI
- *   renderScoringModelTable()— render the V1 scoring table
  *   renderUnitScoreTable()   — render unit matching score table
  * ============================================================ */
 
@@ -310,15 +309,6 @@ function resetV2ScoringModelED() {
   });
 }
 
-var SCORING_CAT_LABELS = {
-  urgent_need:       'Urgent Need / Displacement',
-  health_safety:     'Health & Safety Risk',
-  occupancy:         'Persons Over Occupancy Standard',
-  income_stability:  'Income Stability',
-  household_comp:    'Household Composition',
-  prior_tenancy:     'Prior ' + ((window.NATION_CONFIG && NATION_CONFIG.short) || 'Housing') + ' Tenancy',
-  waitlist_age:      'Application Age (Waitlist Duration)'
-};
 
 // Load or init scoring model
 
@@ -326,16 +316,6 @@ var SCORING_CAT_LABELS = {
 // ── Live scoring helpers — read from liveScoreModel ──────────────────
 // ── Rescore all applications from current liveScoreModel ─────────────
 
-function saveScoringModel() {
-  // Save scoring model to Supabase housing_settings
-  fetch(SUPABASE_URL+'/rest/v1/housing_settings', {
-    method: 'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'resolution=merge-duplicates,return=minimal'}),
-    body: JSON.stringify({ key: 'scoring_model', value: liveScoreModel })
-  }).catch(function(e){ console.warn('Scoring model save failed:',e); });
-  rescoreAllApplications();
-  _refreshAppViews();
-}
 
 // ── Nation & Modules panel (read-only, Phase A0) ─────────────────────────
 // Renders the NATION_CONFIG identity + the CLFN_MODULES enablement list so
@@ -736,103 +716,6 @@ function saveNationSettings() {
   });
 }
 
-function renderScoringModelTable() {
-  var wrap = document.getElementById('scoring_model_table_wrap');
-  if(!wrap) return;
-
-  // Re-read from settings (may have loaded after page init)
-  var model = liveScoreModel;
-  if(window._appSettings && window._appSettings['scoring_model_v2']) {
-    try { var m2 = window._appSettings['scoring_model_v2']; if(m2 && m2.length) model = m2; } catch(e){}
-  }
-  if(!model || !model.length) {
-    wrap.innerHTML = '<div class="empty-state-ctr">No scoring model configured. Settings will appear here after they are saved.</div>';
-    return;
-  }
-
-  // Group by category
-  var grouped = {};
-  model.forEach(function(r) {
-    if(!grouped[r.cat]) grouped[r.cat] = [];
-    grouped[r.cat].push(r);
-  });
-
-  var catOrder = ['urgent_need','health_safety','occupancy',
-                  'income_stability','household_comp','prior_tenancy','waitlist_age'];
-
-  var html = '';
-  catOrder.forEach(function(cat) {
-    var rows = (grouped||{})[cat];
-    if(!rows || !rows.length) return;
-    var catLabel = SCORING_CAT_LABELS[cat] || cat;
-
-    html += '<div style="margin-bottom:20px;">';
-    html += '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:8px 0 6px;border-bottom:1px solid var(--border);margin-bottom:6px;">'+catLabel+'</div>';
-
-    rows.sort(function(a,b){return a.order-b.order;});
-    rows.forEach(function(r) {
-      var ptsColor = r.pts > 0 ? '#15803d' : r.pts < 0 ? '#b91c1c' : 'var(--gray)';
-      var sign = r.pts > 0 ? '+' : '';
-      var isAuto = (r.id === 'oc1' || r.id === 'wa1');
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:7px;margin-bottom:3px;background:var(--bg);">'        + '<span style="font-size:13px;color:var(--text);flex:1;">'+r.label+'</span>'        + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'        + (isAuto          ? '<span style="font-size:11px;color:var(--muted);font-style:italic;margin-right:4px;">auto-calculated</span>'            + '<input type="number" value="'+r.pts+'" step="1" min="0" max="10" '            +   'style="width:64px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';text-align:center;font-family:\'DM Sans\',sans-serif;background:var(--surface);" '            +   'data-smid="'+r.id+'" oninput="updateV2ScoreModel(this)"/>'            + '<span class="js-lbl-sm">pts each</span>'          : '<input type="number" value="'+r.pts+'" step="1" min="-20" max="30" '            +   'style="width:64px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';text-align:center;font-family:\'DM Sans\',sans-serif;background:var(--surface);" '            +   'data-smid="'+r.id+'" oninput="updateV2ScoreModel(this)"/>'            + '<span class="js-lbl-sm">pts</span>'        )        + '<button onclick="deleteV2ScoreCriteria(\''+r.id+'\')" title="Remove" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:14px;padding:2px 4px;" onmouseover="this.style.color=\'#b91c1c\'" onmouseout="this.style.color=\'var(--gray)\'">✕</button>'        + '</div>'        + '</div>';
-    });
-    html += '</div>';
-  });
-
-  if(!html) html = '<div style="padding:20px;text-align:center;color:var(--muted);">No scoring criteria defined. Click "Add Criteria" to add one.</div>';
-  wrap.innerHTML = html;
-}
-
-// Called by the ✕ button in renderScoringModelTable rows.
-// Removes the criterion with the given id from the active scoring model and persists.
-function deleteV2ScoreCriteria(id) {
-  if (!id) return;
-  showConfirm({
-    title:       'Remove this scoring criterion?',
-    message:     'It will be removed from the model and applications will be re-scored.',
-    confirmText: 'Remove',
-    danger:      true
-  }).then(function(ok){
-    if (!ok) return;
-
-  // liveScoreModel may be the V2 model loaded from settings — mutate in place
-  var idx = liveScoreModel.findIndex(function(r) { return r.id === id; });
-  if (idx === -1) {
-    showToast('Criterion not found — it may have already been removed.');
-    return;
-  }
-  var removed = liveScoreModel.splice(idx, 1)[0];
-  // Persist to Supabase settings and localStorage
-  saveV2ScoringModel();
-  // Refresh the editor table
-  renderScoringModelTable();
-  // Re-score all applications so points reflect the change
-    if (typeof rescoreAllApplications === 'function') rescoreAllApplications();
-    showToast('Criterion \u201c' + (removed.label || removed.id) + '\u201d removed');
-  });
-}
-
-// Called oninput on the pts number input in each renderScoringModelTable row.
-// Updates the row's pts value in liveScoreModel and persists (debounced).
-function updateV2ScoreModel(el) {
-  var id  = el.getAttribute('data-smid');
-  var val = parseInt(el.value) || 0;
-  if (!id) return;
-  var row = liveScoreModel.find(function(r) { return r.id === id; });
-  if (!row) return;
-  row.pts = val;
-  // Colour feedback: green positive, red negative, grey zero
-  el.style.color = val > 0 ? '#15803d' : val < 0 ? '#b91c1c' : 'var(--gray)';
-  // Debounce the save — avoid hitting Supabase on every keystroke
-  clearTimeout(el._saveTimer);
-  el._saveTimer = setTimeout(function() {
-    saveV2ScoringModel();
-    auditEntry('SETTINGS', 'scoring_v2_pts_change',
-      'V2 Scoring: ' + (row.label || id) + ' pts set to ' + val,
-      window.currentRole || 'ed');
-    showToast('Score updated \u2014 rescore all to apply');
-  }, 800);
-}
 function setPts(elId,score){
   const el=document.getElementById(elId);if(!el)return;
   const abs=Math.abs(score);
@@ -974,14 +857,6 @@ var DEFAULT_NOS_TABLE = {
   '5': 10   // 5+ bedrooms — 10 persons max
 };
 
-var NOS_BED_LABELS = {
-  '0': 'Studio / 0 bedrooms',
-  '1': '1 bedroom',
-  '2': '2 bedrooms',
-  '3': '3 bedrooms',
-  '4': '4 bedrooms',
-  '5': '5+ bedrooms'
-};
 
 function getNosTable() {
   // Read from settings (loaded from Supabase), fall back to default
@@ -1677,8 +1552,6 @@ function calcDuration(startInput) {
   durInput.value = parts.join(' ');
 }
 
-// ── SP Data (v9) ──
-const SP_APPLICATIONS=[];
 
 // ── Housing Unit Inventory (from SharePoint — 262 units) ──
 const HOUSING_UNITS_DATA=[];

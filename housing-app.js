@@ -7,7 +7,7 @@
  * Covers: application form steps (goTo, validateStep*),
  *   income/household/reference/pet forms, file uploads,
  *   approval flow, submit modal, print preview,
- *   dashboard table (renderDashTable, updateDashStats, wireDashTable),
+ *   dashboard table (renderDashTable, updateDashStats),
  *   assign unit modal, reno approvals view
  * ============================================================ */
 
@@ -692,15 +692,6 @@ function addPet(){
 function rmRow(btn){const row=btn.closest('.rrow');if(row)row.remove();}
 
 // ── File upload ──
-function handleFiles(files){
-  if(!window._pendingAppFiles) window._pendingAppFiles = [];
-  Array.from(files).forEach(function(f){
-    window._pendingAppFiles.push(f);
-    var li=document.createElement('div');li.className='file-item';
-    li.innerHTML='<span class="file-name">'+escapeHtml(f.name)+'</span><span class="file-size">'+(f.size/1024).toFixed(0)+' KB</span>';
-    document.getElementById('fileList').appendChild(li);
-  });
-}
 
 // Called after application is submitted — uploads staged files to Supabase Storage
 async function uploadPendingAppFiles(appId){
@@ -856,77 +847,6 @@ function renderDashTable(){
   }).join('');
 }
 
-function wireDashTable(){
-  var wrap=document.querySelector('#dashTable')?.closest('.doclib-table-wrap') || document.querySelector('.doclib-table-wrap');
-  if(!wrap) return;
-  if(wrap._wired) return; // already delegated — event delegation handles new rows automatically
-  wrap._wired=true;
-  wrap.addEventListener('click',function(e){
-    // Applicant name td click — opens the application form for editing.
-    // (Score breakdown lives on the score cell itself via _openScoreByEl.)
-    var scTd=e.target.closest('[data-sc-id]');
-    if(scTd && !e.target.closest('button')){
-      var scId=scTd.getAttribute('data-sc-id');
-      if(_appIsCommercial(scId) && typeof openCommercialApp === 'function'){ openCommercialApp(scId); return; }
-      if(scId && typeof window.openEditModal === 'function') window.openEditModal(scId);
-      return;
-    }
-    // Preview button
-    var pvBtn=e.target.closest('.preview-app-btn');
-    if(pvBtn){
-      var pvApp=(typeof applications!=='undefined'?applications:[]).find(function(a){return a.id===pvBtn.getAttribute('data-id');});
-      if(pvApp) previewFromDash(pvApp);
-      return;
-    }
-    // Review button — opens scorecard directly for approval
-    var rvBtn=e.target.closest('.review-app-btn');
-    if(rvBtn){
-      var rvApp=(typeof applications!=='undefined'?applications:[]).find(function(a){return a.id===rvBtn.getAttribute('data-id');});
-      if(rvApp) showScorecard(rvApp);
-      return;
-    }
-    var aBtn=e.target.closest('.assign-app-btn');
-    if(aBtn){
-      var aid=aBtn.getAttribute('data-id');
-      if(aid) {
-        // Find best matching vacant unit for this applicant
-        var _dashApp=(typeof applications!=='undefined'?applications:[]).find(function(a){return a.id===aid;});
-        var _dashBest='';
-        if(_dashApp){
-          var _allU=[];
-          _allU = housingUnits.slice();
-          if(!_allU.length)_allU=(typeof housingUnits!=='undefined'&&housingUnits.length)?housingUnits:(window.HOUSING_UNITS_DATA||[]);
-          var _vac=_allU.filter(function(u){return u.status==='vacant'&&!u.archived;});
-          var _nb=Math.max(1,1+(_dashApp.coApp?1:0)+((_dashApp.habitants||[]).length));
-          var _na=_dashApp.accessibility&&_dashApp.accessibility!=='None'&&_dashApp.accessibility!=='0'&&_dashApp.accessibility!==0;
-          var _age=_dashApp.dob?Math.floor((new Date()-new Date(_dashApp.dob))/(365.25*24*3600*1000)):0;
-          var _scored=_vac.map(function(u){
-            var sc=0;
-            if(u.bedrooms===_nb)sc+=10;else if(u.bedrooms>_nb)sc+=5;else if(u.bedrooms===_nb-1)sc+=3;
-            if(_na&&u.accessible)sc+=8;if(_na&&!u.accessible)sc-=4;
-            if(_age>=55&&u.isElders)sc+=6;if(_age<55&&u.isElders)sc-=2;
-            return{u:u,sc:sc};
-          }).sort(function(a,b){return b.sc-a.sc;});
-          if(_scored.length)_dashBest=_scored[0].u.id;
-        }
-        openAssignModal(aid, _dashBest);
-      }
-      return;
-    }
-    var eBtn=e.target.closest('.edit-app-btn');
-    if(eBtn){var id=eBtn.getAttribute('data-id');
-      if(_appIsCommercial(id) && typeof openCommercialApp === 'function'){ openCommercialApp(id); return; }
-      if(id)window.openEditModal(id);}
-    var mBtn=e.target.closest('.app-menu-btn');
-    if(mBtn){
-      var mid=mBtn.getAttribute('data-id');
-      if(mid){
-        var proxyE = {stopPropagation:function(){e.stopPropagation();},currentTarget:mBtn};
-        window.openAppMenu(proxyE, mid);
-      }
-    }
-  });
-}
 
 
 // ── Dashboard row context menu (⋮) ──────────────────────────────────────────
