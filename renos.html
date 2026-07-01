@@ -1054,53 +1054,11 @@ function saveRenoBudgetApproval() {
   showToast(overBudget ? 'Over-budget approval saved — ED sign-off recorded' : 'Budget approval granted');
 }
 
-function openSowModal(unitId) {
-  _sowUnitId  = unitId || null;
-  _sowItemIdx = 0;
-  // Reset "previously saved" flag so first save of a session logs as new/update correctly
-  window._sowWasPreviouslySaved = !!(unitId && getSowData(unitId));
-  var label = '';
-  if(unitId) {
-    var allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
-    var u = allUnits.find(function(x){ return x.id===unitId; });
-    if(u) label = u.num+' '+u.street+' · '+u.bedrooms+'-bed';
-  }
-  var lbl = document.getElementById('sow_unit_label');
-  if(lbl) lbl.textContent = label || 'No unit selected';
-  var today = new Date().toISOString().slice(0,10);
-  var dateEl = document.getElementById('sow_date'); if(dateEl) dateEl.value = today;
-  var saved = unitId ? getSowData(unitId) : null;
-  if(saved) { populateSow(saved); } else {
-    resetSow();
-    if(label) { var addr=document.getElementById('sow_address'); if(addr) addr.value=label; }
-  }
-  // Auto-populate tenant name from unit's assigned tenant
-  if(unitId && !saved) {
-    var allUnits2 = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : (window.HOUSING_UNITS_DATA||[]);
-    var u2 = allUnits2.find(function(x){ return x.id===unitId; });
-    if(u2 && u2.assignedName) {
-      var tnEl = document.getElementById('sow_tenant_name');
-      if(tnEl) tnEl.value = u2.assignedName;
-    }
-  }
-
-  var modal = document.getElementById('sowModal');
-  if(modal){ modal.style.removeProperty('display'); modal.style.setProperty('display','flex','important'); }
-
-  // Init signature pads
-  setTimeout(function(){
-    if(true) {
-      _initSigPad('sow_sig_canvas_tenant');
-      _initSigPad('sow_sig_canvas_staff');
-    }
-  }, 100);
-
-  // Hide budget badge
-  setTimeout(function(){
-    var badge = document.getElementById('sow_budget_badge');
-    if(badge) badge.style.display = 'none';
-  }, 50);
-}
+// openSowModal / saveSOW are intentionally NOT defined here. The canonical,
+// multi-SOW implementations in housing-modals-sow.js (loaded at the bottom of
+// this page) are authoritative and override any inline copy. A legacy
+// single-SOW version used to live here and was dead code (shadowed by the
+// later script). Do NOT re-add a divergent copy — extend the shared one.
 
 
 
@@ -1267,101 +1225,8 @@ function canEditProgressFor(unitId){
 
 
 
-function saveSOW(){
-  var get=function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
-  var chk=function(id){ var el=document.getElementById(id); return el?el.checked:false; };
-  var data = {
-    unitId:_sowUnitId, address:get('sow_address'), date:get('sow_date'),
-    tenantName:get('sow_tenant_name'),
-    preparedBy:get('sow_prepared_by'), contractor:get('sow_contractor'), contractorId:(document.getElementById('sow_contractor_id')||{}).value||'',
-    condition:get('sow_condition'), totalCost:get('sow_total_cost'),
-    startDate:get('sow_start_date'), endDate:get('sow_end_date'), notes:get('sow_notes'),
-    hmName:get('sow_hm_name'), hmDate:get('sow_hm_date'),
-    edName:get('sow_ed_name'), edDate:get('sow_ed_date'),
-    tenantSig: {
-      name:  get('sow_sig_tenant_name'),
-      date:  get('sow_sig_tenant_date'),
-      image: (typeof getSigDataURL === 'function') ? getSigDataURL('sow_sig_canvas_tenant') : ''
-    },
-    staffSig: {
-      name:  get('sow_sig_staff_name'),
-      date:  get('sow_sig_staff_date'),
-      image: (typeof getSigDataURL === 'function') ? getSigDataURL('sow_sig_canvas_staff') : ''
-    },
-    mold:chk('sow_mold'), asbestos:chk('sow_asbestos'), electrical:chk('sow_electrical'),
-    structural:chk('sow_structural'), plumbing:chk('sow_plumbing'), fire:chk('sow_fire'),
-    rentArrears:chk('sow_rent_arrears'), tenantDamage:chk('sow_tenant_damage'),
-    negligence:chk('sow_negligence'), vandalism:chk('sow_vandalism'),
-    policeReport:chk('sow_police_report'), accountabilityNotes:get('sow_accountability_notes'),
-    items:collectSowItems(), savedAt:new Date().toISOString()
-  };
-
-  // ── Approval-chain authority gate ─────────────────────────────────────────
-  // Strip name/date fields the actor isn't authorized to fill so a save
-  // cannot promote the SOW past what the actor's authority allows.
-  var _saveRole = window.currentRole || 'staff';
-  if(!APPROVAL_AUTHORITY.can('approveSowOverThreshold', _saveRole)){
-    data.edName = ''; data.edDate = '';
-  }
-  if(!APPROVAL_AUTHORITY.can('approveSowUnderThreshold', _saveRole) &&
-     !APPROVAL_AUTHORITY.can('approveSowOverThreshold', _saveRole)){
-    data.hmName = ''; data.hmDate = '';
-  }
-
-  if(_sowUnitId) saveSowData(_sowUnitId, data);
-
-  // ── Audit trail ──────────────────────────────────────────────────────────
-  var role = window.currentRole || 'staff';
-  var addr = data.address || _sowUnitId || 'unit';
-  var isNew = !window._sowWasPreviouslySaved;
-  window._sowWasPreviouslySaved = true;
-
-  // Core save event
-  var detail = (isNew ? 'SOW created' : 'SOW updated') + ' — ' + addr;
-  if(data.totalCost) detail += ' · Total: ' + data.totalCost;
-  if(data.condition) detail += ' · Condition: ' + data.condition;
-  auditEntry('SOW:'+(_sowUnitId||'?'), isNew ? 'sow_created' : 'sow_updated', detail, role);
-
-  // Tenant signature captured
-  if(data.tenantSig && (data.tenantSig.name || data.tenantSig.image)) {
-    auditEntry('SOW:'+(_sowUnitId||'?'), 'sow_tenant_signed',
-      'Tenant signature recorded — ' + (data.tenantSig.name || 'name not provided') +
-      (data.tenantSig.date ? ' on ' + data.tenantSig.date : ''), role);
-  }
-  // Staff signature captured
-  if(data.staffSig && (data.staffSig.name || data.staffSig.image)) {
-    auditEntry('SOW:'+(_sowUnitId||'?'), 'sow_staff_signed',
-      'Staff signature recorded — ' + (data.staffSig.name || 'name not provided') +
-      (data.staffSig.date ? ' on ' + data.staffSig.date : ''), role);
-  }
-  // HM approval recorded
-  if(data.hmName) {
-    auditEntry('SOW:'+(_sowUnitId||'?'), 'sow_hm_approval',
-      'HM approval recorded — ' + data.hmName + (data.hmDate ? ' on ' + data.hmDate : ''), role);
-  }
-  // ED approval recorded
-  if(data.edName) {
-    auditEntry('SOW:'+(_sowUnitId||'?'), 'sow_ed_approval',
-      'ED approval recorded — ' + data.edName + (data.edDate ? ' on ' + data.edDate : ''), role);
-  }
-  // Accountability flags
-  var flags = [];
-  if(data.rentArrears)  flags.push('rent arrears');
-  if(data.tenantDamage) flags.push('tenant damage');
-  if(data.negligence)   flags.push('negligence');
-  if(data.vandalism)    flags.push('vandalism');
-  if(data.policeReport) flags.push('police report');
-  if(flags.length) {
-    auditEntry('SOW:'+(_sowUnitId||'?'), 'sow_accountability',
-      'Accountability flags set: ' + flags.join(', '), role);
-  }
-  // Refresh the inline audit panel if visible
-  if(true) renderSowAuditLog(_sowUnitId);
-
-  var ind=document.getElementById('sow_saved_indicator');
-  if(ind) ind.textContent='✓ Saved '+new Date().toLocaleTimeString();
-  showToast('Scope of work saved');
-}
+// (legacy single-SOW saveSOW removed — see the breadcrumb above; the shared
+//  multi-SOW saveSOW in housing-modals-sow.js is authoritative on this page.)
 
 
 

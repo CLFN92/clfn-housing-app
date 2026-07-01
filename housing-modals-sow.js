@@ -1132,8 +1132,13 @@ function sowApproveInline() {
     var dtEl  = document.getElementById(dtId);
     if (nmEl) nmEl.value = staffName;
     if (dtEl) dtEl.value = today;
-    // Trigger save — the save flow detects the approval fields and sets approval_status
-    if (typeof sowSaveClicked === 'function') sowSaveClicked();
+    // Save directly rather than via sowSaveClicked(): approving is not the same
+    // as the preparer *submitting*, so we skip that path's "Submit + email a
+    // tenant PDF copy" prompt. This trims the inline-approve flow from three
+    // sequential dialogs (approve -> submit/tenant-copy -> work-order) down to
+    // two contextual ones (approve, then the work-order email prompt in saveSOW).
+    // saveSOW derives approval_status from the hm/ed name+date fields set above.
+    if (typeof saveSOW === 'function') saveSOW();
   });
 }
 
