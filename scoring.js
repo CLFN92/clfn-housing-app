@@ -1735,84 +1735,17 @@ function tierColor(tier){
 
 
 // ── Unit matching + Reno priority models ──────────────────────────────────
-
-var DEFAULT_UNIT_SCORE_MODEL = [
-  {id:'bed_exact',   factor:'Bedroom Fit',       condition:'Exact match',             pts:10, max:10, group:'bed', editable:true,  notes:'Unit bedrooms = household need'},
-  {id:'bed_larger',  factor:'Bedroom Fit',       condition:'Larger than needed',      pts:5,  max:10, group:'bed', editable:true,  notes:'Unit has more beds than needed'},
-  {id:'bed_one_short',factor:'Bedroom Fit',      condition:'One bedroom short',       pts:3,  max:10, group:'bed', editable:true,  notes:'Unit is 1 bed under household need'},
-  {id:'bed_insuff',  factor:'Bedroom Fit',       condition:'Insufficient bedrooms',   pts:0,  max:10, group:'bed', editable:false, notes:'2+ beds under need (no points)'},
-  {id:'acc_met',     factor:'Accessibility',     condition:'Need met by unit',        pts:8,  max:8,  group:'acc', editable:true,  notes:'Applicant needs accessible unit and unit qualifies'},
-  {id:'acc_unmet',   factor:'Accessibility',     condition:'Need not met (penalty)',  pts:-4, max:8,  group:'acc', editable:true,  notes:'Applicant needs accessible unit but unit does not qualify'},
-  {id:'acc_na',      factor:'Accessibility',     condition:'Not required',            pts:0,  max:8,  group:'acc', editable:false, notes:'No accessibility need'},
-  {id:'eld_matched', factor:'Elders Eligibility',condition:'Eligible + Elders unit',  pts:6,  max:6,  group:'eld', editable:true,  notes:'Applicant is 55+ and unit is Elders Unit'},
-  {id:'eld_ineligible',factor:'Elders Eligibility',condition:'Not eligible (penalty)',pts:-2, max:6,  group:'eld', editable:true,  notes:'Applicant under 55 but unit is Elders Unit'},
-  {id:'eld_standard',factor:'Elders Eligibility',condition:'Eligible, standard unit', pts:0,  max:6,  group:'eld', editable:false, notes:'Applicant is 55+ but standard unit'},
-  {id:'eld_na',      factor:'Elders Eligibility',condition:'Not applicable',           pts:0,  max:6,  group:'eld', editable:false, notes:'Applicant under 55, standard unit'},
-];
+// DEFAULT_UNIT_SCORE_MODEL, DEFAULT_RENO_SCORE_MODEL, RENO_FUND_RULES and
+// CRITICAL_SOW_CATS now live in shared-config.js (the single file loaded on
+// every page) — they used to be duplicated here and in renos.html. Do not
+// re-declare them; reference the shared globals.
 
 
 
 
 
 
-// ══ RENOVATION PRIORITY SCORING MODEL ══════════════════════════════════════
-var DEFAULT_RENO_SCORE_MODEL = [
-  // Unit Condition (from unit record)
-  {id:'rs_cond_critical', group:'condition', factor:'Unit Condition', condition:'Condemned / Critical',         pts:20, editable:true,  notes:'Unit status is condemned'},
-  {id:'rs_cond_poor',     group:'condition', factor:'Unit Condition', condition:'Poor — major repairs needed',  pts:15, editable:true,  notes:'Home condition rated Poor'},
-  {id:'rs_cond_average',  group:'condition', factor:'Unit Condition', condition:'Average — minor wear',         pts:8,  editable:true,  notes:'Home condition rated Average'},
-  {id:'rs_cond_good',     group:'condition', factor:'Unit Condition', condition:'Good — well maintained',       pts:2,  editable:true,  notes:'Home condition rated Good'},
-  // Critical Systems (from SOW line items — additive, each system that appears in SOW adds points)
-  {id:'rs_sys_furnace',   group:'systems',   factor:'Critical Systems (additive)', condition:'Furnace / Heating system',      pts:14, editable:true,  notes:'SOW contains Heating / HVAC work'},
-  {id:'rs_sys_hvac',      group:'systems',   factor:'Critical Systems (additive)', condition:'HVAC / Ventilation',            pts:12, editable:true,  notes:'SOW contains HVAC / Ventilation work'},
-  {id:'rs_sys_electrical',group:'systems',   factor:'Critical Systems (additive)', condition:'Electrical system',             pts:13, editable:true,  notes:'SOW contains Electrical work'},
-  {id:'rs_sys_roof',      group:'systems',   factor:'Critical Systems (additive)', condition:'Roof replacement / repair',     pts:15, editable:true,  notes:'SOW contains Roofing work'},
-  {id:'rs_sys_windows',   group:'systems',   factor:'Critical Systems (additive)', condition:'Exterior windows & doors',      pts:10, editable:true,  notes:'SOW contains Windows & Doors work'},
-  // SOW Cost (from Scope of Work)
-  {id:'rs_cost_5',        group:'cost',      factor:'SOW Est. Cost',  condition:'$50,000+',                    pts:18, editable:true,  notes:'Major renovation — highest urgency'},
-  {id:'rs_cost_4',        group:'cost',      factor:'SOW Est. Cost',  condition:'$25,001 – $50,000',           pts:14, editable:true,  notes:'Significant renovation'},
-  {id:'rs_cost_3',        group:'cost',      factor:'SOW Est. Cost',  condition:'$10,001 – $25,000',           pts:10, editable:true,  notes:'Moderate renovation'},
-  {id:'rs_cost_2',        group:'cost',      factor:'SOW Est. Cost',  condition:'$2,501 – $10,000',            pts:5,  editable:true,  notes:'Minor repairs'},
-  {id:'rs_cost_1',        group:'cost',      factor:'SOW Est. Cost',  condition:'$0 – $2,500',                 pts:2,  editable:true,  notes:'Routine maintenance'},
-  // Health & Safety Concerns (from SOW checkboxes — each adds points, higher = more urgent)
-  {id:'rs_haz_mold',      group:'hazard',    factor:'Health & Safety Concerns (additive)', condition:'Mould / Mildew',              pts:8,  editable:true,  notes:'Health risk — increases reno urgency'},
-  {id:'rs_haz_asbestos',  group:'hazard',    factor:'Health & Safety Concerns (additive)', condition:'Asbestos Risk',               pts:12, editable:true,  notes:'Serious health hazard — high urgency'},
-  {id:'rs_haz_electrical',group:'hazard',    factor:'Health & Safety Concerns (additive)', condition:'Electrical Hazard',           pts:10, editable:true,  notes:'Fire/safety risk — high urgency'},
-  {id:'rs_haz_structural',group:'hazard',    factor:'Health & Safety Concerns (additive)', condition:'Structural Concern',          pts:10, editable:true,  notes:'Structural failure risk — high urgency'},
-  {id:'rs_haz_plumbing',  group:'hazard',    factor:'Health & Safety Concerns (additive)', condition:'Plumbing/Sewage',             pts:7,  editable:true,  notes:'Health/sanitation risk'},
-  {id:'rs_haz_fire',      group:'hazard',    factor:'Health & Safety Concerns (additive)', condition:'Fire Safety',                 pts:12, editable:true,  notes:'Fire safety risk — high urgency'},
-  // SOW Scope (number of line items — additive)
-  {id:'rs_items_5',       group:'scope',     factor:'SOW Scope',      condition:'10+ work items',              pts:8,  editable:true,  notes:'Very broad scope'},
-  {id:'rs_items_4',       group:'scope',     factor:'SOW Scope',      condition:'6 – 9 work items',            pts:5,  editable:true,  notes:'Broad scope'},
-  {id:'rs_items_3',       group:'scope',     factor:'SOW Scope',      condition:'3 – 5 work items',            pts:3,  editable:true,  notes:'Moderate scope'},
-  {id:'rs_items_2',       group:'scope',     factor:'SOW Scope',      condition:'1 – 2 work items',            pts:1,  editable:true,  notes:'Targeted repair'},
-  {id:'rs_items_1',       group:'scope',     factor:'SOW Scope',      condition:'No SOW filed',                pts:0,  editable:false, notes:'No scope of work submitted'},
-  // Occupancy impact
-  {id:'rs_occ_displaced', group:'occupancy', factor:'Occupancy',      condition:'Tenant displaced (under repair)', pts:10, editable:true,  notes:'Unit status is under_repair with tenant'},
-  {id:'rs_occ_condemned', group:'occupancy', factor:'Occupancy',      condition:'Condemned — uninhabitable',   pts:12, editable:true,  notes:'Unit is condemned'},
-  {id:'rs_occ_vacant',    group:'occupancy', factor:'Occupancy',      condition:'Vacant — no tenant impact',   pts:3,  editable:true,  notes:'Unit is vacant'},
-  {id:'rs_occ_occupied',  group:'occupancy', factor:'Occupancy',      condition:'Occupied — tenant in place',  pts:0,  editable:false, notes:'Active tenant — lower urgency'},
-  // Tenant Accountability — Damage & Conduct (increases urgency — unit needs repair because of tenant)
-  {id:'rs_ten_damage',    group:'conduct',   factor:'Tenant Conduct — Damage (additive)', condition:'Damage caused by tenant',     pts:-12, editable:true,  notes:'Tenant caused damage — reduces reno priority'},
-  {id:'rs_ten_negligence',group:'conduct',   factor:'Tenant Conduct — Damage (additive)', condition:'Negligence (failure to maintain/report)', pts:-10, editable:true, notes:'Failure to maintain or report — reduces priority'},
-  {id:'rs_ten_vandalism', group:'conduct',   factor:'Tenant Conduct — Damage (additive)', condition:'Vandalism',                   pts:-15, editable:true,  notes:'Intentional damage — tenant liability reduces priority'},
-  {id:'rs_ten_police',    group:'conduct',   factor:'Tenant Conduct — Damage (additive)', condition:'Police report on file',       pts:-5,  editable:true,  notes:'Police involvement — reduces reno priority'},
-  // Tenant Arrears — mirrors housing app scoring but as penalty (negative points = lower priority)
-  // A payment plan reduces the penalty, mirroring the payment arrangement bonus in the housing app
-  {id:'rs_arr_0',         group:'arrears',   factor:'Tenant Arrears',  condition:'$0 — no arrears',             pts:0,  editable:false, notes:'No arrears — no impact on score'},
-  {id:'rs_arr_1',         group:'arrears',   factor:'Tenant Arrears',  condition:'$1 – $500',                   pts:0,  editable:true,  notes:'Minor arrears — no penalty'},
-  {id:'rs_arr_2',         group:'arrears',   factor:'Tenant Arrears',  condition:'$501 – $1,500',               pts:-1, editable:true,  notes:'Mirrors housing app arrears score'},
-  {id:'rs_arr_3',         group:'arrears',   factor:'Tenant Arrears',  condition:'$1,501 – $3,000',             pts:-2, editable:true,  notes:'Mirrors housing app arrears score'},
-  {id:'rs_arr_4',         group:'arrears',   factor:'Tenant Arrears',  condition:'$3,001 – $5,000',             pts:-3, editable:true,  notes:'Mirrors housing app arrears score'},
-  {id:'rs_arr_5',         group:'arrears',   factor:'Tenant Arrears',  condition:'$5,001+',                     pts:-5, editable:true,  notes:'Mirrors housing app arrears score'},
-  // Payment arrangement — mirrors housing app: shorter plan = larger bonus that offsets arrears penalty
-  {id:'rs_pay_1',         group:'arrears',   factor:'Tenant Arrears',  condition:'Payment plan 0–12 months',    pts:5,  editable:true,  notes:'Mirrors payment arrangement bonus — short plan reduces penalty most'},
-  {id:'rs_pay_2',         group:'arrears',   factor:'Tenant Arrears',  condition:'Payment plan 13–36 months',   pts:4,  editable:true,  notes:'Mirrors payment arrangement bonus'},
-  {id:'rs_pay_3',         group:'arrears',   factor:'Tenant Arrears',  condition:'Payment plan 37–60 months',   pts:3,  editable:true,  notes:'Mirrors payment arrangement bonus'},
-  {id:'rs_pay_4',         group:'arrears',   factor:'Tenant Arrears',  condition:'Payment plan 61–120 months',  pts:2,  editable:true,  notes:'Mirrors payment arrangement bonus'},
-  {id:'rs_pay_5',         group:'arrears',   factor:'Tenant Arrears',  condition:'Payment plan 121–180 months', pts:1,  editable:true,  notes:'Mirrors payment arrangement bonus'},
-  {id:'rs_pay_6',         group:'arrears',   factor:'Tenant Arrears',  condition:'Payment plan 181+ months',    pts:0,  editable:true,  notes:'Very long plan — no bonus'},
-];
+
 
 
 
@@ -1834,21 +1767,7 @@ var DEFAULT_RENO_SCORE_MODEL = [
 
 // ══ RENOVATION BUDGET APPROVAL ═══════════════════════════════════════════════
 
-// Funding rules by funder type.
-// band_rep is eligible for all unit types.
-// fncfs is shown conditionally in the SOW form based on the configured
-// dependent age threshold (Settings → Reno Budget → FNCFS Dependent Age).
-var RENO_FUND_RULES = {
-  'ISC':        { pools:['rrap','band','ofnlp','band_rep'],         label:'ISC House',       rule:'Eligible: RRAP + Band Funds + OFNLP + Band Rep Funds' },
-  'CMHC_95':    { pools:['cmhc','band','ofnlp','band_rep'],         label:'CMHC Section 95', rule:'Eligible: CMHC + Band Funds + OFNLP + Band Rep Funds' },
-  'section_10': { pools:['rrap','isc','band','ofnlp','band_rep'],   label:'Section 10',      rule:'Eligible: RRAP + ISC + Band Funds + OFNLP + Band Rep Funds', repayment:true },
-  'rent_to_own':{ pools:['rrap','isc','band','ofnlp','band_rep'],   label:'Rent-to-Own',     rule:'Eligible: RRAP + ISC + Band Funds + OFNLP + Band Rep Funds. Tenant repayment expected.', repayment:true },
-  'band_house': { pools:['rrap','isc','band','ofnlp','band_rep'],   label:'Band House',      rule:'Eligible: RRAP + ISC + Band Funds + OFNLP + Band Rep Funds' },
-  '':           { pools:['rrap','isc','band','ofnlp','band_rep'],   label:'Band House',      rule:'Eligible: RRAP + ISC + Band Funds + OFNLP + Band Rep Funds' },
-};
 
-// Critical system SOW categories — must be funded first
-var CRITICAL_SOW_CATS = ['Heating / HVAC','Electrical','Roofing','Windows & Doors','Plumbing'];
 
 
 

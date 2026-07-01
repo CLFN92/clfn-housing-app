@@ -70,7 +70,7 @@ Items below with `[x]` were removed in Batch 2; `[ ]` remain deferred. Each is g
 
 ## 🟡 Refactor / duplication (drift risk)
 
-- [ ] **Duplicated scoring/fund models across `scoring.js` ↔ `renos.html`** (HIGH): `RENO_FUND_RULES`, `DEFAULT_UNIT_SCORE_MODEL`, `DEFAULT_RENO_SCORE_MODEL`, `CRITICAL_SOW_CATS`. Hoist each to one shared source; editing one copy silently diverges the other.
+- [x] **Duplicated scoring/fund models across `scoring.js` ↔ `renos.html`** (HIGH) — **DONE (Batch 3, 2026-07):** `RENO_FUND_RULES`, `DEFAULT_UNIT_SCORE_MODEL`, `DEFAULT_RENO_SCORE_MODEL`, `CRITICAL_SOW_CATS` consolidated into **`shared-config.js`** (the one file loaded on every page; scoring.js/shared-sow.js are not), both copies removed. The two `DEFAULT_RENO_SCORE_MODEL` copies had **drifted** — renos.html used newer "Request Scope"/"maintenance request" labels vs scoring.js's "SOW Scope"; the newer labels were adopted as canonical (display-only; ids/pts/logic were identical, so scoring is unchanged — housing pages now show the newer labels too).
 - [ ] **Two near-identical Leaflet location pickers** — `_udpLoc*` (housing-modals.js) vs `_slp*` (housing-tic.js), ~220 lines. One shared picker in shared-ui/shared-data.
 - [ ] **PDF scaffolding copy-paste** — nation header/footer + signature-block renderers duplicated across notifications.js (×3 generators), housing-tic.js, housing-modals.js, shared-data.js, finance-pdf/batch/statement/vouchers. Extract shared `_pdfHeader`/`_pdfFooter`/`_pdfSigBlock`.
 - [ ] **`getAllUnits()` helper** — a self-contradictory units-fallback idiom copy-pasted ~11× across housing-init/app/modals/views/shared-data.
