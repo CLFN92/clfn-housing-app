@@ -626,6 +626,70 @@ internet.
 
 ---
 
+## Phase WF — Application → Match → Agreement workflow polish  ✅ (shipped 2026-06)
+A deep review of the **application → unit-matching → contract-signing** flow
+surfaced friction and redundancy. Fixes shipped in four tiers (most impactful
+first). Files touched: `housing-app.js`, `housing-modals.js`, `housing-init.js`,
+`housing-tic.js`, `housing-views.js`, `shared-data.js`, `housing-settings.js`,
+`housing.html`.
+
+### Tier 1 — Workflow hand-offs  (done)
+Guide staff to the next step instead of relying on memory.
+- **Next Step indicator** (`renderDashTable`): a grey next-action line under each
+  dashboard status pill (e.g. `ed_approved` → "Match to a unit", `assigned` →
+  "Generate agreement"; commercial apps route to "Assign to a building").
+- **Approve → Match prompt** (`confirmApprovalAction`): after final ED approval
+  of a scored app with no unit, offer "Go to Match →".
+- **Assign → Agreement prompt** (`confirmAssignment` + `openTenantCard`): after
+  assigning a tenant, offer "Generate Agreement →"; sets `window._ticAutoLease`
+  and the TIC auto-opens the pre-filled lease modal.
+
+### Tier 2 — Agreement-generation safeguards  (done, `housing-tic.js`)
+- **Readiness gate + checklist** (`_ticLeaseMissing` / `_ticShowLeaseChecklist`):
+  "Generate PDF" validates required initials, tenant/co-tenant/landlord
+  signatures, and (fixed-term docs) an end date; shows a "Not ready to generate"
+  checklist and stops if anything is missing.
+- **Draft persistence** (`_leaseDraft` keyed by `docKey|unitId`): closing the
+  modal snapshots captured initials + signatures; reopening restores them
+  (drawn/typed/wet). No lost signing work.
+- **Rent-source label**: the Monthly Rent field shows where the prefilled amount
+  came from (ledger / unit / tenant / application) or a warning when none is on
+  file.
+
+### Tier 3 — Cut redundancy in the assign flow  (done)
+- **One shared approval rule** (`appAssignabilityStatus` / `appIsAssignable` in
+  `shared-data.js`): replaces three near-duplicate status checks (with three
+  different messages) across the Match queue, `confirmAssignment`, and the
+  unit-edit tenant gate — the four assignment paths can no longer drift.
+- **Always write tenancy back** (`writeTenancyToApplication`): mirrors
+  `assignedUnit` / `assignedAddress` / `status='assigned'` onto the application
+  whenever a unit is assigned. Fixed the leak site: `saveAddTenant` wrote the
+  unit but never the application (the "Cheryl Neegan" class of bug where housed
+  tenants surfaced on Match as unhoused) — it now gates + writes the app back.
+
+### Tier 4 — Larger UX  (done)
+- **Inline agreement initials** (`housing-tic.js`): each required clause renders
+  an inline Draw/Type/Wet initial pad in the agreement modal, replacing the five
+  separate full-screen pop-outs (signatures were already inline).
+  `_ticCaptureInlineInitials()` reads the inline pads into `_leaseInitials` keyed
+  by clause id, so the PDF generators, readiness gate, and draft snapshot are
+  unchanged. Old pop-out walker left defined but unwired.
+- **Conditional wizard steps** (`housing-app.js`, `housing-settings.js`,
+  `housing.html`): file updates (`existing_tenant`) and transfer requests
+  (`transfer_request`) skip Income (1), References/Emergency Contacts (4) and
+  Pets (5) — they already have a full file. `goTo()` jumps over skipped steps in
+  either direction; `_syncWizardNavFlow()` hides the skipped progress pills and
+  fixes the two forward-button labels (`nav_next_0` / `nav_next_3`), running on
+  every `goTo` and on `onAppTypeChange`. Skipping equals leaving those lists
+  empty (already valid) and does not affect scoring (income *stability* is a
+  separate staff-scorecard field).
+
+🔖 Parked follow-ups from the review (not built): consolidate the remaining
+approval/assignment error messaging further; editing a saved *transfer* app
+still restores its radio as New Housing (skip only applies during creation).
+
+---
+
 ## Rollback points
 - Pre-refactor snapshots (Phase C)
 
