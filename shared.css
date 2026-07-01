@@ -760,12 +760,17 @@ input:disabled, select:disabled, textarea:disabled {
 .pill-tabs {
   display: flex; gap: 4px; padding: 4px;
   background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
-  width: fit-content; margin-bottom: 16px;
+  width: fit-content; max-width: 100%; margin-bottom: 16px;
+  /* Scroll horizontally when the tabs exceed the viewport instead of squishing
+     / wrapping (matches .tabs / .tic-tabs). */
+  overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
 }
+.pill-tabs::-webkit-scrollbar { display: none; }
 .pill-tab {
   background: none; border: none; padding: 8px 18px;
   font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer;
   font-family: var(--sans); border-radius: 7px; transition: var(--tr);
+  flex-shrink: 0; white-space: nowrap;
 }
 .pill-tab:hover  { color: var(--text); }
 .pill-tab.active {
