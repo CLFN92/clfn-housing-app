@@ -1888,11 +1888,11 @@ async function generateContractorContract() {
       // appended Schedule B / Signatures sections are consistent with the body
       // rather than the smaller uppercase sectionHeader style.
       function h2Heading(text) {
-        ctx.needSpace(13); ctx.gap(3);
+        ctx.needSpace(15); ctx.gap(2);
         pdf.setFont('helvetica', 'bold'); pdf.setFontSize(12); pdf.setTextColor(30);
         var hl = pdf.splitTextToSize(String(text), ctx.contentW);
-        pdf.text(hl, ctx.marginL, ctx.y);
-        ctx.y += hl.length * 6 + 2;
+        pdf.text(hl, ctx.marginL, ctx.y + 4);
+        ctx.y += hl.length * 5.5 + 4;
         pdf.setTextColor(0);
       }
 
@@ -1964,8 +1964,9 @@ async function generateContractorContract() {
       pdf.setTextColor(0);
       ctx.y += 12;
 
-      // Signatures section
-      ctx.needSpace(50); ctx.gap(8);
+      // Signatures section — keep the block together on a page, but let
+      // h2Heading own the spacing so it matches the other section headers.
+      ctx.needSpace(50);
       h2Heading('Signatures');
 
       function _addSigBlock(label, sigId, nameVal) {

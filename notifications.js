@@ -4405,34 +4405,39 @@ function _renderBlocksToPdf(ctx, blocks) {
 
   blocks.forEach(function(block) {
     if (block.type === 'h1') {
-      ctx.needSpace(16);
-      ctx.gap(4);
+      // Balanced heading spacing: the baseline is drawn BELOW the cursor (y + cap
+      // ascent) so the leading gap is real space above the text — not eaten by the
+      // glyphs ascending over the cursor — and the trailing advance is a matching
+      // bottom margin. This keeps every header evenly spaced from the paragraph
+      // above and the section text below.
+      ctx.needSpace(18);
+      ctx.gap(3);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(15);
       pdf.setTextColor(20);
       var lines = pdf.splitTextToSize(block.text, contentW);
-      pdf.text(lines, marginL, ctx.y);
-      ctx.y += lines.length * 7 + 3;
+      pdf.text(lines, marginL, ctx.y + 5);
+      ctx.y += lines.length * 6.5 + 5;
 
     } else if (block.type === 'h2') {
-      ctx.needSpace(13);
-      ctx.gap(3);
+      ctx.needSpace(15);
+      ctx.gap(2);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(12);
       pdf.setTextColor(30);
       var lines = pdf.splitTextToSize(block.text, contentW);
-      pdf.text(lines, marginL, ctx.y);
-      ctx.y += lines.length * 6 + 2;
+      pdf.text(lines, marginL, ctx.y + 4);
+      ctx.y += lines.length * 5.5 + 4;
 
     } else if (block.type === 'h3') {
-      ctx.needSpace(10);
+      ctx.needSpace(12);
       ctx.gap(2);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
       pdf.setTextColor(50);
       var lines = pdf.splitTextToSize(block.text, contentW);
-      pdf.text(lines, marginL, ctx.y);
-      ctx.y += lines.length * 5 + 2;
+      pdf.text(lines, marginL, ctx.y + 3.5);
+      ctx.y += lines.length * 4.5 + 3.5;
 
     } else if (block.type === 'p') {
       ctx.paragraph(block.text, 9);
