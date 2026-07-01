@@ -1770,7 +1770,7 @@ function _ctRenderFormsSows(ctId, prefix) {
     var s = r.sow;
     var addr = s.address || '—';
     var pn   = s.project_number || '—';
-    var stat = statusLabels[s.approval_status] || s.approval_status || '—';
+    var stat = s.system_approved ? 'System Approved' : (statusLabels[s.approval_status] || s.approval_status || '—');
     var date = s.created_at || s.date || '—';
     var amt  = fmtMoney(s.amount || s.totalCost);
     var uid  = String(r.unitId).replace(/'/g, "\\'");
@@ -6798,7 +6798,36 @@ async function sendRfqToRecipients(rfq, contractorList) {
   return { ok: ok, fail: fail, failNames: failNames };
 }
 
-async function awardRfq(rfqId, contractorId, amount, notes) {
+// Marks the SOW linked to an RFQ as approved — awarding/contracting an RFQ
+// greenlights the underlying scope of work, so it should no longer sit in the
+// reno-approval queue. Idempotent; safe to call more than once.
+function _rfqApproveLinkedSow(unitId, projectNumber, role) {
+  if (!unitId || typeof getUnitSowList !== 'function' || typeof saveSowData !== 'function') return;
+  var list = getUnitSowList(unitId);
+  if (!list.length) return;
+  var sow = (projectNumber ? list.find(function(s){ return s && s.project_number === projectNumber; }) : null) || list[0];
+  if (!sow) return;
+  if (sow.approval_status === 'completed' || sow.approval_status === 'ed_approved') return;
+  // System Approved: the SOW is approved BY the tendering workflow (RFQ award),
+  // not by a person. Keep approval_status='ed_approved' so every existing
+  // "is this approved?" check recognizes it, but flag system_approved so the UI
+  // can label it "System Approved" instead of falsely showing "ED Approved".
+  sow.approval_status = 'ed_approved';
+  sow.approved_via_rfq = true;
+  sow.system_approved = true;
+  sow.edName = 'System';
+  sow.edDate = (new Date().toISOString().slice(0, 10));
+  saveSowData(unitId, { sows: list });
+  if (typeof auditEntry === 'function') {
+    auditEntry('SOW:' + unitId, 'sow_system_approval', (projectNumber || '') + ' system-approved via RFQ award/contract', role || window.currentRole || 'staff');
+  }
+}
+
+// opts.skipNotify — record the award WITHOUT emailing the winner or the other
+// bidders (for tenders run manually/offline where the app is used only for
+// contracting).
+async function awardRfq(rfqId, contractorId, amount, notes, opts) {
+  opts = opts || {};
   var rfq = (window._rfqCache || {})[rfqId];
   if (!rfq) { if (typeof showToast === 'function') showToast('RFQ not found'); return false; }
   var role = window.currentRole || 'staff';
@@ -6813,8 +6842,10 @@ async function awardRfq(rfqId, contractorId, amount, notes) {
     if (!r.ok) throw new Error('PATCH failed: ' + await r.text());
     Object.assign(rfq, updates);
     var ct = (window._contractors || []).find(function(c){ return c && c.id === contractorId; });
-    if (typeof auditEntry === 'function') auditEntry('RFQ:' + rfqId, 'awarded', 'Awarded to ' + ((ct && ct.name) || contractorId) + ' -- $' + (parseFloat(amount)||0).toFixed(2) + (notes ? ' -- ' + notes : ''), role);
-    if (ct && ct.email && typeof window.sendNotification === 'function') {
+    if (typeof auditEntry === 'function') auditEntry('RFQ:' + rfqId, 'awarded', 'Awarded to ' + ((ct && ct.name) || contractorId) + ' -- $' + (parseFloat(amount)||0).toFixed(2) + (opts.skipNotify ? ' (no notifications)' : '') + (notes ? ' -- ' + notes : ''), role);
+    // Awarding an RFQ approves the linked SOW.
+    _rfqApproveLinkedSow(rfq.sow_unit_id, rfq.sow_project_number, role);
+    if (!opts.skipNotify && ct && ct.email && typeof window.sendNotification === 'function') {
       var units = (typeof housingUnits !== 'undefined' ? housingUnits : []);
       var unit  = units.find(function(u){ return u && u.id === rfq.sow_unit_id; }) || {};
       var addr  = ((unit.num || '') + ' ' + (unit.street || '')).trim() || rfq.sow_unit_id;
@@ -6830,7 +6861,7 @@ async function awardRfq(rfqId, contractorId, amount, notes) {
     // award and don't trip the Graph ~4-concurrent sendMail throttle.
     var _bids = (rfq.data && rfq.data.bids) || {};
     var _loserIds = Object.keys(_bids).filter(function(bid){ return bid !== contractorId; });
-    if (_loserIds.length && typeof window.sendNotification === 'function') {
+    if (!opts.skipNotify && _loserIds.length && typeof window.sendNotification === 'function') {
       (async function(){
         var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || 'Housing';
         for (var i = 0; i < _loserIds.length; i++) {
@@ -6851,7 +6882,8 @@ async function awardRfq(rfqId, contractorId, amount, notes) {
         }
       })();
     }
-    if (typeof showToast === 'function') showToast('RFQ ' + rfqId + ' awarded');
+    if (typeof showToast === 'function') showToast('RFQ ' + rfqId + ' awarded' + (opts.skipNotify ? ' (no notifications) — SOW approved' : ' — SOW approved'));
     return true;
   } catch(e) { console.warn('[rfq] award failed:', e); if (typeof showToast === 'function') showToast('Award failed -- see console'); return false; }
 }
+window.awardRfq = awardRfq;

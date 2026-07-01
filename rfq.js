@@ -1161,6 +1161,36 @@ async function confirmAward() {
   }
 }
 
+// Manual award (no notifications) — for tenders run manually/offline where the
+// app is used only for contracting. Records the awarded contractor + amount from
+// the Scope Award card, marks the linked SOW approved, and jumps to Contracting
+// WITHOUT issuing the RFQ or emailing anyone.
+async function _rfqManualAward() {
+  var ctId = (document.getElementById('rfq_awarded_to') || {}).value || '';
+  var amt  = _rfqParseNum((document.getElementById('rfq_award_amount') || {}).value);
+  if (!ctId)       { showToast('Select the awarded contractor above (Awarded To)'); return; }
+  if (!(amt > 0))  { showToast('Enter the award amount'); return; }
+  // The award patches the cached RFQ record, so make sure it exists first.
+  if (typeof saveRfqDraft === 'function') { try { await saveRfqDraft(); } catch(e){ console.warn('[rfq] manual-award pre-save failed:', e); } }
+  if (!_rfqCurrentId) { showToast('Save the RFQ first'); return; }
+  var ct   = (window._contractors || []).find(function(c){ return c && c.id === ctId; });
+  var elig = (typeof _rfqContractorEligibility === 'function') ? _rfqContractorEligibility(ct) : [];
+  var msg  = ((ct && ct.name) || 'This contractor') + ' will be recorded as the awarded contractor for '
+           + _rfqFmtMoney(amt) + '. <strong>No emails will be sent</strong>, and the linked SOW will be marked approved.'
+           + (elig.length ? '<br><br>Note: ' + escapeHtml((ct && ct.name) || 'the contractor') + ' is ' + escapeHtml(elig.join('; ')) + '.' : '');
+  if (typeof showConfirm === 'function') {
+    var go = await showConfirm({ title: 'Record award (no notifications)?', message: msg, confirmText: 'Record award', cancelText: 'Cancel' });
+    if (!go) return;
+  }
+  var notes = (document.getElementById('rfq_award_notes') || {}).value || '';
+  var ok = (typeof awardRfq === 'function') ? await awardRfq(_rfqCurrentId, ctId, amt, notes, { skipNotify: true }) : false;
+  if (ok) {
+    showRfqForm(_rfqCurrentId);
+    switchRfqTab('contracting');
+    _rfqSeedContractFromAward(_rfqCurrentId);
+  }
+}
+
 // Prefill the Contracting tab from the award so the contractor + price aren't
 // re-entered: select the awarded contractor (fills signatory), and seed the
 // contract price from the award amount when the breakdown is still empty (so

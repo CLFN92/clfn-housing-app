@@ -662,6 +662,7 @@ function _openSowPicker(unitId, activeList) {
 
   function _card(sow) {
     var ss = statusStyles[sow.approval_status || ''] || {bg:'#f4f4f0', c:'#666', label: sow.approval_status || 'Draft'};
+    if (sow.system_approved) ss = {bg:'#eef2ff', c:'#4338ca', label:'System Approved'};
     var pn = sow.project_number || '—';
     var date = (sow.created_at || sow.date || '').slice(0, 10) || '—';
     var amount = (sow.amount != null && sow.amount !== '') ? (typeof formatCurrency === 'function' ? formatCurrency(sow.amount) : '$' + sow.amount) : '—';
@@ -1292,6 +1293,7 @@ function udpRenderSowTable(unitId){
 
   var rows = list.map(function(sow){
     var ss = statusStyles[sow.approval_status] || {bg:'#f4f4f0', c:'#666', label:sow.approval_status || '—'};
+    if (sow.system_approved && sow.approval_status !== 'completed') ss = {bg:'#eef2ff', c:'#4338ca', label:'System Approved'};
     var pn = esc(sow.project_number || '—');
     var date = esc(sow.created_at || sow.date || '—');
     var amount = (sow.amount == null) ? '—' : fmtCurrency(sow.amount);

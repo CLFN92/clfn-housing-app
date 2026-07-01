@@ -1359,6 +1359,8 @@ function _getRaApprovalStatusForSow(u, sow) {
   if(pct >= 100) return {key:'complete',    label:'Complete',     bg:'#f0fdf4', c:'#15803d'};
   if(pct > 0)    return {key:'in_progress', label:'In Progress',  bg:'#fffbeb', c:'#92400e'};
   // SOW-level approval flags (new).
+  // System Approved: auto-approved by the tendering workflow (RFQ award), not a person.
+  if(sow.system_approved) return {key:'approved', label:'System Approved', bg:'#eef2ff', c:'#4338ca'};
   if(sow.approval_status === APP_STATUS.ED_APPROVED) return {key:'approved', label:'ED Approved', bg:'#f0fdf4', c:'#15803d'};
   if(sow.approval_status === 'hm_approved') {
     if(needsED) return {key:'pending_ed', label:'Pending ED', bg:'#eff6ff', c:'#1d4ed8'};
