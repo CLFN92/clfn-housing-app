@@ -307,6 +307,21 @@ async function _fetchAndPopulateSow(unitId, sowPn) {
       var items = sow.items || sow.lineItems || [];
       _rfqScopeItems = items.map(function(it){ return Object.assign({}, it, {_hidden:false}); });
     }
+
+    // Prefill the Scope Summary paragraph from the SOW work items for a NEW RFQ
+    // (blank until now, so staff re-typed it). Never touch a saved RFQ or a
+    // value the user already entered.
+    if (!_rfqCurrentId) {
+      var sumEl = document.getElementById('rfq_sow_summary');
+      if (sumEl && !(sumEl.value || '').trim()) {
+        var _lines = (sow.items || sow.lineItems || []).map(function(it){
+          return ((it.category ? it.category + ': ' : '') + (it.description || '')).trim();
+        }).filter(Boolean);
+        if (_lines.length) {
+          sumEl.value = 'Requested scope of work at ' + addr + ':\n- ' + _lines.join('\n- ');
+        }
+      }
+    }
   } catch(e) {
     console.warn('[rfq] SOW fetch failed:', e);
   }
@@ -903,10 +918,54 @@ async function confirmAward() {
   var notes  = document.getElementById('award_notes').value.trim();
   if (!ctId)   { showToast('Select a contractor'); return; }
   if (!amount) { showToast('Enter the award amount'); return; }
+  // Capture the RFQ id BEFORE closeAwardModal() clears _rfqAwardingId — otherwise
+  // awardRfq() was being handed null.
+  var rfqId = _rfqAwardingId;
+  var ct    = (window._contractors || []).find(function(c){ return c && c.id === ctId; });
   closeAwardModal();
-  if (typeof awardRfq === 'function') {
-    var ok = await awardRfq(_rfqAwardingId, ctId, amount, notes);
-    if (ok) renderRfqList();
+  if (typeof awardRfq !== 'function') return;
+  var ok = await awardRfq(rfqId, ctId, amount, notes);
+  if (!ok) return;
+
+  // Hand off straight into the contract instead of stranding the user on the
+  // list and making them re-open + re-key everything.
+  var amtLabel = '$' + (parseFloat(amount) || 0).toLocaleString('en-CA', {minimumFractionDigits:2});
+  var proceed  = (typeof showConfirm === 'function')
+    ? await showConfirm({
+        title:       'Awarded',
+        message:     ((ct && ct.name) || 'Contractor') + ' awarded ' + amtLabel + '. Set up the contract now?',
+        confirmText: 'Set up contract →', cancelText: 'Later'
+      })
+    : false;
+  if (proceed) {
+    showRfqForm(rfqId);
+    switchRfqTab('contracting');
+    _rfqSeedContractFromAward(rfqId);
+  } else {
+    renderRfqList();
+  }
+}
+
+// Prefill the Contracting tab from the award so the contractor + price aren't
+// re-entered: select the awarded contractor (fills signatory), and seed the
+// contract price from the award amount when the breakdown is still empty (so
+// the on-screen Contract Price matches what the PDF prints).
+function _rfqSeedContractFromAward(rfqId) {
+  var rfq = (window._rfqCache || {})[rfqId];
+  if (!rfq) return;
+  var awEl = document.getElementById('rfq_awarded_to');
+  if (awEl && rfq.awarded_contractor_id) awEl.value = rfq.awarded_contractor_id;
+  if (typeof _rfqAutoFillContractor === 'function') _rfqAutoFillContractor();
+
+  var amt = parseFloat(rfq.award_amount) || 0;
+  if (amt) {
+    var ids = ['rfq_price_materials','rfq_price_labour','rfq_price_equipment','rfq_price_other'];
+    var anyFilled = ids.some(function(id){ var el = document.getElementById(id); return el && parseFloat(el.value) > 0; });
+    var other = document.getElementById('rfq_price_other');
+    if (!anyFilled && other) {
+      other.value = amt;   // agreed lump sum; staff can redistribute into materials/labour
+      if (typeof _rfqRecalcPrices === 'function') _rfqRecalcPrices();
+    }
   }
 }
 

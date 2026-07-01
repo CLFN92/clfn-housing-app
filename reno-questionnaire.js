@@ -504,28 +504,46 @@
 
     var unitId = S.unitId, issues = S.issues.slice(), notes = S.notes;
     close();
+    // Hand a structured seed to the SOW modal instead of scraping its DOM after
+    // a fixed timeout. openSowModal applies it in-flow once the modal is mounted,
+    // so items/condition/H&S flags can't silently fail to land.
     window._sowForceNew = true;
+    window._sowSeed = {
+      items: issues.map(function(it){ return { category: it.trade, description: it.description }; }),
+      notes: 'Captured via Renovation Questionnaire.' + (notes ? '\n' + notes : ''),
+      condition: _severityToCondition(issues),
+      hsFlags: _issuesToHsFlags(issues)
+    };
     openSowModal(unitId);
-    setTimeout(function(){
-      try {
-        var cont = document.getElementById('sow_items');
-        if(cont){
-          Array.prototype.slice.call(cont.querySelectorAll('div[id^="sow_item_"]')).forEach(function(row){
-            var desc=(row.querySelector('[data-sow="description"]')||{}).value||'';
-            var cat =(row.querySelector('[data-sow="category"]')||{}).value||'';
-            if(!desc && !cat) row.remove();
-          });
-        }
-        issues.forEach(function(it){ if(typeof addSowItem === 'function') addSowItem({ category: it.trade, description: it.description }); });
-        if(typeof recalcSowTotal === 'function') recalcSowTotal();
-        var n = document.getElementById('sow_notes');
-        if(n){
-          var add = 'Captured via Renovation Questionnaire.' + (notes ? '\n' + notes : '');
-          n.value = n.value ? (n.value + '\n\n' + add) : add;
-        }
-        if(typeof showToast === 'function') showToast(issues.length + ' issue' + (issues.length>1?'s':'') + ' added to the maintenance request.');
-      } catch(err){ console.warn('[reno-q] populate SOW failed:', err); }
-    }, 220);
+    if(typeof showToast === 'function') showToast(issues.length + ' issue' + (issues.length>1?'s':'') + ' added to the maintenance request.');
+  }
+
+  // Map the worst captured severity to the SOW "Overall Condition" select.
+  function _severityToCondition(issues){
+    var rank = { 'Urgent':4, 'High':3, 'Medium':2, 'Low':1 };
+    var worst = 0;
+    issues.forEach(function(it){
+      var key = (it.severity || '').split(' ')[0];   // 'Urgent — …' -> 'Urgent'
+      if(rank[key] > worst) worst = rank[key];
+    });
+    return ({ 4:'Critical', 3:'Poor', 2:'Fair', 1:'Good' })[worst] || '';
+  }
+
+  // Infer SOW Health & Safety checkbox ids from the reported trade/issues text.
+  // Conservative: only genuine hazards flag (staff can adjust). Ids match the
+  // SOW modal's H&S checkboxes (sow_mold/electrical/structural/plumbing/fire).
+  function _issuesToHsFlags(issues){
+    var flags = {};
+    issues.forEach(function(it){
+      var hay = ((it.trade||'') + ' ' + (it.component||'') + ' '
+               + (it.issues||[]).join(' ') + ' ' + (it.details||'')).toLowerCase();
+      if(/mould|mold|mildew/.test(hay)) flags.sow_mold = 1;
+      if(/spark|burn|shock|exposed|no power|grounded|warm to touch|buzzing|knob & tube/.test(hay)) flags.sow_electrical = 1;
+      if(/structural|rotted|sagging|buckling|foundation|soft \/ rotted|subfloor/.test(hay)) flags.sow_structural = 1;
+      if(/leak|sewer|backup|burst|frozen|flood|sewage/.test(hay)) flags.sow_plumbing = 1;
+      if(/smoke|co detector|fire/.test(hay)) flags.sow_fire = 1;
+    });
+    return Object.keys(flags);
   }
 
   // ── Public API ──────────────────────────────────────────────────────────────

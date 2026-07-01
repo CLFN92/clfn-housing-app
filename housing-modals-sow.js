@@ -843,7 +843,48 @@ function openSowModal(unitId, projectNumber) {
 
   // Apply the locked/unlocked state based on the SOW's status and the current user's role.
   _applySowModalLock(saved);
+
+  // Apply a one-shot seed handed off by the Reno Questionnaire. Done in-flow
+  // (the modal DOM is fully mounted here) instead of a post-open setTimeout
+  // DOM-scrape race — the previous approach could silently drop items.
+  if (window._sowSeed) {
+    var _seed = window._sowSeed; window._sowSeed = null;
+    try { _applySowSeed(_seed); } catch(e){ console.warn('[sow] seed apply failed:', e); }
+  }
 }
+
+// Populate a brand-new SOW from a structured seed (Reno Questionnaire hand-off):
+// work items, overall condition, Health & Safety flags, and appended notes.
+function _applySowSeed(seed){
+  if(!seed) return;
+  // Drop the blank default row(s) so seeded items don't sit next to an empty one.
+  var cont = document.getElementById('sow_items');
+  if(cont){
+    Array.prototype.slice.call(cont.querySelectorAll('div[id^="sow_item_"]')).forEach(function(row){
+      var desc=(row.querySelector('[data-sow="description"]')||{}).value||'';
+      var cat =(row.querySelector('[data-sow="category"]')||{}).value||'';
+      if(!desc && !cat) row.remove();
+    });
+  }
+  (seed.items||[]).forEach(function(it){
+    if(typeof addSowItem === 'function') addSowItem({ category: it.category, description: it.description });
+  });
+  if(typeof recalcSowTotal === 'function') recalcSowTotal();
+  // Overall condition (worst severity from the questionnaire) — only if unset.
+  if(seed.condition){
+    var c = document.getElementById('sow_condition');
+    if(c && !c.value) c.value = seed.condition;
+  }
+  // Health & Safety flags inferred from the reported issues.
+  (seed.hsFlags||[]).forEach(function(id){
+    var el = document.getElementById(id); if(el) el.checked = true;
+  });
+  if(seed.notes){
+    var n = document.getElementById('sow_notes');
+    if(n) n.value = n.value ? (n.value + '\n\n' + seed.notes) : seed.notes;
+  }
+}
+window._applySowSeed = _applySowSeed;
 
 // ── SOW completion state control ──────────────────────────────────────────
 // Applies read-only lock when a SOW is completed AND the viewer isn't the ED.
