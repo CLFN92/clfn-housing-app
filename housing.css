@@ -1823,6 +1823,18 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 .tic-grid-2               { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; }
 .tic-grid-3               { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 18px; }
 @media (max-width: 700px) { .tic-grid-2, .tic-grid-3 { grid-template-columns: 1fr; } }
+/* .stg-lookup-input carries flex-row assumptions (flex:1; min-width:200px) from
+   the Settings layout; inside a .f grid cell those let native date pickers push
+   past the cell. Neutralise them so the cell width governs. */
+.f .stg-lookup-input      { flex: initial; min-width: 0; width: 100%; box-sizing: border-box; }
+/* iOS Safari sizes native date/datetime inputs to their content and centres the
+   value, ignoring width:100% — so they overflow the grid cell. Force plain
+   text-field rendering on narrow screens (keeps the desktop calendar picker). */
+@media (max-width: 700px) {
+  .f input[type="date"], .f input[type="datetime-local"] {
+    -webkit-appearance: none; appearance: none; min-width: 0; text-align: left;
+  }
+}
 .tic-field                { display: flex; flex-direction: column; gap: 4px; }
 .tic-field-lbl            { font-size: 10px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); }
 .tic-field-val            { font-size: 13px; font-weight: 600; color: var(--text); }
