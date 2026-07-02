@@ -1680,7 +1680,8 @@ function _ctRenderActions(ct, prefix) {
   var status = ct.status || 'pending_review';
   var actions = [];
 
-  if(APPROVAL_AUTHORITY.can('recommendContractor', role)) {
+  var canRecommend = APPROVAL_AUTHORITY.can('recommendContractor', role);
+  if(canRecommend) {
     if(status === 'pending_review' || status === 'returned') {
       actions.push({label:'✅ Recommend to ED', cls:'btn-primary',      action:'hm_recommended', needsNotes:false});
       actions.push({label:'↩ Return for Info',  cls:'btn-ghost',        action:'returned',       needsNotes:true});
@@ -1688,7 +1689,11 @@ function _ctRenderActions(ct, prefix) {
     }
   }
   if(APPROVAL_AUTHORITY.can('approveContractor', role)) {
-    if(status === 'hm_recommended' || status === 'pending_review') {
+    // Final approval is by HM or ED. Show it at hm_recommended (post-recommend).
+    // Also allow it straight from pending_review ONLY for a pure approver (e.g.
+    // ED) who has no recommend step — a role that can BOTH recommend and approve
+    // (HM) uses the recommend action at pending_review, so it isn't shown both.
+    if(status === 'hm_recommended' || (status === 'pending_review' && !canRecommend)) {
       actions.push({label:'✅ Final Approval',  cls:'btn-primary',      action:'approved', needsNotes:false});
       actions.push({label:'↩ Return to HM',    cls:'btn-ghost',        action:'returned', needsNotes:true});
       actions.push({label:'❌ Decline',          cls:'btn-danger-ghost', action:'declined', needsNotes:true});
@@ -2345,7 +2350,7 @@ function confirmCtAction() {
   window._ctLastSaved = ct;
 
   // Audit entry
-  var actionLabels = {hm_recommended:'HM verified and recommended to ED',approved:'ED granted final approval',declined:'Application declined'+(notes?' — '+notes:''),returned:'Returned for more information'+(notes?' — '+notes:'')};
+  var actionLabels = {hm_recommended:'HM verified and recommended to ED',approved:'Final approval granted ('+role+')',declined:'Application declined'+(notes?' — '+notes:''),returned:'Returned for more information'+(notes?' — '+notes:'')};
   auditEntry('CT:'+ct.id, action, (actionLabels[action]||action)+': '+ct.name, role);
 
   // Persist the status change so it survives a reload — without this,
@@ -2385,7 +2390,7 @@ function _ctSetCicStatusBanner(ct) {
   if(!banner) return;
   var ctStatusStyle = {
     pending_review: {bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'⏳ Pending Housing Manager Review'},
-    hm_recommended: {bg:'#eff6ff',c:'#1d4ed8',label:'📋 HM Recommended — Awaiting ED Approval'},
+    hm_recommended: {bg:'#eff6ff',c:'#1d4ed8',label:'📋 HM Recommended — Awaiting Final Approval'},
     approved:       {bg:'#f0fdf4',c:'#15803d',label:'✅ Approved — Active Contractor'},
     declined:       {bg:'#fef2f2',c:'#b91c1c',label:'❌ Declined'},
     returned:       {bg:'#faf5ff',c:'#7c3aed',label:'↩ Returned for More Information'}
@@ -2898,7 +2903,7 @@ function openCtApprovalPanel(idx) {
   // Status banner
   var ctStatusStyle = {
     pending_review: {bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'⏳ Pending Housing Manager Review'},
-    hm_recommended: {bg:'#eff6ff',c:'#1d4ed8',label:'📋 HM Recommended — Awaiting ED Approval'},
+    hm_recommended: {bg:'#eff6ff',c:'#1d4ed8',label:'📋 HM Recommended — Awaiting Final Approval'},
     approved:       {bg:'#f0fdf4',c:'#15803d',label:'✅ Approved — Active Contractor'},
     declined:       {bg:'#fef2f2',c:'#b91c1c',label:'❌ Declined'},
     returned:       {bg:'#faf5ff',c:'#7c3aed',label:'↩ Returned for More Information'}
@@ -3447,7 +3452,7 @@ function renderContractorsView(){
 
   var ctStatusStyle = {
     pending_review: {cls:'pending-review', label:'⏳ Pending HM'},
-    hm_recommended: {cls:'hm-recommended', label:'📋 Awaiting ED'},
+    hm_recommended: {cls:'hm-recommended', label:'📋 Awaiting Approval'},
     approved:       {cls:'approved',        label:'✅ Approved'},
     declined:       {cls:'declined',        label:'❌ Declined'},
     returned:       {cls:'returned',        label:'↩ Returned'}
@@ -4265,16 +4270,22 @@ function renderWorklist() {
   }
 
   // ── 4. Contractors awaiting the logged-in user's approval ────────────────
-  // Contractor status values: 'pending_review' = needs HM verification,
-  // 'hm_recommended' = needs ED approval.
+  // Contractor status values: 'pending_review' = needs recommend/verify,
+  // 'hm_recommended' = needs final approval (HM or ED). Bucket off the real
+  // contractor authorities (not the application-level canFinal): a recommender
+  // (HE-L2/HM) sees pending_review; a final approver (HM/ED) sees hm_recommended
+  // (and pending_review directly only if they cannot recommend — i.e. the ED).
   var ctItems = [];
   if (isManagement) {
+    var canRecommendCt = typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('recommendContractor', role);
+    var canApproveCt   = typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('approveContractor', role);
     var cts = window._contractors || [];
     cts.forEach(function(ct) {
       if (!ct) return;
-      var needsHm = !canFinal && ct.status === 'pending_review';
-      var needsEd = canFinal && (ct.status === 'hm_recommended' || ct.status === 'pending_review');
-      if (!needsHm && !needsEd) return;
+      var st = ct.status;
+      var needsRecommend = canRecommendCt && st === 'pending_review';
+      var needsApprove   = canApproveCt && (st === 'hm_recommended' || (st === 'pending_review' && !canRecommendCt));
+      if (!needsRecommend && !needsApprove) return;
       ctItems.push({ id: ct.id, name: ct.name || ct.id, trade: ct.trade || '', status: ct.status });
     });
     ctItems = ctItems.slice(0, 6);
@@ -4529,8 +4540,8 @@ function renderWorklist() {
 
   // Contractors
   if (ctItems.length) {
-    var ctLabel = { pending_review:'Awaiting HM Verification', hm_recommended:'Awaiting ED Approval' };
-    var ctStatusLabel = { pending_review:'Awaiting HM Verification', hm_recommended:'HM Verified — Awaiting ED' };
+    var ctLabel = { pending_review:'Awaiting HM Verification', hm_recommended:'Awaiting Final Approval' };
+    var ctStatusLabel = { pending_review:'Awaiting HM Verification', hm_recommended:'HM Verified — Awaiting Approval' };
     var ctBtnText     = { pending_review:'Verify →', hm_recommended:'Approve →' };
     var ctRows = ctItems.map(function(c) {
       // Set nav referrer so contractors.html back-button returns here

@@ -73,12 +73,13 @@ var APPROVAL_AUTHORITY = (function() {
     assignWorkOrder:          ['housing_manager', 'ed'],
 
     // ── Contractor approvals ──────────────────────────────────────────────
-    // Who can recommend a contractor to ED. HE-L2 included so senior
-    // employees can move new contractors forward without HM having to be
-    // the bottleneck — ED still owns the final approve/decline.
+    // Who can recommend a contractor for final approval. HE-L2 included so
+    // senior employees can move new contractors forward without HM having to
+    // be the bottleneck. The recommend step is retained, but final approval is
+    // held by the HM or the ED (either can grant it).
     recommendContractor:      ['housing_employee_l2', 'housing_manager'],
-    // Who gives final contractor approval
-    approveContractor:        ['ed'],
+    // Who gives final contractor approval — HM or ED.
+    approveContractor:        ['housing_manager', 'ed'],
     // Who can decline a contractor
     declineContractor:        ['housing_manager', 'ed'],
 

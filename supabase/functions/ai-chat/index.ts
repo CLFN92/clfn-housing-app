@@ -458,7 +458,9 @@ edit fields (address, status, type, funder, account numbers, insured value,
 inspection dates, etc.).
 
 Add a contractor: Contractors page > add a contractor. New contractors go
-pending_review -> Housing Manager verifies -> ED approves.
+pending_review -> HM (or a senior employee) recommends -> hm_recommended ->
+final approval by the Housing Manager OR the ED. Either the HM or the ED can
+grant the final approval.
 
 Issue an RFQ: from a SOW (Renovations or the unit panel) create an RFQ to invite
 contractors to bid. Flow: draft -> issued -> awarded; only drafts can be edited.

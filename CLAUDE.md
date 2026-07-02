@@ -73,7 +73,7 @@ The landing-page action queue is a single function that renders grouped sections
 2. **Applications** — submitted/mgr_approved apps for management; returned apps for the owner.
 3. **Renovations Waiting Approval** — SOWs needing HM or ED sign-off. HM sees `''`/`'draft'`/`'signed'`/`'submitted'`; ED sees `'hm_approved'` (and can also act on earlier statuses). Clicking opens the SOW modal in-place via `openSowModal()` when available, otherwise navigates to renos.html.
 4. **RFQs Open for Bids** — `status === 'issued'` RFQs for management.
-5. **Contractors Waiting Approval** — `pending_review` (HM verifies) → `hm_recommended` (ED approves).
+5. **Contractors Waiting Approval** — `pending_review` (HE-L2/HM recommends) → `hm_recommended` (**HM or ED** gives final approval; `approveContractor` authority). The recommend step is retained; a role that can both recommend and approve (HM) recommends at `pending_review` and approves at `hm_recommended`, while a pure approver (ED) can approve straight from `pending_review`.
 6. **Inventory Approvals** — units where `unitHmSig` is set but `decision` is blank (HM pending), or `unitEdSig` pending / HM deferred to ED. Links to `inventory.html?unit=<id>` which auto-opens the unit detail panel.
 7. **Ready to Match** — `ed_approved`/`mgr_approved` apps with no assigned unit.
 
