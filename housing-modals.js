@@ -2554,6 +2554,15 @@ window.openEditModal = function(appId) {
     return;
   }
 
+  // Commercial (business/department) applications use their own modal, NOT the
+  // residential wizard — otherwise they open demanding housing-only fields
+  // (last name, on-reserve, street/city/postal). Route them there.
+  if (app.appType === 'commercial') {
+    if (typeof window.openCommercialApp === 'function') { window.openCommercialApp(appId); return; }
+    showToast('Commercial application viewer is not available on this page.');
+    return;
+  }
+
   // Store the ID so saveApplicationRecord knows which record to update
   currentAppId = app.id;
   // Existing application → Internal Notes tab is available immediately.

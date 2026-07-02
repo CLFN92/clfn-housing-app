@@ -6397,6 +6397,13 @@ function _getAllRenoUnits() {
 
 function showScorecard(app){
   if(!app)return;
+  // Commercial (business/department) applications are NOT scored/waitlisted and
+  // have their own review modal — never show them the residential scorecard.
+  if(app.appType === 'commercial'){
+    if(typeof window.openCommercialApp === 'function'){ window.openCommercialApp(app.id); return; }
+    if(typeof showToast === 'function') showToast('Commercial application viewer is not available on this page.');
+    return;
+  }
   window._currentScorecardApp=app;
   hideAllViews('scorecardView');
   var _scv=document.getElementById('scorecardView');if(!_scv)return;
