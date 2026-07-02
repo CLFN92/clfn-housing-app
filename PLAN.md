@@ -690,7 +690,7 @@ still restores its radio as New Housing (skip only applies during creation).
 
 ---
 
-## Phase RF — Maintenance → SOW → RFQ → Contract flow polish  ✅ (Tiers 1-3 shipped 2026-07)
+## Phase RF — Maintenance → SOW → RFQ → Contract flow polish  ✅ (Tiers 1-5 shipped 2026-07)
 A deep review (3 audit agents) of the **maintenance request → SOW → RFQ →
 tendering → contracting** chain found it was three disconnected islands linked
 only by URL navigation + manual re-entry, with a hollow tendering middle (no bid
@@ -754,6 +754,33 @@ intake). Fixes shipped in tiers. Files: `reno-questionnaire.js`,
   `saveSOW()` directly instead of via `sowSaveClicked()`, skipping the
   submit-mode "email tenant PDF copy" prompt (approving ≠ submitting). Inline
   approval is now two contextual dialogs (approve → work-order email).
+
+### Tier 5 — RFQ → SOW approval, System Approved, read-only, AI parity  ✅ (shipped 2026-07)
+- **Awarding an RFQ approves the linked SOW.** `awardRfq` (shared-data.js) is now
+  `async` and calls `_rfqApproveLinkedSow(sow_unit_id, sow_project_number, role)`.
+  Because "we don't always run the full tender in the app — sometimes it's done
+  manually then we just use the app for contracting," there's also a **manual
+  no-notification path**: **"Record Award & Approve SOW — No Notifications"** on
+  the Scope tab's Award card (`_rfqManualAward` → `awardRfq(…, {skipNotify:true})`),
+  which records the award, approves the SOW, and opens Contracting without issuing
+  the RFQ or emailing anyone.
+- **System Approved** state so RFQ auto-approval isn't mislabeled as a manual ED
+  sign-off. `approval_status` stays `'ed_approved'` (universal recognition) plus a
+  **`system_approved`** flag (+`approved_via_rfq`, `edName:'System'`); an indigo
+  "System Approved" badge shows wherever a render holds the SOW object.
+- **Contract saved to the RFQ document library** too (file-meta entity `'rfq'`),
+  in addition to the unit's — same stored PDF, surfaced on the RFQ → Documents tab.
+- **RFQ read-only unless HM/ED.** `_rfqCanEdit()` (HM/ED only) drives
+  `_rfqApplyReadOnly()` — disables fields + mutation buttons, "View only" banner,
+  read-only Documents library; guards on every mutation entry point. RFQs are
+  linked to the unit via the inventory "RFQs & Contracts" section, so anyone can
+  view; only HM/ED can edit.
+- **AI parity.** `ai-assistant.js` SOW context was reading the `_sowCache` wrapper
+  instead of `.sows[]` (blank status/total for every SOW) and RFQ context used
+  non-existent columns — both fixed, and the SOW context now carries
+  `approval_status`/`system_approved`. `ai-chat/index.ts` SOW-section prose +
+  `housing_rfq` cols hint + HOW_TO RFQ steps updated (Edge Function redeployed
+  manually).
 
 🔖 Deferred bigger idea (needs RLS first, like the tenant portal): a
 **contractor-facing** bid-submission surface instead of staff-entered bids.
