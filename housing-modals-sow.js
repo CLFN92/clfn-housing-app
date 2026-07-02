@@ -757,17 +757,22 @@ function openSowModal(unitId, projectNumber) {
   // brand-new SOW even when the unit already has requests. One-shot — cleared on read.
   var _forceNew = !!window._sowForceNew; window._sowForceNew = false;
   var activeList = existingList.filter(function(s){ return !s.archived && s.approval_status !== 'completed'; });
-  if(!projectNumber && !_forceNew && activeList.length > 1){
-    // Multiple active requests — show a picker so the user can choose which to open.
-    _openSowPicker(unitId, activeList);
-    return;
-  }
-  if(!projectNumber && !_forceNew && existingList.length > 0){
-    // Single (or all completed/archived) — open the most recent.
-    var sortedByDate = existingList.slice().sort(function(a, b){
-      return (b.created_at || '').localeCompare(a.created_at || '');
-    });
-    projectNumber = sortedByDate[0].project_number || null;
+  if(!projectNumber && !_forceNew){
+    if(activeList.length > 1){
+      // Multiple active requests — show a picker so the user can choose which to open.
+      _openSowPicker(unitId, activeList);
+      return;
+    }
+    if(activeList.length === 1){
+      // Exactly one active request — open it.
+      projectNumber = activeList[0].project_number || null;
+    }
+    // Zero ACTIVE requests (unit has none, or all are completed/archived) — fall
+    // through with projectNumber null to start a BRAND-NEW request. We must NOT
+    // open a completed request here: completed SOWs open locked, which stranded
+    // the user with no way to add another work order after completing one.
+    // Completed/archived SOWs are still viewable/printable from the unit's SOW
+    // table (udpEditSow / udpOpenSowDocument pass an explicit project number).
   }
 
   var isEdit = !!projectNumber;
@@ -1448,7 +1453,10 @@ window.archiveCurrentSow = function(){
 function udpNewSow(){
   if(!_currentDetailUnitId) return;
   closeUnitDetail();
-  openSowModal(_currentDetailUnitId);  // no projectNumber → new SOW
+  // Force a brand-new request — otherwise openSowModal opens the unit's most
+  // recent ACTIVE SOW (and this button would never actually create a new one).
+  window._sowForceNew = true;
+  openSowModal(_currentDetailUnitId);
 }
 
 function udpEditSow(unitId, projectNumber){

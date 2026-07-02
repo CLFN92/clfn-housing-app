@@ -2192,6 +2192,7 @@
       }
       _ticClose();
       if(typeof openSowModal === 'function'){
+        window._sowForceNew = true;   // "New Work Order" always starts a fresh request
         openSowModal(unitId);
       } else {
         if(typeof showToast === 'function') showToast('Work order module not loaded on this page.');
