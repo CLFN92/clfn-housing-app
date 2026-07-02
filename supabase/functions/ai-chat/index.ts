@@ -80,7 +80,7 @@ const TABLES: Record<string, TableDef> = {
   },
   housing_rfq: {
     roles: MGMT,
-    cols: 'id, rfq_number, status (draft|issued|awarded|cancelled), unit_id, sow_id, created_at. Most form fields live in a `data` jsonb.',
+    cols: 'id (e.g. RFQ-2026-0007), status (draft|issued|awarded|cancelled), sow_unit_id, sow_project_number, awarded_contractor_id, award_amount, created_at. Most form fields (bids, contract_number, contract details) live in a `data` jsonb - use select=* to inspect.',
   },
   inspections: {
     roles: ALL,
@@ -462,6 +462,15 @@ pending_review -> Housing Manager verifies -> ED approves.
 
 Issue an RFQ: from a SOW (Renovations or the unit panel) create an RFQ to invite
 contractors to bid. Flow: draft -> issued -> awarded; only drafts can be edited.
+Only the Housing Manager or ED can edit an RFQ; everyone else sees it read-only.
+Awarding an RFQ AUTO-approves the linked SOW (it becomes "System Approved" - see
+the SOW section). Award two ways: the "Award ->" button on the Recipients tab
+(runs the full app tender - emails the winner and regret notices to other
+bidders), or, on the Scope tab's Award card, "Record Award & Approve SOW - No
+Notifications" for a tender run manually/offline (records the award and approves
+the SOW without issuing the RFQ or emailing anyone). Both then open the
+Contracting tab to generate the Contractor Agreement, which is saved to both the
+RFQ and the unit document libraries.
 
 Set a unit's location & photo: open the unit's Tenant Information Card and use
 "Set Location & Photo" to drop a map pin and add a photo (ED/admin).
@@ -534,7 +543,7 @@ Write 2-4 sentences. Be professional, clear, and compassionate. Reference specif
     : '\n\n## Housing Units\nNo unit data available.'
 
   const sowsJson = ctx?.sows?.length
-    ? `\n\n## Scopes of Work / SOWs - ${ctx.sows.length} records\nIn this system, SOWs (Scopes of Work) ARE the maintenance and renovation work orders. When staff say "maintenance request", "work order", or "repair job", they mean a SOW. Each SOW is linked to a housing unit.\n` + JSON.stringify(ctx.sows)
+    ? `\n\n## Scopes of Work / SOWs - ${ctx.sows.length} records\nIn this system, SOWs (Scopes of Work) ARE the maintenance and renovation work orders. When staff say "maintenance request", "work order", or "repair job", they mean a SOW. Each SOW is linked to a housing unit.\nApproval fields: approval_status is one of ''/draft/signed/submitted/hm_approved/ed_approved/completed; approved=true means hm_approved, ed_approved, or completed. IMPORTANT: if system_approved=true the SOW was AUTO-approved by the tendering workflow (an RFQ was awarded), NOT signed off by the Executive Director - call this "System Approved", and do NOT count it as an ED approval even though approval_status reads 'ed_approved'. approved_via_rfq marks the same thing.\n` + JSON.stringify(ctx.sows)
     : '\n\n## Scopes of Work / SOWs\nNo SOW/maintenance data loaded yet.'
 
   const rfqsJson = ctx?.rfqs?.length

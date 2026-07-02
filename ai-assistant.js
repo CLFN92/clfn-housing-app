@@ -151,21 +151,41 @@ function aiSendMessage() {
   if (sendBtn) sendBtn.disabled = true;
   _appendAIMessage('assistant', '…', 'ai_typing_msg');
 
-  // Flatten SOW cache (keyed by unit_id) into an array for context
+  // Flatten SOW cache into an array for context. _sowCache[unitId] is a wrapper
+  // { sows:[...] } — one entry PER SOW — so we must iterate .sows, not read
+  // fields off the wrapper. Surface the real approval state incl. the
+  // system_approved flag (auto-approval via RFQ award, distinct from a manual
+  // ED sign-off) so the assistant doesn't mislabel it as "ED Approved".
   var sowList = [];
   try {
     var sowCache = window._sowCache || {};
     Object.keys(sowCache).forEach(function(uid) {
-      var d = sowCache[uid];
-      if (!d || typeof d !== 'object') return;
-      var items = Array.isArray(d.items) ? d.items
-                : Array.isArray(d.sow_items) ? d.sow_items
-                : Array.isArray(d.line_items) ? d.line_items : [];
-      var total = items.reduce(function(s, i) {
-        return s + (parseFloat(i.cost || i.amount || i.total || 0) || 0);
-      }, 0);
-      sowList.push({ unit_id: uid, contractor: d.contractor_name || d.contractor || '',
-                     status: d.status || '', total: total, item_count: items.length });
+      var wrap = sowCache[uid];
+      if (!wrap || typeof wrap !== 'object') return;
+      var arr = Array.isArray(wrap.sows) ? wrap.sows : (Array.isArray(wrap) ? wrap : [wrap]);
+      arr.forEach(function(s) {
+        if (!s || typeof s !== 'object') return;
+        var items = Array.isArray(s.items) ? s.items
+                  : Array.isArray(s.sow_items) ? s.sow_items
+                  : Array.isArray(s.line_items) ? s.line_items : [];
+        var total = (typeof s.amount === 'number' ? s.amount : parseFloat(s.amount)) ||
+                    items.reduce(function(sum, i) {
+                      return sum + (parseFloat(i.cost || i.amount || i.total || 0) || 0);
+                    }, 0);
+        var status = s.approval_status || '';
+        sowList.push({
+          unit_id:          uid,
+          project_number:   s.project_number || '',
+          contractor:       s.assignedToName || s.contractor_name || s.contractor || '',
+          assigned_team:    s.assignedTeam || '',
+          approval_status:  status,
+          approved:         (status === 'ed_approved' || status === 'hm_approved' || status === 'completed'),
+          system_approved:  !!s.system_approved,   // auto-approved via RFQ award, NOT a manual ED sign-off
+          approved_via_rfq: !!s.approved_via_rfq,
+          total:            total,
+          item_count:       items.length
+        });
+      });
     });
   } catch(e) { console.warn('[AI] SOW build error:', e); }
 
@@ -191,9 +211,18 @@ function aiSendMessage() {
     }),
     sows:        sowList,
     rfqs:        Object.keys(window._rfqCache || {}).map(function(id) {
-      var r = window._rfqCache[id];
-      return { id: id, unit_id: r.unit_id, status: r.status, contractor: r.contractor_name || '',
-               total: r.total_amount || r.total || 0, created_at: r.created_at };
+      var r = window._rfqCache[id] || {};
+      var d = r.data || {};
+      return {
+        id: id,
+        unit_id: r.sow_unit_id || '',
+        sow_project_number: r.sow_project_number || '',
+        status: r.status || '',
+        awarded_contractor_id: r.awarded_contractor_id || '',
+        award_amount: r.award_amount || d.award_amount || 0,
+        contract_number: d.contract_number || '',
+        created_at: r.created_at
+      };
     }),
     contractors: (window._contractors || []).map(function(c) {
       return { name: c.name, trade: c.trade, phone: c.phone, email: c.email, status: c.status };
