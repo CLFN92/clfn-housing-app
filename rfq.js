@@ -633,6 +633,7 @@ function switchRfqTab(tab) {
     renderMaterialsRows();
     renderExclusionsRows();
     renderClfnSuppliedRows();
+    _rfqSeedDefaultMilestonesIfEmpty();   // tiered default payment schedule when none set yet
     renderMilestoneRows();
     _rfqRecalcPrices();   // compute subtotal/total/holdback + refresh milestones from the loaded prices
     _rfqRenderAwardedContractorInfo();   // show the awarded contractor's on-file details
@@ -1475,6 +1476,61 @@ function removeMilestoneRow(i) {
   _readMilestoneRows();
   _rfqMilestoneRows.splice(i, 1);
   renderMilestoneRows();
+}
+
+// Build one milestone row from a percentage of the contract total.
+function _rfqMilestoneFromPct(name, pct, total) {
+  var p = parseFloat(pct) || 0;
+  var gross = (parseFloat(total) || 0) * p / 100;
+  var holdback = gross * 0.10;
+  var net = gross - holdback;
+  return {
+    name: name, pct: (pct === '' || pct == null) ? '' : String(pct),
+    gross: String(gross || ''), holdback: String(holdback || ''),
+    net: String(net >= 0 ? net : 0)
+  };
+}
+
+// Default milestone schedule by contract-value tier. Rows are editable after
+// seeding; the LAST phase carries the remaining percent so the schedule totals
+// 100%. <= $75k: 50% Material + P1 25 + P2 25 + P3 (remainder). >= $75k:
+// 50% Material + P1..P4 splitting the remaining 50% (12.5% each).
+function _rfqDefaultMilestones(total) {
+  var big = (parseFloat(total) || 0) >= 75000;
+  var rows = big
+    ? [ {name:'50% Material', pct:'50'}, {name:'Phase 1', pct:'12.5'},
+        {name:'Phase 2', pct:'12.5'}, {name:'Phase 3', pct:'12.5'}, {name:'Phase 4', pct:''} ]
+    : [ {name:'50% Material', pct:'50'}, {name:'Phase 1', pct:'25'},
+        {name:'Phase 2', pct:'25'}, {name:'Phase 3', pct:''} ];
+  // Last row = remaining percent so the schedule totals 100%.
+  var used = rows.reduce(function(s, r){ return s + (parseFloat(r.pct) || 0); }, 0);
+  var last = rows[rows.length - 1];
+  last.pct = String(Math.max(0, Math.round((100 - used) * 100) / 100));
+  return rows.map(function(r){ return _rfqMilestoneFromPct(r.name, r.pct, total); });
+}
+
+// Contract value used to pick the tier + compute gross: the awarded amount if
+// recorded, else the current price-breakdown total.
+function _rfqContractValueForMilestones() {
+  var award = _rfqParseNum(((window._rfqCache || {})[_rfqCurrentId] || {}).award_amount);
+  if (award > 0) return award;
+  return (typeof _rfqContractTotal === 'function') ? _rfqContractTotal() : 0;
+}
+
+// Seed defaults only when there are no milestones yet (never clobbers a saved
+// or in-progress schedule). Called when the Contracting tab renders.
+function _rfqSeedDefaultMilestonesIfEmpty() {
+  if (_rfqMilestoneRows && _rfqMilestoneRows.length) return;
+  _rfqMilestoneRows = _rfqDefaultMilestones(_rfqContractValueForMilestones());
+}
+
+// "Reset to default schedule" button — re-applies the tiered defaults for the
+// CURRENT contract value, replacing whatever is there (HM/ED only).
+function resetMilestonesToDefault() {
+  if (typeof _rfqCanEdit === 'function' && !_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
+  _rfqMilestoneRows = _rfqDefaultMilestones(_rfqContractValueForMilestones());
+  renderMilestoneRows();
+  if (typeof _rfqCheckMilestoneTotal === 'function') _rfqCheckMilestoneTotal();
 }
 
 // Recompute one milestone row. source = 'pct' (gross = pct% of contract price)
