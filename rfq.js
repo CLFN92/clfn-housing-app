@@ -1265,17 +1265,11 @@ function _rfqSeedContractFromAward(rfqId) {
   var awEl = document.getElementById('rfq_awarded_to');
   if (awEl && rfq.awarded_contractor_id) awEl.value = rfq.awarded_contractor_id;
   if (typeof _rfqAutoFillContractor === 'function') _rfqAutoFillContractor();
-
-  var amt = parseFloat(rfq.award_amount) || 0;
-  if (amt) {
-    var ids = ['rfq_price_materials','rfq_price_labour','rfq_price_equipment','rfq_price_subcontractors','rfq_price_other'];
-    var anyFilled = ids.some(function(id){ var el = document.getElementById(id); return el && _rfqParseNum(el.value) > 0; });
-    var other = document.getElementById('rfq_price_other');
-    if (!anyFilled && other) {
-      other.value = _rfqFmtMoney(amt);   // agreed lump sum; staff can redistribute into materials/labour
-      if (typeof _rfqRecalcPrices === 'function') _rfqRecalcPrices();
-    }
-  }
+  // NOTE: we intentionally do NOT seed the price breakdown from the award
+  // amount. Dumping the full contract value into the "Other" line was
+  // confusing and wrong on the generated contract. Staff enter the real
+  // breakdown (materials/labour/etc.); the Contract Price total derives from
+  // it, and the awarded amount is shown on the Scope > Award card as reference.
 }
 
 // ── Contract number generation ────────────────────────────────────────────
@@ -1589,23 +1583,12 @@ function _rfqAutoFillContractor() {
     setIfBlank('rfq_site_lead_phone',    ct.phone || '');
   }
   _rfqRenderAwardedContractorInfo();
-  _rfqSeedPriceFromAward();
 }
 
-// Seed the contract price from the Award Amount when the breakdown is still
-// empty (agreed lump sum -> Other line; staff can redistribute). No-op once any
-// price line has a value, so it never clobbers manual entry.
-function _rfqSeedPriceFromAward() {
-  var amt = _rfqParseNum((document.getElementById('rfq_award_amount') || {}).value);
-  if (!(amt > 0)) return;
-  var ids = ['rfq_price_materials','rfq_price_labour','rfq_price_equipment','rfq_price_subcontractors','rfq_price_other'];
-  var anyFilled = ids.some(function(id){ var el = document.getElementById(id); return el && _rfqParseNum(el.value) > 0; });
-  var other = document.getElementById('rfq_price_other');
-  if (!anyFilled && other) {
-    other.value = _rfqFmtMoney(amt);
-    if (typeof _rfqRecalcPrices === 'function') _rfqRecalcPrices();
-  }
-}
+// (Removed _rfqSeedPriceFromAward — it auto-filled the "Other" price line with
+// the full award amount, which was confusing and produced a bad contract. The
+// price breakdown is now entered by staff; the Contract Price total derives
+// from it, and the awarded amount is shown on the Scope > Award card.)
 
 // Holdback release timing: N days after Substantial Completion -> a date.
 function _rfqAddDays(dateStr, days) {
