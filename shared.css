@@ -339,7 +339,7 @@ body {
    page-header-bar provides vertical breathing room below the back button. */
 #worklistView, #dashView, .dash-view, #settingsView, .settings-view,
 #inventoryView, #matchView, #tenantsView, #renoApprovalsView,
-#renosView, #contractorsView, #scorecardView,
+#renosView, #contractorsView, #scorecardView, #leadershipDashView,
 #landingView,
 #page-home, #page-entryforms, #page-tenants, #page-rent,
 #page-arrangements, #page-loans, #page-journal,
@@ -855,7 +855,7 @@ input:disabled, select:disabled, textarea:disabled {
   /* View containers — sides only, top stays 0 */
   #worklistView, #dashView, #settingsView, #employeeHomeView,
   #inventoryView, #matchView, #tenantsView, #renoApprovalsView,
-  #renosView, #contractorsView, #scorecardView,
+  #renosView, #contractorsView, #scorecardView, #leadershipDashView,
   #page-home, #page-entryforms, #page-tenants, #page-rent,
   #page-arrangements, #page-loans, #page-journal,
   #page-collections, #page-hydro {
@@ -918,7 +918,7 @@ input:disabled, select:disabled, textarea:disabled {
   /* View containers tighter */
   #worklistView, #dashView, #settingsView, #employeeHomeView,
   #inventoryView, #matchView, #tenantsView, #renoApprovalsView,
-  #renosView, #contractorsView, #scorecardView,
+  #renosView, #contractorsView, #scorecardView, #leadershipDashView,
   #page-home, #page-entryforms, #page-tenants, #page-rent,
   #page-arrangements, #page-loans, #page-journal,
   #page-collections, #page-hydro {

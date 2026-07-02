@@ -2343,3 +2343,19 @@ body.tic-modal-open       { overflow: hidden; }
 
 /* Avatar popover moved to shared.css */
 
+
+/* ── Chief & Council (leadership) dashboard ─────────────────────────────────── */
+.ld-kpis { margin-bottom: 18px; }
+.ld-chart-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
+}
+.ld-chart-card { padding: 16px 16px 14px; }
+.ld-chart-title {
+  font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 10px;
+}
+.ld-chart-sub { font-size: 11px; font-weight: 500; color: var(--muted); }
+.ld-chart-wrap { position: relative; height: 260px; }
+.ld-chart-wrap canvas { max-height: 260px; }
+@media (max-width: 900px) {
+  .ld-chart-grid { grid-template-columns: 1fr; }
+}

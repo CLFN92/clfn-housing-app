@@ -136,6 +136,11 @@ var APPROVAL_AUTHORITY = (function() {
     manageLoan:               ['ed'],
     reverseTransaction:       ['housing_manager', 'ed'],
 
+    // ── Leadership / reporting ────────────────────────────────────────────
+    // Who can open the Chief & Council (leadership) KPI dashboard. Read-only
+    // cross-app metrics, no data edits. ED + HM by default; editable here.
+    accessLeadershipDashboard: ['ed', 'housing_manager'],
+
   };
 
   // ── LIVE CONFIG (defaults + any saved overrides) ──────────────────────
@@ -322,6 +327,7 @@ var APPROVAL_AUTHORITY = (function() {
       createArrangement:        'Create payment arrangements',
       manageLoan:               'Create and manage loans',
       reverseTransaction:       'Reverse posted transactions',
+      accessLeadershipDashboard:'Access the Chief &amp; Council dashboard',
     },
 
     /** Group labels for the Settings UI sections */
@@ -337,6 +343,7 @@ var APPROVAL_AUTHORITY = (function() {
       'Tenants':              ['manageBcr','mergeTenants'],
       'System':               ['accessSettings','editApprovalAuthority','manageStaff','manageStaffRecord','manageAllStaffRoles'],
       'Finance':              ['viewFinanceCard','recordPayment','createInvoice','createArrangement','manageLoan','reverseTransaction'],
+      'Leadership Dashboard': ['accessLeadershipDashboard'],
     },
 
   };

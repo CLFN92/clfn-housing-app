@@ -787,6 +787,23 @@ intake). Fixes shipped in tiers. Files: `reno-questionnaire.js`,
 
 ---
 
+## Phase LD — Chief & Council dashboard  ✅ (v1 shipped 2026-07)
+A native, read-only cross-app KPI dashboard for leadership (Chief & Council).
+Chosen **over Power BI** for **OCAP / data sovereignty** — it summarises data
+already loaded in memory (no cloud replication, no new queries), fits the
+static-SPA / Chart.js stack, and works per-nation for free.
+- `council-dashboard.js` — self-injecting `#leadershipDashView` view: 7 KPI
+  cards + 6 Chart.js charts (Chart.js lazy-loaded; graceful fallback to KPIs
+  if it can't load). Computes from `applications` / `housingUnits` / `_sowCache`.
+- **Access configurable in Settings** via approval authority
+  `accessLeadershipDashboard` (default ED + HM), auto-rendered under a
+  "Leadership Dashboard" group in Settings → Approval Authority. Nav "Council"
+  item + `?view=leadership` gate on the live authority.
+- 🔖 **Finance KPIs deferred** until the finance model is built out and all data
+  is loaded. Extensible: add KPIs/charts or a finance section later.
+
+---
+
 ## Rollback points
 - Pre-refactor snapshots (Phase C)
 

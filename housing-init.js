@@ -1898,6 +1898,7 @@ function initHousingPage() {
   else if(view==='match')       { if(true) showMatch(); }
   else if(view==='tenants')     { if(true) showTenants(); }
   else if(view==='settings')    { if(typeof showSettings==='function') showSettings(); }
+  else if(view==='leadership')  { if(typeof showLeadershipDashboard==='function') showLeadershipDashboard(); }
   else if(view==='contractors') { if(true) showContractors(); }
   else {
     // Fallback when view doesn't match any branch. The Applications
@@ -2014,6 +2015,7 @@ window.HEADER_NAV = [
   { key:'home',         label:'Home',         module:null,           svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>',                                                                                                                                                                                                                run:function(){ if(typeof showLanding==='function') showLanding(); else if(typeof showEmployeeHome==='function') showEmployeeHome(); } },
   { key:'inventory',    label:'Inventory',    module:'inventory',    svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>',                                                                                                                                            run:function(){ if(typeof showInventory==='function') showInventory(); } },
   { key:'match',        label:'Match',        module:'match',        svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',                                                                                                                       run:function(){ if(typeof showMatch==='function') showMatch(); } },
+  { key:'leadership',   label:'Council',      module:null,           authority:'accessLeadershipDashboard', svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',                                                                                                       run:function(){ if(typeof showLeadershipDashboard==='function') showLeadershipDashboard(); } },
   { key:'operations', label:'Operations', isGroup:true,
     svg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
     children: [
@@ -2060,7 +2062,18 @@ function renderHeaderNav(){
             + '</div>';
     } else {
       var cls = 'app-nav-item' + (item.drawerOnly ? ' in-drawer-only' : '');
-      var roles = item.roles ? ' data-roles="'+item.roles+'"' : '';
+      // Configurable access: derive data-roles from the live approval authority
+      // so Settings > Approval Authority controls who sees this nav item.
+      var roleList = item.roles || '';
+      if(item.authority && window.APPROVAL_AUTHORITY && typeof APPROVAL_AUTHORITY.get==='function'){
+        var ar = APPROVAL_AUTHORITY.get(item.authority);
+        if(Array.isArray(ar)){
+          var rr = ar.slice();
+          if(rr.indexOf('ed')!==-1 && rr.indexOf('super_user')===-1) rr.push('super_user'); // ED tier
+          roleList = rr.join(',');
+        }
+      }
+      var roles = roleList ? ' data-roles="'+roleList+'"' : '';
       html += '<button class="'+cls+'" data-nav="'+item.key+'"'+roles+'>'+item.svg+' '+item.label+'</button>';
     }
   });
