@@ -1183,6 +1183,20 @@ function markSowComplete(){
     } catch(e){ console.warn('[SOW] complete-revert threw:', e); }
     showToast('✓ Request marked Completed');
     _applySowModalLock(sow);
+    // Optional completion note on the tenant file (outcome / follow-up).
+    try {
+      var _cu = (typeof housingUnits !== 'undefined' ? housingUnits : []).find(function(x){ return x.id === _sowUnitId; });
+      var _tn = _cu && _cu.assignedName;
+      if(_tn && typeof promptTenantNote === 'function'){
+        promptTenantNote(_tn, {
+          title: 'Work order note (optional)',
+          message: 'Add a note for ' + _tn + ' on the completed work (outcome, follow-up). Leave blank to skip.',
+          placeholder: 'e.g. Replaced furnace igniter, tested OK. Tenant advised…',
+          context: 'sow_complete',
+          prefix: '[Work order ' + pn + ']'
+        });
+      }
+    } catch(e){ console.warn('[SOW] completion note prompt threw:', e); }
   });
 }
 

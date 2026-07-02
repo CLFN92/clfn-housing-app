@@ -150,6 +150,8 @@ The TIC is a self-contained IIFE full-screen modal opened via `window.openTenant
 
 **Tabs:** Overview, Utilities, Documents, Unit History (and tenant detail fields). `_ticRenderOverview()` / `_ticRenderUtilities()` render the panels; a known footgun is the DocLibrary not mounting until its tab is actually shown (several fixes around tab-switch mounting).
 
+**Notes.** TIC notes ("Add a Note" on the Notes tab) save to **`tenant_notes`** (keyed by `tenant_id`) via `_ticSaveNote` → `_ticEnsureTenantRow` (creates the tenant row on first write for applicant TICs). The Notes panel *displays* a merge of `tenant_notes` + intake `housing_application_notes` (loaded read-only via `sbLoadAppNotes`), but adds always go to `tenant_notes`. The **hero shows a last-note-age badge** (`_ticLastNoteInfo`, red when there are no notes or the newest is > 90 days old) so staff keep files current. **Reusable workflow note prompts:** `promptTenantNote(name, opts)` / `sbSaveTenantNote(name, body, opts)` / `sbResolveTenantId(name)` in `shared-data.js` let any flow capture an optional note against the tenant file — wired into **move-in** (`confirmAssignment`), **work-order completion** (`markSowComplete`), and **inspection approval** (`saveInspection`). `sbResolveTenantId` is find-first (avoids minting duplicate trigger-synced tenant rows); all are fire-and-forget safe.
+
 **Field save routing:** TIC fields carry a `saveTarget` (`'unit'` → PATCH `housing_units`; otherwise the `tenants` row). On `'unit'` save success the in-memory `housingUnits[]` cache is kept in sync. Hydro/gas **meter** numbers save to `housing_units`; hydro/gas **account** numbers save to `tenants`.
 
 **Maps — two distinct widgets:**

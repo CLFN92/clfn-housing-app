@@ -563,6 +563,24 @@ async function saveInspection(approveAction) {
     if (repairItems.length && status !== 'pass') {
       _inspPromptSOW(saved, repairItems);
     }
+
+    // Optional note on the tenant file when the report is approved (sign-off =
+    // completion). Fires after any SOW prompt above; safe no-op if unhoused.
+    if (approveAction === 'approve') {
+      try {
+        var _iu = (typeof housingUnits !== 'undefined' ? housingUnits : []).find(function(u){ return u.id === unitId; });
+        var _itn = _iu && _iu.assignedName;
+        if (_itn && typeof promptTenantNote === 'function') {
+          promptTenantNote(_itn, {
+            title: 'Inspection note (optional)',
+            message: 'Add a note for ' + _itn + ' on this inspection (follow-up, condition). Leave blank to skip.',
+            placeholder: 'e.g. Smoke detector battery replaced; follow up on window seal…',
+            context: 'inspection',
+            prefix: '[Inspection ' + (type || '') + ' ' + (date || '') + ']'
+          });
+        }
+      } catch(e){ console.warn('[Inspections] note prompt threw:', e); }
+    }
   } catch(e) {
     if(typeof showToast==='function') showToast('Save failed: ' + e.message, {type:'error'});
     console.warn('[Inspections] save error:', e);

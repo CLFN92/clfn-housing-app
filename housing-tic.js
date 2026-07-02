@@ -366,7 +366,39 @@
           + (_bcr.bcrd_date ? ' (' + _ticEsc(_bcr.bcrd_date) + ')' : '') + '</span>');
       }
     }
+    // Last-note-age nudge: red when there are no notes or the newest is older
+    // than the stale threshold, so staff are prompted to keep the file current.
+    var _na = _ticLastNoteInfo();
+    if(_na){ badges.push(_na.badge); }
     _ticEl('tic_hero_badges').innerHTML = badges.join('');
+  }
+  // Newest note across tenant_notes (_ticState.notes) + intake application notes
+  // (_ticState.applicationNotes) — both carry `created_at`. Returns a badge HTML
+  // string; null only if the state isn't ready. Stale threshold = 90 days.
+  var _TIC_NOTE_STALE_DAYS = 90;
+  function _ticLastNoteInfo(){
+    var rows = [].concat(
+      _ticIsArray(_ticState.notes) ? _ticState.notes : [],
+      _ticIsArray(_ticState.applicationNotes) ? _ticState.applicationNotes : []
+    );
+    var newest = 0;
+    rows.forEach(function(n){
+      var v = n && (n[TIC_C.created_at] || n.created_at);
+      if(!v) return;
+      var t = new Date(v).getTime();
+      if(!isNaN(t) && t > newest) newest = t;
+    });
+    if(!newest){
+      return { days: null, stale: true, badge: '<span class="std-pill" style="background:#7f1d1d;color:#fff;font-weight:700;" title="No notes on file — add one">🕑 No notes</span>' };
+    }
+    var days = Math.floor((Date.now() - newest) / 86400000);
+    var stale = days > _TIC_NOTE_STALE_DAYS;
+    var ago = days <= 0 ? 'today' : days === 1 ? '1 day ago' : days + ' days ago';
+    var style = stale
+      ? 'background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;'
+      : 'background:#f4f4f0;color:var(--muted);';
+    return { days: days, stale: stale,
+      badge: '<span class="std-pill" style="' + style + '" title="Newest note on this tenant file">🕑 Last note: ' + ago + '</span>' };
   }
   function _ticRenderStrip(){
     var t = _ticState.tenant  || {};
@@ -1993,6 +2025,7 @@
           list.insertAdjacentHTML('afterbegin', _ticNoteHtml(added));
         }
         if(inp) inp.value = '';
+        if(typeof _ticRenderHero === 'function') _ticRenderHero();  // refresh last-note badge
         _ticAudit('tic_note_add', 'Added note (' + body.length + ' chars)');
         if(typeof showToast === 'function') showToast('Note added.');
       });

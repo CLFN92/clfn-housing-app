@@ -863,6 +863,92 @@ async function sbAddAppNote(appId, body) {
   }
 }
 
+// ── Tenant notes (workflow prompts) ──────────────────────────────────────────
+// Reusable helpers so common flows (move-in, inspection, work-order complete)
+// can capture a quick note against the tenant file. Notes live in `tenant_notes`
+// keyed by tenant_id; these mirror the TIC's own note save path but work from
+// any page. All are fire-and-forget safe (catch + warn, never throw).
+
+// Resolve a tenant_id by full name. Find-first (avoids minting duplicate tenant
+// rows, which the trigger-synced tenants table is prone to); creates a minimal
+// row only as a last resort. Returns null if it can't resolve.
+async function sbResolveTenantId(fullName) {
+  fullName = (fullName || '').trim();
+  if (!fullName) return null;
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/tenants?full_name=eq.'
+      + encodeURIComponent(fullName) + '&select=id&limit=1', { headers: HOUSING_HEADERS });
+    if (r.ok) { var rows = await r.json(); if (rows && rows.length && rows[0].id) return rows[0].id; }
+    var ins = await fetch(SUPABASE_URL + '/rest/v1/tenants', {
+      method: 'POST',
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=representation' }),
+      body: JSON.stringify({ full_name: fullName })
+    });
+    if (ins.ok) { var created = await ins.json(); return (created && created[0] && created[0].id) || null; }
+  } catch (e) { console.warn('[note] resolve tenant failed:', e); }
+  return null;
+}
+
+// Save a note to tenant_notes for the given tenant (by name or explicit id).
+// opts.prefix prepends a workflow tag; opts.context is recorded in the audit row.
+async function sbSaveTenantNote(fullName, body, opts) {
+  opts = opts || {};
+  body = (body || '').trim();
+  if (!body) return false;
+  var tid = opts.tenantId || await sbResolveTenantId(fullName);
+  if (!tid) { if (typeof showToast === 'function') showToast('Could not save note — tenant not found', { type: 'error' }); return false; }
+  var author = (window.HOUSING_SESSION && HOUSING_SESSION.name)
+             || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('clfn_housing_name'))
+             || 'Unknown';
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/tenant_notes', {
+      method: 'POST',
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+      body: JSON.stringify({
+        tenant_id:   tid,
+        note_body:   (opts.prefix ? opts.prefix + ' ' : '') + body,
+        author_name: author,
+        created_at:  new Date().toISOString()
+      })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (typeof auditEntry === 'function') {
+      auditEntry('TENANT:' + tid, 'tenant_note_add', 'Note added via ' + (opts.context || 'workflow'), window.currentRole || 'staff');
+    }
+    if (typeof showToast === 'function') showToast('Note saved.');
+    return true;
+  } catch (e) {
+    console.warn('[note] save failed:', e);
+    if (typeof showToast === 'function') showToast('Note save failed: ' + e.message, { type: 'error' });
+    return false;
+  }
+}
+
+// Show an OPTIONAL note prompt inside a workflow, then save what's entered.
+// Never blocks the flow — returns a promise that resolves whether or not a note
+// was saved. Skipping (Cancel / empty) is a no-op.
+function promptTenantNote(fullName, opts) {
+  opts = opts || {};
+  if (!fullName || typeof showPrompt !== 'function') return Promise.resolve(false);
+  return showPrompt({
+    title:       opts.title || 'Add a note (optional)',
+    message:     opts.message || ('Add a quick note for ' + fullName + '. Leave blank to skip.'),
+    placeholder: opts.placeholder || 'Type a note…',
+    multiline:   true,
+    confirmText: opts.confirmText || 'Save note',
+    cancelText:  'Skip'
+  }).then(function (txt) {
+    if (txt == null) return false;
+    if (!String(txt).trim()) return false;
+    return sbSaveTenantNote(fullName, txt, { context: opts.context, prefix: opts.prefix });
+  });
+}
+if (typeof window !== 'undefined') {
+  window.sbResolveTenantId = sbResolveTenantId;
+  window.sbSaveTenantNote  = sbSaveTenantNote;
+  window.promptTenantNote  = promptTenantNote;
+}
+
 // ── Required-field helpers ────────────────────────────────────────────────────
 // Drive both the application form's red * markers AND validation off a single
 // settings key (housing_settings.required_fields). ED-only edit; everyone else

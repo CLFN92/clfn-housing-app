@@ -1151,14 +1151,28 @@ function confirmAssignment() {
   // Hand-off: the tenant is now housed -> offer to generate the occupancy
   // agreement right away. Opening their TIC with the _ticAutoLease flag set
   // auto-opens the agreement modal, pre-filled from the application + unit.
-  if(typeof showConfirm === 'function' && typeof openTenantCard === 'function'){
-    showConfirm({
-      title:   'Assigned — generate the agreement?',
-      message: name + ' is assigned to ' + addr + '. Generate the occupancy agreement now?',
-      confirmText: 'Generate Agreement →', cancelText: 'Later'
-    }).then(function(ok){
-      if(ok){ window._ticAutoLease = 'residential_lease'; openTenantCard(u.id); }
-    });
+  var _agreementHandoff = function(){
+    if(typeof showConfirm === 'function' && typeof openTenantCard === 'function'){
+      showConfirm({
+        title:   'Assigned — generate the agreement?',
+        message: name + ' is assigned to ' + addr + '. Generate the occupancy agreement now?',
+        confirmText: 'Generate Agreement →', cancelText: 'Later'
+      }).then(function(ok){
+        if(ok){ window._ticAutoLease = 'residential_lease'; openTenantCard(u.id); }
+      });
+    }
+  };
+  // Optional move-in note first (sequential, so it doesn't stack on the
+  // agreement dialog / opening TIC), then the agreement hand-off.
+  if(typeof promptTenantNote === 'function'){
+    promptTenantNote(name, {
+      title: 'Move-in note (optional)',
+      message: 'Add a quick note for ' + name + ' — move-in condition, keys handed over, etc. Leave blank to skip.',
+      placeholder: 'e.g. Keys handed over, unit clean, minor scuff in hallway…',
+      context: 'move_in'
+    }).then(_agreementHandoff);
+  } else {
+    _agreementHandoff();
   }
 }
 
