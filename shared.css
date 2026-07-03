@@ -2161,7 +2161,12 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
    Replaces transient stacked toasts. One box in the top-right; messages stay
    until the user closes them (individually or via "Clear all"). */
 #clfn_msgbox {
-  position: fixed; top: 88px; right: 16px; z-index: 100000;
+  /* Below the modal stack (overlays are 1100+, top-most 9999): a persistent,
+     un-dismissed message must never sit ON TOP of a modal and block its
+     header/close button (worst on mobile where the box is full-width).
+     Messages fired mid-modal simply surface once the modal closes — they
+     persist, so nothing is lost. */
+  position: fixed; top: 88px; right: 16px; z-index: 1095;
   width: 340px; max-width: calc(100vw - 24px);
   background: #111; color: #f4f4f0; border: 1px solid #333;
   border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.5);

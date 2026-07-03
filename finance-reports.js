@@ -610,8 +610,10 @@ function renderJournal() {
     var groupRef = first.ref || '';
     var groupId  = first.id  || '';
     var isPending = (first.status === 'pending-ed' || first.status === 'pending');
-    var isED = (typeof _currentRole !== 'undefined' && _currentRole === 'ed')
-            || (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && HOUSING_SESSION.role === 'ed');
+    // ED tier: super_user inherits everything granted to ed.
+    var _edTier = function(r){ return r === 'ed' || r === 'super_user'; };
+    var isED = (typeof _currentRole !== 'undefined' && _edTier(_currentRole))
+            || (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && _edTier(HOUSING_SESSION.role));
     var _r = groupRef.replace(/"/g,'&quot;'), _i = groupId.replace(/"/g,'&quot;');
     var actionCell = isPending && isED
       ? '<td class="je-action-cell">'

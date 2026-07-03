@@ -57,7 +57,7 @@ function aiDraftNote() {
       app:    app,
       action: action,
       unit:   unit,
-      role:   window._effectiveRole || '',
+      role:   window._effectiveRole || window.currentRole || '',
     },
     history: [],
   }).then(function(data) {
@@ -196,7 +196,7 @@ function aiSendMessage() {
         id: a.id, fn: a.fn, ln: a.ln, status: a.status,
         score: a.score || a.total_score, tier: a.tier,
         bedrooms: a.bed_req || a.bedrooms, household_size: a.household_size || a.adults,
-        app_type: a.app_type || a.type,
+        app_type: a.appType || a.app_type || a.type,  // loaded apps use camelCase appType (sbLoadApplications mapper)
         assignedUnit: a.assignedUnit, assignedAddress: a.assignedAddress,
         submittedAt: a.submittedAt,
       };

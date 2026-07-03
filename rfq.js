@@ -329,13 +329,14 @@ async function _fetchAndPopulateSow(unitId, sowPn) {
 }
 
 // ── Edit permission ──────────────────────────────────────────────────────────
-// Only the Housing Manager and Executive Director may edit an RFQ. Everyone
-// else sees the full record read-only (all info visible, nothing editable).
+// Only the Housing Manager and the ED tier (ED / super_user) may edit an RFQ.
+// Everyone else sees the full record read-only (all info visible, nothing
+// editable).
 function _rfqCanEdit() {
   var r = (window.CLFN_PERMS && CLFN_PERMS.normalizeRole)
         ? CLFN_PERMS.normalizeRole(window.currentRole)
         : (window.currentRole || '');
-  return r === 'ed' || r === 'housing_manager';
+  return r === 'ed' || r === 'super_user' || r === 'housing_manager';
 }
 
 // Lock or unlock the whole RFQ form based on _rfqCanEdit(). Disables every
@@ -415,7 +416,10 @@ function showRfqForm(rfqId, unitId, sowPn) {
     document.getElementById('rfqIssueBtn').disabled = rfq.status !== 'draft';
     var _unlockBtn = document.getElementById('rfqUnlockBtn');
     if (_unlockBtn) {
-      var _isEd = (window.currentRole === 'ed');
+      // Unlock is override authority: check the REAL role (view-as must not
+      // remove it), and super_user inherits the ED tier.
+      var _rr   = window._realRole || window.currentRole || '';
+      var _isEd = (_rr === 'ed' || _rr === 'super_user');
       _unlockBtn.style.display = (_isEd && rfq.status === 'issued') ? '' : 'none';
     }
   } else {

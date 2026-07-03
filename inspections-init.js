@@ -560,26 +560,28 @@ async function saveInspection(approveAction) {
     closeInspectionModal();
     renderInspectionsList();
 
-    if (repairItems.length && status !== 'pass') {
-      _inspPromptSOW(saved, repairItems);
-    }
-
     // Optional note on the tenant file when the report is approved (sign-off =
-    // completion). Fires after any SOW prompt above; safe no-op if unhoused.
+    // completion). SEQUENCED: the note prompt resolves BEFORE the SOW prompt —
+    // _inspPromptSOW opens the full SOW modal, and firing the note dialog
+    // unawaited used to stack it on top of the form the user was sent to fill.
+    var _notePromise = Promise.resolve();
     if (approveAction === 'approve') {
       try {
         var _iu = (typeof housingUnits !== 'undefined' ? housingUnits : []).find(function(u){ return u.id === unitId; });
         var _itn = _iu && _iu.assignedName;
         if (_itn && typeof promptTenantNote === 'function') {
-          promptTenantNote(_itn, {
+          _notePromise = promptTenantNote(_itn, {
             title: 'Inspection note (optional)',
             message: 'Add a note for ' + _itn + ' on this inspection (follow-up, condition). Leave blank to skip.',
             placeholder: 'e.g. Smoke detector battery replaced; follow up on window seal…',
             context: 'inspection',
             prefix: '[Inspection ' + (type || '') + ' ' + (date || '') + ']'
-          });
+          }).catch(function(){});
         }
       } catch(e){ console.warn('[Inspections] note prompt threw:', e); }
+    }
+    if (repairItems.length && status !== 'pass') {
+      _notePromise.then(function(){ _inspPromptSOW(saved, repairItems); });
     }
   } catch(e) {
     if(typeof showToast==='function') showToast('Save failed: ' + e.message, {type:'error'});
@@ -607,12 +609,40 @@ function _inspPromptSOW(insp, repairItems) {
   window._sowForceNew = true;
   window._sowSeed = {
     items: repairItems.map(function(it) {
-      return { category: it.section, description: it.item + (it.notes ? ': ' + it.notes : '') };
+      return { category: _inspSowCategory(it), description: it.item + (it.notes ? ': ' + it.notes : '') };
     }),
     notes: 'Generated from inspection' + (insp.id ? ' ' + insp.id : '') + '.'
   };
   openSowModal(insp.unit_id);
   if(typeof showToast==='function') showToast('Repair items pre-loaded into the SOW.');
+}
+
+// Map an inspection checklist row to the closest SOW_CATEGORIES entry
+// (housing-modals-sow.js). The SOW modal's category <select> only preselects
+// on an EXACT match, and the raw checklist section names ('Exterior',
+// 'Bathroom(s)', 'Mechanical'…) match nothing — every seeded item used to
+// land with a blank category. Item keywords first, then a section fallback.
+function _inspSowCategory(it) {
+  var t = ((it.item || '') + ' ' + (it.section || '')).toLowerCase();
+  if (/roof/.test(t))                                        return 'Roofing';
+  if (/window|door/.test(t))                                 return 'Windows & Doors';
+  if (/foundation|structure|deck|porch|steps/.test(t))       return 'Foundation / Structure';
+  if (/plumb|sink|faucet|toilet|tub|shower|caulk|water heater|water shut/.test(t)) return 'Plumbing';
+  if (/electric|panel|hydro meter|smoke|carbon monoxide/.test(t)) return 'Electrical';
+  if (/furnace|heating|ventilation|air condition|exhaust fan|gas meter/.test(t))  return 'Heating / HVAC';
+  if (/floor/.test(t))                                       return 'Flooring';
+  if (/siding|exterior wall/.test(t))                        return 'Exterior Walls / Siding';
+  if (/wall|ceiling/.test(t))                                return 'Interior Walls / Drywall';
+  var bySection = {
+    'Kitchen':             'Kitchen',
+    'Bathroom(s)':         'Bathroom',
+    'Mechanical':          'Heating / HVAC',
+    'Exterior':            'Exterior Walls / Siding',
+    'Interior – General':  'Interior Walls / Drywall',
+    'Bedrooms':            'Other',
+    'Utility Connections': 'Other'
+  };
+  return bySection[it.section] || 'Other';
 }
 
 // ── Delete ───────────────────────────────────────────────────────────────────

@@ -876,8 +876,13 @@ async function sbResolveTenantId(fullName) {
   fullName = (fullName || '').trim();
   if (!fullName) return null;
   try {
+    // merged_into=is.null mirrors the TIC's own resolver (_ticResolveTenant):
+    // without it a note could land on a merged-away tenant row the TIC never
+    // displays — the note "saves" but is invisible in the tenant file, and the
+    // hero badge falsely reports "No notes". order=id.asc makes the limit=1
+    // pick deterministic when duplicates exist.
     var r = await fetch(SUPABASE_URL + '/rest/v1/tenants?full_name=eq.'
-      + encodeURIComponent(fullName) + '&select=id&limit=1', { headers: HOUSING_HEADERS });
+      + encodeURIComponent(fullName) + '&merged_into=is.null&select=id&order=id.asc&limit=1', { headers: HOUSING_HEADERS });
     if (r.ok) { var rows = await r.json(); if (rows && rows.length && rows[0].id) return rows[0].id; }
     var ins = await fetch(SUPABASE_URL + '/rest/v1/tenants', {
       method: 'POST',
@@ -2032,6 +2037,12 @@ window.sowRequiresEdApproval = sowRequiresEdApproval;
 function appAssignabilityStatus(app){
   if(!app) return { ok:false, reason:'Application not found' };
   if(app.archived) return { ok:false, reason:'Application is archived' };
+  // Commercial (business/department) applications are assigned to buildings
+  // through their own review modal (openCommercialAssign) — they never belong
+  // in the residential Match queue or the standard unit-assignment paths.
+  if((app.appType || app.app_type) === 'commercial'){
+    return { ok:false, reason:'Commercial applications are assigned from the Business/Department review modal' };
+  }
   var s = app.status || '';
   var ok = (s === 'ed_approved' || s === 'mgr_approved' || s === 'hm_approved');
   if(ok) return { ok:true, reason:'' };
@@ -4378,10 +4389,13 @@ function renderWorklist() {
   }
 
   // ── 5. Approved apps ready to match (no unit assigned) ───────────────────
+  // Commercial apps are excluded — they're assigned to buildings via their own
+  // review modal, never the residential Match queue.
   var matchItems = [];
   if (isManagement) {
     matchItems = apps.filter(function(a) {
       if (!a || a.archived || a.assignedUnit) return false;
+      if (a.appType === 'commercial') return false;
       return a.status === 'ed_approved' || a.status === 'mgr_approved';
     }).slice(0, 6);
   }
