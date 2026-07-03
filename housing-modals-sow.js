@@ -1540,72 +1540,27 @@ async function sowSaveClicked() {
   });
 }
 
-function saveSOW(opts){
-  opts = opts || {};
-  var sendTenantCopy = opts.sendTenantCopy === true;
-  var get=function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
-  var chk=function(id){ var el=document.getElementById(id); return el?el.checked:false; };
-  var data = {
-    unitId:_sowUnitId, address:get('sow_address'), date:get('sow_date'),
-    tenantName:get('sow_tenant_name'),
-    preparedBy:get('sow_prepared_by'), contractor:get('sow_contractor'), contractorId:(document.getElementById('sow_contractor_id')||{}).value||'',
-    assignedTeam:(document.getElementById('sow_assigned_team')||{}).value||'',
-    assignedTo:(document.getElementById('sow_assigned_team')||{}).value==='in_house' ? ((document.getElementById('sow_assigned_to')||{}).value||'') : '',
-    assignedToName:(function(){ var s=document.getElementById('sow_assigned_to'); if(!s||((document.getElementById('sow_assigned_team')||{}).value)!=='in_house') return ''; var o=s.options[s.selectedIndex]; return (o&&o.getAttribute('data-name'))||''; })(),
-    poNumber:get('sow_po_number'),
-    condition:get('sow_condition'), fundSource:get('sow_fund_source'), totalCost:get('sow_total_cost'),
-    startDate:get('sow_start_date'), endDate:get('sow_end_date'), notes:get('sow_notes'),
-    hmName:get('sow_hm_name'), hmDate:get('sow_hm_date'),
-    edName:get('sow_ed_name'), edDate:get('sow_ed_date'),
-    tenantSig: {
-      name:  get('sow_sig_tenant_name'),
-      date:  get('sow_sig_tenant_date'),
-      image: (typeof getSigDataURL === 'function') ? getSigDataURL('sow_sig_canvas_tenant') : ''
-    },
-    staffSig: {
-      name:  get('sow_sig_staff_name'),
-      date:  get('sow_sig_staff_date'),
-      image: (typeof getSigDataURL === 'function') ? getSigDataURL('sow_sig_canvas_staff') : ''
-    },
-    mold:chk('sow_mold'), asbestos:chk('sow_asbestos'), electrical:chk('sow_electrical'),
-    structural:chk('sow_structural'), plumbing:chk('sow_plumbing'), fire:chk('sow_fire'),
-    rentArrears:chk('sow_rent_arrears'), tenantDamage:chk('sow_tenant_damage'),
-    negligence:chk('sow_negligence'), vandalism:chk('sow_vandalism'),
-    policeReport:chk('sow_police_report'), accountabilityNotes:get('sow_accountability_notes'),
-    items:collectSowItems(),
-    files: (window._sowFiles || []).slice(),
-    savedAt:new Date().toISOString()
-  };
-  // Reconcile assignment: in-house work has no contractor; contractor work has
-  // no field-employee assignee. Prevents a stale contractor email firing on an
-  // in-house job, and keeps the Field Employee filter clean.
+// Reconcile assignment: in-house work has no contractor; contractor work has
+// no field-employee assignee. Prevents a stale contractor email firing on an
+// in-house job, and keeps the Field Employee filter clean.
+function _sowReconcileAssignment(data){
   if(data.assignedTeam === 'in_house'){ data.contractor = ''; data.contractorId = ''; }
   else if(data.assignedTeam === 'contractor'){ data.assignedTo = ''; data.assignedToName = ''; }
-  // ── Multi-SOW fields ───────────────────────────────────────────────────
-  // Stamp the project number (either the one being edited or a fresh one for new SOWs).
-  data.project_number = window._sowEditingProjectNumber || (_sowUnitId ? nextProjectNumber(_sowUnitId) : 'NO-UNIT-SOW-001');
-  // Preserve created_at if editing an existing SOW; otherwise stamp today.
-  if(_sowUnitId){
-    var existing = getSowByProjectNumber(_sowUnitId, data.project_number);
-    data.created_at = (existing && existing.created_at) || data.date || new Date().toISOString().slice(0,10);
-    // Preserve progress block so editing SOW doesn't wipe progress.
-    if(existing && existing.progress) data.progress = existing.progress;
-  } else {
-    data.created_at = data.date || new Date().toISOString().slice(0,10);
-  }
-  // Normalize the amount to a number for table display / sorting.
-  var totalNum = parseFloat(String(data.totalCost||'').replace(/[^0-9.\-]/g,'')) || 0;
-  data.amount = totalNum;
+}
 
-  // ── Approval-chain authority gate ─────────────────────────────────────────
+// ── Approval-chain authority gate + status derivation ─────────────────────
+// Mutates `data` in place: strips approval name/date fields the actor isn't
+// authorized to fill, then computes data.approval_status (preserving the
+// terminal 'completed' and System Approved states), then applies the
+// review-all-tabs draft gate. Extracted verbatim from saveSOW.
+function _sowComputeApprovalStatus(data, existingForStatus, saveRole, saveMode){
   // Strip name/date fields the actor isn't authorized to fill so the
   // auto-promotion below cannot bump status past what they're allowed.
-  var _saveRole = window.currentRole || 'staff';
-  if(!APPROVAL_AUTHORITY.can('approveSowOverThreshold', _saveRole)){
+  if(!APPROVAL_AUTHORITY.can('approveSowOverThreshold', saveRole)){
     data.edName = ''; data.edDate = '';
   }
-  if(!APPROVAL_AUTHORITY.can('approveSowUnderThreshold', _saveRole) &&
-     !APPROVAL_AUTHORITY.can('approveSowOverThreshold', _saveRole)){
+  if(!APPROVAL_AUTHORITY.can('approveSowUnderThreshold', saveRole) &&
+     !APPROVAL_AUTHORITY.can('approveSowOverThreshold', saveRole)){
     data.hmName = ''; data.hmDate = '';
   }
 
@@ -1613,7 +1568,6 @@ function saveSOW(opts){
   // EXCEPTION: if the SOW was already marked 'completed', preserve that — only markSowComplete/reopenSow
   // should transition into or out of the completed state. This keeps Save from accidentally
   // downgrading a completed SOW when an ED edits its fields.
-  var existingForStatus = _sowUnitId && data.project_number ? getSowByProjectNumber(_sowUnitId, data.project_number) : null;
   if(existingForStatus && existingForStatus.approval_status === 'completed'){
     data.approval_status = 'completed';
     if(existingForStatus.completed_at) data.completed_at = existingForStatus.completed_at;
@@ -1630,8 +1584,8 @@ function saveSOW(opts){
     if(existingForStatus.approved_via_rfq) data.approved_via_rfq = true;
     data.edName = existingForStatus.edName || 'System';
     data.edDate = existingForStatus.edDate || '';
-  } else if(data.edName && data.edDate && APPROVAL_AUTHORITY.can('approveSowOverThreshold', _saveRole)) data.approval_status = 'ed_approved';
-  else if(data.hmName && data.hmDate && APPROVAL_AUTHORITY.can('approveSowUnderThreshold', _saveRole)) data.approval_status = 'hm_approved';
+  } else if(data.edName && data.edDate && APPROVAL_AUTHORITY.can('approveSowOverThreshold', saveRole)) data.approval_status = 'ed_approved';
+  else if(data.hmName && data.hmDate && APPROVAL_AUTHORITY.can('approveSowUnderThreshold', saveRole)) data.approval_status = 'hm_approved';
   else if((data.tenantSig && data.tenantSig.image) || (data.staffSig && data.staffSig.image)) data.approval_status = 'signed';
   else data.approval_status = 'draft';
 
@@ -1642,45 +1596,15 @@ function saveSOW(opts){
   // user has walked every section. Edits to an existing saved SOW open
   // with every tab pre-marked visited, so this gate is effectively skipped
   // for re-edits — only first-time authoring is forced through the walk.
-  var _saveBtn = document.getElementById('sow_save_btn');
-  var _saveMode = _saveBtn && _saveBtn.dataset ? _saveBtn.dataset.mode : null;
-  if (_saveMode !== 'submit' && data.approval_status !== 'completed' && !data.system_approved) {
+  if (saveMode !== 'submit' && data.approval_status !== 'completed' && !data.system_approved) {
     data.approval_status = 'draft';
   }
+}
 
-  if(_sowUnitId) upsertSowInList(_sowUnitId, data);
-
-  // ── Unit status auto-flip ────────────────────────────────────────────────
-  // When this save took the SOW into its first HM/ED-approved state, flip
-  // the unit to 'under_repair' so it surfaces in the Renovations view. When
-  // it took the SOW to 'completed' AND no other SOWs on the unit are still
-  // active, revert the unit to its prior status. See maybeAutoFlipUnitForSow
-  // in shared-sow.js for the transition rules.
-  if(_sowUnitId){
-    try {
-      var _allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : [];
-      var _u = _allUnits.find(function(x){ return x.id === _sowUnitId; });
-      var _prev = existingForStatus ? existingForStatus.approval_status : null;
-      if(_u && typeof maybeAutoFlipUnitForSow === 'function' && maybeAutoFlipUnitForSow(_u, data, _prev)){
-        saveUnitWithDraftFallback(_u);
-        var _newStatus = _u.under_renovation ? 'Under Renovations' : (_u.status || 'updated');
-        auditEntry('UNIT:'+_sowUnitId, 'unit_status_auto', (_u.num+' '+_u.street).trim()+' → '+_newStatus+' (SOW '+(data.project_number||'')+' '+(data.approval_status==='completed'?'completed':'approved')+')', _saveRole);
-      }
-    } catch(e){ console.warn('[SOW] auto-flip threw:', e); }
-  }
-
-  // ── Audit trail ──────────────────────────────────────────────────────────
-  var role = window.currentRole || 'staff';
-  var addr = data.address || _sowUnitId || 'unit';
-  var isNew = !window._sowWasPreviouslySaved;
-  window._sowWasPreviouslySaved = true;
-
-  // Core save event
-  var detail = (isNew ? 'SOW created' : 'SOW updated') + ' — ' + addr;
-  if(data.totalCost) detail += ' · Total: ' + data.totalCost;
-  if(data.condition) detail += ' · Condition: ' + data.condition;
-  auditEntry('SOW:'+(_sowUnitId||'?'), isNew ? 'sow_created' : 'sow_updated', detail, role);
-
+// ── Post-persist notification block ───────────────────────────────────────
+// All the workflow emails saveSOW fires after the SOW is persisted, with
+// their dedupe conditions exactly as before. Extracted verbatim from saveSOW.
+function _sowFireEmails(data, existingForStatus, isNew, sendTenantCopy, saveMode){
   // Notify approvers on FIRST save only — subsequent edits don't re-fire
   // so the SOW reviewers don't get spammed during iteration. Fire-and-
   // forget; UI never blocks on delivery.
@@ -1745,7 +1669,7 @@ function saveSOW(opts){
   // Work Order email to the assigned in-house field employee — fires on SUBMIT
   // when the work is assigned in-house with a key person. De-duped so editing
   // an already-submitted SOW with the same assignee doesn't re-notify.
-  if (_saveMode === 'submit' && data.assignedTeam === 'in_house' && data.assignedTo
+  if (saveMode === 'submit' && data.assignedTeam === 'in_house' && data.assignedTo
       && typeof notifyWorkOrderToFieldEmployee === 'function') {
     var _prevAssignee = (existingForStatus && (existingForStatus.assignedTo || '')).toLowerCase();
     var _prevSubmitted = existingForStatus && existingForStatus.approval_status && existingForStatus.approval_status !== 'draft';
@@ -1756,6 +1680,108 @@ function saveSOW(opts){
       notifyWorkOrderToFieldEmployee(data, _unitFE);
     }
   }
+}
+
+function saveSOW(opts){
+  opts = opts || {};
+  var sendTenantCopy = opts.sendTenantCopy === true;
+  var get=function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
+  var chk=function(id){ var el=document.getElementById(id); return el?el.checked:false; };
+  var data = {
+    unitId:_sowUnitId, address:get('sow_address'), date:get('sow_date'),
+    tenantName:get('sow_tenant_name'),
+    preparedBy:get('sow_prepared_by'), contractor:get('sow_contractor'), contractorId:(document.getElementById('sow_contractor_id')||{}).value||'',
+    assignedTeam:(document.getElementById('sow_assigned_team')||{}).value||'',
+    assignedTo:(document.getElementById('sow_assigned_team')||{}).value==='in_house' ? ((document.getElementById('sow_assigned_to')||{}).value||'') : '',
+    assignedToName:(function(){ var s=document.getElementById('sow_assigned_to'); if(!s||((document.getElementById('sow_assigned_team')||{}).value)!=='in_house') return ''; var o=s.options[s.selectedIndex]; return (o&&o.getAttribute('data-name'))||''; })(),
+    poNumber:get('sow_po_number'),
+    condition:get('sow_condition'), fundSource:get('sow_fund_source'), totalCost:get('sow_total_cost'),
+    startDate:get('sow_start_date'), endDate:get('sow_end_date'), notes:get('sow_notes'),
+    hmName:get('sow_hm_name'), hmDate:get('sow_hm_date'),
+    edName:get('sow_ed_name'), edDate:get('sow_ed_date'),
+    tenantSig: {
+      name:  get('sow_sig_tenant_name'),
+      date:  get('sow_sig_tenant_date'),
+      image: (typeof getSigDataURL === 'function') ? getSigDataURL('sow_sig_canvas_tenant') : ''
+    },
+    staffSig: {
+      name:  get('sow_sig_staff_name'),
+      date:  get('sow_sig_staff_date'),
+      image: (typeof getSigDataURL === 'function') ? getSigDataURL('sow_sig_canvas_staff') : ''
+    },
+    mold:chk('sow_mold'), asbestos:chk('sow_asbestos'), electrical:chk('sow_electrical'),
+    structural:chk('sow_structural'), plumbing:chk('sow_plumbing'), fire:chk('sow_fire'),
+    rentArrears:chk('sow_rent_arrears'), tenantDamage:chk('sow_tenant_damage'),
+    negligence:chk('sow_negligence'), vandalism:chk('sow_vandalism'),
+    policeReport:chk('sow_police_report'), accountabilityNotes:get('sow_accountability_notes'),
+    items:collectSowItems(),
+    files: (window._sowFiles || []).slice(),
+    savedAt:new Date().toISOString()
+  };
+  // Reconcile assignment (in-house vs contractor — see _sowReconcileAssignment).
+  _sowReconcileAssignment(data);
+  // ── Multi-SOW fields ───────────────────────────────────────────────────
+  // Stamp the project number (either the one being edited or a fresh one for new SOWs).
+  data.project_number = window._sowEditingProjectNumber || (_sowUnitId ? nextProjectNumber(_sowUnitId) : 'NO-UNIT-SOW-001');
+  // Preserve created_at if editing an existing SOW; otherwise stamp today.
+  if(_sowUnitId){
+    var existing = getSowByProjectNumber(_sowUnitId, data.project_number);
+    data.created_at = (existing && existing.created_at) || data.date || new Date().toISOString().slice(0,10);
+    // Preserve progress block so editing SOW doesn't wipe progress.
+    if(existing && existing.progress) data.progress = existing.progress;
+  } else {
+    data.created_at = data.date || new Date().toISOString().slice(0,10);
+  }
+  // Normalize the amount to a number for table display / sorting.
+  var totalNum = parseFloat(String(data.totalCost||'').replace(/[^0-9.\-]/g,'')) || 0;
+  data.amount = totalNum;
+
+  // ── Approval-chain authority gate + status derivation ────────────────────
+  // Extracted to _sowComputeApprovalStatus (mutates data in place): authority
+  // gate, completed / System Approved preservation, review-all-tabs draft gate.
+  var _saveRole = window.currentRole || 'staff';
+  var existingForStatus = _sowUnitId && data.project_number ? getSowByProjectNumber(_sowUnitId, data.project_number) : null;
+  var _saveBtn = document.getElementById('sow_save_btn');
+  var _saveMode = _saveBtn && _saveBtn.dataset ? _saveBtn.dataset.mode : null;
+  _sowComputeApprovalStatus(data, existingForStatus, _saveRole, _saveMode);
+
+  if(_sowUnitId) upsertSowInList(_sowUnitId, data);
+
+  // ── Unit status auto-flip ────────────────────────────────────────────────
+  // When this save took the SOW into its first HM/ED-approved state, flip
+  // the unit to 'under_repair' so it surfaces in the Renovations view. When
+  // it took the SOW to 'completed' AND no other SOWs on the unit are still
+  // active, revert the unit to its prior status. See maybeAutoFlipUnitForSow
+  // in shared-sow.js for the transition rules.
+  if(_sowUnitId){
+    try {
+      var _allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : [];
+      var _u = _allUnits.find(function(x){ return x.id === _sowUnitId; });
+      var _prev = existingForStatus ? existingForStatus.approval_status : null;
+      if(_u && typeof maybeAutoFlipUnitForSow === 'function' && maybeAutoFlipUnitForSow(_u, data, _prev)){
+        saveUnitWithDraftFallback(_u);
+        var _newStatus = _u.under_renovation ? 'Under Renovations' : (_u.status || 'updated');
+        auditEntry('UNIT:'+_sowUnitId, 'unit_status_auto', (_u.num+' '+_u.street).trim()+' → '+_newStatus+' (SOW '+(data.project_number||'')+' '+(data.approval_status==='completed'?'completed':'approved')+')', _saveRole);
+      }
+    } catch(e){ console.warn('[SOW] auto-flip threw:', e); }
+  }
+
+  // ── Audit trail ──────────────────────────────────────────────────────────
+  var role = window.currentRole || 'staff';
+  var addr = data.address || _sowUnitId || 'unit';
+  var isNew = !window._sowWasPreviouslySaved;
+  window._sowWasPreviouslySaved = true;
+
+  // Core save event
+  var detail = (isNew ? 'SOW created' : 'SOW updated') + ' — ' + addr;
+  if(data.totalCost) detail += ' · Total: ' + data.totalCost;
+  if(data.condition) detail += ' · Condition: ' + data.condition;
+  auditEntry('SOW:'+(_sowUnitId||'?'), isNew ? 'sow_created' : 'sow_updated', detail, role);
+
+  // Workflow emails (sow_created / tenant copy / contractor work order /
+  // in-house field-employee work order) — extracted to _sowFireEmails with
+  // the dedupe conditions unchanged.
+  _sowFireEmails(data, existingForStatus, isNew, sendTenantCopy, _saveMode);
 
   // Tenant signature captured
   if(data.tenantSig && (data.tenantSig.name || data.tenantSig.image)) {

@@ -1925,115 +1925,12 @@ function _rfqShowChecklist(title, items) {
   document.body.appendChild(m);
 }
 
-// ── Generate Contractor Agreement PDF ────────────────────────────────────
-// Renders the contract body from notifications.js CONTRACTS_DOCS_REGISTRY
-// via jsPDF text primitives. getContractBody() always returns a non-empty
-// body (registry default when no saved override), so no AcroForm fallback.
-async function generateContractorContract() {
-  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can generate a contract'); return; }
-  // Readiness gate — hard-block on missing contract essentials.
-  var _missing = _rfqContractMissing();
-  if (_missing.length) { _rfqShowChecklist('Not ready to generate', _missing); return; }
-  // Signatures are soft — allow generating an unsigned copy to sign on paper.
-  var _noSigs = _rfqContractMissingSigs();
-  if (_noSigs.length && typeof showConfirm === 'function') {
-    var _goSig = await showConfirm({
-      title:       'Generate without signatures?',
-      message:     'No signature captured for: ' + _noSigs.join(', ') + '. Generate the contract anyway (e.g. to sign on paper)? You can re-generate after signing.',
-      confirmText: 'Generate anyway', cancelText: 'Cancel'
-    });
-    if (!_goSig) return;
-  }
-
-  if (typeof showToast === 'function') showToast('Generating contract PDF…');
-
-  // Build data directly from current form state — don't depend on saveRfqDraft
-  // completing successfully or _rfqCache being up to date. Save is fire-and-forget.
-  var currentPayload = _buildRfqPayload();
-  var d = currentPayload.data || {};
-  if (typeof saveRfqDraft === 'function') saveRfqDraft().catch(function(e){ console.warn('[contract] background save failed:', e); });
-
-  var rfqId = _rfqCurrentId || document.getElementById('rfq_number').value.trim();
-  var rfq   = (window._rfqCache || {})[rfqId] || {};
-
-  function fv(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
-
-  // Resolve awarded contractor
-  var ctId = fv('rfq_awarded_to') || rfq.awarded_contractor_id;
-  var ct   = (window._contractors || []).find(function(c){ return c && c.id === ctId; }) || {};
-
-  // Resolve unit address
-  var unit = (window.housingUnits || []).find(function(u){ return u && u.id === _rfqSowUnitId; }) || {};
-  var addr = (unit.num || '') + ' ' + (unit.street || '');
-  addr = addr.trim() || _rfqSowUnitId || '';
-
-  // Price totals
-  function numFmt(v) { return v ? '$' + Number(v).toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : ''; }
-  var pMat  = parseFloat(d.price_materials || 0);
-  var pLab  = parseFloat(d.price_labour    || 0);
-  var pEqp  = parseFloat(d.price_equipment || 0);
-  var pSubc = parseFloat(d.price_subcontractors || 0);
-  var pOth  = parseFloat(d.price_other     || 0);
-  var pSub  = pMat + pLab + pEqp + pSubc + pOth;
-  var pTot  = pSub; // First Nations — tax always $0
-
-  var tokens = {
-    rfqNumber:               rfqId,
-    contractNumber:          d.contract_number          || '',
-    contractDate:            d.contract_date            || '',
-    propertyAddress:         addr,
-    projectType:             (_rfqSowData && (_rfqSowData.condition || _rfqSowData.type)) || '',
-    sowReference:            _rfqSowPn || rfq.sow_project_number || '',
-    quoteNumber:             d.ct_quote_number || rfqId,
-    contractorQuoteNumber:   d.ct_quote_number || '',
-    startDate:               d.contract_start           || d.target_start_date       || '',
-    substantialCompletionDate: d.substantial_completion_date || '',
-    totalCompletionDate:     d.total_completion_date    || d.target_completion_date  || '',
-    contractorLegalName:     ct.name    || '',
-    contractorOperatingName: ct.name    || '',
-    contractorAddressLine1:  ct.address || '',
-    contractorAddressLine2:  '',
-    contractorGstHst:        ct.hst     || '',
-    contractorWsib:          ct.wsibNum || '',
-    contractorPhone:         ct.phone   || '',
-    contractorSignatoryName: d.ct_signatory_name  || (ct.sigCt && ct.sigCt.name)  || ct.name || '',
-    contractorSignatoryTitle:d.ct_signatory_title || (ct.sigCt && ct.sigCt.title) || '',
-    contractorSignatoryEmail:ct.email   || '',
-    contractorSiteLead:      d.site_lead_name  || '',
-    contractorSiteLeadPhone: d.site_lead_phone || '',
-    contractPrice:           numFmt(rfq.award_amount),
-    contractPriceExclTax:    d.contract_price_excl_tax ? numFmt(d.contract_price_excl_tax) : numFmt(pSub),
-    apEmail:                 d.ap_email || '',
-    nationName:              (window.NATION_CONFIG && NATION_CONFIG.display_name) || 'Housing Authority',
-    nationShort:             (window.NATION_CONFIG && NATION_CONFIG.short) || '',
-    clfnSignatoryName:       d.sig_name  || '',
-    clfnSignatoryTitle:      d.sig_title || '',
-    sowSummary:              d.sow_summary     || '',
-    sowDetailTable:          (d.scope_detail_rows || []).filter(function(r){ return r.category || r.description; }).map(function(r, i){ return (i+1) + '. ' + [r.category, r.description, r.notes].filter(Boolean).join(' — '); }).join('\n') || '',
-    materialsSpecifications: (d.materials_rows    || []).filter(function(r){ return r.material || r.specification; }).map(function(r, i){ return (i+1) + '. ' + [r.material, r.specification, r.notes].filter(Boolean).join(' — '); }).join('\n') || '',
-    exclusionsAssumptions:   (d.exclusions_rows   || []).filter(function(r){ return r.text; }).map(function(r, i){ return (i+1) + '. ' + r.text; }).join('\n') || '',
-    clfnSuppliedItems:       (d.clfn_supplied_rows|| []).filter(function(r){ return r.item; }).map(function(r, i){ return (i+1) + '. ' + r.item; }).join('\n') || 'None',
-    priceMaterials:          numFmt(pMat),
-    priceLabour:             numFmt(pLab),
-    priceEquipment:          numFmt(pEqp),
-    priceSubcontractors:     numFmt(pSubc),
-    priceOther:              numFmt(pOth),
-    priceSubtotal:           numFmt(pSub),
-    priceTax:                '$0.00',
-    priceTotalInclTax:       numFmt(pTot),
-    labourHours:             d.labour_hours    || '',
-    holdbackRelease:         numFmt(d.holdback_release)
-  };
-
-  var filename = (tokens.nationShort || 'Housing') + '_Contract_' + rfqId + '.pdf';
-
-  // ── jsPDF path ─────────────────────────────────────────────────────────
-  var savedBody = (typeof getContractBody === 'function') ? getContractBody('contractor_agreement') : '';
-  if (!savedBody || !savedBody.trim()) {
-    if (typeof showToast === 'function') showToast('Contract body not found — check Settings → Contracts');
-    return;
-  }
-  try {
+// ── Build the contractor agreement PDF ───────────────────────────────────
+// All header / body / Schedule B / acknowledgement / signature drawing,
+// extracted verbatim from generateContractorContract. tokens/d come from the
+// caller's form scrape; numFmt is the caller's currency formatter (shared so
+// Schedule B matches the token formatting). Returns the finished PDF Blob.
+async function _rfqBuildContractPdf(tokens, d, savedBody, numFmt) {
       if (typeof _loadJsPdf === 'function') await _loadJsPdf();
       var logoDataUrl = (typeof _fetchLogoForPdf === 'function') ? await _fetchLogoForPdf() : null;
       var ctx = _makePdfDoc({
@@ -2172,8 +2069,14 @@ async function generateContractorContract() {
       var binStr = atob(base64);
       var arr = new Uint8Array(binStr.length);
       for (var bi = 0; bi < binStr.length; bi++) arr[bi] = binStr.charCodeAt(bi);
-      var blob = new Blob([arr], {type:'application/pdf'});
+      return new Blob([arr], {type:'application/pdf'});
+}
 
+// ── Download + file the contract PDF ─────────────────────────────────────
+// Browser download, then the dual doc-library filing (unit 'tenant' meta +
+// this RFQ's meta) with the doc-lib / attach-list refreshes and the final
+// toast. Extracted verbatim from generateContractorContract.
+async function _rfqFileContractPdf(blob, filename) {
       // Download
       var dlUrl = URL.createObjectURL(blob);
       var dlLink = document.createElement('a');
@@ -2208,6 +2111,121 @@ async function generateContractorContract() {
           ? 'Contract PDF saved — added to RFQ and unit documents'
           : 'Contract PDF saved — also added to unit documents');
       }
+}
+
+// ── Generate Contractor Agreement PDF ────────────────────────────────────
+// Renders the contract body from notifications.js CONTRACTS_DOCS_REGISTRY
+// via jsPDF text primitives. getContractBody() always returns a non-empty
+// body (registry default when no saved override), so no AcroForm fallback.
+// Orchestrator: permission + readiness gates → token build →
+// _rfqBuildContractPdf → _rfqFileContractPdf.
+async function generateContractorContract() {
+  if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can generate a contract'); return; }
+  // Readiness gate — hard-block on missing contract essentials.
+  var _missing = _rfqContractMissing();
+  if (_missing.length) { _rfqShowChecklist('Not ready to generate', _missing); return; }
+  // Signatures are soft — allow generating an unsigned copy to sign on paper.
+  var _noSigs = _rfqContractMissingSigs();
+  if (_noSigs.length && typeof showConfirm === 'function') {
+    var _goSig = await showConfirm({
+      title:       'Generate without signatures?',
+      message:     'No signature captured for: ' + _noSigs.join(', ') + '. Generate the contract anyway (e.g. to sign on paper)? You can re-generate after signing.',
+      confirmText: 'Generate anyway', cancelText: 'Cancel'
+    });
+    if (!_goSig) return;
+  }
+
+  if (typeof showToast === 'function') showToast('Generating contract PDF…');
+
+  // Build data directly from current form state — don't depend on saveRfqDraft
+  // completing successfully or _rfqCache being up to date. Save is fire-and-forget.
+  var currentPayload = _buildRfqPayload();
+  var d = currentPayload.data || {};
+  if (typeof saveRfqDraft === 'function') saveRfqDraft().catch(function(e){ console.warn('[contract] background save failed:', e); });
+
+  var rfqId = _rfqCurrentId || document.getElementById('rfq_number').value.trim();
+  var rfq   = (window._rfqCache || {})[rfqId] || {};
+
+  function fv(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+  // Resolve awarded contractor
+  var ctId = fv('rfq_awarded_to') || rfq.awarded_contractor_id;
+  var ct   = (window._contractors || []).find(function(c){ return c && c.id === ctId; }) || {};
+
+  // Resolve unit address
+  var unit = (window.housingUnits || []).find(function(u){ return u && u.id === _rfqSowUnitId; }) || {};
+  var addr = (unit.num || '') + ' ' + (unit.street || '');
+  addr = addr.trim() || _rfqSowUnitId || '';
+
+  // Price totals
+  function numFmt(v) { return v ? '$' + Number(v).toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : ''; }
+  var pMat  = parseFloat(d.price_materials || 0);
+  var pLab  = parseFloat(d.price_labour    || 0);
+  var pEqp  = parseFloat(d.price_equipment || 0);
+  var pSubc = parseFloat(d.price_subcontractors || 0);
+  var pOth  = parseFloat(d.price_other     || 0);
+  var pSub  = pMat + pLab + pEqp + pSubc + pOth;
+  var pTot  = pSub; // First Nations — tax always $0
+
+  var tokens = {
+    rfqNumber:               rfqId,
+    contractNumber:          d.contract_number          || '',
+    contractDate:            d.contract_date            || '',
+    propertyAddress:         addr,
+    projectType:             (_rfqSowData && (_rfqSowData.condition || _rfqSowData.type)) || '',
+    sowReference:            _rfqSowPn || rfq.sow_project_number || '',
+    quoteNumber:             d.ct_quote_number || rfqId,
+    contractorQuoteNumber:   d.ct_quote_number || '',
+    startDate:               d.contract_start           || d.target_start_date       || '',
+    substantialCompletionDate: d.substantial_completion_date || '',
+    totalCompletionDate:     d.total_completion_date    || d.target_completion_date  || '',
+    contractorLegalName:     ct.name    || '',
+    contractorOperatingName: ct.name    || '',
+    contractorAddressLine1:  ct.address || '',
+    contractorAddressLine2:  '',
+    contractorGstHst:        ct.hst     || '',
+    contractorWsib:          ct.wsibNum || '',
+    contractorPhone:         ct.phone   || '',
+    contractorSignatoryName: d.ct_signatory_name  || (ct.sigCt && ct.sigCt.name)  || ct.name || '',
+    contractorSignatoryTitle:d.ct_signatory_title || (ct.sigCt && ct.sigCt.title) || '',
+    contractorSignatoryEmail:ct.email   || '',
+    contractorSiteLead:      d.site_lead_name  || '',
+    contractorSiteLeadPhone: d.site_lead_phone || '',
+    contractPrice:           numFmt(rfq.award_amount),
+    contractPriceExclTax:    d.contract_price_excl_tax ? numFmt(d.contract_price_excl_tax) : numFmt(pSub),
+    apEmail:                 d.ap_email || '',
+    nationName:              (window.NATION_CONFIG && NATION_CONFIG.display_name) || 'Housing Authority',
+    nationShort:             (window.NATION_CONFIG && NATION_CONFIG.short) || '',
+    clfnSignatoryName:       d.sig_name  || '',
+    clfnSignatoryTitle:      d.sig_title || '',
+    sowSummary:              d.sow_summary     || '',
+    sowDetailTable:          (d.scope_detail_rows || []).filter(function(r){ return r.category || r.description; }).map(function(r, i){ return (i+1) + '. ' + [r.category, r.description, r.notes].filter(Boolean).join(' — '); }).join('\n') || '',
+    materialsSpecifications: (d.materials_rows    || []).filter(function(r){ return r.material || r.specification; }).map(function(r, i){ return (i+1) + '. ' + [r.material, r.specification, r.notes].filter(Boolean).join(' — '); }).join('\n') || '',
+    exclusionsAssumptions:   (d.exclusions_rows   || []).filter(function(r){ return r.text; }).map(function(r, i){ return (i+1) + '. ' + r.text; }).join('\n') || '',
+    clfnSuppliedItems:       (d.clfn_supplied_rows|| []).filter(function(r){ return r.item; }).map(function(r, i){ return (i+1) + '. ' + r.item; }).join('\n') || 'None',
+    priceMaterials:          numFmt(pMat),
+    priceLabour:             numFmt(pLab),
+    priceEquipment:          numFmt(pEqp),
+    priceSubcontractors:     numFmt(pSubc),
+    priceOther:              numFmt(pOth),
+    priceSubtotal:           numFmt(pSub),
+    priceTax:                '$0.00',
+    priceTotalInclTax:       numFmt(pTot),
+    labourHours:             d.labour_hours    || '',
+    holdbackRelease:         numFmt(d.holdback_release)
+  };
+
+  var filename = (tokens.nationShort || 'Housing') + '_Contract_' + rfqId + '.pdf';
+
+  // ── jsPDF path ─────────────────────────────────────────────────────────
+  var savedBody = (typeof getContractBody === 'function') ? getContractBody('contractor_agreement') : '';
+  if (!savedBody || !savedBody.trim()) {
+    if (typeof showToast === 'function') showToast('Contract body not found — check Settings → Contracts');
+    return;
+  }
+  try {
+      var blob = await _rfqBuildContractPdf(tokens, d, savedBody, numFmt);
+      await _rfqFileContractPdf(blob, filename);
   } catch(e) {
     console.error('[contract] generation failed:', e);
     if (typeof showToast === 'function') showToast('Contract PDF failed: ' + e.message);

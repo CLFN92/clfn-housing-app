@@ -4475,20 +4475,17 @@ function sowHiddenFromCurrentFieldEmployee(sow){
 }
 window.sowHiddenFromCurrentFieldEmployee = sowHiddenFromCurrentFieldEmployee;
 
-function renderWorklist() {
-  var body = document.getElementById('worklist_body');
-  if (!body) return;
-  var role  = window._viewAsRole || window._realRole || window.currentRole || 'housing_employee_l1';
-  var email = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.email : '').toLowerCase();
-  var isManagement = typeof ROLE !== 'undefined' && ROLE.isManagement(role);
-  var canFinal     = typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('finalApproveApp', role);
+// ── Worklist collectors ──────────────────────────────────────────────────
+// Pure data-collection helpers for renderWorklist. Each takes the shared
+// context object computed ONCE by the orchestrator ({role, email, myName,
+// apps, isManagement, canFinal}) and returns its section's items. No DOM
+// writes here — all rendering stays in renderWorklist.
 
-  var myName = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.name : '') || '';
-  var apps   = (typeof applications !== 'undefined' && applications) ? applications : [];
-
-  // ── 0. My Drafts — items the current user started but hasn't submitted ───
-  // Shown for ALL roles so an employee, HM, or ED can find and continue
-  // their own in-progress work without navigating to another page.
+// ── 0. My Drafts — items the current user started but hasn't submitted ───
+// Shown for ALL roles so an employee, HM, or ED can find and continue
+// their own in-progress work without navigating to another page.
+function _wlCollectDrafts(ctx) {
+  var email = ctx.email, myName = ctx.myName, apps = ctx.apps;
   var draftApps = apps.filter(function(a) {
     if (!a || a.archived) return false;
     return (a.created_by_email || '').toLowerCase() === email && a.status === 'draft';
@@ -4529,11 +4526,16 @@ function renderWorklist() {
     draftRfqs = draftRfqs.slice(0, 6);
   }
 
-  // ── 1. Applications requiring action ────────────────────────────────────
-  // Keep the FULL filtered list so the "+N more" overflow under the section is
-  // computed from the same role-gated filter as the rows themselves (it used
-  // to be re-derived from a role-blind 3-status filter, over- and
-  // under-counting).
+  return { draftApps: draftApps, draftSows: draftSows, draftRfqs: draftRfqs };
+}
+
+// ── 1. Applications requiring action ────────────────────────────────────
+// Keep the FULL filtered list so the "+N more" overflow under the section is
+// computed from the same role-gated filter as the rows themselves (it used
+// to be re-derived from a role-blind 3-status filter, over- and
+// under-counting).
+function _wlCollectApps(ctx) {
+  var email = ctx.email, isManagement = ctx.isManagement, canFinal = ctx.canFinal, apps = ctx.apps;
   var appItemsAll = apps.filter(function(a) {
     if (!a || a.archived) return false;
     // Commercial (business/department) applications are non-scored and reviewed
@@ -4546,13 +4548,16 @@ function renderWorklist() {
     return false;
   });
   var appItems = appItemsAll.slice(0, 10);
+  return { appItemsAll: appItemsAll, appItems: appItems };
+}
 
-  // ── 2. SOWs pending approval ─────────────────────────────────────────────
-  // ── 2. SOWs awaiting the logged-in user's approval ──────────────────────
-  // Stored approval_status values: ''/'draft'/'signed' = needs HM review,
-  // 'hm_approved' = needs ED final approval. 'ed_approved'/'completed' = done.
+// ── 2. SOWs awaiting the logged-in user's approval ──────────────────────
+// Stored approval_status values: ''/'draft'/'signed' = needs HM review,
+// 'hm_approved' = needs ED final approval. 'ed_approved'/'completed' = done.
+function _wlCollectSows(ctx) {
+  var canFinal = ctx.canFinal;
   var sowItems = [];
-  if (isManagement) {
+  if (ctx.isManagement) {
     var sowCache2 = window._sowCache || {};
     var sowUnitsAll = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     Object.keys(sowCache2).forEach(function(uid) {
@@ -4578,12 +4583,15 @@ function renderWorklist() {
     });
     sowItems = sowItems.slice(0, 8);
   }
+  return sowItems;
+}
 
-  // ── 2b. Field Employee: approved work orders to execute ──────────────────
-  // Maintenance crew queue — SOWs that HM/ED have approved and that aren't yet
-  // completed, i.e. the work the crew can go do now and then mark complete.
+// ── 2b. Field Employee: approved work orders to execute ──────────────────
+// Maintenance crew queue — SOWs that HM/ED have approved and that aren't yet
+// completed, i.e. the work the crew can go do now and then mark complete.
+function _wlCollectFieldSows(ctx) {
   var fieldSowItems = [];
-  if (role === 'field_employee') {
+  if (ctx.role === 'field_employee') {
     var fsCache = window._sowCache || {};
     var fsUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     Object.keys(fsCache).forEach(function(uid) {
@@ -4600,10 +4608,13 @@ function renderWorklist() {
     });
     fieldSowItems = fieldSowItems.slice(0, 12);
   }
+  return fieldSowItems;
+}
 
-  // ── 3. RFQs needing action ───────────────────────────────────────────────
+// ── 3. RFQs needing action ───────────────────────────────────────────────
+function _wlCollectRfqs(ctx) {
   var rfqItems = [];
-  if (isManagement && (typeof moduleOn !== 'function' || moduleOn('rfq'))) {
+  if (ctx.isManagement && (typeof moduleOn !== 'function' || moduleOn('rfq'))) {
     var rfqCache = window._rfqCache || {};
     var rfqUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     Object.keys(rfqCache).forEach(function(rfqId) {
@@ -4616,15 +4627,19 @@ function renderWorklist() {
     });
     rfqItems = rfqItems.slice(0, 6);
   }
+  return rfqItems;
+}
 
-  // ── 4. Contractors awaiting the logged-in user's approval ────────────────
-  // Contractor status values: 'pending_review' = needs recommend/verify,
-  // 'hm_recommended' = needs final approval (HM or ED). Bucket off the real
-  // contractor authorities (not the application-level canFinal): a recommender
-  // (HE-L2/HM) sees pending_review; a final approver (HM/ED) sees hm_recommended
-  // (and pending_review directly only if they cannot recommend — i.e. the ED).
+// ── 4. Contractors awaiting the logged-in user's approval ────────────────
+// Contractor status values: 'pending_review' = needs recommend/verify,
+// 'hm_recommended' = needs final approval (HM or ED). Bucket off the real
+// contractor authorities (not the application-level canFinal): a recommender
+// (HE-L2/HM) sees pending_review; a final approver (HM/ED) sees hm_recommended
+// (and pending_review directly only if they cannot recommend — i.e. the ED).
+function _wlCollectContractors(ctx) {
+  var role = ctx.role;
   var ctItems = [];
-  if (isManagement) {
+  if (ctx.isManagement) {
     var canRecommendCt = typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('recommendContractor', role);
     var canApproveCt   = typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('approveContractor', role);
     var cts = window._contractors || [];
@@ -4638,25 +4653,32 @@ function renderWorklist() {
     });
     ctItems = ctItems.slice(0, 6);
   }
+  return ctItems;
+}
 
-  // ── 5. Approved apps ready to match (no unit assigned) ───────────────────
-  // Commercial apps are excluded — they're assigned to buildings via their own
-  // review modal, never the residential Match queue.
+// ── 5. Approved apps ready to match (no unit assigned) ───────────────────
+// Commercial apps are excluded — they're assigned to buildings via their own
+// review modal, never the residential Match queue.
+function _wlCollectMatch(ctx) {
   var matchItems = [];
-  if (isManagement) {
-    matchItems = apps.filter(function(a) {
+  if (ctx.isManagement) {
+    matchItems = ctx.apps.filter(function(a) {
       if (!a || a.archived || a.assignedUnit) return false;
       if (a.appType === 'commercial') return false;
       return a.status === 'ed_approved' || a.status === 'mgr_approved';
     }).slice(0, 6);
   }
+  return matchItems;
+}
 
-  // ── 6. Inventory / unit approvals pending ────────────────────────────────
-  // Shows units where an HM or ED approval decision has been initiated but
-  // not yet set (decision field is blank). HM sees their pending block;
-  // ED sees ED-pending items and any HM-deferred items.
+// ── 6. Inventory / unit approvals pending ────────────────────────────────
+// Shows units where an HM or ED approval decision has been initiated but
+// not yet set (decision field is blank). HM sees their pending block;
+// ED sees ED-pending items and any HM-deferred items.
+function _wlCollectUnitApprovals(ctx) {
+  var canFinal = ctx.canFinal;
   var unitApprItems = [];
-  if (isManagement) {
+  if (ctx.isManagement) {
     var allUnitsAppr = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     allUnitsAppr.forEach(function(u) {
       if (!u) return;
@@ -4674,7 +4696,36 @@ function renderWorklist() {
     });
     unitApprItems = unitApprItems.slice(0, 8);
   }
+  return unitApprItems;
+}
 
+function renderWorklist() {
+  var body = document.getElementById('worklist_body');
+  if (!body) return;
+  var role  = window._viewAsRole || window._realRole || window.currentRole || 'housing_employee_l1';
+  var email = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.email : '').toLowerCase();
+  var isManagement = typeof ROLE !== 'undefined' && ROLE.isManagement(role);
+  var canFinal     = typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('finalApproveApp', role);
+
+  var myName = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.name : '') || '';
+  var apps   = (typeof applications !== 'undefined' && applications) ? applications : [];
+
+  // Shared context — computed ONCE and passed to every collector.
+  var ctx = { role: role, email: email, myName: myName, apps: apps, isManagement: isManagement, canFinal: canFinal };
+
+  var _drafts       = _wlCollectDrafts(ctx);
+  var draftApps     = _drafts.draftApps;
+  var draftSows     = _drafts.draftSows;
+  var draftRfqs     = _drafts.draftRfqs;
+  var _wlApps       = _wlCollectApps(ctx);
+  var appItemsAll   = _wlApps.appItemsAll;
+  var appItems      = _wlApps.appItems;
+  var sowItems      = _wlCollectSows(ctx);
+  var fieldSowItems = _wlCollectFieldSows(ctx);
+  var rfqItems      = _wlCollectRfqs(ctx);
+  var ctItems       = _wlCollectContractors(ctx);
+  var matchItems    = _wlCollectMatch(ctx);
+  var unitApprItems = _wlCollectUnitApprovals(ctx);
   // ── Inline archive helpers (exposed on window so onclick can reach them) ──
   window._wlArchiveSow = function(uid, pn) {
     if (typeof showConfirm !== 'function') return;
