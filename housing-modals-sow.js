@@ -1739,7 +1739,13 @@ function saveSOW(opts){
   // ── Approval-chain authority gate + status derivation ────────────────────
   // Extracted to _sowComputeApprovalStatus (mutates data in place): authority
   // gate, completed / System Approved preservation, review-all-tabs draft gate.
-  var _saveRole = window.currentRole || 'staff';
+  // Use the REAL authenticated role (not the effective/view-as role) so the
+  // authority check matches the approve button (line ~996) and sowApproveInline,
+  // which both key off _realRole. Otherwise an ED with "view as HM" active would
+  // set the ED signature via sowApproveInline but have it stripped here (HM can't
+  // approve over threshold) -> the approval silently vanishes and the SOW never
+  // clears from the worklist. View-as is a preview; approving acts as the real ED.
+  var _saveRole = window._realRole || window.currentRole || 'staff';
   var existingForStatus = _sowUnitId && data.project_number ? getSowByProjectNumber(_sowUnitId, data.project_number) : null;
   var _saveBtn = document.getElementById('sow_save_btn');
   var _saveMode = _saveBtn && _saveBtn.dataset ? _saveBtn.dataset.mode : null;

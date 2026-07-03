@@ -1216,10 +1216,13 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 @media (max-width: 640px) {
   .modal-body-sow-shell { max-height: 100vh; border-radius: 0; }
   .modal-tab-panel     { padding: 10px 0; }
-  /* Swap horizontal strip for the always-open vertical drawer at phone
-     widths. Applies to both the SOW modal and the contractor CIC. */
-  .modal-tabs          { display: none; }
-  .modal-tab-drawer    { display: block; }
+  /* Keep the horizontal tab strip on phones and let it scroll sideways
+     (it already has overflow-x:auto) — matches the tab pattern used
+     everywhere else in the app. The always-open vertical drawer is
+     retained in the markup but stays hidden. Applies to both the SOW
+     modal and the contractor CIC. */
+  .modal-tabs          { display: flex; }
+  .modal-tab-drawer    { display: none; }
 }
 
 /* Flex utilities already in shared.css but repeated inline */
