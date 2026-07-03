@@ -3304,18 +3304,18 @@ var TERMS_DOCS_REGISTRY = [
     key:         'housing_application',
     label:       'Housing Application — Terms & Conditions',
     description: 'Printed on the applicant declaration page of every housing application PDF.',
-    defaultBody: '<p>By signing below, I hereby apply for housing assistance from the Constance Lake First Nation (CLFN) Housing Program and declare the following:</p>'
+    defaultBody: '<p>By signing below, I hereby apply for housing assistance from the {nationName} ({nationShort}) Housing Program and declare the following:</p>'
                + '<ol>'
                + '<li><strong>Truthful Information.</strong> All information provided in this application is true, accurate, and complete to the best of my knowledge. I understand that providing false or misleading information may result in immediate disqualification, removal from the housing waitlist, and — where tenancy has already commenced — may constitute grounds for termination of my housing agreement.</li>'
-               + '<li><strong>Eligibility.</strong> I confirm that I am a registered Band member of Constance Lake First Nation, am 18 years of age or older, and meet the eligibility requirements set out in the CLFN Housing Policy. I understand that all registered Band members are eligible regardless of on- or off-reserve residency, and that ownership of property off-reserve does not affect my eligibility.</li>'
-               + '<li><strong>Privacy and Consent.</strong> I consent to CLFN collecting, using, retaining, and sharing my personal information for the purpose of assessing this application, administering housing services, and meeting reporting obligations, in accordance with PIPEDA and the OCAP® principles of the First Nations Information Governance Centre (FNIGC).</li>'
-               + '<li><strong>Assessment and Priority.</strong> I understand that my application will be assessed against the criteria set out in the CLFN Housing Policy, and that placement priority is determined by assessed need and unit availability — not by date of application alone.</li>'
-               + '<li><strong>Duty to Update.</strong> I agree to notify the CLFN Housing Department within thirty (30) days of any change in household composition, income, employment, address, contact information, or any other matter that may affect my eligibility or assessment. Failure to notify may result in re-assessment or removal from the waitlist.</li>'
-               + '<li><strong>Arrears and Good Standing.</strong> I understand that I must be in good standing with CLFN, or actively working toward good standing through a written payment arrangement approved by the Housing Department, as a condition of placement. I acknowledge that CLFN follows a supportive arrears model providing up to twelve (12) months under a payment arrangement before eviction proceedings may be initiated, and that the minimum monthly payment under such an arrangement is regular rent plus fifty percent (50%) of monthly rent applied against arrears.</li>'
-               + '<li><strong>Utilities and Band Payment Recovery.</strong> I authorize CLFN to recover unpaid utilities, rent, damage charges, or other housing-related debts from any monetary payments administered by the Band to me, including but not limited to per capita distributions, honoraria, and program benefits, as provided under the CLFN Housing Policy.</li>'
-               + '<li><strong>Compliance.</strong> I agree to comply with the CLFN Housing Policy, my Housing Agreement or lease, the Governance and Administration Policy, and all applicable community by-laws as a condition of tenancy.</li>'
-               + '<li><strong>Verification.</strong> I authorize CLFN to verify any information provided in this application with relevant third parties, including employers, financial institutions, utility providers, previous landlords, and other First Nations housing authorities where applicable.</li>'
-               + '<li><strong>Acknowledgement of Policy.</strong> I acknowledge that I have been offered access to the current CLFN Housing Policy and Governance and Administration Policy, and that I am responsible for familiarizing myself with their contents.</li>'
+               + '<li><strong>Eligibility.</strong> I confirm that I am a registered Band member of {nationName}, am 18 years of age or older, and meet the eligibility requirements set out in the {nationShort} Housing Policy. I understand that all registered Band members are eligible regardless of on- or off-reserve residency, and that ownership of property off-reserve does not affect my eligibility.</li>'
+               + '<li><strong>Privacy and Consent.</strong> I consent to {nationShort} collecting, using, retaining, and sharing my personal information for the purpose of assessing this application, administering housing services, and meeting reporting obligations, in accordance with PIPEDA and the OCAP® principles of the First Nations Information Governance Centre (FNIGC).</li>'
+               + '<li><strong>Assessment and Priority.</strong> I understand that my application will be assessed against the criteria set out in the {nationShort} Housing Policy, and that placement priority is determined by assessed need and unit availability — not by date of application alone.</li>'
+               + '<li><strong>Duty to Update.</strong> I agree to notify the {nationShort} Housing Department within thirty (30) days of any change in household composition, income, employment, address, contact information, or any other matter that may affect my eligibility or assessment. Failure to notify may result in re-assessment or removal from the waitlist.</li>'
+               + '<li><strong>Arrears and Good Standing.</strong> I understand that I must be in good standing with {nationShort}, or actively working toward good standing through a written payment arrangement approved by the Housing Department, as a condition of placement. I acknowledge that {nationShort} follows a supportive arrears model providing up to twelve (12) months under a payment arrangement before eviction proceedings may be initiated, and that the minimum monthly payment under such an arrangement is regular rent plus fifty percent (50%) of monthly rent applied against arrears.</li>'
+               + '<li><strong>Utilities and Band Payment Recovery.</strong> I authorize {nationShort} to recover unpaid utilities, rent, damage charges, or other housing-related debts from any monetary payments administered by the Band to me, including but not limited to per capita distributions, honoraria, and program benefits, as provided under the {nationShort} Housing Policy.</li>'
+               + '<li><strong>Compliance.</strong> I agree to comply with the {nationShort} Housing Policy, my Housing Agreement or lease, the Governance and Administration Policy, and all applicable community by-laws as a condition of tenancy.</li>'
+               + '<li><strong>Verification.</strong> I authorize {nationShort} to verify any information provided in this application with relevant third parties, including employers, financial institutions, utility providers, previous landlords, and other First Nations housing authorities where applicable.</li>'
+               + '<li><strong>Acknowledgement of Policy.</strong> I acknowledge that I have been offered access to the current {nationShort} Housing Policy and Governance and Administration Policy, and that I am responsible for familiarizing myself with their contents.</li>'
                + '</ol>'
   },
   {
@@ -3324,13 +3324,13 @@ var TERMS_DOCS_REGISTRY = [
     description: 'Printed in the Work Authorization section of every contractor work order PDF.',
     defaultBody: '<p>By accepting this Work Order, the contractor agrees to the following terms and conditions:</p>'
                + '<ol>'
-               + '<li><strong>Authorized Scope.</strong> The contractor is authorized to perform only the work described in this Work Order. Any additional work or changes to scope require prior written approval from CLFN Housing before work commences.</li>'
-               + '<li><strong>Invoicing.</strong> All invoices must reference this Work Order number and the unit address. Payment is subject to satisfactory completion and inspection by CLFN Housing staff.</li>'
-               + '<li><strong>Quality and Standards.</strong> All work must be performed in a good and workmanlike manner, in compliance with applicable building codes, health and safety regulations, and CLFN Housing standards.</li>'
-               + '<li><strong>Timeline.</strong> Work must commence and be completed within the dates specified in this Work Order. Any anticipated delays must be reported promptly to CLFN Housing in writing before the affected date.</li>'
-               + '<li><strong>Workplace Safety and Insurance.</strong> The contractor assumes full responsibility for workplace safety and must maintain current WSIB clearance and general liability insurance throughout the project. Certificates must be provided to CLFN Housing upon request.</li>'
-               + '<li><strong>Deficiencies.</strong> The contractor is responsible for correcting any deficiencies identified during inspection at no additional cost to CLFN.</li>'
-               + '<li><strong>Compliance.</strong> The contractor must comply with all applicable federal, provincial, and First Nations regulations, as well as CLFN community by-laws, while on-reserve.</li>'
+               + '<li><strong>Authorized Scope.</strong> The contractor is authorized to perform only the work described in this Work Order. Any additional work or changes to scope require prior written approval from {nationShort} Housing before work commences.</li>'
+               + '<li><strong>Invoicing.</strong> All invoices must reference this Work Order number and the unit address. Payment is subject to satisfactory completion and inspection by {nationShort} Housing staff.</li>'
+               + '<li><strong>Quality and Standards.</strong> All work must be performed in a good and workmanlike manner, in compliance with applicable building codes, health and safety regulations, and {nationShort} Housing standards.</li>'
+               + '<li><strong>Timeline.</strong> Work must commence and be completed within the dates specified in this Work Order. Any anticipated delays must be reported promptly to {nationShort} Housing in writing before the affected date.</li>'
+               + '<li><strong>Workplace Safety and Insurance.</strong> The contractor assumes full responsibility for workplace safety and must maintain current WSIB clearance and general liability insurance throughout the project. Certificates must be provided to {nationShort} Housing upon request.</li>'
+               + '<li><strong>Deficiencies.</strong> The contractor is responsible for correcting any deficiencies identified during inspection at no additional cost to {nationShort}.</li>'
+               + '<li><strong>Compliance.</strong> The contractor must comply with all applicable federal, provincial, and First Nations regulations, as well as {nationShort} community by-laws, while on-reserve.</li>'
                + '</ol>'
   },
   {
@@ -3342,15 +3342,15 @@ var TERMS_DOCS_REGISTRY = [
                + '<li><strong>Prioritization of Requests.</strong> Renovation requests are assessed and prioritized based on urgency of need, health and safety risk to occupants, and overall unit condition. Immediate hazards — structural, electrical, plumbing, fire safety, or matters affecting habitability — take priority over general maintenance and cosmetic work.</li>'
                + '<li><strong>Funding Eligibility and Unit Qualifying Criteria.</strong> Approval is subject to available funding and the qualifying criteria of the unit under its applicable program (e.g. ISC, CMHC Section 95, or Band-funded). Funding availability and program restrictions may affect the scope, cost ceiling, materials, or timing of approved work.</li>'
                + '<li><strong>Budget Authority and Approval Routing.</strong> Requests within the Housing Manager\'s approved budget authority may be approved by the Housing Manager. Requests exceeding that threshold require Executive Director approval, and requests beyond the Executive Director\'s authority require Chief and Council approval by Band Council Resolution before work commences. No work begins until all required approvals are documented in writing.</li>'
-               + '<li><strong>Tenant Responsibilities.</strong> The tenant must provide timely and reasonable access to the unit for inspection, assessment, and the performance of work, in accordance with the CLFN Housing Policy. Failure to permit reasonable access may result in the request being delayed, deprioritized, or closed.</li>'
-               + '<li><strong>Tenant Neglect and Cost Recovery.</strong> Damage or unsafe conditions arising from willful damage, misuse, failure to report issues in a timely manner, or tenant neglect may reduce the priority of the request and may result in the tenant being financially responsible for all or part of the repair cost. Outstanding charges may be recovered through the Band payment recovery provisions of the CLFN Housing Policy, including from rent, per capita distributions, honoraria, or other monetary payments administered by the Band.</li>'
-               + '<li><strong>Good Standing.</strong> Non-emergency renovation work may be conditional on the tenant being in good standing with CLFN, or actively working toward good standing through a written payment arrangement approved by the Housing Department. Emergency health and safety work will not be withheld on the basis of arrears.</li>'
+               + '<li><strong>Tenant Responsibilities.</strong> The tenant must provide timely and reasonable access to the unit for inspection, assessment, and the performance of work, in accordance with the {nationShort} Housing Policy. Failure to permit reasonable access may result in the request being delayed, deprioritized, or closed.</li>'
+               + '<li><strong>Tenant Neglect and Cost Recovery.</strong> Damage or unsafe conditions arising from willful damage, misuse, failure to report issues in a timely manner, or tenant neglect may reduce the priority of the request and may result in the tenant being financially responsible for all or part of the repair cost. Outstanding charges may be recovered through the Band payment recovery provisions of the {nationShort} Housing Policy, including from rent, per capita distributions, honoraria, or other monetary payments administered by the Band.</li>'
+               + '<li><strong>Good Standing.</strong> Non-emergency renovation work may be conditional on the tenant being in good standing with {nationShort}, or actively working toward good standing through a written payment arrangement approved by the Housing Department. Emergency health and safety work will not be withheld on the basis of arrears.</li>'
                + '<li><strong>No Guarantee of Approval or Timeline.</strong> Submission of a request does not guarantee approval or a specific completion date. Decisions will be communicated in writing. Priority and scheduling may be adjusted based on available resources, weather, contractor availability, and emerging urgent community needs.</li>'
                + '<li><strong>Scope of Work and Change Orders.</strong> Approved work will be performed in accordance with the documented scope of work. Any additions, deletions, or substantive changes require a written change order approved through the same approval routing as the original request before that work is undertaken.</li>'
-               + '<li><strong>Procurement and Contractors.</strong> All contractors performing work must meet CLFN procurement, insurance, and WSIB requirements. Tenants may not engage contractors directly on behalf of CLFN, and unauthorized work will not be reimbursed.</li>'
+               + '<li><strong>Procurement and Contractors.</strong> All contractors performing work must meet {nationShort} procurement, insurance, and WSIB requirements. Tenants may not engage contractors directly on behalf of {nationShort}, and unauthorized work will not be reimbursed.</li>'
                + '<li><strong>Accuracy of Information.</strong> All information provided in this request must be accurate and complete. False or misleading information may result in the request being cancelled, delayed, or referred for further review.</li>'
-               + '<li><strong>Privacy and Consent.</strong> I consent to CLFN collecting, using, and retaining information related to this request — including photographs, inspection notes, and contractor records — for the purpose of assessing, performing, and documenting the work, in accordance with PIPEDA and OCAP® principles.</li>'
-               + '<li><strong>Compliance with Policy.</strong> I agree that all renovation work and related obligations are governed by the CLFN Housing Policy, my Housing Agreement or lease, and applicable community by-laws.</li>'
+               + '<li><strong>Privacy and Consent.</strong> I consent to {nationShort} collecting, using, and retaining information related to this request — including photographs, inspection notes, and contractor records — for the purpose of assessing, performing, and documenting the work, in accordance with PIPEDA and OCAP® principles.</li>'
+               + '<li><strong>Compliance with Policy.</strong> I agree that all renovation work and related obligations are governed by the {nationShort} Housing Policy, my Housing Agreement or lease, and applicable community by-laws.</li>'
                + '</ol>'
   },
   {
@@ -3362,11 +3362,11 @@ var TERMS_DOCS_REGISTRY = [
                + '<li><strong>Bid Validity.</strong> All bids submitted in response to this RFQ shall remain valid and irrevocable for a minimum of sixty (60) calendar days from the bid closing date.</li>'
                + '<li><strong>Compliance with Scope.</strong> Bids must address the full scope of work as described. Partial bids will not be considered unless explicitly invited in writing.</li>'
                + '<li><strong>WSIB and Insurance.</strong> The contractor must provide a current WSIB clearance certificate and proof of general liability insurance (minimum $2,000,000) with this bid. Failure to include these documents will result in disqualification.</li>'
-               + '<li><strong>No Award Guarantee.</strong> Submission of a bid does not guarantee award. Constance Lake First Nation reserves the right to reject any or all bids, to cancel this RFQ at any time, and to award the work to the contractor deemed most advantageous to the community, price and other factors considered.</li>'
-               + '<li><strong>Indigenous Preference.</strong> In accordance with the CLFN Housing Policy, preference will be given to Indigenous-owned and CLFN-member-owned businesses where qualifications and price are competitive.</li>'
+               + '<li><strong>No Award Guarantee.</strong> Submission of a bid does not guarantee award. {nationName} reserves the right to reject any or all bids, to cancel this RFQ at any time, and to award the work to the contractor deemed most advantageous to the community, price and other factors considered.</li>'
+               + '<li><strong>Indigenous Preference.</strong> In accordance with the {nationShort} Housing Policy, preference will be given to Indigenous-owned and {nationShort}-member-owned businesses where qualifications and price are competitive.</li>'
                + '<li><strong>Confidentiality.</strong> All bid information submitted is confidential and will not be disclosed to other bidders.</li>'
                + '<li><strong>Accuracy.</strong> All information submitted must be accurate and complete. Misrepresentation will result in immediate disqualification and may affect future eligibility.</li>'
-               + '<li><strong>Governing Authority.</strong> This RFQ and any resulting contract are governed by the inherent jurisdiction of Constance Lake First Nation and applicable federal and provincial law.</li>'
+               + '<li><strong>Governing Authority.</strong> This RFQ and any resulting contract are governed by the inherent jurisdiction of {nationName} and applicable federal and provincial law.</li>'
                + '</ol>'
   }
 ];
@@ -3378,14 +3378,29 @@ function _termsDocConfig(docKey) {
   return null;
 }
 
+// Nation-identity token substitution for T&C bodies. The registry defaults
+// use {nationName}/{nationShort} instead of hardcoded nation literals
+// (HARD RULE); values resolve from NATION_CONFIG via the shared-config
+// accessors, so rendered output for the configured nation is unchanged.
+// Idempotent and safe on saved bodies (plain text passes through untouched).
+function _termsApplyNationTokens(html) {
+  if (!html) return html || '';
+  var name  = (typeof nationDisplay === 'function') ? nationDisplay()
+            : ((window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '');
+  var short = (typeof nationShort === 'function') ? nationShort()
+            : ((window.NATION_CONFIG && NATION_CONFIG.short) || '');
+  return String(html).replace(/\{nationName\}/g, name).replace(/\{nationShort\}/g, short);
+}
+
 // Public accessor for PDF generators. Falls back to the registry default
-// when no ED override has been saved yet.
+// when no ED override has been saved yet. Nation tokens are substituted on
+// the way out so no consumer ever renders raw {nationName}/{nationShort}.
 function getTermsBody(docKey) {
   var saved = (window._appSettings && window._appSettings.terms_and_conditions
             && window._appSettings.terms_and_conditions[docKey]) || {};
-  if (saved.bodyHtml != null && saved.bodyHtml !== '') return saved.bodyHtml;
+  if (saved.bodyHtml != null && saved.bodyHtml !== '') return _termsApplyNationTokens(saved.bodyHtml);
   var cfg = _termsDocConfig(docKey);
-  return cfg ? cfg.defaultBody : '';
+  return cfg ? _termsApplyNationTokens(cfg.defaultBody) : '';
 }
 
 var _termsSelectedDoc = null;
@@ -3426,7 +3441,9 @@ function _termsRenderEditorHtml(docKey) {
 
   var saved    = (window._appSettings && window._appSettings.terms_and_conditions
                && window._appSettings.terms_and_conditions[docKey]) || {};
-  var bodyHtml = (saved.bodyHtml != null && saved.bodyHtml !== '') ? saved.bodyHtml : cfg.defaultBody;
+  // Default bodies carry {nationName}/{nationShort} tokens — resolve them so
+  // the ED edits (and saves) the real nation wording, never raw tokens.
+  var bodyHtml = (saved.bodyHtml != null && saved.bodyHtml !== '') ? saved.bodyHtml : _termsApplyNationTokens(cfg.defaultBody);
 
   var toolbar =
       '<div class="ntf-toolbar" role="toolbar" aria-label="Formatting">'
@@ -3534,7 +3551,7 @@ function resetTermsDoc() {
   if (!_termsSelectedDoc) return;
   var cfg    = _termsDocConfig(_termsSelectedDoc);
   var bodyEl = document.getElementById('terms_body');
-  if (cfg && bodyEl) bodyEl.innerHTML = cfg.defaultBody;
+  if (cfg && bodyEl) bodyEl.innerHTML = _termsApplyNationTokens(cfg.defaultBody);
   showToast('Reverted to default. Click Save to persist.');
 }
 
