@@ -1011,11 +1011,13 @@ function _applySowModalLock(sow){
     var _showHm  = _canHm && !_canEd && _hasPn && _hasItems && !completed &&
                    (_sowSt === '' || _sowSt === 'draft' || _sowSt === 'signed' || _sowSt === 'submitted');
     // ED sees button when SOW is at hm_approved AND over the budget limit (needs
-    // ED final), or unreviewed (ED can act directly). Under-limit hm_approved is
-    // already final, so no ED button.
+    // ED final), or at any pre-approval stage (ED can approve directly — an ED
+    // approval is terminal, so the HM does not also need to approve). NOTE:
+    // 'submitted' must be included or the ED cannot approve a submitted SOW even
+    // though the worklist shows it to them.
     var _needsEd = (typeof sowRequiresEdApproval === 'function') && sowRequiresEdApproval(sow);
     var _showEd  = _canEd && _hasPn && _hasItems && !completed &&
-                   ((_sowSt === 'hm_approved' && _needsEd) || _sowSt === '' || _sowSt === 'draft' || _sowSt === 'signed');
+                   ((_sowSt === 'hm_approved' && _needsEd) || _sowSt === '' || _sowSt === 'draft' || _sowSt === 'signed' || _sowSt === 'submitted');
     var _showAp  = _showHm || _showEd;
     apBtn.style.display = _showAp ? 'flex' : 'none';
     apBtn.textContent   = (_sowSt === 'hm_approved') ? '✓ Final Approve' : '✓ Approve';
