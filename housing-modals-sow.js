@@ -651,18 +651,10 @@ function _openSowPicker(unitId, activeList) {
   var u = allUnits.find(function(x){ return x.id === unitId; });
   var unitLabel = u ? u.num + ' ' + u.street : unitId;
 
-  var statusStyles = {
-    '':           {bg:'#f4f4f0', c:'#666',                              label:'Draft'},
-    draft:        {bg:'#f4f4f0', c:'#666',                              label:'Draft'},
-    signed:       {bg:'#eff6ff', c:'#1d4ed8',                           label:'Signed'},
-    submitted:    {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)',label:'Submitted'},
-    hm_approved:  {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)',label:'HM Approved'},
-    ed_approved:  {bg:'#f0fdf4', c:'#15803d',                           label:'ED Approved'},
-  };
-
   function _card(sow) {
-    var ss = statusStyles[sow.approval_status || ''] || {bg:'#f4f4f0', c:'#666', label: sow.approval_status || 'Draft'};
-    if (sow.system_approved) ss = {bg:'#eef2ff', c:'#4338ca', label:'System Approved'};
+    // Shared badge helper (shared-data.js) — 'picker' variant keeps this
+    // card's exact labels/colors, incl. the System Approved override.
+    var ss = sowStatusBadge(sow, {variant:'picker'});
     var pn = sow.project_number || '—';
     var date = (sow.created_at || sow.date || '').slice(0, 10) || '—';
     var amount = (sow.amount != null && sow.amount !== '') ? (typeof formatCurrency === 'function' ? formatCurrency(sow.amount) : '$' + sow.amount) : '—';
@@ -1292,14 +1284,6 @@ function udpRenderSowTable(unitId){
     return (b.created_at || '').localeCompare(a.created_at || '');
   });
 
-  var statusStyles = {
-    draft:        {bg:'#f4f4f0', c:'#666',    label:'Draft'},
-    signed:       {bg:'#eff6ff', c:'#1d4ed8', label:'Signed'},
-    hm_approved:  {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'HM Approved'},
-    ed_approved:  {bg:'#f0fdf4', c:'#15803d', label:'ED Approved'},
-    completed:    {bg:'#f0fdf4', c:'#15803d', label:'Completed'},
-    archived:     {bg:'#f4f4f0', c:'var(--gray)',    label:'Archived'}
-  };
   // Archive UI gating: HM/ED only. Read-only viewers don't see the button.
   var _udpRole = window.currentRole || 'staff';
   var _canArchive = (typeof ROLE !== 'undefined' && ROLE.isManagement && ROLE.isManagement(_udpRole));
@@ -1313,8 +1297,10 @@ function udpRenderSowTable(unitId){
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
   var rows = list.map(function(sow){
-    var ss = statusStyles[sow.approval_status] || {bg:'#f4f4f0', c:'#666', label:sow.approval_status || '—'};
-    if (sow.system_approved && sow.approval_status !== 'completed') ss = {bg:'#eef2ff', c:'#4338ca', label:'System Approved'};
+    // Shared badge helper (shared-data.js) — 'unit_table' variant keeps this
+    // table's exact labels/colors, incl. the System Approved override (not for
+    // completed SOWs) and the Archived pill override below.
+    var ss = sowStatusBadge(sow, {variant:'unit_table'});
     var pn = esc(sow.project_number || '—');
     var date = esc(sow.created_at || sow.date || '—');
     var amount = (sow.amount == null) ? '—' : fmtCurrency(sow.amount);
@@ -1330,8 +1316,8 @@ function udpRenderSowTable(unitId){
     var isArchived = !!sow.archived;
     // Archived SOWs always render the "Archived" pill (overrides the
     // approval-status pill) so the row's state is unmistakable when the
-    // "Show archived" toggle is on.
-    if(isArchived){ ss = statusStyles.archived; }
+    // "Show archived" toggle is on — handled inside sowStatusBadge's
+    // 'unit_table' variant.
     var editBtn = locked
       ? '<button onclick="udpEditSow(\''+esc(unitId)+'\',\''+pn+'\')" title="View request (read-only)" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:600;font-family:DM Sans,sans-serif;margin-right:4px;">View</button>'
       : '<button onclick="udpEditSow(\''+esc(unitId)+'\',\''+pn+'\')" title="Edit request" style="background:none;border:1px solid var(--border);color:var(--text);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:600;font-family:DM Sans,sans-serif;margin-right:4px;">Edit</button>';

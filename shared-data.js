@@ -104,7 +104,70 @@ function sbMapRole(staffRow) {
 // banners, pills). The raw values (hm_approved, mgr_approved, etc.) read as
 // terminal-style debug strings to staff — this gives the polished label.
 // Defined here in shared-data.js so it loads before housing-modals / -init.
-function formatAppStatusLabel(status) {
+// Per-surface wording variants. Each variant is a COMPLETE label map for its
+// surface (not a delta over the canonical map) so migrated call sites render
+// byte-identically — including statuses a surface deliberately leaves unmapped:
+// with opts.variant a miss returns '' and the CALL SITE keeps its historical
+// fallback expression (these surfaces fall back to the raw status string, not
+// the canonical prettifier). Do NOT "unify" wording across variants.
+var _APP_STATUS_LABEL_VARIANTS = {
+  // Match view status column (housing-views.js renderMatchView). Only the
+  // appIsAssignable statuses ever reach this surface.
+  match: {
+    submitted:    'Pending HM',
+    hm_approved:  'HM Approved',
+    ed_approved:  'ED Approved',
+    mgr_approved: 'Mgr Approved',
+    assigned:     'Assigned'
+  },
+  // Housing KPI drilldowns (housing-views.js showHousingKpiDrilldown).
+  // Note: unmapped statuses (e.g. 'draft' rows in the drills) render the raw
+  // status via the call-site fallback — same as the old inline map.
+  kpi: {
+    submitted:    'Pending HM',
+    file_update:  'File Update',
+    mgr_approved: 'Mgr Approved',
+    ed_approved:  'ED Approved',
+    hm_approved:  'HM Approved',
+    returned:     'Returned',
+    declined:     'Declined',
+    assigned:     'Assigned'
+  },
+  // Worklist "Applications" section rows (renderWorklist below).
+  worklist: {
+    submitted:    'Awaiting Review',
+    file_update:  'File Update',
+    mgr_approved: 'Awaiting ED Approval',
+    returned:     'Returned — Action Needed',
+    transfer_request_submitted: 'Transfer Request'
+  },
+  // Add-Tenant modal application picker (housing-modals.js atSelectApp).
+  add_tenant: {
+    ed_approved:  'ED Approved',
+    mgr_approved: 'HM Recommended',
+    submitted:    'Submitted',
+    returned:     'Returned',
+    declined:     'Declined'
+  },
+  // Scorecard info strip (showScorecard below) — file-update oriented wording.
+  scorecard: {
+    draft:        'Draft',
+    submitted:    'Awaiting HM Review',
+    file_update:  'File Update — Awaiting HM',
+    mgr_approved: 'Awaiting ED Approval',
+    hm_approved:  'File Update Approved',
+    ed_approved:  'ED Approved',
+    declined:     'Declined',
+    returned:     'Returned for Info',
+    housed:       'Housed'
+  }
+};
+function formatAppStatusLabel(status, opts) {
+  // Variant lookup is exact-match only; '' on a miss (see note above).
+  if (opts && opts.variant) {
+    var vmap = _APP_STATUS_LABEL_VARIANTS[opts.variant] || {};
+    return vmap[status] || '';
+  }
   var map = {
     'draft':         'Draft',
     'submitted':     'Awaiting HM Review',
@@ -127,6 +190,137 @@ function formatAppStatusLabel(status) {
     .replace(/\b\w/g, function(c){ return c.toUpperCase(); });
 }
 window.formatAppStatusLabel = formatAppStatusLabel;
+
+// ── sowStatusBadge ────────────────────────────────────────────────────────────
+// Single source of truth for SOW approval-status → badge {key, label, bg, c}.
+// Stored approval_status values are '' (new/draft), 'draft', 'signed',
+// 'submitted', 'hm_approved', 'ed_approved', 'completed' — labels like
+// "Pending HM" are computed, never stored. Shared rules encapsulated here:
+//   • system_approved (RFQ auto-approval) renders the indigo "System Approved"
+//     badge instead of "ED Approved" — never a manual ED sign-off. Whether it
+//     also overrides a 'completed' status is per-variant (matches each
+//     surface's historical behaviour).
+//   • archived override (grey "Archived" pill) is per-variant — only the
+//     inventory unit SOW table renders it; other surfaces show the underlying
+//     status for archived rows (renos approvals view included).
+// opts.variant selects per-surface wording/colors — byte-identical to the
+// inline maps this replaced; do NOT "unify" wording across variants:
+//   (default)         — renos.html approvals routing (pure-status branches)
+//   'picker'          — _openSowPicker cards (housing-modals-sow.js)
+//   'unit_table'      — udpRenderSowTable rows (housing-modals-sow.js)
+//   'contractor_list' — contractor card Forms & SOWs list (label used only)
+//   'worklist'        — renderWorklist "Renovations Waiting Approval" rows
+//                       (label used only; pass {approval_status: item.status})
+var _SOW_BADGE_VARIANTS = {
+  'default': {
+    map: {
+      '':           {bg:'#f4f4f0', c:'#666',    label:'Draft'},
+      draft:        {bg:'#f4f4f0', c:'#666',    label:'Draft'},
+      signed:       {bg:'#eff6ff', c:'#1d4ed8', label:'Signed'},
+      submitted:    {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'Submitted'},
+      hm_approved:  {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'HM Approved'},
+      ed_approved:  {bg:'#f0fdf4', c:'#15803d', label:'ED Approved'},
+      completed:    {bg:'#f0fdf4', c:'#15803d', label:'Completed'}
+    },
+    fallback: function(st){ return {bg:'#f4f4f0', c:'#666', label: st || '—'}; }
+  },
+  picker: {
+    map: {
+      '':           {bg:'#f4f4f0', c:'#666',    label:'Draft'},
+      draft:        {bg:'#f4f4f0', c:'#666',    label:'Draft'},
+      signed:       {bg:'#eff6ff', c:'#1d4ed8', label:'Signed'},
+      submitted:    {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'Submitted'},
+      hm_approved:  {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'HM Approved'},
+      ed_approved:  {bg:'#f0fdf4', c:'#15803d', label:'ED Approved'}
+    },
+    systemEvenIfCompleted: true,
+    fallback: function(st){ return {bg:'#f4f4f0', c:'#666', label: st || 'Draft'}; }
+  },
+  unit_table: {
+    map: {
+      draft:        {bg:'#f4f4f0', c:'#666',    label:'Draft'},
+      signed:       {bg:'#eff6ff', c:'#1d4ed8', label:'Signed'},
+      hm_approved:  {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'HM Approved'},
+      ed_approved:  {bg:'#f0fdf4', c:'#15803d', label:'ED Approved'},
+      completed:    {bg:'#f0fdf4', c:'#15803d', label:'Completed'}
+    },
+    // Archived SOWs always render the "Archived" pill on this surface (it
+    // overrides the approval-status pill AND the System Approved badge).
+    archived: {bg:'#f4f4f0', c:'var(--gray)', label:'Archived'},
+    fallback: function(st){ return {bg:'#f4f4f0', c:'#666', label: st || '—'}; }
+  },
+  // Label-only surface (colors carried for the {key,label,bg,c} contract but
+  // not rendered there).
+  contractor_list: {
+    map: {
+      draft:        {bg:'#f4f4f0', c:'#666',    label:'Draft'},
+      signed:       {bg:'#eff6ff', c:'#1d4ed8', label:'Signed'},
+      hm_approved:  {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'HM Approved'},
+      ed_approved:  {bg:'#f0fdf4', c:'#15803d', label:'ED Approved'},
+      completed:    {bg:'#f0fdf4', c:'#15803d', label:'Completed'}
+    },
+    systemEvenIfCompleted: true,
+    fallback: function(st){ return {bg:'#f4f4f0', c:'#666', label: st || '—'}; }
+  },
+  // Label-only surface (colors carried for the contract but not rendered).
+  worklist: {
+    map: {
+      '':           {bg:'#f4f4f0', c:'#666',    label:'Awaiting HM Review'},
+      draft:        {bg:'#f4f4f0', c:'#666',    label:'Awaiting HM Review'},
+      signed:       {bg:'#f4f4f0', c:'#666',    label:'Signed — Awaiting HM'},
+      submitted:    {bg:'#f4f4f0', c:'#666',    label:'Awaiting HM Review'},
+      hm_approved:  {bg:'#f4f4f0', c:'#666',    label:'HM Approved — Awaiting ED'}
+    },
+    fallback: function(){ return {bg:'#f4f4f0', c:'#666', label:'Awaiting Review'}; }
+  }
+};
+function sowStatusBadge(sow, opts) {
+  sow  = sow  || {};
+  opts = opts || {};
+  var v = _SOW_BADGE_VARIANTS[opts.variant] || _SOW_BADGE_VARIANTS['default'];
+  // '' means new/draft; null/undefined are treated the same (matches the old
+  // per-surface lookups). Callers with a plain status string pass
+  // {approval_status: status}.
+  var st = (sow.approval_status == null) ? '' : sow.approval_status;
+  var badge, key;
+  if (v.archived && sow.archived) {
+    badge = v.archived;
+    key = 'archived';
+  } else if (sow.system_approved && (v.systemEvenIfCompleted || st !== 'completed')) {
+    badge = {bg:'#eef2ff', c:'#4338ca', label:'System Approved'};
+    key = 'system_approved';
+  } else {
+    badge = v.map[st] || v.fallback(st);
+    key = st;
+  }
+  return {key: key, label: badge.label, bg: badge.bg, c: badge.c};
+}
+window.sowStatusBadge = sowStatusBadge;
+
+// ── contractorStatusBadge ─────────────────────────────────────────────────────
+// Single source of truth for contractor registry status → badge. Default
+// returns {bg, c, label} (the status banners); opts.variant 'table' returns
+// {cls, label} (contractor table pills styled by shared.css classes). Returns
+// null for unknown statuses — call sites keep their own historical fallbacks.
+var _CT_BADGE_BANNER = {
+  pending_review: {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'⏳ Pending Housing Manager Review'},
+  hm_recommended: {bg:'#eff6ff', c:'#1d4ed8', label:'📋 HM Recommended — Awaiting Final Approval'},
+  approved:       {bg:'#f0fdf4', c:'#15803d', label:'✅ Approved — Active Contractor'},
+  declined:       {bg:'#fef2f2', c:'#b91c1c', label:'❌ Declined'},
+  returned:       {bg:'#faf5ff', c:'#7c3aed', label:'↩ Returned for More Information'}
+};
+var _CT_BADGE_TABLE = {
+  pending_review: {cls:'pending-review', label:'⏳ Pending HM'},
+  hm_recommended: {cls:'hm-recommended', label:'📋 Awaiting Approval'},
+  approved:       {cls:'approved',        label:'✅ Approved'},
+  declined:       {cls:'declined',        label:'❌ Declined'},
+  returned:       {cls:'returned',        label:'↩ Returned'}
+};
+function contractorStatusBadge(status, opts) {
+  var map = (opts && opts.variant === 'table') ? _CT_BADGE_TABLE : _CT_BADGE_BANNER;
+  return map[status] || null;
+}
+window.contractorStatusBadge = contractorStatusBadge;
 
 // ── sbLoadApplications ────────────────────────────────────────────────────────
 // Fetches all applications and maps DB columns → app object shape.
@@ -1931,17 +2125,13 @@ function _ctRenderFormsSows(ctId, prefix) {
   // Sort newest first by created_at
   rows.sort(function(a, b){ return (b.sow.created_at || '').localeCompare(a.sow.created_at || ''); });
 
-  var statusLabels = {
-    draft:'Draft', signed:'Signed', hm_approved:'HM Approved',
-    ed_approved:'ED Approved', completed:'Completed'
-  };
   var fmtMoney = formatCurrency; // canonical $1,234.56
 
   el.innerHTML = '<div class="ct-sow-list">' + rows.map(function(r){
     var s = r.sow;
     var addr = s.address || '—';
     var pn   = s.project_number || '—';
-    var stat = s.system_approved ? 'System Approved' : (statusLabels[s.approval_status] || s.approval_status || '—');
+    var stat = sowStatusBadge(s, {variant:'contractor_list'}).label;
     var date = s.created_at || s.date || '—';
     var amt  = fmtMoney(s.amount || s.totalCost);
     var uid  = String(r.unitId).replace(/'/g, "\\'");
@@ -2561,14 +2751,7 @@ function _ctRenderCicApproval(ct) {
 function _ctSetCicStatusBanner(ct) {
   var banner = document.getElementById('cic_status_banner');
   if(!banner) return;
-  var ctStatusStyle = {
-    pending_review: {bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'⏳ Pending Housing Manager Review'},
-    hm_recommended: {bg:'#eff6ff',c:'#1d4ed8',label:'📋 HM Recommended — Awaiting Final Approval'},
-    approved:       {bg:'#f0fdf4',c:'#15803d',label:'✅ Approved — Active Contractor'},
-    declined:       {bg:'#fef2f2',c:'#b91c1c',label:'❌ Declined'},
-    returned:       {bg:'#faf5ff',c:'#7c3aed',label:'↩ Returned for More Information'}
-  };
-  var ss = ctStatusStyle[ct.status || 'pending_review'] || {bg:'#f4f4f0',c:'var(--gray)',label:ct.status||'Unknown'};
+  var ss = contractorStatusBadge(ct.status || 'pending_review') || {bg:'#f4f4f0',c:'var(--gray)',label:ct.status||'Unknown'};
   banner.textContent = ss.label;
   banner.style.background = ss.bg;
   banner.style.color = ss.c;
@@ -3075,14 +3258,7 @@ function openCtApprovalPanel(idx) {
   setT('ctap_submitted', ct.submittedAt||'—');
 
   // Status banner
-  var ctStatusStyle = {
-    pending_review: {bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'⏳ Pending Housing Manager Review'},
-    hm_recommended: {bg:'#eff6ff',c:'#1d4ed8',label:'📋 HM Recommended — Awaiting Final Approval'},
-    approved:       {bg:'#f0fdf4',c:'#15803d',label:'✅ Approved — Active Contractor'},
-    declined:       {bg:'#fef2f2',c:'#b91c1c',label:'❌ Declined'},
-    returned:       {bg:'#faf5ff',c:'#7c3aed',label:'↩ Returned for More Information'}
-  };
-  var ss = ctStatusStyle[ct.status||'pending_review'] || {bg:'#f4f4f0',c:'var(--gray)',label:ct.status};
+  var ss = contractorStatusBadge(ct.status||'pending_review') || {bg:'#f4f4f0',c:'var(--gray)',label:ct.status};
   var banner = document.getElementById('ctap_status_banner');
   if(banner){ banner.textContent=ss.label; banner.style.background=ss.bg; banner.style.color=ss.c; }
 
@@ -3624,13 +3800,6 @@ function renderContractorsView(){
       '</div>';
   }
 
-  var ctStatusStyle = {
-    pending_review: {cls:'pending-review', label:'⏳ Pending HM'},
-    hm_recommended: {cls:'hm-recommended', label:'📋 Awaiting Approval'},
-    approved:       {cls:'approved',        label:'✅ Approved'},
-    declined:       {cls:'declined',        label:'❌ Declined'},
-    returned:       {cls:'returned',        label:'↩ Returned'}
-  };
   var classLabels = {internal_indigenous:'Internal — Indigenous',external_indigenous:'External — Indigenous',external_non_indigenous:'External — Non-Indigenous'};
   var role = window.currentRole || 'housing_employee_l1';
   var isMgmt = (typeof ROLE !== 'undefined') && ROLE.isManagement(role);
@@ -3650,7 +3819,7 @@ function renderContractorsView(){
       wsib:       ct.wsibExpiry || '',
       ins:        ct.insExpiry  || '',
       statusKey:  statusKey,
-      statusLabel:(ctStatusStyle[statusKey] || {label:statusKey}).label
+      statusLabel:(contractorStatusBadge(statusKey, {variant:'table'}) || {label:statusKey}).label
     };
   }).filter(function(r){ return !r.ct.archived; });
 
@@ -3706,7 +3875,7 @@ function renderContractorsView(){
   } else {
     tbody.innerHTML = rows.map(function(r){
       var ct = r.ct; var i = r.i;
-      var ss = ctStatusStyle[r.statusKey] || {cls:'', label:r.statusKey};
+      var ss = contractorStatusBadge(r.statusKey, {variant:'table'}) || {cls:'', label:r.statusKey};
       var initials = (function(n){var w=(n||'??').trim().split(/\s+/);return w.length>=2?w[0][0].toUpperCase()+w[w.length-1][0].toUpperCase():(n||'??').slice(0,2).toUpperCase();})(ct.name);
       var contact = ct.phone ? formatPhone(ct.phone) : (ct.email || '—');
       var indigClass = 'ct-indig-other';
@@ -4643,12 +4812,11 @@ function renderWorklist() {
 
   // Applications
   if (appItems.length) {
-    var statusLabel = { submitted:'Awaiting Review', file_update:'File Update', mgr_approved:'Awaiting ED Approval', returned:'Returned — Action Needed', transfer_request_submitted:'Transfer Request' };
     var appBtnText = { submitted:'Review', file_update:'Review', mgr_approved: canFinal ? 'Approve' : 'View', returned:'Edit', transfer_request_submitted:'Review' };
     var _wlReviewStatuses = ['submitted', 'file_update', 'mgr_approved', 'transfer_request_submitted'];
     var appRows = appItems.map(function(a) {
       var name  = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
-      var lbl   = statusLabel[a.status] || a.status;
+      var lbl   = formatAppStatusLabel(a.status, {variant:'worklist'}) || a.status;
       var score = (a.score != null && a.appType !== 'existing_tenant') ? (a.score + ' pts') : '';
       var btnHref = (_wlReviewStatuses.indexOf(a.status) >= 0)
         ? 'housing.html?openScorecard=' + encodeURIComponent(a.id)
@@ -4665,7 +4833,6 @@ function renderWorklist() {
 
   // SOWs
   if (sowItems.length) {
-    var sowStatusLabel = { '':'Awaiting HM Review', draft:'Awaiting HM Review', signed:'Signed — Awaiting HM', submitted:'Awaiting HM Review', hm_approved:'HM Approved — Awaiting ED' };
     var sowRows = sowItems.map(function(s) {
       // Open the SOW modal in-place on the current page when possible (housing.html
       // has openSowModal); fall back to navigating to renos.html only when needed.
@@ -4678,7 +4845,7 @@ function renderWorklist() {
         + '<div onclick="' + openCall + '" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;">'
         +   '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(s.addr) + '</span>'
         +   '<span style="font-size:11px;color:var(--muted);width:120px;flex-shrink:0;">' + escapeHtml(s.pn || '—') + '</span>'
-        +   '<span style="font-size:11px;color:var(--muted);width:180px;flex-shrink:0;">' + escapeHtml(sowStatusLabel[s.status] || 'Awaiting Review') + '</span>'
+        +   '<span style="font-size:11px;color:var(--muted);width:180px;flex-shrink:0;">' + escapeHtml(sowStatusBadge({approval_status: s.status}, {variant:'worklist'}).label) + '</span>'
         + '</div>'
         + '<button onclick="' + openCall + '" style="flex-shrink:0;background:var(--yellow);color:var(--dark);border:none;border-radius:6px;'
         +   'padding:5px 12px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;">'
@@ -6525,8 +6692,7 @@ function showScorecard(app){
   var barEl=document.getElementById('sc_score_bar');if(barEl){barEl.style.width=Math.min(100,Math.max(0,Math.round((s/barMax)*100)))+'%';barEl.style.background=tc.bar;}
   var infoEl=document.getElementById('sc_info_strip');
   if(infoEl){
-    var _wfStatus={'draft':'Draft','submitted':'Awaiting HM Review','file_update':'File Update — Awaiting HM','mgr_approved':'Awaiting ED Approval','hm_approved':'File Update Approved','ed_approved':'ED Approved','declined':'Declined','returned':'Returned for Info','housed':'Housed'};
-    var fields=[['Reserve Status',app.reserve||'—'],['Classification',(app.classification||'—').replace(' Housing','')],['App Type',app.appType==='existing_tenant'?'File Update':app.appType==='transfer_request'?'Transfer Request':'New Housing'],['Arrears',app.hasArrears?'Yes':'No'],['Status',_wfStatus[app.status]||((app.status||'draft').replace(/_/g,' '))]];
+    var fields=[['Reserve Status',app.reserve||'—'],['Classification',(app.classification||'—').replace(' Housing','')],['App Type',app.appType==='existing_tenant'?'File Update':app.appType==='transfer_request'?'Transfer Request':'New Housing'],['Arrears',app.hasArrears?'Yes':'No'],['Status',formatAppStatusLabel(app.status,{variant:'scorecard'})||((app.status||'draft').replace(/_/g,' '))]];
     infoEl.innerHTML=fields.map(function(f){return'<div><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:2px;">'+f[0]+'</div><div style="font-size:13px;font-weight:500;color:var(--text);">'+f[1]+'</div></div>';}).join('');
   }
   var bd=app.scoreBreakdown||{};

@@ -2340,7 +2340,7 @@ function atSelectApp(appId,name,status){
   if(sel){
     var statusCol=status===APP_STATUS.ED_APPROVED?'var(--success)':status===APP_STATUS.MGR_APPROVED?'var(--info-blue)':'var(--warn-amber)';
     var statusBg=status===APP_STATUS.ED_APPROVED?'var(--success-bg)':status===APP_STATUS.MGR_APPROVED?'var(--info-blue-bg)':'var(--warn-amber-bg)';
-    var statusLabel={'ed_approved':'ED Approved','mgr_approved':'HM Recommended','submitted':'Submitted','returned':'Returned','declined':'Declined'}[status]||status;
+    var statusLabel=formatAppStatusLabel(status,{variant:'add_tenant'})||status;
     var warn=status!==APP_STATUS.ED_APPROVED&&status!==APP_STATUS.MGR_APPROVED
       ? '<div style="font-size:11px;color:var(--warn-amber);margin-top:4px;">⚠️ This application has not been fully approved. Housing Manager confirmation required before assigning.</div>'
       : (status===APP_STATUS.MGR_APPROVED?'<div style="font-size:11px;color:var(--info-blue);margin-top:4px;">ℹ️ Recommended by HM — awaiting Executive Director final approval.</div>':'');

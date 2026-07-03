@@ -455,13 +455,8 @@ function renderMatchView(){
     'Medium Priority': '#d97706',
     'Low Priority':    '#6b7280'
   };
-  var statusLabel = {
-    'submitted':    'Pending HM',
-    'hm_approved':  'HM Approved',
-    'ed_approved':  'ED Approved',
-    'mgr_approved': 'Mgr Approved',
-    'assigned':     'Assigned'
-  };
+  // Status wording comes from the shared 'match' variant of
+  // formatAppStatusLabel (shared-data.js) — raw-status fallback preserved.
 
   // ── Column-menu sort + filter via the shared scaffolding (Phase 2B) ────
   function _bestUnitAddr(app){
@@ -474,7 +469,7 @@ function renderMatchView(){
     tier:        { label: 'Tier',       accessor: function(a){ return (a.tier || 'Low Priority').replace(' Priority',''); } },
     reserve:     { label: 'Reserve',    accessor: function(a){ return a.reserve || '(none)'; } },
     bestUnit:    { label: 'Best Unit',  accessor: function(a){ return _bestUnitAddr(a) || '(no match)'; } },
-    status:      { label: 'Status',     accessor: function(a){ return statusLabel[a.status] || a.status || 'Unknown'; } },
+    status:      { label: 'Status',     accessor: function(a){ return formatAppStatusLabel(a.status, {variant:'match'}) || a.status || 'Unknown'; } },
     hasHouse:    { label: 'Has House',  accessor: function(a){ return (a.assignedUnit || a.appType==='transfer_request' || _currentTenancyAddr(a)) ? 1 : 0; } },
     action:      { label: 'Action',     accessor: function(a){ var ready = !a.assignedUnit && (a.status==='ed_approved'||a.status==='mgr_approved'||a.status==='hm_approved'); return ready ? 1000 + (a.score||0) : (a.score||0); } }
   };
@@ -529,7 +524,7 @@ function renderMatchView(){
     var age = app.dob ? Math.floor((new Date()-new Date(app.dob))/(365.25*24*3600*1000)) : 0;
     if(age>=_eldersMin) reqs.push('<span style="font-size:10px;color:var(--warn-amber);">Elders eligible</span>');
 
-    var sl = statusLabel[app.status] || app.status || '';
+    var sl = formatAppStatusLabel(app.status, {variant:'match'}) || app.status || '';
     var appDateStr = app.appDate ? 'Applied '+app.appDate : '';
 
     // "Has a unit" is the source of truth — an app with an assignedUnit is
@@ -1127,11 +1122,9 @@ function showHousingKpiDrilldown(type) {
   var apps  = (typeof applications !== 'undefined' && applications) ? applications : [];
   var units = (typeof housingUnits  !== 'undefined' && housingUnits)  ? housingUnits  : [];
 
-  var STATUS_LABELS = {
-    'submitted':'Pending HM', 'file_update':'File Update', 'mgr_approved':'Mgr Approved',
-    'ed_approved':'ED Approved', 'hm_approved':'HM Approved',
-    'returned':'Returned', 'declined':'Declined', 'assigned':'Assigned'
-  };
+  // Status wording: shared 'kpi' variant of formatAppStatusLabel
+  // (shared-data.js) — raw-status fallback for unmapped statuses (e.g. draft).
+  function STATUS_LBL(a){ return formatAppStatusLabel(a.status, {variant:'kpi'}) || a.status || ''; }
   var URGENT_LABELS = {
     'homeless':'Homeless','domestic_violence':'Domestic Violence','fire_disaster':'Fire / Disaster',
     'homeless_eviction':'Homeless / Eviction','eviction_risk':'Eviction Risk','separation':'Separation',
@@ -1170,7 +1163,7 @@ function showHousingKpiDrilldown(type) {
     exportHeaders = ['Applicant','App ID','Status','Tier','Score','Days Waiting'];
     exportColWidths = [28,16,14,22,8,12];
     exportRows = rows.map(function(a){
-      return [(a.fn||'')+' '+(a.ln||''), a.id||'', STATUS_LABELS[a.status]||a.status||'',
+      return [(a.fn||'')+' '+(a.ln||''), a.id||'', STATUS_LBL(a),
               a.tier_v2||a.tier||'', a.score||0, daysSinceRaw(a.appDate)];
     });
     html = '<table class="tbl"><thead><tr>'
@@ -1179,7 +1172,7 @@ function showHousingKpiDrilldown(type) {
       + (rows.length ? rows.map(function(a){
           return appRow(a,
             '<td style="font-weight:600;">'+escapeHtml((a.fn||'')+' '+(a.ln||''))+'</td>'
-            +'<td>'+escapeHtml(STATUS_LABELS[a.status]||a.status||'')+'</td>'
+            +'<td>'+escapeHtml(STATUS_LBL(a))+'</td>'
             +'<td>'+tierPill(a.tier_v2||a.tier)+'</td>'
             +'<td class="std-cell-right" style="font-weight:700;">'+(a.score||0)+'</td>'
             +'<td class="std-cell-muted">'+daysSince(a.appDate)+'</td>'
@@ -1227,7 +1220,7 @@ function showHousingKpiDrilldown(type) {
     exportColWidths = [28,16,22,8,14,12];
     exportRows = rows.map(function(a){
       return [(a.fn||'')+' '+(a.ln||''), a.id||'', a.tier_v2||a.tier||'',
-              a.score||0, STATUS_LABELS[a.status]||a.status||'', daysSinceRaw(a.appDate)];
+              a.score||0, STATUS_LBL(a), daysSinceRaw(a.appDate)];
     });
     html = '<table class="tbl"><thead><tr>'
       + '<th>Applicant</th><th>Status</th><th>Tier</th><th class="std-cell-right">Score</th><th>Waiting</th>'
@@ -1235,7 +1228,7 @@ function showHousingKpiDrilldown(type) {
       + (rows.length ? rows.map(function(a){
           return appRow(a,
             '<td style="font-weight:600;">'+escapeHtml((a.fn||'')+' '+(a.ln||''))+'</td>'
-            +'<td>'+escapeHtml(STATUS_LABELS[a.status]||a.status||'')+'</td>'
+            +'<td>'+escapeHtml(STATUS_LBL(a))+'</td>'
             +'<td>'+tierPill(a.tier_v2||a.tier)+'</td>'
             +'<td class="std-cell-right" style="font-weight:700;">'+(a.score||0)+'</td>'
             +'<td class="std-cell-muted">'+daysSince(a.appDate)+'</td>'
