@@ -178,7 +178,7 @@ The TIC is a self-contained IIFE full-screen modal opened via `window.openTenant
 Every save promise is wrapped by `_withSaveTimeout()` with a hard **10 s** timeout (`_SAVE_TIMEOUT_MS`). A timeout while the device still reports `navigator.onLine === true` calls `_enterDegradedMode()`, which sets a **30 s** cooldown (`_DEGRADED_COOLDOWN_MS`), queues saves locally via `saveQueueAdd()`, and toasts "Slow connection — saving locally…". During the cooldown all saves skip the network and queue immediately. `_runDegradedProbe()` HEAD-pings Supabase after the cooldown: success exits degraded mode and flushes the queue; another timeout extends the cooldown. The browser `online` event also clears degraded mode immediately and syncs. Implemented with a simple `Promise.race` + `setTimeout` — no `AbortController` or `navigator.connection`.
 
 ### Renovation fund sources (`RENO_FUND_RULES`)
-Defined in both `scoring.js` and `renos.html` (two copies — keep in sync). Current valid pool IDs:
+Single definition in `shared-config.js` (the old scoring.js/renos.html duplicate copies were removed in the Batch 3 dedup — do not re-add page-local copies). Current valid pool IDs:
 - `'cmhc_95'` — CMHC Section 95 (all unit types)
 - `'cmhc_56'` — **REMOVED** (do not re-add)
 - `'section_10'` — Section 10 (all unit types)
