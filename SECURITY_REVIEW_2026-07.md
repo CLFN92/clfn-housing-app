@@ -14,50 +14,51 @@ Legend: ☐ open · ☑ fixed
 
 ## TIER 0 — VERIFY IN SUPABASE FIRST (potentially catastrophic; not verifiable from repo)
 
-### ◐ S0. RLS is absent from the repo — migration AUTHORED (needs to be RUN in Supabase)
-**Update (2026-07-03):** `supabase/migrations/20260703_rls_lockdown.sql` authored + validated
-end-to-end on a real Postgres 16 (applies cleanly + idempotent; proved a field_employee
-cannot self-escalate/forge approvals/rewrite settings, inactive accounts are locked out,
-ED writes succeed, and the audit/note append-only triggers fire even under RLS-bypass).
-**Still OPEN until you RUN it in the live Supabase project(s)** — see the file header.
+### ☑ S0. RLS — live scheme ALREADY closes the catastrophic holes (lockdown reverted)
+**Resolved (2026-07-03).** A dump of the live `public.*` policies (pasted by the
+project owner) shows the database **already had a complete, coherent RLS scheme**
+predating this review — the repo just never captured it (`0001_init_schema.sql`
+was referenced by `migrations/README.md` but absent). The scheme uses
+`get_my_role()` / `is_housing_role()` / `is_finance_role()` SECURITY-DEFINER
+helpers with `staff_*` and `*_ed_only` policies, and it:
+- **Locks self-escalation:** `staff` INSERT/UPDATE/DELETE are **ED-only**
+  (`staff_*_ed_only`) — a field_employee cannot PATCH their own role to `ed`.
+- **Locks governance:** `housing_settings` writes are **ED-only**
+  (`settings_write_ed_only`) — no approval-authority / scoring / template rewrite.
+- **Gates every browser-written table:** RLS is ON with a staff-scoped policy on
+  all of them. `housing_applications` writes require `is_housing_role()` (housing
+  office); the remaining data tables require `get_my_role() IS NOT NULL` (active
+  staff). `housing_rfq` is **NOT** `using(true)` — it has proper `staff_*`
+  policies gated by `get_my_role() IS NOT NULL` (the `using(true)` set S0
+  originally feared was not present on the live table).
+- **Keeps audit append-only:** `housing_audit_log` has INSERT-only policies (no
+  UPDATE/DELETE) so `DELETE /rest/v1/housing_audit_log` is denied to authenticated.
 
-`migrations/README.md` says the full schema + all RLS lives in
-`0001_init_schema.sql` — **that file does not exist in the repo.** The
-migrations present define **zero** RLS policies except:
-- `rfq-migration.sql` → `housing_rfq`: **confirmed permissive** (`to authenticated using(true)` for select/insert/update/delete).
-- `supabase/sql/…housing_application_notes.sql` → correctly append-only.
+**On the authored lockdown (`20260703_rls_lockdown.sql`):** it was REDUNDANT with
+the above and, because RLS policies OR together, slightly **loosened** access —
+`hs_is_staff()` SELECT exposed `housing_applications` / `tenants` to
+field_employee + finance (which `is_housing_role()` excluded), and `staff` INSERT
+was broadened to let HM add non-privileged staff. Since it had been applied to
+live, it is reverted by **`20260703b_rls_revert_redundant_lockdown.sql`** (drops
+the `*_hs_*` / `hs_storage_*` policies + helper functions; keeps the hard
+append-only triggers on the two audit tables). Run that in each live project the
+lockdown was applied to.
 
-Every other browser-written table (`staff`, `housing_applications`,
-`housing_units`, `housing_sow`, `housing_settings`, `tenants`, `tenant_notes`,
-`inspections`, `housing_audit_log`, `finance_*`, `bcr_registry`, storage objects…)
-has **no policy in the repo**. The app sends the user JWT on every REST call, so
-PostgREST enforces whatever RLS exists *in the live project* — which can't be
-confirmed here. **If RLS is not actually deployed (or is `using(true)` like
-housing_rfq), the following are exploitable TODAY by anyone with one valid
-staff login + the public anon key:**
-
-- **CRITICAL self-escalation:** `PATCH /rest/v1/staff?email=eq.<self>` → set
-  `role:'ed'`, `is_active:true`; reload → you are the ED (full override + view-as).
-- **Forge approvals:** `PATCH /rest/v1/housing_applications?id=eq.X` →
-  `status:'ed_approved'`; same for `housing_sow.approval_status`,
-  `housing_contractors.status`, `inspections.approved_by`.
-- **Award contracts:** `PATCH /rest/v1/housing_rfq` → `status:'awarded'` +
-  `award_amount` (CONFIRMED open — the RFQ policy is `using(true)`).
-- **Rewrite governance:** `POST/PATCH /rest/v1/housing_settings` →
-  overwrite `approval_authority` (grant yourself any action), `score_model_v2`,
-  `email_templates`, `module_enablement`.
-- **Finance:** post/void `finance_journal`, approve `finance_loans`, adjust
-  `finance_rent_ledger` directly.
-- **Erase your tracks:** `DELETE /rest/v1/housing_audit_log` — the repo proves
-  append-only triggers only for `housing_application_notes`, NOT for
-  `housing_audit_log`/`finance_audit_log`.
-
-**Action:** in the live Supabase project, confirm role-scoped RLS exists on
-`staff`, `housing_applications`, `housing_sow`, `housing_settings`, `finance_*`,
-`housing_contractors`, `inspections`, `bcr_registry`, `storage.objects`, and that
-append-only triggers exist on both audit tables. **Then commit the real policies
-into `0001_init_schema.sql`** so this is reproducible/verifiable per nation. Any
-table found on the `using(true)` pattern is a live hole.
+**Remaining follow-ups (deliberate, tracked — pre-existing, NOT regressions):**
+1. **Coarse data-table writes.** `get_my_role() IS NOT NULL` lets ANY active
+   staff (incl. field_employee, housing_employee_l1) PATCH e.g.
+   `housing_sow.approval_status='ed_approved'`, `housing_contractors.status`,
+   `inspections.approved_by`, or a `housing_rfq` award via **direct REST**. The
+   browser gates these by role/approval-authority; RLS does not. Real but lower
+   severity than self-escalation (all rows still belong to trusted, named,
+   audited staff — no anon/random-signup reach; the fine-grained matrix is
+   runtime-configurable in `housing_settings` and can't be mirrored in static
+   SQL). Tighten with per-table role predicates or a status-transition trigger in
+   a separate, app-tested migration.
+2. **Capture the canonical scheme in the repo.** `supabase db dump --schema public`
+   (service-role) into `0001_init_schema.sql` so a new nation is reproducible and
+   the policies are reviewable in git.
+3. **Storage bucket** — see S0b (unchanged; verify separately).
 
 ### ☐ S0b. Storage: private bucket, but no object-level policy in repo + guessable paths
 `seed.sql` makes bucket `housing-files` `public:false` (good — no anon URLs).

@@ -1,4 +1,11 @@
 -- ============================================================================
+-- ⚠ SUPERSEDED / REVERTED — see 20260703b_rls_revert_redundant_lockdown.sql.
+-- After this was applied, a dump of the LIVE policies showed the database
+-- ALREADY had a complete RLS scheme that closed the catastrophic escalations
+-- (staff + housing_settings writes are ED-only). This parallel hs_* layer was
+-- redundant and, because RLS policies OR together, LOOSENED some SELECTs. It has
+-- been reverted. Kept here only as a record of what was applied to live.
+-- ============================================================================
 -- 20260703_rls_lockdown.sql — Row Level Security lockdown (SECURITY_REVIEW S0)
 --
 -- WHY: the app is a static SPA that talks to Supabase with the PUBLIC anon key
