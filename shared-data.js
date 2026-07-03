@@ -4581,7 +4581,13 @@ function _wlCollectSows(ctx) {
         sowItems.push({ uid: uid, pn: sow.project_number || '', addr: addr, status: status });
       });
     });
+    // Keep a display cap of 8 rows, but remember the TRUE pending count so the
+    // section header shows the real number and a "+N more" overflow link —
+    // otherwise, with a backlog > 8, approving rows just refills the slots and
+    // the "(8)" never moves, so it looks like approvals aren't clearing.
+    var _fullCount = sowItems.length;
     sowItems = sowItems.slice(0, 8);
+    sowItems._total = _fullCount;
   }
   return sowItems;
 }
@@ -4769,7 +4775,10 @@ function renderWorklist() {
   // every other bucket is empty for them — omitting it made their entire
   // "Work Orders to Complete" queue hit the empty-state early return below.
   var draftTotal = draftApps.length + draftSows.length + draftRfqs.length;
-  var total = appItems.length + sowItems.length + fieldSowItems.length + rfqItems.length + ctItems.length + matchItems.length + unitApprItems.length + draftTotal;
+  // Use the TRUE pending-SOW count (not the 8-row display cap) so the header
+  // badge reflects the real backlog and visibly decreases as SOWs are approved.
+  var sowTotalCount = (typeof sowItems._total === 'number') ? sowItems._total : sowItems.length;
+  var total = appItems.length + sowTotalCount + fieldSowItems.length + rfqItems.length + ctItems.length + matchItems.length + unitApprItems.length + draftTotal;
   var pill = document.getElementById('worklist_count_pill'); if (pill) pill.textContent = total;
   var qa   = document.getElementById('qa_pending_count');   if (qa) qa.textContent = total;
 
@@ -4910,7 +4919,8 @@ function renderWorklist() {
         +   escapeHtml(btnText) + '</button>'
         + '</div>';
     }).join('');
-    html += sectionWrap('🔨', 'Renovations Waiting Approval', sowItems.length, 'renos.html', sowRows, 0);
+    var _sowTotal = (typeof sowItems._total === 'number') ? sowItems._total : sowItems.length;
+    html += sectionWrap('🔨', 'Renovations Waiting Approval', _sowTotal, 'renos.html', sowRows, Math.max(0, _sowTotal - sowItems.length));
   }
 
   // Field Employee — approved work orders to complete
