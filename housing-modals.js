@@ -1702,20 +1702,11 @@ async function _udpLocSave() {
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   try {
     var updates = { latitude: parseFloat(_udpLocLat), longitude: parseFloat(_udpLocLng) };
-    var res = await fetch(
-      window.SUPABASE_URL + '/rest/v1/housing_units?id=eq.' + encodeURIComponent(_udpLocUnitId),
-      { method: 'PATCH', headers: Object.assign({}, window.HOUSING_HEADERS, { 'Prefer': 'return=minimal' }), body: JSON.stringify(updates) }
-    );
-    if (!res.ok) { var t = await res.text(); throw new Error(t); }
+    // PATCH housing_units + sync the in-memory unit (camelCase keys match the columns here)
+    var patched = await sbPatchUnit(_udpLocUnitId, updates, updates);
+    if (!patched) throw new Error('could not update the unit record');
 
-    // Update in-memory unit
     var units = getAllUnits();
-    for (var i = 0; i < units.length; i++) {
-      if (String(units[i].id) === String(_udpLocUnitId)) {
-        Object.assign(units[i], updates);
-        break;
-      }
-    }
     if (typeof sbSaveUnit === 'function') {
       var u2 = units.find(function(x){ return String(x.id) === String(_udpLocUnitId); });
       if (u2) sbSaveUnit(u2).catch(function(){});

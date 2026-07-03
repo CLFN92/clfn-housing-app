@@ -23,6 +23,8 @@ window.NATIONS_DIRECTORY = window.NATIONS_DIRECTORY || {
     supabase_url:  'https://fkhzrbalumzeripzolph.supabase.co',
     supabase_anon: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo',
     role_labels:   {},
+    email_domain:  'clfn.on.ca',          // staff email domain gate (@<domain> checks)
+    housing_email: 'housing@clfn.on.ca',  // the nation's housing dept mailbox (AP/manager defaults)
     modules_licensed: null   // null → all optional modules licensed (defaults apply)
   }
   // Example additional nation (one entry per hostname AND/OR subdomain label):
@@ -315,6 +317,10 @@ window.moduleOn = function(mod) {
 // override any subset of the defaults from CLFN_PERMS.ROLE_LABELS for this
 // nation. Example for a nation that calls their ED "Lands Director":
 //   role_labels: { ed: 'Lands Director', housing_manager: 'Housing Lead' }
+// `email_domain` is the nation's staff email domain (drives the "@<domain>"
+// placeholder/validation gates via nationEmailDomain()); `housing_email` is the
+// nation's housing-department mailbox (AP-email / manager_email defaults). Both
+// come from the NATIONS_DIRECTORY entry (see _default for CLFN's values).
 // Built from the resolved nation (window._NATION); falls back to CLFN so the
 // lead nation is byte-identical. Per-nation overrides from housing_settings
 // (nation_config_override) are still merged on top at login via
@@ -327,7 +333,9 @@ window.NATION_CONFIG = window.NATION_CONFIG || (function(){
     name:         disp,
     display_name: disp,
     short:        n.short || 'CLFN',
-    role_labels:  n.role_labels || {} // empty for CLFN — CLFN_PERMS.ROLE_LABELS defaults apply
+    role_labels:  n.role_labels || {}, // empty for CLFN — CLFN_PERMS.ROLE_LABELS defaults apply
+    email_domain:  n.email_domain  || 'clfn.on.ca',
+    housing_email: n.housing_email || 'housing@clfn.on.ca'
   };
 })();
 
@@ -445,4 +453,17 @@ var CRITICAL_SOW_CATS = ['Heating / HVAC','Electrical','Roofing','Windows & Door
 // if config is missing, and keeps 'CLFN' out of consumer code.
 window.nationShort = function nationShort(){
   return (window.NATION_CONFIG && window.NATION_CONFIG.short) || 'Housing';
+};
+
+// Single accessor for the nation's full display name. Same rationale as
+// nationShort(): keeps '... || "CLFN"'-style fallbacks out of consumer code.
+window.nationDisplay = function nationDisplay(){
+  return (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || nationShort() || '';
+};
+
+// Single accessor for the nation's staff email domain (no leading '@').
+// Consumers build gates/placeholders as '@' + nationEmailDomain(). The CLFN
+// literal here is the config-file default (the sanctioned home for it).
+window.nationEmailDomain = function nationEmailDomain(){
+  return (window.NATION_CONFIG && NATION_CONFIG.email_domain) || 'clfn.on.ca';
 };

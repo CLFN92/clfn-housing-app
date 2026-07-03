@@ -374,7 +374,7 @@
       </div>
       <div class="card">
         <div class="ctitle">Current Address</div>
-        <div class="ftog" style="margin-bottom:10px;"><label class="tsw"><input type="checkbox" id="homelessToggle" onchange="_toggleHomelessAddress(this.checked);_saveToggleStates();"/><span class="tsl"></span></label><label>Homeless / No Fixed Address</label></div>
+        <div class="ftog" style="margin-bottom:10px;"><label class="tsw"><input type="checkbox" id="homelessToggle" onchange="_toggleHomelessAddress(this.checked);"/><span class="tsl"></span></label><label>Homeless / No Fixed Address</label></div>
         <div id="addrBlk" class="fg c2">
           <div class="f s2" data-req="street"><label>Street Address <span class="r">*</span></label><input type="text" id="street" placeholder="Street address"/></div>
           <div class="f" data-req="city"><label>City <span class="r">*</span></label><input type="text" id="city" placeholder="City"/></div>
@@ -399,7 +399,7 @@
       </div>
       <div class="card">
         <div class="ctitle">Current Housing</div>
-        <div class="ftog"><label class="tsw"><input type="checkbox" id="hasHouseToggle" onchange="var b=document.getElementById('homeCondBlk');if(b)b.style.display=this.checked?'block':'none';_saveToggleStates();if(typeof autoPopulateScore==='function'){autoPopulateScore();calcScore();}"/><span class="tsl"></span></label><label>Currently Has a House on Reserve</label></div>
+        <div class="ftog"><label class="tsw"><input type="checkbox" id="hasHouseToggle" onchange="var b=document.getElementById('homeCondBlk');if(b)b.style.display=this.checked?'block':'none';if(typeof autoPopulateScore==='function'){autoPopulateScore();calcScore();}"/><span class="tsl"></span></label><label>Currently Has a House on Reserve</label></div>
         <div id="homeCondBlk">
           <div class="f" style="margin-top:12px;margin-bottom:4px;">
             <label>Search Current Unit</label>
@@ -439,7 +439,7 @@
       </div>
       <div class="card">
         <div class="ctitle"><span data-nation="short">CLFN</span> Arrears — Applicant</div>
-        <div class="ftog"><label class="tsw"><input type="checkbox" id="arrToggle" onchange="var b=document.getElementById('arrBlk');if(b)b.style.display=this.checked?'block':'none';_saveToggleStates();if(typeof autoPopulateScore==='function'){autoPopulateScore();calcScore();}triggerV2Score();"/><span class="tsl"></span></label><label>Money Owed to <span data-nation="short">CLFN</span></label></div>
+        <div class="ftog"><label class="tsw"><input type="checkbox" id="arrToggle" onchange="var b=document.getElementById('arrBlk');if(b)b.style.display=this.checked?'block':'none';if(typeof autoPopulateScore==='function'){autoPopulateScore();calcScore();}triggerV2Score();"/><span class="tsl"></span></label><label>Money Owed to <span data-nation="short">CLFN</span></label></div>
         <div id="arrBlk">
           <div class="divider"></div>
           <div class="fg c3">
@@ -502,7 +502,7 @@
       </div>
       <div class="card" id="coArrCard">
         <div class="ctitle"><span data-nation="short">CLFN</span> Arrears — Co-Applicant</div>
-        <div class="ftog"><label class="tsw"><input type="checkbox" id="coArrToggle" onchange="var b=document.getElementById('coArrBlk');if(b)b.style.display=this.checked?'block':'none';if(typeof _saveToggleStates==='function')_saveToggleStates();triggerV2Score();"/><span class="tsl"></span></label><label>Money Owed to <span data-nation="short">CLFN</span></label></div>
+        <div class="ftog"><label class="tsw"><input type="checkbox" id="coArrToggle" onchange="var b=document.getElementById('coArrBlk');if(b)b.style.display=this.checked?'block':'none';triggerV2Score();"/><span class="tsl"></span></label><label>Money Owed to <span data-nation="short">CLFN</span></label></div>
         <div id="coArrBlk">
           <div class="divider"></div>
           <div class="fg c3">

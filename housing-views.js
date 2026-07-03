@@ -1300,7 +1300,7 @@ function _kpiDrillExport(format) {
 function _kpiDrillPrint() {
   if (!_kpiDrillData) return;
   var d = _kpiDrillData;
-  var nation = (window.NATION_CONFIG && window.NATION_CONFIG.display_name) || 'CLFN Housing';
+  var nation = nationDisplay();
   var dateStr = new Date().toLocaleDateString('en-CA', {year:'numeric',month:'long',day:'numeric'});
   var thead = '<tr>' + d.headers.map(function(h){ return '<th>'+h+'</th>'; }).join('') + '</tr>';
   var tbody = (d.rows && d.rows.length)

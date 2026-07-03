@@ -47,14 +47,16 @@ window.liveScoreModel   = window.liveScoreModel   || null;
 
 
 function saveV2ScoringModel() {
-  localStorage.setItem('clfn_scoring_model_v2', JSON.stringify(liveV2ScoreModel));
+  // (localStorage mirror removed — nothing ever read it; housing_settings is
+  // the real persistence via saveSettingWithDraftFallback below.)
   saveSettingWithDraftFallback('scoring_model_v2', liveV2ScoreModel).then(function(ok){
     if(!ok) showToast('Scoring model saved locally but did not reach the server — it may revert on next sign-in.');
   });
 }
 
 function saveV2Tiers() {
-  localStorage.setItem('clfn_scoring_tiers_v2', JSON.stringify(liveV2Tiers));
+  // (localStorage mirror removed — nothing ever read it; housing_settings is
+  // the real persistence via saveSettingWithDraftFallback below.)
   saveSettingWithDraftFallback('scoring_tiers_v2', liveV2Tiers).then(function(ok){
     if(!ok) {
       showToast('Tier thresholds saved locally but did not reach the server — please retry.');
@@ -2031,32 +2033,22 @@ function saveNationPositionLabels(){
     if (val && val !== defaults[key]) next[key] = val;
   });
 
-  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
-    method:  'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
-    body:    JSON.stringify({ key: 'role_labels', value: next })
-  }).then(function(r){
-    if (!r.ok) { showToast('Save failed - check connection'); return; }
-    if (!window._appSettings) window._appSettings = {};
-    window._appSettings.role_labels = next;
-    if (typeof auditEntry === 'function') {
-      var changed = Object.keys(next).map(function(k){ return k + '=' + next[k]; }).join('; ');
-      auditEntry('SETTINGS', 'role_labels_save',
-        'Position names updated: ' + (changed || '(all reset to defaults)'),
-        window.currentRole || 'ed');
+  var changed = Object.keys(next).map(function(k){ return k + '=' + next[k]; }).join('; ');
+  persistSetting('role_labels', next, {
+    auditAction: 'role_labels_save',
+    auditDetail: 'Position names updated: ' + (changed || '(all reset to defaults)'),
+    okMsg:       'Position names saved',
+    failMsg:     'Save failed - check connection',
+    onSuccess:   function(){
+      // Re-render the block so the placeholders + saved values stay in sync.
+      _renderNationPositionsBlock();
+      // Push the new labels through the header avatar + badge so the
+      // rename is visible without a page reload. Other surfaces (settings
+      // tabs, notifications panel) re-render when next opened.
+      if (typeof updateHeaderUser === 'function') {
+        updateHeaderUser(window._viewAsRole || window.currentRole || window._realRole);
+      }
     }
-    showToast('Position names saved');
-    // Re-render the block so the placeholders + saved values stay in sync.
-    _renderNationPositionsBlock();
-    // Push the new labels through the header avatar + badge so the
-    // rename is visible without a page reload. Other surfaces (settings
-    // tabs, notifications panel) re-render when next opened.
-    if (typeof updateHeaderUser === 'function') {
-      updateHeaderUser(window._viewAsRole || window.currentRole || window._realRole);
-    }
-  }).catch(function(e){
-    console.warn('[positions] save failed:', e);
-    showToast('Save failed - see console');
   });
 }
 

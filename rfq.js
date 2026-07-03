@@ -240,25 +240,15 @@ function renderRfqList() {
 // Called after showRfqForm() so the form is already visible.
 async function _fetchAndPopulateSow(unitId, sowPn) {
   try {
-    var rows;
-    var _handoffStr = sessionStorage.getItem('_rfq_sow_handoff');
-    if (_handoffStr) {
-      sessionStorage.removeItem('_rfq_sow_handoff');
-      try {
-        var _ho = JSON.parse(_handoffStr);
-        if (_ho && _ho.project_number === sowPn) {
-          rows = [{ data: { sows: [_ho] } }];
-        }
-      } catch(e) {}
-    }
-    if (!rows) {
-      var r = await fetch(
-        SUPABASE_URL + '/rest/v1/housing_sow?unit_id=eq.' + encodeURIComponent(unitId) + '&select=data',
-        { headers: HOUSING_HEADERS }
-      );
-      if (!r.ok) return;
-      rows = await r.json();
-    }
+    // (A sessionStorage '_rfq_sow_handoff' fast-path was removed here — no code
+    // ever WROTE that key, so the branch was dead and the network fetch below
+    // was always the real path. See AUDIT_2026-07.md storage-key inventory.)
+    var r = await fetch(
+      SUPABASE_URL + '/rest/v1/housing_sow?unit_id=eq.' + encodeURIComponent(unitId) + '&select=data',
+      { headers: HOUSING_HEADERS }
+    );
+    if (!r.ok) return;
+    var rows = await r.json();
     if (!rows || !rows.length) return;
 
     var data = rows[0].data || {};
@@ -448,7 +438,7 @@ function showRfqForm(rfqId, unitId, sowPn) {
     var cdEl = document.getElementById('rfq_contract_date');
     if (cdEl) cdEl.value = new Date().toISOString().slice(0,10);
     var apEl = document.getElementById('rfq_ap_email');
-    if (apEl) apEl.value = 'housing@clfn.on.ca';
+    if (apEl) apEl.value = (window.NATION_CONFIG && NATION_CONFIG.housing_email) || 'housing@clfn.on.ca';
     renderMilestoneRows();
   }
 
@@ -491,7 +481,7 @@ function _populateFormFields(rfq) {
   set('rfq_contract_start',        d.contract_start  || d.target_start_date || '');
   set('rfq_substantial_completion',d.substantial_completion_date || '');
   set('rfq_total_completion',      d.total_completion_date || d.target_completion_date || '');
-  set('rfq_ap_email',              d.ap_email || 'housing@clfn.on.ca');
+  set('rfq_ap_email',              d.ap_email || (window.NATION_CONFIG && NATION_CONFIG.housing_email) || 'housing@clfn.on.ca');
   set('rfq_site_lead_name',        d.site_lead_name        || '');
   set('rfq_site_lead_phone',       d.site_lead_phone       || '');
   set('rfq_ct_signatory_name',     d.ct_signatory_name     || '');
@@ -727,6 +717,9 @@ function renderContractorCards() {
       + '<span class="rfq-ct-badge ' + wsibClass + '">' + wsib + '</span>'
       + '</div>';
   }).join('');
+  // Re-render leaves fresh inputs ENABLED — re-lock for view-only users
+  // (intra-tab renders don't pass through switchRfqTab's re-apply).
+  if (window._rfqReadOnly && typeof _rfqApplyReadOnly === 'function') _rfqApplyReadOnly();
 }
 
 function toggleContractor(ctId) {
@@ -786,6 +779,9 @@ function renderBidsSection() {
   });
   html += '</tbody></table>';
   mount.innerHTML = html;
+  // Re-render leaves fresh inputs ENABLED — re-lock for view-only users
+  // (intra-tab renders don't pass through switchRfqTab's re-apply).
+  if (window._rfqReadOnly && typeof _rfqApplyReadOnly === 'function') _rfqApplyReadOnly();
 }
 
 function _rfqSetBid(id, field, val) {
@@ -811,6 +807,10 @@ function _rfqDropBidFile(e, id) {
 
 // ── Bid quote-file attach (stored on rfq.data.bids[id].doc_path) ────────────
 async function _rfqAttachBidFile(id, inputEl) {
+  // Hard guard: the dropzone is a <label ondrop> — disabling its child file
+  // input does not neutralize the drop handler, so a view-only user could
+  // still trigger an (orphan) Storage upload via drag-and-drop.
+  if (typeof _rfqCanEdit === 'function' && !_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
   var file = inputEl && inputEl.files && inputEl.files[0];
   if (!file) return;
   if (typeof window.sbUploadFile !== 'function') { showToast('File upload is not available on this page'); return; }
@@ -1318,6 +1318,9 @@ function renderScopeDetailRows() {
           + '</tr>';
       }).join('')
     + '</tbody></table></div>';
+  // Re-render leaves fresh inputs ENABLED — re-lock for view-only users
+  // (intra-tab renders don't pass through switchRfqTab's re-apply).
+  if (window._rfqReadOnly && typeof _rfqApplyReadOnly === 'function') _rfqApplyReadOnly();
 }
 
 function addScopeDetailRow(row) {
@@ -1366,6 +1369,9 @@ function renderMaterialsRows() {
           + '</tr>';
       }).join('')
     + '</tbody></table></div>';
+  // Re-render leaves fresh inputs ENABLED — re-lock for view-only users
+  // (intra-tab renders don't pass through switchRfqTab's re-apply).
+  if (window._rfqReadOnly && typeof _rfqApplyReadOnly === 'function') _rfqApplyReadOnly();
 }
 function addMaterialsRow() { _readMaterialsRows(); _rfqMaterialsRows.push({material:'',specification:'',notes:''}); renderMaterialsRows(); }
 function removeMaterialsRow(i) { _readMaterialsRows(); _rfqMaterialsRows.splice(i,1); renderMaterialsRows(); }
@@ -1395,6 +1401,9 @@ function renderExclusionsRows() {
           + '</tr>';
       }).join('')
     + '</tbody></table></div>';
+  // Re-render leaves fresh inputs ENABLED — re-lock for view-only users
+  // (intra-tab renders don't pass through switchRfqTab's re-apply).
+  if (window._rfqReadOnly && typeof _rfqApplyReadOnly === 'function') _rfqApplyReadOnly();
 }
 function addExclusionRow() { _readExclusionsRows(); _rfqExclusionsRows.push({text:''}); renderExclusionsRows(); }
 function removeExclusionRow(i) { _readExclusionsRows(); _rfqExclusionsRows.splice(i,1); renderExclusionsRows(); }
@@ -1424,6 +1433,9 @@ function renderClfnSuppliedRows() {
           + '</tr>';
       }).join('')
     + '</tbody></table></div>';
+  // Re-render leaves fresh inputs ENABLED — re-lock for view-only users
+  // (intra-tab renders don't pass through switchRfqTab's re-apply).
+  if (window._rfqReadOnly && typeof _rfqApplyReadOnly === 'function') _rfqApplyReadOnly();
 }
 function addClfnSuppliedRow() { _readClfnSuppliedRows(); _rfqClfnSuppliedRows.push({item:''}); renderClfnSuppliedRows(); }
 function removeClfnSuppliedRow(i) { _readClfnSuppliedRows(); _rfqClfnSuppliedRows.splice(i,1); renderClfnSuppliedRows(); }
@@ -1468,6 +1480,9 @@ function renderMilestoneRows() {
       }).join('')
     + '</tbody></table></div>';
   _rfqCheckMilestoneTotal();
+  // Re-render leaves fresh inputs ENABLED — re-lock for view-only users
+  // (intra-tab renders don't pass through switchRfqTab's re-apply).
+  if (window._rfqReadOnly && typeof _rfqApplyReadOnly === 'function') _rfqApplyReadOnly();
 }
 
 function addMilestoneRow() {

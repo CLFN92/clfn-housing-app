@@ -69,15 +69,9 @@ function _toggleHomelessAddress(isHomeless) {
   }
 }
 
-function _saveToggleStates(){
-  try{
-    var states={};
-    document.querySelectorAll('input[type="checkbox"][id$="Toggle"]').forEach(function(el){
-      states[el.id]=el.checked;
-    });
-    sessionStorage.setItem('_toggleStates',JSON.stringify(states));
-  }catch(e){}
-}
+// (removed _saveToggleStates — it wrote sessionStorage '_toggleStates' that
+// nothing ever read; the inline onchange callers in housing.html were cleaned
+// up with it. See AUDIT_2026-07.md storage-key inventory.)
 
 function syncAccessibility(){
   // Read every checked acc_* checkbox by its visible value, write to the
@@ -212,7 +206,9 @@ function newApp(){
   });
 
   // Clear draft from localStorage
-  try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
+  // Legacy residue cleanup: 'clfn_housing_draft' was never written by any
+  // current code path (superseded by clfn_housing_draft_queue).
+  try{ localStorage.removeItem('clfn_housing_draft'); }catch(e){}
 
   // Clear the editing banner
   var secHdr = document.querySelector('#step0 .sec-hdr p');
@@ -1553,8 +1549,8 @@ function showAddHousingStaff() {
     + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Full Name</label>'
     + '<input id="hs-name" placeholder="e.g. Edith Moore" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;"></div>'
     + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Work Email</label>'
-    + '<input id="hs-email" type="email" placeholder="edith.moore@clfn.on.ca" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'
-    + '<div id="hs-email-hint" style="display:none;font-size:11px;color:var(--danger);margin-top:3px;">&#9888; Must be a @clfn.on.ca address</div></div>'
+    + '<input id="hs-email" type="email" placeholder="edith.moore@' + nationEmailDomain() + '" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'
+    + '<div id="hs-email-hint" style="display:none;font-size:11px;color:var(--danger);margin-top:3px;">&#9888; Must be a @' + nationEmailDomain() + ' address</div></div>'
     + '</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
     + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Department</label>'
@@ -1578,7 +1574,7 @@ function showAddHousingStaff() {
   var emailEl = document.getElementById('hs-email');
   if(emailEl) emailEl.addEventListener('input', function(){
     var h = document.getElementById('hs-email-hint');
-    if(h) h.style.display = (this.value && !this.value.endsWith('@clfn.on.ca')) ? 'block' : 'none';
+    if(h) h.style.display = (this.value && !this.value.endsWith('@' + nationEmailDomain())) ? 'block' : 'none';
   });
 }
 
@@ -1597,7 +1593,8 @@ async function submitAddHousingStaff() {
 
   if(!name)  { showToast("Please enter the employee's full name"); return; }
   if(!email||!email.includes('@')) { showToast('Please enter a valid email address'); return; }
-  if(!email.endsWith('@clfn.on.ca')) { showToast('Only @clfn.on.ca email addresses can be registered'); return; }
+  var _staffDomain = '@' + nationEmailDomain();
+  if(!email.endsWith(_staffDomain)) { showToast('Only ' + _staffDomain + ' email addresses can be registered'); return; }
 
   // Role-based add-staff gate. Only roles with manageAllStaffRoles can assign
   // anything other than HE-L1 / HE-L2. (HM is constrained to HE-L1/L2 by default.)

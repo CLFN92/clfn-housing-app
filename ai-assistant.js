@@ -559,7 +559,7 @@ function _aiBuildReplyPdf(work, explicitImages, tableImages){
   var doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'letter' });
   var pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
   var margin = 16, y = 16, contentW = pageW - margin * 2;
-  var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'CLFN';
+  var nation = nationDisplay();
   var tm = work.match(/^#\s+(.+)$/m); var title = tm ? _aiPdfClean(tm[1]) : 'Report';
   var today = new Date().toISOString().slice(0, 10);
 

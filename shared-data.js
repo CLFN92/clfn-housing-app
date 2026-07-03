@@ -670,7 +670,13 @@ async function sbLoadUnits() {
         longitude: row.longitude != null ? Number(row.longitude)
                  : (row.data && row.data.longitude != null ? Number(row.data.longitude) : null),
         hydro_meter_number: row.hydro_meter_number || (row.data && row.data.hydro_meter_number) || null,
-        gas_meter_number:   row.gas_meter_number   || (row.data && row.data.gas_meter_number)   || null
+        gas_meter_number:   row.gas_meter_number   || (row.data && row.data.gas_meter_number)   || null,
+        // Inspection dates: prefer the top-level columns (sbSaveUnit writes
+        // them; SQL backfills only set these) — without this mapping a unit
+        // whose next_inspection_due existed only as a column was never counted
+        // overdue (dashboard KPI) and showed blank in the unit modal.
+        lastInspectionDate: row.last_inspection_date || (row.data && row.data.lastInspectionDate) || null,
+        nextInspectionDue:  row.next_inspection_due  || (row.data && row.data.nextInspectionDue)  || null
       });
     });
   } catch(e) {
@@ -724,6 +730,40 @@ async function sbSaveUnit(u) {
     return false;
   }
 }
+
+// ── sbPatchUnit ───────────────────────────────────────────────────────────────
+// Targeted column PATCH on housing_units (vs sbSaveUnit's full-row upsert).
+// partial   — snake_case column updates sent to PostgREST.
+// cacheSync — optional object of camelCase updates Object.assign'd onto the
+//             matching entry in window.housingUnits on success (caller decides
+//             what the in-memory equivalents are).
+// Resolves true/false; never throws.
+async function sbPatchUnit(unitId, partial, cacheSync) {
+  try {
+    var r = await fetch(
+      SUPABASE_URL + '/rest/v1/housing_units?id=eq.' + encodeURIComponent(unitId),
+      {
+        method:  'PATCH',
+        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body:    JSON.stringify(partial)
+      }
+    );
+    if (!r.ok) { console.warn('[SB] patch unit failed:', await r.text()); return false; }
+    if (cacheSync && typeof housingUnits !== 'undefined' && Array.isArray(housingUnits)) {
+      for (var i = 0; i < housingUnits.length; i++) {
+        if (String(housingUnits[i].id) === String(unitId)) {
+          Object.assign(housingUnits[i], cacheSync);
+          break;
+        }
+      }
+    }
+    return true;
+  } catch(e) {
+    console.warn('[SB] patch unit error:', e);
+    return false;
+  }
+}
+window.sbPatchUnit = sbPatchUnit;
 
 // ── sbSaveAllUnits ────────────────────────────────────────────────────────────
 async function sbSaveAllUnits(units) {
@@ -1059,6 +1099,41 @@ async function sbSaveSetting(key, value) {
     return false;
   }
 }
+
+// ── persistSetting ────────────────────────────────────────────────────────────
+// One shared "upsert a housing_settings row + update the _appSettings cache +
+// audit + toast" flow. Replaces 7 hand-rolled copies of the identical
+// POST/merge-duplicates block (notifications.js x6, scoring.js x1). Keeps the
+// merge-duplicates upsert those sites already used (byte-identical server
+// behavior — deliberately NOT switched to sbSaveSetting's PATCH-then-INSERT).
+// opts: { auditAction, auditDetail, okMsg, failMsg, onSuccess }
+// Resolves true/false; never throws.
+function persistSetting(key, value, opts) {
+  opts = opts || {};
+  function _fail(msg) {
+    if (typeof showToast === 'function') showToast(opts.failMsg || msg);
+    return false;
+  }
+  return fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
+    method:  'POST',
+    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+    body:    JSON.stringify({ key: key, value: value })
+  }).then(function(r) {
+    if (!r.ok) return _fail('Save failed — check connection');
+    if (!window._appSettings) window._appSettings = {};
+    window._appSettings[key] = value;
+    if (opts.auditAction && typeof auditEntry === 'function') {
+      auditEntry('SETTINGS', opts.auditAction, opts.auditDetail || (key + ' updated'), window.currentRole || 'ed');
+    }
+    if (opts.okMsg && typeof showToast === 'function') showToast(opts.okMsg);
+    if (typeof opts.onSuccess === 'function') opts.onSuccess();
+    return true;
+  }).catch(function(e) {
+    console.warn('[settings] persist ' + key + ' failed:', e);
+    return _fail('Save failed');
+  });
+}
+window.persistSetting = persistSetting;
 
 // ── sbLoadContractors ─────────────────────────────────────────────────────────
 async function sbLoadContractors() {
@@ -1893,7 +1968,8 @@ function _ctRenderFlow(status, ct, prefix) {
   var steps = [
     {key:'pending_review', label:'Employee\nSubmits',   icon:'👤'},
     {key:'hm_recommended', label:'HM\nVerifies',        icon:'🏠'},
-    {key:'approved',       label:'ED\nApproves',         icon:'✅'}
+    // Final approval is HM-or-ED (approveContractor authority) — not ED-only.
+    {key:'approved',       label:'Final\nApproval',      icon:'✅'}
   ];
 
   var order = ['pending_review','hm_recommended','approved'];
@@ -2825,9 +2901,10 @@ async function lookupUser(){
   var resultEl = document.getElementById('user_lookup_result');
   if(!resultEl) return;
   if(!email){ resultEl.style.display='none'; return; }
-  if(!email.endsWith('@clfn.on.ca')){
+  var _lookupDomain = '@' + nationEmailDomain();
+  if(!email.endsWith(_lookupDomain)){
     resultEl.style.display='block';
-    resultEl.innerHTML='<div style="padding:10px 14px;background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:8px;font-size:12px;color:var(--danger);">Only @clfn.on.ca email addresses can be added.</div>';
+    resultEl.innerHTML='<div style="padding:10px 14px;background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:8px;font-size:12px;color:var(--danger);">Only ' + _lookupDomain + ' email addresses can be added.</div>';
     return;
   }
   resultEl.innerHTML='<div style="padding:10px;font-size:12px;color:var(--muted);">Searching…</div>';
@@ -4284,7 +4361,11 @@ function renderWorklist() {
   }
 
   // ── 1. Applications requiring action ────────────────────────────────────
-  var appItems = apps.filter(function(a) {
+  // Keep the FULL filtered list so the "+N more" overflow under the section is
+  // computed from the same role-gated filter as the rows themselves (it used
+  // to be re-derived from a role-blind 3-status filter, over- and
+  // under-counting).
+  var appItemsAll = apps.filter(function(a) {
     if (!a || a.archived) return false;
     // Commercial (business/department) applications are non-scored and reviewed
     // from the Applications list, not this scored worklist queue.
@@ -4294,7 +4375,8 @@ function renderWorklist() {
     if (isManagement && !canFinal && (a.status === 'submitted' || a.status === 'file_update' || a.status === 'mgr_approved' || a.status === 'transfer_request_submitted')) return true;
     if (canFinal && (a.status === 'mgr_approved' || a.status === 'submitted' || a.status === 'file_update' || a.status === 'transfer_request_submitted')) return true;
     return false;
-  }).slice(0, 10);
+  });
+  var appItems = appItemsAll.slice(0, 10);
 
   // ── 2. SOWs pending approval ─────────────────────────────────────────────
   // ── 2. SOWs awaiting the logged-in user's approval ──────────────────────
@@ -4577,8 +4659,8 @@ function renderWorklist() {
         { text: score,style: 'font-size:11px;color:var(--muted);width:55px;text-align:right;flex-shrink:0;' }
       ], { text: (appBtnText[a.status] || 'Open') + ' →', href: btnHref });
     }).join('');
-    var appTotal = apps.filter(function(a){ return !a.archived && (a.status==='submitted'||a.status==='mgr_approved'||a.status==='returned'); }).length;
-    html += sectionWrap('📋', 'Applications', appItems.length, 'housing.html?view=worklist', appRows, Math.max(0, appTotal - appItems.length));
+    // Overflow = same filter as the rows (appItemsAll), just past the display cap.
+    html += sectionWrap('📋', 'Applications', appItems.length, 'housing.html?view=worklist', appRows, Math.max(0, appItemsAll.length - appItems.length));
   }
 
   // SOWs
@@ -6966,10 +7048,14 @@ async function awardRfq(rfqId, contractorId, amount, notes, opts) {
     if (typeof auditEntry === 'function') auditEntry('RFQ:' + rfqId, 'awarded', 'Awarded to ' + ((ct && ct.name) || contractorId) + ' -- $' + (parseFloat(amount)||0).toFixed(2) + (opts.skipNotify ? ' (no notifications)' : '') + (notes ? ' -- ' + notes : ''), role);
     // Awarding an RFQ approves the linked SOW.
     _rfqApproveLinkedSow(rfq.sow_unit_id, rfq.sow_project_number, role);
+    // Resolve the unit address BEFORE the winner-email branch: the regret
+    // notices below also use it, and when the winner has no email this branch
+    // is skipped — addr used to stay undefined and losers' emails lost the
+    // address.
+    var units = (typeof housingUnits !== 'undefined' ? housingUnits : []);
+    var unit  = units.find(function(u){ return u && u.id === rfq.sow_unit_id; }) || {};
+    var addr  = ((unit.num || '') + ' ' + (unit.street || '')).trim() || rfq.sow_unit_id;
     if (!opts.skipNotify && ct && ct.email && typeof window.sendNotification === 'function') {
-      var units = (typeof housingUnits !== 'undefined' ? housingUnits : []);
-      var unit  = units.find(function(u){ return u && u.id === rfq.sow_unit_id; }) || {};
-      var addr  = ((unit.num || '') + ' ' + (unit.street || '')).trim() || rfq.sow_unit_id;
       window.sendNotification({
         to: ct.email, to_name: ct.name || '',
         subject: rfq.id + ' -- Contract Award Notification',

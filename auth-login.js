@@ -328,7 +328,9 @@ async function startSignIn() {
   var GENERIC_AUTH_ERROR = 'Sign-in failed. Please check your email and password.';
 
   // Silent domain prefilter: skip the network call for obviously-wrong emails.
-  if (!email.endsWith('@clfn.on.ca')) {
+  // Defensive read (no nationEmailDomain() call) in case config didn't load.
+  var _domain = '@' + ((window.NATION_CONFIG && NATION_CONFIG.email_domain) || 'clfn.on.ca');
+  if (!email.endsWith(_domain)) {
     if (errEl) { errEl.textContent = GENERIC_AUTH_ERROR; errEl.style.display = 'block'; }
     return;
   }

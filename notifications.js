@@ -1392,7 +1392,7 @@ async function _generateApplicationPdfBase64() {
     var cLines = pdf.splitTextToSize(
       'The applicant has consented to ' + short
       + ' Housing sharing relevant information from this application with other '
-      + (nation || 'CLFN')
+      + (nation || nationDisplay())
       + ' programs and departments — including Health, Education, Wellness, Ontario Works, and Finance — in support of this housing application.',
       contentW - 6
     );
@@ -2695,25 +2695,15 @@ function saveNotificationTemplate() {
     ccRoles:        ed.ccRoles
   };
 
-  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
-    method:  'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
-    body:    JSON.stringify({ key: 'email_templates', value: next })
-  }).then(function(r){
-    if (!r.ok) { showToast('Save failed - check connection'); return; }
-    if (!window._appSettings) window._appSettings = {};
-    window._appSettings.email_templates = next;
-    if (typeof auditEntry === 'function') {
-      var _detail = 'Email template updated: ' + ed.eventKey
-                  + ' (recipients: ' + (ed.recipientRoles.join(',') || '-')
-                  + '; cc: '         + (ed.ccRoles.join(',')        || '-')
-                  + ')';
-      auditEntry('SETTINGS', 'email_template_save', _detail, window.currentRole || 'ed');
-    }
-    showToast('✓ Template saved');
-  }).catch(function(e){
-    console.warn('[ntf] save failed:', e);
-    showToast('Save failed - see console');
+  var _detail = 'Email template updated: ' + ed.eventKey
+              + ' (recipients: ' + (ed.recipientRoles.join(',') || '-')
+              + '; cc: '         + (ed.ccRoles.join(',')        || '-')
+              + ')';
+  persistSetting('email_templates', next, {
+    auditAction: 'email_template_save',
+    auditDetail: _detail,
+    okMsg:       '✓ Template saved',
+    failMsg:     'Save failed - check connection'
   });
 }
 
@@ -3103,17 +3093,11 @@ function saveRfqThreshold() {
   if (!inp) return;
   var val = parseFloat(inp.value);
   if (isNaN(val) || val < 0) { showToast('Enter a valid dollar amount'); inp.focus(); return; }
-  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
-    method:  'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
-    body:    JSON.stringify({ key: 'rfq_threshold', value: val })
-  }).then(function(r) {
-    if (!r.ok) { showToast('Save failed — check connection'); return; }
-    if (!window._appSettings) window._appSettings = {};
-    window._appSettings.rfq_threshold = val;
-    if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'rfq_threshold_save', 'RFQ threshold set to $' + val.toLocaleString(), role);
-    showToast('RFQ threshold saved — $' + val.toLocaleString());
-  }).catch(function(e) { console.warn('[cfg] rfq threshold save failed:', e); showToast('Save failed'); });
+  persistSetting('rfq_threshold', val, {
+    auditAction: 'rfq_threshold_save',
+    auditDetail: 'RFQ threshold set to $' + val.toLocaleString(),
+    okMsg:       'RFQ threshold saved — $' + val.toLocaleString()
+  });
 }
 
 function saveEldersAgeMin() {
@@ -3123,17 +3107,11 @@ function saveEldersAgeMin() {
   if (!inp) return;
   var val = parseInt(inp.value, 10);
   if (isNaN(val) || val < 18 || val > 99) { showToast('Enter a valid age between 18 and 99'); inp.focus(); return; }
-  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
-    method:  'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
-    body:    JSON.stringify({ key: 'eldersAgeMin', value: val })
-  }).then(function(r) {
-    if (!r.ok) { showToast('Save failed — check connection'); return; }
-    if (!window._appSettings) window._appSettings = {};
-    window._appSettings.eldersAgeMin = val;
-    if (typeof auditEntry === 'function') auditEntry('SETTINGS', 'elders_age_min_save', 'Elders minimum age set to ' + val, role);
-    showToast('Elders minimum age saved — ' + val + ' yrs');
-  }).catch(function(e) { console.warn('[cfg] elders age min save failed:', e); showToast('Save failed'); });
+  persistSetting('eldersAgeMin', val, {
+    auditAction: 'elders_age_min_save',
+    auditDetail: 'Elders minimum age set to ' + val,
+    okMsg:       'Elders minimum age saved — ' + val + ' yrs'
+  });
 }
 
 var _dupAuditRows = []; // retained for CSV export
@@ -3545,21 +3523,10 @@ function saveTermsDoc() {
   var next = Object.assign({}, all);
   next[_termsSelectedDoc] = { bodyHtml: bodyHtml };
 
-  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
-    method:  'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
-    body:    JSON.stringify({ key: 'terms_and_conditions', value: next })
-  }).then(function(r) {
-    if (!r.ok) { showToast('Save failed — check connection'); return; }
-    if (!window._appSettings) window._appSettings = {};
-    window._appSettings.terms_and_conditions = next;
-    if (typeof auditEntry === 'function') {
-      auditEntry('SETTINGS', 'terms_save', 'Terms & Conditions updated: ' + _termsSelectedDoc, window.currentRole || 'ed');
-    }
-    showToast('✓ Terms & Conditions saved');
-  }).catch(function(e) {
-    console.warn('[terms] save failed:', e);
-    showToast('Save failed — see console');
+  persistSetting('terms_and_conditions', next, {
+    auditAction: 'terms_save',
+    auditDetail: 'Terms & Conditions updated: ' + _termsSelectedDoc,
+    okMsg:       '✓ Terms & Conditions saved'
   });
 }
 
@@ -4247,21 +4214,10 @@ function saveContractsDoc() {
   var next = Object.assign({}, all);
   next[_contractsSelectedDoc] = { bodyHtml: bodyHtml, initials_clauses: clauses };
 
-  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
-    method:  'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
-    body:    JSON.stringify({ key: 'contracts_agreements', value: next })
-  }).then(function(r) {
-    if (!r.ok) { showToast('Save failed — check connection'); return; }
-    if (!window._appSettings) window._appSettings = {};
-    window._appSettings.contracts_agreements = next;
-    if (typeof auditEntry === 'function') {
-      auditEntry('SETTINGS', 'contracts_save', 'Contracts & Agreements updated: ' + _contractsSelectedDoc, role);
-    }
-    showToast('✓ Contract saved');
-  }).catch(function(e) {
-    console.warn('[contracts] save failed:', e);
-    showToast('Save failed — see console');
+  persistSetting('contracts_agreements', next, {
+    auditAction: 'contracts_save',
+    auditDetail: 'Contracts & Agreements updated: ' + _contractsSelectedDoc,
+    okMsg:       '✓ Contract saved'
   });
 }
 
@@ -4290,18 +4246,9 @@ function clearContractsSavedBody() {
   if (next[_contractsSelectedDoc]) {
     next[_contractsSelectedDoc] = Object.assign({}, next[_contractsSelectedDoc], { bodyHtml: '' });
   }
-  fetch(SUPABASE_URL + '/rest/v1/housing_settings', {
-    method:  'POST',
-    headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
-    body:    JSON.stringify({ key: 'contracts_agreements', value: next })
-  }).then(function(r) {
-    if (!r.ok) { showToast('Clear failed — check connection'); return; }
-    if (!window._appSettings) window._appSettings = {};
-    window._appSettings.contracts_agreements = next;
-    showToast('Saved body cleared — Generate Contract will now use the built-in default.');
-  }).catch(function(e) {
-    console.warn('[contracts] clear failed:', e);
-    showToast('Clear failed — see console');
+  persistSetting('contracts_agreements', next, {
+    okMsg:   'Saved body cleared — Generate Contract will now use the built-in default.',
+    failMsg: 'Clear failed — check connection'
   });
 }
 

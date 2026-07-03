@@ -18,7 +18,6 @@
 
 let cur = 0;
 const STEPS = 9; // 7 visible steps (0-6) + review (8) = 8 total
-const DRAFT_KEY = 'clfn_housing_draft';
 let currentAppId = null;
 
 // ── Helpers ──

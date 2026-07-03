@@ -2613,6 +2613,11 @@
     clauses.forEach(function(c, i){
       var v = (typeof getSigDataURL === 'function') ? getSigDataURL('ls_init_' + i) : '';
       if (v) _leaseInitials[c.id] = v;
+      // A cleared pad must also clear the captured copy — otherwise the
+      // readiness gate still counts the stale initial and the PDF prints it.
+      // Only clear when the pad EXISTS in the DOM (v === '' from a mounted,
+      // empty pad); a missing pad (modal closed) must not wipe saved drafts.
+      else if (document.getElementById('ls_init_' + i)) delete _leaseInitials[c.id];
     });
   }
 
@@ -3338,7 +3343,7 @@
     var custPostal = app.postal              || '';
     var hydroAcct  = t[TIC_C.hydro_account]  || '';
     var hydroMeter = t[TIC_C.hydro_meter]    || '';
-    var tpName     = ((window.NATION_CONFIG && (NATION_CONFIG.display_name||NATION_CONFIG.name))||'CLFN') + ' Housing';
+    var tpName     = nationDisplay() + ' Housing';
     var tpPhone    = (window.NATION_CONFIG && NATION_CONFIG.phone) || '';
 
     var existing = document.getElementById('tic_hydroone_modal');
@@ -3488,7 +3493,7 @@
     var otherText  = fv('ho_other_text');
     var sigData    = (typeof getSigDataURL === 'function') ? getSigDataURL('tic_hydro_sig') : '';
 
-    var tpName  = ((window.NATION_CONFIG && (NATION_CONFIG.display_name||NATION_CONFIG.name))||'CLFN') + ' Housing';
+    var tpName  = nationDisplay() + ' Housing';
     var tpPhone = (window.NATION_CONFIG && NATION_CONFIG.phone) || '';
     var dateDisp = dateRaw ? (function(){ var d = new Date(dateRaw + 'T12:00:00'); return isNaN(d) ? dateRaw : d.toLocaleDateString('en-CA'); })() : '';
 
@@ -4092,25 +4097,11 @@
       var updates = { latitude: parseFloat(_slpLat), longitude: parseFloat(_slpLng) };
       if(photoPath) updates.photo_url = photoPath;
 
-      var res = await fetch(
-        window.SUPABASE_URL + '/rest/v1/housing_units?id=eq.' + encodeURIComponent(unitId),
-        {
-          method:  'PATCH',
-          headers: Object.assign({}, window.HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
-          body:    JSON.stringify(updates)
-        }
-      );
-      if(!res.ok){ var errTxt = await res.text(); throw new Error(errTxt); }
+      // PATCH housing_units + sync window.housingUnits (same keys as the columns here)
+      var patched = await sbPatchUnit(unitId, updates, updates);
+      if(!patched) throw new Error('could not update the unit record');
 
       _ticState.unit = Object.assign({}, _ticState.unit, updates);
-      if(typeof housingUnits !== 'undefined' && Array.isArray(housingUnits)){
-        for(var i=0;i<housingUnits.length;i++){
-          if(String(housingUnits[i].id) === String(unitId)){
-            housingUnits[i] = Object.assign({}, housingUnits[i], updates);
-            break;
-          }
-        }
-      }
       // Belt-and-suspenders: also flush via sbSaveUnit so coords land in the
       // data blob even if the targeted PATCH column grant wasn't applied yet.
       if(typeof sbSaveUnit === 'function') sbSaveUnit(_ticState.unit).catch(function(){});
