@@ -1141,6 +1141,89 @@ function sowApproveInline() {
   });
 }
 
+// Headless inline approval fired straight from the "My Worklist" Approve button
+// (renderWorklist in shared-data.js) — approves a SPECIFIC SOW by unit + project
+// number WITHOUT opening the modal. This removes the friction of the old flow
+// (worklist button just opened the modal, then the user had to find the modal's
+// tiny "Approve" button, and a multi-SOW unit showed a picker first). Authority
+// is resolved from the REAL authenticated role (view-as is a preview), matching
+// sowApproveInline + saveSOW. Reuses _sowComputeApprovalStatus + _sowFireEmails
+// so status derivation and the contractor work-order email stay identical to the
+// modal path.
+function _wlApproveSow(uid, pn){
+  var role  = window._realRole || window.currentRole || '';
+  var canHm = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role);
+  var canEd = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('approveSowOverThreshold', role);
+  if(!canHm && !canEd){
+    if(typeof showToast === 'function') showToast('You do not have approval authority for this request.');
+    return;
+  }
+  // Fall back to opening the modal if we can't resolve the specific SOW here.
+  if(typeof getSowByProjectNumber !== 'function' || !uid || !pn){
+    if(typeof openSowModal === 'function') openSowModal(uid, pn);
+    return;
+  }
+  var sow = getSowByProjectNumber(uid, pn);
+  if(!sow){
+    if(typeof openSowModal === 'function') openSowModal(uid, pn);
+    return;
+  }
+  var approver = canEd ? 'ed' : 'hm';
+  var needsEd  = (typeof sowRequiresEdApproval === 'function') && sowRequiresEdApproval(sow);
+  var title    = approver === 'ed'
+    ? 'Grant ED Final Approval?'
+    : (needsEd ? 'Approve as Housing Manager?' : 'Approve Maintenance Request?');
+  var message  = approver === 'ed'
+    ? 'This records your ED approval on ' + pn + '. ED approval is final — no further sign-off is required and it will clear from the worklist.'
+    : (needsEd
+        ? 'This request is over the budget limit, so this records your HM approval on ' + pn + ' and forwards it to the Executive Director for final approval.'
+        : 'This records your approval on ' + pn + '. The request will be approved and ready for the work order — no further sign-off is required.');
+  if(typeof showConfirm !== 'function'){ if(typeof openSowModal === 'function') openSowModal(uid, pn); return; }
+
+  showConfirm({ title: title, message: message, confirmText: 'Approve', danger: false }).then(function(ok){
+    if(!ok) return;
+    var today = new Date().toISOString().split('T')[0];
+    var name  = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION.name) || role;
+    var prevStatus = sow.approval_status || '';
+    if(approver === 'ed'){ sow.edName = name; sow.edDate = today; }
+    else                 { sow.hmName = name; sow.hmDate = today; }
+    // Derive approval_status with the shared helper (real role, submit mode so
+    // the review-all-tabs gate doesn't force it back to draft).
+    if(typeof _sowComputeApprovalStatus === 'function'){
+      _sowComputeApprovalStatus(sow, sow, role, 'submit');
+    } else {
+      sow.approval_status = approver === 'ed' ? 'ed_approved' : 'hm_approved';
+    }
+    if(typeof upsertSowInList === 'function') upsertSowInList(uid, sow);
+    if(typeof auditEntry === 'function'){
+      auditEntry('SOW:'+uid, approver === 'ed' ? 'sow_ed_approval' : 'sow_hm_approval',
+        (approver === 'ed' ? 'ED' : 'HM') + ' approval recorded (worklist) — ' + name + ' on ' + today + ' · ' + pn, role);
+    }
+    // Unit auto-flip to under-repair on first approval (mirrors saveSOW).
+    try {
+      var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : [];
+      var u = units.find(function(x){ return x && x.id === uid; });
+      if(u && typeof maybeAutoFlipUnitForSow === 'function' && maybeAutoFlipUnitForSow(u, sow, prevStatus)
+         && typeof saveUnitWithDraftFallback === 'function'){
+        saveUnitWithDraftFallback(u);
+      }
+    } catch(e){ console.warn('[wlApprove] unit flip threw:', e); }
+    // Contractor work-order email on the approval transition (saveMode null so
+    // only the status-transition email fires, not the submit-only ones).
+    try {
+      if(typeof _sowFireEmails === 'function'){
+        var _prevUnitId = _sowUnitId; _sowUnitId = uid;   // _sowFireEmails reads this
+        _sowFireEmails(sow, { approval_status: prevStatus, assignedTo: sow.assignedTo, contractorId: sow.contractorId }, false, false, null);
+        _sowUnitId = _prevUnitId;
+      }
+    } catch(e){ console.warn('[wlApprove] email fire threw:', e); }
+    if(typeof showToast === 'function') showToast('✓ ' + pn + ' approved');
+    if(typeof renderWorklist === 'function') renderWorklist();
+    if(typeof udpRenderSowTable === 'function' && document.getElementById('udp_sow_table_wrap')) udpRenderSowTable(uid);
+  });
+}
+window._wlApproveSow = _wlApproveSow;
+
 function markSowComplete(){
   if(!_sowUnitId || !window._sowEditingProjectNumber){
     showToast('Save the request before marking complete.');

@@ -4888,9 +4888,16 @@ function renderWorklist() {
       // Open the SOW modal in-place on the current page when possible (housing.html
       // has openSowModal); fall back to navigating to renos.html only when needed.
       var btnText  = s.status === 'hm_approved' ? 'Final Approve' : 'Approve';
+      var _uidJs   = escapeHtml(s.uid).replace(/'/g, "\\'");
+      var _pnJs    = escapeHtml(s.pn || '').replace(/'/g, "\\'");
       var openCall = 'if(typeof openSowModal===\'function\'){openSowModal(\''
-                   + escapeHtml(s.uid).replace(/'/g, "\\'") + '\');}'
+                   + _uidJs + '\');}'
                    + 'else{window.location.href=\'renos.html?sow=' + encodeURIComponent(s.uid) + '\';}';
+      // The Approve button approves the specific request in place (single confirm,
+      // no modal). Falls back to opening the modal where _wlApproveSow isn't
+      // loaded (e.g. renos.html without housing-modals-sow.js).
+      var approveCall = 'event.stopPropagation();if(typeof _wlApproveSow===\'function\'){_wlApproveSow(\''
+                   + _uidJs + '\',\'' + _pnJs + '\');}else{' + openCall + '}';
       return '<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid var(--border);background:var(--surface);" '
         + 'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'var(--surface)\'">'
         + '<div onclick="' + openCall + '" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;">'
@@ -4898,7 +4905,7 @@ function renderWorklist() {
         +   '<span style="font-size:11px;color:var(--muted);width:120px;flex-shrink:0;">' + escapeHtml(s.pn || '—') + '</span>'
         +   '<span style="font-size:11px;color:var(--muted);width:180px;flex-shrink:0;">' + escapeHtml(sowStatusBadge({approval_status: s.status}, {variant:'worklist'}).label) + '</span>'
         + '</div>'
-        + '<button onclick="' + openCall + '" style="flex-shrink:0;background:var(--yellow);color:var(--dark);border:none;border-radius:6px;'
+        + '<button onclick="' + approveCall + '" style="flex-shrink:0;background:var(--yellow);color:var(--dark);border:none;border-radius:6px;'
         +   'padding:5px 12px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;">'
         +   escapeHtml(btnText) + '</button>'
         + '</div>';
