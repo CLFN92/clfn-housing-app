@@ -94,13 +94,6 @@
     var totalUnits = activeUnits.length;
     var occupancyRate = _pct(byStatus.occupied, byStatus.occupied + byStatus.vacant + byStatus.reserved);
 
-    // Units by funder (top-level or in a nested data blob).
-    var byFunder = {};
-    activeUnits.forEach(function (u) {
-      var f = u.funder || (u.data && u.data.funder) || 'Unspecified';
-      byFunder[f] = (byFunder[f] || 0) + 1;
-    });
-
     // Waitlist: active, scored, not yet placed.
     var APPROVED = { mgr_approved: 1, hm_approved: 1, ed_approved: 1 };
     var openReview = apps.filter(function (a) {
@@ -150,6 +143,9 @@
     var year = new Date().getFullYear();
     var sowStatus = { Draft: 0, 'HM Approved': 0, 'ED / System Approved': 0, Completed: 0 };
     var activeReno = 0, completedYtd = 0;
+    // Renovation dollars by work-item category — sum each item's estimated cost
+    // (items carry {category, description, cost}) across non-archived SOWs.
+    var byCategory = {};
     sows.forEach(function (s) {
       if (s.archived) return;
       var st = s.approval_status || '';
@@ -162,6 +158,13 @@
         else if (st === 'hm_approved') sowStatus['HM Approved']++;
         else sowStatus.Draft++;
       }
+      var items = Array.isArray(s.items) ? s.items : [];
+      items.forEach(function (it) {
+        if (!it) return;
+        var cat = (it.category || '').toString().trim() || 'Uncategorized';
+        var cost = parseFloat(String(it.cost != null ? it.cost : (it.amount || 0)).replace(/[^0-9.\-]/g, '')) || 0;
+        if (cost > 0) byCategory[cat] = (byCategory[cat] || 0) + cost;
+      });
     });
 
     // Inspections overdue — from the unit's next-due date (no extra fetch).
@@ -173,7 +176,7 @@
 
     return {
       totalUnits: totalUnits, occupancyRate: occupancyRate, byStatus: byStatus,
-      byFunder: byFunder, openReview: openReview, awaitingMatch: awaitingMatch,
+      byCategory: byCategory, openReview: openReview, awaitingMatch: awaitingMatch,
       byType: byType, byTier: byTier, tierLabels: tierLabels,
       sowStatus: sowStatus, activeReno: activeReno, completedYtd: completedYtd,
       overdueInsp: overdueInsp, waitlist: apps.filter(function (a) { return _isActiveApp(a) && SCORED[_appType(a)] && !a.assignedUnit; }).length
@@ -264,7 +267,7 @@
       + _chartCard('Unit Occupancy', 'ld_chart_occupancy')
       + _chartCard('Waitlist by Priority', 'ld_chart_tier', 'scored & unplaced')
       + _chartCard('Applications by Type', 'ld_chart_type', 'active')
-      + _chartCard('Units by Funder', 'ld_chart_funder')
+      + _chartCard('Renovation $ by Category', 'ld_chart_renocat', 'estimated cost')
       + _chartCard('Renovation Pipeline', 'ld_chart_sow', 'by approval stage')
       + _chartCard('Applications — Last 12 Months', 'ld_chart_trend')
       + '</div>';
@@ -302,14 +305,21 @@
         options: { responsive: true, maintainAspectRatio: false, plugins: commonLegend, cutout: '58%' }
       });
 
-      // Units by funder (horizontal bar)
-      var funderLabels = Object.keys(k.byFunder);
-      _mkChart('ld_chart_funder', {
+      // Renovation $ by category (horizontal bar, sorted high→low, dollars)
+      var catPairs = Object.keys(k.byCategory).map(function (c) { return [c, k.byCategory[c]]; })
+        .sort(function (a, b) { return b[1] - a[1]; });
+      var catLabels = catPairs.map(function (p) { return p[0]; });
+      var catVals = catPairs.map(function (p) { return p[1]; });
+      var money = function (v) { return (typeof formatCurrency === 'function') ? formatCurrency(v) : ('$' + Math.round(v).toLocaleString()); };
+      _mkChart('ld_chart_renocat', {
         type: 'bar',
-        data: { labels: funderLabels, datasets: [{ label: 'Units', data: funderLabels.map(function (f) { return k.byFunder[f]; }),
-          backgroundColor: funderLabels.map(function (_, i) { return PAL[i % PAL.length]; }) }] },
-        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-          scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+        data: { labels: catLabels.length ? catLabels : ['No renovation costs recorded'],
+          datasets: [{ label: 'Estimated $', data: catLabels.length ? catVals : [0],
+          backgroundColor: (catLabels.length ? catLabels : [0]).map(function (_, i) { return PAL[i % PAL.length]; }) }] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false },
+            tooltip: { callbacks: { label: function (ctx) { return money(ctx.parsed.x); } } } },
+          scales: { x: { beginAtZero: true, ticks: { callback: function (v) { return money(v); } } } } }
       });
 
       // Renovation pipeline (bar)
