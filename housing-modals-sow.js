@@ -1632,6 +1632,18 @@ function saveSOW(opts){
     data.approval_status = 'completed';
     if(existingForStatus.completed_at) data.completed_at = existingForStatus.completed_at;
     if(existingForStatus.completed_by) data.completed_by = existingForStatus.completed_by;
+  } else if(existingForStatus && existingForStatus.system_approved){
+    // System Approved (auto-approved by an RFQ award) is terminal like
+    // 'completed'. The form carries no field for these flags, so a routine
+    // edit-and-save must not shed them or let the status recompute downward
+    // (the authority gate above strips edName/edDate for non-ED savers, which
+    // would otherwise downgrade the SOW back into the approval queue while its
+    // RFQ stays awarded).
+    data.approval_status   = 'ed_approved';
+    data.system_approved   = true;
+    if(existingForStatus.approved_via_rfq) data.approved_via_rfq = true;
+    data.edName = existingForStatus.edName || 'System';
+    data.edDate = existingForStatus.edDate || '';
   } else if(data.edName && data.edDate && APPROVAL_AUTHORITY.can('approveSowOverThreshold', _saveRole)) data.approval_status = 'ed_approved';
   else if(data.hmName && data.hmDate && APPROVAL_AUTHORITY.can('approveSowUnderThreshold', _saveRole)) data.approval_status = 'hm_approved';
   else if((data.tenantSig && data.tenantSig.image) || (data.staffSig && data.staffSig.image)) data.approval_status = 'signed';
@@ -1646,7 +1658,7 @@ function saveSOW(opts){
   // for re-edits — only first-time authoring is forced through the walk.
   var _saveBtn = document.getElementById('sow_save_btn');
   var _saveMode = _saveBtn && _saveBtn.dataset ? _saveBtn.dataset.mode : null;
-  if (_saveMode !== 'submit' && data.approval_status !== 'completed') {
+  if (_saveMode !== 'submit' && data.approval_status !== 'completed' && !data.system_approved) {
     data.approval_status = 'draft';
   }
 

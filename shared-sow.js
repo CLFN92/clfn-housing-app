@@ -33,22 +33,36 @@ function unitHasCompletedSow(unitId){
 // A SOW becomes immutable once its approval_status is 'completed'.
 // Only the ED can edit/reopen completed SOWs.
 
+// These delegate to the canonical CLFN_PERMS helpers (shared.js) so the two
+// definitions can't drift again: a duplicate here once excluded field_employee
+// from Mark Complete (despite CLFN_PERMS + the unit test saying they can) and
+// hardcoded ED-only checks that dropped super_user (an ED tier).
 function canEditSow(sow){
   // Anyone authenticated can edit a non-completed SOW (existing behavior).
-  // Only the ED (real role) can edit a completed one.
+  // Only the ED tier (real role) can edit a completed one.
   if(!isSowCompleted(sow)) return true;
-  return _realRoleForPermissions() === ROLE.ED;
+  var r = _realRoleForPermissions();
+  return r === ROLE.ED || r === 'super_user';
 }
 
 function canMarkSowComplete(){
-  // HM or ED can mark a SOW complete; staff/employee cannot.
+  // Field employees execute the work, so they close out (complete) work
+  // orders; HM and the ED tier can too. Single source: CLFN_PERMS.
+  // (CLFN_PERMS.assertRole throws on empty/unknown roles — treat that as no.)
   var r = _realRoleForPermissions();
-  return ROLE.isManagement(r) || r === 'hm';
+  if(r && window.CLFN_PERMS && typeof CLFN_PERMS.canMarkSowComplete === 'function'){
+    try { return CLFN_PERMS.canMarkSowComplete(r); } catch(e) { return false; }
+  }
+  return ROLE.isManagement(r) || r === 'field_employee';
 }
 
 function canReopenSow(){
-  // Only ED can reopen a completed SOW.
-  return _realRoleForPermissions() === ROLE.ED;
+  // Only the ED tier can reopen a completed SOW.
+  var r = _realRoleForPermissions();
+  if(r && window.CLFN_PERMS && typeof CLFN_PERMS.canReopenSow === 'function'){
+    try { return CLFN_PERMS.canReopenSow(r); } catch(e) { return false; }
+  }
+  return r === ROLE.ED || r === 'super_user';
 }
 
 function upsertSowInList(unitId, sow){

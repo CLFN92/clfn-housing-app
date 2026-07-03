@@ -4449,8 +4449,11 @@ function renderWorklist() {
   };
 
   // ── Count + empty state ───────────────────────────────────────────────────
+  // fieldSowItems MUST be in the total: a field employee is not management, so
+  // every other bucket is empty for them — omitting it made their entire
+  // "Work Orders to Complete" queue hit the empty-state early return below.
   var draftTotal = draftApps.length + draftSows.length + draftRfqs.length;
-  var total = appItems.length + sowItems.length + rfqItems.length + ctItems.length + matchItems.length + unitApprItems.length + draftTotal;
+  var total = appItems.length + sowItems.length + fieldSowItems.length + rfqItems.length + ctItems.length + matchItems.length + unitApprItems.length + draftTotal;
   var pill = document.getElementById('worklist_count_pill'); if (pill) pill.textContent = total;
   var qa   = document.getElementById('qa_pending_count');   if (qa) qa.textContent = total;
 

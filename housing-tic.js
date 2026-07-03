@@ -2441,7 +2441,10 @@
     if (window.PDFLib && window.PDFLib.PDFDocument) return;
     await new Promise(function(resolve, reject) {
       var s = document.createElement('script');
-      s.src = 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+      // jsdelivr, NOT unpkg — unpkg.com is not in the CSP script-src allowlist
+      // (staticwebapp.config.json permits only cdnjs + jsdelivr), so the old
+      // unpkg URL was blocked by the browser and this loader always failed.
+      s.src = 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
       s.onload  = resolve;
       s.onerror = function(){ reject(new Error('pdf-lib load failed')); };
       document.head.appendChild(s);
