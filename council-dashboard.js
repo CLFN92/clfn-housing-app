@@ -92,7 +92,18 @@
       if (byStatus[st] != null) byStatus[st]++; else byStatus.other++;
     });
     var totalUnits = activeUnits.length;
-    var occupancyRate = _pct(byStatus.occupied, byStatus.occupied + byStatus.vacant + byStatus.reserved);
+    // Occupancy = (occupied + reserved) / total units — reserved units are
+    // committed stock (a tenant is assigned, moving in), so they count toward
+    // occupancy; only truly-vacant units are "available". The full breakdown
+    // sums back to total and is shown in the subtitle + occupancy chart.
+    var occupancyRate = _pct(byStatus.occupied + byStatus.reserved, totalUnits);
+    var outOfService = byStatus.condemned + byStatus.other;
+    var occSubtitle = [
+      byStatus.occupied + ' occupied',
+      byStatus.reserved ? byStatus.reserved + ' reserved' : '',
+      byStatus.vacant + ' vacant',
+      outOfService ? outOfService + ' other' : ''
+    ].filter(Boolean).join(' · ');
 
     // Waitlist: active, scored, not yet placed.
     var APPROVED = { mgr_approved: 1, hm_approved: 1, ed_approved: 1 };
@@ -175,7 +186,7 @@
     }).length;
 
     return {
-      totalUnits: totalUnits, occupancyRate: occupancyRate, byStatus: byStatus,
+      totalUnits: totalUnits, occupancyRate: occupancyRate, byStatus: byStatus, occSubtitle: occSubtitle,
       byCategory: byCategory, openReview: openReview, awaitingMatch: awaitingMatch,
       byType: byType, byTier: byTier, tierLabels: tierLabels,
       sowStatus: sowStatus, activeReno: activeReno, completedYtd: completedYtd,
@@ -254,7 +265,7 @@
     // KPI strip
     html += '<div class="kpi-strip ld-kpis">'
       + _kpiCard('Total Units', k.totalUnits, 'Active housing stock')
-      + _kpiCard('Occupancy Rate', k.occupancyRate + '%', k.byStatus.occupied + ' occupied · ' + k.byStatus.vacant + ' vacant', 'kpi-accent-success')
+      + _kpiCard('Occupancy Rate', k.occupancyRate + '%', k.occSubtitle, 'kpi-accent-success')
       + _kpiCard('Vacant Units', k.byStatus.vacant, 'Available to fill')
       + _kpiCard('Applicants Waiting', k.waitlist, k.openReview + ' pending review')
       + _kpiCard('Awaiting Match', k.awaitingMatch, 'Approved, no unit yet')
