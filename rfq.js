@@ -1478,35 +1478,52 @@ function removeMilestoneRow(i) {
   renderMilestoneRows();
 }
 
-// Build one milestone row from a percentage of the contract total.
-function _rfqMilestoneFromPct(name, pct, total) {
-  var p = parseFloat(pct) || 0;
-  var gross = (parseFloat(total) || 0) * p / 100;
-  var holdback = gross * 0.10;
-  var net = gross - holdback;
-  return {
-    name: name, pct: (pct === '' || pct == null) ? '' : String(pct),
-    gross: String(gross || ''), holdback: String(holdback || ''),
-    net: String(net >= 0 ? net : 0)
-  };
+// Build one milestone row from a DOLLAR amount. pct is left blank unless a
+// clean round percent is supplied: _rfqRefreshMilestonesFromTotal re-derives
+// gross from pct (when pct > 0) every time the contract price recalcs, so a
+// row whose true percentage isn't round (the material deposit, the remainder)
+// must carry exact dollars + blank pct or each refresh would drift its value.
+function _rfqMilestoneFromAmount(name, gross, pct) {
+  gross = Math.round((parseFloat(gross) || 0) * 100) / 100;
+  var holdback = Math.round(gross * 10) / 100;             // 10% holdback
+  var net = Math.round((gross - holdback) * 100) / 100;
+  return { name: name, pct: (pct == null ? '' : String(pct)),
+           gross: String(gross || ''), holdback: String(holdback || ''),
+           net: String(net >= 0 ? net : 0) };
 }
 
-// Default milestone schedule by contract-value tier. Rows are editable after
-// seeding; the LAST phase carries the remaining percent so the schedule totals
-// 100%. <= $75k: 50% Material + P1 25 + P2 25 + P3 (remainder). >= $75k:
-// 50% Material + P1..P4 splitting the remaining 50% (12.5% each).
+// Default milestone schedule — DYNAMIC, driven by the Price Breakdown:
+//   Milestone 1 "50% Material" = HALF THE MATERIALS LINE of the breakdown
+//   (a materials deposit so the contractor can purchase supply), then fixed
+//   phases as a % of the contract price, and the FINAL phase = whatever
+//   remains of the contract.
+//     <  $75k: Material + Phase 1 25% + Phase 2 25% + Phase 3 (remainder)
+//     >= $75k: Material + Phase 1-3 at 20% each   + Phase 4 (remainder)
+// Seeded once when the schedule is empty; it does NOT auto-track later
+// breakdown edits — "Reset to default schedule" recomputes from the current
+// breakdown. Rows stay fully editable.
 function _rfqDefaultMilestones(total) {
-  var big = (parseFloat(total) || 0) >= 75000;
-  var rows = big
-    ? [ {name:'50% Material', pct:'50'}, {name:'Phase 1', pct:'12.5'},
-        {name:'Phase 2', pct:'12.5'}, {name:'Phase 3', pct:'12.5'}, {name:'Phase 4', pct:''} ]
-    : [ {name:'50% Material', pct:'50'}, {name:'Phase 1', pct:'25'},
-        {name:'Phase 2', pct:'25'}, {name:'Phase 3', pct:''} ];
-  // Last row = remaining percent so the schedule totals 100%.
-  var used = rows.reduce(function(s, r){ return s + (parseFloat(r.pct) || 0); }, 0);
-  var last = rows[rows.length - 1];
-  last.pct = String(Math.max(0, Math.round((100 - used) * 100) / 100));
-  return rows.map(function(r){ return _rfqMilestoneFromPct(r.name, r.pct, total); });
+  total = parseFloat(total) || 0;
+  var materials  = _rfqParseNum((document.getElementById('rfq_price_materials') || {}).value);
+  var matDeposit = Math.round(materials * 50) / 100;       // 50% of Materials
+  var big        = total >= 75000;
+  var phasePct   = big ? 20 : 25;
+  var midPhases  = big ? ['Phase 1', 'Phase 2', 'Phase 3'] : ['Phase 1', 'Phase 2'];
+  matDeposit = Math.min(matDeposit, total);               // never exceed the contract
+  var rows  = [ _rfqMilestoneFromAmount('50% Material', matDeposit, null) ];
+  var spent = matDeposit;
+  midPhases.forEach(function(name){
+    // Clamp each phase to what's left so an outsized material deposit can't
+    // push the seeded schedule past the contract price. A clamped row gets a
+    // blank pct (its true % isn't the round number any more).
+    var ideal     = Math.round(total * phasePct) / 100;
+    var remaining = Math.max(0, Math.round((total - spent) * 100) / 100);
+    var gross     = Math.min(ideal, remaining);
+    spent += gross;
+    rows.push(_rfqMilestoneFromAmount(name, gross, gross === ideal ? phasePct : null));
+  });
+  rows.push(_rfqMilestoneFromAmount(big ? 'Phase 4' : 'Phase 3', Math.max(0, Math.round((total - spent) * 100) / 100), null));
+  return rows;
 }
 
 // Contract value used to pick the tier + compute gross: the awarded amount if
