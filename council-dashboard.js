@@ -120,19 +120,30 @@
       else byType['New Housing']++;
     });
 
-    // Waitlist by priority tier (active + scored + not placed).
-    var TIERS = ['Emergency', 'Critical', 'High', 'Medium', 'Low'];
-    var byTier = {};
-    TIERS.forEach(function (t) { byTier[t] = 0; });
+    // Waitlist by priority tier (active + scored type + not placed). The scoring
+    // model stores tiers as "Critical Priority" / "High Priority" / etc.
+    // (scoring.js), so match by contains — not equality. Fall back to the
+    // numeric score vs. the live thresholds, and bucket anything still
+    // unresolved as "Unscored" so outstanding apps never silently disappear.
+    var TIERS = ['Critical', 'High', 'Medium', 'Low'];
+    function _tierOf(a) {
+      var t = (a.tier || a.tier_v2 || '').toString().toLowerCase();
+      for (var i = 0; i < TIERS.length; i++) { if (t.indexOf(TIERS[i].toLowerCase()) !== -1) return TIERS[i]; }
+      var s = (typeof a.score === 'number') ? a.score : (typeof a.score_v2 === 'number' ? a.score_v2 : null);
+      if (s != null) {
+        var _t = window.liveV2Tiers || { critical: 80, high: 60, medium: 40 };
+        return s >= _t.critical ? 'Critical' : s >= _t.high ? 'High' : s >= _t.medium ? 'Medium' : 'Low';
+      }
+      return 'Unscored';
+    }
+    var byTier = { Critical: 0, High: 0, Medium: 0, Low: 0, Unscored: 0 };
     apps.forEach(function (a) {
       if (!_isActiveApp(a) || !SCORED[_appType(a)] || a.assignedUnit) return;
-      var tier = (a.tier || '').toString();
-      var key = TIERS.filter(function (t) { return t.toLowerCase() === tier.toLowerCase(); })[0];
-      if (key) byTier[key]++;
+      byTier[_tierOf(a)]++;
     });
-    // Drop tiers nobody is in so the chart isn't cluttered with empty bars.
-    var tierLabels = TIERS.filter(function (t) { return byTier[t] > 0; });
-    if (!tierLabels.length) tierLabels = ['High', 'Medium', 'Low'];
+    // Always show the full Critical→Low scale; append Unscored only if any exist.
+    var tierLabels = TIERS.slice();
+    if (byTier.Unscored > 0) tierLabels.push('Unscored');
 
     // Renovations (SOWs).
     var sows = _allSows();
