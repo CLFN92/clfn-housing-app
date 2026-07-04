@@ -2737,13 +2737,19 @@ function confirmCtAction() {
   showToast(toastLabels[action]||action);
   cancelCtAction();
   // Refresh whichever surface the action came from. CIC = inline approval
-  // sections inside the edit modal; ctap = legacy side panel.
+  // sections inside the edit modal (stays open — the user is editing the
+  // contractor). ctap = the approval side panel: the decision is made, so close
+  // the panel and return to the initiating screen (contractors list / worklist)
+  // rather than leaving the form open on the post-action state.
   if(prefix === 'cic') {
     _ctRenderCicApproval(ct);
   } else {
-    openCtApprovalPanel(_ctApprovalIdx);
+    if(typeof closeCtApprovalPanel === 'function') closeCtApprovalPanel();
   }
   renderContractorsView();
+  // If the panel was opened from the landing-page worklist, refresh it so the
+  // just-actioned contractor drops out of "Contractors Waiting Approval".
+  if(typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
 }
 // Re-render the inline approval surface inside the edit modal. Used after
 // confirmCtAction lands, so the status banner / flow / action pills reflect
