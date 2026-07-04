@@ -4961,11 +4961,14 @@ function renderWorklist() {
   if (rfqItems.length) {
     var rfqRows = rfqItems.map(function(r) {
       var rfqHref = 'rfq.html?rfq=' + encodeURIComponent(r.id);
+      // Mobile-safe layout: RFQ id stays full width, the closes date takes the
+      // flexible middle (ellipsizes on a narrow phone), and the recipient count
+      // is a compact fixed chip. Dropping the (redundant) address column keeps
+      // the row from overflowing under the Award button on small screens.
       return actionRow(rfqHref, [
-        { text: r.id,   style: 'font-size:12px;font-weight:600;width:130px;flex-shrink:0;' },
-        { text: r.addr, style: 'flex:1;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
-        { text: r.closes ? 'Closes ' + r.closes : '', style: 'font-size:11px;color:var(--muted);width:100px;flex-shrink:0;' },
-        { text: r.recipients + ' contractor' + (r.recipients===1?'':'s'), style: 'font-size:11px;color:var(--muted);width:100px;text-align:right;flex-shrink:0;' }
+        { text: r.id, style: 'font-size:12px;font-weight:600;flex-shrink:0;white-space:nowrap;' },
+        { text: r.closes ? 'Closes ' + r.closes : '', style: 'flex:1;min-width:0;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
+        { text: '👥 ' + r.recipients, style: 'font-size:11px;color:var(--muted);flex-shrink:0;white-space:nowrap;text-align:right;' }
       ], { text: 'Award →', href: rfqHref });
     }).join('');
     html += sectionWrap('📊', 'RFQs Open for Bids', rfqItems.length, 'rfq.html', rfqRows, 0);
