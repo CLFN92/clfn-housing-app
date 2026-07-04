@@ -91,6 +91,17 @@
     </div>
     <!-- Action pills sit at the top of the form body, centered, on light bg -->
     <div id="ctap_actions"></div>
+    <!-- Confirm/notes step for the action pills. Without this, clicking a pill
+         (Approve / Return / Decline) called initCtAction but had no Confirm
+         button to fire confirmCtAction(), so the action did nothing. -->
+    <div id="ctap_notes_wrap" class="cic-notes-wrap" style="display:none;">
+      <label class="cic-notes-label">Notes <span id="ctap_notes_req" class="cic-notes-req"></span></label>
+      <textarea id="ctap_notes" rows="2" class="cic-notes-input"></textarea>
+      <div class="cic-notes-actions">
+        <button type="button" onclick="cancelCtAction()" class="btn btn-ghost btn-sm">Cancel</button>
+        <button type="button" id="ctap_confirm_btn" onclick="confirmCtAction()" class="btn btn-primary btn-sm">Confirm</button>
+      </div>
+    </div>
     <div id="ctap_status_banner" class="ct-status-banner"></div>
     <div class="ct-modal-form-body">
       <!-- Application Summary -->

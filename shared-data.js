@@ -2041,22 +2041,29 @@ function _ctRenderActions(ct, prefix) {
   var actions = [];
 
   var canRecommend = APPROVAL_AUTHORITY.can('recommendContractor', role);
-  if(canRecommend) {
-    if(status === 'pending_review' || status === 'returned') {
-      actions.push({label:'✅ Recommend to ED', cls:'btn-primary',      action:'hm_recommended', needsNotes:false});
-      actions.push({label:'↩ Return for Info',  cls:'btn-ghost',        action:'returned',       needsNotes:true});
-      actions.push({label:'❌ Decline',           cls:'btn-danger-ghost', action:'declined',       needsNotes:true});
+  var canApprove   = APPROVAL_AUTHORITY.can('approveContractor', role);   // HM or ED
+  if(status === 'pending_review' || status === 'returned') {
+    if(canApprove) {
+      // Verification is by EITHER the Housing Manager or the ED, in one step —
+      // whoever gets to it approves the contractor directly (no separate
+      // recommend -> ED stage). Matches "change the verify to either the ED or HM".
+      actions.push({label:'✅ Approve Contractor', cls:'btn-primary',      action:'approved',  needsNotes:false});
+      actions.push({label:'↩ Return for Info',    cls:'btn-ghost',        action:'returned',  needsNotes:true});
+      actions.push({label:'❌ Decline',             cls:'btn-danger-ghost', action:'declined',  needsNotes:true});
+    } else if(canRecommend) {
+      // A recommender who is NOT an approver (Housing Employee L2) can only move
+      // the contractor forward for HM/ED verification.
+      actions.push({label:'✅ Recommend for Approval', cls:'btn-primary',      action:'hm_recommended', needsNotes:false});
+      actions.push({label:'↩ Return for Info',        cls:'btn-ghost',        action:'returned',       needsNotes:true});
+      actions.push({label:'❌ Decline',                 cls:'btn-danger-ghost', action:'declined',       needsNotes:true});
     }
   }
-  if(APPROVAL_AUTHORITY.can('approveContractor', role)) {
-    // Final approval is by HM or ED. Show it at hm_recommended (post-recommend).
-    // Also allow it straight from pending_review ONLY for a pure approver (e.g.
-    // ED) who has no recommend step — a role that can BOTH recommend and approve
-    // (HM) uses the recommend action at pending_review, so it isn't shown both.
-    if(status === 'hm_recommended' || (status === 'pending_review' && !canRecommend)) {
-      actions.push({label:'✅ Final Approval',  cls:'btn-primary',      action:'approved', needsNotes:false});
-      actions.push({label:'↩ Return to HM',    cls:'btn-ghost',        action:'returned', needsNotes:true});
-      actions.push({label:'❌ Decline',          cls:'btn-danger-ghost', action:'declined', needsNotes:true});
+  if(canApprove) {
+    // A contractor an L2 recommended is waiting on HM/ED final approval.
+    if(status === 'hm_recommended') {
+      actions.push({label:'✅ Approve Contractor', cls:'btn-primary',      action:'approved', needsNotes:false});
+      actions.push({label:'↩ Return for Info',    cls:'btn-ghost',        action:'returned', needsNotes:true});
+      actions.push({label:'❌ Decline',             cls:'btn-danger-ghost', action:'declined', needsNotes:true});
     }
     if(status === 'approved') {
       actions.push({label:'⛔ Revoke Approval', cls:'btn-danger-ghost', action:'declined', needsNotes:true});
