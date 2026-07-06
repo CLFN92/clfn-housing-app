@@ -160,6 +160,12 @@ window._setFavicon = function(href) {
   var head = document.head || document.getElementsByTagName('head')[0];
   if (!head) return;
   ['icon', 'apple-touch-icon'].forEach(function(rel) {
+    // iOS "Add to Home Screen" ignores data-URI apple-touch-icons, so a nation
+    // logo stored as a data URI must NOT overwrite the static app icon
+    // (apple-touch-icon.png) — leave that in place for the home screen. The
+    // browser-tab favicon ('icon') still takes the data-URI logo. A nation whose
+    // logo is a real hosted URL still flows through to the home-screen icon.
+    if (rel === 'apple-touch-icon' && /^data:/i.test(href)) return;
     var sel = (rel === 'icon')
       ? 'link[rel="icon"], link[rel="shortcut icon"]'
       : 'link[rel="apple-touch-icon"]';
@@ -197,6 +203,29 @@ try {
       l.rel = 'manifest';
       l.href = 'manifest.json';
       (document.head || document.documentElement).appendChild(l);
+    }
+    // Static home-screen icon. iOS "Add to Home Screen" needs a real hosted PNG
+    // (it ignores the data-URI nation logo), so ship a neutral house app icon.
+    // _setFavicon deliberately won't overwrite this with a data-URI logo.
+    var _head = document.head || document.documentElement;
+    if (!document.querySelector('link[rel="apple-touch-icon"]')) {
+      var ai = document.createElement('link');
+      ai.setAttribute('rel', 'apple-touch-icon');
+      ai.setAttribute('href', 'apple-touch-icon.png');
+      _head.appendChild(ai);
+    }
+    if (!document.querySelector('meta[name="apple-mobile-web-app-capable"]')) {
+      var cap = document.createElement('meta');
+      cap.setAttribute('name', 'apple-mobile-web-app-capable');
+      cap.setAttribute('content', 'yes');
+      _head.appendChild(cap);
+    }
+    if (!document.querySelector('meta[name="apple-mobile-web-app-title"]')) {
+      var t = document.createElement('meta');
+      t.setAttribute('name', 'apple-mobile-web-app-title');
+      // Nation-neutral fallback; the browser tab still shows the nation title.
+      t.setAttribute('content', (window.NATION_CONFIG && (NATION_CONFIG.short || NATION_CONFIG.display_name)) || 'Housing');
+      _head.appendChild(t);
     }
   } catch(e){}
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
