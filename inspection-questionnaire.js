@@ -30,6 +30,13 @@
     { v:'na',     lbl:'N/A',      c:'#6b7280', bg:'#f4f4f5', bd:'#d4d4d8' }
   ];
 
+  // Shared input CSS. -webkit-appearance:none strips iOS Safari's native
+  // date-input chrome (which otherwise renders taller than a text input and
+  // centres its text), so the Date and Inspector fields are the same height.
+  var _iqFieldCss = 'width:100%;height:44px;box-sizing:border-box;padding:0 12px;'
+    + 'border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--sans);'
+    + 'background:var(--surface);color:var(--text);-webkit-appearance:none;appearance:none;';
+
   function _sections(){ return (typeof INSP_CHECKLIST_TEMPLATE !== 'undefined' && INSP_CHECKLIST_TEMPLATE) || []; }
   function _types(){ return (typeof INSP_TYPES !== 'undefined' && INSP_TYPES) || ['Routine']; }
   function _key(section, item){ return section + '|' + item; }
@@ -155,9 +162,9 @@
         + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:18px;">'+typeBtns+'</div>'
         + '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:4px;">'
         +   '<div style="flex:1;min-width:150px;margin-bottom:6px;"><label style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">INSPECTION DATE</label>'
-        +     '<input id="iq_date" type="date" value="'+_esc(S.date)+'" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box;font-family:var(--sans);height:42px;"/></div>'
+        +     '<input id="iq_date" type="date" value="'+_esc(S.date)+'" style="'+_iqFieldCss+'text-align:left;"/></div>'
         +   '<div style="flex:1;min-width:150px;margin-bottom:6px;"><label style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">INSPECTOR</label>'
-        +     '<input id="iq_inspector" type="text" value="'+_esc(S.inspector)+'" placeholder="Full name" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box;font-family:var(--sans);height:42px;"/></div>'
+        +     '<input id="iq_inspector" type="text" value="'+_esc(S.inspector)+'" placeholder="Full name" style="'+_iqFieldCss+'"/></div>'
         + '</div>';
       footRight = '<button class="btn btn-primary" data-iq-start="1"'+(S.unitId?'':' disabled')+'>Start inspection →</button>';
     }
