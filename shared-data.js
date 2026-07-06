@@ -4591,7 +4591,10 @@ function _wlCollectSows(ctx) {
         if (!needsHm && !needsEd) return;
         var u = sowUnitsAll.find(function(x){ return x && x.id === uid; });
         var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : uid;
-        sowItems.push({ uid: uid, pn: sow.project_number || '', addr: addr, status: status });
+        sowItems.push({ uid: uid, pn: sow.project_number || '', addr: addr, status: status,
+          amount:     (typeof sow.amount === 'number' ? sow.amount : (parseFloat(String(sow.totalCost||'').replace(/[^0-9.\-]/g,'')) || 0)),
+          contractor: (sow.assignedTeam === 'in_house' ? (sow.assignedToName || 'In-house crew') : (sow.contractor || '')),
+          itemCount:  (sow.items && sow.items.length) || 0 });
       });
     });
     // Keep a display cap of 8 rows, but remember the TRUE pending count so the
@@ -4642,7 +4645,8 @@ function _wlCollectRfqs(ctx) {
       var u = rfqUnits.find(function(x){ return x && x.id === rfq.sow_unit_id; });
       var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : (rfq.sow_unit_id||'');
       var closes = rfq.closes_at ? new Date(rfq.closes_at).toLocaleDateString('en-CA') : '';
-      rfqItems.push({ id: rfqId, addr: addr, closes: closes, recipients: (rfq.recipient_contractor_ids||[]).length });
+      rfqItems.push({ id: rfqId, addr: addr, closes: closes, recipients: (rfq.recipient_contractor_ids||[]).length,
+        bids: Object.keys((rfq.data && rfq.data.bids) || {}).length, sowPn: rfq.sow_project_number || '' });
     });
     rfqItems = rfqItems.slice(0, 6);
   }
@@ -4668,7 +4672,7 @@ function _wlCollectContractors(ctx) {
       var needsRecommend = canRecommendCt && st === 'pending_review';
       var needsApprove   = canApproveCt && (st === 'hm_recommended' || (st === 'pending_review' && !canRecommendCt));
       if (!needsRecommend && !needsApprove) return;
-      ctItems.push({ id: ct.id, name: ct.name || ct.id, trade: ct.trade || '', status: ct.status });
+      ctItems.push({ id: ct.id, name: ct.name || ct.id, trade: ct.trade || '', status: ct.status, submitted: ct.submittedAt || '' });
     });
     ctItems = ctItems.slice(0, 6);
   }
@@ -4840,7 +4844,51 @@ function renderWorklist() {
       + '</div>';
   }
 
-  var html = '';
+  // ── View mode (List vs Cards) — persisted per device, defaults to List ────
+  var _view = (function(){ try { return localStorage.getItem('clfn_worklist_view') === 'cards' ? 'cards' : 'list'; } catch(e){ return 'list'; } })();
+  window._wlSetView = function(v){ try { localStorage.setItem('clfn_worklist_view', v === 'cards' ? 'cards' : 'list'); } catch(e){} renderWorklist(); };
+  function _wlToggleBar(){
+    function b(v, label, icon){
+      var on = _view === v;
+      return '<button type="button" onclick="_wlSetView(\'' + v + '\')" style="display:flex;align-items:center;gap:5px;padding:5px 12px;'
+        + 'border:1px solid ' + (on ? 'var(--yellow)' : 'var(--border)') + ';background:' + (on ? 'var(--yellow)' : 'var(--surface)') + ';'
+        + 'color:' + (on ? 'var(--dark)' : 'var(--muted)') + ';font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;'
+        + 'border-radius:' + (v === 'list' ? '7px 0 0 7px' : '0 7px 7px 0') + ';' + (v === 'cards' ? 'margin-left:-1px;' : '') + '">' + icon + ' ' + label + '</button>';
+    }
+    return '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><div style="display:flex;">'
+      + b('list', 'List', '&#9776;') + b('cards', 'Cards', '&#9638;') + '</div></div>';
+  }
+
+  // Card renderers (used when _view === 'cards'). wlGrid lays cards out
+  // responsively inside a section; wlCard builds one tile with a title, an
+  // optional status pill, label:value meta rows, and one or two action buttons.
+  function wlGrid(cards){ return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:8px;padding:8px;background:var(--surface);">' + cards + '</div>'; }
+  function wlPill(p){ if(!p || !p.text) return ''; return '<span style="flex-shrink:0;font-size:10px;font-weight:700;color:' + (p.color||'var(--muted)') + ';background:' + (p.bg||'var(--bg)') + ';border:1px solid var(--border);border-radius:20px;padding:2px 8px;white-space:nowrap;">' + esc(p.text) + '</span>'; }
+  function wlCard(o){
+    var metas = (o.metas||[]).filter(function(m){ return m && m.v != null && String(m.v) !== ''; }).map(function(m){
+      return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;margin-top:4px;">'
+        + '<span style="color:var(--muted);flex-shrink:0;">' + esc(m.k) + '</span>'
+        + '<span style="color:var(--text);font-weight:600;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(m.v) + '</span></div>';
+    }).join('');
+    var actions = (o.actions||[]).map(function(a){
+      return '<button type="button" onclick="' + a.onclick + '" style="flex:1;background:' + (a.ghost ? 'none' : 'var(--yellow)') + ';color:' + (a.ghost ? 'var(--muted)' : 'var(--dark)') + ';'
+        + 'border:' + (a.ghost ? '1px solid var(--border)' : 'none') + ';border-radius:6px;padding:7px 10px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;">' + esc(a.text) + '</button>';
+    }).join('');
+    return '<div style="border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:11px 12px;display:flex;flex-direction:column;">'
+      + '<div ' + (o.open ? 'onclick="' + o.open + '"' : '') + ' style="cursor:' + (o.open ? 'pointer' : 'default') + ';">'
+      +   '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">'
+      +     '<span style="font-size:13px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(o.title) + '</span>'
+      +     wlPill(o.pill)
+      +   '</div>'
+      +   metas
+      + '</div>'
+      + (actions ? '<div style="display:flex;gap:6px;margin-top:10px;">' + actions + '</div>' : '')
+      + '</div>';
+  }
+  var _money = function(n){ return '$' + (Math.round((parseFloat(n)||0))).toLocaleString(); };
+  var _appTypeLabel = { new_housing:'New Housing', existing_tenant:'File Update', transfer_request:'Transfer', commercial:'Commercial' };
+
+  var html = _wlToggleBar();
 
   // Draft row with Continue + Archive buttons
   function draftRow(info, continueHref, continueOnclick, archiveOnclick) {
@@ -4859,13 +4907,18 @@ function renderWorklist() {
 
   // My Drafts — in-progress items the current user hasn't submitted yet
   if (draftTotal > 0) {
-    var draftRows = '';
+    var _draftPill = { text:'Draft', color:'var(--muted)', bg:'var(--bg)' };
+    var draftRows = '', draftCards = '';
     draftApps.forEach(function(a) {
       var name = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
+      var idJs = esc(a.id).replace(/'/g,"\\'");
+      var open = 'window.location.href=\'housing.html?openApp=' + encodeURIComponent(a.id) + '\'';
       var info = '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(name) + '</span>'
                + '<span style="font-size:11px;color:var(--muted);width:100px;flex-shrink:0;">Application</span>'
                + '<span style="font-size:11px;color:var(--muted);width:50px;text-align:right;flex-shrink:0;font-style:italic;">Draft</span>';
-      draftRows += draftRow(info, 'housing.html?openApp=' + encodeURIComponent(a.id), null, '_wlArchiveApp(\'' + esc(a.id).replace(/'/g,"\\'") + '\')');
+      draftRows += draftRow(info, 'housing.html?openApp=' + encodeURIComponent(a.id), null, '_wlArchiveApp(\'' + idJs + '\')');
+      draftCards += wlCard({ title:name, pill:_draftPill, open:open, metas:[{k:'Type',v:'Application'}],
+        actions:[{text:'Continue →',onclick:open},{text:'📥 Archive',ghost:true,onclick:'_wlArchiveApp(\'' + idJs + '\')'}] });
     });
     draftSows.forEach(function(s) {
       var sowOpen = 'if(typeof openSowModal===\'function\'){openSowModal(\'' + esc(s.uid).replace(/'/g,"\\'") + '\');}else{window.location.href=\'renos.html?sow=' + encodeURIComponent(s.uid) + '\';}';
@@ -4873,14 +4926,20 @@ function renderWorklist() {
                + '<span style="font-size:11px;color:var(--muted);width:100px;flex-shrink:0;">' + esc(s.pn || 'Request') + '</span>'
                + '<span style="font-size:11px;color:var(--muted);width:50px;text-align:right;flex-shrink:0;font-style:italic;">Draft</span>';
       draftRows += draftRow(info, null, sowOpen, '_wlArchiveSow(\'' + esc(s.uid).replace(/'/g,"\\'") + '\',\'' + esc(s.pn).replace(/'/g,"\\'") + '\')');
+      draftCards += wlCard({ title:s.addr, pill:_draftPill, open:sowOpen, metas:[{k:'Type',v:'Maintenance'},{k:'Project',v:s.pn||'Request'}],
+        actions:[{text:'Continue →',onclick:sowOpen},{text:'📥 Archive',ghost:true,onclick:'_wlArchiveSow(\'' + esc(s.uid).replace(/'/g,"\\'") + '\',\'' + esc(s.pn).replace(/'/g,"\\'") + '\')'}] });
     });
     draftRfqs.forEach(function(r) {
+      var idJs = esc(r.id).replace(/'/g,"\\'");
+      var open = 'window.location.href=\'rfq.html?rfq=' + encodeURIComponent(r.id) + '\'';
       var info = '<span style="font-size:12px;font-weight:600;width:130px;flex-shrink:0;">' + esc(r.id) + '</span>'
                + '<span style="flex:1;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(r.addr) + '</span>'
                + '<span style="font-size:11px;color:var(--muted);width:50px;text-align:right;flex-shrink:0;font-style:italic;">Draft</span>';
-      draftRows += draftRow(info, 'rfq.html?rfq=' + encodeURIComponent(r.id), null, '_wlCancelRfq(\'' + esc(r.id).replace(/'/g,"\\'") + '\')');
+      draftRows += draftRow(info, 'rfq.html?rfq=' + encodeURIComponent(r.id), null, '_wlCancelRfq(\'' + idJs + '\')');
+      draftCards += wlCard({ title:r.id, pill:_draftPill, open:open, metas:[{k:'Type',v:'RFQ'},{k:'Unit',v:r.addr}],
+        actions:[{text:'Continue →',onclick:open},{text:'Cancel',ghost:true,onclick:'_wlCancelRfq(\'' + idJs + '\')'}] });
     });
-    html += sectionWrap('✏️', 'My Drafts', draftTotal, '', draftRows, 0);
+    html += sectionWrap('✏️', 'My Drafts', draftTotal, '', _view==='cards' ? wlGrid(draftCards) : draftRows, 0);
   }
 
   // Applications
@@ -4900,8 +4959,20 @@ function renderWorklist() {
         { text: score,style: 'font-size:11px;color:var(--muted);width:55px;text-align:right;flex-shrink:0;' }
       ], { text: (appBtnText[a.status] || 'Open') + ' →', href: btnHref });
     }).join('');
+    var appCards = appItems.map(function(a) {
+      var name  = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
+      var lbl   = formatAppStatusLabel(a.status, {variant:'worklist'}) || a.status;
+      var score = (a.score != null && a.appType !== 'existing_tenant') ? (a.score + ' pts') : '';
+      var btnHref = (_wlReviewStatuses.indexOf(a.status) >= 0)
+        ? 'housing.html?openScorecard=' + encodeURIComponent(a.id)
+        : 'housing.html?openApp=' + encodeURIComponent(a.id);
+      var open = 'window.location.href=\'' + btnHref + '\'';
+      return wlCard({ title:name, pill:{text:lbl}, open:open,
+        metas:[{k:'Type',v:_appTypeLabel[a.appType]||''},{k:'Score',v:score},{k:'Tier',v:(a.tier?a.tier.replace(' Priority',''):'')}],
+        actions:[{text:(appBtnText[a.status]||'Open')+' →',onclick:open}] });
+    }).join('');
     // Overflow = same filter as the rows (appItemsAll), just past the display cap.
-    html += sectionWrap('📋', 'Applications', appItems.length, 'housing.html?view=worklist', appRows, Math.max(0, appItemsAll.length - appItems.length));
+    html += sectionWrap('📋', 'Applications', appItems.length, 'housing.html?view=worklist', _view==='cards' ? wlGrid(appCards) : appRows, Math.max(0, appItemsAll.length - appItems.length));
   }
 
   // SOWs
@@ -4932,8 +5003,18 @@ function renderWorklist() {
         +   escapeHtml(btnText) + '</button>'
         + '</div>';
     }).join('');
+    var sowCards = sowItems.map(function(s) {
+      var _uidJs = escapeHtml(s.uid).replace(/'/g, "\\'");
+      var _pnJs  = escapeHtml(s.pn || '').replace(/'/g, "\\'");
+      var openCall = 'if(typeof openSowModal===\'function\'){openSowModal(\'' + _uidJs + '\');}else{window.location.href=\'renos.html?sow=' + encodeURIComponent(s.uid) + '\';}';
+      var approveCall = 'event.stopPropagation();if(typeof _wlApproveSow===\'function\'){_wlApproveSow(\'' + _uidJs + '\',\'' + _pnJs + '\');}else{' + openCall + '}';
+      var badge = sowStatusBadge({approval_status: s.status}, {variant:'worklist'});
+      return wlCard({ title:s.addr, pill:{text:badge.label}, open:openCall,
+        metas:[{k:'Project',v:s.pn||'—'},{k:'Total',v:s.amount?_money(s.amount):''},{k:'Contractor',v:s.contractor},{k:'Work items',v:s.itemCount||''}],
+        actions:[{text:(s.status==='hm_approved'?'Final Approve':'Approve'),onclick:approveCall}] });
+    }).join('');
     var _sowTotal = (typeof sowItems._total === 'number') ? sowItems._total : sowItems.length;
-    html += sectionWrap('🔨', 'Renovations Waiting Approval', _sowTotal, 'renos.html', sowRows, Math.max(0, _sowTotal - sowItems.length));
+    html += sectionWrap('🔨', 'Renovations Waiting Approval', _sowTotal, 'renos.html', _view==='cards' ? wlGrid(sowCards) : sowRows, Math.max(0, _sowTotal - sowItems.length));
   }
 
   // Field Employee — approved work orders to complete
@@ -4954,7 +5035,13 @@ function renderWorklist() {
         +   'padding:5px 12px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;">Open →</button>'
         + '</div>';
     }).join('');
-    html += sectionWrap('🔧', 'Work Orders to Complete', fieldSowItems.length, 'renos.html', fsRows, 0);
+    var fsCards = fieldSowItems.map(function(s) {
+      var openCall = 'if(typeof openSowModal===\'function\'){openSowModal(\'' + escapeHtml(s.uid).replace(/'/g, "\\'") + '\');}else{window.location.href=\'renos.html?sow=' + encodeURIComponent(s.uid) + '\';}';
+      var statLbl = (s.status === 'ed_approved') ? 'Approved — Ready to Work' : 'HM Approved — Ready to Work';
+      return wlCard({ title:s.addr, pill:{text:statLbl,color:'#15803d',bg:'#f0fdf4'}, open:openCall,
+        metas:[{k:'Project',v:s.pn||'—'}], actions:[{text:'Open →',onclick:openCall}] });
+    }).join('');
+    html += sectionWrap('🔧', 'Work Orders to Complete', fieldSowItems.length, 'renos.html', _view==='cards' ? wlGrid(fsCards) : fsRows, 0);
   }
 
   // RFQs
@@ -4971,7 +5058,13 @@ function renderWorklist() {
         { text: '👥 ' + r.recipients, style: 'font-size:11px;color:var(--muted);flex-shrink:0;white-space:nowrap;text-align:right;' }
       ], { text: 'Award →', href: rfqHref });
     }).join('');
-    html += sectionWrap('📊', 'RFQs Open for Bids', rfqItems.length, 'rfq.html', rfqRows, 0);
+    var rfqCards = rfqItems.map(function(r) {
+      var open = 'window.location.href=\'rfq.html?rfq=' + encodeURIComponent(r.id) + '\'';
+      return wlCard({ title:r.id, pill:{text:'Open for Bids',color:'#1d4ed8',bg:'#eff6ff'}, open:open,
+        metas:[{k:'Unit',v:r.addr},{k:'Closes',v:r.closes},{k:'Invited',v:r.recipients},{k:'Bids in',v:r.bids}],
+        actions:[{text:'Award →',onclick:open}] });
+    }).join('');
+    html += sectionWrap('📊', 'RFQs Open for Bids', rfqItems.length, 'rfq.html', _view==='cards' ? wlGrid(rfqCards) : rfqRows, 0);
   }
 
   // Contractors
@@ -4995,7 +5088,13 @@ function renderWorklist() {
         +   escapeHtml(ctBtnText[c.status] || 'Review') + '</button>'
         + '</div>';
     }).join('');
-    html += sectionWrap('👷', 'Contractors Waiting Approval', ctItems.length, 'contractors.html', ctRows, 0);
+    var ctCards = ctItems.map(function(c) {
+      var ctNav = 'if(typeof setNavReferrer===\'function\')setNavReferrer(\'home\');window.location.href=\'contractors.html?openContractor=' + encodeURIComponent(c.id) + '\';';
+      return wlCard({ title:c.name, pill:{text:ctStatusLabel[c.status] || c.status, color:'#b45309', bg:'#fffbeb'}, open:ctNav,
+        metas:[{k:'Trade',v:c.trade},{k:'Submitted',v:(c.submitted?String(c.submitted).slice(0,10):'')}],
+        actions:[{text:ctBtnText[c.status] || 'Review →',onclick:ctNav}] });
+    }).join('');
+    html += sectionWrap('👷', 'Contractors Waiting Approval', ctItems.length, 'contractors.html', _view==='cards' ? wlGrid(ctCards) : ctRows, 0);
   }
 
   // Inventory approvals
@@ -5007,7 +5106,11 @@ function renderWorklist() {
         { text: u.lbl,  style: 'font-size:11px;color:var(--muted);width:200px;flex-shrink:0;' }
       ], { text: 'Review →', href: href });
     }).join('');
-    html += sectionWrap('🏘️', 'Inventory Approvals', unitApprItems.length, 'inventory.html', unitApprRows, 0);
+    var unitApprCards = unitApprItems.map(function(u) {
+      var open = 'window.location.href=\'inventory.html?unit=' + encodeURIComponent(u.id) + '\'';
+      return wlCard({ title:u.addr, pill:{text:u.lbl}, open:open, metas:[], actions:[{text:'Review →',onclick:open}] });
+    }).join('');
+    html += sectionWrap('🏘️', 'Inventory Approvals', unitApprItems.length, 'inventory.html', _view==='cards' ? wlGrid(unitApprCards) : unitApprRows, 0);
   }
 
   // Match queue
@@ -5022,7 +5125,17 @@ function renderWorklist() {
         { text: tier,  style: 'font-size:11px;color:var(--muted);width:100px;text-align:right;flex-shrink:0;' }
       ], { text: 'Match →', href: 'housing.html?view=match' });
     }).join('');
-    html += sectionWrap('🏠', 'Ready to Match', matchItems.length, 'housing.html?view=match', matchRows, 0);
+    var matchCards = matchItems.map(function(a) {
+      var name = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
+      var tier = a.tier ? a.tier.replace(' Priority','') : '';
+      var isTransfer = (a.appType || a.app_type) === 'transfer_request';
+      var open = 'window.location.href=\'housing.html?view=match\'';
+      var pillColor = /high/i.test(tier) ? {color:'#b91c1c',bg:'#fef2f2'} : /med/i.test(tier) ? {color:'#b45309',bg:'#fffbeb'} : {color:'var(--muted)',bg:'var(--bg)'};
+      return wlCard({ title:name, pill:(tier?{text:tier,color:pillColor.color,bg:pillColor.bg}:null), open:open,
+        metas:[{k:'Score',v:(a.score!=null?a.score+' pts':'')},{k:'Type',v:_appTypeLabel[a.appType]||''},{k:'On rez',v:(isTransfer?'🏠 Transfer':'')}],
+        actions:[{text:'Match →',onclick:open}] });
+    }).join('');
+    html += sectionWrap('🏠', 'Ready to Match', matchItems.length, 'housing.html?view=match', _view==='cards' ? wlGrid(matchCards) : matchRows, 0);
   }
 
   body.innerHTML = html;
