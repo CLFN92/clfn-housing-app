@@ -152,12 +152,12 @@
         +   'style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:8px;font-family:var(--sans);"/>'
         + '<div id="iq_unit_results" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;margin-bottom:14px;"></div>'
         + '<label style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;">TYPE</label>'
-        + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:14px;">'+typeBtns+'</div>'
-        + '<div style="display:flex;gap:12px;flex-wrap:wrap;">'
-        +   '<div style="flex:1;min-width:150px;"><label style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;">INSPECTION DATE</label>'
-        +     '<input id="iq_date" type="date" value="'+_esc(S.date)+'" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box;font-family:var(--sans);"/></div>'
-        +   '<div style="flex:1;min-width:150px;"><label style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;">INSPECTOR</label>'
-        +     '<input id="iq_inspector" type="text" value="'+_esc(S.inspector)+'" placeholder="Full name" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box;font-family:var(--sans);"/></div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:18px;">'+typeBtns+'</div>'
+        + '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:4px;">'
+        +   '<div style="flex:1;min-width:150px;margin-bottom:6px;"><label style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">INSPECTION DATE</label>'
+        +     '<input id="iq_date" type="date" value="'+_esc(S.date)+'" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box;font-family:var(--sans);height:42px;"/></div>'
+        +   '<div style="flex:1;min-width:150px;margin-bottom:6px;"><label style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">INSPECTOR</label>'
+        +     '<input id="iq_inspector" type="text" value="'+_esc(S.inspector)+'" placeholder="Full name" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box;font-family:var(--sans);height:42px;"/></div>'
         + '</div>';
       footRight = '<button class="btn btn-primary" data-iq-start="1"'+(S.unitId?'':' disabled')+'>Start inspection →</button>';
     }
