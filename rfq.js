@@ -1502,13 +1502,37 @@ function removeMilestoneRow(i) {
 // gross from pct (when pct > 0) every time the contract price recalcs, so a
 // row whose true percentage isn't round (the material deposit, the remainder)
 // must carry exact dollars + blank pct or each refresh would drift its value.
-function _rfqMilestoneFromAmount(name, gross, pct) {
+function _rfqMilestoneFromAmount(name, gross, pct, kind) {
   gross = Math.round((parseFloat(gross) || 0) * 100) / 100;
   var holdback = Math.round(gross * 10) / 100;             // 10% holdback
   var net = Math.round((gross - holdback) * 100) / 100;
-  return { name: name, pct: (pct == null ? '' : String(pct)),
+  return { name: name, kind: kind || '', pct: (pct == null ? '' : String(pct)),
            gross: String(gross || ''), holdback: String(holdback || ''),
            net: String(net >= 0 ? net : 0) };
+}
+
+// Push gross (+ derived holdback/net, and the reference % for kind-driven rows)
+// onto milestone row i, in both the DOM and _rfqMilestoneRows.
+function _rfqSetMilestoneGross(i, gross, total) {
+  gross = Math.round((parseFloat(gross) || 0) * 100) / 100;
+  var grossEl = document.getElementById('rfq_mr_gross_' + i);
+  var hbEl    = document.getElementById('rfq_mr_holdback_' + i);
+  var netEl   = document.getElementById('rfq_mr_net_' + i);
+  var pctEl   = document.getElementById('rfq_mr_pct_' + i);
+  var hb  = Math.round(gross * 10) / 100;
+  var net = Math.round((gross - hb) * 100) / 100;
+  if (grossEl) grossEl.value = _rfqFmtMoney(gross);
+  if (hbEl)    hbEl.value    = _rfqFmtMoney(hb);
+  if (netEl)   netEl.value   = _rfqFmtMoney(net >= 0 ? net : 0);
+  var kind = (_rfqMilestoneRows[i] && _rfqMilestoneRows[i].kind) || '';
+  var showPct = (kind === 'material' || kind === 'remainder');
+  if (pctEl && showPct) pctEl.value = total > 0 ? String(Math.round(gross / total * 10000) / 100) : '';
+  if (_rfqMilestoneRows[i]) {
+    _rfqMilestoneRows[i].gross    = String(gross || '');
+    _rfqMilestoneRows[i].holdback = String(hb || '');
+    _rfqMilestoneRows[i].net      = String(net >= 0 ? net : 0);
+    if (pctEl && showPct) _rfqMilestoneRows[i].pct = pctEl.value;
+  }
 }
 
 // Default milestone schedule — DYNAMIC, driven by the Price Breakdown:
@@ -1528,20 +1552,30 @@ function _rfqDefaultMilestones(total) {
   var big        = total >= 75000;
   var phasePct   = big ? 20 : 25;
   var midPhases  = big ? ['Phase 1', 'Phase 2', 'Phase 3'] : ['Phase 1', 'Phase 2'];
-  matDeposit = Math.min(matDeposit, total);               // never exceed the contract
-  var rows  = [ _rfqMilestoneFromAmount('50% Material', matDeposit, null) ];
+  if (total > 0) matDeposit = Math.min(matDeposit, total); // never exceed the contract
+  function pctOf(g){ return total > 0 ? Math.round(g / total * 10000) / 100 : null; }
+  // `kind` drives the LIVE recompute in _rfqRefreshMilestonesFromTotal:
+  //   'material'  -> 50% of the Materials line (re-read each price change)
+  //   'phase'     -> pct of the contract price
+  //   'remainder' -> whatever is left of the contract after the others
+  // The pct column on material/remainder rows is shown for reference only; their
+  // gross is re-derived from the kind, so they no longer sit static while the
+  // pct-based phases update.
+  var rows  = [ _rfqMilestoneFromAmount('50% Material', matDeposit, pctOf(matDeposit), 'material') ];
   var spent = matDeposit;
   midPhases.forEach(function(name){
-    // Clamp each phase to what's left so an outsized material deposit can't
-    // push the seeded schedule past the contract price. A clamped row gets a
-    // blank pct (its true % isn't the round number any more).
+    // Clamp each phase to what's left so an outsized material deposit can't push
+    // the seeded schedule past the contract price. A clamped row becomes a fixed
+    // dollar amount (no kind, blank pct) so it isn't re-derived.
     var ideal     = Math.round(total * phasePct) / 100;
     var remaining = Math.max(0, Math.round((total - spent) * 100) / 100);
     var gross     = Math.min(ideal, remaining);
+    var clean     = gross === ideal;
     spent += gross;
-    rows.push(_rfqMilestoneFromAmount(name, gross, gross === ideal ? phasePct : null));
+    rows.push(_rfqMilestoneFromAmount(name, gross, clean ? phasePct : null, clean ? 'phase' : ''));
   });
-  rows.push(_rfqMilestoneFromAmount(big ? 'Phase 4' : 'Phase 3', Math.max(0, Math.round((total - spent) * 100) / 100), null));
+  var rem = Math.max(0, Math.round((total - spent) * 100) / 100);
+  rows.push(_rfqMilestoneFromAmount(big ? 'Phase 4' : 'Phase 3', rem, pctOf(rem), 'remainder'));
   return rows;
 }
 
@@ -1592,6 +1626,10 @@ function _rfqCalcMilestoneRow(i, source) {
   var net = gross - holdback;
   if (netEl) netEl.value = _rfqFmtMoney(net >= 0 ? net : 0);
   if (_rfqMilestoneRows[i]) {
+    // A manual edit overrides the auto schedule for this row: drop its kind so
+    // the price-change refresh stops re-deriving it (the typed value sticks). A
+    // typed percent keeps it phase-driven; a typed dollar makes it fixed.
+    _rfqMilestoneRows[i].kind     = (source === 'pct' && _rfqParseNum(pctEl.value) > 0) ? 'phase' : '';
     _rfqMilestoneRows[i].pct      = pctEl.value;
     _rfqMilestoneRows[i].gross    = String(gross || '');
     _rfqMilestoneRows[i].holdback = String(holdback || '');
@@ -1600,30 +1638,42 @@ function _rfqCalcMilestoneRow(i, source) {
   _rfqCheckMilestoneTotal();
 }
 
-// When the contract price changes, re-derive each milestone's gross from its %.
+// When the contract price (or the Materials line) changes, re-derive every
+// milestone's gross: 'material' rows = 50% of the Materials line, pct-bearing
+// 'phase' rows = pct of the contract, and 'remainder' rows = whatever is left.
+// This is why the material deposit and the final phase now track price edits
+// too — previously only rows carrying a round pct were refreshed, so those two
+// (which deliberately store a blank pct) sat static.
 function _rfqRefreshMilestonesFromTotal() {
-  var total = _rfqContractTotal();
-  var i = 0;
-  while (document.getElementById('rfq_mr_pct_' + i)) {
-    var pctEl = document.getElementById('rfq_mr_pct_' + i);
-    var pct   = _rfqParseNum(pctEl.value);
-    if (pct > 0 && total > 0) {
-      var grossEl = document.getElementById('rfq_mr_gross_' + i);
-      var hbEl    = document.getElementById('rfq_mr_holdback_' + i);
-      var netEl   = document.getElementById('rfq_mr_net_' + i);
-      var gross   = total * pct / 100;
-      var hb      = gross * 0.10;
-      if (grossEl) grossEl.value = _rfqFmtMoney(gross);
-      if (hbEl)    hbEl.value    = _rfqFmtMoney(hb);
-      if (netEl)   netEl.value   = _rfqFmtMoney(gross - hb);
-      if (_rfqMilestoneRows[i]) {
-        _rfqMilestoneRows[i].gross    = String(gross);
-        _rfqMilestoneRows[i].holdback = String(hb);
-        _rfqMilestoneRows[i].net      = String(gross - hb);
-      }
+  var total     = _rfqContractTotal();
+  var materials = _rfqParseNum((document.getElementById('rfq_price_materials') || {}).value);
+  // Pass 1: material + phase (and fixed) rows; sum them so remainder can be derived.
+  var i = 0, sumNonRemainder = 0;
+  var remainderIdxs = [];
+  while (document.getElementById('rfq_mr_gross_' + i)) {
+    var kind = (_rfqMilestoneRows[i] && _rfqMilestoneRows[i].kind) || '';
+    if (kind === 'remainder') { remainderIdxs.push(i); i++; continue; }
+    var pct = _rfqParseNum((document.getElementById('rfq_mr_pct_' + i) || {}).value);
+    var g;
+    if (kind === 'material') {
+      g = Math.round(materials * 50) / 100;                     // 50% of the Materials line
+      _rfqSetMilestoneGross(i, g, total);
+    } else if (pct > 0 && total > 0) {
+      g = total * pct / 100;
+      _rfqSetMilestoneGross(i, g, total);
+    } else {
+      g = _rfqParseNum((document.getElementById('rfq_mr_gross_' + i) || {}).value);   // fixed / manual — leave as-is
     }
+    sumNonRemainder += (parseFloat(g) || 0);
     i++;
   }
+  // Pass 2: remainder rows take whatever is left of the contract price.
+  remainderIdxs.forEach(function(ri){
+    var g = Math.max(0, Math.round((total - sumNonRemainder) * 100) / 100);
+    _rfqSetMilestoneGross(ri, g, total);
+    sumNonRemainder += g;   // a 2nd remainder (unusual) would then be 0
+  });
+  _rfqCheckMilestoneTotal();
 }
 
 // Summary + guard: total of milestone gross cannot exceed the contract price.
@@ -1649,6 +1699,9 @@ function _readMilestoneRows() {
   while (document.getElementById('rfq_mr_name_' + i)) {
     rows.push({
       name:     (document.getElementById('rfq_mr_name_' + i) || {}).value || '',
+      // Preserve the auto-calc kind (material/phase/remainder) across DOM reads —
+      // it isn't an input, so carry it from the existing row by index.
+      kind:     (_rfqMilestoneRows[i] && _rfqMilestoneRows[i].kind) || '',
       pct:      (document.getElementById('rfq_mr_pct_'  + i) || {}).value || '',
       // Store clean numbers (strip $ , formatting) so the payload/PDF parse cleanly.
       gross:    String(_rfqParseNum((document.getElementById('rfq_mr_gross_'    + i) || {}).value) || ''),
