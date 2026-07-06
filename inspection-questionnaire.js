@@ -48,7 +48,6 @@
       role:     window.currentRole || '',
       step:     unitId ? 'section' : 'details',
       sectionIdx: 0,
-      mode:     {},   // sectionIdx -> 'gate' | 'items'
       ratings:  {},   // key -> { rating, notes }
       generalNotes: '',
       saving: false,
@@ -88,10 +87,6 @@
   function _pill(txt, color){
     return '<span style="font-size:11px;font-weight:700;color:'+color+';background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:3px 11px;">'+_esc(txt)+'</span>';
   }
-  function _sectionHasRatings(idx){
-    var sec = _sections()[idx]; if(!sec) return false;
-    return sec.items.some(function(item){ var r = S.ratings[_key(sec.section,item)]; return r && r.rating; });
-  }
   function _deficiencies(){
     var out = [];
     _sections().forEach(function(sec){
@@ -120,15 +115,6 @@
     if(c.rated && c.rated >= (c.total - c.na)) return 'pass';
     return 'pending';
   }
-  function _markSectionPass(idx){
-    var sec = _sections()[idx]; if(!sec) return;
-    sec.items.forEach(function(item){
-      var k = _key(sec.section, item);
-      if(!S.ratings[k]) S.ratings[k] = { rating:'', notes:'' };
-      S.ratings[k].rating = 'pass';
-    });
-  }
-
   // ── Render ──────────────────────────────────────────────────────────────────
   function render(){
     var body = document.getElementById('iq_body');
@@ -176,33 +162,19 @@
       footRight = '<button class="btn btn-primary" data-iq-start="1"'+(S.unitId?'':' disabled')+'>Start inspection →</button>';
     }
 
-    // ── One section: gate (branch) or items ───────────────────────────────────
+    // ── One section: rate the items (with a quick "mark all pass" shortcut) ───
     else if(S.step === 'section'){
       var sec  = secs[S.sectionIdx];
-      var mode = S.mode[S.sectionIdx] || (_sectionHasRatings(S.sectionIdx) ? 'items' : 'gate');
-      if(mode === 'gate'){
-        html = _stepTitle(sec.section, 'Quick check — is everything in order in this area?')
-          + '<div style="display:flex;flex-direction:column;gap:10px;">'
-          +   '<button class="iq-opt" data-iq-gate="pass" style="text-align:left;padding:14px 16px;border:1.5px solid #86efac;border-radius:12px;background:#f0fdf4;cursor:pointer;font-family:var(--sans);">'
-          +     '<div style="font-size:14px;font-weight:800;color:#15803d;">✓ All good</div>'
-          +     '<div style="font-size:12px;color:#4d7c5a;margin-top:2px;">Mark every item in '+_esc(sec.section)+' as Pass and continue.</div></button>'
-          +   '<button class="iq-opt" data-iq-gate="inspect" style="text-align:left;padding:14px 16px;border:1.5px solid var(--border);border-radius:12px;background:var(--surface);cursor:pointer;font-family:var(--sans);">'
-          +     '<div style="font-size:14px;font-weight:800;color:var(--text);">⚠ Inspect items</div>'
-          +     '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Rate each item and flag anything that needs repair or fails.</div></button>'
-          + '</div>';
-        footLeft = '<button class="btn btn-ghost" data-iq-back="1">← Back</button>';
-      } else {
-        html = _stepTitle(sec.section, 'Rate each item. A comment box opens on anything you flag Repair or Fail.')
-          + '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">'
-          +   '<button class="btn btn-ghost btn-sm" data-iq-allpass="1" style="font-size:12px;">✓ Mark remaining Pass</button></div>'
-          + '<div style="display:flex;flex-direction:column;gap:10px;">'
-          + sec.items.map(function(item){ return _itemRow(sec.section, item); }).join('')
-          + '</div>';
-        footLeft  = '<button class="btn btn-ghost" data-iq-back="1">← Back</button>';
-        footRight = (S.sectionIdx < secs.length - 1)
-          ? '<button class="btn btn-primary" data-iq-next="1">Next section →</button>'
-          : '<button class="btn btn-primary" data-iq-next="1">Photos →</button>';
-      }
+      html = _stepTitle(sec.section, 'Rate each item. A comment box opens on anything you flag Repair or Fail.')
+        + '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">'
+        +   '<button class="btn btn-ghost btn-sm" data-iq-allpass="1" style="font-size:12px;">✓ Mark remaining Pass</button></div>'
+        + '<div style="display:flex;flex-direction:column;gap:10px;">'
+        + sec.items.map(function(item){ return _itemRow(sec.section, item); }).join('')
+        + '</div>';
+      footLeft  = '<button class="btn btn-ghost" data-iq-back="1">← Back</button>';
+      footRight = (S.sectionIdx < secs.length - 1)
+        ? '<button class="btn btn-primary" data-iq-next="1">Next section →</button>'
+        : '<button class="btn btn-primary" data-iq-next="1">Photos →</button>';
     }
 
     // ── Photos (in-flow) ──────────────────────────────────────────────────────
@@ -350,7 +322,7 @@
   function _onClick(e){
     if(!S) return;
     if(S.step === 'details') _syncDetails();
-    var t = e.target.closest('[data-iq-close],[data-iq-type],[data-iq-unit],[data-iq-start],[data-iq-gate],[data-iq-back],[data-iq-next],[data-iq-allpass],[data-iq-rate],[data-iq-save]');
+    var t = e.target.closest('[data-iq-close],[data-iq-type],[data-iq-unit],[data-iq-start],[data-iq-back],[data-iq-next],[data-iq-allpass],[data-iq-rate],[data-iq-save]');
     if(!t){ if(e.target.id === 'inspQModal') close(); return; }
 
     if(t.hasAttribute('data-iq-close')){ close(); return; }
@@ -361,14 +333,6 @@
       _syncDetails();
       if(!S.unitId){ if(typeof showToast==='function') showToast('Please select a unit.'); return; }
       S.step = 'section'; S.sectionIdx = 0; render(); return;
-    }
-
-    // Section gate branch
-    if(t.hasAttribute('data-iq-gate')){
-      var g = t.getAttribute('data-iq-gate');
-      if(g === 'pass'){ _markSectionPass(S.sectionIdx); S.mode[S.sectionIdx] = 'gate'; _advance(); }
-      else { S.mode[S.sectionIdx] = 'items'; render(); }
-      return;
     }
 
     if(t.hasAttribute('data-iq-rate')){
@@ -390,12 +354,9 @@
 
     if(t.hasAttribute('data-iq-back')){
       if(S.step === 'review'){ _syncNotes(); S.step = 'photos'; render(); return; }
-      if(S.step === 'photos'){ S.step = 'section'; S.sectionIdx = _sections().length - 1; S.mode[S.sectionIdx] = 'items'; render(); return; }
+      if(S.step === 'photos'){ S.step = 'section'; S.sectionIdx = _sections().length - 1; render(); return; }
       if(S.step === 'section'){
-        var mode = S.mode[S.sectionIdx] || (_sectionHasRatings(S.sectionIdx) ? 'items' : 'gate');
-        if(mode === 'items'){ S.mode[S.sectionIdx] = 'gate'; render(); return; }   // items -> gate
-        // gate -> previous section (or details)
-        if(S.sectionIdx > 0){ S.sectionIdx--; S.mode[S.sectionIdx] = 'gate'; render(); }
+        if(S.sectionIdx > 0){ S.sectionIdx--; render(); }
         else { S.step = 'details'; render(); }
         return;
       }
