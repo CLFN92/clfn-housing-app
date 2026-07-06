@@ -186,6 +186,15 @@ function openInspectionModal(id) {
   window._inspEditId      = id || null;
   window._inspDocEntityId = id || _inspUuid();   // scope for the document library
 
+  // Guided-questionnaire hand-off: a brand-new inspection can arrive pre-filled
+  // via window._inspSeed (set by inspection-questionnaire.js). One-shot. `src` is
+  // the field-value source for prefills (insp = editing an existing record;
+  // seed = a guided new report). Edit-only UI (delete / PDF / approval) stays
+  // keyed to `insp` so a seeded record renders as a new, unsaved inspection.
+  var seed = (!id && window._inspSeed) ? window._inspSeed : null;
+  window._inspSeed = null;
+  var src = insp || seed;
+
   var units = window.housingUnits || [];
   var today = new Date().toISOString().split('T')[0];
 
@@ -196,18 +205,22 @@ function openInspectionModal(id) {
   var preAddr = insp ? (insp.unit_address || insp.unit_id || '') : '';
 
   var typeOpts = INSP_TYPES.map(function(t){
-    return '<option value="' + t + '"' + (insp && insp.type === t ? ' selected' : '') + '>' + t + '</option>';
+    return '<option value="' + t + '"' + (src && src.type === t ? ' selected' : '') + '>' + t + '</option>';
   }).join('');
 
+  var preStatus = (src && src.overall_status) ? src.overall_status : 'pending';
   var statusOpts = INSP_STATUSES.map(function(s){
     var labels = { pending:'Pending', pass:'Pass', fail:'Fail', needs_repair:'Needs Repair' };
-    return '<option value="' + s + '"' + (insp && insp.overall_status === s ? ' selected' : (!insp && s==='pending' ? ' selected' : '')) + '>' + labels[s] + '</option>';
+    return '<option value="' + s + '"' + (s === preStatus ? ' selected' : '') + '>' + labels[s] + '</option>';
   }).join('');
 
-  // Parse checklist
+  // Parse checklist — from the saved record when editing, else from the guided
+  // questionnaire seed (same {section,item,rating,notes} shape) for a new report.
   var savedChecklist = [];
   if (insp && insp.checklist) {
     try { savedChecklist = typeof insp.checklist === 'string' ? JSON.parse(insp.checklist) : insp.checklist; } catch(e){}
+  } else if (seed && seed.checklist) {
+    savedChecklist = seed.checklist;
   }
 
   // Build checklist HTML — default template rows, then any saved custom rows
@@ -257,7 +270,7 @@ function openInspectionModal(id) {
     '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:740px;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35);">'
     + '<div class="modal-hdr">'
     +   '<div><div class="lbl-yellow">🔍 ' + (insp ? 'Edit Inspection' : 'New Inspection') + '</div>'
-    +   '<div class="txt-sm-meta">' + (insp ? _esc(insp.unit_address||insp.unit_id) + ' · ' + _esc(insp.type) : 'Complete the checklist and save.') + '</div></div>'
+    +   '<div class="txt-sm-meta">' + (src ? _esc(src.unit_address||src.unit_id||'') + (src.type ? ' · ' + _esc(src.type) : '') : 'Complete the checklist and save.') + '</div></div>'
     +   '<button type="button" onclick="closeInspectionModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button>'
     + '</div>'
     + '<div style="overflow-y:auto;padding:18px 22px;flex:1;">'
@@ -267,10 +280,10 @@ function openInspectionModal(id) {
     + '<div class="tic-grid-2" style="margin-bottom:16px;">'
     +   '<div class="f"><label class="tic-field-lbl">Unit</label><div id="insp_unit_wrap"></div></div>'
     +   '<div class="f"><label class="tic-field-lbl">Type</label><select id="insp_type" class="tic-input">' + typeOpts + '</select></div>'
-    +   '<div class="f"><label class="tic-field-lbl">Inspection Date</label><input id="insp_date" type="date" class="tic-input" value="' + _esc(insp ? insp.inspection_date : today) + '"/></div>'
+    +   '<div class="f"><label class="tic-field-lbl">Inspection Date</label><input id="insp_date" type="date" class="tic-input" value="' + _esc(src ? (src.inspection_date||today) : today) + '"/></div>'
     +   '<div class="f"><label class="tic-field-lbl">Overall Status</label><select id="insp_status" class="tic-input">' + statusOpts + '</select></div>'
-    +   '<div class="f"><label class="tic-field-lbl">Inspector Name</label><input id="insp_inspector" type="text" class="tic-input" value="' + _esc(insp ? insp.inspector_name : (window.HOUSING_SESSION&&window.HOUSING_SESSION.name||'')) + '" placeholder="Full name"/></div>'
-    +   '<div class="f"><label class="tic-field-lbl">Inspector Role</label><input id="insp_role" type="text" class="tic-input" value="' + _esc(insp ? insp.inspector_role : (window.currentRole||'')) + '" placeholder="Role"/></div>'
+    +   '<div class="f"><label class="tic-field-lbl">Inspector Name</label><input id="insp_inspector" type="text" class="tic-input" value="' + _esc(src ? (src.inspector_name||'') : (window.HOUSING_SESSION&&window.HOUSING_SESSION.name||'')) + '" placeholder="Full name"/></div>'
+    +   '<div class="f"><label class="tic-field-lbl">Inspector Role</label><input id="insp_role" type="text" class="tic-input" value="' + _esc(src ? (src.inspector_role||'') : (window.currentRole||'')) + '" placeholder="Role"/></div>'
     + '</div>'
 
     // ── Approval status banner
@@ -285,7 +298,7 @@ function openInspectionModal(id) {
     +   '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);">General Notes</span>'
     +   (aiNotesOn ? '<button type="button" id="insp_ai_notes_btn" class="insp-ai-btn" onclick="_inspDraftNotes()"><span style="color:var(--yellow);">✦</span> Draft with AI</button>' : '')
     + '</div>'
-    + '<textarea id="insp_notes" class="tic-input" rows="4" style="resize:vertical;min-height:80px;width:100%;box-sizing:border-box;" placeholder="Overall observations, recommendations…">' + _esc(insp ? insp.general_notes : '') + '</textarea>'
+    + '<textarea id="insp_notes" class="tic-input" rows="4" style="resize:vertical;min-height:80px;width:100%;box-sizing:border-box;" placeholder="Overall observations, recommendations…">' + _esc(src ? (src.general_notes||'') : '') + '</textarea>'
 
     // ── Photos & documents (standard upload widget)
     + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin:16px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--border);">Photos &amp; Documents</div>'
@@ -320,7 +333,7 @@ function openInspectionModal(id) {
     window._inspUnitSS = clfnSearchSelect({
       wrap:        unitWrap,
       items:       unitItems,
-      value:       insp ? insp.unit_id || '' : '',
+      value:       src ? (src.unit_id || '') : '',
       placeholder: 'Search address…',
       onChange:    function(id, label) { window._inspUnitSS._selectedId = id; window._inspUnitSS._selectedLabel = label; }
     });
