@@ -112,13 +112,32 @@ function _ueApplyReadOnly(ro){
   if(ro && !banner){
     banner = document.createElement('div');
     banner.id = 'ueReadOnlyBanner';
-    banner.style.cssText = 'background:var(--warn-amber-bg);color:var(--warn-amber-text);border:1px solid var(--warn-amber-border);border-radius:8px;padding:9px 14px;font-size:12px;font-weight:600;margin:0 24px 12px;';
+    banner.style.cssText = 'background:var(--warn-amber-bg);color:var(--warn-amber-text);border:1px solid var(--warn-amber-border);border-radius:8px;padding:9px 14px;font-size:12px;font-weight:600;margin-bottom:12px;';
     banner.textContent = '🔒 View only — Field Employees cannot edit unit records, but can still manage Scopes of Work.';
-    var body = modal.querySelector('.modal-hdr').nextElementSibling;
+    var body = modal.querySelector('.tic-body');
     if(body) body.insertBefore(banner, body.firstChild);
   } else if(!ro && banner){
     banner.remove();
   }
+}
+
+// Tab switching for the Edit Unit card — mirrors _ticSwitchTab in
+// housing-tic.js. All tab content is already rendered eagerly by
+// openUnitEditModal regardless of which tab is active, so this is purely
+// a show/hide toggle (no lazy re-render needed).
+function _ueSwitchTab(name){
+  var modal = document.getElementById('unitEditModal');
+  if(!modal) return;
+  var tabs = modal.querySelectorAll('.tic-tab');
+  for(var i=0;i<tabs.length;i++){
+    tabs[i].classList.toggle('tic-active', tabs[i].getAttribute('data-ue-tab') === name);
+  }
+  var panels = modal.querySelectorAll('.tic-panel');
+  for(var j=0;j<panels.length;j++){
+    panels[j].classList.remove('tic-active');
+  }
+  var p = document.getElementById('ue_panel_' + name);
+  if(p) p.classList.add('tic-active');
 }
 
 // ── Placeholder renderers (to be built out) ──
@@ -181,9 +200,21 @@ function openUnitEditModal(unitId){
   var acc=document.getElementById('ue_accessible'); if(acc) acc.checked=!!u.accessible;
   var eld=document.getElementById('ue_isElders');   if(eld) eld.checked=!!u.isElders;
   var title=document.getElementById('ue_modal_title'); if(title) title.textContent=u.num+' '+u.street;
+  // Hero subtitle + info strip (mirrors the TIC hero/strip layout)
+  var heroSub = [_roomBedLabel(u), (u.bathrooms&&u.bathrooms!=='nan')?u.bathrooms+' bath':'', _fmtUnitType(u.type)||''].filter(Boolean).join(' · ');
+  setText('ue_hero_sub', heroSub);
+  var _ueStatusLabels = { vacant:'Vacant', occupied:'Occupied', reserved:'Reserved', condemned:'Condemned' };
+  setText('ue_strip_status',    _ueStatusLabels[u.status] || (u.status || '—'));
+  setText('ue_strip_bedrooms',  (u.bedrooms != null && u.bedrooms !== '') ? String(u.bedrooms) : '—');
+  setText('ue_strip_bathrooms', (u.bathrooms && u.bathrooms !== 'nan') ? String(u.bathrooms) : '—');
+  setText('ue_strip_type',      _fmtUnitType(u.type) || '—');
+  setText('ue_strip_funder',    _fmtFunder(u.funder) || 'Band');
+  var _ueRentVal = (u.monthlyRent != null ? u.monthlyRent : u.monthly_rent);
+  setText('ue_strip_rent', (_ueRentVal != null && _ueRentVal !== '') ? ('$' + Number(_ueRentVal).toLocaleString('en-CA', {minimumFractionDigits:0, maximumFractionDigits:2})) : '—');
   unitEditStatusChange();
   _ueCurrentUnitId = unitId;
   renderEditUnitPhotoPreview(unitId);
+  _ueSwitchTab('overview');
   var _uem=document.getElementById('unitEditModal'); if(_uem){_uem.style.removeProperty('display');_uem.style.setProperty('display','flex','important');}
 
   // Restore saved unit signatures (HM / ED only — tenant block was removed
