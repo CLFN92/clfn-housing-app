@@ -2622,15 +2622,22 @@
   }
 
   // ── Readiness gate ─────────────────────────────────────────────────────
-  // Returns a list of everything still required before the agreement can be
-  // generated (initials, signatures, and — for fixed-term docs — an end date).
-  function _ticLeaseMissing() {
+  // Hard requirement: without a fixed-term end date the document would
+  // print with a core term literally missing, so this alone still blocks.
+  function _ticLeaseMissingHard() {
+    var fv  = function(id){ var e=document.getElementById(id); return e ? (e.value||'').trim() : ''; };
+    var isTemp = _ticLeaseDocKey !== 'residential_lease';
+    var missing = [];
+    if (isTemp && !fv('ls_end_date')) missing.push('End date (required for a fixed-term agreement)');
+    return missing;
+  }
+  // Soft requirement: initials/signatures are often collected on paper or
+  // added after an unsigned copy is printed — warn, but let staff proceed.
+  function _ticLeaseMissingSigs() {
     _ticCaptureInlineInitials();
     var missing = [];
     var fv  = function(id){ var e=document.getElementById(id); return e ? (e.value||'').trim() : ''; };
     var sig = function(id){ return (typeof getSigDataURL==='function') ? getSigDataURL(id) : ''; };
-    var isTemp = _ticLeaseDocKey !== 'residential_lease';
-    if (isTemp && !fv('ls_end_date')) missing.push('End date (required for a fixed-term agreement)');
     var clauses  = _getEffectiveLeaseClauses();
     var initDone = 0;
     clauses.forEach(function(c){ if (_leaseInitials[c.id]) initDone++; });
@@ -2961,10 +2968,28 @@
 
   // ── PDF generator ─────────────────────────────────────────────────────
   async function _ticGenerateLeasePdf() {
-    // Readiness gate — don't generate a half-signed agreement. Surface a
-    // checklist of everything still required and stop.
-    var _missing = _ticLeaseMissing();
-    if (_missing.length) { _ticShowLeaseChecklist(_missing); return; }
+    // Hard gate — don't generate with a core term (fixed-term end date)
+    // literally missing from the document.
+    var _missingHard = _ticLeaseMissingHard();
+    if (_missingHard.length) { _ticShowLeaseChecklist(_missingHard); return; }
+    // Initials/signatures are a soft check — often collected on paper or
+    // added after an unsigned copy is printed. Warn, but let staff proceed.
+    var _missingSigs = _ticLeaseMissingSigs();
+    if (_missingSigs.length) {
+      if (typeof showConfirm === 'function') {
+        var _go = await showConfirm({
+          title:       'Generate without all signatures?',
+          message:     'Missing: ' + _missingSigs.join(', ') + '. Generate the agreement anyway? You can re-generate after collecting the rest.',
+          confirmText: 'Generate anyway', cancelText: 'Cancel'
+        });
+        if (!_go) return;
+      } else {
+        // showConfirm unavailable — fall back to a hard block rather than
+        // silently generating an incomplete agreement.
+        _ticShowLeaseChecklist(_missingSigs);
+        return;
+      }
+    }
 
     if (typeof showToast === 'function') showToast('Saving changes and generating PDF...');
 
