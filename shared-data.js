@@ -4697,7 +4697,12 @@ function _wlCollectMatch(ctx) {
       if (!a || a.archived || a.assignedUnit) return false;
       if (a.appType === 'commercial') return false;
       return a.status === 'ed_approved' || a.status === 'mgr_approved';
-    }).slice(0, 6);
+    })
+    // Rank by score, highest first (highest need at the top). Unscored records
+    // (e.g. file updates) sort to the bottom. Sort BEFORE the cap so the top 6
+    // shown are the top 6 by score.
+    .sort(function(a, b) { return (Number(b.score) || 0) - (Number(a.score) || 0); })
+    .slice(0, 6);
   }
   return matchItems;
 }
