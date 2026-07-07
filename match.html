@@ -131,283 +131,362 @@
 
 <div id="sowModalHost"></div>
 
-<!-- unitEditModal -->
+<!-- unitEditModal — laid out like the TIC: hero + info strip + tabs -->
 <div id="unitEditModal" class="modal-overlay modal-z-700">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:820px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
-    <!-- Header -->
-    <div class="modal-hdr spacious">
-      <div>
+  <div class="tic-shell">
+
+    <!-- Hero -->
+    <div class="tic-hero">
+      <div class="tic-hero-main">
         <div class="lbl-uppercase-sm">Edit Unit</div>
-        <div id="ue_modal_title" class="txt-hdr-white"></div>
+        <h2 id="ue_modal_title" class="tic-name">—</h2>
+        <div id="ue_hero_sub" class="tic-hero-sub"></div>
       </div>
       <div class="flex-gap8">
-        <button id="ue_sow_btn" data-ue-keep onclick="ueOpenSow()" title="Scope of Work"
-          style="background:none;border:1px solid var(--dark-border);color:var(--txt-on-dark);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;white-space:nowrap;"
-          onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'"
-          onmouseout="this.style.borderColor='#555';this.style.color='#ccc'">
-          🔨 SOW
-        </button>
-        <button data-ue-keep onclick="closeUnitEditModal()" class="btn-close-sm">✕</button>
+        <button id="ue_sow_btn" data-ue-keep onclick="ueOpenSow()" title="Quick-open the most recent Scope of Work" class="btn btn-ghost">🔨 SOW</button>
+        <button data-ue-keep onclick="closeUnitEditModal()" class="tic-close-btn" aria-label="Close">✕</button>
       </div>
     </div>
+
+    <!-- Info strip -->
+    <div class="tic-strip">
+      <div class="tic-strip-tile"><div class="tic-strip-lbl">Status</div><div id="ue_strip_status" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><div class="tic-strip-lbl">Bedrooms</div><div id="ue_strip_bedrooms" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><div class="tic-strip-lbl">Bathrooms</div><div id="ue_strip_bathrooms" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><div class="tic-strip-lbl">Type</div><div id="ue_strip_type" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><div class="tic-strip-lbl">Funder</div><div id="ue_strip_funder" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><div class="tic-strip-lbl">Monthly Rent</div><div id="ue_strip_rent" class="tic-strip-val">—</div></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tic-tabs" role="tablist">
+      <button type="button" data-ue-keep class="tic-tab tic-active" data-ue-tab="overview"  onclick="_ueSwitchTab('overview')"  role="tab">Overview</button>
+      <button type="button" data-ue-keep class="tic-tab"            data-ue-tab="tenant"    onclick="_ueSwitchTab('tenant')"    role="tab">Tenant</button>
+      <button type="button" data-ue-keep class="tic-tab"            data-ue-tab="approvals" onclick="_ueSwitchTab('approvals')" role="tab">Approvals</button>
+      <button type="button" data-ue-keep class="tic-tab"            data-ue-tab="sow"       onclick="_ueSwitchTab('sow')"       role="tab">Scopes of Work</button>
+      <button type="button" data-ue-keep class="tic-tab"            data-ue-tab="rfq"       onclick="_ueSwitchTab('rfq')"       role="tab">RFQs &amp; Contracts</button>
+      <button type="button" data-ue-keep class="tic-tab"            data-ue-tab="documents" onclick="_ueSwitchTab('documents')" role="tab">Documents</button>
+      <button type="button" data-ue-keep class="tic-tab"            data-ue-tab="map"       onclick="_ueSwitchTab('map')"       role="tab">Map &amp; Photos</button>
+    </div>
+
     <!-- Body -->
-    <div style="padding:24px;display:flex;flex-direction:column;gap:16px;">
+    <div class="tic-body">
 
-      <!-- Address row -->
-      <div>
-        <div class="lbl-muted" class="mb-12">Address</div>
-        <div style="display:grid;grid-template-columns:80px 1fr;gap:10px;">
-          <div class="f"><label>Number</label><input id="ue_num" type="text"/></div>
-          <div class="f"><label>Street</label><input id="ue_street" type="text"/></div>
-        </div>
-      </div>
+      <!-- Overview -->
+      <div id="ue_panel_overview" class="tic-panel tic-active">
 
-      <!-- Building Name (shown for Admin / Band / Commercial building types) -->
-      <div id="ue_building_name_row" style="display:none;" class="f">
-        <label>Building Name</label>
-        <input id="ue_building_name" type="text" placeholder="e.g. Band Administration Building"/>
-      </div>
-
-      <!-- Unit details -->
-      <div>
-        <div class="lbl-muted" class="mb-12">Unit Details</div>
-        <div class="grid-c3-tight">
-          <div class="f"><label id="ue_bedrooms_label">Bedrooms</label>
-            <select id="ue_bedrooms">
-              <option value="1">1</option><option value="2">2</option><option value="3">3</option>
-              <option value="4">4</option><option value="5">5</option><option value="6">6</option>
-            </select>
-          </div>
-          <div class="f"><label>Bathrooms</label><input id="ue_bathrooms" type="text" placeholder="e.g. 1"/></div>
-          <div class="f"><label>Year Built</label><input id="ue_year" type="text" placeholder="e.g. 1998"/></div>
-          <div class="f"><label>Monthly Rent (CAD)</label><input id="ue_rent" type="number" min="0" step="any" placeholder="e.g. 750"/></div>
-          <div class="f"><label>Type</label>
-            <select id="ue_type" onchange="ueTypeChanged('ue')">
-              <option value="">— Select —</option>
-              <option value="detached unit">Detached</option>
-              <option value="duplex unit">Duplex</option>
-              <option value="4-plex unit">4-plex</option>
-              <option value="5-plex unit">5-plex</option>
-              <option value="6-plex unit">6-plex</option>
-              <option value="complex">Complex</option>
-              <option value="mobile unit">Mobile</option>
-              <option value="admin_building">Admin Building</option>
-              <option value="band_building">Band Building</option>
-              <option value="commercial_building">Commercial Building</option>
-            </select>
-          </div>
-          <div class="f"><label>Foundation</label>
-            <select id="ue_foundation">
-              <option value="">— Select —</option>
-              <option value="basement">Basement</option>
-              <option value="crawlspace">Crawlspace</option>
-              <option value="Slab">Slab</option>
-              <option value="unknown">Unknown</option>
-            </select>
-          </div>
-          <div class="f"><label>Phase</label><input id="ue_phase" type="text" placeholder="e.g. 15"/></div>
-          <div class="f"><label>Department Number</label><input id="ue_dept_number" type="text" placeholder="e.g. D-042"/></div>
-          <div class="f"><label>Insured Value (CAD)</label><input id="ue_constructionCost" type="number" min="0" step="any" placeholder="e.g. 250000"/></div>
-          <div class="f"><label>CMHC Value (CAD) <span style="font-size:10px;color:var(--muted);font-weight:400;">CMHC Sec. 95 only</span></label><input id="ue_cmhc_value" type="number" min="0" step="any" placeholder="CMHC Section 95 only" disabled style="background:var(--bg);color:var(--muted);"/></div>
-          <div class="f">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-              <label class="m-0">Account Number</label>
-              <span class="tip-host">
-                <button type="button" class="tip-btn" onclick="toggleTip('ue_acct_tip')">?</button>
-                <div id="ue_acct_tip" class="tip-panel">
-                  <div class="tip-panel-title">Account Number</div>
-                  <div class="tip-panel-body">Used for recurring charges such as rent and utilities. This number links the unit to the appropriate billing or payment account.</div>
-                  <button type="button" class="tip-panel-close" onclick="closeTip('ue_acct_tip')">Close &#10005;</button>
-                </div>
-              </span>
-            </div>
-            <input id="ue_acct_number" type="text" placeholder="e.g. ACC-0042"/>
-          </div>
-        </div>
-      </div>
-
-      <!-- Flags -->
-      <div style="display:flex;gap:20px;">
-        <div class="ftog">
-          <label class="tsw"><input id="ue_accessible" type="checkbox"/><span class="tsl"></span></label>
-          <label for="ue_accessible">Accessible Unit ♿</label>
-        </div>
-        <div class="ftog">
-          <label class="tsw"><input id="ue_isElders" type="checkbox"/><span class="tsl"></span></label>
-          <label for="ue_isElders">Elders Unit</label>
-        </div>
-      </div>
-
-      <!-- Funder -->
-      <div class="grid-c2-10">
-        <div class="f"><label>Funder / Program</label>
-          <select id="ue_funder" onchange="ueFunderChanged()">
-            <option value="">— Select —</option>
-            <option value="ISC">ISC</option>
-            <option value="CMHC_95">CMHC Section 95</option>
-            <option value="section_10">Section 10</option>
-            <option value="rent_to_own">Rent-to-Own</option>
-            <option value="band_house">Band House</option>
-            <option value="privately_owned">Privately Owned</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-        <div class="f"><label>Status</label>
-          <select id="ue_status" onchange="unitEditStatusChange()">
-            <option value="vacant">Vacant</option>
-            <option value="occupied">Occupied</option>
-
-            <option value="reserved">Reserved</option>
-            <option value="condemned">Condemned</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Assignment (shown only for occupied/reserved) -->
-      <div id="ue_assign_row">
-        <!-- Section header -->
-        <div class="lbl-muted">Tenant Assignment — search approved applicants or start a new application</div>
-
-        <!-- Current tenant card (shown when already assigned) -->
-        <div id="ue_current_tenant">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
-            <div>
-              <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Currently Assigned</div>
-              <div id="ue_current_tenant_name" class="txt-md-bold"></div>
-              <div id="ue_current_tenant_meta" class="txt-sm-meta"></div>
-            </div>
-            <button type="button" onclick="ueRemoveTenant()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:var(--danger);cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;flex-shrink:0;">Remove</button>
-          </div>
-        </div>
-
-        <!-- Applicant search -->
+        <!-- Address row -->
         <div>
-          <label style="font-size:11.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;">Search Applicant <span class="txt-required">*</span></label>
-          <div class="pos-rel">
-            <input type="text" id="ue_tenant_search"
-              placeholder="Search by name or APP-ID…"
-              autocomplete="off"
-              oninput="ueTenantSearch(this.value)"
-              onfocus="ueTenantSearch(this.value)"
-              onblur="setTimeout(function(){var d=document.getElementById('ue_tenant_dropdown');if(d)d.style.display='none';},200)"
-              style="width:100%;box-sizing:border-box;padding:8px 11px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>
-            <div id="ue_tenant_dropdown"></div>
+          <div class="lbl-muted mb-12">Address</div>
+          <div style="display:grid;grid-template-columns:80px 1fr;gap:10px;">
+            <div class="f"><label>Number</label><input id="ue_num" type="text"/></div>
+            <div class="f"><label>Street</label><input id="ue_street" type="text"/></div>
           </div>
-          <input type="hidden" id="ue_assignedTo"/>
-          <input type="hidden" id="ue_assignedName"/>
         </div>
 
-        <!-- Selected applicant card -->
-        <div id="ue_tenant_selected"></div>
-
-        <!-- Not found — prompt new application -->
-        <div id="ue_tenant_notfound">
-          <div style="font-size:12px;font-weight:700;color:var(--warn-amber);margin-bottom:6px;">No approved application found</div>
-          <div style="font-size:12px;color:var(--warn-amber);margin-bottom:10px;">The applicant needs an approved housing application before being assigned to a unit.</div>
-          <button type="button" onclick="closeUnitEditModal();newApp();" class="btn btn-primary" style="font-size:12px;padding:7px 16px;">📝 Start New Application</button>
+        <!-- Building Name (shown for Admin / Band / Commercial building types) -->
+        <div id="ue_building_name_row" style="display:none;margin-top:16px;" class="f">
+          <label>Building Name</label>
+          <input id="ue_building_name" type="text" placeholder="e.g. Band Administration Building"/>
         </div>
 
-        <!-- Move-in date -->
-        <div class="f">
-          <label>Move-in Date <span class="txt-required">*</span></label>
-          <input type="date" id="ue_assignedDate"/>
-        </div>
-      </div>
-
-      <!-- Budget Approval Indicator (shown when SOW cost exists) -->
-      <div id="ue_budget_indicator"></div>
-
-      <!-- Approvals (HM / ED signatures for SOW workflow) -->
-      <div id="ue_sig_section">
-        <div class="lbl-muted" style="margin-bottom:12px">Approvals</div>
-
-        <!-- HM approval signature (shown when SOW requires HM or ED approval) -->
-        <div id="ue_sig_hm_block">
-          <div class="flex-sb-mb">
-            <div class="flex-gap8">
-              <div class="avatar-circle-24-blue">HM</div>
-              <div>
-                <div style="font-size:12px;font-weight:700;color:var(--info-blue);">Housing Manager Approval</div>
-                <div class="txt-xs-muted">Required — renovation within HM budget authority</div>
-              </div>
-            </div>
-            <span id="ue_sig_hm_badge" class="pill-info">Pending</span>
-          </div>
-          <div class="grid-c3-tight-mb">
-            <div class="f"><label>HM Name</label><input type="text" id="ue_sig_hm_name" placeholder="Full name"/></div>
-            <div class="f"><label>Date</label><input type="date" id="ue_sig_hm_date"/></div>
-            <div class="f"><label>Decision</label>
-              <select id="ue_sig_hm_decision">
-                <option value="">— Pending —</option>
-                <option value="approved">Approved</option>
-                <option value="declined">Declined</option>
-                <option value="deferred">Deferred to ED</option>
+        <!-- Unit details -->
+        <div style="margin-top:16px;">
+          <div class="lbl-muted mb-12">Unit Details</div>
+          <div class="grid-c3-tight">
+            <div class="f"><label id="ue_bedrooms_label">Bedrooms</label>
+              <select id="ue_bedrooms">
+                <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                <option value="4">4</option><option value="5">5</option><option value="6">6</option>
               </select>
             </div>
-          </div>
-          <div class="f"><label>Notes</label><input type="text" id="ue_sig_hm_notes" placeholder="Optional notes"/></div>
-        </div>
-
-        <!-- ED approval signature (shown when SOW exceeds HM budget limit) -->
-        <div id="ue_sig_ed_block">
-          <div class="flex-sb-mb">
-            <div class="flex-gap8">
-              <div class="avatar-circle-24-yellow">ED</div>
-              <div>
-                <div style="font-size:12px;font-weight:700;color:var(--warn-amber);">Executive Director Approval</div>
-                <div class="txt-xs-muted">Required — renovation exceeds HM budget authority</div>
-              </div>
-            </div>
-            <span id="ue_sig_ed_badge" class="pill-warn">Pending</span>
-          </div>
-          <div class="grid-c3-tight-mb">
-            <div class="f"><label>ED Name</label><input type="text" id="ue_sig_ed_name" placeholder="Full name"/></div>
-            <div class="f"><label>Date</label><input type="date" id="ue_sig_ed_date"/></div>
-            <div class="f"><label>Decision</label>
-              <select id="ue_sig_ed_decision">
-                <option value="">— Pending —</option>
-                <option value="approved">Approved</option>
-                <option value="declined">Declined</option>
+            <div class="f"><label>Bathrooms</label><input id="ue_bathrooms" type="text" placeholder="e.g. 1"/></div>
+            <div class="f"><label>Year Built</label><input id="ue_year" type="text" placeholder="e.g. 1998"/></div>
+            <div class="f"><label>Monthly Rent (CAD)</label><input id="ue_rent" type="number" min="0" step="any" placeholder="e.g. 750"/></div>
+            <div class="f"><label>Type</label>
+              <select id="ue_type" onchange="ueTypeChanged('ue')">
+                <option value="">— Select —</option>
+                <option value="detached unit">Detached</option>
+                <option value="duplex unit">Duplex</option>
+                <option value="4-plex unit">4-plex</option>
+                <option value="5-plex unit">5-plex</option>
+                <option value="6-plex unit">6-plex</option>
+                <option value="complex">Complex</option>
+                <option value="mobile unit">Mobile</option>
+                <option value="admin_building">Admin Building</option>
+                <option value="band_building">Band Building</option>
+                <option value="commercial_building">Commercial Building</option>
               </select>
             </div>
+            <div class="f"><label>Foundation</label>
+              <select id="ue_foundation">
+                <option value="">— Select —</option>
+                <option value="basement">Basement</option>
+                <option value="crawlspace">Crawlspace</option>
+                <option value="Slab">Slab</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </div>
+            <div class="f"><label>Phase</label><input id="ue_phase" type="text" placeholder="e.g. 15"/></div>
+            <div class="f"><label>Department Number</label><input id="ue_dept_number" type="text" placeholder="e.g. D-042"/></div>
+            <div class="f"><label>Insured Value (CAD)</label><input id="ue_constructionCost" type="number" min="0" step="any" placeholder="e.g. 250000"/></div>
+            <div class="f"><label>CMHC Value (CAD) <span style="font-size:10px;color:var(--muted);font-weight:400;">CMHC Sec. 95 only</span></label><input id="ue_cmhc_value" type="number" min="0" step="any" placeholder="CMHC Section 95 only" disabled style="background:var(--bg);color:var(--muted);"/></div>
+            <div class="f">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                <label class="m-0">Account Number</label>
+                <span class="tip-host">
+                  <button type="button" class="tip-btn" onclick="toggleTip('ue_acct_tip')">?</button>
+                  <div id="ue_acct_tip" class="tip-panel">
+                    <div class="tip-panel-title">Account Number</div>
+                    <div class="tip-panel-body">Used for recurring charges such as rent and utilities. This number links the unit to the appropriate billing or payment account.</div>
+                    <button type="button" class="tip-panel-close" onclick="closeTip('ue_acct_tip')">Close &#10005;</button>
+                  </div>
+                </span>
+              </div>
+              <input id="ue_acct_number" type="text" placeholder="e.g. ACC-0042"/>
+            </div>
           </div>
-          <div class="f"><label>Notes</label><input type="text" id="ue_sig_ed_notes" placeholder="Optional notes"/></div>
+        </div>
+
+        <!-- Flags -->
+        <div style="display:flex;gap:20px;margin-top:16px;">
+          <div class="ftog">
+            <label class="tsw"><input id="ue_accessible" type="checkbox"/><span class="tsl"></span></label>
+            <label for="ue_accessible">Accessible Unit ♿</label>
+          </div>
+          <div class="ftog">
+            <label class="tsw"><input id="ue_isElders" type="checkbox"/><span class="tsl"></span></label>
+            <label for="ue_isElders">Elders Unit</label>
+          </div>
+        </div>
+
+        <!-- Funder / Status -->
+        <div class="grid-c2-10" style="margin-top:16px;">
+          <div class="f"><label>Funder / Program</label>
+            <select id="ue_funder" onchange="ueFunderChanged()">
+              <option value="">— Select —</option>
+              <option value="ISC">ISC</option>
+              <option value="CMHC_95">CMHC Section 95</option>
+              <option value="section_10">Section 10</option>
+              <option value="rent_to_own">Rent-to-Own</option>
+              <option value="band_house">Band House</option>
+              <option value="privately_owned">Privately Owned</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="f"><label>Status</label>
+            <select id="ue_status" onchange="unitEditStatusChange()">
+              <option value="vacant">Vacant</option>
+              <option value="occupied">Occupied</option>
+
+              <option value="reserved">Reserved</option>
+              <option value="condemned">Condemned</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Inspection -->
+        <div class="f-row" style="margin-top:16px;">
+          <div class="f"><label>Last Inspection Date</label><input id="ue_last_inspection" type="date" class="tic-input"/></div>
+          <div class="f"><label>Next Inspection Due</label><input id="ue_next_inspection" type="date" class="tic-input"/></div>
+        </div>
+
+        <!-- Notes -->
+        <div class="f" style="margin-top:16px;"><label>Notes</label><textarea id="ue_notes" rows="2" placeholder="Internal notes about this unit…"></textarea></div>
+
+      </div>
+
+      <!-- Tenant -->
+      <div id="ue_panel_tenant" class="tic-panel">
+
+        <!-- Assignment (shown only for occupied/reserved) -->
+        <div id="ue_assign_row">
+          <!-- Section header -->
+          <div class="lbl-muted">Tenant Assignment — search approved applicants or start a new application</div>
+
+          <!-- Current tenant card (shown when already assigned) -->
+          <div id="ue_current_tenant">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+              <div>
+                <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Currently Assigned</div>
+                <div id="ue_current_tenant_name" class="txt-md-bold"></div>
+                <div id="ue_current_tenant_meta" class="txt-sm-meta"></div>
+              </div>
+              <button type="button" onclick="ueRemoveTenant()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:var(--danger);cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;flex-shrink:0;">Remove</button>
+            </div>
+          </div>
+
+          <!-- Applicant search -->
+          <div>
+            <label style="font-size:11.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;">Search Applicant <span class="txt-required">*</span></label>
+            <div class="pos-rel">
+              <input type="text" id="ue_tenant_search"
+                placeholder="Search by name or APP-ID…"
+                autocomplete="off"
+                oninput="ueTenantSearch(this.value)"
+                onfocus="ueTenantSearch(this.value)"
+                onblur="setTimeout(function(){var d=document.getElementById('ue_tenant_dropdown');if(d)d.style.display='none';},200)"
+                style="width:100%;box-sizing:border-box;padding:8px 11px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);"/>
+              <div id="ue_tenant_dropdown"></div>
+            </div>
+            <input type="hidden" id="ue_assignedTo"/>
+            <input type="hidden" id="ue_assignedName"/>
+          </div>
+
+          <!-- Selected applicant card -->
+          <div id="ue_tenant_selected"></div>
+
+          <!-- Not found — prompt new application -->
+          <div id="ue_tenant_notfound">
+            <div style="font-size:12px;font-weight:700;color:var(--warn-amber);margin-bottom:6px;">No approved application found</div>
+            <div style="font-size:12px;color:var(--warn-amber);margin-bottom:10px;">The applicant needs an approved housing application before being assigned to a unit.</div>
+            <button type="button" onclick="closeUnitEditModal();newApp();" class="btn btn-primary" style="font-size:12px;padding:7px 16px;">📝 Start New Application</button>
+          </div>
+
+          <!-- Move-in date -->
+          <div class="f">
+            <label>Move-in Date <span class="txt-required">*</span></label>
+            <input type="date" id="ue_assignedDate"/>
+          </div>
+        </div>
+
+        <!-- Tenant History -->
+        <div id="udp_history_section" style="display:none;margin-top:20px;">
+          <div class="lbl-muted" style="margin-bottom:8px">Tenant History</div>
+          <div id="udp_history_list"></div>
         </div>
 
       </div>
 
-      <!-- Inspection -->
-      <div class="f-row">
-        <div class="f"><label>Last Inspection Date</label><input id="ue_last_inspection" type="date" class="tic-input"/></div>
-        <div class="f"><label>Next Inspection Due</label><input id="ue_next_inspection" type="date" class="tic-input"/></div>
+      <!-- Approvals -->
+      <div id="ue_panel_approvals" class="tic-panel">
+
+        <!-- Budget Approval Indicator (shown when SOW cost exists) -->
+        <div id="ue_budget_indicator"></div>
+
+        <!-- Approvals (HM / ED signatures for SOW workflow) -->
+        <div id="ue_sig_section">
+          <div class="lbl-muted" style="margin-bottom:12px">Approvals</div>
+
+          <!-- HM approval signature (shown when SOW requires HM or ED approval) -->
+          <div id="ue_sig_hm_block">
+            <div class="flex-sb-mb">
+              <div class="flex-gap8">
+                <div class="avatar-circle-24-blue">HM</div>
+                <div>
+                  <div style="font-size:12px;font-weight:700;color:var(--info-blue);">Housing Manager Approval</div>
+                  <div class="txt-xs-muted">Required — renovation within HM budget authority</div>
+                </div>
+              </div>
+              <span id="ue_sig_hm_badge" class="pill-info">Pending</span>
+            </div>
+            <div class="grid-c3-tight-mb">
+              <div class="f"><label>HM Name</label><input type="text" id="ue_sig_hm_name" placeholder="Full name"/></div>
+              <div class="f"><label>Date</label><input type="date" id="ue_sig_hm_date"/></div>
+              <div class="f"><label>Decision</label>
+                <select id="ue_sig_hm_decision">
+                  <option value="">— Pending —</option>
+                  <option value="approved">Approved</option>
+                  <option value="declined">Declined</option>
+                  <option value="deferred">Deferred to ED</option>
+                </select>
+              </div>
+            </div>
+            <div class="f"><label>Notes</label><input type="text" id="ue_sig_hm_notes" placeholder="Optional notes"/></div>
+          </div>
+
+          <!-- ED approval signature (shown when SOW exceeds HM budget limit) -->
+          <div id="ue_sig_ed_block">
+            <div class="flex-sb-mb">
+              <div class="flex-gap8">
+                <div class="avatar-circle-24-yellow">ED</div>
+                <div>
+                  <div style="font-size:12px;font-weight:700;color:var(--warn-amber);">Executive Director Approval</div>
+                  <div class="txt-xs-muted">Required — renovation exceeds HM budget authority</div>
+                </div>
+              </div>
+              <span id="ue_sig_ed_badge" class="pill-warn">Pending</span>
+            </div>
+            <div class="grid-c3-tight-mb">
+              <div class="f"><label>ED Name</label><input type="text" id="ue_sig_ed_name" placeholder="Full name"/></div>
+              <div class="f"><label>Date</label><input type="date" id="ue_sig_ed_date"/></div>
+              <div class="f"><label>Decision</label>
+                <select id="ue_sig_ed_decision">
+                  <option value="">— Pending —</option>
+                  <option value="approved">Approved</option>
+                  <option value="declined">Declined</option>
+                </select>
+              </div>
+            </div>
+            <div class="f"><label>Notes</label><input type="text" id="ue_sig_ed_notes" placeholder="Optional notes"/></div>
+          </div>
+
+        </div>
       </div>
 
-      <!-- Notes -->
-      <div class="f"><label>Notes</label><textarea id="ue_notes" rows="2" placeholder="Internal notes about this unit…"></textarea></div>
+      <!-- Scopes of Work -->
+      <div id="ue_panel_sow" class="tic-panel">
+        <div id="udp_sow_section">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div class="lbl-muted">Scopes of Work</div>
+            <button data-ue-keep onclick="udpNewSow()" style="background:var(--yellow);border:none;color:var(--dark);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:4px;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New SOW
+            </button>
+          </div>
+          <div id="udp_sow_table_wrap"></div>
+        </div>
+      </div>
 
-      <!-- Photos -->
-      <div>
-        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:8px;">Photos</label>
-        <div id="ue_photo_preview"></div>
-        <div id="ue_drop_zone" ondragover="photoDragOver(event,'ue_drop_zone')" ondragleave="photoDragLeave('ue_drop_zone')" ondrop="photoDrop(event,'edit')"
-          class="upload-zone"
-          onclick="document.getElementById('ue_photo_input').click()">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--muted);margin-bottom:6px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;">Drag photos here or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
-          <div class="txt-muted-xs">JPG, PNG, WEBP — multiple files supported</div>
-          <input type="file" id="ue_photo_input" accept="image/*" multiple onchange="handleEditUnitPhotoUpload(this)"/>
+      <!-- RFQs & Contracts -->
+      <div id="ue_panel_rfq" class="tic-panel">
+        <div id="udp_rfq_section">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div class="lbl-muted">RFQs &amp; Contracts</div>
+            <a href="rfq.html" style="font-size:11px;font-weight:600;color:var(--text);text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;">View All &#8599;</a>
+          </div>
+          <div id="udp_rfq_list"></div>
+        </div>
+      </div>
+
+      <!-- Documents -->
+      <div id="ue_panel_documents" class="tic-panel">
+        <div id="udp_files_section">
+          <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:8px;">Documents</label>
+          <div id="udp_files_mount"></div>
+        </div>
+      </div>
+
+      <!-- Map & Photos -->
+      <div id="ue_panel_map" class="tic-panel">
+        <!-- Map -->
+        <div id="udp_map_section"></div>
+
+        <!-- Photos -->
+        <div style="margin-top:20px;">
+          <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:8px;">Photos</label>
+          <div id="ue_photo_preview"></div>
+          <div id="ue_drop_zone" ondragover="photoDragOver(event,'ue_drop_zone')" ondragleave="photoDragLeave('ue_drop_zone')" ondrop="photoDrop(event,'edit')"
+            class="upload-zone"
+            onclick="document.getElementById('ue_photo_input').click()">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--muted);margin-bottom:6px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;">Drag photos here or <span style="color:var(--yellow);text-decoration:underline;">browse</span></div>
+            <div class="txt-muted-xs">JPG, PNG, WEBP — multiple files supported</div>
+            <input type="file" id="ue_photo_input" accept="image/*" multiple onchange="handleEditUnitPhotoUpload(this)"/>
+          </div>
         </div>
       </div>
 
     </div>
+
     <!-- Footer -->
-    <div class="flex-sb" style="padding:16px 24px;border-top:1px solid var(--border);background:var(--bg)">
+    <div class="tic-footer">
       <div id="ue_archive_btn_wrap"></div>
-      <div class="flex-row-10">
-        <button data-ue-keep onclick="closeUnitEditModal()" class="btn btn-ghost">Cancel</button>
-        <button id="ue_save_btn" onclick="saveUnitEdit()" class="btn btn-primary">Save Changes</button>
-      </div>
+      <span class="tic-footer-spacer"></span>
+      <button data-ue-keep onclick="closeUnitEditModal()" class="btn btn-ghost">Cancel</button>
+      <button id="ue_save_btn" onclick="saveUnitEdit()" class="btn btn-primary">Save Changes</button>
     </div>
+
   </div>
 </div>
 
