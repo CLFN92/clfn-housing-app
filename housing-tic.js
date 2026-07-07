@@ -968,7 +968,9 @@
         var beforeStr = _ticIsArray(prevForAudit) ? prevForAudit.join(', ') : (prevForAudit == null ? '' : String(prevForAudit));
         var afterStr  = _ticIsArray(body[key]) ? body[key].join(', ') : (body[key] == null ? '' : String(body[key]));
         _ticAudit('tic_overview_change', _ticDescribe(field.label, beforeStr, afterStr));
-        if (typeof showToast === 'function') showToast('Saved.');
+        // No success toast here — the field's .tic-saving highlight clearing
+        // is already the save confirmation; a toast per field is noisy when
+        // editing several Overview fields in a row.
         if (key === TIC_C.tenancy_status && body[key] === 'banished') _ticSyncBanishedToBcr();
       })
       .catch(function(err){
@@ -1317,7 +1319,6 @@
         inp.classList.remove('tic-saving');
         _ticRenderHero(); _ticRenderStrip(); _ticRenderOccupants();
         _ticAudit('tic_coapp_change', auditDetail);
-        if(typeof showToast === 'function') showToast('Saved.');
       })
       .catch(function(err){
         inp.classList.remove('tic-saving');
@@ -1455,7 +1456,6 @@
       .then(function(){
         inp.classList.remove('tic-saving');
         _ticAudit('tic_contact_change', _ticDescribe(key, prev, app[key]));
-        if(typeof showToast === 'function') showToast('Saved.');
       })
       .catch(function(err){
         inp.classList.remove('tic-saving');
