@@ -1728,7 +1728,23 @@ async function renderRecentActivity(role) {
     return d.toLocaleTimeString('en-CA', {hour:'2-digit', minute:'2-digit', hour12:true});
   }
 
-  function renderEntry(e) {
+  // View mode shared with the worklist toggle (one preference drives both).
+  var _view = (function(){ try { return localStorage.getItem('clfn_worklist_view') === 'cards' ? 'cards' : 'list'; } catch(e){ return 'list'; } })();
+  function _recentToggleBar(){
+    function b(v, label, icon){
+      var on = _view === v;
+      var click = 'if(typeof _wlSetView===\'function\'){_wlSetView(\''+v+'\');}else{try{localStorage.setItem(\'clfn_worklist_view\',\''+v+'\');}catch(e){}if(typeof renderRecentActivity===\'function\')renderRecentActivity(\''+role+'\');}';
+      return '<button type="button" onclick="'+click+'" style="display:flex;align-items:center;gap:5px;padding:5px 12px;'
+        + 'border:1px solid '+(on?'var(--yellow)':'var(--border)')+';background:'+(on?'var(--yellow)':'var(--surface)')+';'
+        + 'color:'+(on?'var(--dark)':'var(--muted)')+';font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;'
+        + 'border-radius:'+(v==='list'?'7px 0 0 7px':'0 7px 7px 0')+';'+(v==='cards'?'margin-left:-1px;':'')+'">'+icon+' '+label+'</button>';
+    }
+    return '<div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><div style="display:flex;">'
+      + b('list','List','&#9776;') + b('cards','Cards','&#9638;') + '</div></div>';
+  }
+
+  // Resolve the entity name / display id / icon meta for an audit entry.
+  function _resolveEntry(e) {
     var meta = icons[e.action] || {icon:'•', color:'var(--muted)', label: e.action.replace(/_/g,' ')};
     var appId = e.appId || '';
     var displayId = appId;
@@ -1746,23 +1762,49 @@ async function renderRecentActivity(role) {
     } else if(appId.startsWith('CT:')) {
       displayId = appId.slice(3);
     }
+    return { meta: meta, extraName: extraName, displayId: displayId };
+  }
+
+  function renderEntry(e) {
+    var r = _resolveEntry(e);
     return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0 8px 0;">'
-      + '<div style="width:28px;height:28px;border-radius:7px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-top:1px;border:1px solid var(--border);">'+meta.icon+'</div>'
+      + '<div style="width:28px;height:28px;border-radius:7px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-top:1px;border:1px solid var(--border);">'+r.meta.icon+'</div>'
       + '<div style="flex:1;min-width:0;">'
         + '<div style="font-size:12px;font-weight:600;color:var(--text);">'
-          + (extraName ? '<span style="color:'+meta.color+';">'+extraName+'</span> · ' : '')
-          + meta.label
+          + (r.extraName ? '<span style="color:'+r.meta.color+';">'+r.extraName+'</span> · ' : '')
+          + r.meta.label
         + '</div>'
         + '<div style="font-size:11px;color:var(--muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(e.detail||'—')+'</div>'
-        + (displayId && displayId!=='SETTINGS' ? '<div style="font-size:10px;color:var(--muted);margin-top:1px;font-family:monospace;opacity:.7;">'+displayId+'</div>' : '')
+        + (r.displayId && r.displayId!=='SETTINGS' ? '<div style="font-size:10px;color:var(--muted);margin-top:1px;font-family:monospace;opacity:.7;">'+r.displayId+'</div>' : '')
       + '</div>'
       + '<div style="font-size:10px;color:var(--muted);white-space:nowrap;flex-shrink:0;padding-top:3px;">'+timeStr(e.ts)+'</div>'
       + '</div>';
   }
 
-  el.innerHTML = order.map(function(key, i) {
+  function renderEntryCard(e) {
+    var r = _resolveEntry(e);
+    return '<div style="border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:10px 11px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;">'
+      +   '<div style="width:26px;height:26px;border-radius:7px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;border:1px solid var(--border);">'+r.meta.icon+'</div>'
+      +   '<span style="font-size:11px;font-weight:700;color:'+r.meta.color+';flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.meta.label+'</span>'
+      +   '<span style="font-size:10px;color:var(--muted);white-space:nowrap;flex-shrink:0;">'+timeStr(e.ts)+'</span>'
+      + '</div>'
+      + (r.extraName ? '<div style="font-size:13px;font-weight:700;color:var(--text);margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.extraName+'</div>' : '')
+      + '<div style="font-size:11px;color:var(--muted);margin-top:'+(r.extraName?'2px':'6px')+';">'+(e.detail||'—')+'</div>'
+      + (r.displayId && r.displayId!=='SETTINGS' ? '<div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:monospace;opacity:.7;">'+r.displayId+'</div>' : '')
+      + '</div>';
+  }
+
+  el.innerHTML = _recentToggleBar() + order.map(function(key, i) {
     var groupId = 'act_group_' + key.replace(/-/g,'');
     var isToday = dayLabel(key) === 'Today';
+    // Cards: a responsive grid of tiles; List: the timeline rows.
+    var entriesHtml = (_view === 'cards')
+      ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;padding-top:6px;">' + groups[key].map(renderEntryCard).join('') + '</div>'
+      : groups[key].map(renderEntry).join('');
+    var entriesWrapStyle = (_view === 'cards')
+      ? 'display:'+(isToday?'block':'none')+';'
+      : 'display:'+(isToday?'block':'none')+';padding-left:12px;border-left:2px solid var(--border);';
     return '<div style="margin-bottom:'+(i<order.length-1?'8px':'0')+'">'
       // Day header — clickable
       + '<div onclick="var g=document.getElementById(\''+groupId+'\');var ch=document.getElementById(\''+groupId+'_ch\');var open=g.style.display!==\'none\';g.style.display=open?\'none\':\'block\';ch.style.transform=open?\'rotate(-90deg)\':\'rotate(0deg)\';" '
@@ -1773,8 +1815,8 @@ async function renderRecentActivity(role) {
         + '<div class="js-lbl-xs">'+groups[key].length+' event'+(groups[key].length!==1?'s':'')+'</div>'
       + '</div>'
       // Entries — today open by default, previous days collapsed
-      + '<div id="'+groupId+'" style="display:'+(isToday?'block':'none')+';padding-left:12px;border-left:2px solid var(--border);">'
-        + groups[key].map(renderEntry).join('')
+      + '<div id="'+groupId+'" style="'+entriesWrapStyle+'">'
+        + entriesHtml
       + '</div>'
       + '</div>';
   }).join('');

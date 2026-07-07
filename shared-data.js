@@ -4846,7 +4846,14 @@ function renderWorklist() {
 
   // ── View mode (List vs Cards) — persisted per device, defaults to List ────
   var _view = (function(){ try { return localStorage.getItem('clfn_worklist_view') === 'cards' ? 'cards' : 'list'; } catch(e){ return 'list'; } })();
-  window._wlSetView = function(v){ try { localStorage.setItem('clfn_worklist_view', v === 'cards' ? 'cards' : 'list'); } catch(e){} renderWorklist(); };
+  window._wlSetView = function(v){
+    try { localStorage.setItem('clfn_worklist_view', v === 'cards' ? 'cards' : 'list'); } catch(e){}
+    renderWorklist();
+    // Recent Activity shares this preference — re-render it too when present.
+    if (typeof renderRecentActivity === 'function') {
+      try { renderRecentActivity(window._viewAsRole || window._realRole || window.currentRole || 'housing_employee_l1'); } catch(e){}
+    }
+  };
   function _wlToggleBar(){
     function b(v, label, icon){
       var on = _view === v;
