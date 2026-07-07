@@ -2676,6 +2676,41 @@
     document.body.appendChild(m);
   }
 
+  // Soft-check confirm for missing initials/signatures. Deliberately not the
+  // generic showConfirm() — that renders at z-index 1100, which sits BEHIND
+  // this modal's z-index 10000 and would be invisible/unclickable. Matches
+  // _ticShowLeaseChecklist's z-index tier (10200) instead. Returns Promise<boolean>.
+  function _ticConfirmMissingSigs(items) {
+    return new Promise(function(resolve){
+      var existing = document.getElementById('ls_sig_confirm_modal');
+      if (existing) existing.remove();
+      var rows = items.map(function(it){
+        return '<div style="display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);">'
+          + '<span style="color:var(--danger,#dc2626);font-size:14px;line-height:1.3;">&#9711;</span>'
+          + '<span style="font-size:12.5px;color:var(--text);line-height:1.5;">' + _ticEsc(it) + '</span></div>';
+      }).join('');
+      var m = document.createElement('div');
+      m.id = 'ls_sig_confirm_modal';
+      m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10200;display:flex;align-items:center;justify-content:center;padding:16px;';
+      m.innerHTML =
+          '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:440px;box-shadow:0 8px 40px rgba(0,0,0,.4);">'
+        + '<div class="modal-hdr"><div>'
+        +   '<div class="lbl-yellow">&#9888;&#65039; Generate without all signatures?</div>'
+        +   '<div class="txt-sm-meta">Missing:</div>'
+        + '</div></div>'
+        + '<div style="padding:14px 22px 4px;">' + rows + '</div>'
+        + '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">'
+        +   '<button type="button" data-sc-cancel class="btn btn-ghost">Cancel</button>'
+        +   '<button type="button" data-sc-confirm class="btn btn-primary">Generate anyway</button>'
+        + '</div></div>';
+      document.body.appendChild(m);
+      function close(ok){ if (m.parentNode) m.parentNode.removeChild(m); resolve(ok); }
+      m.querySelector('[data-sc-cancel]').onclick  = function(){ close(false); };
+      m.querySelector('[data-sc-confirm]').onclick = function(){ close(true); };
+      m.addEventListener('click', function(e){ if (e.target === m) close(false); });
+    });
+  }
+
   // ── Draft persistence (survive close/reopen) ───────────────────────────
   function _ticLeaseDraftKey() {
     var u = _ticState.unit || {};
@@ -2976,19 +3011,8 @@
     // added after an unsigned copy is printed. Warn, but let staff proceed.
     var _missingSigs = _ticLeaseMissingSigs();
     if (_missingSigs.length) {
-      if (typeof showConfirm === 'function') {
-        var _go = await showConfirm({
-          title:       'Generate without all signatures?',
-          message:     'Missing: ' + _missingSigs.join(', ') + '. Generate the agreement anyway? You can re-generate after collecting the rest.',
-          confirmText: 'Generate anyway', cancelText: 'Cancel'
-        });
-        if (!_go) return;
-      } else {
-        // showConfirm unavailable — fall back to a hard block rather than
-        // silently generating an incomplete agreement.
-        _ticShowLeaseChecklist(_missingSigs);
-        return;
-      }
+      var _go = await _ticConfirmMissingSigs(_missingSigs);
+      if (!_go) return;
     }
 
     if (typeof showToast === 'function') showToast('Saving changes and generating PDF...');
