@@ -458,7 +458,7 @@
   // Editable rows write to the `tenants` table via PATCH. Read-only rows are
   // unit-derived (bedrooms, unit_number) or system-set (approved_by) and
   // always render as plain text.
-  var TIC_TENANCY_OPTIONS = ['active','vacated','transferred','evicted','suspended','deceased','bankrupt'];
+  var TIC_TENANCY_OPTIONS = ['active','vacated','transferred','evicted','suspended','deceased','bankrupt','banished','harbouring'];
   var TIC_LEASE_TYPE_OPTIONS = ['Rental','Rent-to-Own','Lease-to-Own','Market','Subsidized','Elders','Family Compound','Other'];
   var TIC_INCOME_PERSONS = ['Applicant','Co-Applicant'];
   var TIC_INCOME_TYPES   = ['Employed','Self-Employment','OW','ODSP','CPP','EI','Pension','Other'];
@@ -969,6 +969,7 @@
         var afterStr  = _ticIsArray(body[key]) ? body[key].join(', ') : (body[key] == null ? '' : String(body[key]));
         _ticAudit('tic_overview_change', _ticDescribe(field.label, beforeStr, afterStr));
         if (typeof showToast === 'function') showToast('Saved.');
+        if (key === TIC_C.tenancy_status && body[key] === 'banished') _ticSyncBanishedToBcr();
       })
       .catch(function(err){
         inp.classList.remove('tic-saving');
@@ -976,6 +977,27 @@
         if (typeof showToast === 'function') showToast('Save failed: ' + err.message, { type:'error' });
       });
   }
+
+  // Keep the BCR (Band Council Resolution ineligibility) registry in sync when
+  // staff mark a tenancy Banished here — the BCR list is what's actually
+  // checked at application-approval / unit-assignment time, so a Tenancy
+  // Status of "banished" with no matching BCR entry would silently NOT block
+  // future housing of that person. Only opens the (HM/ED-gated) Add form —
+  // never auto-writes a registry row with no date/reason on file.
+  function _ticSyncBanishedToBcr(){
+    var t = _ticState.tenant || {};
+    var u = _ticState.unit   || {};
+    var name = t[TIC_C.full_name] || u.assignedName || '';
+    if (!name) return;
+    if (typeof bcrLookup === 'function' && bcrLookup(name)) return; // already on the list
+    if (typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('manageBcr', window.currentRole)) {
+      if (typeof showToast === 'function') showToast(name + ' is marked Banished — ask a Housing Manager or ED to add them to the BCR list so eligibility checks pick it up.');
+      return;
+    }
+    if (typeof showToast === 'function') showToast('Add ' + name + ' to the BCR (banishment) list to keep eligibility checks in sync.');
+    if (typeof openBcrManager === 'function') openBcrManager(name);
+  }
+
   function _ticToggleHomeCare(){
     if(_ticReadOnlyRole()){
       if(typeof showToast === 'function') showToast('Read-only access — editing tenant details is disabled for your role.');
