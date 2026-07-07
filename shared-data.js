@@ -4579,6 +4579,14 @@ function _wlCollectSows(ctx) {
         if (!sow || !sow.items || !sow.items.length) return; // no content
         var status = sow.approval_status || '';
         if (status === 'ed_approved' || status === 'completed') return; // already done
+        // A draft the current user prepared already shows under "My Drafts" — it
+        // hasn't been submitted for approval, so don't also list it here (this was
+        // showing the creator's own draft in both sections). Mirrors the
+        // _wlCollectDrafts inclusion rule (status ''/draft + prepared by me).
+        if (status === '' || status === 'draft') {
+          var _prep = (sow.preparedBy || sow.prepared_by || '').trim();
+          if (ctx.myName && _prep === ctx.myName) return;
+        }
         // HM sees SOWs not yet HM-approved (needs their review)
         var needsHm = !canFinal && (status === '' || status === 'draft' || status === 'signed' || status === 'submitted');
         // ED sees SOWs at HM-approved stage ONLY when the cost is over the HM
