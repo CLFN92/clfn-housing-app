@@ -129,7 +129,6 @@
   </div>
 </div>
 
-<!-- unitDetailPanel -->
 <div id="sowModalHost"></div>
 
 <!-- unitEditModal -->
@@ -142,13 +141,13 @@
         <div id="ue_modal_title" class="txt-hdr-white"></div>
       </div>
       <div class="flex-gap8">
-        <button id="ue_sow_btn" onclick="ueOpenSow()" title="Scope of Work"
+        <button id="ue_sow_btn" data-ue-keep onclick="ueOpenSow()" title="Scope of Work"
           style="background:none;border:1px solid var(--dark-border);color:var(--txt-on-dark);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;white-space:nowrap;"
           onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'"
           onmouseout="this.style.borderColor='#555';this.style.color='#ccc'">
           🔨 SOW
         </button>
-        <button onclick="closeUnitEditModal()" class="btn-close-sm">✕</button>
+        <button data-ue-keep onclick="closeUnitEditModal()" class="btn-close-sm">✕</button>
       </div>
     </div>
     <!-- Body -->
@@ -405,8 +404,8 @@
     <div class="flex-sb" style="padding:16px 24px;border-top:1px solid var(--border);background:var(--bg)">
       <div id="ue_archive_btn_wrap"></div>
       <div class="flex-row-10">
-        <button onclick="closeUnitEditModal()" class="btn btn-ghost">Cancel</button>
-        <button onclick="saveUnitEdit()" class="btn btn-primary">Save Changes</button>
+        <button data-ue-keep onclick="closeUnitEditModal()" class="btn btn-ghost">Cancel</button>
+        <button id="ue_save_btn" onclick="saveUnitEdit()" class="btn btn-primary">Save Changes</button>
       </div>
     </div>
   </div>

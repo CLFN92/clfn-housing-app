@@ -273,7 +273,7 @@ function renderInventoryView(){
     var funder = _fmtFunder(u.funder)||'—';
     var uid = u.id.replace(/'/g,"\\'");
     return '<tr style="border-bottom:1px solid var(--border);transition:background .12s;" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
-      +'<td style="padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="openUnitDetail(\''+uid+'\')">'+'<span style="text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;">'+addr+'</span>'
+      +'<td style="padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="openUnitEditModal(\''+uid+'\')">'+'<span style="text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;">'+addr+'</span>'
       +(u.isElders?' <span style="font-size:9px;background:var(--warn-amber-bg);color:var(--warn-amber);border:1px solid var(--warn-amber-border);padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>':'')
       +'</td>'
       +'<td style="padding:9px 10px;text-align:center;font-size:13px;font-weight:700;color:var(--text);">'+u.bedrooms+'</td>'
@@ -336,7 +336,7 @@ function renderInventoryView(){
     btn.addEventListener('click', function(e){ e.stopPropagation(); openSowModal(btn.getAttribute('data-sow-uid')); });
   });
   tbody.querySelectorAll('[data-uid]').forEach(function(row){
-    row.addEventListener('click', function(){ openUnitDetail(row.getAttribute('data-uid')); });
+    row.addEventListener('click', function(){ openUnitEditModal(row.getAttribute('data-uid')); });
   });
 }
 

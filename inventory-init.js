@@ -33,7 +33,7 @@
   // ?openSow=<unitId>&pn=<projectNumber>, hide the inventory chrome so only
   // the SOW modal is visible, then open the SOW.
   // Also: ?unit=<unitId> from landing-page Quick Lookup opens the unit
-  // detail panel; ?action=newUnit opens the Add Unit modal.
+  // edit card; ?action=newUnit opens the Add Unit modal.
   try {
     var qp = new URLSearchParams(window.location.search);
     var openUid = qp.get('openSow');
@@ -43,8 +43,8 @@
       setTimeout(function(){ openSowModal(openUid, openPn || null); }, 100);
     }
     var deepUnit = qp.get('unit');
-    if (deepUnit && typeof openUnitDetail === 'function') {
-      setTimeout(function(){ openUnitDetail(deepUnit); }, 100);
+    if (deepUnit && typeof openUnitEditModal === 'function') {
+      setTimeout(function(){ openUnitEditModal(deepUnit); }, 100);
     }
     if (qp.get('action') === 'newUnit' && typeof openAddUnitModal === 'function') {
       setTimeout(function(){ openAddUnitModal(); }, 100);
