@@ -217,68 +217,6 @@
   </div>
 </div>
 
-<!-- unitDetailPanel -->
-<div id="unitDetailPanel" class="modal-overlay modal-z-750">
-  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.35);margin:auto;">
-    <div class="modal-hdr sticky">
-      <div>
-        <div id="udp_address" class="panel-title"></div>
-        <div id="udp_subtitle" class="txt-sm-meta"></div>
-      </div>
-      <button onclick="closeUnitDetail()" class="btn-close-dark-30">✕</button>
-    </div>
-    <div style="padding:20px;display:flex;flex-direction:column;gap:16px;">
-      <div id="udp_status_row" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
-      <div id="udp_tenant_section">
-        <div class="lbl-muted" style="margin-bottom:8px">Tenant</div>
-        <div id="udp_tenant_info" style="font-size:13px;font-weight:600;"></div>
-      </div>
-      <div id="udp_history_section" style="display:none;">
-        <div class="lbl-muted" style="margin-bottom:8px">Tenant History</div>
-        <div id="udp_history_list"></div>
-      </div>
-      <div id="udp_details" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;"></div>
-      <div id="udp_notes_section">
-        <div class="lbl-muted" style="margin-bottom:6px">Notes</div>
-        <div id="udp_notes" style="font-size:13px;color:var(--text);"></div>
-      </div>
-      <!-- Scopes of Work -->
-      <div id="udp_sow_section">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <div class="lbl-muted">Scopes of Work</div>
-          <button onclick="udpNewSow()" style="background:var(--yellow);border:none;color:var(--dark);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:4px;">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            New SOW
-          </button>
-        </div>
-        <div id="udp_sow_table_wrap"></div>
-      </div>
-      <!-- RFQs & Contracts -->
-      <div id="udp_rfq_section">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <div class="lbl-muted">RFQs &amp; Contracts</div>
-          <a href="rfq.html" style="font-size:11px;font-weight:600;color:var(--text);text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;">View All &#8599;</a>
-        </div>
-        <div id="udp_rfq_list"></div>
-      </div>
-      <div><!-- Photos -->
-        <div class="lbl-muted" style="margin-bottom:8px">Photos</div>
-        <div id="udp_photos"></div>
-      </div>
-      <!-- Map -->
-      <div id="udp_map_section"></div>
-      <!-- Tenant files — DocLibrary with upload enabled inline -->
-      <div id="udp_files_section">
-        <div id="udp_files_mount"></div>
-      </div>
-      <div class="flex-row-10">
-        <button onclick="openUnitEditFromDetail()" class="btn btn-primary">Edit Unit</button>
-        <button onclick="closeUnitDetail()" class="btn btn-ghost">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div id="sowModalHost"></div>
 
 <!-- unitEditModal -->
@@ -291,13 +229,13 @@
         <div id="ue_modal_title" class="txt-hdr-white"></div>
       </div>
       <div class="flex-gap8">
-        <button id="ue_sow_btn" onclick="ueOpenSow()" title="Scope of Work"
+        <button id="ue_sow_btn" data-ue-keep onclick="ueOpenSow()" title="Scope of Work"
           style="background:none;border:1px solid var(--dark-border);color:var(--txt-on-dark);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:5px;white-space:nowrap;"
           onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'"
           onmouseout="this.style.borderColor='#555';this.style.color='#ccc'">
           🔨 SOW
         </button>
-        <button onclick="closeUnitEditModal()" class="btn-close-sm">✕</button>
+        <button data-ue-keep onclick="closeUnitEditModal()" class="btn-close-sm">✕</button>
       </div>
     </div>
     <!-- Body -->
@@ -534,6 +472,42 @@
 
       </div>
 
+      <!-- Tenant History -->
+      <div id="udp_history_section" style="display:none;">
+        <div class="lbl-muted" style="margin-bottom:8px">Tenant History</div>
+        <div id="udp_history_list"></div>
+      </div>
+
+      <!-- Scopes of Work -->
+      <div id="udp_sow_section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div class="lbl-muted">Scopes of Work</div>
+          <button data-ue-keep onclick="udpNewSow()" style="background:var(--yellow);border:none;color:var(--dark);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;display:flex;align-items:center;gap:4px;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New SOW
+          </button>
+        </div>
+        <div id="udp_sow_table_wrap"></div>
+      </div>
+
+      <!-- RFQs & Contracts -->
+      <div id="udp_rfq_section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div class="lbl-muted">RFQs &amp; Contracts</div>
+          <a href="rfq.html" style="font-size:11px;font-weight:600;color:var(--text);text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;">View All &#8599;</a>
+        </div>
+        <div id="udp_rfq_list"></div>
+      </div>
+
+      <!-- Map -->
+      <div id="udp_map_section"></div>
+
+      <!-- Documents -->
+      <div id="udp_files_section">
+        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:8px;">Documents</label>
+        <div id="udp_files_mount"></div>
+      </div>
+
       <!-- Inspection -->
       <div class="f-row">
         <div class="f"><label>Last Inspection Date</label><input id="ue_last_inspection" type="date" class="tic-input"/></div>
@@ -562,8 +536,8 @@
     <div class="flex-sb" style="padding:16px 24px;border-top:1px solid var(--border);background:var(--bg)">
       <div id="ue_archive_btn_wrap"></div>
       <div class="flex-row-10">
-        <button onclick="closeUnitEditModal()" class="btn btn-ghost">Cancel</button>
-        <button onclick="saveUnitEdit()" class="btn btn-primary">Save Changes</button>
+        <button data-ue-keep onclick="closeUnitEditModal()" class="btn btn-ghost">Cancel</button>
+        <button id="ue_save_btn" onclick="saveUnitEdit()" class="btn btn-primary">Save Changes</button>
       </div>
     </div>
   </div>

@@ -5,12 +5,12 @@
  *   - SOW photos & documents widget (window._sowFiles staging)
  *   - openSowModal / saveSOW / markSowComplete / reopenSow
  *   - SOW lock & permission helpers (canEditSow, canMarkSowComplete, …)
- *   - SOW table on the Unit Detail card (udpRenderSowTable, udpNewSow, …)
+ *   - SOW table on the Edit Unit card (udpRenderSowTable, udpNewSow, …)
  *   - printSOW (print template)
  *
  * Loaded AFTER housing-modals.js because:
  *   - _currentDetailUnitId is declared in housing-modals.js
- *   - The SOW table renderer is invoked from openUnitDetail there
+ *   - The SOW table renderer is invoked from openUnitEditModal there
  * ============================================================ */
 
 // ══════════════════════════════════════════════════════════
@@ -1537,7 +1537,7 @@ window.archiveCurrentSow = function(){
 
 function udpNewSow(){
   if(!_currentDetailUnitId) return;
-  closeUnitDetail();
+  closeUnitEditModal();
   // Force a brand-new request — otherwise openSowModal opens the unit's most
   // recent ACTIVE SOW (and this button would never actually create a new one).
   window._sowForceNew = true;
@@ -1545,7 +1545,7 @@ function udpNewSow(){
 }
 
 function udpEditSow(unitId, projectNumber){
-  closeUnitDetail();
+  closeUnitEditModal();
   openSowModal(unitId, projectNumber);
 }
 
@@ -1554,7 +1554,7 @@ function udpOpenSowDocument(unitId, projectNumber){
   // Loads the SOW into the modal first so printSOW() has the right data, then triggers print.
   var sow = getSowByProjectNumber(unitId, projectNumber);
   if(!sow){ showToast('Request not found'); return; }
-  closeUnitDetail();
+  closeUnitEditModal();
   openSowModal(unitId, projectNumber);
   // Give the modal a tick to populate before printing.
   setTimeout(function(){ if(true) printSOW(); }, 250);
@@ -1565,7 +1565,7 @@ function udpPrintWorkOrder(unitId, projectNumber){
   // the existing printWorkOrder() (which reads from modal state) produces the right output.
   var sow = getSowByProjectNumber(unitId, projectNumber);
   if(!sow){ showToast('Request not found'); return; }
-  closeUnitDetail();
+  closeUnitEditModal();
   openSowModal(unitId, projectNumber);
   setTimeout(function(){ if(true) printWorkOrder(); }, 250);
 }

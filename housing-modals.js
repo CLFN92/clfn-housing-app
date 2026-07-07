@@ -7,7 +7,7 @@
  * Covers:
  *   Unit edit modal (openUnitEditModal, saveUnitEdit, closeUnitEditModal)
  *   SOW modal (openSowModal, saveSOW, markSowComplete, reopenSow)
- *   Unit detail panel (openUnitDetail, udpRenderSowTable)
+ *   Unit edit modal — also the only unit view (openUnitEditModal, udpRenderSowTable)
  *   Add unit modal (openAddUnitModal, saveNewUnit)
  *   Add tenant modal (openAddTenantModal, saveAddTenant)
  *   Tenant/contractor detail panels
@@ -77,17 +77,58 @@ function contractorSearchFilter(q) {
   }).join('');
 }
 
+// Read-only mode for roles that can view but not edit unit records (currently
+// field_employee — they still need to see the unit, its SOWs/work orders, and
+// RFQs, since this modal is now the only unit view). Mirrors _rfqApplyReadOnly
+// in rfq.js: disable inputs/selects/textareas/buttons except ones marked
+// data-ue-keep (Cancel, the SOW button/section — field employees can still
+// create/edit work orders).
+function _ueApplyReadOnly(ro){
+  window._ueReadOnly = ro;
+  var modal = document.getElementById('unitEditModal');
+  if(!modal) return;
+  modal.classList.toggle('ue-readonly', ro);
+  modal.querySelectorAll('input, select, textarea').forEach(function(c){
+    if(c.closest('[data-ue-keep]')) return;
+    if(ro){
+      if(!c.hasAttribute('data-ro-was')) c.setAttribute('data-ro-was', c.disabled ? '1' : '0');
+      c.disabled = true;
+    } else if(c.hasAttribute('data-ro-was')){
+      if(c.getAttribute('data-ro-was') === '0') c.disabled = false;
+      c.removeAttribute('data-ro-was');
+    }
+  });
+  modal.querySelectorAll('button').forEach(function(b){
+    if(b.hasAttribute('data-ue-keep') || b.closest('[data-ue-keep]')) return;
+    if(ro){
+      if(!b.hasAttribute('data-ro-was')) b.setAttribute('data-ro-was', b.disabled ? '1' : '0');
+      b.disabled = true;
+    } else if(b.hasAttribute('data-ro-was')){
+      if(b.getAttribute('data-ro-was') === '0') b.disabled = false;
+      b.removeAttribute('data-ro-was');
+    }
+  });
+  var banner = document.getElementById('ueReadOnlyBanner');
+  if(ro && !banner){
+    banner = document.createElement('div');
+    banner.id = 'ueReadOnlyBanner';
+    banner.style.cssText = 'background:var(--warn-amber-bg);color:var(--warn-amber-text);border:1px solid var(--warn-amber-border);border-radius:8px;padding:9px 14px;font-size:12px;font-weight:600;margin:0 24px 12px;';
+    banner.textContent = '🔒 View only — Field Employees cannot edit unit records, but can still manage Scopes of Work.';
+    var body = modal.querySelector('.modal-hdr').nextElementSibling;
+    if(body) body.insertBefore(banner, body.firstChild);
+  } else if(!ro && banner){
+    banner.remove();
+  }
+}
+
 // ── Placeholder renderers (to be built out) ──
 function openUnitEditModal(unitId){
-  // Field Employees view inventory read-only — block the unit edit modal.
-  if((window.currentRole || '') === 'field_employee'){
-    if(typeof showToast === 'function') showToast('Read-only — Field Employees cannot edit unit records.');
-    return;
-  }
+  var isFieldEmployee = (window.currentRole || '') === 'field_employee';
   var units = getAllUnits();
   var u = units.find(function(x){ return x.id === unitId; });
   if(!u){ showToast('Unit not found: ' + unitId); return; }
-  window._editingUnitId = unitId;
+  window._editingUnitId    = unitId;
+  window._currentDetailUnitId = unitId; // back-compat: udpNewSow(), renos.html, file-panel sync all key off this
   var set = function(id,val){ var el=document.getElementById(id); if(el) el.value=(val===null||val===undefined||val==='nan')?'':String(val); };
   set('ue_street',u.street); set('ue_num',u.num);
   set('ue_bathrooms',u.bathrooms); set('ue_type',u.type); set('ue_foundation',u.foundation);
@@ -193,6 +234,19 @@ function openUnitEditModal(unitId){
 
   // Check budget routing
   setTimeout(ueUpdateBudgetRouting, 50);
+
+  // Sections merged in from the removed Unit Detail Panel (Phase — single
+  // unit view). Field employees get these too (read-only below) since this
+  // modal is now the only way to see a unit's SOWs/RFQs/documents/history.
+  udpRenderSowTable(unitId);
+  if(typeof udpRenderRfqSection === 'function') udpRenderRfqSection(unitId);
+  if(typeof udpRenderTenantHistory === 'function') udpRenderTenantHistory(unitId);
+  udpRenderMap(u);
+  if(typeof udpRenderFilePreviews === 'function') udpRenderFilePreviews(unitId);
+
+  _ueApplyReadOnly(isFieldEmployee);
+  var saveBtn = document.getElementById('ue_save_btn');
+  if(saveBtn) saveBtn.style.display = isFieldEmployee ? 'none' : '';
 }
 var _UE_BLDG_TYPES = ['admin_building', 'band_building', 'commercial_building'];
 var _UE_ROOM_OPTS_BLDG = '<option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option><option value="12">12</option><option value="15">15</option><option value="20">20</option><option value="25">25</option><option value="30">30</option>';
@@ -1726,119 +1780,7 @@ async function _udpLocSave() {
   }
 }
 
-function openUnitDetail(unitId) {
-  var units = getAllUnits();
-  var u = units.find(function(x){ return x.id === unitId; });
-  if(!u) return;
-  _currentDetailUnitId = unitId;
-
-  var statusStyle = {
-    vacant:      {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
-    occupied:    {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
-    under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Vacant'},
-    reserved:    {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
-    condemned:   {bg:'#fef2f2',c:'#b91c1c',label:'Condemned'}
-  };
-  var ss = statusStyle[u.status] || {bg:'#f0f0ec',c:'var(--gray)',label:u.status||'Unknown'};
-
-  // Header
-  var addr = u.num + ' ' + u.street;
-  setText('udp_address', addr);
-  var sub = [_roomBedLabel(u), u.bathrooms&&u.bathrooms!=='nan'?u.bathrooms+' bath':'', _fmtUnitType(u.type)||''].filter(Boolean).join(' · ');
-  setText('udp_subtitle', sub);
-
-  // Status badge
-  var sr = document.getElementById('udp_status_row');
-  if(sr) sr.innerHTML = '<span style="font-size:12px;font-weight:700;padding:5px 14px;border-radius:20px;background:'+ss.bg+';color:'+ss.c+';">'+ss.label+'</span>'
-    +(u.under_renovation?' <span style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--warn-amber-bg);color:var(--warn-amber-text);border:1px solid var(--warn-amber-border);margin-left:6px;">🔨 Under Renovations</span>':'')
-    +(u.isElders?' <span style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--warn-amber-bg);color:var(--warn-amber);border:1px solid var(--warn-amber-border);margin-left:6px;">Elders Unit</span>':'')
-    +(u.accessible?' <span style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--info-blue-bg);color:var(--info-blue);margin-left:6px;">♿ Accessible</span>':'');
-
-  // Details grid
-  var det = document.getElementById('udp_details');
-  if(det){
-    var _ccVal = (u.constructionCost != null && u.constructionCost !== '')
-      ? '$' + Number(u.constructionCost).toLocaleString('en-CA', {minimumFractionDigits:0, maximumFractionDigits:2})
-      : '—';
-    var fields = [
-      ['Foundation', (u.foundation&&u.foundation!=='nan'&&u.foundation!=='0')?u.foundation:'—'],
-      ['Funder', u.funder||'Band'],
-      ['Phase', (u.phase&&u.phase!=='nan')?u.phase:'—'],
-      ['Year Built', (u.year&&u.year!=='nan')?u.year:'—'],
-      ['Dept #', u.deptNumber||'—'],
-      ['Account #', u.acctNumber||'—'],
-      ['Insured Value', _ccVal],
-    ];
-    if(u.funder === 'CMHC_95') {
-      var _cmhcVal = (u.cmhcValue != null && u.cmhcValue !== '')
-        ? '$' + Number(u.cmhcValue).toLocaleString('en-CA', {minimumFractionDigits:0, maximumFractionDigits:2})
-        : '—';
-      fields.push(['CMHC Value', _cmhcVal]);
-    }
-    det.innerHTML = fields.map(function(f){
-      return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">'
-        +'<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">'+f[0]+'</div>'
-        +'<div style="font-size:14px;font-weight:600;color:var(--text);text-transform:capitalize;">'+f[1]+'</div>'
-        +'</div>';
-    }).join('');
-  }
-
-  // Tenant section
-  var ts = document.getElementById('udp_tenant_section');
-  var ti = document.getElementById('udp_tenant_info');
-  if(ts && ti){
-    if(u.assignedName || u.status==='occupied' || u.status==='reserved'){
-      ts.style.display = 'block';
-      ti.innerHTML = (u.assignedName?'<div class="empty-title">'+u.assignedName+'</div>':'')
-        +(u.assignedTo?'<div class="js-txt-muted-sm">App ID: '+u.assignedTo+'</div>':'')
-        +(u.assignedDate?'<div class="js-txt-muted-sm">Move-in: '+u.assignedDate+'</div>':'')
-        +(!u.assignedName&&!u.assignedTo?'<span class="js-lbl-xs">No tenant assigned yet</span>':'');
-    } else {
-      ts.style.display = 'none';
-    }
-  }
-
-  // Notes
-  var ns = document.getElementById('udp_notes_section');
-  var nd = document.getElementById('udp_notes');
-  if(ns && nd){
-    if(u.notes && u.notes.trim()){
-      ns.style.display = 'block';
-      nd.textContent = u.notes;
-    } else {
-      ns.style.display = 'none';
-    }
-  }
-
-  // Photos
-  renderUnitPhotos(unitId);
-
-  // Scopes of Work table
-  udpRenderSowTable(unitId);
-
-  // RFQs & Contracts section
-  if (typeof udpRenderRfqSection === 'function') udpRenderRfqSection(unitId);
-
-  // Map
-  udpRenderMap(u);
-
-  // Tenant files preview in detail panel
-  udpRenderFilePreviews(unitId);
-
-  // Tenant history (past tenants at this unit)
-  udpRenderTenantHistory(unitId);
-
-  // Show panel — set both inline display AND .is-open class for redundancy.
-  // Either alone should be enough; both ensures the modal becomes visible
-  // even if some other rule wins specificity on one of the two.
-  var panel = document.getElementById('unitDetailPanel');
-  if(panel){
-    panel.style.setProperty('display','flex','important');
-    panel.classList.add('is-open');
-  }
-}
-
-// ── Unit Detail Panel — tenant history ───────────────────────────────
+// ── Unit Detail — tenant history (rendered inside the Edit Unit card) ───
 function udpRenderTenantHistory(unitId) {
   var sec  = document.getElementById('udp_history_section');
   var list = document.getElementById('udp_history_list');
@@ -2123,36 +2065,6 @@ function renoSearchFilter(q) {
 
 // ══ RESTORED UNIT/PHOTO FUNCTIONS ══
 
-function renderUnitPhotos(unitId){
-  var container = document.getElementById('udp_photos');
-  if(!container) return;
-  var photos = getUnitPhotos(unitId);
-  if(!photos.length){
-    container.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:10px 0;font-style:italic;">No photos yet — upload one below.</div>';
-    return;
-  }
-  var html = '';
-  photos.forEach(function(p, i){
-    html += '<div style="position:relative;flex-shrink:0;">'
-      +'<img src="'+p.data+'" alt="Unit photo" data-uid="'+unitId+'" data-idx="'+i+'" style="width:90px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer;" title="Click to view"/>'
-      +'<button type="button" data-del-uid="'+unitId+'" data-del-idx="'+i+'" style="position:absolute;top:-5px;right:-5px;background:var(--danger);border:none;color:#fff;width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:10px;line-height:18px;text-align:center;padding:0;" title="Remove">✕</button>'
-      +'</div>';
-  });
-  container.innerHTML = html;
-  container.querySelectorAll('img[data-uid]').forEach(function(img){
-    img.onclick = function(){ viewUnitPhoto(img.getAttribute('data-uid'), parseInt(img.getAttribute('data-idx'))); };
-  });
-  container.querySelectorAll('button[data-del-uid]').forEach(function(btn){
-    btn.onclick = function(){ deleteUnitPhoto(btn.getAttribute('data-del-uid'), parseInt(btn.getAttribute('data-del-idx'))); };
-  });
-}
-
-function openUnitEditFromDetail() {
-  if(_currentDetailUnitId){
-    closeUnitDetail();
-    openUnitEditModal(_currentDetailUnitId);
-  }
-}
 
 function openRenoProgress(unitId) {
   var allUnits = getAllUnits();
