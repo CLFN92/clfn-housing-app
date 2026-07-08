@@ -233,9 +233,9 @@ function _buildSowModalHTML() {
 
         // ── OVERVIEW ─────────────────────────────────────────────────────
         '<div class="tic-panel tic-active" data-modal-panel="overview">' +
-          '<div class="card card-flush-mb-overflow">' +
-            '<div class="modal-hdr compact"><div class="lbl-yellow">Unit Information</div></div>' +
-            '<div class="grid-c2-pad">' +
+          '<div class="tic-section">' +
+            '<div class="tic-section-h">Unit Information</div>' +
+            '<div class="grid-c2-10">' +
               '<div class="f"><label>Unit Address</label><input id="sow_address" type="text" placeholder="e.g. 11 Musko Road"/></div>' +
               '<div class="f"><label>Date Prepared</label><input id="sow_date" type="date"/></div>' +
               '<div class="f"><label>Current Tenant Name</label><input id="sow_tenant_name" type="text" placeholder="Full name of tenant"/></div>' +
@@ -255,9 +255,9 @@ function _buildSowModalHTML() {
               '</div>' +
             '</div>' +
           '</div>' +
-          '<div class="card card-flush-mb">' +
-            '<div class="modal-hdr compact"><div class="lbl-yellow">Condition Assessment</div></div>' +
-            '<div class="grid-c2-pad">' +
+          '<div class="tic-section">' +
+            '<div class="tic-section-h">Condition Assessment</div>' +
+            '<div class="grid-c2-10">' +
               '<div class="f"><label>Overall Condition</label>' +
                 '<select id="sow_condition">' +
                   '<option value="">— Select —</option>' +
@@ -284,16 +284,14 @@ function _buildSowModalHTML() {
         // value is auto-calculated from the SOW Items list above it —
         // reading top-to-bottom: itemize the work → see the total.
         '<div class="tic-panel" data-modal-panel="scope">' +
-          '<div class="card card-flush-mb">' +
-            '<div class="modal-hdr compact"><div class="lbl-yellow">Work Items</div></div>' +
-            '<div class="p-16">' +
-              '<div id="sow_items"></div>' +
-              '<button type="button" onclick="addSowItem()" class="sow-add-item-btn">+ Add Work Item</button>' +
-            '</div>' +
+          '<div class="tic-section">' +
+            '<div class="tic-section-h">Work Items</div>' +
+            '<div id="sow_items"></div>' +
+            '<button type="button" onclick="addSowItem()" class="sow-add-item-btn">+ Add Work Item</button>' +
           '</div>' +
-          '<div class="card card-flush-mb">' +
-            '<div class="modal-hdr compact"><div class="lbl-yellow">Estimated Total Cost</div></div>' +
-            '<div class="grid-c2-pad">' +
+          '<div class="tic-section">' +
+            '<div class="tic-section-h">Estimated Total Cost</div>' +
+            '<div class="grid-c2-10">' +
               '<div class="f"><label>Sum of items above</label><input id="sow_total_cost" type="text" placeholder="Auto-calculated" readonly class="sow-total-cost-input"/></div>' +
             '</div>' +
           '</div>' +
@@ -304,80 +302,72 @@ function _buildSowModalHTML() {
         // Split out of the Scope of Work tab so files don't compete with
         // the work-items list for screen space, especially on tablet.
         '<div class="tic-panel" data-modal-panel="documents">' +
-          '<div class="card card-flush-mb">' +
-            '<div class="modal-hdr compact"><div class="lbl-yellow">Photos &amp; Documents</div><div id="sow_files_size" class="file-list-meta"></div></div>' +
-            '<div class="p-16">' +
-              '<div id="sow_drop_zone" class="upload-zone"' +
-                ' ondragover="photoDragOver(event,\'sow_drop_zone\')"' +
-                ' ondragleave="photoDragLeave(\'sow_drop_zone\')"' +
-                ' ondrop="sowFileDrop(event)"' +
-                ' onclick="document.getElementById(\'sow_files_input\').click()">' +
-                '<svg class="upload-zone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>' +
-                '<div class="upload-zone-title">Drag files here or <span class="link-yellow">browse</span></div>' +
-                '<div class="txt-muted-xs">Photos · PDF · DOC/DOCX · XLS/XLSX · CSV · TXT — up to 50 MB total</div>' +
-                '<input type="file" id="sow_files_input" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" multiple onchange="handleSowFileUpload(this)"/>' +
-              '</div>' +
-              '<div id="sow_files_list" class="file-list"></div>' +
+          '<div class="tic-section">' +
+            '<div class="tic-section-h flex-sb"><span>Photos &amp; Documents</span><span id="sow_files_size" class="file-list-meta"></span></div>' +
+            '<div id="sow_drop_zone" class="upload-zone"' +
+              ' ondragover="photoDragOver(event,\'sow_drop_zone\')"' +
+              ' ondragleave="photoDragLeave(\'sow_drop_zone\')"' +
+              ' ondrop="sowFileDrop(event)"' +
+              ' onclick="document.getElementById(\'sow_files_input\').click()">' +
+              '<svg class="upload-zone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>' +
+              '<div class="upload-zone-title">Drag files here or <span class="link-yellow">browse</span></div>' +
+              '<div class="txt-muted-xs">Photos · PDF · DOC/DOCX · XLS/XLSX · CSV · TXT — up to 50 MB total</div>' +
+              '<input type="file" id="sow_files_input" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" multiple onchange="handleSowFileUpload(this)"/>' +
             '</div>' +
+            '<div id="sow_files_list" class="file-list"></div>' +
           '</div>' +
         '</div>' +
 
         // ── HEALTH & SAFETY ──────────────────────────────────────────────
         '<div class="tic-panel" data-modal-panel="safety">' +
-          '<div class="card card-flush-mb">' +
-            '<div class="modal-hdr compact"><div class="lbl-yellow">Health &amp; Safety Concerns</div></div>' +
-            '<div class="p-16">' +
-              '<div class="grid-c3-tight">' +
-                '<label class="check-row"><input type="checkbox" id="sow_mold" class="icon-sm"/> Mould / Mildew</label>' +
-                '<label class="check-row"><input type="checkbox" id="sow_asbestos" class="icon-sm"/> Asbestos Risk</label>' +
-                '<label class="check-row"><input type="checkbox" id="sow_electrical" class="icon-sm"/> Electrical Hazard</label>' +
-                '<label class="check-row"><input type="checkbox" id="sow_structural" class="icon-sm"/> Structural Concern</label>' +
-                '<label class="check-row"><input type="checkbox" id="sow_plumbing" class="icon-sm"/> Plumbing / Sewage</label>' +
-                '<label class="check-row"><input type="checkbox" id="sow_fire" class="icon-sm"/> Fire Safety</label>' +
-              '</div>' +
+          '<div class="tic-section">' +
+            '<div class="tic-section-h">Health &amp; Safety Concerns</div>' +
+            '<div class="grid-c3-tight">' +
+              '<label class="check-row"><input type="checkbox" id="sow_mold" class="icon-sm"/> Mould / Mildew</label>' +
+              '<label class="check-row"><input type="checkbox" id="sow_asbestos" class="icon-sm"/> Asbestos Risk</label>' +
+              '<label class="check-row"><input type="checkbox" id="sow_electrical" class="icon-sm"/> Electrical Hazard</label>' +
+              '<label class="check-row"><input type="checkbox" id="sow_structural" class="icon-sm"/> Structural Concern</label>' +
+              '<label class="check-row"><input type="checkbox" id="sow_plumbing" class="icon-sm"/> Plumbing / Sewage</label>' +
+              '<label class="check-row"><input type="checkbox" id="sow_fire" class="icon-sm"/> Fire Safety</label>' +
             '</div>' +
           '</div>' +
         '</div>' +
 
         // ── ACCOUNTABILITY ───────────────────────────────────────────────
         '<div class="tic-panel" data-modal-panel="acct">' +
-          '<div class="card card-flush-mb">' +
-            '<div class="modal-hdr compact"><div class="lbl-yellow">Tenant Accountability</div></div>' +
-            '<div class="p-16">' +
-              '<div class="sow-acct-hint">Record factors that affect renovation priority and tenant responsibility.</div>' +
-              '<div class="sow-acct-list">' +
-                '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_rent_arrears"/><span class="tsl"></span></label><label for="sow_rent_arrears" class="txt-sm-bold">Tenant has rent arrears</label></div>' +
-                '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_tenant_damage"/><span class="tsl"></span></label><label for="sow_tenant_damage" class="txt-sm-bold">Damage caused by tenant</label></div>' +
-                '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_negligence"/><span class="tsl"></span></label><label for="sow_negligence" class="txt-sm-bold">Negligence (failure to maintain / report issues)</label></div>' +
-                '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_vandalism"/><span class="tsl"></span></label><label for="sow_vandalism" class="txt-sm-bold">Vandalism</label></div>' +
-                '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_police_report"/><span class="tsl"></span></label><label for="sow_police_report" class="txt-sm-bold">Police report on file</label></div>' +
-              '</div>' +
-              '<div class="f"><label>Accountability Notes</label>' +
-                '<textarea id="sow_accountability_notes" rows="2" placeholder="Details on tenant responsibility, incident dates, report numbers…"></textarea>' +
-              '</div>' +
+          '<div class="tic-section">' +
+            '<div class="tic-section-h">Tenant Accountability</div>' +
+            '<div class="sow-acct-hint">Record factors that affect renovation priority and tenant responsibility.</div>' +
+            '<div class="sow-acct-list">' +
+              '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_rent_arrears"/><span class="tsl"></span></label><label for="sow_rent_arrears" class="txt-sm-bold">Tenant has rent arrears</label></div>' +
+              '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_tenant_damage"/><span class="tsl"></span></label><label for="sow_tenant_damage" class="txt-sm-bold">Damage caused by tenant</label></div>' +
+              '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_negligence"/><span class="tsl"></span></label><label for="sow_negligence" class="txt-sm-bold">Negligence (failure to maintain / report issues)</label></div>' +
+              '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_vandalism"/><span class="tsl"></span></label><label for="sow_vandalism" class="txt-sm-bold">Vandalism</label></div>' +
+              '<div class="ftog"><label class="tsw"><input type="checkbox" id="sow_police_report"/><span class="tsl"></span></label><label for="sow_police_report" class="txt-sm-bold">Police report on file</label></div>' +
+            '</div>' +
+            '<div class="f"><label>Accountability Notes</label>' +
+              '<textarea id="sow_accountability_notes" rows="2" placeholder="Details on tenant responsibility, incident dates, report numbers…"></textarea>' +
             '</div>' +
           '</div>' +
         '</div>' +
 
         // ── NOTES & TERMS ────────────────────────────────────────────────
         '<div class="tic-panel" data-modal-panel="notes">' +
-          '<div class="card card-flush-mb">' +
-            '<div class="modal-hdr compact"><div class="lbl-yellow">Additional Notes</div></div>' +
-            '<div class="p-16">' +
-              '<div class="f"><label>Special Instructions / Access Requirements</label>' +
-                '<textarea id="sow_notes" rows="3" placeholder="Any additional context, access requirements, tenant considerations…"></textarea>' +
-              '</div>' +
+          '<div class="tic-section">' +
+            '<div class="tic-section-h">Additional Notes</div>' +
+            '<div class="f"><label>Special Instructions / Access Requirements</label>' +
+              '<textarea id="sow_notes" rows="3" placeholder="Any additional context, access requirements, tenant considerations…"></textarea>' +
             '</div>' +
           '</div>' +
           // Terms & Conditions default to COLLAPSED — the section is long
           // boilerplate that users rarely need to read in full once they've
           // seen it once. The accordion uses the shared .collapsible-card
-          // pattern (toggling .is-collapsed on the wrapper card hides the
+          // pattern (toggling .is-collapsed on the wrapper hides the
           // .collapsible-body and rotates the chevron).
-          '<div class="card card-flush-mb collapsible-card is-collapsed">' +
-            '<div class="modal-hdr compact collapsible-head" onclick="this.parentElement.classList.toggle(\'is-collapsed\')">' +
-              '<div class="lbl-yellow">Terms &amp; Conditions</div>' +
-              '<svg class="collapsible-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>' +
+          '<div class="tic-section collapsible-card is-collapsed">' +
+            '<div class="tic-section-h flex-sb collapsible-head" onclick="this.parentElement.classList.toggle(\'is-collapsed\')">' +
+              '<span>Terms &amp; Conditions</span>' +
+              '<svg class="collapsible-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>' +
             '</div>' +
             '<div id="sow_terms_body" class="sow-terms-body collapsible-body">' +
               '<p class="sow-terms-eyebrow" data-nation-template="{NATION} — Housing Department">Constance Lake First Nation — Housing Department</p>' +
@@ -397,8 +387,8 @@ function _buildSowModalHTML() {
 
         // ── SIGNATURES ───────────────────────────────────────────────────
         '<div class="tic-panel" data-modal-panel="sigs">' +
-          '<div class="card card-flush-mb">' +
-            '<div class="modal-hdr compact"><div class="lbl-yellow">Signatures &amp; Acknowledgement<span class="lbl-required">Required</span></div></div>' +
+          '<div class="tic-section">' +
+            '<div class="tic-section-h">Signatures &amp; Acknowledgement<span class="lbl-required">Required</span></div>' +
             '<div id="sow_sig_body" class="sow-sig-body">' +
               // Tenant signature
               '<div class="box-bg-card">' +
