@@ -114,6 +114,17 @@
 
 /* ── 2. BASE RESET ──────────────────────────────────────────────────────── */
 
+/* iOS Safari's "text autosizer" silently inflates the font-size of short
+   text in a wide column (e.g. a field <label> next to a narrow sibling
+   field) well past the CSS value, and does it inconsistently between
+   portrait/landscape — the giant, clipped "Street" label bug in the Edit
+   Unit / TIC / Maintenance Request field grids. Disabling the adjuster
+   makes every element render at exactly its authored font-size. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   font-family: var(--sans);
   background:  #fafaf8; /* fallback before --bg resolves, prevents white flash */
