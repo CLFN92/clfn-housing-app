@@ -203,13 +203,15 @@ function _buildSowModalHTML() {
       '</div>' +
 
       // ── Info strip ───────────────────────────────────────────────────────
+      // 4 tiles only — Fund Source and Condition are one tap away on the
+      // Overview tab immediately below, so the strip sticks to the fields
+      // worth a glance without opening a tab: workflow state, budget, who's
+      // doing it, and when it's due.
       '<div class="tic-strip">' +
         '<div class="tic-strip-tile"><div class="tic-strip-lbl">Status</div><div id="sow_strip_status" class="tic-strip-val">—</div></div>' +
-        '<div class="tic-strip-tile"><div class="tic-strip-lbl">Fund Source</div><div id="sow_strip_fund" class="tic-strip-val">—</div></div>' +
         '<div class="tic-strip-tile"><div class="tic-strip-lbl">Est. Cost</div><div id="sow_strip_cost" class="tic-strip-val">—</div></div>' +
         '<div class="tic-strip-tile"><div class="tic-strip-lbl">Assigned To</div><div id="sow_strip_assigned" class="tic-strip-val">—</div></div>' +
         '<div class="tic-strip-tile"><div class="tic-strip-lbl">Target Completion</div><div id="sow_strip_target" class="tic-strip-val">—</div></div>' +
-        '<div class="tic-strip-tile"><div class="tic-strip-lbl">Condition</div><div id="sow_strip_condition" class="tic-strip-val">—</div></div>' +
       '</div>' +
 
       // Read-only banner (shown when SOW is marked Complete and locked)
@@ -570,11 +572,11 @@ function _updateSowSaveButtonState() {
   if (prog) prog.textContent = allReviewed ? 'All sections reviewed' : (visited + ' of ' + _SOW_TAB_TOTAL + ' sections reviewed');
 }
 
-// Refreshes the info-strip tiles (Status/Fund Source/Est. Cost/Assigned To/
-// Target Completion/Condition) from whatever is currently in the form —
-// called on open, on every tab switch, and after the total cost recalculates.
-// Status is the exception: it isn't a form field, so it reads
-// window._sowCurrentSowMeta (set in openSowModal from the saved record).
+// Refreshes the info-strip tiles (Status/Est. Cost/Assigned To/Target
+// Completion) from whatever is currently in the form — called on open, on
+// every tab switch, and after the total cost recalculates. Status is the
+// exception: it isn't a form field, so it reads window._sowCurrentSowMeta
+// (set in openSowModal from the saved record).
 function _sowRefreshStrip() {
   var get = function(id){ var el = document.getElementById(id); return el ? el.value : ''; };
 
@@ -586,13 +588,6 @@ function _sowRefreshStrip() {
     statusEl.style.color = sb ? sb.c : '';
   }
 
-  var fundEl = document.getElementById('sow_strip_fund');
-  if (fundEl) {
-    var fundSel = document.getElementById('sow_fund_source');
-    var opt = (fundSel && fundSel.selectedIndex >= 0) ? fundSel.options[fundSel.selectedIndex] : null;
-    fundEl.textContent = (opt && opt.value) ? opt.textContent : '—';
-  }
-
   var costEl = document.getElementById('sow_strip_cost');
   if (costEl) costEl.textContent = get('sow_total_cost') || '—';
 
@@ -601,9 +596,6 @@ function _sowRefreshStrip() {
 
   var tgtEl = document.getElementById('sow_strip_target');
   if (tgtEl) tgtEl.textContent = get('sow_end_date') || '—';
-
-  var condEl = document.getElementById('sow_strip_condition');
-  if (condEl) condEl.textContent = get('sow_condition') || '—';
 }
 window._sowRefreshStrip = _sowRefreshStrip;
 
@@ -663,7 +655,6 @@ function _sowUpdateFundBadge(poolId) {
   badge.style.background = pool.bg || 'var(--bg)';
   badge.style.color      = pool.color || 'var(--text)';
   badge.style.border     = '1px solid ' + (pool.color || 'var(--border)');
-  if (typeof _sowRefreshStrip === 'function') _sowRefreshStrip();
 }
 
 // ── SOW Picker — shown when a unit has multiple active maintenance requests ──
