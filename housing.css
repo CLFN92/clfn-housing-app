@@ -1043,53 +1043,21 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════
- * SOW Modal — tabbed layout (Stop C consolidation)
+ * SOW ("Maintenance Request") Modal — tic-shell layout
  * The SOW modal markup was duplicated across renos / inventory / match /
- * tenants HTML. It now lives as a single innerHTML template in
- * housing-modals-sow.js (_buildSowModalHTML). These rules style the new
- * tab strip + per-section panels and the small wrapper utilities the
- * template introduced.
+ * tenants HTML, then consolidated into a single innerHTML template in
+ * housing-modals-sow.js (_buildSowModalHTML). It now reuses the same
+ * hero/strip/tabs/body/footer shell as the TIC and Edit Unit card
+ * (.tic-shell/.tic-hero/.tic-strip/.tic-tabs/.tic-body/.tic-footer — see
+ * those rules later in this file). These rules style the small
+ * SOW-specific wrapper utilities the template introduces on top of that
+ * shared shell.
  * ════════════════════════════════════════════════════════════════════════ */
 
-/* Outer modal-body shell (replaces the inline width/border-radius div).
-   min-height anchors the modal to a stable size so switching between
-   short tabs (Health & Safety = a single checkbox grid) and long tabs
-   (Notes & Terms with the full Terms accordion expanded) doesn't bounce
-   the page height. max-height keeps it within viewport. */
-.modal-body-sow-shell {
-  background: var(--surface);
-  border-radius: 14px;
-  width: 100%;
-  max-width: 760px;
-  box-shadow: 0 24px 60px rgba(0,0,0,0.4);
-  overflow: hidden;
-  margin: auto;
-  display: flex;
-  flex-direction: column;
-  min-height: 75vh;
-  max-height: 92vh;
-}
-.modal-body-sow-shell .modal-body-stack { overflow-y: auto; flex: 1; }
-
-/* Project # row in the header */
+/* Project # row in the hero (tic-hero-main) */
 .sow-pn-row { margin-top: 4px; display: flex; align-items: center; gap: 6px; }
 .sow-pn-lbl { font-size: 9px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--muted); }
 .sow-pn-val { font-size: 11px; font-weight: 700; color: var(--yellow); font-family: ui-monospace, Menlo, Monaco, 'Courier New', monospace; }
-
-/* Header action buttons (was inline) */
-.sow-hdr-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-.sow-hdr-btn-success,
-.sow-hdr-btn-warn,
-.sow-hdr-btn-ghost,
-.sow-hdr-btn-primary {
-  padding: 5px 12px; border-radius: 7px; cursor: pointer; font-size: 12px;
-  font-family: 'DM Sans', sans-serif; font-weight: 700;
-  display: inline-flex; align-items: center; gap: 5px;
-}
-.sow-hdr-btn-success { background: var(--success); border: none; color: #fff; }
-.sow-hdr-btn-warn    { background: none; border: 1px solid var(--warn-amber-border); color: var(--warn-amber); }
-.sow-hdr-btn-ghost   { background: none; border: 1px solid var(--dark-border); color: var(--txt-on-dark); }
-.sow-hdr-btn-primary { background: var(--yellow); border: none; color: var(--dark); }
 
 .banner-icon { font-size: 14px; margin-right: 6px; }
 
@@ -1146,8 +1114,23 @@ body.is-sow-only .modal-overlay { visibility: visible; }
   vertical-align: middle;
 }
 
+/* Same unreviewed-tab dot for the Maintenance Request modal, which uses the
+   shared .tic-tab styling (hero/strip/tabs shell) instead of .modal-tab.
+   Scoped to #sow_tab_bar — .tic-tab is also used by the TIC and Edit Unit
+   card, neither of which track a "visited" set, so an unscoped rule would
+   put a dot on every one of their tabs. */
+#sow_tab_bar .tic-tab:not(.visited)::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--warn-amber, #f59e0b);
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
 /* Review-progress label in the SOW + CIC footers ("3 of 7 sections reviewed") */
-.sow-footer-right,
 .cic-footer-right     { display: flex; align-items: center; gap: 10px; }
 .sow-review-progress,
 .cic-review-progress  { font-size: 11px; color: var(--muted); font-style: italic; white-space: nowrap; }
@@ -1211,10 +1194,8 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 .sow-sig-badge-tenant    { background: var(--yellow); color: var(--dark); }
 .sow-sig-badge-staff     { background: var(--surface); border: 2px solid var(--border); color: var(--muted); }
 .sow-approvals-card      { margin-bottom: 0; padding: 0; overflow: hidden; border-color: var(--yellow); }
-.sow-modal-footer        { padding: 14px 24px; border-top: 1px solid var(--border); gap: 10px; background: var(--bg); position: sticky; bottom: 0; }
 
 @media (max-width: 640px) {
-  .modal-body-sow-shell { max-height: 100vh; border-radius: 0; }
   .modal-tab-panel     { padding: 10px 0; }
   /* Keep the horizontal tab strip on phones and let it scroll sideways
      (it already has overflow-x:auto) — matches the tab pattern used

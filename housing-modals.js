@@ -113,7 +113,7 @@ function _ueApplyReadOnly(ro){
     banner = document.createElement('div');
     banner.id = 'ueReadOnlyBanner';
     banner.style.cssText = 'background:var(--warn-amber-bg);color:var(--warn-amber-text);border:1px solid var(--warn-amber-border);border-radius:8px;padding:9px 14px;font-size:12px;font-weight:600;margin-bottom:12px;';
-    banner.textContent = '🔒 View only — Field Employees cannot edit unit records, but can still manage Scopes of Work.';
+    banner.textContent = '🔒 View only — Field Employees cannot edit unit records, but can still manage Maintenance Requests.';
     var body = modal.querySelector('.tic-body');
     if(body) body.insertBefore(banner, body.firstChild);
   } else if(!ro && banner){
@@ -423,7 +423,7 @@ function ueUpdateBudgetRouting() {
       indicator.innerHTML = '<div class="flex-g8">'
         +'<span style="font-size:16px;">⚠️</span>'
         +'<div><strong>ED Approval Required</strong><br>'
-        +'SOW total is <strong>'+fmtCost+'</strong> — exceeds the HM budget authority of '+fmtLimit+'.<br>'
+        +'Maintenance Request total is <strong>'+fmtCost+'</strong> — exceeds the HM budget authority of '+fmtLimit+'.<br>'
         +'<span style="font-size:11px;">Executive Director must sign off before work begins.</span></div>'
         +'</div>';
     } else {
@@ -433,7 +433,7 @@ function ueUpdateBudgetRouting() {
       indicator.innerHTML = '<div class="flex-g8">'
         +'<span style="font-size:16px;">✅</span>'
         +'<div><strong>HM Approval Sufficient</strong><br>'
-        +'SOW total is <strong>'+fmtCost+'</strong> — within HM budget authority of '+fmtLimit+'.<br>'
+        +'Maintenance Request total is <strong>'+fmtCost+'</strong> — within HM budget authority of '+fmtLimit+'.<br>'
         +'<span style="font-size:11px;">Housing Manager signature below is all that is required.</span></div>'
         +'</div>';
     }

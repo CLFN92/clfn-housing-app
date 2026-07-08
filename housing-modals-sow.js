@@ -143,7 +143,7 @@ async function removeSowFile(path) {
   if (!path) return;
   var ok = await showConfirm({
     title:       'Remove this file?',
-    message:     'The file will be deleted from this SOW. This cannot be undone.',
+    message:     'The file will be deleted from this Maintenance Request. This cannot be undone.',
     confirmText: 'Remove',
     danger:      true
   });
@@ -172,8 +172,9 @@ var SOW_CATEGORIES = [
 // <div id="sowModalHost"></div> and openSowModal() mounts the template on
 // first call via _ensureSowModal().
 //
-// Sections are wrapped in 7 .modal-tab-panel containers so the modal can scroll
-// far less on iPad/iPhone (Stop C tab refactor):
+// Sections are wrapped in 7 .tic-panel containers (same hero/strip/tabs shell
+// as the TIC and Edit Unit card) so the modal can scroll far less on
+// iPad/iPhone (Stop C tab refactor):
 //   overview     — Unit Information + Condition Assessment
 //   scope        — Scope of Work Items + Photos & Documents
 //   safety       — Health & Safety Concerns
@@ -189,62 +190,47 @@ var SOW_CATEGORIES = [
 // closeSowModal) keeps working unchanged.
 function _buildSowModalHTML() {
   return '' +
-    '<div class="modal-body-sow-shell">' +
-      // ── Header ───────────────────────────────────────────────────────────
-      '<div class="modal-hdr spacious sticky">' +
-        '<div>' +
+    '<div class="tic-shell">' +
+
+      // ── Hero ─────────────────────────────────────────────────────────────
+      '<div class="tic-hero">' +
+        '<div class="tic-hero-main">' +
           '<div class="lbl-uppercase-sm" data-nation-template="{NATION} — Housing">Constance Lake First Nation — Housing</div>' +
-          '<div class="txt-hdr-white">Maintenance Request</div>' +
-          '<div id="sow_unit_label" class="txt-sm-meta"></div>' +
+          '<h2 id="sow_unit_label" class="tic-name">—</h2>' +
           '<div class="sow-pn-row"><span class="sow-pn-lbl">Project #</span><span id="sow_project_number_label" class="sow-pn-val"></span></div>' +
         '</div>' +
-        '<div class="sow-hdr-actions">' +
-          '<button id="sow_approve_btn" type="button" onclick="sowApproveInline()" class="sow-hdr-btn-success" style="display:none;">✓ Approve</button>' +
-          '<button id="sow_mark_complete_btn" type="button" onclick="markSowComplete()" class="sow-hdr-btn-success" style="display:none;">✓ Mark Complete</button>' +
-          '<button id="sow_reopen_btn" type="button" onclick="reopenSow()" class="sow-hdr-btn-warn" style="display:none;">↺ Reopen</button>' +
-          '<button id="sow_archive_btn" type="button" onclick="archiveCurrentSow()" class="sow-hdr-btn-ghost" style="display:none;">🗄 Archive</button>' +
-          '<button type="button" onclick="printWorkOrder()" class="sow-hdr-btn-primary">🏗 Work Order</button>' +
-          '<button type="button" onclick="printSOW()" class="sow-hdr-btn-ghost">🖨 Full Request</button>' +
-          '<button type="button" id="sow_rfq_btn" onclick="if(_sowUnitId&&window._sowEditingProjectNumber){saveSOW();try{var _c=window._sowCache&&window._sowCache[_sowUnitId];var _sa=_c&&Array.isArray(_c.sows)?_c.sows:(_c&&Array.isArray(_c)?_c:[]);var _sh=_sa.find(function(s){return s&&s.project_number===window._sowEditingProjectNumber;})||null;if(_sh)sessionStorage.setItem(\'_rfq_sow_handoff\',JSON.stringify(_sh));}catch(e){}window.location.href=\'rfq.html?unit=\'+encodeURIComponent(_sowUnitId)+\'&sow=\'+encodeURIComponent(window._sowEditingProjectNumber);}else{if(typeof showToast===\'function\')showToast(\'Save the request first\');}" class="sow-hdr-btn-ghost" style="display:none;">📋 RFQ</button>' +
-          '<button type="button" onclick="closeSowModal()" class="btn-close-sm">✕</button>' +
-        '</div>' +
+        '<button type="button" onclick="closeSowModal()" class="tic-close-btn" aria-label="Close">✕</button>' +
+      '</div>' +
+
+      // ── Info strip ───────────────────────────────────────────────────────
+      '<div class="tic-strip">' +
+        '<div class="tic-strip-tile"><div class="tic-strip-lbl">Status</div><div id="sow_strip_status" class="tic-strip-val">—</div></div>' +
+        '<div class="tic-strip-tile"><div class="tic-strip-lbl">Fund Source</div><div id="sow_strip_fund" class="tic-strip-val">—</div></div>' +
+        '<div class="tic-strip-tile"><div class="tic-strip-lbl">Est. Cost</div><div id="sow_strip_cost" class="tic-strip-val">—</div></div>' +
+        '<div class="tic-strip-tile"><div class="tic-strip-lbl">Assigned To</div><div id="sow_strip_assigned" class="tic-strip-val">—</div></div>' +
+        '<div class="tic-strip-tile"><div class="tic-strip-lbl">Target Completion</div><div id="sow_strip_target" class="tic-strip-val">—</div></div>' +
+        '<div class="tic-strip-tile"><div class="tic-strip-lbl">Condition</div><div id="sow_strip_condition" class="tic-strip-val">—</div></div>' +
       '</div>' +
 
       // Read-only banner (shown when SOW is marked Complete and locked)
-      '<div id="sow_readonly_banner" class="banner-strip-success" style="display:none;"><span class="banner-icon">🔒</span>This Maintenance Request is marked Completed and is read-only. Only the Executive Director can reopen or modify a completed request.</div>' +
+      '<div id="sow_readonly_banner" class="banner-strip-success" style="display:none;margin:12px 28px 0;"><span class="banner-icon">🔒</span>This Maintenance Request is marked Completed and is read-only. Only the Executive Director can reopen or modify a completed request.</div>' +
 
-      // ── Tab strip (desktop) ──────────────────────────────────────────────
-      // CSS hides this on viewports < 640px and shows the drawer below.
-      '<div class="modal-tabs" id="sow_tab_bar">' +
-        '<button type="button" class="modal-tab active" data-modal-tab="overview"  onclick="setSowTab(\'overview\')">Overview</button>' +
-        '<button type="button" class="modal-tab"        data-modal-tab="scope"     onclick="setSowTab(\'scope\')">Work Items</button>' +
-        '<button type="button" class="modal-tab"        data-modal-tab="documents" onclick="setSowTab(\'documents\')">Documents</button>' +
-        '<button type="button" class="modal-tab"        data-modal-tab="safety"    onclick="setSowTab(\'safety\')">Health &amp; Safety</button>' +
-        '<button type="button" class="modal-tab"        data-modal-tab="acct"      onclick="setSowTab(\'acct\')">Accountability</button>' +
-        '<button type="button" class="modal-tab"        data-modal-tab="notes"     onclick="setSowTab(\'notes\')">Notes &amp; Terms</button>' +
-        '<button type="button" class="modal-tab"        data-modal-tab="sigs"      onclick="setSowTab(\'sigs\')">Signatures</button>' +
+      // ── Tabs ─────────────────────────────────────────────────────────────
+      '<div class="tic-tabs" id="sow_tab_bar" role="tablist">' +
+        '<button type="button" class="tic-tab tic-active" data-modal-tab="overview"  onclick="setSowTab(\'overview\')"  role="tab">Overview</button>' +
+        '<button type="button" class="tic-tab"            data-modal-tab="scope"     onclick="setSowTab(\'scope\')"     role="tab">Work Items</button>' +
+        '<button type="button" class="tic-tab"            data-modal-tab="documents" onclick="setSowTab(\'documents\')" role="tab">Documents</button>' +
+        '<button type="button" class="tic-tab"            data-modal-tab="safety"    onclick="setSowTab(\'safety\')"    role="tab">Health &amp; Safety</button>' +
+        '<button type="button" class="tic-tab"            data-modal-tab="acct"      onclick="setSowTab(\'acct\')"      role="tab">Accountability</button>' +
+        '<button type="button" class="tic-tab"            data-modal-tab="notes"     onclick="setSowTab(\'notes\')"     role="tab">Notes &amp; Terms</button>' +
+        '<button type="button" class="tic-tab"            data-modal-tab="sigs"      onclick="setSowTab(\'sigs\')"      role="tab">Signatures</button>' +
       '</div>' +
 
-      // ── Tab drawer (mobile) ──────────────────────────────────────────────
-      // Always-open vertical tab list for small screens. No toggle — all 7
-      // sections are visible at once so the user can tap any one without
-      // an extra expand step. CSS hides this whole block on viewports
-      // >= 640px (the horizontal strip above takes over).
-      '<div class="modal-tab-drawer" id="sow_tab_drawer">' +
-        '<button type="button" class="modal-drawer-item active" data-modal-tab="overview"  onclick="setSowTab(\'overview\')">Overview</button>' +
-        '<button type="button" class="modal-drawer-item"        data-modal-tab="scope"     onclick="setSowTab(\'scope\')">Work Items</button>' +
-        '<button type="button" class="modal-drawer-item"        data-modal-tab="documents" onclick="setSowTab(\'documents\')">Documents</button>' +
-        '<button type="button" class="modal-drawer-item"        data-modal-tab="safety"    onclick="setSowTab(\'safety\')">Health &amp; Safety</button>' +
-        '<button type="button" class="modal-drawer-item"        data-modal-tab="acct"      onclick="setSowTab(\'acct\')">Accountability</button>' +
-        '<button type="button" class="modal-drawer-item"        data-modal-tab="notes"     onclick="setSowTab(\'notes\')">Notes &amp; Terms</button>' +
-        '<button type="button" class="modal-drawer-item"        data-modal-tab="sigs"      onclick="setSowTab(\'sigs\')">Signatures</button>' +
-      '</div>' +
-
-      // ── Tab panels ───────────────────────────────────────────────────────
-      '<div class="modal-body-stack">' +
+      // ── Body / tab panels ────────────────────────────────────────────────
+      '<div class="tic-body">' +
 
         // ── OVERVIEW ─────────────────────────────────────────────────────
-        '<div class="modal-tab-panel active" data-modal-panel="overview">' +
+        '<div class="tic-panel tic-active" data-modal-panel="overview">' +
           '<div class="card card-flush-mb-overflow">' +
             '<div class="modal-hdr compact"><div class="lbl-yellow">Unit Information</div></div>' +
             '<div class="grid-c2-pad">' +
@@ -295,7 +281,7 @@ function _buildSowModalHTML() {
         // Estimated Total Cost sits HERE (not on Overview) because the
         // value is auto-calculated from the SOW Items list above it —
         // reading top-to-bottom: itemize the work → see the total.
-        '<div class="modal-tab-panel" data-modal-panel="scope">' +
+        '<div class="tic-panel" data-modal-panel="scope">' +
           '<div class="card card-flush-mb">' +
             '<div class="modal-hdr compact"><div class="lbl-yellow">Work Items</div></div>' +
             '<div class="p-16">' +
@@ -315,7 +301,7 @@ function _buildSowModalHTML() {
         // Photos + supporting documents (PDFs, quotes, inspection reports).
         // Split out of the Scope of Work tab so files don't compete with
         // the work-items list for screen space, especially on tablet.
-        '<div class="modal-tab-panel" data-modal-panel="documents">' +
+        '<div class="tic-panel" data-modal-panel="documents">' +
           '<div class="card card-flush-mb">' +
             '<div class="modal-hdr compact"><div class="lbl-yellow">Photos &amp; Documents</div><div id="sow_files_size" class="file-list-meta"></div></div>' +
             '<div class="p-16">' +
@@ -335,7 +321,7 @@ function _buildSowModalHTML() {
         '</div>' +
 
         // ── HEALTH & SAFETY ──────────────────────────────────────────────
-        '<div class="modal-tab-panel" data-modal-panel="safety">' +
+        '<div class="tic-panel" data-modal-panel="safety">' +
           '<div class="card card-flush-mb">' +
             '<div class="modal-hdr compact"><div class="lbl-yellow">Health &amp; Safety Concerns</div></div>' +
             '<div class="p-16">' +
@@ -352,7 +338,7 @@ function _buildSowModalHTML() {
         '</div>' +
 
         // ── ACCOUNTABILITY ───────────────────────────────────────────────
-        '<div class="modal-tab-panel" data-modal-panel="acct">' +
+        '<div class="tic-panel" data-modal-panel="acct">' +
           '<div class="card card-flush-mb">' +
             '<div class="modal-hdr compact"><div class="lbl-yellow">Tenant Accountability</div></div>' +
             '<div class="p-16">' +
@@ -372,7 +358,7 @@ function _buildSowModalHTML() {
         '</div>' +
 
         // ── NOTES & TERMS ────────────────────────────────────────────────
-        '<div class="modal-tab-panel" data-modal-panel="notes">' +
+        '<div class="tic-panel" data-modal-panel="notes">' +
           '<div class="card card-flush-mb">' +
             '<div class="modal-hdr compact"><div class="lbl-yellow">Additional Notes</div></div>' +
             '<div class="p-16">' +
@@ -408,7 +394,7 @@ function _buildSowModalHTML() {
         '</div>' +
 
         // ── SIGNATURES ───────────────────────────────────────────────────
-        '<div class="modal-tab-panel" data-modal-panel="sigs">' +
+        '<div class="tic-panel" data-modal-panel="sigs">' +
           '<div class="card card-flush-mb">' +
             '<div class="modal-hdr compact"><div class="lbl-yellow">Signatures &amp; Acknowledgement<span class="lbl-required">Required</span></div></div>' +
             '<div id="sow_sig_body" class="sow-sig-body">' +
@@ -416,7 +402,7 @@ function _buildSowModalHTML() {
               '<div class="box-bg-card">' +
                 '<div class="flex-row-mb">' +
                   '<div class="sow-sig-badge sow-sig-badge-tenant">T</div>' +
-                  '<div><div class="fw-bold-sm">Tenant</div><div class="txt-xs-muted">I acknowledge the scope of work and grant access to the unit</div></div>' +
+                  '<div><div class="fw-bold-sm">Tenant</div><div class="txt-xs-muted">I acknowledge the maintenance request and grant access to the unit</div></div>' +
                 '</div>' +
                 '<div class="grid-c2-tight-mb">' +
                   '<div class="f"><label>Printed Name</label><input type="text" id="sow_sig_tenant_name" placeholder="Tenant full name"/></div>' +
@@ -440,7 +426,7 @@ function _buildSowModalHTML() {
               '<div class="box-bg-card">' +
                 '<div class="flex-row-mb">' +
                   '<div class="sow-sig-badge sow-sig-badge-staff">S</div>' +
-                  '<div><div class="fw-bold-sm">Housing Staff</div><div class="txt-xs-muted">Employee completing this scope of work</div></div>' +
+                  '<div><div class="fw-bold-sm">Housing Staff</div><div class="txt-xs-muted">Employee completing this maintenance request</div></div>' +
                 '</div>' +
                 '<div class="grid-c2-tight-mb">' +
                   '<div class="f"><label>Printed Name</label><input type="text" id="sow_sig_staff_name" placeholder="Staff full name"/></div>' +
@@ -479,25 +465,33 @@ function _buildSowModalHTML() {
           '<span id="sow_budget_badge"></span>' +
         '</div>' +
 
-      '</div>' + /* /modal-body-stack */
+      '</div>' + /* /tic-body */
 
       // ── Footer ───────────────────────────────────────────────────────────
-      '<div class="flex-sb sow-modal-footer">' +
+      // Mirrors the TIC / Edit Unit footer: a row of secondary actions (all
+      // .btn-ghost), a spacer, then Cancel + the single primary action.
+      '<div class="tic-footer">' +
         '<div id="sow_saved_indicator" class="txt-muted-sm"></div>' +
-        '<div class="flex-row-10 sow-footer-right">' +
-          // Review progress label — populated by _updateSowSaveButtonState.
-          // Reads "3 of 8 sections reviewed" until all tabs have been
-          // visited at least once; then flips to "All sections reviewed".
-          '<div id="sow_review_progress" class="txt-muted-sm sow-review-progress"></div>' +
-          '<button type="button" onclick="closeSowModal()" class="btn btn-ghost">Cancel</button>' +
-          // Initial label is "Save Draft" because a fresh modal starts with
-          // only the Overview tab visited. _updateSowSaveButtonState flips
-          // it to "Submit Scope of Work" once all 8 tabs have been opened.
-          '<button id="sow_save_btn" type="button" onclick="sowSaveClicked()" class="btn btn-primary" data-mode="draft">💾 Save Draft</button>' +
-        '</div>' +
+        '<button id="sow_approve_btn" type="button" onclick="sowApproveInline()" class="btn btn-ghost" style="display:none;">✓ Approve</button>' +
+        '<button id="sow_mark_complete_btn" type="button" onclick="markSowComplete()" class="btn btn-ghost" style="display:none;">✓ Mark Complete</button>' +
+        '<button id="sow_reopen_btn" type="button" onclick="reopenSow()" class="btn btn-ghost" style="display:none;">↺ Reopen</button>' +
+        '<button id="sow_archive_btn" type="button" onclick="archiveCurrentSow()" class="btn btn-ghost" style="display:none;">🗄 Archive</button>' +
+        '<button type="button" onclick="printWorkOrder()" class="btn btn-ghost">🏗 Work Order</button>' +
+        '<button type="button" onclick="printSOW()" class="btn btn-ghost">🖨 Full Request</button>' +
+        '<button type="button" id="sow_rfq_btn" onclick="if(_sowUnitId&&window._sowEditingProjectNumber){saveSOW();try{var _c=window._sowCache&&window._sowCache[_sowUnitId];var _sa=_c&&Array.isArray(_c.sows)?_c.sows:(_c&&Array.isArray(_c)?_c:[]);var _sh=_sa.find(function(s){return s&&s.project_number===window._sowEditingProjectNumber;})||null;if(_sh)sessionStorage.setItem(\'_rfq_sow_handoff\',JSON.stringify(_sh));}catch(e){}window.location.href=\'rfq.html?unit=\'+encodeURIComponent(_sowUnitId)+\'&sow=\'+encodeURIComponent(window._sowEditingProjectNumber);}else{if(typeof showToast===\'function\')showToast(\'Save the request first\');}" class="btn btn-ghost" style="display:none;">📋 RFQ</button>' +
+        '<span class="tic-footer-spacer"></span>' +
+        // Review progress label — populated by _updateSowSaveButtonState.
+        // Reads "3 of 7 sections reviewed" until all tabs have been
+        // visited at least once; then flips to "All sections reviewed".
+        '<div id="sow_review_progress" class="txt-muted-sm sow-review-progress"></div>' +
+        '<button type="button" onclick="closeSowModal()" class="btn btn-ghost">Cancel</button>' +
+        // Initial label is "Save Draft" because a fresh modal starts with
+        // only the Overview tab visited. _updateSowSaveButtonState flips
+        // it to "Submit Request" once all 7 tabs have been opened.
+        '<button id="sow_save_btn" type="button" onclick="sowSaveClicked()" class="btn btn-primary" data-mode="draft">💾 Save Draft</button>' +
       '</div>' +
 
-    '</div>'; /* /modal-body-sow-shell */
+    '</div>'; /* /tic-shell */
 }
 
 // Mount the SOW template into a host on first call. Re-using #sowModal as
@@ -535,41 +529,35 @@ function _ensureSowModal() {
 var _SOW_TAB_NAMES  = ['overview','scope','documents','safety','acct','notes','sigs'];
 var _SOW_TAB_TOTAL  = _SOW_TAB_NAMES.length;
 
-// Tab switcher for the SOW modal. Mirrors the TIC pattern (data-modal-tab on
-// the buttons, data-modal-panel on the panels). Also tracks visited tabs in
+// Tab switcher for the SOW modal. Mirrors _ueSwitchTab/_ticSwitchTab
+// (data-modal-tab on the buttons, data-modal-panel on the panels, .tic-tab/
+// .tic-panel + .tic-active). Also tracks visited tabs in
 // window._sowVisitedTabs (a Set) so the Save button can flip between draft
-// and submit modes. Updates BOTH the desktop tab strip and the mobile
-// drawer in lockstep so the visible UI is the same regardless of viewport.
+// and submit modes, and refreshes the info strip so it reflects whatever the
+// user just entered on the tab they're leaving.
 function setSowTab(name) {
   if (!window._sowVisitedTabs) window._sowVisitedTabs = new Set();
   window._sowVisitedTabs.add(name);
-  // Desktop strip
   var bar = document.getElementById('sow_tab_bar');
   if (bar) {
-    bar.querySelectorAll(".modal-tab").forEach(function(b){
+    bar.querySelectorAll(".tic-tab").forEach(function(b){
       var n = b.getAttribute('data-modal-tab');
-      b.classList.toggle('active', n === name);
+      b.classList.toggle('tic-active', n === name);
       b.classList.toggle('visited', window._sowVisitedTabs.has(n));
     });
   }
-  // Mobile drawer (always-open vertical list, mirrors the desktop strip)
-  var drawer = document.getElementById('sow_tab_drawer');
-  if (drawer) {
-    drawer.querySelectorAll(".modal-drawer-item").forEach(function(b){
-      var n = b.getAttribute('data-modal-tab');
-      b.classList.toggle('active', n === name);
-      b.classList.toggle('visited', window._sowVisitedTabs.has(n));
+  var modal = document.getElementById('sowModal');
+  if (modal) {
+    modal.querySelectorAll(".tic-panel").forEach(function(p){
+      p.classList.toggle('tic-active', p.getAttribute('data-modal-panel') === name);
     });
   }
-  // Panels
-  document.querySelectorAll(".modal-tab-panel").forEach(function(p){
-    p.classList.toggle('active', p.getAttribute('data-modal-panel') === name);
-  });
+  if (typeof _sowRefreshStrip === 'function') _sowRefreshStrip();
   _updateSowSaveButtonState();
 }
 
 // Flips the Save button between "Save Draft" (not all tabs reviewed yet)
-// and "Submit Scope of Work" (every tab has been clicked at least once).
+// and "Submit Request" (every tab has been clicked at least once).
 // saveSOW reads btn.dataset.mode to decide whether to force draft status.
 function _updateSowSaveButtonState() {
   var btn = document.getElementById('sow_save_btn');
@@ -581,6 +569,43 @@ function _updateSowSaveButtonState() {
   btn.textContent   = allReviewed ? '📤 Submit Request' : '💾 Save Draft';
   if (prog) prog.textContent = allReviewed ? 'All sections reviewed' : (visited + ' of ' + _SOW_TAB_TOTAL + ' sections reviewed');
 }
+
+// Refreshes the info-strip tiles (Status/Fund Source/Est. Cost/Assigned To/
+// Target Completion/Condition) from whatever is currently in the form —
+// called on open, on every tab switch, and after the total cost recalculates.
+// Status is the exception: it isn't a form field, so it reads
+// window._sowCurrentSowMeta (set in openSowModal from the saved record).
+function _sowRefreshStrip() {
+  var get = function(id){ var el = document.getElementById(id); return el ? el.value : ''; };
+
+  var statusEl = document.getElementById('sow_strip_status');
+  if (statusEl) {
+    var meta = window._sowCurrentSowMeta || {approval_status:''};
+    var sb = (typeof sowStatusBadge === 'function') ? sowStatusBadge(meta, {variant:'unit_table'}) : null;
+    statusEl.textContent = sb ? sb.label : '—';
+    statusEl.style.color = sb ? sb.c : '';
+  }
+
+  var fundEl = document.getElementById('sow_strip_fund');
+  if (fundEl) {
+    var fundSel = document.getElementById('sow_fund_source');
+    var opt = (fundSel && fundSel.selectedIndex >= 0) ? fundSel.options[fundSel.selectedIndex] : null;
+    fundEl.textContent = (opt && opt.value) ? opt.textContent : '—';
+  }
+
+  var costEl = document.getElementById('sow_strip_cost');
+  if (costEl) costEl.textContent = get('sow_total_cost') || '—';
+
+  var asgEl = document.getElementById('sow_strip_assigned');
+  if (asgEl) asgEl.textContent = get('sow_contractor') || '—';
+
+  var tgtEl = document.getElementById('sow_strip_target');
+  if (tgtEl) tgtEl.textContent = get('sow_end_date') || '—';
+
+  var condEl = document.getElementById('sow_strip_condition');
+  if (condEl) condEl.textContent = get('sow_condition') || '—';
+}
+window._sowRefreshStrip = _sowRefreshStrip;
 
 // ── Fund Source dropdown helpers ─────────────────────────────────────────
 // Populates #sow_fund_source with pools eligible for the unit's funder type
@@ -638,6 +663,7 @@ function _sowUpdateFundBadge(poolId) {
   badge.style.background = pool.bg || 'var(--bg)';
   badge.style.color      = pool.color || 'var(--text)';
   badge.style.border     = '1px solid ' + (pool.color || 'var(--border)');
+  if (typeof _sowRefreshStrip === 'function') _sowRefreshStrip();
 }
 
 // ── SOW Picker — shown when a unit has multiple active maintenance requests ──
@@ -771,6 +797,9 @@ function openSowModal(unitId, projectNumber) {
   var saved = (unitId && projectNumber) ? getSowByProjectNumber(unitId, projectNumber) : null;
   window._sowEditingProjectNumber = isEdit ? projectNumber : null;  // remember for save
   window._sowWasPreviouslySaved = isEdit && !!saved;
+  // Status tile (info strip) reads approval state from here, not a form field —
+  // sowStatusBadge needs approval_status/system_approved/archived off the saved record.
+  window._sowCurrentSowMeta = saved ? {approval_status: saved.approval_status, system_approved: saved.system_approved, archived: saved.archived} : {approval_status:''};
   var label = '';
   if(unitId) {
     var allUnits = getAllUnits();
@@ -848,6 +877,8 @@ function openSowModal(unitId, projectNumber) {
     var _seed = window._sowSeed; window._sowSeed = null;
     try { _applySowSeed(_seed); } catch(e){ console.warn('[sow] seed apply failed:', e); }
   }
+
+  if (typeof _sowRefreshStrip === 'function') _sowRefreshStrip();
 }
 
 // Populate a brand-new SOW from a structured seed (Reno Questionnaire hand-off):
@@ -1060,8 +1091,9 @@ function _applySowModalLock(sow){
   if(saveBtn) saveBtn.style.display = readOnly ? 'none' : '';
 
   // Disable every form control inside the modal body when read-only.
-  // Inputs in the header (like close button) are outside this query.
-  var body = modal.querySelector('div[style*="padding:24px"]');
+  // Scoped to .tic-body so header/footer controls (close, Cancel) are
+  // untouched — mirrors _ueApplyReadOnly's use of the same class.
+  var body = modal.querySelector('.tic-body');
   if(body){
     var controls = body.querySelectorAll('input, select, textarea, button');
     controls.forEach(function(el){
@@ -2170,7 +2202,7 @@ function printSOW(){
       +'<div class="section-body">'
         /* Declaration text */
         +'<div style="font-size:9.5px;color:var(--text);line-height:1.6;margin-bottom:14px;padding:10px 12px;background:var(--bg);border-left:3px solid var(--yellow);">'
-          +'By signing below, the tenant acknowledges the scope of work described in this document and grants access to the unit for the purpose of completing the renovation. '
+          +'By signing below, the tenant acknowledges the maintenance request described in this document and grants access to the unit for the purpose of completing the renovation. '
           +'The Housing Staff member confirms this Maintenance Request is accurate and complete.'
         +'</div>'
         /* Tenant + Staff */

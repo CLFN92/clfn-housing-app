@@ -606,11 +606,11 @@ async function saveInspection(approveAction) {
 
 // ── SOW prompt ───────────────────────────────────────────────────────────────
 function _inspPromptSOW(insp, repairItems) {
-  var msg = repairItems.length + ' item' + (repairItems.length===1?'':'s') + ' marked as needing repair. Create a Scope of Work (SOW) for this unit?';
+  var msg = repairItems.length + ' item' + (repairItems.length===1?'':'s') + ' marked as needing repair. Create a Maintenance Request for this unit?';
   if (!confirm(msg)) return;
 
   if (typeof openSowModal !== 'function') {
-    if(typeof showToast==='function') showToast('Open the unit\'s Scope of Work to create the repair request.', {type:'info'});
+    if(typeof showToast==='function') showToast('Open the unit\'s Maintenance Request to create the repair request.', {type:'info'});
     return;
   }
 
@@ -627,7 +627,7 @@ function _inspPromptSOW(insp, repairItems) {
     notes: 'Generated from inspection' + (insp.id ? ' ' + insp.id : '') + '.'
   };
   openSowModal(insp.unit_id);
-  if(typeof showToast==='function') showToast('Repair items pre-loaded into the SOW.');
+  if(typeof showToast==='function') showToast('Repair items pre-loaded into the Maintenance Request.');
 }
 
 // Map an inspection checklist row to the closest SOW_CATEGORIES entry

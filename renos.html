@@ -1062,7 +1062,7 @@ function saveRenoProgress() {
 
   // Block non-ED writes when any SOW for this unit is completed.
   if(!canEditProgressFor(unitId)){
-    showToast('This unit has a completed SOW. Only the Executive Director can update progress on completed work.');
+    showToast('This unit has a completed Maintenance Request. Only the Executive Director can update progress on completed work.');
     return;
   }
 
@@ -1126,7 +1126,7 @@ function saveRenoProgress() {
         target.completed_at = new Date().toISOString();
         target.completed_by = window.currentUserName || _realRoleForPermissions();
         if(true){
-          auditEntry('SOW:'+unitId, 'sow_auto_completed', 'SOW '+(target.project_number||'?')+' auto-completed — progress reached 100%', _realRoleForPermissions());
+          auditEntry('SOW:'+unitId, 'sow_auto_completed', 'Maintenance Request '+(target.project_number||'?')+' auto-completed — progress reached 100%', _realRoleForPermissions());
         }
         touched = true;
       }
@@ -1589,7 +1589,7 @@ function raQuickApprove(unitId, approver, projectNumber) {
   var _qaRole = window.currentRole || 'staff';
   var _needAuthority = approver === 'ed' ? 'approveSowOverThreshold' : 'approveSowUnderThreshold';
   if(!APPROVAL_AUTHORITY.can(_needAuthority, _qaRole)){
-    showToast('You do not have authority to approve this SOW.');
+    showToast('You do not have authority to approve this Maintenance Request.');
     return;
   }
   var units = getAllUnits().slice();
@@ -1601,8 +1601,8 @@ function raQuickApprove(unitId, approver, projectNumber) {
   var projLabel = projectNumber ? ' ('+projectNumber+')' : '';
 
   showConfirm({
-    title:       'Approve SOW?',
-    message:     'Approve SOW for ' + addr + projLabel + ' as ' + label + '?',
+    title:       'Approve Maintenance Request?',
+    message:     'Approve Maintenance Request for ' + addr + projLabel + ' as ' + label + '?',
     confirmText: 'Approve'
   }).then(function(ok){
     if(!ok) return;
@@ -1610,10 +1610,10 @@ function raQuickApprove(unitId, approver, projectNumber) {
     // Legacy unit-level approval sig (keeps old dashboards working).
     if(approver==='hm') {
       u.unitHmSig={name:role,date:today,decision:'approved',savedAt:today};
-      auditEntry('UNIT:'+unitId,'sow_hm_approval',addr+' SOW'+projLabel+' approved by Housing Manager',role);
+      auditEntry('UNIT:'+unitId,'sow_hm_approval',addr+' Maintenance Request'+projLabel+' approved by Housing Manager',role);
     } else {
       u.unitEdSig={name:role,date:today,decision:'approved',savedAt:today};
-      auditEntry('UNIT:'+unitId,'sow_ed_approval',addr+' SOW'+projLabel+' approved by Executive Director',role);
+      auditEntry('UNIT:'+unitId,'sow_ed_approval',addr+' Maintenance Request'+projLabel+' approved by Executive Director',role);
     }
     units[idx]=u;
     saveUnitWithDraftFallback(u);
@@ -1639,7 +1639,7 @@ function raQuickApprove(unitId, approver, projectNumber) {
       if(touched) saveSowList(unitId, list);
     }
 
-    showToast('✓ '+addr+projLabel+' SOW approved');
+    showToast('✓ '+addr+projLabel+' Maintenance Request approved');
     renderRenoApprovalsView();
   });
 }

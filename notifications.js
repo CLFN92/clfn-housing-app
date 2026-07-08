@@ -159,7 +159,7 @@ var EMAIL_EVENT_REGISTRY = [
     defaults: {
       subject:  '{nationShort} Housing — RFQ {rfqNumber}: {projectAddress} — Bids close {closingDate}',
       bodyHtml: '<p>Dear {contractorName},</p>'
-              + '<p>{nationShort} Housing invites your firm to submit a competitive bid for the project referenced above. The RFQ package — including the scope of work, bid form, and terms and conditions — is attached to this email.</p>'
+              + '<p>{nationShort} Housing invites your firm to submit a competitive bid for the project referenced above. The RFQ package — including the maintenance request, bid form, and terms and conditions — is attached to this email.</p>'
               + '<p><strong>RFQ Number:</strong> {rfqNumber}<br/>'
               + '<strong>Project:</strong> {projectAddress}<br/>'
               + '<strong>Bids close:</strong> {closingDate}</p>'
@@ -1748,7 +1748,7 @@ async function notifySowTenantCopy(sow, unit) {
   var bodyHtml = rendered.bodyHtml;
   if (pdfBase64) {
     attachments = [{
-      name:         'SOW ' + (sow.project_number || 'scope') + '.pdf',
+      name:         'Maintenance Request ' + (sow.project_number || 'scope') + '.pdf',
       contentType:  'application/pdf',
       contentBytes: pdfBase64
     }];
@@ -1814,7 +1814,7 @@ async function _generateRfqPdfBase64(rfq, unit) {
   row('RFQ Number',             rfq.id || '--');
   if (buildingName)             row('Building Name',           buildingName);
   row('Project Address',        addr);
-  row('SOW Reference',          rfq.sow_project_number || '--');
+  row('Maintenance Request Reference', rfq.sow_project_number || '--');
   row('Issue Date',             issueDate);
   row('Bid Closing Date & Time', closing);
   row('Target Start Date',      startDate);
@@ -1824,7 +1824,7 @@ async function _generateRfqPdfBase64(rfq, unit) {
 
   // ── 2. Scope of Work ─────────────────────────────────────────────────────
   if (items.length) {
-    sectionHeader('Scope of Work');
+    sectionHeader('Maintenance Request');
     var colW = [contentW * 0.32, contentW * 0.68];
     ctx.needSpace(8);
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(80);
@@ -2058,7 +2058,7 @@ async function _generateWorkOrderPdfBase64() {
   gap();
 
   // Scope of Work — use quoted price when available, fall back to estimate.
-  sectionHeader('Scope of Work');
+  sectionHeader('Maintenance Request');
   var items = (typeof collectSowItems === 'function') ? collectSowItems() : [];
   var filtered = items.filter(function(it){ return it.category || it.description || it.quote || it.cost; });
   var quoteTotal = 0;
@@ -2933,7 +2933,7 @@ async function renderConfigPanel() {
     +       '</div>'
     +     '</div>'
     +   '</div>'
-    +   '<div style="font-size:11px;color:var(--muted);margin-top:8px;padding:0 0 4px;">SOW totals at or above this amount will show the RFQ button on the Renovations pipeline. Housing Managers and the ED can override below-threshold SOWs.</div>'
+    +   '<div style="font-size:11px;color:var(--muted);margin-top:8px;padding:0 0 4px;">Maintenance Request totals at or above this amount will show the RFQ button on the Renovations pipeline. Housing Managers and the ED can override below-threshold maintenance requests.</div>'
     + '</div>'
 
     + '<div class="cfg-section">'
@@ -3282,7 +3282,7 @@ var TERMS_DOCS_REGISTRY = [
                + '<li><strong>Tenant Neglect and Cost Recovery.</strong> Damage or unsafe conditions arising from willful damage, misuse, failure to report issues in a timely manner, or tenant neglect may reduce the priority of the request and may result in the tenant being financially responsible for all or part of the repair cost. Outstanding charges may be recovered through the Band payment recovery provisions of the {nationShort} Housing Policy, including from rent, per capita distributions, honoraria, or other monetary payments administered by the Band.</li>'
                + '<li><strong>Good Standing.</strong> Non-emergency renovation work may be conditional on the tenant being in good standing with {nationShort}, or actively working toward good standing through a written payment arrangement approved by the Housing Department. Emergency health and safety work will not be withheld on the basis of arrears.</li>'
                + '<li><strong>No Guarantee of Approval or Timeline.</strong> Submission of a request does not guarantee approval or a specific completion date. Decisions will be communicated in writing. Priority and scheduling may be adjusted based on available resources, weather, contractor availability, and emerging urgent community needs.</li>'
-               + '<li><strong>Scope of Work and Change Orders.</strong> Approved work will be performed in accordance with the documented scope of work. Any additions, deletions, or substantive changes require a written change order approved through the same approval routing as the original request before that work is undertaken.</li>'
+               + '<li><strong>Maintenance Request and Change Orders.</strong> Approved work will be performed in accordance with the documented maintenance request. Any additions, deletions, or substantive changes require a written change order approved through the same approval routing as the original request before that work is undertaken.</li>'
                + '<li><strong>Procurement and Contractors.</strong> All contractors performing work must meet {nationShort} procurement, insurance, and WSIB requirements. Tenants may not engage contractors directly on behalf of {nationShort}, and unauthorized work will not be reimbursed.</li>'
                + '<li><strong>Accuracy of Information.</strong> All information provided in this request must be accurate and complete. False or misleading information may result in the request being cancelled, delayed, or referred for further review.</li>'
                + '<li><strong>Privacy and Consent.</strong> I consent to {nationShort} collecting, using, and retaining information related to this request — including photographs, inspection notes, and contractor records — for the purpose of assessing, performing, and documenting the work, in accordance with PIPEDA and OCAP® principles.</li>'
@@ -3296,7 +3296,7 @@ var TERMS_DOCS_REGISTRY = [
     defaultBody: '<p>By submitting a bid in response to this Request for Quotes, the contractor agrees to the following terms and conditions:</p>'
                + '<ol>'
                + '<li><strong>Bid Validity.</strong> All bids submitted in response to this RFQ shall remain valid and irrevocable for a minimum of sixty (60) calendar days from the bid closing date.</li>'
-               + '<li><strong>Compliance with Scope.</strong> Bids must address the full scope of work as described. Partial bids will not be considered unless explicitly invited in writing.</li>'
+               + '<li><strong>Compliance with Scope.</strong> Bids must address the full maintenance request as described. Partial bids will not be considered unless explicitly invited in writing.</li>'
                + '<li><strong>WSIB and Insurance.</strong> The contractor must provide a current WSIB clearance certificate and proof of general liability insurance (minimum $2,000,000) with this bid. Failure to include these documents will result in disqualification.</li>'
                + '<li><strong>No Award Guarantee.</strong> Submission of a bid does not guarantee award. {nationName} reserves the right to reject any or all bids, to cancel this RFQ at any time, and to award the work to the contractor deemed most advantageous to the community, price and other factors considered.</li>'
                + '<li><strong>Indigenous Preference.</strong> In accordance with the {nationShort} Housing Policy, preference will be given to Indigenous-owned and {nationShort}-member-owned businesses where qualifications and price are competitive.</li>'
@@ -3770,11 +3770,11 @@ var CONTRACTS_DOCS_REGISTRY = [
       + '<h2>1. PROJECT</h2>'
       + '<p><strong>Property Address:</strong> {propertyAddress}</p>'
       + '<p><strong>Project Type:</strong> {projectType}</p>'
-      + '<p><strong>SOW Reference:</strong> {sowReference}</p>'
+      + '<p><strong>Maintenance Request Reference:</strong> {sowReference}</p>'
       + '<p>The Owner hereby engages the Contractor to perform the renovation and construction work described in this Agreement and the attached Schedules (the <strong>"Work"</strong>). The Contractor accepts this engagement and agrees to perform the Work in accordance with the terms and conditions set out herein.</p>'
-      + '<h2>2. SCOPE OF WORK</h2>'
+      + '<h2>2. MAINTENANCE REQUEST</h2>'
       + '<p>{sowSummary}</p>'
-      + '<p>The detailed scope of work, including all work packages, quantities, and specifications, is set out in <strong>Schedule A</strong> attached to and forming part of this Agreement. The Contractor shall perform all items set out in Schedule A unless a written change order signed by both parties provides otherwise.</p>'
+      + '<p>The detailed maintenance request, including all work packages, quantities, and specifications, is set out in <strong>Schedule A</strong> attached to and forming part of this Agreement. The Contractor shall perform all items set out in Schedule A unless a written change order signed by both parties provides otherwise.</p>'
       + '<h2>3. CONTRACT PRICE</h2>'
       + '<p>The Owner agrees to pay the Contractor, subject to the holdback and payment provisions of this Agreement, the all-inclusive Contract Price of:</p>'
       + '<p><strong>Contract Price (excluding tax): {contractPriceExclTax}</strong></p>'
@@ -3846,8 +3846,8 @@ var CONTRACTS_DOCS_REGISTRY = [
       + '<li><strong>Notices.</strong> All notices under this Agreement shall be in writing and delivered by email, hand, or courier to the addresses set out in this Agreement.</li>'
       + '<li><strong>Counterparts.</strong> This Agreement may be executed in counterparts, each of which shall be deemed an original. Electronic signatures are binding.</li>'
       + '</ol>'
-      + '<h2>SCHEDULE A - SCOPE OF WORK</h2>'
-      + '<p>Property: {propertyAddress}  Project Type: {projectType}  SOW Reference: {sowReference}  Quote: {quoteNumber}</p>'
+      + '<h2>SCHEDULE A - MAINTENANCE REQUEST</h2>'
+      + '<p>Property: {propertyAddress}  Project Type: {projectType}  Maintenance Request Reference: {sowReference}  Quote: {quoteNumber}</p>'
       + '<h3>Work Items</h3>'
       + '<p>{sowDetailTable}</p>'
       + '<h3>Materials and Specifications</h3>'
@@ -3902,7 +3902,7 @@ var _CONTRACT_TOKENS = [
   { token: 'contractDate',             desc: 'Contract date' },
   { token: 'propertyAddress',          desc: 'Project property address' },
   { token: 'projectType',              desc: 'Project type / condition' },
-  { token: 'sowReference',             desc: 'SOW project number' },
+  { token: 'sowReference',             desc: 'Maintenance Request project number' },
   { token: 'quoteNumber',              desc: 'Quote / RFQ number' },
   { token: 'startDate',                desc: 'Work start date' },
   { token: 'substantialCompletionDate',desc: 'Substantial completion date' },
@@ -3924,7 +3924,7 @@ var _CONTRACT_TOKENS = [
   { token: 'apEmail',                  desc: 'Accounts payable email' },
   { token: 'clfnSignatoryName',        desc: 'Nation signatory name' },
   { token: 'clfnSignatoryTitle',       desc: 'Nation signatory title' },
-  { token: 'sowSummary',               desc: 'Scope of work summary' },
+  { token: 'sowSummary',               desc: 'Maintenance request summary' },
   { token: 'sowDetailTable',           desc: 'Detailed work packages' },
   { token: 'materialsSpecifications',  desc: 'Materials and specifications' },
   { token: 'exclusionsAssumptions',    desc: 'Exclusions and assumptions' },

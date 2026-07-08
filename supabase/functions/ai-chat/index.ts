@@ -402,7 +402,7 @@ Complete a maintenance request: open the request, click "Mark Complete" in the
 header and confirm. This locks the request, work order, and progress reports.
 Field employees, Housing Manager, and ED can complete; only ED can reopen.
 
-Approve a renovation / SOW: items needing sign-off appear in "Renovations
+Approve a renovation / maintenance request: items needing sign-off appear in "Renovations
 Waiting Approval" on the Home worklist and in Renovations > Reno Approvals.
 Housing Manager approves first; higher-cost work then needs ED approval.
 
@@ -445,32 +445,34 @@ appear on Match).
 Inspections: open the Inspections page (under the Operations nav) > "New
 Inspection". Pick the unit and type (Move-In, Move-Out, Annual, Routine,
 Emergency), complete the room-by-room checklist (pass / fail / needs repair),
-add notes/photos, and save. A failed/needs-repair inspection can spawn a SOW
-(maintenance request) for the unit. Unit records show last and next inspection
+add notes/photos, and save. A failed/needs-repair inspection can spawn a
+maintenance request for the unit. Unit records show last and next inspection
 dates.
 
 View or edit a tenant: Tenants > open a tenant card (TIC). Tabs: Overview,
 Utilities (hydro/gas meters + accounts), Documents, Unit History. Lease start
 and end dates are recorded on the tenant. Field employees see the TIC read-only.
 
-Edit a housing unit: Inventory > click a unit to open its detail panel, then
-edit fields (address, status, type, funder, account numbers, insured value,
-inspection dates, etc.).
+Edit a housing unit: Inventory > click a unit to open the Edit Unit card
+(tabs: Overview, Tenant, Approvals, Maintenance Requests, RFQs & Contracts,
+Documents, Map & Photos). Edit fields (address, status, type, funder, account
+numbers, insured value, inspection dates, etc.) on the Overview tab.
 
 Add a contractor: Contractors page > add a contractor. New contractors go
 pending_review -> HM (or a senior employee) recommends -> hm_recommended ->
 final approval by the Housing Manager OR the ED. Either the HM or the ED can
 grant the final approval.
 
-Issue an RFQ: from a SOW (Renovations or the unit panel) create an RFQ to invite
-contractors to bid. Flow: draft -> issued -> awarded; only drafts can be edited.
-Only the Housing Manager or ED can edit an RFQ; everyone else sees it read-only.
-Awarding an RFQ AUTO-approves the linked SOW (it becomes "System Approved" - see
-the SOW section). Award two ways: the "Award ->" button on the Recipients tab
-(runs the full app tender - emails the winner and regret notices to other
-bidders), or, on the Scope tab's Award card, "Record Award & Approve SOW - No
-Notifications" for a tender run manually/offline (records the award and approves
-the SOW without issuing the RFQ or emailing anyone). Both then open the
+Issue an RFQ: from a maintenance request (Renovations or the unit panel) create
+an RFQ to invite contractors to bid. Flow: draft -> issued -> awarded; only
+drafts can be edited. Only the Housing Manager or ED can edit an RFQ; everyone
+else sees it read-only. Awarding an RFQ AUTO-approves the linked maintenance
+request (it becomes "System Approved" - see the maintenance requests section).
+Award two ways: the "Award ->" button on the Recipients tab (runs the full app
+tender - emails the winner and regret notices to other bidders), or, on the
+Scope tab's Award card, "Record Award & Approve Maintenance Request - No
+Notifications" for a tender run manually/offline (records the award and
+approves the maintenance request without issuing the RFQ or emailing anyone). Both then open the
 Contracting tab to generate the Contractor Agreement, which is saved to both the
 RFQ and the unit document libraries.
 
@@ -545,8 +547,8 @@ Write 2-4 sentences. Be professional, clear, and compassionate. Reference specif
     : '\n\n## Housing Units\nNo unit data available.'
 
   const sowsJson = ctx?.sows?.length
-    ? `\n\n## Scopes of Work / SOWs - ${ctx.sows.length} records\nIn this system, SOWs (Scopes of Work) ARE the maintenance and renovation work orders. When staff say "maintenance request", "work order", or "repair job", they mean a SOW. Each SOW is linked to a housing unit.\nApproval fields: approval_status is one of ''/draft/signed/submitted/hm_approved/ed_approved/completed; approved=true means hm_approved, ed_approved, or completed. IMPORTANT: if system_approved=true the SOW was AUTO-approved by the tendering workflow (an RFQ was awarded), NOT signed off by the Executive Director - call this "System Approved", and do NOT count it as an ED approval even though approval_status reads 'ed_approved'. approved_via_rfq marks the same thing.\n` + JSON.stringify(ctx.sows)
-    : '\n\n## Scopes of Work / SOWs\nNo SOW/maintenance data loaded yet.'
+    ? `\n\n## Maintenance Requests - ${ctx.sows.length} records\nThese are stored internally as SOWs (Scope of Work) in the housing_sow table, but ALWAYS call them "Maintenance Requests" when talking to staff - that is the term shown in the app UI. Each maintenance request is linked to a housing unit.\nApproval fields: approval_status is one of ''/draft/signed/submitted/hm_approved/ed_approved/completed; approved=true means hm_approved, ed_approved, or completed. IMPORTANT: if system_approved=true the maintenance request was AUTO-approved by the tendering workflow (an RFQ was awarded), NOT signed off by the Executive Director - call this "System Approved", and do NOT count it as an ED approval even though approval_status reads 'ed_approved'. approved_via_rfq marks the same thing.\n` + JSON.stringify(ctx.sows)
+    : '\n\n## Maintenance Requests\nNo maintenance request data loaded yet.'
 
   const rfqsJson = ctx?.rfqs?.length
     ? `\n\n## RFQs / Requests for Quotes - ${ctx.rfqs.length} records\nRFQs are procurement requests sent to contractors for pricing on upcoming work.\n` + JSON.stringify(ctx.rfqs.slice(0, 30))
@@ -564,13 +566,13 @@ Write 2-4 sentences. Be professional, clear, and compassionate. Reference specif
   const vacantCount = (ctx?.units || []).filter((u: any) => u.status === 'vacant').length
   const pendingApps = (ctx?.apps  || []).filter((a: any) => !['assigned','declined','archived'].includes(a.status)).length
 
-  return `You are an AI assistant for the Constance Lake First Nation (CLFN) Housing Department. You help housing staff answer questions about applications, housing units, maintenance work orders (SOWs), renovations, contractors, inspections, and housing policy, and explain how to do things in the app.
+  return `You are an AI assistant for the Constance Lake First Nation (CLFN) Housing Department. You help housing staff answer questions about applications, housing units, maintenance requests (work orders), renovations, contractors, inspections, and housing policy, and explain how to do things in the app.
 
 Staff role: ${role}
-Quick stats: ${ctx?.units?.length ?? 0} total units (${vacantCount} vacant), ${ctx?.apps?.length ?? 0} applications (${pendingApps} pending), ${ctx?.sows?.length ?? 0} SOWs on file.
+Quick stats: ${ctx?.units?.length ?? 0} total units (${vacantCount} vacant), ${ctx?.apps?.length ?? 0} applications (${pendingApps} pending), ${ctx?.sows?.length ?? 0} maintenance requests on file.
 
 IMPORTANT terminology for this system:
-- "Maintenance request" / "work order" / "repair job" = SOW (Scope of Work) - there is no separate maintenance table
+- "Maintenance request" is the term shown in the app UI; internally these are stored as SOW (Scope of Work) records - there is no separate maintenance table. Staff may also say "work order" or "repair job" and mean the same thing.
 - "RFQ" = Request for Quotes (sent to contractors for pricing)
 - "Tier" on an application = priority tier (e.g. Emergency, High, Medium, Low)
 ${appsJson}${unitsJson}${sowsJson}${rfqsJson}${contractorsJson}${renoJson}
@@ -612,8 +614,8 @@ containing ONLY JSON describing it, for example:
 - Only include a chart when a visual genuinely helps; otherwise answer in text.
 
 Rules:
-- For unit counts, ALWAYS use the Housing Units section (or query_database) - never the SOW count.
-- For maintenance/repair/work-order (SOW) questions, use the SOWs section from the loaded context (the housing_sow table is not directly queryable).
+- For unit counts, ALWAYS use the Housing Units section (or query_database) - never the maintenance request count.
+- For maintenance/repair/work-order questions, use the Maintenance Requests section from the loaded context (the housing_sow table is not directly queryable).
 - The audit log (housing_audit_log) records ACTIONS (who did what, when), NOT records. For "how many / list X" about records - notes, applications, tenants, units, inspections, contractors, RFQs - query the dedicated table for X (e.g. housing_application_notes + tenant_notes for notes). Do not answer record-count questions from the audit log.
 - For "how do I ..." questions, use the How-to knowledge above and tailor to the staff role.
 - Perform calculations (totals, counts, averages) directly from the data.
