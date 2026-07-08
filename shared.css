@@ -1009,7 +1009,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .doclib .std-table th:last-child  { padding-right: 16px; }
 .doclib .std-table tr.empty-row td { padding: 32px 16px; text-align: center; color: var(--muted); font-size: 13px; }
 .doclib-table-wrap { overflow-x: auto; width: 100%; }
-.doclib-table      { width: 100% !important; }
+.doclib-table      { width: 100% !important; min-width: 520px; }
 /* First column (file icon) narrow, file name column takes remaining space */
 .doclib-table td:first-child,
 .doclib-table th:first-child { width: 32px; }
