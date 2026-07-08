@@ -567,11 +567,20 @@ input:disabled, select:disabled, textarea:disabled {
    icon replaces the missing native affordance; the stretched, invisible
    ::-webkit-calendar-picker-indicator keeps the whole field clickable to
    open Chrome's native picker (Safari has no such pseudo-element — the
-   field opens its picker on tap regardless). */
+   field opens its picker on tap regardless).
+   -webkit-appearance:none also strips iOS's own comfortable minimum touch
+   height for the control — a bonus of the native chrome we just removed,
+   not something our padding alone replaces — so the field renders visibly
+   shorter than the untouched text/select inputs beside it. line-height and
+   min-height pin it back to the same computed box height as
+   `.f input, .f select` (1.5px border + 9px padding + 13px × 1.6 line +
+   9px padding ≈ 43px) so every field in a form reads the same height. */
 input[type="date"] {
   position: relative;
   -webkit-appearance: none;
   appearance: none;
+  line-height: 1.6;
+  min-height: 43px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23696960' stroke-width='1.7'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cline x1='16' y1='3' x2='16' y2='7'/%3E%3Cline x1='8' y1='3' x2='8' y2='7'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
