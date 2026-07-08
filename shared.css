@@ -547,6 +547,32 @@ input:disabled, select:disabled, textarea:disabled {
 }
 .field-error { border-color: var(--danger) !important; }
 
+/* Date inputs, app-wide — iOS Safari renders an empty input[type=date] as a
+   totally blank box (no calendar icon, no mm/dd/yyyy placeholder like the
+   selects beside it), AND gives a filled date input a taller native height
+   than an empty one, so the field looks broken and jumps in height once a
+   date is picked. -webkit-appearance:none hands sizing fully to our own
+   padding-driven box model (identical for empty/filled) and a background
+   icon replaces the missing native affordance; the stretched, invisible
+   ::-webkit-calendar-picker-indicator keeps the whole field clickable to
+   open Chrome's native picker (Safari has no such pseudo-element — the
+   field opens its picker on tap regardless). */
+input[type="date"] {
+  position: relative;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23696960' stroke-width='1.7'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cline x1='16' y1='3' x2='16' y2='7'/%3E%3Cline x1='8' y1='3' x2='8' y2='7'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+  padding-right: 34px;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 0; top: 0; width: 100%; height: 100%;
+  margin: 0; padding: 0; opacity: 0; cursor: pointer;
+}
+
 /* Toggle switch */
 .toggle-row { display: flex; align-items: center; justify-content: space-between; }
 .tsw  {
