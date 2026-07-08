@@ -40,7 +40,7 @@ function renderApprovalAuthorityPanel() {
   var rolesFinance = _aaRoleSet(MGMT_ROLES.concat(['cfo', 'finance_l1']));
   var rolesField   = _aaRoleSet(MGMT_ROLES.concat(['field_employee']));
   // Groups where Field Employee is a selectable role.
-  var FIELD_GROUPS = ['Housing Application', 'SOW & Renovation', 'Contractors', 'Inspections'];
+  var FIELD_GROUPS = ['Housing Application', 'Maintenance Request & Renovation', 'Contractors', 'Inspections'];
 
   var groups   = APPROVAL_AUTHORITY.groups;
   var labels   = APPROVAL_AUTHORITY.labels;

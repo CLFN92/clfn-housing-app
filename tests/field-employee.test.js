@@ -95,7 +95,7 @@ ok("can('assignWorkOrder','field_employee') = false",  A.can('assignWorkOrder', 
 ok("can('assignWorkOrder','housing_employee_l2')=false",A.can('assignWorkOrder', 'housing_employee_l2') === false);
 ok("super_user inherits ED (assignWorkOrder) = true",  A.can('assignWorkOrder', 'super_user') === true);
 ok("assignWorkOrder has a Settings label",             !!(A.labels && A.labels.assignWorkOrder));
-ok("assignWorkOrder grouped under 'SOW & Renovation'", (A.groups && A.groups['SOW & Renovation'] || []).indexOf('assignWorkOrder') !== -1);
+ok("assignWorkOrder grouped under 'Maintenance Request & Renovation'", (A.groups && A.groups['Maintenance Request & Renovation'] || []).indexOf('assignWorkOrder') !== -1);
 ok("can('editRenoProgress','field_employee') = true",  A.can('editRenoProgress', 'field_employee') === true);
 
 console.log('\n=== 4. saveSOW assignment reconcile ===');

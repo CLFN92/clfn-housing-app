@@ -2126,7 +2126,7 @@ function _ctRenderFormsSows(ctId, prefix) {
   if (!el) return;
   var rows = getAllSowsForContractor(ctId);
   if (!rows.length) {
-    el.innerHTML = '<div class="empty-state-italic">No forms or SOWs filed for this contractor yet.</div>';
+    el.innerHTML = '<div class="empty-state-italic">No forms or maintenance requests filed for this contractor yet.</div>';
     return;
   }
   // Sort newest first by created_at
@@ -3466,7 +3466,7 @@ function printWorkOrder(){
     +'</div>'
     // Scope items
     +'<div style="margin-top:16px;">'
-    +'<div class="section-title">Scope of Work</div>'
+    +'<div class="section-title">Maintenance Request</div>'
     +'<table><thead><tr>'
       +'<th>Category</th><th>Description of Work</th><th class="r">Quoted Price</th>'
     +'</tr></thead><tbody>'
@@ -3520,6 +3520,7 @@ function recalcSowTotal(){
   });
   var el=document.getElementById('sow_total_cost');
   if(el) el.value = total>0 ? formatCurrency(total) : '';
+  if (typeof _sowRefreshStrip === 'function') _sowRefreshStrip();
 }
 function removeRenoPhoto(idx) {
   window._rpStoredPhotos = window._rpStoredPhotos || [];
@@ -3726,7 +3727,7 @@ function _ctHandleRowAction(action, idx) {
   if (action === 'archive') {
     showConfirm({
       title: 'Archive this contractor?',
-      message: 'It will be hidden from the main list. Existing SOWs and audit records are preserved.',
+      message: 'It will be hidden from the main list. Existing maintenance requests and audit records are preserved.',
       confirmText: 'Archive',
       danger: true
     }).then(function(ok){
@@ -4406,7 +4407,7 @@ function renderSowAuditLog(unitId) {
   };
 
   if(!sowLog.length) {
-    tbody.innerHTML = '<tr><td colspan="4" style="padding:16px 14px;color:var(--muted);font-style:italic;font-size:12px;">No audit entries yet — save the SOW to begin tracking.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" style="padding:16px 14px;color:var(--muted);font-style:italic;font-size:12px;">No audit entries yet — save the Maintenance Request to begin tracking.</td></tr>';
     return;
   }
 
@@ -6472,7 +6473,7 @@ function ctRemovePerson(idx) {
 function exportRenos(format) {
   var units=getAllUnits();
   var rows=units.filter(function(u){return u.under_renovation||u.status==='condemned';});
-  var headers=['Address','Beds','Type','Foundation','Status','Priority Score','Contractor','SOW Filed','Progress %'];
+  var headers=['Address','Beds','Type','Foundation','Status','Priority Score','Contractor','Maintenance Request Filed','Progress %'];
   var data=rows.map(function(u){
     var rs=calcRenoScore(u.id);
     var sow=null;sow = getSowData(u.id);
@@ -7183,7 +7184,7 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
           + '<div class="mf"><label>RFQ Number</label><span>' + escapeHtml(rfq.id) + '</span></div>'
           + '<div class="mf"><label>Issue Date</label><span>' + escapeHtml(issueDate) + '</span></div>'
           + '<div class="mf"><label>Project Address</label><span>' + escapeHtml(addr) + '</span></div>'
-          + '<div class="mf"><label>SOW Reference</label><span>' + escapeHtml(rfq.sow_project_number || '--') + '</span></div>'
+          + '<div class="mf"><label>Maintenance Request Reference</label><span>' + escapeHtml(rfq.sow_project_number || '--') + '</span></div>'
           + '<div class="mf"><label>Target Start Date</label><span>' + escapeHtml(startDate) + '</span></div>'
           + '<div class="mf"><label>Target Completion Date</label><span>' + escapeHtml(endDate) + '</span></div>'
           + '<div class="mf"><label>Bid Closing Date &amp; Time</label><span style="font-weight:bold;color:#b91c1c;">' + escapeHtml(closingDisplay) + '</span></div>'
@@ -7191,7 +7192,7 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
           + '</div></div></div>';
       })()
 
-    + '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Scope of Work</div>'
+    + '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Maintenance Request</div>'
     + '<table><thead><tr>'
     +   '<th style="width:28%;background:' + primary + ';color:#111;">Category</th>'
     +   '<th style="background:' + primary + ';color:#111;">Description of Work Required</th>'
@@ -7472,7 +7473,7 @@ async function awardRfq(rfqId, contractorId, amount, notes, opts) {
         }
       })();
     }
-    if (typeof showToast === 'function') showToast('RFQ ' + rfqId + ' awarded' + (opts.skipNotify ? ' (no notifications) — SOW approved' : ' — SOW approved'));
+    if (typeof showToast === 'function') showToast('RFQ ' + rfqId + ' awarded' + (opts.skipNotify ? ' (no notifications) — Maintenance Request approved' : ' — Maintenance Request approved'));
     return true;
   } catch(e) { console.warn('[rfq] award failed:', e); if (typeof showToast === 'function') showToast('Award failed -- see console'); return false; }
 }

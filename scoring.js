@@ -1611,7 +1611,7 @@ function archiveUnit(unitId) {
   var addr = u.num + ' ' + u.street;
   showConfirm({
     title:       'Archive ' + addr + '?',
-    message:     'This marks the unit as demolished. All documentation (SOW, renovation progress, tenant files, photos) will be preserved in the archive record. The unit will be hidden from active inventory.',
+    message:     'This marks the unit as demolished. All documentation (Maintenance Requests, renovation progress, tenant files, photos) will be preserved in the archive record. The unit will be hidden from active inventory.',
     confirmText: 'Archive Unit',
     danger:      true
   }).then(function(ok){

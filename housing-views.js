@@ -298,7 +298,7 @@ function renderInventoryView(){
           var _rs=calcRenoScore(u.id); var _sc=_rs.score;
           var _tier=_sc>=40?{label:'Critical',c:'#b91c1c',bg:'#fef2f2'}:_sc>=25?{label:'High',c:'#7a6000',bg:'#fef9ec'}:_sc>=12?{label:'Medium',c:'#1d4ed8',bg:'#eff6ff'}:{label:'Low',c:'#15803d',bg:'#f0fdf4'};
           return '<td style="padding:9px 10px;">'
-            +'<div data-inv-reno-sow="'+uid+'" style="display:flex;align-items:center;gap:5px;cursor:pointer;" title="Open Scope of Work">'
+            +'<div data-inv-reno-sow="'+uid+'" style="display:flex;align-items:center;gap:5px;cursor:pointer;" title="Open Maintenance Request">'
             +'<span style="font-size:14px;font-weight:800;color:var(--text);">'+_sc+'</span>'
             +'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+_tier.bg+';color:'+_tier.c+';">'+_tier.label+'</span>'
             +'</div></td>';
@@ -307,7 +307,7 @@ function renderInventoryView(){
       })() : '')
       +'<td style="padding:9px 10px;text-align:center;width:1%;white-space:nowrap;">'
       +'<div style="display:flex;align-items:center;justify-content:center;gap:6px;">'
-      +'<button type="button" onclick="event.stopPropagation();openSowModal(\''+uid+'\')" title="Scope of Work" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px;">🔨</button>'
+      +'<button type="button" onclick="event.stopPropagation();openSowModal(\''+uid+'\')" title="Maintenance Request" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px;">🔨</button>'
       +'<button type="button" onclick="event.stopPropagation();openUnitEditModal(\''+uid+'\')" title="Edit unit" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;transition:all .15s;" onmouseover="this.style.borderColor=\'var(--yellow)\';this.style.color=\'var(--yellow)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.color=\'var(--muted)\'">'
       +'<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'
       +'</button>'
@@ -689,7 +689,7 @@ function renderTenantsView(){
     if(_showRenoScore && hasSowOrReno(u.id)){
       var rs=calcRenoScore(u.id); var s=rs.score;
       var tier=s>=40?{label:'Critical',c:'#b91c1c',bg:'#fef2f2'}:s>=25?{label:'High',c:'#7a6000',bg:'#fef9ec'}:s>=12?{label:'Medium',c:'#1d4ed8',bg:'#eff6ff'}:{label:'Low',c:'#15803d',bg:'#f0fdf4'};
-      renoCell='<div data-reno-sow="'+u.id+'" style="display:flex;align-items:center;gap:5px;cursor:pointer;" title="Open Scope of Work"><span style="font-size:14px;font-weight:800;color:var(--text);">'+s+'</span><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+tier.bg+';color:'+tier.c+';">'+tier.label+'</span></div>';
+      renoCell='<div data-reno-sow="'+u.id+'" style="display:flex;align-items:center;gap:5px;cursor:pointer;" title="Open Maintenance Request"><span style="font-size:14px;font-weight:800;color:var(--text);">'+s+'</span><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+tier.bg+';color:'+tier.c+';">'+tier.label+'</span></div>';
     } else if(_showRenoScore) {
       renoCell='<span style="font-size:11px;color:var(--border);">—</span>';
     }
@@ -707,7 +707,7 @@ function renderTenantsView(){
       +'</td>'
       +'<td style="padding:10px 10px;text-align:right;white-space:nowrap;">'
         +'<button type="button" data-tic-uid="'+u.id+'" title="Tenant Information Card" class="tic-tenant-card-btn">🪪</button>'
-        +'<button type="button" data-sow-uid="'+u.id+'" title="Scope of Work" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;">🔨</button>'
+        +'<button type="button" data-sow-uid="'+u.id+'" title="Maintenance Request" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;">🔨</button>'
       +'</td>'
       +'</tr>';
   }).join('');
@@ -1495,7 +1495,7 @@ function showEmployeeHome(){
       makeStat('Condemned',    condemned,   condemned>0?'alert':'good') +
       makeStat('Pending HM Approval',  sowPendingHM,  sowPendingHM>0?(APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role)?'alert':'info'):'neutral') +
       makeStat('Pending ED Approval',  sowPendingED,  sowPendingED>0?(APPROVAL_AUTHORITY.can('approveSowOverThreshold', role)?'alert':'info'):'neutral') +
-      makeStat('SOW Approved',         sowApproved,   sowApproved>0?'good':'neutral') +
+      makeStat('Maintenance Requests Approved', sowApproved,   sowApproved>0?'good':'neutral') +
       makeStat('In Progress',          sowInProgress, sowInProgress>0?'good':'neutral'));
 
     var ctPending = 0, ctAwaitingED = 0, ctApproved = 0, ctDeclined = 0;
@@ -1551,7 +1551,7 @@ function showEmployeeHome(){
       // applications, tenants edit, contractors, finance, or settings.
       empTiles = [
         {icon:'🏠', label:'Inventory',   desc:'View units and complete work',        fn:'showInventory()',     module:'inventory'},
-        {icon:'🔨', label:'Work Orders', desc:'SOWs, work orders & progress reports', fn:'showRenosForRole()', module:'renovations'}
+        {icon:'🔨', label:'Work Orders', desc:'Maintenance requests, work orders & progress reports', fn:'showRenosForRole()', module:'renovations'}
       ];
     } else {
       empTiles = [
@@ -1756,7 +1756,7 @@ async function renderRecentActivity(role) {
       var uid = appId.slice(4);
       var linkedUnit = units.find(function(u){ return u.id === uid; });
       if(linkedUnit) extraName = linkedUnit.num + ' ' + linkedUnit.street;
-      displayId = 'SOW';
+      displayId = 'MR';
     } else if(appId.startsWith('UNIT:')) {
       displayId = appId.slice(5);
     } else if(appId.startsWith('CT:')) {
