@@ -114,7 +114,8 @@
   <div class="std-search-row std-search-row-wide">
     <input id="inv_search" class="std-search" type="text" placeholder="🔍 Search address, status, type, bedrooms, or tenant..." oninput="renderInventoryView()"/>
   </div>
-  <div class="std-table-card">
+  <div id="inv_view_toggle"></div>
+  <div id="inv_table_wrap" class="std-table-card">
     <div class="doclib-table-wrap">
       <table class="std-table" style="min-width:640px;table-layout:fixed;">
         <thead id="inv_thead"><tr>
@@ -134,6 +135,7 @@
       </table>
     </div>
   </div>
+  <div id="inv_cards" style="display:none;"></div>
 </div></div><!-- end inventoryView -->
 
 <!-- ═══ MATCH VIEW ═══ -->
