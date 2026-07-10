@@ -218,6 +218,120 @@ const QUERY_TOOL = {
   },
 }
 
+// ----- audit_activity: server-side staff-activity aggregation ----------------
+// The 50-row query cap + created_at.desc silently drops staff whose rows are
+// pushed past the cap, so "who was active / usage today" could show only the
+// most-recent (often the asker) on a busy day. This scans the WHOLE window
+// server-side (paginated, well past the model row cap) and returns only a small
+// per-actor / per-action summary, so the answer is complete regardless of volume.
+const AUDIT_ROLES    = ['ed', 'super_user', 'housing_manager']
+const AUDIT_MAX_SCAN = 6000   // safety cap on rows scanned server-side
+
+function dayWindowUTC(dateStr: string): { from: string; to: string } {
+  // Treat YYYY-MM-DD as a UTC calendar day: from 00:00 up to the next 00:00.
+  const from = dateStr + 'T00:00:00.000Z'
+  const d = new Date(from)
+  d.setUTCDate(d.getUTCDate() + 1)
+  return { from, to: d.toISOString() }
+}
+
+async function runAuditActivity(role: string, input: Record<string, unknown>): Promise<{ summary?: Record<string, unknown>; error?: string }> {
+  if (AUDIT_ROLES.indexOf(role) === -1) {
+    return { error: 'Activity reports are restricted to ED and Housing Manager roles.' }
+  }
+  if (!SUPABASE_SERVICE_KEY || !SUPABASE_URL) return { error: 'Server not configured for activity reports.' }
+
+  // Resolve the time window: explicit from/to win; else a single UTC day; else today (UTC).
+  let from = input.from ? String(input.from).trim() : ''
+  let to   = input.to   ? String(input.to).trim()   : ''
+  const date = input.date ? String(input.date).trim() : ''
+  if (!from || !to) {
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10)
+    const w = dayWindowUTC(d)
+    from = from || w.from
+    to   = to   || w.to
+  }
+  const action = input.action ? String(input.action).trim().toLowerCase() : ''
+  if (action && !/^[a-z0-9_]+$/.test(action)) return { error: 'Invalid action filter.' }
+
+  // Scan the window in pages (bypasses the model-facing 50-row cap).
+  const rows: Array<Record<string, unknown>> = []
+  const pageSize = 1000
+  let offset = 0
+  let truncated = false
+  while (offset < AUDIT_MAX_SCAN) {
+    const params = [
+      'select=' + encodeURIComponent('actor,action,entity_type,created_at'),
+      'created_at=gte.' + encodeURIComponent(from),
+      'created_at=lt.'  + encodeURIComponent(to),
+      'order=created_at.asc',
+      'limit=' + pageSize,
+      'offset=' + offset,
+    ]
+    if (action) params.push('action=eq.' + action)
+    const url = SUPABASE_URL + '/rest/v1/housing_audit_log?' + params.join('&')
+    const r = await fetch(url, {
+      headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: 'Bearer ' + SUPABASE_SERVICE_KEY, Accept: 'application/json' },
+    })
+    if (!r.ok) return { error: 'Activity query failed (' + r.status + '): ' + (await r.text()).slice(0, 300) }
+    let batch: Array<Record<string, unknown>>
+    try { batch = await r.json() } catch { return { error: 'Could not parse activity result.' } }
+    if (!Array.isArray(batch) || batch.length === 0) break
+    for (const b of batch) rows.push(b)
+    if (batch.length < pageSize) break
+    offset += pageSize
+    if (offset >= AUDIT_MAX_SCAN) truncated = true
+  }
+
+  // Aggregate per actor and per action; collect logins.
+  const actorMap: Record<string, { count: number; first: string; last: string }> = {}
+  const actionMap: Record<string, number> = {}
+  const logins: Array<{ actor: string; at: string }> = []
+  for (const row of rows) {
+    const a  = String(row.actor || 'unknown')
+    const ts = String(row.created_at || '')
+    if (!actorMap[a]) actorMap[a] = { count: 0, first: ts, last: ts }
+    actorMap[a].count++
+    if (ts && ts < actorMap[a].first) actorMap[a].first = ts
+    if (ts && ts > actorMap[a].last)  actorMap[a].last  = ts
+    const act = String(row.action || 'unknown')
+    actionMap[act] = (actionMap[act] || 0) + 1
+    if (act === 'user_login') logins.push({ actor: a, at: ts })
+  }
+  const by_actor = Object.keys(actorMap)
+    .map((k) => ({ actor: k, events: actorMap[k].count, first: actorMap[k].first, last: actorMap[k].last }))
+    .sort((x, y) => y.events - x.events)
+  const by_action = Object.keys(actionMap)
+    .map((k) => ({ action: k, count: actionMap[k] }))
+    .sort((x, y) => y.count - x.count)
+
+  return { summary: {
+    window: { from, to },
+    total_events: rows.length,
+    distinct_actors: by_actor.length,
+    logins_count: logins.length,
+    by_actor,
+    by_action,
+    logins,
+    truncated,
+    note: truncated ? 'Scan hit the ' + AUDIT_MAX_SCAN + '-row safety cap; counts may be partial.' : '',
+  } }
+}
+
+const AUDIT_TOOL = {
+  name: 'audit_activity',
+  description: 'Server-computed staff activity summary from the audit log for a date window (bypasses the ' + MAX_ROW_LIMIT + '-row cap). USE THIS for any "who was active / usage today / activity report / who logged in" question -- it aggregates EVERY event in the window and returns per-actor and per-action counts plus the login list, so it is complete even when a day has hundreds of events. Do NOT answer activity/usage questions from query_database (its row cap silently drops people). ED and Housing Manager only.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      date:   { type: 'string', description: 'Single day as YYYY-MM-DD (UTC). Defaults to today (UTC) if omitted.' },
+      from:   { type: 'string', description: 'Optional ISO start timestamp (inclusive); overrides date.' },
+      to:     { type: 'string', description: 'Optional ISO end timestamp (exclusive); overrides date.' },
+      action: { type: 'string', description: 'Optional single action filter, e.g. user_login.' },
+    },
+  },
+}
+
 async function callClaude(system: string, messages: unknown[], tools?: unknown[]): Promise<Record<string, unknown>> {
   const payload: Record<string, unknown> = { model: MODEL, max_tokens: 1500, system, messages }
   if (tools && tools.length) payload.tools = tools
@@ -341,7 +455,7 @@ serve(async (req) => {
     let turns = 0
     while (turns < MAX_TOOL_TURNS) {
       turns++
-      const resp = await callClaude(system, messages, [QUERY_TOOL])
+      const resp = await callClaude(system, messages, [QUERY_TOOL, AUDIT_TOOL])
       const content = (resp.content as Array<Record<string, unknown>>) || []
       messages.push({ role: 'assistant', content })
 
@@ -364,6 +478,11 @@ serve(async (req) => {
           resultText = qr.error
             ? 'ERROR: ' + qr.error
             : 'Returned ' + (qr.rows || []).length + ' row(s):\n' + JSON.stringify(qr.rows).slice(0, 12000)
+        } else if (block.name === 'audit_activity') {
+          const input = (block.input as Record<string, unknown>) || {}
+          if (tablesQueried.indexOf('audit_activity') === -1) tablesQueried.push('audit_activity')
+          const ar = await runAuditActivity(role, input)
+          resultText = ar.error ? 'ERROR: ' + ar.error : JSON.stringify(ar.summary).slice(0, 12000)
         } else {
           resultText = "ERROR: unknown tool '" + block.name + "'."
         }
@@ -569,6 +688,7 @@ Write 2-4 sentences. Be professional, clear, and compassionate. Reference specif
   return `You are an AI assistant for the Constance Lake First Nation (CLFN) Housing Department. You help housing staff answer questions about applications, housing units, maintenance requests (work orders), renovations, contractors, inspections, and housing policy, and explain how to do things in the app.
 
 Staff role: ${role}
+Current date/time (UTC): ${new Date().toISOString()} (audit timestamps are UTC; use this when a question says "today" / "yesterday").
 Quick stats: ${ctx?.units?.length ?? 0} total units (${vacantCount} vacant), ${ctx?.apps?.length ?? 0} applications (${pendingApps} pending), ${ctx?.sows?.length ?? 0} maintenance requests on file.
 
 IMPORTANT terminology for this system:
@@ -587,6 +707,17 @@ Vacant units: housing_units status=eq.vacant. If unsure of a table's columns, ru
 select=* with limit=3. Prefer the loaded context for quick questions; use the tool
 when you need exact or complete data. Only state facts present in the context or
 returned by the tool - never invent records, names, numbers, or statuses.
+
+## audit_activity tool (staff activity / usage reports)
+For ANY "who was active", "usage today", "activity report", "who logged in", or
+per-staff activity question, call the audit_activity tool -- NOT query_database.
+It aggregates EVERY audit event in the window server-side (it is not limited to
+50 rows), and returns { window, total_events, distinct_actors, logins_count,
+by_actor:[{actor,events,first,last}], by_action:[{action,count}], logins:[...] }.
+Pass date=YYYY-MM-DD for a single day (defaults to today UTC), or from/to ISO
+timestamps for a custom range, and optionally action=user_login. Report the
+per-actor breakdown; do not conclude "only X was active" from query_database,
+whose row cap silently drops people on busy days.
 ${HOW_TO}
 ## Charts / visual reports
 When the user asks to show / chart / graph / visualize something, or wants a
