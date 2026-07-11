@@ -589,7 +589,7 @@ function renderMatchView(){
 
   // ── Column-menu sort + filter via the shared scaffolding (Phase 2B) ────
   function _bestUnitAddr(app){
-    var b = bestUnit(app);
+    var b = _allocatedUnit(app);
     return b && b.unit ? (b.unit.num + ' ' + b.unit.street) : '';
   }
   // Placement order — combines "has a matching unit" + that unit's
@@ -627,12 +627,29 @@ function renderMatchView(){
               + (!hasHouse ? (w.noHouseBonus||0) : 0);
     return bonus + (a.score||0);
   }
+
+  // Exclusive per-unit allocation for DISPLAY (Best Unit cell, Assign button
+  // default, and the Best Unit sortable column) — bestUnit()/_matchPriorityOf
+  // above stay non-exclusive on purpose: an applicant either has an eligible
+  // unit *category* or doesn't, independent of anyone else, so ranking never
+  // depends on allocation order (which would be circular). This second pass
+  // walks applicants in canonical Match Priority order and greedily claims
+  // each one's best still-unclaimed vacant unit (shared-data.js), so two rows
+  // never both show the same still-vacant unit as their recommendation — the
+  // lower-priority applicant shows Unmatched instead. Computed over the full
+  // filtered list in Match Priority order (not whatever column the user has
+  // the table sorted/displayed by) so who "wins" a unit never changes just
+  // because the table is re-sorted.
+  var _priorityOrder = filtered.slice().sort(function(a, b){ return _matchPriorityOf(b) - _matchPriorityOf(a); });
+  var _matchAllocation = (typeof matchAllocateExclusive === 'function') ? matchAllocateExclusive(_priorityOrder) : {};
+  function _allocatedUnit(app){ return _matchAllocation[app.id] || null; }
+
   var _matchColumns = {
     applicant:     { label: 'Applicant',      accessor: function(a){ return ((a.fn||'') + ' ' + (a.ln||'')).trim(); } },
     score:         { label: 'Score',          accessor: function(a){ return a.score || 0; } },
     tier:          { label: 'Tier',           accessor: function(a){ return (a.tier || 'Low Priority').replace(' Priority',''); } },
     reserve:       { label: 'Reserve',        accessor: function(a){ return a.reserve || '(none)'; } },
-    bestUnit:      { label: 'Best Unit',      accessor: function(a){ return _bestUnitAddr(a) || '(no match)'; } },
+    bestUnit:      { label: 'Best Unit',      accessor: function(a){ return _bestUnitAddr(a) || '(unmatched)'; } },
     status:        { label: 'Status',         accessor: function(a){ return formatAppStatusLabel(a.status, {variant:'match'}) || a.status || 'Unknown'; } },
     hasHouse:      { label: 'Has House',      accessor: function(a){ return (a.assignedUnit || a.appType==='transfer_request' || _currentTenancyAddr(a)) ? 1 : 0; } },
     matchPriority: { label: 'Match Priority', accessor: _matchPriorityOf },
@@ -665,7 +682,7 @@ function renderMatchView(){
   }
 
   var rows = _matchRows.map(function(app, i){
-    var best = bestUnit(app);
+    var best = _allocatedUnit(app);
     var name = ((app.fn||'')+' '+(app.ln||'')).trim();
     var curAddr = _currentTenancyAddr(app);   // current home address, if resolvable
     var isTransfer = (app.appType === 'transfer_request') || !!curAddr;  // current tenant moving
@@ -685,7 +702,7 @@ function renderMatchView(){
         +'</div>'
         +'<div class="js-lbl-sm">'+_roomBedLabel(best.unit)+' · '+(_fmtUnitType(best.unit.type)||'—')+'</div>'
         +'</div>'
-      : '<span class="js-txt-muted-sm">No suitable vacant units</span>';
+      : '<span class="js-txt-muted-sm">Unmatched</span>';
 
     var reqs = [];
     if(needsAccess) reqs.push('<span style="font-size:10px;color:var(--info-blue);">Needs accessible unit</span>');
@@ -744,7 +761,7 @@ function renderMatchView(){
   // data-assign-unit + addEventListener wiring as the table (below) rather
   // than an inline onclick, so both views share one wiring path.
   function _matchCardHtml(app, i){
-    var best = bestUnit(app);
+    var best = _allocatedUnit(app);
     var name = ((app.fn||'')+' '+(app.ln||'')).trim();
     var curAddr = _currentTenancyAddr(app);
     var isTransfer = (app.appType === 'transfer_request') || !!curAddr;
@@ -765,7 +782,7 @@ function renderMatchView(){
     var metas = [
       {k:'Score',     v: app.score||0},
       {k:'Reserve',   v: app.reserve||''},
-      {k:'Best Unit', v: best ? (best.unit.num+' '+best.unit.street+' · '+matchPct+'% match') : 'No suitable unit'},
+      {k:'Best Unit', v: best ? (best.unit.num+' '+best.unit.street+' · '+matchPct+'% match') : 'Unmatched'},
       {k:'Status',    v: sl},
       {k:'Has House', v: hasHouseReal ? ('Yes'+(curAddr?' — '+curAddr:'')) : 'No'}
     ];
