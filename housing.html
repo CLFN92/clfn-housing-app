@@ -1098,6 +1098,23 @@
       <div id="scoring_model_table_wrap"></div>
     </div>
   </div>
+  <div id="match_priority_section" style="margin-top:20px;">
+    <div class="card card-flush-gold">
+      <div class="modal-hdr">
+        <div>
+          <div class="lbl-yellow">&#127968; Match Priority &mdash; Housing Placement Order</div>
+          <div class="txt-sm-meta">ED only &mdash; who gets matched to a vacant unit first on the Match page. Separate from the application score above, which measures need/urgency; these bonuses decide placement order on top of it. Set both to 0 to match by score alone.</div>
+        </div>
+        <div class="flex-gap8 flex-wrap">
+          <button onclick="saveMatchPriorityModelED()" class="btn btn-primary">Save Match Priority</button>
+          <button onclick="resetMatchPriorityModelED()" class="btn btn-ghost">Reset Defaults</button>
+        </div>
+      </div>
+      <div style="padding:16px;">
+        <div id="match_priority_wrap"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- REQUIRED FIELDS -->

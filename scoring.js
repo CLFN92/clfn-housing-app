@@ -38,6 +38,47 @@ window.liveV2ScoreModel = window.liveV2ScoreModel || {};
 window.liveV2Tiers      = window.liveV2Tiers      || Object.assign({}, DEFAULT_V2_TIERS);
 window.liveScoreModel   = window.liveScoreModel   || null;
 
+// ── Match Priority Model (ED-adjustable) ──────────────────────────────
+// Governs placement ORDER on the Match page — separate from the application
+// score above, which measures need/urgency. These bonuses are added on top
+// of an applicant's score to form the "Match Priority" sort key:
+//   hasMatchBonus   — added when the applicant has at least one suitable
+//                     vacant unit (bestUnit() in housing-views.js returns
+//                     non-null). The single dominant factor: an applicant
+//                     nobody can actually place right now shouldn't occupy
+//                     the top of the queue ahead of someone who CAN be
+//                     placed today, regardless of score/reserve/house tier.
+//   onReserveBonus  — added when the applicant's "On Reserve Status" is
+//                     'On Reserve' (see the application form's `reserve`
+//                     field). Off-reserve applicants get 0.
+//   noHouseBonus    — added when the applicant does NOT currently have a
+//                     house (i.e. isn't a transfer_request / doesn't already
+//                     hold an assigned unit / no resolvable current tenancy —
+//                     the same "Has House" check the Match table/cards show).
+//   temporaryBonus  — added when the applicant's best-matching unit is
+//                     designated a Temporary unit (`housing_units.assignmentType
+//                     === 'temporary'` — see the Edit Unit modal's Assignment
+//                     Type field). Temporary units are for urgent/emergency
+//                     placements, so a match against one should jump the
+//                     queue outright — this stacks on top of the tiering
+//                     below rather than replacing it.
+// noHouseBonus outweighs onReserveBonus because house status is the primary
+// split, reserve status the secondary one — the four combinations rank:
+// On-Reserve+NoHouse > Off-Reserve+NoHouse > On-Reserve+HasHouse >
+// Off-Reserve+HasHouse. In particular an off-reserve applicant with no house
+// outranks an on-reserve applicant who already has one. Separately, when the
+// best-matching unit is a **Transition** unit (for tenants demonstrating
+// they can care for a unit — lower urgency than a genuine placement), the
+// applicant's own reserve/house status is ignored and they're scored as if
+// off-reserve with a house (the bottom of that tiering), regardless of their
+// real status. hasMatchBonus outweighs every other bonus combined so it
+// always applies first, ahead of temporary/reserve/house tiering. Every
+// bonus is far larger than the ~100-point max application score so, within
+// a tier, the highest score always wins. Set any of these to 0 to remove
+// that factor from ranking.
+var DEFAULT_MATCH_PRIORITY_MODEL = { hasMatchBonus: 10000, temporaryBonus: 5000, onReserveBonus: 1000, noHouseBonus: 2000 };
+window.liveMatchPriorityModel = window.liveMatchPriorityModel || Object.assign({}, DEFAULT_MATCH_PRIORITY_MODEL);
+
 // ── V2 Scoring Model Defaults ──────────────────────────────────────────
 // These are the editable point values for each option in the V2 model.
 // Stored in housing_settings as 'scoring_model_v2'. ED can adjust via Settings.
@@ -308,6 +349,60 @@ function resetV2ScoringModelED() {
     renderV2ScoringEditor();
     showToast('Scoring model reset to defaults');
     auditEntry('SETTINGS', 'scoring_v2_reset', 'V2 scoring model reset to defaults', 'ed');
+  });
+}
+
+// ── Match Priority Editor — ED-adjustable bonus weights (see the model
+// comment above) that decide placement order on the Match page. Kept as its
+// own small card next to the V2 scoring editor rather than folded into it,
+// since it governs WHO gets matched first, not an applicant's raw score.
+function renderMatchPriorityEditor() {
+  var wrap = document.getElementById('match_priority_wrap');
+  if (!wrap) return;
+  var m = liveMatchPriorityModel;
+  function bonusInput(key, label, hint) {
+    return '<div class="f">'
+      + '<label>' + label + '</label>'
+      + '<input type="number" value="' + (m[key] != null ? m[key] : 0) + '" step="100" min="0" data-priority-key="' + key + '" '
+      + 'onchange="updateMatchPriorityOption(this)"/>'
+      + '<div class="txt-sm-meta">' + hint + '</div>'
+      + '</div>';
+  }
+  wrap.innerHTML = '<div class="grid-c3-tight">'
+    + bonusInput('hasMatchBonus',   'Has A Matching Unit Bonus', 'Added when there is at least one suitable vacant unit for the applicant. Dominates everything below.')
+    + bonusInput('temporaryBonus',  'Temporary Unit Bonus', 'Added when the best-matching unit is a Temporary (emergency placement) unit. Stacks on top of reserve/house status.')
+    + bonusInput('onReserveBonus', 'On-Reserve Priority Bonus', 'Added when the applicant\'s On Reserve Status is "On Reserve". Ignored when matched to a Transition unit.')
+    + bonusInput('noHouseBonus',   'No Current House Priority Bonus', 'Added when the applicant does not already have a house (per the Has House column). Ignored when matched to a Transition unit.')
+    + '</div>';
+}
+
+function updateMatchPriorityOption(input) {
+  var key = input.getAttribute('data-priority-key');
+  var val = parseInt(input.value, 10);
+  if (isNaN(val) || val < 0) val = 0;
+  liveMatchPriorityModel[key] = val;
+  input.value = val;
+}
+
+function saveMatchPriorityModelED() {
+  edGuard('Match Priority weighting updated', function() {
+    saveSettingWithDraftFallback('match_priority_model', liveMatchPriorityModel).then(function(ok){
+      if(!ok){ showToast('Match priority weights saved locally but did not reach the server — it may revert on next sign-in.'); return; }
+      showToast('Match priority weights saved');
+    });
+    auditEntry('SETTINGS', 'match_priority_model', 'Match priority weights updated: Has-Match=' + liveMatchPriorityModel.hasMatchBonus + ' Temporary=' + liveMatchPriorityModel.temporaryBonus + ' On-Reserve=' + liveMatchPriorityModel.onReserveBonus + ' No-House=' + liveMatchPriorityModel.noHouseBonus, 'ed');
+  });
+}
+
+function resetMatchPriorityModelED() {
+  edGuard('Match Priority weighting reset to defaults', function() {
+    liveMatchPriorityModel = Object.assign({}, DEFAULT_MATCH_PRIORITY_MODEL);
+    renderMatchPriorityEditor();
+    saveSettingWithDraftFallback('match_priority_model', liveMatchPriorityModel).then(function(ok){
+      if(!ok){ showToast('Match priority weights reset locally but did not reach the server — it may revert on next sign-in.'); return; }
+      showToast('Match priority weights reset to defaults');
+    });
+    auditEntry('SETTINGS', 'match_priority_model_reset', 'Match priority weights reset to defaults', 'ed');
   });
 }
 

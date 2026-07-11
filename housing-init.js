@@ -1810,6 +1810,9 @@ async function loadHousingData() {
       // Also hydrate liveScoreModel (V1 array format) used by buildV2FormSelects dropdowns
       var _sm = window._appSettings['scoring_model_v2'] || window._appSettings['scoring_model'];
       if(_sm && Array.isArray(_sm) && _sm.length) window.liveScoreModel = _sm;
+      // Merge (not replace) over defaults so a model saved before a new bonus
+      // was added (e.g. hasMatchBonus) still gets that key instead of undefined.
+      if(window._appSettings['match_priority_model']) window.liveMatchPriorityModel=Object.assign({}, DEFAULT_MATCH_PRIORITY_MODEL, window._appSettings['match_priority_model']);
     }
     // Apply theme + nation-name overrides + required-field config now that
     // _appSettings is hydrated. Sub-pages (inventory / match / renos /

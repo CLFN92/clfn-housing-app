@@ -291,6 +291,12 @@ function showSettingsSection(section) {
       var wrap = document.getElementById('scoring_model_table_wrap');
       if(wrap) wrap.innerHTML = '<div class="empty-state-italic">Scoring model configuration is only available to the Executive Director.</div>';
     }
+    if(APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole) && typeof renderMatchPriorityEditor === 'function') {
+      renderMatchPriorityEditor();
+    } else {
+      var mpWrap = document.getElementById('match_priority_wrap');
+      if(mpWrap) mpWrap.innerHTML = '<div class="empty-state-italic">Match priority configuration is only available to the Executive Director.</div>';
+    }
   }
   if(section==='sec_unit_match'  && typeof renderUnitScoreTable==='function') renderUnitScoreTable();
   if(section==='sec_reno_score'  && typeof renderRenoScoreTable==='function') renderRenoScoreTable();
