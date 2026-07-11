@@ -894,10 +894,10 @@ function renderTenantsView(){
     }
     var _openCall = u.assignedName ? "openTenantCard('"+uid+"')" : "openUnitEditModal('"+uid+"')";
     return _cardTile({
-      title: (u.num||'')+' '+(u.street||''),
+      title: u.assignedName || 'No tenant assigned',
       pill: {text: (u.status==='reserved'?'Reserved':'Occupied'), bg: (u.status==='reserved'?'#faf5ff':'#eff6ff'), color: (u.status==='reserved'?'#7c3aed':'#1d4ed8')},
       badges: badges,
-      metas: [{k:'Tenant', v: u.assignedName || ''}].concat(metas),
+      metas: [{k:'Address', v: ((u.num||'')+' '+(u.street||'')).trim()}].concat(metas),
       open: _openCall,
       actions: [
         {text:'🪪 Card', onclick:"event.stopPropagation();"+_openCall, ghost:true},
