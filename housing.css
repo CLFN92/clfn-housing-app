@@ -1800,6 +1800,19 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 #sowModal .tic-strip { grid-template-columns: repeat(4, 1fr); }
 @media (max-width: 520px) { #sowModal .tic-strip { grid-template-columns: repeat(2, 1fr); } }
 
+/* Scroll-collapse (tablet/mobile space-saver, mirrors the MyChart hero/tile
+   -> icon-row pattern): each tile carries a hidden .tic-strip-icon glyph.
+   Once _initScrollCollapse (shared-ui.js) adds .is-scrolled — the user has
+   started reading the tab body — the label/value text hides and the icon
+   shows, shrinking the strip to a compact glance-only row. Reversed the
+   moment they scroll back near the top. */
+.tic-strip-icon           { display: none; font-size: 18px; line-height: 1; }
+.tic-strip-tile           { transition: padding .15s ease; }
+.tic-strip.is-scrolled .tic-strip-tile { padding: 7px 4px; text-align: center; }
+.tic-strip.is-scrolled .tic-strip-lbl,
+.tic-strip.is-scrolled .tic-strip-val  { display: none; }
+.tic-strip.is-scrolled .tic-strip-icon { display: block; }
+
 .tic-tabs                 { display: flex; gap: 0; border-bottom: 1px solid var(--border); padding: 0 20px; background: var(--surface); overflow-x: auto; flex-shrink: 0; }
 .tic-tab                  { background: none; border: none; padding: 12px 16px; cursor: pointer; font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
 .tic-tab:hover            { color: var(--text); }

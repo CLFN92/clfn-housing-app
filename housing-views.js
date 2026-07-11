@@ -233,6 +233,14 @@ function stashHousingSession(){
 
 
 function renderInventoryView(){
+  // Scroll-collapse: shrink the page header to a compact title bar once the
+  // list scrolls, freeing space on tablet/mobile (shared-ui.js). Idempotent —
+  // safe to call on every render.
+  (function(){
+    var _hdr = document.querySelector('#inventoryView .page-header-bar');
+    var _area = document.querySelector('.content-area');
+    if (_hdr && _area && typeof _initScrollCollapse === 'function') _initScrollCollapse(_area, _hdr);
+  })();
   var showRenoCol = (ROLE.isManagement(window.currentRole));
   var th = document.getElementById('inv_reno_score_th');
   if(th) th.style.display = showRenoCol ? '' : 'none';
@@ -459,6 +467,14 @@ window._invSetView = function(v){
 // ── Unit Edit Modal ──────────────────────────────────────
 
 function renderMatchView(){
+  // Scroll-collapse: shrink the page header to a compact title bar once the
+  // list scrolls, freeing space on tablet/mobile (shared-ui.js). Idempotent —
+  // safe to call on every render.
+  (function(){
+    var _hdr = document.querySelector('#matchView .page-header-bar');
+    var _area = document.querySelector('.content-area');
+    if (_hdr && _area && typeof _initScrollCollapse === 'function') _initScrollCollapse(_area, _hdr);
+  })();
   var allApps = (typeof applications !== 'undefined' ? applications : []);
   var allUnits = getAllUnits();
   var vacantUnits = allUnits.filter(function(u){ return u.status==='vacant' && !u.archived; });
@@ -777,6 +793,14 @@ window._matchSetView = function(v){
 
 
 function renderTenantsView(){
+  // Scroll-collapse: shrink the page header to a compact title bar once the
+  // list scrolls, freeing space on tablet/mobile (shared-ui.js). Idempotent —
+  // safe to call on every render.
+  (function(){
+    var _hdr = document.querySelector('#tenantsView .page-header-bar');
+    var _area = document.querySelector('.content-area');
+    if (_hdr && _area && typeof _initScrollCollapse === 'function') _initScrollCollapse(_area, _hdr);
+  })();
   var showRenoCol = (ROLE.isManagement(window.currentRole));
   var th = document.getElementById('ten_reno_score_th');
   if(th) th.style.display = showRenoCol ? '' : 'none';
@@ -1287,6 +1311,15 @@ function _renderLandingKpis(){
   setKpi('kpi_new_apps',        newApps);
   setKpi('kpi_file_updates',    fileUpdates);
   setKpi('kpi_house_requests',  houseRequests);
+
+  // Scroll-collapse: shrink the KPI strip to icon-only once the page scrolls,
+  // freeing space on tablet/mobile (shared-ui.js). _initScrollCollapse is
+  // itself idempotent, so calling it on every render is safe.
+  var _kpiStrip = document.getElementById('landing_kpi_strip');
+  var _contentArea = document.querySelector('.content-area');
+  if (_kpiStrip && _contentArea && typeof _initScrollCollapse === 'function') {
+    _initScrollCollapse(_contentArea, _kpiStrip);
+  }
 }
 
 var _kpiDrillData = null; // { title, headers, rows, colWidths, filename }

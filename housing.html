@@ -95,18 +95,21 @@
        housing-views.js. Hidden when none of the values are available. -->
   <div class="kpi-strip" id="landing_kpi_strip">
     <div class="kpi-card kpi-clickable" data-kpi="open-apps" onclick="showHousingKpiDrilldown('open')" role="button" tabindex="0">
+      <span class="kpi-icon">📋</span>
       <div class="kpi-label">Open Applications</div>
       <div class="kpi-value" id="kpi_open_apps">—</div>
       <div class="kpi-meta">Pending HM or ED review</div>
     </div>
     <div class="kpi-card kpi-accent-success kpi-clickable" data-kpi="vacant" onclick="showHousingKpiDrilldown('vacant')" role="button" tabindex="0">
+      <span class="kpi-icon">🏠</span>
       <div class="kpi-label">Vacant Units</div>
       <div class="kpi-value" id="kpi_vacant">—</div>
       <div class="kpi-meta">Available for assignment</div>
     </div>
     <div class="kpi-card" data-kpi="app-types" style="display:flex;flex-direction:column;">
+      <span class="kpi-icon">📊</span>
       <div class="kpi-label">Applications by Type</div>
-      <div style="display:flex;flex-direction:column;margin-top:6px;">
+      <div class="kpi-breakdown" style="display:flex;flex-direction:column;margin-top:6px;">
         <div onclick="showHousingKpiDrilldown('new_apps')" role="button" tabindex="0" title="Seeking a new unit"
              style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:6px 0;border-bottom:1px solid var(--border);">
           <span style="font-size:12px;color:var(--text);">New Applications</span>
@@ -1429,13 +1432,13 @@
 
     <!-- Info strip -->
     <div class="tic-strip">
-      <div class="tic-strip-tile"><div class="tic-strip-lbl">Monthly Rent</div><div id="tic_strip_rent" class="tic-strip-val">—</div></div>
-      <div class="tic-strip-tile"><div class="tic-strip-lbl">Arrears</div><div id="tic_strip_arrears" class="tic-strip-val">—</div></div>
-      <div class="tic-strip-tile"><div class="tic-strip-lbl">Move-In Date</div><div id="tic_strip_movein" class="tic-strip-val">—</div></div>
-      <div class="tic-strip-tile"><div class="tic-strip-lbl">Lease Type</div><div id="tic_strip_lease" class="tic-strip-val">—</div></div>
-      <div class="tic-strip-tile"><div class="tic-strip-lbl">Lease Expires</div><div id="tic_strip_lease_end" class="tic-strip-val">—</div></div>
-      <div class="tic-strip-tile"><div class="tic-strip-lbl">Tenancy Status</div><div id="tic_strip_status" class="tic-strip-val">—</div></div>
-      <div class="tic-strip-tile" id="tic_strip_hcc_tile" style="cursor:pointer;" onclick="window._ticToggleHomeCare && window._ticToggleHomeCare()"><div class="tic-strip-lbl">Home &amp; Community Care</div><div id="tic_strip_hcc" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><span class="tic-strip-icon">💰</span><div class="tic-strip-lbl">Monthly Rent</div><div id="tic_strip_rent" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><span class="tic-strip-icon">⚠️</span><div class="tic-strip-lbl">Arrears</div><div id="tic_strip_arrears" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><span class="tic-strip-icon">📅</span><div class="tic-strip-lbl">Move-In Date</div><div id="tic_strip_movein" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><span class="tic-strip-icon">📄</span><div class="tic-strip-lbl">Lease Type</div><div id="tic_strip_lease" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><span class="tic-strip-icon">⏰</span><div class="tic-strip-lbl">Lease Expires</div><div id="tic_strip_lease_end" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile"><span class="tic-strip-icon">🏠</span><div class="tic-strip-lbl">Tenancy Status</div><div id="tic_strip_status" class="tic-strip-val">—</div></div>
+      <div class="tic-strip-tile" id="tic_strip_hcc_tile" style="cursor:pointer;" onclick="window._ticToggleHomeCare && window._ticToggleHomeCare()"><span class="tic-strip-icon">❤️</span><div class="tic-strip-lbl">Home &amp; Community Care</div><div id="tic_strip_hcc" class="tic-strip-val">—</div></div>
     </div>
 
     <!-- Tabs -->
