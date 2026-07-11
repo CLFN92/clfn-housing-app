@@ -1094,3 +1094,33 @@ function closeTip(id){
   var el = document.getElementById(id);
   if(el) el.classList.remove('is-open');
 }
+
+// ── Scroll-collapse (shared) ─────────────────────────────────────────────────
+// Toggles an `.is-scrolled` class on a "key info" element (a .tic-strip,
+// .kpi-strip, or .page-header-bar) once its scroll container passes a small
+// threshold, and removes it near the top — mirrors the MyChart-style pattern
+// of a hero/tile row shrinking to a compact bar once the user starts reading
+// content, then expanding back when they scroll back up. Purely visual: CSS
+// (housing.css) owns what "collapsed" looks like per element type; this just
+// flips the class. Idempotent — wiring the same stripEl twice is a no-op, so
+// callers can call this from a render function that runs more than once.
+function _initScrollCollapse(scrollEl, stripEl, opts){
+  if(!scrollEl || !stripEl) return;
+  if(stripEl.dataset.scrollCollapseWired === '1') return;
+  stripEl.dataset.scrollCollapseWired = '1';
+  var threshold = (opts && opts.threshold) || 16;
+  var ticking = false;
+  function apply(){
+    var y = (scrollEl === window) ? (window.scrollY || document.documentElement.scrollTop) : scrollEl.scrollTop;
+    stripEl.classList.toggle('is-scrolled', y > threshold);
+    ticking = false;
+  }
+  function onScroll(){
+    if(ticking) return;
+    ticking = true;
+    (window.requestAnimationFrame || function(fn){ setTimeout(fn, 16); })(apply);
+  }
+  scrollEl.addEventListener('scroll', onScroll, { passive: true });
+  apply(); // initial state — handles a modal reopened mid-scroll, or a page loaded already scrolled
+}
+window._initScrollCollapse = _initScrollCollapse;

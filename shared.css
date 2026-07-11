@@ -395,6 +395,29 @@ body {
 .phb-actions select,
 .phb-actions input     { width: auto; min-width: 0; box-sizing: border-box; }
 
+/* Scroll-collapse (tablet/mobile space-saver, mirrors the MyChart hero/tile
+   -> icon-row pattern used on .tic-strip/.kpi-strip): once _initScrollCollapse
+   (shared-ui.js) adds .is-scrolled to the header bar, the subtitle hides and
+   the title shrinks, freeing vertical space while the user reads the list
+   below. Scoped to Inventory/Match/Tenants only — those are list pages where
+   the header competes with the list for space; other .page-header-bar users
+   (renos, rfq, contractors, inspections, finance) are unaffected. .phb-actions
+   stays visible/untouched so action buttons remain reachable while scrolled. */
+#inventoryView .page-header-bar,
+#matchView .page-header-bar,
+#tenantsView .page-header-bar { transition: padding .15s ease; }
+#inventoryView .page-header-bar.is-scrolled,
+#matchView .page-header-bar.is-scrolled,
+#tenantsView .page-header-bar.is-scrolled {
+  padding-top: 10px; padding-bottom: 10px;
+}
+#inventoryView .page-header-bar.is-scrolled .phb-title p,
+#matchView .page-header-bar.is-scrolled .phb-title p,
+#tenantsView .page-header-bar.is-scrolled .phb-title p { display: none; }
+#inventoryView .page-header-bar.is-scrolled .phb-title h1,
+#matchView .page-header-bar.is-scrolled .phb-title h1,
+#tenantsView .page-header-bar.is-scrolled .phb-title h1 { font-size: 18px; }
+
 /* inventoryView filters below the header */
 #inventoryView .phb-actions {
   flex-basis: 100%;
@@ -2008,6 +2031,20 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .kpi-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
 .kpi-card.kpi-clickable { cursor: pointer; transition: var(--tr); }
 .kpi-card.kpi-clickable:hover { border-color: var(--yellow); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+
+/* Scroll-collapse (tablet/mobile space-saver, mirrors the MyChart hero/tile
+   -> icon-row pattern, see .tic-strip.is-scrolled in housing.css): each card
+   carries a hidden .kpi-icon glyph. Once _initScrollCollapse (shared-ui.js)
+   adds .is-scrolled to #landing_kpi_strip, the label/value/meta/breakdown
+   text hides and the icon shows, shrinking the strip to a glance-only row. */
+.kpi-icon { display: none; font-size: 20px; line-height: 1; }
+.kpi-card  { transition: padding .15s ease; }
+.kpi-strip.is-scrolled .kpi-card { padding: 8px 10px; text-align: center; }
+.kpi-strip.is-scrolled .kpi-label,
+.kpi-strip.is-scrolled .kpi-value,
+.kpi-strip.is-scrolled .kpi-meta,
+.kpi-strip.is-scrolled .kpi-breakdown { display: none; }
+.kpi-strip.is-scrolled .kpi-icon { display: block; }
 
 /* Quick row */
 .quick-row {

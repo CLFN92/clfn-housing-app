@@ -216,6 +216,14 @@ function openUnitEditModal(unitId){
   renderEditUnitPhotoPreview(unitId);
   _ueSwitchTab('overview');
   var _uem=document.getElementById('unitEditModal'); if(_uem){_uem.style.removeProperty('display');_uem.style.setProperty('display','flex','important');}
+  // Scroll-collapse: shrink the info strip to icon-only once the tab body
+  // scrolls, freeing space on tablet/mobile (shared-ui.js). _initScrollCollapse
+  // is itself idempotent, so calling it on every open is safe.
+  if(_uem && typeof _initScrollCollapse === 'function'){
+    var _ueBody = _uem.querySelector('.tic-body');
+    var _ueStrip = _uem.querySelector('.tic-strip');
+    if(_ueBody && _ueStrip) _initScrollCollapse(_ueBody, _ueStrip);
+  }
 
   // Restore saved unit signatures (HM / ED only — tenant block was removed
   // because the inputs duplicated u.assignedName/u.assignedDate and the snapshot

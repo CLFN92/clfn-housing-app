@@ -2362,6 +2362,11 @@
     var footer = modal.querySelector('.tic-footer');
     if(footer) footer.addEventListener('click', _ticOnFooterClick);
 
+    // Scroll-collapse: shrink the info strip to icon-only once the tab body
+    // scrolls, freeing space on tablet/mobile (shared-ui.js).
+    var strip = modal.querySelector('.tic-strip');
+    if(body && strip && typeof _initScrollCollapse === 'function') _initScrollCollapse(body, strip);
+
     _ticWired = true;
   }
 

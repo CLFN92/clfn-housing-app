@@ -208,10 +208,10 @@ function _buildSowModalHTML() {
       // worth a glance without opening a tab: workflow state, budget, who's
       // doing it, and when it's due.
       '<div class="tic-strip">' +
-        '<div class="tic-strip-tile"><div class="tic-strip-lbl">Status</div><div id="sow_strip_status" class="tic-strip-val">—</div></div>' +
-        '<div class="tic-strip-tile"><div class="tic-strip-lbl">Est. Cost</div><div id="sow_strip_cost" class="tic-strip-val">—</div></div>' +
-        '<div class="tic-strip-tile"><div class="tic-strip-lbl">Assigned To</div><div id="sow_strip_assigned" class="tic-strip-val">—</div></div>' +
-        '<div class="tic-strip-tile"><div class="tic-strip-lbl">Target Completion</div><div id="sow_strip_target" class="tic-strip-val">—</div></div>' +
+        '<div class="tic-strip-tile"><span class="tic-strip-icon">🛠️</span><div class="tic-strip-lbl">Status</div><div id="sow_strip_status" class="tic-strip-val">—</div></div>' +
+        '<div class="tic-strip-tile"><span class="tic-strip-icon">💰</span><div class="tic-strip-lbl">Est. Cost</div><div id="sow_strip_cost" class="tic-strip-val">—</div></div>' +
+        '<div class="tic-strip-tile"><span class="tic-strip-icon">👷</span><div class="tic-strip-lbl">Assigned To</div><div id="sow_strip_assigned" class="tic-strip-val">—</div></div>' +
+        '<div class="tic-strip-tile"><span class="tic-strip-icon">📅</span><div class="tic-strip-lbl">Target Completion</div><div id="sow_strip_target" class="tic-strip-val">—</div></div>' +
       '</div>' +
 
       // Read-only banner (shown when SOW is marked Complete and locked)
@@ -860,6 +860,15 @@ function openSowModal(unitId, projectNumber) {
   }
 
   if (typeof _sowRefreshStrip === 'function') _sowRefreshStrip();
+
+  // Scroll-collapse: shrink the info strip to icon-only once the tab body
+  // scrolls, freeing space on tablet/mobile (shared-ui.js). _initScrollCollapse
+  // is itself idempotent, so calling it on every open is safe.
+  if (modal && typeof _initScrollCollapse === 'function') {
+    var _sowBody = modal.querySelector('.tic-body');
+    var _sowStrip = modal.querySelector('.tic-strip');
+    if (_sowBody && _sowStrip) _initScrollCollapse(_sowBody, _sowStrip);
+  }
 }
 
 // Populate a brand-new SOW from a structured seed (Reno Questionnaire hand-off):
