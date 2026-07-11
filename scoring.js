@@ -384,25 +384,43 @@ function updateMatchPriorityOption(input) {
   input.value = val;
 }
 
+// Guards Match Priority edits against the dedicated 'editMatchPriority'
+// authority (Settings -> Approval Authority -> Scoring) rather than the
+// shared edGuard()/editScoreModel check, so an ED can delegate WHO gets
+// matched first (this) separately from WHO can edit the application scoring
+// model itself (editScoreModel).
+function _matchPriorityGuard(featureName, callback) {
+  var role = window.currentRole;
+  if (window.APPROVAL_AUTHORITY && APPROVAL_AUTHORITY.can('editMatchPriority', role)) {
+    if (typeof callback === 'function') {
+      var rv = callback();
+      return (rv === undefined) ? true : rv;
+    }
+    return true;
+  }
+  if (typeof showToast === 'function') showToast((featureName || 'This action') + ' is not available for your role.');
+  return false;
+}
+
 function saveMatchPriorityModelED() {
-  edGuard('Match Priority weighting updated', function() {
+  _matchPriorityGuard('Match Priority weighting updated', function() {
     saveSettingWithDraftFallback('match_priority_model', liveMatchPriorityModel).then(function(ok){
       if(!ok){ showToast('Match priority weights saved locally but did not reach the server — it may revert on next sign-in.'); return; }
       showToast('Match priority weights saved');
     });
-    auditEntry('SETTINGS', 'match_priority_model', 'Match priority weights updated: Has-Match=' + liveMatchPriorityModel.hasMatchBonus + ' Temporary=' + liveMatchPriorityModel.temporaryBonus + ' On-Reserve=' + liveMatchPriorityModel.onReserveBonus + ' No-House=' + liveMatchPriorityModel.noHouseBonus, 'ed');
+    auditEntry('SETTINGS', 'match_priority_model', 'Match priority weights updated: Has-Match=' + liveMatchPriorityModel.hasMatchBonus + ' Temporary=' + liveMatchPriorityModel.temporaryBonus + ' On-Reserve=' + liveMatchPriorityModel.onReserveBonus + ' No-House=' + liveMatchPriorityModel.noHouseBonus, window.currentRole);
   });
 }
 
 function resetMatchPriorityModelED() {
-  edGuard('Match Priority weighting reset to defaults', function() {
+  _matchPriorityGuard('Match Priority weighting reset to defaults', function() {
     liveMatchPriorityModel = Object.assign({}, DEFAULT_MATCH_PRIORITY_MODEL);
     renderMatchPriorityEditor();
     saveSettingWithDraftFallback('match_priority_model', liveMatchPriorityModel).then(function(ok){
       if(!ok){ showToast('Match priority weights reset locally but did not reach the server — it may revert on next sign-in.'); return; }
       showToast('Match priority weights reset to defaults');
     });
-    auditEntry('SETTINGS', 'match_priority_model_reset', 'Match priority weights reset to defaults', 'ed');
+    auditEntry('SETTINGS', 'match_priority_model_reset', 'Match priority weights reset to defaults', window.currentRole);
   });
 }
 
