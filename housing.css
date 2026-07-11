@@ -413,8 +413,17 @@
   /* Settings tabs — allow horizontal scroll rather than wrapping */
   .tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
 
-  /* Page header actions — stack vertically */
-  .phb-actions { flex-direction: column; align-items: stretch; width: 100%; }
+  /* Page header actions — every current .phb-actions group is buttons-only
+     (Tenants, Inventory, Contractors, Renos, Inspections, the scorecard) --
+     keep them side by side and let flex-wrap (shared.css base rule) wrap
+     onto a second row if they don't fit, rather than stacking full-width.
+     The width:100% is still needed here even though flex-direction stays
+     row: .phb-actions has flex-shrink:0 (so it doesn't get squeezed next to
+     a long title on wider screens), but that same flex-shrink:0 stops it
+     from being constrained to the wrapped line's width on its own row --
+     without an explicit width it just overflows past the viewport edge
+     instead of wrapping its buttons onto a second row. */
+  .phb-actions { width: 100%; }
   .phb-actions select,
   .phb-actions input  { width: 100%; min-width: 0; }
 
@@ -485,8 +494,8 @@
   #unitEditModal   [style*="1fr 1fr 1fr"] { grid-template-columns: 1fr 1fr !important; }
   /* Settings tabs scroll horizontally rather than wrapping */
   .tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
-  /* Page header actions stack */
-  .phb-actions { flex-direction: column; align-items: stretch; }
+  /* Page header actions — stay side by side (see the ≤600px rule above for why). */
+  .phb-actions { width: 100%; }
   .phb-actions select, .phb-actions input { width: 100%; min-width: 0 !important; }
   /* Filter inputs full width */
   #tenant_search, #inv_search { width: 100%; box-sizing: border-box; }
@@ -1935,6 +1944,17 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 
 .tic-footer               { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 28px; border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
 .tic-footer-spacer        { flex: 1; }
+/* On a wide modal the footer fits on one line, so the spacer correctly
+   pushes Cancel + the primary button to the right end of that row. Once the
+   footer wraps (narrow phones), the spacer still tries to grow-and-push on
+   whatever line it lands on, shoving Cancel/Submit off to the right of their
+   own wrapped row instead of continuing flush-left like the rows above them.
+   Forcing it to its own full-width line is a standard flexbox line-break
+   trick: nothing else can share a 100%-wide flex item's line, so it cleanly
+   starts Cancel/Submit at the container's left edge on a fresh row. */
+@media (max-width: 700px) {
+  .tic-footer-spacer      { flex-basis: 100%; height: 0; }
+}
 
 .tic-tenant-card-btn      { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 14px; padding: 3px 6px; border-radius: 5px; }
 .tic-tenant-card-btn:hover { color: var(--text); background: var(--yellow-light); }

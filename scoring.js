@@ -224,9 +224,9 @@ function renderV2ScoringEditor() {
     + '</div>';
 
   html += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">'
-    + '<button onclick="saveV2TiersED()" style="background:var(--yellow);border:none;color:var(--dark);padding:7px 18px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save Tier Thresholds</button>'
-    + '<button onclick="saveV2TiersAndRescoreED()" style="background:none;border:1.5px solid var(--yellow);color:var(--yellow);padding:7px 14px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;">Save &amp; Rescore All</button>'
-    + '<button onclick="resetV2TiersED()" style="background:none;border:1px solid var(--dark-border);color:var(--muted);padding:7px 14px;border-radius:7px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;">Reset Defaults</button>'
+    + '<button onclick="saveV2TiersED()" class="btn btn-primary">Save Tier Thresholds</button>'
+    + '<button onclick="saveV2TiersAndRescoreED()" class="btn btn-ghost">Save &amp; Rescore All</button>'
+    + '<button onclick="resetV2TiersED()" class="btn btn-ghost">Reset Defaults</button>'
     + '</div>';
 
   html += '</div>';
