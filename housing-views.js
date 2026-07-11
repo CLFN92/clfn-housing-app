@@ -489,7 +489,6 @@ function renderMatchView(){
   })();
   var allApps = (typeof applications !== 'undefined' ? applications : []);
   var allUnits = getAllUnits();
-  var vacantUnits = allUnits.filter(function(u){ return u.status==='vacant' && !u.archived; });
 
   // Tenancy is authoritative on the UNIT (housing_units.assigned_name) and is
   // NOT reliably synced back onto the application record: assignedUnit/status
@@ -569,33 +568,14 @@ function renderMatchView(){
   var content = document.getElementById('match_content');
   if(!content) return;
 
-  // For each applicant find their best matching vacant unit
+  // For each applicant find their best matching vacant unit. Scoring itself
+  // lives in the shared matchBestUnit() (shared-data.js) so the Match page
+  // and the worklist's Ready to Match section score/filter applicants
+  // against real inventory identically — see that function's comment for
+  // the bedroom-fit/accessibility/Elders rules.
   var _eldersMin = (window._appSettings && window._appSettings.eldersAgeMin) || 65;
   function bestUnit(app){
-    var needsBeds = 1;
-    if(app.habitants) needsBeds = Math.max(1, 1 + (app.coApp?1:0) + app.habitants.length);
-    var needsAccess = app.accessibility && app.accessibility!=='None' && app.accessibility!=='0' && app.accessibility!==0;
-    var age = app.dob ? Math.floor((new Date()-new Date(app.dob))/(365.25*24*3600*1000)) : 0;
-    var isElders = age >= _eldersMin;
-
-    var eligible = isElders ? vacantUnits : vacantUnits.filter(function(u){ return !u.isElders; });
-    var scored = eligible.map(function(u){
-      var sc = 0;
-      // One size up (needsBeds+1) is a fine, freely-assignable match; two or
-      // more sizes up (e.g. a 3-bed for someone who needs 1) is heavily
-      // penalized here to match the hard "requires ED approval" gate in
-      // confirmAssignment() (housing-init.js) — see _isOversizedUnit() there.
-      if(u.bedrooms === needsBeds)          sc += 10;
-      else if(u.bedrooms === needsBeds + 1) sc += 5;
-      else if(u.bedrooms === needsBeds - 1) sc += 3;
-      else if(u.bedrooms >= needsBeds + 2)  sc -= 50;
-      if(needsAccess && u.accessible)     sc += 8;
-      if(needsAccess && !u.accessible)    sc -= 4;
-      if(isElders && u.isElders)          sc += 6;
-      return {unit:u, score:sc, maxPossible:24};
-    }).sort(function(a,b){ return b.score-a.score; });
-
-    return scored[0] || null;
+    return (typeof matchBestUnit === 'function') ? matchBestUnit(app) : null;
   }
 
   var tierColor = {
