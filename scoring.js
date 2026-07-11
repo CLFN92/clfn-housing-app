@@ -367,14 +367,17 @@ function renderMatchPriorityEditor() {
   if (!wrap) return;
   var m = liveMatchPriorityModel;
   function bonusInput(key, label, hint) {
-    return '<div class="f">'
-      + '<label>' + label + '</label>'
-      + '<input type="number" value="' + (m[key] != null ? m[key] : 0) + '" step="100" min="0" data-priority-key="' + key + '" '
-      + 'onchange="updateMatchPriorityOption(this)"/>'
-      + '<div class="txt-sm-meta">' + hint + '</div>'
+    var inputHtml = '<input type="number" value="' + (m[key] != null ? m[key] : 0) + '" step="100" min="0" data-priority-key="' + key + '" '
+      + 'style="width:70px;padding:4px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);" '
+      + 'onchange="updateMatchPriorityOption(this)"/>';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:7px;margin-bottom:3px;background:var(--bg);">'
+      + '<div style="flex:1;"><span class="js-txt-bold2" style="font-weight:400;">' + label + '</span>'
+      + '<div style="font-size:10px;color:var(--muted);margin-top:1px;">' + hint + '</div>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">' + inputHtml + '<span class="js-lbl-sm">pts</span></div>'
       + '</div>';
   }
-  wrap.innerHTML = '<div class="grid-c3-tight">'
+  wrap.innerHTML = '<div style="padding:16px;">'
     + bonusInput('hasMatchBonus',   'Has A Matching Unit Bonus', 'Added when there is at least one suitable vacant unit for the applicant. Dominates everything below.')
     + bonusInput('temporaryBonus',  'Temporary Unit Bonus', 'Added when the best-matching unit is a Temporary (emergency placement) unit. Stacks on top of reserve/house status.')
     + bonusInput('onReserveBonus', 'On-Reserve Priority Bonus', 'Added when the applicant\'s On Reserve Status is "On Reserve". Ignored when matched to a Transition unit.')
