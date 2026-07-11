@@ -91,7 +91,8 @@
   <div class="std-search-row std-search-row-wide">
     <input id="tenant_search" class="std-search" type="text" placeholder="🔍 Search name, address, unit #, classification, or move-in date..." oninput="renderTenantsView()"/>
   </div>
-  <div class="std-table-card">
+  <div id="ten_view_toggle"></div>
+  <div id="ten_table_wrap" class="std-table-card">
     <div class="doclib-table-wrap">
       <table class="std-table" style="min-width:600px;">
         <thead id="tenants_thead"><tr>
@@ -107,6 +108,7 @@
       </table>
     </div>
   </div>
+  <div id="ten_cards" style="display:none;"></div>
 </div></div><!-- end tenantsView -->
 
 <!-- ══ ASSIGN UNIT MODAL ══ -->
