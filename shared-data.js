@@ -4729,6 +4729,37 @@ function matchScoreCandidateUnits(app) {
 function matchBestUnit(app) {
   return matchScoreCandidateUnits(app)[0] || null;
 }
+// ── Shared "who gets matched first" placement-order score ─────────────────
+// Combines "has a matching unit" + that unit's Assignment Type + reserve
+// status + current-house status on top of the raw need score (see
+// liveMatchPriorityModel, scoring.js) so ranking/allocation order is
+// identical everywhere it's used. The Match page (_matchPriorityOf() in
+// housing-views.js, which delegates here) and the worklist's Ready to Match
+// section both need the SAME order — otherwise the same applicant could get
+// a different Best Unit recommendation (or Unmatched status) depending on
+// which page shows them, since matchAllocateExclusive's result depends on
+// the order applicants are walked in. opts.hasHouse lets a caller that has
+// already resolved a fuller current-tenancy cross-reference (the Match
+// page's _currentTenancyAddr, built from occupied/reserved units) pass a
+// more accurate value in; callers without that context (the worklist) fall
+// back to the simpler assignedUnit/transfer_request check.
+function matchPriorityOf(app, opts) {
+  opts = opts || {};
+  var w = window.liveMatchPriorityModel || DEFAULT_MATCH_PRIORITY_MODEL;
+  var best = matchBestUnit(app);
+  var hasMatch = !!best;
+  var assignType = (best && best.unit) ? (best.unit.assignmentType||'') : '';
+  var isTemporary = assignType === 'temporary';
+  var isTransition = assignType === 'transition';
+  var onReserve = !isTransition && app.reserve === 'On Reserve';
+  var hasHouseReal = opts.hasHouse != null ? opts.hasHouse : !!(app.assignedUnit || app.appType === 'transfer_request');
+  var hasHouse = isTransition || hasHouseReal;
+  var bonus = (hasMatch ? (w.hasMatchBonus||0) : 0)
+            + (isTemporary ? (w.temporaryBonus||0) : 0)
+            + (onReserve ? (w.onReserveBonus||0) : 0)
+            + (!hasHouse ? (w.noHouseBonus||0) : 0);
+  return bonus + (app.score||0);
+}
 // ── Exclusive one-unit-per-applicant allocation ───────────────────────────
 // matchBestUnit() scores each applicant against inventory in isolation, so
 // two different applicants can each be told the SAME still-vacant unit is
@@ -4759,24 +4790,38 @@ function matchAllocateExclusive(orderedApps) {
 }
 
 // ── 5. Approved apps ready to match (no unit assigned) ───────────────────
+// Uses the shared appIsAssignable() (the same eligibility rule the Match
+// page, confirmAssignment, the unit-edit gate, and the Add-Tenant modal all
+// use) so an hm_approved application shows up here exactly when it's
+// assignable everywhere else — this list used to hand-check only
+// ed_approved/mgr_approved and silently never surfaced hm_approved apps.
 // Commercial apps are excluded — they're assigned to buildings via their own
-// review modal, never the residential Match queue. An applicant with no
-// suitable vacant unit is still included (not filtered out) — their card
-// renders an "Unmatched" status instead of a Best Unit; see matchAllocateExclusive
-// below, which also ensures two applicants here never both show the SAME
-// still-vacant unit as their recommendation.
+// review modal, never the residential Match queue. existing_tenant "file
+// update" records are excluded too — they're not housing requests and are
+// never scored/ranked, same rule as the Match page's own filter (they used
+// to be able to slip in here if one happened to carry an approved status).
+// An applicant with no suitable vacant unit is still included (not filtered
+// out) — their card renders an "Unmatched" status instead of a Best Unit;
+// see matchAllocateExclusive below, which also ensures two applicants here
+// never both show the SAME still-vacant unit as their recommendation.
 function _wlCollectMatch(ctx) {
   var matchItems = [];
   if (ctx.isManagement) {
     matchItems = ctx.apps.filter(function(a) {
-      if (!a || a.archived || a.assignedUnit) return false;
-      if (a.appType === 'commercial') return false;
-      return a.status === 'ed_approved' || a.status === 'mgr_approved';
+      if (!a || a.assignedUnit) return false;
+      if (a.appType === 'existing_tenant') return false;
+      return (typeof appIsAssignable === 'function')
+        ? appIsAssignable(a)
+        : (!a.archived && a.appType !== 'commercial' && (a.status === 'ed_approved' || a.status === 'mgr_approved' || a.status === 'hm_approved'));
     })
-    // Rank by score, highest first (highest need at the top). Unscored records
-    // (e.g. file updates) sort to the bottom. Sort BEFORE the cap so the top 6
-    // shown are the top 6 by score.
-    .sort(function(a, b) { return (Number(b.score) || 0) - (Number(a.score) || 0); })
+    // Rank by Match Priority (the same shared matchPriorityOf() formula the
+    // full Match page uses for its own allocation order) rather than raw
+    // score alone -- otherwise this list and the Match page could rank the
+    // same two applicants differently and hand out conflicting Best Unit
+    // recommendations. Sort BEFORE the cap so the top 6 shown are the top 6
+    // by priority, and BEFORE matchAllocateExclusive so allocation walks
+    // applicants in that same order.
+    .sort(function(a, b) { return matchPriorityOf(b) - matchPriorityOf(a); })
     .slice(0, 6);
   }
   return matchItems;
