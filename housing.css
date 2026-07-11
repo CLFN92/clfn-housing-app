@@ -1806,9 +1806,20 @@ body.is-sow-only .modal-overlay { visibility: visible; }
    started reading the tab body — the label/value text hides and the icon
    shows, shrinking the strip to a compact glance-only row. Reversed the
    moment they scroll back near the top. */
-.tic-strip-icon           { display: none; font-size: 18px; line-height: 1; }
+.tic-strip-icon           { display: none; font-size: 22px; line-height: 1; }
 .tic-strip-tile           { transition: padding .15s ease; }
-.tic-strip.is-scrolled .tic-strip-tile { padding: 7px 4px; text-align: center; }
+/* Collapsed: the multi-row wrap + cell gridlines/background that the label+
+   value layout needs on narrow phones just reads as empty bordered boxes
+   once it's icon-only, so force back to a single row and drop the divider
+   lines — a clean icon strip, closer to the MyChart reference this pattern
+   is modeled on. Higher specificity (2 classes) beats the plain .tic-strip
+   column-count media queries above regardless of source order. */
+.tic-strip.is-scrolled {
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0; background: transparent;
+}
+#sowModal .tic-strip.is-scrolled { grid-template-columns: repeat(4, 1fr); }
+.tic-strip.is-scrolled .tic-strip-tile { padding: 6px 2px; text-align: center; }
 .tic-strip.is-scrolled .tic-strip-lbl,
 .tic-strip.is-scrolled .tic-strip-val  { display: none; }
 .tic-strip.is-scrolled .tic-strip-icon { display: block; }
