@@ -291,11 +291,11 @@ function showSettingsSection(section) {
       var wrap = document.getElementById('scoring_model_table_wrap');
       if(wrap) wrap.innerHTML = '<div class="empty-state-italic">Scoring model configuration is only available to the Executive Director.</div>';
     }
-    if(APPROVAL_AUTHORITY.can('editScoreModel', window.currentRole) && typeof renderMatchPriorityEditor === 'function') {
+    if(APPROVAL_AUTHORITY.can('editMatchPriority', window.currentRole) && typeof renderMatchPriorityEditor === 'function') {
       renderMatchPriorityEditor();
     } else {
       var mpWrap = document.getElementById('match_priority_wrap');
-      if(mpWrap) mpWrap.innerHTML = '<div class="empty-state-italic">Match priority configuration is only available to the Executive Director.</div>';
+      if(mpWrap) mpWrap.innerHTML = '<div class="empty-state-italic">Match priority configuration is not available for your role.</div>';
     }
   }
   if(section==='sec_unit_match'  && typeof renderUnitScoreTable==='function') renderUnitScoreTable();

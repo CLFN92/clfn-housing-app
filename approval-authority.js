@@ -88,6 +88,11 @@ var APPROVAL_AUTHORITY = (function() {
     editScoreModel:           ['ed'],
     // Who can apply a manual score adjustment on an application
     applyScoreAdjustment:     ['ed'],
+    // Who can edit the Match Priority weights (Housing Placement Order) —
+    // deliberately separate from editScoreModel so this can be delegated on
+    // its own: it decides WHO gets matched first (reserve/house status,
+    // Temporary/Transition unit type), not the application's need/urgency score.
+    editMatchPriority:        ['ed'],
 
     // ── Settings & config ─────────────────────────────────────────────────
     // Who can access the Settings page
@@ -309,6 +314,7 @@ var APPROVAL_AUTHORITY = (function() {
       declineContractor:        'Decline contractor',
       editScoreModel:           'Edit scoring model',
       applyScoreAdjustment:     'Apply manual score adjustment',
+      editMatchPriority:        'Edit housing placement order (Match Priority)',
       accessSettings:           'Access settings page',
       editApprovalAuthority:    'Edit approval authorities',
       manageStaff:              'Add / edit staff',
@@ -337,7 +343,7 @@ var APPROVAL_AUTHORITY = (function() {
       'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand','assignRentAmount'],
       'Maintenance Request & Renovation': ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow','assignWorkOrder','editRenoProgress'],
       'Contractors':          ['recommendContractor','approveContractor','declineContractor'],
-      'Scoring':              ['editScoreModel','applyScoreAdjustment'],
+      'Scoring':              ['editScoreModel','applyScoreAdjustment','editMatchPriority'],
       'Inventory':            ['archiveUnit', 'setUnitLocation'],
       'Inspections':          ['approveInspection'],
       'Tenants':              ['manageBcr','mergeTenants'],
