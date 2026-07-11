@@ -523,7 +523,15 @@ function renderMatchView(){
   // popovers (see tableApplyFilterSort below).
   var search = (document.getElementById('match_search')||{}).value||'';
   var _searchLc = (search || '').toLowerCase().trim();
-  var filtered = allApps.filter(function(a){
+  // Structural eligibility — everyone who could ever appear on Match,
+  // regardless of the search box or column-menu filters. Kept separate from
+  // the text-search filter below because the exclusive per-unit allocation
+  // (_priorityOrder / _matchAllocation further down) must run over the FULL
+  // eligible pool: if it ran over the search-narrowed list instead, typing a
+  // search query would silently remove someone's competitors and could hand
+  // the searched-for applicant a unit they wouldn't actually be entitled to
+  // once everyone else is back in the running.
+  var eligibleApps = allApps.filter(function(a){
     if(a.archived) return false;
     // Existing-tenant FILE UPDATES are record updates, not housing requests, and
     // are never scored/ranked -> they must never appear on Match, regardless of
@@ -555,15 +563,16 @@ function renderMatchView(){
     // a home and aren't being ranked.
     var _scored = (a.appType === 'new_housing' || a.appType === 'transfer_request');
     if(_currentTenancyAddr(a) && !_scored) return false;
-    if(_searchLc){
-      var hay = [
-        a.fn, a.ln, a.id, a.tier, a.status, a.reserve,
-        a.score, a.classification, a.assignedAddress
-      ].filter(function(v){ return v != null; }).join(' ').toLowerCase();
-      if (hay.indexOf(_searchLc) === -1) return false;
-    }
     return true;
   });
+  // Text search narrows what's DISPLAYED only — never who competes for units.
+  var filtered = _searchLc ? eligibleApps.filter(function(a){
+    var hay = [
+      a.fn, a.ln, a.id, a.tier, a.status, a.reserve,
+      a.score, a.classification, a.assignedAddress
+    ].filter(function(v){ return v != null; }).join(' ').toLowerCase();
+    return hay.indexOf(_searchLc) !== -1;
+  }) : eligibleApps;
 
   var content = document.getElementById('match_content');
   if(!content) return;
@@ -613,19 +622,15 @@ function renderMatchView(){
   // Within any tier, score still wins since every bonus dwarfs the
   // ~100-point max application score.
   function _matchPriorityOf(a){
-    var w = window.liveMatchPriorityModel || DEFAULT_MATCH_PRIORITY_MODEL;
-    var best = bestUnit(a);
-    var hasMatch = !!best;
-    var assignType = (best && best.unit) ? (best.unit.assignmentType||'') : '';
-    var isTemporary = assignType === 'temporary';
-    var isTransition = assignType === 'transition';
-    var onReserve = !isTransition && a.reserve === 'On Reserve';
-    var hasHouse = isTransition || !!(a.assignedUnit || a.appType==='transfer_request' || _currentTenancyAddr(a));
-    var bonus = (hasMatch ? (w.hasMatchBonus||0) : 0)
-              + (isTemporary ? (w.temporaryBonus||0) : 0)
-              + (onReserve ? (w.onReserveBonus||0) : 0)
-              + (!hasHouse ? (w.noHouseBonus||0) : 0);
-    return bonus + (a.score||0);
+    // Delegates to the shared matchPriorityOf() (shared-data.js) so this page
+    // and the worklist's Ready to Match section rank applicants — and
+    // therefore allocate units — in the same order. Passes the fuller,
+    // cross-referenced current-tenancy check as hasHouse since this page (and
+    // only this page) has already resolved it via _currentTenancyAddr.
+    if (typeof matchPriorityOf === 'function') {
+      return matchPriorityOf(a, { hasHouse: !!(a.assignedUnit || a.appType==='transfer_request' || _currentTenancyAddr(a)) });
+    }
+    return a.score || 0;
   }
 
   // Exclusive per-unit allocation for DISPLAY (Best Unit cell, Assign button
@@ -637,10 +642,11 @@ function renderMatchView(){
   // each one's best still-unclaimed vacant unit (shared-data.js), so two rows
   // never both show the same still-vacant unit as their recommendation — the
   // lower-priority applicant shows Unmatched instead. Computed over the full
-  // filtered list in Match Priority order (not whatever column the user has
-  // the table sorted/displayed by) so who "wins" a unit never changes just
-  // because the table is re-sorted.
-  var _priorityOrder = filtered.slice().sort(function(a, b){ return _matchPriorityOf(b) - _matchPriorityOf(a); });
+  // structurally-eligible pool (eligibleApps — before search text or column-
+  // menu filters narrow what's displayed) in Match Priority order, so who
+  // "wins" a unit never changes just because the table is searched, filtered,
+  // or re-sorted to a different column.
+  var _priorityOrder = eligibleApps.slice().sort(function(a, b){ return _matchPriorityOf(b) - _matchPriorityOf(a); });
   var _matchAllocation = (typeof matchAllocateExclusive === 'function') ? matchAllocateExclusive(_priorityOrder) : {};
   function _allocatedUnit(app){ return _matchAllocation[app.id] || null; }
 
