@@ -4688,16 +4688,56 @@ function _wlCollectContractors(ctx) {
   return ctItems;
 }
 
+// ── Shared "which vacant unit best fits this applicant?" scorer ───────────
+// Single source for bedroom-fit + accessibility + Elders-unit scoring, so the
+// Match page (bestUnit() in housing-views.js, which delegates here) and the
+// worklist's Ready to Match section (below) score/filter applicants against
+// real inventory identically. Mirrors the hard "2+ bedrooms oversized needs
+// ED approval" rule enforced in confirmAssignment() (housing-init.js) via the
+// same -50 penalty, without excluding the unit outright — an oversized unit
+// is still "a match" that exists, just one requiring escalation. Returns
+// {unit, score, maxPossible} for the best-fitting vacant unit, or null if no
+// suitable vacant unit exists at all.
+function matchBestUnit(app) {
+  var allUnits = getAllUnits();
+  var vacantUnits = allUnits.filter(function(u){ return u && u.status === 'vacant' && !u.archived; });
+  var needsBeds = 1;
+  if (app.habitants) needsBeds = Math.max(1, 1 + (app.coApp ? 1 : 0) + app.habitants.length);
+  var needsAccess = app.accessibility && app.accessibility !== 'None' && app.accessibility !== '0' && app.accessibility !== 0;
+  var age = app.dob ? Math.floor((new Date() - new Date(app.dob)) / (365.25*24*3600*1000)) : 0;
+  var eldersMin = (window._appSettings && window._appSettings.eldersAgeMin) || 65;
+  var isElders = age >= eldersMin;
+  var eligible = isElders ? vacantUnits : vacantUnits.filter(function(u){ return !u.isElders; });
+  var scored = eligible.map(function(u){
+    var sc = 0;
+    if (u.bedrooms === needsBeds)          sc += 10;
+    else if (u.bedrooms === needsBeds + 1) sc += 5;
+    else if (u.bedrooms === needsBeds - 1) sc += 3;
+    else if (u.bedrooms >= needsBeds + 2)  sc -= 50;
+    if (needsAccess && u.accessible)  sc += 8;
+    if (needsAccess && !u.accessible) sc -= 4;
+    if (isElders && u.isElders) sc += 6;
+    return { unit: u, score: sc, maxPossible: 24 };
+  }).sort(function(a, b){ return b.score - a.score; });
+  return scored[0] || null;
+}
+
 // ── 5. Approved apps ready to match (no unit assigned) ───────────────────
 // Commercial apps are excluded — they're assigned to buildings via their own
-// review modal, never the residential Match queue.
+// review modal, never the residential Match queue. Also excludes applicants
+// with no suitable vacant unit at all (matchBestUnit() returns null) — the
+// worklist is a "you can act on this today" queue, so surfacing someone
+// nobody can actually place right now just wastes the preview's limited
+// slots. The full Match page (housing.html?view=match) still lists everyone,
+// unmatched applicants included, ranked to the bottom via hasMatchBonus.
 function _wlCollectMatch(ctx) {
   var matchItems = [];
   if (ctx.isManagement) {
     matchItems = ctx.apps.filter(function(a) {
       if (!a || a.archived || a.assignedUnit) return false;
       if (a.appType === 'commercial') return false;
-      return a.status === 'ed_approved' || a.status === 'mgr_approved';
+      if (a.status !== 'ed_approved' && a.status !== 'mgr_approved') return false;
+      return !!matchBestUnit(a);
     })
     // Rank by score, highest first (highest need at the top). Unscored records
     // (e.g. file updates) sort to the bottom. Sort BEFORE the cap so the top 6
@@ -4891,6 +4931,7 @@ function renderWorklist() {
         + '<span style="color:var(--muted);flex-shrink:0;">' + esc(m.k) + '</span>'
         + '<span style="color:var(--text);font-weight:600;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(m.v) + '</span></div>';
     }).join('');
+    var badges = (o.badges||[]).join(' ');
     var actions = (o.actions||[]).map(function(a){
       return '<button type="button" onclick="' + a.onclick + '" style="flex:1;background:' + (a.ghost ? 'none' : 'var(--yellow)') + ';color:' + (a.ghost ? 'var(--muted)' : 'var(--dark)') + ';'
         + 'border:' + (a.ghost ? '1px solid var(--border)' : 'none') + ';border-radius:6px;padding:7px 10px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;">' + esc(a.text) + '</button>';
@@ -4901,6 +4942,7 @@ function renderWorklist() {
       +     '<span style="font-size:13px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(o.title) + '</span>'
       +     wlPill(o.pill)
       +   '</div>'
+      +   (badges ? '<div style="margin-top:4px;">' + badges + '</div>' : '')
       +   metas
       + '</div>'
       + (actions ? '<div style="display:flex;gap:6px;margin-top:10px;">' + actions + '</div>' : '')
@@ -5134,26 +5176,48 @@ function renderWorklist() {
     html += sectionWrap('🏘️', 'Inventory Approvals', unitApprItems.length, 'inventory.html', _view==='cards' ? wlGrid(unitApprCards) : unitApprRows, 0);
   }
 
-  // Match queue
+  // Match queue — pill colors mirror the Match page's own tierColor map
+  // (housing-views.js) so a tier reads identically in both places.
   if (matchItems.length) {
+    var _wlTierColor = {
+      'Critical Priority': { color: '#15803d', bg: '#f0fdf4' },
+      'High Priority':     { color: '#1d4ed8', bg: '#eff6ff' },
+      'Medium Priority':   { color: '#d97706', bg: '#fffbeb' },
+      'Low Priority':      { color: '#6b7280', bg: 'var(--bg)' }
+    };
     var matchRows = matchItems.map(function(a) {
       var name = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
       var tier  = a.tier ? a.tier.replace(' Priority','') : '';
       var score = a.score != null ? a.score + ' pts' : '';
+      var best  = matchBestUnit(a);
+      var unitTxt = best ? (best.unit.num + ' ' + best.unit.street) : '';
       return actionRow('housing.html?view=match', [
-        { text: name,  style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
-        { text: score, style: 'font-size:11px;color:var(--muted);width:60px;flex-shrink:0;' },
-        { text: tier,  style: 'font-size:11px;color:var(--muted);width:100px;text-align:right;flex-shrink:0;' }
+        { text: name,    style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
+        { text: unitTxt, style: 'font-size:11px;color:var(--muted);width:150px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
+        { text: score,   style: 'font-size:11px;color:var(--muted);width:60px;flex-shrink:0;' },
+        { text: tier,    style: 'font-size:11px;color:var(--muted);width:100px;text-align:right;flex-shrink:0;' }
       ], { text: 'Match →', href: 'housing.html?view=match' });
     }).join('');
     var matchCards = matchItems.map(function(a) {
       var name = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
-      var tier = a.tier ? a.tier.replace(' Priority','') : '';
+      var tier = a.tier || 'Low Priority';
+      var tierLbl = tier.replace(' Priority','');
       var isTransfer = (a.appType || a.app_type) === 'transfer_request';
       var open = 'window.location.href=\'housing.html?view=match\'';
-      var pillColor = /high/i.test(tier) ? {color:'#b91c1c',bg:'#fef2f2'} : /med/i.test(tier) ? {color:'#b45309',bg:'#fffbeb'} : {color:'var(--muted)',bg:'var(--bg)'};
-      return wlCard({ title:name, pill:(tier?{text:tier,color:pillColor.color,bg:pillColor.bg}:null), open:open,
-        metas:[{k:'Score',v:(a.score!=null?a.score+' pts':'')},{k:'Type',v:_appTypeLabel[a.appType]||''},{k:'On rez',v:(isTransfer?'🏠 Transfer':'')}],
+      var pillColor = _wlTierColor[tier] || _wlTierColor['Low Priority'];
+      var best = matchBestUnit(a);
+      var matchPct = best ? Math.round(Math.max(0, best.score) / best.maxPossible * 100) : 0;
+      var badges = [];
+      if (isTransfer) badges.push('<span style="display:inline-block;font-size:10px;font-weight:700;background:var(--warn-amber);color:#111;padding:1px 7px;border-radius:4px;white-space:nowrap;">🏠 On Rez</span>');
+      return wlCard({ title:name, pill:(tierLbl?{text:tierLbl,color:pillColor.color,bg:pillColor.bg}:null), open:open,
+        badges: badges,
+        metas:[
+          {k:'Score',     v:(a.score!=null?a.score+' pts':'')},
+          {k:'Reserve',   v:(a.reserve||'')},
+          {k:'Best Unit', v:(best ? (best.unit.num+' '+best.unit.street+' · '+matchPct+'% match') : 'No suitable unit')},
+          {k:'Type',      v:_appTypeLabel[a.appType]||''},
+          {k:'Has House', v:(isTransfer ? 'Yes' : 'No')}
+        ],
         actions:[{text:'Match →',onclick:open}] });
     }).join('');
     html += sectionWrap('🏠', 'Ready to Match', matchItems.length, 'housing.html?view=match', _view==='cards' ? wlGrid(matchCards) : matchRows, 0);
