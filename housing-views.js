@@ -581,9 +581,14 @@ function renderMatchView(){
     var eligible = isElders ? vacantUnits : vacantUnits.filter(function(u){ return !u.isElders; });
     var scored = eligible.map(function(u){
       var sc = 0;
-      if(u.bedrooms === needsBeds)        sc += 10;
-      else if(u.bedrooms > needsBeds)     sc += 5;
-      else if(u.bedrooms === needsBeds-1) sc += 3;
+      // One size up (needsBeds+1) is a fine, freely-assignable match; two or
+      // more sizes up (e.g. a 3-bed for someone who needs 1) is heavily
+      // penalized here to match the hard "requires ED approval" gate in
+      // confirmAssignment() (housing-init.js) — see _isOversizedUnit() there.
+      if(u.bedrooms === needsBeds)          sc += 10;
+      else if(u.bedrooms === needsBeds + 1) sc += 5;
+      else if(u.bedrooms === needsBeds - 1) sc += 3;
+      else if(u.bedrooms >= needsBeds + 2)  sc -= 50;
       if(needsAccess && u.accessible)     sc += 8;
       if(needsAccess && !u.accessible)    sc -= 4;
       if(isElders && u.isElders)          sc += 6;

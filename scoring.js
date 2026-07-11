@@ -133,9 +133,15 @@ function renderV2ScoringEditor() {
       + 'onchange="updateV2ScoreOption(this)" oninput="this.style.color=+this.value>0?\x27#15803d\x27:\x27var(--gray)\x27"/>';
   }
 
+  // Standard borderless section header (matches .tic-section-h, used by the
+  // TIC / Edit Unit / Maintenance Request modals) instead of a full-bleed dark
+  // bar. The old version used negative horizontal margins to force the dark
+  // background edge-to-edge, assuming the parent wrap always has exactly
+  // 20px of padding — when it didn't, the bar overflowed past the card's
+  // rounded corners/border instead of lining up with it.
   function sectionHdr(label, maxScore) {
-    return '<div style="padding:10px 16px;background:var(--dark2);border-bottom:2px solid var(--yellow);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;margin:16px -20px 12px;">'
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);">' + label + '</div>'
+    return '<div style="margin:22px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--yellow);display:flex;align-items:center;justify-content:space-between;">'
+      + '<div style="font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text);">' + label + '</div>'
       + (maxScore ? '<div style="font-size:11px;color:var(--muted);">max ' + maxScore + ' pts</div>' : '')
       + '</div>';
   }
@@ -149,7 +155,7 @@ function renderV2ScoringEditor() {
       + '</div>';
   }
 
-  var html = '<div style="padding:0 4px;">';
+  var html = '<div style="padding:16px;">';
 
   // ── Section A ──
   html += sectionHdr('Section A — Housing Need', 70);
