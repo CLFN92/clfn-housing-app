@@ -1827,8 +1827,8 @@ function showSubmissionConfirmation(appId, isFileUpdate) {
     +   '</div>'
     +   '<div style="font-size:12px;color:var(--muted);margin-bottom:20px;line-height:1.6;">The Housing Manager will review your application and contact you if additional information is required. Please keep your application ID for your records.</div>'
     +   '<div style="display:flex;gap:10px;justify-content:flex-end;">'
-    +     '<button onclick="closeSubmissionConfirmation(true);" style="padding:10px 20px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text);cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:600;">Return Home</button>'
-    +     '<button onclick="closeSubmissionConfirmation(false);" style="padding:10px 24px;border-radius:8px;border:none;background:var(--yellow);color:var(--dark);cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;font-weight:700;">Done</button>'
+    +     '<button onclick="closeSubmissionConfirmation(true);" class="btn btn-ghost">Return Home</button>'
+    +     '<button onclick="closeSubmissionConfirmation(false);" class="btn btn-primary">Done</button>'
     +   '</div>'
     + '</div>'
     + '</div>';

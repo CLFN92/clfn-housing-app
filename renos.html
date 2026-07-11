@@ -58,8 +58,8 @@
       <p>Maintenance request queue — all units with a request filed, by approval status</p>
     </div>
     <div class="phb-actions">
-      <button onclick="exportRenoApprovalsCSV()" style="background:none;border:1.5px solid var(--border);color:var(--text);padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="this.style.borderColor='var(--border)'">⬇ CSV</button>
-      <button onclick="exportRenoApprovalsPDF()" style="background:none;border:1.5px solid var(--border);color:var(--text);padding:6px 14px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="this.style.borderColor='var(--border)'">🖨 PDF</button>
+      <button onclick="exportRenoApprovalsCSV()" class="btn btn-ghost">⬇ CSV</button>
+      <button onclick="exportRenoApprovalsPDF()" class="btn btn-ghost">🖨 PDF</button>
       <!-- "Progress View" cross-link removed — the tab bar above both views
            handles switching between Approvals and Renovations now. -->
     </div>
@@ -309,7 +309,7 @@
     </div>
     <!-- Footer -->
     <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:var(--bg);">
-      <button type="button" onclick="openRenoBudget(window._rpUnitId)" style="background:none;border:1.5px solid var(--yellow);color:var(--text);padding:7px 16px;border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;">💰 Budget &amp; Approval</button>
+      <button type="button" onclick="openRenoBudget(window._rpUnitId)" class="btn btn-ghost">💰 Budget &amp; Approval</button>
       <button type="button" onclick="closeRenoProgress()" class="btn btn-ghost">Close</button>
       <button id="rp_save_btn" type="button" onclick="saveRenoProgress()" class="btn btn-primary">Save Update</button>
     </div>

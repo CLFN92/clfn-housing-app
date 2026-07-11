@@ -1563,8 +1563,8 @@ function showAddHousingStaff() {
     + '</div>'
     + '<div id="hs-result" style="display:none;border-radius:8px;padding:10px 14px;font-size:12px;"></div>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">'
-    + '<button onclick="closeStaffModal()" style="padding:8px 18px;border:1px solid var(--border);border-radius:7px;background:none;font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;">Cancel</button>'
-    + '<button id="hs-submit-btn" onclick="submitAddHousingStaff()" style="padding:8px 18px;background:var(--yellow);border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">+ Add to Staff Directory</button>'
+    + '<button onclick="closeStaffModal()" class="btn btn-ghost">Cancel</button>'
+    + '<button id="hs-submit-btn" onclick="submitAddHousingStaff()" class="btn btn-primary">+ Add to Staff Directory</button>'
     + '</div>'
     + '</div></div>';
 

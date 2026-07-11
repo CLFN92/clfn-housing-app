@@ -1674,8 +1674,8 @@ function _udpLocEnsureModal(cb) {
           '</div>' +
         '</div>' +
         '<div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">' +
-          '<button id="udp-loc-cancel" style="background:none;border:1.5px solid var(--border);border-radius:7px;padding:7px 18px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text);">Cancel</button>' +
-          '<button id="udp-loc-save" disabled style="background:var(--yellow);border:none;border-radius:7px;padding:7px 20px;font-size:13px;font-weight:700;cursor:pointer;color:var(--dark);opacity:.5;">Save Location</button>' +
+          '<button id="udp-loc-cancel" class="btn btn-ghost">Cancel</button>' +
+          '<button id="udp-loc-save" disabled class="btn btn-primary" style="opacity:.5;">Save Location</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(overlay);
