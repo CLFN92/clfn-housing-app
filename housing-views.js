@@ -790,6 +790,10 @@ window._matchSetView = function(v){
   try { localStorage.setItem('clfn_match_view', v === 'cards' ? 'cards' : 'list'); } catch(e){}
   renderMatchView();
 };
+window._tenSetView = function(v){
+  try { localStorage.setItem('clfn_tenants_view', v === 'cards' ? 'cards' : 'list'); } catch(e){}
+  renderTenantsView();
+};
 
 
 function renderTenantsView(){
@@ -865,6 +869,50 @@ function renderTenantsView(){
   units = (typeof tableApplyFilterSort === 'function')
     ? tableApplyFilterSort(units, _tenAccessors, _tenState)
     : units;
+
+  var _tenMode = _viewMode('tenants');
+  var _tenToggleEl = document.getElementById('ten_view_toggle');
+  if (_tenToggleEl) _tenToggleEl.innerHTML = _viewToggleHtml('tenants', '_tenSetView');
+  var _tenTableWrapEl = document.getElementById('ten_table_wrap');
+  var _tenCardsEl     = document.getElementById('ten_cards');
+  if (_tenTableWrapEl) _tenTableWrapEl.style.display = (_tenMode === 'cards') ? 'none' : '';
+  if (_tenCardsEl)     _tenCardsEl.style.display     = (_tenMode === 'cards') ? '' : 'none';
+
+  // Card renderer — same status/badge/reno-score logic as the table row,
+  // laid out as a _cardTile instead of a <tr>.
+  function _tenCardHtml(u){
+    var _showRenoScore = (ROLE.isManagement(window.currentRole));
+    var uid = String(u.id).replace(/'/g,"\\'");
+    var badges = [];
+    if(u.isElders) badges.push('<span style="font-size:9px;background:var(--warn-amber-bg);color:var(--warn-amber);border:1px solid var(--warn-amber-border);padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>');
+    var metas = [
+      {k:'Beds', v: u.bedrooms ? (u.bedrooms + '-bed' + (u.accessible ? ' · Accessible' : '')) : ''},
+      {k:'Move-In Date', v: u.assignedDate || ''}
+    ];
+    if (_showRenoScore) {
+      if (hasSowOrReno(u.id)) metas.push({k:'Reno Score', v: calcRenoScore(u.id).score});
+    }
+    var _openCall = u.assignedName ? "openTenantCard('"+uid+"')" : "openUnitEditModal('"+uid+"')";
+    return _cardTile({
+      title: (u.num||'')+' '+(u.street||''),
+      pill: {text: (u.status==='reserved'?'Reserved':'Occupied'), bg: (u.status==='reserved'?'#faf5ff':'#eff6ff'), color: (u.status==='reserved'?'#7c3aed':'#1d4ed8')},
+      badges: badges,
+      metas: [{k:'Tenant', v: u.assignedName || ''}].concat(metas),
+      open: _openCall,
+      actions: [
+        {text:'🪪 Card', onclick:"event.stopPropagation();"+_openCall, ghost:true},
+        {text:'🔨 Maintenance', onclick:"event.stopPropagation();openSowModal('"+uid+"')", ghost:true},
+        {text:'📎 Files', onclick:"event.stopPropagation();openTenantFilesPanel('"+uid+"')", ghost:true}
+      ]
+    });
+  }
+
+  if (_tenMode === 'cards') {
+    if (_tenCardsEl) _tenCardsEl.innerHTML = units.length
+      ? _cardGrid(units.map(_tenCardHtml).join(''))
+      : '<div class="card" style="text-align:center;padding:40px;color:var(--muted);">No tenants match the current filters.</div>';
+    return;
+  }
 
   var tbody=document.getElementById('tenants_tbody');
   if(!tbody) return;
