@@ -573,11 +573,20 @@ function _isSecondaryEligibleUnit(u) {
   return _SECONDARY_FUNDERS.indexOf(u.funder) !== -1 || _SECONDARY_TYPES.indexOf(u.type) !== -1;
 }
 
+// A unit two or more bedrooms bigger than what the applicant needs (e.g. a
+// 3-bed for someone who needs 1) is out of the normal auto-assignable range —
+// one size up (needsBeds+1) is fine, but anything beyond that needs ED
+// approval. Shared by _scoreUnit() below and confirmAssignment()'s hard gate.
+function _isOversizedUnit(u, needsBeds) {
+  return u && u.bedrooms != null && u.bedrooms >= needsBeds + 2;
+}
+
 function _scoreUnit(u, needsBeds, needsAccess, isElders) {
   var sc = 0;
-  if(u.bedrooms === needsBeds)        sc += 10;
-  else if(u.bedrooms > needsBeds)     sc += 5;
-  else if(u.bedrooms === needsBeds-1) sc += 3;
+  if(u.bedrooms === needsBeds)            sc += 10;
+  else if(u.bedrooms === needsBeds + 1)   sc += 5;
+  else if(u.bedrooms === needsBeds - 1)   sc += 3;
+  else if(_isOversizedUnit(u, needsBeds)) sc -= 50; // 2+ bedrooms over — requires ED approval
   if(needsAccess && u.accessible)     sc += 8;
   if(needsAccess && !u.accessible)    sc -= 4;
   if(isElders && u.isElders)          sc += 6;
@@ -904,21 +913,26 @@ function amSelectUnit(unitId) {
     return;
   }
 
-  // Tie detection: units within 1 point of the top score are "tied" / equally recommended
-  var topScore = _amAllScored.length > 0 ? _amAllScored[0].score : 0;
-  var selectedObj = _amAllScored.find(function(o){ return o.unit.id === unitId; });
-  var selectedScore = selectedObj ? selectedObj.score : 0;
-  var isTied = selectedScore >= topScore - 1; // within 1 pt of top = tied/recommended
-  var canOverride  = APPROVAL_AUTHORITY.can('overrideMatch', role);
-  var canAssignTie = APPROVAL_AUTHORITY.can('assignTiedBand', role);
-  var isEdOverride = canOverride && !isTied; // override-authority user picking below the tied band
-
   var allApps=(typeof applications!=='undefined'?applications:[]);
   var app=allApps.find(function(a){return a.id===_amAppId;});
   var needsAccess = app&&app.accessibility&&app.accessibility!=='None'&&app.accessibility!=='0'&&app.accessibility!==0;
+  var needsBeds = Math.max(1, 1 + ((app&&app.coApp)?1:0) + (((app&&app.habitants)||[]).length));
 
   var allUnits = getAllUnits().slice();
   var u=allUnits.find(function(x){return x.id===unitId;});
+
+  // Tie detection: units within 1 point of the top score are "tied" / equally
+  // recommended. A unit 2+ bedrooms bigger than needed is never "tied" even
+  // if its score happens to land in that band (e.g. every available unit is
+  // oversized) — it always routes to the "ED approval required" path below.
+  var topScore = _amAllScored.length > 0 ? _amAllScored[0].score : 0;
+  var selectedObj = _amAllScored.find(function(o){ return o.unit.id === unitId; });
+  var selectedScore = selectedObj ? selectedObj.score : 0;
+  var isOversized = _isOversizedUnit(u, needsBeds);
+  var isTied = selectedScore >= topScore - 1 && !isOversized; // within 1 pt of top = tied/recommended
+  var canOverride  = APPROVAL_AUTHORITY.can('overrideMatch', role);
+  var canAssignTie = APPROVAL_AUTHORITY.can('assignTiedBand', role);
+  var isEdOverride = canOverride && !isTied; // override-authority user picking below the tied band
 
   // Notes field:
   //   HM — always required, label reflects whether tied or not
@@ -968,7 +982,8 @@ function amSelectUnit(unitId) {
   if(warn && u){
     var warnMsgs = [];
     if(needsAccess && !u.accessible) warnMsgs.push('⚠ Applicant requires accessible unit — this unit is not accessible');
-    if(canAssignTie && !canOverride && !isTied) warnMsgs.push('⛔ This unit scores below the recommended match band — only the Executive Director can assign a lower-scored unit');
+    if(isOversized && !canOverride) warnMsgs.push('⛔ This unit is 2+ bedrooms larger than the applicant needs — only the Executive Director can assign it');
+    else if(canAssignTie && !canOverride && !isTied) warnMsgs.push('⛔ This unit scores below the recommended match band — only the Executive Director can assign a lower-scored unit');
     if(warnMsgs.length){
       warn.style.display='block'; warn.style.background='#fef2f2'; warn.style.color='#b91c1c';
       warn.textContent = warnMsgs.join(' · ');
@@ -1045,6 +1060,20 @@ function confirmAssignment() {
   var name=((app.fn||'')+' '+(app.ln||'')).trim();
   var addr = u.num+' '+u.street;
   var today = new Date().toISOString().split('T')[0];
+
+  // Explicit bedroom-oversize gate — independent of the score-tied-band check
+  // above so it holds even in the edge case where every available vacant
+  // unit happens to be oversized (they'd all tie with each other on score,
+  // which would otherwise let the tied-band path through). One size up from
+  // what the applicant needs is fine; two or more sizes up always needs ED
+  // approval, regardless of what else is available.
+  if (!_isSecondaryEligibleUnit(u)) {
+    var _caNeedsBeds = Math.max(1, 1 + (app.coApp?1:0) + ((app.habitants||[]).length));
+    if (_isOversizedUnit(u, _caNeedsBeds) && !canOverride2) {
+      showToast('This unit is 2+ bedrooms larger than the applicant needs — Executive Director approval required');
+      return;
+    }
+  }
 
   // ── Secondary unit path ─────────────────────────────────────────────────
   if (_isSecondaryEligibleUnit(u)) {
