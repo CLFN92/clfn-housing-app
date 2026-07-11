@@ -43,6 +43,16 @@ function _roomBedLabel(u) {
   var isBldg = ['admin_building','band_building','commercial_building'].indexOf(u.type) >= 0;
   return isBldg ? n + (n == 1 ? ' room' : ' rooms') : n + '-bed';
 }
+// Assignment Type badge — Temporary (urgent/emergency) and Transition
+// (probationary) units, set via the Edit Unit modal. Mirrors the ELDERS UNIT
+// badge markup pattern used alongside it. See liveMatchPriorityModel
+// (scoring.js) for how each type affects Match placement order.
+function _assignmentTypeBadge(u) {
+  if (!u || !u.assignmentType) return '';
+  if (u.assignmentType === 'temporary') return '<span style="font-size:9px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:1px 5px;border-radius:6px;">TEMPORARY</span>';
+  if (u.assignmentType === 'transition') return '<span style="font-size:9px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:1px 5px;border-radius:6px;">TRANSITION</span>';
+  return '';
+}
 
 // ── List / Cards view toggle (Inventory, Match) ─────────────────────────────
 // Mirrors the worklist's List/Cards pattern (clfn_worklist_view in
@@ -348,6 +358,7 @@ function renderInventoryView(){
     return '<tr style="border-bottom:1px solid var(--border);transition:background .12s;" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
       +'<td style="padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="openUnitEditModal(\''+uid+'\')">'+'<span style="text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;">'+addr+'</span>'
       +(u.isElders?' <span style="font-size:9px;background:var(--warn-amber-bg);color:var(--warn-amber);border:1px solid var(--warn-amber-border);padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>':'')
+      +' '+_assignmentTypeBadge(u)
       +'</td>'
       +'<td style="padding:9px 10px;text-align:center;font-size:13px;font-weight:700;color:var(--text);">'+u.bedrooms+'</td>'
       +'<td style="padding:9px 10px;text-align:center;font-size:12px;color:var(--muted);">'+bath+'</td>'
@@ -398,6 +409,7 @@ function renderInventoryView(){
     var uid = u.id.replace(/'/g,"\\'");
     var badges = [];
     if(u.isElders) badges.push('<span style="font-size:9px;background:var(--warn-amber-bg);color:var(--warn-amber);border:1px solid var(--warn-amber-border);padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>');
+    if(_assignmentTypeBadge(u)) badges.push(_assignmentTypeBadge(u));
     if(u.under_renovation) badges.push('<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--warn-amber-bg);color:var(--warn-amber-text);">🔨 Reno</span>');
     var r = (u.monthlyRent != null && u.monthlyRent !== '') ? Number(u.monthlyRent) : null;
     var metas = [
@@ -595,21 +607,57 @@ function renderMatchView(){
     var b = bestUnit(app);
     return b && b.unit ? (b.unit.num + ' ' + b.unit.street) : '';
   }
+  // Placement order — combines "has a matching unit" + that unit's
+  // Assignment Type + reserve status + current-house status (see
+  // liveMatchPriorityModel, scoring.js) on top of the raw score, so who gets
+  // matched first is a distinct, ED-adjustable decision from need/urgency.
+  // Ranked highest bonus to lowest:
+  //   1. Has a suitable vacant unit at all (bestUnit() != null) — an
+  //      applicant nobody can place today shouldn't sit at the top of the
+  //      queue ahead of someone who can be placed right now.
+  //   2. Best-matching unit is a Temporary (urgent/emergency) unit — jumps
+  //      the queue outright, stacking on top of the tier below.
+  //   3. On-Reserve+NoHouse > Off-Reserve+NoHouse > On-Reserve+HasHouse >
+  //      Off-Reserve+HasHouse — house status dominates, reserve status is
+  //      the secondary tiebreak, so an off-reserve applicant with no house
+  //      outranks an on-reserve applicant who already has one. If the
+  //      best-matching unit is a Transition unit (demonstrating the tenant
+  //      can care for a unit — lower urgency), the applicant's real reserve/
+  //      house status is ignored and they're scored at the bottom of this
+  //      tier (as if off-reserve with a house) regardless of their own status.
+  // Within any tier, score still wins since every bonus dwarfs the
+  // ~100-point max application score.
+  function _matchPriorityOf(a){
+    var w = window.liveMatchPriorityModel || DEFAULT_MATCH_PRIORITY_MODEL;
+    var best = bestUnit(a);
+    var hasMatch = !!best;
+    var assignType = (best && best.unit) ? (best.unit.assignmentType||'') : '';
+    var isTemporary = assignType === 'temporary';
+    var isTransition = assignType === 'transition';
+    var onReserve = !isTransition && a.reserve === 'On Reserve';
+    var hasHouse = isTransition || !!(a.assignedUnit || a.appType==='transfer_request' || _currentTenancyAddr(a));
+    var bonus = (hasMatch ? (w.hasMatchBonus||0) : 0)
+              + (isTemporary ? (w.temporaryBonus||0) : 0)
+              + (onReserve ? (w.onReserveBonus||0) : 0)
+              + (!hasHouse ? (w.noHouseBonus||0) : 0);
+    return bonus + (a.score||0);
+  }
   var _matchColumns = {
-    applicant:   { label: 'Applicant',  accessor: function(a){ return ((a.fn||'') + ' ' + (a.ln||'')).trim(); } },
-    score:       { label: 'Score',      accessor: function(a){ return a.score || 0; } },
-    tier:        { label: 'Tier',       accessor: function(a){ return (a.tier || 'Low Priority').replace(' Priority',''); } },
-    reserve:     { label: 'Reserve',    accessor: function(a){ return a.reserve || '(none)'; } },
-    bestUnit:    { label: 'Best Unit',  accessor: function(a){ return _bestUnitAddr(a) || '(no match)'; } },
-    status:      { label: 'Status',     accessor: function(a){ return formatAppStatusLabel(a.status, {variant:'match'}) || a.status || 'Unknown'; } },
-    hasHouse:    { label: 'Has House',  accessor: function(a){ return (a.assignedUnit || a.appType==='transfer_request' || _currentTenancyAddr(a)) ? 1 : 0; } },
-    action:      { label: 'Action',     accessor: function(a){ var ready = !a.assignedUnit && (a.status==='ed_approved'||a.status==='mgr_approved'||a.status==='hm_approved'); return ready ? 1000 + (a.score||0) : (a.score||0); } }
+    applicant:     { label: 'Applicant',      accessor: function(a){ return ((a.fn||'') + ' ' + (a.ln||'')).trim(); } },
+    score:         { label: 'Score',          accessor: function(a){ return a.score || 0; } },
+    tier:          { label: 'Tier',           accessor: function(a){ return (a.tier || 'Low Priority').replace(' Priority',''); } },
+    reserve:       { label: 'Reserve',        accessor: function(a){ return a.reserve || '(none)'; } },
+    bestUnit:      { label: 'Best Unit',      accessor: function(a){ return _bestUnitAddr(a) || '(no match)'; } },
+    status:        { label: 'Status',         accessor: function(a){ return formatAppStatusLabel(a.status, {variant:'match'}) || a.status || 'Unknown'; } },
+    hasHouse:      { label: 'Has House',      accessor: function(a){ return (a.assignedUnit || a.appType==='transfer_request' || _currentTenancyAddr(a)) ? 1 : 0; } },
+    matchPriority: { label: 'Match Priority', accessor: _matchPriorityOf },
+    action:        { label: 'Action',         accessor: function(a){ var ready = !a.assignedUnit && (a.status==='ed_approved'||a.status==='mgr_approved'||a.status==='hm_approved'); return ready ? 1000 + (a.score||0) : (a.score||0); } }
   };
   var _matchAccessors = {};
   Object.keys(_matchColumns).forEach(function(k){ _matchAccessors[k] = _matchColumns[k].accessor; });
 
-  var _matchState = (typeof tableStateGet === 'function') ? tableStateGet('match') : { sort:{key:'action',dir:-1}, filters:{} };
-  if (_matchState.sort && !_matchState.sort.key) _matchState.sort = { key: 'action', dir: -1 };
+  var _matchState = (typeof tableStateGet === 'function') ? tableStateGet('match') : { sort:{key:'matchPriority',dir:-1}, filters:{} };
+  if (_matchState.sort && (!_matchState.sort.key || _matchState.sort.key === 'action')) _matchState.sort = { key: 'matchPriority', dir: -1 };
 
   if (typeof tableRegisterColumns === 'function') {
     tableRegisterColumns('match', {
@@ -885,6 +933,7 @@ function renderTenantsView(){
     var uid = String(u.id).replace(/'/g,"\\'");
     var badges = [];
     if(u.isElders) badges.push('<span style="font-size:9px;background:var(--warn-amber-bg);color:var(--warn-amber);border:1px solid var(--warn-amber-border);padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>');
+    if(_assignmentTypeBadge(u)) badges.push(_assignmentTypeBadge(u));
     var metas = [
       {k:'Beds', v: u.bedrooms ? (u.bedrooms + '-bed' + (u.accessible ? ' · Accessible' : '')) : ''},
       {k:'Move-In Date', v: u.assignedDate || ''}
@@ -940,7 +989,7 @@ function renderTenantsView(){
     }
     // fileCount already set above
     return '<tr class="clickable" data-tuid="'+escapeHtml(u.id)+'">'
-      +'<td><div class="std-cell-primary">'+escapeHtml(u.num)+' '+escapeHtml(u.street)+(u.isElders?' <span style="font-size:9px;background:var(--warn-amber-bg);color:var(--warn-amber);border:1px solid var(--warn-amber-border);padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>':'')+'</div><div class="tbl-sub">'+escapeHtml(String(u.bedrooms||''))+'-bed'+(u.accessible?' · Accessible':'')+'</div></td>'
+      +'<td><div class="std-cell-primary">'+escapeHtml(u.num)+' '+escapeHtml(u.street)+(u.isElders?' <span style="font-size:9px;background:var(--warn-amber-bg);color:var(--warn-amber);border:1px solid var(--warn-amber-border);padding:1px 5px;border-radius:6px;">ELDERS UNIT</span>':'')+' '+_assignmentTypeBadge(u)+'</div><div class="tbl-sub">'+escapeHtml(String(u.bedrooms||''))+'-bed'+(u.accessible?' · Accessible':'')+'</div></td>'
       +'<td class="std-cell-primary">'+escapeHtml(name)+'</td>'
       +'<td class="std-cell-dash">'+date+'</td>'
       +'<td><span class="std-pill std-pill-info">'+(u.status==='reserved'?'Reserved':'Occupied')+'</span></td>'

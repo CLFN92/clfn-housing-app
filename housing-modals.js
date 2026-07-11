@@ -199,6 +199,7 @@ function openUnitEditModal(unitId){
   // section in #ue_sig_section was removed; tenant info lives in #ue_assign_row.
   var acc=document.getElementById('ue_accessible'); if(acc) acc.checked=!!u.accessible;
   var eld=document.getElementById('ue_isElders');   if(eld) eld.checked=!!u.isElders;
+  var atype=document.getElementById('ue_assignment_type'); if(atype) atype.value=u.assignmentType||'';
   var title=document.getElementById('ue_modal_title'); if(title) title.textContent=u.num+' '+u.street;
   // Hero subtitle + info strip (mirrors the TIC hero/strip layout)
   var heroSub = [_roomBedLabel(u), (u.bathrooms&&u.bathrooms!=='nan')?u.bathrooms+' bath':'', _fmtUnitType(u.type)||''].filter(Boolean).join(' · ');
@@ -497,6 +498,7 @@ function saveUnitEdit(){
   // already overrode. Drop priorStatus whenever the user explicitly picks
   // any status other than under_repair.
   u.status=get('ue_status')||'vacant'; u.accessible=chk('ue_accessible'); u.isElders=chk('ue_isElders');
+  u.assignmentType=get('ue_assignment_type')||'';
   u.under_renovation = u.status !== 'condemned' && chk('ue_under_renovation');
   u.lastInspectionDate = get('ue_last_inspection') || null;
   u.nextInspectionDue  = get('ue_next_inspection')  || null;
