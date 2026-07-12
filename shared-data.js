@@ -5375,6 +5375,22 @@ function rpSelectContractor(el) {
   var dd = document.getElementById('rp_ct_dropdown');
   if(dd) dd.style.display = 'none';
 }
+// Name-only match against every other contractor (mirrors the "nameOnly"
+// tier of _findDuplicateApplications() in housing-app.js) — excludes the
+// record currently being edited so re-saving an unchanged name doesn't warn
+// against itself.
+function _findDuplicateContractor(name, excludeId){
+  var contractors = window._contractors || [];
+  var n = (name || '').trim().toLowerCase();
+  if(!n) return null;
+  for(var i=0;i<contractors.length;i++){
+    var c = contractors[i];
+    if(!c || c.id === excludeId) continue;
+    if((c.name||'').trim().toLowerCase() === n) return c;
+  }
+  return null;
+}
+
 function saveContractor(){
   var get=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
   var name=get('ct_name');
@@ -5383,6 +5399,23 @@ function saveContractor(){
   var editIdx = (window._ctEditIdx !== undefined) ? window._ctEditIdx : -1;
   var isEdit = editIdx >= 0 && editIdx < contractors.length;
   var id = isEdit ? (contractors[editIdx].id || ('CT-'+editIdx)) : ('CT-'+Date.now());
+
+  // Warn (don't block) on a name-only match — same tone/pattern as the
+  // application submit flow's "Applicant Name Already Exists" check. Uses a
+  // synchronous window.confirm() rather than the async showConfirm() helper
+  // so saveContractor() stays synchronous — saveContractorAndFinalize() reads
+  // window._contractors back immediately after calling this function.
+  var _dupCt = _findDuplicateContractor(name, isEdit ? id : null);
+  if(_dupCt){
+    var _dupDetail = [_dupCt.trade, _dupCt.status].filter(Boolean).join(' · ');
+    if(!window.confirm('A contractor named "' + name + '" already exists'
+      + (_dupDetail ? ' (' + _dupDetail + ')' : '') + '.\n\n'
+      + 'Please confirm this is a different contractor or company before saving.\n\n'
+      + 'Save anyway?')) {
+      return;
+    }
+  }
+
   var classRadio = document.querySelector('input[name="ct_classification"]:checked');
   var torEl = document.getElementById('ct_tor_agreed');
   var data = {
