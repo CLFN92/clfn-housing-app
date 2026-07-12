@@ -1100,18 +1100,16 @@
   </div>
   <div id="match_priority_section" style="margin-top:20px;">
     <div class="card card-flush-gold">
-      <div class="modal-hdr">
-        <div>
-          <div class="lbl-yellow">&#127968; Match Priority &mdash; Housing Placement Order</div>
-          <div class="txt-sm-meta">Who gets matched to a vacant unit first on the Match page (delegable via Settings &rarr; Approval Authority &rarr; Scoring). Separate from the application score above, which measures need/urgency; these bonuses decide placement order on top of it. Set all to 0 to match by score alone.</div>
-        </div>
-        <div class="flex-gap8 flex-wrap">
-          <button onclick="saveMatchPriorityModelED()" class="btn btn-primary">Save Match Priority</button>
-          <button onclick="resetMatchPriorityModelED()" class="btn btn-primary">Reset Defaults</button>
-        </div>
-      </div>
       <div style="padding:16px;">
+        <div style="margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid var(--yellow);">
+          <div style="font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text);">&#127968; Match Priority &mdash; Housing Placement Order</div>
+        </div>
+        <div class="txt-sm-meta" style="margin-bottom:12px;">Who gets matched to a vacant unit first on the Match page (delegable via Settings &rarr; Approval Authority &rarr; Scoring). Separate from the application score above, which measures need/urgency; these bonuses decide placement order on top of it. Set all to 0 to match by score alone.</div>
         <div id="match_priority_wrap"></div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="saveMatchPriorityModelED()" class="btn btn-primary">Save Match Priority</button>
+          <button onclick="resetMatchPriorityModelED()" class="btn btn-ghost">Reset Defaults</button>
+        </div>
       </div>
     </div>
   </div>
