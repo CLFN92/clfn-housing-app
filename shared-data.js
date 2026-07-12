@@ -1623,10 +1623,23 @@ function _mergeDoGroup(gi){
   if (!canonicalId) { if (typeof showToast === 'function') showToast('Pick a record to keep.', { type:'error' }); return; }
   var dupIds = g.map(function(t){ return t.id; }).filter(function(id){ return id !== canonicalId; });
   if (!dupIds.length) return;
-  if (!window.confirm('Merge ' + dupIds.length + ' record(s) into the selected one? History is kept; reversible by clearing merged_into.')) return;
-  sbMergeTenants(canonicalId, dupIds)
-    .then(function(){ _mergeReload(); if (typeof showToast === 'function') showToast('Records merged.'); })
-    .catch(function(e){ if (typeof showToast === 'function') showToast('Merge failed: ' + e.message, { type:'error' }); });
+  var n = dupIds.length;
+  // Styled showConfirm() (shared.js) instead of the native browser confirm()
+  // dialog — matches every other confirmation gate in the app.
+  var _confirm = (typeof showConfirm === 'function')
+    ? showConfirm({
+        title:       'Merge Duplicate Records?',
+        message:     'Merge ' + n + ' record' + (n === 1 ? '' : 's') + ' into the selected one?',
+        detail:      'History is kept &mdash; reversible by clearing <code>merged_into</code>.',
+        confirmText: 'Merge'
+      })
+    : Promise.resolve(window.confirm('Merge ' + n + ' record(s) into the selected one? History is kept; reversible by clearing merged_into.'));
+  _confirm.then(function(ok){
+    if (!ok) return;
+    sbMergeTenants(canonicalId, dupIds)
+      .then(function(){ _mergeReload(); if (typeof showToast === 'function') showToast('Records merged.'); })
+      .catch(function(e){ if (typeof showToast === 'function') showToast('Merge failed: ' + e.message, { type:'error' }); });
+  });
 }
 window._mergeDoGroup = _mergeDoGroup;
 
