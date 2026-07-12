@@ -193,8 +193,7 @@ function renderV2ScoringEditor() {
   html += optRow('None', pts(m.accessibility.none, 'accessibility', 'none'));
 
   html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:14px 0 6px;">Waitlist Time</div>';
-  html += optRow('Points per full year on waitlist', maxPts('waitlist', 'per_year'), '');
-  html += optRow('Maximum waitlist points', maxPts('waitlist', 'max'), '');
+  html += optRow('Points per full year on waitlist', maxPts('waitlist', 'per_year'), 'No maximum — points keep accruing for every year an applicant waits.');
 
   // ── Section B ──
   html += sectionHdr('Section B — Tenant Responsibility', 30);
@@ -377,12 +376,13 @@ function renderMatchPriorityEditor() {
       + '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">' + inputHtml + '<span class="js-lbl-sm">pts</span></div>'
       + '</div>';
   }
-  wrap.innerHTML = '<div style="padding:16px;">'
-    + bonusInput('hasMatchBonus',   'Has A Matching Unit Bonus', 'Added when there is at least one suitable vacant unit for the applicant. Dominates everything below.')
+  // No wrapping padding div here — #match_priority_wrap already sits inside a
+  // padded container in housing.html (the section header/description/buttons
+  // share that same padding, matching the Priority Tier Thresholds layout).
+  wrap.innerHTML = bonusInput('hasMatchBonus',   'Has A Matching Unit Bonus', 'Added when there is at least one suitable vacant unit for the applicant. Dominates everything below.')
     + bonusInput('temporaryBonus',  'Temporary Unit Bonus', 'Added when the best-matching unit is a Temporary (emergency placement) unit. Stacks on top of reserve/house status.')
     + bonusInput('onReserveBonus', 'On-Reserve Priority Bonus', 'Added when the applicant\'s On Reserve Status is "On Reserve". Ignored when matched to a Transition unit.')
-    + bonusInput('noHouseBonus',   'No Current House Priority Bonus', 'Added when the applicant does not already have a house (per the Has House column). Ignored when matched to a Transition unit.')
-    + '</div>';
+    + bonusInput('noHouseBonus',   'No Current House Priority Bonus', 'Added when the applicant does not already have a house (per the Has House column). Ignored when matched to a Transition unit.');
 }
 
 function updateMatchPriorityOption(input) {
@@ -1136,8 +1136,10 @@ function scoreApplicationLocally(app) {
   var householdPts = Math.min(10, deps + (app.elderInHousehold?3:0) + (app.loneParent?3:0) + (app.householdDisability?2:0));
   var accessMap = { high:10, moderate:5, none:0 };
   var accessPts = accessMap[app.accessibilityNeed || 'none'] !== undefined ? accessMap[app.accessibilityNeed || 'none'] : 0;
+  // No cap — an applicant keeps accruing +1 pt for every full year on the
+  // waitlist, however long that ends up being.
   var waitlistPts = 0;
-  if (app.appDate) { var yrs = (Date.now() - new Date(app.appDate).getTime()) / (365.25*24*3600*1000); waitlistPts = Math.min(5, Math.max(0, Math.floor(yrs))); }
+  if (app.appDate) { var yrs = (Date.now() - new Date(app.appDate).getTime()) / (365.25*24*3600*1000); waitlistPts = Math.max(0, Math.floor(yrs)); }
   var sectionA = urgentPts + healthPts + overcrowdingPts + householdPts + accessPts + waitlistPts;
   var isNew = (app.noPriorTenancy === true || app.noPriorTenancy === 'true');
   var rentMap = { excellent:10, mostly:7, occasional:5, frequent:0, no_history:6 };
