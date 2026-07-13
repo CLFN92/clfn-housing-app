@@ -3492,6 +3492,7 @@ function printWorkOrder(){
         +'<div class="grid-2">'
           +'<div class="field"><label>Unit Address</label><span>'+esc(address||'—')+'</span></div>'
           +'<div class="field"><label>Tenant</label><span>'+esc(tenantName||'—')+'</span></div>'
+          +'<div class="field"><label>Tenant Phone</label><span>'+esc(get('sow_tenant_phone')||'—')+'</span></div>'
           +'<div class="field"><label>Assigned To</label><span>'+esc(assigneeIH||_natShort+' Housing Department')+'</span></div>'
           +'<div class="field"><label>Issued By</label><span>'+esc(preparedBy||'—')+'</span></div>'
           +'<div class="field"><label>Start Date</label><span>'+esc(startDate||'—')+'</span></div>'
@@ -3515,8 +3516,8 @@ function printWorkOrder(){
       // Materials
       +'<div class="section-title">Materials</div>'
       +'<div class="section-body">'
-        +'<div class="chk-line"><span>Materials required?</span><span>'+mkbox(woIH.materialsRequired)+'Yes</span><span>'+mkbox(!woIH.materialsRequired)+'No</span></div>'
-        +'<div class="chk-line"><span>Materials ordered?</span><span>'+mkbox(woIH.materialsOrdered)+'Yes</span><span>'+mkbox(!woIH.materialsOrdered && woIH.materialsRequired)+'No</span><span>'+mkbox(!woIH.materialsRequired)+'N/A</span></div>'
+        +'<div class="chk-line"><span>Materials required?</span><span>'+mkbox(woIH.materialsRequired)+'Yes</span><span>'+mkbox(false)+'No</span></div>'
+        +'<div class="chk-line"><span>Materials ordered?</span><span>'+mkbox(woIH.materialsOrdered)+'Yes</span><span>'+mkbox(false)+'No</span><span>'+mkbox(false)+'N/A</span></div>'
         +(woIH.materialsList
             ? '<div style="font-size:10px;color:var(--text);white-space:pre-wrap;margin-top:8px;">'+esc(woIH.materialsList)+'</div>'
             : '<div style="font-size:9px;color:#666;margin:10px 0 6px;">List materials needed / ordered and the order date:</div>'+blankLines(3))
@@ -3626,6 +3627,7 @@ function printWorkOrder(){
       +'<div class="grid-2" style="margin-bottom:10px;">'
         +'<div class="field"><label>Unit Address</label><span>'+( address||'—')+'</span></div>'
         +'<div class="field"><label>Tenant</label><span>'+(tenantName||'—')+'</span></div>'
+        +'<div class="field"><label>Tenant Phone</label><span>'+esc(get('sow_tenant_phone')||'—')+'</span></div>'
         +'<div class="field"><label>Contractor</label><span>'+(contractor||'—')+'</span></div>'
         +'<div class="field"><label>Issued By</label><span>'+(preparedBy||'—')+'</span></div>'
         +'<div class="field"><label>Start Date</label><span>'+(startDate||'—')+'</span></div>'

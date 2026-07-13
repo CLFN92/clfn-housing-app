@@ -1674,32 +1674,47 @@ async function _generateSowPdfBase64() {
 // table is the source of truth (TIC reads from it) and unit.assignedName
 // is trigger-synced from housing_units.assigned_name — same join that
 // the TIC's _ticResolveTenant uses, just slimmed down for one column.
-async function _resolveTenantEmailForUnit(unit) {
-  if (!unit || !unit.assignedName) return '';
-  if (typeof SUPABASE_URL === 'undefined' || typeof HOUSING_HEADERS === 'undefined') return '';
+// Resolve the tenant's on-file contact info (email + phone) for a unit,
+// mirroring the TIC's tenant resolution: exclude merged-away duplicate rows
+// (merged_into=is.null) and pick the first row that actually has a value.
+// Returns { email, phone } (either may be '').
+async function _resolveTenantContactForUnit(unit) {
+  var out = { email: '', phone: '' };
+  if (!unit || !unit.assignedName) return out;
+  if (typeof SUPABASE_URL === 'undefined' || typeof HOUSING_HEADERS === 'undefined') return out;
   try {
-    // Mirror the TIC's tenant resolution: exclude merged-away duplicate rows
-    // (merged_into=is.null). The old query omitted that filter and blindly took
-    // rows[0], so a duplicate/blank tenant row could hide the real email the TIC
-    // shows. Pick the first non-merged row that actually has an email.
     var url = SUPABASE_URL
-            + '/rest/v1/tenants?select=email,merged_into&full_name=eq.'
+            + '/rest/v1/tenants?select=email,phone,merged_into&full_name=eq.'
             + encodeURIComponent(unit.assignedName)
             + '&merged_into=is.null';
     var r = await fetch(url, { headers: HOUSING_HEADERS });
     if (!r.ok) {
-      console.warn('[notify] tenant email lookup HTTP ' + r.status);
-      return '';
+      console.warn('[notify] tenant contact lookup HTTP ' + r.status);
+      return out;
     }
     var rows = await r.json();
-    if (!Array.isArray(rows)) return '';
-    var pick = rows.find(function(t){ return t && t.email && String(t.email).trim(); });
-    return pick ? String(pick.email).trim() : '';
+    if (!Array.isArray(rows)) return out;
+    var em = rows.find(function(t){ return t && t.email && String(t.email).trim(); });
+    var ph = rows.find(function(t){ return t && t.phone && String(t.phone).trim(); });
+    out.email = em ? String(em.email).trim() : '';
+    out.phone = ph ? String(ph.phone).trim() : '';
+    return out;
   } catch (e) {
-    console.warn('[notify] tenant email lookup error:', e);
-    return '';
+    console.warn('[notify] tenant contact lookup error:', e);
+    return out;
   }
 }
+window._resolveTenantContactForUnit = _resolveTenantContactForUnit;
+
+async function _resolveTenantEmailForUnit(unit) {
+  var c = await _resolveTenantContactForUnit(unit);
+  return c.email;
+}
+async function _resolveTenantPhoneForUnit(unit) {
+  var c = await _resolveTenantContactForUnit(unit);
+  return c.phone;
+}
+window._resolveTenantPhoneForUnit = _resolveTenantPhoneForUnit;
 
 // Wired from saveSOW() in housing-modals-sow.js when the preparer ticks
 // the inline "Email a copy to the tenant" checkbox on the submit
@@ -2068,6 +2083,7 @@ async function _generateWorkOrderPdfBase64() {
   sectionHeader('Project Information');
   row('Unit Address',     unitAddr);
   row('Tenant',           fld('sow_tenant_name'));
+  row('Tenant Phone',     fld('sow_tenant_phone'));
   if (inHouse) row('Assigned To', _woAssigneeName() || fld('sow_contractor'));
   else         row('Contractor',  fld('sow_contractor'));
   row('Issued By',        fld('sow_prepared_by'));
@@ -2171,8 +2187,11 @@ async function _generateWorkOrderPdfBase64() {
     gap();
 
     sectionHeader('Materials');
-    woInlineChecks('Materials required?', [{label:'Yes', checked:!!wo.materialsRequired}, {label:'No', checked:!wo.materialsRequired}]);
-    woInlineChecks('Materials ordered?',  [{label:'Yes', checked:!!wo.materialsOrdered}, {label:'No', checked:!wo.materialsOrdered && !!wo.materialsRequired}, {label:'N/A', checked:!wo.materialsRequired}]);
+    // Only mark "Yes" when the Work Order tab checkbox is set; No / N/A stay
+    // blank (nothing to infer from a single boolean — and blank boxes stay
+    // hand-markable on a printed form).
+    woInlineChecks('Materials required?', [{label:'Yes', checked:!!wo.materialsRequired}, {label:'No', checked:false}]);
+    woInlineChecks('Materials ordered?',  [{label:'Yes', checked:!!wo.materialsOrdered}, {label:'No', checked:false}, {label:'N/A', checked:false}]);
     if (wo.materialsList) {
       paragraph(wo.materialsList);
     } else {

@@ -490,6 +490,9 @@ function _buildSowModalHTML() {
           '<input id="sow_hm_date" type="hidden"/>' +
           '<input id="sow_ed_name" type="hidden"/>' +
           '<input id="sow_ed_date" type="hidden"/>' +
+          // Tenant phone, resolved from the tenants record at open — printed in
+          // the Work Order Project Information so the crew can reach the tenant.
+          '<input id="sow_tenant_phone" type="hidden"/>' +
           '<span id="sow_budget_badge"></span>' +
         '</div>' +
 
@@ -858,6 +861,22 @@ function openSowModal(unitId, projectNumber) {
       if(u2 && u2.assignedName) tnEl.value = u2.assignedName;
     }
   }
+  // Resolve the tenant's phone (async) into the hidden field the Work Order
+  // Project Information prints. Clear first so a stale value from a previous
+  // open never leaks onto a different unit's work order.
+  (function(){
+    var phEl = document.getElementById('sow_tenant_phone');
+    if(phEl) phEl.value = '';
+    if(unitId && typeof _resolveTenantPhoneForUnit === 'function'){
+      var uPh = getAllUnits().find(function(x){ return x.id===unitId; });
+      if(uPh){
+        _resolveTenantPhoneForUnit(uPh).then(function(ph){
+          var el = document.getElementById('sow_tenant_phone');
+          if(el && ph) el.value = ph;
+        }).catch(function(){});
+      }
+    }
+  })();
   // Auto-populate "Prepared By (Staff)" from the logged-in user. Done for both
   // new and existing SOWs, but only when the field is empty — never overwrite
   // a saved value (the original preparer should be preserved on re-open).
