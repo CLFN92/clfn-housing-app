@@ -74,7 +74,7 @@ function renderSowFiles() {
       + '<span class="file-name">' + (f.name || f.path || '—') + '</span>'
       + '<span class="file-meta">' + size + (added ? ' &middot; ' + added : '') + '</span>'
       + '<span class="file-actions">'
-        + '<button type="button" class="file-download" onclick="_sowDownloadFile(\'' + pathAttr + '\')" title="Download">Download</button>'
+        + '<button type="button" class="file-download" onclick="_sowViewFile(\'' + pathAttr + '\')" title="View">View</button>'
         + '<button type="button" class="file-delete" onclick="removeSowFile(\'' + pathAttr + '\')" title="Remove">&times;</button>'
       + '</span>'
       + '</div>';
@@ -126,19 +126,25 @@ function sowFileDrop(e) {
   // Reuse handleSowFileUpload by faking an input shape
   handleSowFileUpload({ files: dt.files, value: '' });
 }
-async function _sowDownloadFile(path) {
+// Open the file in a new tab for viewing (inline for PDFs/images), matching
+// the DocLibrary "View" action used everywhere else — standardized on viewing
+// rather than downloading.
+async function _sowViewFile(path) {
   if (!path) return;
   try {
     var url = (typeof sbGetSignedUrl === 'function')
       ? await sbGetSignedUrl(path)
       : null;
     if (url) { window.open(url, '_blank', 'noopener'); }
-    else { showToast('Could not generate download link.'); }
+    else { showToast('Could not generate a link for that file.'); }
   } catch(e) {
-    console.warn('[SOW FILE] download failed:', e);
-    showToast('Download failed: ' + (e.message || 'unknown error'));
+    console.warn('[SOW FILE] view failed:', e);
+    showToast('Could not open file: ' + (e.message || 'unknown error'));
   }
 }
+// Back-compat alias in case any cached markup still calls the old name.
+var _sowDownloadFile = _sowViewFile;
+window._sowViewFile = _sowViewFile;
 async function removeSowFile(path) {
   if (!path) return;
   var ok = await showConfirm({
