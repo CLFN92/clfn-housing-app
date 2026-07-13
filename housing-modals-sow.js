@@ -226,6 +226,7 @@ function _buildSowModalHTML() {
         '<button type="button" class="tic-tab"            data-modal-tab="acct"      onclick="setSowTab(\'acct\')"      role="tab">Accountability</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="notes"     onclick="setSowTab(\'notes\')"     role="tab">Notes &amp; Terms</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="sigs"      onclick="setSowTab(\'sigs\')"      role="tab">Signatures</button>' +
+        '<button type="button" class="tic-tab"            data-modal-tab="workorder" onclick="setSowTab(\'workorder\')" role="tab">Work Order</button>' +
       '</div>' +
 
       // ── Body / tab panels ────────────────────────────────────────────────
@@ -442,6 +443,41 @@ function _buildSowModalHTML() {
           '</div>' +
         '</div>' +
 
+        // ── WORK ORDER (execution) ───────────────────────────────────────
+        // The functional, editable record the crew (or the office, if the
+        // field employee does not update it) fills in as the work is done.
+        // Persisted on the SOW's `workOrder` block; drives the in-house Work
+        // Order PDF/print. NOT part of the submit "review all tabs" gate.
+        '<div class="tic-panel" data-modal-panel="workorder">' +
+          '<div class="tic-section">' +
+            '<div class="tic-section-h">Work Checklist</div>' +
+            '<div class="txt-muted-xs" style="margin-bottom:8px;">Field staff (or the office) check off each item as it is completed on site. Items come from the Work Items tab.</div>' +
+            '<div id="sow_wo_items"></div>' +
+          '</div>' +
+          '<div class="tic-section">' +
+            '<div class="tic-section-h">Measurements</div>' +
+            '<div class="f"><label>Measurements taken on site</label>' +
+              '<textarea id="sow_wo_measurements" rows="3" placeholder="Rooms, openings, materials — e.g. Kitchen window 900 x 1200 mm"></textarea></div>' +
+          '</div>' +
+          '<div class="tic-section">' +
+            '<div class="tic-section-h">Materials</div>' +
+            '<div class="grid-c3-tight">' +
+              '<label class="check-row"><input type="checkbox" id="sow_wo_mat_required" class="icon-sm"/> Materials required</label>' +
+              '<label class="check-row"><input type="checkbox" id="sow_wo_mat_ordered" class="icon-sm"/> Materials ordered</label>' +
+            '</div>' +
+            '<div class="f"><label>Materials list / order details</label>' +
+              '<textarea id="sow_wo_materials" rows="2" placeholder="What is needed / ordered, supplier, order date…"></textarea></div>' +
+          '</div>' +
+          '<div class="tic-section">' +
+            '<div class="tic-section-h">Field Employee Notes</div>' +
+            '<div class="f"><label>Notes from the field</label>' +
+              '<textarea id="sow_wo_field_notes" rows="3" placeholder="Observations, issues found, follow-up needed…"></textarea></div>' +
+          '</div>' +
+          '<div class="tic-section">' +
+            '<div id="sow_wo_meta" class="txt-muted-xs"></div>' +
+          '</div>' +
+        '</div>' +
+
         // Approvals tab removed — HM / ED approval flow is handled outside
         // the SOW form (Renovation Approvals view, internal-only). The
         // hidden inputs below preserve the IDs that saveSOW reads so the
@@ -468,8 +504,8 @@ function _buildSowModalHTML() {
         '<button id="sow_mark_complete_btn" type="button" onclick="markSowComplete()" class="btn btn-ghost" style="display:none;">✓ Mark Complete</button>' +
         '<button id="sow_reopen_btn" type="button" onclick="reopenSow()" class="btn btn-ghost" style="display:none;">↺ Reopen</button>' +
         '<button id="sow_archive_btn" type="button" onclick="archiveCurrentSow()" class="btn btn-ghost" style="display:none;">🗄 Archive</button>' +
-        '<button type="button" onclick="printWorkOrder()" class="btn btn-ghost">🏗 Work Order</button>' +
-        '<button type="button" onclick="printSOW()" class="btn btn-ghost">🖨 Full Request</button>' +
+        '<button type="button" onclick="sowWorkOrderClicked()" class="btn btn-ghost">🏗 Work Order</button>' +
+        '<button type="button" onclick="sowTenantFormClicked()" class="btn btn-ghost">🖨 Tenant form</button>' +
         '<button type="button" id="sow_rfq_btn" onclick="if(_sowUnitId&&window._sowEditingProjectNumber){saveSOW();try{var _c=window._sowCache&&window._sowCache[_sowUnitId];var _sa=_c&&Array.isArray(_c.sows)?_c.sows:(_c&&Array.isArray(_c)?_c:[]);var _sh=_sa.find(function(s){return s&&s.project_number===window._sowEditingProjectNumber;})||null;if(_sh)sessionStorage.setItem(\'_rfq_sow_handoff\',JSON.stringify(_sh));}catch(e){}window.location.href=\'rfq.html?unit=\'+encodeURIComponent(_sowUnitId)+\'&sow=\'+encodeURIComponent(window._sowEditingProjectNumber);}else{if(typeof showToast===\'function\')showToast(\'Save the request first\');}" class="btn btn-ghost" style="display:none;">📋 RFQ</button>' +
         '<span class="tic-footer-spacer"></span>' +
         // Review progress label — populated by _updateSowSaveButtonState.
@@ -544,6 +580,9 @@ function setSowTab(name) {
       p.classList.toggle('tic-active', p.getAttribute('data-modal-panel') === name);
     });
   }
+  // The Work Order (execution) tab renders its checklist from the current
+  // work items on open, so items added on the Work Items tab show up here.
+  if (name === 'workorder' && typeof _sowRenderWorkOrderItems === 'function') _sowRenderWorkOrderItems();
   if (typeof _sowRefreshStrip === 'function') _sowRefreshStrip();
   _updateSowSaveButtonState();
 }
@@ -555,7 +594,13 @@ function _updateSowSaveButtonState() {
   var btn = document.getElementById('sow_save_btn');
   var prog = document.getElementById('sow_review_progress');
   if (!btn) return;
-  var visited = (window._sowVisitedTabs && window._sowVisitedTabs.size) || 0;
+  // Count only the real review tabs — the Work Order (execution) tab is
+  // filled after the request is set up, so visiting it must not satisfy the
+  // "review every section" submit gate.
+  var visited = 0;
+  if (window._sowVisitedTabs) {
+    _SOW_TAB_NAMES.forEach(function(t){ if (window._sowVisitedTabs.has(t)) visited++; });
+  }
   var allReviewed = visited >= _SOW_TAB_TOTAL;
   btn.dataset.mode  = allReviewed ? 'submit' : 'draft';
   btn.textContent   = allReviewed ? '📤 Submit Request' : '💾 Save Draft';
@@ -903,6 +948,169 @@ function _applySowSeed(seed){
   }
 }
 window._applySowSeed = _applySowSeed;
+
+// ── Work Order (execution) tab ────────────────────────────────────────────
+// The editable, functional work-order record kept on the SOW's `workOrder`
+// block (round-trips through the SOW `data` jsonb — no schema change). Field
+// staff OR the office fill it in as the work is done; it drives the in-house
+// Work Order PDF/print.
+
+// Render the per-item completion checklist from the current work items,
+// preserving check state. Pass an explicit doneMap (from a saved record) to
+// restore saved ticks; omit it to preserve whatever is currently checked
+// (used when re-opening the tab after items changed).
+function _sowRenderWorkOrderItems(doneMap){
+  var cont = document.getElementById('sow_wo_items');
+  if(!cont) return;
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+  var items = (typeof collectSowItems === 'function') ? collectSowItems() : [];
+  items = items.filter(function(it){ return it.category || it.description; });
+  if(!doneMap){
+    var prev = {};
+    cont.querySelectorAll('input[type=checkbox][data-wo-idx]').forEach(function(cb){
+      prev[cb.getAttribute('data-wo-idx')] = cb.checked;
+    });
+    doneMap = prev;
+  }
+  if(!items.length){
+    cont.innerHTML = '<div class="txt-muted-xs" style="padding:6px 0;">No work items yet — add them on the Work Items tab.</div>';
+    return;
+  }
+  cont.innerHTML = items.map(function(it,i){
+    var done = !!(doneMap && doneMap[i]);
+    var lbl  = (it.category ? esc(it.category) + ' — ' : '') + esc(it.description || 'Item');
+    return '<label class="check-row" style="align-items:flex-start;gap:8px;">'
+      + '<input type="checkbox" class="icon-sm" data-wo-idx="' + i + '"' + (done ? ' checked' : '') + '/> '
+      + '<span>' + lbl + '</span></label>';
+  }).join('');
+}
+window._sowRenderWorkOrderItems = _sowRenderWorkOrderItems;
+
+// Read the Work Order tab fields into a plain object for saveSOW.
+function _sowCollectWorkOrder(){
+  var g = function(id){ var e=document.getElementById(id); return e ? String(e.value||'').trim() : ''; };
+  var c = function(id){ var e=document.getElementById(id); return e ? !!e.checked : false; };
+  var wo = {
+    itemsDone:        {},
+    measurements:     g('sow_wo_measurements'),
+    materialsRequired:c('sow_wo_mat_required'),
+    materialsOrdered: c('sow_wo_mat_ordered'),
+    materialsList:    g('sow_wo_materials'),
+    fieldNotes:       g('sow_wo_field_notes')
+  };
+  var cont = document.getElementById('sow_wo_items');
+  var total = 0, done = 0;
+  if(cont){
+    cont.querySelectorAll('input[type=checkbox][data-wo-idx]').forEach(function(cb){
+      total++; if(cb.checked) done++;
+      wo.itemsDone[cb.getAttribute('data-wo-idx')] = cb.checked;
+    });
+  }
+  var hasAny = done > 0 || wo.measurements || wo.materialsList || wo.fieldNotes || wo.materialsRequired || wo.materialsOrdered;
+  wo.status = (total > 0 && done === total) ? 'done' : (hasAny ? 'in_progress' : 'not_started');
+  if(hasAny){
+    wo.updatedAt = new Date().toISOString();
+    wo.updatedBy = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION && (HOUSING_SESSION.email || HOUSING_SESSION.name)) || '';
+  }
+  return wo;
+}
+window._sowCollectWorkOrder = _sowCollectWorkOrder;
+
+// Fill the Work Order tab from a saved `workOrder` block (called from
+// populateSow). Safe to call with null/undefined for a brand-new request.
+function _sowPopulateWorkOrder(wo){
+  wo = wo || {};
+  var s = function(id,v){ var e=document.getElementById(id); if(e) e.value = v || ''; };
+  var k = function(id,v){ var e=document.getElementById(id); if(e) e.checked = !!v; };
+  s('sow_wo_measurements', wo.measurements);
+  s('sow_wo_materials',    wo.materialsList);
+  s('sow_wo_field_notes',  wo.fieldNotes);
+  k('sow_wo_mat_required', wo.materialsRequired);
+  k('sow_wo_mat_ordered',  wo.materialsOrdered);
+  _sowRenderWorkOrderItems(wo.itemsDone || {});
+  _sowUpdateWorkOrderMeta(wo);
+}
+window._sowPopulateWorkOrder = _sowPopulateWorkOrder;
+
+function _sowUpdateWorkOrderMeta(wo){
+  var el = document.getElementById('sow_wo_meta'); if(!el) return;
+  if(!wo || !wo.updatedAt){ el.textContent = ''; return; }
+  var when = ''; try { when = new Date(wo.updatedAt).toLocaleString('en-CA'); } catch(e){ when = wo.updatedAt; }
+  var stat = wo.status === 'done' ? 'Completed' : (wo.status === 'in_progress' ? 'In progress' : 'Not started');
+  el.textContent = 'Work order status: ' + stat + ' · Last updated ' + when + (wo.updatedBy ? (' by ' + wo.updatedBy) : '');
+}
+
+// ── Document buttons (open the document, then confirm the email) ──────────
+// Work Order → contractor OR in-house employee (+ Housing Manager CC).
+async function sowWorkOrderClicked(){
+  if(typeof printWorkOrder === 'function') printWorkOrder();  // saves + opens the document
+  try{
+    if(typeof showConfirm !== 'function') return;
+    var sow = (_sowUnitId && window._sowEditingProjectNumber && typeof getSowByProjectNumber === 'function')
+            ? getSowByProjectNumber(_sowUnitId, window._sowEditingProjectNumber) : null;
+    if(!sow) return;
+    var unit = (_sowUnitId && typeof getAllUnits === 'function')
+             ? (getAllUnits().find(function(x){ return x.id === _sowUnitId; }) || null) : null;
+    var team = sow.assignedTeam || (sow.contractorId ? 'contractor' : '');
+    var _esc = function(s){ return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); };
+    if(team === 'in_house' && sow.assignedTo){
+      if(typeof notifyWorkOrderToFieldEmployee !== 'function') return;
+      var who = sow.assignedToName || sow.assignedTo;
+      var hmLabel = (window.CLFN_PERMS && CLFN_PERMS.roleLabel) ? CLFN_PERMS.roleLabel('housing_manager') : 'Housing Manager';
+      var r = await showConfirm({
+        title:'Email Work Order?',
+        message:'Send this work order (PDF attached) to the assigned employee and the ' + hmLabel + '?',
+        detail:'<div style="font-size:14px;font-weight:700;color:var(--text);">' + _esc(who) + '</div>'
+             + '<div style="font-size:12px;color:var(--muted);margin-top:3px;">&#128231; ' + _esc(sow.assignedTo) + '</div>',
+        confirmText:'Send Email', cancelText:'Skip'
+      });
+      if((typeof r === 'object' && r) ? r.ok : r) notifyWorkOrderToFieldEmployee(sow, unit);
+    } else if(sow.contractorId){
+      if(typeof notifyWorkOrderToContractor !== 'function' || typeof _resolveContractorForEmail !== 'function') return;
+      var ct = await _resolveContractorForEmail(sow.contractorId);
+      if(!ct || !ct.email){ if(typeof showToast === 'function') showToast('No contractor email on file.'); return; }
+      var r2 = await showConfirm({
+        title:'Email Work Order?',
+        message:'Send this work order (PDF attached) to the assigned contractor?',
+        detail:'<div style="font-size:14px;font-weight:700;color:var(--text);">' + _esc(ct.name) + '</div>'
+             + '<div style="font-size:12px;color:var(--muted);margin-top:3px;">&#128231; ' + _esc(ct.email) + '</div>',
+        confirmText:'Send Email', cancelText:'Skip'
+      });
+      if((typeof r2 === 'object' && r2) ? r2.ok : r2) notifyWorkOrderToContractor(sow, unit, ct);
+    } else {
+      if(typeof showToast === 'function') showToast('Assign this request to a contractor or employee to email the work order.');
+    }
+  }catch(e){ console.warn('[sow] work-order email prompt threw:', e); }
+}
+window.sowWorkOrderClicked = sowWorkOrderClicked;
+
+// Tenant form → a PDF copy of the full request to the tenant.
+async function sowTenantFormClicked(){
+  if(typeof printSOW === 'function') printSOW();  // saves + opens the document
+  try{
+    if(typeof showConfirm !== 'function' || typeof notifySowTenantCopy !== 'function') return;
+    var sow = (_sowUnitId && window._sowEditingProjectNumber && typeof getSowByProjectNumber === 'function')
+            ? getSowByProjectNumber(_sowUnitId, window._sowEditingProjectNumber) : null;
+    if(!sow) return;
+    var unit = (_sowUnitId && typeof getAllUnits === 'function')
+             ? (getAllUnits().find(function(x){ return x.id === _sowUnitId; }) || null) : null;
+    if(!unit) return;
+    var email = '';
+    if(typeof _resolveTenantEmailForUnit === 'function'){ try { email = await _resolveTenantEmailForUnit(unit); } catch(e){ email = ''; } }
+    if(!email){ if(typeof showToast === 'function') showToast('No tenant email on file for this unit.'); return; }
+    var _esc = function(s){ return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); };
+    var tenantName = unit.assignedName || 'the tenant';
+    var r = await showConfirm({
+      title:'Email Tenant Copy?',
+      message:'Email a PDF copy of this maintenance request to the tenant?',
+      detail:'<div style="font-size:14px;font-weight:700;color:var(--text);">' + _esc(tenantName) + '</div>'
+           + '<div style="font-size:12px;color:var(--muted);margin-top:3px;">&#128231; ' + _esc(email) + '</div>',
+      confirmText:'Send Email', cancelText:'Skip'
+    });
+    if((typeof r === 'object' && r) ? r.ok : r) notifySowTenantCopy(sow, unit);
+  }catch(e){ console.warn('[sow] tenant-copy email prompt threw:', e); }
+}
+window.sowTenantFormClicked = sowTenantFormClicked;
 
 // ── SOW completion state control ──────────────────────────────────────────
 // Applies read-only lock when a SOW is completed AND the viewer isn't the ED.
@@ -1616,33 +1824,17 @@ async function sowSaveClicked() {
   var mode = (btn && btn.dataset) ? btn.dataset.mode : 'draft';
   if (mode !== 'submit') { saveSOW(); return; }
 
-  var unitId = _sowUnitId;
-  var allUnits = getAllUnits();
-  var unit = unitId ? allUnits.find(function(x){ return x.id === unitId; }) : null;
-
-  // Tenant email lookup is best-effort. If the helper is missing (older
-  // notifications.js) OR the lookup throws OR no email comes back, we
-  // submit without the copy prompt — the SOW still saves normally.
-  var tenantEmail = '';
-  if (unit && typeof _resolveTenantEmailForUnit === 'function') {
-    try { tenantEmail = await _resolveTenantEmailForUnit(unit); }
-    catch (e) { tenantEmail = ''; }
-  }
-
-  if (!tenantEmail || typeof showConfirm !== 'function') { saveSOW(); return; }
-
-  var tenantName = (unit && unit.assignedName) || 'the tenant';
-  showConfirm({
+  // Submit confirmation only — emailing the tenant is now an explicit,
+  // separate action on the "Tenant form" button (sowTenantFormClicked), so
+  // submitting no longer prompts about (or sends) any email.
+  if (typeof showConfirm !== 'function') { saveSOW(); return; }
+  var result = await showConfirm({
     title:       'Submit Maintenance Request?',
-    message:     'This will submit the request for review. You can still edit it later if you have approval authority.',
-    confirmText: 'Confirm Submit',
-    checkbox:    { label: 'Email a PDF copy of this request to ' + tenantName + ' (' + tenantEmail + ')', defaultChecked: true }
-  }).then(function(result){
-    var ok       = (typeof result === 'object' && result !== null) ? !!result.ok      : !!result;
-    var sendCopy = (typeof result === 'object' && result !== null) ? !!result.checked : false;
-    if (!ok) return;
-    saveSOW({ sendTenantCopy: sendCopy });
+    message:     'This submits the request for review. You can still edit it later if you have approval authority. Use the Work Order and Tenant form buttons to email copies.',
+    confirmText: 'Confirm Submit'
   });
+  var ok = (typeof result === 'object' && result !== null) ? !!result.ok : !!result;
+  if (ok) saveSOW();
 }
 
 // Reconcile assignment: in-house work has no contractor; contractor work has
@@ -1717,74 +1909,12 @@ function _sowFireEmails(data, existingForStatus, isNew, sendTenantCopy, saveMode
     notifySowCreated(data, _sowUnitId);
   }
 
-  // Tenant copy email (PDF attached) — only fires when the preparer
-  // opted in via the inline checkbox on the submit confirmation. Looked
-  // up against the tenants table; silent skip if no email on file. Same
-  // fire-and-forget pattern as notifyApplicationConfirmation in
-  // housing-app.js finalSubmit.
-  if (sendTenantCopy && typeof notifySowTenantCopy === 'function') {
-    var _allUnitsT = getAllUnits();
-    var _unitT = _sowUnitId ? _allUnitsT.find(function(x){ return x.id === _sowUnitId; }) : null;
-    notifySowTenantCopy(data, _unitT);
-  }
-
-  // Work Order email to contractor — fires when THIS save transitioned the
-  // SOW into an approved state (hm_approved or ed_approved). Detached
-  // async: looks up the contractor, shows a confirm dialog with an
-  // opt-in checkbox, and only sends if the approver ticks it. Silent
-  // skip when there's no assigned contractor / no email on file.
-  var _prevApproved = existingForStatus && (
-    existingForStatus.approval_status === 'hm_approved'
-    || existingForStatus.approval_status === 'ed_approved'
-    || existingForStatus.approval_status === 'completed'
-  );
-  var _nowApproved = data.approval_status === 'hm_approved' || data.approval_status === 'ed_approved';
-  if (_nowApproved && !_prevApproved && data.contractorId
-      && typeof notifyWorkOrderToContractor === 'function'
-      && typeof _resolveContractorForEmail === 'function') {
-    var _allUnitsW = getAllUnits();
-    var _unitW = _sowUnitId ? _allUnitsW.find(function(x){ return x.id === _sowUnitId; }) : null;
-    var _sowSnapshot = data;
-    (async function(){
-      try {
-        var ct = await _resolveContractorForEmail(_sowSnapshot.contractorId);
-        if (!ct || !ct.email) return;
-        if (typeof showConfirm !== 'function') return;
-        var _esc = function(s){ return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); };
-        var result = await showConfirm({
-          title:   'Send Work Order Email?',
-          message: 'The Maintenance Request has been approved. Confirm the contractor details below before sending the Work Order PDF.',
-          detail:  '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px;">Contractor</div>'
-                 + '<div style="font-size:14px;font-weight:700;color:var(--text);">' + _esc(ct.name) + '</div>'
-                 + '<div style="font-size:12px;color:var(--muted);margin-top:3px;">&#128231; ' + _esc(ct.email) + '</div>',
-          confirmText: 'Send Email',
-          cancelText:  'Skip',
-          checkbox:    { label: 'Send work order email to this contractor', defaultChecked: true }
-        });
-        var ok     = (typeof result === 'object' && result !== null) ? !!result.ok      : !!result;
-        var sendIt = (typeof result === 'object' && result !== null) ? !!result.checked : false;
-        if (!ok || !sendIt) return;
-        notifyWorkOrderToContractor(_sowSnapshot, _unitW, ct);
-      } catch (e) {
-        console.warn('[notify] work-order prompt threw:', e);
-      }
-    })();
-  }
-
-  // Work Order email to the assigned in-house field employee — fires on SUBMIT
-  // when the work is assigned in-house with a key person. De-duped so editing
-  // an already-submitted SOW with the same assignee doesn't re-notify.
-  if (saveMode === 'submit' && data.assignedTeam === 'in_house' && data.assignedTo
-      && typeof notifyWorkOrderToFieldEmployee === 'function') {
-    var _prevAssignee = (existingForStatus && (existingForStatus.assignedTo || '')).toLowerCase();
-    var _prevSubmitted = existingForStatus && existingForStatus.approval_status && existingForStatus.approval_status !== 'draft';
-    var _alreadyNotified = _prevSubmitted && _prevAssignee === (data.assignedTo || '').toLowerCase();
-    if (!_alreadyNotified) {
-      var _allUnitsFE = getAllUnits();
-      var _unitFE = _sowUnitId ? _allUnitsFE.find(function(x){ return x.id === _sowUnitId; }) : null;
-      notifyWorkOrderToFieldEmployee(data, _unitFE);
-    }
-  }
+  // NOTE: Work Order emails (to the contractor or the in-house employee +
+  // Housing Manager) and the tenant copy are NO LONGER sent automatically on
+  // submit/approve. They are sent explicitly, with a confirmation dialog,
+  // from the "Work Order" and "Tenant form" buttons (sowWorkOrderClicked /
+  // sowTenantFormClicked). This keeps saving side-effect-free — no surprise
+  // emails, no PDF-generation spin on save.
 }
 
 function saveSOW(opts){
@@ -1821,6 +1951,7 @@ function saveSOW(opts){
     policeReport:chk('sow_police_report'), accountabilityNotes:get('sow_accountability_notes'),
     items:collectSowItems(),
     files: (window._sowFiles || []).slice(),
+    workOrder: (typeof _sowCollectWorkOrder === 'function') ? _sowCollectWorkOrder() : null,
     savedAt:new Date().toISOString()
   };
   // Reconcile assignment (in-house vs contractor — see _sowReconcileAssignment).
@@ -1828,6 +1959,11 @@ function saveSOW(opts){
   // ── Multi-SOW fields ───────────────────────────────────────────────────
   // Stamp the project number (either the one being edited or a fresh one for new SOWs).
   data.project_number = window._sowEditingProjectNumber || (_sowUnitId ? nextProjectNumber(_sowUnitId) : 'NO-UNIT-SOW-001');
+  // Lock the modal onto this project number so a subsequent Save, or the
+  // Work Order / Tenant form document buttons, target THIS saved request
+  // (not a fresh one) — matters for brand-new requests whose number was
+  // just generated on this first save.
+  window._sowEditingProjectNumber = data.project_number;
   // Preserve created_at if editing an existing SOW; otherwise stamp today.
   if(_sowUnitId){
     var existing = getSowByProjectNumber(_sowUnitId, data.project_number);

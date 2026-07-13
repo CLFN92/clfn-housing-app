@@ -3377,6 +3377,8 @@ function populateSow(data){
   _sowItemIdx=0;
   if(data.items && data.items.length) { data.items.forEach(function(item){ addSowItem(item); }); }
   else { addSowItem(); }
+  // Work Order (execution) block — fill checklist + measurements/materials/notes.
+  if (typeof _sowPopulateWorkOrder === 'function') _sowPopulateWorkOrder(data.workOrder);
 }
 function printContractorAgreement() {
   // Read live form data — no save required to print
@@ -3418,19 +3420,30 @@ function printWorkOrder(){
       var o = s.options[s.selectedIndex];
       return (o && o.getAttribute('data-name')) || '';
     })();
-    var notesIH = get('sow_notes');
+    // Captured Work Order (execution) data from the Work Order tab.
+    var woIH = (typeof _sowCollectWorkOrder === 'function') ? _sowCollectWorkOrder() : {};
+    woIH = woIH || {};
+    var woDoneIH = woIH.itemsDone || {};
+    var notesIH = woIH.fieldNotes || '';
     var logoSrcIH = '';
     try { var _lg = document.querySelector('.hlogo'); if(_lg && _lg.src) logoSrcIH = _lg.src; } catch(e) {}
-    var chkbox = '<span style="display:inline-block;width:14px;height:14px;border:1.5px solid #333;border-radius:3px;vertical-align:middle;margin-right:6px;"></span>';
+    var boxOpen   = '<span style="display:inline-block;width:14px;height:14px;border:1.5px solid #333;border-radius:3px;vertical-align:middle;margin-right:6px;"></span>';
+    var boxDone   = '<span style="display:inline-block;width:14px;height:14px;border:1.5px solid #333;border-radius:3px;vertical-align:middle;margin-right:6px;text-align:center;line-height:12px;font-weight:700;">&#10007;</span>';
+    var mkbox = function(on){ return on ? boxDone : boxOpen; };
     var blankLines = function(n){ var s=''; for(var i=0;i<n;i++){ s+='<div style="height:22px;border-bottom:1px solid #c9c9c9;"></div>'; } return s; };
 
-    var checklistRows = items.length
-      ? items.map(function(it,i){
+    // Use the SAME item filter as the Work Order tab (_sowRenderWorkOrderItems)
+    // so the done-state indices in woDoneIH line up with the rows printed here.
+    var woItemsIH = items.filter(function(it){ return it.category || it.description; });
+    var checklistRows = woItemsIH.length
+      ? woItemsIH.map(function(it,i){
+          var doneCell = woDoneIH[i]
+            ? '<span style="display:inline-block;width:16px;height:16px;border:1.5px solid #333;border-radius:3px;text-align:center;line-height:14px;font-weight:700;">&#10007;</span>'
+            : '<span style="display:inline-block;width:16px;height:16px;border:1.5px solid #333;border-radius:3px;"></span>';
           return '<tr style="'+(i%2===1?'background:var(--bg);':'')+'">'
-            +'<td style="padding:9px 10px;border-bottom:1px solid var(--border);width:34px;text-align:center;">'
-              +'<span style="display:inline-block;width:16px;height:16px;border:1.5px solid #333;border-radius:3px;"></span></td>'
-            +'<td style="padding:9px 10px;border-bottom:1px solid var(--border);font-size:10px;color:var(--text);width:150px;">'+esc(it.category||'—')+'</td>'
-            +'<td style="padding:9px 10px;border-bottom:1px solid var(--border);font-size:10px;color:var(--text);">'+esc(it.description||'—')+'</td>'
+            +'<td style="padding:9px 10px;border-bottom:1px solid var(--border);width:34px;text-align:center;">'+doneCell+'</td>'
+            +'<td style="padding:9px 10px;border-bottom:1px solid var(--border);font-size:10px;color:var(--text);width:150px;'+(woDoneIH[i]?'font-weight:700;':'')+'">'+esc(it.category||'—')+'</td>'
+            +'<td style="padding:9px 10px;border-bottom:1px solid var(--border);font-size:10px;color:var(--text);'+(woDoneIH[i]?'font-weight:700;':'')+'">'+esc(it.description||'—')+'</td>'
             +'</tr>';
         }).join('')
       : '<tr><td colspan="3" style="padding:10px;font-size:10px;color:var(--muted);font-style:italic;">No line items - describe the work in the Notes section below.</td></tr>';
@@ -3494,16 +3507,19 @@ function printWorkOrder(){
       +'</tbody></table>'
       // Measurements
       +'<div class="section-title">Measurements</div>'
-      +'<div class="section-body"><div style="font-size:9px;color:#666;margin-bottom:8px;">Record measurements taken on site (rooms, openings, materials).</div>'
-        +blankLines(4)
+      +'<div class="section-body">'
+        +(woIH.measurements
+            ? '<div style="font-size:10px;color:var(--text);white-space:pre-wrap;">'+esc(woIH.measurements)+'</div>'
+            : '<div style="font-size:9px;color:#666;margin-bottom:8px;">Record measurements taken on site (rooms, openings, materials).</div>'+blankLines(4))
       +'</div>'
       // Materials
       +'<div class="section-title">Materials</div>'
       +'<div class="section-body">'
-        +'<div class="chk-line"><span>Materials required?</span><span>'+chkbox+'Yes</span><span>'+chkbox+'No</span></div>'
-        +'<div class="chk-line"><span>Materials ordered?</span><span>'+chkbox+'Yes</span><span>'+chkbox+'No</span><span>'+chkbox+'N/A</span></div>'
-        +'<div style="font-size:9px;color:#666;margin:10px 0 6px;">List materials needed / ordered and the order date:</div>'
-        +blankLines(3)
+        +'<div class="chk-line"><span>Materials required?</span><span>'+mkbox(woIH.materialsRequired)+'Yes</span><span>'+mkbox(!woIH.materialsRequired)+'No</span></div>'
+        +'<div class="chk-line"><span>Materials ordered?</span><span>'+mkbox(woIH.materialsOrdered)+'Yes</span><span>'+mkbox(!woIH.materialsOrdered && woIH.materialsRequired)+'No</span><span>'+mkbox(!woIH.materialsRequired)+'N/A</span></div>'
+        +(woIH.materialsList
+            ? '<div style="font-size:10px;color:var(--text);white-space:pre-wrap;margin-top:8px;">'+esc(woIH.materialsList)+'</div>'
+            : '<div style="font-size:9px;color:#666;margin:10px 0 6px;">List materials needed / ordered and the order date:</div>'+blankLines(3))
       +'</div>'
       // Field employee notes
       +'<div class="section-title">Field Employee Notes</div>'
@@ -5496,6 +5512,14 @@ function resetSow(){
   // Clear attached files
   window._sowFiles = [];
   if (typeof renderSowFiles === 'function') renderSowFiles();
+  // Clear the Work Order (execution) block for a brand-new request.
+  ['sow_wo_measurements','sow_wo_materials','sow_wo_field_notes'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  ['sow_wo_mat_required','sow_wo_mat_ordered'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.checked=false;
+  });
+  if (typeof _sowPopulateWorkOrder === 'function') _sowPopulateWorkOrder(null);
 }
 function rpAddNewContractor() {
   var dd = document.getElementById('rp_ct_dropdown');

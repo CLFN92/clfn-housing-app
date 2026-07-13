@@ -2074,17 +2074,25 @@ async function _generateWorkOrderPdfBase64() {
     // ── In-house crew checklist (printable field form) ─────────────────────
     // Small drawing helpers scoped to this branch so they can't collide with
     // the contractor path's own signature box below.
-    var woCheckbox = function(label) {
+    var woCheckbox = function(label, done) {
       var lines = pdf.splitTextToSize(String(label), contentW - 8);
       needSpace(Math.max(lines.length * 4, 5) + 2);
       pdf.setDrawColor(120); pdf.setLineWidth(0.3);
       pdf.rect(marginL, ctx.y, 4, 4);
+      if (done) {
+        // Draw an X to mark the item complete.
+        pdf.setLineWidth(0.5);
+        pdf.line(marginL + 0.7, ctx.y + 0.7, marginL + 3.3, ctx.y + 3.3);
+        pdf.line(marginL + 3.3, ctx.y + 0.7, marginL + 0.7, ctx.y + 3.3);
+      }
       pdf.setDrawColor(0);
-      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(20);
+      pdf.setFont('helvetica', done ? 'bold' : 'normal'); pdf.setFontSize(9); pdf.setTextColor(20);
       pdf.text(lines, marginL + 6, ctx.y + 3.2);
+      pdf.setFont('helvetica', 'normal');
       ctx.y += Math.max(lines.length * 4, 5) + 2;
       pdf.setTextColor(0);
     };
+    // options: array of { label, checked } — draws a box per option, X'd when checked.
     var woInlineChecks = function(label, options) {
       needSpace(7);
       pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(20);
@@ -2093,9 +2101,14 @@ async function _generateWorkOrderPdfBase64() {
       options.forEach(function(op) {
         pdf.setDrawColor(120); pdf.setLineWidth(0.3);
         pdf.rect(x, ctx.y, 4, 4);
+        if (op.checked) {
+          pdf.setLineWidth(0.5);
+          pdf.line(x + 0.7, ctx.y + 0.7, x + 3.3, ctx.y + 3.3);
+          pdf.line(x + 3.3, ctx.y + 0.7, x + 0.7, ctx.y + 3.3);
+        }
         pdf.setDrawColor(0);
-        pdf.text(op, x + 6, ctx.y + 3.2);
-        x += 6 + pdf.getTextWidth(op) + 9;
+        pdf.text(op.label, x + 6, ctx.y + 3.2);
+        x += 6 + pdf.getTextWidth(op.label) + 9;
       });
       ctx.y += 7;
       pdf.setTextColor(0);
@@ -2122,13 +2135,20 @@ async function _generateWorkOrderPdfBase64() {
       pdf.setDrawColor(0); pdf.setTextColor(0);
     };
 
+    // Captured Work Order (execution) data — filled in the app on the Work
+    // Order tab by field OR office staff. Falls back to a blank fill-in form
+    // when nothing has been entered yet.
+    var wo = (typeof _sowCollectWorkOrder === 'function') ? _sowCollectWorkOrder() : {};
+    wo = wo || {};
+    var woDone = wo.itemsDone || {};
+
     sectionHeader('Work Checklist');
-    paragraph('Check off each item as the work is completed on site.', 8);
+    paragraph('Items checked are complete; unchecked remain outstanding.', 8);
     var woItems = (typeof collectSowItems === 'function') ? collectSowItems() : [];
     var woFiltered = woItems.filter(function(it){ return it.category || it.description; });
     if (woFiltered.length) {
-      woFiltered.forEach(function(it){
-        woCheckbox((it.category ? it.category + ' - ' : '') + (it.description || 'Item'));
+      woFiltered.forEach(function(it, i){
+        woCheckbox((it.category ? it.category + ' - ' : '') + (it.description || 'Item'), !!woDone[i]);
       });
     } else {
       woCheckbox('(No line items listed - describe the work in Notes below.)');
@@ -2136,19 +2156,27 @@ async function _generateWorkOrderPdfBase64() {
     gap();
 
     sectionHeader('Measurements');
-    paragraph('Record measurements taken on site (rooms, openings, materials).', 8);
-    woBlankLines(4);
+    if (wo.measurements) {
+      paragraph(wo.measurements);
+    } else {
+      paragraph('Record measurements taken on site (rooms, openings, materials).', 8);
+      woBlankLines(4);
+    }
     gap();
 
     sectionHeader('Materials');
-    woInlineChecks('Materials required?', ['Yes', 'No']);
-    woInlineChecks('Materials ordered?',  ['Yes', 'No', 'N/A']);
-    paragraph('List materials needed / ordered and the order date:', 8);
-    woBlankLines(3);
+    woInlineChecks('Materials required?', [{label:'Yes', checked:!!wo.materialsRequired}, {label:'No', checked:!wo.materialsRequired}]);
+    woInlineChecks('Materials ordered?',  [{label:'Yes', checked:!!wo.materialsOrdered}, {label:'No', checked:!wo.materialsOrdered && !!wo.materialsRequired}, {label:'N/A', checked:!wo.materialsRequired}]);
+    if (wo.materialsList) {
+      paragraph(wo.materialsList);
+    } else {
+      paragraph('List materials needed / ordered and the order date:', 8);
+      woBlankLines(3);
+    }
     gap();
 
     sectionHeader('Field Employee Notes');
-    var _feNotes = fld('sow_notes');
+    var _feNotes = wo.fieldNotes || '';
     if (_feNotes) paragraph(_feNotes);
     woBlankLines(_feNotes ? 2 : 4);
     gap();
