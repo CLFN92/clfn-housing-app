@@ -198,10 +198,10 @@ var EMAIL_EVENT_REGISTRY = [
   {
     key:                   'sow_assigned_to_field_employee',
     label:                 'Work Order Assigned to Field Employee',
-    description:           'Sent to the assigned in-house field employee when a maintenance request is submitted with them assigned. Goes to the employee\'s email on file (silent skip if none).',
+    description:           'Sent to the assigned in-house field employee (and CC\'d to the Housing Manager) when a maintenance request is submitted with them assigned. The printable in-house Work Order checklist PDF is attached. Goes to the employee\'s email on file (silent skip if none).',
     recipientType:         'field_employee',
     defaultRecipientRoles: [],
-    defaultCcRoles:        [],
+    defaultCcRoles:        ['housing_manager'],
     wired:                 true,
     placeholders:          ['employeeName','unitAddress','projectNumber','tenantName','totalCost','startDate','endDate','nationShort','appLink'],
     defaults: {
@@ -2046,16 +2046,122 @@ async function _generateWorkOrderPdfBase64() {
   pdf.setTextColor(0);
   ctx.y += 6;
 
+  // In-house crew work orders print as a field checklist (no pricing, no terms);
+  // contractor work orders keep quoted prices + a work-authorization notice.
+  // Team is read from the (still-mounted) modal field.
+  var _teamEl = document.getElementById('sow_assigned_team');
+  var inHouse = !!(_teamEl && _teamEl.value === 'in_house');
+  function _woAssigneeName() {
+    var s = document.getElementById('sow_assigned_to');
+    if (!s) return '';
+    var o = s.options[s.selectedIndex];
+    return (o && o.getAttribute('data-name')) || '';
+  }
+
   // Project Information
   sectionHeader('Project Information');
   row('Unit Address',     unitAddr);
   row('Tenant',           fld('sow_tenant_name'));
-  row('Contractor',       fld('sow_contractor'));
+  if (inHouse) row('Assigned To', _woAssigneeName() || fld('sow_contractor'));
+  else         row('Contractor',  fld('sow_contractor'));
   row('Issued By',        fld('sow_prepared_by'));
   row('Start Date',       fld('sow_start_date'));
   row('Completion Date',  fld('sow_end_date'));
   row('Project Number',   projNum);
   gap();
+
+  if (inHouse) {
+    // ── In-house crew checklist (printable field form) ─────────────────────
+    // Small drawing helpers scoped to this branch so they can't collide with
+    // the contractor path's own signature box below.
+    var woCheckbox = function(label) {
+      var lines = pdf.splitTextToSize(String(label), contentW - 8);
+      needSpace(Math.max(lines.length * 4, 5) + 2);
+      pdf.setDrawColor(120); pdf.setLineWidth(0.3);
+      pdf.rect(marginL, ctx.y, 4, 4);
+      pdf.setDrawColor(0);
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(20);
+      pdf.text(lines, marginL + 6, ctx.y + 3.2);
+      ctx.y += Math.max(lines.length * 4, 5) + 2;
+      pdf.setTextColor(0);
+    };
+    var woInlineChecks = function(label, options) {
+      needSpace(7);
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(20);
+      pdf.text(String(label), marginL, ctx.y + 3.2);
+      var x = marginL + 72;
+      options.forEach(function(op) {
+        pdf.setDrawColor(120); pdf.setLineWidth(0.3);
+        pdf.rect(x, ctx.y, 4, 4);
+        pdf.setDrawColor(0);
+        pdf.text(op, x + 6, ctx.y + 3.2);
+        x += 6 + pdf.getTextWidth(op) + 9;
+      });
+      ctx.y += 7;
+      pdf.setTextColor(0);
+    };
+    var woBlankLines = function(n) {
+      n = n || 3;
+      for (var i = 0; i < n; i++) {
+        needSpace(7);
+        pdf.setDrawColor(205); pdf.setLineWidth(0.2);
+        pdf.line(marginL, ctx.y + 5, pageW - marginR, ctx.y + 5);
+        pdf.setDrawColor(0);
+        ctx.y += 7;
+      }
+    };
+    var woSigBox = function(x, sigW, role) {
+      pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(60);
+      pdf.text(role, x, ctx.y + 4);
+      pdf.setDrawColor(160); pdf.setLineWidth(0.3);
+      pdf.line(x, ctx.y + 16, x + sigW, ctx.y + 16);
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(120);
+      pdf.text('Signature', x, ctx.y + 20);
+      pdf.text('Date: ____________', x + sigW, ctx.y + 20, { align: 'right' });
+      pdf.text('Print name: ____________________________', x, ctx.y + 25);
+      pdf.setDrawColor(0); pdf.setTextColor(0);
+    };
+
+    sectionHeader('Work Checklist');
+    paragraph('Check off each item as the work is completed on site.', 8);
+    var woItems = (typeof collectSowItems === 'function') ? collectSowItems() : [];
+    var woFiltered = woItems.filter(function(it){ return it.category || it.description; });
+    if (woFiltered.length) {
+      woFiltered.forEach(function(it){
+        woCheckbox((it.category ? it.category + ' - ' : '') + (it.description || 'Item'));
+      });
+    } else {
+      woCheckbox('(No line items listed - describe the work in Notes below.)');
+    }
+    gap();
+
+    sectionHeader('Measurements');
+    paragraph('Record measurements taken on site (rooms, openings, materials).', 8);
+    woBlankLines(4);
+    gap();
+
+    sectionHeader('Materials');
+    woInlineChecks('Materials required?', ['Yes', 'No']);
+    woInlineChecks('Materials ordered?',  ['Yes', 'No', 'N/A']);
+    paragraph('List materials needed / ordered and the order date:', 8);
+    woBlankLines(3);
+    gap();
+
+    sectionHeader('Field Employee Notes');
+    var _feNotes = fld('sow_notes');
+    if (_feNotes) paragraph(_feNotes);
+    woBlankLines(_feNotes ? 2 : 4);
+    gap();
+
+    sectionHeader('Completion Sign-Off');
+    var _sgGap = 6, _sgW = (contentW - _sgGap) / 2;
+    needSpace(30);
+    woSigBox(marginL,                   _sgW, 'Field Employee');
+    woSigBox(marginL + _sgW + _sgGap,   _sgW, (short ? short + ' ' : '') + 'Housing - Supervisor');
+    ctx.y += 30;
+
+    return ctx.finish();
+  }
 
   // Scope of Work — use quoted price when available, fall back to estimate.
   sectionHeader('Maintenance Request');
@@ -2283,12 +2389,41 @@ async function notifyWorkOrderToFieldEmployee(sow, unit) {
   }
   var rendered = _renderEmailTemplate(eventKey, _emailTokensForFieldWorkOrder(sow, unit));
   if (!rendered) return;
+
+  // Attach the in-house Work Order PDF (checklist form) so the crew and the
+  // Housing Manager receive the printable form, not just a notice. Best-effort:
+  // if generation fails the email still sends with a short note. The SOW modal
+  // is still mounted (closeSowModal only hides it), so the generator's DOM
+  // reads resolve to the in-house checklist variant.
+  var attachments = null;
+  var bodyHtml    = rendered.bodyHtml;
+  if (typeof _generateWorkOrderPdfBase64 === 'function') {
+    try {
+      var pdfBase64 = await _generateWorkOrderPdfBase64();
+      if (pdfBase64) {
+        attachments = [{
+          name:         'Work Order ' + (sow.project_number || 'wo') + '.pdf',
+          contentType:  'application/pdf',
+          contentBytes: pdfBase64
+        }];
+      }
+    } catch (e) {
+      console.warn('[notify] in-house Work Order PDF generation failed, sending without attachment:', e);
+    }
+  }
+  if (!attachments) {
+    bodyHtml += '<p style="color:#888;font-size:12px;font-style:italic;">'
+              + '(Work Order PDF could not be generated automatically. Open the request in the Housing app to print it.)'
+              + '</p>';
+  }
+
   await _sendSerially(emails.map(function(e){ return { email: e }; }), function(rcp){
     return {
       to:          rcp.email,
       to_name:     (rcp.email === to ? (sow.assignedToName || '') : ''),
       subject:     rendered.subject,
-      bodyHtml:    rendered.bodyHtml,
+      bodyHtml:    bodyHtml,
+      attachments: attachments,
       event:       eventKey,
       entity_type: 'sow',
       entity_id:   sow.project_number || '—'

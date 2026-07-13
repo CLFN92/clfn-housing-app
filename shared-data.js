@@ -3401,6 +3401,131 @@ function printWorkOrder(){
   var tenantName = get('sow_tenant_name');
   var _natDisp  = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.name)) || '';
   var _natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || '';
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+
+  // ── In-house crew work order (printable field checklist) ──────────────────
+  // When the request is assigned to the nation's own Housing Department (not a
+  // contractor), print a checklist form for the field employee: no pricing, no
+  // terms/authorization, plus space to check off items, record measurements,
+  // confirm materials, and add notes. Contractor requests fall through to the
+  // priced/authorized work order below.
+  var _woTeamEl = document.getElementById('sow_assigned_team');
+  if (_woTeamEl && _woTeamEl.value === 'in_house') {
+    var projNumIH = (window._sowEditingProjectNumber) || '—';
+    var assigneeIH = (function(){
+      var s = document.getElementById('sow_assigned_to');
+      if (!s) return '';
+      var o = s.options[s.selectedIndex];
+      return (o && o.getAttribute('data-name')) || '';
+    })();
+    var notesIH = get('sow_notes');
+    var logoSrcIH = '';
+    try { var _lg = document.querySelector('.hlogo'); if(_lg && _lg.src) logoSrcIH = _lg.src; } catch(e) {}
+    var chkbox = '<span style="display:inline-block;width:14px;height:14px;border:1.5px solid #333;border-radius:3px;vertical-align:middle;margin-right:6px;"></span>';
+    var blankLines = function(n){ var s=''; for(var i=0;i<n;i++){ s+='<div style="height:22px;border-bottom:1px solid #c9c9c9;"></div>'; } return s; };
+
+    var checklistRows = items.length
+      ? items.map(function(it,i){
+          return '<tr style="'+(i%2===1?'background:var(--bg);':'')+'">'
+            +'<td style="padding:9px 10px;border-bottom:1px solid var(--border);width:34px;text-align:center;">'
+              +'<span style="display:inline-block;width:16px;height:16px;border:1.5px solid #333;border-radius:3px;"></span></td>'
+            +'<td style="padding:9px 10px;border-bottom:1px solid var(--border);font-size:10px;color:var(--text);width:150px;">'+esc(it.category||'—')+'</td>'
+            +'<td style="padding:9px 10px;border-bottom:1px solid var(--border);font-size:10px;color:var(--text);">'+esc(it.description||'—')+'</td>'
+            +'</tr>';
+        }).join('')
+      : '<tr><td colspan="3" style="padding:10px;font-size:10px;color:var(--muted);font-style:italic;">No line items - describe the work in the Notes section below.</td></tr>';
+
+    var htmlIH = '<!DOCTYPE html><html lang="en"><head>'
+      +'<meta charset="UTF-8"/>'
+      +'<title>Work Order - '+esc(_natShort)+' Housing</title>'
+      +'<style>'
+      +_printThemeStyles()
+      +'*{box-sizing:border-box;margin:0;padding:0;}'
+      +'body{font-family:Georgia,serif;font-size:11px;color:var(--text);background:var(--surface);}'
+      +'@page{size:letter portrait;margin:15mm 15mm 18mm 15mm;}'
+      +'@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.no-print{display:none!important;}}'
+      +'.header{background:var(--dark);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;}'
+      +'.org{font-size:13px;font-weight:bold;color:var(--yellow);}'
+      +'.dept{font-size:10px;color:var(--txt-on-dark);margin-top:2px;}'
+      +'.doc-type{font-size:18px;font-weight:bold;color:var(--yellow);letter-spacing:.05em;}'
+      +'.doc-sub{font-size:9px;color:var(--muted);margin-top:3px;}'
+      +'.yellow-bar{background:#F8E41A;height:4px;}'
+      +'.section-title{font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#fff;background:var(--dark);padding:5px 10px;margin-top:16px;}'
+      +'.section-body{border:1px solid var(--border);border-top:none;padding:12px 14px;}'
+      +'.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;}'
+      +'.field label{display:block;font-size:8px;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;color:#666;margin-bottom:3px;}'
+      +'.field span{display:block;font-size:11px;color:var(--text);border-bottom:1px solid #e0e0e0;padding-bottom:3px;min-height:15px;}'
+      +'table{width:100%;border-collapse:collapse;}'
+      +'th{background:var(--dark);color:var(--yellow);padding:7px 10px;text-align:left;font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;}'
+      +'.chk-line{font-size:10px;color:var(--text);margin:6px 0;display:flex;align-items:center;gap:18px;flex-wrap:wrap;}'
+      +'.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:8px;}'
+      +'.sig-box .role{font-size:8px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;color:#666;margin-bottom:6px;}'
+      +'.sig-box .sig-line{height:48px;border-bottom:1.5px solid #333;margin-bottom:5px;}'
+      +'.sig-box .sig-label{font-size:9px;color:var(--muted);}'
+      +'.footer{margin-top:20px;border-top:3px solid #F8E41A;padding-top:8px;display:flex;justify-content:space-between;font-size:8.5px;color:#666;}'
+      +'</style></head><body>'
+      // Header
+      +'<div class="header">'
+        +'<div style="display:flex;align-items:center;gap:14px;">'
+          +(logoSrcIH?'<img src="'+logoSrcIH+'" style="height:44px;width:auto;" alt="'+esc(_natShort)+'"/>':'')
+          +'<div><div class="org">'+esc(_natDisp)+'</div><div class="dept">Housing Department</div></div>'
+        +'</div>'
+        +'<div style="text-align:right;"><div class="doc-type">WORK ORDER</div><div class="doc-sub">'+esc(projNumIH)+' &middot; '+today+'</div></div>'
+      +'</div>'
+      +'<div class="yellow-bar"></div>'
+      // Project info
+      +'<div class="section-title">Project Information</div>'
+      +'<div class="section-body">'
+        +'<div class="grid-2">'
+          +'<div class="field"><label>Unit Address</label><span>'+esc(address||'—')+'</span></div>'
+          +'<div class="field"><label>Tenant</label><span>'+esc(tenantName||'—')+'</span></div>'
+          +'<div class="field"><label>Assigned To</label><span>'+esc(assigneeIH||_natShort+' Housing Department')+'</span></div>'
+          +'<div class="field"><label>Issued By</label><span>'+esc(preparedBy||'—')+'</span></div>'
+          +'<div class="field"><label>Start Date</label><span>'+esc(startDate||'—')+'</span></div>'
+          +'<div class="field"><label>Target Completion</label><span>'+esc(endDate||'—')+'</span></div>'
+        +'</div>'
+      +'</div>'
+      // Work checklist
+      +'<div class="section-title">Work Checklist</div>'
+      +'<table><thead><tr>'
+        +'<th style="width:34px;">Done</th><th style="width:150px;">Category</th><th>Description of Work</th>'
+      +'</tr></thead><tbody>'
+      +checklistRows
+      +'</tbody></table>'
+      // Measurements
+      +'<div class="section-title">Measurements</div>'
+      +'<div class="section-body"><div style="font-size:9px;color:#666;margin-bottom:8px;">Record measurements taken on site (rooms, openings, materials).</div>'
+        +blankLines(4)
+      +'</div>'
+      // Materials
+      +'<div class="section-title">Materials</div>'
+      +'<div class="section-body">'
+        +'<div class="chk-line"><span>Materials required?</span><span>'+chkbox+'Yes</span><span>'+chkbox+'No</span></div>'
+        +'<div class="chk-line"><span>Materials ordered?</span><span>'+chkbox+'Yes</span><span>'+chkbox+'No</span><span>'+chkbox+'N/A</span></div>'
+        +'<div style="font-size:9px;color:#666;margin:10px 0 6px;">List materials needed / ordered and the order date:</div>'
+        +blankLines(3)
+      +'</div>'
+      // Field employee notes
+      +'<div class="section-title">Field Employee Notes</div>'
+      +'<div class="section-body">'
+        +(notesIH?'<div style="font-size:10px;color:var(--text);white-space:pre-wrap;margin-bottom:8px;">'+esc(notesIH)+'</div>':'')
+        +blankLines(notesIH?2:4)
+      +'</div>'
+      // Completion sign-off (no terms/authorization for in-house crew)
+      +'<div class="section-title">Completion Sign-Off</div>'
+      +'<div class="section-body">'
+        +'<div class="sig-grid">'
+          +'<div class="sig-box"><div class="role">Field Employee</div><div class="sig-line"></div><div class="sig-label">Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date: ____________</div><div style="margin-top:8px;font-size:9px;color:var(--muted);">Print name: ____________________________</div></div>'
+          +'<div class="sig-box"><div class="role">'+esc(_natShort)+' Housing - Supervisor</div><div class="sig-line"></div><div class="sig-label">Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date: ____________</div><div style="margin-top:8px;font-size:9px;color:var(--muted);">Print name: ____________________________</div></div>'
+        +'</div>'
+      +'</div>'
+      +'<div class="footer"><span>'+escapeHtml(buildNationFooterStrip({ suffix: "Work Order", includeConfidential: false }))+'</span><span>Generated: '+today+'</span></div>'
+      +'</body></html>';
+
+    var wIH = window.open('','_blank');
+    if(wIH){ wIH.document.write(htmlIH); wIH.document.close(); setTimeout(function(){ wIH.print(); }, 400); }
+    return;
+  }
 
   // Quote total — use contractor quote if available, else blank
   var quoteTotal = 0;
