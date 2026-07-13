@@ -4502,6 +4502,47 @@ function renderRenosView(){
       (_rvTopCats[2] ? _rvKpiCard(_rvTopCats[2], _rvCatCounts[_rvTopCats[2]], _rvCatMeta(_rvTopCats[2])) : '');
   }
 
+  // ── List / Cards toggle ──────────────────────────────────────
+  var _rnMode = (typeof _viewMode === 'function') ? _viewMode('renovations') : 'list';
+  var _rnToggleEl = document.getElementById('rv_view_toggle');
+  if (_rnToggleEl && typeof _viewToggleHtml === 'function') _rnToggleEl.innerHTML = _viewToggleHtml('renovations', '_renosSetView');
+  var _rnTableWrap = document.getElementById('renos_table_wrap');
+  var _rnCardsEl   = document.getElementById('renos_cards');
+  if (_rnTableWrap) _rnTableWrap.style.display = (_rnMode === 'cards') ? 'none' : '';
+  if (_rnCardsEl)   _rnCardsEl.style.display   = (_rnMode === 'cards') ? '' : 'none';
+  if (_rnMode === 'cards' && _rnCardsEl && typeof _cardGrid === 'function') {
+    var _rnEsc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+    if (!_renosRows.length) {
+      _rnCardsEl.innerHTML = '<div class="card" style="text-align:center;padding:40px;color:var(--muted);">No units match the current filters.</div>';
+    } else {
+      _rnCardsEl.innerHTML = _cardGrid(_renosRows.map(function(u){
+        var isCondemned = u.status === 'condemned';
+        var sow = getSowData(u.id);
+        var prog = getRenoProgress(u.id);
+        var pct = prog.overallPct || 0;
+        var uid = String(u.id).replace(/'/g,"\\'");
+        var _rs = calcRenoScore(u.id).score;
+        var _tier = _rs>=40?{l:'Critical',c:'#b91c1c',bg:'#fef2f2'}:_rs>=25?{l:'High',c:'#7a6000',bg:'#fef9ec'}:_rs>=12?{l:'Medium',c:'#1d4ed8',bg:'#eff6ff'}:{l:'Low',c:'#15803d',bg:'#f0fdf4'};
+        return _cardTile({
+          title: _rnEsc(((u.num||'')+' '+(u.street||'')).trim()),
+          pill: isCondemned ? {text:'🚫 Condemned', bg:'var(--danger-bg)', color:'var(--danger)'} : {text:'🔨 Under Repair', bg:'var(--warn-amber-bg)', color:'var(--warn-amber)'},
+          badges: ['<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+_tier.bg+';color:'+_tier.c+';">'+_rs+' · '+_tier.l+'</span>'],
+          metas: [
+            {k:'Beds',       v: u.bedrooms},
+            {k:'Progress',   v: sow ? ((prog.status||'No updates yet')+(pct?' — '+pct+'%':'')) : 'No request filed'},
+            {k:'Contractor', v: _rnEsc((sow&&sow.contractor) || '—')}
+          ],
+          open: "openRenoProgress('"+uid+"')",
+          actions: [
+            {text:'🔨 Request',  onclick:"event.stopPropagation();openSowModal('"+uid+"')", ghost:true},
+            {text:'📊 Progress', onclick:"event.stopPropagation();openRenoProgress('"+uid+"')"}
+          ]
+        });
+      }).join(''));
+    }
+    return;
+  }
+
   var tbody = document.getElementById('renos_tbody');
   if(!tbody) return;
 
@@ -4552,6 +4593,10 @@ function renderRenosView(){
   if (typeof tableBindColumnMenuClicks === 'function')   tableBindColumnMenuClicks(_renosThead, 'renos');
   if (typeof tableRefreshSortIndicators === 'function') tableRefreshSortIndicators(_renosThead, 'renos');
 }
+window._renosSetView = function(v){
+  try { localStorage.setItem('clfn_renovations_view', v === 'cards' ? 'cards' : 'list'); } catch(e){}
+  if (typeof renderRenosView === 'function') renderRenosView();
+};
 
 function renderSowAuditLog(unitId) {
   var tbody = document.getElementById('sow_audit_tbody');
