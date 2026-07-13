@@ -221,12 +221,12 @@ function _buildSowModalHTML() {
       '<div class="tic-tabs" id="sow_tab_bar" role="tablist">' +
         '<button type="button" class="tic-tab tic-active" data-modal-tab="overview"  onclick="setSowTab(\'overview\')"  role="tab">Overview</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="scope"     onclick="setSowTab(\'scope\')"     role="tab">Work Items</button>' +
+        '<button type="button" class="tic-tab"            data-modal-tab="workorder" onclick="setSowTab(\'workorder\')" role="tab">Work Order</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="documents" onclick="setSowTab(\'documents\')" role="tab">Documents</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="safety"    onclick="setSowTab(\'safety\')"    role="tab">Health &amp; Safety</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="acct"      onclick="setSowTab(\'acct\')"      role="tab">Accountability</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="notes"     onclick="setSowTab(\'notes\')"     role="tab">Notes &amp; Terms</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="sigs"      onclick="setSowTab(\'sigs\')"      role="tab">Signatures</button>' +
-        '<button type="button" class="tic-tab"            data-modal-tab="workorder" onclick="setSowTab(\'workorder\')" role="tab">Work Order</button>' +
       '</div>' +
 
       // ── Body / tab panels ────────────────────────────────────────────────
@@ -1061,24 +1061,26 @@ async function _sowPromptWorkOrderEmail(){
       var hmLabel = (window.CLFN_PERMS && CLFN_PERMS.roleLabel) ? CLFN_PERMS.roleLabel('housing_manager') : 'Housing Manager';
       var r = await showConfirm({
         title:'Email Work Order?',
-        message:'Send this work order (PDF attached) to the assigned employee and the ' + hmLabel + '?',
-        detail:'<div style="font-size:14px;font-weight:700;color:var(--text);">' + _esc(who) + '</div>'
-             + '<div style="font-size:12px;color:var(--muted);margin-top:3px;">&#128231; ' + _esc(sow.assignedTo) + '</div>',
-        confirmText:'Send Email', cancelText:'Skip'
+        message:'Send this work order (PDF attached) to the assigned employee and the ' + hmLabel + '? Uncheck to skip sending.',
+        confirmText:'Send Email', cancelText:'Cancel',
+        checkbox:{ label: _esc(who) + ' (' + _esc(sow.assignedTo) + ') + ' + _esc(hmLabel), defaultChecked:true }
       });
-      if((typeof r === 'object' && r) ? r.ok : r) notifyWorkOrderToFieldEmployee(sow, unit);
+      var ok  = (typeof r === 'object' && r) ? r.ok : r;
+      var snd = (typeof r === 'object' && r) ? r.checked : false;
+      if(ok && snd) notifyWorkOrderToFieldEmployee(sow, unit);
     } else if(sow.contractorId){
       if(typeof notifyWorkOrderToContractor !== 'function' || typeof _resolveContractorForEmail !== 'function') return;
       var ct = await _resolveContractorForEmail(sow.contractorId);
       if(!ct || !ct.email){ if(typeof showToast === 'function') showToast('No contractor email on file.'); return; }
       var r2 = await showConfirm({
         title:'Email Work Order?',
-        message:'Send this work order (PDF attached) to the assigned contractor?',
-        detail:'<div style="font-size:14px;font-weight:700;color:var(--text);">' + _esc(ct.name) + '</div>'
-             + '<div style="font-size:12px;color:var(--muted);margin-top:3px;">&#128231; ' + _esc(ct.email) + '</div>',
-        confirmText:'Send Email', cancelText:'Skip'
+        message:'Send this work order (PDF attached) to the assigned contractor? Uncheck to skip sending.',
+        confirmText:'Send Email', cancelText:'Cancel',
+        checkbox:{ label: _esc(ct.name || 'Contractor') + ' (' + _esc(ct.email) + ')', defaultChecked:true }
       });
-      if((typeof r2 === 'object' && r2) ? r2.ok : r2) notifyWorkOrderToContractor(sow, unit, ct);
+      var ok2  = (typeof r2 === 'object' && r2) ? r2.ok : r2;
+      var snd2 = (typeof r2 === 'object' && r2) ? r2.checked : false;
+      if(ok2 && snd2) notifyWorkOrderToContractor(sow, unit, ct);
     } else {
       if(typeof showToast === 'function') showToast('Assign this request to a contractor or employee to email the work order.');
     }
@@ -1110,12 +1112,13 @@ async function _sowPromptTenantEmail(){
     var tenantName = unit.assignedName || 'the tenant';
     var r = await showConfirm({
       title:'Email Tenant Copy?',
-      message:'Email a PDF copy of this maintenance request to the tenant?',
-      detail:'<div style="font-size:14px;font-weight:700;color:var(--text);">' + _esc(tenantName) + '</div>'
-           + '<div style="font-size:12px;color:var(--muted);margin-top:3px;">&#128231; ' + _esc(email) + '</div>',
-      confirmText:'Send Email', cancelText:'Skip'
+      message:'Email a PDF copy of this maintenance request to the tenant? Uncheck to skip sending.',
+      confirmText:'Send Email', cancelText:'Cancel',
+      checkbox:{ label: _esc(tenantName) + ' (' + _esc(email) + ')', defaultChecked:true }
     });
-    if((typeof r === 'object' && r) ? r.ok : r) notifySowTenantCopy(sow, unit);
+    var ok  = (typeof r === 'object' && r) ? r.ok : r;
+    var snd = (typeof r === 'object' && r) ? r.checked : false;
+    if(ok && snd) notifySowTenantCopy(sow, unit);
   }catch(e){ console.warn('[sow] tenant-copy email prompt threw:', e); }
 }
 window._sowPromptTenantEmail = _sowPromptTenantEmail;

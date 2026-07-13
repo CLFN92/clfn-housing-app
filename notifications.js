@@ -1678,17 +1678,23 @@ async function _resolveTenantEmailForUnit(unit) {
   if (!unit || !unit.assignedName) return '';
   if (typeof SUPABASE_URL === 'undefined' || typeof HOUSING_HEADERS === 'undefined') return '';
   try {
+    // Mirror the TIC's tenant resolution: exclude merged-away duplicate rows
+    // (merged_into=is.null). The old query omitted that filter and blindly took
+    // rows[0], so a duplicate/blank tenant row could hide the real email the TIC
+    // shows. Pick the first non-merged row that actually has an email.
     var url = SUPABASE_URL
-            + '/rest/v1/tenants?select=email&full_name=eq.'
-            + encodeURIComponent(unit.assignedName);
+            + '/rest/v1/tenants?select=email,merged_into&full_name=eq.'
+            + encodeURIComponent(unit.assignedName)
+            + '&merged_into=is.null';
     var r = await fetch(url, { headers: HOUSING_HEADERS });
     if (!r.ok) {
       console.warn('[notify] tenant email lookup HTTP ' + r.status);
       return '';
     }
     var rows = await r.json();
-    var email = (rows && rows[0] && rows[0].email) || '';
-    return String(email || '').trim();
+    if (!Array.isArray(rows)) return '';
+    var pick = rows.find(function(t){ return t && t.email && String(t.email).trim(); });
+    return pick ? String(pick.email).trim() : '';
   } catch (e) {
     console.warn('[notify] tenant email lookup error:', e);
     return '';
