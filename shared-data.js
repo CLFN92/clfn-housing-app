@@ -1430,11 +1430,11 @@ function bcrLookup(name) {
 window.bcrLookup = bcrLookup;
 window.isBcrd = function (name) { return !!bcrLookup(name); };
 
-async function sbAddBcr(fullName, bcrdDate, reason) {
+async function sbAddBcr(fullName, bcrdDate, reason, dateOfBirth) {
   var actor = (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || '';
   var body = {
     full_name: (fullName || '').trim(), bcrd_date: bcrdDate || null,
-    reason: reason || null, active: true, created_by: actor
+    reason: reason || null, date_of_birth: dateOfBirth || null, active: true, created_by: actor
   };
   if (!body.full_name) throw new Error('A name is required.');
   var r = await fetch(SUPABASE_URL + '/rest/v1/bcr_registry', {
@@ -1486,12 +1486,19 @@ window.openBcrManager = function(prefillName){
     +   '<button class="modal-close" onclick="var m=document.getElementById(\'modalBcrManager\');if(m)m.remove();">&#x2715;</button>'
     + '</div>'
     + '<div class="modal-body" style="padding:18px 20px;">'
-    +   '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">'
+    +   '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">'
     +     '<div style="flex:1;min-width:150px;"><label class="tic-field-lbl">Full name</label><input id="bcr_name" type="text" class="tic-input" placeholder="First Last"/></div>'
+    +     '<div><label class="tic-field-lbl">Date of birth</label><input id="bcr_dob" type="date" class="tic-input"/></div>'
     +     '<div><label class="tic-field-lbl">BCR date</label><input id="bcr_date" type="date" class="tic-input"/></div>'
+    +   '</div>'
+    +   '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;">'
     +     '<div style="flex:1;min-width:150px;"><label class="tic-field-lbl">Reason (optional)</label><input id="bcr_reason" type="text" class="tic-input" placeholder="e.g. BCR 2026-014"/></div>'
     +     '<button class="btn btn-primary" onclick="_bcrAddSubmit()">+ Add</button>'
     +   '</div>'
+    +   '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:16px;cursor:pointer;">'
+    +     '<input id="bcr_harbouring" type="checkbox" onchange="_bcrHarbouringToggle(this)"/>'
+    +     'Evicted for harbouring (housing/sheltering someone already on this list)'
+    +   '</label>'
     +   '<div id="bcr_list"></div>'
     + '</div>'
     + '</div>';
@@ -1509,19 +1516,37 @@ function _bcrRenderList(){
   el.innerHTML = list.map(function(b){
     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">'
       + '<div><div style="font-weight:700;font-size:13px;">' + _bcrEsc(b.full_name||'') + '</div>'
-      + '<div style="font-size:11px;color:var(--muted);">BCR&#39;d' + (b.bcrd_date ? ' ' + _bcrEsc(b.bcrd_date) : '') + (b.reason ? ' &middot; ' + _bcrEsc(b.reason) : '') + '</div></div>'
+      + '<div style="font-size:11px;color:var(--muted);">' + (b.date_of_birth ? 'DOB ' + _bcrEsc(b.date_of_birth) + ' &middot; ' : '') + 'BCR&#39;d' + (b.bcrd_date ? ' ' + _bcrEsc(b.bcrd_date) : '') + (b.reason ? ' &middot; ' + _bcrEsc(b.reason) : '') + '</div></div>'
       + '<button class="btn btn-ghost" style="font-size:12px;" onclick="_bcrLift(\'' + _bcrEsc(b.id) + '\')">Lift</button>'
       + '</div>';
   }).join('');
 }
 
+// Toggling the "Evicted for harbouring" checkbox fills the free-text Reason
+// field with a standard phrase, so staff don't need to type it themselves —
+// but only when Reason is empty (won't overwrite something already typed),
+// and unchecking only clears it back out if Reason still exactly matches
+// (so a manually edited reason is never silently wiped).
+var _BCR_HARBOURING_TEXT = 'Evicted for harbouring';
+function _bcrHarbouringToggle(cb){
+  var r = document.getElementById('bcr_reason'); if (!r) return;
+  if (cb.checked) {
+    if (!r.value.trim()) r.value = _BCR_HARBOURING_TEXT;
+  } else if (r.value.trim() === _BCR_HARBOURING_TEXT) {
+    r.value = '';
+  }
+}
+window._bcrHarbouringToggle = _bcrHarbouringToggle;
+
 function _bcrAddSubmit(){
   var name   = (document.getElementById('bcr_name')   || {}).value || '';
+  var dob    = (document.getElementById('bcr_dob')    || {}).value || '';
   var date   = (document.getElementById('bcr_date')   || {}).value || '';
   var reason = (document.getElementById('bcr_reason') || {}).value || '';
   if (!name.trim()) { if (typeof showToast === 'function') showToast('Enter a name.', { type:'error' }); return; }
-  sbAddBcr(name, date, reason).then(function(){
-    ['bcr_name','bcr_date','bcr_reason'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
+  sbAddBcr(name, date, reason, dob).then(function(){
+    ['bcr_name','bcr_dob','bcr_date','bcr_reason'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
+    var hb = document.getElementById('bcr_harbouring'); if (hb) hb.checked = false;
     _bcrRenderList();
     if (typeof showToast === 'function') showToast('Added to BCR list.');
   }).catch(function(e){ if (typeof showToast === 'function') showToast('Add failed: ' + e.message, { type:'error' }); });
