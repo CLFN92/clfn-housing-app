@@ -3390,6 +3390,25 @@ function printContractorAgreement() {
   w.onload = function(){ w.focus(); w.print(); };
 }
 
+// Open an HTML string in a new tab and print it RELIABLY. Printing on a fixed
+// timer (the old pattern) fired window.print() before the popup finished
+// rendering — the browser showed a blank/white page and its print preview
+// retried ("connecting to printer" loop). This waits for the document's load
+// event (with a fallback), and guards against double-printing. Returns the
+// window (or null if a pop-up blocker stopped it).
+function _openAndPrint(html){
+  var w = window.open('', '_blank');
+  if(!w){ if(typeof showToast === 'function') showToast('Please allow pop-ups to print this document.'); return null; }
+  w.document.open(); w.document.write(html); w.document.close();
+  var printed = false;
+  var go = function(){ if(printed) return; printed = true; try { w.focus(); w.print(); } catch(e){} };
+  try { w.onload = go; } catch(e){}
+  // Fallback in case onload already fired (document.write races) or an image stalls.
+  setTimeout(go, 900);
+  return w;
+}
+window._openAndPrint = _openAndPrint;
+
 function printWorkOrder(){
   saveSOW();
   var get = function(id){ var el=document.getElementById(id); return el ? el.value.trim() : ''; };
@@ -3538,8 +3557,9 @@ function printWorkOrder(){
       +'<div class="footer"><span>'+escapeHtml(buildNationFooterStrip({ suffix: "Work Order", includeConfidential: false }))+'</span><span>Generated: '+today+'</span></div>'
       +'</body></html>';
 
-    var wIH = window.open('','_blank');
-    if(wIH){ wIH.document.write(htmlIH); wIH.document.close(); setTimeout(function(){ wIH.print(); }, 400); }
+    _openAndPrint(htmlIH);
+    // Offer to email the work order (contractor or in-house employee + HM).
+    if (typeof _sowPromptWorkOrderEmail === 'function') _sowPromptWorkOrderEmail();
     return;
   }
 
@@ -3669,12 +3689,9 @@ function printWorkOrder(){
     +'<div class="footer"><span>'+escapeHtml(buildNationFooterStrip({ suffix: "Work Order", includeConfidential: false }))+'</span><span>Generated: '+today+'</span></div>'
     +'</body></html>';
 
-  var w = window.open('','_blank');
-  if(w) {
-    w.document.write(html);
-    w.document.close();
-    setTimeout(function(){ w.print(); }, 400);
-  }
+  _openAndPrint(html);
+  // Offer to email the work order to the assigned contractor.
+  if (typeof _sowPromptWorkOrderEmail === 'function') _sowPromptWorkOrderEmail();
 }
 function recalcSowTotal(){
   var total=0;
