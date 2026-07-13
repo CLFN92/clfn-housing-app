@@ -1055,15 +1055,24 @@ async function _sowPromptWorkOrderEmail(){
              ? (getAllUnits().find(function(x){ return x.id === _sowUnitId; }) || null) : null;
     var team = sow.assignedTeam || (sow.contractorId ? 'contractor' : '');
     var _esc = function(s){ return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); };
-    if(team === 'in_house' && sow.assignedTo){
+    if(team === 'in_house'){
+      // In-house: the work order always goes to the Housing Manager; the
+      // selected field employee (if any) is added. The employee is optional.
       if(typeof notifyWorkOrderToFieldEmployee !== 'function') return;
-      var who = sow.assignedToName || sow.assignedTo;
       var hmLabel = (window.CLFN_PERMS && CLFN_PERMS.roleLabel) ? CLFN_PERMS.roleLabel('housing_manager') : 'Housing Manager';
+      var hasEmp = !!(sow.assignedTo && String(sow.assignedTo).trim());
+      var who = sow.assignedToName || sow.assignedTo || '';
+      var msg = hasEmp
+        ? 'Send this work order (PDF attached) to the assigned employee and the ' + hmLabel + '? Uncheck to skip sending.'
+        : 'Send this work order (PDF attached) to the ' + hmLabel + '? Uncheck to skip sending.';
+      var lbl = hasEmp
+        ? (_esc(who) + ' (' + _esc(sow.assignedTo) + ') + ' + _esc(hmLabel))
+        : _esc(hmLabel);
       var r = await showConfirm({
         title:'Email Work Order?',
-        message:'Send this work order (PDF attached) to the assigned employee and the ' + hmLabel + '? Uncheck to skip sending.',
+        message: msg,
         confirmText:'Send Email', cancelText:'Cancel',
-        checkbox:{ label: _esc(who) + ' (' + _esc(sow.assignedTo) + ') + ' + _esc(hmLabel), defaultChecked:true }
+        checkbox:{ label: lbl, defaultChecked:true }
       });
       var ok  = (typeof r === 'object' && r) ? r.ok : r;
       var snd = (typeof r === 'object' && r) ? r.checked : false;

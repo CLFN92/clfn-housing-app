@@ -2404,22 +2404,25 @@ function _emailTokensForFieldWorkOrder(sow, unit) {
   return base;
 }
 
-// Email the assigned in-house field employee that a work order is theirs.
-// Recipient = sow.assignedTo (the field employee's email), plus any CC roles.
-// Silent skip when there's no assignee / invalid email. Fire-and-forget.
+// Email an in-house work order. The assigned field employee (if one is
+// selected) gets it, and the Housing Manager ALWAYS gets it (via the event's
+// CC roles). The employee is optional — the work order still goes out to the
+// Housing Manager when no specific employee is picked. Fire-and-forget.
 async function notifyWorkOrderToFieldEmployee(sow, unit) {
   if (!sow) return;
   var eventKey = 'sow_assigned_to_field_employee';
   var to = (sow.assignedTo || '').trim().toLowerCase();
-  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-    console.log('[notify] sow_assigned_to_field_employee skipped - no assignee email for SOW ' + (sow.project_number || '—'));
-    return;
-  }
-  var seen = {}; var emails = [to]; seen[to] = true;
+  var hasEmployee = !!(to && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to));
+  var seen = {}; var emails = [];
+  if (hasEmployee) { emails.push(to); seen[to] = true; }
   var extraRoles = _emailEventRecipientRoles(eventKey).concat(_emailEventCcRoles(eventKey));
   if (extraRoles.length) {
     var extra = await _resolveActiveStaffForRoles(extraRoles);
     extra.forEach(function(r){ var c = (r.email||'').trim().toLowerCase(); if (c && !seen[c]) { seen[c] = true; emails.push(c); } });
+  }
+  if (!emails.length) {
+    console.log('[notify] sow_assigned_to_field_employee skipped - no employee email and no Housing Manager on file for SOW ' + (sow.project_number || '—'));
+    return;
   }
   var rendered = _renderEmailTemplate(eventKey, _emailTokensForFieldWorkOrder(sow, unit));
   if (!rendered) return;
