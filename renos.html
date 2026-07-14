@@ -879,10 +879,13 @@ function initRenosPage() {
   if(view==='contractors') showContractors();
   else if(view==='approvals') showRenoApprovals();
   else showRenos();
-  // Cross-page handoff from landing-page Quick Lookup: ?sow=<unitId> opens the SOW.
+  // Cross-page handoff (Quick Lookup, or "Back to Maintenance Request" from an
+  // RFQ): ?sow=<unitId> opens the SOW; optional &pn=<projectNumber> opens that
+  // specific request rather than the unit's most recent one.
   var deepSow = params.get('sow');
   if (deepSow && typeof openSowModal === 'function') {
-    setTimeout(function(){ openSowModal(deepSow); }, 100);
+    var deepPn = params.get('pn') || null;
+    setTimeout(function(){ openSowModal(deepSow, deepPn); }, 100);
   }
 }
 function updateRenosHeader() {

@@ -70,7 +70,10 @@
         <h1 id="rfqFormHeading">New Request for Quotes</h1>
         <p id="rfqFormSub"></p>
       </div>
-      <button class="btn btn-ghost" data-rfq-keep onclick="showRfqList()">&#8592; Back to List</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-ghost" data-rfq-keep onclick="rfqBackToSow()" title="Open the linked maintenance request">&#8592; Maintenance Request</button>
+        <button class="btn btn-ghost" data-rfq-keep onclick="showRfqList()">&#8592; Back to List</button>
+      </div>
     </div>
 
     <!-- Tabs -->

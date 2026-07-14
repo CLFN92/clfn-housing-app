@@ -7654,6 +7654,15 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
     + '<tbody>' + (scopeRows || '<tr><td colspan="2" style="padding:10px;text-align:center;color:#888;">No line items specified.</td></tr>') + '</tbody>'
     + '</table></div>'
 
+    // Notes / access requirements carried over from the initiating maintenance
+    // request, so contractors see special instructions and site access details.
+    + (function(){
+        var _n = String((sow && sow.notes) || (rfq.data && rfq.data.sow_notes) || '').trim();
+        if (!_n) return '';
+        return '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Additional Notes &amp; Access Requirements</div>'
+          + '<div class="sec-b" style="font-size:10px;line-height:1.6;white-space:pre-wrap;">' + escapeHtml(_n) + '</div></div>';
+      })()
+
     + '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Contractor Bid Form — Complete and Return</div>'
     + '<div class="sec-b">'
     + '<p style="font-size:9.5px;color:#333;margin-bottom:6px;">Price all line items below in Canadian dollars (CDN), exclusive of HST.</p>'

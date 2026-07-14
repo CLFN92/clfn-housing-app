@@ -1868,6 +1868,21 @@ async function _generateRfqPdfBase64(rfq, unit) {
     gap(4);
   }
 
+  // ── 2b. Notes & access requirements from the initiating request ───────────
+  var _rfqSowNotes = String(d.sow_notes || '').trim();
+  if (!_rfqSowNotes && rfq.sow_unit_id && window._sowCache) {
+    // Fallback for RFQs saved before the notes snapshot existed.
+    var _sce = window._sowCache[rfq.sow_unit_id];
+    var _sarr = _sce && Array.isArray(_sce.sows) ? _sce.sows : [];
+    var _ssow = _sarr.find(function(s){ return s && s.project_number === rfq.sow_project_number; }) || _sarr[0];
+    if (_ssow && _ssow.notes) _rfqSowNotes = String(_ssow.notes).trim();
+  }
+  if (_rfqSowNotes) {
+    sectionHeader('Additional Notes & Access Requirements');
+    paragraph(_rfqSowNotes, 9);
+    gap(4);
+  }
+
   // ── 3. Contractor Bid Form ────────────────────────────────────────────────
   if (items.length) {
     sectionHeader('Contractor Bid Form — Complete and Return');

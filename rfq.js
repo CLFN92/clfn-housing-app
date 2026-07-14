@@ -322,6 +322,16 @@ async function _fetchAndPopulateSow(unitId, sowPn) {
   }
 }
 
+// Navigate back to the maintenance request (SOW) this RFQ was created from.
+// Opens renos.html deep-linked to the specific request (unit + project number).
+function rfqBackToSow(){
+  if(!_rfqSowUnitId){ if(typeof showToast === 'function') showToast('No linked maintenance request for this RFQ.'); return; }
+  var url = 'renos.html?sow=' + encodeURIComponent(_rfqSowUnitId)
+          + (_rfqSowPn ? '&pn=' + encodeURIComponent(_rfqSowPn) : '');
+  window.location.href = url;
+}
+window.rfqBackToSow = rfqBackToSow;
+
 // ── Edit permission ──────────────────────────────────────────────────────────
 // Only the Housing Manager and the ED tier (ED / super_user) may edit an RFQ.
 // Everyone else sees the full record read-only (all info visible, nothing
@@ -952,6 +962,12 @@ function _buildRfqPayload() {
       attached_doc_paths: _rfqAttachedPaths.slice(),
       contract_emailed:   !!_rfqContractEmailed,
       sow_summary:        fv('rfq_sow_summary'),
+      // Snapshot the initiating request's notes so the RFQ document (preview +
+      // emailed) can show them without re-resolving the SOW. Preserve an
+      // existing snapshot when the live SOW isn't loaded.
+      sow_notes:          (_rfqSowData && _rfqSowData.notes)
+                            || (((window._rfqCache || {})[_rfqCurrentId] || {}).data || {}).sow_notes
+                            || '',
       scope_detail_rows:  scopeDetailRows,
       materials_rows:     materialsRows,
       exclusions_rows:    exclusionsRows,
