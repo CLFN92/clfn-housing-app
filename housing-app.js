@@ -436,9 +436,12 @@ function goTo(s){
       if(window._pendingSigRestore) {
         var _sr = window._pendingSigRestore;
         setTimeout(function(){
-          _restoreSigCanvas('sig_canvas_app',   _sr.applicant   && _sr.applicant.image);
-          _restoreSigCanvas('sig_canvas_co',    _sr.coApplicant && _sr.coApplicant.image);
-          _restoreSigCanvas('sig_canvas_staff', _sr.staff       && _sr.staff.image);
+          // Use _restoreSignature (not _restoreSigCanvas) so typed/wet
+          // signatures restore to their tab + input and survive a re-save.
+          var _rs = (typeof _restoreSignature === 'function') ? _restoreSignature : _restoreSigCanvas;
+          _rs('sig_canvas_app',   _sr.applicant   && _sr.applicant.image);
+          _rs('sig_canvas_co',    _sr.coApplicant && _sr.coApplicant.image);
+          _rs('sig_canvas_staff', _sr.staff       && _sr.staff.image);
           window._pendingSigRestore = null;
         }, 200);
       }

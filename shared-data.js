@@ -2520,6 +2520,32 @@ function _restoreSigCanvas(canvasId, dataURL) {
   };
   img.src = dataURL;
 }
+// Restore a saved signature VALUE onto its pad, whichever method was used:
+//   'data:...'   -> draw onto the canvas (Draw tab)
+//   'typed:<name>' -> fill the typed input + switch to the Type tab
+//   'wet:<ref>'    -> fill the wet-reference input + switch to the Wet tab
+// Without this, reopening a typed/wet-signed record left the pad on the empty
+// Draw tab, so re-saving from the review step overwrote the stored signature
+// with '' (getSigDataURL reads the visible panel). Use this instead of
+// _restoreSigCanvas anywhere a saved signature is restored into a live pad.
+function _restoreSignature(canvasId, value) {
+  if(!value) return;
+  if(value.indexOf('data:') === 0){ _restoreSigCanvas(canvasId, value); return; }
+  if(value.indexOf('typed:') === 0){
+    var tEl = document.getElementById(canvasId + '_typed');
+    if(tEl) tEl.value = value.slice(6);
+    if(typeof setSigMethod === 'function') setSigMethod(canvasId, 'type');
+    return;
+  }
+  if(value.indexOf('wet:') === 0){
+    var ref = value.slice(4);
+    var wEl = document.getElementById(canvasId + '_wet_ref');
+    if(wEl) wEl.value = (ref === 'pending') ? '' : ref;
+    if(typeof setSigMethod === 'function') setSigMethod(canvasId, 'wet');
+    return;
+  }
+}
+window._restoreSignature = _restoreSignature;
 function _rsm(model, id) {
   var r = model.find(function(x){ return x.id === id; });
   return r ? (r.pts||0) : 0;

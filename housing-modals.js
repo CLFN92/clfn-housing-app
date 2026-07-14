@@ -1212,20 +1212,40 @@ function previewFromDash(app){
   function yn(v) { return v ? 'Yes' : 'No'; }
   function dollar(v) { var f=parseFloat(v)||0; return f>0 ? formatCurrency(f) : '—'; }
 
-  // ── sig block (pen-on-paper for dash print — no canvas available) ──
-  function sigBlock(label, pName, dt) {
+  // ── sig block — renders the SAVED signature off the application record.
+  // `sig` is the saved {name,date,image} object (app.sig.applicant, etc.).
+  // image is a drawn data: URL, a 'typed:<name>' string, or 'wet:<ref>';
+  // falls back to a blank "Sign here" box when unsigned. fallbackName/Date
+  // fill the name/date when the sig object doesn't carry them.
+  function sigBlock(label, sig, fallbackName, fallbackDate) {
+    sig = sig || {};
+    var _esc  = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+    var pName = sig.name || fallbackName || '';
+    var dt    = sig.date || fallbackDate || '';
+    var img   = sig.image || '';
+    var sigArea;
+    if (img.indexOf('data:') === 0) {
+      sigArea = '<img src="'+img+'" style="max-height:58px;max-width:96%;object-fit:contain;" alt="signature"/>';
+    } else if (img.indexOf('typed:') === 0) {
+      sigArea = '<span style="font-family:\'Segoe Script\',\'Brush Script MT\',cursive;font-size:20px;color:var(--text);">'+_esc(img.slice(6))+'</span>';
+    } else if (img.indexOf('wet:') === 0) {
+      var ref = img.slice(4);
+      sigArea = '<span style="font-size:9.5px;color:var(--muted);">&#10003; Signed on paper / e-sign'+((ref && ref !== 'pending') ? ' &mdash; '+_esc(ref) : '')+'</span>';
+    } else {
+      sigArea = '<span style="font-size:9px;color:var(--border);">Sign here</span>';
+    }
     return '<div class="print-sec">'
       +'<div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;'
       +'color:var(--muted);margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #ddd;">'+label+'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 90px;gap:8px;margin-bottom:6px;">'
       +'<div><div class="sig-lbl">Full Name</div>'
-      +'<div style="font-size:10.5px;font-weight:600;border-bottom:1px solid var(--border);padding-bottom:2px;min-height:15px;">'+(pName||'')+'</div></div>'
+      +'<div style="font-size:10.5px;font-weight:600;border-bottom:1px solid var(--border);padding-bottom:2px;min-height:15px;">'+_esc(pName)+'</div></div>'
       +'<div><div class="sig-lbl">Date</div>'
-      +'<div style="font-size:10px;border-bottom:1px solid var(--border);padding-bottom:2px;min-height:15px;">'+(dt||'')+'</div></div>'
+      +'<div style="font-size:10px;border-bottom:1px solid var(--border);padding-bottom:2px;min-height:15px;">'+_esc(dt)+'</div></div>'
       +'</div>'
       +'<div style="width:100%;height:65px;border:1px solid var(--border);border-radius:3px;background:var(--bg);'
-      +'display:flex;align-items:center;justify-content:center;">'
-      +'<span style="font-size:9px;color:var(--border);">Sign here</span></div>'
+      +'display:flex;align-items:center;justify-content:center;overflow:hidden;">'
+      +sigArea+'</div>'
       +'</div>';
   }
   function internalSig(label) {
@@ -1404,9 +1424,9 @@ function previewFromDash(app){
     +'<div style="margin-top:14px;page-break-inside:avoid;">'
     +'<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:2.5px solid var(--yellow);padding-bottom:3px;margin-bottom:10px;">Signatures</div>'
     +'<div style="display:grid;grid-template-columns:'+sigCols+';gap:12px;">'
-    +sigBlock('Applicant', name, app.appDate||today)
-    +(hasCoApp ? sigBlock('Co-Applicant', (app.coApp.fn||'')+' '+(app.coApp.ln||''), app.appDate||today) : '')
-    +sigBlock('Received by — Housing Staff', '', today)
+    +sigBlock('Applicant', app.sig && app.sig.applicant, name, app.appDate||today)
+    +(hasCoApp ? sigBlock('Co-Applicant', app.sig && app.sig.coApplicant, (app.coApp.fn||'')+' '+(app.coApp.ln||''), app.appDate||today) : '')
+    +sigBlock('Received by — Housing Staff', app.sig && app.sig.staff, '', today)
     +'</div></div>'
 
     // Internal Use
