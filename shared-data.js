@@ -4717,15 +4717,24 @@ window.sowHiddenFromCurrentFieldEmployee = sowHiddenFromCurrentFieldEmployee;
 // ── 0. My Drafts — items the current user started but hasn't submitted ───
 // Shown for ALL roles so an employee, HM, or ED can find and continue
 // their own in-progress work without navigating to another page.
+// Super User bypasses the "started by me" filter entirely — it aggregates
+// every staff member's outstanding drafts (each row tagged with a `by`
+// preparer so the multi-person list stays legible), per the ED's request
+// to use Super User as a nation-wide "everything outstanding" view.
 function _wlCollectDrafts(ctx) {
   var email = ctx.email, myName = ctx.myName, apps = ctx.apps;
+  var isSuperUser = !!ctx.isSuperUser;
   var draftApps = apps.filter(function(a) {
-    if (!a || a.archived) return false;
-    return (a.created_by_email || '').toLowerCase() === email && a.status === 'draft';
-  }).slice(0, 8);
+    if (!a || a.archived || a.status !== 'draft') return false;
+    if (isSuperUser) return true;
+    return (a.created_by_email || '').toLowerCase() === email;
+  }).slice(0, isSuperUser ? 20 : 8);
+  if (isSuperUser) {
+    draftApps.forEach(function(a){ a._wlBy = a.created_by_email || ''; });
+  }
 
   var draftSows = [];
-  if (email || myName) {
+  if (isSuperUser || email || myName) {
     var sowCache = window._sowCache || {};
     var sowUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     Object.keys(sowCache).forEach(function(uid) {
@@ -4735,28 +4744,30 @@ function _wlCollectDrafts(ctx) {
         var status = sow.approval_status || '';
         if (status && status !== 'draft') return;       // skip submitted/approved
         var prep = (sow.preparedBy || sow.prepared_by || '').trim();
-        if (!prep || (myName && prep !== myName)) return;
+        if (!isSuperUser) {
+          if (!prep || (myName && prep !== myName)) return;
+        }
         var u = sowUnits.find(function(x){ return x && x.id === uid; });
         var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : uid;
-        draftSows.push({ uid: uid, pn: sow.project_number || '', addr: addr });
+        draftSows.push({ uid: uid, pn: sow.project_number || '', addr: addr, by: isSuperUser ? prep : '' });
       });
     });
-    draftSows = draftSows.slice(0, 6);
+    draftSows = draftSows.slice(0, isSuperUser ? 15 : 6);
   }
 
   var draftRfqs = [];
-  if (email && (typeof moduleOn !== 'function' || moduleOn('rfq'))) {
+  if ((isSuperUser || email) && (typeof moduleOn !== 'function' || moduleOn('rfq'))) {
     var rfqCache = window._rfqCache || {};
     var rfqUnits = (typeof housingUnits !== 'undefined' && housingUnits) ? housingUnits : [];
     Object.keys(rfqCache).forEach(function(rfqId) {
       var rfq = rfqCache[rfqId];
       if (!rfq || rfq.status !== 'draft') return;
-      if ((rfq.created_by || '').toLowerCase() !== email) return;
+      if (!isSuperUser && (rfq.created_by || '').toLowerCase() !== email) return;
       var u = rfqUnits.find(function(x){ return x && x.id === rfq.sow_unit_id; });
       var addr = u ? ((u.num||'') + ' ' + (u.street||'')).trim() : (rfq.sow_unit_id||'');
-      draftRfqs.push({ id: rfqId, addr: addr });
+      draftRfqs.push({ id: rfqId, addr: addr, by: isSuperUser ? (rfq.created_by || '') : '' });
     });
-    draftRfqs = draftRfqs.slice(0, 6);
+    draftRfqs = draftRfqs.slice(0, isSuperUser ? 15 : 6);
   }
 
   return { draftApps: draftApps, draftSows: draftSows, draftRfqs: draftRfqs };
@@ -5081,12 +5092,16 @@ function renderWorklist() {
   var email = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.email : '').toLowerCase();
   var isManagement = typeof ROLE !== 'undefined' && ROLE.isManagement(role);
   var canFinal     = typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can('finalApproveApp', role);
+  // Super User is a nation-wide "everything outstanding" view — it aggregates
+  // every staff member's drafts instead of scoping "My Drafts" to the actual
+  // logged-in person (see _wlCollectDrafts).
+  var isSuperUser  = (role === 'super_user');
 
   var myName = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION ? HOUSING_SESSION.name : '') || '';
   var apps   = (typeof applications !== 'undefined' && applications) ? applications : [];
 
   // Shared context — computed ONCE and passed to every collector.
-  var ctx = { role: role, email: email, myName: myName, apps: apps, isManagement: isManagement, canFinal: canFinal };
+  var ctx = { role: role, email: email, myName: myName, apps: apps, isManagement: isManagement, canFinal: canFinal, isSuperUser: isSuperUser };
 
   var _drafts       = _wlCollectDrafts(ctx);
   var draftApps     = _drafts.draftApps;
@@ -5266,7 +5281,9 @@ function renderWorklist() {
       + '</div>';
   }
 
-  // My Drafts — in-progress items the current user hasn't submitted yet
+  // My Drafts — in-progress items the current user hasn't submitted yet.
+  // Super User sees every staff member's drafts (see _wlCollectDrafts), so
+  // each row is tagged with who prepared it and the section is relabeled.
   if (draftTotal > 0) {
     var _draftPill = { text:'Draft', color:'var(--muted)', bg:'var(--bg)' };
     var draftRows = '', draftCards = '';
@@ -5274,33 +5291,36 @@ function renderWorklist() {
       var name = ((a.fn||'') + ' ' + (a.ln||'')).trim() || a.id;
       var idJs = esc(a.id).replace(/'/g,"\\'");
       var open = 'window.location.href=\'housing.html?openApp=' + encodeURIComponent(a.id) + '\'';
+      var byTxt = isSuperUser && a._wlBy ? (' · by ' + a._wlBy) : '';
       var info = '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(name) + '</span>'
-               + '<span style="font-size:11px;color:var(--muted);width:100px;flex-shrink:0;">Application</span>'
+               + '<span style="font-size:11px;color:var(--muted);width:' + (isSuperUser?160:100) + 'px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Application' + esc(byTxt) + '</span>'
                + '<span style="font-size:11px;color:var(--muted);width:50px;text-align:right;flex-shrink:0;font-style:italic;">Draft</span>';
       draftRows += draftRow(info, 'housing.html?openApp=' + encodeURIComponent(a.id), null, '_wlArchiveApp(\'' + idJs + '\')');
-      draftCards += wlCard({ title:name, pill:_draftPill, open:open, metas:[{k:'Type',v:'Application'}],
+      draftCards += wlCard({ title:name, pill:_draftPill, open:open, metas:[{k:'Type',v:'Application'}].concat(isSuperUser && a._wlBy ? [{k:'By',v:a._wlBy}] : []),
         actions:[{text:'Continue →',onclick:open},{text:'📥 Archive',ghost:true,onclick:'_wlArchiveApp(\'' + idJs + '\')'}] });
     });
     draftSows.forEach(function(s) {
       var sowOpen = 'if(typeof openSowModal===\'function\'){openSowModal(\'' + esc(s.uid).replace(/'/g,"\\'") + '\');}else{window.location.href=\'renos.html?sow=' + encodeURIComponent(s.uid) + '\';}';
+      var sByTxt = isSuperUser && s.by ? (' · by ' + s.by) : '';
       var info = '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(s.addr) + '</span>'
-               + '<span style="font-size:11px;color:var(--muted);width:100px;flex-shrink:0;">' + esc(s.pn || 'Request') + '</span>'
+               + '<span style="font-size:11px;color:var(--muted);width:' + (isSuperUser?160:100) + 'px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc((s.pn || 'Request') + sByTxt) + '</span>'
                + '<span style="font-size:11px;color:var(--muted);width:50px;text-align:right;flex-shrink:0;font-style:italic;">Draft</span>';
       draftRows += draftRow(info, null, sowOpen, '_wlArchiveSow(\'' + esc(s.uid).replace(/'/g,"\\'") + '\',\'' + esc(s.pn).replace(/'/g,"\\'") + '\')');
-      draftCards += wlCard({ title:s.addr, pill:_draftPill, open:sowOpen, metas:[{k:'Type',v:'Maintenance'},{k:'Project',v:s.pn||'Request'}],
+      draftCards += wlCard({ title:s.addr, pill:_draftPill, open:sowOpen, metas:[{k:'Type',v:'Maintenance'},{k:'Project',v:s.pn||'Request'}].concat(isSuperUser && s.by ? [{k:'By',v:s.by}] : []),
         actions:[{text:'Continue →',onclick:sowOpen},{text:'📥 Archive',ghost:true,onclick:'_wlArchiveSow(\'' + esc(s.uid).replace(/'/g,"\\'") + '\',\'' + esc(s.pn).replace(/'/g,"\\'") + '\')'}] });
     });
     draftRfqs.forEach(function(r) {
       var idJs = esc(r.id).replace(/'/g,"\\'");
       var open = 'window.location.href=\'rfq.html?rfq=' + encodeURIComponent(r.id) + '\'';
+      var rByTxt = isSuperUser && r.by ? (' · by ' + r.by) : '';
       var info = '<span style="font-size:12px;font-weight:600;width:130px;flex-shrink:0;">' + esc(r.id) + '</span>'
-               + '<span style="flex:1;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(r.addr) + '</span>'
+               + '<span style="flex:1;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(r.addr + rByTxt) + '</span>'
                + '<span style="font-size:11px;color:var(--muted);width:50px;text-align:right;flex-shrink:0;font-style:italic;">Draft</span>';
       draftRows += draftRow(info, 'rfq.html?rfq=' + encodeURIComponent(r.id), null, '_wlCancelRfq(\'' + idJs + '\')');
-      draftCards += wlCard({ title:r.id, pill:_draftPill, open:open, metas:[{k:'Type',v:'RFQ'},{k:'Unit',v:r.addr}],
+      draftCards += wlCard({ title:r.id, pill:_draftPill, open:open, metas:[{k:'Type',v:'RFQ'},{k:'Unit',v:r.addr}].concat(isSuperUser && r.by ? [{k:'By',v:r.by}] : []),
         actions:[{text:'Continue →',onclick:open},{text:'Cancel',ghost:true,onclick:'_wlCancelRfq(\'' + idJs + '\')'}] });
     });
-    html += sectionWrap('✏️', 'My Drafts', draftTotal, '', _view==='cards' ? wlGrid(draftCards) : draftRows, 0);
+    html += sectionWrap('✏️', isSuperUser ? 'All Staff Drafts' : 'My Drafts', draftTotal, '', _view==='cards' ? wlGrid(draftCards) : draftRows, 0);
   }
 
   // Applications
