@@ -515,7 +515,7 @@ function _buildSowModalHTML() {
         '<button id="sow_archive_btn" type="button" onclick="archiveCurrentSow()" class="btn btn-ghost" style="display:none;">🗄 Archive</button>' +
         '<button type="button" onclick="printWorkOrder()" class="btn btn-ghost">🏗 Work Order</button>' +
         '<button type="button" onclick="printSOW()" class="btn btn-ghost">🖨 Tenant form</button>' +
-        '<button type="button" id="sow_rfq_btn" onclick="if(_sowUnitId&&window._sowEditingProjectNumber){saveSOW();try{var _c=window._sowCache&&window._sowCache[_sowUnitId];var _sa=_c&&Array.isArray(_c.sows)?_c.sows:(_c&&Array.isArray(_c)?_c:[]);var _sh=_sa.find(function(s){return s&&s.project_number===window._sowEditingProjectNumber;})||null;if(_sh)sessionStorage.setItem(\'_rfq_sow_handoff\',JSON.stringify(_sh));}catch(e){}window.location.href=\'rfq.html?unit=\'+encodeURIComponent(_sowUnitId)+\'&sow=\'+encodeURIComponent(window._sowEditingProjectNumber);}else{if(typeof showToast===\'function\')showToast(\'Save the request first\');}" class="btn btn-ghost" style="display:none;">📋 RFQ</button>' +
+        '<button type="button" id="sow_rfq_btn" onclick="sowOpenRfq()" class="btn btn-ghost" style="display:none;">📋 RFQ</button>' +
         '<span class="tic-footer-spacer"></span>' +
         // Review progress label — populated by _updateSowSaveButtonState.
         // Reads "3 of 7 sections reviewed" until all tabs have been
@@ -1178,6 +1178,45 @@ function _sowIsApproved(sow){
 }
 window._sowIsApproved = _sowIsApproved;
 
+// Whether the RFQ (tender) process is still available for a request. A manual
+// HM/ED approval authorizes the work/budget but does NOT select the contractor,
+// so the RFQ button stays available after approval. It's only gone once the
+// work is COMPLETED, the request is archived, or a contractor was already
+// selected via an awarded RFQ (system_approved). Previously this hid on ANY
+// approval (_sowIsApproved), which removed the button right after approving.
+function _sowRfqStillOpen(sow){
+  if(!sow) return false;
+  if(sow.archived) return false;
+  if(sow.approval_status === 'completed') return false;
+  if(sow.system_approved || sow.approved_via_rfq) return false;
+  return true;
+}
+window._sowRfqStillOpen = _sowRfqStillOpen;
+
+// Navigate from the open request to the RFQ page for it. Persists any form
+// edits FIRST — but only when the request isn't already approved, because
+// re-saving an approved request as a non-ED can strip the ED sign-off and
+// downgrade its status (the review step defaults to blank approval fields for
+// roles that can't sign at that tier). For an approved request we hand off the
+// already-saved record untouched.
+function sowOpenRfq(){
+  if(!(_sowUnitId && window._sowEditingProjectNumber)){
+    if(typeof showToast === 'function') showToast('Save the request first');
+    return;
+  }
+  var _existing = (typeof getSowByProjectNumber === 'function')
+    ? getSowByProjectNumber(_sowUnitId, window._sowEditingProjectNumber) : null;
+  if(!_existing || !_sowIsApproved(_existing)){ if(typeof saveSOW === 'function') saveSOW(); }
+  try {
+    var _c  = window._sowCache && window._sowCache[_sowUnitId];
+    var _sa = _c && Array.isArray(_c.sows) ? _c.sows : (_c && Array.isArray(_c) ? _c : []);
+    var _sh = _sa.find(function(s){ return s && s.project_number === window._sowEditingProjectNumber; }) || null;
+    if(_sh) sessionStorage.setItem('_rfq_sow_handoff', JSON.stringify(_sh));
+  } catch(e){}
+  window.location.href = 'rfq.html?unit=' + encodeURIComponent(_sowUnitId) + '&sow=' + encodeURIComponent(window._sowEditingProjectNumber);
+}
+window.sowOpenRfq = sowOpenRfq;
+
 
 // Fill the "Assigned To" field-employee dropdown from active staff whose role is
 // field_employee. Uses _staffCache when present, otherwise fetches once and
@@ -1318,8 +1357,7 @@ function _applySowModalLock(sow){
   var rfqBtn = document.getElementById('sow_rfq_btn');
   if (rfqBtn) {
     var _rfqRole = window.currentRole || '';
-    var _rfqShow = !!sow && !sow.archived
-      && !_sowIsApproved(sow)
+    var _rfqShow = _sowRfqStillOpen(sow)
       && (typeof moduleOn !== 'function' || moduleOn('rfq'))
       && (
         (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)) ||
@@ -1698,7 +1736,7 @@ function udpRenderSowTable(unitId){
         +editBtn
         +archiveBtn
         +'<button onclick="udpPrintWorkOrder(\''+esc(unitId)+'\',\''+pn+'\')" title="Print work order" style="background:var(--yellow);border:none;color:var(--dark);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700;font-family:DM Sans,sans-serif;">Work Order</button>'
-        +((typeof moduleOn !== 'function' || moduleOn('rfq')) && !_sowIsApproved(sow) && typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)
+        +((typeof moduleOn !== 'function' || moduleOn('rfq')) && _sowRfqStillOpen(sow) && typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)
           ? '<a href="rfq.html?unit='+esc(unitId)+'&sow='+esc(pn)+'" style="margin-left:4px;background:#1d4ed8;border:none;color:#fff;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;display:inline-block;">RFQ</a>'
           : '')
       +'</td>'
