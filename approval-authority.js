@@ -82,6 +82,10 @@ var APPROVAL_AUTHORITY = (function() {
     approveContractor:        ['housing_manager', 'ed'],
     // Who can decline a contractor
     declineContractor:        ['housing_manager', 'ed'],
+    // Who can UNLOCK adding files to contractor emails after a contract has
+    // been emailed (the RFQ Documents "attach to email" list locks once the
+    // contract is sent, to freeze what was shared).
+    unlockEmailAttachments:   ['housing_manager', 'ed'],
 
     // ── Score model ───────────────────────────────────────────────────────
     // Who can edit the scoring model criteria and weights
@@ -312,6 +316,7 @@ var APPROVAL_AUTHORITY = (function() {
       recommendContractor:      'Approve contractor (first stage — HM)',
       approveContractor:        'Final contractor approval',
       declineContractor:        'Decline contractor',
+      unlockEmailAttachments:   'Unlock adding files to contractor emails',
       editScoreModel:           'Edit scoring model',
       applyScoreAdjustment:     'Apply manual score adjustment',
       editMatchPriority:        'Edit housing placement order (Match Priority)',
@@ -342,7 +347,7 @@ var APPROVAL_AUTHORITY = (function() {
       'File Update':          ['reviewFileUpdate','approveFileUpdate'],
       'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand','assignRentAmount'],
       'Maintenance Request & Renovation': ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow','assignWorkOrder','editRenoProgress'],
-      'Contractors':          ['recommendContractor','approveContractor','declineContractor'],
+      'Contractors':          ['recommendContractor','approveContractor','declineContractor','unlockEmailAttachments'],
       'Scoring':              ['editScoreModel','applyScoreAdjustment','editMatchPriority'],
       'Inventory':            ['archiveUnit', 'setUnitLocation'],
       'Inspections':          ['approveInspection'],

@@ -17,6 +17,7 @@ var _rfqExclusionsRows   = [];
 var _rfqClfnSuppliedRows = [];
 var _rfqDocFiles         = [];   // cached list from audit log
 var _rfqAttachedPaths    = [];   // paths selected to attach to email
+var _rfqContractEmailed  = false; // true once the generated contract has been emailed (locks attach-to-email)
 var _rfqDocLib           = null; // DocLibrary instance for this RFQ
 
 // ── Page init (mirrors renos.html IIFE pattern — never loads housing-init.js) ─
@@ -505,6 +506,7 @@ function _populateFormFields(rfq) {
 
   // Document attachment selection
   _rfqAttachedPaths = d.attached_doc_paths || [];
+  _rfqContractEmailed = !!d.contract_emailed;
 
   // Dynamic row arrays
   _rfqScopeDetailRows  = d.scope_detail_rows   || [];
@@ -945,6 +947,7 @@ function _buildRfqPayload() {
       ct_quote_number:              fv('rfq_ct_quote_number'),
       // Scope detail
       attached_doc_paths: _rfqAttachedPaths.slice(),
+      contract_emailed:   !!_rfqContractEmailed,
       sow_summary:        fv('rfq_sow_summary'),
       scope_detail_rows:  scopeDetailRows,
       materials_rows:     materialsRows,
@@ -1866,17 +1869,36 @@ function renderDocumentsTab() {
   _rfqRefreshAttachList();
 }
 
+// True once the contract has been emailed AND the current user lacks the
+// unlockEmailAttachments authority — the attach-to-email list is then frozen.
+function _rfqAttachLocked() {
+  if (!_rfqContractEmailed) return false;
+  var role = (typeof CLFN_PERMS !== 'undefined' && CLFN_PERMS.normalizeRole)
+    ? CLFN_PERMS.normalizeRole(window.currentRole) : (window.currentRole || '');
+  if (typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.can) {
+    return !APPROVAL_AUTHORITY.can('unlockEmailAttachments', role);
+  }
+  // Fallback if the authority registry isn't loaded: HM / ED / super_user unlock.
+  return !(role === 'housing_manager' || role === 'ed' || role === 'super_user');
+}
+
 async function _rfqRefreshAttachList() {
   var el = document.getElementById('rfq_doc_attach_section');
   if (!el) return;
   var rfqId = _rfqCurrentId || document.getElementById('rfq_number').value.trim();
   if (!rfqId) { el.innerHTML = ''; return; }
 
+  var _locked = _rfqAttachLocked();
+  var _lockBanner = _locked
+    ? '<div style="display:flex;align-items:center;gap:8px;background:var(--warn-amber-bg);border:1px solid var(--warn-amber-border);border-radius:7px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:var(--warn-amber-text,#7a6000);">&#128274; Attaching files is locked because the contract has been emailed. A Housing Manager or ED can unlock this in Settings &rarr; Approval Authority.</div>'
+    : '';
+
   el.innerHTML = '<div style="border-top:1px solid var(--border);padding-top:14px;">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
     +   '<div style="font-size:12px;font-weight:600;color:var(--text);">&#128231; Attach to contractor email</div>'
     +   '<button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="_rfqRefreshAttachList()">&#8635; Refresh</button>'
     + '</div>'
+    + _lockBanner
     + '<div id="rfq_doc_attach_list"><div style="font-size:11px;color:var(--muted);font-style:italic;">Loading&hellip;</div></div>'
     + '<div style="margin-top:8px;font-size:10px;color:var(--muted);">Checked files will be attached to each contractor email when you issue the RFQ. Max 3 MB per file (Graph API limit). Larger files should be shared via link instead.</div>'
     + '</div>';
@@ -1898,13 +1920,14 @@ async function _rfqRefreshAttachList() {
     var dispName   = f.name || f.path.split('/').pop().replace(/^\d+_/, '');
     var sizeKb     = f.size ? Math.round(f.size / 1024) + ' KB' : '';
     var tooBig     = f.size && f.size > 3 * 1024 * 1024;
+    var _disabled  = tooBig || _locked;
     var safePath   = escapeHtml(f.path).replace(/'/g, "\\'");
-    return '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg);border-radius:7px;margin-bottom:6px;cursor:' + (tooBig ? 'default' : 'pointer') + ';border:1px solid var(--border);">'
+    return '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg);border-radius:7px;margin-bottom:6px;cursor:' + (_disabled ? 'default' : 'pointer') + ';border:1px solid var(--border);' + (_locked ? 'opacity:.7;' : '') + '">'
       +   '<input type="checkbox" '
       +     (isAttached ? 'checked ' : '')
-      +     (tooBig ? 'disabled ' : '')
+      +     (_disabled ? 'disabled ' : '')
       +     'onchange="_rfqToggleAttach(\'' + safePath + '\', this.checked)" '
-      +     'style="width:15px;height:15px;accent-color:var(--yellow);flex-shrink:0;cursor:' + (tooBig ? 'default' : 'pointer') + ';"/>'
+      +     'style="width:15px;height:15px;accent-color:var(--yellow);flex-shrink:0;cursor:' + (_disabled ? 'default' : 'pointer') + ';"/>'
       +   '<div style="min-width:0;flex:1;">'
       +     '<div style="font-size:12px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(dispName) + '</div>'
       +     '<div style="font-size:10px;color:var(--muted);margin-top:1px;">'
@@ -1917,6 +1940,8 @@ async function _rfqRefreshAttachList() {
 }
 
 function _rfqToggleAttach(path, checked) {
+  // Frozen once the contract has been emailed (unless the user can unlock).
+  if (_rfqAttachLocked()) { if (typeof _rfqRefreshAttachList === 'function') _rfqRefreshAttachList(); return; }
   _rfqAttachedPaths = _rfqAttachedPaths.filter(function(p){ return p !== path; });
   if (checked) _rfqAttachedPaths.push(path);
 }
@@ -2177,9 +2202,28 @@ async function generateContractorContract() {
   // Readiness gate — hard-block on missing contract essentials.
   var _missing = _rfqContractMissing();
   if (_missing.length) { _rfqShowChecklist('Not ready to generate', _missing); return; }
+  // Resolve the awarded contractor + current award state early, for the
+  // confirm messaging and the first-time award-on-generate.
+  var _rfqId0    = _rfqCurrentId || (document.getElementById('rfq_number')||{}).value || '';
+  _rfqId0        = String(_rfqId0).trim();
+  var _rfq0      = (window._rfqCache || {})[_rfqId0] || {};
+  var _ctId0     = ((document.getElementById('rfq_awarded_to')||{}).value || '').trim() || _rfq0.awarded_contractor_id;
+  var _ct0       = (window._contractors || []).find(function(c){ return c && c.id === _ctId0; }) || {};
+  var _needsAward = _rfq0.status !== 'awarded';
   // Signatures are soft — allow generating an unsigned copy to sign on paper.
   var _noSigs = _rfqContractMissingSigs();
-  if (_noSigs.length && typeof showConfirm === 'function') {
+
+  if (_needsAward && typeof showConfirm === 'function') {
+    // First-time generation: ONE confirm covering generate + award + approve.
+    var _sigNote = _noSigs.length ? ' Signatures are not captured (' + _noSigs.join(', ') + ') — you can sign on paper and re-generate.' : '';
+    var _goAward = await showConfirm({
+      title:       'Generate & Award Contract?',
+      message:     'This will generate the contract, award this RFQ to ' + (_ct0.name || 'the selected contractor') + ', and approve the linked maintenance request.' + _sigNote + ' Continue?',
+      confirmText: 'Generate & Award', cancelText: 'Cancel'
+    });
+    if (!_goAward) return;
+  } else if (_noSigs.length && typeof showConfirm === 'function') {
+    // Already awarded (re-generating) — keep the soft signature confirm only.
     var _goSig = await showConfirm({
       title:       'Generate without signatures?',
       message:     'No signature captured for: ' + _noSigs.join(', ') + '. Generate the contract anyway (e.g. to sign on paper)? You can re-generate after signing.',
@@ -2194,7 +2238,9 @@ async function generateContractorContract() {
   // completing successfully or _rfqCache being up to date. Save is fire-and-forget.
   var currentPayload = _buildRfqPayload();
   var d = currentPayload.data || {};
-  if (typeof saveRfqDraft === 'function') saveRfqDraft().catch(function(e){ console.warn('[contract] background save failed:', e); });
+  // Await this save so it can't land AFTER the award-on-generate PATCH below
+  // and revert status 'awarded' back to 'draft'. Still resilient (catch).
+  if (typeof saveRfqDraft === 'function') { try { await saveRfqDraft(); } catch(e){ console.warn('[contract] background save failed:', e); } }
 
   var rfqId = _rfqCurrentId || document.getElementById('rfq_number').value.trim();
   var rfq   = (window._rfqCache || {})[rfqId] || {};
@@ -2219,6 +2265,18 @@ async function generateContractorContract() {
   var pOth  = parseFloat(d.price_other     || 0);
   var pSub  = pMat + pLab + pEqp + pSubc + pOth;
   var pTot  = pSub; // First Nations — tax always $0
+
+  // First-time generation awards the RFQ + approves the linked SOW (confirmed
+  // above). skipNotify: the contract email below is the contractor's notice.
+  // Awarding here also sets rfq.award_amount so the contract price renders.
+  if (_needsAward && typeof awardRfq === 'function') {
+    var _awardAmt = (parseFloat(rfq.award_amount) || pTot) || 0;
+    try {
+      await awardRfq(rfqId, ctId, _awardAmt, d.award_notes || rfq.award_notes || null, { skipNotify: true });
+      rfq = (window._rfqCache || {})[rfqId] || rfq;
+      ct  = (window._contractors || []).find(function(c){ return c && c.id === ctId; }) || ct;
+    } catch(e) { console.warn('[contract] award-on-generate failed:', e); }
+  }
 
   var tokens = {
     rfqNumber:               rfqId,
@@ -2279,9 +2337,76 @@ async function generateContractorContract() {
   try {
       var blob = await _rfqBuildContractPdf(tokens, d, savedBody, numFmt);
       await _rfqFileContractPdf(blob, filename);
+      // Email the contract to the awarded contractor (confirm + uncheckable
+      // recipient). Best-effort — the contract is already generated + filed.
+      await _rfqEmailContract(blob, filename, ct, (d.ap_email || ''), rfqId, addr);
   } catch(e) {
     console.error('[contract] generation failed:', e);
     if (typeof showToast === 'function') showToast('Contract PDF failed: ' + e.message);
+  }
+}
+
+// Base64-encode a Blob (strips the data: URI prefix) for email attachments.
+function _rfqBlobToBase64(blob) {
+  return new Promise(function(resolve, reject) {
+    try {
+      var fr = new FileReader();
+      fr.onload  = function(){ var s = String(fr.result || ''); resolve(s.substring(s.indexOf(',') + 1)); };
+      fr.onerror = function(){ reject(fr.error || new Error('read failed')); };
+      fr.readAsDataURL(blob);
+    } catch(e) { reject(e); }
+  });
+}
+
+// Email the generated contract PDF to the awarded contractor. Shows a confirm
+// with an uncheckable recipient (uncheck to skip). From-address is the fixed
+// nation mailbox (Microsoft Graph); reply-to is the AP/Invoice email so the
+// contractor's replies route to accounts payable. On send, marks the RFQ
+// contract_emailed (which locks the "attach to email" list) and persists it.
+async function _rfqEmailContract(blob, filename, ct, apEmail, rfqId, addr) {
+  try {
+    if (typeof showConfirm !== 'function' || typeof sendNotification !== 'function') return;
+    if (!ct || !ct.email) { if (typeof showToast === 'function') showToast('No contractor email on file — contract not emailed.'); return; }
+    var _esc = function(s){ return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); };
+    var r = await showConfirm({
+      title:       'Email Contract to Contractor?',
+      message:     'Send the generated contract (PDF attached) to the awarded contractor? Uncheck to skip sending.',
+      confirmText: 'Send Contract', cancelText: 'Cancel',
+      checkbox:    { label: _esc(ct.name || 'Contractor') + ' (' + _esc(ct.email) + ')', defaultChecked: true }
+    });
+    var ok  = (typeof r === 'object' && r) ? r.ok : r;
+    var snd = (typeof r === 'object' && r) ? r.checked : false;
+    if (!ok || !snd) return;
+
+    var b64 = await _rfqBlobToBase64(blob);
+    var short = (window.NATION_CONFIG && NATION_CONFIG.short) || 'Housing';
+    var opts = {
+      to:          ct.email,
+      to_name:     ct.name || '',
+      subject:     short + ' Housing — Contract: ' + (addr || rfqId),
+      bodyHtml:    '<p>Hello ' + _esc(ct.name || '') + ',</p>'
+                 + '<p>Please find the attached contract for <strong>' + _esc(addr || 'the project') + '</strong> (' + _esc(rfqId) + ').</p>'
+                 + '<p>Please review, sign, and return a copy. If you have any questions, reply to this email'
+                 + (apEmail ? ' or contact ' + _esc(apEmail) : '') + '.</p>'
+                 + '<p>Thank you,<br/>' + _esc(short) + ' Housing</p>',
+      attachments: [{ name: filename, contentType: 'application/pdf', contentBytes: b64 }],
+      event:       'rfq_contract',
+      entity_type: 'rfq',
+      entity_id:   rfqId
+    };
+    if (apEmail) { opts.cc = apEmail; opts.reply_to = apEmail; }
+    await sendNotification(opts);
+
+    // Mark emailed → locks the attach-to-email list (see _rfqAttachLocked).
+    _rfqContractEmailed = true;
+    var rfq = (window._rfqCache || {})[rfqId];
+    if (rfq) { rfq.data = rfq.data || {}; rfq.data.contract_emailed = true; }
+    if (typeof saveRfqDraft === 'function') saveRfqDraft().catch(function(){});
+    if (typeof _rfqRefreshAttachList === 'function') _rfqRefreshAttachList();
+    if (typeof showToast === 'function') showToast('✓ Contract emailed to ' + (ct.name || 'contractor'));
+  } catch(e) {
+    console.warn('[contract] email failed:', e);
+    if (typeof showToast === 'function') showToast('Contract email failed: ' + (e.message || 'unknown error'));
   }
 }
 
