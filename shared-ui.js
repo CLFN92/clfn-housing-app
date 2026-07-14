@@ -48,9 +48,19 @@ function escapeHtml(v) {
 // showToast(...) call keeps working.
 //   opts.type — 'error' | 'info' | 'default'   (styles the row)
 //   opts.duration / opts.position — accepted but ignored (kept for compat)
+//
+// Only errors and missing-information prompts are shown ('error' — every
+// validation/"required field" message in the app already uses this type) plus
+// 'info' (degraded/offline-mode notices like "saved locally — will sync when
+// network is available", which matter even though they're not errors). Plain
+// success confirmations ('default' — no type passed, e.g. "Records merged.",
+// "Added: X") are suppressed outright: the UI change the user just performed
+// is its own confirmation, so a routine "it worked" message is just clutter
+// piling up in the message box (nothing here auto-dismisses).
 function showToast(msg, opts) {
   opts = opts || {};
   var type = (opts.type === 'error' || opts.type === 'info') ? opts.type : 'default';
+  if (type === 'default') return;
   var text = (msg === null || msg === undefined) ? '' : String(msg);
   if (!text) return;
 
