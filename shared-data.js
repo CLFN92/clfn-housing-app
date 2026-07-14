@@ -1632,24 +1632,20 @@ function _mergeReload(){
           + '<input type="radio" name="merge_canon_' + gi + '" value="' + _bcrEsc(t.id) + '"' + (ri === canonIdx ? ' checked' : '') + '/>'
           + '<span><strong>' + _bcrEsc(t.full_name||'') + '</strong> <span style="color:var(--muted);font-size:11px;">' + _bcrEsc(meta) + '</span></span></label>';
       }).join('');
-      return '<div data-merge-card="' + gi + '" style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:12px;">'
+      return '<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:12px;">'
         + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">' + _bcrEsc(g[0].full_name||'') + ' &mdash; ' + g.length + ' records</div>'
         + rowsHtml
-        + '<div data-merge-actions style="text-align:right;margin-top:8px;"><button class="btn btn-primary" onclick="_mergeDoGroup(' + gi + ')">Merge into selected</button></div>'
+        + '<div style="text-align:right;margin-top:8px;"><button class="btn btn-primary" onclick="_mergeDoGroup(' + gi + ')">Merge into selected</button></div>'
         + '</div>';
     }).join('');
   });
 }
 
-// Confirms inline within the already-open Merge Duplicate Tenants modal —
-// deliberately NOT a second stacked modal-overlay. showConfirm() renders a
-// full-viewport position:fixed layer on top of the already-open modal-ov,
-// and nesting two fixed-position overlays is a known source of iOS Safari
-// losing the ability to scroll the page underneath after the top one
-// closes. Swapping the "Merge into selected" button for an inline
-// confirm/cancel row (in the same scroll container, no new overlay) avoids
-// that whole class of bug while still replacing the native window.confirm()
-// look with something styled.
+// Merges immediately on click -- no separate confirm step. Which record is
+// canonical is already a deliberate choice (the radio picker above this
+// button), so a second "are you sure" click was just extra friction; the
+// operation is reversible anyway (sbMergeTenants sets merged_into rather
+// than deleting).
 function _mergeDoGroup(gi){
   var g = (window._mergeGroups || [])[gi]; if (!g) return;
   var sel = document.querySelector('input[name="merge_canon_' + gi + '"]:checked');
@@ -1657,24 +1653,9 @@ function _mergeDoGroup(gi){
   if (!canonicalId) { if (typeof showToast === 'function') showToast('Pick a record to keep.', { type:'error' }); return; }
   var dupIds = g.map(function(t){ return t.id; }).filter(function(id){ return id !== canonicalId; });
   if (!dupIds.length) return;
-  var n = dupIds.length;
-  var card = document.querySelector('[data-merge-card="' + gi + '"]');
-  var actions = card ? card.querySelector('[data-merge-actions]') : null;
-  if (!actions) return;
-  actions.innerHTML =
-    '<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;">'
-    + '<span style="font-size:12px;color:var(--muted);flex:1;min-width:200px;text-align:left;">'
-    +   'Merge ' + n + ' record' + (n === 1 ? '' : 's') + ' into the selected one? History is kept, reversible.'
-    + '</span>'
-    + '<button type="button" class="btn btn-ghost" data-merge-cancel>Cancel</button>'
-    + '<button type="button" class="btn btn-primary" data-merge-confirm>Merge</button>'
-    + '</div>';
-  actions.querySelector('[data-merge-cancel]').onclick = function(){ _mergeReload(); };
-  actions.querySelector('[data-merge-confirm]').onclick = function(){
-    sbMergeTenants(canonicalId, dupIds)
-      .then(function(){ _mergeReload(); if (typeof showToast === 'function') showToast('Records merged.'); })
-      .catch(function(e){ if (typeof showToast === 'function') showToast('Merge failed: ' + e.message, { type:'error' }); });
-  };
+  sbMergeTenants(canonicalId, dupIds)
+    .then(function(){ _mergeReload(); if (typeof showToast === 'function') showToast('Records merged.'); })
+    .catch(function(e){ if (typeof showToast === 'function') showToast('Merge failed: ' + e.message, { type:'error' }); });
 }
 window._mergeDoGroup = _mergeDoGroup;
 
