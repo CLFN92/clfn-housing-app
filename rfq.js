@@ -300,18 +300,21 @@ async function _fetchAndPopulateSow(unitId, sowPn) {
       _rfqScopeItems = items.map(function(it){ return Object.assign({}, it, {_hidden:false}); });
     }
 
-    // Prefill the Scope Summary paragraph from the SOW work items for a NEW RFQ
-    // (blank until now, so staff re-typed it). Never touch a saved RFQ or a
-    // value the user already entered.
+    // Prefill the Scope Summary paragraph from the SOW work items AND the SOW's
+    // notes (Special Instructions / Access Requirements) for a NEW RFQ (blank
+    // until now, so staff re-typed it). Never touch a saved RFQ or a value the
+    // user already entered.
     if (!_rfqCurrentId) {
       var sumEl = document.getElementById('rfq_sow_summary');
       if (sumEl && !(sumEl.value || '').trim()) {
         var _lines = (sow.items || sow.lineItems || []).map(function(it){
           return ((it.category ? it.category + ': ' : '') + (it.description || '')).trim();
         }).filter(Boolean);
-        if (_lines.length) {
-          sumEl.value = 'Requested scope of work at ' + addr + ':\n- ' + _lines.join('\n- ');
-        }
+        var _sowNotes = String(sow.notes || '').trim();
+        var _parts = [];
+        if (_lines.length)  _parts.push('Requested scope of work at ' + addr + ':\n- ' + _lines.join('\n- '));
+        if (_sowNotes)      _parts.push('Notes from the maintenance request:\n' + _sowNotes);
+        if (_parts.length)  sumEl.value = _parts.join('\n\n');
       }
     }
   } catch(e) {
