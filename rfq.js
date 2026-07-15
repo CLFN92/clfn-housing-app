@@ -130,9 +130,24 @@ function renderRfqList() {
   var body  = document.getElementById('rfqListBody');
   if (!body) return;
 
+  // Build the search bar + table container ONCE. Re-renders (every keystroke,
+  // via the debounced oninput) then only replace the table container's
+  // contents — the search input is never destroyed, so focus and the caret
+  // stay put. Previously the whole body (input included) was re-injected on
+  // each keystroke, which stole focus and jumped the cursor out of the field.
+  if (!document.getElementById('rfq_search_input')) {
+    body.innerHTML =
+        '<div class="std-search-row std-search-row-wide">'
+      +   '<input id="rfq_search_input" class="std-search" type="text"'
+      +   ' placeholder="&#128269; Search RFQ #, unit, status, contractor&hellip;"'
+      +   ' oninput="clearTimeout(window._rfqST);window._rfqST=setTimeout(renderRfqList,200)"/>'
+      + '</div>'
+      + '<div id="rfq_list_table_wrap"></div>';
+  }
+
   var cache  = window._rfqCache || {};
   var units  = (typeof housingUnits !== 'undefined' ? housingUnits : []);
-  // Preserve search value across re-renders
+  // Read current search value from the (persistent) input.
   var prevSearch = ((document.getElementById('rfq_search_input')||{}).value || '');
 
   // Enrich rows
@@ -206,15 +221,11 @@ function renderRfqList() {
   }).join('')
   : '<tr><td colspan="9" style="padding:32px;text-align:center;color:var(--muted);font-size:13px;font-style:italic;">' + emptyMsg + '</td></tr>';
 
-  // Inject full HTML into the body container — mirrors worklist body.innerHTML pattern
-  body.innerHTML =
-      '<div class="std-search-row std-search-row-wide">'
-    +   '<input id="rfq_search_input" class="std-search" type="text"'
-    +   ' placeholder="&#128269; Search RFQ #, unit, status, contractor…"'
-    +   ' value="' + escapeHtml(prevSearch) + '"'
-    +   ' oninput="window._rfqSearch=this.value;clearTimeout(window._rfqST);window._rfqST=setTimeout(renderRfqList,200)"/>'
-    + '</div>'
-    + '<div class="std-table-card">'
+  // Re-render ONLY the table container (the search input above it persists).
+  var _tableWrap = document.getElementById('rfq_list_table_wrap');
+  if (!_tableWrap) return;
+  _tableWrap.innerHTML =
+      '<div class="std-table-card">'
     +   '<div class="doclib-table-wrap"><table class="std-table">'
     +     '<thead id="rfq_thead"><tr>'
     +       '<th class="std-th-sortable" data-sort-key="id">RFQ #</th>'
