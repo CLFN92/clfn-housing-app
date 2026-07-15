@@ -573,11 +573,14 @@ function goBack() {
   var prev    = stack.length ? stack[stack.length - 1] : null;
   var navMap  = window._navMap || {};
   var handler = prev && navMap[prev];
-  if (typeof handler === 'function') {
-    handler();
-  } else if (typeof showEmployeeHome === 'function') {
-    showEmployeeHome();
-  }
+  if (typeof handler === 'function') { handler(); return; }
+  // No in-page back target (e.g. a freshly-loaded sub-page whose in-memory
+  // stack is empty). Return to the ACTUAL previous screen using the browser's
+  // real history — the user reached this page via a hard navigation — instead
+  // of always dumping them at the landing page. Only fall back to home when
+  // there's genuinely nowhere to go back to (direct deep-link / bookmark).
+  if (window.history.length > 1) { window.history.back(); return; }
+  if (typeof showEmployeeHome === 'function') showEmployeeHome();
 }
 
 // ── setNavActive ──────────────────────────────────────────────────────────────
