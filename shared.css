@@ -256,6 +256,17 @@ body {
 .header-export-item:last-child { border-bottom: none; }
 .header-export-item:hover { background: var(--bg); }
 .header-export-icon { font-size: 16px; }
+/* Grouped variant — used by the TIC "Generate Forms" menu to bucket the
+   available letters/agreements under category headers. Wider than the plain
+   CSV/Excel export menus so the longer document labels fit on one line. */
+.header-export-menu--wide { min-width: 288px; max-width: 340px; }
+.header-export-group {
+  padding: 9px 16px 5px; font-size: 9.5px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .7px; color: var(--muted);
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  cursor: default; user-select: none;
+}
+.header-export-group:first-child { border-top: none; }
 
 /* Inline export dropdown — same look as the page-header export, but always
    visible (no setExportView gating). Use anywhere a card needs an Export

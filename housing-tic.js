@@ -199,6 +199,12 @@
   function _ticReadOnlyRole(){
     return (window.currentRole || '') === 'field_employee';
   }
+  // Eviction notices are a serious legal action — restricted to HM/ED.
+  function _ticCanEvict(){
+    var r = window.currentRole || '';
+    if (typeof CLFN_PERMS !== 'undefined' && CLFN_PERMS.normalizeRole) r = CLFN_PERMS.normalizeRole(r);
+    return r === 'ed' || r === 'housing_manager';
+  }
   function _ticWrite(method, path, body){
     if(!_ticReady()) return Promise.reject(new Error('supabase config not loaded'));
     if(_ticReadOnlyRole()) return Promise.reject(new Error('read-only role'));
@@ -1714,11 +1720,24 @@
     }
     var key = String(unit.id);
     if(_ticDocLibKey === key && _ticDocLib){ return; } // already mounted for this tenant
+    // Eviction notices are HM/ED-only; hide them from other roles.
+    var evictBtns = _ticCanEvict()
+      ? ( '<button type="button" onclick="window._ticOpenEvictionNoticeModal && window._ticOpenEvictionNoticeModal(\'standard\')" class="header-export-item">Notice of Eviction &mdash; Standard (Drug-Related)</button>'
+        + '<button type="button" onclick="window._ticOpenEvictionNoticeModal && window._ticOpenEvictionNoticeModal(\'immediate\')" class="header-export-item">Notice of IMMEDIATE Eviction (Safety Risk)</button>' )
+      : '';
     p.innerHTML = '<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:flex-end;">'
       + '<div class="export-dropdown">'
       +   '<button type="button" onclick="toggleExportMenu(this)" class="btn btn-primary">&#128196; Generate Forms &#9660;</button>'
-      +   '<div class="header-export-menu">'
-      +     '<button type="button" onclick="window._ticOpenInspectionNoticeModal && window._ticOpenInspectionNoticeModal()" class="header-export-item">Notice of Inspection &mdash; 48 Hours</button>' + '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">'+(nationShort())+' Residential Occupancy Agreement</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'temporary_lease\')" class="header-export-item">Temporary Occupancy Agreement (Fixed Term)</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'commercial_lease\')" class="header-export-item">Commercial Occupancy &amp; Lease Agreement</button>'
+      +   '<div class="header-export-menu header-export-menu--wide">'
+      +     '<div class="header-export-group">Occupancy Agreements</div>'
+      +     '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">'+(nationShort())+' Residential Occupancy Agreement</button>'
+      +     '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'temporary_lease\')" class="header-export-item">Temporary Occupancy Agreement (Fixed Term)</button>'
+      +     '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'commercial_lease\')" class="header-export-item">Commercial Occupancy &amp; Lease Agreement</button>'
+      +     '<div class="header-export-group">Notices</div>'
+      +     '<button type="button" onclick="window._ticOpenInspectionNoticeModal && window._ticOpenInspectionNoticeModal()" class="header-export-item">Notice of Inspection &mdash; 48 Hours</button>'
+      +     evictBtns
+      +     '<div class="header-export-group">Consents</div>'
+      +     '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>'
       +   '</div>'
       + '</div>'
       + '</div>'
@@ -4160,6 +4179,384 @@
 
   window._ticOpenInspectionNoticeModal   = _ticOpenInspectionNoticeModal;
   window._ticGenerateInspectionNoticePdf = _ticGenerateInspectionNoticePdf;
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // Eviction Notices — Standard (s. 26.2) + Immediate (s. 26.3)
+  // One modal + one PDF generator, parameterized by `kind`
+  // ('standard' | 'immediate'). Both follow the same letterhead + record-of-
+  // service layout as the inspection notice; the eviction notices run to two
+  // pages, which _makePdfDoc handles (header redrawn + "Page X of Y" footers).
+  // ════════════════════════════════════════════════════════════════════════════
+
+  // Shared compact letter writers (mirrors the inspection notice's inline
+  // writers). Blank meta values print just the label so a field can be
+  // completed by hand on the printed copy.
+  function _ticLetterWriters(ctx) {
+    var pdf = ctx.pdf;
+    var L = ctx.marginL, CW = ctx.contentW, RX = ctx.pageW - ctx.marginR;
+    var BODY = 8.5, STEP = 3.5;
+    function para(text, opts) {
+      opts = opts || {};
+      pdf.setFont('helvetica', opts.bold ? 'bold' : 'normal');
+      pdf.setFontSize(opts.size || BODY);
+      pdf.setTextColor(opts.color != null ? opts.color : 40);
+      var lines = pdf.splitTextToSize(String(text), CW);
+      ctx.needSpace(lines.length * STEP + 1.9);
+      pdf.text(lines, L, ctx.y + 2.6);
+      ctx.y += lines.length * STEP + 1.9;
+      pdf.setTextColor(0); pdf.setFont('helvetica','normal');
+    }
+    function metaLine(label, val) {
+      var v = (val == null ? '' : String(val)).trim();
+      var lbl = label + ':';
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(BODY);
+      var lw = pdf.getTextWidth(lbl + ' ');
+      var vlines = v ? pdf.splitTextToSize(v, CW - lw) : [''];
+      ctx.needSpace(vlines.length * STEP + 0.9);
+      pdf.setTextColor(20); pdf.text(lbl, L, ctx.y + 2.6);
+      if (v) { pdf.setFont('helvetica','normal'); pdf.setTextColor(40); pdf.text(vlines, L + lw, ctx.y + 2.6); }
+      ctx.y += vlines.length * STEP + 0.9;
+      pdf.setTextColor(0); pdf.setFont('helvetica','normal');
+    }
+    function bullet(text) {
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(BODY); pdf.setTextColor(40);
+      var lines = pdf.splitTextToSize(String(text), CW - 5);
+      ctx.needSpace(lines.length * STEP + 1.5);
+      pdf.text('-', L + 1, ctx.y + 2.6);
+      pdf.text(lines, L + 5, ctx.y + 2.6);
+      ctx.y += lines.length * STEP + 1.5;
+      pdf.setTextColor(0);
+    }
+    function sect(title) {
+      ctx.needSpace(9); ctx.y += 2.6;
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(8.5); pdf.setTextColor(90);
+      pdf.text(String(title).toUpperCase(), L, ctx.y + 2.6);
+      pdf.setDrawColor(248,228,26); pdf.setLineWidth(0.6);
+      pdf.line(L, ctx.y + 3.6, RX, ctx.y + 3.6); pdf.setDrawColor(0);
+      ctx.y += 5.6; pdf.setTextColor(0); pdf.setFont('helvetica','normal');
+    }
+    function signature(hmName, nationName, hPhone, hEmail) {
+      para('Sincerely,');
+      ctx.gap(11); ctx.needSpace(8);
+      pdf.setDrawColor(120); pdf.setLineWidth(0.3); pdf.line(L, ctx.y, L + 72, ctx.y); pdf.setDrawColor(0);
+      ctx.y += 3.2;
+      para(hmName, { bold:true, color:20 });
+      para('Housing Manager');
+      para(nationName + ' — Housing Department');
+      var bits = [];
+      if (hPhone) bits.push('Phone: ' + hPhone);
+      if (hEmail) bits.push('Email: ' + hEmail);
+      if (bits.length) para(bits.join('   |   '));
+    }
+    return { para:para, metaLine:metaLine, bullet:bullet, sect:sect, signature:signature,
+             L:L, CW:CW, RX:RX, BODY:BODY, STEP:STEP };
+  }
+
+  function _ticOpenEvictionNoticeModal(kind) {
+    if (!_ticCanEvict()) { if (typeof showToast === 'function') showToast('Eviction notices are restricted to the Housing Manager or Executive Director'); return; }
+    var immediate = (kind === 'immediate');
+    var k = immediate ? 'immediate' : 'standard';
+
+    var t   = _ticState.tenant      || {};
+    var u   = _ticState.unit        || {};
+    var app = _ticState.application || {};
+    var today = new Date().toISOString().split('T')[0];
+
+    var tenantName = t[TIC_C.full_name] || ((app.fn||'') + ' ' + (app.ln||'')).trim();
+    var unitAddr   = u.num ? ((u.num||'') + ' ' + (u.street||'')).trim() : (app.street||'');
+    var hmName     = (window.HOUSING_SESSION && HOUSING_SESSION.name) || '';
+    var nc         = window.NATION_CONFIG || {};
+    var hPhone     = nc.phone || '';
+    var hEmail     = nc.housing_email || nc.email || '';
+    var fileRef    = u.id ? String(u.id) : '';
+
+    var existing = document.getElementById('tic_eviction_modal');
+    if (existing) existing.remove();
+
+    function inp(id, val, ph, type) {
+      return '<input id="' + id + '" type="' + (type||'text') + '" value="' + _ticEsc(val||'') + '" placeholder="' + _ticEsc(ph||'') + '" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>';
+    }
+    function ta(id, ph, rows) {
+      return '<textarea id="' + id + '" rows="' + (rows||2) + '" placeholder="' + _ticEsc(ph||'') + '" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;resize:vertical;"></textarea>';
+    }
+    function fld(label, inputHtml) {
+      return '<div class="tic-field"><label class="tic-field-lbl">' + label + '</label>' + inputHtml + '</div>';
+    }
+    function req() { return ' <span style="color:var(--danger);">*</span>'; }
+    function hdr(text) {
+      return '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin:4px 0 12px;padding-bottom:5px;border-bottom:1px solid var(--border);">' + text + '</div>';
+    }
+
+    // Kind-specific timeline fields
+    var timelineHtml = immediate
+      ? ( hdr('Executive Director Approval &amp; Vacate (s. 26.3)')
+        + '<div class="tic-grid-2" style="margin-bottom:16px;">'
+        +   fld('Executive Director Name' + req(), inp('evx_ed_name', '', 'Full name of the ED'))
+        +   fld('ED Approval Date' + req(),        inp('evx_ed_date', today, '', 'date'))
+        +   fld('Vacate By (Date &amp; Time)' + req(), inp('evx_vacate', '', 'e.g. 2026-07-20 5:00 PM'))
+        + '</div>' )
+      : ( hdr('Response &amp; Timeline (s. 26.2)')
+        + '<div class="tic-grid-2" style="margin-bottom:16px;">'
+        +   fld('Response Deadline' + req(),   inp('evx_response', '', '', 'date'))
+        +   fld('Vacate By (if eviction proceeds)', inp('evx_vacate', '', '', 'date'))
+        + '</div>' );
+
+    var titleLbl = immediate ? 'Notice of IMMEDIATE Eviction' : 'Notice of Eviction — Standard';
+    var subLbl   = immediate
+      ? 'Immediate safety risk (drug-related). Requires Executive Director approval.'
+      : 'Standard eviction proceedings with an opportunity to respond.';
+
+    var modal = document.createElement('div');
+    modal.id = 'tic_eviction_modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.innerHTML =
+        '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:720px;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35);">'
+      + '<div class="modal-hdr"><div>'
+      +   '<div class="lbl-yellow">&#128196; ' + _ticEsc(titleLbl) + '</div>'
+      +   '<div class="txt-sm-meta">' + subLbl + ' Confirm the details below, then generate the PDF. It is filed to this tenant\'s documents.</div>'
+      + '</div><button type="button" onclick="document.getElementById(\'tic_eviction_modal\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button></div>'
+
+      + '<div style="overflow-y:auto;padding:20px 24px;flex:1;">'
+
+      + hdr('Letter Details')
+      + '<div class="tic-grid-2" style="margin-bottom:16px;">'
+      +   fld('File Reference',           inp('evx_fileref',    fileRef,    'Optional reference'))
+      +   fld('Letter Date',              inp('evx_letterdate', today,      '', 'date'))
+      +   fld('Name of Tenant' + req(),   inp('evx_tenant',     tenantName, 'Full name of tenant'))
+      +   fld('Housing Unit / Address',   inp('evx_address',    unitAddr,   'Unit address'))
+      + '</div>'
+
+      + hdr('Grounds &amp; Evidence (s. 26.1)')
+      + '<div class="tic-grid-2" style="margin-bottom:12px;">'
+      +   fld('Unit Inspected / Attended On', inp('evx_discovery_date', '', '', 'date'))
+      +   fld('Discovered During',            inp('evx_discovery_method', 'inspection under Housing Policy s. 13.9', 'How it was discovered'))
+      + '</div>'
+      + fld('Description of Substances / Evidence Found', ta('evx_evidence', 'Describe what was found and where', 2))
+      + '<div class="tic-grid-2" style="margin:12px 0 16px;">'
+      +   fld('Person(s) Involved / Residing in Unit', inp('evx_persons', '', 'Names of persons involved'))
+      +   fld('Referred to Police (NAPS) On',          inp('evx_police_date', '', '', 'date'))
+      +   fld('Police File No.',                        inp('evx_police_file', '', 'NAPS file reference'))
+      + '</div>'
+
+      + timelineHtml
+
+      + hdr('Signatory &amp; Contact')
+      + '<div class="tic-grid-2" style="margin-bottom:16px;">'
+      +   fld('Housing Manager' + req(), inp('evx_hm', hmName, 'Housing Manager name'))
+      +   fld('Housing Phone',  inp('evx_phone', hPhone, 'Housing Department phone'))
+      +   fld('Housing Email',  inp('evx_email', hEmail, 'Housing Department email'))
+      + '</div>'
+
+      + hdr('For Housing Office Use &mdash; Record of Service (optional)')
+      + '<div class="tic-grid-2" style="margin-bottom:4px;">'
+      +   fld('Notice Served By',       inp('evx_served_by', '', 'Staff name'))
+      +   fld('Date &amp; Time Served', inp('evx_service_dt', '', 'e.g. 2026-07-17 2:15 PM'))
+      +   fld('Method of Service',
+            '<select id="evx_service_method" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">'
+          +   '<option value="">&mdash; Select &mdash;</option>'
+          +   '<option>hand-delivered</option><option>posted on door</option><option>registered mail</option><option>email</option>'
+          + '</select>')
+      +   fld('Executive Director Notified', inp('evx_ed_notified', '', 'e.g. Yes — 2026-07-17'))
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Leave the Record of Service blank to complete it by hand on the printed copy.</div>'
+      + '</div>'
+
+      // Footer
+      + '<div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;">'
+      +   '<button type="button" onclick="document.getElementById(\'tic_eviction_modal\').remove()" class="btn btn-ghost">Cancel</button>'
+      +   '<button type="button" onclick="window._ticGenerateEvictionNoticePdf && window._ticGenerateEvictionNoticePdf(\'' + k + '\')" class="btn btn-primary">Generate PDF</button>'
+      + '</div>'
+      + '</div>';
+
+    document.body.appendChild(modal);
+  }
+
+  async function _ticGenerateEvictionNoticePdf(kind) {
+    if (!_ticCanEvict()) { if (typeof showToast === 'function') showToast('Eviction notices are restricted to the Housing Manager or Executive Director'); return; }
+    var immediate = (kind === 'immediate');
+    if (typeof _loadJsPdf === 'function') await _loadJsPdf();
+    if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable'); return; }
+
+    var fv = function(id) { var e = document.getElementById(id); return e ? (e.value || '').trim() : ''; };
+    function markRequired(id, on) { var e = document.getElementById(id); if (e) e.style.borderColor = on ? 'var(--danger)' : ''; }
+
+    var tenant     = fv('evx_tenant');
+    var address    = fv('evx_address');
+    var fileRef    = fv('evx_fileref');
+    var letterYmd  = fv('evx_letterdate');
+    var discYmd    = fv('evx_discovery_date');
+    var discMethod = fv('evx_discovery_method');
+    var evidence   = fv('evx_evidence');
+    var persons    = fv('evx_persons');
+    var policeYmd  = fv('evx_police_date');
+    var policeFile = fv('evx_police_file');
+    var hmName     = fv('evx_hm');
+    var hPhone     = fv('evx_phone');
+    var hEmail     = fv('evx_email');
+    var servedBy   = fv('evx_served_by');
+    var serviceDt  = fv('evx_service_dt');
+    var serviceMet = fv('evx_service_method');
+    var edNotified = fv('evx_ed_notified');
+    var vacate     = fv('evx_vacate');
+    // kind-specific
+    var edName     = fv('evx_ed_name');
+    var edYmd      = fv('evx_ed_date');
+    var responseYmd= fv('evx_response');
+
+    // Validation
+    var reqIds = immediate
+      ? ['evx_tenant','evx_hm','evx_ed_name','evx_ed_date','evx_vacate']
+      : ['evx_tenant','evx_hm','evx_response'];
+    reqIds.forEach(function(id){ markRequired(id, false); });
+    var missing = reqIds.filter(function(id){ return !fv(id); });
+    if (missing.length) {
+      missing.forEach(function(id){ markRequired(id, true); });
+      var f = document.getElementById(missing[0]); if (f) f.focus();
+      if (typeof showToast === 'function') {
+        showToast(immediate
+          ? 'Tenant, Housing Manager, ED name, ED approval date, and vacate date/time are required'
+          : 'Tenant, Housing Manager, and response deadline are required');
+      }
+      return;
+    }
+
+    var nationName = (typeof nationDisplay === 'function') ? nationDisplay() : ((window.NATION_CONFIG||{}).display_name || '');
+    var nationSh   = (typeof nationShort   === 'function') ? nationShort()   : ((window.NATION_CONFIG||{}).short || nationName);
+    var letterLong = _inspFmtDateLong(letterYmd) || _inspFmtDateLong(new Date().toISOString().split('T')[0]);
+    var discLong   = _inspFmtDateLong(discYmd);
+    var policeLong = _inspFmtDateLong(policeYmd);
+    var edLong     = _inspFmtDateLong(edYmd);
+    var respLong   = _inspFmtDateLong(responseYmd);
+    var vacateLong = immediate ? vacate : _inspFmtDateLong(vacate); // immediate vacate is free-text date+time
+
+    var logo = (typeof _fetchLogoForPdf === 'function') ? await _fetchLogoForPdf() : null;
+    if (typeof _makePdfDoc !== 'function') { if (typeof showToast === 'function') showToast('PDF letterhead helper unavailable'); return; }
+    var ctx = _makePdfDoc({
+      headerTitle:    immediate ? 'Notice of Immediate Eviction' : 'Notice of Eviction',
+      headerSubtitle: immediate ? 'Housing Policy s. 26.3' : 'Housing Policy s. 26.2',
+      logoDataUrl:    logo,
+      footerLeft:     nationName + ' Housing Department — Confidential'
+    });
+    var W = _ticLetterWriters(ctx);
+    var para = W.para, metaLine = W.metaLine, bullet = W.bullet, sect = W.sect;
+
+    // Letter head block ------------------------------------------------------
+    metaLine('File Reference', fileRef);
+    metaLine('Date', letterLong);
+    metaLine('Name of Tenant', tenant);
+    metaLine('Housing Unit / Address', address);
+    metaLine('Community', nationName);
+    ctx.gap(3.5);
+
+    var reLine = immediate
+      ? 'RE: Notice of IMMEDIATE Eviction — Immediate Safety Risk from Drug-Related Criminal Activity'
+      : 'RE: Notice of Eviction — Criminal Activity Involving Drugs in the Housing Unit';
+    para(reLine, { bold:true, size:9.5, color:20 });
+    ctx.gap(1.5);
+    para('Dear ' + (tenant || 'Tenant') + ',');
+
+    if (immediate) {
+      para('This letter is formal written notice, under Section 26.3 of the ' + nationName + ' ("' + nationSh + '") Housing Policy, that the Housing Program has determined that your continued occupancy of the housing unit identified above presents an immediate and substantiated risk to the safety of others. As a result, you are being evicted immediately, without the standard notice and response period that would otherwise apply under Section 26.2.');
+    } else {
+      para('This letter is formal written notice, under Section 26 of the ' + nationName + ' ("' + nationSh + '") Housing Policy, that the Housing Program intends to initiate eviction proceedings in respect of the housing unit identified above. This notice sets out the grounds for eviction, your opportunity to respond, and your right to appeal, as required by Section 26.2 of the Housing Policy.');
+    }
+
+    // Grounds ----------------------------------------------------------------
+    if (immediate) {
+      sect('Grounds for Immediate Eviction (ss. 26.1 & 26.3)');
+      para('Drugs and/or evidence of drug-related criminal activity were found in or in direct connection with your housing unit. The Housing Program has determined that this constitutes criminal activity within or directly connected to the housing unit (s. 26.1) and that continued occupancy presents an immediate and substantiated risk to the safety of others (s. 26.3). The determination is based on the following:');
+    } else {
+      sect('Grounds for Eviction (s. 26.1)');
+      para('The Housing Program has determined that drugs and/or evidence of drug-related criminal activity were found in or in direct connection with your housing unit. The following grounds for eviction under Section 26.1 of the Housing Policy apply:');
+      bullet('Criminal activity within or directly connected to the housing unit;');
+      bullet('Non-compliance with the terms of your housing agreement and this Policy; and');
+      bullet('Where a conviction is entered, conviction of selling drugs or alcohol from the Band housing unit.');
+      ctx.gap(1);
+      para('The determination is based on the following:');
+    }
+    metaLine('Housing unit inspected / attended on', discLong);
+    metaLine('Discovered during', discMethod);
+    metaLine('Description of substances / evidence found', evidence);
+    metaLine('Person(s) involved / residing in unit', persons);
+    metaLine('Referred to police (NAPS) on', policeLong);
+    metaLine('Police file no.', policeFile);
+    ctx.gap(1);
+    if (immediate) {
+      para('In keeping with the Housing Policy, this matter has been reported to the police.');
+      sect('Executive Director Approval (s. 26.3)');
+      para('As required by Section 26.3 of the Housing Policy, the decision to proceed with immediate eviction has been approved by the Executive Director, ' + edName + ', on ' + edLong + ', and has been documented in the housing file.');
+      sect('You Are Required to Vacate');
+      para('You are required to vacate the housing unit and return all keys by ' + vacateLong + '. You remain responsible for the unit, and for all rent and charges, until the unit is vacated and keys are returned. Any personal belongings must be removed by that time.');
+      sect('Your Right to Appeal Is Preserved (ss. 26.3 & 29)');
+      para('Although this is an immediate eviction, your right to appeal is preserved. An appeal must be submitted in writing to the Housing Manager within five (5) business days of this decision, must identify the specific grounds for appeal, and must include all relevant supporting information. Appeals are conducted in accordance with the Housing Governance and Administration Policy, Section 9. You have the right to appear before the appropriate authority with supporting witnesses and documentation. Filing an appeal does not, on its own, delay the requirement to vacate unless the appeal authority orders otherwise.');
+    } else {
+      para('Section 13.1 of the Housing Policy requires all tenants, as a condition of their housing agreement, to ensure that household members and guests conduct themselves in a manner that does not endanger others or damage the unit. In keeping with the Housing Policy, this matter has been reported to the police.');
+      sect('Your Opportunity to Respond (s. 26.2)');
+      para('Before any final decision to evict is made, you have a reasonable opportunity to respond to this notice in writing. Any response must be submitted to the Housing Manager on or before ' + respLong + '. You may include any explanation, information, or supporting documentation you wish the Housing Program to consider.');
+      sect('What Happens Next');
+      para('After the response date, the Housing Manager will review any response received and a decision will be made. If the decision is to proceed with eviction, you will be notified in writing of that decision and required to vacate the housing unit by ' + (vacateLong || 'a date specified in that decision') + '. You will remain responsible for the unit, and for all rent and charges, until the unit is vacated and keys are returned.');
+      sect('Your Right to Appeal (s. 29)');
+      para('If a decision to evict is made, you have the right to appeal. An appeal must be submitted in writing to the Housing Manager within five (5) business days of the decision, must identify the specific grounds for appeal, and must include all relevant supporting information. Appeals are conducted in accordance with the Housing Governance and Administration Policy, Section 9. You have the right to appear before the appropriate authority with supporting witnesses and documentation.');
+    }
+
+    var contact = (hPhone || hEmail)
+      ? ('If you have any questions about this notice, please contact the Housing Department at ' + [hPhone, hEmail].filter(Boolean).join(' or ') + '.')
+      : 'If you have any questions about this notice, please contact the Housing Department.';
+    para(contact);
+    ctx.gap(2.5);
+    W.signature(hmName, nationName, hPhone, hEmail);
+
+    // Record of Service (office use) -----------------------------------------
+    sect('For Housing Office Use — Record of Service');
+    metaLine('Notice served by', servedBy);
+    metaLine('Date & time served', serviceDt);
+    metaLine('Method of service', serviceMet);
+    metaLine('Executive Director notified', edNotified);
+    ctx.gap(3);
+    var pdf = ctx.pdf, L = W.L, CW = W.CW;
+    pdf.setFont('helvetica','italic'); pdf.setFontSize(7.3); pdf.setTextColor(120);
+    var authTxt = immediate
+      ? 'Authority: ' + nationSh + ' Housing Policy, Version 5.8 — s. 26.1 (Grounds for Eviction), s. 26.3 (Immediate Eviction), and s. 29 (Appeals). Immediate eviction requires Executive Director approval and must be documented.'
+      : 'Authority: ' + nationSh + ' Housing Policy, Version 5.8 — s. 26.1 (Grounds for Eviction), s. 26.2 (Eviction Process), s. 13.1 (General Obligations), and s. 29 (Appeals).';
+    var authLines = pdf.splitTextToSize(authTxt, CW);
+    ctx.needSpace(authLines.length * 3.2 + 1);
+    pdf.text(authLines, L, ctx.y + 2.4); ctx.y += authLines.length * 3.2;
+    pdf.setTextColor(0); pdf.setFont('helvetica','normal');
+
+    ctx.finish(); // draw footers (Page X of Y)
+
+    var tenantSlug = (tenant || 'Tenant').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'Tenant';
+    var filename   = nationSh.replace(/[^a-z0-9]+/gi, '') + '_Eviction_Notice_' + (immediate ? 'Immediate_' : 'Standard_') + tenantSlug + '.pdf';
+
+    pdf.save(filename);
+
+    // Save to tenant document library
+    var unit = _ticState.unit || {};
+    var mo = document.getElementById('tic_eviction_modal');
+    if (unit.id && typeof window.sbUploadFile === 'function') {
+      try {
+        var blob      = pdf.output('blob');
+        var storePath = 'tenants/' + unit.id + '/' + Date.now() + '_' + filename;
+        await window.sbUploadFile(storePath, blob);
+        if (typeof window.sbSaveFileMeta === 'function') {
+          await window.sbSaveFileMeta('tenant', String(unit.id), storePath, filename, blob.size, 'application/pdf');
+        }
+        _ticDocLibKey = null; _ticDocLib = null; // force doc-lib remount so it appears
+        if (mo) mo.remove();
+        if (typeof showToast === 'function') showToast('✓ Eviction notice saved to document library');
+      } catch (e) {
+        console.warn('[tic] eviction notice upload failed:', e);
+        if (mo) mo.remove();
+        if (typeof showToast === 'function') showToast('✓ Notice downloaded (document library save failed — see console)');
+      }
+    } else {
+      if (mo) mo.remove();
+      if (typeof showToast === 'function') showToast('✓ Eviction notice generated');
+    }
+  }
+
+  window._ticOpenEvictionNoticeModal   = _ticOpenEvictionNoticeModal;
+  window._ticGenerateEvictionNoticePdf = _ticGenerateEvictionNoticePdf;
 
   // ════════════════════════════════════════════════════════════════════════════
   // Set Location & Photo (SLP) — Admin Workflow
