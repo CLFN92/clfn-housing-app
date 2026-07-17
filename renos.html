@@ -1511,7 +1511,7 @@ function renderRenoApprovalsView() {
   }
 
   // ── List / Cards toggle ──────────────────────────────────────
-  var _raMode = (typeof _viewMode === 'function') ? _viewMode('reno_approvals') : 'list';
+  var _raMode = (typeof _viewMode === 'function') ? _viewMode('reno_approvals') : 'cards';
   var _raToggleEl = document.getElementById('ra_view_toggle');
   if (_raToggleEl && typeof _viewToggleHtml === 'function') _raToggleEl.innerHTML = _viewToggleHtml('reno_approvals', '_raSetView');
   var _raTableWrap = document.getElementById('ra_table_wrap');

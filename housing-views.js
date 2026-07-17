@@ -61,7 +61,9 @@ function _assignmentTypeBadge(u) {
 // locally-scoped wlGrid/wlPill/wlCard) since those are private to
 // renderWorklist(); this is the shared home for every OTHER page's table.
 function _viewMode(key) {
-  try { return localStorage.getItem('clfn_' + key + '_view') === 'cards' ? 'cards' : 'list'; } catch(e) { return 'list'; }
+  // Default is Cards for every page — only an explicit saved 'list' preference
+  // shows the table. (Users who picked List keep List; everyone else gets Cards.)
+  try { return localStorage.getItem('clfn_' + key + '_view') === 'list' ? 'list' : 'cards'; } catch(e) { return 'cards'; }
 }
 function _viewToggleHtml(key, setFnName) {
   var cur = _viewMode(key);
@@ -2040,7 +2042,8 @@ async function renderRecentActivity(role) {
   }
 
   // View mode shared with the worklist toggle (one preference drives both).
-  var _view = (function(){ try { return localStorage.getItem('clfn_worklist_view') === 'cards' ? 'cards' : 'list'; } catch(e){ return 'list'; } })();
+  // Defaults to Cards; only an explicit saved 'list' shows the list layout.
+  var _view = (function(){ try { return localStorage.getItem('clfn_worklist_view') === 'list' ? 'list' : 'cards'; } catch(e){ return 'cards'; } })();
   function _recentToggleBar(){
     function b(v, label, icon){
       var on = _view === v;

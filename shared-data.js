@@ -4196,14 +4196,17 @@ function renderContractorsView(){
   // No contractors yet → swap the search/KPI/table out for a single empty
   // card. Search input stays visible (sits above) but with nothing to
   // search, that's harmless.
+  var _ctCardsEl0  = document.getElementById('ct_cards');
+  var _ctToggleEl0 = document.getElementById('ct_view_toggle');
   if(!allContractors.length){
     if (kpiHost)   kpiHost.innerHTML = '';
     if (tableWrap) tableWrap.style.display = 'none';
+    if (_ctCardsEl0)  { _ctCardsEl0.style.display = 'none'; _ctCardsEl0.innerHTML = ''; }
+    if (_ctToggleEl0) _ctToggleEl0.innerHTML = '';
     if (emptyHost) emptyHost.innerHTML = '<div class="card ct-empty"><div class="ct-empty-inner"><span class="ct-empty-icon">🧰</span><div class="ct-empty-title">No contractors added yet</div><div class="ct-empty-sub">Click "Add Contractor" to build your directory.</div></div></div>';
     return;
   }
   if (emptyHost) emptyHost.innerHTML = '';
-  if (tableWrap) tableWrap.style.display = '';
 
   // ── KPIs ─────────────────────────────────────────────────────────────
   var kpi = _ctComputeKpis();
@@ -4294,6 +4297,50 @@ function renderContractorsView(){
     ? tableApplyFilterSort(enriched, _ctAccessors, _ctState)
     : enriched;
 
+  // ── List / Cards toggle (mirrors Inventory / Match / Tenants) ─────────
+  var _ctMode    = (typeof _viewMode === 'function') ? _viewMode('contractors') : 'cards';
+  var _ctCardsEl = document.getElementById('ct_cards');
+  var _ctToggle  = document.getElementById('ct_view_toggle');
+  if (_ctToggle && typeof _viewToggleHtml === 'function') _ctToggle.innerHTML = _viewToggleHtml('contractors', '_ctSetView');
+  if (tableWrap)  tableWrap.style.display  = (_ctMode === 'cards') ? 'none' : '';
+  if (_ctCardsEl) _ctCardsEl.style.display = (_ctMode === 'cards') ? '' : 'none';
+
+  // ── Cards view — same filtered + sorted rows as the table ────────────
+  if (_ctMode === 'cards') {
+    if (_ctCardsEl) {
+      if (!rows.length) {
+        _ctCardsEl.innerHTML = '<div class="card" style="text-align:center;padding:40px;color:var(--muted);">No contractors match the current filters.</div>';
+      } else if (typeof _cardTile === 'function' && typeof _cardGrid === 'function') {
+        _ctCardsEl.innerHTML = _cardGrid(rows.map(function(r){
+          var ct = r.ct; var i = r.i;
+          var ss = contractorStatusBadge(r.statusKey, {variant:'table'}) || {label:r.statusKey};
+          var contact = ct.phone ? formatPhone(ct.phone) : (ct.email || '');
+          return _cardTile({
+            title: ct.name || '(unnamed)',
+            pill: {text: ss.label, bg: (ss.bg||'var(--bg)'), color: (ss.c||'var(--muted)')},
+            metas: [
+              {k:'Trade',            v: ct.trade || 'General Contractor'},
+              {k:'Contact',          v: contact},
+              {k:'Indigenous',       v: (r.classLabel && r.classLabel !== '(none)') ? r.classLabel : ''},
+              {k:'# Jobs',           v: r.jobs},
+              {k:'Cumulative $',     v: _ctFmtCurrency(r.value)},
+              {k:'WSIB Expiry',      v: ct.wsibExpiry || ''},
+              {k:'Insurance Expiry', v: ct.insExpiry  || ''}
+            ],
+            open: 'openAddContractorModal('+i+')',
+            actions: [
+              {text:'🖨 Print', onclick:'event.stopPropagation();ctPrintFromRow('+i+')', ghost:true},
+              {text:'✏️ Edit',  onclick:'event.stopPropagation();openAddContractorModal('+i+')'}
+            ]
+          });
+        }).join(''));
+      }
+    }
+    // Column registration already ran above so List mode's popovers stay in
+    // sync; there's no table header to bind in Cards mode.
+    return;
+  }
+
   // ── Table rows ───────────────────────────────────────────────────────
   if(!rows.length){
     tbody.innerHTML = '<tr><td colspan="10" class="ct-table-empty">No contractors match the current filters.</td></tr>';
@@ -4339,6 +4386,12 @@ function renderContractorsView(){
   if (typeof tableBindColumnMenuClicks === 'function')   tableBindColumnMenuClicks(thead, 'contractors');
   if (typeof tableRefreshSortIndicators === 'function') tableRefreshSortIndicators(thead, 'contractors');
 }
+// List/Cards toggle setter for the Contractors page (mirrors _invSetView /
+// _matchSetView / _tenSetView in housing-views.js). Persisted per device.
+window._ctSetView = function(v){
+  try { localStorage.setItem('clfn_contractors_view', v === 'cards' ? 'cards' : 'list'); } catch(e){}
+  if (typeof renderContractorsView === 'function') renderContractorsView();
+};
 function renderCtFilePreview(bucket){
   var container=document.getElementById('ct_'+bucket+'_preview');
   if(!container)return;
@@ -4746,7 +4799,7 @@ function renderRenosView(){
   }
 
   // ── List / Cards toggle ──────────────────────────────────────
-  var _rnMode = (typeof _viewMode === 'function') ? _viewMode('renovations') : 'list';
+  var _rnMode = (typeof _viewMode === 'function') ? _viewMode('renovations') : 'cards';
   var _rnToggleEl = document.getElementById('rv_view_toggle');
   if (_rnToggleEl && typeof _viewToggleHtml === 'function') _rnToggleEl.innerHTML = _viewToggleHtml('renovations', '_renosSetView');
   var _rnTableWrap = document.getElementById('renos_table_wrap');
@@ -5448,8 +5501,8 @@ function renderWorklist() {
       + '</div>';
   }
 
-  // ── View mode (List vs Cards) — persisted per device, defaults to List ────
-  var _view = (function(){ try { return localStorage.getItem('clfn_worklist_view') === 'cards' ? 'cards' : 'list'; } catch(e){ return 'list'; } })();
+  // ── View mode (List vs Cards) — persisted per device, defaults to Cards ────
+  var _view = (function(){ try { return localStorage.getItem('clfn_worklist_view') === 'list' ? 'list' : 'cards'; } catch(e){ return 'cards'; } })();
   window._wlSetView = function(v){
     try { localStorage.setItem('clfn_worklist_view', v === 'cards' ? 'cards' : 'list'); } catch(e){}
     renderWorklist();

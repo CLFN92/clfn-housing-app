@@ -142,7 +142,13 @@ async function loadRenosData() {
     var openCtId = qp.get('openContractor');
     if (openCtId && Array.isArray(window._contractors)) {
       var idx = window._contractors.findIndex(function(c){ return c && c.id === openCtId; });
-      if (idx >= 0 && typeof openCtApprovalPanel === 'function') {
+      // Open the contractor in the new TIC-style card (edit mode reveals the
+      // approval surface — Approve / Return for Info / Decline pills — so the
+      // "Verify"/"Approve" worklist actions land on the same card layout as
+      // every other contractor view, not the old standalone approval panel.
+      if (idx >= 0 && typeof openAddContractorModal === 'function') {
+        setTimeout(function(){ openAddContractorModal(idx); }, 80);
+      } else if (idx >= 0 && typeof openCtApprovalPanel === 'function') {
         setTimeout(function(){ openCtApprovalPanel(idx); }, 80);
       }
     }
