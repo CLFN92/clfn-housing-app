@@ -2646,12 +2646,56 @@ function applyApprovalDisabledSweep(gate){
     });
   });
 
+  // Inspections — chain: approveInspection. Data may not be loaded on this
+  // page (the toggle lives on housing.html), so sweep straight over REST.
+  if (APPROVAL_AUTHORITY.chainDisabled('inspection')) {
+    _sweepInspectionsViaRest(); // async, detached — self-toasts its own count
+  }
+
   if (swept && typeof showToast === 'function') showToast('✓ ' + swept + ' item(s) auto-approved');
   // Refresh any open surfaces that show queues.
   if (typeof renderWorklist === 'function') renderWorklist();
   if (typeof renderDashTable === 'function') try { renderDashTable(); } catch(e){}
   return swept;
 }
+
+// Approve every completed-but-unsigned inspection over REST (used by the
+// sweep, since inspection records / _inspSave aren't loaded on housing.html).
+// Pending = a real result (pass/fail/needs_repair) with no approved_by yet.
+async function _sweepInspectionsViaRest(){
+  if (typeof SUPABASE_URL === 'undefined' || typeof HOUSING_HEADERS === 'undefined') return 0;
+  try {
+    var listUrl = SUPABASE_URL + '/rest/v1/inspections'
+      + '?approved_by=is.null&overall_status=in.(pass,fail,needs_repair)&select=id';
+    var lr = await fetch(listUrl, { headers: HOUSING_HEADERS });
+    if (!lr.ok) return 0;
+    var rows = await lr.json();
+    if (!rows || !rows.length) return 0;
+    var when = new Date().toISOString();
+    var n = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var pr = await fetch(SUPABASE_URL + '/rest/v1/inspections?id=eq.' + encodeURIComponent(rows[i].id), {
+        method:  'PATCH',
+        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body:    JSON.stringify({ approved_by: _APPROVAL_SYSTEM_ACTOR, approved_at: when })
+      });
+      if (pr.ok) {
+        n++;
+        if (typeof auditEntry === 'function') auditEntry(rows[i].id, 'inspection_auto_approved', 'Inspection auto-approved (approval disabled in Settings)', _APPROVAL_SYSTEM_ACTOR);
+      }
+    }
+    // Reflect into the in-memory cache if this page has one loaded.
+    (window._inspections || []).forEach(function(ins){
+      if (ins && !ins.approved_by && ['pass','fail','needs_repair'].indexOf(ins.overall_status) !== -1) {
+        ins.approved_by = _APPROVAL_SYSTEM_ACTOR; ins.approved_at = when;
+      }
+    });
+    if (n && typeof showToast === 'function') showToast('✓ ' + n + ' inspection report(s) auto-approved');
+    if (typeof renderInspectionsList === 'function') try { renderInspectionsList(); } catch(e){}
+    return n;
+  } catch(e) { console.warn('[approval sweep] inspections:', e); return 0; }
+}
+
 window.approvalSweepCount = approvalSweepCount;
 window.applyApprovalDisabledSweep = applyApprovalDisabledSweep;
 

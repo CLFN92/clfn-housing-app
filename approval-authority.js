@@ -171,8 +171,8 @@ var APPROVAL_AUTHORITY = (function() {
     'reviewApplication', 'finalApproveApp',
     'reviewFileUpdate', 'approveFileUpdate',
     'approveSowUnderThreshold', 'approveSowOverThreshold',
-    'recommendContractor', 'approveContractor'
-    // 'approveInspection' — pending its own auto-approve wiring (next increment)
+    'recommendContractor', 'approveContractor',
+    'approveInspection'
   ];
   var CHAINS = {
     application: ['reviewApplication', 'finalApproveApp'],

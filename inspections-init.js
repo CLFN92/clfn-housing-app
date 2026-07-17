@@ -255,6 +255,12 @@ function openInspectionModal(id) {
   // Approval gate: only roles granted 'approveInspection' (Settings > Approval
   // Authority) can approve / sign off the report (stamps approved_by/approved_at).
   var canApproveInsp = (typeof APPROVAL_AUTHORITY === 'undefined') || APPROVAL_AUTHORITY.can('approveInspection', window.currentRole);
+  // When the sign-off step is switched OFF in Settings, a completed report is
+  // approved automatically on save — so the manual "Approve Report" button is
+  // moot and hidden (Revoke stays available for anything already approved).
+  var inspApprovalRequired = (typeof APPROVAL_AUTHORITY === 'undefined')
+    || (typeof APPROVAL_AUTHORITY.required !== 'function')
+    || APPROVAL_AUTHORITY.required('approveInspection');
   var inspApprovedBy = insp && insp.approved_by ? insp.approved_by : '';
   var inspApprovedAt = insp && insp.approved_at ? String(insp.approved_at).slice(0, 10) : '';
   var apprBanner = '';
@@ -311,7 +317,7 @@ function openInspectionModal(id) {
     +   '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
     +     (insp ? '<button type="button" class="btn btn-ghost" onclick="_inspConfirmDelete()">Delete</button>' : '')
     +     (insp ? '<button type="button" class="btn btn-ghost" onclick="generateInspectionPDF()">⬇ PDF</button>' : '')
-    +     (canApproveInsp && !inspApprovedBy ? '<button type="button" class="btn" style="background:#15803d;color:#fff;border:1px solid #15803d;" onclick="saveInspection(\'approve\')">✓ Approve Report</button>' : '')
+    +     (canApproveInsp && !inspApprovedBy && inspApprovalRequired ? '<button type="button" class="btn" style="background:#15803d;color:#fff;border:1px solid #15803d;" onclick="saveInspection(\'approve\')">✓ Approve Report</button>' : '')
     +     (canApproveInsp && inspApprovedBy ? '<button type="button" class="btn btn-ghost" onclick="saveInspection(\'revoke\')">Revoke Approval</button>' : '')
     +   '</div>'
     +   '<div style="display:flex;gap:8px;">'
@@ -542,6 +548,14 @@ async function saveInspection(approveAction) {
   } else if (approveAction === 'revoke') {
     record.approved_by = null;
     record.approved_at = null;
+  } else if (!record.approved_by
+      && (status === 'pass' || status === 'fail' || status === 'needs_repair')
+      && typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.chainDisabled
+      && APPROVAL_AUTHORITY.chainDisabled('inspection')) {
+    // The inspection sign-off step is switched OFF in Settings — auto-approve a
+    // completed report on save ("any off = fully approved"), recorded as System.
+    record.approved_by = 'System — approval disabled';
+    record.approved_at = new Date().toISOString();
   }
   // Photos/documents are managed live by the document library (Supabase Storage
   // + audit log), so the legacy `photos` column is intentionally left untouched.
