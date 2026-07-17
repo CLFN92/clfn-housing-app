@@ -1235,6 +1235,53 @@ if (typeof window !== 'undefined') {
   window.sbSaveUnitNote  = sbSaveUnitNote;
 }
 
+// Contractor notes — same append-only note log as unit_notes / tenant_notes,
+// keyed by the contractor's TEXT id ('CT-...'). Read via contractor_notes.
+async function sbLoadContractorNotes(contractorId) {
+  if (!contractorId) return [];
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/contractor_notes?contractor_id=eq.'
+                        + encodeURIComponent(contractorId) + '&select=*&order=created_at.desc',
+                        { headers: HOUSING_HEADERS });
+    if (!r.ok) { console.warn('[ct-note] load HTTP ' + r.status); return []; }
+    var rows = await r.json();
+    return Array.isArray(rows) ? rows : [];
+  } catch (e) { console.warn('[ct-note] load failed:', e); return []; }
+}
+// Append a note to contractor_notes (author + timestamp from the session).
+// Returns the saved row (or a local shape) on success, null on failure.
+async function sbSaveContractorNote(contractorId, body) {
+  body = (body || '').trim();
+  if (!contractorId || !body) return null;
+  var author = (window.HOUSING_SESSION && HOUSING_SESSION.name)
+             || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('clfn_housing_name'))
+             || 'Unknown';
+  var email  = (window.HOUSING_SESSION && HOUSING_SESSION.email) || '';
+  var payload = { contractor_id: contractorId, note_body: body, author_name: author, author_email: email, created_at: new Date().toISOString() };
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/contractor_notes', {
+      method: 'POST',
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=representation' }),
+      body: JSON.stringify(payload)
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var rows = await r.json();
+    var added = (rows && rows[0]) || payload;
+    if (typeof auditEntry === 'function') {
+      auditEntry('CT:' + contractorId, 'contractor_note_add', 'Note added (' + body.length + ' chars)', window.currentRole || 'staff');
+    }
+    return added;
+  } catch (e) {
+    console.warn('[ct-note] save failed:', e);
+    if (typeof showToast === 'function') showToast('Note save failed: ' + e.message, { type: 'error' });
+    return null;
+  }
+}
+if (typeof window !== 'undefined') {
+  window.sbLoadContractorNotes = sbLoadContractorNotes;
+  window.sbSaveContractorNote  = sbSaveContractorNote;
+}
+
 // ── Required-field helpers ────────────────────────────────────────────────────
 // Drive both the application form's red * markers AND validation off a single
 // settings key (housing_settings.required_fields). ED-only edit; everyone else
@@ -2029,40 +2076,139 @@ var _CIC_TAB_NAMES = ['overview','compliance','documents','terms','sigs'];
 var _CIC_TAB_TOTAL = _CIC_TAB_NAMES.length;
 
 // Tab switcher for the Contractor Information Card (CIC) modal. Mirrors
-// the SOW pattern (setSowTab in housing-modals-sow.js) but scoped to the
-// CIC's container IDs so the two modals don't collide. Updates both the
-// desktop tab strip (#cic_tab_bar) and the mobile drawer (#cic_tab_drawer)
-// plus the .modal-tab-panel[data-cic-panel="..."] panels. Visited tabs
-// get the .visited class so the amber unread-dot disappears once a tab
-// has been opened.
+// the TIC/SOW pattern (setSowTab in housing-modals-sow.js) but scoped to the
+// CIC's container IDs so the modals don't collide. Toggles the .tic-tab
+// buttons (#cic_tab_bar) and the .tic-panel[data-cic-panel="..."] bodies via
+// .tic-active. Visited tabs get the .visited class so the amber unread-dot
+// disappears once a tab has been opened.
 function setCicTab(name) {
   if (!window._cicVisitedTabs) window._cicVisitedTabs = new Set();
   window._cicVisitedTabs.add(name);
+  // TIC-shell tabs: .tic-tab buttons carry data-cic-tab, .tic-panel bodies
+  // carry data-cic-panel; the active tab/panel gets .tic-active (matching
+  // setSowTab / _ueSwitchTab). Visited tabs get .visited for the unread dot.
   var bar = document.getElementById('cic_tab_bar');
   if (bar) {
-    bar.querySelectorAll('.modal-tab').forEach(function(b){
+    bar.querySelectorAll('.tic-tab').forEach(function(b){
       var n = b.getAttribute('data-cic-tab');
-      b.classList.toggle('active', n === name);
+      b.classList.toggle('tic-active', n === name);
       b.classList.toggle('visited', window._cicVisitedTabs.has(n));
     });
   }
-  var drawer = document.getElementById('cic_tab_drawer');
-  if (drawer) {
-    drawer.querySelectorAll('.modal-drawer-item').forEach(function(b){
-      var n = b.getAttribute('data-cic-tab');
-      b.classList.toggle('active', n === name);
-      b.classList.toggle('visited', window._cicVisitedTabs.has(n));
-    });
-  }
-  // Scope panel toggle to the CIC modal so SOW panels (different
-  // data attribute) on a future shared page wouldn't be affected.
+  // Scope panel toggle to the CIC modal so SOW/TIC panels elsewhere in the
+  // DOM (which also use .tic-panel) aren't affected.
   var modal = document.getElementById('addContractorModal');
   var scope = modal || document;
-  scope.querySelectorAll('.modal-tab-panel[data-cic-panel]').forEach(function(p){
-    p.classList.toggle('active', p.getAttribute('data-cic-panel') === name);
+  scope.querySelectorAll('.tic-panel[data-cic-panel]').forEach(function(p){
+    p.classList.toggle('tic-active', p.getAttribute('data-cic-panel') === name);
   });
+  // The Notes tab renders lazily (like the TIC's) so it reflects the latest
+  // contractor_notes each time it's opened.
+  if (name === 'notes' && typeof cicRenderNotes === 'function') {
+    cicRenderNotes(window._ctLastSaved && window._ctLastSaved.id);
+  }
+  if (typeof _cicRefreshStrip === 'function') _cicRefreshStrip();
   _updateCicSaveButtonState();
 }
+
+// Refreshes the 6 info-strip tiles from the current form + saved record.
+// Status comes from the saved contractor (contractorStatusBadge); the rest
+// mirror whatever is in the Overview/Compliance fields. Called on open and
+// on every tab switch.
+function _cicRefreshStrip() {
+  var get = function(id){ var el = document.getElementById(id); return el ? (el.value || '') : ''; };
+  var set = function(id, val, color){
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = (val === '' || val == null) ? '—' : val;
+    el.style.color = color || '';
+  };
+  var ct = window._ctLastSaved;
+  var statusEl = document.getElementById('cic_strip_status');
+  if (statusEl) {
+    if (ct && typeof contractorStatusBadge === 'function') {
+      var ss = contractorStatusBadge(ct.status || 'pending_review') || {c:'', label:(ct.status||'—')};
+      statusEl.textContent = ss.label || '—';
+      statusEl.style.color = ss.c || '';
+    } else {
+      statusEl.textContent = 'New — not yet saved';
+      statusEl.style.color = '';
+    }
+  }
+  set('cic_strip_trade', get('ct_trade'));
+  set('cic_strip_phone', get('ct_phone'));
+  set('cic_strip_email', get('ct_email'));
+  set('cic_strip_wsib',  get('ct_wsib_expiry'));
+  set('cic_strip_ins',   get('ct_ins_expiry'));
+}
+window._cicRefreshStrip = _cicRefreshStrip;
+
+// ── Contractor Notes tab (append-only log, same UX as unit/tenant notes) ──
+function _cicNoteHtml(n){
+  var esc  = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+  var when = '';
+  try { if(n.created_at) when = new Date(n.created_at).toLocaleString('en-CA'); } catch(e){ when = n.created_at || ''; }
+  return '<div class="tic-note"><div class="tic-note-meta"><span class="tic-note-author">'
+       + esc(n.author_name || 'Unknown') + '</span>' + (when ? ' &middot; ' + esc(when) : '') + '</div>'
+       + '<div class="tic-note-body">' + esc(n.note_body || '') + '</div></div>';
+}
+function cicRenderNotes(contractorId){
+  var mount = document.getElementById('cic_notes_mount');
+  if(!mount) return;
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+  window._cicNotesCtId = contractorId || null;
+  // A brand-new contractor has no id yet — notes are keyed by contractor id,
+  // so prompt the user to save first (mirrors how unit notes need a saved unit).
+  if(!contractorId){
+    mount.innerHTML = '<div class="tic-section"><div class="tic-section-h">Notes</div>'
+      + '<div class="tic-empty">Save the contractor first to start adding notes.</div></div>';
+    return;
+  }
+  mount.innerHTML =
+      '<div class="tic-section"><div class="tic-section-h">Add a Note</div>'
+    +   '<textarea id="cic_note_input" class="tic-textarea" placeholder="Type your note…"></textarea>'
+    +   '<div class="tic-form-actions" style="margin-top:8px;"><button type="button" class="btn btn-primary" onclick="cicSaveNote()">Add Note</button></div>'
+    + '</div>'
+    + '<div class="tic-section tic-section-spaced"><div class="tic-section-h">Notes &amp; History</div>'
+    +   '<div id="cic_notes_list"><div class="tic-empty">Loading…</div></div>'
+    + '</div>';
+  // Any legacy single-field ct.notes value is shown read-only so nothing is lost.
+  var legacy = (window._ctLastSaved && window._ctLastSaved.notes) ? String(window._ctLastSaved.notes).trim() : '';
+  function _render(notes){
+    var list = document.getElementById('cic_notes_list');
+    if(!list) return;
+    var html = '';
+    (notes || []).forEach(function(n){ html += _cicNoteHtml(n); });
+    if(legacy){
+      html += '<div class="tic-note"><div class="tic-note-meta"><span class="tic-note-author">Legacy note</span></div>'
+            + '<div class="tic-note-body">' + esc(legacy) + '</div></div>';
+    }
+    list.innerHTML = html || '<div class="tic-empty">No notes yet.</div>';
+  }
+  if(typeof sbLoadContractorNotes === 'function'){
+    sbLoadContractorNotes(contractorId).then(_render).catch(function(){ _render([]); });
+  } else { _render([]); }
+}
+function cicSaveNote(){
+  var inp = document.getElementById('cic_note_input');
+  var body = (inp && inp.value || '').trim();
+  if(!body){ if(typeof showToast === 'function') showToast('Note cannot be empty.', { type:'error' }); return; }
+  var ctId = window._cicNotesCtId || (window._ctLastSaved && window._ctLastSaved.id);
+  if(!ctId || typeof sbSaveContractorNote !== 'function') return;
+  sbSaveContractorNote(ctId, body).then(function(added){
+    if(!added) return;
+    var list = document.getElementById('cic_notes_list');
+    if(list){
+      var empty = list.querySelector('.tic-empty');
+      if(empty) list.innerHTML = '';
+      list.insertAdjacentHTML('afterbegin', _cicNoteHtml(added));
+    }
+    if(inp) inp.value = '';
+    if(typeof showToast === 'function') showToast('Note added.');
+  });
+}
+window.cicRenderNotes = cicRenderNotes;
+window.cicSaveNote    = cicSaveNote;
 
 // Flips the contractor Save button between three modes:
 //   "edit"   → existing contractor being edited; label is "Save Changes",
@@ -2730,7 +2876,7 @@ function cancelCtAction() {
   if(ni) ni.value='';
 }
 function closeAddContractorModal(){
-  var acm=document.getElementById('addContractorModal');if(acm)acm.style.display='none';
+  var acm=document.getElementById('addContractorModal');if(acm){acm.style.display='none';acm.style.zIndex='';}
   // If search modal was the caller and is still mounted, refresh its results
   var sm = document.getElementById('contractorSearchModal');
   if(sm && sm.style.display !== 'none') {
@@ -3230,9 +3376,17 @@ async function lookupUser(){
   }
 }
 function openAddContractorModal(editIdx){
+  // Mount the modal on demand. contractors.html ships only a host div now
+  // (the full markup lives in the single _buildAddContractorModalHTML builder),
+  // and sub-pages never had it — _ensureAddContractorModal is idempotent.
+  if (typeof _ensureAddContractorModal === 'function') _ensureAddContractorModal();
   window._ctEditIdx = (editIdx !== undefined) ? editIdx : -1;
   window._ctLastSaved = null;
   window._ctFiles={wsib:[],insurance:[],other:[]};
+  // Reset the hero title to the new-contractor default; edit mode sets it to
+  // the company name below.
+  var _ctTitle0 = document.getElementById('ct_modal_title');
+  if (_ctTitle0) _ctTitle0.textContent = 'New Contractor';
   // Approval index gates the Approve/Decline pill handlers. Reset on every
   // open — edit mode will re-set it below.
   _ctApprovalIdx = -1;
@@ -3319,7 +3473,7 @@ function openAddContractorModal(editIdx){
     // _updateCicSaveButtonState (Save Changes / Save Draft / Submit
     // Contractor) so we no longer set it here.
     var title = document.getElementById('ct_modal_title');
-    if(title) title.textContent = 'Contractor Information';
+    if(title) title.textContent = (ct && ct.name) ? ct.name : 'Contractor Information';
     // Wire the unified CIC: status banner + action pills + flow + Forms&SOWs.
     // _ctApprovalIdx is what initCtAction / confirmCtAction key off of;
     // _ctLastSaved lets Print render the current record without a fresh save.
@@ -3341,12 +3495,22 @@ function openAddContractorModal(editIdx){
     }
   } else {
     var title = document.getElementById('ct_modal_title');
-    if(title) title.textContent = 'Contractor Application';
+    if(title) title.textContent = 'New Contractor';
     // Save button label is owned by _updateCicSaveButtonState (currently
     // "💾 Save Draft" until all tabs are visited, then "📤 Submit Contractor").
   }
   var acm=document.getElementById('addContractorModal');
   if(acm) acm.style.display = 'flex';
+  // Refresh the glance strip now that every field is populated (setCicTab ran
+  // before the edit-mode fill above), pre-render the Notes tab for the current
+  // contractor, and wire the scroll-collapse shrink on the info strip (mirrors
+  // the TIC / Edit Unit / SOW modals).
+  if (typeof _cicRefreshStrip === 'function') _cicRefreshStrip();
+  if (typeof cicRenderNotes === 'function') cicRenderNotes(window._ctLastSaved && window._ctLastSaved.id);
+  if (acm && typeof _initScrollCollapse === 'function') {
+    var _cicBody = acm.querySelector('.tic-body'), _cicStrip = acm.querySelector('.tic-strip');
+    if (_cicBody && _cicStrip) _initScrollCollapse(_cicBody, _cicStrip);
+  }
 }
 function openCtApprovalPanel(idx) {
   var contractors = [];
@@ -5672,16 +5836,22 @@ function resetSow(){
 function rpAddNewContractor() {
   var dd = document.getElementById('rp_ct_dropdown');
   if(dd) dd.style.display = 'none';
-  // Pre-fill the name if the user typed something
+  // Mount the modal on demand (it's built by the shared builder now).
+  if (typeof _ensureAddContractorModal === 'function') _ensureAddContractorModal();
   var typed = (document.getElementById('rp_contractor')||{}).value||'';
-  var nameField = document.getElementById('ct_name');
-  if(nameField && typed) nameField.value = typed;
   // Close progress modal first
   var prog = document.getElementById('renoProgressModal');
   if(prog) prog.style.display = 'none';
-  // Open the add contractor modal
+  // Open via the canonical helper so all per-mode setup (field reset, sig pads,
+  // strip/notes render, tab reset) runs and the modal is guaranteed mounted.
+  if (typeof openAddContractorModal === 'function') openAddContractorModal();
   var m = document.getElementById('addContractorModal');
-  if(m) m.style.display = 'flex';
+  if(m){ m.style.display = 'flex'; m.style.zIndex = '1000'; }
+  // Pre-fill the name AFTER open (openAddContractorModal resets fields, so
+  // setting it earlier would be wiped).
+  var nameField = document.getElementById('ct_name');
+  if(nameField && typed) nameField.value = typed;
+  if (typeof _cicRefreshStrip === 'function') _cicRefreshStrip();
   // Flag so saveContractor knows to reopen progress modal after
   window._rpAfterContractorSave = true;
 }
@@ -5880,6 +6050,13 @@ function saveContractorAndFinalize() {
       var he = document.getElementById('ct_header_email_btn');
       if(hp){ hp.classList.remove('hidden'); hp.style.display=''; }
       if(he && window._ctLastSaved.email){ he.classList.remove('hidden'); he.style.display=''; }
+      // Keep the hero title on the company name and refresh the glance strip
+      // (Status tile now reflects the saved record). Re-render the Notes tab
+      // too: a brand-new contractor now has an id, so notes become addable.
+      var _htitle = document.getElementById('ct_modal_title');
+      if(_htitle && window._ctLastSaved.name) _htitle.textContent = window._ctLastSaved.name;
+      if(typeof _cicRefreshStrip === 'function') _cicRefreshStrip();
+      if(typeof cicRenderNotes === 'function')   cicRenderNotes(window._ctLastSaved.id);
       // If we just saved a brand-new contractor, switch the modal into
       // edit mode so the CIC approval surface appears for managers
       // without a second click.
@@ -5890,8 +6067,6 @@ function saveContractorAndFinalize() {
         if (cas2) cas2.style.display = '';
         if(typeof _ctSetCicStatusBanner === 'function') _ctSetCicStatusBanner(window._ctLastSaved);
         if(typeof _ctRenderActions === 'function')      _ctRenderActions(window._ctLastSaved, 'cic');
-        var title = document.getElementById('ct_modal_title');
-        if(title) title.textContent = 'Contractor Information';
         // Now that this is an edit (saved contractor exists), pre-fill
         // all tabs as visited and refresh the Save button — it'll flip
         // to "Save Changes" mode automatically.
@@ -6351,24 +6526,40 @@ function _ctTorToggle(el) {
 
 function _buildAddContractorModalHTML() {
   return [
-    '<div id="addContractorModal" class="ct-modal-overlay">',
-      '<div class="ct-modal-body">',
+    // TIC-shell layout — mirrors the Tenant Information Card / Edit Unit modal
+    // (hero + 6-tile glance strip + tic-tabs + tic-panels + tic-section headers
+    // + tic-footer). Overlay is .modal-overlay (shown via display:flex by
+    // openAddContractorModal, same as before) at z-900 so it sits above the
+    // SOW modal; sowAddNewContractor bumps it to 1000 inline when needed.
+    '<div id="addContractorModal" class="modal-overlay modal-z-900">',
+      '<div class="tic-shell">',
 
-        // ── Header ──────────────────────────────────────────────────────
-        '<div class="modal-hdr spacious">',
-          '<div>',
-            '<div class="ct-panel-supertitle">Contractor Application</div>',
-            '<div id="ct_modal_title" class="panel-title">Contractor Application</div>',
+        // ── Hero ────────────────────────────────────────────────────────
+        '<div class="tic-hero">',
+          '<div class="tic-hero-main">',
+            '<div class="lbl-uppercase-sm">Contractor Application</div>',
+            '<h2 id="ct_modal_title" class="tic-name">New Contractor</h2>',
           '</div>',
-          '<div class="ct-modal-actions">',
-            '<button type="button" id="ct_header_print_btn" class="ct-hdr-btn hidden" onclick="printContractorAgreement()">🖨 Print / Save PDF</button>',
-            '<button type="button" id="ct_header_email_btn" class="ct-hdr-btn hidden" onclick="emailContractorAgreement()">✉ Email to Contractor</button>',
-            '<button type="button" onclick="closeAddContractorModal()" class="btn-close-sm">✕</button>',
+          '<div class="flex-gap8 flex-wrap">',
+            '<button type="button" id="ct_header_print_btn" class="btn btn-ghost hidden" onclick="printContractorAgreement()">🖨 Print / Save PDF</button>',
+            '<button type="button" id="ct_header_email_btn" class="btn btn-ghost hidden" onclick="emailContractorAgreement()">✉ Email to Contractor</button>',
+            '<button type="button" onclick="closeAddContractorModal()" class="tic-close-btn" aria-label="Close">✕</button>',
           '</div>',
         '</div>',
 
-        // Inline approval surface (edit/view mode only).
-        '<div id="cic_approval_surface" style="display:none;">',
+        // ── Info strip (6 tiles: Status/Trade/Phone/Email/WSIB exp/Ins exp) ──
+        '<div class="tic-strip">',
+          '<div class="tic-strip-tile"><span class="tic-strip-icon">📋</span><div class="tic-strip-lbl">Status</div><div id="cic_strip_status" class="tic-strip-val">—</div></div>',
+          '<div class="tic-strip-tile"><span class="tic-strip-icon">🔧</span><div class="tic-strip-lbl">Trade</div><div id="cic_strip_trade" class="tic-strip-val">—</div></div>',
+          '<div class="tic-strip-tile"><span class="tic-strip-icon">📞</span><div class="tic-strip-lbl">Phone</div><div id="cic_strip_phone" class="tic-strip-val">—</div></div>',
+          '<div class="tic-strip-tile"><span class="tic-strip-icon">✉️</span><div class="tic-strip-lbl">Email</div><div id="cic_strip_email" class="tic-strip-val">—</div></div>',
+          '<div class="tic-strip-tile"><span class="tic-strip-icon">🦺</span><div class="tic-strip-lbl">WSIB Expiry</div><div id="cic_strip_wsib" class="tic-strip-val">—</div></div>',
+          '<div class="tic-strip-tile"><span class="tic-strip-icon">🛡️</span><div class="tic-strip-lbl">Insurance Expiry</div><div id="cic_strip_ins" class="tic-strip-val">—</div></div>',
+        '</div>',
+
+        // Inline approval surface (edit/view mode only). Sits between the strip
+        // and the tabs so the status banner + action pills read at a glance.
+        '<div id="cic_approval_surface" style="display:none;margin:12px 28px 0;">',
           '<div id="cic_status_banner" class="ct-status-banner"></div>',
           '<div id="cic_actions"></div>',
           '<div id="cic_notes_wrap" class="cic-notes-wrap" style="display:none;">',
@@ -6381,31 +6572,25 @@ function _buildAddContractorModalHTML() {
           '</div>',
         '</div>',
 
-        // Tab strip (desktop) + drawer (mobile).
-        '<div class="modal-tabs" id="cic_tab_bar">',
-          '<button type="button" class="modal-tab active" data-cic-tab="overview"   onclick="setCicTab(\'overview\')">Overview</button>',
-          '<button type="button" class="modal-tab"        data-cic-tab="compliance" onclick="setCicTab(\'compliance\')">Compliance</button>',
-          '<button type="button" class="modal-tab"        data-cic-tab="documents"  onclick="setCicTab(\'documents\')">Documents</button>',
-          '<button type="button" class="modal-tab"        data-cic-tab="terms"      onclick="setCicTab(\'terms\')">Terms</button>',
-          '<button type="button" class="modal-tab"        data-cic-tab="sigs"       onclick="setCicTab(\'sigs\')">Signatures</button>',
-        '</div>',
-        '<div class="modal-tab-drawer" id="cic_tab_drawer">',
-          '<button type="button" class="modal-drawer-item active" data-cic-tab="overview"   onclick="setCicTab(\'overview\')">Overview</button>',
-          '<button type="button" class="modal-drawer-item"        data-cic-tab="compliance" onclick="setCicTab(\'compliance\')">Compliance</button>',
-          '<button type="button" class="modal-drawer-item"        data-cic-tab="documents"  onclick="setCicTab(\'documents\')">Documents</button>',
-          '<button type="button" class="modal-drawer-item"        data-cic-tab="terms"      onclick="setCicTab(\'terms\')">Terms</button>',
-          '<button type="button" class="modal-drawer-item"        data-cic-tab="sigs"       onclick="setCicTab(\'sigs\')">Signatures</button>',
+        // ── Tabs ────────────────────────────────────────────────────────
+        '<div class="tic-tabs" id="cic_tab_bar" role="tablist">',
+          '<button type="button" class="tic-tab tic-active" data-cic-tab="overview"   onclick="setCicTab(\'overview\')"   role="tab">Overview</button>',
+          '<button type="button" class="tic-tab"            data-cic-tab="notes"      onclick="setCicTab(\'notes\')"      role="tab">Notes</button>',
+          '<button type="button" class="tic-tab"            data-cic-tab="compliance" onclick="setCicTab(\'compliance\')" role="tab">Compliance</button>',
+          '<button type="button" class="tic-tab"            data-cic-tab="documents"  onclick="setCicTab(\'documents\')"  role="tab">Documents</button>',
+          '<button type="button" class="tic-tab"            data-cic-tab="terms"      onclick="setCicTab(\'terms\')"      role="tab">Terms</button>',
+          '<button type="button" class="tic-tab"            data-cic-tab="sigs"       onclick="setCicTab(\'sigs\')"       role="tab">Signatures</button>',
         '</div>',
 
-        // Form body
-        '<div class="ct-modal-form-body">',
+        // ── Body / tab panels ───────────────────────────────────────────
+        '<div class="tic-body">',
 
           // ── OVERVIEW tab ──────────────────────────────────────────────
-          '<div class="modal-tab-panel active" data-cic-panel="overview">',
+          '<div class="tic-panel tic-active" data-cic-panel="overview">',
 
-            '<div class="card ct-sec">',
-              '<div class="modal-hdr compact"><div class="ct-lbl-yellow">Company Information</div></div>',
-              '<div class="ct-sec-grid">',
+            '<div class="tic-section">',
+              '<div class="tic-section-h">Company Information</div>',
+              '<div class="grid-c2-10">',
                 '<div class="f ct-full-col"><label>Company / Name <span class="r">*</span></label><input id="ct_name" type="text" placeholder="e.g. Northern Builds Ltd."/></div>',
                 '<div class="f"><label>Trade / Specialty</label>',
                   '<select id="ct_trade">',
@@ -6424,25 +6609,26 @@ function _buildAddContractorModalHTML() {
               '</div>',
             '</div>',
 
-            '<div class="card ct-sec">',
-              '<div class="modal-hdr compact flex-sb">',
-                '<div class="ct-lbl-yellow">Key People</div>',
+            '<div class="tic-section tic-section-spaced">',
+              '<div class="tic-section-h flex-sb">',
+                '<span>Key People</span>',
                 '<button type="button" onclick="ctAddPerson()" class="btn btn-primary btn-sm">+ Add Person</button>',
               '</div>',
-              '<div class="ct-sec-pad">',
-                '<div id="ct_people_list" class="ct-people-list"></div>',
-              '</div>',
+              '<div id="ct_people_list" class="ct-people-list"></div>',
             '</div>',
 
           '</div>',
 
-          // ── COMPLIANCE tab ────────────────────────────────────────────
-          '<div class="modal-tab-panel" data-cic-panel="compliance">',
+          // ── NOTES tab (contractor_notes append-only log) ──────────────
+          '<div class="tic-panel" data-cic-panel="notes"><div id="cic_notes_mount" style="padding:6px 2px;"></div></div>',
 
-            '<div class="card ct-sec">',
-              '<div class="modal-hdr compact"><div class="ct-lbl-yellow">WSIB Clearance Certificate</div></div>',
+          // ── COMPLIANCE tab ────────────────────────────────────────────
+          '<div class="tic-panel" data-cic-panel="compliance">',
+
+            '<div class="tic-section">',
+              '<div class="tic-section-h">WSIB Clearance Certificate</div>',
               '<div class="ct-sec-col">',
-                '<div class="edit-grid-2">',
+                '<div class="grid-c2-10">',
                   '<div class="f"><label>WSIB Account #</label><input id="ct_wsib_num" type="text" placeholder="1234567"/></div>',
                   '<div class="f"><label>Expiry Date</label><input id="ct_wsib_expiry" type="date"/></div>',
                 '</div>',
@@ -6454,10 +6640,10 @@ function _buildAddContractorModalHTML() {
               '</div>',
             '</div>',
 
-            '<div class="card ct-sec">',
-              '<div class="modal-hdr compact"><div class="ct-lbl-yellow">Liability Insurance</div></div>',
+            '<div class="tic-section tic-section-spaced">',
+              '<div class="tic-section-h">Liability Insurance</div>',
               '<div class="ct-sec-col">',
-                '<div class="edit-grid-2">',
+                '<div class="grid-c2-10">',
                   '<div class="f"><label>Policy #</label><input id="ct_ins_policy" type="text" placeholder="Policy number"/></div>',
                   '<div class="f"><label>Expiry Date</label><input id="ct_ins_expiry" type="date"/></div>',
                 '</div>',
@@ -6469,8 +6655,8 @@ function _buildAddContractorModalHTML() {
               '</div>',
             '</div>',
 
-            '<div class="card ct-sec">',
-              '<div class="modal-hdr compact"><div class="ct-lbl-yellow">Classification &amp; Compliance</div></div>',
+            '<div class="tic-section tic-section-spaced">',
+              '<div class="tic-section-h">Classification &amp; Compliance</div>',
               '<div class="ct-sec-col-gap12">',
                 '<div>',
                   '<div class="ct-lbl-muted">Contractor Classification</div>',
@@ -6487,9 +6673,9 @@ function _buildAddContractorModalHTML() {
           '</div>',
 
           // ── DOCUMENTS tab ─────────────────────────────────────────────
-          '<div class="modal-tab-panel" data-cic-panel="documents">',
-            '<div class="card ct-sec">',
-              '<div class="modal-hdr compact"><div class="ct-lbl-yellow">Other Documents</div></div>',
+          '<div class="tic-panel" data-cic-panel="documents">',
+            '<div class="tic-section">',
+              '<div class="tic-section-h">Other Documents</div>',
               '<div class="ct-sec-col">',
                 '<div id="ct_other_preview" class="ct-upload-preview"></div>',
                 '<div id="ct_other_drop" ondragover="ctFileDragOver(event,\'ct_other_drop\')" ondragleave="ctFileDragLeave(\'ct_other_drop\')" ondrop="ctFileDrop(event,\'other\')" class="upload-zone" onclick="document.getElementById(\'ct_other_input\').click()">',
@@ -6501,10 +6687,10 @@ function _buildAddContractorModalHTML() {
           '</div>',
 
           // ── TERMS tab ─────────────────────────────────────────────────
-          '<div class="modal-tab-panel" data-cic-panel="terms">',
-            '<div class="card ct-sec">',
-              '<div class="modal-hdr compact ct-tor-toggle" onclick="_ctTorToggle(this)">',
-                '<div class="ct-lbl-yellow">Terms of Reference</div>',
+          '<div class="tic-panel" data-cic-panel="terms">',
+            '<div class="tic-section">',
+              '<div class="tic-section-h ct-tor-toggle" onclick="_ctTorToggle(this)">',
+                '<span>Terms of Reference</span>',
                 '<svg class="ct-tor-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>',
               '</div>',
               '<div id="ct_tor_body" class="ct-tor-body">',
@@ -6528,9 +6714,9 @@ function _buildAddContractorModalHTML() {
           '</div>',
 
           // ── SIGNATURES tab ────────────────────────────────────────────
-          '<div class="modal-tab-panel" data-cic-panel="sigs">',
-            '<div class="card ct-sec-last">',
-              '<div class="modal-hdr compact"><div class="ct-lbl-yellow">Signatures</div></div>',
+          '<div class="tic-panel" data-cic-panel="sigs">',
+            '<div class="tic-section">',
+              '<div class="tic-section-h">Signatures</div>',
               '<div class="ct-sec-col-lg">',
                 '<div class="ct-txt-sm-muted">By signing below, both parties acknowledge the accuracy of the information provided and agreement to the Terms of Reference above.</div>',
 
@@ -6601,22 +6787,22 @@ function _buildAddContractorModalHTML() {
             '</div>',
           '</div>',
 
-        '</div>', // end form body
+        '</div>', // end tic-body
 
-        // Footer
-        '<div class="ct-modal-footer">',
-          '<div class="ct-modal-actions">',
-            '<button type="button" id="ct_print_btn" class="ct-hdr-btn hidden" onclick="printContractorAgreement()">🖨 Print / Save PDF</button>',
-            '<button type="button" id="ct_email_btn" class="ct-hdr-btn hidden" onclick="emailContractorAgreement()">✉ Email to Contractor</button>',
-          '</div>',
-          '<div class="flex-end gap-8 cic-footer-right">',
-            '<div id="cic_review_progress" class="txt-muted-sm cic-review-progress"></div>',
-            '<button type="button" onclick="closeAddContractorModal()" class="btn btn-ghost">Cancel</button>',
-            '<button type="button" id="ct_save_btn" onclick="saveContractorAndFinalize()" class="btn btn-primary" data-mode="draft">💾 Save Draft</button>',
-          '</div>',
+        // ── Footer (mirrors the TIC / Edit Unit footer) ─────────────────
+        // Print/Email footer copies are kept (hidden) for the open-logic that
+        // toggles ct_print_btn/ct_email_btn; the header copies in the hero are
+        // the visible surface. Cancel + the single primary Save sit at the end.
+        '<div class="tic-footer">',
+          '<button type="button" id="ct_print_btn" class="btn btn-ghost hidden" onclick="printContractorAgreement()">🖨 Print / Save PDF</button>',
+          '<button type="button" id="ct_email_btn" class="btn btn-ghost hidden" onclick="emailContractorAgreement()">✉ Email to Contractor</button>',
+          '<span class="tic-footer-spacer"></span>',
+          '<div id="cic_review_progress" class="txt-muted-sm cic-review-progress"></div>',
+          '<button type="button" onclick="closeAddContractorModal()" class="btn btn-ghost">Cancel</button>',
+          '<button type="button" id="ct_save_btn" onclick="saveContractorAndFinalize()" class="btn btn-primary" data-mode="draft">💾 Save Draft</button>',
         '</div>',
 
-      '</div>', // end ct-modal-body
+      '</div>', // end tic-shell
     '</div>'    // end addContractorModal
   ].join('');
 }

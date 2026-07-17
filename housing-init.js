@@ -2433,7 +2433,9 @@ function _runCreateAction(action){
     if(document.getElementById('addUnitModal') && typeof openAddUnitModal === 'function') openAddUnitModal();
     else window.location.href = 'inventory.html?action=newUnit';
   } else if(action === 'contractor'){
-    if(document.getElementById('addContractorModal') && typeof openAddContractorModal === 'function') openAddContractorModal();
+    // The CIC modal is built on demand now (host div on contractors.html),
+    // so probe for the host rather than the modal itself.
+    if(document.getElementById('addContractorModalHost') && typeof openAddContractorModal === 'function') openAddContractorModal();
     else window.location.href = 'contractors.html?action=newContractor';
   } else if(action === 'tenant'){
     if(document.getElementById('addTenantModal') && typeof openAddTenantModal === 'function') openAddTenantModal();
