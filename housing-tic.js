@@ -1718,7 +1718,7 @@
       + '<div class="export-dropdown">'
       +   '<button type="button" onclick="toggleExportMenu(this)" class="btn btn-primary">&#128196; Generate Forms &#9660;</button>'
       +   '<div class="header-export-menu">'
-      +     '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">'+(nationShort())+' Residential Occupancy Agreement</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'temporary_lease\')" class="header-export-item">Temporary Occupancy Agreement (Fixed Term)</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'commercial_lease\')" class="header-export-item">Commercial Occupancy &amp; Lease Agreement</button>'
+      +     '<button type="button" onclick="window._ticOpenInspectionNoticeModal && window._ticOpenInspectionNoticeModal()" class="header-export-item">Notice of Inspection &mdash; 48 Hours</button>' + '<button type="button" onclick="window._ticOpenHydroOneConsentModal && window._ticOpenHydroOneConsentModal()" class="header-export-item">Hydro One &mdash; Consent for Disclosure</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">'+(nationShort())+' Residential Occupancy Agreement</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'temporary_lease\')" class="header-export-item">Temporary Occupancy Agreement (Fixed Term)</button>' + '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'commercial_lease\')" class="header-export-item">Commercial Occupancy &amp; Lease Agreement</button>'
       +   '</div>'
       + '</div>'
       + '</div>'
@@ -3852,6 +3852,291 @@
       if (typeof showToast === 'function') showToast('✓ PDF generated');
     }
   }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // Notice of Housing Inspection — 48 Hours' Notice (Housing Policy s. 13.9)
+  // Fill-in modal + PDF generator. Nation identity (name / short / phone /
+  // email) is read from NATION_CONFIG so no CLFN literal is baked in.
+  // ════════════════════════════════════════════════════════════════════════════
+
+  // Friendly long date, e.g. "Wednesday, July 19, 2026". Accepts a yyyy-mm-dd.
+  function _inspFmtDateLong(d) {
+    if (!d) return '';
+    try { var dt = new Date(d + 'T12:00:00'); if (isNaN(dt)) return d;
+      return dt.toLocaleDateString('en-CA', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    } catch(e) { return d; }
+  }
+  // served date (yyyy-mm-dd) + 48h -> friendly long date of the day the period ends.
+  function _inspExpiryFromServed(servedYmd) {
+    if (!servedYmd) return '';
+    try { var dt = new Date(servedYmd + 'T12:00:00'); if (isNaN(dt)) return '';
+      dt.setDate(dt.getDate() + 2); // 48 hours
+      return dt.toLocaleDateString('en-CA', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    } catch(e) { return ''; }
+  }
+  // Recompute the expiry field when the served date changes (staff can still
+  // append a time). Exposed so the inline onchange can reach it.
+  window._ticRecalcNoticeExpiry = function() {
+    var s = document.getElementById('insp_served');
+    var e = document.getElementById('insp_expiry');
+    if (s && e) e.value = _inspExpiryFromServed(s.value);
+  };
+
+  function _ticOpenInspectionNoticeModal() {
+    var t   = _ticState.tenant      || {};
+    var u   = _ticState.unit        || {};
+    var app = _ticState.application || {};
+    var today = new Date().toISOString().split('T')[0];
+
+    var tenantName = t[TIC_C.full_name] || ((app.fn||'') + ' ' + (app.ln||'')).trim();
+    var unitAddr   = u.num ? ((u.num||'') + ' ' + (u.street||'')).trim() : (app.street||'');
+    var hmName     = (window.HOUSING_SESSION && HOUSING_SESSION.name) || '';
+    var nc         = window.NATION_CONFIG || {};
+    var hPhone     = nc.phone || '';
+    var hEmail     = nc.housing_email || nc.email || '';
+    var fileRef    = u.id ? String(u.id) : '';
+
+    var existing = document.getElementById('tic_inspnotice_modal');
+    if (existing) existing.remove();
+
+    function inp(id, val, ph, type) {
+      return '<input id="' + id + '" type="' + (type||'text') + '" value="' + _ticEsc(val||'') + '" placeholder="' + _ticEsc(ph||'') + '" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>';
+    }
+    function fld(label, inputHtml) {
+      return '<div class="tic-field"><label class="tic-field-lbl">' + label + '</label>' + inputHtml + '</div>';
+    }
+    function hdr(text) {
+      return '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin:4px 0 12px;padding-bottom:5px;border-bottom:1px solid var(--border);">' + text + '</div>';
+    }
+
+    var modal = document.createElement('div');
+    modal.id = 'tic_inspnotice_modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.innerHTML =
+        '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:680px;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35);">'
+      + '<div class="modal-hdr"><div>'
+      +   '<div class="lbl-yellow">&#128196; Notice of Inspection &mdash; 48 Hours</div>'
+      +   '<div class="txt-sm-meta">Confirm the details below, then generate the notice PDF. It is filed to this tenant\'s documents.</div>'
+      + '</div><button type="button" onclick="document.getElementById(\'tic_inspnotice_modal\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button></div>'
+
+      + '<div style="overflow-y:auto;padding:20px 24px;flex:1;">'
+
+      + hdr('Letter Details')
+      + '<div class="tic-grid-2" style="margin-bottom:16px;">'
+      +   fld('File Reference',     inp('insp_fileref',    fileRef,    'Optional reference'))
+      +   fld('Letter Date',        inp('insp_letterdate', today,      '', 'date'))
+      +   fld('Name of Tenant',     inp('insp_tenant',     tenantName, 'Full name of tenant'))
+      +   fld('Housing Unit / Address', inp('insp_address', unitAddr,  'Unit address'))
+      + '</div>'
+
+      + hdr('Inspection Notice')
+      + '<div class="tic-grid-2" style="margin-bottom:12px;">'
+      +   fld('Date Notice Served <span style="color:var(--danger);">*</span>', inp('insp_served', today, '', 'date').replace('/>', ' oninput="window._ticRecalcNoticeExpiry && window._ticRecalcNoticeExpiry()"/>'))
+      +   fld('48-Hour Period Ends', inp('insp_expiry', _inspExpiryFromServed(today), 'Auto-filled from served date'))
+      + '</div>'
+      + fld('Purpose / Reason for Inspection <span style="color:var(--danger);">*</span>',
+          '<textarea id="insp_purpose" rows="2" placeholder="e.g. Annual condition inspection; follow-up on reported maintenance" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;resize:vertical;"></textarea>')
+      + '<div class="tic-grid-2" style="margin:12px 0 16px;">'
+      +   fld('Conducted By (Housing Manager) <span style="color:var(--danger);">*</span>', inp('insp_hm', hmName, 'Housing Manager name'))
+      +   fld('Housing Phone',  inp('insp_phone', hPhone, 'Housing Department phone'))
+      +   fld('Housing Email',  inp('insp_email', hEmail, 'Housing Department email'))
+      + '</div>'
+
+      + hdr('For Housing Office Use &mdash; Record of Notice (optional)')
+      + '<div class="tic-grid-2" style="margin-bottom:4px;">'
+      +   fld('Notice Delivered By',  inp('insp_delivered_by', '', 'Staff name'))
+      +   fld('Date &amp; Time Delivered', inp('insp_delivered_at', '', 'e.g. 2026-07-17 2:15 PM'))
+      +   fld('Method of Delivery',
+            '<select id="insp_method" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">'
+          +   '<option value="">&mdash; Select &mdash;</option>'
+          +   '<option>hand-delivered</option><option>posted on door</option><option>mail</option><option>email</option>'
+          + '</select>')
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Leave the Record of Notice blank to complete it by hand on the printed copy.</div>'
+      + '</div>'
+
+      // Footer
+      + '<div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;">'
+      +   '<button type="button" onclick="document.getElementById(\'tic_inspnotice_modal\').remove()" class="btn btn-ghost">Cancel</button>'
+      +   '<button type="button" onclick="window._ticGenerateInspectionNoticePdf && window._ticGenerateInspectionNoticePdf()" class="btn btn-primary">Generate PDF</button>'
+      + '</div>'
+      + '</div>';
+
+    document.body.appendChild(modal);
+  }
+
+  async function _ticGenerateInspectionNoticePdf() {
+    if (typeof _loadJsPdf === 'function') await _loadJsPdf();
+    if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable'); return; }
+
+    var fv = function(id) { var e = document.getElementById(id); return e ? (e.value || '').trim() : ''; };
+    function markRequired(id, on) { var e = document.getElementById(id); if (e) e.style.borderColor = on ? 'var(--danger)' : ''; }
+
+    var tenant   = fv('insp_tenant');
+    var address  = fv('insp_address');
+    var servedYmd= fv('insp_served');
+    var purpose  = fv('insp_purpose');
+    var hmName   = fv('insp_hm');
+    var fileRef  = fv('insp_fileref');
+    var letterYmd= fv('insp_letterdate');
+    var expiry   = fv('insp_expiry') || _inspExpiryFromServed(servedYmd);
+    var hPhone   = fv('insp_phone');
+    var hEmail   = fv('insp_email');
+    var delBy    = fv('insp_delivered_by');
+    var delAt    = fv('insp_delivered_at');
+    var delMethod= fv('insp_method');
+
+    // Required: served date, purpose, HM name.
+    var missing = [];
+    ['insp_served','insp_purpose','insp_hm'].forEach(function(id){ markRequired(id, false); });
+    if (!servedYmd) missing.push('insp_served');
+    if (!purpose)   missing.push('insp_purpose');
+    if (!hmName)    missing.push('insp_hm');
+    if (missing.length) {
+      missing.forEach(function(id){ markRequired(id, true); });
+      var f = document.getElementById(missing[0]); if (f) f.focus();
+      if (typeof showToast === 'function') showToast('Date served, purpose, and Housing Manager are required');
+      return;
+    }
+
+    var nationName  = (typeof nationDisplay === 'function') ? nationDisplay() : ((window.NATION_CONFIG||{}).display_name || '');
+    var nationSh    = (typeof nationShort   === 'function') ? nationShort()   : ((window.NATION_CONFIG||{}).short || nationName);
+    var servedLong  = _inspFmtDateLong(servedYmd);
+    var letterLong  = _inspFmtDateLong(letterYmd) || _inspFmtDateLong(new Date().toISOString().split('T')[0]);
+
+    var logo = (typeof _fetchLogoForPdf === 'function') ? await _fetchLogoForPdf() : null;
+    if (typeof _makePdfDoc !== 'function') { if (typeof showToast === 'function') showToast('PDF letterhead helper unavailable'); return; }
+    var ctx = _makePdfDoc({
+      headerTitle:    'Notice of Inspection',
+      headerSubtitle: "48 Hours' Notice",
+      logoDataUrl:    logo,
+      footerLeft:     nationName + ' Housing Department — Confidential'
+    });
+    var pdf = ctx.pdf;
+    var L = ctx.marginL, CW = ctx.contentW;
+
+    // Local writers ----------------------------------------------------------
+    function metaLine(label, val) {
+      ctx.needSpace(6);
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(20);
+      pdf.text(label + ':', L, ctx.y + 3);
+      var lw = pdf.getTextWidth(label + ':  ');
+      pdf.setFont('helvetica','normal'); pdf.setTextColor(40);
+      var vlines = pdf.splitTextToSize(String(val == null ? '' : val), CW - lw);
+      pdf.text(vlines.length ? vlines : [''], L + lw, ctx.y + 3);
+      ctx.y += Math.max(1, vlines.length) * 4 + 1.5;
+      pdf.setTextColor(0);
+    }
+    function bullet(text) {
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(40);
+      var lines = pdf.splitTextToSize(String(text), CW - 5);
+      ctx.needSpace(lines.length * 4 + 2);
+      pdf.text('-', L + 1, ctx.y + 3);
+      pdf.text(lines, L + 5, ctx.y + 3);
+      ctx.y += lines.length * 4 + 2;
+      pdf.setTextColor(0);
+    }
+    var para = ctx.paragraph.bind(ctx);
+
+    // Letter head block ------------------------------------------------------
+    metaLine('File Reference', fileRef || '—');
+    metaLine('Date', letterLong);
+    metaLine('Name of Tenant', tenant || '—');
+    metaLine('Housing Unit / Address', address || '—');
+    metaLine('Community', nationName);
+    ctx.gap(3);
+
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(10); pdf.setTextColor(20);
+    ctx.needSpace(7); pdf.text("RE: Notice of Housing Inspection — 48 Hours' Notice", L, ctx.y + 3);
+    ctx.y += 7; pdf.setTextColor(0);
+
+    para('Dear ' + (tenant || 'Tenant') + ',');
+    para('This letter is formal notice that the ' + nationName + ' ("' + nationSh + '") Housing Department will be conducting an inspection of your housing unit. Under Section 13.9 of the ' + nationSh + " Housing Policy, the Housing Manager reserves the right to inspect any Band housing unit by providing residents with at least forty-eight (48) hours' notice. This notice is served on you on " + servedLong + ', and the inspection may be carried out at any time once the 48-hour notice period has ended.');
+
+    ctx.gap(1);
+    ctx.sectionHeader('Details of the Inspection');
+    metaLine('Date this notice is served', servedLong);
+    metaLine('48-hour notice period ends', expiry || '—');
+    metaLine('Inspection will be conducted', 'At any time on or after the end of the 48-hour notice period shown above');
+    metaLine('Purpose / reason for inspection', purpose);
+    metaLine('Inspection to be conducted by', hmName + ', Housing Manager, and authorized Housing staff and/or contractors');
+    ctx.gap(1);
+    para('In accordance with Section 13.9 of the ' + nationSh + ' Housing Policy, no specific appointment time is required. The inspection may take place at any time after the 48-hour notice period has ended, and no further reminder or second notice will be given before it is carried out. Housing staff will access all areas of the unit as reasonably required for the purpose stated above.');
+
+    ctx.gap(1);
+    ctx.sectionHeader('What to Expect');
+    bullet('The inspection will be carried out by the Housing Manager together with authorized Housing staff and/or contractors.');
+    bullet('Findings will be documented in writing, and photographs may be taken to record the condition of the unit.');
+    bullet('You are welcome to be present during the inspection, but your presence is not required for it to proceed.');
+    bullet('Housing staff will not remove any property from the unit as part of a routine inspection.');
+
+    ctx.gap(1);
+    ctx.sectionHeader('Your Responsibility as a Tenant');
+    para('As a condition of your housing agreement, Section 13.1 of the ' + nationSh + ' Housing Policy requires all tenants to allow authorized staff and contractors access to the unit for inspections, maintenance, and repairs with reasonable notice. Refusing to permit reasonable access for inspection may be treated as tenant neglect and may constitute non-compliance with the terms of your housing agreement and this Policy.');
+
+    var contact = (hPhone || hEmail)
+      ? ('If you have any questions about this notice, please contact the Housing Department at ' + [hPhone, hEmail].filter(Boolean).join(' or ') + '.')
+      : 'If you have any questions about this notice, please contact the Housing Department.';
+    para(contact);
+    para('Miigwetch for your cooperation.');
+    ctx.gap(2);
+    para('Sincerely,');
+    ctx.gap(6);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(20);
+    ctx.needSpace(6); pdf.text(hmName, L, ctx.y + 3); ctx.y += 5; pdf.setTextColor(0);
+    para('Housing Manager');
+    para(nationName + ' — Housing Department');
+    if (hPhone || hEmail) para('Phone: ' + (hPhone || '—') + '   |   Email: ' + (hEmail || '—'));
+
+    // Record of Notice (office use) -----------------------------------------
+    ctx.gap(2);
+    ctx.sectionHeader('For Housing Office Use — Record of Notice (Housing Policy s. 13.9)');
+    ctx.row('Notice delivered by', delBy || '');
+    ctx.row('Date & time delivered', delAt || '');
+    ctx.row('Method of delivery', delMethod ? (delMethod + '  (hand-delivered / posted on door / mail / email)') : '(hand-delivered / posted on door / mail / email)');
+    ctx.row('48-hour period ends', expiry || '');
+    ctx.gap(2);
+    pdf.setFont('helvetica','italic'); pdf.setFontSize(7.5); pdf.setTextColor(120);
+    ctx.needSpace(6);
+    var authLines = pdf.splitTextToSize('Authority: ' + nationSh + ' Housing Policy, Version 5.8 — s. 13.9 (Inspections) and s. 13.1 (General Obligations).', CW);
+    pdf.text(authLines, L, ctx.y + 3); ctx.y += authLines.length * 3.5;
+    pdf.setTextColor(0); pdf.setFont('helvetica','normal');
+
+    ctx.finish(); // draw footers (Page X of Y)
+
+    var tenantSlug = (tenant || 'Tenant').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'Tenant';
+    var filename   = nationSh.replace(/[^a-z0-9]+/gi, '') + '_Inspection_Notice_' + tenantSlug + '.pdf';
+
+    // Download to browser
+    pdf.save(filename);
+
+    // Save to tenant document library
+    var unit = _ticState.unit || {};
+    var mo = document.getElementById('tic_inspnotice_modal');
+    if (unit.id && typeof window.sbUploadFile === 'function') {
+      try {
+        var blob      = pdf.output('blob');
+        var storePath = 'tenants/' + unit.id + '/' + Date.now() + '_' + filename;
+        await window.sbUploadFile(storePath, blob);
+        if (typeof window.sbSaveFileMeta === 'function') {
+          await window.sbSaveFileMeta('tenant', String(unit.id), storePath, filename, blob.size, 'application/pdf');
+        }
+        _ticDocLibKey = null; _ticDocLib = null; // force doc-lib remount so it appears
+        if (mo) mo.remove();
+        if (typeof showToast === 'function') showToast('✓ Notice saved to document library');
+      } catch (e) {
+        console.warn('[tic] inspection notice upload failed:', e);
+        if (mo) mo.remove();
+        if (typeof showToast === 'function') showToast('✓ Notice downloaded (document library save failed — see console)');
+      }
+    } else {
+      if (mo) mo.remove();
+      if (typeof showToast === 'function') showToast('✓ Notice generated');
+    }
+  }
+
+  window._ticOpenInspectionNoticeModal   = _ticOpenInspectionNoticeModal;
+  window._ticGenerateInspectionNoticePdf = _ticGenerateInspectionNoticePdf;
 
   // ════════════════════════════════════════════════════════════════════════════
   // Set Location & Photo (SLP) — Admin Workflow
