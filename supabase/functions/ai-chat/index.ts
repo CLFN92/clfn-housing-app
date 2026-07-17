@@ -320,7 +320,7 @@ async function runAuditActivity(role: string, input: Record<string, unknown>): P
 
 const AUDIT_TOOL = {
   name: 'audit_activity',
-  description: 'Server-computed staff activity summary from the audit log for a date window (bypasses the ' + MAX_ROW_LIMIT + '-row cap). USE THIS for any "who was active / usage today / activity report / who logged in" question -- it aggregates EVERY event in the window and returns per-actor and per-action counts plus the login list, so it is complete even when a day has hundreds of events. Do NOT answer activity/usage questions from query_database (its row cap silently drops people). ED and Housing Manager only.',
+  description: 'Server-computed staff activity summary from the audit log for a date window (bypasses the ' + MAX_ROW_LIMIT + '-row cap). USE THIS for ANY question about app usage or staff activity, e.g. "app usage report", "who used the app today", "how many people / how many staff were active", "who was active", "usage today", "activity report", "who logged in". It aggregates EVERY event in the window and returns per-actor and per-action counts plus the login list, so it is complete even when a day has hundreds of events. Do NOT answer app-usage / activity questions from query_database -- its 50-row cap silently drops people and will make a busy day look like one person. ED and Housing Manager only.',
   input_schema: {
     type: 'object',
     properties: {
