@@ -4018,16 +4018,16 @@
 
     // Compact local writers — tuned so the whole notice fits on one page.
     // STEP is the per-line height; blanks print nothing (no dash / underscore).
-    var BODY = 8.2, STEP = 3.05;
+    var BODY = 8.5, STEP = 3.5;
     function para(text, opts) {
       opts = opts || {};
       pdf.setFont('helvetica', opts.bold ? 'bold' : 'normal');
       pdf.setFontSize(opts.size || BODY);
       pdf.setTextColor(opts.color != null ? opts.color : 40);
       var lines = pdf.splitTextToSize(String(text), CW);
-      ctx.needSpace(lines.length * STEP + 0.8);
+      ctx.needSpace(lines.length * STEP + 1.9);
       pdf.text(lines, L, ctx.y + 2.6);
-      ctx.y += lines.length * STEP + 0.8;
+      ctx.y += lines.length * STEP + 1.9;
       pdf.setTextColor(0); pdf.setFont('helvetica','normal');
     }
     function metaLine(label, val) {
@@ -4036,28 +4036,28 @@
       pdf.setFont('helvetica','bold'); pdf.setFontSize(BODY);
       var lw = pdf.getTextWidth(lbl + ' ');
       var vlines = v ? pdf.splitTextToSize(v, CW - lw) : [''];
-      ctx.needSpace(vlines.length * STEP + 0.6);
+      ctx.needSpace(vlines.length * STEP + 0.9);
       pdf.setTextColor(20); pdf.text(lbl, L, ctx.y + 2.6);
       if (v) { pdf.setFont('helvetica','normal'); pdf.setTextColor(40); pdf.text(vlines, L + lw, ctx.y + 2.6); }
-      ctx.y += vlines.length * STEP + 0.6;
+      ctx.y += vlines.length * STEP + 0.9;
       pdf.setTextColor(0); pdf.setFont('helvetica','normal');
     }
     function bullet(text) {
       pdf.setFont('helvetica','normal'); pdf.setFontSize(BODY); pdf.setTextColor(40);
       var lines = pdf.splitTextToSize(String(text), CW - 5);
-      ctx.needSpace(lines.length * STEP + 0.7);
+      ctx.needSpace(lines.length * STEP + 1.5);
       pdf.text('-', L + 1, ctx.y + 2.6);
       pdf.text(lines, L + 5, ctx.y + 2.6);
-      ctx.y += lines.length * STEP + 0.7;
+      ctx.y += lines.length * STEP + 1.5;
       pdf.setTextColor(0);
     }
     function sect(title) {
-      ctx.needSpace(7); ctx.y += 0.9;
+      ctx.needSpace(9); ctx.y += 2.6;
       pdf.setFont('helvetica','bold'); pdf.setFontSize(8.5); pdf.setTextColor(90);
       pdf.text(String(title).toUpperCase(), L, ctx.y + 2.6);
       pdf.setDrawColor(248,228,26); pdf.setLineWidth(0.6);
       pdf.line(L, ctx.y + 3.6, RX, ctx.y + 3.6); pdf.setDrawColor(0);
-      ctx.y += 4.8; pdf.setTextColor(0); pdf.setFont('helvetica','normal');
+      ctx.y += 5.6; pdf.setTextColor(0); pdf.setFont('helvetica','normal');
     }
 
     // Letter head block ------------------------------------------------------
@@ -4066,10 +4066,10 @@
     metaLine('Name of Tenant', tenant);
     metaLine('Housing Unit / Address', address);
     metaLine('Community', nationName);
-    ctx.gap(1);
+    ctx.gap(3.5);
 
     para("RE: Notice of Housing Inspection — 48 Hours' Notice", { bold:true, size:9.5, color:20 });
-    ctx.gap(0.5);
+    ctx.gap(1.5);
     para('Dear ' + (tenant || 'Tenant') + ',');
     para('This letter is formal notice that the ' + nationName + ' ("' + nationSh + '") Housing Department will be conducting an inspection of your housing unit. Under Section 13.9 of the ' + nationSh + " Housing Policy, the Housing Manager reserves the right to inspect any Band housing unit by providing residents with at least forty-eight (48) hours' notice. This notice is served on you on " + servedLong + ', and the inspection may be carried out at any time once the 48-hour notice period has ended.');
 
@@ -4079,7 +4079,7 @@
     metaLine('Inspection will be conducted', 'At any time on or after the end of the 48-hour notice period shown above');
     metaLine('Purpose / reason for inspection', purpose);
     metaLine('Inspection to be conducted by', hmName + ', Housing Manager, and authorized Housing staff and/or contractors');
-    ctx.gap(0.5);
+    ctx.gap(1.5);
     para('In accordance with Section 13.9 of the ' + nationSh + ' Housing Policy, no specific appointment time is required. The inspection may take place at any time after the 48-hour notice period has ended, and no further reminder or second notice will be given before it is carried out. Housing staff will access all areas of the unit as reasonably required for the purpose stated above.');
 
     sect('What to Expect');
@@ -4096,9 +4096,14 @@
       : 'If you have any questions about this notice, please contact the Housing Department.';
     para(contact);
     para('Miigwetch for your cooperation.');
-    ctx.gap(1);
+    ctx.gap(2.5);
     para('Sincerely,');
-    ctx.gap(1.5);
+    // Blank space for the Housing Manager's handwritten signature, then a
+    // signature line with the printed name/title beneath it.
+    ctx.gap(11);
+    ctx.needSpace(8);
+    pdf.setDrawColor(120); pdf.setLineWidth(0.3); pdf.line(L, ctx.y, L + 72, ctx.y); pdf.setDrawColor(0);
+    ctx.y += 3.2;
     para(hmName, { bold:true, color:20 });
     para('Housing Manager');
     para(nationName + ' — Housing Department');
@@ -4113,7 +4118,7 @@
     metaLine('Date & time delivered', delAt);
     metaLine('Method of delivery', delMethod);
     metaLine('48-hour period ends', expiry);
-    ctx.gap(1);
+    ctx.gap(3);
     pdf.setFont('helvetica','italic'); pdf.setFontSize(7.3); pdf.setTextColor(120);
     var authLines = pdf.splitTextToSize('Authority: ' + nationSh + ' Housing Policy, Version 5.8 — s. 13.9 (Inspections) and s. 13.1 (General Obligations).', CW);
     ctx.needSpace(authLines.length * 3.2 + 1);
