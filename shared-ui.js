@@ -1124,8 +1124,26 @@ function _initScrollCollapse(scrollEl, stripEl, opts){
   var threshold = (opts && opts.threshold) || 16;
   var ticking = false;
   function apply(){
-    var y = (scrollEl === window) ? (window.scrollY || document.documentElement.scrollTop) : scrollEl.scrollTop;
-    stripEl.classList.toggle('is-scrolled', y > threshold);
+    var isWin = (scrollEl === window);
+    var y = isWin ? (window.scrollY || document.documentElement.scrollTop) : scrollEl.scrollTop;
+    var isOn = stripEl.classList.contains('is-scrolled');
+    if(!isOn){
+      // Collapsing the strip makes the scroll container taller (the strip is a
+      // sibling above it), which REDUCES the container's overflow. On a short
+      // card that removes the overflow entirely: scrollTop snaps to 0, the
+      // strip expands, the content overflows again — flashing every frame.
+      // So only collapse when the content overflows (in the current expanded
+      // state) by clearly MORE than the strip will reclaim, guaranteeing the
+      // container is still scrollable after collapsing.
+      var overflow = isWin
+        ? ((document.documentElement.scrollHeight || 0) - window.innerHeight)
+        : (scrollEl.scrollHeight - scrollEl.clientHeight);
+      if(y > threshold && overflow > threshold + 48) stripEl.classList.add('is-scrolled');
+    } else {
+      // Once collapsed, only expand when scrolled back near the top — a small
+      // hysteresis band so we never toggle rapidly at the threshold boundary.
+      if(y < Math.max(0, threshold - 8)) stripEl.classList.remove('is-scrolled');
+    }
     ticking = false;
   }
   function onScroll(){
