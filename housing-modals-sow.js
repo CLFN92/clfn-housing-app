@@ -513,6 +513,10 @@ function _buildSowModalHTML() {
         '<button id="sow_mark_complete_btn" type="button" onclick="markSowComplete()" class="btn btn-ghost" style="display:none;">✓ Mark Complete</button>' +
         '<button id="sow_reopen_btn" type="button" onclick="reopenSow()" class="btn btn-ghost" style="display:none;">↺ Reopen</button>' +
         '<button id="sow_archive_btn" type="button" onclick="archiveCurrentSow()" class="btn btn-ghost" style="display:none;">🗄 Archive</button>' +
+        // Start ANOTHER request for the same unit (e.g. a second work order under
+        // a different contractor). Shown when a saved request is open — you do
+        // NOT have to complete the current one first (units support multiple).
+        '<button id="sow_new_request_btn" type="button" onclick="sowStartNewRequest()" class="btn btn-ghost" style="display:none;">🆕 New Request</button>' +
         '<button type="button" onclick="printWorkOrder()" class="btn btn-ghost">🏗 Work Order</button>' +
         '<button type="button" onclick="printSOW()" class="btn btn-ghost">🖨 Tenant form</button>' +
         '<button type="button" id="sow_rfq_btn" onclick="sowOpenRfq()" class="btn btn-ghost" style="display:none;">📋 RFQ</button>' +
@@ -1217,6 +1221,20 @@ function sowOpenRfq(){
 }
 window.sowOpenRfq = sowOpenRfq;
 
+// Start a brand-new request for the SAME unit as the one currently open. Lets
+// staff add a second work order (e.g. under a different contractor) without
+// completing or archiving the existing one -- a unit can hold multiple requests,
+// each with its own project number. Closes the current request first (save it
+// before clicking this if you have unsaved edits).
+function sowStartNewRequest(){
+  var unitId = _sowUnitId;
+  if(!unitId){ if(typeof showToast === 'function') showToast('Open a request on a unit first.'); return; }
+  if(typeof closeSowModal === 'function') closeSowModal();
+  window._sowForceNew = true;          // one-shot: bypass the open-existing / picker path
+  openSowModal(unitId);
+}
+window.sowStartNewRequest = sowStartNewRequest;
+
 
 // Fill the "Assigned To" field-employee dropdown from active staff whose role is
 // field_employee. Uses _staffCache when present, otherwise fetches once and
@@ -1351,6 +1369,14 @@ function _applySowModalLock(sow){
     var _arSaved = !!sow && !!sow.project_number;
     var _arShow  = _arSaved && !sow.archived;
     arBtn.style.display = _arShow ? 'flex' : 'none';
+  }
+
+  // New Request: shown whenever a SAVED request is open (any status). Lets staff
+  // add another request for this unit -- e.g. a second work order under a
+  // different contractor -- without having to complete/archive this one.
+  var nrBtn = document.getElementById('sow_new_request_btn');
+  if(nrBtn){
+    nrBtn.style.display = (!!sow && !!sow.project_number) ? 'flex' : 'none';
   }
 
   // RFQ button: show when SOW amount meets the threshold (or HM/ED override).
