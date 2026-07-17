@@ -251,6 +251,7 @@
     <!-- Tabs -->
     <div class="tic-tabs" role="tablist">
       <button type="button" data-ue-keep class="tic-tab tic-active" data-ue-tab="overview"  onclick="_ueSwitchTab('overview')"  role="tab">Overview</button>
+      <button type="button" data-ue-keep class="tic-tab"            data-ue-tab="notes"     onclick="_ueSwitchTab('notes')"     role="tab">Notes</button>
       <button type="button" data-ue-keep class="tic-tab"            data-ue-tab="tenant"    onclick="_ueSwitchTab('tenant')"    role="tab">Tenant</button>
       <button type="button" data-ue-keep class="tic-tab"            data-ue-tab="approvals" onclick="_ueSwitchTab('approvals')" role="tab">Approvals</button>
       <button type="button" data-ue-keep class="tic-tab"            data-ue-tab="sow"       onclick="_ueSwitchTab('sow')"       role="tab">Maintenance Requests</button>
@@ -401,11 +402,14 @@
         </div>
 
         <!-- Notes -->
-        <div class="f" style="margin-top:16px;"><label>Notes</label><textarea id="ue_notes" rows="2" placeholder="Internal notes about this unit…"></textarea></div>
+        <!-- Unit notes moved to their own Notes tab (a note log like tenant notes). This
+             hidden input preserves any legacy single-field note so it is not lost on save. -->
+        <input type="hidden" id="ue_notes"/>
 
       </div>
 
       <!-- Tenant -->
+      <div id="ue_panel_notes" class="tic-panel"><div id="ue_notes_mount" style="padding:6px 2px;"></div></div>
       <div id="ue_panel_tenant" class="tic-panel">
 
         <!-- Assignment (shown only for occupied/reserved) -->

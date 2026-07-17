@@ -1188,6 +1188,53 @@ if (typeof window !== 'undefined') {
   window.promptTenantNote  = promptTenantNote;
 }
 
+// ── Unit notes (note log per housing unit; mirrors tenant_notes) ───────────
+// Load the note rows for a unit, newest first.
+async function sbLoadUnitNotes(unitId) {
+  if (!unitId) return [];
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/unit_notes?unit_id=eq.'
+                        + encodeURIComponent(unitId) + '&select=*&order=created_at.desc',
+                        { headers: HOUSING_HEADERS });
+    if (!r.ok) { console.warn('[unit-note] load HTTP ' + r.status); return []; }
+    var rows = await r.json();
+    return Array.isArray(rows) ? rows : [];
+  } catch (e) { console.warn('[unit-note] load failed:', e); return []; }
+}
+// Append a note to unit_notes (author + timestamp from the session). Returns the
+// saved row (or a local shape) on success, null on failure.
+async function sbSaveUnitNote(unitId, body) {
+  body = (body || '').trim();
+  if (!unitId || !body) return null;
+  var author = (window.HOUSING_SESSION && HOUSING_SESSION.name)
+             || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('clfn_housing_name'))
+             || 'Unknown';
+  var email  = (window.HOUSING_SESSION && HOUSING_SESSION.email) || '';
+  var payload = { unit_id: unitId, note_body: body, author_name: author, author_email: email, created_at: new Date().toISOString() };
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/unit_notes', {
+      method: 'POST',
+      headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=representation' }),
+      body: JSON.stringify(payload)
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var rows = await r.json();
+    var added = (rows && rows[0]) || payload;
+    if (typeof auditEntry === 'function') {
+      auditEntry('UNIT:' + unitId, 'unit_note_add', 'Note added (' + body.length + ' chars)', window.currentRole || 'staff');
+    }
+    return added;
+  } catch (e) {
+    console.warn('[unit-note] save failed:', e);
+    if (typeof showToast === 'function') showToast('Note save failed: ' + e.message, { type: 'error' });
+    return null;
+  }
+}
+if (typeof window !== 'undefined') {
+  window.sbLoadUnitNotes = sbLoadUnitNotes;
+  window.sbSaveUnitNote  = sbSaveUnitNote;
+}
+
 // ── Required-field helpers ────────────────────────────────────────────────────
 // Drive both the application form's red * markers AND validation off a single
 // settings key (housing_settings.required_fields). ED-only edit; everyone else

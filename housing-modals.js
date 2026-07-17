@@ -125,6 +125,70 @@ function _ueApplyReadOnly(ro){
 // housing-tic.js. All tab content is already rendered eagerly by
 // openUnitEditModal regardless of which tab is active, so this is purely
 // a show/hide toggle (no lazy re-render needed).
+// ── Unit Notes tab (note log; mirrors the TIC Notes tab) ───────────────────
+// Renders an "Add a Note" box + a reverse-chronological list of notes for the
+// unit, using the same tenant-note visual design (author, timestamp, body).
+// Notes are stored append-only in the unit_notes table (sbSaveUnitNote). Any
+// legacy single-field note (u.notes) is shown read-only at the bottom.
+function _udpUnitNoteHtml(n){
+  var esc  = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+  var when = '';
+  try { if(n.created_at) when = new Date(n.created_at).toLocaleString('en-CA'); } catch(e){ when = n.created_at || ''; }
+  return '<div class="tic-note"><div class="tic-note-meta"><span class="tic-note-author">'
+       + esc(n.author_name || 'Unknown') + '</span>' + (when ? ' &middot; ' + esc(when) : '') + '</div>'
+       + '<div class="tic-note-body">' + esc(n.note_body || '') + '</div></div>';
+}
+function udpRenderUnitNotes(unitId){
+  var mount = document.getElementById('ue_notes_mount');
+  if(!mount) return;
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+  window._ueNotesUnitId = unitId;
+  mount.innerHTML =
+      '<div class="tic-section"><div class="tic-section-h">Add a Note</div>'
+    +   '<textarea id="ue_note_input" class="tic-textarea" placeholder="Type your note…"></textarea>'
+    +   '<div class="tic-form-actions" style="margin-top:8px;"><button type="button" class="btn btn-primary" onclick="udpSaveUnitNote()">Add Note</button></div>'
+    + '</div>'
+    + '<div class="tic-section tic-section-spaced"><div class="tic-section-h">Notes &amp; History</div>'
+    +   '<div id="ue_notes_list"><div class="tic-empty">Loading…</div></div>'
+    + '</div>';
+  var u = (typeof getAllUnits === 'function') ? getAllUnits().find(function(x){ return x && x.id === unitId; }) : null;
+  var legacy = u && u.notes ? String(u.notes).trim() : '';
+  function _render(notes){
+    var list = document.getElementById('ue_notes_list');
+    if(!list) return;
+    var html = '';
+    (notes || []).forEach(function(n){ html += _udpUnitNoteHtml(n); });
+    if(legacy){
+      html += '<div class="tic-note"><div class="tic-note-meta"><span class="tic-note-author">Legacy note</span></div>'
+            + '<div class="tic-note-body">' + esc(legacy) + '</div></div>';
+    }
+    list.innerHTML = html || '<div class="tic-empty">No notes yet.</div>';
+  }
+  if(typeof sbLoadUnitNotes === 'function'){
+    sbLoadUnitNotes(unitId).then(_render).catch(function(){ _render([]); });
+  } else { _render([]); }
+}
+function udpSaveUnitNote(){
+  var inp = document.getElementById('ue_note_input');
+  var body = (inp && inp.value || '').trim();
+  if(!body){ if(typeof showToast === 'function') showToast('Note cannot be empty.', { type:'error' }); return; }
+  var unitId = window._ueNotesUnitId || _currentDetailUnitId;
+  if(!unitId || typeof sbSaveUnitNote !== 'function') return;
+  sbSaveUnitNote(unitId, body).then(function(added){
+    if(!added) return;
+    var list = document.getElementById('ue_notes_list');
+    if(list){
+      var empty = list.querySelector('.tic-empty');
+      if(empty) list.innerHTML = '';
+      list.insertAdjacentHTML('afterbegin', _udpUnitNoteHtml(added));
+    }
+    if(inp) inp.value = '';
+    if(typeof showToast === 'function') showToast('Note added.');
+  });
+}
+window.udpRenderUnitNotes = udpRenderUnitNotes;
+window.udpSaveUnitNote    = udpSaveUnitNote;
+
 function _ueSwitchTab(name){
   var modal = document.getElementById('unitEditModal');
   if(!modal) return;
@@ -283,6 +347,7 @@ function openUnitEditModal(unitId){
   if(typeof udpRenderTenantHistory === 'function') udpRenderTenantHistory(unitId);
   udpRenderMap(u);
   if(typeof udpRenderFilePreviews === 'function') udpRenderFilePreviews(unitId);
+  if(typeof udpRenderUnitNotes === 'function') udpRenderUnitNotes(unitId);
 
   _ueApplyReadOnly(isFieldEmployee);
   var saveBtn = document.getElementById('ue_save_btn');
