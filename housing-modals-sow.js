@@ -2004,6 +2004,13 @@ function _sowComputeApprovalStatus(data, existingForStatus, saveRole, saveMode){
   // for re-edits — only first-time authoring is forced through the walk.
   if (saveMode !== 'submit' && data.approval_status !== 'completed' && !data.system_approved) {
     data.approval_status = 'draft';
+  } else if (saveMode === 'submit' && data.approval_status === 'draft') {
+    // The user clicked "Submit Request" (all sections reviewed) but the request
+    // carries no signature or HM/ED approval yet, so the status above computed
+    // to 'draft'. Promote it to 'submitted' (Awaiting HM Review) — otherwise a
+    // genuinely submitted request lingers under the preparer's "My Drafts" even
+    // though they submitted it and received a confirmation email.
+    data.approval_status = 'submitted';
   }
 }
 
