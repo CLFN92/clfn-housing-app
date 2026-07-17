@@ -1327,7 +1327,19 @@ function saveApplicationRecord(opts){
         }
         return existingStatus;
       }
-      return isFileUpdate ? 'file_update' : 'submitted';
+      var baseStatus = isFileUpdate ? 'file_update' : 'submitted';
+      // Auto-approve on submit when this application's approval chain has a
+      // step switched OFF in Settings (Approval Authority). Commercial apps
+      // use their own review flow, so they're left on the base status.
+      if (appType !== 'commercial' && typeof APPROVAL_AUTHORITY !== 'undefined'
+          && APPROVAL_AUTHORITY.chainDisabled) {
+        if (isFileUpdate) {
+          if (APPROVAL_AUTHORITY.chainDisabled('file_update')) return 'hm_approved';
+        } else if (APPROVAL_AUTHORITY.chainDisabled('application')) {
+          return 'ed_approved';
+        }
+      }
+      return baseStatus;
     })(),
     submittedAt: new Date().toISOString().slice(0,10),
     score:       isFileUpdate ? null : scoreTotal,
@@ -1778,6 +1790,15 @@ function finalSubmit(opts){
   triggerV2Score();
   var id=saveApplicationRecord();
   var submittedApp = applications.find(function(a){ return a.id === id; }) || null;
+  // If an approval step is switched off in Settings, saveApplicationRecord
+  // returns an already-approved status (never the case for a normal submit).
+  // Flag + audit it so it reads as a System auto-approval, not a person's.
+  if (submittedApp && ((isFileUpdate && submittedApp.status === 'hm_approved')
+        || (!isFileUpdate && appType !== 'commercial' && submittedApp.status === 'ed_approved'))) {
+    submittedApp.approvalAuto = true;
+    auditEntry(id, isFileUpdate ? 'file_update_auto_approved' : 'application_auto_approved',
+      'Auto-approved on submit — approval disabled in Settings', 'System — approval disabled');
+  }
   // Lock the applicant-side signature panels immediately — the document is
   // now a submitted record and the canvases shouldn't be alterable.
   if (typeof _lockApplicantSignatures === 'function') _lockApplicantSignatures();

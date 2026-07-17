@@ -1990,6 +1990,15 @@ function _sowComputeApprovalStatus(data, existingForStatus, saveRole, saveMode){
     if(existingForStatus.approved_via_rfq) data.approved_via_rfq = true;
     data.edName = existingForStatus.edName || 'System';
     data.edDate = existingForStatus.edDate || '';
+  } else if(existingForStatus && existingForStatus.approval_auto){
+    // Auto-approved because a Maintenance Request approval step was switched
+    // OFF in Settings. Terminal like completed/System Approved — a routine
+    // re-save (the authority gate above strips name/date for non-approvers)
+    // must not recompute it back down into the approval queue.
+    data.approval_status = existingForStatus.approval_status || 'hm_approved';
+    data.approval_auto   = true;
+    if(existingForStatus.hmName){ data.hmName = existingForStatus.hmName; data.hmDate = existingForStatus.hmDate; }
+    if(existingForStatus.edName){ data.edName = existingForStatus.edName; data.edDate = existingForStatus.edDate; }
   } else if(data.edName && data.edDate && APPROVAL_AUTHORITY.can('approveSowOverThreshold', saveRole)) data.approval_status = 'ed_approved';
   else if(data.hmName && data.hmDate && APPROVAL_AUTHORITY.can('approveSowUnderThreshold', saveRole)) data.approval_status = 'hm_approved';
   else if((data.tenantSig && data.tenantSig.image) || (data.staffSig && data.staffSig.image)) data.approval_status = 'signed';
@@ -2002,7 +2011,7 @@ function _sowComputeApprovalStatus(data, existingForStatus, saveRole, saveMode){
   // user has walked every section. Edits to an existing saved SOW open
   // with every tab pre-marked visited, so this gate is effectively skipped
   // for re-edits — only first-time authoring is forced through the walk.
-  if (saveMode !== 'submit' && data.approval_status !== 'completed' && !data.system_approved) {
+  if (saveMode !== 'submit' && data.approval_status !== 'completed' && !data.system_approved && !data.approval_auto) {
     data.approval_status = 'draft';
   } else if (saveMode === 'submit' && data.approval_status === 'draft') {
     // The user clicked "Submit Request" (all sections reviewed) but the request
@@ -2011,6 +2020,20 @@ function _sowComputeApprovalStatus(data, existingForStatus, saveRole, saveMode){
     // genuinely submitted request lingers under the preparer's "My Drafts" even
     // though they submitted it and received a confirmation email.
     data.approval_status = 'submitted';
+  }
+
+  // Auto-approve on submit when this request's approval chain has a step
+  // switched OFF in Settings (Approval Authority). "Any off = fully approved."
+  if (saveMode === 'submit' && data.approval_status === 'submitted' && !data.approval_auto
+      && typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.chainDisabled) {
+    var _over = (typeof sowRequiresEdApproval === 'function') && sowRequiresEdApproval(data);
+    if (APPROVAL_AUTHORITY.chainDisabled(_over ? 'sow_over' : 'sow_under')) {
+      var _td = new Date().toISOString().slice(0,10);
+      data.approval_status = _over ? 'ed_approved' : 'hm_approved';
+      data.approval_auto   = true;
+      if (_over) { data.edName = 'System'; data.edDate = _td; }
+      else       { data.hmName = 'System'; data.hmDate = _td; }
+    }
   }
 }
 

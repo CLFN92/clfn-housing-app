@@ -113,20 +113,36 @@ function renderApprovalAuthorityPanel() {
           + 'background:var(--surface);text-align:right;"'
           + ' oninput="APPROVAL_AUTHORITY.update(\'' + key + '\', parseFloat(this.value)||0)"/></div>';
       } else {
-        var rolesForKey = rolesForGroup;
-        html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
-        rolesForKey.forEach(function(r) {
-          var rVal   = r.value || r;
-          var rLabel = r.label || rVal;
-          var active = Array.isArray(cur) && cur.indexOf(rVal) !== -1;
-          html += '<button data-aa-key="' + key + '" data-aa-role="' + rVal + '" onclick="aaToggleRole(this)"'
-            + ' style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;'
-            + 'font-family:DM Sans,sans-serif;transition:all .12s;white-space:nowrap;'
-            + 'background:' + (active ? 'var(--yellow)' : 'var(--surface)') + ';'
-            + 'color:'       + (active ? '#111'          : 'var(--muted)')   + ';'
-            + 'border:1.5px solid ' + (active ? 'var(--yellow)' : 'var(--border)') + ';">'
-            + rLabel + '</button>';
-        });
+        var toggleable = (typeof APPROVAL_AUTHORITY.isToggleable === 'function') && APPROVAL_AUTHORITY.isToggleable(key);
+        var reqd = !toggleable || APPROVAL_AUTHORITY.required(key);
+        html += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">';
+        // On/off (auto-approve) switch for the sign-off gates.
+        if (toggleable) {
+          html += '<button onclick="aaToggleApproval(\'' + key + '\')" title="Turn this approval step on or off"'
+            + ' style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:800;cursor:pointer;'
+            + 'font-family:DM Sans,sans-serif;white-space:nowrap;margin-right:6px;'
+            + 'background:' + (reqd ? '#f0fdf4' : '#fff7ed') + ';'
+            + 'color:'      + (reqd ? '#15803d' : '#c2410c') + ';'
+            + 'border:1.5px solid ' + (reqd ? '#86efac' : '#fdba74') + ';">'
+            + (reqd ? '&#10003; Approval required' : '&#9889; Auto-approve (off)') + '</button>';
+        }
+        if (reqd) {
+          var rolesForKey = rolesForGroup;
+          rolesForKey.forEach(function(r) {
+            var rVal   = r.value || r;
+            var rLabel = r.label || rVal;
+            var active = Array.isArray(cur) && cur.indexOf(rVal) !== -1;
+            html += '<button data-aa-key="' + key + '" data-aa-role="' + rVal + '" onclick="aaToggleRole(this)"'
+              + ' style="padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;'
+              + 'font-family:DM Sans,sans-serif;transition:all .12s;white-space:nowrap;'
+              + 'background:' + (active ? 'var(--yellow)' : 'var(--surface)') + ';'
+              + 'color:'       + (active ? '#111'          : 'var(--muted)')   + ';'
+              + 'border:1.5px solid ' + (active ? 'var(--yellow)' : 'var(--border)') + ';">'
+              + rLabel + '</button>';
+          });
+        } else {
+          html += '<span style="font-size:11px;color:var(--muted);font-style:italic;">Auto-approved on submit &mdash; recorded as System.</span>';
+        }
         html += '</div>';
       }
 
@@ -159,6 +175,63 @@ function aaToggleRole(btn) {
   APPROVAL_AUTHORITY.update(key, next);
   renderApprovalAuthorityPanel();
 }
+
+// ── Approval on/off toggle ──────────────────────────────────────────────
+// Unlike the role pills (in-memory until "Save Changes"), flipping an
+// approval on/off is a side-effecting action — turning it off auto-approves
+// the current queue — so it confirms, persists immediately, sweeps, audits.
+function aaToggleApproval(key) {
+  if (typeof APPROVAL_AUTHORITY === 'undefined' || !APPROVAL_AUTHORITY.isToggleable(key)) return;
+  var role = window._realRole || window.currentRole;
+  if (!APPROVAL_AUTHORITY.can('editApprovalAuthority', role)) {
+    if (typeof showToast === 'function') showToast('Only the Executive Director can change approvals.');
+    return;
+  }
+  var label       = APPROVAL_AUTHORITY.labels[key] || key;
+  var turningOff   = APPROVAL_AUTHORITY.required(key); // currently required → we're turning it off
+  if (!turningOff) { _aaApplyApprovalToggle(key, true); return; } // turning back ON — no confirm/sweep
+
+  var pending = (typeof approvalSweepCount === 'function') ? approvalSweepCount(key) : 0;
+  var msg = 'Turn OFF "' + label + '"?\n\nFrom now on, matching items are approved automatically on submit (recorded as System — approval disabled).';
+  if (pending > 0) msg += '\n\n' + pending + ' item(s) currently waiting for this approval will be auto-approved right now.';
+  if (typeof showConfirm === 'function') {
+    showConfirm({ title:'Turn off this approval?', message: msg, confirmText:'Turn off and auto-approve', danger:true }).then(function(r){
+      var ok = (typeof r === 'object' && r !== null) ? !!r.ok : !!r;
+      if (ok) _aaApplyApprovalToggle(key, false);
+    });
+  } else if (window.confirm(msg)) {
+    _aaApplyApprovalToggle(key, false);
+  }
+}
+
+function _aaApplyApprovalToggle(key, isRequired) {
+  APPROVAL_AUTHORITY.setRequired(key, isRequired);
+  _aaPersistApprovalAuthority();
+  var role  = window._realRole || window.currentRole || 'ed';
+  var label = APPROVAL_AUTHORITY.labels[key] || key;
+  if (typeof auditEntry === 'function') {
+    auditEntry('SETTINGS', 'approval_toggle',
+      label + ' — approval ' + (isRequired ? 'turned ON (sign-off required)' : 'turned OFF (auto-approve)'),
+      role);
+  }
+  if (!isRequired && typeof applyApprovalDisabledSweep === 'function') {
+    applyApprovalDisabledSweep(key); // retroactively approve the current queue
+  }
+  if (typeof renderApprovalAuthorityPanel === 'function') renderApprovalAuthorityPanel();
+  if (typeof renderWorklist === 'function') renderWorklist();
+}
+
+// Persist the full approval-authority blob INCLUDING the __disabled list.
+function _aaPersistApprovalAuthority() {
+  var data = Object.assign({}, APPROVAL_AUTHORITY.allRoleEntries(), APPROVAL_AUTHORITY.allThresholds());
+  data.__disabled = APPROVAL_AUTHORITY.disabledList();
+  if (!window._appSettings) window._appSettings = {};
+  window._appSettings['approval_authority'] = data;
+  if (typeof saveSettingWithDraftFallback === 'function') {
+    saveSettingWithDraftFallback('approval_authority', data);
+  }
+}
+window.aaToggleApproval = aaToggleApproval;
 
 // Save the approval threshold (HM budget limit) from the Approval Authority
 // panel. Writes the single _appSettings.hmBudgetLimit value, keeps the
@@ -202,6 +275,7 @@ function saveApprovalAuthoritySettings() {
   // Save the full live config (role arrays + numeric thresholds) so any
   // revert-to-default is also captured rather than relying on diffs.
   var data = Object.assign({}, APPROVAL_AUTHORITY.allRoleEntries(), APPROVAL_AUTHORITY.allThresholds());
+  data.__disabled = APPROVAL_AUTHORITY.disabledList();
   console.log('[AA] saving approval_authority:', data);
   if(!window._appSettings) window._appSettings = {};
   window._appSettings['approval_authority'] = data;

@@ -2524,6 +2524,137 @@ function sowRequiresEdApproval(sow) {
 }
 window.sowRequiresEdApproval = sowRequiresEdApproval;
 
+// ════════════════════════════════════════════════════════════════════════
+// Auto-approve engine — approval steps switched OFF in Settings
+// ════════════════════════════════════════════════════════════════════════
+// When the ED turns an approval step OFF (Settings > Approval Authority),
+// the owning workflow auto-approves instead of routing to a person. Two
+// halves: (1) submit-time — each workflow calls APPROVAL_AUTHORITY.chainDisabled
+// at its save point and stamps the terminal status (wired in each workflow);
+// (2) retroactive — flipping a switch off sweeps the CURRENT queue via
+// applyApprovalDisabledSweep(). Auto-approvals are recorded under a System
+// actor and carry an `approval_auto` flag so they read as System, not a real
+// person's sign-off. "Any step in a chain off => the whole item auto-approves."
+var _APPROVAL_SYSTEM_ACTOR = 'System — approval disabled';
+
+// Is a SOW still awaiting a human sign-off given its threshold?
+function _sowIsApprovalPending(sow){
+  var s = sow.approval_status || '';
+  if (s === 'completed' || s === 'ed_approved') return false;
+  if (sowRequiresEdApproval(sow)) {
+    // over threshold: pending through hm_approved (still needs ED)
+    return s === '' || s === 'draft' || s === 'signed' || s === 'submitted' || s === 'hm_approved';
+  }
+  // under threshold: hm_approved is terminal
+  return s === '' || s === 'draft' || s === 'signed' || s === 'submitted';
+}
+
+// Count items that WOULD be auto-approved if `gate` were switched off — used
+// for the Settings confirm dialog. (gate is not disabled yet at call time.)
+function approvalSweepCount(gate){
+  var n = 0;
+  var apps = window.applications || [];
+  if (gate === 'reviewApplication' || gate === 'finalApproveApp') {
+    apps.forEach(function(a){
+      if (a && !a.archived && a.appType !== 'existing_tenant' && a.appType !== 'commercial'
+          && (a.status === 'submitted' || a.status === 'mgr_approved')) n++;
+    });
+  }
+  if (gate === 'reviewFileUpdate' || gate === 'approveFileUpdate') {
+    apps.forEach(function(a){
+      if (a && !a.archived && a.appType === 'existing_tenant' && a.status === 'file_update') n++;
+    });
+  }
+  if (gate === 'recommendContractor' || gate === 'approveContractor') {
+    (window._contractors || []).forEach(function(c){
+      if (c && (c.status === 'pending_review' || c.status === 'hm_recommended')) n++;
+    });
+  }
+  if (gate === 'approveSowUnderThreshold' || gate === 'approveSowOverThreshold') {
+    var onlyOver = (gate === 'approveSowOverThreshold');
+    var cache = window._sowCache || {};
+    Object.keys(cache).forEach(function(uid){
+      var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
+      list.forEach(function(sow){
+        if (!sow || sow.archived) return;
+        if (onlyOver && !sowRequiresEdApproval(sow)) return;
+        if (_sowIsApprovalPending(sow)) n++;
+      });
+    });
+  }
+  return n;
+}
+
+// Retroactively auto-approve every queued item whose approval chain now has a
+// disabled step. Idempotent: re-scans all workflows and only touches items
+// still pending. Called after a gate is switched off.
+function applyApprovalDisabledSweep(gate){
+  if (typeof APPROVAL_AUTHORITY === 'undefined') return 0;
+  var today = new Date().toISOString().slice(0,10);
+  var swept = 0;
+  var apps  = window.applications || [];
+
+  // Housing / transfer applications — chain: reviewApplication → finalApproveApp
+  if (APPROVAL_AUTHORITY.chainDisabled('application')) {
+    apps.forEach(function(a){
+      if (!a || a.archived || a.appType === 'existing_tenant' || a.appType === 'commercial') return;
+      if (a.status !== 'submitted' && a.status !== 'mgr_approved') return;
+      a.status = 'ed_approved'; a.approvalAuto = true;
+      a.edApprovedBy = _APPROVAL_SYSTEM_ACTOR; a.edApprovedAt = today;
+      if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
+      if (typeof auditEntry === 'function') auditEntry(a.id, 'application_auto_approved', 'Auto-approved (ED approval disabled in Settings)', _APPROVAL_SYSTEM_ACTOR);
+      swept++;
+    });
+  }
+  // File updates — chain: reviewFileUpdate → approveFileUpdate
+  if (APPROVAL_AUTHORITY.chainDisabled('file_update')) {
+    apps.forEach(function(a){
+      if (!a || a.archived || a.appType !== 'existing_tenant' || a.status !== 'file_update') return;
+      a.status = 'hm_approved'; a.approvalAuto = true;
+      a.hmApprovedBy = _APPROVAL_SYSTEM_ACTOR; a.hmApprovedAt = today;
+      if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
+      if (typeof auditEntry === 'function') auditEntry(a.id, 'file_update_auto_approved', 'Auto-approved (file-update approval disabled in Settings)', _APPROVAL_SYSTEM_ACTOR);
+      swept++;
+    });
+  }
+  // Contractors — chain: recommendContractor → approveContractor
+  if (APPROVAL_AUTHORITY.chainDisabled('contractor')) {
+    (window._contractors || []).forEach(function(c){
+      if (!c || (c.status !== 'pending_review' && c.status !== 'hm_recommended')) return;
+      c.status = 'approved'; c.approvalAuto = true;
+      c.edActionAt = today; c.edActionBy = _APPROVAL_SYSTEM_ACTOR;
+      if (typeof saveContractorWithDraftFallback === 'function') saveContractorWithDraftFallback(c);
+      if (typeof auditEntry === 'function') auditEntry('CT:' + (c.id||'?'), 'contractor_auto_approved', 'Auto-approved (contractor approval disabled in Settings)', _APPROVAL_SYSTEM_ACTOR);
+      swept++;
+    });
+  }
+  // SOWs — chain depends on threshold (sow_under / sow_over)
+  var cache = window._sowCache || {};
+  Object.keys(cache).forEach(function(uid){
+    var list = (typeof getUnitSowList === 'function') ? getUnitSowList(uid) : [];
+    list.forEach(function(sow){
+      if (!sow || sow.archived || !_sowIsApprovalPending(sow)) return;
+      var over  = sowRequiresEdApproval(sow);
+      if (!APPROVAL_AUTHORITY.chainDisabled(over ? 'sow_over' : 'sow_under')) return;
+      sow.approval_status = over ? 'ed_approved' : 'hm_approved';
+      sow.approval_auto = true;
+      if (over) { sow.edName = 'System'; sow.edDate = today; }
+      else      { sow.hmName = 'System'; sow.hmDate = today; }
+      if (typeof upsertSowInList === 'function') upsertSowInList(uid, sow);
+      if (typeof auditEntry === 'function') auditEntry('SOW:' + uid, 'sow_auto_approved', 'Maintenance request ' + (sow.project_number||'') + ' auto-approved (approval disabled in Settings)', _APPROVAL_SYSTEM_ACTOR);
+      swept++;
+    });
+  });
+
+  if (swept && typeof showToast === 'function') showToast('✓ ' + swept + ' item(s) auto-approved');
+  // Refresh any open surfaces that show queues.
+  if (typeof renderWorklist === 'function') renderWorklist();
+  if (typeof renderDashTable === 'function') try { renderDashTable(); } catch(e){}
+  return swept;
+}
+window.approvalSweepCount = approvalSweepCount;
+window.applyApprovalDisabledSweep = applyApprovalDisabledSweep;
+
 // ── Assignment: single source of truth ──────────────────────────────────
 // One rule for "is this application approved enough to be placed in a unit?"
 // Shared by the Match queue (row inclusion), confirmAssignment, the unit-edit
@@ -6026,6 +6157,17 @@ function saveContractor(){
     if (_auditAction === 'ct_submitted' && typeof notifyContractorSubmitted === 'function') {
       notifyContractorSubmitted(data);
     }
+  }
+  // Auto-approve on submit when the contractor approval chain is switched OFF
+  // in Settings (Approval Authority). "Any off = fully approved."
+  if (data.status === 'pending_review' && !data.approvalAuto
+      && typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.chainDisabled
+      && APPROVAL_AUTHORITY.chainDisabled('contractor')) {
+    data.status     = 'approved';
+    data.approvalAuto = true;
+    data.edActionAt = new Date().toISOString().split('T')[0];
+    data.edActionBy = 'System — approval disabled';
+    auditEntry('CT:'+id, 'contractor_auto_approved', 'Contractor auto-approved on submit — approval disabled in Settings', 'System — approval disabled');
   }
   window._contractors = contractors;
   // Persist to Supabase. The contractor record is `data` (built above) — an

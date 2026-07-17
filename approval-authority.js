@@ -155,6 +155,34 @@ var APPROVAL_AUTHORITY = (function() {
   // ── LIVE CONFIG (defaults + any saved overrides) ──────────────────────
   var _live = JSON.parse(JSON.stringify(DEFAULTS));
 
+  // ── DISABLED APPROVALS ────────────────────────────────────────────────
+  // Approval STEPS that the ED has switched OFF in Settings. When a step is
+  // off, the workflow that owns it auto-approves instead of routing to a
+  // person (recorded under "System — approval disabled"). Keyed by action.
+  // Only the sign-off gates in TOGGLEABLE below may be disabled; capability
+  // and view gates are not toggleable. Persisted in the same housing_settings
+  // 'approval_authority' blob under the reserved __disabled key.
+  var _disabled = {};
+
+  // The approval gates that support an on/off (auto-approve) toggle, and the
+  // per-workflow approval CHAINS used to decide when an item auto-approves.
+  // "Any step in the chain off" => the whole item auto-approves on submit.
+  var TOGGLEABLE = [
+    'reviewApplication', 'finalApproveApp',
+    'reviewFileUpdate', 'approveFileUpdate',
+    'approveSowUnderThreshold', 'approveSowOverThreshold',
+    'recommendContractor', 'approveContractor'
+    // 'approveInspection' — pending its own auto-approve wiring (next increment)
+  ];
+  var CHAINS = {
+    application: ['reviewApplication', 'finalApproveApp'],
+    file_update: ['reviewFileUpdate', 'approveFileUpdate'],
+    sow_under:   ['approveSowUnderThreshold'],
+    sow_over:    ['approveSowUnderThreshold', 'approveSowOverThreshold'],
+    contractor:  ['recommendContractor', 'approveContractor'],
+    inspection:  ['approveInspection']
+  };
+
   // ── PUBLIC API ────────────────────────────────────────────────────────
 
   return {
@@ -179,6 +207,48 @@ var APPROVAL_AUTHORITY = (function() {
       if (role === 'super_user' && allowed.indexOf('ed') !== -1) return true;
       return false;
     },
+
+    // ── Approval on/off (auto-approve) ────────────────────────────────────
+
+    /**
+     * Is a human sign-off still REQUIRED for this approval step?
+     * Returns false when the ED has switched the step OFF in Settings (the
+     * workflow then auto-approves). Non-toggleable / unknown actions are
+     * always required (true).
+     */
+    required: function(action) {
+      return !_disabled[action];
+    },
+
+    /** Turn an approval step on (required=true) or off (auto-approve). */
+    setRequired: function(action, isRequired) {
+      if (TOGGLEABLE.indexOf(action) === -1) return; // only sign-off gates toggle
+      if (isRequired) delete _disabled[action];
+      else _disabled[action] = true;
+    },
+
+    /**
+     * Does this item's approval CHAIN have ANY step switched off? If so the
+     * whole item auto-approves on submit ("any off = fully approved").
+     * @param {Array<string>|string} chain — action keys, or a CHAINS key
+     */
+    chainDisabled: function(chain) {
+      var gates = (typeof chain === 'string') ? (CHAINS[chain] || []) : (chain || []);
+      for (var i = 0; i < gates.length; i++) {
+        if (_disabled[gates[i]]) return true;
+      }
+      return false;
+    },
+
+    /** List of currently-disabled approval steps. */
+    disabledList: function() { return Object.keys(_disabled); },
+
+    /** Which gates support the on/off toggle. */
+    toggleable: TOGGLEABLE.slice(),
+    isToggleable: function(action) { return TOGGLEABLE.indexOf(action) !== -1; },
+
+    /** The per-workflow approval chains (read-only copy). */
+    chains: JSON.parse(JSON.stringify(CHAINS)),
 
     /**
      * Get the list of roles allowed for an action, or a threshold value.
@@ -227,6 +297,15 @@ var APPROVAL_AUTHORITY = (function() {
           _live[k] = saved[k];
         }
       });
+      // Disabled approval steps (reserved __disabled key — an array of action
+      // names). Only accept known toggleable gates so stale/bad data can't
+      // silently switch off something that isn't meant to be toggleable.
+      if (Array.isArray(saved.__disabled)) {
+        _disabled = {};
+        saved.__disabled.forEach(function(a) {
+          if (TOGGLEABLE.indexOf(a) !== -1) _disabled[a] = true;
+        });
+      }
       console.info('[APPROVAL_AUTHORITY] Loaded overrides:', Object.keys(saved).length, 'keys');
     },
 
@@ -242,6 +321,8 @@ var APPROVAL_AUTHORITY = (function() {
         var defVal  = JSON.stringify(DEFAULTS[k]);
         if (liveVal !== defVal) out[k] = _live[k];
       });
+      var off = Object.keys(_disabled);
+      if (off.length) out.__disabled = off;
       return out;
     },
 
@@ -265,8 +346,10 @@ var APPROVAL_AUTHORITY = (function() {
     reset: function(action) {
       if (action) {
         _live[action] = JSON.parse(JSON.stringify(DEFAULTS[action]));
+        delete _disabled[action];
       } else {
         _live = JSON.parse(JSON.stringify(DEFAULTS));
+        _disabled = {};
       }
     },
 
