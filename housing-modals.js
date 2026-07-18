@@ -259,6 +259,9 @@ function openUnitEditModal(unitId){
   } else {
     if(curCard) curCard.style.display='none';
   }
+  // Tenant Card header button — only meaningful when a tenant is assigned.
+  var tenantBtn = document.getElementById('ue_tenant_btn');
+  if(tenantBtn) tenantBtn.style.display = (u.assignedName && u.assignedTo) ? '' : 'none';
   // (removed) Redundant tenant display card population — the duplicate Tenant
   // section in #ue_sig_section was removed; tenant info lives in #ue_assign_row.
   var acc=document.getElementById('ue_accessible'); if(acc) acc.checked=!!u.accessible;
@@ -453,6 +456,22 @@ function ueOpenSow() {
   closeUnitEditModal();
   openSowModal(uid);
 }
+
+// Open the Tenant Information Card for the tenant assigned to this unit.
+// The TIC only exists on housing.html + tenants.html, so on pages without it
+// (inventory / match) we hand off to tenants.html, which already auto-opens a
+// TIC from the ?tic=<unitId> deep-link (tenants-init.js).
+function ueOpenTenantCard() {
+  var uid = window._editingUnitId;
+  if(!uid) return;
+  if(typeof openTenantCard === 'function'){
+    closeUnitEditModal();
+    openTenantCard(uid);
+  } else {
+    window.location.href = 'tenants.html?tic=' + encodeURIComponent(uid);
+  }
+}
+window.ueOpenTenantCard = ueOpenTenantCard;
 
 // ── Budget threshold helpers ──────────────────────────────────────────────────
 function getHmBudgetLimit() {
