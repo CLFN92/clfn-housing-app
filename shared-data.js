@@ -1830,6 +1830,27 @@ function sbLookupRFQs(q) {
   return out;
 }
 
+// Quick Lookup — contractors (name / trade / phone / email / status).
+function sbLookupContractors(q) {
+  q = (q || '').toLowerCase().trim();
+  if (!q) return [];
+  var cts = window._contractors || [];
+  var out = [];
+  for (var i = 0; i < cts.length; i++) {
+    if (out.length >= 20) break;
+    var c = cts[i];
+    if (!c) continue;
+    var hay = ((c.name||'') + ' ' + (c.trade||'') + ' ' + (c.phone||'') + ' ' + (c.email||'') + ' ' + (c.status||'')).toLowerCase();
+    if (hay.indexOf(q) === -1) continue;
+    var bits = [];
+    if (c.trade)  bits.push(c.trade);
+    if (c.status) bits.push(String(c.status).replace(/_/g, ' '));
+    if (c.phone)  bits.push(c.phone);
+    out.push({ id: c.id, label: c.name || '(unnamed contractor)', meta: bits.join(' · ') });
+  }
+  return out;
+}
+
 // ── auditEntry ────────────────────────────────────────────────────────────────
 // Writes one entry to both:
 //   1. window.auditLog[]  — in-memory array for current-session display

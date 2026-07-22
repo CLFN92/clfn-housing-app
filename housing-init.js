@@ -2198,7 +2198,7 @@ function _debounce(fn, ms){
 // ── Quick Lookup ─────────────────────────────────────────────────────────
 // Lookup state lives on window so the tab filter and recently-viewed list
 // can read it without re-querying.
-window._lookupState = window._lookupState || { tab:'all', q:'', results:{tenants:[],units:[],sows:[],rfqs:[]} };
+window._lookupState = window._lookupState || { tab:'all', q:'', results:{tenants:[],units:[],sows:[],rfqs:[],contractors:[]} };
 var LOOKUP_RECENT_KEY = 'clfn_landing_recent_lookups';
 
 function _lookupReadRecent(){
@@ -2246,12 +2246,13 @@ function _renderLookupRecent(){
 function _runLookup(q){
   q = (q||'').trim();
   window._lookupState.q = q;
-  var results = { tenants:[], units:[], sows:[], rfqs:[] };
+  var results = { tenants:[], units:[], sows:[], rfqs:[], contractors:[] };
   if(q.length >= 1){
-    if(typeof sbLookupTenants === 'function') results.tenants = sbLookupTenants(q) || [];
-    if(typeof sbLookupUnits   === 'function') results.units   = sbLookupUnits(q)   || [];
-    if(typeof sbLookupSOWs    === 'function') results.sows    = sbLookupSOWs(q)    || [];
-    if(typeof sbLookupRFQs    === 'function') results.rfqs    = sbLookupRFQs(q)    || [];
+    if(typeof sbLookupTenants     === 'function') results.tenants     = sbLookupTenants(q)     || [];
+    if(typeof sbLookupUnits       === 'function') results.units       = sbLookupUnits(q)       || [];
+    if(typeof sbLookupSOWs        === 'function') results.sows        = sbLookupSOWs(q)        || [];
+    if(typeof sbLookupRFQs        === 'function') results.rfqs        = sbLookupRFQs(q)        || [];
+    if(typeof sbLookupContractors === 'function') results.contractors = sbLookupContractors(q) || [];
   }
   window._lookupState.results = results;
   _renderLookupCounts();
@@ -2259,14 +2260,15 @@ function _runLookup(q){
 }
 
 function _renderLookupCounts(){
-  var r = window._lookupState.results || {tenants:[],units:[],sows:[],rfqs:[]};
-  var total = r.tenants.length + r.units.length + r.sows.length + (r.rfqs||[]).length;
+  var r = window._lookupState.results || {tenants:[],units:[],sows:[],rfqs:[],contractors:[]};
+  var total = r.tenants.length + r.units.length + r.sows.length + (r.rfqs||[]).length + (r.contractors||[]).length;
   function set(id,n){ var el=document.getElementById(id); if(el) el.textContent = n; }
-  set('lookup_tab_count_all',     total);
-  set('lookup_tab_count_tenants', r.tenants.length);
-  set('lookup_tab_count_units',   r.units.length);
-  set('lookup_tab_count_sows',    r.sows.length);
-  set('lookup_tab_count_rfqs',   (r.rfqs||[]).length);
+  set('lookup_tab_count_all',         total);
+  set('lookup_tab_count_tenants',     r.tenants.length);
+  set('lookup_tab_count_units',       r.units.length);
+  set('lookup_tab_count_sows',        r.sows.length);
+  set('lookup_tab_count_rfqs',       (r.rfqs||[]).length);
+  set('lookup_tab_count_contractors',(r.contractors||[]).length);
 }
 
 function _renderLookupResults(){
@@ -2274,12 +2276,13 @@ function _renderLookupResults(){
   if(!host) return;
   var st = window._lookupState;
   if(!st.q){ host.classList.remove('open'); host.innerHTML=''; return; }
-  var r = st.results || {tenants:[],units:[],sows:[],rfqs:[]};
+  var r = st.results || {tenants:[],units:[],sows:[],rfqs:[],contractors:[]};
   var rows = [];
   if(st.tab==='all' || st.tab==='tenants') r.tenants.forEach(function(x){ rows.push(_lookupRow('tenant', x)); });
   if(st.tab==='all' || st.tab==='units')   r.units  .forEach(function(x){ rows.push(_lookupRow('unit',   x)); });
   if(st.tab==='all' || st.tab==='sows')    r.sows   .forEach(function(x){ rows.push(_lookupRow('sow',    x)); });
   if(st.tab==='all' || st.tab==='rfqs')   (r.rfqs||[]).forEach(function(x){ rows.push(_lookupRow('rfq',  x)); });
+  if(st.tab==='all' || st.tab==='contractors')(r.contractors||[]).forEach(function(x){ rows.push(_lookupRow('contractor', x)); });
   host.classList.add('open');
   host.innerHTML = rows.length
     ? rows.join('')
@@ -2289,7 +2292,7 @@ function _renderLookupResults(){
 function _lookupRow(kind, x){
   var label = _esc(x.label || x.id || '');
   var meta  = _esc(x.meta  || '');
-  var initial = kind === 'tenant' ? 'T' : kind === 'unit' ? 'U' : kind === 'rfq' ? 'R' : 'S';
+  var initial = kind === 'tenant' ? 'T' : kind === 'unit' ? 'U' : kind === 'rfq' ? 'R' : kind === 'contractor' ? 'C' : 'S';
   return '<div class="lookup-result" data-lookup-kind="'+kind+'" data-lookup-id="'+_esc(x.id||'')+'">'
        + '<span class="lookup-result-icon type-'+kind+'">'+initial+'</span>'
        + '<span class="lookup-result-main">'
@@ -2344,6 +2347,9 @@ function _lookupOpen(kind, id, label){
   } else if(kind==='rfq'){
     if (typeof setNavReferrer === 'function') setNavReferrer('home');
     window.location.href = 'rfq.html?rfq=' + encodeURIComponent(id);
+  } else if(kind==='contractor'){
+    if (typeof setNavReferrer === 'function') setNavReferrer('home');
+    window.location.href = 'contractors.html?openContractor=' + encodeURIComponent(id);
   }
 }
 
