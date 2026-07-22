@@ -235,19 +235,35 @@ function dayWindowUTC(dateStr: string): { from: string; to: string } {
   return { from, to: d.toISOString() }
 }
 
-async function runAuditActivity(role: string, input: Record<string, unknown>): Promise<{ summary?: Record<string, unknown>; error?: string }> {
+function dayWindowLocal(dateStr: string, offsetMin: number): { from: string; to: string } {
+  // Treat YYYY-MM-DD as a LOCAL calendar day and return its UTC bounds.
+  // offsetMin is JS getTimezoneOffset() for the client (minutes to ADD to
+  // local to reach UTC, e.g. +240 for Eastern Daylight / UTC-4). So local
+  // midnight in UTC = UTC-midnight-of-that-date + offsetMin.
+  const base = Date.parse(dateStr + 'T00:00:00.000Z')
+  const fromMs = base + offsetMin * 60000
+  return { from: new Date(fromMs).toISOString(), to: new Date(fromMs + 86400000).toISOString() }
+}
+
+async function runAuditActivity(role: string, input: Record<string, unknown>, tz?: { localDate?: string; offsetMin?: number }): Promise<{ summary?: Record<string, unknown>; error?: string }> {
   if (AUDIT_ROLES.indexOf(role) === -1) {
     return { error: 'Activity reports are restricted to ED and Housing Manager roles.' }
   }
   if (!SUPABASE_SERVICE_KEY || !SUPABASE_URL) return { error: 'Server not configured for activity reports.' }
 
-  // Resolve the time window: explicit from/to win; else a single UTC day; else today (UTC).
+  // Resolve the time window: explicit from/to win; else a single day; else today.
+  // Days are the CLIENT'S LOCAL calendar day when a timezone offset was sent, so
+  // an evening report doesn't roll into the next UTC day and miss the day's work.
   let from = input.from ? String(input.from).trim() : ''
   let to   = input.to   ? String(input.to).trim()   : ''
   const date = input.date ? String(input.date).trim() : ''
   if (!from || !to) {
-    const d = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10)
-    const w = dayWindowUTC(d)
+    const hasTz = tz && typeof tz.offsetMin === 'number'
+    const localToday = (tz && tz.localDate && /^\d{4}-\d{2}-\d{2}$/.test(tz.localDate))
+      ? tz.localDate
+      : new Date().toISOString().slice(0, 10)
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : localToday
+    const w = hasTz ? dayWindowLocal(d, tz!.offsetMin as number) : dayWindowUTC(d)
     from = from || w.from
     to   = to   || w.to
   }
@@ -324,7 +340,7 @@ const AUDIT_TOOL = {
   input_schema: {
     type: 'object',
     properties: {
-      date:   { type: 'string', description: 'Single day as YYYY-MM-DD (UTC). Defaults to today (UTC) if omitted.' },
+      date:   { type: 'string', description: "Single day as YYYY-MM-DD, interpreted in the user's local timezone. Defaults to the user's local today if omitted." },
       from:   { type: 'string', description: 'Optional ISO start timestamp (inclusive); overrides date.' },
       to:     { type: 'string', description: 'Optional ISO end timestamp (exclusive); overrides date.' },
       action: { type: 'string', description: 'Optional single action filter, e.g. user_login.' },
@@ -481,7 +497,7 @@ serve(async (req) => {
         } else if (block.name === 'audit_activity') {
           const input = (block.input as Record<string, unknown>) || {}
           if (tablesQueried.indexOf('audit_activity') === -1) tablesQueried.push('audit_activity')
-          const ar = await runAuditActivity(role, input)
+          const ar = await runAuditActivity(role, input, { localDate: context.localDate, offsetMin: context.tzOffsetMin })
           resultText = ar.error ? 'ERROR: ' + ar.error : JSON.stringify(ar.summary).slice(0, 12000)
         } else {
           resultText = "ERROR: unknown tool '" + block.name + "'."
@@ -688,7 +704,8 @@ Write 2-4 sentences. Be professional, clear, and compassionate. Reference specif
   return `You are an AI assistant for the Constance Lake First Nation (CLFN) Housing Department. You help housing staff answer questions about applications, housing units, maintenance requests (work orders), renovations, contractors, inspections, and housing policy, and explain how to do things in the app.
 
 Staff role: ${role}
-Current date/time (UTC): ${new Date().toISOString()} (audit timestamps are UTC; use this when a question says "today" / "yesterday").
+Current date/time (UTC): ${new Date().toISOString()} (audit timestamps are stored in UTC).
+User's local day: ${ctx?.localDate || '(unknown)'}${ctx?.tzName ? ' (' + ctx.tzName + ')' : ''}. When a question says "today" / "yesterday", it means the user's LOCAL day, not the UTC day. The audit_activity tool already defaults to the local day and converts to UTC internally, so for "today" just call it with no date, and for another local day pass date=YYYY-MM-DD (it is interpreted in the user's local timezone).
 Quick stats: ${ctx?.units?.length ?? 0} total units (${vacantCount} vacant), ${ctx?.apps?.length ?? 0} applications (${pendingApps} pending), ${ctx?.sows?.length ?? 0} maintenance requests on file.
 
 IMPORTANT terminology for this system:
@@ -714,8 +731,9 @@ per-staff activity question, call the audit_activity tool -- NOT query_database.
 It aggregates EVERY audit event in the window server-side (it is not limited to
 50 rows), and returns { window, total_events, distinct_actors, logins_count,
 by_actor:[{actor,events,first,last}], by_action:[{action,count}], logins:[...] }.
-Pass date=YYYY-MM-DD for a single day (defaults to today UTC), or from/to ISO
-timestamps for a custom range, and optionally action=user_login. Report the
+Pass date=YYYY-MM-DD for a single day (interpreted in the user's LOCAL
+timezone; defaults to the user's local today), or from/to ISO timestamps for
+a custom range, and optionally action=user_login. Report the
 per-actor breakdown; do not conclude "only X was active" from query_database,
 whose row cap silently drops people on busy days.
 ${HOW_TO}

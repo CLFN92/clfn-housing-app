@@ -191,6 +191,12 @@ function aiSendMessage() {
 
   var ctx = {
     role:        window._effectiveRole || window.currentRole || '',
+    // Local-time context so "today"/"yesterday" in activity reports use the
+    // nation's calendar day, not UTC (an evening report was rolling into the
+    // next UTC day and showing almost no activity).
+    localDate:   (function(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); })(),
+    tzOffsetMin: new Date().getTimezoneOffset(),
+    tzName:      (function(){ try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch(e){ return ''; } })(),
     apps:        (window.applications  || []).map(function(a) {
       return {
         id: a.id, fn: a.fn, ln: a.ln, status: a.status,
