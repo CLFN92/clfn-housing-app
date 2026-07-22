@@ -689,6 +689,18 @@ function renderMatchView(){
     return;
   }
 
+  // Delete (archive) gate — controlled by the deleteApplication approval
+  // authority (Settings > Approval Authority > Housing Application). Default ED.
+  var _canDeleteApp = (typeof APPROVAL_AUTHORITY !== 'undefined')
+    && APPROVAL_AUTHORITY.can('deleteApplication', window.currentRole);
+  function _matchDelBtn(appId, block){
+    if(!_canDeleteApp) return '';
+    return '<button data-del-app="'+appId+'" title="Delete (archive) application"'
+      + (block ? ' style="background:transparent;border:1px solid var(--danger);color:var(--danger);padding:8px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;white-space:nowrap;"'
+               : ' style="background:transparent;border:1px solid var(--border);color:var(--danger);padding:6px 9px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;line-height:1;"')
+      + '>🗑</button>';
+  }
+
   var rows = _matchRows.map(function(app, i){
     var best = _allocatedUnit(app);
     var name = ((app.fn||'')+' '+(app.ln||'')).trim();
@@ -760,7 +772,7 @@ function renderMatchView(){
           ? '<span style="font-size:12px;font-weight:700;color:var(--success);">Yes</span>'+(curAddr?'<div class="js-lbl-sm">'+curAddr+'</div>':'')
           : '<span style="font-size:12px;color:var(--muted);">No</span>')
       +'</td>'
-      +'<td style="padding:12px 14px;">'+assignCell+'</td>'
+      +'<td style="padding:12px 14px;white-space:nowrap;"><div style="display:flex;align-items:center;gap:8px;">'+assignCell+_matchDelBtn(app.id,false)+'</div></td>'
       +'</tr>';
   }).join('');
 
@@ -800,6 +812,7 @@ function renderMatchView(){
     } else if (canAssign) {
       actions.push({html:'<button type="button" data-assign-app="'+app.id+'" data-assign-unit="'+(best?best.unit.id:'')+'" style="flex:1;background:var(--yellow);border:none;color:var(--dark);padding:8px 10px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;white-space:nowrap;">Assign →</button>'});
     }
+    if (_canDeleteApp) actions.push({html: _matchDelBtn(app.id, true)});
     return _cardTile({
       title: name,
       pill: {text: tier, bg:'var(--bg)', color: tCol},
@@ -843,7 +856,40 @@ function renderMatchView(){
       openAssignModal(btn.getAttribute('data-assign-app'), btn.getAttribute('data-assign-unit'));
     });
   });
+  // Wire delete (archive) buttons — shared by both views.
+  if(matchContent) matchContent.querySelectorAll('[data-del-app]').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      _matchDeleteApp(btn.getAttribute('data-del-app'));
+    });
+  });
 }
+
+// Delete (archive) an application from the Match list. Gated by the
+// deleteApplication approval authority; soft-deletes via archiveApplication
+// (record preserved + audited), then refreshes Match.
+function _matchDeleteApp(appId){
+  if(typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('deleteApplication', window.currentRole)){
+    if(typeof showToast === 'function') showToast('You are not authorized to delete applications.');
+    return;
+  }
+  var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var app  = apps.find(function(a){ return a.id === appId; });
+  var name = app ? (((app.fn||'')+' '+(app.ln||'')).trim() || appId) : appId;
+  function doIt(){
+    if(typeof archiveApplication === 'function') archiveApplication(appId);
+    if(typeof renderMatchView === 'function') renderMatchView();
+  }
+  if(typeof showConfirm === 'function'){
+    showConfirm({
+      title:       'Delete application?',
+      message:     'Remove <strong>'+name+'</strong> from the match list? The application is archived (hidden from active lists) and its record is preserved in the audit trail.',
+      confirmText: 'Delete',
+      danger:      true
+    }).then(function(ok){ if(ok) doIt(); });
+  } else if(window.confirm('Delete '+name+'?')){ doIt(); }
+}
+window._matchDeleteApp = _matchDeleteApp;
 window._matchSetView = function(v){
   try { localStorage.setItem('clfn_match_view', v === 'cards' ? 'cards' : 'list'); } catch(e){}
   renderMatchView();

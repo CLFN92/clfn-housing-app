@@ -39,6 +39,8 @@ var APPROVAL_AUTHORITY = (function() {
     declineApplication:       ['housing_manager', 'ed'],
     // Who can return an application for more info
     returnApplication:        ['housing_manager', 'ed'],
+    // Who can delete (archive) an application from the Match list / worklist
+    deleteApplication:        ['ed'],
 
     // ── File Update workflow ──────────────────────────────────────────────
     // File updates only need HM approval — no ED sign-off required
@@ -384,6 +386,7 @@ var APPROVAL_AUTHORITY = (function() {
       finalApproveApp:          'Final approval — housing application',
       declineApplication:       'Decline application',
       returnApplication:        'Return application for more info',
+      deleteApplication:        'Delete / archive an application',
       reviewFileUpdate:         'Review file update',
       approveFileUpdate:        'Approve file update',
       assignUnit:               'Assign unit to applicant',
@@ -426,7 +429,7 @@ var APPROVAL_AUTHORITY = (function() {
 
     /** Group labels for the Settings UI sections */
     groups: {
-      'Housing Application':  ['reviewApplication','finalApproveApp','declineApplication','returnApplication','unlockSignatures','viewApplicationScore'],
+      'Housing Application':  ['reviewApplication','finalApproveApp','declineApplication','returnApplication','deleteApplication','unlockSignatures','viewApplicationScore'],
       'File Update':          ['reviewFileUpdate','approveFileUpdate'],
       'Unit Assignment':      ['assignUnit','overrideMatch','assignTiedBand','assignRentAmount'],
       'Maintenance Request & Renovation': ['sowEdThreshold','approveSowUnderThreshold','approveSowOverThreshold','lockSow','assignWorkOrder','editRenoProgress'],
