@@ -75,6 +75,22 @@ var EMAIL_EVENT_REGISTRY = [
     }
   },
   {
+    key:                   'application_updated',
+    label:                 'Application Updated (Resubmission)',
+    description:           'Sent when an application that already exists in the system (an existing application number) is edited and re-submitted, in place of the new-application email.',
+    defaultRecipientRoles: ['housing_manager'],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['applicantName','applicantId','score','tier','nationShort','appLink'],
+    defaults: {
+      subject:  '{nationShort} Housing — Application Updated: {applicantName}',
+      bodyHtml: '<p>An existing housing application has been <strong>updated and re-submitted</strong> by <strong>{applicantName}</strong> ({applicantId}).</p>'
+              + '<p>Score: <strong>{score}</strong> &middot; Tier: <strong>{tier}</strong></p>'
+              + '<p>This is a change to an application already in the system &mdash; not a new application. Please log in to the {nationShort} Housing app to review the updated details.</p>'
+              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+    }
+  },
+  {
     key:                   'sow_created',
     label:                 'Maintenance Request Created',
     description:           'Sent on the first save of a new maintenance request (not on subsequent edits).',
@@ -547,12 +563,17 @@ async function _sbLoadActiveStaffByRole(role) {
 // window.sendNotification. Best-effort, never throws.
 
 // Wired from finalSubmit() in housing-app.js. Picks the event based on
-// app.appType: existing_tenant → file_update_submitted,
-//              transfer_request → transfer_request_submitted,
-//              else → application_submitted.
-async function notifyApplicationSubmitted(app) {
+// whether this is an UPDATE (an application that already existed / had been
+// submitted before) or a first submission, then by app.appType:
+//   opts.isUpdate === true → application_updated (explains it's a resubmission)
+//   existing_tenant        → file_update_submitted
+//   transfer_request       → transfer_request_submitted
+//   else                   → application_submitted
+async function notifyApplicationSubmitted(app, opts) {
   if (!app) return;
-  var eventKey = app.appType === 'existing_tenant'  ? 'file_update_submitted'
+  opts = opts || {};
+  var eventKey = opts.isUpdate                       ? 'application_updated'
+               : app.appType === 'existing_tenant'  ? 'file_update_submitted'
                : app.appType === 'transfer_request' ? 'transfer_request_submitted'
                : 'application_submitted';
   var cfg      = _emailEventConfig(eventKey);

@@ -1779,10 +1779,17 @@ function finalSubmit(opts){
   var appType = (typeof getAppType==='function') ? getAppType() : 'new_housing';
   var isFileUpdate      = (appType === 'existing_tenant');
   var isTransferRequest = (appType === 'transfer_request');
-  var actionLabel = isFileUpdate      ? 'file_update_submitted'
+  // An UPDATE is a re-submission of an application that already exists in the
+  // system — it has a record ("application number") and a non-draft status.
+  // A brand-new draft being submitted for the first time is NOT an update.
+  var _priorApp = currentAppId ? applications.find(function(a){ return a.id === currentAppId; }) : null;
+  var isUpdate  = !!(_priorApp && _priorApp.status && _priorApp.status !== 'draft');
+  var actionLabel = isUpdate          ? 'application_updated'
+                  : isFileUpdate      ? 'file_update_submitted'
                   : isTransferRequest ? 'transfer_request_submitted'
                   : 'application_submitted';
-  var detail = isFileUpdate      ? 'File update submitted by applicant — awaiting Housing Manager review'
+  var detail = isUpdate          ? 'Existing application updated and re-submitted by applicant — awaiting Housing Manager review'
+             : isFileUpdate      ? 'File update submitted by applicant — awaiting Housing Manager review'
              : isTransferRequest ? 'Transfer / new housing request submitted by existing tenant — awaiting Housing Manager review'
              : 'New housing application submitted by applicant — awaiting Housing Manager review';
   auditEntry(currentAppId||'new', actionLabel, detail, 'Applicant');
@@ -1806,7 +1813,7 @@ function finalSubmit(opts){
   // Microsoft Graph notification pipeline — emails every active Housing
   // Manager resolved from the staff table. Fire-and-forget; UI never
   // blocks on delivery.
-  if(typeof notifyApplicationSubmitted === 'function') notifyApplicationSubmitted(submittedApp);
+  if(typeof notifyApplicationSubmitted === 'function') notifyApplicationSubmitted(submittedApp, { isUpdate: isUpdate });
   // Confirmation email to the applicant (and co-applicant if a separate
   // address) with a PDF copy attached. Only fires when the applicant
   // opted in via the inline checkbox on openSubmitModal — keeps the
