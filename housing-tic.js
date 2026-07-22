@@ -1733,6 +1733,7 @@
       +     '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">'+(nationShort())+' Residential Occupancy Agreement</button>'
       +     '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'temporary_lease\')" class="header-export-item">Temporary Occupancy Agreement (Fixed Term)</button>'
       +     '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'commercial_lease\')" class="header-export-item">Commercial Occupancy &amp; Lease Agreement</button>'
+      +     '<button type="button" onclick="window._ticGenerateReplacementLeasePdf && window._ticGenerateReplacementLeasePdf()" class="header-export-item">Replacement Lease Agreement (No Appliances)</button>'
       +     '<div class="header-export-group">Notices</div>'
       +     '<button type="button" onclick="window._ticOpenInspectionNoticeModal && window._ticOpenInspectionNoticeModal()" class="header-export-item">Notice of Inspection &mdash; 48 Hours</button>'
       +     evictBtns
@@ -4557,6 +4558,287 @@
 
   window._ticOpenEvictionNoticeModal   = _ticOpenEvictionNoticeModal;
   window._ticGenerateEvictionNoticePdf = _ticGenerateEvictionNoticePdf;
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // Replacement Lease Agreement (the legacy "No Appliances" house rental
+  // agreement, reproduced verbatim with a "Replacement Lease Agreement" header).
+  // Nation identity (name / committee / mailing block / province) comes from
+  // NATION_CONFIG, never literals. Tenant name, address, and rent are pre-filled
+  // from the card; dates / initials / signatures print as fill-in blanks.
+  // ════════════════════════════════════════════════════════════════════════════
+  async function _ticGenerateReplacementLeasePdf() {
+    if (typeof _loadJsPdf === 'function') await _loadJsPdf();
+    if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable'); return; }
+    if (typeof _makePdfDoc !== 'function') { if (typeof showToast === 'function') showToast('PDF letterhead helper unavailable'); return; }
+
+    var t = _ticState.tenant || {}, u = _ticState.unit || {}, app = _ticState.application || {};
+    var tenantName = t[TIC_C.full_name] || ((app.fn||'') + ' ' + (app.ln||'')).trim();
+    var streetName = u.num ? ((u.num||'') + ' ' + (u.street||'')).trim() : (app.street||'');
+    var rentRaw    = (u.monthlyRent != null ? u.monthlyRent : (u.monthly_rent != null ? u.monthly_rent : ''));
+    var rent       = (rentRaw !== '' && rentRaw != null && !isNaN(parseFloat(rentRaw))) ? parseFloat(rentRaw).toFixed(2) : '';
+
+    var nc         = window.NATION_CONFIG || {};
+    var nationName = (typeof nationDisplay === 'function') ? nationDisplay() : (nc.display_name || '');
+    var committee  = nc.landlord_committee || 'Housing Committee';
+    var poBox      = nc.mailing_po_box || '';
+    var postal     = nc.mailing_postal || '';
+    var province   = nc.province || '';
+
+    function blank(v, n){ v = (v == null ? '' : String(v)).trim(); return v || new Array((n||12) + 1).join('_'); }
+
+    var logo = (typeof _fetchLogoForPdf === 'function') ? await _fetchLogoForPdf() : null;
+    var ctx = _makePdfDoc({
+      headerTitle:    'Replacement Lease Agreement',
+      headerSubtitle: 'No Appliances',
+      logoDataUrl:    logo,
+      footerLeft:     nationName + ' Housing — Confidential'
+    });
+    var pdf = ctx.pdf;
+    var L = ctx.marginL, CW = ctx.contentW, RX = ctx.pageW - ctx.marginR, CX = ctx.pageW / 2;
+    var BODY = 10, STEP = 4.6;
+
+    function para(text, o){
+      o = o || {};
+      pdf.setFont('helvetica', o.bold ? 'bold' : 'normal');
+      pdf.setFontSize(o.size || BODY);
+      pdf.setTextColor(o.color != null ? o.color : 20);
+      var indent = o.indent || 0;
+      var lines = pdf.splitTextToSize(String(text), CW - indent);
+      ctx.needSpace(lines.length * STEP + (o.after != null ? o.after : 2));
+      if (o.center)     pdf.text(lines, CX, ctx.y + 3, { align:'center' });
+      else if (o.right) pdf.text(lines, RX, ctx.y + 3, { align:'right' });
+      else              pdf.text(lines, L + indent, ctx.y + 3);
+      ctx.y += lines.length * STEP + (o.after != null ? o.after : 2);
+      pdf.setTextColor(0); pdf.setFont('helvetica','normal');
+    }
+    function gap(mm){ ctx.y += mm; }
+    function titleBlock(){
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(15); pdf.setTextColor(0);
+      var tt = 'RESIDENTIAL HOUSE RENTAL AGREEMENT';
+      pdf.text(tt, CX, ctx.y + 5, { align:'center' });
+      var tw = pdf.getTextWidth(tt);
+      pdf.setLineWidth(0.4); pdf.line(CX - tw/2, ctx.y + 6.5, CX + tw/2, ctx.y + 6.5);
+      ctx.y += 8;
+      pdf.setFontSize(13); pdf.text("(No Appliance's)", CX, ctx.y + 5, { align:'center' });
+      ctx.y += 11; pdf.setFont('helvetica','normal');
+    }
+    function secHead(n, title){
+      ctx.needSpace(STEP + 5); ctx.y += 3;
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(BODY); pdf.setTextColor(0);
+      pdf.text(String(n) + '.', L, ctx.y + 3);
+      pdf.text(title, L + 9, ctx.y + 3);
+      ctx.y += STEP + 1.5; pdf.setFont('helvetica','normal');
+    }
+    // Hanging-indent lettered/numbered clause.
+    function clause(marker, text, indent){
+      indent = (indent == null) ? 9 : indent;
+      var mx = L + indent, tx = L + indent + 9, tw = CW - indent - 9;
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(BODY); pdf.setTextColor(20);
+      var lines = pdf.splitTextToSize(String(text), tw);
+      ctx.needSpace(lines.length * STEP + 2.5);
+      pdf.text(String(marker), mx, ctx.y + 3);
+      pdf.text(lines, tx, ctx.y + 3);
+      ctx.y += lines.length * STEP + 2.5;
+      pdf.setTextColor(0);
+    }
+
+    // ── Title + intro ───────────────────────────────────────────────────────
+    titleBlock();
+    para('THIS HOUSE RENTAL AGREEMENT (hereinafter the "Agreement") is entered into on this ' + blank('', 10) + ' of ' + blank('', 8) + ', ' + blank('', 6) + ' between:', { after:3 });
+
+    para('The Lessor:', { bold:true });
+    para(nationName.toUpperCase(), { center:true, bold:true, after:1 });
+    para(committee, { center:true, bold:true, after:1 });
+    if (poBox)   para(poBox, { center:true, after:1 });
+    para(nationName.toUpperCase() + (province ? ', ' + province.toUpperCase().slice(0,2) : ''), { center:true, after:1 });
+    if (postal)  para(postal, { center:true, after:1 });
+    para('(Called the "Landlord")', { right:true, after:3 });
+
+    para('and the Lessee:', { bold:true });
+    para(blank(tenantName, 24), { center:true, after:1 });
+    para('of ' + nationName.toUpperCase(), { center:true, after:1 });
+    para('P.O. Box ' + blank('', 8) + ',', { center:true, after:1 });
+    para(nationName.toUpperCase() + (province ? ', ' + province.toUpperCase().slice(0,2) : ''), { center:true, after:1 });
+    if (postal)  para(postal, { center:true, after:1 });
+    para('(Called the "Tenant")', { right:true, after:3 });
+
+    para('In regards to the Property:', { bold:true });
+    para('Lot # ' + blank('', 8), { center:true, after:1 });
+    para('Street name: ' + blank(streetName, 18), { center:true, after:1 });
+    para(nationName + ', ' + (province || 'Ontario'), { center:true, bold:true, after:1 });
+    para('(Called the "Residence")', { right:true, after:3 });
+
+    para('The Housing Authority and Tenant do hereby agree to abide by the terms set out in this Agreement. The terms of this Agreement are as follows:', { after:2 });
+
+    // ── 1. USE of the RESIDENCE ─────────────────────────────────────────────
+    secHead(1, 'USE of the RESIDENCE:');
+    clause('a.', 'In consideration of the rent payment to be paid by Tenant and of the other covenants and agreements herein contained, the Landlord rents the Residence to the Tenant.');
+    clause('b.', 'Tenant shall use the Residence only for residential purposes.');
+    clause('c.', "Tenant shall not use or allow the use of the premises in any way that interferes with other tenants' use and enjoyment of the premises or neighboring property.");
+    clause('d.', 'Tenants shall not use the Residence for any illegal or improper use.');
+    clause('e.', 'Additionally, the Tenant agrees that the Residence may be a smoking environment. The Tenant agrees shall be liable to the Landlord for any damage and liability that may arise as a result of smoking.');
+
+    // ── 2. PAYMENT SCHEDULE AND DETAILS ─────────────────────────────────────
+    secHead(2, 'PAYMENT SCHEDULE AND DETAILS');
+    clause('a)', 'The Tenant agrees to pay the Landlord $ ' + blank(rent, 8) + ' (CDN), monthly. Payments shall be made on or before the first of every calendar month of during the entire length of this Agreement. Payments shall be made to the: ' + nationName + '.        Initial ' + blank('', 8));
+    clause('b)', 'Should a Tenant’s payment be 15 days late, the Tenant shall be subject to a $ 25.00 late payment fee as a penalty.        Initial ' + blank('', 8));
+    clause('c)', 'The Tenant agrees to pay a $45.00 fee for non-sufficient funds (NSF) fees when a cheque does not clear at the financial institution.        Initial ' + blank('', 8));
+    clause('d)', 'The Tenant shall pay Rental Arrears of $25.00.        Initial ' + blank('', 8));
+    clause('e)', 'The Tenant shall pay Water and Sewer rate of $16.00 per month.        Initial ' + blank('', 8));
+    clause('f)', 'The Tenant shall pay a 1 time fee for Maintenance Deposit of $100.00.        Initial ' + blank('', 8));
+
+    // ── 3. LENGTH OF AGREEMENT ──────────────────────────────────────────────
+    secHead(3, 'LENGTH OF AGREEMENT');
+    clause('a.', 'This Agreement shall commence until at which time either party decides to dissolve said agreement on ' + blank('', 6) + ' day of ' + blank('', 10) + ', ' + blank('', 6) + '.');
+
+    // ── 4. TERMINATION ──────────────────────────────────────────────────────
+    secHead(4, 'TERMINATION');
+    clause('a.', 'After the anniversary date, either party may terminate this Agreement by giving written notice to the other no later than the first day of the calendar month on which the party wishes to terminate the agreement. The premises shall be considered vacated only after all areas including storage areas are clear of all Tenant belongings, and keys and other property furnished for Tenant use are returned to Landlord.');
+    clause('b.', "Should the Tenant continue beyond the termination date or fail to vacate all possessions on or before the termination date, Tenant shall be liable for additional rent and damages, which may include damages due to the Landlord’s loss of prospective new renters.");
+
+    // ── 5. DEFAULT ──────────────────────────────────────────────────────────
+    secHead(5, 'DEFAULT');
+    clause('a.', "It is understood and agreed that if the Tenant fails to fulfill or perform any obligation under this Agreement, the Tenant shall be considered to be in default of this Agreement. The Tenant shall receive 15 days’ notice by Landlord to remedy the default (i.e. non-payment of rent).");
+    clause('b.', "In the event the Tenant does not remedy a default for which he or she has been given notice by the Landlord under this Article, the Landlord may, at Landlord’s sole discretion, remedy such default and the cost of so doing will be added to the Tenant’s payments under this Agreement, or declare the Tenant in default of the Agreement.");
+    clause('c.', 'The Landlord may re-enter the premises and re-possession of the premises in the event of default. After default, the Tenant may be held liable for the balance of the unpaid rent under this Agreement if Landlord cannot re-let the House during the remaining term of this Agreement.');
+
+    // ── 6. ENFORCING OUR RIGHTS ─────────────────────────────────────────────
+    secHead(6, 'ENFORCING OUR RIGHTS');
+    clause('a.', "It is understood and agreed upon that the Tenant(s)’ right to continue in occupancy of the Residence rental is conditional upon the continued payment of the monthly payments as stipulated in this Agreement. Upon failure to make such monthly payments, this Agreement shall terminate immediately and all the Tenant’s rights hereunder shall be forfeited.");
+    clause('b.', 'The Landlord may enforce its right to be paid the total balance due under this Agreement by:');
+    clause('1.', 'Taking legal action for what (s)he owes', 18);
+    clause('2.', 'Taking possession of the Residence or', 18);
+    clause('3.', 'Both (a) and (b)', 18);
+
+    // ── 7. TENANT RESPONSIBILITIES ──────────────────────────────────────────
+    secHead(7, 'TENANT RESPONSIBILITIES');
+    clause('a.', 'The Tenant shall comply with all obligations imposed upon tenants by applicable provisions of building, housing, and health codes; maintain the Premises in good condition during the entire length of this Agreement and shall neither cause nor allow any abuse of the facilities therein.');
+    clause('b.', 'The Tenant shall inform the Landlord of any condition that may cause damage to the Premises. If the Premises, or any part of the Premises, is partially damaged by fire or other casualty not due to the negligence or willful act of the Tenant or an agent of the Tenant, the Premises will be repaired by the Landlord.');
+    clause('c.', 'Upon the termination or expiry of this Agreement the Tenant shall redeliver the property, appliances and any other applicable aspects of the Unit, in as good condition as at the commencement of the Agreement. Reasonable wear and tear from use to the Unit shall be accepted.');
+
+    // ── 8. HOUSE ALTERATIONS ────────────────────────────────────────────────
+    secHead(8, 'HOUSE ALTERATIONS');
+    clause('a.', 'Tenant shall make no alterations, additions or improvements to the Premises (including the application of paints, stains, nails or screws to the woodwork, walls, floors or furnishings) without first obtaining the express written consent of the Landlord.');
+    clause('b.', 'All alterations must be approved by the Landlord. All drawings of the alterations shall be kept on file at the office of the Landlord.');
+
+    // ── 9. INSURANCE ────────────────────────────────────────────────────────
+    secHead(9, 'INSURANCE');
+    clause('a.', "Tenant acknowledges that Landlord’s insurance does not cover personal property damage caused by fire, theft, rain, war, acts of God, acts of others, and/or any other causes, nor shall Housing Authority be held liable for such losses.");
+    clause('b.', 'The Tenant is responsible to obtain their own insurance policy to cover any personal liability losses occasioned by damaged to the Premises i.e. life insurance, content insurance.');
+
+    // ── 10. ENTRY FOR REPAIRS OR SHOW ───────────────────────────────────────
+    secHead(10, 'ENTRY FOR REPAIRS OR SHOW');
+    clause('a.', 'The Landlord shall have the right to enter the Unit at all reasonable times for the purpose of inspecting the and/or showing the same to prospective tenants, and to make such reasonable repairs and alterations as may be deemed necessary by the Landlord for the preservation of the Unit or the building and to remove any alterations, additions, fixtures, and any other objects which may be affixed or erected in violation of the terms of this Agreement.');
+    clause('b.', 'The Landlord shall give reasonable notice of intent to enter Premises, except in the case of an emergency.');
+
+    // ── 11. QUIET ENJOYMENT ─────────────────────────────────────────────────
+    secHead(11, 'QUIET ENJOYMENT');
+    clause('a.', 'The Tenant shall be entitled to quiet enjoyment of the Unit for the term of this Agreement provided that the Tenant performs all covenants and obligations under this Agreement.');
+
+    // ── 12. POSSESSION AND SURRENDER OF THE AGREEMENT ───────────────────────
+    secHead(12, 'POSSESSION AND SURRENDER OF THE AGREEMENT');
+    clause('a.', 'At the expiration of the Agreement Term, Tenant shall immediately surrender the Unit to the Landlord in the same condition as at the start of the Agreement, reasonable wear and tear elements are accepted.');
+    clause('b.', 'The Tenant shall return the complete set of keys to the Landlord.');
+    clause('c.', "If any Tenant remains on the Premises after the expiration or termination of this Agreement without the Landlord’s written permission, the Landlord may recover possession of the Premises in the manner provided for by law.");
+
+    // ── 13. ABANDONMENT ─────────────────────────────────────────────────────
+    secHead(13, 'ABANDONMENT');
+    clause('a.', 'Abandonment is defined as absence of the Tenant from the premises for a period of seven (7) or more consecutive days while monthly payments or other payments under this Agreement remain unpaid, whereupon Tenant will be considered in breach of this Agreement.');
+    clause('b.', 'If the Tenant abandons the Unit during the term of this Agreement, the Landlord may enter the Unit by any legal means, without being liable for such entering, and without becoming liable to the Tenant for damages caused upon entering. Landlord may consider any personal property belonging to the Tenant and left on the property to have been abandoned, in which case the Landlord may dispose of all such personal property in any manner the Landlord deems proper without becoming liable to the Tenant for doing so.');
+    clause('c.', 'In case of abandonment as defined by this Agreement, the Landlord may, at its option, terminate the Agreement and re-let the Unit, and may receive and collect all payments payable by virtue of such re-letting. Should this Agreement continue in force, the Landlord may hold the Tenant liable for any difference between the rent that would have been payable under this Agreement during the balance of the unexpired term and the net rent for such period that would have been realized by the Landlord by means of the re-letting.');
+
+    // ── 14. LEGAL FEES ──────────────────────────────────────────────────────
+    secHead(14, 'LEGAL FEES');
+    clause('a.', 'If the Tenant is in breach of this Agreement, and the Landlord finds it necessary to enforce this Agreement, or collect rental or other damages, through a collection agency or by virtue of other legal action, the Landlord shall be indemnified by the Tenant for any reasonable legal fees and out-or-pocket costs which in any way relate to, or were precipitated by, the breach of this Agreement by the Tenant.');
+
+    // ── 15. WAIVER ──────────────────────────────────────────────────────────
+    secHead(15, 'WAIVER');
+    clause('a.', "The Landlord’s failure to enforce or insist on compliance with any provisions of this Agreement shall not be deemed a waiver or a limitation of the Landlord’s right to enforce or insist on compliance with the provisions of this Agreement.");
+
+    // ── 16. BINDING EFFECT ──────────────────────────────────────────────────
+    secHead(16, 'BINDING EFFECT');
+    clause('a.', 'Except as otherwise provided in this Agreement, all of the covenants, conditions, and provisions of this Agreement shall apply to and bind the parties and the heirs, personal representatives, successors, and assigns of the parties.');
+
+    // ── 17. HEADINGS ────────────────────────────────────────────────────────
+    secHead(17, 'HEADINGS');
+    clause('a.', 'Headings are inserted for the convenience of the parties only and are not to be considered when interpreting this Agreement.');
+
+    // ── 18. ASSIGNMENT, SUB-LET AND LICENSES ────────────────────────────────
+    secHead(18, 'ASSIGNMENT, SUB-LET AND LICENSES');
+    clause('a.', 'The Tenant shall not assign this Agreement, or sub-let or grant any license to use the Unit or any part thereof without the prior written consent of the Landlord.');
+    clause('b.', 'Consent by the Landlord to one such assignment, sub-letting or license shall not be deemed to be a consent to any subsequent assignment, sub-letting or license.');
+    clause('c.', 'An assignment, sub-letting or license without the prior written consent of the Landlord or an assignment or sub-letting by operation of law shall be absolutely null and void and may, at the Landlord option, result in immediate termination of this Agreement.');
+
+    // ── 19. AMENDMENT OF AGREEMENT ──────────────────────────────────────────
+    secHead(19, 'AMENDMENT OF AGREEMENT');
+    clause('a.', 'Any amendment or modification of this Agreement, or additional obligation assumed by either party that is not specified in this Agreement will only be binding if evidenced in writing signed by both parties.');
+
+    // ── 20. ENTIRE AGREEMENT ────────────────────────────────────────────────
+    secHead(20, 'ENTIRE AGREEMENT');
+    clause('a.', 'This Agreement constitutes the entire agreement between the parties and supercedes any prior written or oral covenants or representations relating thereto and not set forth herein shall be binding on either party hereto. This Agreement may not be amended, modified, extended, or supplemented except by written instrument executed by the Landlord and Tenant. The Landlord has made no representation or warranty to Tenant except as herein expressly set forth.');
+
+    // ── 21. SEVERABILITY ────────────────────────────────────────────────────
+    secHead(21, 'SEVERABILITY');
+    clause('a.', 'In the event any of the provisions of this Agreement are held to be invalid or unenforceable in whole or in part, those provisions to the extent enforceable and all other provisions will nevertheless continue to be valid and enforceable as though the invalid or unenforceable parts had not been included in this Agreement.');
+
+    // ── 22. GOVERNING LAW ───────────────────────────────────────────────────
+    secHead(22, 'GOVERNING LAW');
+    clause('a.', 'This Agreement shall be governed and construed in accordance with the laws of the Province of ' + (province || 'Ontario') + ' or Canada, as applicable.');
+
+    // ── 23. THE LAND ────────────────────────────────────────────────────────
+    secHead(23, 'THE LAND');
+    clause('a.', 'The Tenant agrees that this Agreement does not attach to the land upon which the Unit sits, and is not an Agreement to rent or lease such land.');
+
+    // ── 24. SIGNATURES ──────────────────────────────────────────────────────
+    secHead(24, 'SIGNATURES');
+    clause('a.', 'The parties hereby indicate by their signatures below that they have read and agree with the terms and conditions of this Agreement in its entirety.');
+    gap(4);
+    ctx.needSpace(70);
+    var colGap = 12, colW = (CW - colGap) / 2, cxL = L, cxR = L + colW + colGap;
+    function sigLine(x, label, w){
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(BODY); pdf.setTextColor(20);
+      pdf.text(label, x, ctx.y + 3);
+      var lw = pdf.getTextWidth(label + ' ');
+      pdf.setDrawColor(120); pdf.setLineWidth(0.3);
+      pdf.line(x + lw, ctx.y + 3, x + (w || colW), ctx.y + 3); pdf.setDrawColor(0);
+    }
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(BODY); pdf.setTextColor(0);
+    pdf.text('For the Landlord', cxL, ctx.y + 3);
+    pdf.text('For the Tenant(s)', cxR, ctx.y + 3);
+    ctx.y += 12;
+    sigLine(cxL, 'Signature:', colW); sigLine(cxR, 'Signature:', colW); ctx.y += 11;
+    sigLine(cxL, 'Print:', colW);     sigLine(cxR, 'Print:', colW);     ctx.y += 11;
+    sigLine(cxL, 'Date:', colW);      sigLine(cxR, 'Signature:', colW); ctx.y += 11;
+    sigLine(cxR, 'Print:', colW);     ctx.y += 11;
+    sigLine(cxR, 'Date:', colW);      ctx.y += 6;
+
+    ctx.finish();
+
+    var slug = (tenantName || 'Tenant').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'Tenant';
+    var nationSh = (typeof nationShort === 'function') ? nationShort() : (nc.short || 'Nation');
+    var filename = nationSh.replace(/[^a-z0-9]+/gi, '') + '_Replacement_Lease_' + slug + '.pdf';
+    pdf.save(filename);
+
+    var mo = null; // no modal for this one
+    if (u.id && typeof window.sbUploadFile === 'function') {
+      try {
+        var blob = pdf.output('blob');
+        var storePath = 'tenants/' + u.id + '/' + Date.now() + '_' + filename;
+        await window.sbUploadFile(storePath, blob);
+        if (typeof window.sbSaveFileMeta === 'function') {
+          await window.sbSaveFileMeta('tenant', String(u.id), storePath, filename, blob.size, 'application/pdf');
+        }
+        _ticDocLibKey = null; _ticDocLib = null;
+        if (typeof showToast === 'function') showToast('✓ Replacement lease saved to document library');
+      } catch (e) {
+        console.warn('[tic] replacement lease upload failed:', e);
+        if (typeof showToast === 'function') showToast('✓ Lease downloaded (document library save failed — see console)');
+      }
+    } else {
+      if (typeof showToast === 'function') showToast('✓ Replacement lease generated');
+    }
+  }
+  window._ticGenerateReplacementLeasePdf = _ticGenerateReplacementLeasePdf;
 
   // ════════════════════════════════════════════════════════════════════════════
   // Set Location & Photo (SLP) — Admin Workflow

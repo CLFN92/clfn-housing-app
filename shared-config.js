@@ -25,6 +25,12 @@ window.NATIONS_DIRECTORY = window.NATIONS_DIRECTORY || {
     role_labels:   {},
     email_domain:  'clfn.on.ca',          // staff email domain gate (@<domain> checks)
     housing_email: 'housing@clfn.on.ca',  // the nation's housing dept mailbox (AP/manager defaults)
+    // Landlord mailing block for generated agreements/leases (kept in config,
+    // not as literals in the generators — see the CLFN hard rule).
+    landlord_committee: 'Housing Committee',
+    mailing_po_box:     'P.O. Box 4000',
+    mailing_postal:     'P0L 1B0',
+    province:           'Ontario',
     modules_licensed: null   // null → all optional modules licensed (defaults apply)
   }
   // Example additional nation (one entry per hostname AND/OR subdomain label):
@@ -335,7 +341,11 @@ window.NATION_CONFIG = window.NATION_CONFIG || (function(){
     short:        n.short || 'CLFN',
     role_labels:  n.role_labels || {}, // empty for CLFN — CLFN_PERMS.ROLE_LABELS defaults apply
     email_domain:  n.email_domain  || 'clfn.on.ca',
-    housing_email: n.housing_email || 'housing@clfn.on.ca'
+    housing_email: n.housing_email || 'housing@clfn.on.ca',
+    landlord_committee: n.landlord_committee || 'Housing Committee',
+    mailing_po_box:     n.mailing_po_box     || '',
+    mailing_postal:     n.mailing_postal     || '',
+    province:           n.province           || ''
   };
 })();
 
