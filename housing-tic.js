@@ -1733,7 +1733,7 @@
       +     '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal()" class="header-export-item">'+(nationShort())+' Residential Occupancy Agreement</button>'
       +     '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'temporary_lease\')" class="header-export-item">Temporary Occupancy Agreement (Fixed Term)</button>'
       +     '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'commercial_lease\')" class="header-export-item">Commercial Occupancy &amp; Lease Agreement</button>'
-      +     '<button type="button" onclick="window._ticGenerateReplacementLeasePdf && window._ticGenerateReplacementLeasePdf()" class="header-export-item">Replacement Lease Agreement (No Appliances)</button>'
+      +     '<button type="button" onclick="window._ticOpenReplacementLeaseModal && window._ticOpenReplacementLeaseModal()" class="header-export-item">Replacement Lease Agreement (No Appliances)</button>'
       +     '<div class="header-export-group">Notices</div>'
       +     '<button type="button" onclick="window._ticOpenInspectionNoticeModal && window._ticOpenInspectionNoticeModal()" class="header-export-item">Notice of Inspection &mdash; 48 Hours</button>'
       +     evictBtns
@@ -4566,16 +4566,150 @@
   // NATION_CONFIG, never literals. Tenant name, address, and rent are pre-filled
   // from the card; dates / initials / signatures print as fill-in blanks.
   // ════════════════════════════════════════════════════════════════════════════
+  // Data-entry modal — collects the fill-in fields, the Section-2 tenant
+  // initials, and the Section-24 signatures using the app's shared sig/initial
+  // pads (Draw / Type / Wet), then hands off to the generator.
+  function _ticOpenReplacementLeaseModal() {
+    var t = _ticState.tenant || {}, u = _ticState.unit || {}, app = _ticState.application || {};
+    var tenantName = t[TIC_C.full_name] || ((app.fn||'') + ' ' + (app.ln||'')).trim();
+    var streetName = u.num ? ((u.num||'') + ' ' + (u.street||'')).trim() : (app.street||'');
+    var rentAmt = (u.monthlyRent != null ? u.monthlyRent : (u.monthly_rent != null ? u.monthly_rent : ''));
+    rentAmt = (rentAmt !== '' && rentAmt != null && !isNaN(parseFloat(rentAmt))) ? parseFloat(rentAmt).toFixed(2) : '';
+    var today = new Date().toISOString().split('T')[0];
+
+    var ex = document.getElementById('tic_rlease_modal'); if (ex) ex.remove();
+
+    function inp(id, val, ph, type){ return '<input id="' + id + '" type="' + (type||'text') + '" value="' + _ticEsc(val||'') + '" placeholder="' + _ticEsc(ph||'') + '" style="width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/>'; }
+    function fld(label, html){ return '<div class="tic-field"><label class="tic-field-lbl">' + label + '</label>' + html + '</div>'; }
+    function secH(title){ return '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--yellow);margin:16px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--border);">' + title + '</div>'; }
+    function initPad(id, label){
+      return '<div class="sig-canvas-wrap"><div class="tab-bar">'
+        + '<button type="button" onclick="setSigMethod(\'' + id + '\',\'canvas\')" id="' + id + '_tab_canvas" class="tab-item active">&#9999;&#65039; Draw</button>'
+        + '<button type="button" onclick="setSigMethod(\'' + id + '\',\'type\')"   id="' + id + '_tab_type"   class="tab-item">&#9000;&#65039; Type</button>'
+        + '<button type="button" onclick="setSigMethod(\'' + id + '\',\'wet\')"    id="' + id + '_tab_wet"    class="tab-item">&#128396; Wet</button>'
+        + '</div>'
+        + '<div id="' + id + '_panel_canvas" class="bg-paper"><canvas id="' + id + '" width="400" height="70" style="width:100%;height:70px;display:block;touch-action:none;cursor:crosshair;"></canvas>'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 10px;border-top:1px solid var(--border);">'
+        + '<span class="txt-xs-muted">Initial with finger or mouse</span>'
+        + '<button type="button" onclick="clearSig(\'' + id + '\')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button>'
+        + '</div></div>'
+        + '<div id="' + id + '_panel_type" class="sec-hidden"><input type="text" id="' + id + '_typed" placeholder="Type initials (e.g. JD)" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:20px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;"/>'
+        + '<div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your initials constitutes a legal electronic acknowledgement</div></div>'
+        + '<div id="' + id + '_panel_wet" class="sec-hidden"><div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Print this form and collect initials on paper.</div>'
+        + '<input type="text" id="' + id + '_wet_ref" placeholder="Reference # (optional)" style="width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/></div>'
+        + '</div>';
+    }
+    function sigPad(id, label){
+      return '<div style="margin-bottom:14px;"><div class="tic-field-lbl" style="margin-bottom:6px;">' + label + '</div>'
+        + '<div class="sig-canvas-wrap"><div class="tab-bar">'
+        + '<button type="button" onclick="setSigMethod(\'' + id + '\',\'canvas\')" id="' + id + '_tab_canvas" class="tab-item active">&#9999;&#65039; Draw</button>'
+        + '<button type="button" onclick="setSigMethod(\'' + id + '\',\'type\')"   id="' + id + '_tab_type"   class="tab-item">&#9000;&#65039; Type</button>'
+        + '<button type="button" onclick="setSigMethod(\'' + id + '\',\'wet\')"    id="' + id + '_tab_wet"    class="tab-item">&#128396; Wet</button>'
+        + '</div>'
+        + '<div id="' + id + '_panel_canvas" class="bg-paper"><canvas id="' + id + '" width="600" height="90" style="width:100%;height:90px;display:block;touch-action:none;cursor:crosshair;"></canvas>'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;border-top:1px solid var(--border);">'
+        + '<span class="txt-xs-muted">Sign with finger or mouse</span>'
+        + '<button type="button" onclick="clearSig(\'' + id + '\')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:DM Sans,sans-serif;">Clear</button>'
+        + '</div></div>'
+        + '<div id="' + id + '_panel_type" class="sec-hidden"><input type="text" id="' + id + '_typed" placeholder="Type full legal name" style="width:100%;border:none;border-bottom:2px solid var(--dark);background:transparent;font-size:18px;font-family:Georgia,serif;font-style:italic;color:var(--text);outline:none;padding:4px 0;box-sizing:border-box;"/>'
+        + '<div style="font-size:10px;color:var(--muted);margin-top:6px;">Typing your name constitutes a legal electronic signature</div></div>'
+        + '<div id="' + id + '_panel_wet" class="sec-hidden"><div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Print this form and collect a wet signature, or attach a signed copy to this tenant\'s file.</div>'
+        + '<input type="text" id="' + id + '_wet_ref" placeholder="Reference # or e-sign envelope ID (optional)" style="width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;"/></div>'
+        + '</div></div>';
+    }
+
+    var INIT_LABELS = [
+      '2(a) — Monthly rent payment',
+      '2(b) — 15-day late payment fee ($25)',
+      '2(c) — NSF fee ($45)',
+      '2(d) — Rental arrears ($25)',
+      '2(e) — Water and sewer ($16/month)',
+      '2(f) — One-time maintenance deposit ($100)'
+    ];
+
+    var modal = document.createElement('div');
+    modal.id = 'tic_rlease_modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.innerHTML =
+        '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:700px;max-height:95vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35);">'
+      + '<div class="modal-hdr"><div>'
+      +   '<div class="lbl-yellow">&#128209; Replacement Lease Agreement</div>'
+      +   '<div class="txt-sm-meta">Enter the details, collect the tenant initials and signatures, then generate. Files to this tenant\'s documents.</div>'
+      + '</div><button type="button" onclick="var m=document.getElementById(\'tic_rlease_modal\');if(m)m.remove();" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button></div>'
+      + '<div style="overflow-y:auto;padding:18px 22px;flex:1;">'
+
+      + secH('Parties &amp; Dates')
+      + '<div class="tic-grid-2">'
+      +   fld('Agreement / Lease Start Date', inp('rl_date', today, '', 'date'))
+      +   fld('Tenant Name',       inp('rl_tenant', tenantName, 'Full legal name'))
+      +   fld('Tenant P.O. Box',   inp('rl_pobox', '', 'Box #'))
+      +   fld('Lot #',             inp('rl_lot', '', 'Lot number'))
+      +   fld('Street Name',       inp('rl_street', streetName, 'e.g. 42 Wawaskashoo'))
+      +   fld('Monthly Rent ($)',  inp('rl_rent', rentAmt, '0.00'))
+      + '</div>'
+
+      + secH('Required Tenant Initials (Section 2)')
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;">The tenant initials each payment term below.</div>'
+      + INIT_LABELS.map(function(lb, i){
+          return '<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px;">' + lb + '</div>' + initPad('rl_init_' + i, lb) + '</div>';
+        }).join('')
+
+      + secH('Signatures (Section 24)')
+      + '<div class="tic-field-lbl" style="margin:4px 0 6px;font-weight:800;color:var(--text);">For the Landlord</div>'
+      + sigPad('rl_sig_landlord', 'Landlord Signature')
+      + '<div class="tic-grid-2">' + fld('Landlord Print Name', inp('rl_landlord_name', '', 'Name')) + fld('Date', inp('rl_landlord_date', today, '', 'date')) + '</div>'
+      + '<div class="tic-field-lbl" style="margin:16px 0 6px;font-weight:800;color:var(--text);">For the Tenant(s)</div>'
+      + sigPad('rl_sig_tenant', 'Tenant Signature')
+      + '<div class="tic-grid-2">' + fld('Tenant Print Name', inp('rl_tenant_print', tenantName, 'Name')) + fld('Date', inp('rl_tenant_date', today, '', 'date')) + '</div>'
+      + sigPad('rl_sig_tenant2', 'Second Tenant Signature (optional)')
+      + '<div class="tic-grid-2">' + fld('Second Tenant Print Name', inp('rl_tenant2_print', '', 'Name')) + fld('Date', inp('rl_tenant2_date', '', '', 'date')) + '</div>'
+
+      + '</div>'
+      + '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;">'
+      +   '<button type="button" onclick="var m=document.getElementById(\'tic_rlease_modal\');if(m)m.remove();" class="btn btn-ghost">Cancel</button>'
+      +   '<button type="button" onclick="window._ticGenerateReplacementLeasePdf && window._ticGenerateReplacementLeasePdf()" class="btn btn-primary">Generate PDF</button>'
+      + '</div>'
+      + '</div>';
+
+    document.body.appendChild(modal);
+    var pads = ['rl_sig_landlord','rl_sig_tenant','rl_sig_tenant2','rl_init_0','rl_init_1','rl_init_2','rl_init_3','rl_init_4','rl_init_5'];
+    setTimeout(function(){ if (typeof _initSigPad === 'function') pads.forEach(function(id){ _initSigPad(id); }); }, 80);
+  }
+  window._ticOpenReplacementLeaseModal = _ticOpenReplacementLeaseModal;
+
   async function _ticGenerateReplacementLeasePdf() {
     if (typeof _loadJsPdf === 'function') await _loadJsPdf();
     if (!window.jspdf || !window.jspdf.jsPDF) { if (typeof showToast === 'function') showToast('PDF library unavailable'); return; }
     if (typeof _makePdfDoc !== 'function') { if (typeof showToast === 'function') showToast('PDF letterhead helper unavailable'); return; }
 
+    var fv = function(id){ var e = document.getElementById(id); return e ? (e.value||'').trim() : ''; };
+    var sigVal = function(id){ return (typeof getSigDataURL === 'function') ? getSigDataURL(id) : ''; };
     var t = _ticState.tenant || {}, u = _ticState.unit || {}, app = _ticState.application || {};
-    var tenantName = t[TIC_C.full_name] || ((app.fn||'') + ' ' + (app.ln||'')).trim();
-    var streetName = u.num ? ((u.num||'') + ' ' + (u.street||'')).trim() : (app.street||'');
-    var rentRaw    = (u.monthlyRent != null ? u.monthlyRent : (u.monthly_rent != null ? u.monthly_rent : ''));
-    var rent       = (rentRaw !== '' && rentRaw != null && !isNaN(parseFloat(rentRaw))) ? parseFloat(rentRaw).toFixed(2) : '';
+
+    // Fields (from the modal; fall back to card data if the modal isn't open).
+    var tenantName = fv('rl_tenant')  || t[TIC_C.full_name] || ((app.fn||'') + ' ' + (app.ln||'')).trim();
+    var streetName = fv('rl_street')  || (u.num ? ((u.num||'') + ' ' + (u.street||'')).trim() : (app.street||''));
+    var poBoxT     = fv('rl_pobox');
+    var lotNum     = fv('rl_lot');
+    var rentRaw    = fv('rl_rent') || (u.monthlyRent != null ? u.monthlyRent : (u.monthly_rent != null ? u.monthly_rent : ''));
+    var _rentNum   = parseFloat(String(rentRaw).replace(/[^0-9.]/g, ''));
+    var rent       = (!isNaN(_rentNum) && String(rentRaw).trim() !== '') ? _rentNum.toFixed(2) : '';
+
+    // Agreement date → day / month / year parts for the intro + Section 3.
+    var agDate = fv('rl_date');
+    var dDay = '', dMonth = '', dYear = '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(agDate)) {
+      var _dd = new Date(agDate + 'T12:00:00');
+      if (!isNaN(_dd)) { dDay = String(_dd.getDate()); dMonth = _dd.toLocaleDateString('en-CA', { month:'long' }); dYear = String(_dd.getFullYear()); }
+    }
+
+    // Captured initials (Section 2 a–f) + signatures.
+    var initCaps = [];
+    for (var _ii = 0; _ii < 6; _ii++) initCaps.push(sigVal('rl_init_' + _ii));
+    var sigLandlord = sigVal('rl_sig_landlord'), sigTenant = sigVal('rl_sig_tenant'), sigTenant2 = sigVal('rl_sig_tenant2');
+    var landlordName = fv('rl_landlord_name'), landlordDate = fv('rl_landlord_date');
+    var tenantPrint  = fv('rl_tenant_print') || tenantName, tenantDate = fv('rl_tenant_date');
+    var tenant2Print = fv('rl_tenant2_print'), tenant2Date = fv('rl_tenant2_date');
 
     var nc         = window.NATION_CONFIG || {};
     var nationName = (typeof nationDisplay === 'function') ? nationDisplay() : (nc.display_name || '');
@@ -4641,10 +4775,35 @@
       ctx.y += lines.length * STEP + 2.5;
       pdf.setTextColor(0);
     }
+    // Draw a captured initial (image / typed / wet / blank) after a payment clause.
+    function embedInitial(cap){
+      ctx.needSpace(9);
+      var lx = L + 18;
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(BODY); pdf.setTextColor(20);
+      pdf.text('Initial:', lx, ctx.y + 3);
+      var vx = lx + pdf.getTextWidth('Initial:  ');
+      if (cap && cap.indexOf('data:image/png') === 0) { try { pdf.addImage(cap, 'PNG', vx, ctx.y - 3, 20, 8); } catch(e){} }
+      else if (cap && cap.indexOf('typed:') === 0) { pdf.setFont('helvetica','italic'); pdf.setFontSize(12); pdf.text(cap.replace('typed:',''), vx, ctx.y + 3); pdf.setFont('helvetica','normal'); pdf.setFontSize(BODY); }
+      else if (cap && cap.indexOf('wet:') === 0) { pdf.setTextColor(90); pdf.text('(initialed on paper)', vx, ctx.y + 3); pdf.setTextColor(20); }
+      else { pdf.setDrawColor(150); pdf.setLineWidth(0.3); pdf.line(vx, ctx.y + 3, vx + 28, ctx.y + 3); pdf.setDrawColor(0); }
+      ctx.y += 8; pdf.setTextColor(0);
+    }
+    // Signature line with a captured signature image / typed name / value drawn on it.
+    function sigLineVal(x, label, w, sigCap, textVal){
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(BODY); pdf.setTextColor(20);
+      pdf.text(label, x, ctx.y + 3);
+      var lx = x + pdf.getTextWidth(label + ' '), lineY = ctx.y + 4, avail = (x + w) - lx;
+      if (sigCap && sigCap.indexOf('data:image/png') === 0) { try { pdf.addImage(sigCap, 'PNG', lx, lineY - 9, Math.min(avail, 46), 9); } catch(e){} }
+      else if (sigCap && sigCap.indexOf('typed:') === 0) { pdf.setFont('helvetica','italic'); pdf.setFontSize(14); pdf.text(sigCap.replace('typed:',''), lx, lineY - 1); pdf.setFont('helvetica','normal'); pdf.setFontSize(BODY); }
+      else if (sigCap && sigCap.indexOf('wet:') === 0) { pdf.setFontSize(8); pdf.setTextColor(90); pdf.text('wet signature on file', lx, lineY - 1); pdf.setFontSize(BODY); pdf.setTextColor(20); }
+      else if (textVal) { pdf.text(String(textVal), lx, lineY - 1); }
+      pdf.setDrawColor(120); pdf.setLineWidth(0.3); pdf.line(lx, lineY, x + w, lineY); pdf.setDrawColor(0);
+      pdf.setTextColor(0);
+    }
 
     // ── Title + intro ───────────────────────────────────────────────────────
     titleBlock();
-    para('THIS HOUSE RENTAL AGREEMENT (hereinafter the "Agreement") is entered into on this ' + blank('', 10) + ' of ' + blank('', 8) + ', ' + blank('', 6) + ' between:', { after:3 });
+    para('THIS HOUSE RENTAL AGREEMENT (hereinafter the "Agreement") is entered into on this ' + blank(dMonth, 10) + ' of ' + blank(dDay, 8) + ', ' + blank(dYear, 6) + ' between:', { after:3 });
 
     para('The Lessor:', { bold:true });
     para(nationName.toUpperCase(), { center:true, bold:true, after:1 });
@@ -4657,13 +4816,13 @@
     para('and the Lessee:', { bold:true });
     para(blank(tenantName, 24), { center:true, after:1 });
     para('of ' + nationName.toUpperCase(), { center:true, after:1 });
-    para('P.O. Box ' + blank('', 8) + ',', { center:true, after:1 });
+    para('P.O. Box ' + blank(poBoxT, 8) + ',', { center:true, after:1 });
     para(nationName.toUpperCase() + (province ? ', ' + province.toUpperCase().slice(0,2) : ''), { center:true, after:1 });
     if (postal)  para(postal, { center:true, after:1 });
     para('(Called the "Tenant")', { right:true, after:3 });
 
     para('In regards to the Property:', { bold:true });
-    para('Lot # ' + blank('', 8), { center:true, after:1 });
+    para('Lot # ' + blank(lotNum, 8), { center:true, after:1 });
     para('Street name: ' + blank(streetName, 18), { center:true, after:1 });
     para(nationName + ', ' + (province || 'Ontario'), { center:true, bold:true, after:1 });
     para('(Called the "Residence")', { right:true, after:3 });
@@ -4680,16 +4839,22 @@
 
     // ── 2. PAYMENT SCHEDULE AND DETAILS ─────────────────────────────────────
     secHead(2, 'PAYMENT SCHEDULE AND DETAILS');
-    clause('a)', 'The Tenant agrees to pay the Landlord $ ' + blank(rent, 8) + ' (CDN), monthly. Payments shall be made on or before the first of every calendar month of during the entire length of this Agreement. Payments shall be made to the: ' + nationName + '.        Initial ' + blank('', 8));
-    clause('b)', 'Should a Tenant’s payment be 15 days late, the Tenant shall be subject to a $ 25.00 late payment fee as a penalty.        Initial ' + blank('', 8));
-    clause('c)', 'The Tenant agrees to pay a $45.00 fee for non-sufficient funds (NSF) fees when a cheque does not clear at the financial institution.        Initial ' + blank('', 8));
-    clause('d)', 'The Tenant shall pay Rental Arrears of $25.00.        Initial ' + blank('', 8));
-    clause('e)', 'The Tenant shall pay Water and Sewer rate of $16.00 per month.        Initial ' + blank('', 8));
-    clause('f)', 'The Tenant shall pay a 1 time fee for Maintenance Deposit of $100.00.        Initial ' + blank('', 8));
+    clause('a)', 'The Tenant agrees to pay the Landlord $ ' + blank(rent, 8) + ' (CDN), monthly. Payments shall be made on or before the first of every calendar month of during the entire length of this Agreement. Payments shall be made to the: ' + nationName + '.');
+    embedInitial(initCaps[0]);
+    clause('b)', 'Should a Tenant’s payment be 15 days late, the Tenant shall be subject to a $ 25.00 late payment fee as a penalty.');
+    embedInitial(initCaps[1]);
+    clause('c)', 'The Tenant agrees to pay a $45.00 fee for non-sufficient funds (NSF) fees when a cheque does not clear at the financial institution.');
+    embedInitial(initCaps[2]);
+    clause('d)', 'The Tenant shall pay Rental Arrears of $25.00.');
+    embedInitial(initCaps[3]);
+    clause('e)', 'The Tenant shall pay Water and Sewer rate of $16.00 per month.');
+    embedInitial(initCaps[4]);
+    clause('f)', 'The Tenant shall pay a 1 time fee for Maintenance Deposit of $100.00.');
+    embedInitial(initCaps[5]);
 
     // ── 3. LENGTH OF AGREEMENT ──────────────────────────────────────────────
     secHead(3, 'LENGTH OF AGREEMENT');
-    clause('a.', 'This Agreement shall commence until at which time either party decides to dissolve said agreement on ' + blank('', 6) + ' day of ' + blank('', 10) + ', ' + blank('', 6) + '.');
+    clause('a.', 'This Agreement shall commence until at which time either party decides to dissolve said agreement on ' + blank(dDay, 6) + ' day of ' + blank(dMonth, 10) + ', ' + blank(dYear, 6) + '.');
 
     // ── 4. TERMINATION ──────────────────────────────────────────────────────
     secHead(4, 'TERMINATION');
@@ -4793,24 +4958,17 @@
     secHead(24, 'SIGNATURES');
     clause('a.', 'The parties hereby indicate by their signatures below that they have read and agree with the terms and conditions of this Agreement in its entirety.');
     gap(4);
-    ctx.needSpace(70);
+    ctx.needSpace(72);
     var colGap = 12, colW = (CW - colGap) / 2, cxL = L, cxR = L + colW + colGap;
-    function sigLine(x, label, w){
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(BODY); pdf.setTextColor(20);
-      pdf.text(label, x, ctx.y + 3);
-      var lw = pdf.getTextWidth(label + ' ');
-      pdf.setDrawColor(120); pdf.setLineWidth(0.3);
-      pdf.line(x + lw, ctx.y + 3, x + (w || colW), ctx.y + 3); pdf.setDrawColor(0);
-    }
     pdf.setFont('helvetica','bold'); pdf.setFontSize(BODY); pdf.setTextColor(0);
     pdf.text('For the Landlord', cxL, ctx.y + 3);
     pdf.text('For the Tenant(s)', cxR, ctx.y + 3);
-    ctx.y += 12;
-    sigLine(cxL, 'Signature:', colW); sigLine(cxR, 'Signature:', colW); ctx.y += 11;
-    sigLine(cxL, 'Print:', colW);     sigLine(cxR, 'Print:', colW);     ctx.y += 11;
-    sigLine(cxL, 'Date:', colW);      sigLine(cxR, 'Signature:', colW); ctx.y += 11;
-    sigLine(cxR, 'Print:', colW);     ctx.y += 11;
-    sigLine(cxR, 'Date:', colW);      ctx.y += 6;
+    ctx.y += 13; pdf.setFont('helvetica','normal');
+    sigLineVal(cxL, 'Signature:', colW, sigLandlord, ''); sigLineVal(cxR, 'Signature:', colW, sigTenant, '');  ctx.y += 12;
+    sigLineVal(cxL, 'Print:',     colW, '', landlordName); sigLineVal(cxR, 'Print:',     colW, '', tenantPrint); ctx.y += 12;
+    sigLineVal(cxL, 'Date:',      colW, '', landlordDate); sigLineVal(cxR, 'Signature:', colW, sigTenant2, '');  ctx.y += 12;
+    sigLineVal(cxR, 'Print:',     colW, '', tenant2Print); ctx.y += 12;
+    sigLineVal(cxR, 'Date:',      colW, '', tenantDate);   ctx.y += 6;
 
     ctx.finish();
 
@@ -4819,7 +4977,7 @@
     var filename = nationSh.replace(/[^a-z0-9]+/gi, '') + '_Replacement_Lease_' + slug + '.pdf';
     pdf.save(filename);
 
-    var mo = null; // no modal for this one
+    var mo = document.getElementById('tic_rlease_modal');
     if (u.id && typeof window.sbUploadFile === 'function') {
       try {
         var blob = pdf.output('blob');
@@ -4829,12 +4987,15 @@
           await window.sbSaveFileMeta('tenant', String(u.id), storePath, filename, blob.size, 'application/pdf');
         }
         _ticDocLibKey = null; _ticDocLib = null;
+        if (mo) mo.remove();
         if (typeof showToast === 'function') showToast('✓ Replacement lease saved to document library');
       } catch (e) {
         console.warn('[tic] replacement lease upload failed:', e);
+        if (mo) mo.remove();
         if (typeof showToast === 'function') showToast('✓ Lease downloaded (document library save failed — see console)');
       }
     } else {
+      if (mo) mo.remove();
       if (typeof showToast === 'function') showToast('✓ Replacement lease generated');
     }
   }
