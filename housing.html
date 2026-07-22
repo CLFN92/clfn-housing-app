@@ -133,9 +133,15 @@
   <div class="quick-row">
 
     <!-- Quick Lookup -->
-    <div class="lookup-panel">
-      <h3>Quick Lookup</h3>
-      <div class="lookup-sub">Search tenants, units, maintenance requests, or RFQs — jump straight to the record.</div>
+    <div class="lookup-panel is-spotlight">
+      <h3><span class="lookup-h-ico">&#128269;</span> Quick Lookup</h3>
+      <div class="lookup-sub">Your fastest way to any tenant, property, request, or record.</div>
+
+      <div class="lookup-search">
+        <svg class="lookup-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="lookup_input" placeholder="Search tenant, address, unit or request&hellip;" autocomplete="off"/>
+        <div class="lookup-results" id="lookup_results"></div>
+      </div>
 
       <div class="lookup-tabs" id="lookup_tabs">
         <button class="lookup-tab active" data-lookup-tab="all">All <span class="lookup-tab-count" id="lookup_tab_count_all">—</span></button>
@@ -143,12 +149,6 @@
         <button class="lookup-tab" data-lookup-tab="units">Units <span class="lookup-tab-count" id="lookup_tab_count_units">—</span></button>
         <button class="lookup-tab" data-lookup-tab="sows" data-roles="ed,housing_manager,super_user">Requests <span class="lookup-tab-count" id="lookup_tab_count_sows">—</span></button>
         <button class="lookup-tab" data-lookup-tab="rfqs" data-roles="ed,housing_manager,housing_employee_l2">RFQs <span class="lookup-tab-count" id="lookup_tab_count_rfqs">—</span></button>
-      </div>
-
-      <div class="lookup-search">
-        <svg class="lookup-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="lookup_input" placeholder="Search by tenant name, unit number, or request #…" autocomplete="off"/>
-        <div class="lookup-results" id="lookup_results"></div>
       </div>
 
       <div class="lookup-recent-label">Recently viewed</div>

@@ -2070,49 +2070,82 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .quick-row > * { min-width: 0; }
 
 /* Lookup panel */
+/* Spotlight lookup — the search is the primary focal point of the landing
+   page. Uses the theme --yellow so it adapts per nation; color-mix drives the
+   soft outer glow (with a plain-shadow fallback for older engines). */
 .lookup-panel {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 18px 20px;
+  border-radius: 14px; padding: 24px 26px;
   position: relative;
 }
-.lookup-panel h3 { font-family: var(--serif); font-size: 18px; margin-bottom: 4px; font-weight: 400; }
-.lookup-sub      { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+.lookup-panel.is-spotlight { box-shadow: 0 6px 30px rgba(0,0,0,0.06); }
+.lookup-panel h3 {
+  font-family: var(--serif); font-size: 24px; margin-bottom: 4px; font-weight: 400;
+  letter-spacing: -0.01em; display: flex; align-items: center; gap: 9px;
+}
+.lookup-h-ico { font-size: 20px; line-height: 1; }
+.lookup-sub      { font-size: 12.5px; color: var(--muted); margin-bottom: 16px; }
 
+/* Focal search bar */
+.lookup-search {
+  display: flex; align-items: center; gap: 13px;
+  margin-bottom: 18px; position: relative;
+  background: #fff;
+  border: 2px solid var(--yellow);
+  border-radius: 16px;
+  padding: 9px 18px 9px 11px;
+  min-height: 66px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.07);
+  box-shadow: 0 5px 20px rgba(0,0,0,0.06), 0 0 0 6px color-mix(in srgb, var(--yellow) 20%, transparent);
+  transition: box-shadow .18s ease, border-color .18s ease;
+  animation: lookupGlowIn 1100ms ease-out 1;
+}
+.lookup-search:focus-within {
+  box-shadow: 0 8px 26px rgba(0,0,0,0.10);
+  box-shadow: 0 8px 26px rgba(0,0,0,0.10), 0 0 0 8px color-mix(in srgb, var(--yellow) 32%, transparent);
+}
+.lookup-search input {
+  flex: 1; min-width: 0; padding: 0;
+  border: none; border-radius: 0; background: transparent;
+  font-size: 19px; font-family: inherit; color: var(--text);
+}
+.lookup-search input::placeholder { color: var(--muted); font-size: 18px; }
+.lookup-search input:focus { outline: none; }
+.lookup-search-icon {
+  position: static; transform: none;
+  width: 46px; height: 46px; min-width: 46px;
+  padding: 11px; box-sizing: border-box;
+  background: var(--yellow); color: #111;
+  border-radius: 50%; pointer-events: none;
+}
+@keyframes lookupGlowIn {
+  0%   { box-shadow: 0 5px 20px rgba(0,0,0,0.06), 0 0 0 0  color-mix(in srgb, var(--yellow) 55%, transparent); }
+  55%  { box-shadow: 0 5px 20px rgba(0,0,0,0.06), 0 0 0 13px color-mix(in srgb, var(--yellow) 28%, transparent); }
+  100% { box-shadow: 0 5px 20px rgba(0,0,0,0.06), 0 0 0 6px color-mix(in srgb, var(--yellow) 20%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .lookup-search { animation: none; } }
+
+/* Filter pills */
 .lookup-tabs {
-  display: flex; gap: 4px; margin-bottom: 10px;
-  background: var(--bg); padding: 4px; border-radius: 8px;
-  border: 1px solid var(--border); width: fit-content;
+  display: flex; gap: 9px; margin-bottom: 12px; flex-wrap: wrap;
+  background: transparent; padding: 0; border: none; width: auto;
   max-width: 100%; overflow-x: auto; scrollbar-width: none;
 }
 .lookup-tabs::-webkit-scrollbar { display: none; }
 .lookup-tab {
-  padding: 6px 12px; border-radius: 6px;
-  font-size: 12px; font-weight: 600; color: var(--muted);
-  background: transparent; border: none; cursor: pointer;
+  padding: 8px 16px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; color: var(--dark);
+  background: #fff; border: 1px solid var(--border); cursor: pointer;
   display: flex; align-items: center; gap: 6px; font-family: inherit;
-  flex-shrink: 0; white-space: nowrap;
+  flex-shrink: 0; white-space: nowrap; transition: all .15s ease;
 }
-.lookup-tab:hover { color: var(--dark); }
-.lookup-tab.active { background: var(--dark); color: #fff; }
+.lookup-tab:hover { border-color: var(--dark); }
+.lookup-tab.active { background: var(--dark); color: #fff; border-color: var(--dark); }
 .lookup-tab-count {
-  background: rgba(255,255,255,0.2); color: inherit;
+  background: rgba(255,255,255,0.22); color: inherit;
   font-size: 10px; padding: 1px 6px; border-radius: 999px; font-weight: 700;
 }
-.lookup-tab:not(.active) .lookup-tab-count { background: var(--border); color: var(--muted); }
-
-.lookup-search {
-  display: flex; gap: 8px; margin-bottom: 14px; position: relative;
-}
-.lookup-search input {
-  flex: 1; padding: 11px 14px 11px 38px;
-  border: 1px solid var(--border); border-radius: 8px;
-  font-size: 14px; font-family: inherit; background: var(--bg); color: var(--text);
-}
-.lookup-search input:focus { outline: none; border-color: var(--dark); background: var(--surface); }
-.lookup-search-icon {
-  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
-  width: 16px; height: 16px; color: var(--muted); pointer-events: none;
-}
+.lookup-tab:not(.active) .lookup-tab-count { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
 .lookup-results {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0;
   background: var(--surface); border: 1px solid var(--border);
@@ -2149,8 +2182,9 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .lookup-empty { padding: 14px; text-align: center; color: var(--muted); font-size: 12px; }
 
 .lookup-recent-label {
-  font-size: 11px; color: var(--muted); text-transform: uppercase;
-  letter-spacing: .6px; font-weight: 600; margin-bottom: 8px;
+  font-size: 10px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .6px; font-weight: 600; margin-bottom: 8px; margin-top: 22px;
+  opacity: .75;
 }
 .lookup-recent { display: flex; gap: 8px; flex-wrap: wrap; }
 .lookup-recent:empty::before {
