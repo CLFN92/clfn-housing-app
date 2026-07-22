@@ -2059,6 +2059,17 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .kpi-strip.is-scrolled .kpi-meta,
 .kpi-strip.is-scrolled .kpi-breakdown { display: none; }
 .kpi-strip.is-scrolled .kpi-icon { display: block; }
+/* Collapsed: pack the icon-only cards into ONE compact row instead of the
+   stacked full-width columns the strip uses on phones — so scrolling actually
+   reclaims vertical space on small devices (the whole point of the collapse). */
+.kpi-strip.is-scrolled {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 8px; margin-bottom: 14px;
+}
+.kpi-strip.is-scrolled .kpi-card { display: flex; align-items: center; justify-content: center; min-height: 40px; }
+.kpi-strip.is-scrolled .kpi-icon { font-size: 22px; }
 
 /* Quick row */
 .quick-row {
