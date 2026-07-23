@@ -1463,6 +1463,15 @@ function sowApproveInline() {
   if (typeof showConfirm !== 'function') return;
   showConfirm({ title: title, message: message, confirmText: 'Approve', danger: false }).then(function(ok) {
     if (!ok) return;
+    // Capture the prior status BEFORE saving so we only prompt the next step on
+    // the FIRST approval transition (an over-threshold request goes HM -> ED).
+    var _prevSt = '';
+    try {
+      if (_sowUnitId && window._sowEditingProjectNumber && typeof getSowByProjectNumber === 'function') {
+        var _pr = getSowByProjectNumber(_sowUnitId, window._sowEditingProjectNumber);
+        _prevSt = (_pr && _pr.approval_status) || '';
+      }
+    } catch (e) {}
     // Set the appropriate approval fields (picked up by saveSOW → approval_status logic)
     var nmId  = approver === 'ed' ? 'sow_ed_name' : 'sow_hm_name';
     var dtId  = approver === 'ed' ? 'sow_ed_date' : 'sow_hm_date';
@@ -1472,11 +1481,15 @@ function sowApproveInline() {
     if (dtEl) dtEl.value = today;
     // Save directly rather than via sowSaveClicked(): approving is not the same
     // as the preparer *submitting*, so we skip that path's "Submit + email a
-    // tenant PDF copy" prompt. This trims the inline-approve flow from three
-    // sequential dialogs (approve -> submit/tenant-copy -> work-order) down to
-    // two contextual ones (approve, then the work-order email prompt in saveSOW).
-    // saveSOW derives approval_status from the hm/ed name+date fields set above.
+    // tenant PDF copy" prompt. saveSOW derives approval_status from the hm/ed
+    // name+date fields set above.
     if (typeof saveSOW === 'function') saveSOW();
+    // Now approved — prompt the next step (issue work order / start RFQ), once.
+    var _wasApproved = _prevSt === 'hm_approved' || _prevSt === 'ed_approved' || _prevSt === 'completed';
+    var js = window._sowJustSaved;
+    if (!_wasApproved && js && js.unitId && js.projectNumber && typeof _sowPromptIssue === 'function') {
+      _sowPromptIssue(js.unitId, js.projectNumber, js.amount);
+    }
   });
 }
 
@@ -1559,6 +1572,14 @@ function _wlApproveSow(uid, pn){
     if(typeof showToast === 'function') showToast('✓ ' + pn + ' approved');
     if(typeof renderWorklist === 'function') renderWorklist();
     if(typeof udpRenderSowTable === 'function' && document.getElementById('udp_sow_table_wrap')) udpRenderSowTable(uid);
+    // Now approved — prompt the next step (issue work order / start RFQ). Only
+    // on the FIRST approval transition, so an over-threshold request that goes
+    // HM -> ED doesn't prompt twice.
+    var _wasApproved = prevStatus === 'hm_approved' || prevStatus === 'ed_approved' || prevStatus === 'completed';
+    if(!_wasApproved && typeof _sowPromptIssue === 'function'){
+      var _amt = parseFloat(sow.amount) || parseFloat(String(sow.totalCost||'').replace(/[^0-9.]/g,'')) || 0;
+      _sowPromptIssue(uid, pn, _amt);
+    }
   });
 }
 window._wlApproveSow = _wlApproveSow;
@@ -1933,18 +1954,89 @@ async function sowSaveClicked() {
   var mode = (btn && btn.dataset) ? btn.dataset.mode : 'draft';
   if (mode !== 'submit') { saveSOW(); return; }
 
-  // Submit confirmation only — emailing the tenant is now an explicit,
-  // separate action on the "Tenant form" button (sowTenantFormClicked), so
-  // submitting no longer prompts about (or sends) any email.
   if (typeof showConfirm !== 'function') { saveSOW(); return; }
-  var result = await showConfirm({
-    title:       'Submit Maintenance Request?',
-    message:     'This submits the request for review. You can still edit it later if you have approval authority. Use the Work Order and Tenant form buttons to email copies.',
-    confirmText: 'Confirm Submit'
-  });
-  var ok = (typeof result === 'object' && result !== null) ? !!result.ok : !!result;
-  if (ok) saveSOW();
+
+  // Cost + threshold decisions. RFQ vs Work Order is the RFQ threshold; the
+  // approval chain (over/under) uses the ED budget limit.
+  var _costEl = document.getElementById('sow_total_cost');
+  var cost  = parseFloat(String((_costEl && _costEl.value) || '').replace(/[^0-9.\-]/g, '')) || 0;
+  var over  = (typeof _sowMeetsRfqThreshold === 'function') && _sowMeetsRfqThreshold({ amount: cost });
+  var rfqOn = (typeof moduleOn !== 'function') || moduleOn('rfq');
+  var needsEd = (typeof sowRequiresEdApproval === 'function') && sowRequiresEdApproval({ amount: cost });
+  // Will this submit auto-approve? (approval turned off in Settings). Only then
+  // is the request immediately actionable, so we FOLD the next step into the
+  // submit dialog. When approval is required, the prompt fires at approval.
+  var autoApprove = (typeof APPROVAL_AUTHORITY !== 'undefined' && APPROVAL_AUTHORITY.chainDisabled)
+    ? APPROVAL_AUTHORITY.chainDisabled(needsEd ? 'sow_over' : 'sow_under') : false;
+  var wantRfq = over && rfqOn;
+
+  var conf;
+  if (autoApprove) {
+    conf = await showConfirm({
+      title:       'Submit maintenance request?',
+      message:     'Submitting approves this request (approval is turned off in Settings).',
+      confirmText: 'Submit',
+      checkbox:    { label: wantRfq ? 'Start the RFQ process now' : 'Issue the work order now', defaultChecked: true }
+    });
+  } else {
+    conf = await showConfirm({
+      title:       'Submit Maintenance Request?',
+      message:     'This submits the request for review. Once it is approved you will be prompted to ' + (wantRfq ? 'start the RFQ process.' : 'issue the work order.'),
+      confirmText: 'Confirm Submit'
+    });
+  }
+  var ok = (typeof conf === 'object' && conf !== null) ? !!conf.ok : !!conf;
+  if (!ok) return;
+  var doNext = autoApprove && (typeof conf === 'object' && conf !== null) ? !!conf.checked : false;
+
+  saveSOW();
+
+  // Folded action (approval off): the checkbox WAS the prompt, so act directly.
+  if (doNext) {
+    var js = window._sowJustSaved;
+    if (js && js.unitId && js.projectNumber) _sowDoIssue(js.unitId, js.projectNumber, wantRfq);
+  }
 }
+
+// One-dialog "next step" prompt fired when a request reaches an approved state
+// (from the approval flow when approval is required). RFQ threshold decides
+// whether it offers to start the RFQ process or issue the work order.
+function _sowPromptIssue(unitId, projectNumber, amount) {
+  if (typeof showConfirm !== 'function') return;
+  var amt   = parseFloat(amount) || 0;
+  var over  = (typeof _sowMeetsRfqThreshold === 'function') && _sowMeetsRfqThreshold({ amount: amt });
+  var rfqOn = (typeof moduleOn !== 'function') || moduleOn('rfq');
+  var wantRfq = over && rfqOn;
+  showConfirm({
+    title:       wantRfq ? 'Start the RFQ process?' : 'Issue the work order?',
+    message:     wantRfq
+      ? 'This maintenance request is at or above the RFQ threshold, so it should go out to contractors for competitive quotes. Start the RFQ process now?'
+      : 'This maintenance request is approved. Do you want to issue the work order now?',
+    confirmText: wantRfq ? 'Start RFQ' : 'Issue Work Order',
+    cancelText:  'Not now'
+  }).then(function (r) {
+    var yes = (typeof r === 'object' && r !== null) ? !!r.ok : !!r;
+    if (yes) _sowDoIssue(unitId, projectNumber, wantRfq);
+  });
+}
+window._sowPromptIssue = _sowPromptIssue;
+
+// Perform the chosen next step: start the RFQ (hand off to rfq.html) or issue
+// (print) the work order for this request.
+function _sowDoIssue(unitId, projectNumber, isRfq) {
+  if (isRfq) {
+    try {
+      var _c  = window._sowCache && window._sowCache[unitId];
+      var _sa = _c && Array.isArray(_c.sows) ? _c.sows : [];
+      var _sh = _sa.find(function (s) { return s && s.project_number === projectNumber; }) || null;
+      if (_sh) sessionStorage.setItem('_rfq_sow_handoff', JSON.stringify(_sh));
+    } catch (e) {}
+    window.location.href = 'rfq.html?unit=' + encodeURIComponent(unitId) + '&sow=' + encodeURIComponent(projectNumber);
+  } else if (typeof udpPrintWorkOrder === 'function') {
+    udpPrintWorkOrder(unitId, projectNumber);
+  }
+}
+window._sowDoIssue = _sowDoIssue;
 
 // Reconcile assignment: in-house work has no contractor; contractor work has
 // no field-employee assignee. Prevents a stale contractor email firing on an
@@ -2230,6 +2322,10 @@ function saveSOW(opts){
   if (typeof udpRenderSowTable === 'function' && _sowUnitId && document.getElementById('udp_sow_table_wrap')) {
     udpRenderSowTable(_sowUnitId);
   }
+
+  // Stash a summary so sowSaveClicked can fire the post-create "issue work
+  // order / start RFQ" prompt after this save (the modal is now closed).
+  window._sowJustSaved = { unitId: _sowUnitId, projectNumber: data.project_number, amount: (parseFloat(data.amount) || 0) };
 }
 
 
