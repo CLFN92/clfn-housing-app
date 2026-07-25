@@ -473,6 +473,92 @@ function ueOpenTenantCard() {
 }
 window.ueOpenTenantCard = ueOpenTenantCard;
 
+// ── Maintenance QR (scan-to-report) ─────────────────────────────────────────
+// Generate/print a per-unit QR that opens the public tenant maintenance-request
+// form (report.html). The QR encodes the unit id + a per-unit secret token
+// (stored in the unit's data jsonb) that the tenant-mr Edge Function validates.
+function _qresc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];}); }
+function _qrLoadLib(){
+  return new Promise(function(resolve, reject){
+    if (window.QRCode) return resolve();
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload = function(){ resolve(); };
+    s.onerror = function(){ reject(new Error('QR library failed to load')); };
+    document.head.appendChild(s);
+  });
+}
+async function ueOpenMaintenanceQr(){
+  var uid = window._editingUnitId;
+  if(!uid) return;
+  var units = getAllUnits();
+  var u = units.find(function(x){ return x.id === uid; });
+  if(!u){ showToast('Unit not found'); return; }
+  // Get or create the per-unit secret token (persists into the unit data jsonb).
+  if(!u.qrToken){
+    u.qrToken = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+      : (Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2));
+    if(typeof saveUnitWithDraftFallback === 'function') saveUnitWithDraftFallback(u);
+    else if(typeof sbSaveUnit === 'function') sbSaveUnit(u);
+  }
+  var addr   = ((u.num||'') + ' ' + (u.street||'')).trim();
+  var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'Housing';
+  var url    = location.origin + '/report.html?u=' + encodeURIComponent(uid) + '&t=' + encodeURIComponent(u.qrToken);
+  window._ueQrData = { url:url, addr:addr, nation:nation };
+
+  var ex = document.getElementById('ue_qr_modal'); if(ex) ex.remove();
+  var modal = document.createElement('div');
+  modal.id = 'ue_qr_modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10001;display:flex;align-items:center;justify-content:center;padding:16px;';
+  modal.innerHTML =
+      '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,.35);overflow:hidden;">'
+    + '<div class="modal-hdr"><div><div class="lbl-yellow">&#128295; Maintenance QR</div>'
+    +   '<div class="txt-sm-meta">' + _qresc(addr) + '</div></div>'
+    +   '<button type="button" onclick="var m=document.getElementById(\'ue_qr_modal\');if(m)m.remove();" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button></div>'
+    + '<div id="ue_qr_body" style="padding:22px;text-align:center;">'
+    +   '<div id="ue_qr_canvas" style="display:inline-block;padding:14px;background:#fff;border:1px solid var(--border);border-radius:10px;"></div>'
+    +   '<div style="font-size:12px;color:var(--muted);margin:14px 0 4px;">Tenants scan this to report a maintenance issue for this unit.</div>'
+    +   '<div style="font-size:10px;color:var(--muted);word-break:break-all;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 8px;margin-top:8px;">' + _qresc(url) + '</div>'
+    + '</div>'
+    + '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">'
+    +   '<button type="button" onclick="ueCopyQrLink()" class="btn btn-ghost">Copy link</button>'
+    +   '<button type="button" onclick="uePrintMaintenanceQr()" class="btn btn-primary">&#128424; Print</button>'
+    + '</div></div>';
+  document.body.appendChild(modal);
+  try {
+    await _qrLoadLib();
+    var host = document.getElementById('ue_qr_canvas'); if(host){ host.innerHTML=''; new QRCode(host, { text:url, width:220, height:220, correctLevel: QRCode.CorrectLevel.M }); }
+  } catch(e){
+    var b = document.getElementById('ue_qr_body');
+    if(b) b.innerHTML = '<div style="color:var(--danger);font-size:13px;padding:20px;">Could not load the QR generator. Check your connection and try again.</div>';
+  }
+}
+function ueCopyQrLink(){
+  var url = (window._ueQrData && window._ueQrData.url) || '';
+  if(navigator.clipboard && url){ navigator.clipboard.writeText(url).then(function(){ showToast('Link copied'); }); }
+  else if(url){ showToast('Copy this link: ' + url); }
+}
+function uePrintMaintenanceQr(){
+  var d = window._ueQrData || {};
+  var host = document.getElementById('ue_qr_canvas');
+  var el = host ? (host.querySelector('img') || host.querySelector('canvas')) : null;
+  var src = '';
+  try { src = el ? (el.tagName === 'IMG' ? el.src : el.toDataURL('image/png')) : ''; } catch(e){}
+  var w = window.open('', '_blank', 'width=480,height=680');
+  if(!w){ showToast('Allow pop-ups to print the QR'); return; }
+  w.document.write('<html><head><title>Maintenance QR</title><style>body{font-family:-apple-system,Segoe UI,sans-serif;text-align:center;padding:44px 20px;}h2{margin:0 0 2px;font-size:20px;}p{color:#555;margin:0 0 22px;font-size:13px;letter-spacing:.5px;text-transform:uppercase;}img{width:300px;height:300px;}.cap{margin-top:18px;font-size:17px;font-weight:800;}.hint{font-size:13px;color:#555;margin-top:8px;}</style></head><body>'
+    + '<h2>' + _qresc(d.nation||'Housing') + '</h2><p>Maintenance Request</p>'
+    + (src ? '<img src="' + src + '"/>' : '')
+    + '<div class="cap">' + _qresc(d.addr||'') + '</div>'
+    + '<div class="hint">Scan this code with your phone camera to report a maintenance issue for this unit.</div>'
+    + '</body></html>');
+  w.document.close();
+  setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} }, 350);
+}
+window.ueOpenMaintenanceQr    = ueOpenMaintenanceQr;
+window.ueCopyQrLink           = ueCopyQrLink;
+window.uePrintMaintenanceQr   = uePrintMaintenanceQr;
+
 // ── Budget threshold helpers ──────────────────────────────────────────────────
 function getHmBudgetLimit() {
   // Default: HM can approve up to $25,000 unilaterally; above that needs ED
