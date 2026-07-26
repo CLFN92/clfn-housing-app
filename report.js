@@ -42,7 +42,61 @@
 
   var CATS = ['Plumbing', 'Heating / Furnace', 'Electrical', 'Appliance', 'Doors / Windows / Locks', 'Structural', 'Water / Leak', 'Pests', 'Other'];
 
+  var MAX_PHOTOS = 3;
+  var photos = [];   // array of compressed JPEG data URLs
+
+  // Downscale + re-encode a chosen image so the upload stays small (phone
+  // photos are often 3-8 MB; we cap the long edge and re-encode as JPEG).
+  function compressImage(file, cb) {
+    if (!file || !/^image\//.test(file.type)) { cb(null); return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var MAX = 1600, w = img.width, h = img.height;
+        if (w > h && w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+        else if (h >= w && h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+        try {
+          var c = document.createElement('canvas'); c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          cb(c.toDataURL('image/jpeg', 0.7));
+        } catch (e) { cb(null); }
+      };
+      img.onerror = function () { cb(null); };
+      img.src = reader.result;
+    };
+    reader.onerror = function () { cb(null); };
+    reader.readAsDataURL(file);
+  }
+
+  function renderPhotos() {
+    var wrap = document.getElementById('f_photos'); if (!wrap) return;
+    var html = photos.map(function (src, i) {
+      return '<div class="thumb"><img src="' + src + '" alt=""/>'
+        + '<button type="button" class="rm" data-rm="' + i + '" aria-label="Remove photo">&times;</button></div>';
+    }).join('');
+    if (photos.length < MAX_PHOTOS) {
+      html += '<label class="addphoto" id="f_addbtn">+ Add photo'
+        + '<input id="f_file" type="file" accept="image/*" hidden/></label>';
+    }
+    wrap.innerHTML = html;
+    var fileInput = document.getElementById('f_file');
+    if (fileInput) fileInput.addEventListener('change', function (ev) {
+      var file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      var btn = document.getElementById('f_addbtn'); if (btn) btn.textContent = 'Adding…';
+      compressImage(file, function (dataUrl) {
+        if (dataUrl && photos.length < MAX_PHOTOS) photos.push(dataUrl);
+        renderPhotos();
+      });
+    });
+    Array.prototype.forEach.call(wrap.querySelectorAll('[data-rm]'), function (b) {
+      b.addEventListener('click', function () { photos.splice(+b.getAttribute('data-rm'), 1); renderPhotos(); });
+    });
+  }
+
   function renderForm(address) {
+    photos = [];
     app.innerHTML =
       '<h1>Report a maintenance issue</h1>'
       + '<p class="sub">Tell us what needs fixing. The Housing office will review your request.</p>'
@@ -63,10 +117,15 @@
       + '<input id="f_name" type="text" autocomplete="name" placeholder="So we know who to follow up with"/>'
       + '<label>Phone (optional)</label>'
       + '<input id="f_phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="Best number to reach you"/>'
+      + '<label>Photos (optional)</label>'
+      + '<div class="photos" id="f_photos"></div>'
+      + '<div class="phint">A photo helps us understand the problem. Up to ' + MAX_PHOTOS + '.</div>'
       + '<div class="msg err" id="f_err"></div>'
       + '<button class="btn" id="f_btn" type="submit">Submit request</button>'
       + '</form>'
       + '<div class="foot">Emergencies (no heat, flooding, gas smell)? Call the Housing office directly &mdash; don’t rely on this form.</div>';
+
+    renderPhotos();
 
     var form = document.getElementById('mrf');
     form.addEventListener('submit', function (e) {
@@ -80,7 +139,8 @@
       call('submit', {
         category: cat, description: desc, urgency: urg,
         contact_name: document.getElementById('f_name').value.trim(),
-        contact_phone: document.getElementById('f_phone').value.trim()
+        contact_phone: document.getElementById('f_phone').value.trim(),
+        photos: photos
       }).then(function (res) {
         if (res.ok && res.data && res.data.ok) { renderDone(res.data.reference); }
         else { btn.disabled = false; btn.textContent = 'Submit request'; errEl.textContent = (res.data && res.data.error) || 'Something went wrong. Please try again.'; errEl.style.display = 'block'; }

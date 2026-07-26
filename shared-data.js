@@ -2757,11 +2757,43 @@ async function sbResolveTenantMr(id, status, notes, sowPn){
 }
 window.sbResolveTenantMr = sbResolveTenantMr;
 
+// Parse the photo_path column (JSON array of Storage paths; tolerates a bare
+// single path string from any older row) into an array of paths.
+function _tenantMrPhotoPaths(s){
+  if(!s || !s.photo_path) return [];
+  try { var p = JSON.parse(s.photo_path); return Array.isArray(p) ? p : (p ? [String(p)] : []); }
+  catch(_e){ return [String(s.photo_path)]; }
+}
+window._tenantMrPhotoPaths = _tenantMrPhotoPaths;
+
+// Fill the review modal's photo strip with signed URLs (bucket is private).
+async function _tenantMrRenderPhotos(paths){
+  var wrap = document.getElementById('tenant_mr_photos');
+  if(!wrap) return;
+  for(var i=0;i<paths.length;i++){
+    try {
+      var url = (typeof sbGetSignedUrl === 'function') ? await sbGetSignedUrl(paths[i]) : '';
+      var a = document.getElementById('tenant_mr_ph_' + i);
+      if(a && url){ a.href = url; var img = a.querySelector('img'); if(img) img.src = url; }
+    } catch(_e){}
+  }
+}
+window._tenantMrRenderPhotos = _tenantMrRenderPhotos;
+
 // Review modal for a single tenant-reported request.
 function openTenantMrReview(id){
   var s = (window._tenantMrSubmissions || []).find(function(x){ return x.id === id; });
   if(!s){ if(typeof showToast === 'function') showToast('Request not found'); return; }
   var e = function(t){ return String(t==null?'':t).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); };
+  var photoPaths = _tenantMrPhotoPaths(s);
+  var photosHtml = photoPaths.length
+    ? '<div class="tic-field-lbl">Photos (' + photoPaths.length + ')</div>'
+      + '<div id="tenant_mr_photos" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
+      +   photoPaths.map(function(_p, i){ return '<a id="tenant_mr_ph_' + i + '" href="#" target="_blank" rel="noopener" '
+          + 'style="display:block;width:84px;height:84px;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--bg);">'
+          + '<img alt="Tenant photo" style="width:100%;height:100%;object-fit:cover;display:block;"/></a>'; }).join('')
+      + '</div>'
+    : '';
   var when = s.created_at ? new Date(s.created_at).toLocaleString() : '';
   var urg = (s.urgency || 'routine');
   var urgColor = urg === 'emergency' ? 'var(--danger)' : (urg === 'urgent' ? '#d97706' : 'var(--muted)');
@@ -2781,6 +2813,7 @@ function openTenantMrReview(id){
     +   '</div>'
     +   '<div class="tic-field-lbl">Reported problem</div>'
     +   '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:11px 13px;font-size:14px;white-space:pre-wrap;margin-bottom:14px;">' + e(s.description || '') + '</div>'
+    +   photosHtml
     +   (s.contact_name || s.contact_phone ? '<div class="tic-field-lbl">Contact</div><div style="font-size:13px;margin-bottom:14px;">' + e([s.contact_name, s.contact_phone].filter(Boolean).join(' · ')) + '</div>' : '')
     +   '<div class="tic-field-lbl">Review note (optional)</div>'
     +   '<textarea id="tenant_mr_note" rows="2" placeholder="Note shown on the audit trail / to the record" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;resize:vertical;"></textarea>'
@@ -2790,6 +2823,7 @@ function openTenantMrReview(id){
     +   '<button type="button" onclick="_tenantMrApprove(\'' + e(s.id) + '\')" class="btn btn-primary">&#10003; Approve &amp; create request</button>'
     + '</div></div>';
   document.body.appendChild(m);
+  if(photoPaths.length) _tenantMrRenderPhotos(photoPaths);
 }
 window.openTenantMrReview = openTenantMrReview;
 
@@ -2798,10 +2832,14 @@ function _tenantMrApprove(id){
   if(!s) return;
   var note = (document.getElementById('tenant_mr_note') || {}).value || '';
   var actor = (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || '';
+  var photoPaths = _tenantMrPhotoPaths(s);
   sbResolveTenantMr(id, 'approved', note).then(function(){
     if(typeof showToast === 'function') showToast('✓ Approved — creating maintenance request');
     var x = document.getElementById('tenant_mr_modal'); if(x) x.remove();
     if(typeof auditEntry === 'function') auditEntry('UNIT:' + s.unit_id, 'tenant_mr_approved', 'Tenant maintenance request approved — ' + (s.category || '') + ': ' + String(s.description || '').slice(0, 140), actor);
+    // Carry the tenant photos onto the unit's Documents tab (they already live
+    // in Storage under tenants/<unitId>/...; a file-meta row surfaces them).
+    _tenantMrFilePhotos(s.unit_id, photoPaths);
     if(typeof renderWorklist === 'function') renderWorklist();
     // Seed a fresh maintenance request with the tenant's report, then open it so
     // staff can categorize / cost / assign before submitting.
@@ -2811,12 +2849,40 @@ function _tenantMrApprove(id){
       notes: 'Tenant-reported via QR maintenance form.'
         + (s.contact_name || s.contact_phone ? '\nContact: ' + [s.contact_name, s.contact_phone].filter(Boolean).join(' · ') : '')
         + '\nReported urgency: ' + (s.urgency || 'routine')
+        + (photoPaths.length ? '\n' + photoPaths.length + ' tenant photo(s) filed on the unit Documents tab.' : '')
     };
     if(typeof openSowModal === 'function') openSowModal(s.unit_id);
     else { if(typeof setNavReferrer === 'function') setNavReferrer('home'); window.location.href = 'renos.html?unit=' + encodeURIComponent(s.unit_id); }
   }).catch(function(err){ console.warn('[tenant-mr] approve failed:', err); if(typeof showToast === 'function') showToast('Approve failed — please retry', {type:'error'}); });
 }
 window._tenantMrApprove = _tenantMrApprove;
+
+// Write a housing_audit_log `file_uploaded` row for each already-stored tenant
+// photo so the unit's DocLibrary (entity 'tenant', prefix tenants/<unitId>)
+// picks them up. Fire-and-forget; a failure never blocks approval.
+function _tenantMrFilePhotos(unitId, paths){
+  if(!unitId || !paths || !paths.length) return;
+  var actorEmail = (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || 'staff';
+  var actorName  = (window.HOUSING_SESSION && HOUSING_SESSION.name) || '';
+  paths.forEach(function(path, i){
+    try {
+      fetch(SUPABASE_URL + '/rest/v1/housing_audit_log', {
+        method: 'POST',
+        headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({
+          entity_type: 'tenant',
+          entity_id: String(unitId),
+          action: 'file_uploaded',
+          detail: JSON.stringify({ path: path, name: 'Tenant photo ' + (i + 1) + '.jpg', type: 'image/jpeg',
+            category: 'image', actor_name: actorName, source: 'tenant_mr' }),
+          actor: actorEmail,
+          created_at: new Date().toISOString()
+        })
+      }).catch(function(){});
+    } catch(_e){}
+  });
+}
+window._tenantMrFilePhotos = _tenantMrFilePhotos;
 
 function _tenantMrReject(id){
   var s = (window._tenantMrSubmissions || []).find(function(x){ return x.id === id; });

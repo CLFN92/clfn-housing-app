@@ -17,7 +17,7 @@ create table if not exists public.tenant_mr_submissions (
   urgency            text default 'routine',          -- routine | urgent | emergency
   contact_name       text,
   contact_phone      text,
-  photo_path         text,                             -- reserved for a later photo upload
+  photo_path         text,                             -- JSON array of Storage paths for tenant-uploaded photos
   status             text not null default 'new',      -- new | approved | rejected
   source_ip          text,
   created_at         timestamptz not null default now(),

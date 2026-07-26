@@ -28,6 +28,48 @@ const RL_UNIT_MAX    = 5       // max submissions per unit per window
 const RL_IP_MAX      = 12      // max submissions per source IP per window
 const URGENCY        = ['routine', 'urgent', 'emergency']
 
+const STORAGE_BUCKET = Deno.env.get('STORAGE_BUCKET') || 'housing-files'
+const MAX_PHOTOS     = 3               // max photos per submission
+const MAX_PHOTO_BYTES = 6 * 1024 * 1024 // per-photo decoded size cap (~6MB)
+const PHOTO_MIME: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
+
+// Decode a data: URL into { bytes, ext, contentType }, or null if unusable.
+function decodePhoto(dataUrl: string): { bytes: Uint8Array; ext: string; contentType: string } | null {
+  if (typeof dataUrl !== 'string') return null
+  const m = dataUrl.match(/^data:([^;,]+);base64,([\s\S]+)$/)
+  if (!m) return null
+  const contentType = m[1].toLowerCase()
+  const ext = PHOTO_MIME[contentType]
+  if (!ext) return null
+  let bin: string
+  try { bin = atob(m[2]) } catch { return null }
+  if (bin.length > MAX_PHOTO_BYTES) return null
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return { bytes, ext, contentType }
+}
+
+// Upload validated photos with the service role. Returns the storage paths that
+// uploaded cleanly; a failed photo is skipped so it can never sink the request.
+async function uploadPhotos(admin: any, unitId: string, submissionId: string, raw: unknown): Promise<string[]> {
+  let list: unknown[] = []
+  if (Array.isArray(raw)) list = raw
+  else if (typeof raw === 'string' && raw) list = [raw]
+  if (!list.length) return []
+  const paths: string[] = []
+  for (let i = 0; i < list.length && paths.length < MAX_PHOTOS; i++) {
+    const dec = decodePhoto(String(list[i] || ''))
+    if (!dec) continue
+    const path = 'tenants/' + unitId + '/tenant-mr/' + submissionId + '/photo-' + (paths.length + 1) + '.' + dec.ext
+    try {
+      const { error } = await admin.storage.from(STORAGE_BUCKET)
+        .upload(path, dec.bytes, { contentType: dec.contentType, upsert: true })
+      if (!error) paths.push(path)
+    } catch (_e) { /* skip this photo, keep the request */ }
+  }
+  return paths
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   try {
@@ -83,7 +125,18 @@ serve(async (req) => {
         contact_name: contactName, contact_phone: contactPhone, status: 'new', source_ip: ip,
       }).select('id').limit(1)
       if (iErr) return json({ error: 'Could not save your request. Please try again.' }, 500)
-      return json({ ok: true, reference: (ins && ins[0] && ins[0].id) || '', address })
+      const subId = (ins && ins[0] && ins[0].id) || ''
+
+      // Optional photos: upload with the service role, store the paths on the row.
+      // A photo failure is non-fatal - the text request is already saved.
+      if (subId && body.photos) {
+        const paths = await uploadPhotos(admin, unitId, subId, body.photos)
+        if (paths.length) {
+          await admin.from('tenant_mr_submissions')
+            .update({ photo_path: JSON.stringify(paths) }).eq('id', subId)
+        }
+      }
+      return json({ ok: true, reference: subId, address })
     }
 
     return json({ error: 'Unknown action.' }, 400)
