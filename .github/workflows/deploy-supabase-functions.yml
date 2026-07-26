@@ -1,0 +1,61 @@
+name: Deploy Supabase Edge Functions
+
+# Deploys the Edge Functions in supabase/functions/* to the Supabase project so
+# you never have to paste code into the dashboard editor again. Runs on any push
+# to main that touches a function (or manually via "Run workflow").
+#
+# One-time setup — add two repository secrets
+# (Settings -> Secrets and variables -> Actions -> New repository secret):
+#   SUPABASE_ACCESS_TOKEN  - Supabase -> Account -> Access Tokens -> generate
+#   SUPABASE_PROJECT_ID    - your project ref (e.g. fkhzrbalumzeripzolph)
+# Until both exist the job runs green and simply skips (no red failures).
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'supabase/functions/**'
+      - '.github/workflows/deploy-supabase-functions.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for Supabase secrets
+        id: secrets
+        run: |
+          if [ -n "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ] && [ -n "${{ secrets.SUPABASE_PROJECT_ID }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping deploy - add SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_ID repo secrets to enable auto-deploy."
+          fi
+
+      - name: Set up Supabase CLI
+        if: steps.secrets.outputs.ready == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy each function
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: |
+          set -e
+          for dir in supabase/functions/*/; do
+            name="$(basename "$dir")"
+            # Skip shared/util folders (conventionally prefixed with _).
+            case "$name" in _*) echo "Skipping helper folder: $name"; continue;; esac
+            if [ ! -f "${dir}index.ts" ]; then
+              echo "No index.ts in $name - skipping"
+              continue
+            fi
+            echo "──────── Deploying: $name ────────"
+            supabase functions deploy "$name" --project-ref "$PROJECT_ID"
+          done
+          echo "All functions deployed."
