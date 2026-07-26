@@ -1832,6 +1832,11 @@ async function loadHousingData() {
     var rfqR = await fetch(SUPABASE_URL+'/rest/v1/housing_rfq?select=*&order=created_at.desc',{headers:HOUSING_HEADERS});
     if(rfqR.ok){var rd=await rfqR.json(); window._rfqCache={}; rd.forEach(function(r){window._rfqCache[r.id]=r;});}
     if(typeof sbLoadBcrRegistry === 'function'){ try { await sbLoadBcrRegistry(); } catch(e){} }
+    // Tenant-reported maintenance requests (scan-to-report queue) — management only.
+    if(typeof sbLoadTenantMrSubmissions === 'function'
+       && typeof ROLE !== 'undefined' && ROLE.isManagement && ROLE.isManagement(window.currentRole)){
+      try { await sbLoadTenantMrSubmissions(); } catch(e){}
+    }
     var stR = await fetch(SUPABASE_URL+'/rest/v1/housing_settings?select=key,value',{headers:HOUSING_HEADERS});
     if(stR.ok){var stD=await stR.json(); window._appSettings={};
       stD.forEach(function(r){window._appSettings[r.key]=r.value;});

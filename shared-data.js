@@ -2720,6 +2720,116 @@ async function _sweepInspectionsViaRest(){
 window.approvalSweepCount = approvalSweepCount;
 window.applyApprovalDisabledSweep = applyApprovalDisabledSweep;
 
+// ════════════════════════════════════════════════════════════════════════════
+// Tenant maintenance submissions — staff review queue (scan-to-report Phase B)
+// ════════════════════════════════════════════════════════════════════════════
+// External tenants submit via the tenant-mr Edge Function into the isolated
+// tenant_mr_submissions staging table. Staff (management) load the `new` ones,
+// review, and either approve (seeds + opens a real maintenance request for the
+// unit) or reject. RLS lets active staff read/update this table.
+async function sbLoadTenantMrSubmissions(){
+  try {
+    var url = SUPABASE_URL + '/rest/v1/tenant_mr_submissions?status=eq.new&order=created_at.desc&limit=200';
+    var r = await fetch(url, { headers: HOUSING_HEADERS });
+    if(!r.ok){ window._tenantMrSubmissions = window._tenantMrSubmissions || []; return window._tenantMrSubmissions; }
+    var rows = await r.json();
+    window._tenantMrSubmissions = Array.isArray(rows) ? rows : [];
+    return window._tenantMrSubmissions;
+  } catch(e){
+    console.warn('[tenant-mr] load failed:', e);
+    window._tenantMrSubmissions = window._tenantMrSubmissions || [];
+    return window._tenantMrSubmissions;
+  }
+}
+window.sbLoadTenantMrSubmissions = sbLoadTenantMrSubmissions;
+
+async function sbResolveTenantMr(id, status, notes, sowPn){
+  var actor = (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || '';
+  var body = { status: status, reviewed_by: actor, reviewed_at: new Date().toISOString() };
+  if(notes)  body.review_notes = String(notes).slice(0, 1000);
+  if(sowPn)  body.sow_project_number = sowPn;
+  var r = await fetch(SUPABASE_URL + '/rest/v1/tenant_mr_submissions?id=eq.' + encodeURIComponent(id), {
+    method: 'PATCH', headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }), body: JSON.stringify(body)
+  });
+  if(!r.ok) throw new Error(await r.text());
+  window._tenantMrSubmissions = (window._tenantMrSubmissions || []).filter(function(s){ return s.id !== id; });
+  return true;
+}
+window.sbResolveTenantMr = sbResolveTenantMr;
+
+// Review modal for a single tenant-reported request.
+function openTenantMrReview(id){
+  var s = (window._tenantMrSubmissions || []).find(function(x){ return x.id === id; });
+  if(!s){ if(typeof showToast === 'function') showToast('Request not found'); return; }
+  var e = function(t){ return String(t==null?'':t).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); };
+  var when = s.created_at ? new Date(s.created_at).toLocaleString() : '';
+  var urg = (s.urgency || 'routine');
+  var urgColor = urg === 'emergency' ? 'var(--danger)' : (urg === 'urgent' ? '#d97706' : 'var(--muted)');
+  var ex = document.getElementById('tenant_mr_modal'); if(ex) ex.remove();
+  var m = document.createElement('div');
+  m.id = 'tenant_mr_modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  m.innerHTML =
+      '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:560px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35);">'
+    + '<div class="modal-hdr"><div><div class="lbl-yellow">&#128238; Tenant Maintenance Request</div>'
+    +   '<div class="txt-sm-meta">' + e(s.unit_address || s.unit_id) + (when ? ' &middot; ' + e(when) : '') + '</div></div>'
+    +   '<button type="button" onclick="var x=document.getElementById(\'tenant_mr_modal\');if(x)x.remove();" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button></div>'
+    + '<div style="overflow-y:auto;padding:18px 22px;flex:1;">'
+    +   '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">'
+    +     '<span style="font-size:12px;font-weight:700;background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:5px 12px;">' + e(s.category || 'Uncategorized') + '</span>'
+    +     '<span style="font-size:12px;font-weight:800;border-radius:999px;padding:5px 12px;border:1px solid ' + urgColor + ';color:' + urgColor + ';">' + e(urg.toUpperCase()) + '</span>'
+    +   '</div>'
+    +   '<div class="tic-field-lbl">Reported problem</div>'
+    +   '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:11px 13px;font-size:14px;white-space:pre-wrap;margin-bottom:14px;">' + e(s.description || '') + '</div>'
+    +   (s.contact_name || s.contact_phone ? '<div class="tic-field-lbl">Contact</div><div style="font-size:13px;margin-bottom:14px;">' + e([s.contact_name, s.contact_phone].filter(Boolean).join(' · ')) + '</div>' : '')
+    +   '<div class="tic-field-lbl">Review note (optional)</div>'
+    +   '<textarea id="tenant_mr_note" rows="2" placeholder="Note shown on the audit trail / to the record" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;resize:vertical;"></textarea>'
+    + '</div>'
+    + '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:10px;flex-shrink:0;">'
+    +   '<button type="button" onclick="_tenantMrReject(\'' + e(s.id) + '\')" class="btn btn-ghost" style="color:var(--danger);border-color:var(--danger);">Reject</button>'
+    +   '<button type="button" onclick="_tenantMrApprove(\'' + e(s.id) + '\')" class="btn btn-primary">&#10003; Approve &amp; create request</button>'
+    + '</div></div>';
+  document.body.appendChild(m);
+}
+window.openTenantMrReview = openTenantMrReview;
+
+function _tenantMrApprove(id){
+  var s = (window._tenantMrSubmissions || []).find(function(x){ return x.id === id; });
+  if(!s) return;
+  var note = (document.getElementById('tenant_mr_note') || {}).value || '';
+  var actor = (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || '';
+  sbResolveTenantMr(id, 'approved', note).then(function(){
+    if(typeof showToast === 'function') showToast('✓ Approved — creating maintenance request');
+    var x = document.getElementById('tenant_mr_modal'); if(x) x.remove();
+    if(typeof auditEntry === 'function') auditEntry('UNIT:' + s.unit_id, 'tenant_mr_approved', 'Tenant maintenance request approved — ' + (s.category || '') + ': ' + String(s.description || '').slice(0, 140), actor);
+    if(typeof renderWorklist === 'function') renderWorklist();
+    // Seed a fresh maintenance request with the tenant's report, then open it so
+    // staff can categorize / cost / assign before submitting.
+    window._sowForceNew = true;
+    window._sowSeed = {
+      items: [{ category: '', description: '[' + (s.category || 'Tenant report') + '] ' + (s.description || '') }],
+      notes: 'Tenant-reported via QR maintenance form.'
+        + (s.contact_name || s.contact_phone ? '\nContact: ' + [s.contact_name, s.contact_phone].filter(Boolean).join(' · ') : '')
+        + '\nReported urgency: ' + (s.urgency || 'routine')
+    };
+    if(typeof openSowModal === 'function') openSowModal(s.unit_id);
+    else { if(typeof setNavReferrer === 'function') setNavReferrer('home'); window.location.href = 'renos.html?unit=' + encodeURIComponent(s.unit_id); }
+  }).catch(function(err){ console.warn('[tenant-mr] approve failed:', err); if(typeof showToast === 'function') showToast('Approve failed — please retry', {type:'error'}); });
+}
+window._tenantMrApprove = _tenantMrApprove;
+
+function _tenantMrReject(id){
+  var s = (window._tenantMrSubmissions || []).find(function(x){ return x.id === id; });
+  var note = (document.getElementById('tenant_mr_note') || {}).value || '';
+  sbResolveTenantMr(id, 'rejected', note).then(function(){
+    if(typeof showToast === 'function') showToast('Request rejected');
+    var x = document.getElementById('tenant_mr_modal'); if(x) x.remove();
+    if(s && typeof auditEntry === 'function') auditEntry('UNIT:' + s.unit_id, 'tenant_mr_rejected', 'Tenant maintenance request rejected' + (note ? ' — ' + note : ''), (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || '');
+    if(typeof renderWorklist === 'function') renderWorklist();
+  }).catch(function(err){ console.warn('[tenant-mr] reject failed:', err); if(typeof showToast === 'function') showToast('Reject failed — please retry', {type:'error'}); });
+}
+window._tenantMrReject = _tenantMrReject;
+
 // ── Assignment: single source of truth ──────────────────────────────────
 // One rule for "is this application approved enough to be placed in a unit?"
 // Shared by the Match queue (row inclusion), confirmAssignment, the unit-edit
@@ -5648,7 +5758,9 @@ function renderWorklist() {
   // Use the TRUE pending-SOW count (not the 8-row display cap) so the header
   // badge reflects the real backlog and visibly decreases as SOWs are approved.
   var sowTotalCount = (typeof sowItems._total === 'number') ? sowItems._total : sowItems.length;
-  var total = appItems.length + sowTotalCount + fieldSowItems.length + rfqItems.length + ctItems.length + matchItems.length + unitApprItems.length + draftTotal;
+  // Tenant-reported maintenance requests awaiting staff review (management only).
+  var tenantMrCount = isManagement ? (window._tenantMrSubmissions || []).length : 0;
+  var total = appItems.length + sowTotalCount + fieldSowItems.length + rfqItems.length + ctItems.length + matchItems.length + unitApprItems.length + draftTotal + tenantMrCount;
   var pill = document.getElementById('worklist_count_pill'); if (pill) pill.textContent = total;
   var qa   = document.getElementById('qa_pending_count');   if (qa) qa.textContent = total;
 
@@ -5765,6 +5877,31 @@ function renderWorklist() {
       + '<a ' + openAction + ' style="flex-shrink:0;background:var(--yellow);color:var(--dark);border-radius:6px;padding:5px 11px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;white-space:nowrap;cursor:pointer;display:inline-block;">Continue &#8594;</a>'
       + '<button onclick="' + archiveOnclick + '" style="flex-shrink:0;background:none;border:1px solid var(--border);border-radius:6px;padding:5px 11px;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--muted);cursor:pointer;white-space:nowrap;" title="Archive">&#128228; Archive</button>'
       + '</div>';
+  }
+
+  // Tenant Requests — maintenance issues reported by tenants via the scan-to-
+  // report QR form (management review queue). Reviewing/approving seeds and
+  // opens a real maintenance request for the unit.
+  var tenantMrItems = isManagement ? (window._tenantMrSubmissions || []) : [];
+  if (tenantMrItems.length) {
+    var tmrRows = '', tmrCards = '';
+    tenantMrItems.forEach(function(s){
+      var idJs = esc(s.id).replace(/'/g, "\\'");
+      var open = 'openTenantMrReview(\'' + idJs + '\')';
+      var urg = (s.urgency || 'routine');
+      var urgColor = urg === 'emergency' ? 'var(--danger)' : (urg === 'urgent' ? '#d97706' : 'var(--muted)');
+      var info = '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(s.unit_address || s.unit_id) + '</span>'
+               + '<span style="font-size:11px;color:var(--muted);width:130px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(s.category || '—') + '</span>'
+               + '<span style="font-size:10px;font-weight:800;color:' + urgColor + ';width:78px;flex-shrink:0;">' + esc(urg.toUpperCase()) + '</span>';
+      tmrRows += '<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid var(--border);background:var(--surface);" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'var(--surface)\'">'
+        + '<div onclick="' + open + '" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;">' + info + '</div>'
+        + '<button onclick="' + open + '" style="flex-shrink:0;background:var(--yellow);color:var(--dark);border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;">Review</button>'
+        + '</div>';
+      tmrCards += wlCard({ title: s.unit_address || s.unit_id, pill:{ text: urg.toUpperCase(), color: urgColor }, open: open,
+        metas:[{k:'Category',v:s.category||'—'},{k:'Reported',v:s.description ? String(s.description).slice(0,60) : ''}],
+        actions:[{text:'Review',onclick:open}] });
+    });
+    html += sectionWrap('📮', 'Tenant Requests', tenantMrItems.length, '', _view === 'cards' ? wlGrid(tmrCards) : tmrRows, 0);
   }
 
   // My Drafts — in-progress items the current user hasn't submitted yet.
