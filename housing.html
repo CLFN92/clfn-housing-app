@@ -1029,6 +1029,7 @@
   <button onclick="showSettingsSection('sec_terms')" id="stab_terms" class="tab-btn" data-roles="ed,super_user">&#128209; Terms &amp; Conditions</button>
   <button onclick="showSettingsSection('sec_contracts');renderContractsTab();" id="stab_contracts" class="tab-btn" data-roles="ed,super_user">&#128196; Contracts</button>
   <button onclick="showSettingsSection('sec_config')" id="stab_config" class="tab-btn" data-roles="ed,super_user">&#128295; Config</button>
+  <button onclick="showSettingsSection('sec_maint_qr');renderMaintenanceQrPanel();" id="stab_maint_qr" class="tab-btn" data-roles="ed,super_user">&#127991;&#65039; Maintenance QR</button>
   <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="tab-btn">&#128203; Audit Log</button>
   <button onclick="showSettingsSection('sec_approval_authority');renderApprovalAuthorityPanel();" id="stab_approval_authority" class="tab-btn">&#128274; Approval Authority</button>
 </div>
@@ -1315,6 +1316,21 @@
       </div>
     </div>
     <div class="sec-pad" id="config_panel_body">
+      <div class="empty-state-ctr">Loading&hellip;</div>
+    </div>
+  </div>
+</div>
+
+<!-- MAINTENANCE QR CODES (bulk label generator) -->
+<div id="sec_maint_qr" class="settings-section">
+  <div class="card card-flush">
+    <div class="modal-hdr">
+      <div>
+        <div class="lbl-yellow">&#127991;&#65039; Maintenance QR Codes</div>
+        <div class="txt-sm-meta">Generate a scan-to-report QR label for every unit. Tenants scan it to submit a maintenance request. Print onto labels and post one at each unit.</div>
+      </div>
+    </div>
+    <div class="sec-pad" id="maint_qr_panel_body">
       <div class="empty-state-ctr">Loading&hellip;</div>
     </div>
   </div>

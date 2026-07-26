@@ -302,6 +302,7 @@ var SETTINGS_SECTION_GROUPS = {
   sec_terms:               'admin',
   sec_contracts:           'admin',
   sec_config:              'admin',
+  sec_maint_qr:            'admin',
   sec_app_scoring:         'app',
   sec_required_fields:     'app',
   sec_unit_match:          'app',
@@ -338,7 +339,7 @@ function showSettingsGroup(groupId) {
 }
 
 function showSettingsSection(section) {
-  var sections = ['sec_users','sec_app_scoring','sec_required_fields','sec_unit_match','sec_reno_score','sec_budget','sec_nation','sec_themes','sec_approval_authority','sec_notifications','sec_terms','sec_contracts','sec_config','sec_audit','sec_occupancy'];
+  var sections = ['sec_users','sec_app_scoring','sec_required_fields','sec_unit_match','sec_reno_score','sec_budget','sec_nation','sec_themes','sec_approval_authority','sec_notifications','sec_terms','sec_contracts','sec_config','sec_maint_qr','sec_audit','sec_occupancy'];
   sections.forEach(function(id){
     var el=document.getElementById(id);
     if(el) el.style.display=(id===section)?'block':'none';
@@ -384,6 +385,7 @@ function showSettingsSection(section) {
   if(section==='sec_terms'          && typeof renderTermsTab==='function')      renderTermsTab();
   if(section==='sec_contracts'      && typeof renderContractsTab==='function')  renderContractsTab();
   if(section==='sec_config'         && typeof renderConfigPanel==='function')   renderConfigPanel();
+  if(section==='sec_maint_qr'       && typeof renderMaintenanceQrPanel==='function') renderMaintenanceQrPanel();
   if(section==='sec_approval_authority' && typeof renderApprovalAuthorityPanel==='function') renderApprovalAuthorityPanel();
 }
 
@@ -1348,4 +1350,141 @@ function resetRequiredFieldsSettings() {
     });
   });
 }
+
+// ── Maintenance QR labels (bulk generator) ───────────────────────────────────
+// Generate a scan-to-report QR for every unit and print them onto labels.
+// Reuses the per-unit token scheme + helpers (_qrLoadLib / _qresc live in
+// housing-modals.js; both are defined well before this runs on click). The QR
+// encodes report.html?u=<unitId>&t=<per-unit secret token>, which the tenant-mr
+// Edge Function validates — the same contract the per-unit "Maintenance QR"
+// button uses, so a label minted here works identically.
+
+function _maintQrEnsureToken(u){
+  if(u && !u.qrToken){
+    u.qrToken = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+      : (Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2));
+    return true; // newly minted -> needs persisting
+  }
+  return false;
+}
+
+function _maintQrUnits(occupiedOnly){
+  var units = (typeof getAllUnits === 'function') ? getAllUnits().slice() : [];
+  units = units.filter(function(u){ return u && u.id; });
+  if(occupiedOnly) units = units.filter(function(u){ return (u.assignedName || u.assignedTo); });
+  units.sort(function(a,b){
+    var sa=(a.street||'').toLowerCase(), sb=(b.street||'').toLowerCase();
+    if(sa!==sb) return sa<sb?-1:1;
+    return (parseInt(a.num,10)||0)-(parseInt(b.num,10)||0);
+  });
+  return units;
+}
+
+function _maintQrToggleOcc(v){ window._maintQrOccupiedOnly = !!v; renderMaintenanceQrPanel(); }
+window._maintQrToggleOcc = _maintQrToggleOcc;
+
+async function renderMaintenanceQrPanel(){
+  var body = document.getElementById('maint_qr_panel_body');
+  if(!body) return;
+  var role = window.currentRole || '';
+  if(!(role==='ed' || role==='super_user')){
+    body.innerHTML = '<div class="empty-state-ctr">Only the ED can generate maintenance QR labels.</div>';
+    return;
+  }
+  var occOnly = !!window._maintQrOccupiedOnly;
+  var units = _maintQrUnits(occOnly);
+
+  var controls =
+      '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px;">'
+    +   '<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;">'
+    +     '<input type="checkbox" id="maint_qr_occ" ' + (occOnly?'checked':'') + ' onchange="_maintQrToggleOcc(this.checked)"/> Only units with a current tenant'
+    +   '</label>'
+    +   '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+    +     '<button type="button" class="btn btn-ghost" onclick="renderMaintenanceQrPanel()">&#8635; Refresh</button>'
+    +     '<button type="button" class="btn btn-primary" onclick="printAllMaintenanceQr()">&#128424; Print all labels</button>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="txt-sm-meta" style="margin-bottom:14px;">' + units.length + ' unit' + (units.length===1?'':'s')
+    +   ' &middot; each label posts at the unit for tenants to scan and report an issue.</div>';
+
+  if(!units.length){
+    body.innerHTML = controls + '<div class="empty-state-ctr">No units found' + (occOnly?' with a current tenant':'') + '.</div>';
+    return;
+  }
+
+  // Mint tokens for any unit missing one, and persist only those.
+  var minted = [];
+  units.forEach(function(u){ if(_maintQrEnsureToken(u)) minted.push(u); });
+  if(minted.length){
+    minted.forEach(function(u){
+      if(typeof saveUnitWithDraftFallback === 'function') saveUnitWithDraftFallback(u);
+      else if(typeof sbSaveUnit === 'function') sbSaveUnit(u);
+    });
+    if(typeof auditEntry === 'function') auditEntry('SETTINGS', 'maint_qr_tokens_minted', 'Generated maintenance QR tokens for ' + minted.length + ' unit(s)', window.currentRole||'staff');
+  }
+
+  var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'Housing';
+  window._maintQrList = units.map(function(u){
+    var addr = ((u.num||'') + ' ' + (u.street||'')).trim() || ('Unit ' + u.id);
+    return { url: location.origin + '/report.html?u=' + encodeURIComponent(u.id) + '&t=' + encodeURIComponent(u.qrToken),
+             addr: addr, nation: nation };
+  });
+
+  var grid = window._maintQrList.map(function(L, i){
+    return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;background:var(--surface);">'
+      + '<div id="maint_qr_host_' + i + '" style="display:inline-block;padding:8px;background:#fff;border-radius:8px;"></div>'
+      + '<div style="font-size:13px;font-weight:800;margin-top:8px;word-break:break-word;">' + _qresc(L.addr) + '</div>'
+      + '</div>';
+  }).join('');
+  body.innerHTML = controls
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;">' + grid + '</div>';
+
+  try {
+    await _qrLoadLib();
+    window._maintQrList.forEach(function(L, i){
+      var host = document.getElementById('maint_qr_host_' + i);
+      if(host){ host.innerHTML=''; new QRCode(host, { text:L.url, width:130, height:130, correctLevel: QRCode.CorrectLevel.M }); }
+    });
+  } catch(e){
+    body.insertAdjacentHTML('beforeend', '<div style="color:var(--danger);font-size:13px;padding:12px;">Could not load the QR generator. Check your connection and try again.</div>');
+  }
+}
+window.renderMaintenanceQrPanel = renderMaintenanceQrPanel;
+
+// Open a print-ready label sheet (3-up grid) from the rendered QR tiles.
+function printAllMaintenanceQr(){
+  var list = window._maintQrList || [];
+  if(!list.length){ if(typeof showToast==='function') showToast('Nothing to print yet'); return; }
+  var labels = [];
+  for(var i=0;i<list.length;i++){
+    var host = document.getElementById('maint_qr_host_' + i);
+    var el = host ? (host.querySelector('img') || host.querySelector('canvas')) : null;
+    var src = '';
+    try { src = el ? (el.tagName==='IMG' ? el.src : el.toDataURL('image/png')) : ''; } catch(e){}
+    labels.push({ src: src, addr: list[i].addr, nation: list[i].nation });
+  }
+  var w = window.open('', '_blank', 'width=900,height=1000');
+  if(!w){ if(typeof showToast==='function') showToast('Allow pop-ups to print the labels'); return; }
+  var cells = labels.map(function(L){
+    return '<div class="label">'
+      + '<div class="hdr">' + _qresc(L.nation||'Housing') + '</div>'
+      + '<div class="sub">Maintenance Request</div>'
+      + (L.src ? '<img src="' + L.src + '"/>' : '<div style="height:150px;"></div>')
+      + '<div class="addr">' + _qresc(L.addr||'') + '</div>'
+      + '<div class="hint">Scan with your phone camera to report a maintenance issue for this unit.</div>'
+      + '</div>';
+  }).join('');
+  w.document.write('<html><head><title>Maintenance QR Labels</title><style>'
+    + '*{box-sizing:border-box;} body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:14px;}'
+    + '.sheet{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}'
+    + '.label{border:1px dashed #bbb;border-radius:8px;padding:12px 10px;text-align:center;page-break-inside:avoid;break-inside:avoid;}'
+    + '.hdr{font-size:13px;font-weight:800;} .sub{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:#555;margin-bottom:6px;}'
+    + '.label img{width:150px;height:150px;} .addr{font-size:14px;font-weight:800;margin-top:6px;word-break:break-word;}'
+    + '.hint{font-size:9px;color:#555;margin-top:4px;line-height:1.35;}'
+    + '@media print{ .label{border-color:#ddd;} @page{margin:12mm;} }'
+    + '</style></head><body><div class="sheet">' + cells + '</div></body></html>');
+  w.document.close();
+  setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} }, 500);
+}
+window.printAllMaintenanceQr = printAllMaintenanceQr;
 
