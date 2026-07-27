@@ -117,6 +117,8 @@
       + '<input id="f_name" type="text" autocomplete="name" placeholder="So we know who to follow up with"/>'
       + '<label>Phone (optional)</label>'
       + '<input id="f_phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="Best number to reach you"/>'
+      + '<label>Email (optional)</label>'
+      + '<input id="f_email" type="email" autocomplete="email" inputmode="email" placeholder="We\'ll email you a confirmation"/>'
       + '<label>Photos (optional)</label>'
       + '<div class="photos" id="f_photos"></div>'
       + '<div class="phint">A photo helps us understand the problem. Up to ' + MAX_PHOTOS + '.</div>'
@@ -140,6 +142,7 @@
         category: cat, description: desc, urgency: urg,
         contact_name: document.getElementById('f_name').value.trim(),
         contact_phone: document.getElementById('f_phone').value.trim(),
+        contact_email: document.getElementById('f_email').value.trim(),
         photos: photos
       }).then(function (res) {
         if (res.ok && res.data && res.data.ok) { renderDone(res.data.reference); }

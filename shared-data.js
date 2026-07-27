@@ -2814,7 +2814,7 @@ function openTenantMrReview(id){
     +   '<div class="tic-field-lbl">Reported problem</div>'
     +   '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:11px 13px;font-size:14px;white-space:pre-wrap;margin-bottom:14px;">' + e(s.description || '') + '</div>'
     +   photosHtml
-    +   (s.contact_name || s.contact_phone ? '<div class="tic-field-lbl">Contact</div><div style="font-size:13px;margin-bottom:14px;">' + e([s.contact_name, s.contact_phone].filter(Boolean).join(' · ')) + '</div>' : '')
+    +   (s.contact_name || s.contact_phone || s.contact_email ? '<div class="tic-field-lbl">Contact</div><div style="font-size:13px;margin-bottom:14px;">' + e([s.contact_name, s.contact_phone, s.contact_email].filter(Boolean).join(' · ')) + '</div>' : '')
     +   '<div class="tic-field-lbl">Review note (optional)</div>'
     +   '<textarea id="tenant_mr_note" rows="2" placeholder="Note shown on the audit trail / to the record" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;resize:vertical;"></textarea>'
     + '</div>'
@@ -2847,7 +2847,7 @@ function _tenantMrApprove(id){
     window._sowSeed = {
       items: [{ category: '', description: '[' + (s.category || 'Tenant report') + '] ' + (s.description || '') }],
       notes: 'Tenant-reported via QR maintenance form.'
-        + (s.contact_name || s.contact_phone ? '\nContact: ' + [s.contact_name, s.contact_phone].filter(Boolean).join(' · ') : '')
+        + (s.contact_name || s.contact_phone || s.contact_email ? '\nContact: ' + [s.contact_name, s.contact_phone, s.contact_email].filter(Boolean).join(' · ') : '')
         + '\nReported urgency: ' + (s.urgency || 'routine')
         + (photoPaths.length ? '\n' + photoPaths.length + ' tenant photo(s) filed on the unit Documents tab.' : '')
     };
