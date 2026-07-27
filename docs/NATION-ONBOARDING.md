@@ -27,8 +27,10 @@ nation's Supabase URL/key + branding from `NATIONS_DIRECTORY`.
    - Build output directory: **`/`**
 4. Save & Deploy. You get a `*.pages.dev` URL — test the app there first.
 
-Headers and SPA routing come from the repo's `_headers` and `_redirects`
-(already committed). No other config is needed.
+Response headers come from the repo's `_headers`, and `.assetsignore` keeps
+internal files (`.git`, `supabase/`, docs, schema SQL) from being served. This
+is a multi-page static app, so no SPA redirect/fallback is needed. No other
+config is required.
 
 ### A2. Domain + wildcard (fnhub.app is already in this Cloudflare account)
 On the Pages project → **Custom domains → Set up a custom domain**, add:

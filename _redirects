@@ -1,5 +1,0 @@
-# Cloudflare Pages redirects/rewrites (mirrors the Azure navigationFallback).
-# Pages serves an existing static file first (so /housing.html, /apply.html,
-# /report.html etc. resolve directly); this catch-all only handles unknown
-# routes, rewriting them to the SPA shell with a 200 (no redirect bounce).
-/*    /index.html    200

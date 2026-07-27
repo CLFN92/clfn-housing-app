@@ -1,0 +1,20 @@
+# Exclude non-asset / internal files from public hosting.
+# Cloudflare (Workers Static Assets / Pages) serves the repo root as-is; only
+# the app's runtime files should be public. Everything below is source,
+# tooling, docs, or schema and must NOT be served.
+.git
+.github
+.gitignore
+.assetsignore
+wrangler.jsonc
+wrangler.toml
+node_modules
+tests
+docs
+supabase
+staticwebapp.config.json
+*.md
+*.sql
+*.ps1
+*.zip
+*.log
