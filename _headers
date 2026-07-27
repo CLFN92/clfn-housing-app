@@ -1,0 +1,13 @@
+# Cloudflare Pages headers (mirrors staticwebapp.config.json globalHeaders).
+# Cloudflare Pages uses this file; Azure Static Web Apps ignores it, so it is
+# safe to land before cutover. On cutover this becomes the live header source.
+#
+# CSP note: connect-src / frame-src are MULTI-NATION ready -- `*.supabase.co`
+# allows each nation's own Supabase project (database-per-nation) without a
+# per-nation edit, replacing the single hardcoded CLFN host used on Azure.
+/*
+  Cache-Control: no-cache
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co https://login.microsoftonline.com https://graph.microsoft.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; frame-src https://www.openstreetmap.org; frame-ancestors 'none';
