@@ -30,6 +30,11 @@ const NOTIFY_TO    = (Deno.env.get('HOUSING_APP_NOTIFY_TO') || '')
 const TYPES     = ['new', 'update', 'transfer']
 const MAX_BYTES = 512 * 1024   // payload cap (defense in depth; docs go to Storage, not here)
 
+// Magic-link rate limits (we replace Supabase's built-in /otp throttle).
+const ML_WINDOW_MIN = 10
+const ML_EMAIL_MAX  = 3        // per email per window
+const ML_IP_MAX     = 15       // per source IP per window
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -94,13 +99,107 @@ async function notifySubmission(admin: any, row: any, applicantEmail: string, ap
   }
 }
 
+// Only allow magic-link redirects back to our own hosts (defense in depth;
+// Supabase also validates against its Redirect URL allow-list).
+function isSafeRedirect(u: string): boolean {
+  try {
+    const url = new URL(u)
+    const h = url.hostname
+    const localOk = (h === 'localhost' || h === '127.0.0.1')
+    if (url.protocol !== 'https:' && !localOk) return false
+    return h === 'fnhub.app' || h.endsWith('.fnhub.app')
+        || h.endsWith('.pages.dev') || h.endsWith('.workers.dev') || localOk
+  } catch { return false }
+}
+
+// Throttle magic-link requests per email + per IP. Generic (never reveals
+// whether an address exists). Degrades to "no limit" if the table is absent.
+async function magicLinkRateLimited(admin: any, email: string, ip: string): Promise<boolean> {
+  try {
+    const since = new Date(Date.now() - ML_WINDOW_MIN * 60000).toISOString()
+    const { count: ec } = await admin.from('magic_link_requests')
+      .select('id', { count: 'exact', head: true }).eq('email', email).gte('created_at', since)
+    if ((ec || 0) >= ML_EMAIL_MAX) return true
+    if (ip) {
+      const { count: ic } = await admin.from('magic_link_requests')
+        .select('id', { count: 'exact', head: true }).eq('ip', ip).gte('created_at', since)
+      if ((ic || 0) >= ML_IP_MAX) return true
+    }
+    await admin.from('magic_link_requests').insert({ email, ip })
+  } catch (_e) { /* table not created yet - skip limiting rather than break */ }
+  return false
+}
+
+// Generate a magic link (creating the auth user on first sign-in) and email it
+// through the nation's OWN provider - not Supabase's default sender.
+async function sendMagicLink(admin: any, email: string, redirectTo?: string): Promise<{ ok: boolean; error?: string }> {
+  const opts = redirectTo ? { redirectTo } : undefined
+  let gen = await admin.auth.admin.generateLink({ type: 'magiclink', email, options: opts })
+  if (gen.error && /not found|no user|does not exist|unable/i.test(gen.error.message || '')) {
+    // First-time applicant: create the account, then generate the link. Their
+    // possession of the emailed link is the email confirmation.
+    await admin.auth.admin.createUser({ email, email_confirm: true })
+    gen = await admin.auth.admin.generateLink({ type: 'magiclink', email, options: opts })
+  }
+  if (gen.error) return { ok: false, error: gen.error.message }
+  const link = gen.data && gen.data.properties && gen.data.properties.action_link
+  if (!link) return { ok: false, error: 'No sign-in link was generated.' }
+
+  const brand   = emailBrand()
+  const subject = 'Sign in to ' + brand
+  const safeLink = escapeHtml(link)
+  const inner =
+      '<p style="font-size:14px;color:#333;margin:0 0 16px;">Click the button below to sign in to the '
+    +   escapeHtml(brand) + ' application portal. This link is valid for a short time and can be used once.</p>'
+    + '<p style="margin:0 0 20px;"><a href="' + safeLink + '" '
+    +   'style="display:inline-block;background:#111;color:#fff;text-decoration:none;font-weight:700;'
+    +   'padding:12px 24px;border-radius:8px;font-size:15px;">Sign in</a></p>'
+    + '<p style="font-size:12px;color:#666;margin:0 0 4px;">Or paste this link into your browser:</p>'
+    + '<p style="font-size:12px;color:#0b6bcb;word-break:break-all;margin:0 0 16px;">' + safeLink + '</p>'
+    + '<p style="font-size:12px;color:#888;margin:0;">If you did not request this, you can safely ignore this email.</p>'
+  const html = renderBrandedEmail(subject, inner)
+  try {
+    await sendEmail({ to: email, subject, html })
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST')    return json({ error: 'Method not allowed' }, 405)
   try {
     if (!SUPABASE_URL || !ANON_KEY || !SERVICE_KEY) return json({ error: 'Server not configured.' }, 500)
 
-    // --- Auth: require a valid, email-CONFIRMED Supabase user (the applicant) ---
+    const body   = await req.json().catch(() => ({}))
+    const action = String(body.action || '')
+
+    // --- request_link: PRE-LOGIN. Generate a magic link and email it through
+    // the nation's OWN pipeline (not Supabase's default sender). No user JWT;
+    // the client calls this with the anon key like any public endpoint. ---
+    if (action === 'request_link') {
+      const linkEmail = String(body.email || '').trim().toLowerCase()
+      if (!isValidEmail(linkEmail)) return json({ error: 'Please enter a valid email address.' }, 400)
+      // If this nation has no email provider configured, tell the client so it
+      // can fall back to Supabase's built-in sender rather than fail.
+      if (!emailConfigured()) return json({ error: 'email_not_configured' }, 503)
+      const rawRedirect = String(body.redirect_to || '').trim()
+      const redirectTo  = isSafeRedirect(rawRedirect) ? rawRedirect : undefined
+      const ip = (req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || '').split(',')[0].trim()
+      const admin0 = createClient(SUPABASE_URL, SERVICE_KEY)
+      // Rate-limit; respond with generic success either way so we never reveal
+      // whether an address exists or signal that a bomb attempt was throttled.
+      if (await magicLinkRateLimited(admin0, linkEmail, ip)) return json({ ok: true })
+      const sent = await sendMagicLink(admin0, linkEmail, redirectTo)
+      if (!sent.ok) {
+        console.warn('[applicant-intake] magic link failed: ' + sent.error)
+        return json({ error: 'Could not send the sign-in link. Please try again shortly.' }, 502)
+      }
+      return json({ ok: true })
+    }
+
+    // --- Auth: all other actions require a valid, email-CONFIRMED applicant ---
     const authHeader = req.headers.get('Authorization') || ''
     if (!authHeader.startsWith('Bearer ')) return json({ error: 'Sign in to continue.' }, 401)
     const userClient = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } } })
@@ -111,9 +210,6 @@ serve(async (req) => {
     const uid   = user.id
     const email = user.email || ''
     const admin = createClient(SUPABASE_URL, SERVICE_KEY)
-
-    const body   = await req.json().catch(() => ({}))
-    const action = String(body.action || '')
 
     // Ensure a profile row exists (email only; never touches linked_app_ids).
     await admin.from('applicant_profiles').upsert({ uid, email, updated_at: new Date().toISOString() }, { onConflict: 'uid' })

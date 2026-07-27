@@ -74,28 +74,46 @@
     el.className = 'msg ' + (kind || 'err'); el.textContent = text;
   }
 
-  async function sendLink() {
-    var em = (document.getElementById('em').value || '').trim();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { setMsg('lmsg', 'Please enter a valid email address.', 'err'); return; }
-    var btn = document.getElementById('lbtn'); btn.disabled = true; btn.textContent = 'Sending…';
+  function showCheckEmail(em) {
+    app.innerHTML = '<div class="center"><div style="font-size:40px;">📧</div>'
+      + '<h1>Check your email</h1>'
+      + '<p class="sub">We sent a sign-in link to <b>' + esc(em) + '</b>. Open it on this device to continue. The link expires shortly.</p>'
+      + '<button class="btn ghost" type="button" onclick="location.reload()">Back</button></div>';
+  }
+
+  // Fallback to Supabase's built-in magic-link sender (used only if the nation
+  // has no email provider configured, or our function is unreachable).
+  async function _otpFallback(em) {
     try {
       var r = await fetch(AUTH + '/otp?redirect_to=' + encodeURIComponent(REDIRECT), {
         method: 'POST', headers: { 'apikey': ANON, 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: em, create_user: true })
       });
-      if (r.ok) {
-        app.innerHTML = '<div class="center"><div style="font-size:40px;">📧</div>'
-          + '<h1>Check your email</h1>'
-          + '<p class="sub">We sent a sign-in link to <b>' + esc(em) + '</b>. Open it on this device to continue. The link expires shortly.</p>'
-          + '<button class="btn ghost" type="button" onclick="location.reload()">Back</button></div>';
-      } else {
-        var d = await r.json().catch(function () { return {}; });
-        setMsg('lmsg', (d && (d.msg || d.error_description || d.error)) || 'Could not send the link. Please try again.', 'err');
-        btn.disabled = false; btn.textContent = 'Email me a sign-in link';
+      return r.ok;
+    } catch (e) { return false; }
+  }
+
+  async function sendLink() {
+    var em = (document.getElementById('em').value || '').trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { setMsg('lmsg', 'Please enter a valid email address.', 'err'); return; }
+    var btn = document.getElementById('lbtn'); btn.disabled = true; btn.textContent = 'Sending…';
+    function fail(msg) { setMsg('lmsg', msg || 'Could not send the link. Please try again.', 'err'); btn.disabled = false; btn.textContent = 'Email me a sign-in link'; }
+    try {
+      // Preferred: our branded pipeline (the nation's own sender via applicant-intake).
+      var r = await fetch(FN, {
+        method: 'POST', headers: { 'apikey': ANON, 'Authorization': 'Bearer ' + ANON, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'request_link', email: em, redirect_to: REDIRECT })
+      });
+      var d = await r.json().catch(function () { return {}; });
+      if (r.ok && d && d.ok) { showCheckEmail(em); return; }
+      // No provider configured for this nation -> Supabase's built-in sender.
+      if (r.status === 503 || (d && d.error === 'email_not_configured')) {
+        if (await _otpFallback(em)) { showCheckEmail(em); return; }
       }
+      fail(d && d.error && d.error !== 'email_not_configured' ? d.error : null);
     } catch (e) {
-      setMsg('lmsg', 'Network error. Please try again.', 'err');
-      btn.disabled = false; btn.textContent = 'Email me a sign-in link';
+      if (await _otpFallback(em)) { showCheckEmail(em); return; }
+      fail('Network error. Please try again.');
     }
   }
 
