@@ -49,6 +49,11 @@
       "route": "/report.html",
       "serve": "/report.html",
       "statusCode": 200
+    },
+    {
+      "route": "/apply.html",
+      "serve": "/apply.html",
+      "statusCode": 200
     }
   ],
   "navigationFallback": {
