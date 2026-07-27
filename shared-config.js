@@ -34,12 +34,19 @@ window.NATIONS_DIRECTORY = window.NATIONS_DIRECTORY || {
     modules_licensed: null   // null → all optional modules licensed (defaults apply)
   }
   // Example additional nation (one entry per hostname AND/OR subdomain label):
-  // 'nation2.housingapp.ca': {
-  //   id:'nation2', display_name:'Second Nation', short:'N2',
+  // 'listuguj': {                              // -> listuguj.fnhub.app
+  //   id:'listuguj', display_name:'Listuguj Mi\'gmaq Government', short:'LMG',
   //   supabase_url:'https://xxxxxxxx.supabase.co', supabase_anon:'<publishable anon key>',
   //   role_labels:{}, modules_licensed:{ finance:false, match:true }
   // }
 };
+// Product domain: fnhub.app (FN Hub) on Cloudflare Pages. Each nation is a
+// subdomain -> clfn.fnhub.app, <nation>.fnhub.app; resolveNation() reads the
+// leftmost label. CLFN's subdomain maps to the same config as _default, so the
+// apex (fnhub.app), www, and any preview host also resolve to CLFN until a
+// neutral landing page replaces the default. Adding a nation = one entry above
+// keyed by its subdomain label.
+window.NATIONS_DIRECTORY.clfn = window.NATIONS_DIRECTORY.clfn || window.NATIONS_DIRECTORY._default;
 window.resolveNation = function(){
   var host = (typeof location !== 'undefined' && location.hostname || '').toLowerCase();
   var dir  = window.NATIONS_DIRECTORY || {};
