@@ -49,6 +49,22 @@ In **each nation's** Supabase project (for CLFN, the existing project):
 - **Redirect URLs:** add `https://*.fnhub.app/**` (covers every nation) plus the
   `*.pages.dev` URL while testing.
 
+### A3b. Route Supabase Auth system emails through Resend (Custom SMTP)
+App notifications, maintenance, applications, and the applicant magic link all
+send through the Edge Functions (EMAIL_PROVIDER=resend). Supabase's OWN auth
+emails (staff password reset, email confirmations) are separate and use
+Supabase's default sender unless you also set Custom SMTP. To make 100% of
+outbound mail come from fnhub.app:
+
+Supabase -> **Authentication -> Emails -> SMTP Settings** -> Enable Custom SMTP:
+- Sender email: `noreply@fnhub.app`   Sender name: `<Nation> Housing`
+- Host: `smtp.resend.com`   Port: `465` (or `587`)
+- Username: `resend`   Password: a Resend API key (`re_...`)
+
+Optional: raise the auth email rate limit (Authentication -> Rate Limits) and
+brand the templates (Authentication -> Email Templates). The sending domain must
+be Verified in Resend (same domain as EMAIL_FROM).
+
 ### A4. Retire Azure (only after Cloudflare is verified live)
 - Disable/delete `.github/workflows/azure-static-web-apps-*.yml`.
 - Later, delete `staticwebapp.config.json` (Cloudflare uses `_headers`/`_redirects`).
