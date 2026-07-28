@@ -3001,6 +3001,15 @@ function openApplicationSubmissionReview(id){
         : '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Blank = create a new application. Enter an APP id to merge these changes into it.</div>')
     + '<input id="app_sub_link_id" type="text" placeholder="APP-000123" value="' + e(preselect) + '" oninput="_appSubSyncPrimary()" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">';
 
+  var docs = (p._docs && p._docs.length) ? p._docs : [];
+  var docsHtml = docs.length
+    ? '<div class="tic-field-lbl" style="margin-top:12px;">Documents (' + docs.length + ')</div>'
+      + '<div style="display:flex;flex-direction:column;gap:5px;">'
+      + docs.map(function(d, i){ return '<a id="app_sub_doc_' + i + '" href="#" target="_blank" rel="noopener" style="font-size:13px;color:#0b6bcb;text-decoration:underline;word-break:break-all;">'
+          + e(d.name || 'Document') + (d.category ? ' <span style="color:var(--muted);">· ' + e(d.category) + '</span>' : '') + '</a>'; }).join('')
+      + '</div>'
+    : '';
+
   var ex = document.getElementById('app_sub_modal'); if(ex) ex.remove();
   var m = document.createElement('div');
   m.id = 'app_sub_modal';
@@ -3021,6 +3030,7 @@ function openApplicationSubmissionReview(id){
     +   listBlock('References', p.references, function(r2){ return [r2.fn, r2.ln].filter(Boolean).join(' ') + (r2.phone ? ' · ' + r2.phone : '') + (r2.relationship ? ' · ' + r2.relationship : ''); })
     +   listBlock('Pets', p.pets, function(pt){ return [pt.name, pt.type, pt.size].filter(Boolean).join(' · '); })
     +   ((p.sig && p.sig.typed) ? '<div style="margin-top:10px;">' + row('Signed', p.sig.typed + (p.sig.date ? ' · ' + e(p.sig.date) : '')) + '</div>' : '')
+    +   docsHtml
     +   linkSection
     +   '<div class="tic-field-lbl" style="margin-top:14px;">Review note (shown to the applicant if you request changes)</div>'
     +   '<textarea id="app_sub_note" rows="2" placeholder="Optional note for the applicant / record" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;resize:vertical;"></textarea>'
@@ -3034,8 +3044,37 @@ function openApplicationSubmissionReview(id){
     + '</div></div>';
   document.body.appendChild(m);
   _appSubSyncPrimary();
+  if(docs.length) _appSubRenderDocs(docs);
 }
 window.openApplicationSubmissionReview = openApplicationSubmissionReview;
+
+// Resolve signed URLs for the applicant's uploaded documents (private bucket).
+async function _appSubRenderDocs(docs){
+  for(var i=0;i<docs.length;i++){
+    try {
+      var url = (typeof sbGetSignedUrl === 'function' && docs[i].path) ? await sbGetSignedUrl(docs[i].path) : '';
+      var a = document.getElementById('app_sub_doc_' + i);
+      if(a && url) a.href = url;
+    } catch(_e){}
+  }
+}
+window._appSubRenderDocs = _appSubRenderDocs;
+
+// Carry the applicant's uploaded documents into the real application's
+// DocLibrary (copy from the intake quarantine to applications/<appId>/ and
+// write a file_uploaded meta row so they show on the app's Documents tab).
+function _appSubCarryDocs(appId, docs){
+  if(!appId || !docs || !docs.length) return;
+  docs.forEach(function(d, idx){
+    if(!d || !d.path || typeof sbCopyFile !== 'function') return;
+    var nm = (d.name || 'document').replace(/[^\w.\-]+/g, '_');
+    var dest = 'applications/' + appId + '/' + (new Date().getTime()) + '_' + idx + '_' + nm;
+    sbCopyFile(d.path, dest).then(function(){
+      if(typeof sbSaveFileMeta === 'function') sbSaveFileMeta('application', appId, dest, d.name || nm, d.size || 0, d.type || 'application/octet-stream');
+    }).catch(function(err){ console.warn('[app-sub] doc carry failed:', err); });
+  });
+}
+window._appSubCarryDocs = _appSubCarryDocs;
 
 function _appSubClose(){ var x = document.getElementById('app_sub_modal'); if(x) x.remove(); }
 
@@ -3057,6 +3096,7 @@ function _appSubApprove(id){
     return sbSaveApplication(app).then(function(){
       return _appSubResolve(id, 'approved', note, appId).then(function(){
         _appSubLinkProfile(s.applicant_uid, appId);
+        _appSubCarryDocs(appId, p._docs);
         if(typeof auditEntry === 'function') auditEntry(appId, 'application_created_from_portal', 'Created from applicant portal submission ' + s.id + ' — ' + ([p.fn, p.ln].filter(Boolean).join(' ')), staffEmail);
         if(typeof applications !== 'undefined' && Array.isArray(applications)) applications.push(app);
         _appSubClose();
@@ -3119,6 +3159,7 @@ function _appSubMerge(id, targetAppId){
   sbSaveApplication(target).then(function(){
     return _appSubResolve(id, 'approved', note, targetAppId).then(function(){
       _appSubLinkProfile(s.applicant_uid, targetAppId);
+      _appSubCarryDocs(targetAppId, p._docs);
       if(typeof auditEntry === 'function') auditEntry(targetAppId, 'application_updated_from_portal', 'Merged portal ' + s.submission_type + ' submission ' + s.id + ' into ' + targetAppId + (note ? ' — ' + note : ''), staffEmail);
       _appSubClose();
       if(typeof showToast === 'function') showToast('✓ Merged into ' + targetAppId);

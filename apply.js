@@ -8,8 +8,10 @@
   var SB   = window.SUPABASE_URL || '';
   var ANON = window.SUPABASE_ANON || '';
   var NC   = window.NATION_CONFIG || {};
-  var AUTH = SB ? SB.replace(/\/$/, '') + '/auth/v1' : '';
-  var FN   = SB ? SB.replace(/\/$/, '') + '/functions/v1/applicant-intake' : '';
+  var SBASE = SB ? SB.replace(/\/$/, '') : '';
+  var AUTH = SBASE ? SBASE + '/auth/v1' : '';
+  var FN   = SBASE ? SBASE + '/functions/v1/applicant-intake' : '';
+  var BUCKET = window.STORAGE_BUCKET || 'housing-files';
   var REDIRECT = location.origin + location.pathname;   // where the magic link returns
 
   var LS_AT = 'clfn_apply_at', LS_RT = 'clfn_apply_rt';
@@ -214,6 +216,7 @@
   var INCOME_OPTS = ['Employment', 'Social Assistance', 'Disability (ODSP)', 'Pension', 'Employment Insurance', 'Child Benefit', 'Self-employed', 'Other'];
   var PET_SIZES   = ['Small', 'Medium', 'Large'];
   var APPTYPE_OF  = { new: 'new_housing', transfer: 'transfer_request', update: 'existing_tenant' };
+  var DOC_CAT_LABEL = { id: 'ID', income: 'Proof of income', housing_hist: 'Housing history', medical: 'Medical', other: 'Other' };
 
   function wfEsc(v) { return esc(v == null ? '' : v); }
   // Single labeled field bound to payload key `id`.
@@ -313,6 +316,26 @@
               { k: 'phone', label: 'Phone', type: 'tel' }, { k: 'relationship', label: 'Relationship' }
             ], 'wizAddRef');
       }, collect: function (p) { p.references = wfCollectRepeater('rep_ref', ['fn', 'ln', 'phone', 'relationship']); } },
+    { title: 'Documents', render: function (p) {
+        var docs = p._docs || [];
+        var list = docs.length
+          ? docs.map(function (d, i) {
+              return '<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--hair);border-radius:9px;padding:9px 11px;margin-bottom:8px;">'
+                + '<span style="flex:1;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + wfEsc(d.name || 'Document') + '</span>'
+                + '<span style="font-size:11px;color:var(--muted);white-space:nowrap;">' + wfEsc(DOC_CAT_LABEL[d.category] || d.category || '') + '</span>'
+                + '<button type="button" data-rmdoc="' + i + '" style="background:none;border:none;color:var(--danger);font-size:20px;line-height:1;cursor:pointer;padding:0;">&times;</button>'
+                + '</div>';
+            }).join('')
+          : '<div class="sub" style="font-style:italic;margin:0 0 10px;">No documents uploaded yet.</div>';
+        return '<h4 style="margin:0 0 6px;">Supporting documents (optional)</h4>'
+          + '<p class="sub" style="margin:0 0 12px;">Upload ID, proof of income, or other documents. You can also bring them to the Housing office later.</p>'
+          + '<label>Document type</label>'
+          + '<select id="doc_cat"><option value="id">ID</option><option value="income">Proof of income</option><option value="housing_hist">Housing history</option><option value="medical">Medical</option><option value="other">Other</option></select>'
+          + '<label style="margin-top:10px;">Choose a file</label>'
+          + '<input id="doc_file" type="file" accept="image/*,application/pdf" style="padding:9px 10px;"/>'
+          + '<div id="doc_list" style="margin-top:14px;">' + list + '</div>'
+          + '<div class="msg" id="doc_msg"></div>';
+      }, collect: function () { /* docs persist on upload */ }, wire: function () { _wizWireDocs(); } },
     { title: 'Review', render: function (p) {
         var line = function (l, v) { return v ? '<div style="font-size:13px;margin:2px 0;"><b>' + wfEsc(l) + ':</b> ' + wfEsc(v) + '</div>' : ''; };
         return '<h4 style="margin:0 0 8px;">Review &amp; submit</h4>'
@@ -323,8 +346,9 @@
           +   line('Household members', (p.habitants || []).length ? (p.habitants.length + ' listed') : '')
           +   line('Income sources', (p.incomes || []).length ? (p.incomes.length + ' listed') : '')
           +   line('References', (p.references || []).length ? (p.references.length + ' listed') : '')
+          +   line('Documents', (p._docs || []).length ? (p._docs.length + ' uploaded') : '')
           + '</div>'
-          + '<p class="sub" style="margin:0 0 10px;">Documents (ID, income proof) can be provided to the Housing office after you submit &mdash; secure upload is coming soon.</p>'
+          + '<p class="sub" style="margin:0 0 10px;">You can add or change documents on the previous step, or bring them to the Housing office later.</p>'
           + '<div style="margin:12px 0;">' + wf('I consent to the Housing office collecting and reviewing this information for my application.', 'w_consent', p.consentShareCLFN, 'checkbox') + '</div>'
           + wf('Type your full name to sign', 'w_sig', (p.sig || {}).typed, 'text', null, 'Your full legal name')
           + wf('Date', 'w_sigdate', (p.sig || {}).date || new Date().toISOString().slice(0, 10), 'date');
@@ -353,6 +377,67 @@
     // Co-applicant show/hide.
     var co = document.getElementById('w_hasco');
     if (co) co.addEventListener('change', function () { var w = document.getElementById('w_co_wrap'); if (w) w.style.display = co.checked ? '' : 'none'; });
+    if (s.wire) s.wire();
+  }
+
+  // ---- Document upload (Documents step) --------------------------------------
+  function _applyUid() {
+    try { var t = getAT().split('.')[1]; return JSON.parse(atob(t.replace(/-/g, '+').replace(/_/g, '/'))).sub || ''; }
+    catch (e) { return ''; }
+  }
+  async function _wizUploadFile(file, cat) {
+    var uid = _applyUid(), sid = _wiz.id;
+    var safe = (file.name || 'file').replace(/[^\w.\-]+/g, '_').slice(0, 80);
+    var path = 'application-intake/' + uid + '/' + sid + '/' + (new Date().getTime()) + '_' + safe;
+    var r = await fetch(SBASE + '/storage/v1/object/' + BUCKET + '/' + path, {
+      method: 'POST', headers: { 'apikey': ANON, 'Authorization': 'Bearer ' + getAT(), 'x-upsert': 'true' }, body: file
+    });
+    if (r.status === 401 && await refreshSession()) {
+      r = await fetch(SBASE + '/storage/v1/object/' + BUCKET + '/' + path, {
+        method: 'POST', headers: { 'apikey': ANON, 'Authorization': 'Bearer ' + getAT(), 'x-upsert': 'true' }, body: file
+      });
+    }
+    if (!r.ok) throw new Error(await r.text());
+    return { path: path, name: file.name, size: file.size, type: file.type, category: cat };
+  }
+  async function _wizDeleteFile(path) {
+    try {
+      await fetch(SBASE + '/storage/v1/object/' + BUCKET, {
+        method: 'DELETE', headers: { 'apikey': ANON, 'Authorization': 'Bearer ' + getAT(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefixes: [path] })
+      });
+    } catch (e) {}
+  }
+  function _wizWireDocs() {
+    var f = document.getElementById('doc_file');
+    if (f) f.addEventListener('change', function (ev) { var file = ev.target.files && ev.target.files[0]; if (file) _wizAddDoc(file); ev.target.value = ''; });
+    var list = document.getElementById('doc_list');
+    if (list) Array.prototype.forEach.call(list.querySelectorAll('[data-rmdoc]'), function (b) {
+      b.addEventListener('click', function () { _wizRemoveDoc(+b.getAttribute('data-rmdoc')); });
+    });
+  }
+  async function _wizAddDoc(file) {
+    var msg = document.getElementById('doc_msg');
+    var setMsg = function (t, k) { if (msg) { msg.className = 'msg ' + (k || 'err'); msg.textContent = t; } };
+    if (file.size > 15 * 1024 * 1024) { setMsg('That file is too large (max 15 MB).'); return; }
+    if (!_wiz.id) { setMsg('Saving…', 'ok'); if (!await wizPersist()) { setMsg('Could not save yet — please try again.'); return; } }
+    var cat = (document.getElementById('doc_cat') || {}).value || 'other';
+    setMsg('Uploading ' + file.name + '…', 'ok');
+    try {
+      var meta = await _wizUploadFile(file, cat);
+      _wiz.payload._docs = _wiz.payload._docs || [];
+      _wiz.payload._docs.push(meta);
+      await wizPersist();
+      wizRender();
+    } catch (e) { setMsg('Upload failed. Please check your connection and try again.'); }
+  }
+  async function _wizRemoveDoc(i) {
+    var docs = _wiz.payload._docs || [];
+    var d = docs[i]; if (!d) return;
+    if (d.path) await _wizDeleteFile(d.path);
+    docs.splice(i, 1); _wiz.payload._docs = docs;
+    await wizPersist();
+    wizRender();
   }
 
   function wizCollect() { try { WIZ_STEPS[_wiz.step].collect(_wiz.payload); } catch (e) {} }
