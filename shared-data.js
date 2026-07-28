@@ -2976,6 +2976,31 @@ function openApplicationSubmissionReview(id){
   var flags = [p.homeless ? 'Homeless / no fixed address' : '', p.haveHouse ? 'Has house on reserve' : ''].filter(Boolean).join(' · ');
   var co = p.hasCoApp && p.coApp ? [p.coApp.fn, p.coApp.ln].filter(Boolean).join(' ') : '';
 
+  // Candidate existing applications to merge into (email exact, or name+DOB) —
+  // for update/transfer submissions, and as a duplicate warning for new ones.
+  var pEmail = String(p.email || '').toLowerCase();
+  var cands = (window.applications || []).filter(function(a){
+    if(!a || a.archived || a.appType === 'commercial') return false;
+    var em = String(a.email || '').toLowerCase();
+    if(pEmail && em && em === pEmail) return true;
+    if(p.fn && p.ln && String(a.fn||'').toLowerCase() === String(p.fn).toLowerCase() && String(a.ln||'').toLowerCase() === String(p.ln).toLowerCase()){
+      if(!p.dob || !a.dob || a.dob === p.dob) return true;
+    }
+    return false;
+  }).slice(0, 6);
+  var isUpdateType = (s.submission_type === 'update' || s.submission_type === 'transfer');
+  var preselect = (isUpdateType && cands.length) ? cands[0].id : '';
+  var candChips = cands.map(function(a){
+    var nm = ((a.fn||'') + ' ' + (a.ln||'')).trim();
+    return '<button type="button" onclick="_appSubPickLink(\'' + e(a.id) + '\')" class="btn btn-ghost" style="font-size:12px;padding:3px 9px;margin:2px 4px 2px 0;">' + e(a.id) + (nm ? ' &middot; ' + e(nm) : '') + '</button>';
+  }).join('');
+  var linkSection =
+      '<div class="tic-field-lbl" style="margin-top:14px;">Link to existing application ' + (isUpdateType ? '<span style="color:#d97706;">(recommended for ' + e(s.submission_type) + ')</span>' : '(optional)') + '</div>'
+    + (cands.length
+        ? '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Possible match' + (cands.length>1?'es':'') + ': ' + candChips + '</div>'
+        : '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Blank = create a new application. Enter an APP id to merge these changes into it.</div>')
+    + '<input id="app_sub_link_id" type="text" placeholder="APP-000123" value="' + e(preselect) + '" oninput="_appSubSyncPrimary()" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">';
+
   var ex = document.getElementById('app_sub_modal'); if(ex) ex.remove();
   var m = document.createElement('div');
   m.id = 'app_sub_modal';
@@ -2996,6 +3021,7 @@ function openApplicationSubmissionReview(id){
     +   listBlock('References', p.references, function(r2){ return [r2.fn, r2.ln].filter(Boolean).join(' ') + (r2.phone ? ' · ' + r2.phone : '') + (r2.relationship ? ' · ' + r2.relationship : ''); })
     +   listBlock('Pets', p.pets, function(pt){ return [pt.name, pt.type, pt.size].filter(Boolean).join(' · '); })
     +   ((p.sig && p.sig.typed) ? '<div style="margin-top:10px;">' + row('Signed', p.sig.typed + (p.sig.date ? ' · ' + e(p.sig.date) : '')) + '</div>' : '')
+    +   linkSection
     +   '<div class="tic-field-lbl" style="margin-top:14px;">Review note (shown to the applicant if you request changes)</div>'
     +   '<textarea id="app_sub_note" rows="2" placeholder="Optional note for the applicant / record" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;resize:vertical;"></textarea>'
     + '</div>'
@@ -3004,9 +3030,10 @@ function openApplicationSubmissionReview(id){
     +     '<button type="button" onclick="_appSubReject(\'' + e(s.id) + '\')" class="btn btn-ghost" style="color:var(--danger);border-color:var(--danger);">Reject</button>'
     +     '<button type="button" onclick="_appSubRequestChanges(\'' + e(s.id) + '\')" class="btn btn-ghost">Request changes</button>'
     +   '</div>'
-    +   '<button type="button" onclick="_appSubApprove(\'' + e(s.id) + '\')" class="btn btn-primary">&#10003; Approve &amp; create application</button>'
+    +   '<button type="button" id="app_sub_primary_btn" onclick="_appSubApproveSmart(\'' + e(s.id) + '\')" class="btn btn-primary">&#10003; Approve &amp; create application</button>'
     + '</div></div>';
   document.body.appendChild(m);
+  _appSubSyncPrimary();
 }
 window.openApplicationSubmissionReview = openApplicationSubmissionReview;
 
@@ -3041,6 +3068,66 @@ function _appSubApprove(id){
   }).catch(function(err){ console.warn('[app-sub] approve failed:', err); if(typeof showToast === 'function') showToast('Could not create the application — please retry', {type:'error'}); });
 }
 window._appSubApprove = _appSubApprove;
+
+// Link-field helpers: chip click fills the input; input change relabels the
+// primary button (Merge into <id> vs Create application).
+function _appSubPickLink(appId){ var el = document.getElementById('app_sub_link_id'); if(el){ el.value = appId; } _appSubSyncPrimary(); }
+window._appSubPickLink = _appSubPickLink;
+function _appSubSyncPrimary(){
+  var el = document.getElementById('app_sub_link_id'); var btn = document.getElementById('app_sub_primary_btn');
+  if(!btn) return;
+  var v = el ? el.value.trim() : '';
+  btn.innerHTML = v ? ('✓ Merge into ' + (v.replace(/[<>&]/g,''))) : '✓ Approve &amp; create application';
+}
+window._appSubSyncPrimary = _appSubSyncPrimary;
+
+// Route the primary action: merge into an existing app if a valid id is set,
+// otherwise create a fresh application.
+function _appSubApproveSmart(id){
+  var el = document.getElementById('app_sub_link_id');
+  var targetId = el ? el.value.trim() : '';
+  if(targetId){
+    var exists = (window.applications || []).some(function(a){ return a.id === targetId; });
+    if(!exists){ if(typeof showToast === 'function') showToast('No application found with id ' + targetId, {type:'error'}); return; }
+    _appSubMerge(id, targetId);
+  } else {
+    _appSubApprove(id);
+  }
+}
+window._appSubApproveSmart = _appSubApproveSmart;
+
+// Merge a portal update/transfer submission into an existing application. Only
+// applicant-provided fields overwrite; staff-owned scoring/status are preserved.
+function _appSubMerge(id, targetAppId){
+  var s = (window._appSubmissions || []).find(function(x){ return x.id === id; });
+  if(!s) return;
+  var target = (window.applications || []).find(function(a){ return a.id === targetAppId; });
+  if(!target){ if(typeof showToast === 'function') showToast('Application ' + targetAppId + ' not found', {type:'error'}); return; }
+  var note = (document.getElementById('app_sub_note') || {}).value || '';
+  var p = s.payload || {};
+  var staffEmail = (window.HOUSING_SESSION && HOUSING_SESSION.email) || '';
+  // Scalar applicant fields — overwrite only when the applicant supplied a value.
+  ['fn','ln','dob','band','marital','reserve','phone','email','street','city','province','postal','occDate','homeless','haveHouse','homeCondition','hasCoApp'].forEach(function(k){
+    if(p[k] !== undefined && p[k] !== '' && p[k] !== null) target[k] = p[k];
+  });
+  if(p.hasCoApp && p.coApp) target.coApp = p.coApp;
+  // Repeater lists — replace only if the applicant provided a non-empty set.
+  ['habitants','incomes','references','pets'].forEach(function(k){ if(Array.isArray(p[k]) && p[k].length) target[k] = p[k]; });
+  if(s.submission_type === 'transfer'){ target.appType = 'transfer_request'; target.transferPending = true; }
+  target.last_portal_merge = { submission_id: s.id, type: s.submission_type, at: new Date().toISOString(), by: staffEmail };
+  if(typeof showToast === 'function') showToast('Merging into ' + targetAppId + '…');
+  sbSaveApplication(target).then(function(){
+    return _appSubResolve(id, 'approved', note, targetAppId).then(function(){
+      _appSubLinkProfile(s.applicant_uid, targetAppId);
+      if(typeof auditEntry === 'function') auditEntry(targetAppId, 'application_updated_from_portal', 'Merged portal ' + s.submission_type + ' submission ' + s.id + ' into ' + targetAppId + (note ? ' — ' + note : ''), staffEmail);
+      _appSubClose();
+      if(typeof showToast === 'function') showToast('✓ Merged into ' + targetAppId);
+      if(typeof renderWorklist === 'function') renderWorklist();
+      if(typeof renderDashboard === 'function') try { renderDashboard(); } catch(_e){}
+    });
+  }).catch(function(err){ console.warn('[app-sub] merge failed:', err); if(typeof showToast === 'function') showToast('Could not merge — please retry', {type:'error'}); });
+}
+window._appSubMerge = _appSubMerge;
 
 function _appSubRequestChanges(id){
   var note = (document.getElementById('app_sub_note') || {}).value || '';
