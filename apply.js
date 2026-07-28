@@ -149,9 +149,13 @@
     var listHtml = subs.length
       ? '<ul class="sublist">' + subs.map(function (s) {
           var st = s.status || 'draft';
-          return '<li><span>' + esc(TYPE_LABEL[s.submission_type] || 'Application')
+          var noteLine = (st === 'changes_requested' && s.review_notes)
+            ? '<div style="width:100%;font-size:12px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:7px;padding:7px 9px;margin-top:6px;"><b>Changes requested:</b> ' + esc(s.review_notes) + '</div>'
+            : '';
+          return '<li style="flex-wrap:wrap;"><span>' + esc(TYPE_LABEL[s.submission_type] || 'Application')
             + (s.submitted_at ? ' · ' + new Date(s.submitted_at).toLocaleDateString() : '')
-            + '</span><span class="pill ' + esc(st) + '">' + esc(STATUS_LABEL[st] || st) + '</span></li>';
+            + '</span><span class="pill ' + esc(st) + '">' + esc(STATUS_LABEL[st] || st) + '</span>'
+            + noteLine + '</li>';
         }).join('') + '</ul>'
       : '<div class="empty">You have no applications yet.</div>';
 

@@ -2896,6 +2896,175 @@ function _tenantMrReject(id){
 }
 window._tenantMrReject = _tenantMrReject;
 
+// ══ Application submissions (applicant portal → staff verify → real app) ══════
+// Applicants submit through the apply.html portal into the quarantine table
+// application_submissions. Management reviews each and, on approval, creates the
+// real housing_applications record (via the existing save path) + links it to
+// the applicant's account. Mirrors the tenant-MR review flow above.
+async function sbLoadApplicationSubmissions(){
+  try {
+    var url = SUPABASE_URL + '/rest/v1/application_submissions'
+      + '?status=in.(submitted,in_review,changes_requested)&order=submitted_at.desc.nullslast,created_at.desc&limit=300';
+    var r = await fetch(url, { headers: HOUSING_HEADERS });
+    if(!r.ok){ window._appSubmissions = window._appSubmissions || []; return window._appSubmissions; }
+    var rows = await r.json();
+    window._appSubmissions = Array.isArray(rows) ? rows : [];
+    return window._appSubmissions;
+  } catch(e){
+    console.warn('[app-sub] load failed:', e);
+    window._appSubmissions = window._appSubmissions || [];
+    return window._appSubmissions;
+  }
+}
+window.sbLoadApplicationSubmissions = sbLoadApplicationSubmissions;
+
+async function _appSubNextAppId(){
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/rpc/next_housing_app_id', {
+      method:'POST', headers: Object.assign({}, HOUSING_HEADERS, { 'Content-Type':'application/json' }), body:'{}'
+    });
+    if(r.ok){ var v = await r.json(); if(typeof v === 'string' && v) return v; }
+  } catch(e){ console.warn('[app-sub] id RPC failed, falling back:', e); }
+  if(typeof generateAppId === 'function') return generateAppId();
+  return 'APP-' + String(Date.now()).slice(-6);
+}
+
+async function _appSubResolve(id, status, notes, createdAppId){
+  var actor = (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || '';
+  var body = { status: status, reviewed_by: actor, reviewed_at: new Date().toISOString() };
+  if(notes)        body.review_notes = String(notes).slice(0, 1000);
+  if(createdAppId) body.created_app_id = createdAppId;
+  var r = await fetch(SUPABASE_URL + '/rest/v1/application_submissions?id=eq.' + encodeURIComponent(id), {
+    method:'PATCH', headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer':'return=minimal' }), body: JSON.stringify(body)
+  });
+  if(!r.ok) throw new Error(await r.text());
+  window._appSubmissions = (window._appSubmissions || []).filter(function(s){ return s.id !== id; });
+  return true;
+}
+
+// Append the created app id to the applicant's profile so their portal switches
+// from "start new" to "update / transfer" and can see the linked application.
+async function _appSubLinkProfile(uid, appId){
+  if(!uid || !appId) return;
+  try {
+    var r = await fetch(SUPABASE_URL + '/rest/v1/applicant_profiles?uid=eq.' + encodeURIComponent(uid) + '&select=linked_app_ids', { headers: HOUSING_HEADERS });
+    var arr = [];
+    if(r.ok){ var rows = await r.json(); arr = (rows[0] && rows[0].linked_app_ids) || []; }
+    if(arr.indexOf(appId) === -1) arr.push(appId);
+    await fetch(SUPABASE_URL + '/rest/v1/applicant_profiles?uid=eq.' + encodeURIComponent(uid), {
+      method:'PATCH', headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer':'return=minimal' }),
+      body: JSON.stringify({ linked_app_ids: arr, updated_at: new Date().toISOString() })
+    });
+  } catch(e){ console.warn('[app-sub] link profile failed:', e); }
+}
+
+var _APPSUB_TYPE_LABEL = { new:'New application', update:'Application update', transfer:'Transfer request' };
+
+function openApplicationSubmissionReview(id){
+  var s = (window._appSubmissions || []).find(function(x){ return x.id === id; });
+  if(!s){ if(typeof showToast === 'function') showToast('Submission not found'); return; }
+  var e = function(t){ return String(t==null?'':t).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); };
+  var p = s.payload || {};
+  var when = s.submitted_at ? new Date(s.submitted_at).toLocaleString() : (s.created_at ? new Date(s.created_at).toLocaleString() : '');
+  var row = function(l, v){ return v ? '<div style="font-size:13px;margin:3px 0;"><span style="color:var(--muted);">' + e(l) + ':</span> ' + e(v) + '</div>' : ''; };
+  var listBlock = function(title, arr, fmt){
+    if(!arr || !arr.length) return '';
+    return '<div style="margin-top:10px;"><div class="tic-field-lbl">' + e(title) + ' (' + arr.length + ')</div>'
+      + arr.map(function(it){ return '<div style="font-size:12px;color:var(--text);padding:4px 0;border-bottom:1px solid var(--border);">' + e(fmt(it)) + '</div>'; }).join('') + '</div>';
+  };
+  var addr = [p.street, p.city, p.province, p.postal].filter(Boolean).join(', ');
+  var flags = [p.homeless ? 'Homeless / no fixed address' : '', p.haveHouse ? 'Has house on reserve' : ''].filter(Boolean).join(' · ');
+  var co = p.hasCoApp && p.coApp ? [p.coApp.fn, p.coApp.ln].filter(Boolean).join(' ') : '';
+
+  var ex = document.getElementById('app_sub_modal'); if(ex) ex.remove();
+  var m = document.createElement('div');
+  m.id = 'app_sub_modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  m.innerHTML =
+      '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:600px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35);">'
+    + '<div class="modal-hdr"><div><div class="lbl-yellow">&#128196; ' + e(_APPSUB_TYPE_LABEL[s.submission_type] || 'Application') + '</div>'
+    +   '<div class="txt-sm-meta">' + e(([p.fn, p.ln].filter(Boolean).join(' ')) || 'Applicant') + (when ? ' &middot; ' + e(when) : '') + '</div></div>'
+    +   '<button type="button" onclick="var x=document.getElementById(\'app_sub_modal\');if(x)x.remove();" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button></div>'
+    + '<div style="overflow-y:auto;padding:18px 22px;flex:1;">'
+    +   row('Name', [p.fn, p.ln].filter(Boolean).join(' '))
+    +   row('Date of birth', p.dob) + row('Band / membership #', p.band) + row('Marital', p.marital) + row('Reserve status', p.reserve)
+    +   row('Phone', p.phone) + row('Email', p.email) + row('Address', addr) + row('Needed by', p.occDate)
+    +   (flags ? row('Flags', flags) : '')
+    +   (co ? row('Co-applicant', co + (p.coApp.dob ? ' (' + e(p.coApp.dob) + ')' : '')) : '')
+    +   listBlock('Household members', p.habitants, function(h){ return [h.fn, h.ln].filter(Boolean).join(' ') + (h.relationship ? ' — ' + h.relationship : '') + (h.dob ? ' · ' + h.dob : ''); })
+    +   listBlock('Income', p.incomes, function(i){ return [i.person, i.incomeType, i.employer, (i.primaryAmt ? '$' + i.primaryAmt + '/mo' : '')].filter(Boolean).join(' · '); })
+    +   listBlock('References', p.references, function(r2){ return [r2.fn, r2.ln].filter(Boolean).join(' ') + (r2.phone ? ' · ' + r2.phone : '') + (r2.relationship ? ' · ' + r2.relationship : ''); })
+    +   listBlock('Pets', p.pets, function(pt){ return [pt.name, pt.type, pt.size].filter(Boolean).join(' · '); })
+    +   ((p.sig && p.sig.typed) ? '<div style="margin-top:10px;">' + row('Signed', p.sig.typed + (p.sig.date ? ' · ' + e(p.sig.date) : '')) + '</div>' : '')
+    +   '<div class="tic-field-lbl" style="margin-top:14px;">Review note (shown to the applicant if you request changes)</div>'
+    +   '<textarea id="app_sub_note" rows="2" placeholder="Optional note for the applicant / record" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:DM Sans,sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;resize:vertical;"></textarea>'
+    + '</div>'
+    + '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;flex-shrink:0;">'
+    +   '<div style="display:flex;gap:8px;">'
+    +     '<button type="button" onclick="_appSubReject(\'' + e(s.id) + '\')" class="btn btn-ghost" style="color:var(--danger);border-color:var(--danger);">Reject</button>'
+    +     '<button type="button" onclick="_appSubRequestChanges(\'' + e(s.id) + '\')" class="btn btn-ghost">Request changes</button>'
+    +   '</div>'
+    +   '<button type="button" onclick="_appSubApprove(\'' + e(s.id) + '\')" class="btn btn-primary">&#10003; Approve &amp; create application</button>'
+    + '</div></div>';
+  document.body.appendChild(m);
+}
+window.openApplicationSubmissionReview = openApplicationSubmissionReview;
+
+function _appSubClose(){ var x = document.getElementById('app_sub_modal'); if(x) x.remove(); }
+
+function _appSubApprove(id){
+  var s = (window._appSubmissions || []).find(function(x){ return x.id === id; });
+  if(!s) return;
+  var note = (document.getElementById('app_sub_note') || {}).value || '';
+  var p = s.payload || {};
+  var staffEmail = (window.HOUSING_SESSION && HOUSING_SESSION.email) || '';
+  var staffName  = (window.HOUSING_SESSION && HOUSING_SESSION.name) || '';
+  if(typeof showToast === 'function') showToast('Creating application…');
+  _appSubNextAppId().then(function(appId){
+    var app = Object.assign({}, p, {
+      id: appId, status: 'submitted', appType: p.appType || 'new_housing',
+      created_by_email: staffEmail, created_by_name: staffName,
+      submittedAt: new Date().toISOString(),
+      source: 'portal', portal_submission_id: s.id, applicant_uid: s.applicant_uid
+    });
+    return sbSaveApplication(app).then(function(){
+      return _appSubResolve(id, 'approved', note, appId).then(function(){
+        _appSubLinkProfile(s.applicant_uid, appId);
+        if(typeof auditEntry === 'function') auditEntry(appId, 'application_created_from_portal', 'Created from applicant portal submission ' + s.id + ' — ' + ([p.fn, p.ln].filter(Boolean).join(' ')), staffEmail);
+        if(typeof applications !== 'undefined' && Array.isArray(applications)) applications.push(app);
+        _appSubClose();
+        if(typeof showToast === 'function') showToast('✓ Application ' + appId + ' created — open it to add scoring & approve');
+        if(typeof renderWorklist === 'function') renderWorklist();
+        if(typeof renderDashboard === 'function') try { renderDashboard(); } catch(_e){}
+      });
+    });
+  }).catch(function(err){ console.warn('[app-sub] approve failed:', err); if(typeof showToast === 'function') showToast('Could not create the application — please retry', {type:'error'}); });
+}
+window._appSubApprove = _appSubApprove;
+
+function _appSubRequestChanges(id){
+  var note = (document.getElementById('app_sub_note') || {}).value || '';
+  if(!note){ if(typeof showToast === 'function') showToast('Add a note so the applicant knows what to change', {type:'error'}); return; }
+  _appSubResolve(id, 'changes_requested', note).then(function(){
+    _appSubClose();
+    if(typeof showToast === 'function') showToast('Sent back to the applicant for changes');
+    if(typeof auditEntry === 'function') auditEntry('APPSUB:' + id, 'application_submission_changes_requested', note, (window.HOUSING_SESSION && HOUSING_SESSION.email) || '');
+    if(typeof renderWorklist === 'function') renderWorklist();
+  }).catch(function(err){ console.warn('[app-sub] request changes failed:', err); if(typeof showToast === 'function') showToast('Failed — please retry', {type:'error'}); });
+}
+window._appSubRequestChanges = _appSubRequestChanges;
+
+function _appSubReject(id){
+  var note = (document.getElementById('app_sub_note') || {}).value || '';
+  _appSubResolve(id, 'rejected', note).then(function(){
+    _appSubClose();
+    if(typeof showToast === 'function') showToast('Submission rejected');
+    if(typeof auditEntry === 'function') auditEntry('APPSUB:' + id, 'application_submission_rejected', note, (window.HOUSING_SESSION && HOUSING_SESSION.email) || '');
+    if(typeof renderWorklist === 'function') renderWorklist();
+  }).catch(function(err){ console.warn('[app-sub] reject failed:', err); if(typeof showToast === 'function') showToast('Failed — please retry', {type:'error'}); });
+}
+window._appSubReject = _appSubReject;
+
 // ── Assignment: single source of truth ──────────────────────────────────
 // One rule for "is this application approved enough to be placed in a unit?"
 // Shared by the Match queue (row inclusion), confirmAssignment, the unit-edit
@@ -5826,7 +5995,8 @@ function renderWorklist() {
   var sowTotalCount = (typeof sowItems._total === 'number') ? sowItems._total : sowItems.length;
   // Tenant-reported maintenance requests awaiting staff review (management only).
   var tenantMrCount = isManagement ? (window._tenantMrSubmissions || []).length : 0;
-  var total = appItems.length + sowTotalCount + fieldSowItems.length + rfqItems.length + ctItems.length + matchItems.length + unitApprItems.length + draftTotal + tenantMrCount;
+  var appSubCount   = isManagement ? (window._appSubmissions || []).length : 0;
+  var total = appItems.length + sowTotalCount + fieldSowItems.length + rfqItems.length + ctItems.length + matchItems.length + unitApprItems.length + draftTotal + tenantMrCount + appSubCount;
   var pill = document.getElementById('worklist_count_pill'); if (pill) pill.textContent = total;
   var qa   = document.getElementById('qa_pending_count');   if (qa) qa.textContent = total;
 
@@ -5968,6 +6138,35 @@ function renderWorklist() {
         actions:[{text:'Review',onclick:open}] });
     });
     html += sectionWrap('📮', 'Tenant Requests', tenantMrItems.length, '', _view === 'cards' ? wlGrid(tmrCards) : tmrRows, 0);
+  }
+
+  // Application Submissions — housing applications submitted through the
+  // applicant portal (management review queue). Approving creates the real
+  // housing_applications record and links it to the applicant's account.
+  var appSubItems = isManagement ? (window._appSubmissions || []) : [];
+  if (appSubItems.length) {
+    var asRows = '', asCards = '';
+    var _asTypeLbl = { new:'New application', update:'Application update', transfer:'Transfer request' };
+    var _asStatusLbl = { submitted:'New', in_review:'In review', changes_requested:'Returned' };
+    appSubItems.forEach(function(s){
+      var idJs = esc(s.id).replace(/'/g, "\\'");
+      var open = 'openApplicationSubmissionReview(\'' + idJs + '\')';
+      var p = s.payload || {};
+      var nm = ([p.fn, p.ln].filter(Boolean).join(' ')) || 'Applicant';
+      var typeLbl = _asTypeLbl[s.submission_type] || 'Application';
+      var stLbl = _asStatusLbl[s.status] || s.status;
+      var info = '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(nm) + '</span>'
+               + '<span style="font-size:11px;color:var(--muted);width:140px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(typeLbl) + '</span>'
+               + '<span style="font-size:10px;font-weight:800;color:' + (s.status==='changes_requested'?'#d97706':'var(--muted)') + ';width:64px;flex-shrink:0;">' + esc(String(stLbl).toUpperCase()) + '</span>';
+      asRows += '<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid var(--border);background:var(--surface);" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'var(--surface)\'">'
+        + '<div onclick="' + open + '" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;">' + info + '</div>'
+        + '<button onclick="' + open + '" style="flex-shrink:0;background:var(--yellow);color:var(--dark);border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;">Review</button>'
+        + '</div>';
+      asCards += wlCard({ title: nm, pill:{ text: stLbl }, open: open,
+        metas:[{k:'Type',v:typeLbl},{k:'Submitted',v:s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : ''}],
+        actions:[{text:'Review',onclick:open}] });
+    });
+    html += sectionWrap('📄', 'Application Submissions', appSubItems.length, '', _view === 'cards' ? wlGrid(asCards) : asRows, 0);
   }
 
   // My Drafts — in-progress items the current user hasn't submitted yet.

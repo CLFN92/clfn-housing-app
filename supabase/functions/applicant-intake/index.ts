@@ -218,7 +218,7 @@ serve(async (req) => {
     if (action === 'ping') {
       const { data: prof } = await admin.from('applicant_profiles').select('*').eq('uid', uid).limit(1)
       const { data: subs } = await admin.from('application_submissions')
-        .select('id, submission_type, status, linked_app_id, created_app_id, submitted_at, updated_at')
+        .select('id, submission_type, status, linked_app_id, created_app_id, review_notes, submitted_at, updated_at')
         .eq('applicant_uid', uid).order('updated_at', { ascending: false })
       return json({ ok: true, uid, email, profile: (prof && prof[0]) || null, submissions: subs || [] })
     }
