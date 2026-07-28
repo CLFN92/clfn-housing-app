@@ -155,21 +155,42 @@
         }).join('') + '</ul>'
       : '<div class="empty">You have no applications yet.</div>';
 
-    // "Has application vs not" (Phase T-B/T-D will wire the buttons):
+    // "Has application vs not" per account, plus any in-progress draft to resume.
     var hasApp = (linked && linked.length) || subs.some(function (s) { return s.status === 'approved'; });
-    var actionHtml = hasApp
-      ? '<button class="btn" type="button" disabled>Update my application (coming soon)</button>'
-        + '<button class="btn ghost" type="button" disabled>Request a transfer (coming soon)</button>'
-      : '<button class="btn" type="button" disabled>Start a new application (coming soon)</button>';
+    var editable = subs.filter(function (s) { return s.status === 'draft' || s.status === 'changes_requested'; });
+    var actionHtml, cardTitle, cardHint = '';
+    if (editable.length) {
+      cardTitle = 'Continue your application';
+      if (editable[0].status === 'changes_requested') cardHint = '<p class="sub" style="margin:6px 0 12px;color:#9a3412;">The Housing office asked for some changes. Continue to update and resubmit.</p>';
+      actionHtml = '<button class="btn" type="button" onclick="applyContinue(\'' + esc(editable[0].id) + '\')">Continue &rarr;</button>';
+    } else if (hasApp) {
+      cardTitle = 'Manage your housing';
+      actionHtml = '<button class="btn" type="button" onclick="applyStart(\'update\')">Update my application</button>'
+        + '<button class="btn ghost" type="button" onclick="applyStart(\'transfer\')">Request a transfer</button>';
+    } else {
+      cardTitle = 'Apply for housing';
+      cardHint = '<p class="sub" style="margin:6px 0 12px;">Start your housing application. You can save and come back any time.</p>';
+      actionHtml = '<button class="btn" type="button" onclick="applyStart(\'new\')">Start a new application</button>';
+    }
 
     app.innerHTML =
       '<h1>Welcome' + (name ? ', ' + esc(name.split(' ')[0]) : '') + '</h1>'
       + '<p class="sub">Signed in as ' + esc(email) + '</p>'
       + '<div class="card"><h3>Your applications</h3>' + listHtml + '</div>'
-      + '<div class="card"><h3>' + (hasApp ? 'Manage your housing' : 'Apply for housing') + '</h3>'
-      +   '<p class="sub" style="margin:6px 0 0;">The application form will be available here shortly.</p>'
-      +   actionHtml
-      + '</div>';
+      + '<div class="card"><h3>' + cardTitle + '</h3>' + cardHint + actionHtml + '</div>';
+  }
+
+  // Fetch one of the applicant's own submissions in full (RLS: owner only).
+  async function apiGetSubmission(id) {
+    var doCall = function () {
+      return fetch(SB.replace(/\/$/, '') + '/rest/v1/application_submissions?id=eq.' + encodeURIComponent(id) + '&select=*&limit=1',
+        { headers: { 'apikey': ANON, 'Authorization': 'Bearer ' + getAT() } });
+    };
+    var r = await doCall();
+    if (r.status === 401 && await refreshSession()) r = await doCall();
+    if (!r.ok) return null;
+    var rows = await r.json().catch(function () { return []; });
+    return (rows && rows[0]) || null;
   }
 
   window.applyLogout = function () {
@@ -177,6 +198,215 @@
     clearSession();
     document.getElementById('btn_out').style.display = 'none';
     showLogin();
+  };
+
+  // ==== Application wizard (Phase T-B) ========================================
+  // Captures the applicant-facing fields into a payload shaped like the
+  // housing_applications `data` blob, so staff can merge it on verify. Staff-only
+  // scoring steps (needs/tenancy) are NOT collected here. Documents are a
+  // follow-up (T-B.2). Saves drafts + submits through the applicant-intake fn.
+  var _wiz = null;
+  var REL_OPTS    = ['Spouse / Partner', 'Child', 'Parent', 'Sibling', 'Grandparent', 'Grandchild', 'Other'];
+  var INCOME_OPTS = ['Employment', 'Social Assistance', 'Disability (ODSP)', 'Pension', 'Employment Insurance', 'Child Benefit', 'Self-employed', 'Other'];
+  var PET_SIZES   = ['Small', 'Medium', 'Large'];
+  var APPTYPE_OF  = { new: 'new_housing', transfer: 'transfer_request', update: 'existing_tenant' };
+
+  function wfEsc(v) { return esc(v == null ? '' : v); }
+  // Single labeled field bound to payload key `id`.
+  function wf(label, id, val, type, opts, ph) {
+    type = type || 'text';
+    if (type === 'select') {
+      return '<label>' + wfEsc(label) + '</label><select id="' + id + '"><option value="">Select&hellip;</option>'
+        + (opts || []).map(function (o) { return '<option' + (String(val) === o ? ' selected' : '') + '>' + wfEsc(o) + '</option>'; }).join('') + '</select>';
+    }
+    if (type === 'checkbox') {
+      return '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;"><input type="checkbox" id="' + id + '" style="width:auto;"' + (val ? ' checked' : '') + '/> ' + wfEsc(label) + '</label>';
+    }
+    if (type === 'textarea') return '<label>' + wfEsc(label) + '</label><textarea id="' + id + '">' + wfEsc(val) + '</textarea>';
+    return '<label>' + wfEsc(label) + '</label><input id="' + id + '" type="' + type + '"' + (ph ? ' placeholder="' + wfEsc(ph) + '"' : '') + ' value="' + wfEsc(val) + '"/>';
+  }
+  function wfVal(id) { var el = document.getElementById(id); return el ? (el.type === 'checkbox' ? el.checked : el.value.trim()) : (id ? '' : ''); }
+
+  // Repeater: renders array rows of `fields` + an Add button.
+  function wfRepeater(cid, rows, fields, addFn) {
+    var body = (rows || []).map(function (row, i) {
+      return '<div class="wrow" style="border:1px solid var(--hair);border-radius:9px;padding:10px 10px 4px;margin-bottom:8px;position:relative;">'
+        + fields.map(function (f) {
+            var v = row[f.k];
+            if (f.type === 'select') return '<label>' + wfEsc(f.label) + '</label><select data-k="' + f.k + '"><option value="">Select&hellip;</option>' + (f.opts || []).map(function (o) { return '<option' + (String(v) === o ? ' selected' : '') + '>' + wfEsc(o) + '</option>'; }).join('') + '</select>';
+            return '<label>' + wfEsc(f.label) + '</label><input data-k="' + f.k + '" type="' + (f.type || 'text') + '" value="' + wfEsc(v == null ? '' : v) + '"/>';
+          }).join('')
+        + '<button type="button" onclick="' + addFn.replace('add', 'rm') + '(' + i + ')" style="position:absolute;top:6px;right:8px;background:none;border:none;color:var(--danger);font-size:20px;line-height:1;cursor:pointer;padding:0;">&times;</button>'
+        + '</div>';
+    }).join('');
+    return '<div id="' + cid + '">' + body + '</div><button type="button" class="btn ghost" style="margin-top:2px;" onclick="' + addFn + '()">+ Add</button>';
+  }
+  function wfCollectRepeater(cid, keys) {
+    var out = [];
+    (document.querySelectorAll('#' + cid + ' .wrow') || []).forEach(function (row) {
+      var obj = {}, any = false;
+      keys.forEach(function (k) { var el = row.querySelector('[data-k="' + k + '"]'); var v = el ? el.value.trim() : ''; obj[k] = v; if (v) any = true; });
+      if (any) out.push(obj);
+    });
+    return out;
+  }
+
+  var WIZ_STEPS = [
+    { title: 'Applicant', render: function (p) {
+        return '<div class="grid2">' + wf('First name', 'w_fn', p.fn) + wf('Last name', 'w_ln', p.ln) + '</div>'
+          + wf('Date of birth', 'w_dob', p.dob, 'date')
+          + '<div class="grid2">' + wf('Band / membership #', 'w_band', p.band) + wf('Marital status', 'w_marital', p.marital, 'select', ['Single', 'Married', 'Common-law', 'Separated', 'Divorced', 'Widowed']) + '</div>'
+          + wf('Reserve status', 'w_reserve', p.reserve, 'select', ['On Reserve', 'Off Reserve'])
+          + '<div class="grid2">' + wf('Phone', 'w_phone', p.phone, 'tel') + wf('Email', 'w_email', p.email, 'email') + '</div>'
+          + '<h4 style="margin:16px 0 2px;">Current address</h4>'
+          + wf('Street address', 'w_street', p.street)
+          + '<div class="grid2">' + wf('City / community', 'w_city', p.city) + wf('Province', 'w_province', p.province) + '</div>'
+          + '<div class="grid2">' + wf('Postal code', 'w_postal', p.postal) + wf('Date you need housing by', 'w_occDate', p.occDate, 'date') + '</div>'
+          + '<div style="margin:12px 0;">' + wf('I am currently homeless / have no fixed address', 'w_homeless', p.homeless, 'checkbox') + '</div>'
+          + '<div style="margin:12px 0;">' + wf('I currently have a house on reserve', 'w_haveHouse', p.haveHouse, 'checkbox') + '</div>'
+          + '<h4 style="margin:16px 0 2px;">Co-applicant (optional)</h4>'
+          + '<div style="margin:8px 0;">' + wf('There is a co-applicant', 'w_hasco', p.hasCoApp, 'checkbox') + '</div>'
+          + '<div id="w_co_wrap" style="' + (p.hasCoApp ? '' : 'display:none;') + '">'
+          +   '<div class="grid2">' + wf('Co-applicant first name', 'w_cofn', (p.coApp || {}).fn) + wf('Co-applicant last name', 'w_coln', (p.coApp || {}).ln) + '</div>'
+          +   '<div class="grid2">' + wf('Date of birth', 'w_codob', (p.coApp || {}).dob, 'date') + wf('Band / membership #', 'w_coband', (p.coApp || {}).band) + '</div>'
+          +   '<div class="grid2">' + wf('Phone', 'w_cocell', (p.coApp || {}).cell, 'tel') + wf('Email', 'w_coemail', (p.coApp || {}).email, 'email') + '</div>'
+          + '</div>';
+      }, collect: function (p) {
+        p.fn = wfVal('w_fn'); p.ln = wfVal('w_ln'); p.dob = wfVal('w_dob'); p.band = wfVal('w_band');
+        p.marital = wfVal('w_marital'); p.reserve = wfVal('w_reserve'); p.phone = wfVal('w_phone'); p.email = wfVal('w_email');
+        p.street = wfVal('w_street'); p.city = wfVal('w_city'); p.province = wfVal('w_province'); p.postal = wfVal('w_postal'); p.occDate = wfVal('w_occDate');
+        p.homeless = wfVal('w_homeless'); p.haveHouse = wfVal('w_haveHouse'); p.hasCoApp = wfVal('w_hasco');
+        p.coApp = { fn: wfVal('w_cofn'), ln: wfVal('w_coln'), dob: wfVal('w_codob'), band: wfVal('w_coband'), cell: wfVal('w_cocell'), email: wfVal('w_coemail') };
+      } },
+    { title: 'Household', render: function (p) {
+        return '<h4 style="margin:0 0 6px;">People who will live in the home</h4>'
+          + '<p class="sub" style="margin:0 0 10px;">Everyone besides yourself (and the co-applicant).</p>'
+          + wfRepeater('rep_hab', p.habitants || [], [
+              { k: 'fn', label: 'First name' }, { k: 'ln', label: 'Last name' },
+              { k: 'dob', label: 'Date of birth', type: 'date' }, { k: 'relationship', label: 'Relationship to you', type: 'select', opts: REL_OPTS }
+            ], 'wizAddHab')
+          + '<h4 style="margin:18px 0 6px;">Pets (optional)</h4>'
+          + wfRepeater('rep_pet', p.pets || [], [
+              { k: 'name', label: 'Name' }, { k: 'type', label: 'Type (dog, cat&hellip;)' }, { k: 'size', label: 'Size', type: 'select', opts: PET_SIZES }
+            ], 'wizAddPet');
+      }, collect: function (p) {
+        p.habitants = wfCollectRepeater('rep_hab', ['fn', 'ln', 'dob', 'relationship']);
+        p.pets = wfCollectRepeater('rep_pet', ['name', 'type', 'size']);
+      } },
+    { title: 'Income', render: function (p) {
+        return '<h4 style="margin:0 0 6px;">Household income</h4>'
+          + '<p class="sub" style="margin:0 0 10px;">Add each source of income for the household.</p>'
+          + wfRepeater('rep_inc', p.incomes || [], [
+              { k: 'person', label: 'Who' }, { k: 'incomeType', label: 'Type', type: 'select', opts: INCOME_OPTS },
+              { k: 'employer', label: 'Employer / source' }, { k: 'primaryAmt', label: 'Monthly amount ($)', type: 'number' }
+            ], 'wizAddInc');
+      }, collect: function (p) { p.incomes = wfCollectRepeater('rep_inc', ['person', 'incomeType', 'employer', 'primaryAmt']); } },
+    { title: 'Contacts', render: function (p) {
+        return '<h4 style="margin:0 0 6px;">References / emergency contacts</h4>'
+          + '<p class="sub" style="margin:0 0 10px;">People we can contact about your application.</p>'
+          + wfRepeater('rep_ref', p.references || [], [
+              { k: 'fn', label: 'First name' }, { k: 'ln', label: 'Last name' },
+              { k: 'phone', label: 'Phone', type: 'tel' }, { k: 'relationship', label: 'Relationship' }
+            ], 'wizAddRef');
+      }, collect: function (p) { p.references = wfCollectRepeater('rep_ref', ['fn', 'ln', 'phone', 'relationship']); } },
+    { title: 'Review', render: function (p) {
+        var line = function (l, v) { return v ? '<div style="font-size:13px;margin:2px 0;"><b>' + wfEsc(l) + ':</b> ' + wfEsc(v) + '</div>' : ''; };
+        return '<h4 style="margin:0 0 8px;">Review &amp; submit</h4>'
+          + '<div style="background:var(--surface);border:1px solid var(--hair);border-radius:9px;padding:12px;margin-bottom:14px;">'
+          +   line('Name', [p.fn, p.ln].filter(Boolean).join(' '))
+          +   line('Date of birth', p.dob) + line('Band #', p.band) + line('Phone', p.phone) + line('Email', p.email)
+          +   line('Address', [p.street, p.city, p.province, p.postal].filter(Boolean).join(', '))
+          +   line('Household members', (p.habitants || []).length ? (p.habitants.length + ' listed') : '')
+          +   line('Income sources', (p.incomes || []).length ? (p.incomes.length + ' listed') : '')
+          +   line('References', (p.references || []).length ? (p.references.length + ' listed') : '')
+          + '</div>'
+          + '<p class="sub" style="margin:0 0 10px;">Documents (ID, income proof) can be provided to the Housing office after you submit &mdash; secure upload is coming soon.</p>'
+          + '<div style="margin:12px 0;">' + wf('I consent to the Housing office collecting and reviewing this information for my application.', 'w_consent', p.consentShareCLFN, 'checkbox') + '</div>'
+          + wf('Type your full name to sign', 'w_sig', (p.sig || {}).typed, 'text', null, 'Your full legal name')
+          + wf('Date', 'w_sigdate', (p.sig || {}).date || new Date().toISOString().slice(0, 10), 'date');
+      }, collect: function (p) {
+        p.consentShareCLFN = wfVal('w_consent');
+        p.sig = { typed: wfVal('w_sig'), date: wfVal('w_sigdate') };
+      } }
+  ];
+
+  function wizRender() {
+    var s = WIZ_STEPS[_wiz.step], n = WIZ_STEPS.length;
+    var dots = WIZ_STEPS.map(function (st, i) { return '<span style="flex:1;height:4px;border-radius:2px;background:' + (i <= _wiz.step ? 'var(--accent)' : 'var(--hair)') + ';"></span>'; }).join('');
+    app.innerHTML =
+      '<div style="display:flex;gap:4px;margin:4px 0 14px;">' + dots + '</div>'
+      + '<h1 style="margin:0 0 2px;">' + wfEsc(s.title) + '</h1>'
+      + '<p class="sub">Step ' + (_wiz.step + 1) + ' of ' + n + '</p>'
+      + '<form id="wizf" novalidate onsubmit="return false;">' + s.render(_wiz.payload) + '</form>'
+      + '<div class="msg" id="wmsg"></div>'
+      + '<div style="display:flex;gap:10px;margin-top:18px;">'
+      +   (_wiz.step > 0 ? '<button class="btn ghost" type="button" onclick="wizNav(-1)">Back</button>' : '<button class="btn ghost" type="button" onclick="wizExit()">Cancel</button>')
+      +   (_wiz.step < n - 1
+            ? '<button class="btn" type="button" onclick="wizNav(1)">Next</button>'
+            : '<button class="btn" type="button" onclick="wizSubmit()">Submit application</button>')
+      + '</div>'
+      + '<div style="text-align:center;margin-top:12px;"><button type="button" onclick="wizSaveExit()" style="background:none;border:none;color:var(--muted);font-size:13px;text-decoration:underline;cursor:pointer;">Save &amp; finish later</button></div>';
+    // Co-applicant show/hide.
+    var co = document.getElementById('w_hasco');
+    if (co) co.addEventListener('change', function () { var w = document.getElementById('w_co_wrap'); if (w) w.style.display = co.checked ? '' : 'none'; });
+  }
+
+  function wizCollect() { try { WIZ_STEPS[_wiz.step].collect(_wiz.payload); } catch (e) {} }
+
+  async function wizPersist() {
+    _wiz.payload.appType = APPTYPE_OF[_wiz.type] || 'new_housing';
+    var res = await api('save_draft', { submission_id: _wiz.id || undefined, submission_type: _wiz.type, payload: _wiz.payload });
+    if (res.ok && res.data && res.data.id) { _wiz.id = res.data.id; return true; }
+    return false;
+  }
+
+  function _evtBtn() { return (typeof event !== 'undefined' && event && event.target) ? event.target : null; }
+  window.wizNav = async function (dir) {
+    wizCollect();
+    if (dir > 0) { var btn = _evtBtn(); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; } await wizPersist(); }
+    _wiz.step = Math.max(0, Math.min(WIZ_STEPS.length - 1, _wiz.step + dir));
+    wizRender();
+  };
+  window.wizExit = function () { _wiz = null; showDashboard(); };
+  window.wizSaveExit = async function () { wizCollect(); await wizPersist(); _wiz = null; showDashboard(); };
+  window.wizSubmit = async function () {
+    wizCollect();
+    var p = _wiz.payload;
+    if (!p.fn || !p.ln) { var m = document.getElementById('wmsg'); if (m) { m.className = 'msg err'; m.textContent = 'Please enter your first and last name (Applicant step).'; } return; }
+    if (!p.consentShareCLFN) { var m2 = document.getElementById('wmsg'); if (m2) { m2.className = 'msg err'; m2.textContent = 'Please check the consent box to submit.'; } return; }
+    var btn = _evtBtn(); if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+    if (!await wizPersist()) { if (btn) { btn.disabled = false; btn.textContent = 'Submit application'; } return; }
+    var res = await api('submit', { submission_id: _wiz.id });
+    if (res.ok && res.data && res.data.ok) {
+      _wiz = null;
+      app.innerHTML = '<div class="center"><div class="check">&#10003;</div><h1>Application submitted</h1>'
+        + '<p class="sub">Thank you. The Housing office has received your application and will review it. You can check the status here any time.</p>'
+        + '<button class="btn" type="button" onclick="showDashboardPublic()">Back to my applications</button></div>';
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = 'Submit application'; }
+      var m3 = document.getElementById('wmsg'); if (m3) { m3.className = 'msg err'; m3.textContent = (res.data && res.data.error) || 'Could not submit. Please try again.'; }
+    }
+  };
+  window.showDashboardPublic = function () { showDashboard(); };
+
+  // Repeater add/remove (collect first so sibling fields aren't lost).
+  function wizRepAdd(key) { wizCollect(); _wiz.payload[key] = _wiz.payload[key] || []; _wiz.payload[key].push({}); wizRender(); }
+  function wizRepRm(key, i) { wizCollect(); (_wiz.payload[key] || []).splice(i, 1); wizRender(); }
+  window.wizAddHab = function () { wizRepAdd('habitants'); }; window.wizRmHab = function (i) { wizRepRm('habitants', i); };
+  window.wizAddPet = function () { wizRepAdd('pets'); };       window.wizRmPet = function (i) { wizRepRm('pets', i); };
+  window.wizAddInc = function () { wizRepAdd('incomes'); };    window.wizRmInc = function (i) { wizRepRm('incomes', i); };
+  window.wizAddRef = function () { wizRepAdd('references'); }; window.wizRmRef = function (i) { wizRepRm('references', i); };
+
+  window.applyStart = function (type) {
+    _wiz = { type: type || 'new', id: null, step: 0, payload: {} };
+    wizRender();
+  };
+  window.applyContinue = async function (id) {
+    app.innerHTML = '<div class="center"><p class="sub">Loading your application…</p></div>';
+    var row = await apiGetSubmission(id);
+    if (!row) { showDashboard(); return; }
+    _wiz = { type: row.submission_type || 'new', id: row.id, step: 0, payload: row.payload || {} };
+    wizRender();
   };
 
   // ---- Boot ------------------------------------------------------------------
