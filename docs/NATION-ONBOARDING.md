@@ -103,6 +103,7 @@ subdomain label:
   short:         'LMG',
   supabase_url:  'https://<newref>.supabase.co',
   supabase_anon: '<their anon key>',
+  portal_base:   'https://listuguj.fnhub.app',   // canonical URL for QR codes / public links
   email_domain:  'listuguj.ca',
   housing_email: 'housing@listuguj.ca',
   landlord_committee: 'Housing Committee',

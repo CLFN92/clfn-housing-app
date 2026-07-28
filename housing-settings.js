@@ -1424,9 +1424,10 @@ async function renderMaintenanceQrPanel(){
   }
 
   var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'Housing';
+  var _qrBase = (typeof nationPortalBase === 'function') ? nationPortalBase() : location.origin;
   window._maintQrList = units.map(function(u){
     var addr = ((u.num||'') + ' ' + (u.street||'')).trim() || ('Unit ' + u.id);
-    return { url: location.origin + '/report.html?u=' + encodeURIComponent(u.id) + '&t=' + encodeURIComponent(u.qrToken),
+    return { url: _qrBase + '/report.html?u=' + encodeURIComponent(u.id) + '&t=' + encodeURIComponent(u.qrToken),
              addr: addr, nation: nation };
   });
 

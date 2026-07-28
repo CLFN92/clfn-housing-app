@@ -23,6 +23,11 @@ window.NATIONS_DIRECTORY = window.NATIONS_DIRECTORY || {
     supabase_url:  'https://fkhzrbalumzeripzolph.supabase.co',
     supabase_anon: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraHpyYmFsdW16ZXJpcHpvbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMTAwODYsImV4cCI6MjA5MDg4NjA4Nn0.0nazS2W-0xzxWyFOuSe2jHhamC0N2WqKgAjrlRY6NQo',
     role_labels:   {},
+    // Canonical public URL for this nation's site. QR codes + public links
+    // (report.html, apply.html) are built from this so they always point at the
+    // stable domain regardless of where staff happen to generate them (Azure,
+    // a preview host, etc.). Falls back to location.origin if blank.
+    portal_base:   'https://clfn.fnhub.app',
     email_domain:  'clfn.on.ca',          // staff email domain gate (@<domain> checks)
     housing_email: 'housing@clfn.on.ca',  // the nation's housing dept mailbox (AP/manager defaults)
     // Landlord mailing block for generated agreements/leases (kept in config,
@@ -37,6 +42,7 @@ window.NATIONS_DIRECTORY = window.NATIONS_DIRECTORY || {
   // 'listuguj': {                              // -> listuguj.fnhub.app
   //   id:'listuguj', display_name:'Listuguj Mi\'gmaq Government', short:'LMG',
   //   supabase_url:'https://xxxxxxxx.supabase.co', supabase_anon:'<publishable anon key>',
+  //   portal_base:'https://listuguj.fnhub.app',  // canonical URL for QR codes / public links
   //   role_labels:{}, modules_licensed:{ finance:false, match:true }
   // }
 };
@@ -54,6 +60,14 @@ window.resolveNation = function(){
   return dir[host] || dir[sub] || dir._default || null;
 };
 window._NATION = window.resolveNation();
+
+// Canonical public base URL for QR codes + public links (report.html / apply.html).
+// Uses the resolved nation's configured portal_base; falls back to the current
+// origin so it still works on localhost / previews / before config is set.
+window.nationPortalBase = function(){
+  var b = (window._NATION && window._NATION.portal_base || '').replace(/\/+$/, '');
+  return b || (typeof location !== 'undefined' ? location.origin : '');
+};
 
 // ── Supabase connection (resolved per nation) ─────────────────────────────────
 window.SUPABASE_URL    = (window._NATION && window._NATION.supabase_url)  || 'https://fkhzrbalumzeripzolph.supabase.co';

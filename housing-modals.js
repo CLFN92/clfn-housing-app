@@ -503,7 +503,8 @@ async function ueOpenMaintenanceQr(){
   }
   var addr   = ((u.num||'') + ' ' + (u.street||'')).trim();
   var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'Housing';
-  var url    = location.origin + '/report.html?u=' + encodeURIComponent(uid) + '&t=' + encodeURIComponent(u.qrToken);
+  var _qrBase = (typeof nationPortalBase === 'function') ? nationPortalBase() : location.origin;
+  var url    = _qrBase + '/report.html?u=' + encodeURIComponent(uid) + '&t=' + encodeURIComponent(u.qrToken);
   window._ueQrData = { url:url, addr:addr, nation:nation };
 
   var ex = document.getElementById('ue_qr_modal'); if(ex) ex.remove();
