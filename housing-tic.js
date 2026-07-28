@@ -2296,6 +2296,16 @@
       if(typeof showToast === 'function') showToast('Generate letter — coming soon.');
       return;
     }
+    if(t.id === 'tic_act_invite'){
+      var iApp = _ticState.application || {};
+      var iTn  = _ticState.tenant || {};
+      var iEmail = (iApp && iApp.email) || iTn.email || '';
+      var iName  = (iApp && ((iApp.fn||'') + ' ' + (iApp.ln||'')).trim()) || iTn.full_name || iTn.name || 'this applicant';
+      var iAppId = (iApp && iApp.id) || '';
+      if(typeof inviteApplicantToPortal === 'function') inviteApplicantToPortal(iEmail, iName, iAppId);
+      else if(typeof showToast === 'function') showToast('Invite is not available on this page.');
+      return;
+    }
     if(t.id === 'tic_act_flag'){
       if(typeof showToast === 'function') showToast('Flag for review — coming soon.');
       return;

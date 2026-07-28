@@ -3065,6 +3065,46 @@ function _appSubReject(id){
 }
 window._appSubReject = _appSubReject;
 
+// Staff action: email an applicant a branded portal sign-in link, pre-linking
+// their existing application (appId) to their email so they land on it (update
+// / transfer) instead of "start new". Used from the scorecard header + TIC
+// footer. Routes through the applicant-intake `invite` action (staff-gated).
+function _appSubSendInvite(email, appId){
+  var base = (typeof nationPortalBase === 'function') ? nationPortalBase() : location.origin;
+  var body = { action: 'invite', email: email, redirect_to: base + '/apply.html' };
+  if(appId) body.app_id = appId;
+  return fetch(SUPABASE_URL + '/functions/v1/applicant-intake', {
+    method: 'POST', headers: Object.assign({}, HOUSING_HEADERS, { 'Content-Type':'application/json' }), body: JSON.stringify(body)
+  }).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return { ok: r.ok, data: d }; }); });
+}
+function inviteApplicantToPortal(email, name, appId){
+  var EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  email = (email || '').trim();
+  var who = name || 'this applicant';
+  var send = function(addr){
+    _appSubSendInvite(addr, appId).then(function(res){
+      if(res.ok && res.data && res.data.ok){
+        if(typeof showToast === 'function') showToast('✓ Portal invite sent to ' + addr);
+        if(appId && typeof auditEntry === 'function') auditEntry(appId, 'portal_invite_sent', 'Portal invite emailed to ' + addr, (window.HOUSING_SESSION && HOUSING_SESSION.email) || '');
+      } else {
+        if(typeof showToast === 'function') showToast((res.data && res.data.error) || 'Could not send the invite', { type:'error' });
+      }
+    }).catch(function(){ if(typeof showToast === 'function') showToast('Network error sending invite', { type:'error' }); });
+  };
+  if(email && EMAIL_RE.test(email)){
+    if(typeof showConfirm === 'function'){
+      showConfirm({ title:'Send portal invite?', message:'Email a sign-in link to ' + who + ' at ' + email + '? They can sign in to submit or update their application.', confirmText:'Send invite' })
+        .then(function(ok){ if(ok) send(email); });
+    } else if(typeof confirm === 'function' && confirm('Send portal invite to ' + email + '?')){ send(email); }
+  } else {
+    // No/invalid email on file — capture one.
+    var entered = (typeof prompt === 'function') ? prompt('Enter ' + who + '’s email to send a portal invite:', email || '') : null;
+    if(entered && EMAIL_RE.test(entered.trim())) send(entered.trim());
+    else if(entered != null && typeof showToast === 'function') showToast('Please enter a valid email address', { type:'error' });
+  }
+}
+window.inviteApplicantToPortal = inviteApplicantToPortal;
+
 // ── Assignment: single source of truth ──────────────────────────────────
 // One rule for "is this application approved enough to be placed in a unit?"
 // Shared by the Match queue (row inclusion), confirmAssignment, the unit-edit

@@ -909,6 +909,10 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Person Card
       </button>
+      <button onclick="var a=window._currentScorecardApp; if(a&&typeof inviteApplicantToPortal==='function')inviteApplicantToPortal(a.email||'',((a.fn||'')+' '+(a.ln||'')).trim(),a.id);"
+              class="btn btn-ghost" title="Email this applicant a sign-in link to the applicant portal">
+        &#9993;&#65039; Invite to Portal
+      </button>
       <button onclick="if(window._currentScorecardApp&&typeof window.openEditModal==='function')window.openEditModal(window._currentScorecardApp.id);"
               class="btn btn-ghost">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -1509,6 +1513,7 @@
       <button id="tic_act_ledger"    type="button" class="btn btn-ghost">Rent Ledger</button>
       <button id="tic_act_finance"   type="button" class="btn btn-ghost">Finance Card</button>
       <button id="tic_act_letter"    type="button" class="btn btn-ghost">Generate Letter</button>
+      <button id="tic_act_invite"    type="button" class="btn btn-ghost">&#9993;&#65039; Invite to Portal</button>
       <span class="tic-footer-spacer"></span>
       <button id="tic_act_flag"      type="button" class="btn btn-primary">Flag for Review</button>
     </div>

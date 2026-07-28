@@ -132,25 +132,25 @@ async function magicLinkRateLimited(admin: any, email: string, ip: string): Prom
 
 // Generate a magic link (creating the auth user on first sign-in) and email it
 // through the nation's OWN provider - not Supabase's default sender.
-async function sendMagicLink(admin: any, email: string, redirectTo?: string): Promise<{ ok: boolean; error?: string }> {
-  const opts = redirectTo ? { redirectTo } : undefined
-  let gen = await admin.auth.admin.generateLink({ type: 'magiclink', email, options: opts })
+async function sendMagicLink(admin: any, email: string, redirectTo?: string, opts?: { subject?: string; intro?: string }): Promise<{ ok: boolean; error?: string }> {
+  const linkOpts = redirectTo ? { redirectTo } : undefined
+  let gen = await admin.auth.admin.generateLink({ type: 'magiclink', email, options: linkOpts })
   if (gen.error && /not found|no user|does not exist|unable/i.test(gen.error.message || '')) {
     // First-time applicant: create the account, then generate the link. Their
     // possession of the emailed link is the email confirmation.
     await admin.auth.admin.createUser({ email, email_confirm: true })
-    gen = await admin.auth.admin.generateLink({ type: 'magiclink', email, options: opts })
+    gen = await admin.auth.admin.generateLink({ type: 'magiclink', email, options: linkOpts })
   }
   if (gen.error) return { ok: false, error: gen.error.message }
   const link = gen.data && gen.data.properties && gen.data.properties.action_link
   if (!link) return { ok: false, error: 'No sign-in link was generated.' }
 
   const brand   = emailBrand()
-  const subject = 'Sign in to ' + brand
+  const subject = (opts && opts.subject) || ('Sign in to ' + brand)
+  const intro   = (opts && opts.intro) || ('Click the button below to sign in to the ' + brand + ' application portal. This link is valid for a short time and can be used once.')
   const safeLink = escapeHtml(link)
   const inner =
-      '<p style="font-size:14px;color:#333;margin:0 0 16px;">Click the button below to sign in to the '
-    +   escapeHtml(brand) + ' application portal. This link is valid for a short time and can be used once.</p>'
+      '<p style="font-size:14px;color:#333;margin:0 0 16px;">' + escapeHtml(intro) + '</p>'
     + '<p style="margin:0 0 20px;"><a href="' + safeLink + '" '
     +   'style="display:inline-block;background:#111;color:#fff;text-decoration:none;font-weight:700;'
     +   'padding:12px 24px;border-radius:8px;font-size:15px;">Sign in</a></p>'
@@ -199,23 +199,58 @@ serve(async (req) => {
       return json({ ok: true })
     }
 
-    // --- Auth: all other actions require a valid, email-CONFIRMED applicant ---
+    // --- Auth: remaining actions require a signed-in user ---
     const authHeader = req.headers.get('Authorization') || ''
     if (!authHeader.startsWith('Bearer ')) return json({ error: 'Sign in to continue.' }, 401)
     const userClient = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } } })
     const { data: { user }, error: authErr } = await userClient.auth.getUser()
     if (authErr || !user) return json({ error: 'Your session has expired. Please sign in again.' }, 401)
-    if (!user.email_confirmed_at) return json({ error: 'Please confirm your email first.' }, 403)
-
     const uid   = user.id
-    const email = user.email || ''
+    const email = (user.email || '').toLowerCase()
     const admin = createClient(SUPABASE_URL, SERVICE_KEY)
+
+    // --- invite: STAFF-only. Email an applicant a branded portal sign-in link,
+    // and (optionally) pre-link their existing application to their email so
+    // they land on it. Runs before the applicant email-confirmed gate. ---
+    if (action === 'invite') {
+      const { data: staffRows } = await admin.from('staff').select('id').ilike('email', email).eq('is_active', true).limit(1)
+      if (!staffRows || !staffRows.length) return json({ error: 'Staff access required.' }, 403)
+      const targetEmail = String(body.email || '').trim().toLowerCase()
+      if (!isValidEmail(targetEmail)) return json({ error: 'Enter a valid applicant email.' }, 400)
+      if (!emailConfigured()) return json({ error: 'Email is not set up for this nation yet.' }, 503)
+      const appId = String(body.app_id || '').trim()
+      const rawRedirect = String(body.redirect_to || '').trim()
+      const redirectTo = isSafeRedirect(rawRedirect) ? rawRedirect : undefined
+      if (appId) { try { await admin.from('applicant_invites').insert({ email: targetEmail, app_id: appId, invited_by: email }) } catch (_e) {} }
+      const brand = emailBrand()
+      const sent = await sendMagicLink(admin, targetEmail, redirectTo, {
+        subject: 'You are invited to the ' + brand + ' portal',
+        intro: 'You have been invited to the ' + brand + ' housing application portal. Sign in with the button below to submit or update your application.'
+      })
+      if (!sent.ok) { console.warn('[applicant-intake] invite failed: ' + sent.error); return json({ error: 'Could not send the invite. Please try again.' }, 502) }
+      return json({ ok: true })
+    }
+
+    // Applicant self-service actions require a confirmed email.
+    if (!user.email_confirmed_at) return json({ error: 'Please confirm your email first.' }, 403)
 
     // Ensure a profile row exists (email only; never touches linked_app_ids).
     await admin.from('applicant_profiles').upsert({ uid, email, updated_at: new Date().toISOString() }, { onConflict: 'uid' })
 
     // --- ping: bootstrap the dashboard ---
     if (action === 'ping') {
+      // Consume any staff invites that pre-linked an application to this email.
+      try {
+        const { data: invs } = await admin.from('applicant_invites').select('id, app_id').eq('email', email).is('consumed_at', null)
+        if (invs && invs.length) {
+          const { data: pr } = await admin.from('applicant_profiles').select('linked_app_ids').eq('uid', uid).limit(1)
+          const linked = (pr && pr[0] && pr[0].linked_app_ids) || []
+          let changed = false
+          for (const iv of invs) { if (iv.app_id && linked.indexOf(iv.app_id) === -1) { linked.push(iv.app_id); changed = true } }
+          if (changed) await admin.from('applicant_profiles').update({ linked_app_ids: linked, updated_at: new Date().toISOString() }).eq('uid', uid)
+          await admin.from('applicant_invites').update({ consumed_at: new Date().toISOString() }).in('id', invs.map((i: any) => i.id))
+        }
+      } catch (_e) { /* invites table may not exist yet */ }
       const { data: prof } = await admin.from('applicant_profiles').select('*').eq('uid', uid).limit(1)
       const { data: subs } = await admin.from('application_submissions')
         .select('id, submission_type, status, linked_app_id, created_app_id, review_notes, submitted_at, updated_at')
