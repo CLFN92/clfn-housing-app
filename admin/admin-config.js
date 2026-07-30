@@ -6,5 +6,5 @@
  * The anon key is publishable (safe here). NEVER put a service-role or
  * Management API key in this file — those live only in Edge Function secrets.
  */
-window.PLATFORM_SUPABASE_URL  = 'https://REPLACE_WITH_PLATFORM_REF.supabase.co';
+window.PLATFORM_SUPABASE_URL  = 'https://dnaxulsdetlnpupegoiq.supabase.co';
 window.PLATFORM_SUPABASE_ANON = 'REPLACE_WITH_PLATFORM_ANON_KEY';
