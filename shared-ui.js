@@ -1155,3 +1155,93 @@ function _initScrollCollapse(scrollEl, stripEl, opts){
   apply(); // initial state — handles a modal reopened mid-scroll, or a page loaded already scrolled
 }
 window._initScrollCollapse = _initScrollCollapse;
+
+/* ============================================================================
+ * Global swipe-between-tabs (touch devices). One document-level listener makes
+ * a horizontal swipe move to the previous/next tab of whatever tab group is
+ * active on screen — modals (.tic-tab/.tic-active), Settings sub-tabs
+ * (.tab-btn/.active), and group pills (.pill-tab/.active). Loaded on every page
+ * via shared-ui.js, so it works app-wide. Swipe left = next tab, right = prev.
+ * ========================================================================== */
+(function(){
+  if (window._swipeTabsWired) return;
+  window._swipeTabsWired = true;
+
+  var CONV = [
+    { sel: '.tic-tab',  active: 'tic-active' },  // modals (Edit Unit / TIC / SOW) — top surface
+    { sel: '.tab-btn',  active: 'active'     },  // sub-tabs
+    { sel: '.pill-tab', active: 'active'     }   // group pills
+  ];
+
+  function _vis(el){ return !!(el && el.offsetParent !== null && el.getClientRects().length); }
+
+  // Is the swipe inside a horizontally-scrollable region (table, tab bar, card
+  // rail)? If so, let native scrolling win instead of switching tabs.
+  function _inHScroll(el){
+    var n = el, guard = 0;
+    while (n && n.nodeType === 1 && guard++ < 14) {
+      try {
+        var s = getComputedStyle(n);
+        if ((s.overflowX === 'auto' || s.overflowX === 'scroll') && n.scrollWidth > n.clientWidth + 4) return true;
+      } catch (_e) {}
+      n = n.parentElement;
+    }
+    return false;
+  }
+
+  function _groupFor(activeEl, sel){
+    var parent = activeEl.parentElement; if (!parent) return null;
+    var tabs = Array.prototype.filter.call(parent.querySelectorAll(sel), function(t){ return t.parentElement === parent && _vis(t); });
+    if (tabs.length < 2) return null;
+    var idx = tabs.indexOf(activeEl); if (idx < 0) return null;
+    return { tabs: tabs, idx: idx, parent: parent };
+  }
+
+  // Pick the tab group to drive: modal groups win (they sit on top); otherwise
+  // the on-page group whose tab bar is vertically nearest the swipe.
+  function _findGroup(y){
+    var cands = [];
+    for (var c = 0; c < CONV.length; c++) {
+      var actives = document.querySelectorAll(CONV[c].sel + '.' + CONV[c].active);
+      for (var a = 0; a < actives.length; a++) {
+        if (!_vis(actives[a])) continue;
+        var g = _groupFor(actives[a], CONV[c].sel);
+        if (g) { g.conv = c; cands.push(g); }
+      }
+    }
+    if (!cands.length) return null;
+    var modal = cands.filter(function(g){ return g.conv === 0; });
+    var pool = modal.length ? modal : cands;
+    var best = null, bestDist = Infinity;
+    for (var i = 0; i < pool.length; i++) {
+      var r = pool[i].parent.getBoundingClientRect();
+      var d = Math.abs((r.top + r.bottom) / 2 - y);
+      if (d < bestDist) { bestDist = d; best = pool[i]; }
+    }
+    return best;
+  }
+
+  var sx = null, sy = null, st = 0, sEl = null;
+  document.addEventListener('touchstart', function(e){
+    if (!e.touches || e.touches.length !== 1) { sx = null; return; }
+    var t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); sEl = e.target;
+  }, { passive: true });
+
+  document.addEventListener('touchend', function(e){
+    if (sx == null) return;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - sx, dy = t.clientY - sy, dt = Date.now() - st, el = sEl, y = sy;
+    sx = null;
+    if (dt > 700) return;                                 // too slow to be a flick
+    if (Math.abs(dx) < 60) return;                        // min horizontal travel
+    if (Math.abs(dx) < Math.abs(dy) * 1.7) return;        // must be mostly horizontal
+    if (el && el.closest && el.closest('input,textarea,select,[contenteditable="true"],[data-noswipe]')) return;
+    if (_inHScroll(el)) return;
+    var g = _findGroup(y);
+    if (!g) return;
+    var nx = dx < 0 ? g.idx + 1 : g.idx - 1;              // swipe left => next tab
+    if (nx < 0 || nx >= g.tabs.length) return;
+    g.tabs[nx].click();
+    try { g.tabs[nx].scrollIntoView({ inline: 'center', block: 'nearest' }); } catch (_e) {}
+  }, { passive: true });
+})();

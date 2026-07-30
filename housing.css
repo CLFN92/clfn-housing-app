@@ -1800,6 +1800,9 @@ body.is-sow-only .modal-overlay { visibility: visible; }
   #unitEditModal .tic-hero        { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px 18px; position: relative; }
   #unitEditModal .tic-hero-main   { padding-right: 36px; }
   #unitEditModal .tic-hero .tic-close-btn { position: absolute; top: 14px; right: 16px; }
+  /* Stack the hero action buttons full-width instead of a ragged 2+1 wrap. */
+  #unitEditModal .tic-hero > .flex-gap8      { flex-direction: column; align-items: stretch; width: 100%; gap: 8px; }
+  #unitEditModal .tic-hero > .flex-gap8 > .btn { width: 100%; justify-content: center; }
 }
 .tic-close-btn:hover      { color: var(--text); border-color: var(--text); }
 
