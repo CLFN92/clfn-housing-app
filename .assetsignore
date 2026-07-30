@@ -13,6 +13,12 @@ tests
 docs
 supabase
 staticwebapp.config.json
+# admin/ is the platform control-plane panel -- it has its OWN deploy target
+# (admin.fnhub.app). The nation site (fnhub.app / *.fnhub.app) must never serve
+# it. Cloudflare Pages reads .assetsignore from its build-output dir, so when the
+# admin project's output dir is set to `admin`, this root exclusion doesn't touch
+# the admin deploy -- it only keeps admin/ out of the nation deploy.
+admin
 *.md
 *.sql
 *.ps1

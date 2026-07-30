@@ -1,0 +1,11 @@
+# Cloudflare headers for the STANDALONE admin.fnhub.app deploy.
+# This deploy serves ONLY the admin/ folder (its own Pages/Worker project),
+# so it carries its own CSP -- the nation repo's root _headers does not apply.
+# The panel loads no third-party scripts; it only talks to the control-plane
+# Supabase project (https://*.supabase.co) and uses one inline <style> block.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  X-Robots-Tag: noindex, nofollow
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
