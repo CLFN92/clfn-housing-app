@@ -5,7 +5,24 @@ FN Hub. This is the "super-user tooling" that CLAUDE.md kept out of the nation
 app — we build it as an **isolated piece** so nation code and platform code stay
 separate.
 
-Status: **PLAN — approved, not yet built.**
+Status: **P1 in progress** (control plane + panel shell). Rest of plan approved, not yet built.
+
+## File structure (isolation boundary)
+
+Platform code is kept **physically separate** from the nation app so the two
+never entangle (Section 10 risk):
+
+```
+admin/                     platform SPA — its own deploy target (admin.fnhub.app)
+  index.html               panel shell ("FN Hub — Platform Admin")
+  admin.js                 auth + nations list + add-nation + admins + audit
+  admin-config.js          control-plane Supabase URL/anon (publishable placeholders)
+supabase/platform/
+  schema.sql               control-plane DB: super_admins, nations, platform_audit + RLS
+```
+
+The panel loads **none** of the nation app's `shared-*.js` / `housing-*.js` and
+talks only to the control-plane project. Nation code is untouched.
 
 **Decisions locked (2026-07-30):**
 1. Control plane → **dedicated "fnhub-platform" Supabase project** (separate from CLFN).
