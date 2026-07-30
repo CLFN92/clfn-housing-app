@@ -894,6 +894,9 @@ var AUDIT_ABBR = {
   'created':'📄 RFQ New', 'issued':'📤 RFQ Iss', 'awarded':'🏆 RFQ Won',
   // External submissions
   'application_portal_submitted':'📨 Portal Sub', 'tenant_mr_submitted':'🔧 QR Report',
+  'application_updated':'📝 App Upd', 'application_opened':'📂 Opened',
+  // Contractor approval flow writes bare status actions (scoped by a CT: ref)
+  'hm_recommended':'🧰 Ctr Rec', 'approved':'🧰 Ctr Appr', 'returned':'🧰 Ctr Ret', 'declined':'🧰 Ctr Decl',
   // Auto / system approvals
   'application_auto_approved':'⚡ App Auto', 'file_update_auto_approved':'⚡ FU Auto',
   'contractor_auto_approved':'⚡ Ctr Auto', 'sow_auto_approved':'⚡ MR Auto',
@@ -929,13 +932,44 @@ var AUDIT_ABBR = {
   'settings_saved':'⚙️ Settings'
 };
 
+// Word-level abbreviation for the Event column — keeps it tight even for
+// actions that aren't in AUDIT_ABBR (e.g. "application updated" -> "App Upd").
+// Words <=4 letters are left alone; known long words map to short forms;
+// unknown words longer than 6 letters are truncated. Names never appear in
+// Event labels, so this is safe (the Detail column is left untouched).
+var _AUDIT_WORD_ABBR = {
+  application:'App', applications:'Apps', update:'Upd', updated:'Upd', confirmation:'Conf',
+  approved:'Appr', approval:'Appr', submitted:'Sub', submission:'Sub', created:'New', create:'New',
+  request:'Req', requests:'Reqs', maintenance:'Maint', signature:'Sig', signatures:'Sigs', signed:'Sign',
+  opened:'Open', editing:'Edit', edited:'Edit', inspection:'Insp', contractor:'Ctr',
+  assigned:'Asgn', assign:'Asgn', assignment:'Asgn', archived:'Arch', unarchived:'Unarch',
+  declined:'Decl', returned:'Ret', recommended:'Rec', category:'Cat', changed:'Chg', change:'Chg',
+  settings:'Set', reactivated:'React', password:'Pwd', location:'Loc', standard:'Std', duplicate:'Dup',
+  vacated:'Vac', removed:'Rmv', reference:'Ref', received:"Rec'd", uploaded:'Up', deleted:'Del',
+  housing:'Hsg', module:'Mod', toggled:'Tgl', authority:'Auth', scoring:'Score', criteria:'Crit',
+  tenancy:'Tncy', merged:'Merge', records:'Recs', secondary:'2nd', priority:'Prio', overridden:'Ovr',
+  locked:'Lock', unlocked:'Unlk', timeout:'TO', reset:'Rst', completed:'Done', reopened:'Reopen',
+  current:'cur', required:'Req', fields:'Flds', applicant:'Applt', tenant:'Tnt', portal:'Portal'
+};
+function _abbrevWord(w){
+  if(w.length <= 4) return w;
+  var k = w.toLowerCase().replace(/[^a-z]/g,'');
+  if(!k) return w;                       // pure emoji / symbol
+  if(_AUDIT_WORD_ABBR[k]) return _AUDIT_WORD_ABBR[k];
+  return w.length > 6 ? w.slice(0,6) : w;
+}
+function _abbrevPhrase(s){ return String(s == null ? '' : s).split(/\s+/).map(_abbrevWord).join(' '); }
+function _auditEventLabel(action){
+  return _abbrevPhrase(AUDIT_ABBR[action] || AUDIT_ACTION_LABELS[action] || (action || '').replace(/_/g,' '));
+}
+
 // Legend modal decoding the Event abbreviations (opened from the Audit header).
 function openAuditLegend(){
   var ex = document.getElementById('audit_legend_modal'); if(ex) ex.remove();
   var rows = Object.keys(AUDIT_ABBR).map(function(a){
     var full = (AUDIT_ACTION_LABELS[a] || a.replace(/_/g,' ')).replace(/^[^A-Za-z0-9]+\s*/,'');
     return '<tr style="border-bottom:1px solid var(--border);">'
-      + '<td style="padding:7px 12px;font-weight:700;white-space:nowrap;">'+AUDIT_ABBR[a]+'</td>'
+      + '<td style="padding:7px 12px;font-weight:700;white-space:nowrap;">'+_auditEventLabel(a)+'</td>'
       + '<td style="padding:7px 12px;color:var(--muted);">'+full+'</td></tr>';
   }).join('');
   var m = document.createElement('div'); m.id = 'audit_legend_modal';
@@ -975,6 +1009,26 @@ function _auditFmtDetail(s) {
           .replace(/\bReceived\b/g, "Rec'd")
           .replace(/\bReference\b/gi, 'Ref')
           .replace(/\bNumber\b/gi, 'No.');
+}
+
+// Labels for the separate finance_audit_log (occurred_at / actor_* / summary).
+var FIN_ACTION_LABELS = {
+  approve_loan:  { a:'💰 Loan OK',  f:'Loan Approved' },
+  post_payment:  { a:'💰 Payment',  f:'Payment Posted' },
+  void_entry:    { a:'💰 Void',     f:'Entry Voided' },
+  create_tenant: { a:'💰 Tnt New',  f:'Finance Tenant Created' },
+  update_tenant: { a:'💰 Tnt Edit', f:'Finance Tenant Updated' }
+};
+function _finAuditLabels(row){
+  var act = row.action || '';
+  var ent = String(row.entity_type || '').replace(/_/g,' ').trim();
+  if (FIN_ACTION_LABELS[act]) return { a: FIN_ACTION_LABELS[act].a, f: '💰 ' + FIN_ACTION_LABELS[act].f };
+  if (act === 'create' || act === 'update') {
+    var en = ent ? (ent.charAt(0).toUpperCase() + ent.slice(1)) : 'Record';
+    return { a: '💰 ' + _abbrevPhrase(en) + (act === 'create' ? ' New' : ' Edit'),
+             f: '💰 ' + en + (act === 'create' ? ' Created' : ' Updated') };
+  }
+  return { a: '💰 ' + _abbrevPhrase(act.replace(/_/g,' ')), f: '💰 ' + act.replace(/_/g,' ') };
 }
 
 async function renderAuditLog(silent) {
@@ -1023,6 +1077,34 @@ async function renderAuditLog(silent) {
     }
   } catch(e) { console.warn('Audit log load failed:', e); }
 
+  // Merge the Finance module's separate finance_audit_log. Its RLS restricts
+  // rows to finance-authorized roles; we ALSO gate the fetch client-side (below)
+  // as defense-in-depth so non-finance viewers never even request it. Different
+  // schema: occurred_at / actor_* / summary — mapped into the same row shape.
+  var _rl = (window.currentRole || '');
+  var _canSeeFinance = ['ed', 'super_user', 'cfo', 'finance_l1'].indexOf(_rl) !== -1;
+  if (_canSeeFinance) try {
+    var fr = await fetch(SUPABASE_URL + '/rest/v1/finance_audit_log?order=occurred_at.desc&limit=300', { headers: HOUSING_HEADERS });
+    if (fr.ok) {
+      var frows = await fr.json();
+      if (Array.isArray(frows) && frows.length) {
+        frows.forEach(function(row) {
+          var lab = _finAuditLabels(row);
+          log.push({
+            ts:     row.occurred_at || row.created_at || '',
+            appId:  row.entity_type ? (String(row.entity_type).toUpperCase() + (row.entity_id ? ':' + row.entity_id : '')) : 'FINANCE',
+            action: 'fin_' + (row.action || ''),
+            detail: row.summary || (row.detail && (row.detail.raw || row.detail.summary)) || '',
+            role:   row.actor_email || row.actor_role || '',
+            name:   row.actor_name || '',
+            _label: lab.a, _full: lab.f
+          });
+        });
+        log.sort(function(a, b){ return String(b.ts || '').localeCompare(String(a.ts || '')); });
+      }
+    }
+  } catch(e) { /* finance audit is optional / role-gated */ }
+
   // Cache for CSV export — built from whatever we just rendered.
   window._auditRows = log;
 
@@ -1034,8 +1116,8 @@ async function renderAuditLog(silent) {
   tbody.innerHTML = log.slice(0,300).map(function(e) {
     var d  = new Date(e.ts);
     var ds = d.toLocaleDateString('en-CA')+' '+d.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit'});
-    var full = AUDIT_ACTION_LABELS[e.action] || (e.action || '').replace(/_/g,' ');
-    var lbl  = AUDIT_ABBR[e.action] || full;   // compact code in the table; full text on hover
+    var full = e._full || AUDIT_ACTION_LABELS[e.action] || (e.action || '').replace(/_/g,' ');
+    var lbl  = e._label ? _abbrevPhrase(e._label) : _auditEventLabel(e.action);   // tight code; full text on hover
     var rowCls = _auditRowClass(e.action);
 
     // Friendly appId display: surface SOW: / SETTINGS prefixes as compact pills.
@@ -1096,7 +1178,7 @@ function exportAudit(format) {
   var data = rows.map(function(e) {
     var d  = new Date(e.ts);
     var ds = isNaN(d.getTime()) ? (e.ts || '') : (d.toLocaleDateString('en-CA')+' '+d.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit'}));
-    var lbl = AUDIT_ACTION_LABELS[e.action] || (e.action || '').replace(/_/g,' ');
+    var lbl = e._full || AUDIT_ACTION_LABELS[e.action] || (e.action || '').replace(/_/g,' ');
     return [ds, e.appId || '', lbl, e.detail || '', e.name || '', e.role || ''];
   });
   var stamp = new Date().toISOString().slice(0,10);
