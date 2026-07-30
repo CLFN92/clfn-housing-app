@@ -53,6 +53,54 @@ window.NATIONS_DIRECTORY = window.NATIONS_DIRECTORY || {
 // neutral landing page replaces the default. Adding a nation = one entry above
 // keyed by its subdomain label.
 window.NATIONS_DIRECTORY.clfn = window.NATIONS_DIRECTORY.clfn || window.NATIONS_DIRECTORY._default;
+
+// ── Registry bootstrap (P2) ───────────────────────────────────────────────────
+// Lets NEW nations resolve without a code deploy: their config comes from the
+// control-plane "nations" registry (published read-only as `nations_public`).
+// SAFETY: this is strictly ADDITIVE. The hardcoded entries above (CLFN as
+// _default/clfn) always win — the registry only fills in subdomains NOT already
+// present — so CLFN's boot is byte-identical and immune to any registry mistake
+// or outage. Everything here fails safe: bad cache, blocked fetch, missing view
+// → the app falls back to the hardcoded _default with no visible effect.
+window.PLATFORM_REGISTRY_URL  = window.PLATFORM_REGISTRY_URL  || 'https://dnaxulsdetlnpupegoiq.supabase.co';
+window.PLATFORM_REGISTRY_ANON = window.PLATFORM_REGISTRY_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuYXh1bHNkZXRsbnB1cGVnb2lxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NDQ5OTksImV4cCI6MjEwMTAyMDk5OX0.HYKgIe_inzHFk518ilfmhQUqtlldkTSoiwnmcwuaw_A';
+window._REG_CACHE_KEY = 'fnhub_nations_registry_v1';
+
+window._mapNationRow = function(r){
+  if (!r || !r.subdomain) return null;
+  var sub = String(r.subdomain).toLowerCase();
+  return {
+    id:            sub,
+    display_name:  r.display_name || sub,
+    short:         r.short || sub.toUpperCase(),
+    supabase_url:  r.supabase_url || '',
+    supabase_anon: r.supabase_anon || '',
+    primary_color: r.primary_color || null,
+    portal_base:   'https://' + sub + '.fnhub.app',
+    email_domain:  r.email_domain || '',
+    housing_email: r.housing_email || '',
+    role_labels:   {},
+    modules_licensed: (r.modules_licensed && typeof r.modules_licensed === 'object')
+                        ? r.modules_licensed : null
+  };
+};
+// Merge registry rows into the directory WITHOUT overriding hardcoded entries.
+window._mergeNationRegistry = function(rows){
+  if (!Array.isArray(rows)) return false;
+  var dir = window.NATIONS_DIRECTORY, added = false;
+  rows.forEach(function(r){
+    var m = window._mapNationRow(r); if (!m) return;
+    var key = String(r.subdomain).toLowerCase();
+    if (!dir[key]) { dir[key] = m; added = true; }   // hardcoded always wins
+  });
+  return added;
+};
+// 1) Synchronous first paint: merge whatever we cached on a previous load.
+try {
+  var _rc = JSON.parse(localStorage.getItem(window._REG_CACHE_KEY) || 'null');
+  if (_rc && _rc.rows) window._mergeNationRegistry(_rc.rows);
+} catch (e) {}
+
 window.resolveNation = function(){
   var host = (typeof location !== 'undefined' && location.hostname || '').toLowerCase();
   var dir  = window.NATIONS_DIRECTORY || {};
@@ -78,6 +126,44 @@ window.STORAGE_BUCKET  = 'housing-files';
 
 // Sentinel checked by shared-auth.js to confirm this file loaded
 window.CLFN_CONFIG_LOADED = true;
+
+// ── Registry background refresh (P2) ─────────────────────────────────────────
+// Pull the live registry, cache it for next load. Fire-and-forget, fully
+// guarded: never blocks boot, never throws, and NEVER reloads for a nation we
+// already resolved (so CLFN is untouched). A reload happens ONCE only for a
+// brand-new nation whose host we could not resolve before this fetch (first ever
+// visit, empty cache) so it re-boots against the correct Supabase project.
+(function _fnhubRefreshRegistry(){
+  try {
+    var url  = String(window.PLATFORM_REGISTRY_URL || '');
+    var anon = String(window.PLATFORM_REGISTRY_ANON || '');
+    if (!url || !anon || /REPLACE_WITH/.test(anon) || typeof fetch !== 'function') return;
+    // Throttle: skip if we refreshed within the last hour (cache still warm).
+    try {
+      var c = JSON.parse(localStorage.getItem(window._REG_CACHE_KEY) || 'null');
+      if (c && c.at && (Date.now() - c.at) < 3600000) return;
+    } catch (e) {}
+    var host = (typeof location !== 'undefined' && location.hostname || '').toLowerCase();
+    var sub  = host.split('.')[0];
+    var knownBefore = !!(window.NATIONS_DIRECTORY[host] || window.NATIONS_DIRECTORY[sub]);
+    fetch(url.replace(/\/+$/, '') + '/rest/v1/nations_public?select=*', {
+      headers: { apikey: anon, Authorization: 'Bearer ' + anon }
+    })
+    .then(function(r){ return r && r.ok ? r.json() : null; })
+    .then(function(rows){
+      if (!Array.isArray(rows)) return;
+      try { localStorage.setItem(window._REG_CACHE_KEY, JSON.stringify({ at: Date.now(), rows: rows })); } catch (e) {}
+      var added = window._mergeNationRegistry(rows);
+      var knownNow = !!(window.NATIONS_DIRECTORY[host] || window.NATIONS_DIRECTORY[sub]);
+      // Only a brand-new, previously-unresolvable nation triggers a one-time reload.
+      if (!knownBefore && added && knownNow && !sessionStorage.getItem('_fnhub_reg_reloaded')) {
+        try { sessionStorage.setItem('_fnhub_reg_reloaded', '1'); } catch (e) {}
+        location.reload();
+      }
+    })
+    .catch(function(){ /* offline / blocked / view missing -> keep hardcoded default */ });
+  } catch (e) { /* never let registry refresh break boot */ }
+})();
 
 // ── Email pipeline reference (display-only) ──────────────────────────────────
 // Mirror of the non-secret GRAPH_* values configured as Supabase Edge

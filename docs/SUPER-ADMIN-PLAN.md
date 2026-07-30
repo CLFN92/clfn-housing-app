@@ -5,7 +5,10 @@ FN Hub. This is the "super-user tooling" that CLAUDE.md kept out of the nation
 app — we build it as an **isolated piece** so nation code and platform code stay
 separate.
 
-Status: **P1 in progress** (control plane + panel shell). Rest of plan approved, not yet built.
+Status: **P1 done, P2 in progress.** P1 = control plane + panel shell (built,
+wired to the fnhub-platform project). P2 = registry-driven `resolveNation`
+(nation app reads `nations_public` at boot; CLFN `_default` stays as the
+hardcoded fallback, never overridden). Rest of plan approved, not yet built.
 
 ## File structure (isolation boundary)
 
