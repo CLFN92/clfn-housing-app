@@ -1358,14 +1358,14 @@
 <!-- AUDIT LOG -->
 <div id="sec_audit" class="settings-section">
   <div class="card card-flush">
-    <div class="modal-hdr">
+    <div class="modal-hdr modal-hdr-stack">
       <div>
         <div class="lbl-yellow">&#128203; Audit Log</div>
         <div class="txt-sm-meta">Full activity trail &mdash; applications, approvals, unit edits, maintenance requests, and system changes</div>
       </div>
       <div class="flex-gap8 flex-wrap">
         <div class="export-dropdown">
-          <button type="button" onclick="toggleExportMenu(this)" class="btn btn-primary">&#128228; Export</button>
+          <button type="button" onclick="toggleExportMenu(this)" class="btn btn-sm btn-primary">&#128228; Export</button>
           <div class="header-export-menu">
             <button type="button" onclick="exportAudit('csv')" class="header-export-item">
               <span class="header-export-icon">&#128196;</span> CSV
@@ -1375,8 +1375,8 @@
             </button>
           </div>
         </div>
-        <button type="button" onclick="openAuditLegend()" class="btn btn-primary">&#128214; Legend</button>
-        <button type="button" onclick="renderAuditLog()" class="btn btn-primary">&#8635; Refresh</button>
+        <button type="button" onclick="openAuditLegend()" class="btn btn-sm btn-primary">&#128214; Legend</button>
+        <button type="button" onclick="renderAuditLog()" class="btn btn-sm btn-primary">&#8635; Refresh</button>
       </div>
     </div>
     <div class="doclib-table-wrap">
