@@ -5,8 +5,14 @@ FN Hub. This is the "super-user tooling" that CLAUDE.md kept out of the nation
 app — we build it as an **isolated piece** so nation code and platform code stay
 separate.
 
-Status: **PLAN — not yet built.** Build begins only after the Open Decisions
-(bottom) are settled.
+Status: **PLAN — approved, not yet built.**
+
+**Decisions locked (2026-07-30):**
+1. Control plane → **dedicated "fnhub-platform" Supabase project** (separate from CLFN).
+2. First provisioning build → **assisted (P4)**: operator creates the Supabase
+   project manually; the panel automates schema → functions → secrets → auth →
+   registry → first ED. Full one-click project creation is a later phase (P5).
+3. Panel → **separate `admin.fnhub.app` SPA** with its own auth.
 
 ---
 
