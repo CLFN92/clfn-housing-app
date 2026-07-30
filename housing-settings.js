@@ -1077,33 +1077,8 @@ async function renderAuditLog(silent) {
     }
   } catch(e) { console.warn('Audit log load failed:', e); }
 
-  // Merge the Finance module's separate finance_audit_log. Its RLS restricts
-  // rows to finance-authorized roles; we ALSO gate the fetch client-side (below)
-  // as defense-in-depth so non-finance viewers never even request it. Different
-  // schema: occurred_at / actor_* / summary — mapped into the same row shape.
-  var _rl = (window.currentRole || '');
-  var _canSeeFinance = ['ed', 'super_user', 'cfo', 'finance_l1'].indexOf(_rl) !== -1;
-  if (_canSeeFinance) try {
-    var fr = await fetch(SUPABASE_URL + '/rest/v1/finance_audit_log?order=occurred_at.desc&limit=300', { headers: HOUSING_HEADERS });
-    if (fr.ok) {
-      var frows = await fr.json();
-      if (Array.isArray(frows) && frows.length) {
-        frows.forEach(function(row) {
-          var lab = _finAuditLabels(row);
-          log.push({
-            ts:     row.occurred_at || row.created_at || '',
-            appId:  row.entity_type ? (String(row.entity_type).toUpperCase() + (row.entity_id ? ':' + row.entity_id : '')) : 'FINANCE',
-            action: 'fin_' + (row.action || ''),
-            detail: row.summary || (row.detail && (row.detail.raw || row.detail.summary)) || '',
-            role:   row.actor_email || row.actor_role || '',
-            name:   row.actor_name || '',
-            _label: lab.a, _full: lab.f
-          });
-        });
-        log.sort(function(a, b){ return String(b.ts || '').localeCompare(String(a.ts || '')); });
-      }
-    }
-  } catch(e) { /* finance audit is optional / role-gated */ }
+  // Finance activity is intentionally NOT merged here — it has its own separate
+  // finance_audit_log + view in the Finance module.
 
   // Cache for CSV export — built from whatever we just rendered.
   window._auditRows = log;
