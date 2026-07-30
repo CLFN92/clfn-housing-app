@@ -1,0 +1,20 @@
+{
+  // Cloudflare Worker config for the PLATFORM ADMIN panel (admin.fnhub.app).
+  // Separate Worker from the nation app: a distinct name + its own custom
+  // domain, serving ONLY the admin/ folder as static assets. This keeps the
+  // control plane isolated from the nation site (they share the repo today but
+  // deploy as two independent Workers; the admin/ folder can move to its own
+  // repo later with no change here beyond the path).
+  //
+  // The nation app's root wrangler.jsonc serves "." and excludes admin/ via
+  // .assetsignore, so the panel is never exposed on fnhub.app / *.fnhub.app --
+  // only on this Worker's admin.fnhub.app domain.
+  //
+  // Cloudflare Workers Build deploy command for THIS project:
+  //   npx wrangler deploy -c wrangler.admin.jsonc
+  "name": "fnhub-admin",
+  "compatibility_date": "2026-07-30",
+  "assets": {
+    "directory": "admin"
+  }
+}
