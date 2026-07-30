@@ -1031,6 +1031,20 @@ function _finAuditLabels(row){
   return { a: '💰 ' + _abbrevPhrase(act.replace(/_/g,' ')), f: '💰 ' + act.replace(/_/g,' ') };
 }
 
+// BY column: employee name only. When the row has no captured name (e.g. email
+// notifications store just the actor email), derive a display name from the
+// email local-part (split on . _ - and title-cased).
+function _auditByName(e){
+  var n = ((e && e.name) || '').trim();
+  if (n) return n;
+  var v = ((e && e.role) || '').trim();   // usually the actor email for these rows
+  if (v.indexOf('@') !== -1) {
+    return v.split('@')[0].split(/[._+-]+/).filter(Boolean)
+      .map(function(p){ return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase(); }).join(' ') || v;
+  }
+  return v || '—';
+}
+
 async function renderAuditLog(silent) {
   var tbody = document.getElementById('audit_log_tbody');
   if(!tbody) return;
@@ -1107,9 +1121,7 @@ async function renderAuditLog(silent) {
 
     // By column: prefer full name; fall back to role for legacy rows that
     // were written before auditEntry started capturing the name.
-    var byHtml = e.name
-      ? '<span class="audit-by-name">'+e.name+'</span><span class="audit-by-role">'+(e.role||'')+'</span>'
-      : '<span class="audit-by-name">'+(e.role||'—')+'</span>';
+    var byHtml = '<span class="audit-by-name">'+_auditByName(e)+'</span>';
 
     return '<tr'+(rowCls?' class="'+rowCls+'"':'')+'>'
       +'<td class="audit-cell-date">'+ds+'</td>'
