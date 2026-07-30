@@ -14,6 +14,24 @@ window._inspTypeFilter    = '';
 window._inspStatusFilter  = '';
 
 var INSP_TYPES    = ['Move-In','Move-Out','Annual','Routine','Emergency'];
+
+// Annual inspection cadence. Given an inspection date + type, return the next
+// due date (YYYY-MM-DD) to stamp on the unit:
+//   Move-Out  -> null  (unit is being vacated; no next inspection scheduled)
+//   Emergency -> undefined (ad hoc; leave the existing schedule untouched)
+//   others    -> +12 months (Move-In starts the annual clock)
+var INSPECTION_CADENCE_MONTHS = 12;
+function _inspComputeNextDue(dateStr, type){
+  if(type === 'Move-Out')  return null;
+  if(type === 'Emergency') return undefined;
+  if(!dateStr) return undefined;
+  var d = new Date(dateStr + 'T00:00:00');
+  if(isNaN(d.getTime())) return undefined;
+  d.setMonth(d.getMonth() + INSPECTION_CADENCE_MONTHS);
+  var mm = ('0' + (d.getMonth() + 1)).slice(-2), dd = ('0' + d.getDate()).slice(-2);
+  return d.getFullYear() + '-' + mm + '-' + dd;
+}
+window._inspComputeNextDue = _inspComputeNextDue;
 var INSP_STATUSES = ['pending','pass','fail','needs_repair'];
 
 // Checklist template — sections with items
@@ -576,6 +594,9 @@ async function saveInspection(approveAction) {
       var unit = housingUnits.find(function(u){ return u.id === unitId; });
       if (unit) {
         unit.lastInspectionDate = date;
+        // Advance the next-due date from this inspection (annual cadence).
+        var _nd = _inspComputeNextDue(date, type);
+        if (_nd !== undefined) unit.nextInspectionDue = _nd;
         if (typeof sbSaveUnit === 'function') sbSaveUnit(unit);
       }
     }

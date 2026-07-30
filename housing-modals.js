@@ -204,6 +204,19 @@ function _ueSwitchTab(name){
   if(p) p.classList.add('tic-active');
 }
 
+// Derive a next-inspection-due default (last inspection + 12 months) when the
+// unit has no explicit next-due stored. Keeps the Edit Unit modal's inspection
+// dates in step with the unit's actual inspection history (annual cadence).
+function _ueDeriveNextDue(u){
+  if(!u || u.nextInspectionDue) return (u && u.nextInspectionDue) || '';
+  var last = u.lastInspectionDate;
+  if(!last) return '';
+  var d = new Date(last + 'T00:00:00');
+  if(isNaN(d.getTime())) return '';
+  d.setMonth(d.getMonth() + 12);
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+
 // ── Placeholder renderers (to be built out) ──
 function openUnitEditModal(unitId){
   var isFieldEmployee = (window.currentRole || '') === 'field_employee';
@@ -232,7 +245,10 @@ function openUnitEditModal(unitId){
   _ueSetUnderRenovation(!!u.under_renovation);
   set('ue_assignedDate',u.assignedDate);
   set('ue_last_inspection', u.lastInspectionDate || '');
-  set('ue_next_inspection', u.nextInspectionDue  || '');
+  // Next-due pre-populates from the unit's inspection history: use the stored
+  // value if set, else derive last-inspection + 1yr (annual cadence) so a unit
+  // that's only ever had a last-inspection date still shows a sensible due date.
+  set('ue_next_inspection', u.nextInspectionDue || _ueDeriveNextDue(u));
   set('ue_notes',u.notes);
   // Populate hidden assignment fields
   var toEl = document.getElementById('ue_assignedTo');
