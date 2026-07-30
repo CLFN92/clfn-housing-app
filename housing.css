@@ -1851,7 +1851,7 @@ body.is-sow-only .modal-overlay { visibility: visible; }
 .tic-tab:hover            { color: var(--text); }
 .tic-tab.tic-active       { color: var(--text); border-bottom-color: var(--yellow); }
 
-.tic-body                 { flex: 1; overflow-y: auto; padding: 22px 28px; background: var(--bg, var(--surface)); }
+.tic-body                 { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 22px 28px; background: var(--bg, var(--surface)); }
 .tic-panel                { display: none; }
 .tic-panel.tic-active     { display: block; }
 

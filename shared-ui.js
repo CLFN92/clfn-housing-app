@@ -1175,14 +1175,19 @@ window._initScrollCollapse = _initScrollCollapse;
 
   function _vis(el){ return !!(el && el.offsetParent !== null && el.getClientRects().length); }
 
-  // Is the swipe inside a horizontally-scrollable region (table, tab bar, card
-  // rail)? If so, let native scrolling win instead of switching tabs.
+  // Is the swipe inside a DEDICATED horizontal scroller (table, tab bar, card
+  // rail)? If so, let native scrolling win instead of switching tabs. A vertical
+  // scroll container (overflow-y auto/scroll) is NOT counted even if its
+  // overflow-x computes to auto (a CSS quirk) — otherwise a slightly-too-wide
+  // field row would silently disable swipe inside modals/pages.
   function _inHScroll(el){
     var n = el, guard = 0;
     while (n && n.nodeType === 1 && guard++ < 14) {
       try {
         var s = getComputedStyle(n);
-        if ((s.overflowX === 'auto' || s.overflowX === 'scroll') && n.scrollWidth > n.clientWidth + 4) return true;
+        var xScroll = (s.overflowX === 'auto' || s.overflowX === 'scroll') && n.scrollWidth > n.clientWidth + 4;
+        var yScroll = (s.overflowY === 'auto' || s.overflowY === 'scroll');
+        if (xScroll && !yScroll) return true;   // horizontal-only scroller — preserve it
       } catch (_e) {}
       n = n.parentElement;
     }
