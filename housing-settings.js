@@ -811,6 +811,25 @@ function _auditRowClass(action) {
   return '';
 }
 
+// Tidy + abbreviate an audit detail string for the compact table. Turns the
+// verbose email-notification rows ("Email -> <to> | <Nation> Housing — <subj>")
+// into "✉ <to> · <subj>" and applies a few space-saving abbreviations.
+function _auditFmtDetail(s) {
+  if (s == null || s === '') return '—';
+  s = String(s).trim();
+  var m = s.match(/^Email\s*->\s*([^|]+?)\s*\|\s*(.+)$/i);
+  if (m) {
+    var to = m[1].trim();
+    var subj = m[2].trim().replace(/^.*?Housing\s*[—–-]\s*/i, '').trim(); // drop brand prefix
+    s = '✉ ' + to + (subj ? ' · ' + subj : '');
+  }
+  return s.replace(/\bApplication\b/g, 'App')
+          .replace(/\bMaintenance Request\b/gi, 'MR')
+          .replace(/\bReceived\b/g, "Rec'd")
+          .replace(/\bReference\b/gi, 'Ref')
+          .replace(/\bNumber\b/gi, 'No.');
+}
+
 async function renderAuditLog(silent) {
   var tbody = document.getElementById('audit_log_tbody');
   if(!tbody) return;
@@ -891,7 +910,7 @@ async function renderAuditLog(silent) {
       +'<td class="audit-cell-date">'+ds+'</td>'
       +'<td class="audit-cell-ref">'+appDisplay+'</td>'
       +'<td class="audit-cell-event">'+lbl+'</td>'
-      +'<td class="audit-cell-detail">'+(e.detail || '—')+'</td>'
+      +'<td class="audit-cell-detail">'+_auditFmtDetail(e.detail)+'</td>'
       +'<td class="audit-cell-by">'+byHtml+'</td>'
       +'</tr>';
   }).join('');

@@ -1240,7 +1240,7 @@ window._initScrollCollapse = _initScrollCollapse;
     if (dt > 700) return;                                 // too slow to be a flick
     if (Math.abs(dx) < 60) return;                        // min horizontal travel
     if (Math.abs(dx) < Math.abs(dy) * 1.7) return;        // must be mostly horizontal
-    if (el && el.closest && el.closest('input,textarea,select,[contenteditable="true"],[data-noswipe]')) return;
+    if (el && el.closest && el.closest('input,textarea,select,[contenteditable="true"],[data-noswipe],table')) return;
     if (_inHScroll(el)) return;
     var g = _findGroup(y);
     if (!g) return;

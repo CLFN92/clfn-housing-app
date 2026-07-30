@@ -350,8 +350,8 @@
 #sec_audit .std-table tbody td      { padding: 8px 12px; vertical-align: top; }
 #sec_audit .audit-cell-date         { font-size: 11px; color: var(--muted); white-space: nowrap; }
 #sec_audit .audit-cell-ref          { font-size: 11px; white-space: nowrap; }
-#sec_audit .audit-cell-event        { font-size: 12px; font-weight: 600; white-space: nowrap; }
-#sec_audit .audit-cell-detail       { font-size: 12px; color: var(--muted); word-break: break-word; overflow-wrap: break-word; min-width: 0; }
+#sec_audit .audit-cell-event        { font-size: 12px; font-weight: 600; white-space: normal; word-break: break-word; overflow-wrap: break-word; max-width: 170px; }
+#sec_audit .audit-cell-detail       { font-size: 12px; color: var(--muted); word-break: break-word; overflow-wrap: anywhere; min-width: 190px; }
 #sec_audit .audit-cell-by           { font-size: 11px; color: var(--muted); white-space: nowrap; line-height: 1.4; }
 #sec_audit .audit-by-name           { display: block; font-weight: 600; color: var(--text); }
 #sec_audit .audit-by-role           { display: block; font-size: 10px; color: var(--muted); text-transform: capitalize; }
