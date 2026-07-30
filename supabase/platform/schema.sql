@@ -20,13 +20,18 @@ insert into public.super_admins (email, added_by)
   on conflict (email) do nothing;
 
 -- Membership check used by every policy below.
+-- SECURITY DEFINER + fixed search_path so it bypasses RLS on super_admins:
+-- the super_admins read policy calls this function, and without definer rights
+-- that would recurse (policy -> function -> select super_admins -> policy ...).
 create or replace function public.is_super_admin() returns boolean
-  language sql stable as $$
+  language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from public.super_admins sa
     where lower(sa.email) = lower(auth.jwt() ->> 'email')
   );
 $$;
+revoke all on function public.is_super_admin() from public, anon;
+grant execute on function public.is_super_admin() to authenticated;
 
 -- ── Nations registry (source of truth; becomes nations.json) ────────────────
 create table if not exists public.nations (
