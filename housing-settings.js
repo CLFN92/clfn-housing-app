@@ -799,8 +799,71 @@ var AUDIT_ACTION_LABELS = {
   'recipient_emailed':        '✉️ Email Sent',
   'created':                  '📄 RFQ Draft Saved',
   'issued':                   '📤 RFQ Issued',
-  'awarded':                  '🏆 RFQ Awarded'
+  'awarded':                  '🏆 RFQ Awarded',
+  // Application workflow + applicant portal + tenant requests
+  'application_confirmation_to_applicant':    '✉️ Applicant Confirmation Email',
+  'application_created_from_portal':          '📄 Application Created (Portal)',
+  'application_updated_from_portal':          '📝 Application Updated (Portal)',
+  'application_submission_changes_requested': '↩️ Portal Submission — Changes Requested',
+  'application_submission_rejected':          '✕ Portal Submission Rejected',
+  'application_mgr_recommended':              '👍 Manager Recommended',
+  'application_hm_approved':                  '✅ HM Approved Application',
+  'application_ed_approved':                  '✅ ED Approved Application',
+  'application_declined':                     '✕ Application Declined',
+  'application_returned':                     '↩️ Application Returned',
+  'portal_invite_sent':                       '✉️ Portal Invite Sent',
+  'tenant_mr_approved':                       '✅ Tenant Request Approved',
+  'tenant_mr_rejected':                       '✕ Tenant Request Rejected',
+  'contractor_approved':                      '🧰 Contractor Approved',
+  'contractor_hm_recommended':                '🧰 Contractor Recommended',
+  'contractor_declined':                      '✕ Contractor Declined',
+  'maint_qr_tokens_minted':                   '🏷️ Maintenance QR Generated',
+  'ai_query':                                 '✦ AI Assistant Query',
+  'ai_draft':                                 '✦ AI Draft Note'
 };
+
+// Compact codes for the on-screen Event column (the export keeps full labels).
+// Anything not listed falls back to its full AUDIT_ACTION_LABELS text.
+var AUDIT_ABBR = {
+  'user_login':'🔑 Sign In', 'user_logout':'🚪 Sign Out', 'user_logout_timeout':'⏱️ Timeout',
+  'application_submitted':'📨 App Sub', 'file_update_submitted':'📨 File Upd',
+  'application_confirmation_to_applicant':'✉️ App Conf',
+  'application_created_from_portal':'📄 App New', 'application_updated_from_portal':'📝 App Merge',
+  'application_submission_changes_requested':'↩️ Sub Chg', 'application_submission_rejected':'✕ Sub Rej',
+  'application_mgr_recommended':'👍 Mgr Rec', 'application_hm_approved':'✅ HM Appr',
+  'application_ed_approved':'✅ ED Appr', 'application_declined':'✕ App Decl', 'application_returned':'↩️ App Ret',
+  'portal_invite_sent':'✉️ Invite',
+  'sow_created':'🔨 MR New', 'sow_updated':'🔨 MR Upd', 'sow_hm_approval':'✅ MR HM', 'sow_ed_approval':'✅ MR ED',
+  'tenant_mr_approved':'✅ TReq OK', 'tenant_mr_rejected':'✕ TReq No',
+  'contractor_approved':'🧰 Ctr Appr', 'contractor_hm_recommended':'🧰 Ctr Rec', 'contractor_declined':'✕ Ctr Decl',
+  'file_uploaded':'📎 File +', 'file_deleted':'🗑️ File −', 'file_category_changed':'🏷️ File Cat',
+  'unit_edit':'🏠 Unit', 'unit_assigned':'🏠 Assign', 'tenant_vacated':'📤 Vacated',
+  'approval_authority_save':'🔐 Auth', 'settings_saved':'⚙️ Settings', 'module_toggle':'🧩 Module',
+  'nation_updated':'🏛️ Nation', 'theme_updated':'🎨 Theme', 'email_template_save':'✉️ Tmpl',
+  'recipient_emailed':'✉️ Email', 'maint_qr_tokens_minted':'🏷️ QR Gen',
+  'ai_query':'✦ AI Ask', 'ai_draft':'✦ AI Draft',
+  'created':'📄 RFQ New', 'issued':'📤 RFQ Iss', 'awarded':'🏆 RFQ Won'
+};
+
+// Legend modal decoding the Event abbreviations (opened from the Audit header).
+function openAuditLegend(){
+  var ex = document.getElementById('audit_legend_modal'); if(ex) ex.remove();
+  var rows = Object.keys(AUDIT_ABBR).map(function(a){
+    var full = (AUDIT_ACTION_LABELS[a] || a.replace(/_/g,' ')).replace(/^[^A-Za-z0-9]+\s*/,'');
+    return '<tr style="border-bottom:1px solid var(--border);">'
+      + '<td style="padding:7px 12px;font-weight:700;white-space:nowrap;">'+AUDIT_ABBR[a]+'</td>'
+      + '<td style="padding:7px 12px;color:var(--muted);">'+full+'</td></tr>';
+  }).join('');
+  var m = document.createElement('div'); m.id = 'audit_legend_modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:10001;display:flex;align-items:center;justify-content:center;padding:16px;';
+  m.innerHTML = '<div style="background:var(--surface);border-radius:12px;width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35);">'
+    + '<div class="modal-hdr"><div class="lbl-yellow">📖 Event Legend</div>'
+    +   '<button type="button" onclick="var x=document.getElementById(\'audit_legend_modal\');if(x)x.remove();" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">&times;</button></div>'
+    + '<div style="overflow-y:auto;padding:6px 8px 12px;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'+rows+'</table></div>'
+    + '</div>';
+  document.body.appendChild(m);
+}
+window.openAuditLegend = openAuditLegend;
 
 // Map an audit row's action to a row-tint class. Empty string = no tint.
 function _auditRowClass(action) {
@@ -887,7 +950,8 @@ async function renderAuditLog(silent) {
   tbody.innerHTML = log.slice(0,300).map(function(e) {
     var d  = new Date(e.ts);
     var ds = d.toLocaleDateString('en-CA')+' '+d.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit'});
-    var lbl = AUDIT_ACTION_LABELS[e.action] || (e.action || '').replace(/_/g,' ');
+    var full = AUDIT_ACTION_LABELS[e.action] || (e.action || '').replace(/_/g,' ');
+    var lbl  = AUDIT_ABBR[e.action] || full;   // compact code in the table; full text on hover
     var rowCls = _auditRowClass(e.action);
 
     // Friendly appId display: surface SOW: / SETTINGS prefixes as compact pills.
@@ -909,7 +973,7 @@ async function renderAuditLog(silent) {
     return '<tr'+(rowCls?' class="'+rowCls+'"':'')+'>'
       +'<td class="audit-cell-date">'+ds+'</td>'
       +'<td class="audit-cell-ref">'+appDisplay+'</td>'
-      +'<td class="audit-cell-event">'+lbl+'</td>'
+      +'<td class="audit-cell-event" title="'+full.replace(/"/g,'')+'">'+lbl+'</td>'
       +'<td class="audit-cell-detail">'+_auditFmtDetail(e.detail)+'</td>'
       +'<td class="audit-cell-by">'+byHtml+'</td>'
       +'</tr>';
