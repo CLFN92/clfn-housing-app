@@ -819,7 +819,56 @@ var AUDIT_ACTION_LABELS = {
   'contractor_declined':                      '✕ Contractor Declined',
   'maint_qr_tokens_minted':                   '🏷️ Maintenance QR Generated',
   'ai_query':                                 '✦ AI Assistant Query',
-  'ai_draft':                                 '✦ AI Draft Note'
+  'ai_draft':                                 '✦ AI Draft Note',
+  // External (portal / QR) submissions
+  'application_portal_submitted': '📨 Application Submitted (Portal)',
+  'tenant_mr_submitted':          '🔧 Maintenance Reported (QR)',
+  // Auto / system approvals
+  'application_auto_approved':    '⚡ Application Auto-Approved',
+  'file_update_auto_approved':    '⚡ File Update Auto-Approved',
+  'contractor_auto_approved':     '⚡ Contractor Auto-Approved',
+  'sow_auto_approved':            '⚡ Maintenance Request Auto-Approved',
+  'inspection_auto_approved':     '⚡ Inspection Auto-Approved',
+  'sow_system_approval':          '🤖 Maintenance Request System-Approved (RFQ)',
+  'approval_toggle':              '🔐 Approval Requirement Toggled',
+  // BCR registry
+  'bcr_added':                    '⛔ BCR Added',
+  'bcr_lifted':                   '✅ BCR Lifted',
+  // Contractors
+  'contractor_note_add':          '🧰 Contractor Note Added',
+  'ct_archived':                  '📦 Contractor Archived',
+  'ct_unarchived':                '📤 Contractor Unarchived',
+  // Scoring / match priority / occupancy
+  'match_priority_model':         '⚙️ Match Priority Saved',
+  'match_priority_model_reset':   '⚙️ Match Priority Reset',
+  'nos_table_save':               '🛏️ Occupancy Standard Saved',
+  // Notes
+  'note_added':                   '📝 Note Added',
+  'tenant_note_add':              '📝 Tenant Note Added',
+  'unit_note_add':                '📝 Unit Note Added',
+  // Units
+  'secondary_unit_assigned':      '🏠 Secondary Unit Assigned',
+  'unit_archived':                '📦 Unit Archived',
+  'unit_unarchived':              '📤 Unit Unarchived',
+  'unit_unassigned':              '🏠 Unit Unassigned',
+  'unit_location_set':            '📍 Unit Location Set',
+  // Users
+  'settings_user_edit':           '👤 User Edited',
+  'settings_user_reactivate':     '👤 User Reactivated',
+  'settings_user_send_reset':     '🔑 Password Reset Sent',
+  // Signatures
+  'sig_lock_override':            '🔓 Signature Lock Overridden',
+  'signatures_locked':            '🔒 Signatures Locked',
+  'unlocked':                     '🔓 Unlocked',
+  // Maintenance request lifecycle
+  'sow_archived':                 '📦 Maintenance Request Archived',
+  'sow_unarchived':               '📤 Maintenance Request Unarchived',
+  'sow_completed':                '✅ Maintenance Request Completed',
+  'sow_reopened':                 '🔄 Maintenance Request Reopened',
+  // Misc
+  'tenants_merged':               '🔗 Tenant Records Merged',
+  'archived_duplicate':           '📦 Duplicate Archived',
+  'required_fields_reset':        '📋 Required Fields Reset'
 };
 
 // Compact codes for the on-screen Event column (the export keeps full labels).
@@ -842,7 +891,42 @@ var AUDIT_ABBR = {
   'nation_updated':'🏛️ Nation', 'theme_updated':'🎨 Theme', 'email_template_save':'✉️ Tmpl',
   'recipient_emailed':'✉️ Email', 'maint_qr_tokens_minted':'🏷️ QR Gen',
   'ai_query':'✦ AI Ask', 'ai_draft':'✦ AI Draft',
-  'created':'📄 RFQ New', 'issued':'📤 RFQ Iss', 'awarded':'🏆 RFQ Won'
+  'created':'📄 RFQ New', 'issued':'📤 RFQ Iss', 'awarded':'🏆 RFQ Won',
+  // External submissions
+  'application_portal_submitted':'📨 Portal Sub', 'tenant_mr_submitted':'🔧 QR Report',
+  // Auto / system approvals
+  'application_auto_approved':'⚡ App Auto', 'file_update_auto_approved':'⚡ FU Auto',
+  'contractor_auto_approved':'⚡ Ctr Auto', 'sow_auto_approved':'⚡ MR Auto',
+  'inspection_auto_approved':'⚡ Insp Auto', 'sow_system_approval':'🤖 MR Sys',
+  'approval_toggle':'🔐 Appr Tgl',
+  // BCR / contractors
+  'bcr_added':'⛔ BCR Add', 'bcr_lifted':'✅ BCR Lift',
+  'contractor_note_add':'🧰 Ctr Note', 'ct_archived':'📦 Ctr Arch', 'ct_unarchived':'📤 Ctr Unarch',
+  // Scoring / occupancy
+  'match_priority_model':'⚙️ Match Pri', 'match_priority_model_reset':'⚙️ Match Rst', 'nos_table_save':'🛏️ NOS Save',
+  'settings_scoring_change':'⚙️ Rubric Chg', 'settings_scoring_add':'⚙️ Rubric +', 'settings_scoring_delete':'⚙️ Rubric −',
+  'settings_scoring_reset':'⚙️ Score Rst', 'settings_unit_score_save':'⚙️ Unit Score', 'settings_reno_score_save':'⚙️ Reno Score',
+  'settings_budget_save':'💰 Budget', 'ed_adjustment':'⭐ ED Adj',
+  // Notes
+  'note_added':'📝 Note', 'tenant_note_add':'📝 Ten Note', 'unit_note_add':'📝 Unit Note', 'tic_overview_change':'📝 Tenant Edit',
+  // Units
+  'secondary_unit_assigned':'🏠 2nd Assign', 'unit_archived':'📦 Unit Arch', 'unit_unarchived':'📤 Unit Unarch',
+  'unit_unassigned':'🏠 Unassign', 'unit_location_set':'📍 Unit Loc', 'unit_status_auto':'🔄 Unit Auto',
+  // Users
+  'settings_user_add':'👤 User +', 'settings_user_remove':'👤 User −', 'settings_user_edit':'👤 User Edit',
+  'settings_user_reactivate':'👤 User React', 'settings_user_send_reset':'🔑 Pwd Reset',
+  // Signatures / locks
+  'signature_captured':'✍️ Signed', 'sig_lock_override':'🔓 Sig Unlock', 'signatures_locked':'🔒 Sig Lock', 'unlocked':'🔓 Unlock',
+  // MR lifecycle + signatures
+  'sow_archived':'📦 MR Arch', 'sow_unarchived':'📤 MR Unarch', 'sow_completed':'✅ MR Done', 'sow_reopened':'🔄 MR Reopen',
+  'sow_tenant_signed':'✍️ MR Tenant', 'sow_staff_signed':'✍️ MR Staff', 'sow_accountability':'⚠️ MR Flag',
+  // App / status / files
+  'application_opened':'📂 Opened', 'draft_saved':'💾 Draft', 'status_change':'🔄 Status', 'status':'🔄 Status',
+  'declined':'✕ Declined', 'archived':'📦 Arch', 'unarchived':'📤 Unarch', 'archived_duplicate':'📦 Arch Dup',
+  'tenants_merged':'🔗 Ten Merge', 'tenant_vacated':'📤 Vacated',
+  // Settings misc
+  'required_fields_updated':'📋 Req Flds', 'required_fields_reset':'📋 Req Rst', 'theme_reset':'🎨 Theme Rst',
+  'settings_saved':'⚙️ Settings'
 };
 
 // Legend modal decoding the Event abbreviations (opened from the Audit header).

@@ -252,6 +252,16 @@ serve(async (req) => {
         })
       } catch (e) { console.warn('[tenant-mr] notify failed: ' + (e as Error).message) }
 
+      // Audit the external submission (service role; append-only). Never throws.
+      try {
+        await admin.from('housing_audit_log').insert({
+          entity_type: 'unit', entity_id: unitId, action: 'tenant_mr_submitted',
+          detail: 'Tenant reported via QR - ' + (category || 'Maintenance') + ': ' + description.slice(0, 120)
+            + (photoCount ? ' (' + photoCount + ' photo' + (photoCount > 1 ? 's' : '') + ')' : ''),
+          actor: contactName || 'Tenant (QR form)', created_at: new Date().toISOString(),
+        })
+      } catch (_e) { /* audit is best-effort */ }
+
       return json({ ok: true, reference: subId, address })
     }
 

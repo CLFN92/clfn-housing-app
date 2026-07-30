@@ -315,6 +315,16 @@ serve(async (req) => {
         .eq('id', subId).select('*').limit(1)
       const saved = (upd && upd[0]) || row
       const applicantName = [p.fn, p.ln].filter(Boolean).join(' ').trim()
+      const kindLbl = row.submission_type === 'update' ? 'Application update'
+        : row.submission_type === 'transfer' ? 'Transfer request' : 'New application'
+      // Audit the external submission (append-only, service role). Never throws.
+      try {
+        await admin.from('housing_audit_log').insert({
+          entity_type: 'application', entity_id: subId, action: 'application_portal_submitted',
+          detail: kindLbl + ' submitted via applicant portal - ' + (applicantName || email),
+          actor: (p.email && isValidEmail(p.email)) ? p.email : email, created_at: now,
+        })
+      } catch (_e) { /* audit is best-effort */ }
       try { await notifySubmission(admin, saved, (p.email && isValidEmail(p.email)) ? p.email : email, applicantName) }
       catch (e) { console.warn('[applicant-intake] notify failed: ' + (e as Error).message) }
       return json({ ok: true, id: subId, reference: subId })
