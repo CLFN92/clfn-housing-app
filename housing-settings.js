@@ -1031,14 +1031,29 @@ function _finAuditLabels(row){
   return { a: '💰 ' + _abbrevPhrase(act.replace(/_/g,' ')), f: '💰 ' + act.replace(/_/g,' ') };
 }
 
-// BY column: employee name only. When the row has no captured name (e.g. email
-// notifications store just the actor email), derive a display name from the
-// email local-part (split on . _ - and title-cased).
+// Resolve an actor email to the staff member's real name via the staff
+// directory cache (window._staffCache, {id:{email,name,...}}). '' if unknown.
+function _auditStaffNameByEmail(email){
+  email = (email || '').toLowerCase();
+  if (!email) return '';
+  var cache = window._staffCache || {};
+  for (var id in cache) {
+    var u = cache[id];
+    if (u && String(u.email || '').toLowerCase() === email) return (u.name || '').trim();
+  }
+  return '';
+}
+
+// BY column: employee name only. Prefer the row's captured name, else the real
+// staff name looked up from the actor email, else a name derived from the email
+// local-part (split on . _ - and title-cased).
 function _auditByName(e){
   var n = ((e && e.name) || '').trim();
   if (n) return n;
   var v = ((e && e.role) || '').trim();   // usually the actor email for these rows
   if (v.indexOf('@') !== -1) {
+    var staffName = _auditStaffNameByEmail(v);
+    if (staffName) return staffName;
     return v.split('@')[0].split(/[._+-]+/).filter(Boolean)
       .map(function(p){ return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase(); }).join(' ') || v;
   }
@@ -1093,6 +1108,15 @@ async function renderAuditLog(silent) {
 
   // Finance activity is intentionally NOT merged here — it has its own separate
   // finance_audit_log + view in the Finance module.
+
+  // Ensure the staff name lookup (for the BY column) is available even if the
+  // Users tab hasn't populated window._staffCache yet.
+  if (!window._staffCache || !Object.keys(window._staffCache).length) {
+    try {
+      var sr = await fetch(SUPABASE_URL + '/rest/v1/staff?select=id,email,name&is_active=eq.true', { headers: HOUSING_HEADERS });
+      if (sr.ok) { window._staffCache = {}; (await sr.json()).forEach(function(u){ window._staffCache[u.id] = u; }); }
+    } catch(e) { /* fall back to email-derived names */ }
+  }
 
   // Cache for CSV export — built from whatever we just rendered.
   window._auditRows = log;
