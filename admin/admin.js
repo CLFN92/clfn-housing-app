@@ -22,6 +22,7 @@
 
   var app = document.getElementById('app');
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); };
+  var _nations = [];   // last-loaded nations list (so Configure can look one up)
 
   function getAT(){ return localStorage.getItem(LS_AT) || ''; }
   function getRT(){ return localStorage.getItem(LS_RT) || ''; }
@@ -94,6 +95,7 @@
     // Load nations.
     var nr = await api('GET', '/nations?select=*&order=created_at.desc');
     var nations = nr.ok ? await nr.json().catch(function(){return[];}) : [];
+    _nations = nations;
 
     app.innerHTML =
       '<h1>Nations</h1>'
@@ -114,6 +116,7 @@
         + '<td><span class="pill ' + esc(st) + '">' + esc(st) + '</span></td>'
         + '<td style="font-size:11px;color:var(--muted);">' + esc(mods.join(', ') || '—') + '</td>'
         + '<td><div class="row-actions">'
+        +   '<button class="btn sm ghost" type="button" onclick="configureNation(\'' + esc(n.id) + '\')">Configure</button>'
         +   '<a class="btn sm ghost" href="' + url + '" target="_blank" rel="noopener">Open</a>'
         +   (st === 'suspended'
               ? '<button class="btn sm ghost" onclick="adminSetStatus(\'' + esc(n.id) + '\',\'active\')">Resume</button>'
@@ -211,6 +214,84 @@
   window.adminLogout = function(){
     try { fetch(AUTH + '/logout', { method:'POST', headers:{ apikey:ANON, Authorization:'Bearer '+getAT() } }); } catch(e){}
     clearSession(); document.getElementById('btn_out').style.display = 'none'; showLogin();
+  };
+
+  // ---- Configure a nation (P3) -----------------------------------------------
+  window.adminHome = function(){ showDashboard(); };
+
+  window.configureNation = async function(id){
+    var n = _nations.filter(function(x){ return String(x.id) === String(id); })[0];
+    if (!n){
+      var r = await api('GET', '/nations?select=*&id=eq.' + encodeURIComponent(id));
+      var a = r.ok ? await r.json().catch(function(){return[];}) : [];
+      n = a[0];
+    }
+    if (!n){ showDashboard(); return; }
+    document.getElementById('btn_out').style.display = '';
+    app.innerHTML = configureView(n);
+  };
+
+  function configureView(n){
+    var g2 = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;';
+    var mods = n.modules_licensed || {};
+    var modChecks = MODULES.map(function(m){
+      return '<label style="display:inline-flex;align-items:center;gap:6px;font-weight:600;margin:0 12px 8px 0;">'
+        + '<input type="checkbox" class="cn-mod" value="' + m[0] + '" style="width:auto;"' + (mods[m[0]] ? ' checked' : '') + '/> ' + esc(m[1]) + '</label>';
+    }).join('');
+    var stOpt = function(v,l){ return '<option value="' + v + '"' + (String(n.status||'provisioning') === v ? ' selected' : '') + '>' + l + '</option>'; };
+    return '<button class="btn sm ghost" type="button" onclick="adminHome()">&larr; Back</button>'
+      + '<h1 style="margin-top:12px;">Configure ' + esc(n.display_name) + '</h1>'
+      + '<p class="sub"><code>' + esc(n.subdomain) + '.fnhub.app</code> &middot; subdomain is fixed</p>'
+      + '<div class="card"><h3>Branding &amp; contact</h3>'
+      +   '<div style="' + g2 + '">'
+      +     '<div><label>Display name</label><input id="cn-name" value="' + esc(n.display_name) + '"/></div>'
+      +     '<div><label>Short code</label><input id="cn-short" value="' + esc(n.short) + '"/></div>'
+      +   '</div>'
+      +   '<div style="' + g2 + '">'
+      +     '<div><label>Primary color</label><input id="cn-color" placeholder="#f8e41a" value="' + esc(n.primary_color || '') + '"/></div>'
+      +     '<div><label>Staff email domain</label><input id="cn-domain" placeholder="nation.ca" value="' + esc(n.email_domain || '') + '"/></div>'
+      +   '</div>'
+      +   '<label>Housing email</label><input id="cn-housing" placeholder="housing@nation.ca" value="' + esc(n.housing_email || '') + '"/>'
+      + '</div>'
+      + '<div class="card"><h3>Supabase project</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">The nation\'s own database-per-nation project. The anon key is publishable.</p>'
+      +   '<label>Supabase URL</label><input id="cn-url" placeholder="https://xxxx.supabase.co" value="' + esc(n.supabase_url || '') + '"/>'
+      +   '<label>Supabase anon key</label><input id="cn-anon" placeholder="eyJ..." value="' + esc(n.supabase_anon || '') + '"/>'
+      + '</div>'
+      + '<div class="card"><h3>Licensed modules</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">Which optional modules this nation is allowed to use. The nation still turns each one on or off in its own in-app settings.</p>'
+      +   '<div>' + modChecks + '</div>'
+      + '</div>'
+      + '<div class="card"><h3>Status</h3>'
+      +   '<label>Registry status</label>'
+      +   '<select id="cn-status">' + stOpt('provisioning','Provisioning') + stOpt('active','Active') + stOpt('suspended','Suspended') + '</select>'
+      +   '<p class="sub" style="margin:6px 0 0;">Only <b>active</b> nations are published to <code>nations_public</code> and resolve at <code>&lt;subdomain&gt;.fnhub.app</code>.</p>'
+      + '</div>'
+      + '<div class="msg" id="cn-msg"></div>'
+      + '<button class="btn" id="cn-save" type="button" onclick="saveNationConfig(\'' + esc(n.id) + '\')">Save changes</button>';
+  }
+
+  window.saveNationConfig = async function(id){
+    var get = function(x){ return (document.getElementById(x) || {}).value || ''; };
+    var name = get('cn-name').trim(), short = get('cn-short').trim();
+    if (!name || !short){ setMsg('cn-msg','Display name and short code are required.'); return; }
+    var mods = {};
+    Array.prototype.forEach.call(document.querySelectorAll('.cn-mod'), function(c){ mods[c.value] = c.checked; });
+    var patch = {
+      display_name: name, short: short,
+      primary_color: get('cn-color').trim() || null,
+      email_domain:  get('cn-domain').trim() || null,
+      housing_email: get('cn-housing').trim() || null,
+      supabase_url:  get('cn-url').trim() || null,
+      supabase_anon: get('cn-anon').trim() || null,
+      modules_licensed: mods,
+      status: get('cn-status') || 'provisioning',
+      updated_at: new Date().toISOString()
+    };
+    var btn = document.getElementById('cn-save'); if (btn){ btn.disabled = true; btn.textContent = 'Saving...'; }
+    var r = await api('PATCH', '/nations?id=eq.' + encodeURIComponent(id), patch, 'return=minimal');
+    if (r.ok){ await audit('nation_configured', id, name); showDashboard(); }
+    else { var t = await r.text(); setMsg('cn-msg','Could not save: ' + t); if (btn){ btn.disabled = false; btn.textContent = 'Save changes'; } }
   };
 
   // ---- Boot ------------------------------------------------------------------
