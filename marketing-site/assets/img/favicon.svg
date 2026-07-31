@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- PLACEHOLDER favicon — swap for the real brand mark -->
+  <rect width="32" height="32" rx="7" fill="#9a4a1f"/>
+  <path d="M6.5 15.5 16 8l9.5 7.5" fill="none" stroke="#faf7f2" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M10 15v9h12v-9" fill="none" stroke="#faf7f2" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
