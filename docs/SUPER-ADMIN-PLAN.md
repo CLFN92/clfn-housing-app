@@ -308,3 +308,40 @@ Captured 2026-07-31 after P1-P3 shipped and `admin.fnhub.app` went live:
    scoped); (c) leave Open as a plain link and rely on the operator having their
    own nation login. Recommend (b) as the real feature, gated behind an explicit
    "enter nation" audit event, built as its own phase.
+
+---
+
+## 13. Domains: app vs marketing (decided direction)
+
+Two-domain split, deliberately separate:
+
+- **`fnhub.app` = the operational APP domain.** Where the product actually runs:
+  `clfn.fnhub.app`, `admin.fnhub.app`, future `<nation>.fnhub.app`. Kept plain and
+  low-profile. Not a marketing surface.
+- **`homelandshousing.ca` (candidate) = the PUBLIC marketing/brand site.** Explains
+  the product and funnels prospects in. Separate site, separate deploy.
+
+**"Obscure app URL" is hygiene, NOT security.** The app is still publicly reachable;
+real protection is auth + RLS + role gating, never URL obscurity. What the split
+genuinely buys: (1) separated attack surface — the marketing site's CMS/forms/
+trackers/3rd-party scripts can't touch app cookies/session or the app's strict CSP;
+(2) clean cookie/CSP/`noindex` scoping — app stays locked down + unindexed while the
+marketing site is open + indexed; (3) email-reputation separation — marketing sends
+stay off the transactional (Resend) domain.
+
+**`fnhub.app` is NOT invisible to end users.** Staff bookmark `clfn.fnhub.app`, QR
+codes point at it, and magic-link/notification emails come FROM it. So it's the
+day-to-day operational URL, not a hidden backend. Consequence: keep the **app
+visually branded** (header/logo/colors via `applyBrandingToHeader` + nation config,
+per the CLAUDE.md no-hardcoded-nation rule) so the app *feels* like the brand even
+on a `fnhub.app` URL, closing the "signed up on the brand site, work on fnhub"
+gap. Heavier future option (not now): serve nation workspaces on the brand domain
+(`clfn.homelandshousing.ca`).
+
+**Naming risk on the marketing name itself (unrelated to the URL split).**
+"Homelands" is double-edged for a First-Nations-facing product: it can read as
+Indigenous *homelands/territory/pride* (good) OR trip *apartheid-era "homelands"
+(Bantustans)* and *"Homeland Security"* associations (bad). Do a gut-check with
+Elders / Chief & Council before committing. Also: "…Housing" is descriptive =
+weak/hard-to-defend trademark and likely name collisions — run CIPO + registry +
+domain/social checks first.
