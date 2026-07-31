@@ -266,3 +266,40 @@ Each phase is independently shippable; CLFN keeps running throughout.
    the bootstrap schema, (b) generate a Supabase Management API token + Cloudflare
    API token for the control plane, (c) confirm the Supabase org has billing for
    multiple projects?
+
+---
+
+## 12. Follow-ups / notes (address on next update)
+
+Captured 2026-07-31 after P1-P3 shipped and `admin.fnhub.app` went live:
+
+1. **P2 not yet served to CLFN users.** The nation Worker (`clfn-housing-app`)
+   deploy command is `npx wrangler versions upload`, which uploads a version but
+   does NOT promote it to live traffic. So the P2 registry code sits on `main`
+   but isn't served. CLFN is unaffected (it resolves via the hardcoded `_default`
+   fallback regardless). **To actually ship P2:** switch that Worker's deploy
+   command to `npx wrangler deploy`, or promote the uploaded version in the
+   Cloudflare dashboard. Do this deliberately when ready to serve registry
+   resolution to end users.
+
+2. **Magic-link email uses Supabase's built-in sender.** The `fnhub-platform`
+   project sends admin sign-in links via Supabase's default email (heavily
+   rate-limited, can land in spam). Fine for a single super-admin today. Move it
+   to **Resend Custom SMTP** (same provider the nation app uses) before adding
+   more platform admins or relying on it heavily.
+
+3. **"Open" should open the nation site with full super-admin access.** Today the
+   panel's per-nation **Open** button just links to `https://<sub>.fnhub.app`
+   (the nation's normal login screen). Desired: clicking Open drops the platform
+   super-admin straight into that nation's app with full access. **Design
+   constraint to resolve first:** the platform admin is a Gmail
+   (`kevint.proctor@gmail.com`), but nation staff auth is a *separate* per-nation
+   Supabase project AND gated to the nation's own email domain
+   (`@clfn.on.ca`), so a Gmail can't be a nation staff user as-is. Options to
+   decide: (a) seed the super-admin as a `super_user` staff row in each nation
+   (still needs a login that passes the email gate); (b) a short-lived
+   impersonation token minted by a nation-side Edge Function that trusts the
+   control plane (powerful + security-sensitive — must be auditable and
+   scoped); (c) leave Open as a plain link and rely on the operator having their
+   own nation login. Recommend (b) as the real feature, gated behind an explicit
+   "enter nation" audit event, built as its own phase.
