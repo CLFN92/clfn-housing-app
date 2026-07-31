@@ -492,6 +492,130 @@ section { padding-block: clamp(3.4rem, 8vw, 6rem); }
 .trust-list p { margin: 0; color: var(--ink-soft); font-size: 0.98rem; }
 
 /* --------------------------------------------------------------------------
+   Pricing
+   -------------------------------------------------------------------------- */
+
+.price-grid {
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 2.2rem;
+  align-items: stretch;
+}
+@media (max-width: 62em) { .price-grid { grid-template-columns: 1fr; max-width: 30rem; margin-inline: auto; } }
+
+.price-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 1.8rem 1.6rem;
+  text-align: center;
+}
+.price-card h3 { margin: 0 0 0.2rem; }
+.price-card .btn { margin-top: auto; align-self: center; }
+
+.price-card.featured {
+  border: 2px solid var(--accent);
+  box-shadow: var(--shadow);
+}
+
+.price-flag {
+  position: absolute;
+  top: -0.9rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.9rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  margin: 0;
+}
+
+.price-size {
+  color: var(--ink-soft);
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.price-amount {
+  font-size: 2.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-bottom: 0.3rem;
+  font-variant-numeric: tabular-nums;
+}
+.price-amount span {
+  font-size: 1.05rem;
+  font-weight: 550;
+  color: var(--ink-soft);
+  letter-spacing: 0;
+}
+
+.price-annual {
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  margin-bottom: 1.1rem;
+}
+
+.price-setup {
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+  margin-bottom: 1.4rem;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+.price-setup strong { color: var(--ink); }
+
+.price-includes {
+  margin-top: 1.6rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 1.7rem 1.6rem;
+}
+.price-includes h3 { margin-bottom: 1rem; }
+.price-includes ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+.price-includes li {
+  padding-left: 1.6rem;
+  position: relative;
+  color: var(--ink-soft);
+}
+.price-includes li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: 800;
+}
+.price-addon {
+  margin: 1.2rem 0 0;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+.price-addon strong { color: var(--ink); }
+
+.price-note {
+  margin-top: 1.8rem;
+  font-weight: 550;
+}
+
+/* --------------------------------------------------------------------------
    Contact / demo form
    -------------------------------------------------------------------------- */
 

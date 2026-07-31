@@ -56,7 +56,7 @@ Nothing on the site is invented — these are the deliberately-open slots:
 | 6 | **Form endpoint** (optional — a URL accepting a JSON POST; a tiny Cloudflare Worker works well) | `SITE_CONFIG.formEndpoint` in `assets/js/main.js`; if it's on another origin, also add it to `connect-src` in `_headers` |
 | 7 | **App login URL** (currently `https://fnhub.app`) | `SITE_CONFIG.appLoginUrl` + the two "Sign in" links in `index.html` |
 | 8 | **About / founding story** copy | `#about` section placeholder in `index.html` |
-| 9 | **Pricing wording** (no numbers invented; current copy says "per-nation, ask for a quote") | `#demo` section placeholder in `index.html` |
+| 9 | **Pricing sign-off** — a full `#pricing` section is now on the page with a market-researched draft schedule (tiers by homes managed + one-time setup + AI add-on). The numbers are a **proposal benchmarked against comparable software** (Yardi Breeze ~$1–2/unit/mo, Buildium $62–400/mo flat tiers, FN-sector vendors mostly quote-only; setup fees ≈20–40% of year-one cost). Adjust freely — they're plain HTML in one section | `#pricing` section in `index.html` |
 | 10 | **Land acknowledgement** wording | Footer placeholder in `index.html` |
 | 11 | **Legal entity name** for the © line | Footer in `index.html` |
 | 12 | **OG/social image** — 1200×630 PNG at `assets/img/og-image.png` (referenced but not shipped) | `og:image` in `index.html` |
