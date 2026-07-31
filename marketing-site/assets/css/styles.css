@@ -575,6 +575,14 @@ section { padding-block: clamp(3.4rem, 8vw, 6rem); }
 }
 .price-setup strong { color: var(--ink); }
 
+.price-waive {
+  display: inline-block;
+  margin-top: 0.45rem;
+  color: var(--accent);
+  font-weight: 650;
+  font-size: 0.88rem;
+}
+
 .price-includes {
   margin-top: 1.6rem;
   background: var(--surface);
