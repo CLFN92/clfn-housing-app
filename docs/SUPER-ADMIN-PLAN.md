@@ -5,10 +5,15 @@ FN Hub. This is the "super-user tooling" that CLAUDE.md kept out of the nation
 app — we build it as an **isolated piece** so nation code and platform code stay
 separate.
 
-Status: **P1 done, P2 in progress.** P1 = control plane + panel shell (built,
-wired to the fnhub-platform project). P2 = registry-driven `resolveNation`
-(nation app reads `nations_public` at boot; CLFN `_default` stays as the
-hardcoded fallback, never overridden). Rest of plan approved, not yet built.
+Status: **P1-P3 shipped and live at `admin.fnhub.app`; P4 scaffolded.**
+P1 = control plane + panel + super-admin auth. P2 = registry-driven
+`resolveNation` (reads `nations_public`; CLFN `_default` stays as fallback).
+P3 = Configure Nation (branding/contact/Supabase/module-licensing/status).
+P4 = assisted provisioning: `provision-nation` control-plane function +
+panel wizard (schema replay via Management API, bucket, first ED, registry).
+**P4 blocked on P0 prereqs:** `supabase/bootstrap/schema.sql` (`supabase db
+dump`) + `SUPABASE_MGMT_TOKEN` secret on the platform project. "Open with
+full access" chosen = **impersonation token** (its own phase, not yet built).
 
 ## File structure (isolation boundary)
 

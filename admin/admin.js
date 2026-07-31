@@ -102,6 +102,7 @@
       + '<p class="sub">Signed in as ' + esc(meEmail) + '</p>'
       + nationsCard(nations)
       + addNationCard()
+      + provisionCard()
       + adminsCard(admins, meEmail);
     wireAddNation();
   }
@@ -293,6 +294,98 @@
     if (r.ok){ await audit('nation_configured', id, name); showDashboard(); }
     else { var t = await r.text(); setMsg('cn-msg','Could not save: ' + t); if (btn){ btn.disabled = false; btn.textContent = 'Save changes'; } }
   };
+
+  // ---- Provision a nation (P4, assisted) -------------------------------------
+  function provisionCard(){
+    return '<div class="card"><h3>Provision a nation (assisted)</h3>'
+      + '<p class="sub" style="margin:2px 0 8px;">Stand up a new nation on a Supabase project you already created: replay the bootstrap schema, create the storage bucket, seed the first ED, and register it. Needs the bootstrap schema file and the Management API token secret on the platform function.</p>'
+      + '<button class="btn" type="button" onclick="showProvision()">Start provisioning wizard</button></div>';
+  }
+
+  window.showProvision = function(){
+    document.getElementById('btn_out').style.display = '';
+    var g2 = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;';
+    var modChecks = MODULES.map(function(m){
+      return '<label style="display:inline-flex;align-items:center;gap:6px;font-weight:600;margin:0 12px 8px 0;"><input type="checkbox" class="pv-mod" value="' + m[0] + '" style="width:auto;"/> ' + esc(m[1]) + '</label>';
+    }).join('');
+    app.innerHTML = '<button class="btn sm ghost" type="button" onclick="adminHome()">&larr; Back</button>'
+      + '<h1 style="margin-top:12px;">Provision a nation</h1>'
+      + '<p class="sub">Assisted: you created the Supabase project; this runs schema, bucket, first ED, and registry.</p>'
+      + '<div class="card"><h3>Nation</h3>'
+      +   '<div style="' + g2 + '"><div><label>Subdomain</label><input id="pv-sub" placeholder="listuguj"/></div><div><label>Short code</label><input id="pv-short" placeholder="LMG"/></div></div>'
+      +   '<label>Display name</label><input id="pv-name" placeholder="Listuguj Mi\'gmaq Government"/>'
+      +   '<div style="' + g2 + '"><div><label>Staff email domain</label><input id="pv-domain" placeholder="listuguj.ca"/></div><div><label>Primary color</label><input id="pv-color" placeholder="#f8e41a"/></div></div>'
+      +   '<label>Housing email</label><input id="pv-housing" placeholder="housing@listuguj.ca"/>'
+      +   '<label style="margin-top:10px;">Licensed modules</label><div>' + modChecks + '</div>'
+      + '</div>'
+      + '<div class="card"><h3>Target Supabase project</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">The new project you created. The service_role key is used once (bucket + ED) and never stored.</p>'
+      +   '<div style="' + g2 + '"><div><label>Project ref</label><input id="pv-ref" placeholder="abcdefgh...ref"/></div><div><label>Project URL</label><input id="pv-url" placeholder="https://&lt;ref&gt;.supabase.co"/></div></div>'
+      +   '<label>Anon (publishable) key</label><input id="pv-anon" placeholder="eyJ..."/>'
+      +   '<label>Service role key (used once)</label><input id="pv-service" placeholder="eyJ... (service_role)"/>'
+      + '</div>'
+      + '<div class="card"><h3>First ED and bootstrap schema</h3>'
+      +   '<div style="' + g2 + '"><div><label>First ED email</label><input id="pv-ed-email" placeholder="ed@listuguj.ca"/></div><div><label>First ED name</label><input id="pv-ed-name" placeholder="Executive Director"/></div></div>'
+      +   '<label>Bootstrap schema file (supabase/bootstrap/schema.sql)</label><input id="pv-schema" type="file" accept=".sql,text/plain"/>'
+      + '</div>'
+      + '<div class="msg" id="pv-msg"></div>'
+      + '<button class="btn" id="pv-btn" type="button" onclick="runProvision()">Provision nation</button>'
+      + '<div id="pv-results" style="margin-top:14px;"></div>';
+  };
+
+  window.runProvision = async function(){
+    var get = function(x){ return (document.getElementById(x) || {}).value || ''; };
+    var sub = get('pv-sub').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+    var name = get('pv-name').trim(), short = get('pv-short').trim();
+    if (!sub || !name || !short){ setMsg('pv-msg', 'Subdomain, display name, and short code are required.'); return; }
+    var mods = {};
+    Array.prototype.forEach.call(document.querySelectorAll('.pv-mod'), function(c){ mods[c.value] = c.checked; });
+    var schemaSql = '';
+    var fileEl = document.getElementById('pv-schema');
+    if (fileEl && fileEl.files && fileEl.files[0]) {
+      try { schemaSql = await fileEl.files[0].text(); }
+      catch (e){ setMsg('pv-msg', 'Could not read the schema file.'); return; }
+    }
+    var payload = {
+      nation: { subdomain: sub, display_name: name, short: short,
+                email_domain: get('pv-domain').trim() || null, housing_email: get('pv-housing').trim() || null,
+                primary_color: get('pv-color').trim() || null, modules_licensed: mods },
+      target: { ref: get('pv-ref').trim() || null, url: get('pv-url').trim() || null,
+                anon: get('pv-anon').trim() || null, service_role: get('pv-service').trim() || null },
+      first_ed: { email: get('pv-ed-email').trim() || null, name: get('pv-ed-name').trim() || null },
+      schema_sql: schemaSql
+    };
+    var btn = document.getElementById('pv-btn'); if (btn){ btn.disabled = true; btn.textContent = 'Provisioning...'; }
+    document.getElementById('pv-results').innerHTML = '<p class="sub">Running... this can take a minute.</p>';
+    try {
+      var r = await fetch(PBASE + '/functions/v1/provision-nation', {
+        method: 'POST',
+        headers: { apikey: ANON, Authorization: 'Bearer ' + getAT(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      var d = await r.json().catch(function(){ return {}; });
+      if (!r.ok){
+        setMsg('pv-msg', (d && d.error) ? ('Failed: ' + d.error) : ('Failed: HTTP ' + r.status));
+        document.getElementById('pv-results').innerHTML = '';
+      } else { renderProvisionResults(d); }
+    } catch (e){ setMsg('pv-msg', 'Network error: ' + String(e).slice(0, 120)); document.getElementById('pv-results').innerHTML = ''; }
+    if (btn){ btn.disabled = false; btn.textContent = 'Provision nation'; }
+  };
+
+  function renderProvisionResults(d){
+    var steps = (d && d.steps) || [];
+    var rows = steps.map(function(s){
+      return '<tr><td>' + (s.ok ? '✅' : '⚠️') + '</td><td><b>' + esc(s.name) + '</b></td>'
+        + '<td style="font-size:12px;color:var(--muted);">' + esc(s.detail) + '</td></tr>';
+    }).join('');
+    var head = d.ok
+      ? '<div class="msg ok" style="display:block;">Provisioned <b>' + esc(d.subdomain) + '</b>. Registry updated.</div>'
+      : '<div class="msg err" style="display:block;">Finished with issues - review the steps below.</div>';
+    var mel = document.getElementById('pv-msg'); if (mel){ mel.className = 'msg'; mel.textContent = ''; }
+    document.getElementById('pv-results').innerHTML = head
+      + '<div class="card"><h3>Result</h3><table><tbody>' + rows + '</tbody></table>'
+      + '<button class="btn sm" type="button" onclick="adminHome()" style="margin-top:10px;">Back to nations</button></div>';
+  }
 
   // ---- Boot ------------------------------------------------------------------
   function parseHash(){ var h = (location.hash||'').replace(/^#/,''); if (!h) return null; var o={}; h.split('&').forEach(function(kv){ var p=kv.split('='); if (p[0]) o[decodeURIComponent(p[0])] = decodeURIComponent(p[1]||''); }); return o; }

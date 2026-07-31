@@ -51,6 +51,10 @@ jobs:
             name="$(basename "$dir")"
             # Skip shared/util folders (conventionally prefixed with _).
             case "$name" in _*) echo "Skipping helper folder: $name"; continue;; esac
+            # Skip control-plane functions: they deploy to the fnhub-platform
+            # project (not this nation project) via `supabase functions deploy
+            # <name> --project-ref <platform-ref>`. See supabase/functions/<name>/README.
+            case "$name" in provision-nation) echo "Skipping platform-only function: $name"; continue;; esac
             if [ ! -f "${dir}index.ts" ]; then
               echo "No index.ts in $name - skipping"
               continue
