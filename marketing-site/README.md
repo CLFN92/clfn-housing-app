@@ -1,4 +1,4 @@
-# Homelands Housing — marketing site
+# Home Land Homes — marketing site (homelandhomes.ca)
 
 The public marketing/brand site for the housing-management platform. **Completely
 separate from the app**: static files only, no shared code, cookies, or sessions —
@@ -32,7 +32,7 @@ Open http://localhost:8080.
 **CLI:**
 
 ```sh
-npx wrangler pages deploy marketing-site --project-name homelands-marketing
+npx wrangler pages deploy marketing-site --project-name homelandhomes
 ```
 
 `_headers` is picked up automatically by Pages and sets the CSP, HSTS,
@@ -48,10 +48,10 @@ Nothing on the site is invented — these are the deliberately-open slots:
 
 | # | Item | Where |
 |---|------|-------|
-| 1 | **Final product name** ("Homelands Housing" is provisional) | `<title>`/meta + the two `.brand` wordmarks in `index.html`, `404.html`, this README |
+| 1 | ~~Final product name~~ ✅ **Home Land Homes** (applied everywhere) | — |
 | 2 | **Logo** (replaces the placeholder house mark + favicon) | `.brand` SVGs in `index.html`, `assets/img/favicon.svg` |
 | 3 | **Brand colors** | The `:root` (and dark-scheme) variables at the top of `assets/css/styles.css` — every color routes through them |
-| 4 | **Production domain** | Replace `REPLACE-WITH-DOMAIN.example` in `index.html` (canonical + OG), `robots.txt`, `sitemap.xml` |
+| 4 | ~~Production domain~~ ✅ **homelandhomes.ca** (applied to canonical/OG, `robots.txt`, `sitemap.xml`) | — |
 | 5 | **Contact email** | `SITE_CONFIG.contactEmail` in `assets/js/main.js` (footer + mailto form fallback pick it up automatically) |
 | 6 | **Form endpoint** (optional — a URL accepting a JSON POST; a tiny Cloudflare Worker works well) | `SITE_CONFIG.formEndpoint` in `assets/js/main.js`; if it's on another origin, also add it to `connect-src` in `_headers` |
 | 7 | **App login URL** (currently `https://fnhub.app`) | `SITE_CONFIG.appLoginUrl` + the two "Sign in" links in `index.html` |

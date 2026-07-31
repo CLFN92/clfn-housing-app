@@ -1,4 +1,4 @@
-/* Homelands Housing — marketing site JS.
+/* Home Land Homes — marketing site JS.
    Progressive enhancement only: the page is fully readable with JS disabled. */
 
 (function () {

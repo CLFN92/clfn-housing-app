@@ -1,5 +1,5 @@
-# Replace REPLACE-WITH-DOMAIN.example with the real production domain.
+# Production domain: homelandhomes.ca
 User-agent: *
 Allow: /
 
-Sitemap: https://REPLACE-WITH-DOMAIN.example/sitemap.xml
+Sitemap: https://homelandhomes.ca/sitemap.xml
