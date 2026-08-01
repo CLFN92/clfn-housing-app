@@ -74,6 +74,26 @@ var _rfqDocLib           = null; // DocLibrary instance for this RFQ
   }
 }());
 
+// Back-navigation refresh. The "Maintenance Request" button leaves this page for
+// renos.html; when the user edits the MR's dates there and returns, mobile
+// browsers often restore this page from bfcache WITHOUT reloading, so _sowCache
+// still holds the old dates. On a bfcache restore, re-fetch the SOW cache and
+// re-run _loadRfqSowContext (which re-syncs the read-only MR-sourced date fields)
+// without a full reload, so it doesn't discard any in-progress RFQ edits.
+window.addEventListener('pageshow', function (e) {
+  if (!e.persisted) return;
+  if (typeof _rfqSowUnitId === 'undefined' || !_rfqSowUnitId) return;
+  fetch(SUPABASE_URL + '/rest/v1/housing_sow?select=unit_id,data', { headers: HOUSING_HEADERS })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (sd) {
+      if (!sd) return;
+      window._sowCache = {};
+      sd.forEach(function (row) { window._sowCache[row.unit_id] = row.data; });
+      if (typeof _loadRfqSowContext === 'function') _loadRfqSowContext();
+    })
+    .catch(function () {});
+});
+
 async function loadRfqPageData() {
   var results = await Promise.all([
     fetch(SUPABASE_URL + '/rest/v1/housing_units?select=*&order=street,num&limit=9999', { headers: HOUSING_HEADERS }),
