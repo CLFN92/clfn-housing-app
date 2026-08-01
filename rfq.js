@@ -608,6 +608,18 @@ function _loadRfqSowContext() {
   if (budgDisp) budgDisp.value = amt;
   if (subLbl)   subLbl.textContent = addr || '';
 
+  // Target Start/Completion are read-only "(from Maintenance Request)" fields, so
+  // keep them synced to the LIVE MR here (the _sowCache is loaded fresh at boot),
+  // not the RFQ's saved snapshot. Without this, editing the MR's dates after the
+  // RFQ was first saved never showed on reopen. Only overwrite when the MR has a
+  // value, so a missing cache entry can't wipe the snapshot from _populateFormFields.
+  if (_rfqSowData) {
+    var tsEl = document.getElementById('rfq_target_start');
+    var teEl = document.getElementById('rfq_target_end');
+    if (tsEl && _rfqSowData.startDate) tsEl.value = _rfqSowData.startDate;
+    if (teEl && _rfqSowData.endDate)   teEl.value = _rfqSowData.endDate;
+  }
+
   // Pre-populate scope items from SOW cache
   if (!_rfqScopeItems.length && _rfqSowData) {
     var rawItems = _rfqSowData.items || _rfqSowData.lineItems || [];
