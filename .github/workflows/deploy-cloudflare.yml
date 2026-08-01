@@ -1,0 +1,47 @@
+name: Deploy nation app to Cloudflare
+
+# Deploys the nation app (root wrangler.jsonc -> the clfn-housing-app Worker) to
+# Cloudflare via `wrangler deploy`, which PROMOTES the version to live traffic
+# (unlike Cloudflare's built-in Workers Build, currently `versions upload`, which
+# only uploads without promoting). Runs on push to main and on manual dispatch.
+#
+# One-time setup - add two repository secrets
+# (Settings -> Secrets and variables -> Actions -> New repository secret):
+#   CLOUDFLARE_API_TOKEN   - Cloudflare -> My Profile -> API Tokens -> Create Token
+#                            -> "Edit Cloudflare Workers" template (scope to this account)
+#   CLOUDFLARE_ACCOUNT_ID  - Cloudflare dashboard -> account overview / URL
+# Until both exist the job runs green and simply skips (no red failures).
+#
+# NOTE: the admin panel (fnhub-admin) keeps its own Cloudflare Workers Build and
+# is excluded from this deploy via .assetsignore, so this only ships the nation app.
+# To avoid double-deploys, once this workflow is live you can set the
+# clfn-housing-app Cloudflare Workers Build deploy command to `npx wrangler deploy`
+# too, OR disconnect its Git build and rely on this workflow.
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for Cloudflare secrets
+        id: secrets
+        run: |
+          if [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] && [ -n "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping deploy - add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repo secrets to enable live deploys."
+          fi
+
+      - name: Deploy with Wrangler
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 deploy
