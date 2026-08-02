@@ -144,6 +144,83 @@ function showRfqList() {
   renderRfqList();
 }
 
+// ── List/Cards toggle (local) ───────────────────────────────────────────────
+// rfq.html does NOT load housing-views.js, so mirror the shared
+// _viewToggleHtml/_cardTile styling here (locally scoped, like the worklist's
+// own toggle). Mode persists per device via localStorage; defaults to 'list'
+// (the RFQ page has always shown a table).
+function _rfqViewMode() {
+  try { return localStorage.getItem('clfn_rfq_view') === 'cards' ? 'cards' : 'list'; } catch (e) { return 'list'; }
+}
+window._rfqSetView = function (v) {
+  try { localStorage.setItem('clfn_rfq_view', v === 'cards' ? 'cards' : 'list'); } catch (e) {}
+  renderRfqList();
+};
+function _rfqViewToggleHtml() {
+  var cur = _rfqViewMode();
+  function b(v, label, icon) {
+    var on = cur === v;
+    return '<button type="button" onclick="_rfqSetView(\'' + v + '\')" style="display:flex;align-items:center;gap:5px;padding:5px 12px;'
+      + 'border:1px solid ' + (on ? 'var(--yellow)' : 'var(--border)') + ';background:' + (on ? 'var(--yellow)' : 'var(--surface)') + ';'
+      + 'color:' + (on ? 'var(--dark)' : 'var(--muted)') + ';font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;'
+      + 'border-radius:' + (v === 'list' ? '7px 0 0 7px' : '0 7px 7px 0') + ';' + (v === 'cards' ? 'margin-left:-1px;' : '') + '">' + icon + ' ' + label + '</button>';
+  }
+  return '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><div style="display:flex;">' + b('list', 'List', '&#9776;') + b('cards', 'Cards', '&#9638;') + '</div></div>';
+}
+function _rfqCardPill(text, bg, color) {
+  if (!text) return '';
+  return '<span style="flex-shrink:0;font-size:10px;font-weight:700;color:' + (color || 'var(--muted)') + ';background:' + (bg || 'var(--bg)') + ';border:1px solid var(--border);border-radius:20px;padding:2px 8px;white-space:nowrap;">' + text + '</span>';
+}
+function _rfqCardTile(o) {
+  var metas = (o.metas || []).filter(function (m) { return m && m.v != null && String(m.v) !== ''; }).map(function (m) {
+    return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;margin-top:5px;">'
+      + '<span style="color:var(--muted);flex-shrink:0;">' + m.k + '</span>'
+      + '<span style="color:var(--text);font-weight:600;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + m.v + '</span></div>';
+  }).join('');
+  var actions = (o.actions || []).map(function (a) {
+    return '<button type="button" onclick="' + a.onclick + '" style="flex:1;background:' + (a.ghost ? 'none' : 'var(--yellow)') + ';color:' + (a.ghost ? 'var(--muted)' : 'var(--dark)') + ';'
+      + 'border:' + (a.ghost ? '1px solid var(--border)' : 'none') + ';border-radius:7px;padding:8px 10px;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;">' + a.text + '</button>';
+  }).join('');
+  return '<div style="border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:13px 14px;display:flex;flex-direction:column;">'
+    + '<div ' + (o.open ? 'onclick="' + o.open + '"' : '') + ' style="cursor:' + (o.open ? 'pointer' : 'default') + ';">'
+    +   '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">'
+    +     '<span style="font-size:14px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;">' + o.title + '</span>'
+    +     _rfqCardPill(o.pill && o.pill.text, o.pill && o.pill.bg, o.pill && o.pill.color)
+    +   '</div>'
+    +   metas
+    + '</div>'
+    + (actions ? '<div style="display:flex;gap:6px;margin-top:11px;">' + actions + '</div>' : '')
+    + '</div>';
+}
+// One RFQ card — same filtered+sorted row the table uses, laid out as a tile.
+function _rfqRenderCard(r) {
+  var rfq  = r.rfq;
+  var id   = escapeHtml(rfq.id);
+  var clos = rfq.closes_at ? new Date(rfq.closes_at).toLocaleDateString('en-CA') : '';
+  var iss  = rfq.issued_at ? new Date(rfq.issued_at).toLocaleDateString('en-CA') : '';
+  var rcp  = (rfq.recipient_contractor_ids || []).length;
+  var amt  = rfq.award_amount ? '$' + Number(rfq.award_amount).toLocaleString('en-CA', { minimumFractionDigits: 2 }) : '';
+  var st   = rfq.status || 'draft';
+  var actions = [];
+  if (st === 'draft')  actions.push({ text: 'Edit',  ghost: true, onclick: "event.stopPropagation();showRfqForm('" + id + "',null,null)" });
+  if (st === 'issued') actions.push({ text: 'Award', ghost: true, onclick: "event.stopPropagation();showAwardModal('" + id + "')" });
+  if (st !== 'cancelled' && st !== 'awarded') actions.push({ text: 'Cancel', ghost: true, onclick: "event.stopPropagation();cancelRfq('" + id + "')" });
+  return _rfqCardTile({
+    title: id,
+    pill:  { text: st },
+    open:  "showRfqForm('" + id + "',null,null)",
+    metas: [
+      { k: 'Unit / SOW',  v: escapeHtml(r.addr) + (rfq.sow_project_number ? ' &middot; ' + escapeHtml(rfq.sow_project_number) : '') },
+      { k: 'Issued',      v: iss },
+      { k: 'Closes',      v: clos },
+      { k: 'Recipients',  v: rcp || '' },
+      { k: 'Awarded To',  v: escapeHtml(r.awardCt || '') },
+      { k: 'Award $',     v: amt }
+    ],
+    actions: actions
+  });
+}
+
 // Mirrors renderWorklist() exactly: builds search + table as innerHTML string
 // into #rfqListBody so layout, spacing and column-menu are identical.
 function renderRfqList() {
@@ -244,8 +321,20 @@ function renderRfqList() {
   // Re-render ONLY the table container (the search input above it persists).
   var _tableWrap = document.getElementById('rfq_list_table_wrap');
   if (!_tableWrap) return;
-  _tableWrap.innerHTML =
-      '<div class="std-table-card">'
+
+  // Cards mode: same filtered+sorted rows, laid out as tiles. No table/thead,
+  // so return before the column-menu binding below (which needs the thead).
+  if (_rfqViewMode() === 'cards') {
+    _tableWrap.innerHTML = _rfqViewToggleHtml()
+      + (sorted.length
+          ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;">'
+              + sorted.map(_rfqRenderCard).join('') + '</div>'
+          : '<div style="padding:32px;text-align:center;color:var(--muted);font-size:13px;font-style:italic;">' + emptyMsg + '</div>');
+    return;
+  }
+
+  _tableWrap.innerHTML = _rfqViewToggleHtml()
+    + '<div class="std-table-card">'
     +   '<div class="doclib-table-wrap"><table class="std-table">'
     +     '<thead id="rfq_thead"><tr>'
     +       '<th class="std-th-sortable" data-sort-key="id">RFQ #</th>'
