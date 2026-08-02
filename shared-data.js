@@ -8914,25 +8914,49 @@ async function sendRfqToRecipients(rfq, contractorList) {
 // Marks the SOW linked to an RFQ as approved — awarding/contracting an RFQ
 // greenlights the underlying scope of work, so it should no longer sit in the
 // reno-approval queue. Idempotent; safe to call more than once.
-function _rfqApproveLinkedSow(unitId, projectNumber, role) {
+function _rfqApproveLinkedSow(unitId, projectNumber, role, contractor) {
   if (!unitId || typeof getUnitSowList !== 'function' || typeof saveSowData !== 'function') return;
   var list = getUnitSowList(unitId);
   if (!list.length) return;
   var sow = (projectNumber ? list.find(function(s){ return s && s.project_number === projectNumber; }) : null) || list[0];
   if (!sow) return;
-  if (sow.approval_status === 'completed' || sow.approval_status === 'ed_approved') return;
+
+  // Assign the AWARDED contractor as the MR's work-order assignee, so the work
+  // order + its emails/PDF go to the winning contractor. Previously the RFQ award
+  // approved the MR but left its "Assigned To" untouched. Done even if the MR is
+  // already approved — the award is the authoritative contractor choice.
+  var didAssign = false;
+  if (contractor && contractor.id && sow.contractorId !== contractor.id) {
+    sow.assignedTeam   = 'contractor';
+    sow.contractorId   = contractor.id;
+    sow.contractor     = contractor.name || sow.contractor || '';
+    sow.assignedTo     = '';   // clear any prior in-house crew assignment
+    sow.assignedToName = '';
+    didAssign = true;
+  }
+
   // System Approved: the SOW is approved BY the tendering workflow (RFQ award),
   // not by a person. Keep approval_status='ed_approved' so every existing
   // "is this approved?" check recognizes it, but flag system_approved so the UI
   // can label it "System Approved" instead of falsely showing "ED Approved".
-  sow.approval_status = 'ed_approved';
-  sow.approved_via_rfq = true;
-  sow.system_approved = true;
-  sow.edName = 'System';
-  sow.edDate = (new Date().toISOString().slice(0, 10));
-  saveSowData(unitId, { sows: list });
-  if (typeof auditEntry === 'function') {
-    auditEntry('SOW:' + unitId, 'sow_system_approval', (projectNumber || '') + ' system-approved via RFQ award/contract', role || window.currentRole || 'staff');
+  // Skip re-approving a terminally-approved MR, but still persist the assignment.
+  var alreadyApproved = (sow.approval_status === 'completed' || sow.approval_status === 'ed_approved');
+  if (!alreadyApproved) {
+    sow.approval_status = 'ed_approved';
+    sow.approved_via_rfq = true;
+    sow.system_approved = true;
+    sow.edName = 'System';
+    sow.edDate = (new Date().toISOString().slice(0, 10));
+  }
+
+  if (didAssign || !alreadyApproved) {
+    saveSowData(unitId, { sows: list });
+    if (typeof auditEntry === 'function') {
+      var _msg = (!alreadyApproved ? (projectNumber || '') + ' system-approved via RFQ award/contract'
+                                   : (projectNumber || '') + ' updated via RFQ award')
+               + (didAssign && contractor ? ' -- assigned to ' + (contractor.name || contractor.id) : '');
+      auditEntry('SOW:' + unitId, 'sow_system_approval', _msg, role || window.currentRole || 'staff');
+    }
   }
 }
 
@@ -8956,8 +8980,10 @@ async function awardRfq(rfqId, contractorId, amount, notes, opts) {
     Object.assign(rfq, updates);
     var ct = (window._contractors || []).find(function(c){ return c && c.id === contractorId; });
     if (typeof auditEntry === 'function') auditEntry('RFQ:' + rfqId, 'awarded', 'Awarded to ' + ((ct && ct.name) || contractorId) + ' -- $' + (parseFloat(amount)||0).toFixed(2) + (opts.skipNotify ? ' (no notifications)' : '') + (notes ? ' -- ' + notes : ''), role);
-    // Awarding an RFQ approves the linked SOW.
-    _rfqApproveLinkedSow(rfq.sow_unit_id, rfq.sow_project_number, role);
+    // Awarding an RFQ approves the linked SOW AND assigns the winning contractor
+    // as its work-order assignee (ct is the awarded contractor from the cache;
+    // fall back to just the id if it isn't loaded).
+    _rfqApproveLinkedSow(rfq.sow_unit_id, rfq.sow_project_number, role, ct || (contractorId ? { id: contractorId } : null));
     // Resolve the unit address BEFORE the winner-email branch: the regret
     // notices below also use it, and when the winner has no email this branch
     // is skipped — addr used to stay undefined and losers' emails lost the
