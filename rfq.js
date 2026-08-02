@@ -82,6 +82,19 @@ var _rfqDocLib           = null; // DocLibrary instance for this RFQ
 // without a full reload, so it doesn't discard any in-progress RFQ edits.
 window.addEventListener('pageshow', function (e) {
   if (!e.persisted) return;
+  // Re-hydrate an open RFQ's recipient selection + bids from the cached record.
+  // Navigating away (e.g. the Maintenance Request button) and returning via the
+  // mobile back-cache could otherwise leave the Recipients tab showing an empty
+  // selection even though the count/record still has recipients.
+  if (typeof _rfqCurrentId !== 'undefined' && _rfqCurrentId && window._rfqCache && window._rfqCache[_rfqCurrentId]) {
+    var _r = window._rfqCache[_rfqCurrentId];
+    _rfqSelectedCts = {};
+    (_r.recipient_contractor_ids || []).forEach(function (id) { _rfqSelectedCts[id] = true; });
+    if (_r.data && _r.data.bids) { try { _rfqBids = JSON.parse(JSON.stringify(_r.data.bids)); } catch (_e) {} }
+    if (typeof updateRecipientBadge === 'function') updateRecipientBadge();
+    if (typeof renderContractorCards === 'function' && document.getElementById('rfqContractorGrid')) renderContractorCards();
+    if (typeof renderBidsSection === 'function') renderBidsSection();
+  }
   if (typeof _rfqSowUnitId === 'undefined' || !_rfqSowUnitId) return;
   fetch(SUPABASE_URL + '/rest/v1/housing_sow?select=unit_id,data', { headers: HOUSING_HEADERS })
     .then(function (r) { return r.ok ? r.json() : null; })
@@ -152,6 +165,12 @@ function showRfqList() {
 function _rfqViewMode() {
   try { return localStorage.getItem('clfn_rfq_view') === 'cards' ? 'cards' : 'list'; } catch (e) { return 'list'; }
 }
+// Status filters — hide finished RFQs by default (declutter); toggles reveal them.
+function _rfqShow(key) { try { return localStorage.getItem('clfn_rfq_show_' + key) === '1'; } catch (e) { return false; } }
+window._rfqToggleShow = function (key, el) {
+  try { localStorage.setItem('clfn_rfq_show_' + key, (el && el.checked) ? '1' : '0'); } catch (e) {}
+  renderRfqList();
+};
 window._rfqSetView = function (v) {
   try { localStorage.setItem('clfn_rfq_view', v === 'cards' ? 'cards' : 'list'); } catch (e) {}
   renderRfqList();
@@ -239,6 +258,11 @@ function renderRfqList() {
       +   ' placeholder="&#128269; Search RFQ #, unit, status, contractor&hellip;"'
       +   ' oninput="clearTimeout(window._rfqST);window._rfqST=setTimeout(renderRfqList,200)"/>'
       + '</div>'
+      + '<div style="display:flex;gap:14px;align-items:center;margin:2px 2px 10px;font-size:12px;color:var(--muted);flex-wrap:wrap;">'
+      +   '<span style="font-weight:700;">Show:</span>'
+      +   '<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ' + (_rfqShow('cancelled') ? 'checked ' : '') + 'onchange="_rfqToggleShow(\'cancelled\',this)"/> Cancelled</label>'
+      +   '<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ' + (_rfqShow('completed') ? 'checked ' : '') + 'onchange="_rfqToggleShow(\'completed\',this)"/> Completed</label>'
+      + '</div>'
       + '<div id="rfq_list_table_wrap"></div>';
   }
 
@@ -255,6 +279,16 @@ function renderRfqList() {
       ? ((window._contractors||[]).find(function(c){ return c && c.id === rfq.awarded_contractor_id; }) || {}).name || rfq.awarded_contractor_id
       : '';
     return { rfq: rfq, addr: addr, awardCt: awardCt };
+  });
+
+  // Status filters: hide cancelled + completed (awarded) unless toggled on.
+  var _showCancelled = _rfqShow('cancelled');
+  var _showCompleted = _rfqShow('completed');
+  allRows = allRows.filter(function (r) {
+    var st = r.rfq.status || 'draft';
+    if (st === 'cancelled' && !_showCancelled) return false;
+    if (st === 'awarded'   && !_showCompleted) return false;
+    return true;
   });
 
   // Search
@@ -820,6 +854,9 @@ function renderScopeTab() {
 function renderContractorCards() {
   var grid = document.getElementById('rfqContractorGrid');
   if (!grid) return;
+  var _lockBanner = _rfqBiddingClosed()
+    ? '<div class="rfq-progress-msg" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--muted);">&#128274; Bidding has closed - recipients are locked.</div>'
+    : '';
   var activeOnly   = document.getElementById('rfq_filter_active') && document.getElementById('rfq_filter_active').checked;
   var tradeMatch   = document.getElementById('rfq_filter_trade')  && document.getElementById('rfq_filter_trade').checked;
   var searchEl     = document.getElementById('rfq_ct_search');
@@ -849,11 +886,11 @@ function renderContractorCards() {
   });
 
   if (!cts.length) {
-    grid.innerHTML = '<div class="rfq-progress-msg">No matching contractors.</div>';
+    grid.innerHTML = _lockBanner + '<div class="rfq-progress-msg">No matching contractors.</div>';
     return;
   }
 
-  grid.innerHTML = cts.map(function(ct) {
+  grid.innerHTML = _lockBanner + cts.map(function(ct) {
     var sel = !!_rfqSelectedCts[ct.id];
     var wsib = ct.wsib_expiry ? (new Date(ct.wsib_expiry) > new Date() ? 'WSIB valid' : 'WSIB EXPIRED') : 'WSIB unknown';
     var wsibClass = ct.wsib_expiry ? (new Date(ct.wsib_expiry) > new Date() ? 'rfq-ct-badge-ok' : 'rfq-ct-badge-warn') : 'rfq-ct-badge-warn';
@@ -869,7 +906,25 @@ function renderContractorCards() {
   if (window._rfqReadOnly && typeof _rfqApplyReadOnly === 'function') _rfqApplyReadOnly();
 }
 
+// Recipients are locked once the bid CLOSE DATE has passed, so bidders can't be
+// added/removed after bidding closes. Drafts stay editable — the ED "Unlock RFQ"
+// path sends an issued RFQ back to draft, which re-opens recipient editing.
+function _rfqBiddingClosed() {
+  var rfq = (typeof _rfqCurrentId !== 'undefined' && _rfqCurrentId) ? (window._rfqCache || {})[_rfqCurrentId] : null;
+  var status = (rfq && rfq.status) || ((document.getElementById('rfq_status_display') || {}).value) || 'draft';
+  if (status === 'draft') return false;
+  var closesVal = (rfq && rfq.closes_at) || ((document.getElementById('rfq_closes_at') || {}).value) || '';
+  if (!closesVal) return false;
+  var closes = new Date(closesVal);
+  if (isNaN(closes.getTime())) return false;
+  return Date.now() > closes.getTime();
+}
+
 function toggleContractor(ctId) {
+  if (_rfqBiddingClosed()) {
+    if (typeof showToast === 'function') showToast('Bidding has closed for this RFQ - recipients are locked. An ED can Unlock the RFQ to change them.');
+    return;
+  }
   if (_rfqSelectedCts[ctId]) delete _rfqSelectedCts[ctId];
   else _rfqSelectedCts[ctId] = true;
   _renderAwardedToDropdown();
@@ -1019,6 +1074,10 @@ async function _rfqAwardFromBid(id) {
 }
 
 function selectAllMatchingContractors() {
+  if (_rfqBiddingClosed()) {
+    if (typeof showToast === 'function') showToast('Bidding has closed for this RFQ - recipients are locked.');
+    return;
+  }
   var activeOnly = document.getElementById('rfq_filter_active') && document.getElementById('rfq_filter_active').checked;
   var sowCategories = {};
   _rfqScopeItems.filter(function(it){ return !it._hidden && it.category; }).forEach(function(it){ sowCategories[it.category.toLowerCase()] = true; });
