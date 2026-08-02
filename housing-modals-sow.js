@@ -607,6 +607,23 @@ function _updateSowSaveButtonState() {
   var btn = document.getElementById('sow_save_btn');
   var prog = document.getElementById('sow_review_progress');
   if (!btn) return;
+
+  // Editing an already-SUBMITTED/approved request: the draft->submit review gate
+  // is moot and "Submit" is confusing (it already exists). Show a clear
+  // "Save Changes" action. Keep data-mode='submit' so saveSOW PRESERVES the
+  // current approval_status (a non-submit save forces it back to draft — see
+  // _sowComputeApprovalStatus); the `existing` flag tells sowSaveClicked to skip
+  // the Submit dialog. Drafts (status 'draft' or unsaved '') keep the gate below.
+  var _st = (window._sowCurrentSowMeta && window._sowCurrentSowMeta.approval_status) || '';
+  if (_st && _st !== 'draft') {
+    btn.dataset.mode     = 'submit';
+    btn.dataset.existing = '1';
+    btn.textContent      = '💾 Save Changes';
+    if (prog) prog.textContent = 'Editing a submitted request';
+    return;
+  }
+  btn.dataset.existing = '';
+
   // Count only the real review tabs — the Work Order (execution) tab is
   // filled after the request is set up, so visiting it must not satisfy the
   // "review every section" submit gate.
@@ -1952,6 +1969,9 @@ function udpPrintWorkOrder(unitId, projectNumber){
 async function sowSaveClicked() {
   var btn = document.getElementById('sow_save_btn');
   var mode = (btn && btn.dataset) ? btn.dataset.mode : 'draft';
+  // "Save Changes" on an already-created request: plain save, no confusing
+  // Submit dialog. data-mode stays 'submit' so saveSOW preserves approval_status.
+  if (btn && btn.dataset && btn.dataset.existing === '1') { saveSOW(); return; }
   if (mode !== 'submit') { saveSOW(); return; }
 
   if (typeof showConfirm !== 'function') { saveSOW(); return; }
