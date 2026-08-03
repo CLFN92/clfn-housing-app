@@ -1993,15 +1993,7 @@ async function _generateRfqPdfBase64(rfq, unit) {
   sectionHeader(_rfqDocStr('h_mandatory'));
   paragraph(_rfqDocStr('mandatory_intro'), 8.5);
   gap(3);
-  var checkList = [
-    'Current WSIB clearance certificate',
-    'Certificate of general liability insurance (minimum $2,000,000 per occurrence)',
-    'List of at least two comparable completed projects (name, owner, value, completion date)',
-    'If new to working with ' + natShort + ' Housing: at least two project references with complete contact information',
-    'If using subcontractors: complete list with contact info, WSIB certificate, and proof of $2M+ liability insurance for each',
-    'Proposed project start date and estimated completion timeline',
-    'Fully completed bid form (above) with all line items priced'
-  ];
+  var checkList = _rfqDocList('mandatory_items').map(function(s){ return _rfqDocSub(s); });
   pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(40);
   checkList.forEach(function(item) {
     var lines = pdf.splitTextToSize(item, contentW - 9);
@@ -3857,12 +3849,15 @@ var RFQ_DOC_DEFAULTS = {
   labour_hours_label:  'Estimated total labour hours:',
   h_mandatory:         'Mandatory Inclusions',
   mandatory_intro:     'The following documents must be included with your bid. Incomplete packages will not be considered.',
+  // {short} = nation short code, {nation} = full name (substituted at render).
   mandatory_items:     [
     'Current WSIB clearance certificate',
     'Certificate of general liability insurance (minimum $2,000,000 per occurrence)',
     'List of at least two comparable completed projects (name, owner, value, completion date)',
+    'If new to working with {short} Housing: at least two project references with complete contact information',
+    'If using subcontractors: complete list with contact info, WSIB certificate, and proof of $2M+ liability insurance for each',
     'Proposed project start date and estimated completion timeline',
-    'Fully completed bid form above with all line items priced'
+    'Fully completed bid form (above) with all line items priced'
   ],
   h_submission:        'Submission Instructions',
   h_authorization:     'Authorization'
@@ -3880,8 +3875,16 @@ function _rfqDocList(key) {
   if (Array.isArray(v) && v.length) return v.slice();
   return (RFQ_DOC_DEFAULTS[key] || []).slice();
 }
+// Substitute nation tokens in an editable RFQ-document string.
+function _rfqDocSub(s) {
+  var nc = window.NATION_CONFIG || {};
+  var shortC = (typeof nationShort === 'function') ? nationShort() : (nc.short || '');
+  var disp   = nc.display_name || nc.name || shortC;
+  return String(s == null ? '' : s).replace(/\{short\}/g, shortC).replace(/\{nation\}/g, disp);
+}
 window._rfqDocStr = _rfqDocStr;
 window._rfqDocList = _rfqDocList;
+window._rfqDocSub = _rfqDocSub;
 
 var CONTRACTS_DOCS_REGISTRY = [
   {
@@ -4547,12 +4550,16 @@ function _rfqDocEditorHtml() {
   var catsField = '<div style="margin-top:14px;"><div style="font-size:12px;font-weight:800;color:var(--text);border-bottom:2px solid var(--yellow);padding-bottom:3px;margin-bottom:9px;">Cost Breakdown Categories</div>'
     + '<label style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:3px;">One category per line (the contractor fills in an amount for each)</label>'
     + '<textarea id="rfqdoc_breakdown_categories" rows="5" style="' + inputStyle + 'resize:vertical;">' + _ntfEsc(cats.join('\n')) + '</textarea></div>';
+  var mand = (typeof _rfqDocList === 'function') ? _rfqDocList('mandatory_items') : [];
+  var mandField = '<div style="margin-top:14px;"><div style="font-size:12px;font-weight:800;color:var(--text);border-bottom:2px solid var(--yellow);padding-bottom:3px;margin-bottom:9px;">Mandatory Inclusions List</div>'
+    + '<label style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:3px;">One item per line. Use <code>{short}</code> for your nation code and <code>{nation}</code> for the full name (e.g. &ldquo;working with {short} Housing&rdquo;).</label>'
+    + '<textarea id="rfqdoc_mandatory_items" rows="8" style="' + inputStyle + 'resize:vertical;">' + _ntfEsc(mand.join('\n')) + '</textarea></div>';
   return ''
     + '<div class="ntf-editor-header">'
     +   '<div class="ntf-editor-title">RFQ Bid Document</div>'
     +   '<div class="ntf-editor-meta">Edit the headings and labels on the RFQ bid document sent to contractors. Leave a field blank to use the default. The Scope and Bid Form tables fill in automatically from the request.</div>'
     + '</div>'
-    + '<div style="padding:2px 2px 8px;">' + groups + catsField
+    + '<div style="padding:2px 2px 8px;">' + groups + catsField + mandField
     +   '<div style="margin-top:16px;display:flex;gap:8px;">'
     +     '<button type="button" class="btn btn-primary" onclick="saveRfqDocumentStrings()">Save</button>'
     +     '<button type="button" class="btn btn-ghost" onclick="resetRfqDocumentStrings()">Reset to defaults</button>'
@@ -4571,6 +4578,11 @@ function saveRfqDocumentStrings() {
   if (catsRaw !== '') {
     var cats = catsRaw.split(/\n+/).map(function(s){ return s.trim(); }).filter(Boolean);
     if (cats.length) obj.breakdown_categories = cats;
+  }
+  var mandRaw = g('rfqdoc_mandatory_items');
+  if (mandRaw !== '') {
+    var mand = mandRaw.split(/\n+/).map(function(s){ return s.trim(); }).filter(Boolean);
+    if (mand.length) obj.mandatory_items = mand;
   }
   persistSetting('rfq_document', obj, {
     auditAction: 'rfq_document_save',

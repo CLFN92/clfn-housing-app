@@ -8772,7 +8772,7 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
 
     + '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">' + escapeHtml(S('h_mandatory', 'Mandatory Inclusions')) + '</div><div class="sec-b">'
     + '<div style="font-size:9.5px;color:#555;margin-bottom:8px;">' + escapeHtml(S('mandatory_intro', 'The following documents must be included with your bid. Incomplete packages will not be considered.')) + '</div>'
-    + '<ul class="cl">' + L('mandatory_items', ['Current WSIB clearance certificate', 'Certificate of general liability insurance (minimum $2,000,000 per occurrence)', 'List of at least two comparable completed projects (name, owner, value, completion date)', 'Proposed project start date and estimated completion timeline', 'Fully completed bid form above with all line items priced']).map(function(it){ return '<li>' + escapeHtml(it) + '</li>'; }).join('') + '</ul></div></div>'
+    + '<ul class="cl">' + L('mandatory_items', ['Current WSIB clearance certificate', 'Certificate of general liability insurance (minimum $2,000,000 per occurrence)', 'List of at least two comparable completed projects (name, owner, value, completion date)', 'Proposed project start date and estimated completion timeline', 'Fully completed bid form above with all line items priced']).map(function(it){ var sub = (typeof _rfqDocSub === 'function') ? _rfqDocSub(it) : it; return '<li>' + escapeHtml(sub) + '</li>'; }).join('') + '</ul></div></div>'
 
     + '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Submission Instructions</div><div class="sec-b" style="font-size:10px;line-height:1.7;">'
     + '<p>' + subInstr + '</p>'
