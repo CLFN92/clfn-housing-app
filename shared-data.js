@@ -8935,21 +8935,28 @@ function _rfqApproveLinkedSow(unitId, projectNumber, role, contractor) {
     didAssign = true;
   }
 
+  // Flag the job as RFQ-awarded regardless of how it was approved, so the "RFQ"
+  // button hides once a job is awarded (via _sowRfqStillOpen) — even when a
+  // person had already ED-approved it BEFORE the tender was awarded. Note:
+  // approved_via_rfq alone does NOT relabel the badge "System Approved" (that
+  // keys on system_approved), so an ED-approved job keeps its "ED Approved" badge.
+  var didFlagRfq = !sow.approved_via_rfq;
+  sow.approved_via_rfq = true;
+
   // System Approved: the SOW is approved BY the tendering workflow (RFQ award),
   // not by a person. Keep approval_status='ed_approved' so every existing
   // "is this approved?" check recognizes it, but flag system_approved so the UI
-  // can label it "System Approved" instead of falsely showing "ED Approved".
-  // Skip re-approving a terminally-approved MR, but still persist the assignment.
+  // can label it "System Approved". Only for a job NOT already approved by a
+  // person — an already-ED-approved job keeps its human approval + badge.
   var alreadyApproved = (sow.approval_status === 'completed' || sow.approval_status === 'ed_approved');
   if (!alreadyApproved) {
     sow.approval_status = 'ed_approved';
-    sow.approved_via_rfq = true;
     sow.system_approved = true;
     sow.edName = 'System';
     sow.edDate = (new Date().toISOString().slice(0, 10));
   }
 
-  if (didAssign || !alreadyApproved) {
+  if (didAssign || !alreadyApproved || didFlagRfq) {
     saveSowData(unitId, { sows: list });
     if (typeof auditEntry === 'function') {
       var _msg = (!alreadyApproved ? (projectNumber || '') + ' system-approved via RFQ award/contract'

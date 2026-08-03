@@ -1577,7 +1577,7 @@ function renderRenoApprovalsView() {
       +'<td style="padding:10px 14px;width:1%;white-space:nowrap;"><div style="display:flex;gap:5px;align-items:center;">'
         +approveBtn
         +'<button data-ra-sow="'+uid+'"'+dataProj+' style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--muted);"> Request</button>'
-        +((typeof moduleOn !== 'function' || moduleOn('rfq')) && pn && (typeof _sowRfqStillOpen === 'function' ? _sowRfqStillOpen(r.sow) : appr.key !== 'approved') && (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(r))
+        +((typeof moduleOn !== 'function' || moduleOn('rfq')) && pn && (typeof _sowRfqStillOpen === 'function' ? _sowRfqStillOpen(r.sow) : appr.key !== 'approved') && (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(r)) && (typeof _raRfqAwarded !== 'function' || !_raRfqAwarded(r))
           ? '<a href="rfq.html?unit='+encodeURIComponent(uid)+'&sow='+encodeURIComponent(pn)+'" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;display:inline-flex;align-items:center;" title="Create Request for Quotes">RFQ</a>'
           : '')
         +'<button data-ra-prog="'+uid+'"'+dataProj+' style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;color:var(--muted);">📊</button>'
@@ -1628,7 +1628,7 @@ function _raCardTileFor(r, role, hmLimit) {
     else if (APPROVAL_AUTHORITY.can('approveSowOverThreshold', role) && (appr.key==='pending_ed'||appr.key==='pending_hm'))
       actions.push({text:(appr.key==='pending_hm'?'Override →':'✓ Approve'), onclick:"event.stopPropagation();raQuickApprove('"+uid+"','ed',"+projArg+")"});
   }
-  if ((typeof moduleOn !== 'function' || moduleOn('rfq')) && pn && (typeof _sowRfqStillOpen === 'function' ? _sowRfqStillOpen(r.sow) : appr.key !== 'approved') && (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(r))) {
+  if ((typeof moduleOn !== 'function' || moduleOn('rfq')) && pn && (typeof _sowRfqStillOpen === 'function' ? _sowRfqStillOpen(r.sow) : appr.key !== 'approved') && (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(r)) && (typeof _raRfqAwarded !== 'function' || !_raRfqAwarded(r))) {
     actions.push({html:'<a href="rfq.html?unit='+encodeURIComponent(u.id)+'&sow='+encodeURIComponent(pn)+'" onclick="event.stopPropagation();" style="flex:1;background:#1d4ed8;color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;text-align:center;white-space:nowrap;">RFQ</a>'});
   }
   actions.push({text:'📊 Progress', onclick:"event.stopPropagation();openRenoProgress('"+uid+"')", ghost:true});
@@ -1677,6 +1677,18 @@ function _raHasActiveRfq(r){
   var arr = Object.keys(cache).map(function(k){ return cache[k]; });
   return arr.some(function(rfq){
     return rfq && rfq.sow_unit_id === uid && (pn ? rfq.sow_project_number === pn : true) && rfq.status === 'issued';
+  });
+}
+// Has this request's RFQ already been AWARDED? Hides the RFQ button once a job
+// is awarded — covers existing awards even if the SOW's own flag isn't set.
+function _raRfqAwarded(r){
+  var cache = window._rfqCache;
+  if (r && r.sow && (r.sow.system_approved || r.sow.approved_via_rfq)) return true;
+  if (!cache || !r || !r.sow) return false;
+  var uid = r.u.id, pn = r.projectNumber;
+  return Object.keys(cache).map(function(k){ return cache[k]; }).some(function(rfq){
+    return rfq && rfq.sow_unit_id === uid && (pn ? rfq.sow_project_number === pn : true)
+      && (rfq.status === 'awarded' || rfq.awarded_contractor_id);
   });
 }
 function _raStageOf(r){
