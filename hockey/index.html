@@ -36,6 +36,9 @@
   }
   header.app h1 { font-size: 18px; font-weight: 800; letter-spacing: .3px; }
   header.app .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .livedot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-right: 4px; vertical-align: 1px; }
+  .livedot.on { background: var(--green); }
+  .livedot.q { background: var(--accent); }
   main { padding: 14px 14px 24px; max-width: 760px; margin: 0 auto; }
 
   /* ---------- generic bits ---------- */
@@ -73,6 +76,7 @@
   .pill.final { background: #1d3a2a; color: var(--green); }
   .pill.live { background: #3a2c14; color: var(--accent); }
   .empty { text-align: center; color: var(--muted); padding: 28px 10px; font-size: 14px; }
+  .viewer-note { background: #16233a; border: 1px solid #23406b; color: var(--blue); border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 600; margin-bottom: 12px; text-align: center; }
 
   /* ---------- bottom nav ---------- */
   nav.tabs {
@@ -141,6 +145,7 @@
     border-radius: 999px; padding: 8px 14px; font-size: 14px; font-weight: 700; cursor: pointer;
   }
   .chiprow button.sel { background: var(--accent); border-color: var(--accent); color: var(--accent-dark); }
+  .chiprow button.static { pointer-events: none; }
   .sheet .foot { display: flex; gap: 8px; margin-top: 18px; }
   .sheet .foot .btn { flex: 1; }
 
@@ -152,7 +157,7 @@
     position: fixed; left: 50%; bottom: 86px; transform: translateX(-50%);
     background: var(--accent); color: var(--accent-dark); font-weight: 800; font-size: 14px;
     padding: 10px 18px; border-radius: 999px; z-index: 99; opacity: 0; pointer-events: none;
-    transition: opacity .2s;
+    transition: opacity .2s; max-width: 90vw; text-align: center;
   }
   .toast.show { opacity: 1; }
   .dnp { opacity: .45; text-decoration: line-through; }
@@ -185,11 +190,28 @@
 <script>
 'use strict';
 /* =========================================================
-   Hockey Stats Tracker — self-contained, offline, localStorage.
-   Tracks per-game and season stats: goals, assists, penalties.
+   Hockey Stats Tracker
+   - Game + season stats: goals, assists, penalties.
+   - Works standalone (localStorage only) OR synced to Supabase:
+       * everyone with the link sees live stats read-only (parents)
+       * signed-in staff can edit; writes queue offline and sync
    ========================================================= */
 
+/* ---------- CONFIG — paste your Supabase project values here ----------
+   Leave both blank to run in local-only mode (no sharing).            */
+var SB_URL  = '';   // e.g. 'https://abcdefgh.supabase.co'
+var SB_ANON = '';   // the 'anon' public API key
+/* --------------------------------------------------------------------- */
+// localStorage overrides (handy for testing without editing this file)
+try {
+  SB_URL  = localStorage.getItem('hk_sb_url')  || SB_URL;
+  SB_ANON = localStorage.getItem('hk_sb_anon') || SB_ANON;
+} catch (e) {}
+
 var STORE_KEY = 'hockey_tracker_v1';
+var QUEUE_KEY = 'hockey_queue_v1';
+var AUTH_KEY  = 'hockey_auth_v1';
+var SYNC_INTERVAL_MS = 45000;
 var PENALTIES = ['Tripping','Hooking','Slashing','High-Sticking','Interference','Roughing','Holding','Cross-Checking','Body Checking','Delay of Game','Too Many Players','Unsportsmanlike','Boarding','Charging','Other'];
 var PERIODS = ['1','2','3','OT'];
 
@@ -198,6 +220,12 @@ var view = 'games';
 var currentGameId = null;
 var currentPeriod = '1';
 var sortKey = 'p', sortDir = -1;
+var auth = loadAuth();
+var lastSyncAt = 0;
+var syncedOnce = false;
+
+function remoteEnabled() { return !!(SB_URL && SB_ANON); }
+function canEdit() { return !remoteEnabled() || !!auth; }
 
 function load() {
   try {
@@ -214,6 +242,15 @@ function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
   catch (e) { toast('⚠️ Could not save — storage full?'); }
 }
+function loadAuth() {
+  try { return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch (e) { return null; }
+}
+function saveAuth() {
+  try {
+    if (auth) localStorage.setItem(AUTH_KEY, JSON.stringify(auth));
+    else localStorage.removeItem(AUTH_KEY);
+  } catch (e) {}
+}
 function seasonLabel() {
   var d = new Date(), y = d.getFullYear();
   return (d.getMonth() >= 6) ? (y + '–' + (y + 1)) : ((y - 1) + '–' + y);
@@ -223,7 +260,7 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function
 function toast(msg) {
   var t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
-  clearTimeout(t._tm); t._tm = setTimeout(function () { t.classList.remove('show'); }, 1800);
+  clearTimeout(t._tm); t._tm = setTimeout(function () { t.classList.remove('show'); }, 2200);
 }
 function playerById(id) {
   for (var i = 0; i < state.players.length; i++) if (state.players[i].id === id) return state.players[i];
@@ -253,7 +290,205 @@ function fmtDate(iso) {
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-/* ---------- navigation ---------- */
+/* =========================================================
+   SYNC LAYER (Supabase REST, raw fetch — no SDK)
+   ========================================================= */
+function sbHeaders(useAuth) {
+  var h = { 'apikey': SB_ANON, 'Content-Type': 'application/json' };
+  h['Authorization'] = 'Bearer ' + ((useAuth && auth) ? auth.access : SB_ANON);
+  return h;
+}
+function sbGet(pathQuery) {
+  return fetch(SB_URL + '/rest/v1/' + pathQuery, { headers: sbHeaders(false) })
+    .then(function (r) { if (!r.ok) throw new Error('GET ' + r.status); return r.json(); });
+}
+
+/* ---- write queue (offline-safe). One entry per entity, replayed in order. ---- */
+function loadQueue() {
+  try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { return []; }
+}
+function saveQueue(q) {
+  try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch (e) {}
+}
+function enqueue(kind, id) {
+  if (!remoteEnabled()) return;
+  var q = loadQueue();
+  // dedupe: latest state wins, so one pending entry per entity is enough
+  q = q.filter(function (it) { return !(it.kind === kind && it.id === id); });
+  q.push({ kind: kind, id: id, at: Date.now() });
+  saveQueue(q);
+  flushQueue();
+  updateHeader();
+}
+var _flushing = false;
+function flushQueue() {
+  if (_flushing || !remoteEnabled() || !auth || !navigator.onLine) return Promise.resolve();
+  var q = loadQueue();
+  if (!q.length) return Promise.resolve();
+  _flushing = true;
+  var chain = Promise.resolve();
+  q.forEach(function (item) {
+    chain = chain.then(function () {
+      return sendItem(item).then(function () {
+        var cur = loadQueue();
+        cur = cur.filter(function (it) { return !(it.kind === item.kind && it.id === item.id && it.at === item.at); });
+        saveQueue(cur);
+      });
+    });
+  });
+  return chain.then(function () {
+    _flushing = false; updateHeader();
+    // anything queued while we were flushing?
+    if (loadQueue().length) return flushQueue();
+  }).catch(function (e) {
+    _flushing = false; updateHeader();
+    console.warn('sync paused:', e && e.message);
+  });
+}
+function sendItem(item) {
+  var body = null, path = null, method = 'POST';
+  if (item.kind === 'settings') {
+    path = 'hk_settings?on_conflict=id';
+    body = [{ id: 1, team_name: state.settings.teamName || 'Our Team', season: state.settings.season || '', updated_at: new Date().toISOString() }];
+  } else if (item.kind === 'player') {
+    var p = playerById(item.id);
+    if (!p) return Promise.resolve(); // deleted before it ever synced
+    path = 'hk_players?on_conflict=id';
+    body = [{ id: p.id, num: p.num, name: p.name, pos: p.pos || 'F', active: p.active !== false, updated_at: new Date().toISOString() }];
+  } else if (item.kind === 'game') {
+    var g = gameById(item.id);
+    if (!g) return Promise.resolve();
+    path = 'hk_games?on_conflict=id';
+    body = [{ id: g.id, opponent: g.opponent, date: g.date || '', loc: g.loc || 'home', final: !!g.final, absent: g.absent || [], events: g.events || [], updated_at: new Date().toISOString() }];
+  } else if (item.kind === 'delete_player') {
+    path = 'hk_players?id=eq.' + encodeURIComponent(item.id); method = 'DELETE';
+  } else if (item.kind === 'delete_game') {
+    path = 'hk_games?id=eq.' + encodeURIComponent(item.id); method = 'DELETE';
+  } else return Promise.resolve();
+
+  function fire() {
+    return fetch(SB_URL + '/rest/v1/' + path, {
+      method: method,
+      headers: (function () {
+        var h = sbHeaders(true);
+        if (method === 'POST') h['Prefer'] = 'resolution=merge-duplicates';
+        return h;
+      })(),
+      body: body ? JSON.stringify(body) : undefined
+    });
+  }
+  return fire().then(function (r) {
+    if (r.status === 401) {
+      return tryRefresh().then(function (ok) {
+        if (!ok) throw new Error('signed out');
+        return fire().then(function (r2) { if (!r2.ok) throw new Error('write ' + r2.status); });
+      });
+    }
+    if (!r.ok) throw new Error('write ' + r.status);
+  });
+}
+
+/* ---- pull everything from the server (parents' path + staff refresh) ---- */
+function syncFromServer() {
+  if (!remoteEnabled() || !navigator.onLine) return Promise.resolve();
+  if (loadQueue().length) return flushQueue(); // never overwrite unsent local edits
+  return Promise.all([
+    sbGet('hk_settings?id=eq.1'),
+    sbGet('hk_players?select=*'),
+    sbGet('hk_games?select=*')
+  ]).then(function (res) {
+    var s = res[0] && res[0][0];
+    if (s) state.settings = { teamName: s.team_name || 'Our Team', season: s.season || '' };
+    state.players = (res[1] || []).map(function (p) {
+      return { id: p.id, num: p.num, name: p.name, pos: p.pos, active: p.active !== false };
+    });
+    state.games = (res[2] || []).map(function (g) {
+      return { id: g.id, opponent: g.opponent, date: g.date, loc: g.loc, final: !!g.final, absent: g.absent || [], events: g.events || [] };
+    });
+    save();
+    lastSyncAt = Date.now();
+    syncedOnce = true;
+    render();
+    updateHeader();
+  }).catch(function (e) {
+    console.warn('sync pull failed:', e && e.message);
+    updateHeader();
+  });
+}
+
+/* ---- auth ---- */
+function doSignIn() {
+  var email = (document.getElementById('si_email').value || '').trim();
+  var pass = document.getElementById('si_pass').value || '';
+  if (!email || !pass) { toast('Enter email and password'); return; }
+  var btn = document.getElementById('si_btn');
+  btn.disabled = true;
+  fetch(SB_URL + '/auth/v1/token?grant_type=password', {
+    method: 'POST',
+    headers: { 'apikey': SB_ANON, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, password: pass })
+  }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (res) {
+      if (!res.ok || !res.j.access_token) {
+        toast(res.j && (res.j.error_description || res.j.msg) || 'Sign-in failed');
+        btn.disabled = false;
+        return;
+      }
+      auth = { access: res.j.access_token, refresh: res.j.refresh_token, email: (res.j.user && res.j.user.email) || email };
+      saveAuth();
+      toast('Signed in — you can now edit');
+      seedIfServerEmpty().then(function () { showView('more'); });
+    }).catch(function () { toast('Network error — try again'); btn.disabled = false; });
+}
+function doSignOut() {
+  if (loadQueue().length) {
+    toast('You still have unsynced changes — get online first, then sign out');
+    flushQueue();
+    return;
+  }
+  auth = null; saveAuth();
+  toast('Signed out — viewer mode');
+  showView('more');
+}
+function tryRefresh() {
+  if (!auth || !auth.refresh) return Promise.resolve(false);
+  return fetch(SB_URL + '/auth/v1/token?grant_type=refresh_token', {
+    method: 'POST',
+    headers: { 'apikey': SB_ANON, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: auth.refresh })
+  }).then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) {
+      if (j && j.access_token) {
+        auth.access = j.access_token;
+        auth.refresh = j.refresh_token || auth.refresh;
+        saveAuth();
+        return true;
+      }
+      auth = null; saveAuth(); updateHeader();
+      toast('Session expired — sign in again to keep editing');
+      return false;
+    }).catch(function () { return false; });
+}
+/* First sign-in on a device that already has local data: if the server is
+   empty, push everything up; otherwise the server copy wins. */
+function seedIfServerEmpty() {
+  return Promise.all([sbGet('hk_players?select=id&limit=1'), sbGet('hk_games?select=id&limit=1')])
+    .then(function (res) {
+      var serverEmpty = !(res[0] && res[0].length) && !(res[1] && res[1].length);
+      if (serverEmpty && (state.players.length || state.games.length)) {
+        enqueue('settings', 1);
+        state.players.forEach(function (p) { enqueue('player', p.id); });
+        state.games.forEach(function (g) { enqueue('game', g.id); });
+        toast('Uploading your existing data to the team site…');
+        return flushQueue();
+      }
+      return syncFromServer();
+    }).catch(function () {});
+}
+
+/* =========================================================
+   NAVIGATION / RENDER
+   ========================================================= */
 function showView(v, gameId) {
   view = v;
   if (gameId) currentGameId = gameId;
@@ -261,11 +496,22 @@ function showView(v, gameId) {
     b.classList.toggle('on', b.getAttribute('data-tab') === (v === 'game' ? 'games' : v));
   });
   document.getElementById('hdrBack').style.display = (v === 'game') ? '' : 'none';
-  var title = document.getElementById('hdrTitle'), sub = document.getElementById('hdrSub');
-  title.textContent = state.settings.teamName || 'Hockey Stats';
-  sub.textContent = 'Season ' + (state.settings.season || '');
+  updateHeader();
   render();
   window.scrollTo(0, 0);
+}
+function updateHeader() {
+  var title = document.getElementById('hdrTitle'), sub = document.getElementById('hdrSub');
+  title.textContent = state.settings.teamName || 'Hockey Stats';
+  var extra = '';
+  if (remoteEnabled()) {
+    var qn = loadQueue().length;
+    if (qn) extra = ' · <span class="livedot q"></span>' + qn + ' to sync';
+    else if (navigator.onLine) extra = ' · <span class="livedot on"></span>Live';
+    else extra = ' · <span class="livedot"></span>Offline';
+    if (!canEdit()) extra += ' · Viewer';
+  }
+  sub.innerHTML = 'Season ' + esc(state.settings.season || '') + extra;
 }
 function render() {
   var m = document.getElementById('main');
@@ -274,6 +520,10 @@ function render() {
   else if (view === 'stats') m.innerHTML = renderStats();
   else if (view === 'roster') m.innerHTML = renderRoster();
   else if (view === 'more') m.innerHTML = renderMore();
+}
+function viewerNoteHtml() {
+  if (canEdit() || !remoteEnabled()) return '';
+  return '<div class="viewer-note">👀 Live team stats — updates automatically</div>';
 }
 
 /* ---------- games list ---------- */
@@ -287,14 +537,17 @@ function seasonRecord() {
   return w + '–' + l + '–' + t;
 }
 function renderGames() {
-  var h = '<div class="statgrid">' +
+  var h = viewerNoteHtml();
+  h += '<div class="statgrid">' +
     '<div class="statbox"><div class="v">' + state.games.length + '</div><div class="l">Games</div></div>' +
     '<div class="statbox"><div class="v">' + seasonRecord() + '</div><div class="l">W–L–T</div></div>' +
     '<div class="statbox"><div class="v">' + state.players.filter(function (p) { return p.active !== false; }).length + '</div><div class="l">Players</div></div>' +
     '</div>';
-  h += '<button class="btn primary block" onclick="openNewGame()" style="margin-bottom:12px">＋ New Game</button>';
+  if (canEdit()) h += '<button class="btn primary block" onclick="openNewGame()" style="margin-bottom:12px">＋ New Game</button>';
   if (!state.games.length) {
-    h += '<div class="card"><div class="empty">No games yet.<br>Add your roster first, then start a game.</div></div>';
+    var msg = (remoteEnabled() && !syncedOnce && navigator.onLine) ? 'Loading team data…'
+      : (canEdit() ? 'No games yet.<br>Add your roster first, then start a game.' : 'No games posted yet — check back soon!');
+    h += '<div class="card"><div class="empty">' + msg + '</div></div>';
     return h;
   }
   var games = state.games.slice().sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
@@ -317,6 +570,7 @@ function renderGames() {
   return h;
 }
 function openNewGame() {
+  if (!canEdit()) return;
   if (!state.players.length) { toast('Add players to the roster first'); showView('roster'); return; }
   var today = new Date();
   var iso = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
@@ -342,7 +596,7 @@ function createGame() {
     events: []
   };
   state.games.push(g);
-  save(); closeSheet();
+  save(); enqueue('game', g.id); closeSheet();
   currentPeriod = '1';
   showView('game', g.id);
 }
@@ -353,7 +607,9 @@ function renderGame() {
   if (!g) return '<div class="empty">Game not found.</div>';
   var s = gameScore(g);
   var team = esc(state.settings.teamName || 'Us');
-  var h = '<div class="scoreboard">' +
+  var edit = canEdit();
+  var h = viewerNoteHtml();
+  h += '<div class="scoreboard">' +
     '<div class="teams">' +
     '<div class="tname">' + team + '</div>' +
     '<div class="score">' + s.us + '</div><div class="dash">–</div><div class="score">' + s.opp + '</div>' +
@@ -361,14 +617,14 @@ function renderGame() {
     '</div>' +
     '<div class="muted small" style="margin-top:8px">' + esc(fmtDate(g.date)) + ' · ' + (g.loc === 'away' ? 'Away' : 'Home') +
     (g.final ? ' · <span class="pill final">FINAL</span>' : '') + '</div>';
-  if (!g.final) {
+  if (!g.final && edit) {
     h += '<div class="periods">' + PERIODS.map(function (p) {
       return '<button class="' + (p === currentPeriod ? 'on' : '') + '" onclick="setPeriod(\'' + p + '\')">' + (p === 'OT' ? 'OT' : 'P' + p) + '</button>';
     }).join('') + '</div>';
   }
   h += '</div>';
 
-  if (!g.final) {
+  if (!g.final && edit) {
     h += '<div class="actionbar">' +
       '<button class="btn green" onclick="openGoalSheet()">🚨 Goal</button>' +
       '<button class="btn red" onclick="addOppGoal()">Opp Goal</button>' +
@@ -378,11 +634,11 @@ function renderGame() {
 
   /* timeline */
   h += '<div class="card"><div class="row" style="margin-bottom:6px"><div class="grow" style="font-weight:800">Events</div>' +
-    (g.events.length && !g.final ? '<button class="btn sm ghost" onclick="undoLast()">↩ Undo last</button>' : '') + '</div>';
-  if (!g.events.length) h += '<div class="empty">Nothing yet — use the buttons above during the game.</div>';
+    (g.events.length && !g.final && edit ? '<button class="btn sm ghost" onclick="undoLast()">↩ Undo last</button>' : '') + '</div>';
+  if (!g.events.length) h += '<div class="empty">' + (edit ? 'Nothing yet — use the buttons above during the game.' : 'No events yet.') + '</div>';
   else {
     g.events.slice().reverse().forEach(function (e) {
-      h += renderEvent(g, e);
+      h += renderEvent(g, e, edit);
     });
   }
   h += '</div>';
@@ -398,24 +654,28 @@ function renderGame() {
     h += '</table></div>';
   }
 
-  /* attendance */
-  h += '<div class="card"><div style="font-weight:800;margin-bottom:2px">Lineup</div>' +
-    '<div class="muted small" style="margin-bottom:8px">Tap a player to mark them out of the lineup (affects GP).</div><div class="chiprow">';
-  state.players.filter(function (p) { return p.active !== false; }).forEach(function (p) {
-    var out = g.absent.indexOf(p.id) >= 0;
-    h += '<button class="' + (out ? 'dnp' : '') + '" onclick="toggleAbsent(\'' + p.id + '\')">#' + p.num + ' ' + esc(p.name) + '</button>';
-  });
-  h += '</div></div>';
+  /* lineup (staff only) */
+  if (edit) {
+    h += '<div class="card"><div style="font-weight:800;margin-bottom:2px">Lineup</div>' +
+      '<div class="muted small" style="margin-bottom:8px">Tap a player to mark them out of the lineup (affects GP).</div><div class="chiprow">';
+    state.players.filter(function (p) { return p.active !== false; }).forEach(function (p) {
+      var out = g.absent.indexOf(p.id) >= 0;
+      h += '<button class="' + (out ? 'dnp' : '') + '" onclick="toggleAbsent(\'' + p.id + '\')">#' + p.num + ' ' + esc(p.name) + '</button>';
+    });
+    h += '</div></div>';
+  }
 
   /* footer actions */
   h += '<div class="row" style="gap:8px">';
-  if (g.final) h += '<button class="btn grow" onclick="reopenGame()">Reopen Game</button>';
-  else h += '<button class="btn primary grow" onclick="finalizeGame()">✔ Mark Final</button>';
+  if (edit) {
+    if (g.final) h += '<button class="btn grow" onclick="reopenGame()">Reopen Game</button>';
+    else h += '<button class="btn primary grow" onclick="finalizeGame()">✔ Mark Final</button>';
+  }
   h += '<button class="btn grow" onclick="copySummary()">📋 Copy Summary</button></div>';
-  h += '<div style="margin-top:14px;text-align:center"><button class="btn sm ghost" style="color:var(--red)" onclick="deleteGame()">Delete this game</button></div>';
+  if (edit) h += '<div style="margin-top:14px;text-align:center"><button class="btn sm ghost" style="color:var(--red)" onclick="deleteGame()">Delete this game</button></div>';
   return h;
 }
-function renderEvent(g, e) {
+function renderEvent(g, e, edit) {
   var when = 'P' + e.period + (e.time ? ' ' + esc(e.time) : '');
   var body = '', tag = '', cls = '';
   if (e.type === 'goal') {
@@ -433,49 +693,56 @@ function renderEvent(g, e) {
   }
   return '<div class="event"><span class="tag ' + cls + '">' + tag + '</span>' +
     '<div class="grow">' + body + '<div class="muted small">' + when + '</div></div>' +
-    (g.final ? '' : '<button class="del" onclick="deleteEvent(\'' + e.id + '\')">✕</button>') +
+    ((g.final || !edit) ? '' : '<button class="del" onclick="deleteEvent(\'' + e.id + '\')">✕</button>') +
     '</div>';
 }
 function setPeriod(p) { currentPeriod = p; render(); }
 function toggleAbsent(pid) {
+  if (!canEdit()) return;
   var g = gameById(currentGameId);
   var i = g.absent.indexOf(pid);
   if (i >= 0) g.absent.splice(i, 1); else g.absent.push(pid);
-  save(); render();
+  save(); enqueue('game', g.id); render();
 }
 function addOppGoal() {
+  if (!canEdit()) return;
   var g = gameById(currentGameId);
   g.events.push({ id: uid(), type: 'opp_goal', period: currentPeriod, time: '' });
-  save(); render();
+  save(); enqueue('game', g.id); render();
 }
 function undoLast() {
+  if (!canEdit()) return;
   var g = gameById(currentGameId);
   if (!g.events.length) return;
   g.events.pop();
-  save(); render();
+  save(); enqueue('game', g.id); render();
   toast('Last event removed');
 }
 function deleteEvent(eid) {
+  if (!canEdit()) return;
   var g = gameById(currentGameId);
   for (var i = 0; i < g.events.length; i++) {
     if (g.events[i].id === eid) { g.events.splice(i, 1); break; }
   }
-  save(); render();
+  save(); enqueue('game', g.id); render();
 }
 function finalizeGame() {
+  if (!canEdit()) return;
   var g = gameById(currentGameId);
-  g.final = true; save(); render();
+  g.final = true; save(); enqueue('game', g.id); render();
   toast('Game marked final');
 }
 function reopenGame() {
+  if (!canEdit()) return;
   var g = gameById(currentGameId);
-  g.final = false; save(); render();
+  g.final = false; save(); enqueue('game', g.id); render();
 }
 function deleteGame() {
+  if (!canEdit()) return;
   var g = gameById(currentGameId);
   if (!confirm('Delete this game and all its events? This cannot be undone.')) return;
   state.games = state.games.filter(function (x) { return x.id !== g.id; });
-  save(); showView('games');
+  save(); enqueue('delete_game', g.id); showView('games');
 }
 function gameBoxScore(g) {
   var rows = {};
@@ -569,6 +836,7 @@ function refreshGrids() {
   });
 }
 function openGoalSheet() {
+  if (!canEdit()) return;
   sel = { scorer: null, a1: null, a2: null };
   openSheet(
     '<h2>🚨 Goal — ' + esc(state.settings.teamName || 'Us') + '</h2>' +
@@ -589,10 +857,11 @@ function saveGoal() {
     time: (document.getElementById('ev_time').value || '').trim(),
     scorer: sel.scorer, a1: sel.a1 || null, a2: sel.a2 || null
   });
-  save(); closeSheet(); render();
+  save(); enqueue('game', g.id); closeSheet(); render();
   toast('Goal — ' + pTag(sel.scorer));
 }
 function openPenaltySheet() {
+  if (!canEdit()) return;
   sel = { penp: null, mins: '2', infr: PENALTIES[0] };
   var h = '<h2>⚠️ Penalty</h2>' +
     '<div class="seclbl">Player *</div>' + playerGridHtml('penp') +
@@ -624,7 +893,7 @@ function savePenalty() {
     infraction: document.getElementById('pen_infr').value,
     minutes: +sel.mins
   });
-  save(); closeSheet(); render();
+  save(); enqueue('game', g.id); closeSheet(); render();
   toast('Penalty — ' + pTag(sel.penp));
 }
 
@@ -659,7 +928,8 @@ function setSort(k) {
 }
 function renderStats() {
   var rows = seasonRows();
-  if (!rows.length) return '<div class="card"><div class="empty">No players yet — add your roster first.</div></div>';
+  var h = viewerNoteHtml();
+  if (!rows.length) return h + '<div class="card"><div class="empty">' + (canEdit() ? 'No players yet — add your roster first.' : 'No stats posted yet — check back soon!') + '</div></div>';
   rows.sort(function (a, b) {
     if (sortKey === 'num') return ((+a.num || 0) - (+b.num || 0)) * sortDir;
     var av = a[sortKey], bv = b[sortKey];
@@ -667,7 +937,7 @@ function renderStats() {
     return (av - bv) * sortDir || b.p - a.p || b.g - a.g;
   });
   var arrow = function (k) { return sortKey === k ? (sortDir < 0 ? ' ↓' : ' ↑') : ''; };
-  var h = '<div class="card"><div class="row" style="margin-bottom:8px">' +
+  h += '<div class="card"><div class="row" style="margin-bottom:8px">' +
     '<div class="grow" style="font-weight:800">Season Stats — ' + esc(state.settings.season || '') + '</div>' +
     '<button class="btn sm" onclick="exportCsv()">⬇ CSV</button></div>' +
     '<div style="overflow-x:auto"><table>' +
@@ -707,9 +977,10 @@ function downloadFile(content, name, type) {
 
 /* ---------- roster ---------- */
 function renderRoster() {
-  var h = '<button class="btn primary block" onclick="openPlayerSheet()" style="margin-bottom:12px">＋ Add Player</button>';
+  var h = viewerNoteHtml();
+  if (canEdit()) h += '<button class="btn primary block" onclick="openPlayerSheet()" style="margin-bottom:12px">＋ Add Player</button>';
   var players = state.players.slice().sort(function (a, b) { return (+a.num || 0) - (+b.num || 0); });
-  if (!players.length) return h + '<div class="card"><div class="empty">No players yet.<br>Add everyone on the team — you\'ll tap their number to record goals during games.</div></div>';
+  if (!players.length) return h + '<div class="card"><div class="empty">' + (canEdit() ? 'No players yet.<br>Add everyone on the team — you\'ll tap their number to record goals during games.' : 'No roster posted yet.') + '</div></div>';
   h += '<div class="card" style="padding:4px 14px">';
   players.forEach(function (p) {
     h += '<div class="row" style="padding:11px 0;border-bottom:1px solid var(--line)">' +
@@ -717,7 +988,7 @@ function renderRoster() {
       '<div class="grow" style="' + (p.active === false ? 'opacity:.4' : '') + '">' +
       '<div style="font-weight:700">' + esc(p.name) + (p.active === false ? ' <span class="muted small">(inactive)</span>' : '') + '</div>' +
       '<div class="muted small">' + esc(posLabel(p.pos)) + '</div></div>' +
-      '<button class="btn sm" onclick="openPlayerSheet(\'' + p.id + '\')">Edit</button>' +
+      (canEdit() ? '<button class="btn sm" onclick="openPlayerSheet(\'' + p.id + '\')">Edit</button>' : '') +
       '</div>';
   });
   h += '</div>';
@@ -727,6 +998,7 @@ function posLabel(pos) {
   return pos === 'F' ? 'Forward' : pos === 'D' ? 'Defence' : pos === 'G' ? 'Goalie' : '—';
 }
 function openPlayerSheet(pid) {
+  if (!canEdit()) return;
   var p = pid ? playerById(pid) : null;
   openSheet(
     '<h2>' + (p ? 'Edit Player' : 'Add Player') + '</h2>' +
@@ -753,15 +1025,18 @@ function savePlayer(pid) {
   var num = document.getElementById('pl_num').value.trim();
   var name = document.getElementById('pl_name').value.trim();
   if (!num || !name) { toast('Number and name are required'); return; }
+  var id;
   if (pid) {
     var p = playerById(pid);
     p.num = num; p.name = name; p.pos = document.getElementById('pl_pos').value;
     var act = document.getElementById('pl_active');
     if (act) p.active = act.value === '1';
+    id = pid;
   } else {
-    state.players.push({ id: uid(), num: num, name: name, pos: document.getElementById('pl_pos').value, active: true });
+    id = uid();
+    state.players.push({ id: id, num: num, name: name, pos: document.getElementById('pl_pos').value, active: true });
   }
-  save(); closeSheet(); render();
+  save(); enqueue('player', id); closeSheet(); render();
 }
 function deletePlayer(pid) {
   var used = false;
@@ -776,31 +1051,52 @@ function deletePlayer(pid) {
   }
   if (!confirm('Delete this player?')) return;
   state.players = state.players.filter(function (p) { return p.id !== pid; });
-  save(); closeSheet(); render();
+  save(); enqueue('delete_player', pid); closeSheet(); render();
 }
 
 /* ---------- more / settings ---------- */
 function renderMore() {
-  return '<div class="card">' +
-    '<div style="font-weight:800;margin-bottom:10px">Team Settings</div>' +
-    '<label class="f"><span>Team name</span><input id="set_team" value="' + esc(state.settings.teamName || '') + '"></label>' +
-    '<label class="f"><span>Season label</span><input id="set_season" value="' + esc(state.settings.season || '') + '"></label>' +
-    '<button class="btn primary" onclick="saveSettings()">Save Settings</button>' +
-    '</div>' +
-    '<div class="card">' +
-    '<div style="font-weight:800;margin-bottom:4px">Backup &amp; Restore</div>' +
-    '<div class="muted small" style="margin-bottom:10px">All data lives only on this device. Export a backup after games, or move data to another phone/laptop.</div>' +
-    '<div class="row"><button class="btn grow" onclick="exportJson()">⬇ Export Backup</button>' +
-    '<button class="btn grow" onclick="document.getElementById(\'imp_file\').click()">⬆ Import Backup</button></div>' +
-    '<input id="imp_file" type="file" accept=".json,application/json" style="display:none" onchange="importJson(this)">' +
-    '</div>' +
-    '<div class="card muted small">Everything works offline once loaded — good for arenas with bad wifi. ' +
-    'Add this page to your phone\'s home screen for one-tap access during livestreams.</div>';
+  var h = '';
+  if (remoteEnabled()) {
+    h += '<div class="card">';
+    if (auth) {
+      h += '<div style="font-weight:800;margin-bottom:4px">✅ Signed in — edit mode</div>' +
+        '<div class="muted small" style="margin-bottom:10px">' + esc(auth.email) + '</div>' +
+        '<button class="btn" onclick="doSignOut()">Sign Out</button>';
+    } else {
+      h += '<div style="font-weight:800;margin-bottom:4px">Team Staff Sign-in</div>' +
+        '<div class="muted small" style="margin-bottom:10px">Parents don\'t need this — everything on this site is already visible. Sign in only if you record the stats.</div>' +
+        '<label class="f"><span>Email</span><input id="si_email" type="email" autocomplete="username"></label>' +
+        '<label class="f"><span>Password</span><input id="si_pass" type="password" autocomplete="current-password"></label>' +
+        '<button class="btn primary" id="si_btn" onclick="doSignIn()">Sign In</button>';
+    }
+    h += '</div>';
+    h += '<div class="card muted small">📱 <b>Share with parents:</b> just send them this page\'s link. ' +
+      'They\'ll see live scores, box scores, and season stats — no account needed, and they can\'t change anything.</div>';
+  }
+  if (canEdit()) {
+    h += '<div class="card">' +
+      '<div style="font-weight:800;margin-bottom:10px">Team Settings</div>' +
+      '<label class="f"><span>Team name</span><input id="set_team" value="' + esc(state.settings.teamName || '') + '"></label>' +
+      '<label class="f"><span>Season label</span><input id="set_season" value="' + esc(state.settings.season || '') + '"></label>' +
+      '<button class="btn primary" onclick="saveSettings()">Save Settings</button>' +
+      '</div>' +
+      '<div class="card">' +
+      '<div style="font-weight:800;margin-bottom:4px">Backup &amp; Restore</div>' +
+      '<div class="muted small" style="margin-bottom:10px">' + (remoteEnabled() ? 'Data syncs to the team site automatically; use this for an extra copy.' : 'All data lives only on this device. Export a backup after games.') + '</div>' +
+      '<div class="row"><button class="btn grow" onclick="exportJson()">⬇ Export Backup</button>' +
+      '<button class="btn grow" onclick="document.getElementById(\'imp_file\').click()">⬆ Import Backup</button></div>' +
+      '<input id="imp_file" type="file" accept=".json,application/json" style="display:none" onchange="importJson(this)">' +
+      '</div>';
+  }
+  h += '<div class="card muted small">Add this page to your phone\'s home screen for one-tap access at the rink.</div>';
+  return h;
 }
 function saveSettings() {
+  if (!canEdit()) return;
   state.settings.teamName = document.getElementById('set_team').value.trim() || 'Our Team';
   state.settings.season = document.getElementById('set_season').value.trim();
-  save(); showView('more');
+  save(); enqueue('settings', 1); showView('more');
   toast('Saved');
 }
 function exportJson() {
@@ -817,7 +1113,13 @@ function importJson(input) {
       if (!confirm('Replace all current data with this backup?')) { input.value = ''; return; }
       state = data;
       if (!state.settings) state.settings = { teamName: 'Our Team', season: seasonLabel() };
-      save(); showView('games');
+      save();
+      if (remoteEnabled() && auth) {
+        enqueue('settings', 1);
+        state.players.forEach(function (p) { enqueue('player', p.id); });
+        state.games.forEach(function (g) { enqueue('game', g.id); });
+      }
+      showView('games');
       toast('Backup restored');
     } catch (e) {
       toast('That file is not a valid backup');
@@ -836,8 +1138,27 @@ function closeSheet() {
   document.getElementById('overlay').classList.remove('open');
   document.getElementById('sheet').innerHTML = '';
 }
+function sheetOpen() {
+  return document.getElementById('overlay').classList.contains('open');
+}
 
+/* ---------- boot ---------- */
 showView('games');
+if (remoteEnabled()) {
+  flushQueue().then(function () { return syncFromServer(); });
+  setInterval(function () {
+    if (document.visibilityState !== 'visible' || sheetOpen()) return;
+    if (loadQueue().length) flushQueue();
+    else syncFromServer();
+  }, SYNC_INTERVAL_MS);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && !sheetOpen()) syncFromServer();
+  });
+  window.addEventListener('online', function () {
+    flushQueue().then(function () { return syncFromServer(); });
+  });
+  window.addEventListener('offline', updateHeader);
+}
 </script>
 </body>
 </html>
