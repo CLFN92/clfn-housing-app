@@ -1716,7 +1716,7 @@ function _raRenderKanban(rows, el, role, hmLimit) {
 }
 
 // View-mode (list/cards/kanban) + hide-completed helpers for the Approvals view.
-function _raViewMode(){ try { var v = localStorage.getItem('clfn_reno_approvals_view'); return (v==='list'||v==='kanban') ? v : 'cards'; } catch(e){ return 'cards'; } }
+function _raViewMode(){ try { var v = localStorage.getItem('clfn_reno_approvals_view'); return (v==='list'||v==='cards'||v==='kanban') ? v : 'kanban'; } catch(e){ return 'kanban'; } }
 function _raHideCompleted(){ try { return localStorage.getItem('clfn_ra_hide_completed') === '1'; } catch(e){ return false; } }
 window._raToggleHideCompleted = function(el){ try { localStorage.setItem('clfn_ra_hide_completed', (el&&el.checked)?'1':'0'); } catch(e){} renderRenoApprovalsView(); };
 function _raViewToggleHtml(){
