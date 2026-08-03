@@ -54,6 +54,16 @@
       "route": "/apply.html",
       "serve": "/apply.html",
       "statusCode": 200
+    },
+    {
+      "route": "/hockey",
+      "serve": "/hockey/index.html",
+      "statusCode": 200
+    },
+    {
+      "route": "/hockey/",
+      "serve": "/hockey/index.html",
+      "statusCode": 200
     }
   ],
   "navigationFallback": {
