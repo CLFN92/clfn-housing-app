@@ -1852,7 +1852,7 @@ async function _generateRfqPdfBase64(rfq, unit) {
   var items        = (d.scope_snapshot || []).filter(function(it){ return it && !it._hidden && (it.category || it.description); });
 
   // ── 1. Project Details ───────────────────────────────────────────────────
-  sectionHeader('Project Details');
+  sectionHeader(_rfqDocStr('h_project'));
   row('RFQ Number',             rfq.id || '--');
   if (buildingName)             row('Building Name',           buildingName);
   row('Project Address',        addr);
@@ -1906,8 +1906,8 @@ async function _generateRfqPdfBase64(rfq, unit) {
 
   // ── 3. Contractor Bid Form ────────────────────────────────────────────────
   if (items.length) {
-    sectionHeader('Contractor Bid Form — Complete and Return');
-    paragraph('Price all line items below in CDN dollars, exclusive of HST. Print, complete by hand, sign, and return with your supporting documents.', 8.5);
+    sectionHeader(_rfqDocStr('h_bidform'));
+    paragraph(_rfqDocStr('bidform_intro'), 8.5);
     gap(3);
 
     var c1 = contentW * 0.50, c2 = contentW * 0.17, c3 = contentW * 0.17, c4 = contentW * 0.16;
@@ -1921,10 +1921,10 @@ async function _generateRfqPdfBase64(rfq, unit) {
     pdf.rect(tX, ctx.y, contentW, hH);
     [c1, c1+c2, c1+c2+c3].forEach(function(x){ pdf.line(tX+x, ctx.y, tX+x, ctx.y+hH); });
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.5); pdf.setTextColor(30);
-    pdf.text('Line Item / Description',  tX + 2,         ctx.y + 4.5);
-    pdf.text('Unit Price ($)',            tX + c1 + 2,    ctx.y + 4.5);
-    pdf.text('Extended Price ($)',        tX + c1+c2 + 2, ctx.y + 4.5);
-    pdf.text('Notes',                     tX + c1+c2+c3+2, ctx.y + 4.5);
+    pdf.text(_rfqDocStr('col_lineitem'),  tX + 2,         ctx.y + 4.5);
+    pdf.text(_rfqDocStr('col_unitprice'), tX + c1 + 2,    ctx.y + 4.5);
+    pdf.text(_rfqDocStr('col_extended'),  tX + c1+c2 + 2, ctx.y + 4.5);
+    pdf.text(_rfqDocStr('col_notes'),     tX + c1+c2+c3+2, ctx.y + 4.5);
     ctx.y += hH;
 
     // One row per scope item
@@ -1949,14 +1949,14 @@ async function _generateRfqPdfBase64(rfq, unit) {
     pdf.rect(tX, ctx.y, contentW, 9);
     [c1, c1+c2, c1+c2+c3].forEach(function(x){ pdf.line(tX+x, ctx.y, tX+x, ctx.y+9); });
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(20);
-    pdf.text('TOTAL BID AMOUNT:', tX + c1 - 2, ctx.y + 5.5, { align: 'right' });
+    pdf.text(_rfqDocStr('total_bid_amount'), tX + c1 - 2, ctx.y + 5.5, { align: 'right' });
     ctx.y += 9;
 
     // Bid Cost Breakdown — blank table for the contractor to break their total
     // bid out by category (mirrors the RFQ Contracting-tab Price Breakdown).
     gap(4);
     ctx.needSpace(12);
-    paragraph('Bid Cost Breakdown - break your total bid out by category (CDN, exclusive of HST). The total must equal the Total Bid Amount above.', 8.5);
+    paragraph(_rfqDocStr('h_breakdown') + ' - ' + _rfqDocStr('breakdown_intro'), 8.5);
     gap(1);
     var bc1 = contentW * 0.68, bH = 7;
     ctx.needSpace(bH + 2);
@@ -1964,11 +1964,11 @@ async function _generateRfqPdfBase64(rfq, unit) {
     pdf.setDrawColor(160); pdf.setLineWidth(0.3); pdf.rect(tX, ctx.y, contentW, bH);
     pdf.line(tX + bc1, ctx.y, tX + bc1, ctx.y + bH);
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.5); pdf.setTextColor(30);
-    pdf.text('Category', tX + 2, ctx.y + 4.5);
-    pdf.text('Amount ($)', tX + bc1 + 2, ctx.y + 4.5);
+    pdf.text(_rfqDocStr('breakdown_col_cat'), tX + 2, ctx.y + 4.5);
+    pdf.text(_rfqDocStr('breakdown_col_amt'), tX + bc1 + 2, ctx.y + 4.5);
     ctx.y += bH;
     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(30);
-    ['Materials', 'Labour', 'Equipment', 'Subcontractors', 'Other'].forEach(function(cat){
+    _rfqDocList('breakdown_categories').forEach(function(cat){
       ctx.needSpace(10);
       pdf.setDrawColor(200); pdf.setLineWidth(0.2); pdf.rect(tX, ctx.y, contentW, 9);
       pdf.line(tX + bc1, ctx.y, tX + bc1, ctx.y + 9);
@@ -1980,18 +1980,18 @@ async function _generateRfqPdfBase64(rfq, unit) {
     pdf.setDrawColor(160); pdf.setLineWidth(0.3); pdf.rect(tX, ctx.y, contentW, 9);
     pdf.line(tX + bc1, ctx.y, tX + bc1, ctx.y + 9);
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(20);
-    pdf.text('TOTAL BID:', tX + bc1 - 2, ctx.y + 5.5, { align: 'right' });
+    pdf.text(_rfqDocStr('breakdown_total'), tX + bc1 - 2, ctx.y + 5.5, { align: 'right' });
     ctx.y += 9;
     gap(2);
     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(30);
-    pdf.text('Estimated total labour hours: __________ hrs', tX + 2, ctx.y + 4);
+    pdf.text(_rfqDocStr('labour_hours_label') + ' __________ hrs', tX + 2, ctx.y + 4);
     ctx.y += 6;
     gap(4);
   }
 
   // ── 4. Mandatory Inclusions ───────────────────────────────────────────────
-  sectionHeader('Mandatory Inclusions');
-  paragraph('The following documents must be included with your bid. Incomplete packages will not be considered.', 8.5);
+  sectionHeader(_rfqDocStr('h_mandatory'));
+  paragraph(_rfqDocStr('mandatory_intro'), 8.5);
   gap(3);
   var checkList = [
     'Current WSIB clearance certificate',
@@ -2015,7 +2015,7 @@ async function _generateRfqPdfBase64(rfq, unit) {
   gap(4);
 
   // ── 5. Submission Instructions ────────────────────────────────────────────
-  sectionHeader('Submission Instructions');
+  sectionHeader(_rfqDocStr('h_submission'));
   var subInstr = subMethod === 'email'
     ? 'Email your complete bid package to: ' + (contactEmail || contact)
     : subMethod === 'office'
@@ -3829,6 +3829,60 @@ var _CONTRACT_DEFAULT_CLAUSES = [
   }
 ];
 
+// ── RFQ bid document — editable strings ──────────────────────────────────────
+// Every fixed string in the RFQ bid document (headings, bid-form labels/columns,
+// cost-breakdown labels, mandatory-inclusions list, submission text). Defaults
+// equal the current hard-coded text, so the document is unchanged until an ED
+// edits it in Settings -> Contracts -> RFQ Bid Document. Both generators
+// (buildRfqDocumentHtml in shared-data.js + _generateRfqPdfBase64 here) read
+// these via _rfqDocStr()/_rfqDocList(). Saved overrides live in
+// _appSettings.rfq_document (housing_settings key 'rfq_document').
+var RFQ_DOC_DEFAULTS = {
+  h_project:            'Project Details',
+  h_scope:             'Scope of Work',
+  h_bidform:           'Contractor Bid Form — Complete and Return',
+  bidform_intro:       'Price all line items below in CDN dollars, exclusive of HST. Print, complete by hand, sign, and return with your supporting documents.',
+  bidform_print_note:  'This form has been provided as a read-only document. Please print it, complete all fields by hand, sign where required, and submit the completed form with your supporting documents. You may also attach a separate quote in your own format — this form must still accompany it.',
+  col_lineitem:        'Line Item / Description',
+  col_unitprice:       'Unit Price ($)',
+  col_extended:        'Extended Price ($)',
+  col_notes:           'Notes',
+  total_bid_amount:    'TOTAL BID AMOUNT:',
+  h_breakdown:         'Bid Cost Breakdown',
+  breakdown_intro:     'break your total bid out by category (CDN, exclusive of HST). The total must equal the Total Bid Amount above.',
+  breakdown_col_cat:   'Category',
+  breakdown_col_amt:   'Amount ($)',
+  breakdown_categories:['Materials', 'Labour', 'Equipment', 'Subcontractors', 'Other'],
+  breakdown_total:     'TOTAL BID:',
+  labour_hours_label:  'Estimated total labour hours:',
+  h_mandatory:         'Mandatory Inclusions',
+  mandatory_intro:     'The following documents must be included with your bid. Incomplete packages will not be considered.',
+  mandatory_items:     [
+    'Current WSIB clearance certificate',
+    'Certificate of general liability insurance (minimum $2,000,000 per occurrence)',
+    'List of at least two comparable completed projects (name, owner, value, completion date)',
+    'Proposed project start date and estimated completion timeline',
+    'Fully completed bid form above with all line items priced'
+  ],
+  h_submission:        'Submission Instructions',
+  h_authorization:     'Authorization'
+};
+// String accessor — saved override, else the default.
+function _rfqDocStr(key) {
+  var o = (window._appSettings && window._appSettings.rfq_document) || {};
+  var v = o[key];
+  return (v != null && v !== '') ? String(v) : (RFQ_DOC_DEFAULTS[key] != null ? String(RFQ_DOC_DEFAULTS[key]) : '');
+}
+// List accessor (mandatory items / breakdown categories) — saved override, else default.
+function _rfqDocList(key) {
+  var o = (window._appSettings && window._appSettings.rfq_document) || {};
+  var v = o[key];
+  if (Array.isArray(v) && v.length) return v.slice();
+  return (RFQ_DOC_DEFAULTS[key] || []).slice();
+}
+window._rfqDocStr = _rfqDocStr;
+window._rfqDocList = _rfqDocList;
+
 var CONTRACTS_DOCS_REGISTRY = [
   {
     key:         'residential_lease',
@@ -4122,6 +4176,16 @@ var CONTRACTS_DOCS_REGISTRY = [
       // and the Signatures block are appended dynamically by the contract
       // generator (generateContractorContract in rfq.js) — the milestone table
       // and captured signature/initial images can't be expressed as {tokens}.
+  },
+  {
+    // Not a rich-text agreement — a form of editable headings/labels for the
+    // RFQ bid document (its data tables stay generated). Handled specially in
+    // _contractsRenderEditorHtml via `special`. Saved to housing_settings key
+    // 'rfq_document'; read by _rfqDocStr()/_rfqDocList().
+    key:         'rfq_document',
+    label:       'RFQ Bid Document',
+    description: 'Headings & labels on the RFQ sent to contractors',
+    special:     'rfq_strings'
   }
 ];
 
@@ -4268,6 +4332,7 @@ function _contractsRenderDocListHtml() {
 function _contractsRenderEditorHtml(docKey) {
   var cfg = _contractDocConfig(docKey);
   if (!cfg) return '<div class="empty-state-italic">Select a document from the list to edit it.</div>';
+  if (cfg.special === 'rfq_strings') return _rfqDocEditorHtml();
 
   var saved     = (window._appSettings && window._appSettings.contracts_agreements
                 && window._appSettings.contracts_agreements[docKey]) || {};
@@ -4435,6 +4500,94 @@ function saveContractsDoc() {
     okMsg:       '✓ Contract saved'
   });
 }
+
+// ── RFQ Bid Document editor (headings + labels) ──────────────────────────────
+var _RFQDOC_EDIT_KEYS = [
+  ['Section Headings', [
+    ['h_project',   'Project Details heading'],
+    ['h_bidform',   'Bid Form heading'],
+    ['h_breakdown', 'Cost Breakdown heading'],
+    ['h_mandatory', 'Mandatory Inclusions heading'],
+    ['h_submission','Submission Instructions heading']
+  ]],
+  ['Bid Form', [
+    ['bidform_intro',    'Bid form intro', true],
+    ['col_lineitem',     'Column: Line Item / Description'],
+    ['col_unitprice',    'Column: Unit Price'],
+    ['col_extended',     'Column: Extended Price'],
+    ['col_notes',        'Column: Notes'],
+    ['total_bid_amount', 'Total label']
+  ]],
+  ['Cost Breakdown', [
+    ['breakdown_intro',   'Breakdown intro', true],
+    ['breakdown_col_cat', 'Column: Category'],
+    ['breakdown_col_amt', 'Column: Amount'],
+    ['breakdown_total',   'Breakdown total label'],
+    ['labour_hours_label','Labour hours label']
+  ]],
+  ['Mandatory Inclusions', [
+    ['mandatory_intro', 'Mandatory intro', true]
+  ]]
+];
+function _rfqDocEditorHtml() {
+  var S = function(k){ return (typeof _rfqDocStr === 'function') ? _rfqDocStr(k) : ''; };
+  var inputStyle = 'width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit;box-sizing:border-box;';
+  function fieldRow(k, label, isArea) {
+    var v = _ntfEsc(S(k));
+    var ctrl = isArea
+      ? '<textarea id="rfqdoc_' + k + '" rows="2" style="' + inputStyle + 'resize:vertical;">' + v + '</textarea>'
+      : '<input id="rfqdoc_' + k + '" type="text" value="' + v + '" style="' + inputStyle + '"/>';
+    return '<div style="margin-bottom:9px;"><label style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:3px;">' + _ntfEsc(label) + '</label>' + ctrl + '</div>';
+  }
+  var groups = _RFQDOC_EDIT_KEYS.map(function(g) {
+    return '<div style="margin-top:14px;"><div style="font-size:12px;font-weight:800;color:var(--text);border-bottom:2px solid var(--yellow);padding-bottom:3px;margin-bottom:9px;">' + _ntfEsc(g[0]) + '</div>'
+      + g[1].map(function(f){ return fieldRow(f[0], f[1], f[2]); }).join('') + '</div>';
+  }).join('');
+  var cats = (typeof _rfqDocList === 'function') ? _rfqDocList('breakdown_categories') : [];
+  var catsField = '<div style="margin-top:14px;"><div style="font-size:12px;font-weight:800;color:var(--text);border-bottom:2px solid var(--yellow);padding-bottom:3px;margin-bottom:9px;">Cost Breakdown Categories</div>'
+    + '<label style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:3px;">One category per line (the contractor fills in an amount for each)</label>'
+    + '<textarea id="rfqdoc_breakdown_categories" rows="5" style="' + inputStyle + 'resize:vertical;">' + _ntfEsc(cats.join('\n')) + '</textarea></div>';
+  return ''
+    + '<div class="ntf-editor-header">'
+    +   '<div class="ntf-editor-title">RFQ Bid Document</div>'
+    +   '<div class="ntf-editor-meta">Edit the headings and labels on the RFQ bid document sent to contractors. Leave a field blank to use the default. The Scope and Bid Form tables fill in automatically from the request.</div>'
+    + '</div>'
+    + '<div style="padding:2px 2px 8px;">' + groups + catsField
+    +   '<div style="margin-top:16px;display:flex;gap:8px;">'
+    +     '<button type="button" class="btn btn-primary" onclick="saveRfqDocumentStrings()">Save</button>'
+    +     '<button type="button" class="btn btn-ghost" onclick="resetRfqDocumentStrings()">Reset to defaults</button>'
+    +   '</div>'
+    + '</div>';
+}
+function saveRfqDocumentStrings() {
+  var role = window.currentRole || window._realRole;
+  if (role !== 'ed') { showToast('Only the Executive Director can edit contracts'); return; }
+  var g = function(id){ var e = document.getElementById(id); return e ? e.value.trim() : ''; };
+  var obj = {};
+  _RFQDOC_EDIT_KEYS.forEach(function(grp){
+    grp[1].forEach(function(f){ var v = g('rfqdoc_' + f[0]); if (v !== '') obj[f[0]] = v; });
+  });
+  var catsRaw = g('rfqdoc_breakdown_categories');
+  if (catsRaw !== '') {
+    var cats = catsRaw.split(/\n+/).map(function(s){ return s.trim(); }).filter(Boolean);
+    if (cats.length) obj.breakdown_categories = cats;
+  }
+  persistSetting('rfq_document', obj, {
+    auditAction: 'rfq_document_save',
+    auditDetail: 'RFQ bid document headings/labels updated',
+    okMsg:       '✓ RFQ bid document saved'
+  });
+}
+function resetRfqDocumentStrings() {
+  persistSetting('rfq_document', {}, {
+    auditAction: 'rfq_document_reset',
+    auditDetail: 'RFQ bid document reset to defaults',
+    okMsg:       '✓ Reset to defaults'
+  });
+  if (typeof renderContractsTab === 'function') renderContractsTab();
+}
+window.saveRfqDocumentStrings  = saveRfqDocumentStrings;
+window.resetRfqDocumentStrings = resetRfqDocumentStrings;
 
 function resetContractsDoc() {
   if (!_contractsSelectedDoc) return;

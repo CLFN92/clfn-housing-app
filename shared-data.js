@@ -8586,6 +8586,12 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
   var natDisp  = nc.display_name || nc.name || 'Constance Lake First Nation';
   var natShort = nationShort();
 
+  // Editable RFQ-document strings (Settings -> Contracts -> RFQ Bid Document).
+  // Fallback = the current literal, so output is unchanged if the config/notify
+  // layer isn't loaded. S() = single string, L() = list.
+  var S = function(k, fb){ return (typeof _rfqDocStr === 'function') ? _rfqDocStr(k) : fb; };
+  var L = function(k, fb){ return (typeof _rfqDocList === 'function') ? _rfqDocList(k) : fb; };
+
   // Theme — primary color drives header strip, section headers, table headers
   var theme       = (window._appSettings && window._appSettings.theme) || {};
   var primary     = theme.primary_color || '#F8E41A';
@@ -8726,16 +8732,16 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
           + '<div class="sec-b" style="font-size:10px;line-height:1.6;white-space:pre-wrap;">' + escapeHtml(_n) + '</div></div>';
       })()
 
-    + '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Contractor Bid Form — Complete and Return</div>'
+    + '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">' + escapeHtml(S('h_bidform', 'Contractor Bid Form — Complete and Return')) + '</div>'
     + '<div class="sec-b">'
-    + '<p style="font-size:9.5px;color:#333;margin-bottom:6px;">Price all line items below in Canadian dollars (CDN), exclusive of HST.</p>'
-    + '<p style="font-size:9px;color:#666;font-style:italic;margin-bottom:10px;">This form has been provided as a read-only document. Please print it, complete all fields by hand, sign where required, and submit the completed form with your supporting documents. You may also attach a separate quote in your own format — this form must still accompany it.</p>'
+    + '<p style="font-size:9.5px;color:#333;margin-bottom:6px;">' + escapeHtml(S('bidform_intro', 'Price all line items below in Canadian dollars (CDN), exclusive of HST.')) + '</p>'
+    + '<p style="font-size:9px;color:#666;font-style:italic;margin-bottom:10px;">' + escapeHtml(S('bidform_print_note', 'This form has been provided as a read-only document. Please print it, complete all fields by hand, sign where required, and submit the completed form with your supporting documents. You may also attach a separate quote in your own format — this form must still accompany it.')) + '</p>'
     + '<table><thead>'
     +   '<tr>'
-    +     '<th style="background:' + primary + ';color:#111;">Line Item / Description</th>'
-    +     '<th style="width:18%;background:' + primary + ';color:#111;">Unit Price ($)</th>'
-    +     '<th style="width:18%;background:' + primary + ';color:#111;">Extended Price ($)</th>'
-    +     '<th style="width:16%;background:' + primary + ';color:#111;">Notes</th>'
+    +     '<th style="background:' + primary + ';color:#111;">' + escapeHtml(S('col_lineitem', 'Line Item / Description')) + '</th>'
+    +     '<th style="width:18%;background:' + primary + ';color:#111;">' + escapeHtml(S('col_unitprice', 'Unit Price ($)')) + '</th>'
+    +     '<th style="width:18%;background:' + primary + ';color:#111;">' + escapeHtml(S('col_extended', 'Extended Price ($)')) + '</th>'
+    +     '<th style="width:16%;background:' + primary + ';color:#111;">' + escapeHtml(S('col_notes', 'Notes')) + '</th>'
     +   '</tr>'
     +   '<tr style="background:#f5f5f5;">'
     +     '<td style="padding:3px 10px;"></td>'
@@ -8745,31 +8751,28 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
     +   '</tr>'
     + '</thead>'
     + '<tbody>' + (bidRows || '<tr><td colspan="4" style="padding:10px;"></td></tr>') + '</tbody>'
-    + '<tfoot><tr style="background:' + primary + ';"><td colspan="2" style="padding:8px 10px;font-size:11px;font-weight:bold;text-align:right;color:#111;">TOTAL BID AMOUNT:</td><td style="padding:8px 10px;border:1px solid #ccc;min-width:80px;background:#fff;">&nbsp;</td><td style="background:#fff;"></td></tr></tfoot>'
+    + '<tfoot><tr style="background:' + primary + ';"><td colspan="2" style="padding:8px 10px;font-size:11px;font-weight:bold;text-align:right;color:#111;">' + escapeHtml(S('total_bid_amount', 'TOTAL BID AMOUNT:')) + '</td><td style="padding:8px 10px;border:1px solid #ccc;min-width:80px;background:#fff;">&nbsp;</td><td style="background:#fff;"></td></tr></tfoot>'
     + '</table>'
     // ── Bid Cost Breakdown (blank — contractor fills in) ──────────────────
-    + '<p style="font-size:9.5px;color:#333;margin:14px 0 6px;"><strong>Bid Cost Breakdown</strong> &mdash; break your total bid out by category (CDN, exclusive of HST). The total must equal your Total Bid Amount above.</p>'
+    + '<p style="font-size:9.5px;color:#333;margin:14px 0 6px;"><strong>' + escapeHtml(S('h_breakdown', 'Bid Cost Breakdown')) + '</strong> &mdash; ' + escapeHtml(S('breakdown_intro', 'break your total bid out by category (CDN, exclusive of HST). The total must equal the Total Bid Amount above.')) + '</p>'
     + '<table><thead><tr>'
-    +   '<th style="background:' + primary + ';color:#111;">Category</th>'
-    +   '<th style="width:32%;background:' + primary + ';color:#111;">Amount ($)</th>'
+    +   '<th style="background:' + primary + ';color:#111;">' + escapeHtml(S('breakdown_col_cat', 'Category')) + '</th>'
+    +   '<th style="width:32%;background:' + primary + ';color:#111;">' + escapeHtml(S('breakdown_col_amt', 'Amount ($)')) + '</th>'
     + '</tr></thead><tbody>'
-    +   ['Materials', 'Labour', 'Equipment', 'Subcontractors', 'Other'].map(function(c){
-          return '<tr><td style="padding:9px 10px;border-bottom:1px solid #e0e0e0;font-size:10px;">' + c + '</td>'
+    +   L('breakdown_categories', ['Materials', 'Labour', 'Equipment', 'Subcontractors', 'Other']).map(function(c){
+          return '<tr><td style="padding:9px 10px;border-bottom:1px solid #e0e0e0;font-size:10px;">' + escapeHtml(c) + '</td>'
             + '<td style="padding:9px 10px;border-bottom:1px solid #e0e0e0;background:#fff;"></td></tr>';
         }).join('')
     + '</tbody>'
-    + '<tfoot><tr style="background:' + primary + ';"><td style="padding:8px 10px;font-size:11px;font-weight:bold;text-align:right;color:#111;">TOTAL BID:</td><td style="padding:8px 10px;border:1px solid #ccc;background:#fff;">&nbsp;</td></tr></tfoot>'
+    + '<tfoot><tr style="background:' + primary + ';"><td style="padding:8px 10px;font-size:11px;font-weight:bold;text-align:right;color:#111;">' + escapeHtml(S('breakdown_total', 'TOTAL BID:')) + '</td><td style="padding:8px 10px;border:1px solid #ccc;background:#fff;">&nbsp;</td></tr></tfoot>'
     + '</table>'
-    + '<p style="font-size:10px;color:#333;margin-top:10px;">Estimated total labour hours: <span style="display:inline-block;border-bottom:1px solid #333;min-width:120px;">&nbsp;</span> hrs</p>'
+    + '<p style="font-size:10px;color:#333;margin-top:10px;">' + escapeHtml(S('labour_hours_label', 'Estimated total labour hours:')) + ' <span style="display:inline-block;border-bottom:1px solid #333;min-width:120px;">&nbsp;</span> hrs</p>'
     + '<p style="font-size:9px;color:#444;margin-top:10px;"><strong>Supporting documents:</strong> Please attach any additional documents to support your bid — shop drawings, product specifications, material substitution notices, alternative scope notes, or any other information relevant to your submission.</p>'
     + '</div></div>'
 
-    + '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Mandatory Inclusions</div><div class="sec-b">'
-    + '<div style="font-size:9.5px;color:#555;margin-bottom:8px;">The following documents must be included with your bid. Incomplete packages will not be considered.</div>'
-    + '<ul class="cl"><li>Current WSIB clearance certificate</li><li>Certificate of general liability insurance (minimum $2,000,000 per occurrence)</li>'
-    + '<li>List of at least two comparable completed projects (name, owner, value, completion date)</li>'
-    + '<li>Proposed project start date and estimated completion timeline</li>'
-    + '<li>Fully completed bid form above with all line items priced</li></ul></div></div>'
+    + '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">' + escapeHtml(S('h_mandatory', 'Mandatory Inclusions')) + '</div><div class="sec-b">'
+    + '<div style="font-size:9.5px;color:#555;margin-bottom:8px;">' + escapeHtml(S('mandatory_intro', 'The following documents must be included with your bid. Incomplete packages will not be considered.')) + '</div>'
+    + '<ul class="cl">' + L('mandatory_items', ['Current WSIB clearance certificate', 'Certificate of general liability insurance (minimum $2,000,000 per occurrence)', 'List of at least two comparable completed projects (name, owner, value, completion date)', 'Proposed project start date and estimated completion timeline', 'Fully completed bid form above with all line items priced']).map(function(it){ return '<li>' + escapeHtml(it) + '</li>'; }).join('') + '</ul></div></div>'
 
     + '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Submission Instructions</div><div class="sec-b" style="font-size:10px;line-height:1.7;">'
     + '<p>' + subInstr + '</p>'
