@@ -95,6 +95,7 @@
   </div>
   </div><!-- end ra_table_wrap -->
   <div id="ra_cards" style="display:none;"></div>
+  <div id="ra_kanban" style="display:none;"></div>
 </div><!-- end renoApprovalsView -->
 
 <div id="renosView" style="display:none;width:100%;flex-direction:column;padding:clamp(14px,3vw,28px);box-sizing:border-box;max-width:1200px;margin:0 auto;">
@@ -1510,16 +1511,24 @@ function renderRenoApprovalsView() {
       (_raTopCats[2] ? _raKpiCard(_raTopCats[2], _raCatCounts[_raTopCats[2]], _raCatMeta(_raTopCats[2])) : '');
   }
 
-  // ── List / Cards toggle ──────────────────────────────────────
-  var _raMode = (typeof _viewMode === 'function') ? _viewMode('reno_approvals') : 'cards';
+  // ── List / Cards / Kanban toggle + Hide-completed filter ─────
+  var _raMode = _raViewMode();
   var _raToggleEl = document.getElementById('ra_view_toggle');
-  if (_raToggleEl && typeof _viewToggleHtml === 'function') _raToggleEl.innerHTML = _viewToggleHtml('reno_approvals', '_raSetView');
+  if (_raToggleEl) _raToggleEl.innerHTML = _raViewToggleHtml();
+  // Hide-completed applies to every view (removes completed requests from the set).
+  if (_raHideCompleted()) _raRows = _raRows.filter(function(r){ return !(r.appr && r.appr.key === 'complete'); });
   var _raTableWrap = document.getElementById('ra_table_wrap');
   var _raCardsEl   = document.getElementById('ra_cards');
-  if (_raTableWrap) _raTableWrap.style.display = (_raMode === 'cards') ? 'none' : '';
-  if (_raCardsEl)   _raCardsEl.style.display   = (_raMode === 'cards') ? '' : 'none';
+  var _raKanbanEl  = document.getElementById('ra_kanban');
+  if (_raTableWrap) _raTableWrap.style.display = (_raMode === 'list')   ? '' : 'none';
+  if (_raCardsEl)   _raCardsEl.style.display   = (_raMode === 'cards')  ? '' : 'none';
+  if (_raKanbanEl)  _raKanbanEl.style.display  = (_raMode === 'kanban') ? '' : 'none';
   if (_raMode === 'cards' && _raCardsEl && typeof _cardGrid === 'function') {
     _raRenderCards(_raRows, _raCardsEl, role, _getHmLimit());
+    return;
+  }
+  if (_raMode === 'kanban' && _raKanbanEl && typeof _cardTile === 'function') {
+    _raRenderKanban(_raRows, _raKanbanEl, role, _getHmLimit());
     return;
   }
 
@@ -1609,53 +1618,136 @@ function renderRenoApprovalsView() {
 
 // Cards view for the Renovation Approvals tab — same rows/filters as the
 // table, laid out as _cardTile tiles. Mirrors the table's open + actions.
+// Build ONE reno-approvals card (shared by the Cards grid and the Kanban board).
+function _raCardTileFor(r, role, hmLimit) {
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+  var u=r.u, sow=r.sow, prog=r.prog, rs=r.rs, appr=r.appr;
+  var tier = rs.score>=40?{l:'Critical',c:'#b91c1c',bg:'#fef2f2'}:rs.score>=25?{l:'High',c:'#7a6000',bg:'#fef9ec'}:rs.score>=12?{l:'Medium',c:'#1d4ed8',bg:'#eff6ff'}:{l:'Low',c:'#15803d',bg:'#f0fdf4'};
+  var pct = prog?(prog.overallPct||0):0;
+  var pn = r.projectNumber || '';
+  var pnShort = pn ? pn.replace(/^.*-SOW-/, 'SOW-') : '';
+  var uid = String(u.id).replace(/'/g,"\\'");
+  var projArg = pn ? "'"+String(pn).replace(/'/g,"\\'")+"'" : 'null';
+  var costStr = r.cost>0?('$'+Math.round(r.cost).toLocaleString()):'—';
+  var locked = sow && sow.approval_status === 'completed';
+  var badges = ['<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+tier.bg+';color:'+tier.c+';">'+rs.score+' · '+tier.l+'</span>'];
+  if (u.status==='condemned') badges.push('<span style="font-size:9px;background:var(--danger-bg);color:var(--danger);padding:1px 6px;border-radius:6px;font-weight:700;">CONDEMNED</span>');
+  var actions = [];
+  if (sow && !locked) {
+    if (APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role) && appr.key==='pending_hm')
+      actions.push({text:'✓ Approve', onclick:"event.stopPropagation();raQuickApprove('"+uid+"','hm',"+projArg+")"});
+    else if (APPROVAL_AUTHORITY.can('approveSowOverThreshold', role) && (appr.key==='pending_ed'||appr.key==='pending_hm'))
+      actions.push({text:(appr.key==='pending_hm'?'Override →':'✓ Approve'), onclick:"event.stopPropagation();raQuickApprove('"+uid+"','ed',"+projArg+")"});
+  }
+  if ((typeof moduleOn !== 'function' || moduleOn('rfq')) && pn && (typeof _sowRfqStillOpen === 'function' ? _sowRfqStillOpen(r.sow) : appr.key !== 'approved') && (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(r))) {
+    actions.push({html:'<a href="rfq.html?unit='+encodeURIComponent(u.id)+'&sow='+encodeURIComponent(pn)+'" onclick="event.stopPropagation();" style="flex:1;background:#1d4ed8;color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;text-align:center;white-space:nowrap;">RFQ</a>'});
+  }
+  actions.push({text:'📊 Progress', onclick:"event.stopPropagation();openRenoProgress('"+uid+"')", ghost:true});
+  return _cardTile({
+    title: esc(((u.num||'')+' '+(u.street||'')).trim()) + (locked ? ' 🔒' : ''),
+    pill: {text: appr.label, bg: appr.bg, color: appr.c},
+    badges: badges,
+    metas: [
+      {k:'Project #',     v: pnShort || '—'},
+      {k:'Request Value', v: costStr + (r.cost>hmLimit && r.cost>0 ? ' · ED auth' : '')},
+      {k:'Contractor',    v: esc((sow&&sow.contractor) || '—')},
+      {k:'Progress',      v: pct+'%'}
+    ],
+    open: "openSowModal('"+uid+"',"+projArg+")",
+    actions: actions
+  });
+}
+
 function _raRenderCards(rows, el, role, hmLimit) {
   if (!el) return;
-  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
   if (!rows.length) {
     el.innerHTML = '<div class="card" style="text-align:center;padding:40px;color:var(--muted);">No renovation records match the current filters.</div>';
     return;
   }
-  el.innerHTML = _cardGrid(rows.map(function(r){
-    var u=r.u, sow=r.sow, prog=r.prog, rs=r.rs, appr=r.appr;
-    var tier = rs.score>=40?{l:'Critical',c:'#b91c1c',bg:'#fef2f2'}:rs.score>=25?{l:'High',c:'#7a6000',bg:'#fef9ec'}:rs.score>=12?{l:'Medium',c:'#1d4ed8',bg:'#eff6ff'}:{l:'Low',c:'#15803d',bg:'#f0fdf4'};
-    var pct = prog?(prog.overallPct||0):0;
-    var pn = r.projectNumber || '';
-    var pnShort = pn ? pn.replace(/^.*-SOW-/, 'SOW-') : '';
-    var uid = String(u.id).replace(/'/g,"\\'");
-    var projArg = pn ? "'"+String(pn).replace(/'/g,"\\'")+"'" : 'null';
-    var costStr = r.cost>0?('$'+Math.round(r.cost).toLocaleString()):'—';
-    var locked = sow && sow.approval_status === 'completed';
-    var badges = ['<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+tier.bg+';color:'+tier.c+';">'+rs.score+' · '+tier.l+'</span>'];
-    if (u.status==='condemned') badges.push('<span style="font-size:9px;background:var(--danger-bg);color:var(--danger);padding:1px 6px;border-radius:6px;font-weight:700;">CONDEMNED</span>');
-    var actions = [];
-    if (sow && !locked) {
-      if (APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role) && appr.key==='pending_hm')
-        actions.push({text:'✓ Approve', onclick:"event.stopPropagation();raQuickApprove('"+uid+"','hm',"+projArg+")"});
-      else if (APPROVAL_AUTHORITY.can('approveSowOverThreshold', role) && (appr.key==='pending_ed'||appr.key==='pending_hm'))
-        actions.push({text:(appr.key==='pending_hm'?'Override →':'✓ Approve'), onclick:"event.stopPropagation();raQuickApprove('"+uid+"','ed',"+projArg+")"});
-    }
-    if ((typeof moduleOn !== 'function' || moduleOn('rfq')) && pn && (typeof _sowRfqStillOpen === 'function' ? _sowRfqStillOpen(r.sow) : appr.key !== 'approved') && (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(r))) {
-      actions.push({html:'<a href="rfq.html?unit='+encodeURIComponent(u.id)+'&sow='+encodeURIComponent(pn)+'" onclick="event.stopPropagation();" style="flex:1;background:#1d4ed8;color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;text-align:center;white-space:nowrap;">RFQ</a>'});
-    }
-    actions.push({text:'📊 Progress', onclick:"event.stopPropagation();openRenoProgress('"+uid+"')", ghost:true});
-    return _cardTile({
-      title: esc(((u.num||'')+' '+(u.street||'')).trim()) + (locked ? ' 🔒' : ''),
-      pill: {text: appr.label, bg: appr.bg, color: appr.c},
-      badges: badges,
-      metas: [
-        {k:'Project #',     v: pnShort || '—'},
-        {k:'Request Value', v: costStr + (r.cost>hmLimit && r.cost>0 ? ' · ED auth' : '')},
-        {k:'Contractor',    v: esc((sow&&sow.contractor) || '—')},
-        {k:'Progress',      v: pct+'%'}
-      ],
-      open: "openSowModal('"+uid+"',"+projArg+")",
-      actions: actions
-    });
-  }).join(''));
+  el.innerHTML = _cardGrid(rows.map(function(r){ return _raCardTileFor(r, role, hmLimit); }).join(''));
+}
+
+// ── Kanban view ──────────────────────────────────────────────────────────────
+// Lifecycle board: Request -> Approved -> RFQ/Tendering -> In Progress ->
+// Completed. Stage is derived from the same approval-status key the table/cards
+// use (so it honours approval-on), plus the RFQ threshold + award state.
+var _RA_STAGES = [
+  {key:'request',     label:'Request'},
+  {key:'approved',    label:'Approved'},
+  {key:'rfq',         label:'RFQ / Tendering'},
+  {key:'in_progress', label:'In Progress'},
+  {key:'completed',   label:'Completed'}
+];
+function _raRfqThreshold(){ try { return parseFloat((window._appSettings||{}).rfq_threshold) || 10000; } catch(e){ return 10000; } }
+// Does this request have an RFQ that's actively out for bids? true/false, or
+// null when the RFQ cache isn't loaded on this page.
+function _raHasActiveRfq(r){
+  var cache = window._rfqCache;
+  if (!cache || !r || !r.sow) return null;
+  var uid = r.u.id, pn = r.projectNumber;
+  var arr = Object.keys(cache).map(function(k){ return cache[k]; });
+  return arr.some(function(rfq){
+    return rfq && rfq.sow_unit_id === uid && (pn ? rfq.sow_project_number === pn : true) && rfq.status === 'issued';
+  });
+}
+function _raStageOf(r){
+  var k = (r.appr && r.appr.key) || '';
+  if (k === 'complete')    return 'completed';
+  if (k === 'in_progress') return 'in_progress';
+  if (k === 'approved') {
+    var over    = (r.cost||0) >= _raRfqThreshold();
+    var awarded = r.sow && (r.sow.system_approved || r.sow.approved_via_rfq);
+    if (_raHasActiveRfq(r) === true) return 'rfq';      // actively out for bid
+    if (over && !awarded)            return 'rfq';       // >= $10k, not yet awarded -> tendering
+    return 'approved';                                    // small job, or awarded and ready to start
+  }
+  return 'request';   // pending_hm / pending_ed / declined / no_sow / unsaved
+}
+function _raRenderKanban(rows, el, role, hmLimit) {
+  if (!el) return;
+  var hideDone = _raHideCompleted();
+  var stages = _RA_STAGES.filter(function(s){ return !(hideDone && s.key === 'completed'); });
+  var groups = {}; stages.forEach(function(s){ groups[s.key] = []; });
+  rows.forEach(function(r){ var st = _raStageOf(r); if (groups[st]) groups[st].push(r); });
+  el.innerHTML = '<div style="display:flex;gap:12px;overflow-x:auto;padding:2px 2px 12px;-webkit-overflow-scrolling:touch;">'
+    + stages.map(function(s){
+        var cards = groups[s.key];
+        var body = cards.length
+          ? cards.map(function(r){ return _raCardTileFor(r, role, hmLimit); }).join('')
+          : '<div style="color:var(--muted);font-size:12px;font-style:italic;padding:12px 4px;">None</div>';
+        return '<div style="flex:0 0 262px;min-width:262px;max-width:262px;">'
+          + '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px 8px;">'
+          +   '<span style="font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">' + s.label + '</span>'
+          +   '<span style="font-size:11px;font-weight:700;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:1px 8px;color:var(--muted);">' + cards.length + '</span>'
+          + '</div>'
+          + '<div style="display:flex;flex-direction:column;gap:8px;">' + body + '</div>'
+          + '</div>';
+      }).join('')
+    + '</div>';
+}
+
+// View-mode (list/cards/kanban) + hide-completed helpers for the Approvals view.
+function _raViewMode(){ try { var v = localStorage.getItem('clfn_reno_approvals_view'); return (v==='list'||v==='kanban') ? v : 'cards'; } catch(e){ return 'cards'; } }
+function _raHideCompleted(){ try { return localStorage.getItem('clfn_ra_hide_completed') === '1'; } catch(e){ return false; } }
+window._raToggleHideCompleted = function(el){ try { localStorage.setItem('clfn_ra_hide_completed', (el&&el.checked)?'1':'0'); } catch(e){} renderRenoApprovalsView(); };
+function _raViewToggleHtml(){
+  var cur = _raViewMode();
+  function b(v,label,icon,pos){
+    var on = cur===v;
+    var radius = pos==='l' ? '7px 0 0 7px' : (pos==='r' ? '0 7px 7px 0' : '0');
+    return '<button type="button" onclick="_raSetView(\''+v+'\')" style="display:flex;align-items:center;gap:5px;padding:5px 12px;'
+      + 'border:1px solid '+(on?'var(--yellow)':'var(--border)')+';background:'+(on?'var(--yellow)':'var(--surface)')+';'
+      + 'color:'+(on?'var(--dark)':'var(--muted)')+';font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;'
+      + 'border-radius:'+radius+';'+(pos!=='l'?'margin-left:-1px;':'')+'">'+icon+' '+label+'</button>';
+  }
+  return '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">'
+    + '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;"><input type="checkbox" '+(_raHideCompleted()?'checked ':'')+'onchange="_raToggleHideCompleted(this)"/> Hide completed</label>'
+    + '<div style="display:flex;">' + b('list','List','&#9776;','l') + b('cards','Cards','&#9638;','m') + b('kanban','Kanban','&#9707;','r') + '</div>'
+    + '</div>';
 }
 window._raSetView = function(v){
-  try { localStorage.setItem('clfn_reno_approvals_view', v === 'cards' ? 'cards' : 'list'); } catch(e){}
+  var mode = (v === 'cards' || v === 'kanban') ? v : 'list';
+  try { localStorage.setItem('clfn_reno_approvals_view', mode); } catch(e){}
   renderRenoApprovalsView();
 };
 
