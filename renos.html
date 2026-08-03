@@ -54,8 +54,8 @@
   </div>
   <div class="page-header-bar">
     <div class="phb-title">
-      <h1>Renovation Approvals</h1>
-      <p>Maintenance request queue — all units with a request filed, by approval status</p>
+      <h1>Renovations</h1>
+      <p>Maintenance request pipeline — from request through approval, tendering, and completion</p>
     </div>
     <div class="phb-actions">
       <button onclick="exportRenoApprovalsCSV()" class="btn btn-ghost">⬇ CSV</button>
@@ -454,7 +454,7 @@ function showAddHousingStaff() {
 window._onSwitchRole = function(role) {
   document.querySelectorAll('.hm-ed-only').forEach(function(e){e.style.display=(ROLE.isManagement(role))?'':'none';});
   document.querySelectorAll('.ed-only').forEach(function(e){e.style.display=APPROVAL_AUTHORITY.can('editApprovalAuthority', role)?'':'none';});
-  if(true) renderRenosView();
+  renderRenoApprovalsView();
 };
 
 // ── Page-specific logout hook ──
@@ -907,28 +907,17 @@ function goBack(){window.location.href='index.html';}
 // honored as initial-tab hints for backward compatibility (initRenosPage
 // reads ?view= once on boot and maps it to setRenosTab).
 function setRenosTab(name) {
-  // Hide both renos views (and any other top-level views) first.
-  hideAllViews(name === 'approvals' ? 'renoApprovalsView' : 'renosView');
-  // Reveal the chosen view.
-  var targetId = name === 'approvals' ? 'renoApprovalsView' : 'renosView';
-  var v = document.getElementById(targetId);
+  // Merged view (2026): the Renovations page is now a SINGLE request pipeline
+  // (List / Cards / Kanban) that already includes units under repair with no
+  // request yet. The old Approvals/Renovations tab split is retired — every
+  // entry (showRenos / showRenoApprovals / nav / deep link) lands on the
+  // pipeline. `name` is ignored, kept so existing callers still work.
+  hideAllViews('renoApprovalsView');
+  var v = document.getElementById('renoApprovalsView');
   if (v) { v.style.display = 'flex'; v.style.flexDirection = 'column'; }
-  // Reveal the tab bar wrapper (hidden until first tab is chosen so it
-  // doesn't flash before loadRenosData completes).
-  var row = document.getElementById('renosTabsRow');
-  if (row) row.style.display = 'block';
-  // Mark the active tab. .active is the convention used by .pill-tab on
-  // the Settings page (Admin / App Settings) — same segmented-control look.
-  var ta = document.getElementById('renos-tab-approvals');
-  var tr = document.getElementById('renos-tab-renovations');
-  if (ta) ta.classList.toggle('active', name === 'approvals');
-  if (tr) tr.classList.toggle('active', name === 'renovations');
-  // Render the target view.
-  if (name === 'approvals' && typeof renderRenoApprovalsView === 'function') {
-    renderRenoApprovalsView();
-  } else if (name === 'renovations' && typeof renderRenosView === 'function') {
-    renderRenosView();
-  }
+  var row = document.getElementById('renosTabsRow');   // retired tab bar — keep hidden
+  if (row) row.style.display = 'none';
+  if (typeof renderRenoApprovalsView === 'function') renderRenoApprovalsView();
 }
 
 // Public wrappers — kept for backward compat with anything (header nav,
@@ -1054,7 +1043,7 @@ function saveRenoBudgetApproval() {
     body: JSON.stringify({ unit_id: unitId, data: approval, updated_at: new Date().toISOString() })
   }).catch(function(e){ console.warn('Reno budget save failed:',e); });
   closeRenoBudget();
-  renderRenosView();
+  renderRenosView(); if (typeof renderRenoApprovalsView === 'function') renderRenoApprovalsView();
   showToast(overBudget ? 'Over-budget approval saved — ED sign-off recorded' : 'Budget approval granted');
 }
 
@@ -1147,7 +1136,7 @@ function saveRenoProgress() {
   })();
 
   closeRenoProgress();
-  renderRenosView();
+  renderRenosView(); if (typeof renderRenoApprovalsView === 'function') renderRenoApprovalsView();
   showToast('Progress updated');
 }
 
