@@ -1951,6 +1951,41 @@ async function _generateRfqPdfBase64(rfq, unit) {
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(20);
     pdf.text('TOTAL BID AMOUNT:', tX + c1 - 2, ctx.y + 5.5, { align: 'right' });
     ctx.y += 9;
+
+    // Bid Cost Breakdown — blank table for the contractor to break their total
+    // bid out by category (mirrors the RFQ Contracting-tab Price Breakdown).
+    gap(4);
+    ctx.needSpace(12);
+    paragraph('Bid Cost Breakdown - break your total bid out by category (CDN, exclusive of HST). The total must equal the Total Bid Amount above.', 8.5);
+    gap(1);
+    var bc1 = contentW * 0.68, bH = 7;
+    ctx.needSpace(bH + 2);
+    pdf.setFillColor(248, 228, 26); pdf.rect(tX, ctx.y, contentW, bH, 'F');
+    pdf.setDrawColor(160); pdf.setLineWidth(0.3); pdf.rect(tX, ctx.y, contentW, bH);
+    pdf.line(tX + bc1, ctx.y, tX + bc1, ctx.y + bH);
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.5); pdf.setTextColor(30);
+    pdf.text('Category', tX + 2, ctx.y + 4.5);
+    pdf.text('Amount ($)', tX + bc1 + 2, ctx.y + 4.5);
+    ctx.y += bH;
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(30);
+    ['Materials', 'Labour', 'Equipment', 'Subcontractors', 'Other'].forEach(function(cat){
+      ctx.needSpace(10);
+      pdf.setDrawColor(200); pdf.setLineWidth(0.2); pdf.rect(tX, ctx.y, contentW, 9);
+      pdf.line(tX + bc1, ctx.y, tX + bc1, ctx.y + 9);
+      pdf.text(cat, tX + 2, ctx.y + 5.5);
+      ctx.y += 9;
+    });
+    ctx.needSpace(9);
+    pdf.setFillColor(248, 228, 26); pdf.rect(tX, ctx.y, contentW, 9, 'F');
+    pdf.setDrawColor(160); pdf.setLineWidth(0.3); pdf.rect(tX, ctx.y, contentW, 9);
+    pdf.line(tX + bc1, ctx.y, tX + bc1, ctx.y + 9);
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(20);
+    pdf.text('TOTAL BID:', tX + bc1 - 2, ctx.y + 5.5, { align: 'right' });
+    ctx.y += 9;
+    gap(2);
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(30);
+    pdf.text('Estimated total labour hours: __________ hrs', tX + 2, ctx.y + 4);
+    ctx.y += 6;
     gap(4);
   }
 

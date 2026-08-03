@@ -8747,6 +8747,20 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
     + '<tbody>' + (bidRows || '<tr><td colspan="4" style="padding:10px;"></td></tr>') + '</tbody>'
     + '<tfoot><tr style="background:' + primary + ';"><td colspan="2" style="padding:8px 10px;font-size:11px;font-weight:bold;text-align:right;color:#111;">TOTAL BID AMOUNT:</td><td style="padding:8px 10px;border:1px solid #ccc;min-width:80px;background:#fff;">&nbsp;</td><td style="background:#fff;"></td></tr></tfoot>'
     + '</table>'
+    // ── Bid Cost Breakdown (blank — contractor fills in) ──────────────────
+    + '<p style="font-size:9.5px;color:#333;margin:14px 0 6px;"><strong>Bid Cost Breakdown</strong> &mdash; break your total bid out by category (CDN, exclusive of HST). The total must equal your Total Bid Amount above.</p>'
+    + '<table><thead><tr>'
+    +   '<th style="background:' + primary + ';color:#111;">Category</th>'
+    +   '<th style="width:32%;background:' + primary + ';color:#111;">Amount ($)</th>'
+    + '</tr></thead><tbody>'
+    +   ['Materials', 'Labour', 'Equipment', 'Subcontractors', 'Other'].map(function(c){
+          return '<tr><td style="padding:9px 10px;border-bottom:1px solid #e0e0e0;font-size:10px;">' + c + '</td>'
+            + '<td style="padding:9px 10px;border-bottom:1px solid #e0e0e0;background:#fff;"></td></tr>';
+        }).join('')
+    + '</tbody>'
+    + '<tfoot><tr style="background:' + primary + ';"><td style="padding:8px 10px;font-size:11px;font-weight:bold;text-align:right;color:#111;">TOTAL BID:</td><td style="padding:8px 10px;border:1px solid #ccc;background:#fff;">&nbsp;</td></tr></tfoot>'
+    + '</table>'
+    + '<p style="font-size:10px;color:#333;margin-top:10px;">Estimated total labour hours: <span style="display:inline-block;border-bottom:1px solid #333;min-width:120px;">&nbsp;</span> hrs</p>'
     + '<p style="font-size:9px;color:#444;margin-top:10px;"><strong>Supporting documents:</strong> Please attach any additional documents to support your bid — shop drawings, product specifications, material substitution notices, alternative scope notes, or any other information relevant to your submission.</p>'
     + '</div></div>'
 
