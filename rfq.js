@@ -2252,6 +2252,54 @@ async function _rfqBuildContractPdf(tokens, d, savedBody, numFmt) {
         pdf.setTextColor(0);
       }
 
+      // ── Contract Price Breakdown ──
+      // Breaks the total bid out by the categories entered on the RFQ Contracting
+      // tab's Price Breakdown (Materials / Labour / Equipment / Subcontractors,
+      // + Other and Labour Hours). Not a lettered Schedule — "Schedule A" is
+      // already the maintenance-request scope and "Schedule B" the milestones.
+      // Skipped when no breakdown was entered.
+      (function _priceBreakdown(){
+        var core = [
+          ['Materials',      parseFloat(d.price_materials)      || 0],
+          ['Labour',         parseFloat(d.price_labour)         || 0],
+          ['Equipment',      parseFloat(d.price_equipment)      || 0],
+          ['Subcontractors', parseFloat(d.price_subcontractors) || 0]
+        ];
+        var other = parseFloat(d.price_other) || 0;
+        var rows  = other > 0 ? core.concat([['Other', other]]) : core;
+        var subtotal = rows.reduce(function(s, r){ return s + r[1]; }, 0);
+        var lh = (d.labour_hours != null) ? String(d.labour_hours).trim() : '';
+        var lhHas = lh !== '' && lh !== '0';
+        if (subtotal <= 0 && !lhHas) return;   // nothing entered — skip the section
+
+        h2Heading('Contract Price Breakdown');
+        var cW = ctx.contentW, mL = ctx.marginL, amtX = mL + cW - 1;
+        ctx.needSpace(8);
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(90);
+        pdf.text('Category', mL, ctx.y + 3, { align: 'left' });
+        pdf.text('Amount',   amtX, ctx.y + 3, { align: 'right' });
+        ctx.y += 5; pdf.setDrawColor(210); pdf.setLineWidth(0.2); pdf.line(mL, ctx.y, mL + cW, ctx.y); ctx.y += 1;
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(30);
+        rows.forEach(function(r){
+          ctx.needSpace(6);
+          pdf.text(r[0], mL, ctx.y + 3, { align: 'left' });
+          pdf.text(numFmt(r[1]) || '$0.00', amtX, ctx.y + 3, { align: 'right' });
+          ctx.y += 5.5;
+        });
+        ctx.needSpace(7);
+        pdf.setDrawColor(210); pdf.line(mL, ctx.y, mL + cW, ctx.y); ctx.y += 1;
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(20);
+        pdf.text('Total Contract Price', mL, ctx.y + 3, { align: 'left' });
+        pdf.text(numFmt(subtotal) || '$0.00', amtX, ctx.y + 3, { align: 'right' });
+        ctx.y += 6; pdf.setTextColor(0);
+        if (lhHas) {
+          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(80);
+          pdf.text('Estimated Labour Hours: ' + lh + ' hrs', mL, ctx.y + 3);
+          ctx.y += 6; pdf.setTextColor(0);
+        }
+        ctx.gap(2);
+      })();
+
       // ── Schedule B — Milestone Payment Schedule + holdback release terms ──
       var _ms = (d.milestones || []).filter(function(m){ return m && (m.name || parseFloat(m.gross)); });
       h2Heading('Schedule B — Milestone Payment Schedule');
