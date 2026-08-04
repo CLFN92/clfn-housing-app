@@ -25,8 +25,8 @@ window.NATIONS_DIRECTORY = window.NATIONS_DIRECTORY || {
     role_labels:   {},
     // Canonical public URL for this nation's site. QR codes + public links
     // (report.html, apply.html) are built from this so they always point at the
-    // stable domain regardless of where staff happen to generate them (Azure,
-    // a preview host, etc.). Falls back to location.origin if blank.
+    // stable domain regardless of where staff happen to generate them (a
+    // preview host, localhost, etc.). Falls back to location.origin if blank.
     portal_base:   'https://clfn.fnhub.app',
     email_domain:  'clfn.on.ca',          // staff email domain gate (@<domain> checks)
     housing_email: 'housing@clfn.on.ca',  // the nation's housing dept mailbox (AP/manager defaults)

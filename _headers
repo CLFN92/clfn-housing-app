@@ -1,10 +1,11 @@
-# Cloudflare Pages headers (mirrors staticwebapp.config.json globalHeaders).
-# Cloudflare Pages uses this file; Azure Static Web Apps ignores it, so it is
-# safe to land before cutover. On cutover this becomes the live header source.
+# Cloudflare response headers -- the LIVE, definitive header source for the
+# nation app (fnhub.app / *.fnhub.app). Any CSP / security-header change goes
+# here. (The app is served entirely by Cloudflare; Azure Static Web Apps has
+# been decommissioned.)
 #
 # CSP note: connect-src / frame-src are MULTI-NATION ready -- `*.supabase.co`
 # allows each nation's own Supabase project (database-per-nation) without a
-# per-nation edit, replacing the single hardcoded CLFN host used on Azure.
+# per-nation edit.
 /*
   Cache-Control: no-cache
   X-Frame-Options: DENY

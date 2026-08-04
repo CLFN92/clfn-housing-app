@@ -2722,8 +2722,8 @@ document.addEventListener('DOMContentLoaded', function(){
 // either shows the wrong thing or, more commonly, a blank screen.
 (function () {
   var path = window.location.pathname;
-  // Accept both `/housing.html` (Azure Static Web Apps) and `/housing` (static
-  // servers like `npx serve` that strip the .html extension via clean URLs).
+  // Accept both `/housing.html` (Cloudflare static assets) and `/housing`
+  // (static servers like `npx serve` that strip the .html via clean URLs).
   var isHousingHome =
     path.endsWith('/housing.html') ||
     path === '/housing.html' ||

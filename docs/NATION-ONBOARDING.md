@@ -65,9 +65,14 @@ Optional: raise the auth email rate limit (Authentication -> Rate Limits) and
 brand the templates (Authentication -> Email Templates). The sending domain must
 be Verified in Resend (same domain as EMAIL_FROM).
 
-### A4. Retire Azure (only after Cloudflare is verified live)
-- Disable/delete `.github/workflows/azure-static-web-apps-*.yml`.
-- Later, delete `staticwebapp.config.json` (Cloudflare uses `_headers`/`_redirects`).
+### A4. Azure — decommissioned
+Azure Static Web Apps has been fully retired. The static host is now **Cloudflare
+Workers** (`.github/workflows/deploy-cloudflare.yml` + `wrangler.jsonc`); response
+headers/CSP live in `_headers`. The Azure deploy workflow and `staticwebapp.config.json`
+have been deleted from the repo. Remaining Azure teardown is on the Azure side only:
+delete the Static Web App resource in the Azure Portal and remove the
+`AZURE_STATIC_WEB_APPS_API_TOKEN_*` GitHub Actions secret.
+
 - The Supabase Edge Function CI (`.github/workflows/deploy-supabase-functions.yml`)
   is independent of the static host — leave it.
 
