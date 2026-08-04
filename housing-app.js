@@ -1134,6 +1134,16 @@ function _appIsCommercial(id){
   return !!(a && a.appType === 'commercial');
 }
 
+// Signature image for save: read the live pad, but fall back to the PREVIOUSLY
+// saved signature when the pad reads blank (e.g. the record was reopened and the
+// drawn pad wasn't re-rendered before this save). This guarantees a re-save can
+// never wipe an existing signature with '' — it only ever adds/keeps one.
+function _appSigImg(appId, canvasId, sigKey){
+  var cur = (typeof getSigDataURL === 'function') ? getSigDataURL(canvasId) : '';
+  if (cur) return cur;
+  var prev = (((applications || []).find(function(a){ return a && a.id === appId; })) || {}).sig || {};
+  return (prev[sigKey] && prev[sigKey].image) || '';
+}
 function saveApplicationRecord(opts){
   var appType = typeof getAppType === 'function' ? getAppType() : 'new_housing';
   var isFileUpdate = (appType === 'existing_tenant');
@@ -1367,17 +1377,17 @@ function saveApplicationRecord(opts){
       applicant: {
         name:  fv('sig_name'),
         date:  fv('sig_date'),
-        image: (typeof getSigDataURL === 'function') ? getSigDataURL('sig_canvas_app') : ''
+        image: _appSigImg(appId, 'sig_canvas_app', 'applicant')
       },
       coApplicant: hasCoApp ? {
         name:  fv('sig_co_name'),
         date:  fv('sig_co_date'),
-        image: (typeof getSigDataURL === 'function') ? getSigDataURL('sig_canvas_co') : ''
+        image: _appSigImg(appId, 'sig_canvas_co', 'coApplicant')
       } : null,
       staff: {
         name:  fv('sig_staff'),
         date:  fv('sig_recv'),
-        image: (typeof getSigDataURL === 'function') ? getSigDataURL('sig_canvas_staff') : ''
+        image: _appSigImg(appId, 'sig_canvas_staff', 'staff')
       }
     },
     // Internal use fields (filled during approval process)
