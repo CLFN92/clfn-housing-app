@@ -2370,6 +2370,7 @@ async function _rfqBuildContractPdf(tokens, d, savedBody, numFmt) {
 
       // Signatures section — keep the block together on a page, but let
       // h2Heading own the spacing so it matches the other section headers.
+      if (typeof _docSigsHidden !== 'function' || !_docSigsHidden()) {
       ctx.needSpace(50);
       h2Heading('Signatures');
 
@@ -2400,6 +2401,7 @@ async function _rfqBuildContractPdf(tokens, d, savedBody, numFmt) {
 
       _addSigBlock('Owner Representative', 'rfq_sig',         tokens.clfnSignatoryName + (tokens.clfnSignatoryTitle ? ', ' + tokens.clfnSignatoryTitle : ''));
       _addSigBlock('Contractor',           'rfq_ct_sig',       tokens.contractorSignatoryName + (tokens.contractorSignatoryTitle ? ', ' + tokens.contractorSignatoryTitle : ''));
+      }
 
       var base64 = ctx.finish();
       var binStr = atob(base64);

@@ -1646,7 +1646,8 @@ async function _generateSowPdfBase64() {
     gap();
   }
 
-  // Signatures
+  // Signatures — omitted when Settings -> Contracts hides signature sections.
+  if (!_docSigsHidden()) {
   sectionHeader('Signatures');
   var tenantSig    = getSig('sow_sig_canvas_tenant');
   var staffSig     = getSig('sow_sig_canvas_staff');
@@ -1686,6 +1687,7 @@ async function _generateSowPdfBase64() {
   drawSig(marginL,                'Tenant Signature',        tenantName, tenantDate, tenantSig);
   drawSig(marginL + sigW + sigGap,'Housing Staff Signature', staffName,  staffDate,  staffSig);
   ctx.y += sigBlockH + 4;
+  }
 
   return ctx.finish();
 }
@@ -2028,7 +2030,8 @@ async function _generateRfqPdfBase64(rfq, unit) {
     if (plainTerms) { sectionHeader('Terms & Conditions'); paragraph(plainTerms, 8); gap(4); }
   }
 
-  // ── 7. Authorization ──────────────────────────────────────────────────────
+  // ── 7. Authorization (signature) — omitted when signatures are hidden ──────
+  if (!_docSigsHidden()) {
   sectionHeader('Authorization');
   gap(2);
   var sigData  = d.sig_data  || '';
@@ -2063,6 +2066,7 @@ async function _generateRfqPdfBase64(rfq, unit) {
   pdf.text(natDisp, marginL, ctx.y); ctx.y += 5;
   pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(80);
   pdf.text('Housing Department', marginL, ctx.y);
+  }
 
   return ctx.finish();
 }
@@ -2343,7 +2347,8 @@ async function _generateWorkOrderPdfBase64() {
     gap();
   }
 
-  // Signature blocks — empty lines; this is a printed/signed artifact.
+  // Signature blocks — omitted when Settings -> Contracts hides signatures.
+  if (!_docSigsHidden()) {
   sectionHeader('Authorization');
   var sigBlockH = 26;
   var sigGap    = 6;
@@ -2370,6 +2375,7 @@ async function _generateWorkOrderPdfBase64() {
   sigBox(marginL,                'Contractor Representative');
   sigBox(marginL + sigW + sigGap,short + ' Housing — Authorized Signatory');
   ctx.y += sigBlockH + 4;
+  }
 
   return ctx.finish();
 }
@@ -3886,6 +3892,13 @@ window._rfqDocStr = _rfqDocStr;
 window._rfqDocList = _rfqDocList;
 window._rfqDocSub = _rfqDocSub;
 
+// Hide signature sections on generated documents (RFQ bid doc, contractor
+// contract, SOW/maintenance-request doc, work order). The housing APPLICATION
+// document always keeps its signatures and is never gated by this. Toggle in
+// Settings -> Contracts. Saved to housing_settings key 'hide_signatures'.
+function _docSigsHidden() { return !!(window._appSettings && window._appSettings.hide_signatures); }
+window._docSigsHidden = _docSigsHidden;
+
 var CONTRACTS_DOCS_REGISTRY = [
   {
     key:         'residential_lease',
@@ -4309,7 +4322,14 @@ function renderContractsTab() {
   if (!_contractsSelectedDoc) _contractsSelectedDoc = CONTRACTS_DOCS_REGISTRY[0] && CONTRACTS_DOCS_REGISTRY[0].key;
 
   body.innerHTML =
-      '<div class="ntf-grid">'
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:2px 2px 12px;margin-bottom:4px;border-bottom:1px solid var(--border);">'
+    +   '<label style="display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;cursor:pointer;">'
+    +     '<input type="checkbox" ' + (_docSigsHidden() ? 'checked ' : '') + 'onchange="toggleHideSignatures(this)"/>'
+    +     'Hide signature sections on generated documents'
+    +   '</label>'
+    +   '<span style="font-size:11px;color:var(--muted);">Applies to the RFQ, contract, maintenance request & work order PDFs. The housing application always keeps its signatures.</span>'
+    + '</div>'
+    + '<div class="ntf-grid">'
     +   '<div class="ntf-event-list" id="contracts_doc_list">' + _contractsRenderDocListHtml() + '</div>'
     +   '<div class="ntf-editor"     id="contracts_editor">'   + _contractsRenderEditorHtml(_contractsSelectedDoc) + '</div>'
     + '</div>';
@@ -4600,6 +4620,18 @@ function resetRfqDocumentStrings() {
 }
 window.saveRfqDocumentStrings  = saveRfqDocumentStrings;
 window.resetRfqDocumentStrings = resetRfqDocumentStrings;
+
+function toggleHideSignatures(el) {
+  var role = window.currentRole || window._realRole;
+  if (role !== 'ed') { showToast('Only the Executive Director can change this'); if (el) el.checked = _docSigsHidden(); return; }
+  var on = !!(el && el.checked);
+  persistSetting('hide_signatures', on, {
+    auditAction: 'contracts_hide_signatures',
+    auditDetail: 'Signature sections ' + (on ? 'hidden' : 'shown') + ' on generated documents',
+    okMsg:       on ? '✓ Signature sections hidden' : '✓ Signature sections shown'
+  });
+}
+window.toggleHideSignatures = toggleHideSignatures;
 
 function resetContractsDoc() {
   if (!_contractsSelectedDoc) return;

@@ -8591,6 +8591,7 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
   // layer isn't loaded. S() = single string, L() = list.
   var S = function(k, fb){ return (typeof _rfqDocStr === 'function') ? _rfqDocStr(k) : fb; };
   var L = function(k, fb){ return (typeof _rfqDocList === 'function') ? _rfqDocList(k) : fb; };
+  var _sigsHidden = (typeof _docSigsHidden === 'function') && _docSigsHidden();
 
   // Theme — primary color drives header strip, section headers, table headers
   var theme       = (window._appSettings && window._appSettings.theme) || {};
@@ -8781,7 +8782,7 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
 
     + (termsHtml ? '<div class="sec"><div class="sec-h" style="background:' + primary + ';color:#111;">Terms &amp; Conditions</div><div class="sec-b">' + termsHtml + '</div></div>' : '')
 
-    + (function() {
+    + (_sigsHidden ? '' : (function() {
         var d = rfq.data || {};
         var sigData   = d.sig_data  || '';
         var sigName   = d.sig_name  || '';
@@ -8814,7 +8815,7 @@ function buildRfqDocumentHtml(rfq, sow, unit) {
     + '<div><div style="font-size:9px;font-weight:bold;text-transform:uppercase;color:#888;margin-bottom:4px;">On behalf of</div>'
     + '<div style="font-size:11px;font-weight:bold;margin-top:8px;">' + escapeHtml(natDisp) + '</div>'
     + '<div style="font-size:10px;color:#555;">Housing Department</div></div>'
-    + '</div></div></div>'
+    + '</div></div></div>')
     + '</div>'
     + '<div class="footer"><span>' + escapeHtml(natShort) + ' Housing  |  ' + escapeHtml(rfq.id) + '</span><span>Generated: ' + today + '</span></div>'
     + '</body></html>';
