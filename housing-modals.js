@@ -2964,6 +2964,32 @@ window.openEditModal = function(appId) {
 
   // ── Restore saved signature fields ──────────────────────────────────────
   function _setSigF(id, val){ var e=document.getElementById(id); if(e&&val) e.value=val; }
+  // Restore an HM/ED decision <select> tolerant of value drift between the
+  // approval workflow (confirmApprovalAction stores 'Approved'/'Declined'/
+  // 'More Info Required') and this form's own dropdown options ('Recommended',
+  // 'Returned - More Info Required', 'Approved', 'Deferred', ...). Without this
+  // an HM recommendation saved via the approval modal came back blank on reopen
+  // because 'Approved' matched no HM option.
+  function _setDecisionSel(selectId, val){
+    var sel=document.getElementById(selectId); if(!sel||!val) return;
+    var want=String(val).trim().toLowerCase(), opts=sel.options, i;
+    for(i=0;i<opts.length;i++){
+      if(String(opts[i].value).trim().toLowerCase()===want || String(opts[i].text).trim().toLowerCase()===want){ sel.selectedIndex=i; return; }
+    }
+    var intent = /more info|return/.test(want) ? 'moreinfo'
+               : /declin|reject/.test(want)    ? 'declined'
+               : /defer/.test(want)            ? 'deferred'
+               : /approv|recommend/.test(want) ? 'approve'
+               : '';
+    if(!intent) return;
+    for(i=0;i<opts.length;i++){
+      var t=String(opts[i].text).trim().toLowerCase(); if(!t) continue;
+      if(intent==='moreinfo' && /more info|return/.test(t)){ sel.selectedIndex=i; return; }
+      if(intent==='declined' && /declin/.test(t))          { sel.selectedIndex=i; return; }
+      if(intent==='deferred' && /defer/.test(t))           { sel.selectedIndex=i; return; }
+      if(intent==='approve'  && /approv|recommend/.test(t)){ sel.selectedIndex=i; return; }
+    }
+  }
   if(app.sig) {
     _setSigF('sig_name',    app.sig.applicant   && app.sig.applicant.name);
     _setSigF('sig_date',    app.sig.applicant   && app.sig.applicant.date);
@@ -2978,13 +3004,13 @@ window.openEditModal = function(appId) {
     _setSigF('sig_hm_name',     app.hmSig.name);
     _setSigF('sig_hm_date',     app.hmSig.date);
     _setSigF('sig_hm_notes',    app.hmSig.notes);
-    var _hd=document.getElementById('sig_hm_decision'); if(_hd&&app.hmSig.decision) _hd.value=app.hmSig.decision;
+    _setDecisionSel('sig_hm_decision', app.hmSig.decision);
   }
   if(app.edSig) {
     _setSigF('sig_ed_name',     app.edSig.name);
     _setSigF('sig_ed_date',     app.edSig.date);
     _setSigF('sig_ed_notes_sig',app.edSig.notes);
-    var _ed=document.getElementById('sig_ed_decision'); if(_ed&&app.edSig.decision) _ed.value=app.edSig.decision;
+    _setDecisionSel('sig_ed_decision', app.edSig.decision);
   }
 
   // ── Restore V2 scoring fields ──

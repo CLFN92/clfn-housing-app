@@ -239,43 +239,50 @@ serve(async (req) => {
 
     // --- ping: bootstrap the dashboard ---
     if (action === 'ping') {
-      // Consume any staff invites that pre-linked an application to this email.
+      // Consume any staff invites that pre-linked an application to this email,
+      // then seed a pre-filled draft from EVERY linked application. The seed is
+      // driven off the profile's persistent linked_app_ids (NOT the one-time
+      // invite row), so it is idempotent: it still populates the portal even if
+      // the invite was already consumed on an earlier sign-in.
       try {
-        const { data: invs } = await admin.from('applicant_invites').select('id, app_id').eq('email', email).is('consumed_at', null)
-        if (invs && invs.length) {
-          const { data: pr } = await admin.from('applicant_profiles').select('linked_app_ids').eq('uid', uid).limit(1)
-          const linked = (pr && pr[0] && pr[0].linked_app_ids) || []
-          let changed = false
-          for (const iv of invs) { if (iv.app_id && linked.indexOf(iv.app_id) === -1) { linked.push(iv.app_id); changed = true } }
-          if (changed) await admin.from('applicant_profiles').update({ linked_app_ids: linked, updated_at: new Date().toISOString() }).eq('uid', uid)
-          // Seed a pre-filled DRAFT submission from each linked application so the
-          // portal opens POPULATED with the applicant's existing data instead of a
-          // blank form. Skip if a submission already exists for that application.
-          for (const iv of invs) {
-            if (!iv.app_id) continue
-            try {
-              const { data: existSub } = await admin.from('application_submissions')
-                .select('id').eq('applicant_uid', uid).eq('linked_app_id', iv.app_id).limit(1)
-              if (existSub && existSub.length) continue
-              const { data: appRows } = await admin.from('housing_applications')
-                .select('id, data, app_type').eq('id', iv.app_id).limit(1)
-              const src = appRows && appRows[0]
-              if (!src) continue
-              const d = (src.data && typeof src.data === 'object') ? src.data : {}
-              const payload: Record<string, unknown> = {}
-              const scalarKeys = ['fn','ln','dob','band','marital','reserve','phone','email','street','city','province','postal','occDate','homeless','haveHouse','homeCondition','hasCoApp']
-              for (const k of scalarKeys) { if (d[k] !== undefined && d[k] !== null && d[k] !== '') payload[k] = d[k] }
-              if (d.coApp) payload.coApp = d.coApp
-              for (const k of ['habitants','incomes','references','pets']) { if (Array.isArray(d[k]) && d[k].length) payload[k] = d[k] }
-              const subType = src.app_type === 'transfer_request' ? 'transfer' : (src.app_type === 'existing_tenant' ? 'update' : 'new')
-              await admin.from('application_submissions').insert({
-                applicant_uid: uid, submission_type: subType, payload, status: 'draft', linked_app_id: iv.app_id,
-              })
-            } catch (_e) { /* best-effort seed; the portal still works without it */ }
+        // 1) Merge any fresh invite app_ids into the profile's linked list.
+        const { data: pr } = await admin.from('applicant_profiles').select('linked_app_ids').eq('uid', uid).limit(1)
+        const linked: string[] = (pr && pr[0] && pr[0].linked_app_ids) || []
+        let changed = false
+        try {
+          const { data: invs } = await admin.from('applicant_invites').select('id, app_id').eq('email', email).is('consumed_at', null)
+          if (invs && invs.length) {
+            for (const iv of invs) { if (iv.app_id && linked.indexOf(iv.app_id) === -1) { linked.push(iv.app_id); changed = true } }
+            await admin.from('applicant_invites').update({ consumed_at: new Date().toISOString() }).in('id', invs.map((i: any) => i.id))
           }
-          await admin.from('applicant_invites').update({ consumed_at: new Date().toISOString() }).in('id', invs.map((i: any) => i.id))
+        } catch (_e) { /* invites table may not exist yet */ }
+        if (changed) await admin.from('applicant_profiles').update({ linked_app_ids: linked, updated_at: new Date().toISOString() }).eq('uid', uid)
+
+        // 2) For each linked application with no submission yet, seed a pre-filled
+        //    DRAFT so the portal opens POPULATED instead of blank.
+        for (const appId of linked) {
+          if (!appId) continue
+          try {
+            const { data: existSub } = await admin.from('application_submissions')
+              .select('id').eq('applicant_uid', uid).eq('linked_app_id', appId).limit(1)
+            if (existSub && existSub.length) continue
+            const { data: appRows } = await admin.from('housing_applications')
+              .select('id, data, app_type').eq('id', appId).limit(1)
+            const src = appRows && appRows[0]
+            if (!src) continue
+            const d = (src.data && typeof src.data === 'object') ? src.data : {}
+            const payload: Record<string, unknown> = {}
+            const scalarKeys = ['fn','ln','dob','band','marital','reserve','phone','email','street','city','province','postal','occDate','homeless','haveHouse','homeCondition','hasCoApp']
+            for (const k of scalarKeys) { if (d[k] !== undefined && d[k] !== null && d[k] !== '') payload[k] = d[k] }
+            if (d.coApp) payload.coApp = d.coApp
+            for (const k of ['habitants','incomes','references','pets']) { if (Array.isArray(d[k]) && d[k].length) payload[k] = d[k] }
+            const subType = src.app_type === 'transfer_request' ? 'transfer' : (src.app_type === 'existing_tenant' ? 'update' : 'new')
+            await admin.from('application_submissions').insert({
+              applicant_uid: uid, submission_type: subType, payload, status: 'draft', linked_app_id: appId,
+            })
+          } catch (_e) { /* best-effort seed; the portal still works without it */ }
         }
-      } catch (_e) { /* invites table may not exist yet */ }
+      } catch (_e) { /* profile table may not exist yet */ }
       const { data: prof } = await admin.from('applicant_profiles').select('*').eq('uid', uid).limit(1)
       const { data: subs } = await admin.from('application_submissions')
         .select('id, submission_type, status, linked_app_id, created_app_id, review_notes, submitted_at, updated_at')
