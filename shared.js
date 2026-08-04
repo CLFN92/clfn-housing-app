@@ -333,6 +333,20 @@ window.showConfirm = function(opts) {
           '<span>' + opts.checkbox.label + '</span>' +
         '</label>'
       : '';
+    // opts.checkboxes: [{ id, label, defaultChecked }] — a multi-select list
+    // (e.g. pick which contacts receive an email). Labels are trusted HTML,
+    // so callers must pre-escape. Resolves { ok, items:{id:bool}, selected:[ids] }.
+    var hasCheckboxes = !!(opts.checkboxes && opts.checkboxes.length);
+    var checkboxesHtml = hasCheckboxes
+      ? '<div style="margin-top:12px;display:flex;flex-direction:column;gap:7px;">' +
+          opts.checkboxes.map(function(cb, i){
+            return '<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer;line-height:1.4;">' +
+                '<input type="checkbox" data-cn-multi="' + i + '"' + (cb.defaultChecked ? ' checked' : '') + ' style="margin-top:3px;flex-shrink:0;cursor:pointer;accent-color:var(--yellow);"/>' +
+                '<span>' + (cb.label || '') + '</span>' +
+              '</label>';
+          }).join('') +
+        '</div>'
+      : '';
     ov.innerHTML =
       '<div class="modal-body modal-body-sm">' +
         '<div class="modal-hdr">' +
@@ -343,6 +357,7 @@ window.showConfirm = function(opts) {
           '<p class="txt-help m-0">' + (opts.message || 'Are you sure?') + '</p>' +
           detailHtml +
           checkboxHtml +
+          checkboxesHtml +
         '</div>' +
         '<div class="modal-footer">' +
           '<button type="button" class="btn btn-ghost" data-cn-cancel>' + (opts.cancelText || 'Cancel') + '</button>' +
@@ -354,9 +369,22 @@ window.showConfirm = function(opts) {
       var cb = ov.querySelector('[data-cn-checkbox]');
       return cb ? !!cb.checked : false;
     }
+    function getMultiState(){
+      var items = {}, selected = [];
+      ov.querySelectorAll('[data-cn-multi]').forEach(function(cb){
+        var idx = parseInt(cb.getAttribute('data-cn-multi'), 10);
+        var def = opts.checkboxes[idx] || {};
+        var id  = (def.id != null) ? def.id : idx;
+        items[id] = !!cb.checked;
+        if (cb.checked) selected.push(id);
+      });
+      return { items: items, selected: selected };
+    }
     function close(ok){
       var checked = hasCheckbox ? getCheckboxState() : false;
+      var multi   = hasCheckboxes ? getMultiState() : null;
       if (ov.parentNode) ov.parentNode.removeChild(ov);
+      if (hasCheckboxes) { resolve({ ok: ok, items: multi.items, selected: multi.selected }); return; }
       resolve(hasCheckbox ? { ok: ok, checked: checked } : ok);
     }
     ov.querySelectorAll('[data-cn-cancel]').forEach(function(b){ b.onclick = function(){ close(false); }; });

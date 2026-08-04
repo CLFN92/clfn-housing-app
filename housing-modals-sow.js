@@ -1126,16 +1126,37 @@ async function _sowPromptWorkOrderEmail(){
     } else if(sow.contractorId){
       if(typeof notifyWorkOrderToContractor !== 'function' || typeof _resolveContractorForEmail !== 'function') return;
       var ct = await _resolveContractorForEmail(sow.contractorId);
-      if(!ct || !ct.email){ if(typeof showToast === 'function') showToast('No contractor email on file.'); return; }
+      if(!ct){ if(typeof showToast === 'function') showToast('Contractor record not found.'); return; }
+      // Build the recipient list: the company email (default on) plus each Key
+      // Contact that has an email on file (default off — the user opts each in).
+      var _validEmail = function(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e||'').trim()); };
+      var recips = [], seenR = {};
+      var _pushRecip = function(id, email, name, defOn){
+        var e = String(email||'').trim();
+        if(!_validEmail(e)) return;
+        var key = e.toLowerCase();
+        if(seenR[key]) return;            // never email the same address twice
+        seenR[key] = true;
+        recips.push({ id:id, email:e,
+          label: _esc(name || 'Contact') + ' &middot; <span style="color:var(--muted);">' + _esc(e) + '</span>',
+          defaultChecked: !!defOn });
+      };
+      _pushRecip('company', ct.email, (ct.name || 'Company') + ' (company)', true);
+      (ct.people || []).forEach(function(p, i){
+        _pushRecip('kc_'+i, p && p.email, (p && p.name) ? (p.name + ' (key contact)') : 'Key contact', false);
+      });
+      if(!recips.length){ if(typeof showToast === 'function') showToast('No contractor or key-contact email on file.'); return; }
       var r2 = await showConfirm({
         title:'Email Work Order?',
-        message:'Send this work order (PDF attached) to the assigned contractor? Uncheck to skip sending.',
+        message:'Select who should receive this work order (PDF attached):',
         confirmText:'Send Email', cancelText:'Cancel',
-        checkbox:{ label: _esc(ct.name || 'Contractor') + ' (' + _esc(ct.email) + ')', defaultChecked:true }
+        checkboxes: recips.map(function(x){ return { id:x.id, label:x.label, defaultChecked:x.defaultChecked }; })
       });
-      var ok2  = (typeof r2 === 'object' && r2) ? r2.ok : r2;
-      var snd2 = (typeof r2 === 'object' && r2) ? r2.checked : false;
-      if(ok2 && snd2) notifyWorkOrderToContractor(sow, unit, ct);
+      if(!r2 || !r2.ok) return;
+      var picked = (r2.items) || {};
+      var chosen = recips.filter(function(x){ return picked[x.id]; }).map(function(x){ return x.email; });
+      if(!chosen.length){ if(typeof showToast === 'function') showToast('No recipients selected — nothing sent.'); return; }
+      notifyWorkOrderToContractor(sow, unit, ct, chosen);
     } else {
       if(typeof showToast === 'function') showToast('Assign this request to a contractor or employee to email the work order.');
     }

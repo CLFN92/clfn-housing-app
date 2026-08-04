@@ -2383,31 +2383,44 @@ async function _generateWorkOrderPdfBase64() {
 // Resolve the contractor's email + name from the in-memory cache first,
 // falling back to Supabase REST if the cache is empty (sub-pages may not
 // have loaded contractors yet). Returns { email, name } or null.
+// Resolve a contractor for work-order emailing. Returns
+//   { email, name, people:[{name,phone,email}] }
+// where `email` is the company address and `people` are the Key Contacts from
+// the Contractor Info Card. Returns the object even when the company email is
+// blank (a key contact may still have one); callers decide who to send to.
 async function _resolveContractorForEmail(contractorId) {
   if (!contractorId) return null;
+  function _shape(email, name, people) {
+    return {
+      email:  (email || '').trim(),
+      name:   name || '',
+      people: Array.isArray(people) ? people : []
+    };
+  }
   var cache = window._contractors || [];
   for (var i = 0; i < cache.length; i++) {
     if (cache[i] && cache[i].id === contractorId) {
-      var e = (cache[i].email || '').trim();
-      return e ? { email: e, name: cache[i].name || '' } : null;
+      return _shape(cache[i].email, cache[i].name, cache[i].people);
     }
   }
   if (typeof SUPABASE_URL === 'undefined' || typeof HOUSING_HEADERS === 'undefined') return null;
   try {
+    // Key Contacts live in the `data` jsonb blob on housing_contractors.
     var url = SUPABASE_URL
-            + '/rest/v1/contractors?select=name,email&id=eq.'
+            + '/rest/v1/housing_contractors?select=name,data&id=eq.'
             + encodeURIComponent(contractorId);
     var r = await fetch(url, { headers: HOUSING_HEADERS });
     if (!r.ok) {
-      console.warn('[notify] contractor email lookup HTTP ' + r.status);
+      console.warn('[notify] contractor lookup HTTP ' + r.status);
       return null;
     }
     var rows = await r.json();
     var row  = rows && rows[0];
-    var em   = row && (row.email || '').trim();
-    return em ? { email: em, name: row.name || '' } : null;
+    if (!row) return null;
+    var d = row.data || {};
+    return _shape(d.email, row.name || d.name, d.people);
   } catch (e) {
-    console.warn('[notify] contractor email lookup error:', e);
+    console.warn('[notify] contractor lookup error:', e);
     return null;
   }
 }
@@ -2417,7 +2430,11 @@ async function _resolveContractorForEmail(contractorId) {
 // checkbox on the post-save "send work order?" confirm. Silent skip when
 // no contractor is assigned, no email on file, or save is fire-and-forget
 // and any step throws. CC roles configurable via Settings -> Notifications.
-async function notifyWorkOrderToContractor(sow, unit, contractor) {
+// recipientEmails (optional): the exact contractor-side addresses the user
+// picked in the work-order recipient dialog (company + selected Key Contacts).
+// When omitted, falls back to the contractor's company email. Staff primary/CC
+// roles from Settings -> Notifications are always added on top.
+async function notifyWorkOrderToContractor(sow, unit, contractor, recipientEmails) {
   if (!sow) return;
   var eventKey = 'sow_work_order_to_contractor';
 
@@ -2432,7 +2449,11 @@ async function notifyWorkOrderToContractor(sow, unit, contractor) {
     emails.push(clean);
   }
 
-  if (contractor && contractor.email) _addEmail(contractor.email);
+  if (Array.isArray(recipientEmails) && recipientEmails.length) {
+    recipientEmails.forEach(function(e){ _addEmail(e); });
+  } else if (contractor && contractor.email) {
+    _addEmail(contractor.email);
+  }
 
   // Additional staff recipients: primary + CC role checkboxes.
   var extraRoles = _emailEventRecipientRoles(eventKey).concat(_emailEventCcRoles(eventKey));
