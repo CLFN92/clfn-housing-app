@@ -248,6 +248,31 @@ serve(async (req) => {
           let changed = false
           for (const iv of invs) { if (iv.app_id && linked.indexOf(iv.app_id) === -1) { linked.push(iv.app_id); changed = true } }
           if (changed) await admin.from('applicant_profiles').update({ linked_app_ids: linked, updated_at: new Date().toISOString() }).eq('uid', uid)
+          // Seed a pre-filled DRAFT submission from each linked application so the
+          // portal opens POPULATED with the applicant's existing data instead of a
+          // blank form. Skip if a submission already exists for that application.
+          for (const iv of invs) {
+            if (!iv.app_id) continue
+            try {
+              const { data: existSub } = await admin.from('application_submissions')
+                .select('id').eq('applicant_uid', uid).eq('linked_app_id', iv.app_id).limit(1)
+              if (existSub && existSub.length) continue
+              const { data: appRows } = await admin.from('housing_applications')
+                .select('id, data, app_type').eq('id', iv.app_id).limit(1)
+              const src = appRows && appRows[0]
+              if (!src) continue
+              const d = (src.data && typeof src.data === 'object') ? src.data : {}
+              const payload: Record<string, unknown> = {}
+              const scalarKeys = ['fn','ln','dob','band','marital','reserve','phone','email','street','city','province','postal','occDate','homeless','haveHouse','homeCondition','hasCoApp']
+              for (const k of scalarKeys) { if (d[k] !== undefined && d[k] !== null && d[k] !== '') payload[k] = d[k] }
+              if (d.coApp) payload.coApp = d.coApp
+              for (const k of ['habitants','incomes','references','pets']) { if (Array.isArray(d[k]) && d[k].length) payload[k] = d[k] }
+              const subType = src.app_type === 'transfer_request' ? 'transfer' : (src.app_type === 'existing_tenant' ? 'update' : 'new')
+              await admin.from('application_submissions').insert({
+                applicant_uid: uid, submission_type: subType, payload, status: 'draft', linked_app_id: iv.app_id,
+              })
+            } catch (_e) { /* best-effort seed; the portal still works without it */ }
+          }
           await admin.from('applicant_invites').update({ consumed_at: new Date().toISOString() }).in('id', invs.map((i: any) => i.id))
         }
       } catch (_e) { /* invites table may not exist yet */ }
