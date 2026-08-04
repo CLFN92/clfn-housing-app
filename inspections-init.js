@@ -603,8 +603,10 @@ async function saveInspection(approveAction) {
 
     if(typeof showToast==='function') showToast(approveAction === 'approve' ? 'Inspection approved.' : approveAction === 'revoke' ? 'Approval revoked.' : 'Inspection saved.');
 
-    // Check if any items need repair — prompt to create SOW
-    var repairItems = checklist.filter(function(it){ return it.rating === 'repair'; });
+    // Check if any items need attention — prompt to create a Maintenance Request.
+    // BOTH 'repair' (needs-repair) AND 'fail' items generate a request; previously
+    // only 'repair' did, so an inspection with FAILED items produced no MR.
+    var repairItems = checklist.filter(function(it){ return it.rating === 'repair' || it.rating === 'fail'; });
     closeInspectionModal();
     renderInspectionsList();
 
@@ -641,7 +643,7 @@ async function saveInspection(approveAction) {
 
 // ── SOW prompt ───────────────────────────────────────────────────────────────
 function _inspPromptSOW(insp, repairItems) {
-  var msg = repairItems.length + ' item' + (repairItems.length===1?'':'s') + ' marked as needing repair. Create a Maintenance Request for this unit?';
+  var msg = repairItems.length + ' item' + (repairItems.length===1?'':'s') + ' marked as failed or needing repair. Create a Maintenance Request for this unit?';
   if (!confirm(msg)) return;
 
   if (typeof openSowModal !== 'function') {
@@ -657,7 +659,8 @@ function _inspPromptSOW(insp, repairItems) {
   window._sowForceNew = true;
   window._sowSeed = {
     items: repairItems.map(function(it) {
-      return { category: _inspSowCategory(it), description: it.item + (it.notes ? ': ' + it.notes : '') };
+      var flag = it.rating === 'fail' ? ' (FAILED)' : ' (needs repair)';
+      return { category: _inspSowCategory(it), description: it.item + flag + (it.notes ? ': ' + it.notes : '') };
     }),
     notes: 'Generated from inspection' + (insp.id ? ' ' + insp.id : '') + '.'
   };
