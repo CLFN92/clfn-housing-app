@@ -4169,8 +4169,9 @@ function openAddContractorModal(editIdx){
       var torEl=document.getElementById('ct_tor_agreed'); if(torEl)torEl.checked=!!ct.torAgreed;
       setTimeout(function(){
         ['ct_sig_canvas_staff','ct_sig_canvas_ct'].forEach(_initSigPad);
-        if(ct.sigStaff && ct.sigStaff.image) _restoreSigCanvas('ct_sig_canvas_staff', ct.sigStaff.image);
-        if(ct.sigCt    && ct.sigCt.image)    _restoreSigCanvas('ct_sig_canvas_ct',    ct.sigCt.image);
+        // _restoreSignature handles draw/typed/wet (not just canvas images).
+        if(ct.sigStaff && ct.sigStaff.image) _restoreSignature('ct_sig_canvas_staff', ct.sigStaff.image);
+        if(ct.sigCt    && ct.sigCt.image)    _restoreSignature('ct_sig_canvas_ct',    ct.sigCt.image);
       }, 80);
       ctRenderPeople(ct.people || []);
       // Hydrate previously-uploaded files so they show in the WSIB / Insurance
@@ -4307,12 +4308,16 @@ function populateSow(data){
   if(data.tenantSig) {
     set('sow_sig_tenant_name', data.tenantSig.name);
     set('sow_sig_tenant_date', data.tenantSig.date);
-    setTimeout(function(){ _restoreSigCanvas('sow_sig_canvas_tenant', data.tenantSig.image); }, 150);
+    // Use _restoreSignature (not _restoreSigCanvas) so TYPED and WET signatures
+    // restore too — and the pad lands on the right tab, so re-saving from the
+    // review step doesn't overwrite the stored signature with '' (getSigDataURL
+    // reads the visible panel).
+    setTimeout(function(){ _restoreSignature('sow_sig_canvas_tenant', data.tenantSig.image); }, 150);
   }
   if(data.staffSig) {
     set('sow_sig_staff_name', data.staffSig.name);
     set('sow_sig_staff_date', data.staffSig.date);
-    setTimeout(function(){ _restoreSigCanvas('sow_sig_canvas_staff', data.staffSig.image); }, 150);
+    setTimeout(function(){ _restoreSignature('sow_sig_canvas_staff', data.staffSig.image); }, 150);
   }
   // Restore attached files — render via housing-modals.js helper
   window._sowFiles = (data.files || []).slice();
