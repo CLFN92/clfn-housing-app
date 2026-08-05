@@ -2872,6 +2872,11 @@
       : '';
     var startDate = t[TIC_C.lease_start_date] || t[TIC_C.move_in_date] || (u && u.assignedDate) || '';
     var endDate   = t[TIC_C.lease_end_date]   || '';
+    // Homeownership / amortization prefill (Replacement Contract only). Home
+    // value defaults from the unit's Insured / CMHC value; rate + term default
+    // to the nation's standard homeownership terms (editable in the modal).
+    var _amortValue = (u && (u.insuredValue || u.cmhcValue)) ? String(u.insuredValue || u.cmhcValue) : '';
+    var _isReplacement = (_ticLeaseDocKey === 'replacement_contract');
 
     var existing = document.getElementById('tic_lease_modal');
     if (existing) existing.remove();
@@ -2963,6 +2968,18 @@
             : '<div style="font-size:10px;color:var(--danger,#dc2626);margin-top:3px;">No rent on file &mdash; enter the monthly rent</div>')
       + '</div>'
       + '</div>'
+
+      + (_isReplacement
+          ? secH('Homeownership &amp; Amortization (optional)')
+            + '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Fill these in to append a <strong>Schedule B &mdash; Amortization Schedule</strong> to the contract. Leave the Home Value blank to omit the schedule.</div>'
+            + '<div class="tic-grid-2">'
+            + fld('Home Value ($)',            inp('ls_amort_value', _amortValue, '0.00'))
+            + fld('Down Payment ($)',          inp('ls_amort_down',  '',          '0.00'))
+            + fld('Annual Interest Rate (%)',  inp('ls_amort_rate',  '3',         'e.g. 3.00'))
+            + fld('Amortization Term (years)', inp('ls_amort_term',  '20',        'e.g. 20'))
+            + fld('First Payment Date',        inp('ls_amort_first', startDate,   '', 'date'))
+            + '</div>'
+          : '')
 
       + secH('Required Initials')
       + '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;">The tenant initials each required clause below. Every clause must be initialed before the agreement can be generated.</div>'
@@ -3064,6 +3081,83 @@
     if (typeof _ticRenderStrip     === 'function') _ticRenderStrip();
   }
 
+  // ── Money + amortization helpers (Replacement Contract, Schedule B) ──────
+  function _ticMoney(v){
+    if (typeof formatCurrency === 'function') return formatCurrency(v);
+    return '$' + (Number(v)||0).toLocaleString('en-CA', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  }
+  function _ticEnsureAutoTable(){
+    return new Promise(function(resolve){
+      try { if (window.jspdf && window.jspdf.jsPDF && typeof (new window.jspdf.jsPDF()).autoTable === 'function') { resolve(true); return; } } catch(e){}
+      var s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
+      s.onload  = function(){ resolve(true); };
+      s.onerror = function(){ resolve(false); };
+      document.head.appendChild(s);
+    });
+  }
+  // Build a standard monthly amortization schedule from the modal inputs and
+  // render it as "Schedule B" via jspdf-autotable. No-op unless a financed
+  // amount (home value minus down payment) can be computed.
+  async function _ticRenderAmortSchedule(ctx){
+    var fv  = function(id){ var e=document.getElementById(id); return e ? (e.value||'').trim() : ''; };
+    var num = function(id){ var v=parseFloat((fv(id)||'').replace(/[^0-9.\-]/g,'')); return isNaN(v)?0:v; };
+    var value = num('ls_amort_value');
+    if (value <= 0) return;                     // no home value -> omit schedule
+    var down  = num('ls_amort_down');
+    var rate  = num('ls_amort_rate');           // annual %
+    var years = num('ls_amort_term') || 20;
+    var first = fv('ls_amort_first');
+    var principal = value - down;
+    if (principal <= 0) return;
+    var n  = Math.max(1, Math.min(Math.round(years * 12), 600));   // cap 50 yr
+    var mr = rate > 0 ? (rate/100/12) : 0;
+    var pay = mr > 0 ? (principal * mr / (1 - Math.pow(1+mr, -n))) : (principal / n);
+
+    var body = [], bal = principal, cumInt = 0;
+    var startD = first ? new Date(first + 'T12:00:00') : null;
+    for (var i = 0; i < n; i++){
+      var interest = mr > 0 ? bal * mr : 0;
+      var princ = pay - interest;
+      if (princ > bal) { princ = bal; }
+      bal -= princ; if (bal < 0.005) bal = 0;
+      cumInt += interest;
+      var dLbl = '';
+      if (startD){ var dd = new Date(startD.getFullYear(), startD.getMonth() + i, 1); dLbl = dd.toLocaleString('en-CA', { month:'short', year:'numeric' }); }
+      body.push([ String(i+1), dLbl, rate.toFixed(2)+'%', _ticMoney(princ+interest), _ticMoney(princ), _ticMoney(interest), _ticMoney(bal), _ticMoney(cumInt) ]);
+      if (bal <= 0) break;
+    }
+
+    var ok  = await _ticEnsureAutoTable();
+    var pdf = ctx.pdf;
+    ctx.needSpace(30); ctx.gap(8);
+    if (typeof ctx.sectionHeader === 'function') ctx.sectionHeader('Schedule B — Amortization Schedule');
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(60);
+    var summary = 'Home value ' + _ticMoney(value)
+      + (down>0 ? '   Down payment ' + _ticMoney(down) : '')
+      + '   Financed ' + _ticMoney(principal)
+      + '   Rate ' + rate.toFixed(2) + '%   Term ' + years + ' yr'
+      + '   Monthly P&I ' + _ticMoney(pay);
+    var sLines = pdf.splitTextToSize(summary, ctx.contentW);
+    pdf.text(sLines, ctx.marginL, ctx.y + 3); ctx.y += sLines.length * 4 + 3; pdf.setTextColor(0);
+
+    if (!ok || typeof pdf.autoTable !== 'function'){
+      pdf.setFontSize(9); pdf.text('(Amortization table unavailable — could not load the table library.)', ctx.marginL, ctx.y + 4); ctx.y += 8;
+      return;
+    }
+    pdf.autoTable({
+      startY: ctx.y + 2,
+      head: [['#','Date','Rate','Payment','Principal','Interest','Balance','Cum. Int.']],
+      body: body,
+      theme: 'striped',
+      styles:      { fontSize: 7, cellPadding: 1.4, halign: 'right' },
+      headStyles:  { fillColor: [40,40,40], textColor: 255, halign: 'right', fontSize: 7 },
+      columnStyles:{ 0: { halign:'center', cellWidth: 9 }, 1: { halign:'left' }, 2: { halign:'center' } },
+      margin:      { left: ctx.marginL, right: ctx.marginR }
+    });
+    ctx.y = (pdf.lastAutoTable ? pdf.lastAutoTable.finalY : ctx.y) + 6;
+  }
+
   // ── PDF generator ─────────────────────────────────────────────────────
   async function _ticGenerateLeasePdf() {
     // Hard gate — don't generate with a core term (fixed-term end date)
@@ -3118,6 +3212,9 @@
       residenceStream:        fv('ls_r_stream'),
       residenceAllocDate:     fv('ls_r_alloc'),
       rentAmount:             fv('ls_rent'),
+      homeValue:              (function(){ var v=parseFloat((fv('ls_amort_value')||'').replace(/[^0-9.]/g,'')); return (!isNaN(v)&&v>0) ? _ticMoney(v) : '$______________'; })(),
+      downPayment:            (function(){ var v=parseFloat((fv('ls_amort_down')||'').replace(/[^0-9.]/g,'')); return (!isNaN(v)&&v>0) ? _ticMoney(v) : ''; })(),
+      downPaymentClause:      (function(){ var v=parseFloat((fv('ls_amort_down')||'').replace(/[^0-9.]/g,'')); return (!isNaN(v)&&v>0) ? ' (with a down payment of ' + _ticMoney(v) + ')' : ''; })(),
       landlordName:           (_ticState.tenant ? (_ticState.tenant.approved_by || '') : ''),
       occupant1Name:          _occName(0), occupant2Name: _occName(1),
       occupant3Name:          _occName(2), occupant4Name: _occName(3),
@@ -3147,6 +3244,12 @@
         var blocks = (typeof _parseHtmlToBlocks === 'function')
           ? _parseHtmlToBlocks(substituted) : [];
         if (typeof _renderBlocksToPdf === 'function') _renderBlocksToPdf(ctx, blocks);
+
+        // Amortization schedule (Replacement Contract, Schedule B) — appended
+        // after the agreement body, before the signature blocks.
+        if (_ticLeaseDocKey === 'replacement_contract') {
+          try { await _ticRenderAmortSchedule(ctx); } catch(e){ console.warn('[lease] amort schedule failed:', e); }
+        }
 
         // Signatures section
         ctx.needSpace(50); ctx.gap(8);
