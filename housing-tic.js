@@ -1734,6 +1734,7 @@
       +     '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'temporary_lease\')" class="header-export-item">Temporary Occupancy Agreement (Fixed Term)</button>'
       +     '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'commercial_lease\')" class="header-export-item">Commercial Occupancy &amp; Lease Agreement</button>'
       +     '<button type="button" onclick="window._ticOpenReplacementLeaseModal && window._ticOpenReplacementLeaseModal()" class="header-export-item">Replacement Lease Agreement (No Appliances)</button>'
+      +     '<button type="button" onclick="window._ticOpenLeaseModal && window._ticOpenLeaseModal(\'replacement_contract\')" class="header-export-item">Rental / Homeownership Agreement (Replacement Contract)</button>'
       +     '<div class="header-export-group">Notices</div>'
       +     '<button type="button" onclick="window._ticOpenInspectionNoticeModal && window._ticOpenInspectionNoticeModal()" class="header-export-item">Notice of Inspection &mdash; 48 Hours</button>'
       +     evictBtns
@@ -2525,15 +2526,20 @@
   // title, and filename differ (all keyed off this).
   var _ticLeaseDocKey = 'residential_lease';
   var _LEASE_TITLES = {
-    residential_lease: 'Residential Lease Agreement',
-    temporary_lease:   'Temporary Residential Occupancy Agreement (Fixed Term)',
-    commercial_lease:  'Commercial Occupancy & Lease Agreement'
+    residential_lease:    'Residential Lease Agreement',
+    temporary_lease:      'Temporary Residential Occupancy Agreement (Fixed Term)',
+    commercial_lease:     'Commercial Occupancy & Lease Agreement',
+    replacement_contract: 'Rental / Homeownership Agreement — Replacement Contract'
   };
   var _LEASE_FILE_SLUGS = {
-    residential_lease: 'Occupancy_Agreement',
-    temporary_lease:   'Temporary_Occupancy_Agreement',
-    commercial_lease:  'Commercial_Lease_Agreement'
+    residential_lease:    'Occupancy_Agreement',
+    temporary_lease:      'Temporary_Occupancy_Agreement',
+    commercial_lease:     'Commercial_Lease_Agreement',
+    replacement_contract: 'Replacement_Contract'
   };
+  // Docs that are FIXED-TERM (need an end date). The replacement contract is a
+  // blank re-issue with no baked-in term, so it is NOT fixed-term.
+  var _LEASE_FIXED_TERM = { temporary_lease: 1, commercial_lease: 1 };
 
   // Returns the effective initials clauses — saved overrides from Settings →
   // Delegates to notifications.js CONTRACTS_DOCS_REGISTRY which is always loaded.
@@ -2683,7 +2689,7 @@
   // print with a core term literally missing, so this alone still blocks.
   function _ticLeaseMissingHard() {
     var fv  = function(id){ var e=document.getElementById(id); return e ? (e.value||'').trim() : ''; };
-    var isTemp = _ticLeaseDocKey !== 'residential_lease';
+    var isTemp = !!_LEASE_FIXED_TERM[_ticLeaseDocKey];
     var missing = [];
     if (isTemp && !fv('ls_end_date')) missing.push('End date (required for a fixed-term agreement)');
     return missing;
@@ -2820,8 +2826,8 @@
       if (typeof showToast === 'function') showToast('Assign a unit to this tenant before creating an agreement.', { type:'error' });
       return;
     }
-    _ticLeaseDocKey = ({ temporary_lease:1, commercial_lease:1 }[docKey]) ? docKey : 'residential_lease';
-    var isTemp = _ticLeaseDocKey !== 'residential_lease';   // fixed-term docs need an end date
+    _ticLeaseDocKey = ({ temporary_lease:1, commercial_lease:1, replacement_contract:1 }[docKey]) ? docKey : 'residential_lease';
+    var isTemp = !!_LEASE_FIXED_TERM[_ticLeaseDocKey];   // fixed-term docs need an end date
     var _docTitle   = _LEASE_TITLES[_ticLeaseDocKey] || 'Residential Lease Agreement';
     var _clauseList = _getEffectiveLeaseClauses();
     var _clauseN    = _clauseList.length;
