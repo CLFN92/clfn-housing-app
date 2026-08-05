@@ -3124,75 +3124,74 @@
     if (principal <= 0){ _amortNote('Amortization schedule omitted: the down payment is greater than or equal to the home value, so there is nothing to amortize.'); return; }
     var mr = rate > 0 ? (rate/100/12) : 0;
 
-    // Does the rent cover the first month's interest? If not, it never amortizes.
+    // If the rent does not cover the first month's interest the balance GROWS
+    // (negative amortization) — we still show the full 25-year schedule and
+    // call out the remaining balance.
     var firstInterest = mr > 0 ? principal * mr : 0;
-    var amortizes = payment > firstInterest + 0.005;
+    var negativeAmort = payment < firstInterest - 0.005;
 
-    var MONTHS_25Y = 300;                        // 25-year milestone
-    var body = [], bal = principal, cumInt = 0, n = 0, CAP = 600;
-    var balAfter25 = null;                        // balance after 300 payments
+    // Build the schedule for UP TO 25 years (300 payments), or until the home
+    // is paid off if that happens sooner. The payment column always equals the
+    // rent; the balance after the last shown payment is called out at the end.
+    var MONTHS_25Y = 300;
+    var body = [], bal = principal, cumInt = 0, n = 0, paidOff = false;
     var startD = first ? new Date(first + 'T12:00:00') : null;
-    if (amortizes){
-      while (bal > 0 && n < CAP){
-        var interest = mr > 0 ? bal * mr : 0;
-        var princ = payment - interest;
-        if (princ > bal) princ = bal;           // final (smaller) payment
-        bal -= princ; if (bal < 0.005) bal = 0;
-        cumInt += interest;
-        var dLbl = '';
-        if (startD){ var dd = new Date(startD.getFullYear(), startD.getMonth() + n, 1); dLbl = dd.toLocaleString('en-CA', { month:'short', year:'numeric' }); }
-        body.push([ String(n+1), dLbl, rate.toFixed(2)+'%', _ticMoney(princ+interest), _ticMoney(princ), _ticMoney(interest), _ticMoney(bal), _ticMoney(cumInt) ]);
-        n++;
-        if (n === MONTHS_25Y) balAfter25 = bal;  // balance the day after 25 years
-      }
-      if (n < MONTHS_25Y) balAfter25 = 0;         // fully paid before 25 years
+    while (n < MONTHS_25Y){
+      var interest = mr > 0 ? bal * mr : 0;
+      var princ = payment - interest;            // negative when rent < interest
+      if (princ >= bal){ princ = bal; bal = 0; paidOff = true; }  // final payment
+      else { bal = bal - princ; }                // princ < 0 -> balance grows
+      cumInt += interest;
+      var dLbl = '';
+      if (startD){ var dd = new Date(startD.getFullYear(), startD.getMonth() + n, 1); dLbl = dd.toLocaleString('en-CA', { month:'short', year:'numeric' }); }
+      body.push([ String(n+1), dLbl, rate.toFixed(2)+'%', _ticMoney(princ+interest), _ticMoney(princ), _ticMoney(interest), _ticMoney(bal), _ticMoney(cumInt) ]);
+      n++;
+      if (paidOff) break;
     }
+    var remaining = bal;                          // balance after the last payment
 
     var ok  = await _ticEnsureAutoTable();
     ctx.needSpace(30); ctx.gap(8);
-    if (typeof ctx.sectionHeader === 'function') ctx.sectionHeader('Schedule B — Amortization Schedule');
+    if (typeof ctx.sectionHeader === 'function') ctx.sectionHeader('Schedule B — Amortization Schedule (First 25 Years)');
     pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(60);
-    var periodStr = amortizes ? ((Math.floor(n/12)) + ' yr ' + (n%12) + ' mo (' + n + ' payments)') : 'does not amortize at this payment';
     var summary = 'Home value ' + _ticMoney(value)
       + (down>0 ? '   Down payment ' + _ticMoney(down) : '')
       + '   Financed ' + _ticMoney(principal)
       + '   Rate ' + rate.toFixed(2) + '%'
-      + '   Monthly payment (rent) ' + _ticMoney(payment)
-      + '   Payoff ' + periodStr;
+      + '   Monthly payment (rent) ' + _ticMoney(payment);
     var sLines = pdf.splitTextToSize(summary, ctx.contentW);
     pdf.text(sLines, ctx.marginL, ctx.y + 3); ctx.y += sLines.length * 4 + 3; pdf.setTextColor(0);
 
-    // 25-year milestone note — the balance still owing after 300 payments,
-    // with the schedule continuing below until the balance reaches zero.
-    if (amortizes){
-      var note25 = (n <= MONTHS_25Y)
-        ? 'Note: This home is paid in full in ' + n + ' payments (' + Math.floor(n/12) + ' yr ' + (n%12) + ' mo) — before the 25-year mark.'
-        : 'Note: Balance remaining after 25 years (300 payments): ' + _ticMoney(balAfter25 || 0) + '. The amortization continues below until the balance reaches zero at payment ' + n + ' (' + Math.floor(n/12) + ' yr ' + (n%12) + ' mo).';
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(8.5); pdf.setTextColor(20);
-      var nLines = pdf.splitTextToSize(note25, ctx.contentW);
-      ctx.needSpace(nLines.length * 4 + 4);
-      pdf.text(nLines, ctx.marginL, ctx.y + 3); ctx.y += nLines.length * 4 + 4;
-      pdf.setFont('helvetica','normal'); pdf.setTextColor(0);
+    // Headline: paid off early, or the balance still owing at the end of 25 years.
+    var headline = paidOff
+      ? 'This home is paid in full in ' + n + ' payments (' + Math.floor(n/12) + ' yr ' + (n%12) + ' mo).'
+      : 'Balance remaining at the end of 25 years (' + n + ' payments): ' + _ticMoney(remaining) + '.';
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(20);
+    var hLines = pdf.splitTextToSize(headline, ctx.contentW);
+    ctx.needSpace(hLines.length * 4 + 4);
+    pdf.text(hLines, ctx.marginL, ctx.y + 3); ctx.y += hLines.length * 4 + 4;
+    pdf.setFont('helvetica','normal'); pdf.setTextColor(0);
+
+    // Negative-amortization disclosure.
+    if (negativeAmort){
+      pdf.setFontSize(8.5); pdf.setTextColor(150,30,30);
+      var warn = pdf.splitTextToSize('Note: the monthly rent of ' + _ticMoney(payment) + ' is less than the first month\'s interest of ' + _ticMoney(firstInterest) + ' at ' + rate.toFixed(2) + '%, so the balance increases over time rather than decreasing (negative amortization). A higher rent or lower interest rate would pay the home down.', ctx.contentW);
+      ctx.needSpace(warn.length * 4 + 5);
+      pdf.text(warn, ctx.marginL, ctx.y + 3); ctx.y += warn.length * 4 + 5; pdf.setTextColor(0);
     }
 
-    if (!amortizes){
-      pdf.setFontSize(9); pdf.setTextColor(150,30,30);
-      var warn = pdf.splitTextToSize('The monthly rent of ' + _ticMoney(payment) + ' does not cover the first month\'s interest of ' + _ticMoney(firstInterest) + ' at ' + rate.toFixed(2) + '%. Increase the rent or lower the interest rate to generate a schedule.', ctx.contentW);
-      pdf.text(warn, ctx.marginL, ctx.y + 4); ctx.y += warn.length * 4 + 6; pdf.setTextColor(0);
-      return;
-    }
     if (!ok || typeof pdf.autoTable !== 'function'){
       pdf.setFontSize(9); pdf.text('(Amortization table unavailable — could not load the table library.)', ctx.marginL, ctx.y + 4); ctx.y += 8;
       return;
     }
-    // Highlighted 25-year marker row (only when the schedule runs past it).
-    if (body.length > MONTHS_25Y){
-      body.splice(MONTHS_25Y, 0, [{
-        content: 'END OF 25 YEARS (300 PAYMENTS) — BALANCE REMAINING ' + _ticMoney(balAfter25 || 0) + ' — SCHEDULE CONTINUES BELOW',
-        colSpan: 8,
-        styles: { halign:'center', fontStyle:'bold', fillColor:[248,228,26], textColor:20, fontSize:7 }
-      }]);
-    }
+    // Closing highlighted row calling out the balance at the end of the schedule.
+    body.push([{
+      content: (paidOff
+        ? 'PAID IN FULL AT PAYMENT ' + n + ' — BALANCE ' + _ticMoney(0)
+        : 'BALANCE REMAINING AT END OF 25 YEARS (300 PAYMENTS): ' + _ticMoney(remaining)),
+      colSpan: 8,
+      styles: { halign:'center', fontStyle:'bold', fillColor:[248,228,26], textColor:20, fontSize:8 }
+    }]);
     try {
       pdf.autoTable({
         startY: ctx.y + 2,
