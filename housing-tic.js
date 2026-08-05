@@ -3124,71 +3124,81 @@
     if (principal <= 0){ _amortNote('Amortization schedule omitted: the down payment is greater than or equal to the home value, so there is nothing to amortize.'); return; }
     var mr = rate > 0 ? (rate/100/12) : 0;
 
-    // If the rent does not cover the first month's interest the balance GROWS
-    // (negative amortization) — we still show the full 25-year schedule and
-    // call out the remaining balance.
+    // Social housing program: the rent is a subsidized contribution. When it
+    // does not cover the monthly carrying cost (interest) the un-recovered
+    // value grows — that end-of-term value is the cost to the community.
     var firstInterest = mr > 0 ? principal * mr : 0;
-    var negativeAmort = payment < firstInterest - 0.005;
+    var subsidized = payment < firstInterest - 0.005;
 
-    // Build the schedule for UP TO 25 years (300 payments), or until the home
-    // is paid off if that happens sooner. The payment column always equals the
-    // rent; the balance after the last shown payment is called out at the end.
+    // Build the schedule for the full 25-year (300-payment) term, or until the
+    // home value is fully recovered if that happens sooner. The payment column
+    // always equals the rent.
     var MONTHS_25Y = 300;
-    var body = [], bal = principal, cumInt = 0, n = 0, paidOff = false;
+    var body = [], bal = principal, cumInt = 0, totalRent = 0, n = 0, paidOff = false;
     var startD = first ? new Date(first + 'T12:00:00') : null;
     while (n < MONTHS_25Y){
       var interest = mr > 0 ? bal * mr : 0;
-      var princ = payment - interest;            // negative when rent < interest
+      var princ = payment - interest;            // negative when rent < carrying cost
       if (princ >= bal){ princ = bal; bal = 0; paidOff = true; }  // final payment
-      else { bal = bal - princ; }                // princ < 0 -> balance grows
+      else { bal = bal - princ; }                // princ < 0 -> value not recovered grows
       cumInt += interest;
+      totalRent += (princ + interest);           // rent actually collected this month
       var dLbl = '';
       if (startD){ var dd = new Date(startD.getFullYear(), startD.getMonth() + n, 1); dLbl = dd.toLocaleString('en-CA', { month:'short', year:'numeric' }); }
       body.push([ String(n+1), dLbl, rate.toFixed(2)+'%', _ticMoney(princ+interest), _ticMoney(princ), _ticMoney(interest), _ticMoney(bal), _ticMoney(cumInt) ]);
       n++;
       if (paidOff) break;
     }
-    var remaining = bal;                          // balance after the last payment
+    var remaining = bal;                          // value at end of term = cost to community
 
     var ok  = await _ticEnsureAutoTable();
-    ctx.needSpace(30); ctx.gap(8);
-    if (typeof ctx.sectionHeader === 'function') ctx.sectionHeader('Schedule B — Amortization Schedule (First 25 Years)');
+    ctx.needSpace(40); ctx.gap(8);
+    if (typeof ctx.sectionHeader === 'function') ctx.sectionHeader('Schedule B — Social Housing Cost Schedule (25-Year Term)');
     pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(60);
     var summary = 'Home value ' + _ticMoney(value)
       + (down>0 ? '   Down payment ' + _ticMoney(down) : '')
-      + '   Financed ' + _ticMoney(principal)
-      + '   Rate ' + rate.toFixed(2) + '%'
-      + '   Monthly payment (rent) ' + _ticMoney(payment);
+      + '   Community carrying rate ' + rate.toFixed(2) + '%'
+      + '   Monthly rent (subsidized contribution) ' + _ticMoney(payment);
     var sLines = pdf.splitTextToSize(summary, ctx.contentW);
-    pdf.text(sLines, ctx.marginL, ctx.y + 3); ctx.y += sLines.length * 4 + 3; pdf.setTextColor(0);
+    pdf.text(sLines, ctx.marginL, ctx.y + 3); ctx.y += sLines.length * 4 + 4; pdf.setTextColor(0);
 
-    // Headline: paid off early, or the balance still owing at the end of 25 years.
-    var headline = paidOff
-      ? 'This home is paid in full in ' + n + ' payments (' + Math.floor(n/12) + ' yr ' + (n%12) + ' mo).'
-      : 'Balance remaining at the end of 25 years (' + n + ' payments): ' + _ticMoney(remaining) + '.';
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(20);
-    var hLines = pdf.splitTextToSize(headline, ctx.contentW);
-    ctx.needSpace(hLines.length * 4 + 4);
-    pdf.text(hLines, ctx.marginL, ctx.y + 3); ctx.y += hLines.length * 4 + 4;
-    pdf.setFont('helvetica','normal'); pdf.setTextColor(0);
+    // Social-housing framing note.
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(80);
+    var intro = subsidized
+      ? 'This is a social housing program. The monthly rent is a subsidized contribution that is applied against the home value and the community\'s carrying cost over the 25-year term. Because the rent is set below the full carrying cost, the community subsidizes the difference; the value still owing at the end of the term is the cost to the community.'
+      : 'This is a social housing program. The monthly rent is applied against the home value and the community\'s carrying cost over the 25-year term. The value still owing at the end of the term is the cost to the community.';
+    var iLines = pdf.splitTextToSize(intro, ctx.contentW);
+    ctx.needSpace(iLines.length * 4 + 4);
+    pdf.text(iLines, ctx.marginL, ctx.y + 3); ctx.y += iLines.length * 4 + 5; pdf.setTextColor(0);
 
-    // Negative-amortization disclosure.
-    if (negativeAmort){
-      pdf.setFontSize(8.5); pdf.setTextColor(150,30,30);
-      var warn = pdf.splitTextToSize('Note: the monthly rent of ' + _ticMoney(payment) + ' is less than the first month\'s interest of ' + _ticMoney(firstInterest) + ' at ' + rate.toFixed(2) + '%, so the balance increases over time rather than decreasing (negative amortization). A higher rent or lower interest rate would pay the home down.', ctx.contentW);
-      ctx.needSpace(warn.length * 4 + 5);
-      pdf.text(warn, ctx.marginL, ctx.y + 3); ctx.y += warn.length * 4 + 5; pdf.setTextColor(0);
+    // Cost-to-the-community summary block (the headline figures).
+    var termLbl = paidOff ? (Math.floor(n/12) + ' yr ' + (n%12) + ' mo — value fully recovered') : '25 years (300 payments)';
+    var rows2 = [
+      ['Home value (start of term)',              _ticMoney(value)],
+      ['Rent collected over the term',            _ticMoney(totalRent) + '  (' + n + ' payments)'],
+      ['Community carrying cost over the term',   _ticMoney(cumInt)],
+      ['Value at end of term (COST TO COMMUNITY)', _ticMoney(remaining)]
+    ];
+    pdf.setFontSize(9);
+    for (var ri = 0; ri < rows2.length; ri++){
+      var bold = (ri === rows2.length - 1);
+      ctx.needSpace(6);
+      pdf.setFont('helvetica', bold ? 'bold' : 'normal'); pdf.setTextColor(bold ? 20 : 60);
+      pdf.text(rows2[ri][0], ctx.marginL + 2, ctx.y + 4);
+      pdf.text(rows2[ri][1], ctx.marginL + ctx.contentW, ctx.y + 4, { align: 'right' });
+      ctx.y += 5.5;
     }
+    ctx.y += 2; pdf.setFont('helvetica','normal'); pdf.setTextColor(0);
 
     if (!ok || typeof pdf.autoTable !== 'function'){
-      pdf.setFontSize(9); pdf.text('(Amortization table unavailable — could not load the table library.)', ctx.marginL, ctx.y + 4); ctx.y += 8;
+      pdf.setFontSize(9); pdf.text('(Cost schedule table unavailable — could not load the table library.)', ctx.marginL, ctx.y + 4); ctx.y += 8;
       return;
     }
-    // Closing highlighted row calling out the balance at the end of the schedule.
+    // Closing highlighted row: the value at end of term = cost to the community.
     body.push([{
       content: (paidOff
-        ? 'PAID IN FULL AT PAYMENT ' + n + ' — BALANCE ' + _ticMoney(0)
-        : 'BALANCE REMAINING AT END OF 25 YEARS (300 PAYMENTS): ' + _ticMoney(remaining)),
+        ? 'HOME VALUE FULLY RECOVERED AT PAYMENT ' + n + ' — COST TO COMMUNITY ' + _ticMoney(0)
+        : 'VALUE AT END OF 25-YEAR TERM — COST TO THE COMMUNITY: ' + _ticMoney(remaining)),
       colSpan: 8,
       styles: { halign:'center', fontStyle:'bold', fillColor:[248,228,26], textColor:20, fontSize:8 }
     }]);
