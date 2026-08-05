@@ -2971,12 +2971,11 @@
 
       + (_isReplacement
           ? secH('Homeownership &amp; Amortization (optional)')
-            + '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Fill these in to append a <strong>Schedule B &mdash; Amortization Schedule</strong> to the contract. Leave the Home Value blank to omit the schedule.</div>'
+            + '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Fill these in to append a <strong>Schedule B &mdash; Amortization Schedule</strong> to the contract. The monthly payment equals the <strong>Monthly Rent</strong> entered above &mdash; the payoff period is calculated from the financed amount, interest rate, and that rent. Leave the Home Value blank to omit the schedule.</div>'
             + '<div class="tic-grid-2">'
             + fld('Home Value ($)',            inp('ls_amort_value', _amortValue, '0.00'))
             + fld('Down Payment ($)',          inp('ls_amort_down',  '',          '0.00'))
             + fld('Annual Interest Rate (%)',  inp('ls_amort_rate',  '3',         'e.g. 3.00'))
-            + fld('Amortization Term (years)', inp('ls_amort_term',  '20',        'e.g. 20'))
             + fld('First Payment Date',        inp('ls_amort_first', startDate,   '', 'date'))
             + '</div>'
           : '')
@@ -3096,36 +3095,41 @@
       document.head.appendChild(s);
     });
   }
-  // Build a standard monthly amortization schedule from the modal inputs and
-  // render it as "Schedule B" via jspdf-autotable. No-op unless a financed
-  // amount (home value minus down payment) can be computed.
+  // Build a monthly amortization schedule where the MONTHLY PAYMENT EQUALS THE
+  // RENT (the rent the tenant pays is applied to the home purchase). The payoff
+  // period is derived from the financed amount, interest rate, and that rent —
+  // it is not a fixed term. No-op unless a home value AND a rent are present.
   async function _ticRenderAmortSchedule(ctx){
     var fv  = function(id){ var e=document.getElementById(id); return e ? (e.value||'').trim() : ''; };
     var num = function(id){ var v=parseFloat((fv(id)||'').replace(/[^0-9.\-]/g,'')); return isNaN(v)?0:v; };
     var value = num('ls_amort_value');
     if (value <= 0) return;                     // no home value -> omit schedule
-    var down  = num('ls_amort_down');
-    var rate  = num('ls_amort_rate');           // annual %
-    var years = num('ls_amort_term') || 20;
-    var first = fv('ls_amort_first');
+    var down    = num('ls_amort_down');
+    var rate    = num('ls_amort_rate');         // annual %
+    var payment = num('ls_rent');               // monthly payment == the rent
+    var first   = fv('ls_amort_first');
     var principal = value - down;
-    if (principal <= 0) return;
-    var n  = Math.max(1, Math.min(Math.round(years * 12), 600));   // cap 50 yr
+    if (principal <= 0 || payment <= 0) return; // need a financed amount + rent
     var mr = rate > 0 ? (rate/100/12) : 0;
-    var pay = mr > 0 ? (principal * mr / (1 - Math.pow(1+mr, -n))) : (principal / n);
 
-    var body = [], bal = principal, cumInt = 0;
+    // Does the rent cover the first month's interest? If not, it never amortizes.
+    var firstInterest = mr > 0 ? principal * mr : 0;
+    var amortizes = payment > firstInterest + 0.005;
+
+    var body = [], bal = principal, cumInt = 0, n = 0, CAP = 600;
     var startD = first ? new Date(first + 'T12:00:00') : null;
-    for (var i = 0; i < n; i++){
-      var interest = mr > 0 ? bal * mr : 0;
-      var princ = pay - interest;
-      if (princ > bal) { princ = bal; }
-      bal -= princ; if (bal < 0.005) bal = 0;
-      cumInt += interest;
-      var dLbl = '';
-      if (startD){ var dd = new Date(startD.getFullYear(), startD.getMonth() + i, 1); dLbl = dd.toLocaleString('en-CA', { month:'short', year:'numeric' }); }
-      body.push([ String(i+1), dLbl, rate.toFixed(2)+'%', _ticMoney(princ+interest), _ticMoney(princ), _ticMoney(interest), _ticMoney(bal), _ticMoney(cumInt) ]);
-      if (bal <= 0) break;
+    if (amortizes){
+      while (bal > 0 && n < CAP){
+        var interest = mr > 0 ? bal * mr : 0;
+        var princ = payment - interest;
+        if (princ > bal) princ = bal;           // final (smaller) payment
+        bal -= princ; if (bal < 0.005) bal = 0;
+        cumInt += interest;
+        var dLbl = '';
+        if (startD){ var dd = new Date(startD.getFullYear(), startD.getMonth() + n, 1); dLbl = dd.toLocaleString('en-CA', { month:'short', year:'numeric' }); }
+        body.push([ String(n+1), dLbl, rate.toFixed(2)+'%', _ticMoney(princ+interest), _ticMoney(princ), _ticMoney(interest), _ticMoney(bal), _ticMoney(cumInt) ]);
+        n++;
+      }
     }
 
     var ok  = await _ticEnsureAutoTable();
@@ -3133,14 +3137,22 @@
     ctx.needSpace(30); ctx.gap(8);
     if (typeof ctx.sectionHeader === 'function') ctx.sectionHeader('Schedule B — Amortization Schedule');
     pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(60);
+    var periodStr = amortizes ? ((Math.floor(n/12)) + ' yr ' + (n%12) + ' mo (' + n + ' payments)') : 'does not amortize at this payment';
     var summary = 'Home value ' + _ticMoney(value)
       + (down>0 ? '   Down payment ' + _ticMoney(down) : '')
       + '   Financed ' + _ticMoney(principal)
-      + '   Rate ' + rate.toFixed(2) + '%   Term ' + years + ' yr'
-      + '   Monthly P&I ' + _ticMoney(pay);
+      + '   Rate ' + rate.toFixed(2) + '%'
+      + '   Monthly payment (rent) ' + _ticMoney(payment)
+      + '   Payoff ' + periodStr;
     var sLines = pdf.splitTextToSize(summary, ctx.contentW);
     pdf.text(sLines, ctx.marginL, ctx.y + 3); ctx.y += sLines.length * 4 + 3; pdf.setTextColor(0);
 
+    if (!amortizes){
+      pdf.setFontSize(9); pdf.setTextColor(150,30,30);
+      var warn = pdf.splitTextToSize('The monthly rent of ' + _ticMoney(payment) + ' does not cover the first month\'s interest of ' + _ticMoney(firstInterest) + ' at ' + rate.toFixed(2) + '%. Increase the rent or lower the interest rate to generate a schedule.', ctx.contentW);
+      pdf.text(warn, ctx.marginL, ctx.y + 4); ctx.y += warn.length * 4 + 6; pdf.setTextColor(0);
+      return;
+    }
     if (!ok || typeof pdf.autoTable !== 'function'){
       pdf.setFontSize(9); pdf.text('(Amortization table unavailable — could not load the table library.)', ctx.marginL, ctx.y + 4); ctx.y += 8;
       return;
