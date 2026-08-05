@@ -3102,14 +3102,26 @@
   async function _ticRenderAmortSchedule(ctx){
     var fv  = function(id){ var e=document.getElementById(id); return e ? (e.value||'').trim() : ''; };
     var num = function(id){ var v=parseFloat((fv(id)||'').replace(/[^0-9.\-]/g,'')); return isNaN(v)?0:v; };
-    var value = num('ls_amort_value');
-    if (value <= 0) return;                     // no home value -> omit schedule
+    var pdf = ctx.pdf;
+    // Instead of silently omitting the schedule when an input is missing, print
+    // a visible "Schedule B" note explaining what to fill in — so staff can see
+    // why the table did not appear.
+    function _amortNote(msg){
+      ctx.needSpace(22); ctx.gap(8);
+      if (typeof ctx.sectionHeader === 'function') ctx.sectionHeader('Schedule B — Amortization Schedule');
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(150,30,30);
+      var l = pdf.splitTextToSize(msg, ctx.contentW);
+      pdf.text(l, ctx.marginL, ctx.y + 4); ctx.y += l.length * 4 + 6; pdf.setTextColor(0);
+    }
+    var value   = num('ls_amort_value');
     var down    = num('ls_amort_down');
     var rate    = num('ls_amort_rate');         // annual %
     var payment = num('ls_rent');               // monthly payment == the rent
     var first   = fv('ls_amort_first');
     var principal = value - down;
-    if (principal <= 0 || payment <= 0) return; // need a financed amount + rent
+    if (value <= 0)    { _amortNote('Amortization schedule omitted: enter a Home Value in the "Homeownership & Amortization" section of the form to generate Schedule B.'); return; }
+    if (payment <= 0)  { _amortNote('Amortization schedule omitted: no Monthly Rent was entered. The rent is used as the monthly payment — enter it to generate Schedule B.'); return; }
+    if (principal <= 0){ _amortNote('Amortization schedule omitted: the down payment is greater than or equal to the home value, so there is nothing to amortize.'); return; }
     var mr = rate > 0 ? (rate/100/12) : 0;
 
     // Does the rent cover the first month's interest? If not, it never amortizes.
@@ -3137,7 +3149,6 @@
     }
 
     var ok  = await _ticEnsureAutoTable();
-    var pdf = ctx.pdf;
     ctx.needSpace(30); ctx.gap(8);
     if (typeof ctx.sectionHeader === 'function') ctx.sectionHeader('Schedule B — Amortization Schedule');
     pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(60);
@@ -3182,17 +3193,24 @@
         styles: { halign:'center', fontStyle:'bold', fillColor:[248,228,26], textColor:20, fontSize:7 }
       }]);
     }
-    pdf.autoTable({
-      startY: ctx.y + 2,
-      head: [['#','Date','Rate','Payment','Principal','Interest','Balance','Cum. Int.']],
-      body: body,
-      theme: 'striped',
-      styles:      { fontSize: 7, cellPadding: 1.4, halign: 'right' },
-      headStyles:  { fillColor: [40,40,40], textColor: 255, halign: 'right', fontSize: 7 },
-      columnStyles:{ 0: { halign:'center', cellWidth: 9 }, 1: { halign:'left' }, 2: { halign:'center' } },
-      margin:      { left: ctx.marginL, right: ctx.marginR }
-    });
-    ctx.y = (pdf.lastAutoTable ? pdf.lastAutoTable.finalY : ctx.y) + 6;
+    try {
+      pdf.autoTable({
+        startY: ctx.y + 2,
+        head: [['#','Date','Rate','Payment','Principal','Interest','Balance','Cum. Int.']],
+        body: body,
+        theme: 'striped',
+        styles:      { fontSize: 7, cellPadding: 1.4, halign: 'right' },
+        headStyles:  { fillColor: [40,40,40], textColor: 255, halign: 'right', fontSize: 7 },
+        columnStyles:{ 0: { halign:'center', cellWidth: 9 }, 1: { halign:'left' }, 2: { halign:'center' } },
+        margin:      { left: ctx.marginL, right: ctx.marginR }
+      });
+      ctx.y = (pdf.lastAutoTable ? pdf.lastAutoTable.finalY : ctx.y) + 6;
+    } catch(e){
+      console.warn('[lease] autoTable render failed:', e);
+      pdf.setFontSize(9); pdf.setTextColor(150,30,30);
+      pdf.text('(Amortization table could not be rendered: ' + (e && e.message ? e.message : 'error') + ')', ctx.marginL, ctx.y + 4);
+      ctx.y += 8; pdf.setTextColor(0);
+    }
   }
 
   // ── PDF generator ─────────────────────────────────────────────────────
