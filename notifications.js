@@ -4119,6 +4119,7 @@ var CONTRACTS_DOCS_REGISTRY = [
       + '<p>C. The Housing Authority has agreed that the Tenant may occupy the premises on the terms and conditions hereinafter set out.</p>'
       + '<p>WITNESSETH THAT for and in consideration of the premises and the mutual covenants and agreements hereinafter contained, the parties agree as follows:</p>'
       + '<h3>Definition of Terms</h3>'
+      + '<p><em>(This Definition of Terms section is an addition for clarification only. It is not part of the original agreement and does not modify, expand, or limit any clause below.)</em></p>'
       + '<p>In this Agreement, unless the context otherwise requires:</p>'
       + '<p><strong>"Agreement"</strong> means this Rental / Homeownership Agreement together with Schedule "B" and any other schedules attached to it, as amended from time to time.</p>'
       + '<p><strong>"Housing Authority"</strong> means the Housing Authority of {nationName}, as represented by its duly instituted Band Council, and includes its officers, employees, and agents.</p>'
