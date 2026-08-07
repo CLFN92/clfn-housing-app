@@ -40,7 +40,7 @@ var EMAIL_EVENT_REGISTRY = [
       bodyHtml: '<p>A new housing application has been submitted by <strong>{applicantName}</strong> ({applicantId}).</p>'
               + '<p>Score: <strong>{score}</strong> · Tier: <strong>{tier}</strong></p>'
               + '<p>Please log in to the {nationShort} Housing app to review and recommend.</p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -54,7 +54,7 @@ var EMAIL_EVENT_REGISTRY = [
     defaults: {
       subject:  '{nationShort} Housing — File Update Requires Your Review: {applicantName}',
       bodyHtml: '<p>A file update has been submitted for <strong>{applicantName}</strong> ({applicantId}) and requires your review and approval in the {nationShort} Housing app.</p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -71,7 +71,7 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>Tenant: <strong>{applicantName}</strong> ({applicantId})<br/>'
               +    'Score: <strong>{score}</strong> &middot; Tier: <strong>{tier}</strong></p>'
               + '<p>Please log in to the {nationShort} Housing app to review and recommend.</p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -87,7 +87,7 @@ var EMAIL_EVENT_REGISTRY = [
       bodyHtml: '<p>An existing housing application has been <strong>updated and re-submitted</strong> by <strong>{applicantName}</strong> ({applicantId}).</p>'
               + '<p>Score: <strong>{score}</strong> &middot; Tier: <strong>{tier}</strong></p>'
               + '<p>This is a change to an application already in the system &mdash; not a new application. Please log in to the {nationShort} Housing app to review the updated details.</p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -104,7 +104,7 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>Total cost: <strong>{totalCost}</strong></p>'
               + '<p>Condition: <strong>{condition}</strong></p>'
               + '<p>Contractor: <strong>{contractor}</strong></p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -121,7 +121,7 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>Contractor: <strong>{contractorName}</strong></p>'
               + '<p>Trade: <strong>{contractorTrade}</strong></p>'
               + '<p>Classification: <strong>{contractorClassification}</strong></p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -250,7 +250,7 @@ var EMAIL_EVENT_REGISTRY = [
               +    'Score: <strong>{score}</strong> &middot; Tier: <strong>{tier}</strong></p>'
               + '<p>{actionNotes}</p>'
               + '<p>Please log in to the {nationShort} Housing app to grant final approval or return the file.</p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -266,7 +266,7 @@ var EMAIL_EVENT_REGISTRY = [
       bodyHtml: '<p>A file update has been reviewed and approved by the Housing Manager.</p>'
               + '<p>Applicant: <strong>{applicantName}</strong> ({applicantId})</p>'
               + '<p>{actionNotes}</p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -283,7 +283,7 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>Applicant: <strong>{applicantName}</strong> ({applicantId})<br/>'
               +    'Score: <strong>{score}</strong> &middot; Tier: <strong>{tier}</strong></p>'
               + '<p>{actionNotes}</p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -299,7 +299,7 @@ var EMAIL_EVENT_REGISTRY = [
       bodyHtml: '<p>The following application has been declined.</p>'
               + '<p>Applicant: <strong>{applicantName}</strong> ({applicantId})</p>'
               + '<p>{actionNotes}</p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -315,7 +315,7 @@ var EMAIL_EVENT_REGISTRY = [
       bodyHtml: '<p>The following application has been returned for more information.</p>'
               + '<p>Applicant: <strong>{applicantName}</strong> ({applicantId})</p>'
               + '<p>{actionNotes}</p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
 
@@ -336,7 +336,7 @@ var EMAIL_EVENT_REGISTRY = [
               +    'Classification: <strong>{contractorClassification}</strong></p>'
               + '<p>{actionNotes}</p>'
               + '<p>Please log in to the {nationShort} Housing app to grant final approval or return the file.</p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -354,7 +354,7 @@ var EMAIL_EVENT_REGISTRY = [
               +    'Trade: <strong>{contractorTrade}</strong><br/>'
               +    'Classification: <strong>{contractorClassification}</strong></p>'
               + '<p>{actionNotes}</p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -371,7 +371,7 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>Contractor: <strong>{contractorName}</strong><br/>'
               +    'Trade: <strong>{contractorTrade}</strong></p>'
               + '<p>{actionNotes}</p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   },
   {
@@ -388,7 +388,7 @@ var EMAIL_EVENT_REGISTRY = [
               + '<p>Contractor: <strong>{contractorName}</strong><br/>'
               +    'Trade: <strong>{contractorTrade}</strong></p>'
               + '<p>{actionNotes}</p>'
-              + '<p><a href="{appLink}">Open {nationShort} Housing</a></p>'
+              + '<p style="margin:22px 0 4px;"><a href="{appLink}" style="display:inline-block;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Open {nationShort} Housing &rarr;</a></p>'
     }
   }
 ];

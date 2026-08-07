@@ -3151,7 +3151,6 @@
     }
     var remaining = bal;                          // value at end of term = cost to community
 
-    var ok  = await _ticEnsureAutoTable();
     ctx.needSpace(40); ctx.gap(8);
     if (typeof ctx.sectionHeader === 'function') ctx.sectionHeader('Schedule B — Social Housing Cost Schedule (25-Year Term)');
     pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(60);
@@ -3190,36 +3189,42 @@
     }
     ctx.y += 2; pdf.setFont('helvetica','normal'); pdf.setTextColor(0);
 
-    if (!ok || typeof pdf.autoTable !== 'function'){
-      pdf.setFontSize(9); pdf.text('(Cost schedule table unavailable — could not load the table library.)', ctx.marginL, ctx.y + 4); ctx.y += 8;
-      return;
+    // ── Table (drawn with plain jsPDF primitives — no external library) ──────
+    // Columns: #, Date, Rate, Payment, Principal, Interest, Balance, Cum. Int.
+    var colW     = [9, 22, 14, 25, 25, 24, 30, 30];
+    var colAlign = ['center','left','center','right','right','right','right','right'];
+    var colHdr   = ['#','Date','Rate','Payment','Principal','Interest','Balance','Cum. Int.'];
+    var tableW = 0, colLeft = [], _acc = ctx.marginL, ci;
+    for (ci = 0; ci < colW.length; ci++) { colLeft[ci] = _acc; _acc += colW[ci]; tableW += colW[ci]; }
+    var colX = function(c){ return colAlign[c]==='center' ? colLeft[c]+colW[c]/2 : colAlign[c]==='right' ? colLeft[c]+colW[c]-1.5 : colLeft[c]+1.5; };
+    var colOpt = function(c){ return colAlign[c]==='center' ? {align:'center'} : colAlign[c]==='right' ? {align:'right'} : undefined; };
+    var rowH = 4.2;
+    function _drawAmortHead(){
+      ctx.needSpace(6);
+      pdf.setFillColor(40,40,40); pdf.rect(ctx.marginL, ctx.y, tableW, 5, 'F');
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(7); pdf.setTextColor(255);
+      for (var c=0;c<colHdr.length;c++) pdf.text(colHdr[c], colX(c), ctx.y+3.4, colOpt(c));
+      ctx.y += 5; pdf.setTextColor(0);
+    }
+    _drawAmortHead();
+    for (var r=0;r<body.length;r++){
+      var _pg = ctx.pageNum;
+      ctx.needSpace(rowH);
+      if (ctx.pageNum !== _pg) _drawAmortHead();       // repeat the header on each new page
+      if (r % 2 === 1){ pdf.setFillColor(246,246,246); pdf.rect(ctx.marginL, ctx.y, tableW, rowH, 'F'); }
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(45);
+      for (var c2=0;c2<colHdr.length;c2++){ var cell = body[r][c2]; pdf.text(String(cell==null?'':cell), colX(c2), ctx.y+2.9, colOpt(c2)); }
+      ctx.y += rowH;
     }
     // Closing highlighted row: the value at end of term = cost to the community.
-    body.push([{
-      content: (paidOff
-        ? 'HOME VALUE FULLY RECOVERED AT PAYMENT ' + n + ' — COST TO COMMUNITY ' + _ticMoney(0)
-        : 'VALUE AT END OF 25-YEAR TERM — COST TO THE COMMUNITY: ' + _ticMoney(remaining)),
-      colSpan: 8,
-      styles: { halign:'center', fontStyle:'bold', fillColor:[248,228,26], textColor:20, fontSize:8 }
-    }]);
-    try {
-      pdf.autoTable({
-        startY: ctx.y + 2,
-        head: [['#','Date','Rate','Payment','Principal','Interest','Balance','Cum. Int.']],
-        body: body,
-        theme: 'striped',
-        styles:      { fontSize: 7, cellPadding: 1.4, halign: 'right' },
-        headStyles:  { fillColor: [40,40,40], textColor: 255, halign: 'right', fontSize: 7 },
-        columnStyles:{ 0: { halign:'center', cellWidth: 9 }, 1: { halign:'left' }, 2: { halign:'center' } },
-        margin:      { left: ctx.marginL, right: ctx.marginR }
-      });
-      ctx.y = (pdf.lastAutoTable ? pdf.lastAutoTable.finalY : ctx.y) + 6;
-    } catch(e){
-      console.warn('[lease] autoTable render failed:', e);
-      pdf.setFontSize(9); pdf.setTextColor(150,30,30);
-      pdf.text('(Amortization table could not be rendered: ' + (e && e.message ? e.message : 'error') + ')', ctx.marginL, ctx.y + 4);
-      ctx.y += 8; pdf.setTextColor(0);
-    }
+    ctx.needSpace(8);
+    pdf.setFillColor(248,228,26); pdf.rect(ctx.marginL, ctx.y, tableW, 6, 'F');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(20);
+    var _closeMsg = paidOff
+      ? ('HOME VALUE FULLY RECOVERED AT PAYMENT ' + n + ' - COST TO COMMUNITY ' + _ticMoney(0))
+      : ('VALUE AT END OF 25-YEAR TERM - COST TO THE COMMUNITY: ' + _ticMoney(remaining));
+    pdf.text(_closeMsg, ctx.marginL + tableW/2, ctx.y+4, {align:'center'});
+    ctx.y += 6 + 6; pdf.setFont('helvetica','normal'); pdf.setTextColor(0);
   }
 
   // ── PDF generator ─────────────────────────────────────────────────────

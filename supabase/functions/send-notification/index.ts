@@ -184,6 +184,60 @@ function escapeHtml(s: unknown): string {
     .replace(/'/g, "&#39;");
 }
 
+// Accept only a plain hex colour so a stray config value can't inject markup.
+function sanitizeHexColor(c: unknown): string {
+  const s = String(c ?? "").trim();
+  return /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(s) ? s : "";
+}
+// Pick black or white text for a given background so the header stays legible
+// whatever the nation's brand colour is (e.g. a yellow bar needs dark text).
+function readableTextColor(hex: string): string {
+  let h = hex.replace("#", "");
+  if (h.length === 3) h = h.split("").map((x) => x + x).join("");
+  const r = parseInt(h.slice(0, 2), 16) || 0;
+  const g = parseInt(h.slice(2, 4), 16) || 0;
+  const b = parseInt(h.slice(4, 6), 16) || 0;
+  // Relative luminance (sRGB) -> dark text on light backgrounds.
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? "#111827" : "#ffffff";
+}
+
+// Branded, email-client-safe HTML shell (tables + inline styles, mobile-fluid).
+// All branding is passed in from the client (nation config); safe fallbacks
+// keep it working if a field is missing. ASCII-only.
+function brandedEmailShell(opts: {
+  subject: string; innerHtml: string; nationName: string;
+  brandColor: string; contactLine: string; brandFooter: string;
+}): string {
+  const bg      = opts.brandColor || "#1f2937";
+  const onBrand = readableTextColor(bg);
+  const name    = escapeHtml(opts.nationName || opts.brandFooter || "Housing");
+  const contact = opts.contactLine ? (escapeHtml(opts.contactLine) + "<br/>") : "";
+  return '' +
+'<!doctype html><html><head><meta charset="utf-8"/>' +
+'<meta name="viewport" content="width=device-width,initial-scale=1"/></head>' +
+'<body style="margin:0;padding:0;background:#f4f5f7;">' +
+'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;">' +
+'<tr><td align="center" style="padding:24px 12px;">' +
+'<table role="presentation" cellpadding="0" cellspacing="0" width="600" style="width:600px;max-width:100%;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">' +
+// Header bar
+'<tr><td style="background:' + bg + ';padding:18px 28px;">' +
+'<span style="font-size:16px;font-weight:700;letter-spacing:.2px;color:' + onBrand + ';">' + name + '</span>' +
+'</td></tr>' +
+// Body
+'<tr><td style="padding:26px 28px 8px;">' +
+'<h1 style="font-size:19px;line-height:1.3;margin:0 0 16px;color:#111827;font-weight:700;">' + escapeHtml(opts.subject) + '</h1>' +
+'<div style="font-size:14px;line-height:1.65;color:#374151;">' + opts.innerHtml + '</div>' +
+'</td></tr>' +
+// Footer
+'<tr><td style="padding:18px 28px 22px;background:#f9fafb;border-top:1px solid #e5e7eb;">' +
+'<div style="font-size:12px;line-height:1.6;color:#6b7280;">' +
+'<strong style="color:#374151;">' + name + '</strong><br/>' + contact +
+'This is an automated notification. Reply to this email to reach the housing team.' +
+'</div></td></tr>' +
+'</table></td></tr></table></body></html>';
+}
+
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -274,14 +328,14 @@ serve(async (req: Request) => {
         + escapeHtml(message)
       + '</div>';
 
-  const emailHtml = html ?? (
-    '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#111;max-width:560px;margin:0 auto;padding:24px;">'
-    + '<h2 style="font-size:18px;margin:0 0 16px;color:#111;">' + escapeHtml(subject) + '</h2>'
-    + innerHtml
-    + '<hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0;"/>'
-    + '<p style="font-size:12px;color:#888;margin:0;">' + escapeHtml(brand) + ' - automated notification. Reply to this email to reach the housing team.</p>'
-    + '</div>'
-  );
+  // Branding for the shell (client passes nation config; safe fallbacks).
+  const nationName  = (payload.nation_name as string) || brand || "Housing";
+  const brandColor  = sanitizeHexColor(payload.brand_color) || "#1f2937";
+  const contactLine = (payload.contact_line as string) || "";
+
+  const emailHtml = html ?? brandedEmailShell({
+    subject, innerHtml, nationName, brandColor, contactLine, brandFooter: brand,
+  });
 
   const outMessage: OutMessage = { to, to_name, subject, emailHtml, replyTo, attachments };
 

@@ -3478,6 +3478,16 @@ window.sendNotification = async function(opts) {
     var _nc = window.NATION_CONFIG || {};
     if(opts.brand == null){ var _s = _nc.short || _nc.display_name; if(_s) opts.brand = _s + ' Housing'; }
     if(opts.reply_to == null && _nc.email) opts.reply_to = _nc.email;
+    // Branded email shell inputs (read by the send-notification Edge Function).
+    if(opts.nation_name == null && _nc.display_name) opts.nation_name = _nc.display_name;
+    if(opts.brand_color == null && _nc.primary_color) opts.brand_color = _nc.primary_color;
+    if(opts.contact_line == null){
+      var _cp = [];
+      if(_nc.phone) _cp.push(_nc.phone);
+      var _em = _nc.email || _nc.housing_email; if(_em) _cp.push(_em);
+      if(_nc.mailing_address) _cp.push(String(_nc.mailing_address).split('\n')[0]);
+      if(_cp.length) opts.contact_line = _cp.join('  |  ');
+    }
   } catch(e) {}
   var session = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION : null;
   var token   = session && session.accessToken;
