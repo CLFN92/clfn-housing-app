@@ -1465,6 +1465,15 @@ function _renderLandingKpis(){
   setKpi('kpi_file_updates',    fileUpdates);
   setKpi('kpi_house_requests',  houseRequests);
 
+  // "Likely already housed" review link — new-housing apps whose applicant
+  // already has a home on file (candidates to reclassify). Hidden when zero.
+  var _lhBtn = document.getElementById('kpi_likely_housed_btn');
+  if (_lhBtn) {
+    var _lhN = (typeof _housingLikelyHousedApps === 'function') ? _housingLikelyHousedApps().length : 0;
+    if (_lhN > 0) { _lhBtn.textContent = 'Review ' + _lhN + ' likely already-housed →'; _lhBtn.style.display = ''; }
+    else { _lhBtn.style.display = 'none'; }
+  }
+
   // Scroll-collapse: shrink the KPI strip to icon-only once the page scrolls,
   // freeing space on tablet/mobile (shared-ui.js). _initScrollCollapse is
   // itself idempotent, so calling it on every render is safe.
@@ -1676,6 +1685,131 @@ function _kpiDrillPrint() {
   var w = window.open('', '_blank', 'width=960,height=700');
   if (w) { w.document.write(html); w.document.close(); }
 }
+
+// ── "Likely already housed" report ──────────────────────────────────────────
+// New-housing applications whose applicant is already housed (has a current
+// tenancy on a unit) — candidates to reclassify as an Existing House Request
+// (transfer) or a File Update. Uses the same tenancy lookups as the Match view.
+function _housingLikelyHousedApps(){
+  var apps  = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var units = (typeof housingUnits  !== 'undefined' && housingUnits)  ? housingUnits  : [];
+  var norm = function(s){ return (s||'').toString().toLowerCase().replace(/\s+/g,' ').trim(); };
+  var byId = {}, byName = {};
+  units.forEach(function(u){
+    if(!u || u.archived) return;
+    var occupied = u.status==='occupied' || u.status==='reserved' || !!u.assignedName;
+    if(!occupied) return;
+    var addr = ((u.num||'') + ' ' + (u.street||'')).trim();
+    if(u.assignedTo)   byId[u.assignedTo] = addr;
+    if(u.assignedName) byName[norm(u.assignedName)] = addr;
+  });
+  var out = [];
+  apps.forEach(function(a){
+    if(!a || a.archived || a.status==='declined') return;
+    if(a.status === 'assigned') return;              // this app already resulted in a placement
+    var t = a.appType || 'new_housing';
+    if(t === 'existing_tenant' || t === 'transfer_request') return;  // already classified
+    var addr = byId[a.id] || byName[norm((a.fn||'')+' '+(a.ln||''))] || '';
+    if(!addr) return;                                 // not matched to any current tenancy
+    out.push({ app:a, addr:addr });
+  });
+  out.sort(function(x,y){ return (y.app.score||0)-(x.app.score||0); });
+  return out;
+}
+
+function showLikelyHousedReport(){
+  var list = _housingLikelyHousedApps();
+  var today = new Date().toISOString().slice(0,10);
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+  var STATUS_LBL = function(a){ return (typeof formatAppStatusLabel==='function' ? formatAppStatusLabel(a.status,{variant:'kpi'}) : a.status) || a.status || ''; };
+
+  var rowsHtml = list.length ? list.map(function(x){
+    var a = x.app; var sid = (a.id||'').replace(/'/g,"\\'");
+    return '<tr>'
+      + '<td style="font-weight:600;">'+esc((a.fn||'')+' '+(a.ln||''))+'</td>'
+      + '<td class="std-cell-muted">'+esc(x.addr)+'</td>'
+      + '<td>'+esc(STATUS_LBL(a))+'</td>'
+      + '<td class="std-cell-right" style="font-weight:700;">'+(a.score||0)+'</td>'
+      + '<td style="white-space:nowrap;">'
+      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="_reclassifyApp(\''+sid+'\',\'transfer_request\')">&rarr; House Request</button> '
+      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="_reclassifyApp(\''+sid+'\',\'existing_tenant\')">&rarr; File Update</button> '
+      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="_closeLikelyHoused();if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">Open</button>'
+      + '</td>'
+      + '</tr>';
+  }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No new applications match an existing tenancy — your New Applications count looks clean.</td></tr>';
+
+  _kpiDrillData = {
+    title:     'Likely Already Housed',
+    headers:   ['Applicant','Current Address','Status','Score'],
+    rows:      list.map(function(x){ return [(x.app.fn||'')+' '+(x.app.ln||''), x.addr, STATUS_LBL(x.app), x.app.score||0]; }),
+    colWidths: [30,34,20,10],
+    filename:  'CLFN_Likely_Already_Housed_' + today
+  };
+
+  var existing = document.getElementById('modalLikelyHoused');
+  if (existing) existing.remove();
+  var mo = document.createElement('div');
+  mo.className = 'modal-ov';
+  mo.id = 'modalLikelyHoused';
+  mo.innerHTML =
+    '<div class="modal" style="max-width:920px;width:96%;">'
+    + '<div class="modal-hdr modal-hdr-stack">'
+    +   '<div><h2>Likely Already Housed</h2>'
+    +     '<div style="font-size:11px;opacity:.7;margin-top:2px;max-width:640px;">'+list.length+' new-housing application'+(list.length===1?'':'s')+' whose applicant already has a home on file. Reclassify each as a <strong>House Request</strong> (transfer) or a <strong>File Update</strong>, or open it to review. Nothing changes until you click.</div>'
+    +   '</div>'
+    +   '<div class="flex-gap8 flex-wrap" style="align-items:center;">'
+    +     '<button class="btn btn-ghost-dark" onclick="_kpiDrillPrint()">&#128438; Print</button>'
+    +     '<div class="export-dropdown"><button onclick="toggleExportMenu(this)" class="btn btn-primary">&#128196; Export</button>'
+    +       '<div class="header-export-menu">'
+    +         '<button onclick="_kpiDrillExport(\'pdf\')"   class="header-export-item">Save as PDF</button>'
+    +         '<button onclick="_kpiDrillExport(\'excel\')" class="header-export-item">Excel (.xlsx)</button>'
+    +         '<button onclick="_kpiDrillExport(\'csv\')"   class="header-export-item">CSV</button>'
+    +       '</div></div>'
+    +     '<button class="modal-close" onclick="_closeLikelyHoused()">&#x2715;</button>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="modal-body" style="padding:0;"><div class="tbl-wrap">'
+    +   '<table class="tbl"><thead><tr><th>Applicant</th><th>Current Address</th><th>Status</th><th class="std-cell-right">Score</th><th>Reclassify</th></tr></thead><tbody>'
+    +   rowsHtml
+    +   '</tbody></table>'
+    + '</div></div>'
+    + '</div>';
+  mo.addEventListener('click', function(e){ if (e.target === mo) _closeLikelyHoused(); });
+  document.body.appendChild(mo);
+  mo.style.display = '';
+  mo.classList.add('on');
+}
+window.showLikelyHousedReport = showLikelyHousedReport;
+
+function _closeLikelyHoused(){ var m = document.getElementById('modalLikelyHoused'); if (m) m.remove(); }
+window._closeLikelyHoused = _closeLikelyHoused;
+
+async function _reclassifyApp(appId, newType){
+  var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var idx = apps.findIndex(function(a){ return a && a.id === appId; });
+  if (idx < 0) return;
+  var role = window.currentRole || 'staff';
+  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
+    if (typeof showToast === 'function') showToast('Only management can reclassify applications.', { type:'error' });
+    return;
+  }
+  var a = apps[idx];
+  var typeLbl = (newType === 'transfer_request') ? 'Existing House Request (transfer)' : 'File Update (existing tenant)';
+  var name = ((a.fn||'')+' '+(a.ln||'')).trim() || a.id;
+  var go = (typeof showConfirm === 'function')
+    ? await showConfirm({ title:'Reclassify application?', message:'Change ' + name + '’s application from New Application to ' + typeLbl + '?', confirmText:'Reclassify', cancelText:'Cancel' })
+    : window.confirm('Reclassify ' + name + ' to ' + typeLbl + '?');
+  if (!go) return;
+  var prev = a.appType || 'new_housing';
+  a.appType = newType;
+  if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
+  else if (typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(){});
+  if (typeof auditEntry === 'function') auditEntry(a.id, 'app_reclassified', 'Application type changed from ' + prev + ' to ' + newType + ' (Likely-Already-Housed review)', role);
+  if (typeof showToast === 'function') showToast(name + ' reclassified to ' + typeLbl + '.');
+  if (typeof _renderLandingKpis === 'function') _renderLandingKpis();
+  showLikelyHousedReport();  // refresh — the reclassified row drops off the list
+}
+window._reclassifyApp = _reclassifyApp;
 
 // Compat shims — old call sites continue to work.
 function showEmployeeHome(){
