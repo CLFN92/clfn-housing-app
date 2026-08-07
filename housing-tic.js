@@ -2971,12 +2971,13 @@
 
       + (_isReplacement
           ? secH('Homeownership &amp; Amortization (optional)')
-            + '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Fill these in to append a <strong>Schedule B &mdash; Amortization Schedule</strong> to the contract. The monthly payment equals the <strong>Monthly Rent</strong> entered above &mdash; the payoff period is calculated from the financed amount, interest rate, and that rent. Leave the Home Value blank to omit the schedule.</div>'
+            + '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Fill these in to append a <strong>Schedule B &mdash; Amortization Schedule</strong> to the contract. The monthly payment equals the <strong>Monthly Rent</strong> entered above &mdash; the payoff period is calculated from the financed amount, interest rate, and that rent. Enter a <strong>Last Payment Date</strong> to show payments made to date and flag any overpayment. Leave the Home Value blank to omit the schedule.</div>'
             + '<div class="tic-grid-2">'
             + fld('Home Value ($)',            inp('ls_amort_value', _amortValue, '0.00'))
             + fld('Down Payment ($)',          inp('ls_amort_down',  '',          '0.00'))
             + fld('Annual Interest Rate (%)',  inp('ls_amort_rate',  '3',         'e.g. 3.00'))
             + fld('First Payment Date',        inp('ls_amort_first', startDate,   '', 'date'))
+            + fld('Last Payment Date (optional)', inp('ls_amort_last', '',        'Date of most recent payment', 'date'))
             + '</div>'
           : '')
 
@@ -3118,6 +3119,7 @@
     var rate    = num('ls_amort_rate');         // annual %
     var payment = num('ls_rent');               // monthly payment == the rent
     var first   = fv('ls_amort_first');
+    var lastPay = fv('ls_amort_last');
     var principal = value - down;
     if (value <= 0)    { _amortNote('Amortization schedule omitted: enter a Home Value in the "Homeownership & Amortization" section of the form to generate Schedule B.'); return; }
     if (payment <= 0)  { _amortNote('Amortization schedule omitted: no Monthly Rent was entered. The rent is used as the monthly payment — enter it to generate Schedule B.'); return; }
@@ -3133,9 +3135,17 @@
     // Build the schedule for the full 25-year (300-payment) term, or until the
     // home value is fully recovered if that happens sooner. The payment column
     // always equals the rent.
+    var startD = first   ? new Date(first   + 'T12:00:00') : null;
+    var lastD  = lastPay ? new Date(lastPay + 'T12:00:00') : null;
+    // Monthly payments made from the first payment date through the last payment
+    // date (inclusive). 0 when no last payment date is entered.
+    var paymentsMade = (startD && lastD)
+      ? Math.max(0, (lastD.getFullYear()-startD.getFullYear())*12 + (lastD.getMonth()-startD.getMonth()) + 1)
+      : 0;
+
     var MONTHS_25Y = 300;
     var body = [], bal = principal, cumInt = 0, totalRent = 0, n = 0, paidOff = false;
-    var startD = first ? new Date(first + 'T12:00:00') : null;
+    var payoffMonth = 0, payoffPayment = 0, balAtLast = null;
     while (n < MONTHS_25Y){
       var interest = mr > 0 ? bal * mr : 0;
       var princ = payment - interest;            // negative when rent < carrying cost
@@ -3147,9 +3157,26 @@
       if (startD){ var dd = new Date(startD.getFullYear(), startD.getMonth() + n, 1); dLbl = dd.toLocaleString('en-CA', { month:'short', year:'numeric' }); }
       body.push([ String(n+1), dLbl, rate.toFixed(2)+'%', _ticMoney(princ+interest), _ticMoney(princ), _ticMoney(interest), _ticMoney(bal), _ticMoney(cumInt) ]);
       n++;
-      if (paidOff) break;
+      if (paymentsMade && n === paymentsMade) balAtLast = bal;    // scheduled balance after payments made
+      if (paidOff){ payoffMonth = n; payoffPayment = princ + interest; break; }
     }
     var remaining = bal;                          // value at end of term = cost to community
+
+    // ── Payments-to-date / overpayment analysis (needs a Last Payment Date) ──
+    var totalPaidToDate = 0, overpaid = 0, owingAtLast = 0;
+    if (paymentsMade > 0){
+      totalPaidToDate = paymentsMade * payment;
+      if (paidOff && paymentsMade >= payoffMonth){
+        // Amount required to fully own = every scheduled payment up to payoff
+        // (the final one is a smaller partial payment).
+        var requiredToOwn = (payoffMonth - 1) * payment + payoffPayment;
+        overpaid = totalPaidToDate - requiredToOwn;
+        if (overpaid < 0.005) overpaid = 0;
+      } else {
+        // Not yet paid off by the last payment date -> still owing the scheduled balance.
+        owingAtLast = (balAtLast != null) ? balAtLast : remaining;
+      }
+    }
 
     ctx.needSpace(40); ctx.gap(8);
     if (typeof ctx.sectionHeader === 'function') ctx.sectionHeader('Schedule B — Social Housing Cost Schedule (25-Year Term)');
@@ -3188,6 +3215,41 @@
       ctx.y += 5.5;
     }
     ctx.y += 2; pdf.setFont('helvetica','normal'); pdf.setTextColor(0);
+
+    // ── Payments Made to Date (only when a Last Payment Date is entered) ──────
+    if (paymentsMade > 0){
+      ctx.needSpace(26); ctx.gap(3);
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(9.5); pdf.setTextColor(20);
+      pdf.text('Payments Made to Date', ctx.marginL, ctx.y + 4); ctx.y += 6.5;
+      var lastLbl = lastD ? lastD.toLocaleString('en-CA', { month:'long', year:'numeric' }) : '';
+      var rows3 = [
+        ['Payments made (through ' + lastLbl + ')', String(paymentsMade)],
+        ['Total paid to date',                      _ticMoney(totalPaidToDate)]
+      ];
+      var _emph;   // index of the row to emphasize
+      if (paidOff && paymentsMade >= payoffMonth){
+        rows3.push(['Home fully paid at payment #',   String(payoffMonth)]);
+        rows3.push([ overpaid > 0 ? 'OVERPAYMENT (paid beyond full value)' : 'Paid exactly in full',
+                     _ticMoney(overpaid) ]);
+        _emph = rows3.length - 1;
+      } else {
+        rows3.push(['Balance still owing as of last payment', _ticMoney(owingAtLast)]);
+        _emph = rows3.length - 1;
+      }
+      pdf.setFontSize(9);
+      for (var qi = 0; qi < rows3.length; qi++){
+        var qEmph = (qi === _emph);
+        ctx.needSpace(6);
+        pdf.setFont('helvetica', qEmph ? 'bold' : 'normal');
+        // Amber for an overpayment, dark for everything else.
+        if (qEmph && overpaid > 0) pdf.setTextColor(176, 108, 0);
+        else pdf.setTextColor(qEmph ? 20 : 60);
+        pdf.text(rows3[qi][0], ctx.marginL + 2, ctx.y + 4);
+        pdf.text(rows3[qi][1], ctx.marginL + ctx.contentW, ctx.y + 4, { align: 'right' });
+        ctx.y += 5.5;
+      }
+      ctx.y += 3; pdf.setFont('helvetica','normal'); pdf.setTextColor(0);
+    }
 
     // ── Table (drawn with plain jsPDF primitives — no external library) ──────
     // Columns: #, Date, Rate, Payment, Principal, Interest, Balance, Cum. Int.
