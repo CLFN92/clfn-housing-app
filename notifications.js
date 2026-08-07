@@ -4910,7 +4910,26 @@ function _renderBlocksToPdf(ctx, blocks) {
       ctx.y += lines.length * 4.5 + 3.5;
 
     } else if (block.type === 'p') {
-      ctx.paragraph(block.text, 9);
+      // Hanging indent for lettered / numbered sub-clauses like "(a) ..." or
+      // "1. ..." so agreement clauses line up under a marker gutter instead of
+      // wrapping flush-left. Plain paragraphs fall through to ctx.paragraph.
+      var _cm = block.text.match(/^(\([a-z0-9]{1,3}\))\s+/i);
+      if (_cm) {
+        var gutter = 8;
+        var rest = block.text.slice(_cm[0].length);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9);
+        pdf.setTextColor(40);
+        var cLines = pdf.splitTextToSize(rest, contentW - gutter);
+        var cH = cLines.length * 4 + 2;
+        ctx.needSpace(cH);
+        pdf.text(_cm[1], marginL, ctx.y + 3);
+        pdf.text(cLines, marginL + gutter, ctx.y + 3);
+        ctx.y += cH;
+        pdf.setTextColor(0);
+      } else {
+        ctx.paragraph(block.text, 9);
+      }
       ctx.gap(1.5);
 
     } else if (block.type === 'li-ol') {
