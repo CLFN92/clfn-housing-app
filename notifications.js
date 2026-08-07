@@ -4110,7 +4110,7 @@ var CONTRACTS_DOCS_REGISTRY = [
       + '<h1>Rental / Homeownership Agreement</h1>'
       + '<h2>Replacement Contract</h2>'
       + '<p><em>This is a replacement copy of the Rental / Homeownership Agreement of the Housing Authority of {nationName}. It replaces any prior agreement for the premises described below.</em></p>'
-      + '<p>Rental Agreement made as of the ______ day of ____________________, __________.</p>'
+      + '<p>Rental Agreement made as of the <strong>{executionDay}</strong> day of <strong>{executionMonth}</strong>, <strong>{executionYear}</strong>.</p>'
       + '<p><strong>BETWEEN: HOUSING AUTHORITY OF {nationName}:</strong> as represented by its duly instituted Band Council (hereinafter called the "Housing Authority") &mdash; OF THE FIRST PART</p>'
       + '<p><strong>AND:</strong> {tenantName} (hereinafter called the "Tenant") &mdash; OF THE SECOND PART</p>'
       + '<h3>Whereas</h3>'
