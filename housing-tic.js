@@ -3254,12 +3254,23 @@
     var _occName = function(i){ return _occ[i] ? ((_occ[i].fn||'') + ' ' + (_occ[i].ln||'')).trim() : ''; };
     var _occRel  = function(i){ return _occ[i] ? (_occ[i].relationship || '') : ''; };
 
+    // Lease-start date broken into day / month / year. For the Replacement
+    // Contract the "Rental Agreement made as of the __ day of __" line reflects
+    // the ORIGINAL agreement date (the lease start), not today's execution date.
+    var _sd = fv('ls_start_date') ? new Date(fv('ls_start_date') + 'T12:00:00') : null;
+    var startDay   = _sd ? String(_sd.getDate()) : '';
+    var startMonth = _sd ? _sd.toLocaleString('en-CA', { month:'long' }) : '';
+    var startYear  = _sd ? String(_sd.getFullYear()) : '';
+
     var tokens = {
       nationName:             (window.NATION_CONFIG && NATION_CONFIG.display_name) || 'Housing Authority',
       nationShort:            (window.NATION_CONFIG && NATION_CONFIG.short) || '',
       executionDay:           execDay,
       executionMonth:         execMonth,
       executionYear:          execYear,
+      startDay:               startDay,
+      startMonth:             startMonth,
+      startYear:              startYear,
       termStartDate:          fv('ls_start_date'),
       termEndDate:            fv('ls_end_date'),
       contactPerson:          (_ticState.tenant && (_ticState.tenant.contact_person || _ticState.tenant.contactPerson)) || '',
