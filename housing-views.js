@@ -1708,14 +1708,19 @@ function _housingLikelyHousedApps(){
     if(!a || a.archived || a.status==='declined') return;
     var t = a.appType || 'new_housing';
     if(t === 'existing_tenant' || t === 'transfer_request') return;  // already classified
-    // Housed if this app is assigned to a unit, OR the applicant matches an
-    // occupied unit by id/name. Assigned new-housing apps are the main ones
-    // inflating "New Applications", so they are included here.
-    var addr = byId[a.id]
-            || byName[norm((a.fn||'')+' '+(a.ln||''))]
-            || (a.assignedUnit ? (a.assignedAddress || 'Assigned unit') : '');
+    // Housed only if the application MATCHES A REAL HOUSING UNIT (on reserve) —
+    // the reliable verification. Strongest first: the unit is assigned to this
+    // application, or the application records an assigned unit; a name match on
+    // an occupied unit is the weaker fallback and is labelled as such.
+    var addr = '', via = '';
+    if (byId[a.id])            { addr = byId[a.id];                       via = 'Unit assigned to this application'; }
+    else if (a.assignedUnit)   { addr = a.assignedAddress || 'Assigned unit'; via = 'Application linked to a unit'; }
+    else {
+      var nm = byName[norm((a.fn||'')+' '+(a.ln||''))];
+      if (nm) { addr = nm; via = 'Name matches an occupied unit'; }
+    }
     if(!addr) return;                                 // not matched to any current tenancy
-    out.push({ app:a, addr:addr });
+    out.push({ app:a, addr:addr, via:via });
   });
   out.sort(function(x,y){ return (y.app.score||0)-(x.app.score||0); });
   return out;
@@ -1731,7 +1736,7 @@ function showLikelyHousedReport(){
     var a = x.app; var sid = (a.id||'').replace(/'/g,"\\'");
     return '<tr>'
       + '<td style="font-weight:600;">'+esc((a.fn||'')+' '+(a.ln||''))+'</td>'
-      + '<td class="std-cell-muted">'+esc(x.addr)+'</td>'
+      + '<td class="std-cell-muted">'+esc(x.addr)+(x.via?'<div style="font-size:10px;color:var(--muted);">'+esc(x.via)+'</div>':'')+'</td>'
       + '<td>'+esc(STATUS_LBL(a))+'</td>'
       + '<td class="std-cell-right" style="font-weight:700;">'+(a.score||0)+'</td>'
       + '<td style="white-space:nowrap;">'
