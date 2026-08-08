@@ -1739,11 +1739,11 @@ function showLikelyHousedReport(){
       + '<td class="std-cell-muted">'+esc(x.addr)+(x.via?'<div style="font-size:10px;color:var(--muted);">'+esc(x.via)+'</div>':'')+'</td>'
       + '<td>'+esc(STATUS_LBL(a))+'</td>'
       + '<td class="std-cell-right" style="font-weight:700;">'+(a.score||0)+'</td>'
-      + '<td style="white-space:nowrap;">'
-      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="_reclassifyApp(\''+sid+'\',\'transfer_request\')">&rarr; House Request</button> '
-      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="_reclassifyApp(\''+sid+'\',\'existing_tenant\')">&rarr; File Update</button> '
-      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="_closeLikelyHoused();if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">Open</button>'
-      + '</td>'
+      + '<td><div style="display:flex;flex-wrap:wrap;gap:4px;">'
+      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_reclassifyApp(\''+sid+'\',\'transfer_request\')">&rarr; Transfer</button>'
+      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_reclassifyApp(\''+sid+'\',\'existing_tenant\')">&rarr; File Update</button>'
+      +   '<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_closeLikelyHoused();if(typeof window.openEditModal===\'function\')window.openEditModal(\''+sid+'\');">Open</button>'
+      + '</div></td>'
       + '</tr>';
   }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">No new applications match an existing tenancy — your New Applications count looks clean.</td></tr>';
 
@@ -1761,13 +1761,12 @@ function showLikelyHousedReport(){
   mo.className = 'modal-ov';
   mo.id = 'modalLikelyHoused';
   mo.innerHTML =
-    '<div class="modal" style="max-width:920px;width:96%;">'
-    + '<div class="modal-hdr modal-hdr-stack">'
+    '<div class="modal" style="max-width:920px;width:96%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;">'
+    + '<div class="modal-hdr modal-hdr-stack" style="flex-shrink:0;">'
     +   '<div><h2>Likely Already Housed</h2>'
-    +     '<div style="font-size:11px;opacity:.7;margin-top:2px;max-width:640px;">'+list.length+' new-housing application'+(list.length===1?'':'s')+' whose applicant already has a home on file. Reclassify each as a <strong>House Request</strong> (transfer) or a <strong>File Update</strong>, or open it to review. Nothing changes until you click.</div>'
+    +     '<div style="font-size:11px;opacity:.7;margin-top:2px;max-width:640px;">'+list.length+' application'+(list.length===1?'':'s')+' matched to a house. Reclassify each, or use the bulk button. Nothing changes until you click.</div>'
     +   '</div>'
     +   '<div class="flex-gap8 flex-wrap" style="align-items:center;">'
-    +     (list.length ? '<button class="btn btn-primary" onclick="_reclassifyAllHoused()" title="Set every listed application to File Update (existing tenant)">&#8635; Reclassify all '+list.length+' to File Update</button>' : '')
     +     '<button class="btn btn-ghost-dark" onclick="_kpiDrillPrint()">&#128438; Print</button>'
     +     '<div class="export-dropdown"><button onclick="toggleExportMenu(this)" class="btn btn-primary">&#128196; Export</button>'
     +       '<div class="header-export-menu">'
@@ -1778,8 +1777,9 @@ function showLikelyHousedReport(){
     +     '<button class="modal-close" onclick="_closeLikelyHoused()">&#x2715;</button>'
     +   '</div>'
     + '</div>'
-    + '<div class="modal-body" style="padding:0;"><div class="tbl-wrap">'
-    +   '<table class="tbl"><thead><tr><th>Applicant</th><th>Current Address</th><th>Status</th><th class="std-cell-right">Score</th><th>Reclassify</th></tr></thead><tbody>'
+    + (list.length ? '<div style="flex-shrink:0;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg);"><button class="btn btn-primary" style="width:100%;" onclick="_reclassifyAllHoused()" title="Set every listed application to File Update (existing tenant)">&#8635; Reclassify all '+list.length+' to File Update</button></div>' : '')
+    + '<div class="modal-body" style="padding:0;flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;"><div class="tbl-wrap" style="min-width:100%;">'
+    +   '<table class="tbl" style="min-width:640px;"><thead><tr><th>Applicant</th><th>Current Address</th><th>Status</th><th class="std-cell-right">Score</th><th>Reclassify</th></tr></thead><tbody>'
     +   rowsHtml
     +   '</tbody></table>'
     + '</div></div>'
