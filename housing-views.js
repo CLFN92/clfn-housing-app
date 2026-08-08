@@ -1918,6 +1918,19 @@ function showReconcileReport(){
   var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
   var uAddr = function(u){ return ((u.num||'')+' '+(u.street||'')).trim() || u.id || '—'; };
   var gap = R.buckets.reno.concat(R.buckets.reserved, R.buckets.other);   // the "not assigned / not vacant" units
+  // Break the gap down by its raw status value so the "other / no status" units
+  // are explained (e.g. left as 'updated' after an edit, or blank).
+  var gapByStatus = {};
+  gap.forEach(function(u){ var s = (u.status && String(u.status).trim()) ? u.status : '(blank)'; gapByStatus[s] = (gapByStatus[s]||0)+1; });
+  var gapStatusTbl = '<table class="tbl" style="margin-bottom:8px;"><thead><tr><th>Status value</th><th class="std-cell-right">Units</th></tr></thead><tbody>'
+    + Object.keys(gapByStatus).sort(function(a,b){ return gapByStatus[b]-gapByStatus[a]; })
+        .map(function(s){ return '<tr><td>'+esc(s)+'</td><td class="std-cell-right" style="font-weight:700;">'+gapByStatus[s]+'</td></tr>'; }).join('')
+    + '</tbody></table>';
+  var _otherN = R.buckets.other.length;
+  var markVacantBtn = _otherN
+    ? '<button class="btn btn-primary" style="margin-bottom:10px;" onclick="_reconMarkVacant()">&#8635; Set '+_otherN+' no-status unit'+(_otherN===1?'':'s')+' to Vacant</button>'
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">These have no tenant and no clear status. Units under renovation or reserved are left as-is.</div>'
+    : '';
 
   function tile(label, val, color){
     return '<div style="flex:1 1 120px;min-width:120px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;">'
@@ -2018,6 +2031,8 @@ function showReconcileReport(){
     +   secH('Units by state — every unit accounted for')
     +   stateTbl
     +   secH('Units not assigned or vacant (the gap)', gap.length, gap.length?'#b45309':null)
+    +   gapStatusTbl
+    +   markVacantBtn
     +   gapTbl
     +   secH('People with more than one application', R.dupExtra+' extra', R.dupExtra?'#b45309':null)
     +   dupTbl
@@ -2060,6 +2075,35 @@ async function _reconClearLink(appId){
   showReconcileReport();
 }
 window._reconClearLink = _reconClearLink;
+
+// Bulk: set the "other / no status" units (no tenant, unrecognized status) to
+// Vacant so they become available for assignment. Renovation/reserved untouched.
+async function _reconMarkVacant(){
+  var role = window.currentRole || 'staff';
+  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
+    if (typeof showToast === 'function') showToast('Only management can do this.', { type:'error' });
+    return;
+  }
+  var targets = _housingReconcile().buckets.other;
+  if (!targets.length) { if (typeof showToast === 'function') showToast('Nothing to update.'); return; }
+  var go = (typeof showConfirm === 'function')
+    ? await showConfirm({ title:'Set to Vacant?', message:'Set ' + targets.length + ' unit' + (targets.length===1?'':'s') + ' that have no tenant and no clear status to Vacant (available for assignment)? Units under renovation or reserved are not touched.', confirmText:'Set to Vacant', cancelText:'Cancel' })
+    : window.confirm('Set ' + targets.length + ' units to Vacant?');
+  if (!go) return;
+  var done = 0;
+  targets.forEach(function(u){
+    var was = (u.status && String(u.status).trim()) ? u.status : 'blank';
+    u.status = 'vacant';
+    if (typeof saveUnitWithDraftFallback === 'function') saveUnitWithDraftFallback(u);
+    else if (typeof sbSaveUnit === 'function') sbSaveUnit(u).catch(function(){});
+    if (typeof auditEntry === 'function') auditEntry('UNIT:'+u.id, 'unit_status_change', 'Status set to vacant via reconciliation (was ' + was + ')', role);
+    done++;
+  });
+  if (typeof showToast === 'function') showToast(done + ' unit' + (done===1?'':'s') + ' set to Vacant.');
+  if (typeof _renderLandingKpis === 'function') _renderLandingKpis();
+  showReconcileReport();
+}
+window._reconMarkVacant = _reconMarkVacant;
 
 // Compat shims — old call sites continue to work.
 function showEmployeeHome(){
