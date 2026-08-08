@@ -3276,6 +3276,15 @@ function writeTenancyToApplication(unit){
     app.assignedAt = app.assignedAt || unit.assignedDate || new Date().toISOString();
     changed = true;
   }
+  // Housed => not a new application. Someone with a home is an existing tenant,
+  // so flip a new-housing (or blank) application to existing_tenant so it stops
+  // being counted on the New Applications waitlist. Transfers stay transfers.
+  var _t = app.appType || 'new_housing';
+  if(_t !== 'existing_tenant' && _t !== 'transfer_request'){
+    app.appType = 'existing_tenant';
+    changed = true;
+    try { if(typeof auditEntry === 'function') auditEntry(app.id, 'app_reclassified', 'Application type set to existing_tenant on housing assignment (' + addr + ')', (window.currentRole||'system')); } catch(_e){}
+  }
   if(changed){
     if(typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(app);
     else if(typeof sbSaveApplication === 'function') sbSaveApplication(app).catch(function(e){ console.warn('[tenancy] app write-back failed:', e); });

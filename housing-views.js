@@ -1706,10 +1706,14 @@ function _housingLikelyHousedApps(){
   var out = [];
   apps.forEach(function(a){
     if(!a || a.archived || a.status==='declined') return;
-    if(a.status === 'assigned') return;              // this app already resulted in a placement
     var t = a.appType || 'new_housing';
     if(t === 'existing_tenant' || t === 'transfer_request') return;  // already classified
-    var addr = byId[a.id] || byName[norm((a.fn||'')+' '+(a.ln||''))] || '';
+    // Housed if this app is assigned to a unit, OR the applicant matches an
+    // occupied unit by id/name. Assigned new-housing apps are the main ones
+    // inflating "New Applications", so they are included here.
+    var addr = byId[a.id]
+            || byName[norm((a.fn||'')+' '+(a.ln||''))]
+            || (a.assignedUnit ? (a.assignedAddress || 'Assigned unit') : '');
     if(!addr) return;                                 // not matched to any current tenancy
     out.push({ app:a, addr:addr });
   });
@@ -1758,6 +1762,7 @@ function showLikelyHousedReport(){
     +     '<div style="font-size:11px;opacity:.7;margin-top:2px;max-width:640px;">'+list.length+' new-housing application'+(list.length===1?'':'s')+' whose applicant already has a home on file. Reclassify each as a <strong>House Request</strong> (transfer) or a <strong>File Update</strong>, or open it to review. Nothing changes until you click.</div>'
     +   '</div>'
     +   '<div class="flex-gap8 flex-wrap" style="align-items:center;">'
+    +     (list.length ? '<button class="btn btn-primary" onclick="_reclassifyAllHoused()" title="Set every listed application to File Update (existing tenant)">&#8635; Reclassify all '+list.length+' to File Update</button>' : '')
     +     '<button class="btn btn-ghost-dark" onclick="_kpiDrillPrint()">&#128438; Print</button>'
     +     '<div class="export-dropdown"><button onclick="toggleExportMenu(this)" class="btn btn-primary">&#128196; Export</button>'
     +       '<div class="header-export-menu">'
@@ -1810,6 +1815,36 @@ async function _reclassifyApp(appId, newType){
   showLikelyHousedReport();  // refresh — the reclassified row drops off the list
 }
 window._reclassifyApp = _reclassifyApp;
+
+// Bulk: set every listed housed application to File Update (existing tenant).
+async function _reclassifyAllHoused(){
+  var role = window.currentRole || 'staff';
+  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
+    if (typeof showToast === 'function') showToast('Only management can reclassify applications.', { type:'error' });
+    return;
+  }
+  var list = _housingLikelyHousedApps();
+  if (!list.length) { if (typeof showToast === 'function') showToast('Nothing to reclassify.'); return; }
+  var go = (typeof showConfirm === 'function')
+    ? await showConfirm({ title:'Reclassify all to File Update?', message:'Set all ' + list.length + ' housed applications to File Update (existing tenant)? They will drop off the New Applications count. This does not change their unit or tenancy.', confirmText:'Reclassify all', cancelText:'Cancel' })
+    : window.confirm('Reclassify all ' + list.length + ' to File Update?');
+  if (!go) return;
+  var done = 0;
+  list.forEach(function(x){
+    var a = x.app; if (!a) return;
+    var prev = a.appType || 'new_housing';
+    if (prev === 'existing_tenant') return;
+    a.appType = 'existing_tenant';
+    if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
+    else if (typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(){});
+    if (typeof auditEntry === 'function') auditEntry(a.id, 'app_reclassified', 'Application type changed from ' + prev + ' to existing_tenant (bulk Likely-Already-Housed cleanup)', role);
+    done++;
+  });
+  if (typeof showToast === 'function') showToast(done + ' application' + (done===1?'':'s') + ' reclassified to File Update.');
+  if (typeof _renderLandingKpis === 'function') _renderLandingKpis();
+  showLikelyHousedReport();  // refresh — the list should now be empty
+}
+window._reclassifyAllHoused = _reclassifyAllHoused;
 
 // Compat shims — old call sites continue to work.
 function showEmployeeHome(){
