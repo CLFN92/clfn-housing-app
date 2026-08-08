@@ -1854,6 +1854,213 @@ async function _reclassifyAllHoused(){
 }
 window._reclassifyAllHoused = _reclassifyAllHoused;
 
+// ── Units <-> Applications reconciliation ───────────────────────────────────
+// Accounts for EVERY unit (so assigned + vacant + everything else = total) and
+// surfaces the application-side duplicates/stale links that inflate the counts.
+function _housingReconcile(){
+  var apps  = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var units = (typeof housingUnits  !== 'undefined' && housingUnits)  ? housingUnits  : [];
+  var norm  = function(s){ return (s||'').toString().toLowerCase().replace(/\s+/g,' ').trim(); };
+
+  // Every unit lands in exactly one bucket.
+  var buckets = { assigned:[], vacant:[], reno:[], reserved:[], archived:[], other:[] };
+  units.forEach(function(u){
+    if(!u) return;
+    if(u.archived){ buckets.archived.push(u); return; }
+    var st = (u.status||'').toLowerCase();
+    if(u.assignedName || u.assignedTo){ buckets.assigned.push(u); }
+    else if(st === 'vacant'){ buckets.vacant.push(u); }
+    else if(u.under_renovation || st.indexOf('renovat') !== -1 || st.indexOf('repair') !== -1){ buckets.reno.push(u); }
+    else if(st === 'reserved'){ buckets.reserved.push(u); }
+    else { buckets.other.push(u); }
+  });
+
+  var activeApps = apps.filter(function(a){ return a && !a.archived && a.status!=='declined'; });
+  var unitById   = {}; units.forEach(function(u){ if(u && !u.archived) unitById[u.id]=u; });
+  var appById    = {}; activeApps.forEach(function(a){ appById[a.id]=a; });
+
+  // People with more than one active application (by name).
+  var byName = {};
+  activeApps.forEach(function(a){ var k=norm((a.fn||'')+' '+(a.ln||'')); if(!k) return; (byName[k]=byName[k]||[]).push(a); });
+  var dupPeople = Object.keys(byName).filter(function(k){ return byName[k].length>1; })
+    .map(function(k){ return { name:((byName[k][0].fn||'')+' '+(byName[k][0].ln||'')).trim() || '(no name)', apps:byName[k] }; })
+    .sort(function(x,y){ return y.apps.length-x.apps.length; });
+  var dupExtra = dupPeople.reduce(function(s,p){ return s+(p.apps.length-1); }, 0);
+
+  // Applications claiming a unit that is missing / vacant / held by someone else.
+  var stale = activeApps.filter(function(a){
+    if(!a.assignedUnit && a.status!=='assigned') return false;
+    var u = a.assignedUnit ? unitById[a.assignedUnit] : null;
+    if(a.assignedUnit && !u) return true;                                 // unit missing/archived
+    if(u && !(u.assignedName || u.assignedTo)) return true;               // unit is vacant
+    if(u && u.assignedTo && u.assignedTo!==a.id
+        && norm(u.assignedName)!==norm((a.fn||'')+' '+(a.ln||''))) return true;  // held by someone else
+    return false;
+  }).map(function(a){
+    var u = a.assignedUnit ? unitById[a.assignedUnit] : null;
+    var why = !u ? 'Unit not found' : (!(u.assignedName||u.assignedTo) ? 'Unit is vacant' : 'Unit held by ' + (u.assignedName||'someone else'));
+    return { app:a, claimed:(a.assignedAddress || a.assignedUnit || '—'), why:why };
+  });
+
+  // Occupied units nothing references (no linked app, no claim, no name match).
+  var occNoApp = buckets.assigned.filter(function(u){
+    if(u.assignedTo && appById[u.assignedTo]) return false;
+    if(activeApps.some(function(a){ return a.assignedUnit===u.id; })) return false;
+    if(activeApps.some(function(a){ return norm((a.fn||'')+' '+(a.ln||''))===norm(u.assignedName); })) return false;
+    return true;
+  });
+
+  return { totalUnits:units.length, buckets:buckets, dupPeople:dupPeople, dupExtra:dupExtra, stale:stale, occNoApp:occNoApp };
+}
+
+function showReconcileReport(){
+  var R = _housingReconcile();
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+  var uAddr = function(u){ return ((u.num||'')+' '+(u.street||'')).trim() || u.id || '—'; };
+  var gap = R.buckets.reno.concat(R.buckets.reserved, R.buckets.other);   // the "not assigned / not vacant" units
+
+  function tile(label, val, color){
+    return '<div style="flex:1 1 120px;min-width:120px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;">'
+      + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">'+label+'</div>'
+      + '<div style="font-size:22px;font-weight:800;'+(color?'color:'+color+';':'')+'">'+val+'</div></div>';
+  }
+  function stateRow(label, arr, note){
+    return '<tr><td>'+label+'</td><td class="std-cell-right" style="font-weight:700;">'+arr.length+'</td><td class="std-cell-muted">'+(note||'')+'</td></tr>';
+  }
+
+  var stateTbl =
+    '<table class="tbl"><thead><tr><th>Unit state</th><th class="std-cell-right">Count</th><th></th></tr></thead><tbody>'
+    + stateRow('Assigned / occupied', R.buckets.assigned)
+    + stateRow('Vacant', R.buckets.vacant)
+    + stateRow('Under renovation / repair', R.buckets.reno)
+    + stateRow('Reserved (no tenant)', R.buckets.reserved)
+    + stateRow('Other / no status', R.buckets.other, R.buckets.other.length ? 'see below' : '')
+    + stateRow('Archived', R.buckets.archived)
+    + '<tr style="border-top:2px solid var(--border);"><td style="font-weight:800;">Total units</td><td class="std-cell-right" style="font-weight:800;">'+R.totalUnits+'</td><td></td></tr>'
+    + '</tbody></table>';
+
+  var gapTbl = gap.length
+    ? '<table class="tbl"><thead><tr><th>Unit</th><th>State</th><th>Status field</th></tr></thead><tbody>'
+      + gap.map(function(u){
+          var state = (u.under_renovation || (u.status||'').toLowerCase().indexOf('renovat')!==-1 || (u.status||'').toLowerCase().indexOf('repair')!==-1) ? 'Under renovation'
+                    : ((u.status||'').toLowerCase()==='reserved' ? 'Reserved' : 'Other / no status');
+          return '<tr class="clickable" onclick="_closeReconcile();window.location.href=\'inventory.html?unit='+esc(String(u.id).replace(/'/g,""))+'\'">'
+            + '<td style="font-weight:600;">'+esc(uAddr(u))+'</td><td>'+state+'</td><td class="std-cell-muted">'+esc(u.status||'(none)')+'</td></tr>';
+        }).join('')
+      + '</tbody></table>'
+    : '<div style="padding:12px;color:var(--muted);font-size:12px;">Every unit is either assigned or vacant.</div>';
+
+  var dupTbl = R.dupPeople.length
+    ? '<table class="tbl"><thead><tr><th>Applicant</th><th class="std-cell-right"># Apps</th><th>Types / statuses</th></tr></thead><tbody>'
+      + R.dupPeople.slice(0,80).map(function(p){
+          var types = p.apps.map(function(a){ return (a.appType||'new_housing').replace('_',' '); }).join(', ');
+          return '<tr><td style="font-weight:600;">'+esc(p.name)+'</td><td class="std-cell-right" style="font-weight:700;">'+p.apps.length+'</td><td class="std-cell-muted">'+esc(types)+'</td></tr>';
+        }).join('')
+      + '</tbody></table>' + (R.dupPeople.length>80 ? '<div style="padding:8px 12px;color:var(--muted);font-size:11px;">Showing first 80 of '+R.dupPeople.length+'. Export for the full list.</div>' : '')
+    : '<div style="padding:12px;color:var(--muted);font-size:12px;">No applicant has more than one active application.</div>';
+
+  var staleTbl = R.stale.length
+    ? '<table class="tbl"><thead><tr><th>Applicant</th><th>Claimed unit</th><th>Issue</th><th></th></tr></thead><tbody>'
+      + R.stale.map(function(s){
+          var a=s.app; var sid=(a.id||'').replace(/'/g,"\\'");
+          return '<tr><td style="font-weight:600;">'+esc((a.fn||'')+' '+(a.ln||''))+'</td><td class="std-cell-muted">'+esc(s.claimed)+'</td><td class="std-cell-muted">'+esc(s.why)+'</td>'
+            + '<td><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;white-space:nowrap;" onclick="_reconClearLink(\''+sid+'\')">Clear link</button></td></tr>';
+        }).join('')
+      + '</tbody></table>'
+    : '<div style="padding:12px;color:var(--muted);font-size:12px;">No stale unit links.</div>';
+
+  var noAppTbl = R.occNoApp.length
+    ? '<table class="tbl"><thead><tr><th>Unit</th><th>Tenant</th></tr></thead><tbody>'
+      + R.occNoApp.slice(0,80).map(function(u){
+          return '<tr class="clickable" onclick="_closeReconcile();window.location.href=\'inventory.html?unit='+esc(String(u.id).replace(/'/g,""))+'\'"><td style="font-weight:600;">'+esc(uAddr(u))+'</td><td class="std-cell-muted">'+esc(u.assignedName||'—')+'</td></tr>';
+        }).join('')
+      + '</tbody></table>'
+    : '<div style="padding:12px;color:var(--muted);font-size:12px;">Every occupied unit has an application on file.</div>';
+
+  // Export = the gap units (the immediate "missing" question).
+  _kpiDrillData = {
+    title:     'Unit Reconciliation',
+    headers:   ['Unit','State','Status field'],
+    rows:      gap.map(function(u){ return [uAddr(u), (u.status||'(none)'), u.status||'']; }),
+    colWidths: [40,30,30],
+    filename:  'CLFN_Unit_Reconciliation_' + new Date().toISOString().slice(0,10)
+  };
+
+  var existing = document.getElementById('modalReconcile');
+  if (existing) existing.remove();
+  var mo = document.createElement('div');
+  mo.className = 'modal-ov'; mo.id = 'modalReconcile';
+  var secH = function(t, n, color){ return '<div style="margin:18px 2px 8px;font-size:13px;font-weight:800;color:'+(color||'var(--text)')+';">'+t+(n!=null?' <span style="color:var(--muted);font-weight:600;">('+n+')</span>':'')+'</div>'; };
+  mo.innerHTML =
+    '<div class="modal" style="max-width:960px;width:96%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;">'
+    + '<div class="modal-hdr modal-hdr-stack" style="flex-shrink:0;">'
+    +   '<div><h2>Unit &amp; Application Reconciliation</h2>'
+    +     '<div style="font-size:11px;opacity:.7;margin-top:2px;">Accounts for every unit, and finds the duplicate/stale applications that inflate the counts.</div>'
+    +   '</div>'
+    +   '<div class="flex-gap8 flex-wrap" style="align-items:center;">'
+    +     '<button class="btn btn-ghost-dark" onclick="_kpiDrillPrint()">&#128438; Print</button>'
+    +     '<div class="export-dropdown"><button onclick="toggleExportMenu(this)" class="btn btn-primary">&#128196; Export gap</button>'
+    +       '<div class="header-export-menu">'
+    +         '<button onclick="_kpiDrillExport(\'excel\')" class="header-export-item">Excel (.xlsx)</button>'
+    +         '<button onclick="_kpiDrillExport(\'csv\')"   class="header-export-item">CSV</button>'
+    +       '</div></div>'
+    +     '<button class="modal-close" onclick="_closeReconcile()">&#x2715;</button>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="modal-body" style="padding:16px;flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;">'
+    +   '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;">'
+    +     tile('Total units', R.totalUnits)
+    +     tile('Assigned', R.buckets.assigned.length)
+    +     tile('Vacant', R.buckets.vacant.length)
+    +     tile('Not assigned/vacant', gap.length, gap.length ? '#b45309' : '')
+    +     tile('Duplicate apps', R.dupExtra, R.dupExtra ? '#b45309' : '')
+    +   '</div>'
+    +   secH('Units by state — every unit accounted for')
+    +   stateTbl
+    +   secH('Units not assigned or vacant (the gap)', gap.length, gap.length?'#b45309':null)
+    +   gapTbl
+    +   secH('People with more than one application', R.dupExtra+' extra', R.dupExtra?'#b45309':null)
+    +   dupTbl
+    +   secH('Applications with a stale unit link', R.stale.length, R.stale.length?'#b45309':null)
+    +   staleTbl
+    +   secH('Occupied units with no application', R.occNoApp.length)
+    +   noAppTbl
+    + '</div>'
+    + '</div>';
+  mo.addEventListener('click', function(e){ if (e.target === mo) _closeReconcile(); });
+  document.body.appendChild(mo);
+  mo.style.display = ''; mo.classList.add('on');
+}
+window.showReconcileReport = showReconcileReport;
+
+function _closeReconcile(){ var m = document.getElementById('modalReconcile'); if (m) m.remove(); }
+window._closeReconcile = _closeReconcile;
+
+async function _reconClearLink(appId){
+  var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var a = apps.find(function(x){ return x && x.id === appId; });
+  if (!a) return;
+  var role = window.currentRole || 'staff';
+  if (typeof ROLE !== 'undefined' && ROLE.isManagement && !ROLE.isManagement(role)) {
+    if (typeof showToast === 'function') showToast('Only management can do this.', { type:'error' });
+    return;
+  }
+  var name = ((a.fn||'')+' '+(a.ln||'')).trim() || a.id;
+  var go = (typeof showConfirm === 'function')
+    ? await showConfirm({ title:'Clear unit link?', message:'Clear the stale unit link on ' + name + '’s application and return it to the active list?', confirmText:'Clear link', cancelText:'Cancel' })
+    : window.confirm('Clear unit link for ' + name + '?');
+  if (!go) return;
+  a.assignedUnit = ''; a.assignedAddress = '';
+  if (a.status === 'assigned' && typeof APP_STATUS !== 'undefined') a.status = APP_STATUS.ED_APPROVED;
+  if (typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
+  else if (typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(){});
+  if (typeof auditEntry === 'function') auditEntry(a.id, 'status_change', 'Stale unit link cleared via reconciliation', role);
+  if (typeof showToast === 'function') showToast('Unit link cleared for ' + name + '.');
+  if (typeof _renderLandingKpis === 'function') _renderLandingKpis();
+  showReconcileReport();
+}
+window._reconClearLink = _reconClearLink;
+
 // Compat shims — old call sites continue to work.
 function showEmployeeHome(){
   if (document.getElementById('landingView')) return showLanding();
