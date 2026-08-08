@@ -1449,13 +1449,20 @@ function _renderLandingKpis(){
   //   new_housing      → New Applications (seeking a new unit)
   //   existing_tenant  → File Updates
   //   transfer_request → House Requests (existing tenant transfer)
-  function _activeOfType(pred){
+  // Housed = linked to a real unit. Derived live from the units, so unlinking a
+  // tenant returns them to the New Applications waitlist automatically.
+  var _housedIds = {};
+  units.forEach(function(u){ if(u && !u.archived && u.assignedTo) _housedIds[u.assignedTo] = true; });
+  function _isHoused(a){ return a.status === 'assigned' || !!a.assignedUnit || !!_housedIds[a.id]; }
+  function _activeOfType(pred, excludeHoused){
     return apps.filter(function(a){
       if(!a || a.archived || a.status === 'declined') return false;
+      if(excludeHoused && _isHoused(a)) return false;
       return pred(a.appType || 'new_housing');
     }).length;
   }
-  var newApps       = _activeOfType(function(t){ return t !== 'existing_tenant' && t !== 'transfer_request'; });
+  // New Applications = the real waitlist: seeking-a-unit apps that are NOT housed.
+  var newApps       = _activeOfType(function(t){ return t !== 'existing_tenant' && t !== 'transfer_request'; }, true);
   var fileUpdates   = _activeOfType(function(t){ return t === 'existing_tenant'; });
   var houseRequests = _activeOfType(function(t){ return t === 'transfer_request'; });
 
@@ -1580,8 +1587,13 @@ function showHousingKpiDrilldown(type) {
       house_requests: { title:'House Requests — Existing Tenant Transfer', pred:function(t){ return t==='transfer_request'; },  empty:'No active house requests.' }
     }[type];
     title = _typeCfg.title;
+    // New Applications drilldown excludes housed (linked) apps, matching the KPI.
+    var _housedIds2 = {};
+    units.forEach(function(u){ if(u && !u.archived && u.assignedTo) _housedIds2[u.assignedTo] = true; });
+    var _isHoused2 = function(a){ return a.status === 'assigned' || !!a.assignedUnit || !!_housedIds2[a.id]; };
     var rows = apps.filter(function(a){
       if (!a || a.archived || a.status==='declined') return false;
+      if (type === 'new_apps' && _isHoused2(a)) return false;
       return _typeCfg.pred(a.appType || 'new_housing');
     }).slice().sort(function(a,b){ return (b.score||0)-(a.score||0); });
     exportHeaders = ['Applicant','App ID','Tier','Score','Status','Days Waiting'];
@@ -1693,33 +1705,24 @@ function _kpiDrillPrint() {
 function _housingLikelyHousedApps(){
   var apps  = (typeof applications !== 'undefined' && applications) ? applications : [];
   var units = (typeof housingUnits  !== 'undefined' && housingUnits)  ? housingUnits  : [];
-  var norm = function(s){ return (s||'').toString().toLowerCase().replace(/\s+/g,' ').trim(); };
-  var byId = {}, byName = {};
+  // Map each unit that is LINKED to an application (unit.assignedTo === app.id).
+  // Linkage is the only reliable "has a house" signal; a name match is not used —
+  // if an application is not linked to a unit we treat it as no house.
+  var byId = {};
   units.forEach(function(u){
-    if(!u || u.archived) return;
-    var occupied = u.status==='occupied' || u.status==='reserved' || !!u.assignedName;
-    if(!occupied) return;
-    var addr = ((u.num||'') + ' ' + (u.street||'')).trim();
-    if(u.assignedTo)   byId[u.assignedTo] = addr;
-    if(u.assignedName) byName[norm(u.assignedName)] = addr;
+    if(!u || u.archived || !u.assignedTo) return;
+    byId[u.assignedTo] = ((u.num||'') + ' ' + (u.street||'')).trim();
   });
   var out = [];
   apps.forEach(function(a){
     if(!a || a.archived || a.status==='declined') return;
     var t = a.appType || 'new_housing';
     if(t === 'existing_tenant' || t === 'transfer_request') return;  // already classified
-    // Housed only if the application MATCHES A REAL HOUSING UNIT (on reserve) —
-    // the reliable verification. Strongest first: the unit is assigned to this
-    // application, or the application records an assigned unit; a name match on
-    // an occupied unit is the weaker fallback and is labelled as such.
+    // Housed only if the application is LINKED to a real housing unit.
     var addr = '', via = '';
-    if (byId[a.id])            { addr = byId[a.id];                       via = 'Unit assigned to this application'; }
-    else if (a.assignedUnit)   { addr = a.assignedAddress || 'Assigned unit'; via = 'Application linked to a unit'; }
-    else {
-      var nm = byName[norm((a.fn||'')+' '+(a.ln||''))];
-      if (nm) { addr = nm; via = 'Name matches an occupied unit'; }
-    }
-    if(!addr) return;                                 // not matched to any current tenancy
+    if (byId[a.id])          { addr = byId[a.id];                       via = 'Unit assigned to this application'; }
+    else if (a.assignedUnit) { addr = a.assignedAddress || 'Assigned unit'; via = 'Application linked to a unit'; }
+    if(!addr) return;                                 // not linked to a unit -> not housed
     out.push({ app:a, addr:addr, via:via });
   });
   out.sort(function(x,y){ return (y.app.score||0)-(x.app.score||0); });

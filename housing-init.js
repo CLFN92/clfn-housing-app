@@ -1814,6 +1814,27 @@ function reconcileAssignments(){
       }
     }
   });
+  // ── Reverse pass: unlink stale "assigned" apps ──────────────────────────
+  // An application that still claims a unit (status assigned or assignedUnit set)
+  // but that NO live unit links to (no unit.assignedTo === app.id) is no longer
+  // housed. Clear its tenancy and revert its status so it returns to the active
+  // waitlist / New Applications. (Declined apps are left alone.)
+  var linkedIds = {};
+  housingUnits.forEach(function(u){ if(u && !u.archived && u.assignedTo) linkedIds[u.assignedTo] = true; });
+  applications.forEach(function(a){
+    if(!a || a.archived) return;
+    if(a.status === 'declined') return;
+    var claimsUnit = (a.status === APP_STATUS.ASSIGNED) || !!a.assignedUnit;
+    if(!claimsUnit) return;
+    if(linkedIds[a.id]) return;                 // genuinely linked to a live unit — keep
+    a.assignedUnit    = '';
+    a.assignedAddress = '';
+    if(a.status === APP_STATUS.ASSIGNED) a.status = APP_STATUS.ED_APPROVED;  // un-housed -> back on the list
+    fixed++;
+    if(typeof auditEntry === 'function'){ try { auditEntry(a.id, 'status_change', 'Unlinked from unit (no live tenancy) — returned to active application', 'system'); } catch(_e){} }
+    if(typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(a);
+    else if(typeof sbSaveApplication === 'function') sbSaveApplication(a).catch(function(e){ console.warn('[reconcile] reverse save failed:', e); });
+  });
   if(fixed){
     console.info('[CLFN] Reconciled assignment drift on '+fixed+' application(s).');
   }
