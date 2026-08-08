@@ -1964,10 +1964,12 @@ function showReconcileReport(){
     : '<div style="padding:12px;color:var(--muted);font-size:12px;">Every unit is either assigned or vacant.</div>';
 
   var dupTbl = R.dupPeople.length
-    ? '<table class="tbl"><thead><tr><th>Applicant</th><th class="std-cell-right"># Apps</th><th>Types / statuses</th></tr></thead><tbody>'
+    ? '<table class="tbl"><thead><tr><th>Applicant</th><th class="std-cell-right"># Apps</th><th>Types / statuses</th><th>Action</th></tr></thead><tbody>'
       + R.dupPeople.slice(0,80).map(function(p){
           var types = p.apps.map(function(a){ return (a.appType||'new_housing').replace('_',' '); }).join(', ');
-          return '<tr><td style="font-weight:600;">'+esc(p.name)+'</td><td class="std-cell-right" style="font-weight:700;">'+p.apps.length+'</td><td class="std-cell-muted">'+esc(types)+'</td></tr>';
+          var ids = p.apps.map(function(a){ return a.id; }).join(',');
+          return '<tr><td style="font-weight:600;">'+esc(p.name)+'</td><td class="std-cell-right" style="font-weight:700;">'+p.apps.length+'</td><td class="std-cell-muted">'+esc(types)+'</td>'
+            + '<td><button class="btn btn-ghost" style="padding:3px 10px;font-size:11px;white-space:nowrap;" onclick="_reconMergePrompt(\''+esc(ids)+'\')">&#8646; Merge</button></td></tr>';
         }).join('')
       + '</tbody></table>' + (R.dupPeople.length>80 ? '<div style="padding:8px 12px;color:var(--muted);font-size:11px;">Showing first 80 of '+R.dupPeople.length+'. Export for the full list.</div>' : '')
     : '<div style="padding:12px;color:var(--muted);font-size:12px;">No applicant has more than one active application.</div>';
@@ -2104,6 +2106,99 @@ async function _reconMarkVacant(){
   showReconcileReport();
 }
 window._reconMarkVacant = _reconMarkVacant;
+
+// Best application to KEEP when merging: prefer the one linked to a unit, then
+// the furthest-along status, then the most recent, then the highest score.
+function _reconBestApp(list){
+  var rank = { assigned:6, ed_approved:5, hm_approved:4, mgr_approved:3, submitted:2, file_update:2, returned:1, draft:0 };
+  return list.slice().sort(function(a,b){
+    var au=a.assignedUnit?1:0, bu=b.assignedUnit?1:0; if(au!==bu) return bu-au;
+    var ar=rank[a.status]||0, br=rank[b.status]||0; if(ar!==br) return br-ar;
+    var ad=Date.parse(a.appDate||a.created_at||a.assignedAt||'')||0, bd=Date.parse(b.appDate||b.created_at||b.assignedAt||'')||0; if(ad!==bd) return bd-ad;
+    return (b.score||0)-(a.score||0);
+  })[0];
+}
+
+// Merge chooser — pick which of a person's applications to KEEP.
+function _reconMergePrompt(idsCsv){
+  var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var ids  = String(idsCsv||'').split(',').filter(Boolean);
+  var group = ids.map(function(id){ return apps.find(function(a){ return a && a.id === id; }); }).filter(Boolean);
+  if (group.length < 2) { if (typeof showToast === 'function') showToast('Nothing to merge.'); return; }
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+  var best = _reconBestApp(group);
+  var rowsHtml = group.map(function(a){
+    var nm  = ((a.fn||'')+' '+(a.ln||'')).trim() || a.id;
+    var meta = (a.appType||'new_housing').replace('_',' ') + '  &middot;  ' + (a.status||'—')
+             + (a.assignedAddress ? ('  &middot;  '+a.assignedAddress) : '')
+             + (a.score!=null ? ('  &middot;  score '+a.score) : '');
+    return '<label style="display:flex;align-items:flex-start;gap:9px;padding:9px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;">'
+      + '<input type="radio" name="recon_keep" value="'+esc(a.id)+'"'+(a.id===best.id?' checked':'')+' style="margin-top:3px;flex-shrink:0;accent-color:var(--yellow);"/>'
+      + '<div><div style="font-weight:700;font-size:13px;">'+esc(nm)+'</div>'
+      + '<div style="font-size:11px;color:var(--muted);">'+meta+'  &middot;  '+esc(a.id)+'</div></div></label>';
+  }).join('');
+  var ex = document.getElementById('modalReconMerge'); if (ex) ex.remove();
+  var mo = document.createElement('div'); mo.className = 'modal-ov'; mo.id = 'modalReconMerge'; mo.style.zIndex = '300';
+  mo.innerHTML =
+    '<div class="modal" style="max-width:560px;width:96%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">'
+    + '<div class="modal-hdr" style="flex-shrink:0;"><div><h2>Merge Applications</h2>'
+    +   '<div style="font-size:11px;opacity:.7;margin-top:2px;">Pick the application to KEEP. The others are archived and any missing details fold into the kept one (reversible).</div></div>'
+    +   '<button class="modal-close" onclick="var m=document.getElementById(\'modalReconMerge\');if(m)m.remove();">&#x2715;</button></div>'
+    + '<div class="modal-body" style="padding:16px;flex:1;min-height:0;overflow:auto;">'+rowsHtml+'</div>'
+    + '<div class="modal-footer" style="flex-shrink:0;"><button class="btn btn-ghost" onclick="var m=document.getElementById(\'modalReconMerge\');if(m)m.remove();">Cancel</button>'
+    +   '<button class="btn btn-primary" onclick="_reconDoMerge()">Merge</button></div>'
+    + '</div>';
+  mo.addEventListener('click', function(e){ if (e.target === mo) mo.remove(); });
+  document.body.appendChild(mo); mo.style.display = ''; mo.classList.add('on');
+  window._reconMergeIds = ids;
+}
+window._reconMergePrompt = _reconMergePrompt;
+
+// Perform the merge: fold missing fields into the kept application, archive the
+// rest with a merged_into pointer (reversible), audit both sides.
+async function _reconDoMerge(){
+  var role = window.currentRole || 'staff';
+  var canMerge = (typeof APPROVAL_AUTHORITY === 'undefined')
+    ? (typeof ROLE !== 'undefined' && ROLE.isManagement && ROLE.isManagement(role))
+    : APPROVAL_AUTHORITY.can('deleteApplication', role);
+  if (!canMerge) { if (typeof showToast === 'function') showToast('You are not authorized to merge applications.', { type:'error' }); return; }
+  var sel = document.querySelector('#modalReconMerge input[name="recon_keep"]:checked');
+  if (!sel) { if (typeof showToast === 'function') showToast('Pick the application to keep.'); return; }
+  var canonicalId = sel.value;
+  var ids  = window._reconMergeIds || [];
+  var apps = (typeof applications !== 'undefined' && applications) ? applications : [];
+  var canon = apps.find(function(a){ return a && a.id === canonicalId; });
+  if (!canon) return;
+  var dups = ids.filter(function(id){ return id !== canonicalId; })
+                .map(function(id){ return apps.find(function(a){ return a && a.id === id; }); }).filter(Boolean);
+  if (!dups.length) { var m0=document.getElementById('modalReconMerge'); if(m0) m0.remove(); return; }
+  var cname = ((canon.fn||'')+' '+(canon.ln||'')).trim() || canon.id;
+  var go = (typeof showConfirm === 'function')
+    ? await showConfirm({ title:'Merge '+dups.length+' into 1?', message:'Keep '+cname+' ('+canon.id+') and archive '+dups.length+' duplicate application'+(dups.length===1?'':'s')+', folding any missing details into the kept one? Archived applications can be restored by an administrator.', confirmText:'Merge', cancelText:'Cancel' })
+    : window.confirm('Merge '+dups.length+' into '+cname+'?');
+  if (!go) return;
+  var scalarFold = ['email','phone','dob','band','reserve','street','city','prov','postal','maritalStatus','homeCondition'];
+  var arrFold    = ['habitants','incomes','references','pets'];
+  dups.forEach(function(d){
+    scalarFold.forEach(function(f){ if((canon[f]==null||canon[f]==='') && d[f]) canon[f]=d[f]; });
+    if(!canon.assignedUnit && d.assignedUnit){ canon.assignedUnit=d.assignedUnit; canon.assignedAddress=d.assignedAddress; if(d.status==='assigned') canon.status='assigned'; }
+    arrFold.forEach(function(arr){ if((!canon[arr] || !canon[arr].length) && d[arr] && d[arr].length) canon[arr]=d[arr]; });
+    if((canon.score==null || canon.score===0) && d.score) canon.score=d.score;
+    d.archived=true; d.mergedInto=canonicalId;
+    d.declineReason=(d.declineReason ? d.declineReason+'; ' : '')+'Merged into '+canonicalId;
+    if(typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(d);
+    else if(typeof sbSaveApplication === 'function') sbSaveApplication(d).catch(function(){});
+    if(typeof auditEntry === 'function') auditEntry(d.id, 'application_merged', 'Merged into '+canonicalId+' via reconciliation', role);
+  });
+  if(typeof saveApplicationWithDraftFallback === 'function') saveApplicationWithDraftFallback(canon);
+  else if(typeof sbSaveApplication === 'function') sbSaveApplication(canon).catch(function(){});
+  if(typeof auditEntry === 'function') auditEntry(canon.id, 'application_merged', 'Absorbed '+dups.length+' duplicate application(s) via reconciliation', role);
+  if(typeof showToast === 'function') showToast('Merged '+dups.length+' duplicate'+(dups.length===1?'':'s')+' into '+cname+'.');
+  var m=document.getElementById('modalReconMerge'); if(m) m.remove();
+  if(typeof _renderLandingKpis === 'function') _renderLandingKpis();
+  showReconcileReport();
+}
+window._reconDoMerge = _reconDoMerge;
 
 // Compat shims — old call sites continue to work.
 function showEmployeeHome(){
