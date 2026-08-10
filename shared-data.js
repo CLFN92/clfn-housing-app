@@ -3492,6 +3492,14 @@ window.sendNotification = async function(opts) {
       if(_nc.mailing_address) _cp.push(String(_nc.mailing_address).split('\n')[0]);
       if(_cp.length) opts.contact_line = _cp.join('  |  ');
     }
+    // Per-nation email delivery method. The Edge Function honours the requested
+    // provider only when its keys are configured server-side, else falls back to
+    // its EMAIL_PROVIDER secret. from/from_name apply to the resend/sendgrid path.
+    if(_nc.email_config){
+      if(opts.email_provider  == null && _nc.email_config.provider)  opts.email_provider  = _nc.email_config.provider;
+      if(opts.email_from      == null && _nc.email_config.from)      opts.email_from      = _nc.email_config.from;
+      if(opts.email_from_name == null && _nc.email_config.from_name) opts.email_from_name = _nc.email_config.from_name;
+    }
   } catch(e) {}
   var session = (typeof HOUSING_SESSION !== 'undefined' && HOUSING_SESSION) ? HOUSING_SESSION : null;
   var token   = session && session.accessToken;

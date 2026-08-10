@@ -36,6 +36,17 @@ window.NATIONS_DIRECTORY = window.NATIONS_DIRECTORY || {
     mailing_po_box:     'P.O. Box 4000',
     mailing_postal:     'P0L 1B0',
     province:           'Ontario',
+    // Email delivery method for this nation (sent to the send-notification Edge
+    // Function per message). provider: 'graph' = Microsoft 365 (mail sends FROM
+    // the mailbox in the function's GRAPH_FROM_USER secret, so it authenticates
+    // as internal M365 and is not phishing-flagged); 'resend'/'sendgrid' = an
+    // email service that sends FROM `from` below. The function only honours a
+    // provider whose API keys are configured server-side, else it falls back to
+    // its EMAIL_PROVIDER secret. `from`/`from_name` apply to the resend/sendgrid
+    // path only (Graph ignores them). CLFN uses Microsoft 365; a nation without
+    // M365 would set provider:'resend' with a `from` on an SPF/DKIM/DMARC-verified
+    // domain. See the resend example in the additional-nation template below.
+    email: { provider: 'graph', from: 'housing@clfn.on.ca', from_name: 'Constance Lake First Nation' },
     modules_licensed: null   // null → all optional modules licensed (defaults apply)
   }
   // Example additional nation (one entry per hostname AND/OR subdomain label):
@@ -43,7 +54,9 @@ window.NATIONS_DIRECTORY = window.NATIONS_DIRECTORY || {
   //   id:'listuguj', display_name:'Listuguj Mi\'gmaq Government', short:'LMG',
   //   supabase_url:'https://xxxxxxxx.supabase.co', supabase_anon:'<publishable anon key>',
   //   portal_base:'https://listuguj.fnhub.app',  // canonical URL for QR codes / public links
-  //   role_labels:{}, modules_licensed:{ finance:false, match:true }
+  //   role_labels:{}, modules_licensed:{ finance:false, match:true },
+  //   // No Microsoft 365 -> send via an email service from an authenticated domain:
+  //   email:{ provider:'resend', from:'noreply@listuguj.fnhub.app', from_name:'Listuguj Mi\'gmaq Government' }
   // }
 };
 // Product domain: fnhub.app (FN Hub) on Cloudflare Pages. Each nation is a
@@ -452,7 +465,16 @@ window.NATION_CONFIG = window.NATION_CONFIG || (function(){
     landlord_committee: n.landlord_committee || 'Housing Committee',
     mailing_po_box:     n.mailing_po_box     || '',
     mailing_postal:     n.mailing_postal     || '',
-    province:           n.province           || ''
+    province:           n.province           || '',
+    // Email delivery preference for this nation, read by sendNotification and
+    // passed to the Edge Function (which honours it only when that provider's
+    // keys are configured, else falls back to its own EMAIL_PROVIDER secret).
+    // Named email_config (not email) to avoid colliding with any reply-to use.
+    email_config: {
+      provider:  (n.email && n.email.provider)  || 'graph',
+      from:      (n.email && n.email.from)       || n.housing_email || 'housing@clfn.on.ca',
+      from_name: (n.email && n.email.from_name)  || disp
+    }
   };
 })();
 

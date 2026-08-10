@@ -66,7 +66,19 @@ type OutMessage = {
   emailHtml: string;
   replyTo: string;
   attachments?: Attachment[];
+  fromEmail?: string;   // resend/sendgrid only (Graph sends from GRAPH_FROM_USER)
+  fromName?: string;
 };
+
+// Basic sender-address validation so a client-supplied From cannot inject mail
+// headers or a bogus address. Returns a clean address or "" if implausible.
+function cleanFromEmail(v: unknown): string {
+  const s = String(v ?? "").trim().replace(/[\r\n]+/g, "");
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : "";
+}
+function cleanFromName(v: unknown): string {
+  return String(v ?? "").trim().replace(/[\r\n]+/g, " ").slice(0, 120);
+}
 
 // ----- Microsoft Graph (M365) ------------------------------------------------
 let _cachedToken: { access_token: string; expires_at: number } | null = null;
@@ -126,7 +138,9 @@ async function sendViaGraph(m: OutMessage): Promise<void> {
 
 // ----- Resend ----------------------------------------------------------------
 async function sendViaResend(m: OutMessage): Promise<void> {
-  const from = EMAIL_FROM_NAME ? (EMAIL_FROM_NAME + " <" + EMAIL_FROM + ">") : EMAIL_FROM!;
+  const addr = m.fromEmail || EMAIL_FROM!;
+  const nm   = m.fromName  || EMAIL_FROM_NAME;
+  const from = nm ? (nm + " <" + addr + ">") : addr;
   const body: Record<string, unknown> = {
     from,
     to:       [m.to],
@@ -151,7 +165,7 @@ async function sendViaResend(m: OutMessage): Promise<void> {
 async function sendViaSendgrid(m: OutMessage): Promise<void> {
   const body: Record<string, unknown> = {
     personalizations: [{ to: [{ email: m.to, name: m.to_name || undefined }] }],
-    from:    { email: EMAIL_FROM!, name: EMAIL_FROM_NAME || undefined },
+    from:    { email: m.fromEmail || EMAIL_FROM!, name: m.fromName || EMAIL_FROM_NAME || undefined },
     reply_to:{ email: m.replyTo },
     subject: m.subject,
     content: [{ type: "text/html", value: m.emailHtml }],
@@ -245,35 +259,47 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
-function providerEnvMissing(): string[] {
+const KNOWN_PROVIDERS = ["graph", "resend", "sendgrid"];
+
+// Which required secrets are missing for a given provider. For resend/sendgrid a
+// From address may instead arrive per-request (payload.email_from), so the From
+// is NOT treated as a hard requirement here - only the API credentials are.
+function providerEnvMissingFor(p: string): string[] {
   const missing: string[] = [];
-  if (EMAIL_PROVIDER === "graph") {
+  if (p === "graph") {
     if (!GRAPH_TENANT_ID)     missing.push("GRAPH_TENANT_ID");
     if (!GRAPH_CLIENT_ID)     missing.push("GRAPH_CLIENT_ID");
     if (!GRAPH_CLIENT_SECRET) missing.push("GRAPH_CLIENT_SECRET");
     if (!GRAPH_FROM_USER)     missing.push("GRAPH_FROM_USER");
-  } else if (EMAIL_PROVIDER === "resend") {
+  } else if (p === "resend") {
     if (!RESEND_API_KEY) missing.push("RESEND_API_KEY");
-    if (!EMAIL_FROM)     missing.push("EMAIL_FROM");
-  } else if (EMAIL_PROVIDER === "sendgrid") {
+  } else if (p === "sendgrid") {
     if (!SENDGRID_API_KEY) missing.push("SENDGRID_API_KEY");
-    if (!EMAIL_FROM)       missing.push("EMAIL_FROM");
+  } else {
+    missing.push("UNKNOWN_PROVIDER");
   }
   return missing;
+}
+function providerHasKeys(p: string): boolean {
+  return KNOWN_PROVIDERS.indexOf(p) !== -1 && providerEnvMissingFor(p).length === 0;
+}
+
+// Pick the effective provider for THIS message: the requested one if its keys
+// are configured, else the EMAIL_PROVIDER secret default, else any provider that
+// happens to be configured (so mail still goes out). null if none are usable.
+function resolveProvider(requested: string): string | null {
+  if (providerHasKeys(requested)) return requested;
+  if (providerHasKeys(EMAIL_PROVIDER)) return EMAIL_PROVIDER;
+  for (const p of KNOWN_PROVIDERS) if (providerHasKeys(p)) return p;
+  return null;
 }
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST")    return jsonResponse({ error: "Method not allowed" }, 405);
 
-  // Provider env sanity
-  if (["graph", "resend", "sendgrid"].indexOf(EMAIL_PROVIDER) === -1) {
-    return jsonResponse({ error: "Unknown EMAIL_PROVIDER: " + EMAIL_PROVIDER }, 500);
-  }
-  const missing = providerEnvMissing();
-  if (missing.length) {
-    return jsonResponse({ error: "Email provider env not configured (" + EMAIL_PROVIDER + ")", missing }, 500);
-  }
+  // (The effective email provider is resolved per-request below, after the
+  // payload is parsed, so a nation can pick its own delivery method.)
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     return jsonResponse({ error: "Supabase env not configured" }, 500);
   }
@@ -337,15 +363,42 @@ serve(async (req: Request) => {
     subject, innerHtml, nationName, brandColor, contactLine, brandFooter: brand,
   });
 
-  const outMessage: OutMessage = { to, to_name, subject, emailHtml, replyTo, attachments };
+  // Resolve the delivery method for THIS message. The client (nation config) may
+  // request a provider; we honour it only when its keys exist server-side, else
+  // fall back to the EMAIL_PROVIDER secret. API keys never come from the client.
+  const requestedProvider = String(payload.email_provider ?? "").toLowerCase();
+  const provider = resolveProvider(requestedProvider);
+  if (!provider) {
+    return jsonResponse({
+      error: "No usable email provider is configured",
+      detail: "requested='" + (requestedProvider || "(none)") + "', secret default='" + EMAIL_PROVIDER + "'",
+      missing: providerEnvMissingFor(EMAIL_PROVIDER),
+    }, 500);
+  }
+  // From override for the resend/sendgrid path (Graph always sends from its
+  // mailbox). Fall back to the EMAIL_FROM secret; require a valid address there.
+  const fromEmail = cleanFromEmail(payload.email_from) || cleanFromEmail(EMAIL_FROM);
+  const fromName  = cleanFromName(payload.email_from_name) || EMAIL_FROM_NAME || nationName || brand;
+  if (provider !== "graph" && !fromEmail) {
+    return jsonResponse({
+      error: "Send provider '" + provider + "' has no From address",
+      detail: "Set the nation's email.from in config, or the EMAIL_FROM secret.",
+    }, 500);
+  }
 
-  // Send via the configured provider
+  const outMessage: OutMessage = {
+    to, to_name, subject, emailHtml, replyTo, attachments,
+    fromEmail: provider === "graph" ? undefined : fromEmail,
+    fromName:  provider === "graph" ? undefined : fromName,
+  };
+
+  // Send via the resolved provider
   try {
-    if (EMAIL_PROVIDER === "graph")         await sendViaGraph(outMessage);
-    else if (EMAIL_PROVIDER === "resend")   await sendViaResend(outMessage);
-    else                                    await sendViaSendgrid(outMessage);
+    if (provider === "graph")         await sendViaGraph(outMessage);
+    else if (provider === "resend")   await sendViaResend(outMessage);
+    else                              await sendViaSendgrid(outMessage);
   } catch (e) {
-    return jsonResponse({ error: "Send failed (" + EMAIL_PROVIDER + ")", detail: (e as Error).message }, 502);
+    return jsonResponse({ error: "Send failed (" + provider + ")", detail: (e as Error).message }, 502);
   }
 
   // Audit log (best-effort, server-side, service-role).
@@ -356,7 +409,7 @@ serve(async (req: Request) => {
         entity_type: entity_type || "notification",
         entity_id:   entity_id || "-",
         action:      event || "email_sent",
-        detail:      "Email -> " + to + " | " + subject,
+        detail:      "Email -> " + to + " | " + subject + " | via " + provider,
         actor:       user.email || user.id,
         created_at:  new Date().toISOString(),
       });
@@ -365,5 +418,5 @@ serve(async (req: Request) => {
     }
   }
 
-  return jsonResponse({ ok: true });
+  return jsonResponse({ ok: true, provider });
 });
