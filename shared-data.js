@@ -3985,6 +3985,60 @@ function exportInventory(format) {
   var _ns2=nationShort();
   _doExport(format,headers,data,_ns2+'_Housing_Inventory_'+new Date().toISOString().slice(0,10),[28,6,6,18,14,10,12,14,22,8],true);
 }
+function exportTenants(format) {
+  // Mirror renderTenantsView's inclusion + search + column-menu sort/filter so
+  // the export matches exactly what's on screen (occupied/reserved, not archived).
+  var units = getAllUnits().filter(function(u){ return (u.status==='occupied'||u.status==='reserved') && !u.archived; });
+  var search = ((document.getElementById('tenant_search')||{}).value||'').toLowerCase().trim();
+  if(search) units = units.filter(function(u){
+    var hay = [u.num,u.street,u.assignedName,u.assignedDate,u.status,u.bedrooms,u.type,u.classification]
+      .filter(function(v){ return v != null; }).join(' ').toLowerCase();
+    return hay.indexOf(search) !== -1;
+  });
+  units.sort(function(a,b){
+    var av=((a.num||'')+' '+(a.street||'')).toLowerCase(), bv=((b.num||'')+' '+(b.street||'')).toLowerCase();
+    return av<bv?-1:av>bv?1:0;
+  });
+  var _isMgmt = (typeof ROLE!=='undefined' && ROLE.isManagement) ? ROLE.isManagement(window.currentRole) : false;
+  function _tenHasReno(uid){
+    if(typeof calcRenoScore!=='function') return false;
+    try{
+      var sow = (typeof getSowData==='function') ? getSowData(uid) : null;
+      var prog = (window._renoProgress && window._renoProgress[uid]) || null;
+      return !!(sow&&sow!=='null') || !!(prog&&prog!=='null');
+    }catch(e){ return false; }
+  }
+  function _tenReno(uid){ return _tenHasReno(uid) ? (calcRenoScore(uid).score||0) : ''; }
+  // Same accessors + state key the table uses, so a column sort/filter carries
+  // into the export.
+  var _tenAcc = {
+    address:    function(u){ return ((u.num||'')+' '+(u.street||'')).trim(); },
+    tenant:     function(u){ return u.assignedName || '(unassigned)'; },
+    move_in:    function(u){ return u.assignedDate || '(none)'; },
+    status:     function(u){ return u.status==='reserved' ? 'Reserved' : 'Occupied'; },
+    reno_score: function(u){ return _tenHasReno(u.id) ? (calcRenoScore(u.id).score||0) : 0; }
+  };
+  var _tenState = (typeof tableStateGet==='function') ? tableStateGet('tenants') : {sort:{key:'',dir:1},filters:{}};
+  if(typeof tableApplyFilterSort==='function') units = tableApplyFilterSort(units, _tenAcc, _tenState);
+
+  var headers = ['Address','Tenant','Move-In Date','Status','Beds','Type'];
+  if(_isMgmt) headers.push('Reno Score');
+  var data = units.map(function(u){
+    var row = [
+      ((u.num||'')+' '+(u.street||'')).trim(),
+      u.assignedName||'',
+      u.assignedDate||'',
+      (u.status==='reserved'?'Reserved':'Occupied'),
+      u.bedrooms||'',
+      (u.type&&u.type!=='0'&&u.type!=='nan')?u.type:''
+    ];
+    if(_isMgmt) row.push(_tenReno(u.id));
+    return row;
+  });
+  var _nsT = nationShort();
+  var widths = _isMgmt ? [28,24,14,12,6,18,10] : [28,24,14,12,6,18];
+  _doExport(format,headers,data,_nsT+'_Tenants_'+new Date().toISOString().slice(0,10),widths,true);
+}
 function exportMatch(format) {
   var allApps=(typeof applications!=='undefined'?applications:[]);
   var search=(document.getElementById('match_search')||{}).value||'';
@@ -4049,6 +4103,7 @@ function headerExport(format) {
   else if(view==='match')  exportMatch(format);
   else if(view==='renos')  exportRenos(format);
   else if(view==='contractors') exportContractors(format);
+  else if(view==='tenants') exportTenants(format);
   else showToast('Nothing to export on this page.');
 }
 function initCtAction(action, needsNotes, prefix) {
@@ -7270,7 +7325,7 @@ async function runDocPoolMigration() {
 window.runDocPoolMigration = runDocPoolMigration;
 function setExportView(viewName) {
   window._currentExportView = viewName;
-  var exportableViews = ['inventory','match','renos','contractors'];
+  var exportableViews = ['inventory','match','renos','contractors','tenants'];
   var visible = exportableViews.indexOf(viewName) >= 0;
   var wrap = document.getElementById('header_export_wrap_v2');
   if(wrap) wrap.style.display = visible ? 'flex' : 'none';
@@ -7302,7 +7357,7 @@ function showTenants(){
   // Tenants lives in tenants.html. Element-based check (see showInventory).
   if(document.getElementById('tenantsView')) {
     if(!window._navSkipPush) pushNav('tenants');
-    setExportView(null);
+    setExportView('tenants');
     setNavActive('tab_tenants');
     _showView('tenantsView', renderTenantsView);
   } else {
