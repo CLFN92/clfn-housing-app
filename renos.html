@@ -58,6 +58,7 @@
       <p>Maintenance request pipeline — from request through approval, tendering, and completion</p>
     </div>
     <div class="phb-actions">
+      <button onclick="openProjectSchedule()" class="btn btn-ghost">📅 Project Schedule</button>
       <button onclick="exportRenoApprovalsCSV()" class="btn btn-ghost">⬇ CSV</button>
       <button onclick="exportRenoApprovalsPDF()" class="btn btn-ghost">🖨 PDF</button>
       <!-- "Progress View" cross-link removed — the tab bar above both views
@@ -1958,6 +1959,7 @@ function exportRenoApprovalsPDF() {
      SOW versions defined inline above. The shared functions also know to
      call _ensureSowModal() which mounts the template into #sowModalHost. -->
 <script src="housing-modals-sow.js"></script>
+<script src="project-schedule.js"></script>
 </div>
 </div>
 <script src="ai-assistant.js"></script>
