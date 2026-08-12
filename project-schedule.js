@@ -111,6 +111,8 @@
           if(!end   && rf.end)   end   = rf.end;
         }
         var st = _psStatus(sow);
+        var assigned = !!(sow.contractorId || sow.contractor || sow.assignedToName ||
+                          (sow.assignedTeam==='in_house' && sow.assignedTo));
         var overdueDays = (end && end.getTime() < today.getTime()) ? _psDayDiff(end, today) : 0;
         var bucket;
         if(!start && !end)        bucket='nodate';
@@ -122,7 +124,7 @@
           unitId: unitId, pn: pn,
           address: sow.address || _psUnitAddr(unitId) || '(no address)',
           contractor: sow.contractor || sow.assignedToName || (sow.assignedTeam==='in_house' ? (typeof nationShort==='function'? nationShort()+' crew' : 'In-house crew') : ''),
-          statusLabel: st.label, statusColor: st.color,
+          statusLabel: st.label, statusColor: st.color, assigned: assigned,
           totalCost: sow.totalCost || sow.total_cost || '',
           start: start, end: end, overdueDays: overdueDays, bucket: bucket
         });
@@ -191,12 +193,14 @@
       '.ps-badge.od{background:#dc2626;}',
       '.ps-l-addr{font-size:12.5px;color:var(--text,#16202b);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
       '.ps-l-sub{font-size:11px;color:var(--muted,#6b7280);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
-      '.ps-track{position:relative;flex:1;min-height:52px;}',
+      '.ps-track{position:relative;flex:1;min-height:56px;}',
       '.ps-grid{position:absolute;top:0;bottom:0;width:1px;background:var(--border,#eef1f4);}',
       '.ps-today-seg{position:absolute;top:0;bottom:0;width:2px;background:#dc2626;opacity:.55;z-index:3;}',
-      '.ps-bar{position:absolute;top:12px;height:26px;border-radius:6px;display:flex;align-items:center;padding:0 8px;font-size:11px;font-weight:700;color:#fff;overflow:hidden;white-space:nowrap;z-index:2;box-shadow:0 1px 2px rgba(0,0,0,.12);}',
+      '.ps-bar{position:absolute;top:9px;height:22px;border-radius:6px;display:flex;align-items:center;padding:0 8px;font-size:11px;font-weight:700;color:#fff;overflow:hidden;white-space:nowrap;z-index:2;box-shadow:0 1px 2px rgba(0,0,0,.12);}',
       '.ps-bar-overdue{background:#dc2626;} .ps-bar-soon{background:#d97706;} .ps-bar-active{background:#2563eb;} .ps-bar-future{background:#64748b;}',
       '.ps-bar.openend{-webkit-mask-image:linear-gradient(90deg,#000 72%,transparent);mask-image:linear-gradient(90deg,#000 72%,transparent);}',
+      '.ps-bar2{position:absolute;top:35px;height:9px;border-radius:5px;z-index:2;background:#0d9488;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.28) 0,rgba(255,255,255,.28) 3px,transparent 3px,transparent 6px);}',
+      '.ps-bar2-over{background:#dc2626;}',
       '.ps-nodate{position:absolute;top:16px;left:10px;font-size:11.5px;color:var(--muted,#9ca3af);font-style:italic;}',
       '.ps-empty{padding:60px 20px;text-align:center;color:var(--muted,#6b7280);}',
       '@media(max-width:640px){.ps-corner,.ps-label{--ps-label-w:180px;flex-basis:180px;width:180px;}}'
@@ -242,6 +246,7 @@
       +    '<span><i style="background:#d97706;"></i>Due \u226414d</span>'
       +    '<span><i style="background:#2563eb;"></i>In progress</span>'
       +    '<span><i style="background:#64748b;"></i>Upcoming</span>'
+      +    '<span><i style="background:#0d9488;height:8px;"></i>Elapsed (assigned &amp; started)</span>'
       +    '<span><i style="background:#dc2626;opacity:.55;width:2px;border-radius:0;"></i>Today</span>'
       +  '</div>'
       +'</div>'
@@ -317,10 +322,28 @@
         width=Math.max(timelineW-left,dayWidth*3); extra=' openend';
       }
       var cap = p.pn + (width>90 && p.start && p.end ? '  \u00b7  '+_psFmt(p.start)+' \u2192 '+_psFmt(p.end) : '');
+      var elapsedDays = (p.start && p.start.getTime()<=today.getTime()) ? _psDayDiff(p.start, today) : 0;
       var tip = p.pn+' | '+p.address+' | '+p.statusLabel
               + ' | '+(p.start?_psNice(p.start):'no start')+' \u2192 '+(p.end?_psNice(p.end):'no completion')
-              + (p.overdueDays>0? ' | OVERDUE '+p.overdueDays+'d' : '');
-      return '<div class="ps-bar ps-bar-'+p.bucket+extra+'" style="left:'+left+'px;width:'+width+'px;" title="'+_psEsc(tip)+'">'+_psEsc(cap)+'</div>';
+              + (p.overdueDays>0? ' | OVERDUE '+p.overdueDays+'d' : '')
+              + (p.assigned && elapsedDays>0 ? ' | in execution '+elapsedDays+'d (contractor assigned)' : '');
+      var main = '<div class="ps-bar ps-bar-'+p.bucket+extra+'" style="left:'+left+'px;width:'+width+'px;" title="'+_psEsc(tip)+'">'+_psEsc(cap)+'</div>';
+
+      // Secondary "elapsed" bar: only for projects that have STARTED (past start
+      // date) AND have a contractor / crew assigned. Shows time from start to
+      // today; the portion beyond the planned completion date is drawn as an
+      // overrun (red).
+      var sec = '';
+      if(p.start && p.assigned && p.start.getTime()<=today.getTime()){
+        var sLeft = _psDayDiff(rangeStart, p.start)*dayWidth;
+        var todayX2 = (_psDayDiff(rangeStart, today)+1)*dayWidth;
+        var planX  = p.end ? (_psDayDiff(rangeStart, p.end)+1)*dayWidth : null;
+        var over   = (planX!=null && today.getTime()>p.end.getTime());
+        var onEnd  = over ? planX : todayX2;
+        sec += '<div class="ps-bar2" style="left:'+sLeft+'px;width:'+Math.max(onEnd-sLeft,2)+'px;" title="'+_psEsc('Elapsed since start: '+elapsedDays+' days')+'"></div>';
+        if(over) sec += '<div class="ps-bar2 ps-bar2-over" style="left:'+planX+'px;width:'+Math.max(todayX2-planX,2)+'px;" title="'+_psEsc('Overrun past planned completion: '+p.overdueDays+' days')+'"></div>';
+      }
+      return main + sec;
     }
 
     var rows = list.map(function(p){
