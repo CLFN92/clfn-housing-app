@@ -81,6 +81,40 @@ verify each is accurate **as worded** before going live:
 - No testimonials, client names, statistics, or certifications appear anywhere —
   keep it that way until you have written permission to name someone.
 
+## Needs-check section (`#assessment`)
+
+A five-question self-assessment that computes, entirely in the browser (nothing
+transmitted or stored), a recommended plan and a staff-time cost estimate from
+the visitor's own answers, then pre-fills the demo form with them.
+
+- **Keep the numbers in sync:** the tier prices live in `ASSESS.tiers` in
+  `assets/js/main.js` as well as in the `#pricing` HTML — if pricing changes,
+  update both.
+- The staff-time math uses an assumed **$35/hour** fully-loaded staff cost
+  (`ASSESS.staffRate`), disclosed in the on-page footnote. Adjust if you prefer
+  a different assumption.
+
+## Emailing the questionnaire to prospects
+
+The intended flow: email a prospect `https://homelandhomes.ca/#assessment` →
+they answer the five questions on the page → the results screen recommends a
+plan and shows the value math → "Book a demo with these answers" pre-fills the
+demo form with their responses → submitting sends everything to you.
+
+For the final step to work, activate the included lead endpoint
+(`functions/api/lead.js`, a Cloudflare Pages Function that emails submissions
+via [Resend](https://resend.com) — free tier is fine):
+
+1. Deploy the site to Cloudflare Pages (the `functions/` folder deploys with it).
+2. In the Pages project → Settings → Environment variables set
+   `RESEND_API_KEY`, `LEAD_TO_EMAIL` (your inbox), and `LEAD_FROM_EMAIL`
+   (a sender verified in Resend, e.g. `leads@homelandhomes.ca`).
+3. Set `SITE_CONFIG.formEndpoint = "/api/lead"` in `assets/js/main.js`.
+
+Until step 3, the form shows a "not wired up yet" notice and nothing breaks.
+Submissions arrive as an email per prospect with their needs-check answers in
+the body and reply-to set to the prospect's address.
+
 ## Accessibility & performance notes
 
 - Semantic landmarks, skip link, one `h1`, labelled form fields, `aria-expanded`

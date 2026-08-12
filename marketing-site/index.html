@@ -424,13 +424,80 @@
           <p class="price-addon"><strong>Optional add-on:</strong> AI staff assistant (plain-language answers over your nation's own data) — $95/month.</p>
         </div>
 
-        <p class="price-note">Managing more than 600 homes, or looking at a Tribal Council / multi-nation rollout? <a href="#demo">Talk to us</a> — group pricing is available.</p>
+        <p class="price-note">Managing more than 600 homes, or looking at a Tribal Council / multi-nation rollout? <a href="#demo">Talk to us</a> — group pricing is available. Not sure it's worth it? <a href="#assessment">Take the two-minute needs check</a>.</p>
         <p class="footnote">All prices in Canadian dollars. Annual billing aligns with April–March fiscal years; monthly billing runs 10% higher than the annual rate. The subscription is always at the full published rate — the 50% discount applies to the one-time setup fee when your nation signs a one-year term and pays the year up front. Setup is scoped in writing after a short call — including any unusually large or messy historical data — so the price you sign is the price you pay.</p>
       </div>
     </section>
 
+    <!-- ═══════════════ NEEDS ASSESSMENT ═══════════════ -->
+    <section class="band" id="assessment">
+      <div class="wrap">
+        <p class="kicker">Two-minute needs check</p>
+        <h2>Is it worth it for your nation? See for yourself.</h2>
+        <p class="lede">Five quick questions. Your answers never leave this page — they simply turn into a plain-dollar look at what manual housing admin is costing you, and which plan fits.</p>
+
+        <form id="needs-form" class="assess-form" novalidate>
+          <fieldset>
+            <legend>1. How many homes does your nation manage?</legend>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="na_homes" value="small"><span>Under 100</span></label>
+              <label class="chip"><input type="radio" name="na_homes" value="mid"><span>100 – 300</span></label>
+              <label class="chip"><input type="radio" name="na_homes" value="large"><span>301 – 600</span></label>
+              <label class="chip"><input type="radio" name="na_homes" value="xl"><span>More than 600</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>2. How does your team track applications and the waitlist today?</legend>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="na_tracking" value="paper"><span>Paper files &amp; binders</span></label>
+              <label class="chip"><input type="radio" name="na_tracking" value="sheets"><span>Spreadsheets</span></label>
+              <label class="chip"><input type="radio" name="na_tracking" value="software"><span>A system we've outgrown</span></label>
+              <label class="chip"><input type="radio" name="na_tracking" value="mix"><span>A mix of everything</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>3. How do tenants report maintenance problems?</legend>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="na_maint" value="phone"><span>Phone calls &amp; office drop-ins</span></label>
+              <label class="chip"><input type="radio" name="na_maint" value="paper"><span>Paper forms</span></label>
+              <label class="chip"><input type="radio" name="na_maint" value="social"><span>Texts &amp; Facebook messages</span></label>
+              <label class="chip"><input type="radio" name="na_maint" value="online"><span>An online system</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>4. Roughly how many staff-hours a week go into chasing files, retyping spreadsheets and building reports?</legend>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="na_hours" value="3"><span>Under 5</span></label>
+              <label class="chip"><input type="radio" name="na_hours" value="10"><span>5 – 15</span></label>
+              <label class="chip"><input type="radio" name="na_hours" value="22"><span>15 – 30</span></label>
+              <label class="chip"><input type="radio" name="na_hours" value="35"><span>More than 30</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>5. What matters most to your nation in a housing system?</legend>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="na_priority" value="sovereignty"><span>Keeping our data under our control</span></label>
+              <label class="chip"><input type="radio" name="na_priority" value="paperwork"><span>Less paperwork for staff</span></label>
+              <label class="chip"><input type="radio" name="na_priority" value="council"><span>Clear reporting for Chief &amp; Council</span></label>
+              <label class="chip"><input type="radio" name="na_priority" value="tenants"><span>Better service for tenants</span></label>
+            </div>
+          </fieldset>
+
+          <button class="btn btn-primary" type="submit">Show my results</button>
+          <p class="form-status" id="needs-status" role="status" aria-live="polite"></p>
+        </form>
+
+        <div id="needs-result" class="assess-result" hidden aria-live="polite"></div>
+        <p class="footnote">Staff-time figures use your own answers and an assumed $35/hour fully-loaded staff cost — a starting point for the conversation, not a promise of savings. Nothing you select here is transmitted or stored.</p>
+      </div>
+    </section>
+
     <!-- ═══════════════ DEMO / CONTACT ═══════════════ -->
-    <section class="band" id="demo">
+    <section id="demo">
       <div class="wrap">
         <p class="kicker">See it for yourself</p>
         <h2>Book a walkthrough for your housing department.</h2>
@@ -487,7 +554,7 @@
     </section>
 
     <!-- ═══════════════ ABOUT ═══════════════ -->
-    <section id="about">
+    <section class="band" id="about">
       <div class="wrap">
         <p class="kicker">About</p>
         <h2>Why we built this</h2>
@@ -523,6 +590,7 @@
             <li><a href="#how">How it works</a></li>
             <li><a href="#trust">Trust &amp; security</a></li>
             <li><a href="#pricing">Pricing</a></li>
+            <li><a href="#assessment">Needs check</a></li>
             <li><a href="#about">About</a></li>
           </ul>
         </div>

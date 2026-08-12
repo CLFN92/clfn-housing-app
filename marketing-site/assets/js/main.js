@@ -76,6 +76,116 @@
     revealEls.forEach(function (el) { el.classList.add("in"); });
   }
 
+  /* ── Needs assessment (all local — nothing is transmitted or stored) ── */
+  var ASSESS = {
+    staffRate: 35, // assumed fully-loaded $/hour for staff time; footnote discloses it
+    tiers: {
+      small: { label: "Small community (up to 100 homes)",  monthly: 395,  annual: 4740,  setup: 2500 },
+      mid:   { label: "Mid-size community (101–300 homes)", monthly: 695,  annual: 8340,  setup: 4500 },
+      large: { label: "Large community (301–600 homes)",    monthly: 1095, annual: 13140, setup: 7500 },
+      xl:    { label: "600+ homes / Tribal Council",         monthly: 0,    annual: 0,     setup: 0 }
+    }
+  };
+
+  function fmtCad(n) {
+    return "$" + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  var needsForm = document.getElementById("needs-form");
+  var needsResult = document.getElementById("needs-result");
+  var needsStatus = document.getElementById("needs-status");
+
+  if (needsForm && needsResult) {
+    needsForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      function picked(name) {
+        var el = needsForm.querySelector('input[name="' + name + '"]:checked');
+        return el ? el.value : null;
+      }
+      function pickedLabel(name) {
+        var el = needsForm.querySelector('input[name="' + name + '"]:checked');
+        return el ? el.parentNode.querySelector("span").textContent : "";
+      }
+
+      var homes = picked("na_homes");
+      var tracking = picked("na_tracking");
+      var maint = picked("na_maint");
+      var hours = picked("na_hours");
+      var priority = picked("na_priority");
+
+      if (!homes || !tracking || !maint || !hours || !priority) {
+        needsStatus.textContent = "Please answer all five questions first.";
+        needsStatus.setAttribute("data-state", "error");
+        return;
+      }
+      needsStatus.textContent = "";
+      needsStatus.removeAttribute("data-state");
+
+      var tier = ASSESS.tiers[homes];
+      var staffCost = Number(hours) * ASSESS.staffRate * 52;
+
+      var bullets = [];
+      if (tracking === "paper") {
+        bullets.push("Your paper files and binders are migrated for you — that is exactly what the setup fee covers.");
+      } else if (tracking === "sheets") {
+        bullets.push("Your spreadsheets become one shared system — migration is included in setup, so nothing is retyped twice.");
+      } else if (tracking === "software") {
+        bullets.push("Everything your current system does, plus applications with scoring, tendering, finance and a tenant portal — with your data in your nation's own database.");
+      } else {
+        bullets.push("One connected system replaces the mix — applications, homes, maintenance and rent stop living in separate places.");
+      }
+      if (maint === "online") {
+        bullets.push("Your online intake connects straight through to work orders, contractors and inspections — end to end.");
+      } else {
+        bullets.push("Tenants scan a QR code and submit a maintenance request with photos — it arrives as a trackable work order, not a phone message.");
+      }
+      if (priority === "sovereignty") {
+        bullets.push("Your records live in your nation's own Canadian-hosted database — never pooled with anyone else's, never sold, never mined.");
+      } else if (priority === "paperwork") {
+        bullets.push("Staff enter things once. Approvals, letters, work orders and reports come out of the same record — no more retyping.");
+      } else if (priority === "council") {
+        bullets.push("The Chief & Council dashboard gives leadership a live, read-only picture — no more assembling reports by hand.");
+      } else {
+        bullets.push("Tenants apply online, upload documents and hear back automatically at every step — no more chasing the office.");
+      }
+
+      var html = "<h3>Your results</h3>";
+      if (homes === "xl") {
+        html += "<p>At your size, pricing is a custom conversation — group and Tribal Council rates are available.</p>";
+      } else {
+        html += "<p><strong>Recommended plan:</strong> " + tier.label + " — " +
+                fmtCad(tier.monthly) + "/month (" + fmtCad(tier.annual) + "/year) plus a one-time " +
+                fmtCad(tier.setup) + " setup, half price if you sign a one-year term and pay the year up front.</p>";
+      }
+      html += "<p class=\"ar-cost\">By your own numbers, roughly <em>" + fmtCad(staffCost) +
+              "/year of staff time</em> currently goes into manual tracking and reporting" +
+              (homes !== "xl" ? " — against " + fmtCad(tier.annual) + "/year for the platform." : ".") + "</p>";
+      html += "<ul><li>" + bullets.join("</li><li>") + "</li></ul>";
+      html += "<div class=\"ar-ctas\">" +
+              "<a class=\"btn btn-primary\" href=\"#demo\" id=\"ar-demo-btn\">Book a demo with these answers</a>" +
+              "<a class=\"btn btn-ghost\" href=\"#pricing\">See full pricing</a></div>";
+
+      needsResult.innerHTML = html;
+      needsResult.hidden = false;
+      needsResult.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+      // Hand the answers to the demo form so the conversation starts warm
+      var demoBtn = document.getElementById("ar-demo-btn");
+      if (demoBtn) {
+        demoBtn.addEventListener("click", function () {
+          var msg = document.getElementById("f-msg");
+          if (msg && !msg.value.trim()) {
+            msg.value = "Needs check: " + pickedLabel("na_homes") + " homes; tracking today: " +
+              pickedLabel("na_tracking") + "; maintenance via " + pickedLabel("na_maint") +
+              "; ~" + pickedLabel("na_hours") + " staff-hours/week on manual admin; top priority: " +
+              pickedLabel("na_priority") + ".";
+          }
+        });
+      }
+    });
+  }
+
   /* ── Demo-request form ── */
   var form = document.getElementById("demo-form");
   var status = document.getElementById("form-status");
