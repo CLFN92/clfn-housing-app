@@ -95,6 +95,21 @@
   var needsResult = document.getElementById("needs-result");
   var needsStatus = document.getElementById("needs-status");
 
+  // Per-feature benefit lines, keyed to the checkboxes in questions 5 and 6.
+  var FEATURE_BULLETS = {
+    applications: "Applications score themselves against your policy — the waitlist ranks fairly and defensibly, with an approval trail.",
+    matching:     "Approved applicants are matched to vacant units by configurable priority — no more whiteboard debates.",
+    maintenance:  "Tenants scan a QR code to report an issue with photos — it arrives as a trackable work order, not a phone message.",
+    renos:        "Renovation scopes, RFQs, bids and awarded contracts flow through one tender process with generated paperwork.",
+    contractors:  "Contractor approvals, insurance and WSIB expiries are tracked so nothing lapses unnoticed.",
+    inspections:  "Room-by-room condition reports with photos, on a phone, that can spawn work orders on the spot.",
+    finance:      "Rent, arrears, arrangements and collections reconcile in the same system the housing team uses.",
+    portal:       "Tenants and applicants apply, upload documents and get status updates online — without calling the office.",
+    council:      "The Chief & Council dashboard gives leadership a live, read-only picture — no more assembling reports by hand.",
+    ai:           "Staff ask plain-language questions and get answers from your nation's own records — read-only and permission-aware.",
+    audit:        "Every change is logged to a tamper-resistant audit trail, with role-based permissions on every action."
+  };
+
   if (needsForm && needsResult) {
     needsForm.addEventListener("submit", function (e) {
       e.preventDefault();
@@ -103,19 +118,25 @@
         var el = needsForm.querySelector('input[name="' + name + '"]:checked');
         return el ? el.value : null;
       }
-      function pickedLabel(name) {
-        var el = needsForm.querySelector('input[name="' + name + '"]:checked');
-        return el ? el.parentNode.querySelector("span").textContent : "";
+      function pickedAll(name) {
+        var els = needsForm.querySelectorAll('input[name="' + name + '"]:checked');
+        return Array.prototype.map.call(els, function (el) { return el.value; });
+      }
+      function labelsFor(name) {
+        var els = needsForm.querySelectorAll('input[name="' + name + '"]:checked');
+        return Array.prototype.map.call(els, function (el) {
+          return el.parentNode.querySelector("span").textContent;
+        }).join(", ");
       }
 
       var homes = picked("na_homes");
-      var tracking = picked("na_tracking");
-      var maint = picked("na_maint");
+      var tracking = pickedAll("na_tracking");
+      var channels = pickedAll("na_maint");
       var hours = picked("na_hours");
-      var priority = picked("na_priority");
+      var features = pickedAll("na_features");
 
-      if (!homes || !tracking || !maint || !hours || !priority) {
-        needsStatus.textContent = "Please answer all five questions first.";
+      if (!homes || !hours || !tracking.length || !channels.length || !features.length) {
+        needsStatus.textContent = "Please answer every question — pick as many options as apply.";
         needsStatus.setAttribute("data-state", "error");
         return;
       }
@@ -124,43 +145,57 @@
 
       var tier = ASSESS.tiers[homes];
       var staffCost = Number(hours) * ASSESS.staffRate * 52;
+      var totalFeatures = Object.keys(FEATURE_BULLETS).length;
 
+      // Every selection feeds the story: record sources -> migration scope,
+      // contact channels -> intake bullet, features -> included-value math.
       var bullets = [];
-      if (tracking === "paper") {
+
+      var sources = tracking.filter(function (t) { return t !== "memory"; }).length;
+      if (sources > 1) {
+        bullets.push("Setup consolidates your " + sources + " current record sources into one system — migration is what the setup fee covers.");
+      } else if (tracking.indexOf("paper") !== -1) {
         bullets.push("Your paper files and binders are migrated for you — that is exactly what the setup fee covers.");
-      } else if (tracking === "sheets") {
+      } else if (tracking.indexOf("sheets") !== -1) {
         bullets.push("Your spreadsheets become one shared system — migration is included in setup, so nothing is retyped twice.");
-      } else if (tracking === "software") {
-        bullets.push("Everything your current system does, plus applications with scoring, tendering, finance and a tenant portal — with your data in your nation's own database.");
-      } else {
-        bullets.push("One connected system replaces the mix — applications, homes, maintenance and rent stop living in separate places.");
+      } else if (tracking.indexOf("software") !== -1) {
+        bullets.push("Everything your current system does, plus the modules it doesn't have — with your data in your nation's own database.");
       }
-      if (maint === "online") {
+      if (tracking.indexOf("memory") !== -1) {
+        bullets.push("What lives in staff's heads becomes a record the whole team can see — and that survives staff turnover.");
+      }
+
+      var offlineChannels = channels.filter(function (c) { return c !== "online"; }).length;
+      if (offlineChannels > 0) {
+        bullets.push("The " + (offlineChannels > 1 ? offlineChannels + " scattered ways tenants reach you" : "phone-and-paper intake") +
+          " become one queue — QR-code requests with photos arrive as trackable work orders.");
+      } else {
         bullets.push("Your online intake connects straight through to work orders, contractors and inspections — end to end.");
-      } else {
-        bullets.push("Tenants scan a QR code and submit a maintenance request with photos — it arrives as a trackable work order, not a phone message.");
       }
-      if (priority === "sovereignty") {
-        bullets.push("Your records live in your nation's own Canadian-hosted database — never pooled with anyone else's, never sold, never mined.");
-      } else if (priority === "paperwork") {
-        bullets.push("Staff enter things once. Approvals, letters, work orders and reports come out of the same record — no more retyping.");
-      } else if (priority === "council") {
-        bullets.push("The Chief & Council dashboard gives leadership a live, read-only picture — no more assembling reports by hand.");
-      } else {
-        bullets.push("Tenants apply online, upload documents and hear back automatically at every step — no more chasing the office.");
+
+      // Feature bullets: show up to 4 of what they picked, in question order.
+      var shown = 0;
+      for (var i = 0; i < features.length && shown < 4; i++) {
+        if (FEATURE_BULLETS[features[i]]) { bullets.push(FEATURE_BULLETS[features[i]]); shown++; }
       }
+      bullets.push("All of it in your nation's own Canadian-hosted database — never pooled with anyone else's, never sold, never mined.");
 
       var html = "<h3>Your results</h3>";
       if (homes === "xl") {
         html += "<p>At your size, pricing is a custom conversation — group and Tribal Council rates are available.</p>";
+        html += "<p class=\"ar-cost\">By your own numbers, roughly <em>" + fmtCad(staffCost) +
+                "/year of staff time</em> currently goes into manual tracking and reporting.</p>";
       } else {
         html += "<p><strong>Recommended plan:</strong> " + tier.label + " — " +
                 fmtCad(tier.monthly) + "/month (" + fmtCad(tier.annual) + "/year) plus a one-time " +
                 fmtCad(tier.setup) + " setup, half price if you sign a one-year term and pay the year up front.</p>";
+        html += "<p class=\"ar-cost\">By your own numbers, roughly <em>" + fmtCad(staffCost) +
+                "/year of staff time</em> currently goes into manual tracking and reporting — against " +
+                fmtCad(tier.annual) + "/year for the platform.</p>";
+        html += "<p>You picked <strong>" + features.length + " of " + totalFeatures +
+                " capabilities</strong> — every one is included in the flat price, which works out to about <strong>" +
+                fmtCad(tier.monthly / features.length) + "/month per capability</strong>. Nothing you selected costs extra.</p>";
       }
-      html += "<p class=\"ar-cost\">By your own numbers, roughly <em>" + fmtCad(staffCost) +
-              "/year of staff time</em> currently goes into manual tracking and reporting" +
-              (homes !== "xl" ? " — against " + fmtCad(tier.annual) + "/year for the platform." : ".") + "</p>";
       html += "<ul><li>" + bullets.join("</li><li>") + "</li></ul>";
       html += "<div class=\"ar-ctas\">" +
               "<a class=\"btn btn-primary\" href=\"#demo\" id=\"ar-demo-btn\">Book a demo with these answers</a>" +
@@ -176,10 +211,10 @@
         demoBtn.addEventListener("click", function () {
           var msg = document.getElementById("f-msg");
           if (msg && !msg.value.trim()) {
-            msg.value = "Needs check: " + pickedLabel("na_homes") + " homes; tracking today: " +
-              pickedLabel("na_tracking") + "; maintenance via " + pickedLabel("na_maint") +
-              "; ~" + pickedLabel("na_hours") + " staff-hours/week on manual admin; top priority: " +
-              pickedLabel("na_priority") + ".";
+            msg.value = "Needs check: " + labelsFor("na_homes") + " homes. Records today: " +
+              labelsFor("na_tracking") + ". Tenants reach us via: " + labelsFor("na_maint") +
+              ". ~" + labelsFor("na_hours") + " staff-hours/week on manual admin. Interested in: " +
+              labelsFor("na_features") + ".";
           }
         });
       }

@@ -434,7 +434,7 @@
       <div class="wrap">
         <p class="kicker">Two-minute needs check</p>
         <h2>Is it worth it for your nation? See for yourself.</h2>
-        <p class="lede">Five quick questions. Your answers never leave this page — they simply turn into a plain-dollar look at what manual housing admin is costing you, and which plan fits.</p>
+        <p class="lede">Six quick questions — most let you pick everything that applies. Your answers never leave this page; they turn into a plain-dollar look at what manual housing admin is costing you, and which plan fits.</p>
 
         <form id="needs-form" class="assess-form" novalidate>
           <fieldset>
@@ -448,22 +448,22 @@
           </fieldset>
 
           <fieldset>
-            <legend>2. How does your team track applications and the waitlist today?</legend>
+            <legend>2. Where do your housing records live today? <span class="legend-hint">Select all that apply</span></legend>
             <div class="chips">
-              <label class="chip"><input type="radio" name="na_tracking" value="paper"><span>Paper files &amp; binders</span></label>
-              <label class="chip"><input type="radio" name="na_tracking" value="sheets"><span>Spreadsheets</span></label>
-              <label class="chip"><input type="radio" name="na_tracking" value="software"><span>A system we've outgrown</span></label>
-              <label class="chip"><input type="radio" name="na_tracking" value="mix"><span>A mix of everything</span></label>
+              <label class="chip"><input type="checkbox" name="na_tracking" value="paper"><span>Paper files &amp; binders</span></label>
+              <label class="chip"><input type="checkbox" name="na_tracking" value="sheets"><span>Spreadsheets</span></label>
+              <label class="chip"><input type="checkbox" name="na_tracking" value="software"><span>A system we've outgrown</span></label>
+              <label class="chip"><input type="checkbox" name="na_tracking" value="memory"><span>In staff's heads</span></label>
             </div>
           </fieldset>
 
           <fieldset>
-            <legend>3. How do tenants report maintenance problems?</legend>
+            <legend>3. How do tenants reach your office today? <span class="legend-hint">Select all that apply</span></legend>
             <div class="chips">
-              <label class="chip"><input type="radio" name="na_maint" value="phone"><span>Phone calls &amp; office drop-ins</span></label>
-              <label class="chip"><input type="radio" name="na_maint" value="paper"><span>Paper forms</span></label>
-              <label class="chip"><input type="radio" name="na_maint" value="social"><span>Texts &amp; Facebook messages</span></label>
-              <label class="chip"><input type="radio" name="na_maint" value="online"><span>An online system</span></label>
+              <label class="chip"><input type="checkbox" name="na_maint" value="phone"><span>Phone calls &amp; drop-ins</span></label>
+              <label class="chip"><input type="checkbox" name="na_maint" value="paper"><span>Paper forms</span></label>
+              <label class="chip"><input type="checkbox" name="na_maint" value="social"><span>Texts &amp; Facebook messages</span></label>
+              <label class="chip"><input type="checkbox" name="na_maint" value="online"><span>An online system</span></label>
             </div>
           </fieldset>
 
@@ -478,12 +478,25 @@
           </fieldset>
 
           <fieldset>
-            <legend>5. What matters most to your nation in a housing system?</legend>
+            <legend>5. Day-to-day operations — which would your team use? <span class="legend-hint">Select all that apply</span></legend>
             <div class="chips">
-              <label class="chip"><input type="radio" name="na_priority" value="sovereignty"><span>Keeping our data under our control</span></label>
-              <label class="chip"><input type="radio" name="na_priority" value="paperwork"><span>Less paperwork for staff</span></label>
-              <label class="chip"><input type="radio" name="na_priority" value="council"><span>Clear reporting for Chief &amp; Council</span></label>
-              <label class="chip"><input type="radio" name="na_priority" value="tenants"><span>Better service for tenants</span></label>
+              <label class="chip"><input type="checkbox" name="na_features" value="applications"><span>Applications &amp; scored waitlist</span></label>
+              <label class="chip"><input type="checkbox" name="na_features" value="matching"><span>Matching applicants to units</span></label>
+              <label class="chip"><input type="checkbox" name="na_features" value="maintenance"><span>Maintenance &amp; work orders</span></label>
+              <label class="chip"><input type="checkbox" name="na_features" value="renos"><span>Renovations &amp; RFQ tendering</span></label>
+              <label class="chip"><input type="checkbox" name="na_features" value="contractors"><span>Contractor registry</span></label>
+              <label class="chip"><input type="checkbox" name="na_features" value="inspections"><span>Inspections</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>6. Money, tenants &amp; oversight — which would you use? <span class="legend-hint">Select all that apply</span></legend>
+            <div class="chips">
+              <label class="chip"><input type="checkbox" name="na_features" value="finance"><span>Rent ledger &amp; collections</span></label>
+              <label class="chip"><input type="checkbox" name="na_features" value="portal"><span>Tenant &amp; applicant portal</span></label>
+              <label class="chip"><input type="checkbox" name="na_features" value="council"><span>Chief &amp; Council dashboard</span></label>
+              <label class="chip"><input type="checkbox" name="na_features" value="ai"><span>AI staff assistant</span></label>
+              <label class="chip"><input type="checkbox" name="na_features" value="audit"><span>Audit trail &amp; role permissions</span></label>
             </div>
           </fieldset>
 

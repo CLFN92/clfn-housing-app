@@ -643,6 +643,13 @@ section { padding-block: clamp(3.4rem, 8vw, 6rem); }
   padding: 0;
 }
 
+.legend-hint {
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: var(--accent-deep);
+  white-space: nowrap;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
