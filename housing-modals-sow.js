@@ -294,7 +294,11 @@ function _buildSowModalHTML() {
           '<div class="tic-section">' +
             '<div class="tic-section-h">Work Items</div>' +
             '<div id="sow_items"></div>' +
-            '<button type="button" onclick="addSowItem()" class="sow-add-item-btn">+ Add Work Item</button>' +
+            '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">' +
+              '<button type="button" onclick="addSowItem()" class="sow-add-item-btn">+ Add Work Item</button>' +
+              '<button type="button" id="sow_quote_ai_btn" onclick="sowUploadQuoteClick()" class="btn btn-ghost btn-sm" title="Upload a contractor quote (PDF or photo) and let AI fill in the work items">✦ Auto-fill from quote</button>' +
+              '<input type="file" id="sow_quote_file" accept="application/pdf,image/*" style="display:none;" onchange="_sowQuotePicked(this)"/>' +
+            '</div>' +
           '</div>' +
           '<div class="tic-section">' +
             '<div class="tic-section-h">Estimated Total Cost</div>' +
@@ -994,6 +998,137 @@ function _applySowSeed(seed){
   }
 }
 window._applySowSeed = _applySowSeed;
+
+// ── AI: auto-fill Work Items from an uploaded quote ───────────────────────
+// User uploads a contractor quote (PDF or photo) on the Scope of Work tab; the
+// ai-extract-quote Edge Function returns structured line items which the user
+// reviews and inserts into the Work Items list. Gated by the ai_assistant module.
+function sowUploadQuoteClick(){
+  if (window.CLFN_MODULES && typeof CLFN_MODULES.isEnabled === 'function' && !CLFN_MODULES.isEnabled('ai_assistant')) {
+    if (typeof showToast === 'function') showToast('AI Assistant is disabled for this nation.', { type:'error' });
+    return;
+  }
+  var inp = document.getElementById('sow_quote_file');
+  if (inp) { inp.value = ''; inp.click(); }
+}
+
+function _sowQuotePicked(input){
+  var file = input && input.files && input.files[0];
+  if (!file) return;
+  var okType = /pdf$/i.test(file.type) || /^image\//i.test(file.type);
+  if (!okType) { if (typeof showToast==='function') showToast('Upload a PDF or an image (JPG/PNG).', { type:'error' }); return; }
+  if (file.size > 12 * 1024 * 1024) { if (typeof showToast==='function') showToast('That file is too large (max ~12 MB).', { type:'error' }); return; }
+
+  var btn = document.getElementById('sow_quote_ai_btn');
+  var btnLabel = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Reading quote…'; }
+  if (typeof showToast==='function') showToast('Reading the quote with AI…', { type:'info' });
+
+  var reader = new FileReader();
+  reader.onload = function(){
+    var dataUrl = String(reader.result || '');
+    var b64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
+    var token = (window.HOUSING_SESSION && window.HOUSING_SESSION.accessToken) || window.SUPABASE_ANON || '';
+    fetch((window.SUPABASE_URL || '') + '/functions/v1/ai-extract-quote', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + token },
+      body: JSON.stringify({
+        file: { name: file.name, contentType: file.type, dataBase64: b64 },
+        categories: (typeof SOW_CATEGORIES !== 'undefined') ? SOW_CATEGORIES : []
+      })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (btn) { btn.disabled = false; btn.textContent = btnLabel; }
+      if (res && res.error) { if (typeof showToast==='function') showToast('Could not read that quote: ' + res.error, { type:'error' }); return; }
+      var items = (res && res.items) || [];
+      if (!items.length) { if (typeof showToast==='function') showToast('No work items were found in that document.', { type:'error' }); return; }
+      _sowShowQuotePreview(items, (res && res.summary) || '', file.name);
+    })
+    .catch(function(e){
+      if (btn) { btn.disabled = false; btn.textContent = btnLabel; }
+      if (typeof showToast==='function') showToast('Quote extraction failed: ' + (e && e.message || e), { type:'error' });
+    });
+  };
+  reader.onerror = function(){
+    if (btn) { btn.disabled = false; btn.textContent = btnLabel; }
+    if (typeof showToast==='function') showToast('Could not read that file.', { type:'error' });
+  };
+  reader.readAsDataURL(file);
+}
+
+// Review modal: lists the extracted items with a checkbox each; the user picks
+// which to add (all checked by default) and they are APPENDED to the Work Items
+// list (nothing existing is removed). AI output is a draft — every inserted row
+// stays fully editable.
+function _sowShowQuotePreview(items, summary, fileName){
+  var esc = function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  var money = function(n){ return (n==null||n==='') ? '<span style="color:var(--muted);">no price</span>' : ('$' + (parseFloat(n)||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})); };
+  window._sowQuoteItems = items;
+  var rows = items.map(function(it, i){
+    return '<label style="display:grid;grid-template-columns:20px 130px 1fr 90px;gap:8px;align-items:start;padding:8px 4px;border-bottom:1px solid var(--border);font-size:12.5px;cursor:pointer;">' +
+      '<input type="checkbox" data-sowq="'+i+'" checked style="margin-top:2px;"/>' +
+      '<span style="color:var(--muted);">'+esc(it.category||'Other')+'</span>' +
+      '<span style="color:var(--text);">'+esc(it.description)+'</span>' +
+      '<span style="text-align:right;font-variant-numeric:tabular-nums;">'+money(it.cost)+'</span>' +
+    '</label>';
+  }).join('');
+  var ov = document.createElement('div');
+  ov.id = '_sowQuotePreviewOv';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML =
+    '<div style="background:var(--surface);border-radius:14px;max-width:620px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;">' +
+      '<div class="modal-hdr compact"><div>' +
+        '<div class="modal-hdr-title">Quote read by AI</div>' +
+        '<div class="modal-hdr-sub">'+esc(fileName||'')+' &middot; '+items.length+' item(s) found</div>' +
+      '</div></div>' +
+      '<div style="padding:14px 18px 4px;">' +
+        (summary ? '<p style="margin:0 0 10px;font-size:12.5px;color:var(--muted);line-height:1.5;">'+esc(summary)+'</p>' : '') +
+        '<div style="display:grid;grid-template-columns:20px 130px 1fr 90px;gap:8px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:0 4px 4px;">' +
+          '<span></span><span>Category</span><span>Description</span><span style="text-align:right;">Est. cost</span></div>' +
+      '</div>' +
+      '<div style="overflow:auto;padding:0 18px;flex:1;">'+rows+'</div>' +
+      '<div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap;">' +
+        '<span style="font-size:11.5px;color:var(--muted);">Review &amp; edit these after adding. Existing items are kept.</span>' +
+        '<div style="display:flex;gap:10px;">' +
+          '<button class="btn btn-ghost" onclick="_sowCloseQuotePreview()">Cancel</button>' +
+          '<button class="btn btn-primary" onclick="_sowInsertQuoteItems()">Add selected to scope</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', function(e){ if (e.target === ov) _sowCloseQuotePreview(); });
+}
+function _sowCloseQuotePreview(){
+  var ov = document.getElementById('_sowQuotePreviewOv');
+  if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  window._sowQuoteItems = null;
+}
+function _sowInsertQuoteItems(){
+  var ov = document.getElementById('_sowQuotePreviewOv');
+  var items = window._sowQuoteItems || [];
+  var added = 0;
+  if (ov) {
+    ov.querySelectorAll('[data-sowq]').forEach(function(cb){
+      if (!cb.checked) return;
+      var it = items[parseInt(cb.getAttribute('data-sowq'), 10)];
+      if (!it) return;
+      if (typeof addSowItem === 'function') {
+        addSowItem({ category: it.category || '', description: it.description || '',
+                     cost: (it.cost != null ? String(it.cost) : '') });
+        added++;
+      }
+    });
+  }
+  if (typeof recalcSowTotal === 'function') recalcSowTotal();
+  _sowCloseQuotePreview();
+  if (typeof showToast === 'function') showToast(added ? ('Added ' + added + ' work item(s) from the quote.') : 'No items selected.', { type: added?'info':'error' });
+}
+window.sowUploadQuoteClick   = sowUploadQuoteClick;
+window._sowQuotePicked       = _sowQuotePicked;
+window._sowShowQuotePreview  = _sowShowQuotePreview;
+window._sowCloseQuotePreview = _sowCloseQuotePreview;
+window._sowInsertQuoteItems  = _sowInsertQuoteItems;
 
 // ── Work Order (execution) tab ────────────────────────────────────────────
 // The editable, functional work-order record kept on the SOW's `workOrder`
