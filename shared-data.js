@@ -8590,6 +8590,12 @@ function openTenantFilesPanel(unitId){
         auditTable:    'housing_audit_log',
         getActor:      function(){ return (window.HOUSING_SESSION && window.HOUSING_SESSION.email) || window.currentRole || 'staff'; },
         categories:    _HOUSING_TENANT_DOC_CATEGORIES,
+        // Soft-archive of tenant files (recoverable) — gated by the
+        // archiveTenantFiles approval authority (Settings -> Approval Authority
+        // -> Tenants). Only shows the Archive/Restore controls for permitted
+        // roles; archived files are hidden from the normal list either way.
+        canArchive: (window.APPROVAL_AUTHORITY &&
+                     APPROVAL_AUTHORITY.can('archiveTenantFiles', window.currentRole || window._realRole)) || false,
         // When anything changes, refresh the Unit Detail Panel preview if
         // it's currently rendered for the same unit (shares data source).
         onChange: function(){

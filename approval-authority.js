@@ -123,6 +123,8 @@ var APPROVAL_AUTHORITY = (function() {
     manageBcr:                ['housing_manager', 'ed'],
     // Who can merge duplicate tenant records into one person
     mergeTenants:             ['housing_manager', 'ed'],
+    // Who can archive (soft-hide, recoverable) and restore tenant files
+    archiveTenantFiles:       ['ed', 'housing_manager'],
 
     // ── Staff management ──────────────────────────────────────────────────
     // Who can edit / deactivate an existing staff record
@@ -414,6 +416,7 @@ var APPROVAL_AUTHORITY = (function() {
       approveInspection:        'Approve inspection report',
       manageBcr:                'Manage BCR / ineligibility list',
       mergeTenants:             'Merge duplicate tenant records',
+      archiveTenantFiles:       'Archive / restore tenant files',
       manageStaffRecord:        'Edit / deactivate a staff record',
       manageAllStaffRoles:      'Assign any role to staff',
       viewApplicationScore:     'View application score',
@@ -437,7 +440,7 @@ var APPROVAL_AUTHORITY = (function() {
       'Scoring':              ['editScoreModel','applyScoreAdjustment','editMatchPriority'],
       'Inventory':            ['archiveUnit', 'setUnitLocation'],
       'Inspections':          ['approveInspection'],
-      'Tenants':              ['manageBcr','mergeTenants'],
+      'Tenants':              ['manageBcr','mergeTenants','archiveTenantFiles'],
       'System':               ['accessSettings','editApprovalAuthority','manageStaff','manageStaffRecord','manageAllStaffRoles'],
       'Finance':              ['viewFinanceCard','recordPayment','createInvoice','createArrangement','manageLoan','reverseTransaction'],
       'Leadership Dashboard': ['accessLeadershipDashboard'],

@@ -1266,7 +1266,7 @@ window.DocLibrary = (function(){
     var base = opts.supabaseUrl + '/rest/v1/' + opts.auditTable +
       '?entity_type=eq.' + encodeURIComponent(opts.entityType) +
       '&entity_id=eq.' + encodeURIComponent(String(opts.entityId)) +
-      '&action=in.(file_uploaded,file_deleted,file_category_changed)' +
+      '&action=in.(file_uploaded,file_deleted,file_category_changed,file_archived,file_restored)' +
       '&order=created_at.desc&limit=500';
     var tok = (typeof opts.getAuthToken === 'function' && opts.getAuthToken()) || opts.supabaseAnon;
     return fetch(base, {
@@ -1276,8 +1276,10 @@ window.DocLibrary = (function(){
         if (!Array.isArray(rows)) return [];
         var deletedPaths = {};
         var categoryOverrides = {}; // path → latest category
+        var archivedState = {};     // path → true/false (latest archive/restore wins)
         // Rows are ordered desc — first occurrence of each action per path wins.
         var seenCatPath = {};
+        var seenArchPath = {};
         rows.forEach(function(r){
           if (r.action === 'file_deleted') {
             var d = _parseDetail(r.detail);
@@ -1288,6 +1290,13 @@ window.DocLibrary = (function(){
             if (d.path && d.category && !seenCatPath[d.path]) {
               seenCatPath[d.path] = true;
               categoryOverrides[d.path] = d.category;
+            }
+          }
+          if (r.action === 'file_archived' || r.action === 'file_restored') {
+            var da = _parseDetail(r.detail);
+            if (da.path && !seenArchPath[da.path]) {
+              seenArchPath[da.path] = true;
+              archivedState[da.path] = (r.action === 'file_archived');
             }
           }
         });
@@ -1305,6 +1314,7 @@ window.DocLibrary = (function(){
             size: d.size || 0,
             type: d.type || '',
             category: categoryOverrides[d.path] || d.category || 'other',
+            archived: !!archivedState[d.path],
             addedAt: (r.created_at || '').slice(0,10),
             addedBy: r.actor || ''
           });
@@ -1335,6 +1345,27 @@ window.DocLibrary = (function(){
         entity_type: opts.entityType,
         entity_id:   String(opts.entityId),
         action:      'file_deleted',
+        detail:      opts.detailAsJson ? detailPayload : JSON.stringify(detailPayload),
+        actor:       actor,
+        created_at:  new Date().toISOString()
+      })
+    });
+  }
+
+  // Soft-archive / restore a file — writes an append-only audit row. The object
+  // is NEVER removed from storage; it is only hidden from the normal list and
+  // recoverable via restore. Opt-in per DocLibrary via opts.canArchive.
+  function _markArchived(opts, path, name, archive) {
+    var url = opts.supabaseUrl + '/rest/v1/' + opts.auditTable;
+    var actor = (typeof opts.getActor === 'function' && opts.getActor()) || 'staff';
+    var detailPayload = { path:path, name:name };
+    return fetch(url, {
+      method:'POST',
+      headers: _restHeaders(opts),
+      body: JSON.stringify({
+        entity_type: opts.entityType,
+        entity_id:   String(opts.entityId),
+        action:      archive ? 'file_archived' : 'file_restored',
         detail:      opts.detailAsJson ? detailPayload : JSON.stringify(detailPayload),
         actor:       actor,
         created_at:  new Date().toISOString()
@@ -1379,7 +1410,8 @@ window.DocLibrary = (function(){
       filter: 'all',      // category key or 'all'
       uploadCategory: opts.categories[0].key,
       uploading: false,
-      error: null
+      error: null,
+      showArchived: false // when opts.canArchive: toggles the archived-files view
     };
 
     // Build DOM once
@@ -1388,30 +1420,46 @@ window.DocLibrary = (function(){
     mountEl.appendChild(root);
 
     function render() {
-      var hasFiles = state.files.length > 0;
+      // Archived files are hidden from the normal list everywhere; the archived
+      // view (and the archive/restore actions) is only offered when canArchive.
+      var activeFiles   = state.files.filter(function(f){ return !f.archived; });
+      var archivedFiles = state.files.filter(function(f){ return f.archived; });
+      var inArchived = !!(opts.canArchive && state.showArchived);
+      var viewFiles = inArchived ? archivedFiles : activeFiles;
+
+      var hasFiles = viewFiles.length > 0;
       var filtered = state.filter === 'all'
-        ? state.files
-        : state.files.filter(function(f){ return f.category === state.filter; });
-      var totalCount = state.files.length;
+        ? viewFiles
+        : viewFiles.filter(function(f){ return f.category === state.filter; });
+      var totalCount = viewFiles.length;
       var shownCount = filtered.length;
 
       var catByKey = {};
       opts.categories.forEach(function(c){ catByKey[c.key] = c; });
 
-      // Header
+      // Header (+ optional archived-view toggle when the viewer may archive)
+      var archiveToggleHTML = '';
+      if (opts.canArchive) {
+        archiveToggleHTML = inArchived
+          ? '<button type="button" class="btn btn-ghost btn-sm" data-dl-arch-toggle>\u2190 Back to active</button>'
+          : (archivedFiles.length
+              ? '<button type="button" class="btn btn-ghost btn-sm" data-dl-arch-toggle>\uD83D\uDDC4 Archived ('+archivedFiles.length+')</button>'
+              : '');
+      }
       var headerHTML =
         '<div class="std-table-hdr">' +
           '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
-            '<h3 style="margin:0;font-size:15px;font-weight:700;">Documents</h3>' +
+            '<h3 style="margin:0;font-size:15px;font-weight:700;">Documents' + (inArchived ? ' \u00B7 Archived' : '') + '</h3>' +
             '<span class="std-table-count">' +
               (shownCount === totalCount ? totalCount + ' total' : shownCount + ' shown \u00B7 ' + totalCount + ' total') +
             '</span>' +
           '</div>' +
+          (archiveToggleHTML ? '<div>'+archiveToggleHTML+'</div>' : '') +
         '</div>';
 
-      // Upload area (skipped when readOnly)
+      // Upload area (skipped when readOnly or viewing the archived list)
       var uploadHTML = '';
-      if (!opts.readOnly) {
+      if (!opts.readOnly && !inArchived) {
         var catOptions = opts.categories.map(function(c){
           var sel = c.key === state.uploadCategory ? ' selected' : '';
           return '<option value="'+_escAttr(c.key)+'"'+sel+'>'+(c.icon?c.icon+' ':'')+_escHtml(c.label)+'</option>';
@@ -1469,7 +1517,7 @@ window.DocLibrary = (function(){
                 'style="width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);display:none;">'
             : '<span style="font-size:16px;">'+_iconForType(f.type)+'</span>';
           var categoryCell;
-          if (opts.readOnly) {
+          if (opts.readOnly || inArchived) {
             categoryCell = '<span class="std-pill std-pill-info">' + (cat.icon?cat.icon+' ':'') + _escHtml(cat.label) + '</span>';
           } else {
             var catOpts = opts.categories.map(function(c){
@@ -1492,7 +1540,13 @@ window.DocLibrary = (function(){
             '<td class="std-cell-right std-cell-mono">'+_fmtBytes(f.size)+'</td>' +
             '<td class="std-cell-tail" style="white-space:nowrap;">' +
               '<button class="btn btn-ghost btn-sm" data-dl-view="'+_escAttr(f.path)+'">View</button>' +
-              (opts.readOnly ? '' : ' <button class="btn btn-ghost btn-sm" style="color:var(--danger);" data-dl-del="'+_escAttr(f.path)+'" data-dl-del-name="'+_escAttr(f.name)+'">Delete</button>') +
+              (inArchived
+                ? (opts.canArchive ? ' <button class="btn btn-ghost btn-sm" data-dl-restore="'+_escAttr(f.path)+'" data-dl-restore-name="'+_escAttr(f.name)+'">Restore</button>' : '')
+                : (
+                    (opts.canArchive ? ' <button class="btn btn-ghost btn-sm" data-dl-arch="'+_escAttr(f.path)+'" data-dl-arch-name="'+_escAttr(f.name)+'">Archive</button>' : '') +
+                    (opts.readOnly ? '' : ' <button class="btn btn-ghost btn-sm" style="color:var(--danger);" data-dl-del="'+_escAttr(f.path)+'" data-dl-del-name="'+_escAttr(f.name)+'">Delete</button>')
+                  )
+              ) +
             '</td>' +
           '</tr>';
         }).join('');
@@ -1519,6 +1573,37 @@ window.DocLibrary = (function(){
       // Chip click
       root.querySelectorAll('[data-dl-chip]').forEach(function(btn){
         btn.onclick = function(){ state.filter = btn.getAttribute('data-dl-chip'); render(); };
+      });
+      // Archived-view toggle
+      var archToggle = root.querySelector('[data-dl-arch-toggle]');
+      if (archToggle) archToggle.onclick = function(){ state.showArchived = !state.showArchived; state.filter = 'all'; render(); };
+      // Archive a file (soft-hide, recoverable)
+      root.querySelectorAll('[data-dl-arch]').forEach(function(btn){
+        btn.onclick = function(){
+          var p = btn.getAttribute('data-dl-arch');
+          var n = btn.getAttribute('data-dl-arch-name');
+          btn.disabled = true;
+          _markArchived(opts, p, n, true).then(function(){
+            var file = state.files.find(function(f){ return f.path === p; });
+            if (file) file.archived = true;
+            if (typeof opts.onChange === 'function') opts.onChange('archive', file);
+            render();
+          }).catch(function(){ _setError('Could not archive that file.'); btn.disabled = false; });
+        };
+      });
+      // Restore an archived file
+      root.querySelectorAll('[data-dl-restore]').forEach(function(btn){
+        btn.onclick = function(){
+          var p = btn.getAttribute('data-dl-restore');
+          var n = btn.getAttribute('data-dl-restore-name');
+          btn.disabled = true;
+          _markArchived(opts, p, n, false).then(function(){
+            var file = state.files.find(function(f){ return f.path === p; });
+            if (file) file.archived = false;
+            if (typeof opts.onChange === 'function') opts.onChange('restore', file);
+            render();
+          }).catch(function(){ _setError('Could not restore that file.'); btn.disabled = false; });
+        };
       });
       // Category dropdown (upload)
       var cat = root.querySelector('[data-dl-cat]');
