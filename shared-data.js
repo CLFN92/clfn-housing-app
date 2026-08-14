@@ -3946,7 +3946,9 @@ async function _sbEditStaffModal(id) {
               }).join('');
             })()
           +'</div></div>'
-        +'<div class="box-bg-card txt-help">Role + feature changes take effect the next time this staff member signs in. Restricting features hides those functions and blocks their pages; it does not grant approval rights (set separately in Approval Authority).</div>'
+        +'<div class="f"><label>Access Expires <span style="font-weight:normal;color:var(--muted);">— optional; blank = no expiry</span></label>'
+          +'<input type="date" id="edit_staff_expires" value="'+escapeHtml(String(u.access_expires_at||'').slice(0,10))+'"/></div>'
+        +'<div class="box-bg-card txt-help">Role + feature changes take effect the next time this staff member signs in. Restricting features hides those functions and blocks their pages; it does not grant approval rights (set separately in Approval Authority). Access Expires denies sign-in after that date (reversible — clear or extend it to restore).</div>'
       +'</div>'
       +'<div class="modal-footer">'
         +'<button id="editStaffCancel" class="btn btn-ghost">Cancel</button>'
@@ -8192,6 +8194,19 @@ async function saveStaffEdit(id, original, modal) {
         if(!fr.ok) console.warn('[feature-access] save skipped — run the staff.feature_access migration', fr.status);
         else auditEntry('SETTINGS', 'settings_user_features', 'Feature access for '+name+': '+(featureAccess?featureAccess.join(', '):'full access'), window.currentRole||'ed');
       } catch(e){ console.warn('[feature-access] save error', e); }
+      // Access expiry — separate best-effort PATCH so it can't block the
+      // feature/role save if the access_expires_at column isn't migrated yet.
+      try {
+        var expEl2 = document.getElementById('edit_staff_expires');
+        var expVal = (expEl2 && expEl2.value) ? expEl2.value : null;
+        var er = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id, {
+          method: 'PATCH',
+          headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+          body: JSON.stringify({ access_expires_at: expVal })
+        });
+        if(!er.ok) console.warn('[access-expiry] save skipped — run the staff.access_expires_at migration', er.status);
+        else auditEntry('SETTINGS', 'settings_user_expiry', 'Access expiry for '+name+': '+(expVal||'none'), window.currentRole||'ed');
+      } catch(e){ console.warn('[access-expiry] save error', e); }
       modal.remove();
       showToast('✓ Staff member updated');
       auditEntry('SETTINGS', 'settings_user_edit', 'Staff updated: '+name+' — role set to '+hrole, window.currentRole||'ed');

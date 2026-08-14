@@ -305,6 +305,7 @@ async function completeMagicLinkSignIn(h) {
     HOUSING_SESSION.name  = (user.user_metadata && user.user_metadata.full_name) || email;
 
     await resolveHousingRole();
+    if (window._accessExpired) return;   // expired -> resolveHousingRole redirected
     _stampStaffLastLogin(email);
     try {
       sessionStorage.setItem('clfn_housing_role',          window.currentRole || '');
@@ -504,6 +505,9 @@ async function startSignIn() {
 
     // Resolve role from the staff table — this is the real authorization gate
     await resolveHousingRole();
+    // resolveHousingRole redirects to the login page if access has expired; bail
+    // here so we don't race it with the hand-off to housing.html.
+    if (window._accessExpired) { if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; } return; }
 
     // Stamp last_login_at on the staff row. Fire-and-forget — a slow PATCH
     // must not delay the redirect to housing.html. Relies on RLS allowing a
@@ -629,6 +633,12 @@ function initLoginPage() {
       var banner = document.getElementById('timeout-banner');
       if (banner) banner.style.display = 'block';
       // Strip the param so a refresh doesn't keep showing the banner
+      history.replaceState(null, '', window.location.pathname);
+    }
+    // Access-expired notice — redirected here by _denyExpiredAccess()
+    if (urlParams.get('expired') === '1') {
+      var expEl = document.getElementById('signin-error');
+      if (expEl) { expEl.textContent = 'Your access has expired. Please contact the housing office.'; expEl.style.display = 'block'; }
       history.replaceState(null, '', window.location.pathname);
     }
   } catch(e) {}

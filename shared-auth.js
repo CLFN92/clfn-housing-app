@@ -183,6 +183,12 @@ async function resolveHousingRole() {
     var rows = r.ok ? await r.json() : [];
     if (rows && rows.length) {
       var staffRow    = rows[0];
+
+      // Access expiry (Phase FA): deny past the expiry date, regardless of auth
+      // method (password or magic link). Deny-by-date only — is_active is not
+      // touched, so extending the date restores access immediately.
+      if (_isStaffExpired(staffRow)) { _denyExpiredAccess(); return; }
+
       var housingRole = (typeof sbMapRole === 'function')
         ? sbMapRole(staffRow)
         : (staffRow.role || 'housing_employee_l1');
@@ -227,6 +233,35 @@ async function resolveHousingRole() {
     window._booting = false;
   }
 }
+
+// ── Access expiry (deny-by-date) ──────────────────────────────────────────────
+// True when the staff row carries an access_expires_at date that has passed.
+// The date is INCLUSIVE — access works through the whole of that local day —
+// so we deny only once the clock is at/after the following local midnight.
+function _isStaffExpired(row) {
+  var v = row && row.access_expires_at;
+  if (!v) return false;
+  var m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return false;
+  var endOfDay = new Date(+m[1], (+m[2]) - 1, (+m[3]) + 1).getTime();
+  return Date.now() >= endOfDay;
+}
+// Mirror the idle-logout teardown: clear tokens synchronously, fire logout
+// detached, redirect to the login page with an expired notice. Sets a flag so an
+// in-flight sign-in caller can bail instead of racing a redirect to the app.
+function _denyExpiredAccess() {
+  window._accessExpired = true;
+  try { if (typeof _clearLocalClientState === 'function') _clearLocalClientState(); } catch (e) {}
+  try {
+    ['clfn_housing_token','clfn_housing_refresh','clfn_housing_token_exp',
+     'clfn_housing_role','clfn_housing_name','clfn_housing_email_session']
+      .forEach(function(k){ try { sessionStorage.removeItem(k); } catch (e) {} });
+  } catch (e) {}
+  try { if (typeof doLogout === 'function') doLogout(); } catch (e) {}
+  try { window.location.href = 'index.html?expired=1'; } catch (e) {}
+}
+window._isStaffExpired = _isStaffExpired;
+window._denyExpiredAccess = _denyExpiredAccess;
 
 // ── _enforcePageFeature ───────────────────────────────────────────────────────
 // Redirect a feature-restricted user off a page whose function they aren't
