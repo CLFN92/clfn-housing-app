@@ -5348,6 +5348,24 @@ function setStaffFilter(which) {
   renderHousingUserTable();
 }
 
+// Access-expiry status chip for the Users table. '' when no expiry is set;
+// red "Expired" once past; amber "Expires <date> (Nd)" within 14 days; a neutral
+// "Expires <date>" otherwise.
+function _staffExpiryChip(u){
+  var v = u && u.access_expires_at;
+  if(!v) return '';
+  var s = String(v).slice(0,10);
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return '';
+  var endOfDay = new Date(+m[1],(+m[2])-1,(+m[3])+1).getTime();
+  var now = Date.now();
+  var days = Math.ceil((endOfDay - now)/86400000);
+  var style, label;
+  if(now >= endOfDay){ style='background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;'; label='Expired'; }
+  else if(days <= 14){ style='background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;'; label='Expires '+s+' ('+days+'d)'; }
+  else { style='background:#f4f4f0;color:#555;border:1px solid var(--border);'; label='Expires '+s; }
+  return '<span title="Access expiry" style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;'+style+'">🕒 '+label+'</span>';
+}
 async function renderHousingUserTable(){
   var tbody = document.getElementById('userTableBody');
   if(!tbody) return;
@@ -5437,7 +5455,9 @@ async function renderHousingUserTable(){
         + '>'+escapeHtml(_fmtRelativeTime(lastLogin))+'</td>';
       return '<tr>'
         +'<td class="std-row-avatar-cell"><div class="std-row-avatar">'+escapeHtml(initials)+'</div></td>'
-        +'<td style="font-weight:600;">'+escapeHtml(u.name)+'</td>'
+        +'<td style="font-weight:600;">'+escapeHtml(u.name)
+          + (function(){ var c=_staffExpiryChip(u); return c ? '<div style="margin-top:3px;">'+c+'</div>' : ''; })()
+        +'</td>'
         +'<td style="color:var(--muted);font-size:12px;">'+escapeHtml(u.email)+'</td>'
         +'<td><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:'+rc.bg+';color:'+rc.c+';">'+escapeHtml(rl)+'</span></td>'
         +lastLoginCell
