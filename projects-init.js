@@ -1005,12 +1005,14 @@ function _prjRenderCosts() {
       var m = ms.find(function(x){ return x.id === e.milestoneId; });
       msName = m ? (m.name || '(unnamed)') : '';
     }
-    var claimed = _prjExpClaim(e);
-    // Selection cell: checkbox for unclaimed rows (builds the next payment
-    // request); a lock for rows already included in one.
-    var selCell = claimed
-      ? '<span title="Included in payment request ' + _prjEsc(claimed.number) + '" style="font-size:13px;">🔒</span>'
-      : '<input type="checkbox"' + (window._prjReqSel[e.id] ? ' checked' : '') + ' title="Include in the next payment request" onchange="_prjReqToggle(\'' + _prjEsc(e.id) + '\', this.checked)" style="accent-color:var(--yellow);width:15px;height:15px;cursor:pointer;"/>';
+    var claims = _prjExpClaims(e);
+    var claimNums = claims.map(function(r){ return r.number || 'REQ-?'; }).join(', ');
+    // Selection cell: always a checkbox — a line already claimed can be
+    // included in another funder's claim (cost-sharing / partial claims),
+    // so claimed rows are badged, not locked.
+    var selCell = '<input type="checkbox"' + (window._prjReqSel[e.id] ? ' checked' : '') +
+      ' title="' + (claims.length ? 'Already claimed in ' + _prjEsc(claimNums) + ' — tick to include in another claim' : 'Include in the next payment request') + '"' +
+      ' onchange="_prjReqToggle(\'' + _prjEsc(e.id) + '\', this.checked)" style="accent-color:var(--yellow);width:15px;height:15px;cursor:pointer;"/>';
 
     // Funder-compliance documents: invoice + proof of payment (EFT) + bank
     // statement proof, one chip per slot.
@@ -1019,15 +1021,15 @@ function _prjRenderCosts() {
     var docStatus = attachedCount === PRJ_EXP_DOC_KINDS.length
       ? '<span style="font-size:11px;color:#15803d;font-weight:600;white-space:nowrap;">✓ Docs complete</span>'
       : '<span style="font-size:11px;color:var(--warn-amber-text,#b45309);white-space:nowrap;">' + attachedCount + ' of ' + PRJ_EXP_DOC_KINDS.length + ' docs</span>';
-    var claimedBadge = claimed
-      ? '<span style="font-size:11px;font-weight:700;color:#1d4ed8;background:#eff6ff;border-radius:10px;padding:2px 8px;white-space:nowrap;">Claimed · ' + _prjEsc(claimed.number) + '</span>'
+    var claimedBadge = claims.length
+      ? '<span style="font-size:11px;font-weight:700;color:#1d4ed8;background:#eff6ff;border-radius:10px;padding:2px 8px;white-space:nowrap;">Claimed · ' + _prjEsc(claimNums) + '</span>'
       : '';
 
     var vendorInfo = [e.vendorAddress, e.vendorPhone].filter(Boolean).join(' · ');
     var vendorCell = e.contractorId
       ? '<a href="contractors.html?openContractor=' + encodeURIComponent(e.contractorId) + '" title="Open the contractor file' + (vendorInfo ? ' — ' + _prjEsc(vendorInfo) : '') + '" style="color:var(--text);text-decoration:underline;">🔗 ' + _prjEsc(e.vendor || '—') + '</a>'
       : '<span' + (vendorInfo ? ' title="' + _prjEsc(vendorInfo) + '"' : '') + '>' + _prjEsc(e.vendor || '—') + '</span>';
-    return '<div class="prj-row prj-row-exp' + (claimed ? ' prj-row-claimed' : '') + '">' +
+    return '<div class="prj-row prj-row-exp' + (claims.length ? ' prj-row-claimed' : '') + '">' +
       '<div>' + selCell + '</div>' +
       '<div style="font-size:12px;white-space:nowrap;">' + _prjEsc(e.date || '—') + '</div>' +
       '<div style="font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;">' + vendorCell + '</div>' +
@@ -1307,8 +1309,9 @@ async function _prjExpAdd() {
 function _prjExpRemove(i) {
   var exp = window._prjDraft.data.expenses;
   if (!exp || !exp[i]) return;
-  if (exp[i].claimedIn) {
-    showToast('This cost line is part of payment request ' + (exp[i].claimedNumber || '') + ' — undo that request first', { type: 'error' });
+  var inClaims = _prjExpClaims(exp[i]);
+  if (inClaims.length) {
+    showToast('This cost line is part of payment request ' + inClaims.map(function(r){ return r.number; }).join(', ') + ' — undo ' + (inClaims.length === 1 ? 'that request' : 'those requests') + ' first', { type: 'error' });
     return;
   }
   var doIt = function() { delete window._prjReqSel[exp[i].id]; exp.splice(i, 1); _prjRenderCosts(); _prjRefreshStrip(); _prjScheduleAutoSave(); };
@@ -1458,11 +1461,17 @@ function _prjExpDoc(e, kind) {
   return null;
 }
 
-function _prjExpClaim(e) {
-  if (!e.claimedIn) return null;
+// All payment requests that include this expense — derived from
+// paymentRequests[].expenseIds (the source of truth), NOT a flag on the
+// expense. One cost line can legitimately appear in more than one funder
+// claim (cost-shared projects billing two funders, or a partial claim
+// followed by the remainder), so lines are never hard-locked after their
+// first claim. The legacy per-expense claimedIn/claimedNumber fields are no
+// longer written; old rows are still covered because every stored request
+// has always carried expenseIds.
+function _prjExpClaims(e) {
   var reqs = (window._prjDraft && window._prjDraft.data.paymentRequests) || [];
-  var req = reqs.find(function(r){ return r.id === e.claimedIn; });
-  return req || { id: e.claimedIn, number: e.claimedNumber || 'REQ-?' };
+  return reqs.filter(function(r){ return (r.expenseIds || []).indexOf(e.id) !== -1; });
 }
 
 function _prjDocChip(e, i, kind, label) {
@@ -1646,8 +1655,12 @@ function _prjUnlinkExpenseDoc(i, kind) {
 // ── Payment requests (claims to funders) ─────────────────────────────────────
 // Staff tick cost lines, pick the grant being billed, and export: a PDF claim
 // summary sheet plus every attached compliance document downloads, and the
-// included lines are marked "Claimed" with the request number so nothing is
-// double-claimed. Stored in data.paymentRequests[]:
+// included lines are badged "Claimed" with the request number(s). Lines are
+// NOT locked after a claim — the same cost can appear in more than one
+// request (cost-shared projects billing two funders, or a partial claim
+// then the remainder); an info box in the modal flags re-claimed lines so a
+// same-funder double bill is a deliberate act. Stored in
+// data.paymentRequests[]:
 //   { id, number (REQ-NN within the project), date, grantId|null, funder,
 //     grantReference, expenseIds[], total, createdBy, createdAt }
 
@@ -1659,7 +1672,7 @@ function _prjReqToggle(expId, checked) {
 
 function _prjSelectedExpenses() {
   var exp = (window._prjDraft && window._prjDraft.data.expenses) || [];
-  return exp.filter(function(e){ return window._prjReqSel[e.id] && !e.claimedIn; });
+  return exp.filter(function(e){ return window._prjReqSel[e.id]; });
 }
 
 function _prjPaymentRequestSectionHtml() {
@@ -1707,6 +1720,11 @@ function _prjOpenPaymentRequestModal() {
   var missingDocs = sel.filter(function(e) {
     return PRJ_EXP_DOC_KINDS.some(function(k){ return !_prjExpDoc(e, k.k); });
   });
+  // Lines already in another claim: allowed (cost-sharing between funders /
+  // partial claims), but warn so a straight double-bill is a deliberate act.
+  var reClaimed = sel.filter(function(e){ return _prjExpClaims(e).length > 0; });
+  var reClaimedNums = {};
+  reClaimed.forEach(function(e) { _prjExpClaims(e).forEach(function(r){ reClaimedNums[r.number || 'REQ-?'] = true; }); });
 
   var grantPicker = grants.length
     ? '<div class="f"><label>Bill against grant</label><select id="prj_req_grant" class="tic-input">' +
@@ -1729,6 +1747,9 @@ function _prjOpenPaymentRequestModal() {
         '</div>' +
         (missingDocs.length
           ? '<div style="margin-top:12px;padding:10px 14px;background:var(--warn-amber-bg,#fffbeb);border:1px solid var(--warn-amber-border,#fde68a);border-radius:8px;font-size:12px;color:var(--warn-amber-text,#b45309);">⚠️ ' + missingDocs.length + ' of the selected cost line' + (missingDocs.length === 1 ? ' is' : 's are') + ' missing compliance documents (invoice / EFT / bank proof). You can still export, but the funder may reject the claim.</div>'
+          : '') +
+        (reClaimed.length
+          ? '<div style="margin-top:12px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:12px;color:#1d4ed8;">ℹ️ ' + reClaimed.length + ' of the selected cost line' + (reClaimed.length === 1 ? ' was' : 's were') + ' already claimed in ' + _prjEsc(Object.keys(reClaimedNums).join(', ')) + '. Including a line in a second claim is for cost-shared projects (billing another funder) or completing a partial claim — make sure this is not a double bill to the same funder.</div>'
           : '') +
         '<div style="margin-top:12px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">' +
           sel.map(function(e) {
@@ -1792,7 +1813,8 @@ async function _prjRunPaymentRequest() {
     createdAt: new Date().toISOString(),
   };
   d.data.paymentRequests.push(req);
-  sel.forEach(function(e) { e.claimedIn = req.id; e.claimedNumber = req.number; });
+  // Claim membership is derived from req.expenseIds (see _prjExpClaims) —
+  // the legacy per-expense claimedIn/claimedNumber flags are not written.
 
   try {
     await _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false);
@@ -1800,9 +1822,8 @@ async function _prjRunPaymentRequest() {
   } catch(e) {
     console.warn('[Projects] payment request save:', e);
     showToast('Could not save the payment request — nothing was marked', { type: 'error' });
-    // Roll back the in-memory marking so the UI matches the server.
+    // Roll back the in-memory request so the UI matches the server.
     d.data.paymentRequests = d.data.paymentRequests.filter(function(r){ return r.id !== req.id; });
-    sel.forEach(function(e) { delete e.claimedIn; delete e.claimedNumber; });
     if (btn) { btn.disabled = false; btn.textContent = '📤 Export & Mark Claimed'; }
     return;
   }
@@ -2158,7 +2179,7 @@ function _prjBuildStatusReportPdf(d) {
   var reqs = data.paymentRequests || [];
   if (reqs.length || exp.length) {
     var claimedTotal = reqs.reduce(function(s, r){ return s + (Number(r.total) || 0); }, 0);
-    var unclaimed = exp.filter(function(e){ return !e.claimedIn; })
+    var unclaimed = exp.filter(function(e){ return _prjExpClaims(e).length === 0; })
                        .reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0);
     section('Payment Requests to Funders', {
       head: [['Request', 'Date', 'Funder', 'Reference', 'Lines', 'Amount']],
