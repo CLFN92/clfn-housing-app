@@ -229,46 +229,12 @@ function _parseAuthHash() {
 }
 
 // ── Magic-link (passwordless) sign-in ─────────────────────────────────────────
-// "Email me a sign-in link" -> Supabase GoTrue /otp with create_user:false, so a
-// link is only mailed to an EXISTING auth user (no account creation, no email
-// enumeration). The emailed link returns to THIS page with the session tokens in
-// the URL fragment; completeMagicLinkSignIn() picks them up. Access is still
-// hard-gated on an ACTIVE staff row, so mailbox possession alone is not enough.
-async function sendMagicLink() {
-  var email  = ((document.getElementById('signin-email') || {}).value || '').trim().toLowerCase();
-  var errEl  = document.getElementById('signin-error');
-  var infoEl = document.getElementById('signin-info');
-  var btn    = document.getElementById('magic-link-btn');
-  if (errEl)  errEl.style.display  = 'none';
-  if (infoEl) infoEl.style.display = 'none';
-  if (!email) {
-    if (errEl) { errEl.textContent = 'Enter your email first, then request a link.'; errEl.style.display = 'block'; }
-    return;
-  }
-  var _domain = '@' + ((window.NATION_CONFIG && NATION_CONFIG.email_domain) || 'clfn.on.ca');
-  if (!email.endsWith(_domain)) {
-    if (errEl) { errEl.textContent = 'Sign-in links are available for your organization email address.'; errEl.style.display = 'block'; }
-    return;
-  }
-  if (btn) { btn.disabled = true; btn.textContent = 'Sending link…'; }
-  try {
-    var redirectTo = window.location.origin + window.location.pathname;
-    await fetch(SUPABASE_URL + '/auth/v1/otp?redirect_to=' + encodeURIComponent(redirectTo), {
-      method:  'POST',
-      headers: HOUSING_HEADERS,
-      body:    JSON.stringify({ email: email, create_user: false })
-    });
-    // GoTrue returns 200 whether or not the user exists (no enumeration) — always
-    // show the same neutral confirmation.
-    if (infoEl) { infoEl.textContent = 'If that address has an account, a sign-in link is on its way. It expires shortly — open it on this device.'; infoEl.style.display = 'block'; }
-  } catch (e) {
-    console.warn('[MAGIC LINK] send failed:', e);
-    if (errEl) { errEl.textContent = 'Could not send the link right now. Please try again.'; errEl.style.display = 'block'; }
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Email me a sign-in link instead'; }
-  }
-}
-
+// Magic links are ISSUED FROM INSIDE THE APP by an authorized admin (Settings ->
+// Users -> "Send Sign-in Link"), NOT self-requested from this login screen — so
+// there is no public "email me a link" affordance. The emailed link returns to
+// this page with the session tokens in the URL fragment; completeMagicLinkSignIn()
+// picks them up and hard-gates on an ACTIVE staff row that is magic_link-enabled.
+//
 // Complete a magic-link return: strip the tokens from the URL, identify the
 // user, confirm an ACTIVE staff row exists, apply the session, resolve role, and
 // hand off. Rejects back to login if the link is invalid/expired or the email is
@@ -326,7 +292,6 @@ async function completeMagicLinkSignIn(h) {
     if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
   }
 }
-window.sendMagicLink = sendMagicLink;
 
 function showResetPasswordPanel() {
   var p = document.getElementById('signin-panel');

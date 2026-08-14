@@ -3897,6 +3897,35 @@ async function sendStaffPasswordReset(email, btn){
     if(btn){btn.disabled=false; btn.textContent='Send Reset';}
   }
 }
+// Issue a passwordless magic-link sign-in email to a magic-link-enabled user.
+// Admin-only, in-app — there is no public self-request. If a consultant's link
+// expires, they ask an admin to send a new one from Settings -> Users.
+async function sendStaffMagicLink(email, btn){
+  if(!email){ showToast('No email on file'); return; }
+  if(typeof APPROVAL_AUTHORITY !== 'undefined' && !APPROVAL_AUTHORITY.can('manageStaffRecord', window.currentRole)){
+    showToast('Not permitted'); return;
+  }
+  if(btn){ btn.disabled=true; btn.textContent='Sending…'; }
+  try {
+    var redirectTo = window.location.origin + '/index.html';
+    var r = await fetch(SUPABASE_URL + '/auth/v1/otp?redirect_to=' + encodeURIComponent(redirectTo), {
+      method:  'POST',
+      headers: { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email: email, create_user: false })
+    });
+    if(r.status === 429){ showToast('Too many attempts — try again in a few minutes'); }
+    else if(!r.ok){ showToast('Could not send sign-in link — try again'); }
+    else {
+      showToast('Sign-in link sent to '+email);
+      auditEntry('SETTINGS','settings_user_send_magic_link','Magic-link sign-in link sent to '+email, window.currentRole||'ed');
+    }
+  } catch(e){
+    showToast('Error: '+e.message);
+  } finally {
+    if(btn){ btn.disabled=false; btn.textContent='Send Sign-in Link'; }
+  }
+}
+window.sendStaffMagicLink = sendStaffMagicLink;
 async function _sbEditStaffModal(id) {
   // Fetch current staff record
   var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id+'&select=*', { headers: HOUSING_HEADERS });
@@ -5444,10 +5473,15 @@ async function renderHousingUserTable(){
             +'<button onclick="reactivateStaff('+u.id+',this)" class="btn btn-sm btn-primary">Reactivate</button>'
             +'</div>';
         } else {
-          // Active: Edit + Send Reset + Deactivate.
+          // Active: Edit + (Send Reset | Send Sign-in Link) + Deactivate.
+          // Magic-link users sign in by an admin-issued link, so they get
+          // "Send Sign-in Link" instead of the password-reset action.
+          var _sendBtn = (u.magic_link === true)
+            ? '<button onclick="sendStaffMagicLink(\''+escapeHtml(u.email)+'\',this)" class="btn btn-ghost btn-sm">Send Sign-in Link</button>'
+            : '<button onclick="sendStaffPasswordReset(\''+escapeHtml(u.email)+'\',this)" class="btn btn-ghost btn-sm">Send Reset</button>';
           actionsHtml = '<div class="flex-end gap-8">'
             +'<button onclick="_sbEditStaffModal('+u.id+')" class="btn btn-ghost btn-sm">Edit</button>'
-            +'<button onclick="sendStaffPasswordReset(\''+escapeHtml(u.email)+'\',this)" class="btn btn-ghost btn-sm">Send Reset</button>'
+            +_sendBtn
             +'<button onclick="deactivateStaff('+u.id+',this)" class="btn btn-sm" style="border-color:var(--danger-border);color:var(--danger);">Deactivate</button>'
             +'</div>';
         }
