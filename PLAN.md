@@ -866,7 +866,10 @@ allocating the project total across delivered units to set each unit's cost.
   batches), so attaching an EFT/bank/invoice doc now offers **"link
   existing"** (picker over same-kind docs on other cost lines, deduped by
   path; audited `project_expense_doc_linked`) instead of forcing duplicate
-  uploads, and the claim export downloads each unique file once. Phone
+  uploads, and the claim export downloads each unique file once. The claim
+  summary PDF numbers the cost lines and adds a **Supporting Documents
+  index** (one row per unique file, `REQ-NN_` download name, type, covered
+  line numbers) plus a note explaining shared files to the funder. Phone
   layout fixes for the milestone rows + modal footer (PR #43).
 - ✅ v1.3 **project status report** — "📄 Status Report" in the modal footer
   generates a one-click jsPDF+autotable snapshot (summary, description,

@@ -1913,30 +1913,66 @@ function _prjGenerateRequestPdf(req, exp) {
         doc.text('Department #: ' + (d.data.deptNumber || '—') + '    PO #: ' + (d.data.poNumber || '—'), 14, y); y += 5;
         doc.text('Prepared by: ' + ((window.HOUSING_SESSION && (HOUSING_SESSION.name || HOUSING_SESSION.email)) || ''), 14, y); y += 4;
 
-        var rows = exp.map(function(e) {
+        var rows = exp.map(function(e, idx) {
           var docsCol = PRJ_EXP_DOC_KINDS.map(function(k) {
             return (k.k === 'invoice' ? 'Inv' : k.k === 'eft' ? 'EFT' : 'Bank') + (_prjExpDoc(e, k.k) ? ' Y' : ' -');
           }).join('  ');
           var vendorCol = (e.vendor || '') +
             ((e.vendorAddress || e.vendorPhone) ? '\n' + [e.vendorAddress, e.vendorPhone].filter(Boolean).join(' / ') : '');
-          return [e.date || '', vendorCol, e.description || '', '$' + (Number(e.amount) || 0).toFixed(2), docsCol];
+          return [String(idx + 1), e.date || '', vendorCol, e.description || '', '$' + (Number(e.amount) || 0).toFixed(2), docsCol];
         });
-        rows.push(['', '', 'TOTAL REQUESTED', '$' + (Number(req.total) || 0).toFixed(2), '']);
+        rows.push(['', '', '', 'TOTAL REQUESTED', '$' + (Number(req.total) || 0).toFixed(2), '']);
 
         doc.autoTable({
           startY: y + 2,
-          head: [['Date', 'Vendor / Payee', 'Description', 'Amount', 'Docs attached']],
+          head: [['#', 'Date', 'Vendor / Payee', 'Description', 'Amount', 'Docs attached']],
           body: rows,
           theme: 'striped',
           headStyles: { fillColor: [17, 17, 15], textColor: [248, 228, 26], fontSize: 8, fontStyle: 'bold' },
           bodyStyles: { fontSize: 8 },
-          columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 40 }, 2: { cellWidth: 60 }, 3: { cellWidth: 24, halign: 'right' }, 4: { cellWidth: 38 } },
+          columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 20 }, 2: { cellWidth: 38 }, 3: { cellWidth: 56 }, 4: { cellWidth: 24, halign: 'right' }, 5: { cellWidth: 36 } },
           margin: { left: 14, right: 14 },
         });
 
+        // Supporting-document index: one row per unique file in the download
+        // package, mapped to the cost line(s) it covers — so a shared EFT
+        // batch or bank statement is explained to the funder rather than
+        // looking like a missing per-line document.
+        var byPath = {};
+        PRJ_EXP_DOC_KINDS.forEach(function(kd) {
+          exp.forEach(function(e, idx) {
+            var dd = _prjExpDoc(e, kd.k);
+            if (!dd || !dd.path) return;
+            if (!byPath[dd.path]) byPath[dd.path] = { name: dd.name || 'document', kind: kd.label, lines: [] };
+            byPath[dd.path].lines.push(idx + 1);
+          });
+        });
+        var docRows = Object.keys(byPath).map(function(p) {
+          var r = byPath[p];
+          return [req.number + '_' + r.name, r.kind, 'Line' + (r.lines.length > 1 ? 's' : '') + ' ' + r.lines.join(', ')];
+        });
+        if (docRows.length) {
+          var dy = doc.lastAutoTable.finalY + 8;
+          if (dy > 235) { doc.addPage(); dy = 20; }
+          doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+          doc.text('Supporting Documents in this Package', 14, dy);
+          doc.autoTable({
+            startY: dy + 2,
+            head: [['File (as downloaded)', 'Type', 'Covers cost line(s)']],
+            body: docRows,
+            theme: 'striped',
+            headStyles: { fillColor: [17, 17, 15], textColor: [248, 228, 26], fontSize: 8, fontStyle: 'bold' },
+            bodyStyles: { fontSize: 8 },
+            columnStyles: { 0: { cellWidth: 92 }, 1: { cellWidth: 32 }, 2: { cellWidth: 58 } },
+            margin: { left: 14, right: 14 },
+          });
+        }
+
         var fy = doc.lastAutoTable.finalY + 8;
-        doc.setFontSize(8);
-        doc.text('Supporting documents (invoice, EFT payment confirmation, bank statement proof) accompany this summary.', 14, fy); fy += 10;
+        doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+        doc.text('Each cost line is supported by its invoice, EFT payment confirmation, and bank statement proof (see index above).', 14, fy); fy += 4;
+        doc.text('A document listed against multiple lines is one shared file — e.g. an EFT batch paying several invoices, or a bank', 14, fy); fy += 4;
+        doc.text('statement covering several payments — and is included once in the package.', 14, fy); fy += 10;
         if (fy > 240) { doc.addPage(); fy = 20; }
         doc.setDrawColor(150, 150, 150);
         doc.line(14, fy + 12, 90, fy + 12);
