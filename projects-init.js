@@ -446,6 +446,76 @@ function openPrjModal(id) {
   if (typeof _initScrollCollapse === 'function') {
     _initScrollCollapse(modal.querySelector('.tic-body'), modal.querySelector('.tic-strip'));
   }
+
+  // Auto-save: any field edit inside the tab body schedules a silent save
+  // (saved projects only — a new project still needs its first explicit
+  // Save so the CP number is assigned deliberately). The .tic-body node is
+  // recreated on every open, so attaching here can't double-wire.
+  var body = modal.querySelector('.tic-body');
+  if (body) {
+    body.addEventListener('input',  _prjScheduleAutoSave);
+    body.addEventListener('change', _prjScheduleAutoSave);
+  }
+  if (p) {
+    var when = p.updated_at ? new Date(p.updated_at) : null;
+    _prjSetSavedIndicator(when && !isNaN(when.getTime()) ? 'Last saved ' + when.toLocaleTimeString() : '');
+  } else {
+    _prjSetSavedIndicator('Draft — not saved yet');
+  }
+}
+
+// ── Auto-save (mirrors the SOW modal's bottom-left saved indicator) ─────────
+var _prjAutoSaveTimer = null;
+var _prjAutoSaveBusy  = false;
+
+function _prjSetSavedIndicator(text) {
+  var el = document.getElementById('prj_saved_indicator');
+  if (el) el.textContent = text || '';
+}
+
+function _prjScheduleAutoSave() {
+  var d = window._prjDraft;
+  if (!d || !d.id || !_prjCanManage()) return;
+  if (_prjAutoSaveTimer) clearTimeout(_prjAutoSaveTimer);
+  _prjAutoSaveTimer = setTimeout(_prjAutoSave, 2500);
+}
+
+async function _prjAutoSave() {
+  _prjAutoSaveTimer = null;
+  var d = window._prjDraft;
+  if (!d || !d.id || !_prjCanManage()) return;
+  if (_prjAutoSaveBusy) { _prjScheduleAutoSave(); return; }
+  _prjAutoSaveBusy = true;
+  _prjSetSavedIndicator('Saving…');
+  try {
+    await _prjSaveProject(_prjBuildRow(d), false);
+    _prjSyncCache(Object.assign({}, d));
+    _prjSetSavedIndicator('✓ Saved ' + new Date().toLocaleTimeString());
+    renderProjectsList();
+  } catch(e) {
+    console.warn('[Projects] auto-save:', e);
+    _prjSetSavedIndicator('⚠ Auto-save failed — use Save Project');
+  } finally {
+    _prjAutoSaveBusy = false;
+  }
+}
+
+// One row-builder shared by explicit save and auto-save.
+function _prjBuildRow(d) {
+  return {
+    id: d.id,
+    project_number: d.project_number || _prjNextNumber(),
+    name: (d.name || '').trim() || 'Untitled project',
+    type: d.type || 'house_build',
+    status: d.status || 'planning',
+    funding_source: d.funding_source || null,
+    budget: (d.budget === '' || d.budget == null) ? null : Number(d.budget),
+    start_date: d.start_date || null,
+    target_date: d.target_date || null,
+    archived: false,
+    data: d.data,
+    updated_at: new Date().toISOString(),
+  };
 }
 
 function closePrjModal() {
@@ -497,6 +567,7 @@ function _prjBuildModalHTML() {
       '</div>' +
 
       '<div class="tic-footer">' +
+        '<div id="prj_saved_indicator" class="txt-muted-sm"></div>' +
         (d.id ? '<button type="button" onclick="_prjArchiveProject()" class="btn btn-ghost">🗄 Archive</button>' : '') +
         '<span class="tic-footer-spacer"></span>' +
         '<button type="button" onclick="closePrjModal()" class="btn btn-ghost" data-prj-keep>Cancel</button>' +
@@ -625,12 +696,14 @@ function _prjGrantAdd() {
   if (!d.data.grants) d.data.grants = [];
   d.data.grants.push({ id: _prjUuid(), source: '', reference: '', amount: null });
   _prjGrantsRecalc();
+  _prjScheduleAutoSave();
 }
 function _prjGrantRemove(i) {
   var d = window._prjDraft;
   if (!d.data.grants || !d.data.grants[i]) return;
   d.data.grants.splice(i, 1);
   _prjGrantsRecalc();
+  _prjScheduleAutoSave();
 }
 // Funding-agreement attachment per grant (g.doc = {path, name}) — same
 // pattern as the expense compliance docs: upload to projects/<id>/grants/,
@@ -776,6 +849,7 @@ function _prjTypeChanged(val) {
     });
     _prjRenderMilestones();
     _prjRenderCosts();
+    _prjScheduleAutoSave();
   };
   if (untouched) { apply(); return; }
   if (typeof showConfirm === 'function') {
@@ -832,6 +906,7 @@ function _prjMsMove(i, dir) {
   var tmp = ms[i]; ms[i] = ms[j]; ms[j] = tmp;
   _prjRenderMilestones();
   _prjRenderPnl();   // the P & L rows follow milestone order
+  _prjScheduleAutoSave();
 }
 
 function _prjMsToggle(i, checked) {
@@ -843,6 +918,7 @@ function _prjMsToggle(i, checked) {
 }
 function _prjMsAdd() {
   window._prjDraft.data.milestones.push({ id: _prjUuid(), name: '', targetDate: null, done: false, completedDate: null, notes: '', budgetAmount: null });
+  _prjScheduleAutoSave();
   _prjRenderMilestones();
   var host = document.getElementById('prj_panel_milestones');
   var inputs = host ? host.querySelectorAll('.prj-row-ms input[type="text"]') : [];
@@ -852,6 +928,7 @@ function _prjMsRemove(i) {
   window._prjDraft.data.milestones.splice(i, 1);
   _prjRenderMilestones();
   _prjRenderCosts();
+  _prjScheduleAutoSave();
 }
 
 // ── Costs tab ────────────────────────────────────────────────────────────────
@@ -1183,7 +1260,7 @@ function _prjExpRemove(i) {
     showToast('This cost line is part of payment request ' + (exp[i].claimedNumber || '') + ' — undo that request first', { type: 'error' });
     return;
   }
-  var doIt = function() { delete window._prjReqSel[exp[i].id]; exp.splice(i, 1); _prjRenderCosts(); _prjRefreshStrip(); };
+  var doIt = function() { delete window._prjReqSel[exp[i].id]; exp.splice(i, 1); _prjRenderCosts(); _prjRefreshStrip(); _prjScheduleAutoSave(); };
   if (typeof showConfirm === 'function') {
     showConfirm({ title: 'Remove expense?', message: 'Remove this ' + _prjMoney(exp[i].amount, true) + ' expense from the project?', confirmText: 'Remove', danger: true })
       .then(function(ok){ if (ok) doIt(); });
@@ -1295,6 +1372,7 @@ function _prjPnlHide(i) {
   if (!ms || !ms[i]) return;
   ms[i].pnlHidden = true;
   _prjRenderPnl();
+  _prjScheduleAutoSave();
 }
 
 function _prjPnlRestore(i) {
@@ -1302,6 +1380,7 @@ function _prjPnlRestore(i) {
   if (!ms || !ms[i]) return;
   delete ms[i].pnlHidden;
   _prjRenderPnl();
+  _prjScheduleAutoSave();
 }
 
 // ── Expense document attachments (funder compliance) ─────────────────────────
@@ -2424,19 +2503,9 @@ async function savePrjProject() {
   if (!d.name || !d.name.trim()) { showToast('Project name is required', { type: 'error' }); _prjSwitchTab('overview'); return; }
 
   var isNew = !d.id;
-  var row = {
-    project_number: d.project_number || _prjNextNumber(),
-    name: d.name.trim(),
-    type: d.type || 'house_build',
-    status: d.status || 'planning',
-    funding_source: d.funding_source || null,
-    budget: (d.budget === '' || d.budget == null) ? null : Number(d.budget),
-    start_date: d.start_date || null,
-    target_date: d.target_date || null,
-    archived: false,
-    data: d.data,
-  };
-  if (!isNew) { row.id = d.id; row.updated_at = new Date().toISOString(); }
+  var row = _prjBuildRow(d);
+  row.name = d.name.trim();
+  if (isNew) { delete row.id; delete row.updated_at; }
 
   var btn = document.getElementById('prj_save_btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
@@ -2458,6 +2527,7 @@ async function savePrjProject() {
     _prjRenderLots();     // a just-saved project unlocks the lots tab
     _prjMountDocsIfOpen();
     renderProjectsList();
+    _prjSetSavedIndicator('✓ Saved ' + new Date().toLocaleTimeString());
     showToast(isNew ? 'Project ' + (d.project_number || '') + ' created' : 'Project saved');
   } catch(e) {
     console.warn('[Projects] save:', e);
