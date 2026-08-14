@@ -869,12 +869,8 @@ function _prjRenderMilestones() {
   var ms = d.data.milestones || [];
 
   var rows = ms.map(function(m, i) {
-    var mover = '<span class="prj-ms-mover">' +
-      '<button type="button" title="Move up" ' + (i === 0 ? 'disabled ' : '') + 'onclick="_prjMsMove(' + i + ', -1)">▲</button>' +
-      '<button type="button" title="Move down" ' + (i === ms.length - 1 ? 'disabled ' : '') + 'onclick="_prjMsMove(' + i + ', 1)">▼</button>' +
-    '</span>';
-    return '<div class="prj-row prj-row-ms' + (m.done ? ' prj-row-done' : '') + '">' +
-      mover +
+    return '<div class="prj-row prj-row-ms' + (m.done ? ' prj-row-done' : '') + '" data-ms-id="' + _prjEsc(m.id) + '">' +
+      '<span class="prj-ms-drag" title="Drag to reorder">⠿</span>' +
       '<input type="checkbox"' + (m.done ? ' checked' : '') + ' title="Mark complete" onchange="_prjMsToggle(' + i + ', this.checked)" style="accent-color:var(--yellow);width:16px;height:16px;cursor:pointer;"/>' +
       '<div style="min-width:0;">' +
         '<input class="tic-input" type="text" placeholder="Milestone name…" value="' + _prjEsc(m.name || '') + '" oninput="_prjMsField(' + i + ',\'name\',this.value)"/>' +
@@ -890,25 +886,79 @@ function _prjRenderMilestones() {
   host.innerHTML =
     '<div class="tic-section">' +
       '<div class="tic-section-h">Milestones' + (stats.total ? ' — ' + stats.done + ' of ' + stats.total + ' complete' : '') + '</div>' +
-      '<div class="prj-rows">' + (rows || '<div style="color:var(--muted);font-size:13px;">No milestones yet — add one below or pick a project type on the Overview tab to apply its template.</div>') + '</div>' +
+      '<div class="prj-rows" id="prj_ms_rows">' + (rows || '<div style="color:var(--muted);font-size:13px;">No milestones yet — add one below or pick a project type on the Overview tab to apply its template.</div>') + '</div>' +
       '<button type="button" class="prj-addrow" onclick="_prjMsAdd()">+ Add milestone</button>' +
     '</div>';
+  _prjWireMsDrag();
+}
+
+// Drag-to-reorder for milestone rows. Pointer events (not HTML5 drag&drop) so
+// it works with a mouse AND with touch on iPads. During the drag only DOM
+// nodes move (the array is untouched, so the rows' index-based input handlers
+// stay valid); on release the array is reordered to match the DOM and both
+// tabs re-render.
+function _prjWireMsDrag() {
+  var container = document.getElementById('prj_ms_rows');
+  if (!container) return;
+  container.querySelectorAll('.prj-ms-drag').forEach(function(handle) {
+    handle.addEventListener('pointerdown', function(ev) {
+      if (!_prjCanManage()) return;
+      var row = handle.closest('.prj-row-ms');
+      if (!row) return;
+      ev.preventDefault();
+      handle.setPointerCapture(ev.pointerId);
+      row.classList.add('prj-ms-dragging');
+      document.body.classList.add('prj-no-select');
+
+      var onMove = function(e) {
+        var rows = Array.prototype.slice.call(container.querySelectorAll('.prj-row-ms'));
+        for (var i = 0; i < rows.length; i++) {
+          var r = rows[i];
+          if (r === row) continue;
+          var rect = r.getBoundingClientRect();
+          var mid = rect.top + rect.height / 2;
+          if (e.clientY < mid && r.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING) {
+            container.insertBefore(row, r);
+            break;
+          }
+          if (e.clientY > mid && r.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_PRECEDING) {
+            container.insertBefore(row, r.nextSibling);
+            break;
+          }
+        }
+      };
+      var onUp = function() {
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        handle.removeEventListener('pointercancel', onUp);
+        row.classList.remove('prj-ms-dragging');
+        document.body.classList.remove('prj-no-select');
+        // Commit the DOM order back to the draft array.
+        var ms = window._prjDraft.data.milestones || [];
+        var byId = {};
+        ms.forEach(function(m){ byId[m.id] = m; });
+        var newOrder = Array.prototype.slice.call(container.querySelectorAll('.prj-row-ms'))
+          .map(function(r){ return byId[r.getAttribute('data-ms-id')]; })
+          .filter(Boolean);
+        if (newOrder.length === ms.length) {
+          var changed = newOrder.some(function(m, i){ return ms[i] !== m; });
+          window._prjDraft.data.milestones = newOrder;
+          if (changed) _prjScheduleAutoSave();
+        }
+        _prjRenderMilestones();
+        _prjRenderPnl();   // the P & L rows follow milestone order
+      };
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+      handle.addEventListener('pointercancel', onUp);
+    });
+  });
 }
 
 function _prjMsField(i, key, val) {
   var ms = window._prjDraft.data.milestones;
   if (ms && ms[i]) ms[i][key] = val;
 }
-function _prjMsMove(i, dir) {
-  var ms = window._prjDraft.data.milestones;
-  var j = i + dir;
-  if (!ms || !ms[i] || j < 0 || j >= ms.length) return;
-  var tmp = ms[i]; ms[i] = ms[j]; ms[j] = tmp;
-  _prjRenderMilestones();
-  _prjRenderPnl();   // the P & L rows follow milestone order
-  _prjScheduleAutoSave();
-}
-
 function _prjMsToggle(i, checked) {
   var ms = window._prjDraft.data.milestones;
   if (!ms || !ms[i]) return;
