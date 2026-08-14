@@ -545,13 +545,17 @@ function _substitutePlaceholders(template, tokens) {
 async function _sbLoadActiveStaffByRole(role) {
   if (!role) return [];
   try {
+    // select=* (not a fixed column list) so the magic_link filter below stays
+    // safe on a nation DB that hasn't added that column yet.
     var url = SUPABASE_URL
-            + '/rest/v1/staff?select=name,email'
+            + '/rest/v1/staff?select=*'
             + '&is_active=eq.true&role=eq.' + encodeURIComponent(role);
     var r = await fetch(url, { headers: HOUSING_HEADERS });
     if (!r.ok) { console.warn('[staff lookup] ' + role + ' failed:', await r.text()); return []; }
     var rows = await r.json();
-    return (rows || []).filter(function(s){ return s && s.email; });
+    // Exclude external consultants (passwordless / magic-link accounts) from
+    // role-based workflow notifications — they should not receive staff emails.
+    return (rows || []).filter(function(s){ return s && s.email && s.magic_link !== true; });
   } catch (e) {
     console.warn('[staff lookup] ' + role + ' error:', e);
     return [];
