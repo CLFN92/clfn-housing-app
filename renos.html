@@ -1408,7 +1408,7 @@ function renderRenoApprovalsView() {
       var prog = (sow.progress && typeof sow.progress.percent === 'number')
         ? { overallPct: sow.progress.percent, status: sow.progress.status }
         : ((window._renoProgress && window._renoProgress[u.id]) || null);
-      rows.push({u:u, sow:sow, projectNumber:sow.project_number||null, prog:prog, rs:rs, appr:appr, cost:cost});
+      rows.push({u:u, sow:sow, projectNumber:sow.project_number||null, prog:prog, rs:rs, appr:appr, cost:cost, archived: !!sow.archived});
     });
   });
 
@@ -1428,10 +1428,10 @@ function renderRenoApprovalsView() {
     });
   }
 
-  // Per-row Dismiss: hide dismissed 'No Request Filed' placeholder rows unless
-  // the user has toggled "Show dismissed".
+  // Hide dismissed 'No Request Filed' placeholders AND archived requests unless
+  // the user has toggled "Show dismissed / archived".
   if(!_raShowDismissed()){
-    filtered = filtered.filter(function(r){ return !r.dismissed; });
+    filtered = filtered.filter(function(r){ return !r.dismissed && !r.archived; });
   }
 
   // Default sort — priority desc, then address, then project #. Stays in
@@ -1592,7 +1592,11 @@ function renderRenoApprovalsView() {
           ? (r.dismissed
              ? '<button data-ra-restore="'+uid+'" title="Restore to pipeline" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;color:var(--muted);">↩</button>'
              : '<button data-ra-dismiss="'+uid+'" title="Dismiss from pipeline (no request filed)" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;color:var(--muted);">🗄</button>')
-          : '')
+          : (pn
+             ? (r.archived
+                ? '<button data-ra-unarchive="'+uid+'"'+dataProj+' title="Restore this request" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;color:var(--muted);">↩</button>'
+                : '<button data-ra-archive="'+uid+'"'+dataProj+' title="Archive this request" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;color:var(--muted);">🗄</button>')
+             : ''))
       +'</div></td>'
       +'</tr>';
   }).join('');
@@ -1613,6 +1617,10 @@ function renderRenoApprovalsView() {
     var resBtn = row.querySelector('[data-ra-restore]');
     if(disBtn) disBtn.addEventListener('click', function(e){e.stopPropagation(); _renoDismissUnit(uid);});
     if(resBtn) resBtn.addEventListener('click', function(e){e.stopPropagation(); _renoRestoreUnit(uid);});
+    var arcBtn = row.querySelector('[data-ra-archive]');
+    var unaBtn = row.querySelector('[data-ra-unarchive]');
+    if(arcBtn) arcBtn.addEventListener('click', function(e){e.stopPropagation(); _raArchiveSow(uid, proj);});
+    if(unaBtn) unaBtn.addEventListener('click', function(e){e.stopPropagation(); _raUnarchiveSow(uid, proj);});
   });
 
   // Column-menu click + sort indicators
@@ -1647,11 +1655,15 @@ function _raCardTileFor(r, role, hmLimit) {
   if ((typeof moduleOn !== 'function' || moduleOn('rfq')) && pn && (typeof _sowRfqStillOpen === 'function' ? _sowRfqStillOpen(r.sow) : appr.key !== 'approved') && (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(r)) && (typeof _raRfqAwarded !== 'function' || !_raRfqAwarded(r))) {
     actions.push({html:'<a href="rfq.html?unit='+encodeURIComponent(u.id)+'&sow='+encodeURIComponent(pn)+'" onclick="event.stopPropagation();" style="flex:1;background:#1d4ed8;color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;text-align:center;white-space:nowrap;">RFQ</a>'});
   }
-  // Dismiss / Restore for 'No Request Filed' placeholder units.
+  // Dismiss placeholder units (no request); Archive/Restore real saved requests.
   if (appr.key === 'no_sow') {
     actions.push(r.dismissed
       ? {text:'↩ Restore', onclick:"event.stopPropagation();_renoRestoreUnit('"+uid+"')", ghost:true}
       : {text:'🗄 Dismiss', onclick:"event.stopPropagation();_renoDismissUnit('"+uid+"')", ghost:true});
+  } else if (pn) {
+    actions.push(r.archived
+      ? {text:'↩ Restore', onclick:"event.stopPropagation();_raUnarchiveSow('"+uid+"',"+projArg+")", ghost:true}
+      : {text:'🗄 Archive', onclick:"event.stopPropagation();_raArchiveSow('"+uid+"',"+projArg+")", ghost:true});
   }
   actions.push({text:'📊 Progress', onclick:"event.stopPropagation();openRenoProgress('"+uid+"')", ghost:true});
   return _cardTile({
@@ -1778,6 +1790,42 @@ window._renoRestoreUnit = function(unitId){
   if(typeof showToast==='function') showToast('Restored to the renovations pipeline.');
   renderRenoApprovalsView();
 };
+// Archive / restore a REAL saved request (e.g. an approved-but-empty input
+// error) straight from the pipeline. archiveSow persists to housing_sow.
+window._raArchiveSow = function(unitId, projectNumber){
+  if(!unitId || !projectNumber) return;
+  if(typeof showConfirm !== 'function'){ if(typeof archiveSow==='function'){ archiveSow(unitId, projectNumber, window.currentRole||'staff'); renderRenoApprovalsView(); } return; }
+  showConfirm({
+    title:'Archive this Request?',
+    message:'Project '+projectNumber+' will be hidden from the pipeline. Reversible via "Show dismissed / archived".',
+    confirmText:'Archive'
+  }).then(function(ok){
+    if(!ok) return;
+    var role = window.currentRole || 'staff';
+    if(typeof archiveSow !== 'function'){ showToast('Archive helper missing.'); return; }
+    var sow = archiveSow(unitId, projectNumber, role);
+    if(!sow){ showToast('Request not found'); return; }
+    if(typeof auditEntry==='function') auditEntry('SOW:'+unitId, 'sow_archived', 'SOW '+projectNumber+' archived (from renovations)', role);
+    // If this emptied the unit's active-SOW set, revert its status.
+    try {
+      var u = (typeof housingUnits!=='undefined'?housingUnits:[]).find(function(x){ return x.id===unitId; });
+      if(u && typeof hasActiveSows==='function' && !hasActiveSows(unitId) && typeof revertUnitFromRepair==='function' && revertUnitFromRepair(u) && typeof saveUnitWithDraftFallback==='function'){
+        saveUnitWithDraftFallback(u);
+      }
+    } catch(e){}
+    if(typeof showToast==='function') showToast('✓ Request '+projectNumber+' archived');
+    renderRenoApprovalsView();
+  });
+};
+window._raUnarchiveSow = function(unitId, projectNumber){
+  if(!unitId || !projectNumber) return;
+  if(typeof unarchiveSow !== 'function'){ showToast('Unarchive helper missing.'); return; }
+  var sow = unarchiveSow(unitId, projectNumber);
+  if(!sow){ showToast('Request not found'); return; }
+  if(typeof auditEntry==='function') auditEntry('SOW:'+unitId, 'sow_unarchived', 'SOW '+projectNumber+' restored (from renovations)', window.currentRole||'staff');
+  if(typeof showToast==='function') showToast('✓ Request '+projectNumber+' restored');
+  renderRenoApprovalsView();
+};
 function _raViewToggleHtml(){
   var cur = _raViewMode();
   function b(v,label,icon,pos){
@@ -1790,7 +1838,7 @@ function _raViewToggleHtml(){
   }
   return '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">'
     + '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;"><input type="checkbox" '+(_raHideCompleted()?'checked ':'')+'onchange="_raToggleHideCompleted(this)"/> Hide completed</label>'
-    + '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;margin-left:14px;"><input type="checkbox" '+(_raShowDismissed()?'checked ':'')+'onchange="_raToggleShowDismissed(this)"/> Show dismissed</label>'
+    + '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;margin-left:14px;"><input type="checkbox" '+(_raShowDismissed()?'checked ':'')+'onchange="_raToggleShowDismissed(this)"/> Show dismissed / archived</label>'
     + '<div style="display:flex;">' + b('list','List','&#9776;','l') + b('cards','Cards','&#9638;','m') + b('kanban','Kanban','&#9707;','r') + '</div>'
     + '</div>';
 }
