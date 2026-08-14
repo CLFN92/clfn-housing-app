@@ -3907,17 +3907,34 @@ async function sendStaffMagicLink(email, btn){
   }
   if(btn){ btn.disabled=true; btn.textContent='Sending…'; }
   try {
-    var redirectTo = window.location.origin + '/index.html';
-    var r = await fetch(SUPABASE_URL + '/auth/v1/otp?redirect_to=' + encodeURIComponent(redirectTo), {
+    // Send through the send-magic-link Edge Function, which generates the link
+    // and emails it via the nation's branded pipeline (from housing mailbox),
+    // including the recipient's access-expiry date — instead of Supabase's own
+    // generic auth email.
+    var _nc = window.NATION_CONFIG || {};
+    var _contact = [];
+    if(_nc.phone) _contact.push(_nc.phone);
+    var _em = _nc.email || _nc.housing_email; if(_em) _contact.push(_em);
+    var token = (window.HOUSING_SESSION && HOUSING_SESSION.accessToken) || '';
+    var r = await fetch(SUPABASE_URL + '/functions/v1/send-magic-link', {
       method:  'POST',
-      headers: { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ email: email, create_user: false })
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body:    JSON.stringify({
+        email: email,
+        redirect_to: window.location.origin + '/index.html',
+        brand: {
+          nation_name:  _nc.display_name || _nc.short || '',
+          brand_color:  _nc.primary_color || '',
+          contact_line: _contact.join('  |  ')
+        }
+      })
     });
-    if(r.status === 429){ showToast('Too many attempts — try again in a few minutes'); }
-    else if(!r.ok){ showToast('Could not send sign-in link — try again'); }
-    else {
+    var data = await r.json().catch(function(){ return {}; });
+    if(r.ok && data.ok){
       showToast('Sign-in link sent to '+email);
       auditEntry('SETTINGS','settings_user_send_magic_link','Magic-link sign-in link sent to '+email, window.currentRole||'ed');
+    } else {
+      showToast(data.error || 'Could not send sign-in link — try again');
     }
   } catch(e){
     showToast('Error: '+e.message);
