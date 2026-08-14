@@ -804,7 +804,7 @@ static-SPA / Chart.js stack, and works per-nation for free.
 
 ---
 
-## Phase CAP — Capital Projects module  ⏳ (v1 built, migration pending)
+## Phase CAP — Capital Projects module  ✅ (v1 shipped 2026-08)
 Track funded capital initiatives ("develop 20 lots", "build 5 houses"):
 milestones, budget vs actual spending, lot records, unit creation on lots, and
 allocating the project total across delivered units to set each unit's cost.
@@ -841,9 +841,15 @@ allocating the project total across delivered units to set each unit's cost.
   `?project=<id>`)
 - ✅ Registrations: `CLFN_MODULES.projects`, `MODULE_LABELS`, approval
   authorities, `auditEntry` `PRJ:`/`LOT:` entity types, Operations nav child
-- ⬜ **Run the migration** in the Supabase SQL Editor (user)
-- 🔖 Deferred: AI assistant context + `housing_projects` query-tool allowlist
-  (Edge Function redeploy), project rows in the `project-schedule.js` Gantt,
+- ✅ **Migration run** in the Supabase SQL Editor (2026-08-14); v1 merged +
+  deployed (PR #37)
+- ✅ AI assistant integration: `projects` client context block
+  (ai-assistant.js), `housing_projects`/`housing_project_lots` in the
+  `query_database` allowlist, CP-vs-SOW terminology rule + Capital Projects
+  HOW_TO section (`ai-chat/index.ts`)
+- ⬜ **Redeploy the `ai-chat` Edge Function** (dashboard paste or
+  `supabase functions deploy ai-chat`) so the server-side changes go live
+- 🔖 Deferred: project rows in the `project-schedule.js` Gantt,
   finance-module integration of project spending.
 
 ---
