@@ -128,8 +128,19 @@ body.prj-no-select { user-select: none; -webkit-user-select: none; }
 .prj-row-exp   { grid-template-columns: 24px 100px 1fr 1fr 110px 120px 24px; }
 .prj-row-grant { grid-template-columns: 1fr 1fr 130px auto 24px; }
 @media (max-width: 760px) {
-  .prj-row-ms    { grid-template-columns: auto auto 1fr; }
-  .prj-row-ms .prj-ms-notes { grid-column: 1 / -1; }
+  /* Milestone card on phones: three tidy lines —
+       ⠿  ☐  [name………………]  ✕
+       [target date ……………………]
+       [notes ………………………………]
+     The desktop grid can't just lose columns here: with auto-placed cells the
+     date input landed in the auto-sized first column, so every card's handle/
+     checkbox column grew to the date's width and each card wrapped differently
+     (the misaligned stagger seen on iPhone). Explicit placements pin line 1
+     and give the date + notes full-width rows of their own. */
+  .prj-row-ms    { grid-template-columns: auto auto 1fr auto; }
+  .prj-row-ms > .prj-row-remove     { grid-row: 1; grid-column: 4; }
+  .prj-row-ms > input[type="date"]  { grid-column: 1 / -1; }
+  .prj-row-ms .prj-ms-notes         { grid-column: 1 / -1; }
   .prj-row-exp   { grid-template-columns: auto 1fr 1fr; }
   .prj-row-grant { grid-template-columns: 1fr 1fr; }
 }
@@ -229,6 +240,19 @@ body.prj-no-select { user-select: none; -webkit-user-select: none; }
 #prjModal .tic-strip { grid-template-columns: repeat(4, 1fr); }
 @media (max-width: 520px) { #prjModal .tic-strip { grid-template-columns: repeat(2, 1fr); } }
 #prjModal .tic-strip.is-scrolled { grid-template-columns: repeat(4, 1fr); }
+
+/* Phone footer: the shared .tic-footer wraps freely, and with five items
+   (saved indicator, Status Report, Archive, spacer, Cancel, Save) it stacked
+   one-per-line and ate a third of the screen. Compact the buttons, give the
+   saved-indicator its own thin full-width line at the top, and let the shared
+   .tic-footer-spacer line-break (housing.css ≤700px rule) split the rest into
+   two rows: [Status Report · Archive] / [Cancel · Save]. */
+@media (max-width: 700px) {
+  #prjModal .tic-footer { padding: 10px 14px 12px; gap: 6px 8px; align-items: center; }
+  #prjModal .tic-footer .btn { padding: 8px 11px; font-size: 12px; }
+  #prjModal .tic-footer .btn-primary { flex: 1 1 auto; }  /* Save = the big target */
+  #prjModal #prj_saved_indicator { flex-basis: 100%; font-size: 11px; }
+}
 
 /* Read-only banner inside the detail modal */
 #prjReadOnlyBanner {
