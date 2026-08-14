@@ -804,6 +804,50 @@ static-SPA / Chart.js stack, and works per-nation for free.
 
 ---
 
+## Phase CAP — Capital Projects module  ⏳ (v1 built, migration pending)
+Track funded capital initiatives ("develop 20 lots", "build 5 houses"):
+milestones, budget vs actual spending, lot records, unit creation on lots, and
+allocating the project total across delivered units to set each unit's cost.
+
+### Decisions (locked)
+- **Naming**: "project" already means SOW internally (`SOW-YYYY-NN`), so this
+  module uses tables `housing_projects` / `housing_project_lots`, JS prefix
+  `_prj*`, reference numbers `CP-YYYY-NN` (in-memory scan + unique constraint +
+  collision-retry insert, RFQ precedent), audit prefixes `PRJ:` / `LOT:`,
+  module key `projects`, user-facing label "Capital Projects".
+- **Two tables**: lots are first-class rows (units reference them, they
+  pre-exist/outlive unit creation, statuses flip raw → serviced → built);
+  milestones + expenses + the allocation snapshot ride `housing_projects.data`
+  jsonb (single-editor blob, same pattern as `rfq.data`).
+- **Unit links are jsonb-only**: `unit.projectId` / `unit.lotId` ride the
+  `housing_units.data` blob — no unit migration needed.
+- **Cost allocation is manual and explicit** ("Allocate Costs to Units" on the
+  Costs tab, `allocateProjectCosts` authority, default ED): user picks the
+  basis (actuals to date / funded budget), sees an old → new preview, then the
+  cents-safe equal split (remainder to the last unit) writes each unit's
+  `constructionCost`; `insuredValue` is prefilled **only when empty**, never
+  overwritten.
+- **Authorities**: `manageProjects` (HM/ED) for create/edit/lots/units,
+  `allocateProjectCosts` (ED) — new "Capital Projects" group in Settings →
+  Approval Authority. All other housing staff get a read-only modal.
+
+### Deliverables
+- ✅ `supabase/migrations/20260814_capital_projects.sql` (tables + RLS + grants)
+- ✅ `projects.html` + `projects.css` + `projects-init.js` (list + KPI strip +
+  filters; tic-shell detail modal: Overview / Milestones / Costs / Lots & Units
+  / Documents; milestone templates per type; expense log; allocation modal;
+  batch Add Lots; link-existing-unit; batch Create Units from Lots reusing the
+  `saveNewUnit` id recipe; DocLibrary; `_prjApplyReadOnly` sweep; deep link
+  `?project=<id>`)
+- ✅ Registrations: `CLFN_MODULES.projects`, `MODULE_LABELS`, approval
+  authorities, `auditEntry` `PRJ:`/`LOT:` entity types, Operations nav child
+- ⬜ **Run the migration** in the Supabase SQL Editor (user)
+- 🔖 Deferred: AI assistant context + `housing_projects` query-tool allowlist
+  (Edge Function redeploy), project rows in the `project-schedule.js` Gantt,
+  finance-module integration of project spending.
+
+---
+
 ## Rollback points
 - Pre-refactor snapshots (Phase C)
 

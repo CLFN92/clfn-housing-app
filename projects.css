@@ -1,0 +1,156 @@
+/* ── Capital Projects page styles ────────────────────────────────── */
+
+/* KPI strip (mirrors the inspections KPI strip) */
+.prj-kpi-strip {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.prj-kpi {
+  flex: 1;
+  min-width: 130px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+}
+.prj-kpi-val {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.prj-kpi-lbl {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-top: 3px;
+}
+
+/* Table */
+.prj-table-wrap { overflow-x: auto; }
+.prj-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.prj-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--muted);
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.prj-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.prj-table tr:last-child td { border-bottom: none; }
+.prj-table tr:hover td { background: var(--bg); cursor: pointer; }
+
+/* Project status badges */
+.prj-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.prj-badge-planning  { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+.prj-badge-active    { background: #f0fdf4; color: #15803d; }
+.prj-badge-on_hold   { background: var(--warn-amber-bg, #fffbeb); color: var(--warn-amber-text, #b45309); }
+.prj-badge-completed { background: #eff6ff; color: #1d4ed8; }
+.prj-badge-cancelled { background: #fef2f2; color: #b91c1c; }
+
+/* Lot status badges */
+.prj-lot-badge-raw      { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+.prj-lot-badge-serviced { background: #ecfeff; color: #0e7490; }
+.prj-lot-badge-built    { background: #f0fdf4; color: #15803d; }
+
+/* Budget vs actual bar */
+.prj-budget-bar {
+  height: 10px;
+  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.prj-budget-fill {
+  height: 100%;
+  background: var(--yellow);
+  transition: width .2s ease;
+}
+.prj-budget-fill.prj-over { background: #b91c1c; }
+
+/* Milestone / expense / lot editor rows */
+.prj-rows { display: flex; flex-direction: column; gap: 8px; }
+.prj-row {
+  display: grid;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.prj-row-ms  { grid-template-columns: auto 1fr 150px 24px; }
+.prj-row-exp { grid-template-columns: 130px 1fr 1fr 130px 170px 24px; }
+@media (max-width: 760px) {
+  .prj-row-ms  { grid-template-columns: auto 1fr; }
+  .prj-row-exp { grid-template-columns: 1fr 1fr; }
+}
+.prj-row.prj-row-done { opacity: .72; }
+.prj-ms-notes { grid-column: 2 / -1; }
+.prj-row-remove {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 5px;
+}
+.prj-row-remove:hover { color: #b91c1c; }
+.prj-addrow {
+  align-self: flex-start;
+  margin-top: 6px;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--sans);
+  padding: 5px 11px;
+  cursor: pointer;
+}
+.prj-addrow:hover { color: var(--text); border-color: var(--muted); }
+
+/* Detail modal info strip: 4 tiles (2 on narrow phones) — the shared
+   .tic-strip rule assumes 6 columns, same override as #sowModal. */
+#prjModal .tic-strip { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 520px) { #prjModal .tic-strip { grid-template-columns: repeat(2, 1fr); } }
+#prjModal .tic-strip.is-scrolled { grid-template-columns: repeat(4, 1fr); }
+
+/* Read-only banner inside the detail modal */
+#prjReadOnlyBanner {
+  margin: 12px 28px 0;
+  padding: 10px 14px;
+  background: var(--warn-amber-bg, #fffbeb);
+  border: 1px solid var(--warn-amber-border, #fde68a);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--warn-amber-text, #b45309);
+  font-weight: 500;
+}
