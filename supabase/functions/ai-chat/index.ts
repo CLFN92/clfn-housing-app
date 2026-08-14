@@ -94,6 +94,14 @@ const TABLES: Record<string, TableDef> = {
     roles: ALL,
     cols: 'id, tenant_id, note_body, author_email, created_at. Dedicated tenant notes - use this (NOT the audit log) to count/list notes on tenants.',
   },
+  housing_projects: {
+    roles: ALL,
+    cols: 'id, project_number (CP-YYYY-NN, e.g. CP-2026-01), name, type (lot_development|house_build|mixed|commercial_building|band_building|infrastructure), status (planning|active|on_hold|completed|cancelled), funding_source, budget, start_date, target_date, archived, created_at. These are CAPITAL PROJECTS (funded initiatives like "build 5 houses" or "develop 20 lots") - NOT the SOW-YYYY-NN "Project #" on maintenance requests. Milestones, expenses, the PO number, and the cost-allocation snapshot live in a `data` jsonb (poNumber, milestones[] with budgetAmount for the per-milestone P&L budget, expenses[] with amount and optional doc attachment, allocation) - use select=* to read them and sum expenses[].amount for spend-to-date.',
+  },
+  housing_project_lots: {
+    roles: ALL,
+    cols: 'id, project_id (-> housing_projects), lot_number, address, legal_description, status (raw|serviced|built), unit_id (-> housing_units, set once a unit is built/linked on the lot), created_at. Count units delivered by a project via unit_id is not null.',
+  },
   housing_audit_log: {
     roles: ['ed', 'super_user', 'housing_manager'],
     cols: 'id, entity_type, entity_id, action, detail, actor (email), created_at',
@@ -584,6 +592,25 @@ add notes/photos, and save. A failed/needs-repair inspection can spawn a
 maintenance request for the unit. Unit records show last and next inspection
 dates.
 
+Capital Projects (under the Operations nav; edit needs the manageProjects
+authority, default HM/ED - everyone else views read-only): Projects page >
+"+ New Project". Pick the type (Lot Development, House Build, Mixed,
+Commercial Building, Band Building, Infrastructure Project) - a
+default milestone checklist is applied and can be edited. Tabs on the project
+card: Overview (name, funding source, PO number, budget, dates), Milestones
+(check off as completed), Costs (log expenses against the budget, optionally
+tagged to a milestone; each expense can carry an attached document such as an
+invoice or receipt, which also appears in the Documents tab), P & L (budget vs
+actual with variance, one row per milestone - milestone budgets are entered on
+this tab), Lots & Units, Documents. On Lots & Units: "+ Add Lots" creates lot
+records in bulk; lots move raw -> serviced -> built; "Create Units from Lots"
+builds housing units on selected lots (they appear in Inventory linked to the
+project); "Link existing unit" attaches an already-existing unit to a lot.
+"Allocate Costs to Units" (Costs tab, allocateProjectCosts authority, default
+ED) divides the project total - actuals to date or the funded budget - equally
+across the project's units and writes each unit's Construction Cost; Insured
+Value is only prefilled where empty, never overwritten.
+
 View or edit a tenant: Tenants > open a tenant card (TIC). Tabs: Overview,
 Utilities (hydro/gas meters + accounts), Documents, Unit History. Lease start
 and end dates are recorded on the tenant. Field employees see the TIC read-only.
@@ -697,11 +724,15 @@ Write 2-4 sentences. Be professional, clear, and compassionate. Reference specif
     ? `\n\n## Renovation Progress - ${ctx.renoProgress.length} units with active renos\noverallPct is % complete (0-100).\n` + JSON.stringify(ctx.renoProgress)
     : ''
 
+  const projectsJson = ctx?.projects?.length
+    ? `\n\n## Capital Projects - ${ctx.projects.length} records\nFunded capital initiatives (lot development / house builds), reference numbers CP-YYYY-NN - distinct from the SOW-YYYY-NN "Project #" on maintenance requests. Fields: project_number, name, type, status, funding_source, budget, spent (actual expenses to date), milestones_done/milestones_total, lots_total, units_delivered, start_date, target_date, allocated (true once costs were allocated to units).\n` + JSON.stringify(ctx.projects.slice(0, 30))
+    : ''
+
   // Compute quick summary stats for the prompt
   const vacantCount = (ctx?.units || []).filter((u: any) => u.status === 'vacant').length
   const pendingApps = (ctx?.apps  || []).filter((a: any) => !['assigned','declined','archived'].includes(a.status)).length
 
-  return `You are an AI assistant for the Constance Lake First Nation (CLFN) Housing Department. You help housing staff answer questions about applications, housing units, maintenance requests (work orders), renovations, contractors, inspections, and housing policy, and explain how to do things in the app.
+  return `You are an AI assistant for the Constance Lake First Nation (CLFN) Housing Department. You help housing staff answer questions about applications, housing units, maintenance requests (work orders), renovations, contractors, inspections, capital projects, and housing policy, and explain how to do things in the app.
 
 Staff role: ${role}
 Current date/time (UTC): ${new Date().toISOString()} (audit timestamps are stored in UTC).
@@ -712,7 +743,8 @@ IMPORTANT terminology for this system:
 - "Maintenance request" is the term shown in the app UI; internally these are stored as SOW (Scope of Work) records - there is no separate maintenance table. Staff may also say "work order" or "repair job" and mean the same thing.
 - "RFQ" = Request for Quotes (sent to contractors for pricing)
 - "Tier" on an application = priority tier (e.g. Emergency, High, Medium, Low)
-${appsJson}${unitsJson}${sowsJson}${rfqsJson}${contractorsJson}${renoJson}
+- "Capital Project" = a funded initiative (build N houses / develop N lots), numbered CP-YYYY-NN in the housing_projects table. This is DIFFERENT from the SOW-YYYY-NN "Project #" shown on a maintenance request - do not mix them up. Capital projects track milestones, budget vs actual expenses, lots (raw/serviced/built), and units built on those lots; "allocate costs" means dividing the project total equally across its units to set each unit's construction cost.
+${appsJson}${unitsJson}${sowsJson}${rfqsJson}${contractorsJson}${renoJson}${projectsJson}
 
 ## query_database tool
 You also have a read-only query_database tool for precise or large-data lookups

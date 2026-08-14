@@ -22,9 +22,12 @@ var _prjDocLib          = null; // DocLibrary instance (Documents tab)
 var _prjDocLibEntity    = null;
 
 var PRJ_TYPES = [
-  { id: 'lot_development', label: 'Lot Development' },
-  { id: 'house_build',     label: 'House Build' },
-  { id: 'mixed',           label: 'Mixed (Lots + Builds)' },
+  { id: 'lot_development',     label: 'Lot Development' },
+  { id: 'house_build',         label: 'House Build' },
+  { id: 'mixed',               label: 'Mixed (Lots + Builds)' },
+  { id: 'commercial_building', label: 'Commercial Building' },
+  { id: 'band_building',       label: 'Band Building' },
+  { id: 'infrastructure',      label: 'Infrastructure Project' },
 ];
 var PRJ_STATUSES = ['planning', 'active', 'on_hold', 'completed', 'cancelled'];
 var PRJ_STATUS_LABELS = {
@@ -64,6 +67,44 @@ var PRJ_MILESTONE_TEMPLATES = {
 };
 PRJ_MILESTONE_TEMPLATES.mixed =
   PRJ_MILESTONE_TEMPLATES.lot_development.concat(PRJ_MILESTONE_TEMPLATES.house_build);
+PRJ_MILESTONE_TEMPLATES.commercial_building = [
+  'Funding confirmed',
+  'Design & drawings finalized',
+  'Permits & approvals',
+  'Site prep & foundation',
+  'Structural framing',
+  'Building envelope (roof / walls / glazing)',
+  'Mechanical / electrical / plumbing rough-in',
+  'Interior fit-out',
+  'Fire & accessibility inspections',
+  'Final inspection & occupancy permit',
+  'Handover / lease-up',
+];
+PRJ_MILESTONE_TEMPLATES.band_building = [
+  'Funding confirmed',
+  'Community consultation',
+  'Design & drawings finalized',
+  'Permits & approvals',
+  'Site prep & foundation',
+  'Structural framing',
+  'Building envelope (roof / walls / glazing)',
+  'Mechanical / electrical / plumbing rough-in',
+  'Interior fit-out',
+  'Final inspection & occupancy permit',
+  'Grand opening / handover',
+];
+PRJ_MILESTONE_TEMPLATES.infrastructure = [
+  'Funding confirmed',
+  'Engineering & design',
+  'Environmental assessment',
+  'Permits & approvals',
+  'Tender & award',
+  'Site prep / clearing',
+  'Construction',
+  'Commissioning & testing',
+  'Final inspection',
+  'In service',
+];
 
 // ── Small helpers ────────────────────────────────────────────────────────────
 function _prjEsc(s) {
@@ -367,7 +408,7 @@ function openPrjModal(id) {
       data: {
         description: '',
         milestones: PRJ_MILESTONE_TEMPLATES.house_build.map(function(name){
-          return { id: _prjUuid(), name: name, targetDate: null, done: false, completedDate: null, notes: '' };
+          return { id: _prjUuid(), name: name, targetDate: null, done: false, completedDate: null, notes: '', budgetAmount: null };
         }),
         expenses: [],
         allocation: null,
@@ -385,6 +426,7 @@ function openPrjModal(id) {
   _prjRenderOverview();
   _prjRenderMilestones();
   _prjRenderCosts();
+  _prjRenderPnl();
   _prjRenderLots();
   _prjRefreshStrip();
   _prjApplyReadOnly();
@@ -428,6 +470,7 @@ function _prjBuildModalHTML() {
         '<button type="button" class="tic-tab tic-active" data-modal-tab="overview"   onclick="_prjSwitchTab(\'overview\')"   role="tab">Overview</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="milestones" onclick="_prjSwitchTab(\'milestones\')" role="tab">Milestones</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="costs"      onclick="_prjSwitchTab(\'costs\')"      role="tab">Costs</button>' +
+        '<button type="button" class="tic-tab"            data-modal-tab="pnl"        onclick="_prjSwitchTab(\'pnl\')"        role="tab">P &amp; L</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="lots"       onclick="_prjSwitchTab(\'lots\')"       role="tab">Lots &amp; Units</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="documents"  onclick="_prjSwitchTab(\'documents\')"  role="tab">Documents</button>' +
       '</div>' +
@@ -436,6 +479,7 @@ function _prjBuildModalHTML() {
         '<div class="tic-panel tic-active" data-modal-panel="overview"   id="prj_panel_overview"></div>' +
         '<div class="tic-panel"            data-modal-panel="milestones" id="prj_panel_milestones"></div>' +
         '<div class="tic-panel"            data-modal-panel="costs"      id="prj_panel_costs"></div>' +
+        '<div class="tic-panel"            data-modal-panel="pnl"        id="prj_panel_pnl"></div>' +
         '<div class="tic-panel"            data-modal-panel="lots"       id="prj_panel_lots"></div>' +
         '<div class="tic-panel"            data-modal-panel="documents"  id="prj_panel_documents"></div>' +
       '</div>' +
@@ -462,6 +506,7 @@ function _prjSwitchTab(name) {
     pn.classList.toggle('tic-active', pn.getAttribute('data-modal-panel') === name);
   });
   if (name === 'documents') _prjMountDocs();
+  if (name === 'pnl') _prjRenderPnl();   // recompute from the latest expenses/budgets
   _prjApplyReadOnly();
 }
 
@@ -504,6 +549,7 @@ function _prjRenderOverview() {
         '</select>' +
         '<input id="prj_f_funding_other" class="tic-input" type="text" placeholder="Funding source…" style="margin-top:6px;' + (selVal === 'other' ? '' : 'display:none;') + '" value="' + _prjEsc(otherVal) + '" oninput="window._prjDraft.funding_source=this.value"/></div>' +
         '<div class="f"><label>Funded Budget (CAD)</label><input id="prj_f_budget" class="tic-input" type="number" min="0" step="0.01" placeholder="e.g. 2500000" value="' + (d.budget != null ? _prjEsc(d.budget) : '') + '" oninput="window._prjDraft.budget=(this.value===\'\'?null:Number(this.value));_prjRefreshStrip()"/></div>' +
+        '<div class="f"><label>PO # <span style="font-size:10px;font-weight:400;color:var(--muted);">(from accounting)</span></label><input id="prj_f_po" class="tic-input" type="text" placeholder="e.g. PO-2026-0042" value="' + _prjEsc(d.data.poNumber || '') + '" oninput="window._prjDraft.data.poNumber=this.value"/></div>' +
         '<div class="f"><label>Start Date</label><input id="prj_f_start" class="tic-input" type="date" value="' + _prjEsc(d.start_date || '') + '" onchange="window._prjDraft.start_date=this.value||null"/></div>' +
         '<div class="f"><label>Target Completion</label><input id="prj_f_target" class="tic-input" type="date" value="' + _prjEsc(d.target_date || '') + '" onchange="window._prjDraft.target_date=this.value||null;_prjRefreshStrip()"/></div>' +
       '</div>' +
@@ -536,7 +582,7 @@ function _prjTypeChanged(val) {
     && JSON.stringify(ms.map(function(m){ return m.name; })) === JSON.stringify(PRJ_MILESTONE_TEMPLATES[prev] || []));
   var apply = function() {
     d.data.milestones = tmpl.map(function(name){
-      return { id: _prjUuid(), name: name, targetDate: null, done: false, completedDate: null, notes: '' };
+      return { id: _prjUuid(), name: name, targetDate: null, done: false, completedDate: null, notes: '', budgetAmount: null };
     });
     _prjRenderMilestones();
     _prjRenderCosts();
@@ -592,7 +638,7 @@ function _prjMsToggle(i, checked) {
   _prjRenderMilestones();
 }
 function _prjMsAdd() {
-  window._prjDraft.data.milestones.push({ id: _prjUuid(), name: '', targetDate: null, done: false, completedDate: null, notes: '' });
+  window._prjDraft.data.milestones.push({ id: _prjUuid(), name: '', targetDate: null, done: false, completedDate: null, notes: '', budgetAmount: null });
   _prjRenderMilestones();
   var host = document.getElementById('prj_panel_milestones');
   var inputs = host ? host.querySelectorAll('.prj-row-ms input[type="text"]') : [];
@@ -627,12 +673,19 @@ function _prjRenderCosts() {
       var m = ms.find(function(x){ return x.id === e.milestoneId; });
       msName = m ? (m.name || '(unnamed)') : '';
     }
+    var docCell = e.doc && e.doc.path
+      ? '<span style="display:inline-flex;align-items:center;gap:2px;min-width:0;">' +
+          '<a href="#" onclick="_prjOpenExpenseDoc(' + i + ');return false;" title="Open ' + _prjEsc(e.doc.name || 'document') + '" style="font-size:11px;color:var(--text);text-decoration:underline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70px;display:inline-block;">📎 ' + _prjEsc(e.doc.name || 'doc') + '</a>' +
+          '<button type="button" class="prj-row-remove" title="Detach document" onclick="_prjUnlinkExpenseDoc(' + i + ')" style="font-size:10px;">✕</button>' +
+        '</span>'
+      : '<button type="button" class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" title="Attach a document (invoice, receipt, PO)" onclick="_prjAttachExpenseDoc(' + i + ')">📎 Attach</button>';
     return '<div class="prj-row prj-row-exp">' +
       '<div style="font-size:12px;white-space:nowrap;">' + _prjEsc(e.date || '—') + '</div>' +
       '<div style="font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;">' + _prjEsc(e.vendor || '—') + '</div>' +
       '<div style="font-size:12px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;">' + _prjEsc(e.description || '') + '</div>' +
       '<div style="font-size:13px;font-weight:600;text-align:right;white-space:nowrap;">' + _prjMoney(e.amount, true) + '</div>' +
       '<div style="font-size:11px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;">' + (msName ? '🏁 ' + _prjEsc(msName) : '') + '</div>' +
+      '<div style="min-width:0;">' + docCell + '</div>' +
       '<button type="button" class="prj-row-remove" title="Remove expense" onclick="_prjExpRemove(' + i + ')">✕</button>' +
     '</div>';
   }).join('');
@@ -710,6 +763,167 @@ function _prjExpRemove(i) {
     showConfirm({ title: 'Remove expense?', message: 'Remove this ' + _prjMoney(exp[i].amount, true) + ' expense from the project?', confirmText: 'Remove', danger: true })
       .then(function(ok){ if (ok) doIt(); });
   } else { doIt(); }
+}
+
+// ── P & L tab ────────────────────────────────────────────────────────────────
+// Budget vs actual with variance, one row per milestone (the milestone list is
+// the project's cost-category breakdown). Milestone budgets are entered here
+// (stored as budgetAmount on each milestone in the data jsonb); actuals are
+// the expenses tagged to that milestone on the Costs tab.
+function _prjRenderPnl() {
+  var d = window._prjDraft;
+  var host = document.getElementById('prj_panel_pnl');
+  if (!host || !d) return;
+  var ms  = d.data.milestones || [];
+  var exp = d.data.expenses || [];
+
+  var actualFor = function(msId) {
+    return exp.filter(function(e){ return e.milestoneId === msId; })
+              .reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0);
+  };
+  var varCell = function(v, hasBudget) {
+    if (!hasBudget) return '<td style="text-align:right;color:var(--muted);">—</td>';
+    var color = v < 0 ? '#b91c1c' : '#15803d';
+    return '<td style="text-align:right;font-weight:600;color:' + color + ';">' + (v < 0 ? '-' : '') + _prjMoney(Math.abs(v), true) + '</td>';
+  };
+
+  var budgetTotal = 0, actualTotal = 0;
+  var rows = ms.map(function(m, i) {
+    var budget = (m.budgetAmount != null && m.budgetAmount !== '') ? Number(m.budgetAmount) : null;
+    var actual = actualFor(m.id);
+    budgetTotal += budget || 0;
+    actualTotal += actual;
+    return '<tr' + (m.done ? ' style="opacity:.72;"' : '') + '>' +
+      '<td>' + _prjEsc(m.name || '(unnamed)') + (m.done ? ' <span style="color:#15803d;" title="Milestone complete">✓</span>' : '') + '</td>' +
+      '<td style="text-align:right;"><input class="tic-input" type="number" min="0" step="0.01" placeholder="0.00" value="' + (budget != null ? _prjEsc(budget) : '') + '" onchange="_prjMsBudget(' + i + ', this.value)" style="max-width:130px;text-align:right;padding:5px 9px;font-size:12px;display:inline-block;"/></td>' +
+      '<td style="text-align:right;">' + (actual ? _prjMoney(actual, true) : '<span style="color:var(--muted);">—</span>') + '</td>' +
+      varCell(budget != null ? budget - actual : 0, budget != null) +
+    '</tr>';
+  }).join('');
+
+  var untagged = exp.filter(function(e){ return !e.milestoneId; })
+                    .reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0);
+  if (untagged > 0) {
+    actualTotal += untagged;
+    rows += '<tr><td style="color:var(--muted);">Not tied to a milestone</td>' +
+      '<td style="text-align:right;color:var(--muted);">—</td>' +
+      '<td style="text-align:right;">' + _prjMoney(untagged, true) + '</td>' +
+      '<td style="text-align:right;color:var(--muted);">—</td></tr>';
+  }
+
+  var totalVar = budgetTotal - actualTotal;
+  var funded = Number(d.budget) || 0;
+  var fundedNote = (funded > 0 && Math.abs(budgetTotal - funded) >= 0.005)
+    ? '<div style="font-size:12px;color:var(--warn-amber-text,#b45309);margin-top:8px;">⚠️ Milestone budgets total ' + _prjMoney(budgetTotal, true) + ', but the project\'s funded budget is ' + _prjMoney(funded, true) + '.</div>'
+    : '';
+
+  host.innerHTML =
+    '<div class="tic-section">' +
+      '<div class="tic-section-h">Profit &amp; Loss — Budget vs Actual by Milestone</div>' +
+      (ms.length
+        ? '<div class="prj-table-wrap"><table class="prj-table"><thead><tr>' +
+            '<th>Milestone</th><th style="text-align:right;">Budget</th><th style="text-align:right;">Actual</th><th style="text-align:right;">Variance</th>' +
+          '</tr></thead><tbody>' + rows +
+          '<tr style="border-top:2px solid var(--border);"><td style="font-weight:700;">Total</td>' +
+            '<td style="text-align:right;font-weight:700;">' + _prjMoney(budgetTotal, true) + '</td>' +
+            '<td style="text-align:right;font-weight:700;">' + _prjMoney(actualTotal, true) + '</td>' +
+            varCell(totalVar, budgetTotal > 0) +
+          '</tr></tbody></table></div>' + fundedNote +
+          '<div style="font-size:12px;color:var(--muted);margin-top:8px;">Enter each milestone\'s budget here; actuals come from expenses tagged to that milestone on the Costs tab. Variance = budget − actual (red means over budget).</div>'
+        : '<div style="color:var(--muted);font-size:13px;">No milestones yet — add them on the Milestones tab to build the P &amp; L breakdown.</div>') +
+    '</div>';
+}
+
+function _prjMsBudget(i, val) {
+  var ms = window._prjDraft.data.milestones;
+  if (!ms || !ms[i]) return;
+  ms[i].budgetAmount = (val === '' || val == null) ? null : Math.round(Number(val) * 100) / 100;
+  _prjRenderPnl();
+}
+
+// ── Expense document attachments ─────────────────────────────────────────────
+// Each expense row can carry one supporting document (invoice, receipt, PO).
+// Files upload to projects/<id>/expenses/<expenseId>/ and the file_uploaded
+// meta row uses entity 'project', so the same document also appears in the
+// project's Documents tab DocLibrary.
+function _prjAttachExpenseDoc(i) {
+  var d = window._prjDraft;
+  if (!d || !_prjCanManage()) return;
+  if (!d.id) { showToast('Save the project first, then attach documents', { type: 'error' }); return; }
+  var exp = d.data.expenses;
+  if (!exp || !exp[i]) return;
+
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = async function() {
+    var file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) { showToast('File is too large (25 MB max)', { type: 'error' }); return; }
+    var safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
+    var path = 'projects/' + d.id + '/expenses/' + exp[i].id + '/' + safeName;
+    try {
+      showToast('Uploading ' + safeName + '…');
+      await sbUploadFile(path, file);
+      if (typeof sbSaveFileMeta === 'function') {
+        sbSaveFileMeta('project', d.id, path, file.name, file.size, file.type);
+      }
+      exp[i].doc = { path: path, name: file.name };
+      // Persist right away so the uploaded file can't be orphaned by an
+      // unsaved draft.
+      await _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false);
+      _prjSyncCache(d);
+      if (typeof auditEntry === 'function') {
+        auditEntry('PRJ:' + d.id, 'project_expense_doc_attached', file.name + ' attached to a ' + _prjMoney(exp[i].amount, true) + ' expense on ' + (d.project_number || d.name));
+      }
+      _prjRenderCosts();
+      showToast('Document attached');
+    } catch(e) {
+      console.warn('[Projects] expense doc upload:', e);
+      showToast('Upload failed — check your connection and try again', { type: 'error' });
+    }
+  };
+  input.click();
+}
+
+async function _prjOpenExpenseDoc(i) {
+  var d = window._prjDraft;
+  var e = d && d.data.expenses && d.data.expenses[i];
+  if (!e || !e.doc || !e.doc.path) return;
+  try {
+    var url = await sbGetSignedUrl(e.doc.path);
+    if (url) window.open(url, '_blank', 'noopener');
+    else showToast('Could not open the document', { type: 'error' });
+  } catch(err) {
+    console.warn('[Projects] open expense doc:', err);
+    showToast('Could not open the document', { type: 'error' });
+  }
+}
+
+function _prjUnlinkExpenseDoc(i) {
+  var d = window._prjDraft;
+  if (!d || !_prjCanManage()) return;
+  var e = d.data.expenses && d.data.expenses[i];
+  if (!e || !e.doc) return;
+  if (typeof showConfirm !== 'function') return;
+  showConfirm({
+    title: 'Detach document?',
+    message: 'Detach "' + _prjEsc(e.doc.name || '') + '" from this expense? The file itself stays in the project\'s Documents tab.',
+    confirmText: 'Detach',
+  }).then(async function(ok) {
+    if (!ok) return;
+    delete e.doc;
+    if (d.id) {
+      try {
+        await _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false);
+        _prjSyncCache(d);
+      } catch(err) { console.warn('[Projects] detach doc save:', err); }
+    }
+    _prjRenderCosts();
+  });
 }
 
 // ── Cost allocation ──────────────────────────────────────────────────────────

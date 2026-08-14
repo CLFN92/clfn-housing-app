@@ -240,6 +240,32 @@ function aiSendMessage() {
         return { unit_id: uid, overallPct: d.overallPct || 0, phases: d.phases || [] };
       });
     }()),
+    // Capital projects (loaded on projects.html only — elsewhere the model
+    // falls back to the query_database tool's housing_projects table).
+    projects: (window._prjProjects || []).map(function(p) {
+      var d = (p && typeof p.data === 'object' && p.data) || {};
+      var expenses = d.expenses || [];
+      var ms = d.milestones || [];
+      var lots = (window._prjLots || []).filter(function(l){ return l.project_id === p.id; });
+      return {
+        id: p.id,
+        project_number: p.project_number || '',
+        name: p.name || '',
+        type: p.type || '',
+        status: p.status || '',
+        funding_source: p.funding_source || '',
+        po_number: d.poNumber || '',
+        budget: p.budget != null ? Number(p.budget) : null,
+        spent: expenses.reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0),
+        milestones_done: ms.filter(function(m){ return m.done; }).length,
+        milestones_total: ms.length,
+        lots_total: lots.length,
+        units_delivered: lots.filter(function(l){ return l.unit_id; }).length,
+        start_date: p.start_date || null,
+        target_date: p.target_date || null,
+        allocated: !!d.allocation,
+      };
+    }),
   };
 
   _aiCall({
