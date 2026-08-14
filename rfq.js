@@ -1213,6 +1213,13 @@ async function saveRfqDraft() {
   if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
   var payload = _buildRfqPayload();
   if (!payload.sow_unit_id) { showToast('No SOW linked to this RFQ'); return; }
+  // Visible feedback: the corner message panel is easy to miss, so the button
+  // itself goes busy and a footer indicator confirms the save inline.
+  var saveBtn = document.getElementById('rfqSaveDraftBtn');
+  var savedInd = document.getElementById('rfq_saved_indicator');
+  var btnLabel = saveBtn ? saveBtn.textContent : '';
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+  if (savedInd) savedInd.textContent = '';
   try {
     if (!_rfqCurrentId) {
       // FIRST save of a new RFQ — collision-safe insert. RFQ numbers are
@@ -1255,8 +1262,17 @@ async function saveRfqDraft() {
     window._rfqCache[payload.id] = payload;
     _rfqCurrentId = payload.id;
     if (typeof auditEntry === 'function') auditEntry('RFQ:' + payload.id, 'created', 'RFQ draft saved', window.currentRole || 'staff');
+    if (savedInd) savedInd.textContent = '✓ Draft saved ' + new Date().toLocaleTimeString();
+    if (saveBtn) { saveBtn.textContent = '✓ Saved'; setTimeout(function(){ saveBtn.textContent = btnLabel; }, 1600); }
     showToast('Draft saved — ' + payload.id);
-  } catch(e) { console.error('[rfq] save failed:', e); showToast('Save failed — see console'); }
+  } catch(e) {
+    console.error('[rfq] save failed:', e);
+    if (savedInd) savedInd.textContent = '⚠ Save failed — try again';
+    if (saveBtn) saveBtn.textContent = btnLabel;
+    showToast('Save failed — check your connection and try again', { type: 'error' });
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+  }
 }
 
 // ── Preview PDF ───────────────────────────────────────────────────────────────

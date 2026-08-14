@@ -568,6 +568,7 @@ function _prjBuildModalHTML() {
 
       '<div class="tic-footer">' +
         '<div id="prj_saved_indicator" class="txt-muted-sm"></div>' +
+        (d.id ? '<button type="button" onclick="_prjStatusReport()" class="btn btn-ghost" data-prj-keep title="Generate a PDF status report for this project">📄 Status Report</button>' : '') +
         (d.id ? '<button type="button" onclick="_prjArchiveProject()" class="btn btn-ghost">🗄 Archive</button>' : '') +
         '<span class="tic-footer-spacer"></span>' +
         '<button type="button" onclick="closePrjModal()" class="btn btn-ghost" data-prj-keep>Cancel</button>' +
@@ -1787,27 +1788,29 @@ async function _prjDownloadDoc(doc, prefix) {
   await new Promise(function(res){ setTimeout(res, 350); });
 }
 
+// Lazy-load jsPDF + the autotable plugin (shared by the payment-request
+// claim summary and the project status report).
+function _prjLoadJsPdf(cb, onerr) {
+  if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable) { cb(); return; }
+  if (window.jspdf && window.jspdf.jsPDF && document.getElementById('prj_jspdf_at')) { cb(); return; }
+  var s1 = document.createElement('script');
+  s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  s1.onload = function() {
+    var s2 = document.createElement('script');
+    s2.id = 'prj_jspdf_at';
+    s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
+    s2.onload = cb;
+    s2.onerror = onerr;
+    document.head.appendChild(s2);
+  };
+  s1.onerror = onerr;
+  if (window.jspdf && window.jspdf.jsPDF) { s1.onload(); return; }
+  document.head.appendChild(s1);
+}
+
 function _prjGenerateRequestPdf(req, exp) {
   return new Promise(function(resolve, reject) {
-    var loadjsPDF = function(cb) {
-      if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable) { cb(); return; }
-      if (window.jspdf && window.jspdf.jsPDF && document.getElementById('prj_jspdf_at')) { cb(); return; }
-      var s1 = document.createElement('script');
-      s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      s1.onload = function() {
-        var s2 = document.createElement('script');
-        s2.id = 'prj_jspdf_at';
-        s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
-        s2.onload = cb;
-        s2.onerror = reject;
-        document.head.appendChild(s2);
-      };
-      s1.onerror = reject;
-      if (window.jspdf && window.jspdf.jsPDF) { s1.onload(); return; }
-      document.head.appendChild(s1);
-    };
-
-    loadjsPDF(function() {
+    _prjLoadJsPdf(function() {
       try {
         var d = window._prjDraft;
         var nc = window.NATION_CONFIG || {};
@@ -1860,8 +1863,206 @@ function _prjGenerateRequestPdf(req, exp) {
         doc.save(((d.project_number || 'project') + '_' + req.number + '_PaymentRequest.pdf').replace(/\s+/g, '_'));
         resolve();
       } catch(e) { reject(e); }
-    });
+    }, reject);
   });
+}
+
+// ── Project status report (PDF) ──────────────────────────────────────────────
+// One-click snapshot of the whole project — overview, funding, milestones,
+// budget vs actual, lots & units, claims — for funders, council, or the file.
+// A read action: available in the read-only (view-only) modal too.
+function _prjStatusReport() {
+  var d = window._prjDraft;
+  if (!d) return;
+  new Promise(function(resolve, reject) {
+    _prjLoadJsPdf(function() {
+      try { _prjBuildStatusReportPdf(d); resolve(); } catch(e) { reject(e); }
+    }, reject);
+  }).then(function() {
+    if (d.id && typeof auditEntry === 'function') {
+      auditEntry('PRJ:' + d.id, 'project_status_report', 'Status report generated for ' + (d.project_number || d.name || 'project'));
+    }
+  }).catch(function(e) {
+    console.warn('[Projects] status report:', e);
+    showToast('Could not generate the status report PDF', { type: 'error' });
+  });
+}
+
+function _prjBuildStatusReportPdf(d) {
+  var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+  var today = new Date().toISOString().slice(0, 10);
+  var data = d.data || {};
+  var ms   = data.milestones || [];
+  var exp  = data.expenses || [];
+  var head = { fillColor: [17, 17, 15], textColor: [248, 228, 26], fontSize: 8, fontStyle: 'bold' };
+  var money = function(n) { return _prjMoney(n, true); };
+  var signedMoney = function(v) { return (v < 0 ? '-' : '') + money(Math.abs(v)); };
+
+  // Section header + table, tracking flow position across sections.
+  var y = 16;
+  var section = function(title, tableOpts) {
+    if (y > 240) { doc.addPage(); y = 20; }
+    doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(0);
+    doc.text(title, 14, y);
+    doc.autoTable(Object.assign({
+      startY: y + 3,
+      theme: 'striped',
+      headStyles: head,
+      bodyStyles: { fontSize: 8 },
+      margin: { left: 14, right: 14 },
+    }, tableOpts));
+    y = doc.lastAutoTable.finalY + 9;
+  };
+
+  // Title block
+  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+  doc.text(_prjNationLabel(), 14, y); y += 7;
+  doc.setFontSize(12);
+  doc.text('Capital Project Status Report', 14, y); y += 8;
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  doc.text('Project: ' + (d.project_number || '(unsaved)') + '  ' + (d.name || ''), 14, y);
+  doc.text('Report date: ' + today, 150, y); y += 5;
+  doc.text('Prepared by: ' + ((window.HOUSING_SESSION && (HOUSING_SESSION.name || HOUSING_SESSION.email)) || ''), 14, y); y += 7;
+
+  // Summary
+  var spent    = _prjSpent(d);
+  var funded   = Number(d.budget) || 0;
+  var msDone   = ms.filter(function(m){ return m.done; }).length;
+  var lots     = d.id ? _prjLotsFor(d.id) : [];
+  var units    = d.id ? _prjUnitsForProject(d.id) : [];
+  var lotBuilt = lots.filter(function(l){ return l.status === 'built'; }).length;
+  var lotServ  = lots.filter(function(l){ return l.status === 'serviced'; }).length;
+  section('Project Summary', {
+    head: [['', '']],
+    showHead: false,
+    body: [
+      ['Type', _prjTypeLabel(d.type)],
+      ['Status', PRJ_STATUS_LABELS[d.status] || d.status || '—'],
+      ['Start date', d.start_date || '—'],
+      ['Target completion', d.target_date || '—'],
+      ['Funding source', d.funding_source || '—'],
+      ['Department # / PO #', (data.deptNumber || '—') + '  /  ' + (data.poNumber || '—')],
+      ['Funded budget', funded ? money(funded) : '—'],
+      ['Spent to date', money(spent) + (funded ? '  (' + Math.round(spent / funded * 100) + '% of budget)' : '')],
+      ['Remaining', funded ? signedMoney(funded - spent) : '—'],
+      ['Milestones complete', msDone + ' of ' + ms.length],
+      ['Lots', lots.length ? (lots.length + ' total — ' + lotServ + ' serviced, ' + lotBuilt + ' built') : '—'],
+      ['Units delivered', units.length ? String(units.length) : '—'],
+    ],
+    columnStyles: { 0: { cellWidth: 55, fontStyle: 'bold' } },
+  });
+
+  // Description
+  var desc = (data.description || '').trim();
+  if (desc) {
+    if (y > 240) { doc.addPage(); y = 20; }
+    doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+    doc.text('Description', 14, y); y += 5;
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+    var lines = doc.splitTextToSize(desc, 182);
+    doc.text(lines, 14, y);
+    y += lines.length * 4.2 + 7;
+  }
+
+  // Grants
+  var grants = data.grants || [];
+  if (grants.length) {
+    section('Funding — Grants', {
+      head: [['Funder', 'Reference', 'Amount', 'Agreement on file']],
+      body: grants.map(function(g) {
+        return [g.source || '—', g.reference || '—', money(Number(g.amount) || 0), (g.doc && g.doc.path) ? 'Yes' : '—'];
+      }).concat([['', 'TOTAL', money(grants.reduce(function(s, g){ return s + (Number(g.amount) || 0); }, 0)), '']]),
+      columnStyles: { 2: { halign: 'right' } },
+    });
+  }
+
+  // Milestones
+  if (ms.length) {
+    section('Milestones', {
+      head: [['Milestone', 'Target date', 'Status', 'Notes']],
+      body: ms.map(function(m) {
+        var status = m.done
+          ? 'Complete' + (m.completedDate ? ' ' + m.completedDate : '')
+          : (m.targetDate && m.targetDate < today ? 'Overdue' : 'Pending');
+        return [m.name || '(unnamed)', m.targetDate || '—', status, m.notes || ''];
+      }),
+      columnStyles: { 0: { cellWidth: 62 }, 1: { cellWidth: 26 }, 2: { cellWidth: 32 } },
+    });
+  }
+
+  // Budget vs actual (same numbers as the P & L tab; every milestone listed)
+  if (ms.length || exp.length) {
+    var actualFor = function(msId) {
+      return exp.filter(function(e){ return e.milestoneId === msId; })
+                .reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0);
+    };
+    var budgetTotal = 0, actualTotal = 0;
+    var pnlRows = ms.map(function(m) {
+      var budget = (m.budgetAmount != null && m.budgetAmount !== '') ? Number(m.budgetAmount) : null;
+      var actual = actualFor(m.id);
+      budgetTotal += budget || 0;
+      actualTotal += actual;
+      return [m.name || '(unnamed)', budget != null ? money(budget) : '—', actual ? money(actual) : '—',
+              budget != null ? signedMoney(budget - actual) : '—'];
+    });
+    var untagged = exp.filter(function(e){ return !e.milestoneId; })
+                      .reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0);
+    if (untagged > 0) {
+      actualTotal += untagged;
+      pnlRows.push(['Not tied to a milestone', '—', money(untagged), '—']);
+    }
+    pnlRows.push(['TOTAL', money(budgetTotal), money(actualTotal), budgetTotal > 0 ? signedMoney(budgetTotal - actualTotal) : '—']);
+    if (funded > 0) pnlRows.push(['Project funded budget', money(funded), '—', signedMoney(funded - budgetTotal)]);
+    section('Budget vs Actual', {
+      head: [['Milestone', 'Budget', 'Actual', 'Variance']],
+      body: pnlRows,
+      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
+    });
+  }
+
+  // Lots & units
+  if (lots.length) {
+    var unitById = {};
+    (window.housingUnits || []).forEach(function(u){ if (u && u.id) unitById[u.id] = u; });
+    section('Lots & Units', {
+      head: [['Lot', 'Status', 'Unit']],
+      body: lots.map(function(l) {
+        var u = l.unit_id && unitById[l.unit_id];
+        return [l.lot_number || '—', PRJ_LOT_STATUS_LABELS[l.status] || l.status || '—',
+                u ? (u.address || l.unit_id) : (l.unit_id || '—')];
+      }),
+    });
+  }
+
+  // Payment requests (claims)
+  var reqs = data.paymentRequests || [];
+  if (reqs.length || exp.length) {
+    var claimedTotal = reqs.reduce(function(s, r){ return s + (Number(r.total) || 0); }, 0);
+    var unclaimed = exp.filter(function(e){ return !e.claimedIn; })
+                       .reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0);
+    section('Payment Requests to Funders', {
+      head: [['Request', 'Date', 'Funder', 'Reference', 'Lines', 'Amount']],
+      body: reqs.map(function(r) {
+        return [r.number || '—', r.date || '—', r.funder || '—', r.grantReference || '—',
+                String((r.expenseIds || []).length), money(Number(r.total) || 0)];
+      }).concat([
+        ['', '', '', '', 'TOTAL CLAIMED', money(claimedTotal)],
+        ['', '', '', '', 'Costs not yet claimed', money(unclaimed)],
+      ]),
+      columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' } },
+    });
+  }
+
+  // Footer on every page
+  var pages = doc.getNumberOfPages();
+  for (var p = 1; p <= pages; p++) {
+    doc.setPage(p);
+    doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(120);
+    doc.text(_prjNationLabel() + ' — Status Report — ' + (d.project_number || '') + ' — generated ' + today, 14, 271);
+    doc.text('Page ' + p + ' of ' + pages, 202, 271, { align: 'right' });
+  }
+
+  doc.save(((d.project_number || d.name || 'project') + '_StatusReport_' + today + '.pdf').replace(/\s+/g, '_'));
 }
 
 function _prjUndoRequest(reqId) {
