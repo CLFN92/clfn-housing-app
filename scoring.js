@@ -1728,6 +1728,46 @@ function archiveApplication(appId) {
 }
 
 // Archive a UNIT (demolition) — bundles all docs, marks archived, auto-archives linked apps
+// Removing a building leaves an empty lot. If the unit was built on a tracked
+// lot, free that lot back to vacant; otherwise create a new vacant-lot record at
+// the unit's address (record_type:'lot'). Links u.lotId for a possible restore.
+function _unitToVacantLot(u, role){
+  if(!u) return;
+  var units = getAllUnits();
+  if(u.lotId){
+    var lot = units.find(function(x){ return String(x.id)===String(u.lotId); });
+    if(lot){
+      lot.builtUnitId = null; lot.status = 'vacant_lot';
+      saveUnitWithDraftFallback(lot);
+      if(typeof auditEntry==='function') auditEntry('UNIT:'+lot.id, 'lot_vacated', 'Lot freed - building '+((u.num||'')+' '+(u.street||'')).trim()+' removed', role);
+      return;
+    }
+  }
+  var lotNum = u.num || '', street = u.street || '';
+  if(!street) return;
+  var newId = ('LOT-'+street.toUpperCase().replace(/\s+/g,'-')+'-'+lotNum).replace(/[^A-Z0-9\-]/g,'');
+  if(units.find(function(x){ return x.id===newId; })){ u.lotId = newId; return; }
+  var newLot = {
+    id:newId, street:street, num:lotNum, lotNumber:lotNum,
+    record_type:'lot', type:'Vacant Lot', status:'vacant_lot',
+    notes:'Created when '+((u.num||'')+' '+(u.street||'')).trim()+' was removed.', builtUnitId:null,
+    bedrooms:null, bathrooms:null, assignedTo:null, assignedName:null, assignedDate:null
+  };
+  if(typeof housingUnits!=='undefined') housingUnits.push(newLot);
+  saveUnitWithDraftFallback(newLot);
+  u.lotId = newId;
+  if(typeof auditEntry==='function') auditEntry('UNIT:'+newId, 'lot_added', 'Vacant lot created when '+((u.num||'')+' '+(u.street||'')).trim()+' was removed', role);
+}
+// Restoring a demolished unit re-occupies its lot (if still vacant).
+function _unitRestoreLot(u, role){
+  if(!u || !u.lotId) return;
+  var lot = getAllUnits().find(function(x){ return String(x.id)===String(u.lotId) && (typeof _isLot!=='function' || _isLot(x)); });
+  if(lot && !lot.builtUnitId){
+    lot.builtUnitId = u.id; lot.status = 'built';
+    saveUnitWithDraftFallback(lot);
+    if(typeof auditEntry==='function') auditEntry('UNIT:'+lot.id, 'lot_rebuilt', 'Lot re-linked - '+((u.num||'')+' '+(u.street||'')).trim()+' restored', role);
+  }
+}
 function archiveUnit(unitId) {
   var units = getAllUnits();
   var u = units.find(function(x){ return x.id === unitId; });
@@ -1736,7 +1776,7 @@ function archiveUnit(unitId) {
   var addr = u.num + ' ' + u.street;
   showConfirm({
     title:       'Archive ' + addr + '?',
-    message:     'This marks the unit as demolished. All documentation (Maintenance Requests, renovation progress, tenant files, photos) will be preserved in the archive record. The unit will be hidden from active inventory.',
+    message:     'This marks the unit as demolished and creates a vacant lot in its place. All documentation (Maintenance Requests, renovation progress, tenant files, photos) is preserved in the archive record. The unit is hidden from active inventory.',
     confirmText: 'Archive Unit',
     danger:      true
   }).then(function(ok){
@@ -1760,6 +1800,7 @@ function archiveUnit(unitId) {
         auditEntry(a.id, 'archived', 'Auto-archived — linked unit ' + addr + ' demolished', role);
       }
     });
+    _unitToVacantLot(u, role);   // demolished building -> empty lot
     saveUnitWithDraftFallback(u);
     applications.forEach(function(a){
       if(a.archived && (a.assignedUnit===unitId||a.assignedUnitId===unitId)){
@@ -1805,6 +1846,7 @@ function unarchiveUnit(unitId) {
     u.archivedBy = null;
     u.status     = 'vacant';
     u.assignedTo = null; u.assignedName = null; u.assignedDate = null;
+    _unitRestoreLot(u, role);   // re-occupy the lot the demolition freed
     saveUnitWithDraftFallback(u);
     auditEntry('UNIT:' + unitId, 'unit_unarchived', addr + ' restored from archive to Vacant', role);
     closeUnitEditModal();
