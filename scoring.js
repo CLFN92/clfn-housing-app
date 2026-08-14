@@ -595,7 +595,8 @@ function renderNationPanel(){
     rfq:          'RFQ (Request for Quotes)',
     mapping:      'Mapping (Unit Location & Photo)',
     ai_assistant: 'AI Assistant (Chat + Draft Notes)',
-    inspections:  'Inspections (Unit Condition Reports)'
+    inspections:  'Inspections (Unit Condition Reports)',
+    projects:     'Capital Projects (Lots & Builds)'
   };
   var humanize = function(name){
     if(MODULE_LABELS[name]) return MODULE_LABELS[name];

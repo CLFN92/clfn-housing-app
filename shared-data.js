@@ -1892,6 +1892,8 @@ function auditEntry(appId, action, detail, user) {
   var etype = sid.startsWith('SOW:')  ? 'sow'
             : sid.startsWith('CT:')   ? 'contractor'
             : sid.startsWith('UNIT:') ? 'unit'
+            : sid.startsWith('PRJ:')  ? 'project'
+            : sid.startsWith('LOT:')  ? 'project_lot'
             : sid === 'SETTINGS'      ? 'settings'
             : 'application';
 

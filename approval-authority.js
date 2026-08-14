@@ -154,6 +154,15 @@ var APPROVAL_AUTHORITY = (function() {
     // cross-app metrics, no data edits. ED + HM by default; editable here.
     accessLeadershipDashboard: ['ed', 'housing_manager'],
 
+    // ── Capital Projects ──────────────────────────────────────────────────
+    // Who can create/edit capital projects (milestones, expenses, lots, and
+    // creating/linking units). Everyone else with housing access views
+    // read-only.
+    manageProjects:           ['housing_manager', 'ed'],
+    // Who can run "Allocate Costs to Units" — divides the project total
+    // across its linked units and rewrites each unit's Construction Cost.
+    allocateProjectCosts:     ['ed'],
+
   };
 
   // ── LIVE CONFIG (defaults + any saved overrides) ──────────────────────
@@ -428,6 +437,8 @@ var APPROVAL_AUTHORITY = (function() {
       manageLoan:               'Create and manage loans',
       reverseTransaction:       'Reverse posted transactions',
       accessLeadershipDashboard:'Access the Chief &amp; Council dashboard',
+      manageProjects:           'Create / edit capital projects',
+      allocateProjectCosts:     'Allocate project costs to units',
     },
 
     /** Group labels for the Settings UI sections */
@@ -444,6 +455,7 @@ var APPROVAL_AUTHORITY = (function() {
       'System':               ['accessSettings','editApprovalAuthority','manageStaff','manageStaffRecord','manageAllStaffRoles'],
       'Finance':              ['viewFinanceCard','recordPayment','createInvoice','createArrangement','manageLoan','reverseTransaction'],
       'Leadership Dashboard': ['accessLeadershipDashboard'],
+      'Capital Projects':     ['manageProjects','allocateProjectCosts'],
     },
 
   };

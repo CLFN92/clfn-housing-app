@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>{NATION_SHORT} Housing — Capital Projects</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="shared.css"/>
+<link rel="stylesheet" href="housing.css"/>
+<link rel="stylesheet" href="projects.css"/>
+
+<script src="shared.js"></script>
+<script src="shared-config.js"></script>
+<script src="shared-auth.js"></script>
+<script src="shared-ui.js"></script>
+<script src="approval-authority.js"></script>
+<script src="shared-data.js"></script>
+<script src="notifications.js"></script>
+<script src="scoring.js"></script>
+<script src="housing-views.js"></script>
+<script src="housing-settings.js"></script>
+<script src="housing-modals.js"></script>
+<script src="shared-sow.js"></script>
+<script src="housing-modals-sow.js"></script>
+<script src="housing-app.js"></script>
+<script src="housing-init.js"></script>
+<script src="ai-assistant.js"></script>
+
+<style>body{ opacity:0; transition:opacity .15s ease; }</style>
+</head>
+<body>
+
+<div id="app_header_host"></div>
+
+<div class="app-wrapper" id="appWrapper">
+  <div class="content-area">
+    <div id="projectsView" class="page-view-wide">
+
+      <div class="page-back-row">
+        <button onclick="history.back()" class="back-btn-yellow">&#8592; Back</button>
+      </div>
+
+      <div class="page-header-bar">
+        <div class="phb-title">
+          <h1>Capital Projects</h1>
+          <p>Funded lot-development and house-build projects — milestones, costs, lots, and delivered units</p>
+        </div>
+        <div class="phb-actions">
+          <button id="prj_new_btn" class="btn btn-primary" onclick="openPrjModal(null)">+ New Project</button>
+        </div>
+      </div>
+
+      <!-- KPI strip -->
+      <div class="prj-kpi-strip" id="prj_kpi_strip"></div>
+
+      <!-- Filters -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+        <input id="prj_filter_search" type="text" class="tic-input" style="max-width:220px;"
+          placeholder="Search by name or number…"
+          oninput="window._prjSearchFilter=this.value;renderProjectsList()"/>
+        <select id="prj_filter_type" class="tic-input" style="max-width:190px;"
+          onchange="window._prjTypeFilter=this.value;renderProjectsList()">
+          <option value="">All types</option>
+          <option value="lot_development">Lot Development</option>
+          <option value="house_build">House Build</option>
+          <option value="mixed">Mixed</option>
+        </select>
+        <select id="prj_filter_status" class="tic-input" style="max-width:170px;"
+          onchange="window._prjStatusFilter=this.value;renderProjectsList()">
+          <option value="">All statuses</option>
+          <option value="planning">Planning</option>
+          <option value="active">Active</option>
+          <option value="on_hold">On Hold</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <button class="btn btn-ghost" onclick="
+          document.getElementById('prj_filter_search').value='';
+          document.getElementById('prj_filter_type').value='';
+          document.getElementById('prj_filter_status').value='';
+          window._prjSearchFilter='';window._prjTypeFilter='';window._prjStatusFilter='';
+          renderProjectsList();">Clear</button>
+      </div>
+
+      <!-- Table -->
+      <div class="card" style="overflow:hidden;">
+        <div class="prj-table-wrap">
+          <table class="prj-table">
+            <thead>
+              <tr>
+                <th>Number</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Budget</th>
+                <th>Spent</th>
+                <th>Milestones</th>
+                <th>Target</th>
+              </tr>
+            </thead>
+            <tbody id="prj_tbody">
+              <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted);">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /projectsView -->
+  </div>
+</div>
+
+<!-- Project detail modal (tic-shell mounted by projects-init.js) -->
+<div id="prjModal" class="modal-overlay modal-z-900"></div>
+
+<!-- Toast host (shared) -->
+<div id="toast_host" style="position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;"></div>
+
+<script src="projects-init.js"></script>
+</body>
+</html>
