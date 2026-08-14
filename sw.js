@@ -12,7 +12,7 @@
  *
  * Bump CACHE to force every client to drop the old cache on next load.
  * ============================================================ */
-var CACHE = 'clfn-shell-v64';
+var CACHE = 'clfn-shell-v65';
 
 var LIB_HOSTS = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net'];
 
@@ -88,8 +88,11 @@ self.addEventListener('fetch', function(e){
     return;
   }
 
-  // Other cross-origin (fonts, OSM) — network, then cache fallback.
-  e.respondWith(
-    fetch(req).then(function(res){ return putInCache(req, res); }).catch(function(){ return caches.match(req); })
-  );
+  // Other cross-origin (map tiles, fonts, etc.) — do NOT intercept. Let the
+  // browser fetch them natively. Passing cross-origin image/tile requests
+  // through the SW turns them opaque and was leaving OSM map tiles blank in the
+  // Set-Location picker (the TIC map works because it's an iframe, whose tile
+  // requests never hit our SW). Nothing here needs SW caching — the immutable
+  // CDN libs are handled above.
+  return;
 });
