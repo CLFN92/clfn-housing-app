@@ -286,13 +286,15 @@ async function completeMagicLinkSignIn(h) {
     var email = (user && user.email || '').toLowerCase();
     if (!email) throw new Error('invalid-link');
 
-    // HARD GATE: must be an ACTIVE staff row — mailbox possession alone is not
-    // enough. Stops any existing auth user without staff access from getting in.
-    var sr = await fetch(SUPABASE_URL + '/rest/v1/staff?select=id&is_active=eq.true&email=eq.' + encodeURIComponent(email), {
+    // HARD GATE: must be an ACTIVE staff row that is explicitly enabled for
+    // magic-link sign-in. Mailbox possession alone is not enough, and regular
+    // staff (magic_link=false, the default) are limited to password sign-in.
+    var sr = await fetch(SUPABASE_URL + '/rest/v1/staff?select=*&is_active=eq.true&email=eq.' + encodeURIComponent(email), {
       headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + token }
     });
     var srows = sr.ok ? await sr.json() : [];
     if (!srows.length) throw new Error('not-staff');
+    if (srows[0].magic_link !== true) throw new Error('password-only');
 
     if (typeof _applyTokenPayload === 'function') {
       _applyTokenPayload({ access_token: token, refresh_token: h.refresh_token, expires_in: parseInt(h.expires_in || '3600', 10) });
@@ -318,7 +320,10 @@ async function completeMagicLinkSignIn(h) {
     console.warn('[MAGIC LINK] completion failed:', e && e.message);
     try { sessionStorage.removeItem('clfn_housing_token'); } catch (ee) {}
     showLoginScreen();
-    if (errEl) { errEl.textContent = 'That sign-in link is invalid or has expired. Request a new one.'; errEl.style.display = 'block'; }
+    var msg = (e && e.message === 'password-only')
+      ? 'This account signs in with a password. Please enter your email and password.'
+      : 'That sign-in link is invalid or has expired. Request a new one.';
+    if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
   }
 }
 window.sendMagicLink = sendMagicLink;

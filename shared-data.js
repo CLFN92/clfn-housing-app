@@ -3935,19 +3935,25 @@ async function _sbEditStaffModal(id) {
             })()
           +'</select></div>'
         +'<div class="f"><label>Feature Access <span style="font-weight:normal;color:var(--muted);">— untick to restrict; all ticked = full access</span></label>'
-          +'<div id="edit_staff_features" style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;padding:8px 2px;">'
+          +'<div id="edit_staff_features" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;padding:8px 2px;">'
           + (function(){
               var reg = window.FEATURE_REGISTRY || [];
               var list = (Array.isArray(u.feature_access) && u.feature_access.length) ? u.feature_access : null;
               return reg.map(function(f){
                 var checked = list ? (list.indexOf(f.key)!==-1) : true;
-                return '<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:normal;cursor:pointer;">'
-                  +'<input type="checkbox" class="ef-feat" value="'+escapeHtml(f.key)+'"'+(checked?' checked':'')+'/> '+escapeHtml(f.label)+'</label>';
+                // Checkbox is pinned to 16px + flex:none so the app-wide
+                // ".f input{width:100%}" rule can't stretch it and shove the label.
+                return '<label style="display:flex;align-items:center;justify-content:flex-start;gap:8px;text-align:left;font-size:12.5px;font-weight:400;line-height:1.3;cursor:pointer;">'
+                  +'<input type="checkbox" class="ef-feat" value="'+escapeHtml(f.key)+'"'+(checked?' checked':'')+' style="width:16px;height:16px;min-width:16px;flex:0 0 16px;margin:0;accent-color:#2563eb;"/>'
+                  +'<span>'+escapeHtml(f.label)+'</span></label>';
               }).join('');
             })()
           +'</div></div>'
         +'<div class="f"><label>Access Expires <span style="font-weight:normal;color:var(--muted);">— optional; blank = no expiry</span></label>'
           +'<input type="date" id="edit_staff_expires" value="'+escapeHtml(String(u.access_expires_at||'').slice(0,10))+'"/></div>'
+        +'<div class="f"><label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;">'
+          +'<input type="checkbox" id="edit_staff_magic" '+(u.magic_link?'checked':'')+' style="width:16px;height:16px;min-width:16px;flex:0 0 16px;margin:0;accent-color:#2563eb;"/>'
+          +'<span><strong>Passwordless (magic-link) sign-in</strong> — for consultants / external users. When on, they sign in with an emailed link; when off, this account uses a password (regular staff).</span></label></div>'
         +'<div class="box-bg-card txt-help">Role + feature changes take effect the next time this staff member signs in. Restricting features hides those functions and blocks their pages; it does not grant approval rights (set separately in Approval Authority). Access Expires denies sign-in after that date (reversible — clear or extend it to restore).</div>'
       +'</div>'
       +'<div class="modal-footer">'
@@ -8227,6 +8233,18 @@ async function saveStaffEdit(id, original, modal) {
         if(!er.ok) console.warn('[access-expiry] save skipped — run the staff.access_expires_at migration', er.status);
         else auditEntry('SETTINGS', 'settings_user_expiry', 'Access expiry for '+name+': '+(expVal||'none'), window.currentRole||'ed');
       } catch(e){ console.warn('[access-expiry] save error', e); }
+      // Magic-link eligibility — separate best-effort PATCH (new column).
+      try {
+        var magicEl = document.getElementById('edit_staff_magic');
+        var magicVal = !!(magicEl && magicEl.checked);
+        var mr = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id, {
+          method: 'PATCH',
+          headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+          body: JSON.stringify({ magic_link: magicVal })
+        });
+        if(!mr.ok) console.warn('[magic-link] save skipped — run the staff.magic_link migration', mr.status);
+        else auditEntry('SETTINGS', 'settings_user_magic_link', 'Magic-link sign-in for '+name+': '+(magicVal?'enabled':'disabled'), window.currentRole||'ed');
+      } catch(e){ console.warn('[magic-link] save error', e); }
       modal.remove();
       showToast('✓ Staff member updated');
       auditEntry('SETTINGS', 'settings_user_edit', 'Staff updated: '+name+' — role set to '+hrole, window.currentRole||'ed');
