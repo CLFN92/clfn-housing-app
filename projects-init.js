@@ -1334,8 +1334,19 @@ function _prjRenderPnl() {
 
   var totalVar = budgetTotal - actualTotal;
   var funded = Number(d.budget) || 0;
-  var fundedNote = (funded > 0 && Math.abs(budgetTotal - funded) >= 0.005)
-    ? '<div style="font-size:12px;color:var(--warn-amber-text,#b45309);margin-top:8px;">⚠️ Milestone budgets total ' + _prjMoney(budgetTotal, true) + ', but the project\'s funded budget is ' + _prjMoney(funded, true) + '.</div>'
+  // Funded-budget comparison row: how the milestone budget allocation stacks
+  // up against what the funder(s) actually granted. Positive variance =
+  // unallocated funding still available; negative = milestones are budgeted
+  // beyond the funded amount.
+  var fundedRow = funded > 0
+    ? '<tr><td style="color:var(--muted);">Project funded budget</td>' +
+        '<td style="text-align:right;font-weight:600;">' + _prjMoney(funded, true) + '</td>' +
+        '<td style="text-align:right;color:var(--muted);">—</td>' +
+        varCell(funded - budgetTotal, true) +
+      '<td></td></tr>'
+    : '';
+  var fundedNote = (funded > 0 && budgetTotal - funded >= 0.005)
+    ? '<div style="font-size:12px;color:var(--warn-amber-text,#b45309);margin-top:8px;">⚠️ Milestone budgets total ' + _prjMoney(budgetTotal, true) + ' — ' + _prjMoney(budgetTotal - funded, true) + ' more than the ' + _prjMoney(funded, true) + ' funded budget.</div>'
     : '';
 
   host.innerHTML =
@@ -1349,7 +1360,7 @@ function _prjRenderPnl() {
             '<td style="text-align:right;font-weight:700;">' + _prjMoney(budgetTotal, true) + '</td>' +
             '<td style="text-align:right;font-weight:700;">' + _prjMoney(actualTotal, true) + '</td>' +
             varCell(totalVar, budgetTotal > 0) +
-          '<td></td></tr></tbody></table></div>' + fundedNote +
+          '<td></td></tr>' + fundedRow + '</tbody></table></div>' + fundedNote +
           (hiddenNames.length
             ? '<div style="font-size:12px;color:var(--muted);margin-top:8px;">Hidden from P &amp; L: ' +
                 hiddenNames.map(function(h){ return _prjEsc(h.name) + ' <button type="button" class="btn btn-ghost" style="padding:1px 7px;font-size:10px;" onclick="_prjPnlRestore(' + h.i + ')">restore</button>'; }).join(' · ') +
