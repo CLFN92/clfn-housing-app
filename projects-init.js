@@ -446,6 +446,76 @@ function openPrjModal(id) {
   if (typeof _initScrollCollapse === 'function') {
     _initScrollCollapse(modal.querySelector('.tic-body'), modal.querySelector('.tic-strip'));
   }
+
+  // Auto-save: any field edit inside the tab body schedules a silent save
+  // (saved projects only — a new project still needs its first explicit
+  // Save so the CP number is assigned deliberately). The .tic-body node is
+  // recreated on every open, so attaching here can't double-wire.
+  var body = modal.querySelector('.tic-body');
+  if (body) {
+    body.addEventListener('input',  _prjScheduleAutoSave);
+    body.addEventListener('change', _prjScheduleAutoSave);
+  }
+  if (p) {
+    var when = p.updated_at ? new Date(p.updated_at) : null;
+    _prjSetSavedIndicator(when && !isNaN(when.getTime()) ? 'Last saved ' + when.toLocaleTimeString() : '');
+  } else {
+    _prjSetSavedIndicator('Draft — not saved yet');
+  }
+}
+
+// ── Auto-save (mirrors the SOW modal's bottom-left saved indicator) ─────────
+var _prjAutoSaveTimer = null;
+var _prjAutoSaveBusy  = false;
+
+function _prjSetSavedIndicator(text) {
+  var el = document.getElementById('prj_saved_indicator');
+  if (el) el.textContent = text || '';
+}
+
+function _prjScheduleAutoSave() {
+  var d = window._prjDraft;
+  if (!d || !d.id || !_prjCanManage()) return;
+  if (_prjAutoSaveTimer) clearTimeout(_prjAutoSaveTimer);
+  _prjAutoSaveTimer = setTimeout(_prjAutoSave, 2500);
+}
+
+async function _prjAutoSave() {
+  _prjAutoSaveTimer = null;
+  var d = window._prjDraft;
+  if (!d || !d.id || !_prjCanManage()) return;
+  if (_prjAutoSaveBusy) { _prjScheduleAutoSave(); return; }
+  _prjAutoSaveBusy = true;
+  _prjSetSavedIndicator('Saving…');
+  try {
+    await _prjSaveProject(_prjBuildRow(d), false);
+    _prjSyncCache(Object.assign({}, d));
+    _prjSetSavedIndicator('✓ Saved ' + new Date().toLocaleTimeString());
+    renderProjectsList();
+  } catch(e) {
+    console.warn('[Projects] auto-save:', e);
+    _prjSetSavedIndicator('⚠ Auto-save failed — use Save Project');
+  } finally {
+    _prjAutoSaveBusy = false;
+  }
+}
+
+// One row-builder shared by explicit save and auto-save.
+function _prjBuildRow(d) {
+  return {
+    id: d.id,
+    project_number: d.project_number || _prjNextNumber(),
+    name: (d.name || '').trim() || 'Untitled project',
+    type: d.type || 'house_build',
+    status: d.status || 'planning',
+    funding_source: d.funding_source || null,
+    budget: (d.budget === '' || d.budget == null) ? null : Number(d.budget),
+    start_date: d.start_date || null,
+    target_date: d.target_date || null,
+    archived: false,
+    data: d.data,
+    updated_at: new Date().toISOString(),
+  };
 }
 
 function closePrjModal() {
@@ -497,6 +567,7 @@ function _prjBuildModalHTML() {
       '</div>' +
 
       '<div class="tic-footer">' +
+        '<div id="prj_saved_indicator" class="txt-muted-sm"></div>' +
         (d.id ? '<button type="button" onclick="_prjArchiveProject()" class="btn btn-ghost">🗄 Archive</button>' : '') +
         '<span class="tic-footer-spacer"></span>' +
         '<button type="button" onclick="closePrjModal()" class="btn btn-ghost" data-prj-keep>Cancel</button>' +
@@ -547,10 +618,17 @@ function _prjRenderOverview() {
   var grants = d.data.grants || [];
   var hasGrants = grants.length > 0;
   var grantRows = grants.map(function(g, i) {
+    var agrChip = (g.doc && g.doc.path)
+      ? '<span class="prj-doc-chip prj-doc-ok">' +
+          '<a href="#" onclick="_prjOpenGrantDoc(' + i + ');return false;" title="Open ' + _prjEsc(g.doc.name || 'funding agreement') + '">📄 Agreement</a>' +
+          '<button type="button" title="Detach the funding agreement" onclick="_prjUnlinkGrantDoc(' + i + ')">✕</button>' +
+        '</span>'
+      : '<button type="button" class="prj-doc-chip prj-doc-missing" title="Attach the signed funding agreement" onclick="_prjAttachGrantDoc(' + i + ')">📎 Agreement</button>';
     return '<div class="prj-row prj-row-grant">' +
       '<input class="tic-input" type="text" placeholder="Funder (e.g. ISC, CMHC, OFNLP)" value="' + _prjEsc(g.source || '') + '" oninput="_prjGrantField(' + i + ',\'source\',this.value)"/>' +
       '<input class="tic-input" type="text" placeholder="Agreement / reference #" value="' + _prjEsc(g.reference || '') + '" oninput="_prjGrantField(' + i + ',\'reference\',this.value)"/>' +
       '<input class="tic-input" type="number" min="0" step="0.01" placeholder="Amount" value="' + (g.amount != null ? _prjEsc(g.amount) : '') + '" onchange="_prjGrantField(' + i + ',\'amount\',this.value);_prjGrantsRecalc()"/>' +
+      '<div style="display:flex;align-items:center;">' + agrChip + '</div>' +
       '<button type="button" class="prj-row-remove" title="Remove grant" onclick="_prjGrantRemove(' + i + ')">✕</button>' +
     '</div>';
   }).join('');
@@ -618,13 +696,95 @@ function _prjGrantAdd() {
   if (!d.data.grants) d.data.grants = [];
   d.data.grants.push({ id: _prjUuid(), source: '', reference: '', amount: null });
   _prjGrantsRecalc();
+  _prjScheduleAutoSave();
 }
 function _prjGrantRemove(i) {
   var d = window._prjDraft;
   if (!d.data.grants || !d.data.grants[i]) return;
   d.data.grants.splice(i, 1);
   _prjGrantsRecalc();
+  _prjScheduleAutoSave();
 }
+// Funding-agreement attachment per grant (g.doc = {path, name}) — same
+// pattern as the expense compliance docs: upload to projects/<id>/grants/,
+// meta entity 'project' so the agreement also files into the Documents tab.
+function _prjAttachGrantDoc(i) {
+  var d = window._prjDraft;
+  if (!d || !_prjCanManage()) return;
+  if (!d.id) { showToast('Save the project first, then attach the agreement', { type: 'error' }); return; }
+  var g = d.data.grants && d.data.grants[i];
+  if (!g) return;
+
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.png,.jpg,.jpeg,.doc,.docx';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = async function() {
+    var file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) { showToast('File is too large (25 MB max)', { type: 'error' }); return; }
+    var safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
+    var path = 'projects/' + d.id + '/grants/' + g.id + '/' + safeName;
+    try {
+      showToast('Uploading ' + safeName + '…');
+      await sbUploadFile(path, file);
+      if (typeof sbSaveFileMeta === 'function') {
+        sbSaveFileMeta('project', d.id, path, file.name, file.size, file.type);
+      }
+      g.doc = { path: path, name: file.name };
+      await _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false);
+      _prjSyncCache(d);
+      if (typeof auditEntry === 'function') {
+        auditEntry('PRJ:' + d.id, 'project_grant_doc_attached', 'Funding agreement ' + file.name + ' attached to grant ' + (g.source || g.reference || '') + ' on ' + (d.project_number || d.name));
+      }
+      _prjRenderOverview();
+      showToast('Funding agreement attached');
+    } catch(e) {
+      console.warn('[Projects] grant doc upload:', e);
+      showToast('Upload failed — check your connection and try again', { type: 'error' });
+    }
+  };
+  input.click();
+}
+
+async function _prjOpenGrantDoc(i) {
+  var d = window._prjDraft;
+  var g = d && d.data.grants && d.data.grants[i];
+  if (!g || !g.doc || !g.doc.path) return;
+  try {
+    var url = await sbGetSignedUrl(g.doc.path);
+    if (url) window.open(url, '_blank', 'noopener');
+    else showToast('Could not open the agreement', { type: 'error' });
+  } catch(err) {
+    console.warn('[Projects] open grant doc:', err);
+    showToast('Could not open the agreement', { type: 'error' });
+  }
+}
+
+function _prjUnlinkGrantDoc(i) {
+  var d = window._prjDraft;
+  if (!d || !_prjCanManage()) return;
+  var g = d.data.grants && d.data.grants[i];
+  if (!g || !g.doc || typeof showConfirm !== 'function') return;
+  showConfirm({
+    title: 'Detach funding agreement?',
+    message: 'Detach "' + _prjEsc(g.doc.name || '') + '" from this grant? The file itself stays in the project\'s Documents tab.',
+    confirmText: 'Detach',
+  }).then(async function(ok) {
+    if (!ok) return;
+    delete g.doc;
+    if (d.id) {
+      try {
+        await _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false);
+        _prjSyncCache(d);
+      } catch(err) { console.warn('[Projects] detach grant doc save:', err); }
+    }
+    _prjRenderOverview();
+  });
+}
+
 // When grants exist the project budget is their sum; funding_source becomes
 // the funder names joined (keeps the column searchable / meaningful).
 function _prjGrantsRecalc() {
@@ -689,6 +849,7 @@ function _prjTypeChanged(val) {
     });
     _prjRenderMilestones();
     _prjRenderCosts();
+    _prjScheduleAutoSave();
   };
   if (untouched) { apply(); return; }
   if (typeof showConfirm === 'function') {
@@ -708,7 +869,12 @@ function _prjRenderMilestones() {
   var ms = d.data.milestones || [];
 
   var rows = ms.map(function(m, i) {
+    var mover = '<span class="prj-ms-mover">' +
+      '<button type="button" title="Move up" ' + (i === 0 ? 'disabled ' : '') + 'onclick="_prjMsMove(' + i + ', -1)">▲</button>' +
+      '<button type="button" title="Move down" ' + (i === ms.length - 1 ? 'disabled ' : '') + 'onclick="_prjMsMove(' + i + ', 1)">▼</button>' +
+    '</span>';
     return '<div class="prj-row prj-row-ms' + (m.done ? ' prj-row-done' : '') + '">' +
+      mover +
       '<input type="checkbox"' + (m.done ? ' checked' : '') + ' title="Mark complete" onchange="_prjMsToggle(' + i + ', this.checked)" style="accent-color:var(--yellow);width:16px;height:16px;cursor:pointer;"/>' +
       '<div style="min-width:0;">' +
         '<input class="tic-input" type="text" placeholder="Milestone name…" value="' + _prjEsc(m.name || '') + '" oninput="_prjMsField(' + i + ',\'name\',this.value)"/>' +
@@ -733,6 +899,16 @@ function _prjMsField(i, key, val) {
   var ms = window._prjDraft.data.milestones;
   if (ms && ms[i]) ms[i][key] = val;
 }
+function _prjMsMove(i, dir) {
+  var ms = window._prjDraft.data.milestones;
+  var j = i + dir;
+  if (!ms || !ms[i] || j < 0 || j >= ms.length) return;
+  var tmp = ms[i]; ms[i] = ms[j]; ms[j] = tmp;
+  _prjRenderMilestones();
+  _prjRenderPnl();   // the P & L rows follow milestone order
+  _prjScheduleAutoSave();
+}
+
 function _prjMsToggle(i, checked) {
   var ms = window._prjDraft.data.milestones;
   if (!ms || !ms[i]) return;
@@ -742,6 +918,7 @@ function _prjMsToggle(i, checked) {
 }
 function _prjMsAdd() {
   window._prjDraft.data.milestones.push({ id: _prjUuid(), name: '', targetDate: null, done: false, completedDate: null, notes: '', budgetAmount: null });
+  _prjScheduleAutoSave();
   _prjRenderMilestones();
   var host = document.getElementById('prj_panel_milestones');
   var inputs = host ? host.querySelectorAll('.prj-row-ms input[type="text"]') : [];
@@ -751,6 +928,7 @@ function _prjMsRemove(i) {
   window._prjDraft.data.milestones.splice(i, 1);
   _prjRenderMilestones();
   _prjRenderCosts();
+  _prjScheduleAutoSave();
 }
 
 // ── Costs tab ────────────────────────────────────────────────────────────────
@@ -794,15 +972,19 @@ function _prjRenderCosts() {
       ? '<span style="font-size:11px;font-weight:700;color:#1d4ed8;background:#eff6ff;border-radius:10px;padding:2px 8px;white-space:nowrap;">Claimed · ' + _prjEsc(claimed.number) + '</span>'
       : '';
 
+    var vendorInfo = [e.vendorAddress, e.vendorPhone].filter(Boolean).join(' · ');
+    var vendorCell = e.contractorId
+      ? '<a href="contractors.html?openContractor=' + encodeURIComponent(e.contractorId) + '" title="Open the contractor file' + (vendorInfo ? ' — ' + _prjEsc(vendorInfo) : '') + '" style="color:var(--text);text-decoration:underline;">🔗 ' + _prjEsc(e.vendor || '—') + '</a>'
+      : '<span' + (vendorInfo ? ' title="' + _prjEsc(vendorInfo) + '"' : '') + '>' + _prjEsc(e.vendor || '—') + '</span>';
     return '<div class="prj-row prj-row-exp' + (claimed ? ' prj-row-claimed' : '') + '">' +
       '<div>' + selCell + '</div>' +
       '<div style="font-size:12px;white-space:nowrap;">' + _prjEsc(e.date || '—') + '</div>' +
-      '<div style="font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;">' + _prjEsc(e.vendor || '—') + '</div>' +
+      '<div style="font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;">' + vendorCell + '</div>' +
       '<div style="font-size:12px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;">' + _prjEsc(e.description || '') + '</div>' +
       '<div style="font-size:13px;font-weight:600;text-align:right;white-space:nowrap;">' + _prjMoney(e.amount, true) + '</div>' +
       '<div style="font-size:11px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;">' + (msName ? '🏁 ' + _prjEsc(msName) : '') + '</div>' +
       '<button type="button" class="prj-row-remove" title="Remove expense" onclick="_prjExpRemove(' + i + ')">✕</button>' +
-      '<div class="prj-exp-docs">' + docChips + '<span style="flex:1;"></span>' + docStatus + claimedBadge + '</div>' +
+      '<div class="prj-exp-docs"><span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Docs</span>' + docChips + '<span style="flex:1;"></span>' + docStatus + claimedBadge + '</div>' +
     '</div>';
   }).join('');
 
@@ -840,12 +1022,27 @@ function _prjRenderCosts() {
       '<div class="tic-section-h">Log an Expense</div>' +
       '<div class="tic-grid-3">' +
         '<div class="f"><label>Date</label><input id="prj_exp_date" class="tic-input" type="date" value="' + new Date().toISOString().slice(0, 10) + '"/></div>' +
-        '<div class="f"><label>Vendor / Payee</label><input id="prj_exp_vendor" class="tic-input" type="text" placeholder="e.g. contractor, supplier"/></div>' +
+        '<div class="f" style="position:relative;"><label>Vendor / Payee *</label>' +
+          '<input id="prj_exp_vendor" class="tic-input" type="text" autocomplete="off" placeholder="Search contractors or type a business name…"' +
+            ' oninput="_prjVendorInput(this.value)" onfocus="_prjVendorSearch(this.value)"' +
+            ' onblur="setTimeout(function(){var dd=document.getElementById(\'prj_exp_vendor_dd\');if(dd)dd.style.display=\'none\';},180)"/>' +
+          '<input type="hidden" id="prj_exp_vendor_ctid"/>' +
+          '<div id="prj_exp_vendor_dd" class="prj-vendor-dd" style="display:none;"></div>' +
+          '<div id="prj_exp_vendor_link" style="display:none;font-size:11px;color:#15803d;margin-top:4px;"></div>' +
+        '</div>' +
         '<div class="f"><label>Amount (CAD) *</label><input id="prj_exp_amount" class="tic-input" type="number" min="0" step="0.01" placeholder="0.00"/></div>' +
+        '<div class="f" id="prj_exp_addr_f"><label>Business Address *</label><input id="prj_exp_vendor_addr" class="tic-input" type="text" placeholder="Street, town, province"/></div>' +
+        '<div class="f" id="prj_exp_phone_f"><label>Business Phone *</label><input id="prj_exp_vendor_phone" class="tic-input" type="tel" placeholder="e.g. 705-555-0100"/></div>' +
         '<div class="f"><label>Description</label><input id="prj_exp_desc" class="tic-input" type="text" placeholder="What was this for?"/></div>' +
         '<div class="f"><label>Milestone (optional)</label><select id="prj_exp_ms" class="tic-input">' + msOpts + '</select></div>' +
-        '<div class="f"><label>&nbsp;</label><button type="button" class="btn btn-primary" onclick="_prjExpAdd()">+ Add Expense</button></div>' +
       '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;">' +
+        '<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Attach docs</span>' +
+        '<span id="prj_exp_staged" style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;"></span>' +
+        '<span style="flex:1;"></span>' +
+        '<button type="button" class="btn btn-primary" onclick="_prjExpAdd()">+ Add Expense</button>' +
+      '</div>' +
+      (d.id ? '' : '<div style="font-size:11px;color:var(--muted);margin-top:6px;">Save the project to enable document attachments.</div>') +
     '</div>' +
     '<div class="tic-section">' +
       '<div class="tic-section-h">Expenses (' + exp.length + ')</div>' +
@@ -853,22 +1050,205 @@ function _prjRenderCosts() {
       '<div class="prj-rows">' + (expRows || '<div style="color:var(--muted);font-size:13px;">No expenses logged yet.</div>') + '</div>' +
     '</div>' +
     _prjPaymentRequestSectionHtml();
+  _prjRenderStagedChips();
 }
 
-function _prjExpAdd() {
+// ── Vendor / payee picker ────────────────────────────────────────────────────
+// The vendor field searches the contractor registry (window._contractors —
+// loaded by loadHousingData at boot). Picking a contractor links the expense
+// to it (contractorId; address/phone come from the contractor file). Typing a
+// name without picking = a manual vendor, which requires business name,
+// address, and phone so the funder-compliance record is complete.
+function _prjVendorInput(val) {
+  var ctid = document.getElementById('prj_exp_vendor_ctid');
+  if (ctid && ctid.value) {   // typing breaks an existing contractor link
+    ctid.value = '';
+    _prjVendorSyncManualFields();
+  }
+  _prjVendorSearch(val);
+}
+
+function _prjVendorSearch(q) {
+  var dd = document.getElementById('prj_exp_vendor_dd');
+  if (!dd) return;
+  var list = (window._contractors || []).filter(function(c){ return c && c.name && !c.archived; });
+  var qq = (q || '').toLowerCase().trim();
+  if (qq) {
+    list = list.filter(function(c) {
+      return (c.name || '').toLowerCase().indexOf(qq) !== -1
+          || (c.trade || '').toLowerCase().indexOf(qq) !== -1;
+    });
+  }
+  list = list.slice(0, 8);
+  if (!list.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = list.map(function(c) {
+    return '<div class="prj-vendor-dd-item" onmousedown="_prjVendorPick(\'' + _prjEsc(String(c.id)) + '\')">' +
+      '<span style="font-weight:600;">' + _prjEsc(c.name) + '</span>' +
+      '<span style="color:var(--muted);font-size:11px;"> ' + _prjEsc(c.trade || '') + (c.phone ? ' · ' + _prjEsc(c.phone) : '') + '</span>' +
+    '</div>';
+  }).join('') +
+  '<div class="prj-vendor-dd-item" style="color:var(--muted);font-size:11px;cursor:default;" onmousedown="event.preventDefault()">…or keep typing to enter a vendor manually (address &amp; phone required)</div>';
+  dd.style.display = '';
+}
+
+function _prjVendorPick(ctId) {
+  var ct = (window._contractors || []).find(function(c){ return String(c.id) === ctId; });
+  if (!ct) return;
+  var nameEl = document.getElementById('prj_exp_vendor');
+  var ctidEl = document.getElementById('prj_exp_vendor_ctid');
+  var dd     = document.getElementById('prj_exp_vendor_dd');
+  if (nameEl) nameEl.value = ct.name || '';
+  if (ctidEl) ctidEl.value = String(ct.id);
+  if (dd) dd.style.display = 'none';
+  _prjVendorSyncManualFields();
+}
+
+function _prjVendorUnlink() {
+  var ctidEl = document.getElementById('prj_exp_vendor_ctid');
+  if (ctidEl) ctidEl.value = '';
+  _prjVendorSyncManualFields();
+}
+
+// Linked contractor → hide the manual address/phone fields and show the link
+// line; manual vendor → show + require them.
+function _prjVendorSyncManualFields() {
+  var ctidEl = document.getElementById('prj_exp_vendor_ctid');
+  var linked = !!(ctidEl && ctidEl.value);
+  var addrF  = document.getElementById('prj_exp_addr_f');
+  var phoneF = document.getElementById('prj_exp_phone_f');
+  var link   = document.getElementById('prj_exp_vendor_link');
+  if (addrF)  addrF.style.display  = linked ? 'none' : '';
+  if (phoneF) phoneF.style.display = linked ? 'none' : '';
+  if (link) {
+    if (linked) {
+      var ct = (window._contractors || []).find(function(c){ return String(c.id) === ctidEl.value; });
+      link.innerHTML = '🔗 Linked to contractor file' + (ct && ct.phone ? ' · ' + _prjEsc(ct.phone) : '') +
+        ' <a href="#" onclick="_prjVendorUnlink();return false;" style="color:var(--muted);">unlink</a>';
+      link.style.display = '';
+    } else {
+      link.style.display = 'none';
+    }
+  }
+}
+
+// ── Staged documents on the entry form ───────────────────────────────────────
+// The invoice / EFT / bank proof can be attached while logging the expense —
+// they upload when "+ Add Expense" is clicked, so the docs land on the new
+// cost line immediately instead of requiring a second trip to the row.
+window._prjExpStagedDocs = {};
+
+function _prjRenderStagedChips() {
+  var host = document.getElementById('prj_exp_staged');
+  if (!host) return;
+  var canAttach = !!(window._prjDraft && window._prjDraft.id);
+  host.innerHTML = PRJ_EXP_DOC_KINDS.map(function(k) {
+    var f = window._prjExpStagedDocs[k.k];
+    if (f) {
+      return '<span class="prj-doc-chip prj-doc-ok"><span title="' + _prjEsc(f.name) + '">📄 ' + _prjEsc(k.label) + '</span>' +
+        '<button type="button" title="Remove staged file" onclick="_prjUnstageExpDoc(\'' + k.k + '\')">✕</button></span>';
+    }
+    return '<button type="button" class="prj-doc-chip prj-doc-missing"' + (canAttach ? '' : ' disabled title="Save the project first"') +
+      ' onclick="_prjStageExpDoc(\'' + k.k + '\')">📎 ' + _prjEsc(k.label) + '</button>';
+  }).join('');
+}
+
+function _prjStageExpDoc(kind) {
+  if (!window._prjDraft || !window._prjDraft.id) { showToast('Save the project first, then attach documents', { type: 'error' }); return; }
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = function() {
+    var file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) { showToast('File is too large (25 MB max)', { type: 'error' }); return; }
+    window._prjExpStagedDocs[kind] = file;
+    _prjRenderStagedChips();
+  };
+  input.click();
+}
+
+function _prjUnstageExpDoc(kind) {
+  delete window._prjExpStagedDocs[kind];
+  _prjRenderStagedChips();
+}
+
+// Shared uploader: storage + DocLibrary meta + set the slot on the expense.
+// Does NOT save the project row — callers batch their own save.
+async function _prjUploadExpenseDocFile(e, kind, file) {
+  var d = window._prjDraft;
+  var safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
+  var path = 'projects/' + d.id + '/expenses/' + e.id + '/' + kind + '_' + safeName;
+  await sbUploadFile(path, file);
+  if (typeof sbSaveFileMeta === 'function') {
+    sbSaveFileMeta('project', d.id, path, file.name, file.size, file.type);
+  }
+  if (!e.docs) e.docs = {};
+  e.docs[kind] = { path: path, name: file.name };
+}
+
+async function _prjExpAdd() {
+  var d = window._prjDraft;
   var get = function(id){ var el = document.getElementById(id); return el ? el.value.trim() : ''; };
   var amount = Number(get('prj_exp_amount'));
   if (!amount || amount <= 0) { showToast('Enter an expense amount', { type: 'error' }); return; }
-  window._prjDraft.data.expenses.push({
+  var vendor = get('prj_exp_vendor');
+  if (!vendor) { showToast('Enter the vendor / payee', { type: 'error' }); return; }
+  var ctId = get('prj_exp_vendor_ctid') || null;
+  var addr = '', phone = '';
+  if (ctId) {
+    var ct = (window._contractors || []).find(function(c){ return String(c.id) === ctId; });
+    addr  = (ct && ct.address) || '';
+    phone = (ct && ct.phone) || '';
+  } else {
+    addr  = get('prj_exp_vendor_addr');
+    phone = get('prj_exp_vendor_phone');
+    if (!addr || !phone) {
+      showToast('This vendor is not a registered contractor — enter the business address and phone number', { type: 'error' });
+      return;
+    }
+  }
+
+  var expense = {
     id: _prjUuid(),
     date: get('prj_exp_date') || new Date().toISOString().slice(0, 10),
-    vendor: get('prj_exp_vendor'),
+    vendor: vendor,
+    contractorId: ctId,
+    vendorAddress: addr,
+    vendorPhone: phone,
     description: get('prj_exp_desc'),
     amount: Math.round(amount * 100) / 100,
     milestoneId: get('prj_exp_ms') || null,
     enteredBy: (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || 'staff',
     createdAt: new Date().toISOString(),
-  });
+  };
+  d.data.expenses.push(expense);
+
+  // Upload any staged compliance docs onto the new line, then persist so the
+  // uploads can't be orphaned. (Staging is disabled until the project is
+  // saved, so d.id is guaranteed here whenever staged files exist.)
+  var staged = Object.keys(window._prjExpStagedDocs || {});
+  if (staged.length && d.id) {
+    var failed = 0;
+    for (var i = 0; i < staged.length; i++) {
+      try { await _prjUploadExpenseDocFile(expense, staged[i], window._prjExpStagedDocs[staged[i]]); }
+      catch(e) { console.warn('[Projects] staged doc upload:', e); failed++; }
+    }
+    try {
+      await _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false);
+      _prjSyncCache(d);
+    } catch(e) { console.warn('[Projects] expense save:', e); }
+    if (failed) showToast(failed + ' document upload' + (failed === 1 ? '' : 's') + ' failed — re-attach from the cost line', { type: 'error' });
+  } else if (d.id) {
+    // Persist the new line right away (matches the attach-doc behavior).
+    _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false)
+      .then(function(){ _prjSyncCache(d); })
+      .catch(function(e){ console.warn('[Projects] expense save:', e); });
+  }
+
+  window._prjExpStagedDocs = {};
   _prjRenderCosts();
   _prjRefreshStrip();
 }
@@ -880,7 +1260,7 @@ function _prjExpRemove(i) {
     showToast('This cost line is part of payment request ' + (exp[i].claimedNumber || '') + ' — undo that request first', { type: 'error' });
     return;
   }
-  var doIt = function() { delete window._prjReqSel[exp[i].id]; exp.splice(i, 1); _prjRenderCosts(); _prjRefreshStrip(); };
+  var doIt = function() { delete window._prjReqSel[exp[i].id]; exp.splice(i, 1); _prjRenderCosts(); _prjRefreshStrip(); _prjScheduleAutoSave(); };
   if (typeof showConfirm === 'function') {
     showConfirm({ title: 'Remove expense?', message: 'Remove this ' + _prjMoney(exp[i].amount, true) + ' expense from the project?', confirmText: 'Remove', danger: true })
       .then(function(ok){ if (ok) doIt(); });
@@ -954,8 +1334,19 @@ function _prjRenderPnl() {
 
   var totalVar = budgetTotal - actualTotal;
   var funded = Number(d.budget) || 0;
-  var fundedNote = (funded > 0 && Math.abs(budgetTotal - funded) >= 0.005)
-    ? '<div style="font-size:12px;color:var(--warn-amber-text,#b45309);margin-top:8px;">⚠️ Milestone budgets total ' + _prjMoney(budgetTotal, true) + ', but the project\'s funded budget is ' + _prjMoney(funded, true) + '.</div>'
+  // Funded-budget comparison row: how the milestone budget allocation stacks
+  // up against what the funder(s) actually granted. Positive variance =
+  // unallocated funding still available; negative = milestones are budgeted
+  // beyond the funded amount.
+  var fundedRow = funded > 0
+    ? '<tr><td style="color:var(--muted);">Project funded budget</td>' +
+        '<td style="text-align:right;font-weight:600;">' + _prjMoney(funded, true) + '</td>' +
+        '<td style="text-align:right;color:var(--muted);">—</td>' +
+        varCell(funded - budgetTotal, true) +
+      '<td></td></tr>'
+    : '';
+  var fundedNote = (funded > 0 && budgetTotal - funded >= 0.005)
+    ? '<div style="font-size:12px;color:var(--warn-amber-text,#b45309);margin-top:8px;">⚠️ Milestone budgets total ' + _prjMoney(budgetTotal, true) + ' — ' + _prjMoney(budgetTotal - funded, true) + ' more than the ' + _prjMoney(funded, true) + ' funded budget.</div>'
     : '';
 
   host.innerHTML =
@@ -969,7 +1360,7 @@ function _prjRenderPnl() {
             '<td style="text-align:right;font-weight:700;">' + _prjMoney(budgetTotal, true) + '</td>' +
             '<td style="text-align:right;font-weight:700;">' + _prjMoney(actualTotal, true) + '</td>' +
             varCell(totalVar, budgetTotal > 0) +
-          '<td></td></tr></tbody></table></div>' + fundedNote +
+          '<td></td></tr>' + fundedRow + '</tbody></table></div>' + fundedNote +
           (hiddenNames.length
             ? '<div style="font-size:12px;color:var(--muted);margin-top:8px;">Hidden from P &amp; L: ' +
                 hiddenNames.map(function(h){ return _prjEsc(h.name) + ' <button type="button" class="btn btn-ghost" style="padding:1px 7px;font-size:10px;" onclick="_prjPnlRestore(' + h.i + ')">restore</button>'; }).join(' · ') +
@@ -992,6 +1383,7 @@ function _prjPnlHide(i) {
   if (!ms || !ms[i]) return;
   ms[i].pnlHidden = true;
   _prjRenderPnl();
+  _prjScheduleAutoSave();
 }
 
 function _prjPnlRestore(i) {
@@ -999,6 +1391,7 @@ function _prjPnlRestore(i) {
   if (!ms || !ms[i]) return;
   delete ms[i].pnlHidden;
   _prjRenderPnl();
+  _prjScheduleAutoSave();
 }
 
 // ── Expense document attachments (funder compliance) ─────────────────────────
@@ -1387,7 +1780,9 @@ function _prjGenerateRequestPdf(req, exp) {
           var docsCol = PRJ_EXP_DOC_KINDS.map(function(k) {
             return (k.k === 'invoice' ? 'Inv' : k.k === 'eft' ? 'EFT' : 'Bank') + (_prjExpDoc(e, k.k) ? ' Y' : ' -');
           }).join('  ');
-          return [e.date || '', e.vendor || '', e.description || '', '$' + (Number(e.amount) || 0).toFixed(2), docsCol];
+          var vendorCol = (e.vendor || '') +
+            ((e.vendorAddress || e.vendorPhone) ? '\n' + [e.vendorAddress, e.vendorPhone].filter(Boolean).join(' / ') : '');
+          return [e.date || '', vendorCol, e.description || '', '$' + (Number(e.amount) || 0).toFixed(2), docsCol];
         });
         rows.push(['', '', 'TOTAL REQUESTED', '$' + (Number(req.total) || 0).toFixed(2), '']);
 
@@ -2119,19 +2514,9 @@ async function savePrjProject() {
   if (!d.name || !d.name.trim()) { showToast('Project name is required', { type: 'error' }); _prjSwitchTab('overview'); return; }
 
   var isNew = !d.id;
-  var row = {
-    project_number: d.project_number || _prjNextNumber(),
-    name: d.name.trim(),
-    type: d.type || 'house_build',
-    status: d.status || 'planning',
-    funding_source: d.funding_source || null,
-    budget: (d.budget === '' || d.budget == null) ? null : Number(d.budget),
-    start_date: d.start_date || null,
-    target_date: d.target_date || null,
-    archived: false,
-    data: d.data,
-  };
-  if (!isNew) { row.id = d.id; row.updated_at = new Date().toISOString(); }
+  var row = _prjBuildRow(d);
+  row.name = d.name.trim();
+  if (isNew) { delete row.id; delete row.updated_at; }
 
   var btn = document.getElementById('prj_save_btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
@@ -2153,6 +2538,7 @@ async function savePrjProject() {
     _prjRenderLots();     // a just-saved project unlocks the lots tab
     _prjMountDocsIfOpen();
     renderProjectsList();
+    _prjSetSavedIndicator('✓ Saved ' + new Date().toLocaleTimeString());
     showToast(isNew ? 'Project ' + (d.project_number || '') + ' created' : 'Project saved');
   } catch(e) {
     console.warn('[Projects] save:', e);
