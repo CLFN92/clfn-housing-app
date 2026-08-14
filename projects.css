@@ -106,7 +106,7 @@
 }
 .prj-row-ms    { grid-template-columns: auto 1fr 150px 24px; }
 .prj-row-exp   { grid-template-columns: 24px 100px 1fr 1fr 110px 120px 24px; }
-.prj-row-grant { grid-template-columns: 1fr 1fr 150px 24px; }
+.prj-row-grant { grid-template-columns: 1fr 1fr 130px auto 24px; }
 @media (max-width: 760px) {
   .prj-row-ms    { grid-template-columns: auto 1fr; }
   .prj-row-exp   { grid-template-columns: auto 1fr 1fr; }

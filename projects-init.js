@@ -547,10 +547,17 @@ function _prjRenderOverview() {
   var grants = d.data.grants || [];
   var hasGrants = grants.length > 0;
   var grantRows = grants.map(function(g, i) {
+    var agrChip = (g.doc && g.doc.path)
+      ? '<span class="prj-doc-chip prj-doc-ok">' +
+          '<a href="#" onclick="_prjOpenGrantDoc(' + i + ');return false;" title="Open ' + _prjEsc(g.doc.name || 'funding agreement') + '">📄 Agreement</a>' +
+          '<button type="button" title="Detach the funding agreement" onclick="_prjUnlinkGrantDoc(' + i + ')">✕</button>' +
+        '</span>'
+      : '<button type="button" class="prj-doc-chip prj-doc-missing" title="Attach the signed funding agreement" onclick="_prjAttachGrantDoc(' + i + ')">📎 Agreement</button>';
     return '<div class="prj-row prj-row-grant">' +
       '<input class="tic-input" type="text" placeholder="Funder (e.g. ISC, CMHC, OFNLP)" value="' + _prjEsc(g.source || '') + '" oninput="_prjGrantField(' + i + ',\'source\',this.value)"/>' +
       '<input class="tic-input" type="text" placeholder="Agreement / reference #" value="' + _prjEsc(g.reference || '') + '" oninput="_prjGrantField(' + i + ',\'reference\',this.value)"/>' +
       '<input class="tic-input" type="number" min="0" step="0.01" placeholder="Amount" value="' + (g.amount != null ? _prjEsc(g.amount) : '') + '" onchange="_prjGrantField(' + i + ',\'amount\',this.value);_prjGrantsRecalc()"/>' +
+      '<div style="display:flex;align-items:center;">' + agrChip + '</div>' +
       '<button type="button" class="prj-row-remove" title="Remove grant" onclick="_prjGrantRemove(' + i + ')">✕</button>' +
     '</div>';
   }).join('');
@@ -625,6 +632,86 @@ function _prjGrantRemove(i) {
   d.data.grants.splice(i, 1);
   _prjGrantsRecalc();
 }
+// Funding-agreement attachment per grant (g.doc = {path, name}) — same
+// pattern as the expense compliance docs: upload to projects/<id>/grants/,
+// meta entity 'project' so the agreement also files into the Documents tab.
+function _prjAttachGrantDoc(i) {
+  var d = window._prjDraft;
+  if (!d || !_prjCanManage()) return;
+  if (!d.id) { showToast('Save the project first, then attach the agreement', { type: 'error' }); return; }
+  var g = d.data.grants && d.data.grants[i];
+  if (!g) return;
+
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.png,.jpg,.jpeg,.doc,.docx';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = async function() {
+    var file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) { showToast('File is too large (25 MB max)', { type: 'error' }); return; }
+    var safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
+    var path = 'projects/' + d.id + '/grants/' + g.id + '/' + safeName;
+    try {
+      showToast('Uploading ' + safeName + '…');
+      await sbUploadFile(path, file);
+      if (typeof sbSaveFileMeta === 'function') {
+        sbSaveFileMeta('project', d.id, path, file.name, file.size, file.type);
+      }
+      g.doc = { path: path, name: file.name };
+      await _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false);
+      _prjSyncCache(d);
+      if (typeof auditEntry === 'function') {
+        auditEntry('PRJ:' + d.id, 'project_grant_doc_attached', 'Funding agreement ' + file.name + ' attached to grant ' + (g.source || g.reference || '') + ' on ' + (d.project_number || d.name));
+      }
+      _prjRenderOverview();
+      showToast('Funding agreement attached');
+    } catch(e) {
+      console.warn('[Projects] grant doc upload:', e);
+      showToast('Upload failed — check your connection and try again', { type: 'error' });
+    }
+  };
+  input.click();
+}
+
+async function _prjOpenGrantDoc(i) {
+  var d = window._prjDraft;
+  var g = d && d.data.grants && d.data.grants[i];
+  if (!g || !g.doc || !g.doc.path) return;
+  try {
+    var url = await sbGetSignedUrl(g.doc.path);
+    if (url) window.open(url, '_blank', 'noopener');
+    else showToast('Could not open the agreement', { type: 'error' });
+  } catch(err) {
+    console.warn('[Projects] open grant doc:', err);
+    showToast('Could not open the agreement', { type: 'error' });
+  }
+}
+
+function _prjUnlinkGrantDoc(i) {
+  var d = window._prjDraft;
+  if (!d || !_prjCanManage()) return;
+  var g = d.data.grants && d.data.grants[i];
+  if (!g || !g.doc || typeof showConfirm !== 'function') return;
+  showConfirm({
+    title: 'Detach funding agreement?',
+    message: 'Detach "' + _prjEsc(g.doc.name || '') + '" from this grant? The file itself stays in the project\'s Documents tab.',
+    confirmText: 'Detach',
+  }).then(async function(ok) {
+    if (!ok) return;
+    delete g.doc;
+    if (d.id) {
+      try {
+        await _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false);
+        _prjSyncCache(d);
+      } catch(err) { console.warn('[Projects] detach grant doc save:', err); }
+    }
+    _prjRenderOverview();
+  });
+}
+
 // When grants exist the project budget is their sum; funding_source becomes
 // the funder names joined (keeps the column searchable / meaningful).
 function _prjGrantsRecalc() {
