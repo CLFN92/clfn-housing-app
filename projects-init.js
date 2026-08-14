@@ -885,17 +885,39 @@ function _prjRenderLots() {
     '</tr>';
   }).join('');
 
+  // Existing units/lots linked directly to the project (not via a project-lot).
+  var _lotUnitIds = {};
+  lots.forEach(function(l){ if (l.unit_id) _lotUnitIds[l.unit_id] = true; });
+  var directLinked = units.filter(function(u){ return u && !_lotUnitIds[u.id]; });
+  var directRows = directLinked.map(function(u){
+    var isLot = (typeof _isLot === 'function' && _isLot(u));
+    var tag = isLot
+      ? '<span style="font-size:10px;font-weight:700;color:#15803d;">LOT</span>'
+      : '<span style="font-size:10px;font-weight:700;color:#1d4ed8;">UNIT</span>';
+    return '<tr><td>' + tag + '</td>' +
+      '<td style="font-weight:600;">' + _prjEsc(((u.num || '') + ' ' + (u.street || '')).trim()) + '</td>' +
+      '<td style="white-space:nowrap;">' + (_prjCanManage()
+        ? '<button type="button" class="btn btn-ghost" style="padding:4px 10px;font-size:11px;" onclick="_prjUnlinkExisting(\'' + _prjEsc(u.id) + '\')">Unlink</button>'
+        : '') + '</td></tr>';
+  }).join('');
+
   host.innerHTML =
     '<div class="tic-section">' +
       '<div class="tic-section-h">Lots (' + lots.length + ') — ' + units.length + ' unit' + (units.length === 1 ? '' : 's') + ' linked to this project</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
         '<button type="button" class="btn btn-ghost" onclick="_prjAddLotsBatch()">+ Add Lots</button>' +
         '<button type="button" class="btn btn-ghost" onclick="_prjCreateUnitsFromLots()">🏠 Create Units from Lots</button>' +
+        '<button type="button" class="btn btn-ghost" onclick="_prjLinkExisting()">🔗 Link Existing Unit / Lot</button>' +
       '</div>' +
       (lots.length
         ? '<div class="prj-table-wrap"><table class="prj-table"><thead><tr><th>Lot #</th><th>Address / Legal</th><th>Status</th><th>Unit</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-        : '<div style="color:var(--muted);font-size:13px;">No lots yet. Use "+ Add Lots" to create them' + (d.type !== 'lot_development' ? ', or "Create Units from Lots" once lots exist' : '') + '.</div>') +
-    '</div>';
+        : '<div style="color:var(--muted);font-size:13px;">No lots yet. Use "+ Add Lots" to create them' + (d.type !== 'lot_development' ? ', or "Create Units from Lots" once lots exist' : '') + '. You can also link an existing unit or lot above.</div>') +
+    '</div>' +
+    (directLinked.length
+      ? '<div class="tic-section"><div class="tic-section-h">Linked existing units &amp; lots (' + directLinked.length + ')</div>' +
+          '<div class="prj-table-wrap"><table class="prj-table"><thead><tr><th style="width:60px;">Type</th><th>Address</th><th></th></tr></thead><tbody>' + directRows + '</tbody></table></div>' +
+        '</div>'
+      : '');
 }
 
 function _prjAddLotsBatch() {
@@ -1081,6 +1103,86 @@ async function _prjConfirmLinkUnit(lotId) {
     showToast('Could not link the unit', { type: 'error' });
   }
 }
+
+// ── Link an EXISTING unit or (inventory) lot directly to the project ──────────
+// Unlike "Link existing unit" (which attaches a unit to a project-lot), this
+// associates any existing housing_units record -- a building OR a vacant lot
+// (record_type:'lot') -- with the project by stamping projectId, so a project
+// can cover existing units/lots, not only newly-created ones.
+function _prjLinkExisting() {
+  var d = window._prjDraft;
+  if (!d || !d.id || !_prjCanManage()) return;
+  var candidates = (window.housingUnits || [])
+    .filter(function(u){ return u && !u.archived && !u.projectId; })
+    .map(function(u){
+      var isLot = (typeof _isLot === 'function' && _isLot(u));
+      return { id: u.id, label: ((u.num || '') + ' ' + (u.street || '')).trim() + (isLot ? '  (Vacant Lot)' : '') };
+    });
+  if (!candidates.length) { showToast('No unlinked units or lots available'); return; }
+
+  var ov = document.createElement('div');
+  ov.id = 'prjLinkExModal';
+  ov.className = 'modal-overlay modal-overlay-centered modal-z-1100 is-open';
+  ov.innerHTML =
+    '<div class="modal-body modal-body-sm">' +
+      '<div class="modal-hdr"><div class="modal-hdr-title">Link Existing Unit or Lot</div>' +
+        '<button type="button" class="btn-close-dark-30" onclick="document.getElementById(\'prjLinkExModal\').remove()">&times;</button></div>' +
+      '<div class="modal-body-stack" style="padding:18px 24px;">' +
+        '<div class="f"><label>Unit or Lot</label><div id="prj_linkex_wrap"></div></div>' +
+        '<div class="txt-help">Associates an existing building or vacant lot with this project (counts toward cost allocation).</div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button type="button" class="btn btn-ghost" onclick="document.getElementById(\'prjLinkExModal\').remove()">Cancel</button>' +
+        '<button id="prj_linkex_confirm" type="button" class="btn btn-primary" disabled onclick="_prjConfirmLinkExisting()">Link</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+
+  window._prjLinkExPick = null;
+  if (typeof clfnSearchSelect === 'function') {
+    clfnSearchSelect({
+      wrap: document.getElementById('prj_linkex_wrap'),
+      items: candidates,
+      placeholder: 'Search units or lots…',
+      onChange: function(id){ window._prjLinkExPick = id || null; var b = document.getElementById('prj_linkex_confirm'); if (b) b.disabled = !id; },
+    });
+  }
+}
+async function _prjConfirmLinkExisting() {
+  var d = window._prjDraft;
+  var unitId = window._prjLinkExPick;
+  if (!d || !unitId) return;
+  var u = (window.housingUnits || []).find(function(x){ return x.id === unitId; });
+  if (!u) return;
+  u.projectId = d.id;
+  try {
+    if (typeof saveUnitWithDraftFallback === 'function') await saveUnitWithDraftFallback(u);
+    else await sbSaveUnit(u);
+    if (typeof auditEntry === 'function') {
+      var isLot = (typeof _isLot === 'function' && _isLot(u));
+      auditEntry('PRJ:' + d.id, 'project_existing_linked', ((u.num || '') + ' ' + (u.street || '')).trim() + (isLot ? ' (lot)' : '') + ' linked to ' + (d.project_number || d.name), window.currentRole || '');
+    }
+  } catch(e) { console.warn('[Projects] link existing:', e); showToast('Could not link', { type: 'error' }); return; }
+  var m = document.getElementById('prjLinkExModal'); if (m) m.remove();
+  _prjRenderLots();
+  renderProjectsList();
+  showToast('Linked to project');
+}
+function _prjUnlinkExisting(unitId) {
+  var d = window._prjDraft;
+  if (!d || !_prjCanManage()) return;
+  var u = (window.housingUnits || []).find(function(x){ return x.id === unitId; });
+  if (!u) return;
+  delete u.projectId; delete u.lotId;
+  try { if (typeof saveUnitWithDraftFallback === 'function') saveUnitWithDraftFallback(u); else sbSaveUnit(u); } catch(e){}
+  if (typeof auditEntry === 'function') auditEntry('PRJ:' + d.id, 'project_existing_unlinked', ((u.num || '') + ' ' + (u.street || '')).trim() + ' unlinked from ' + (d.project_number || d.name), window.currentRole || '');
+  _prjRenderLots();
+  renderProjectsList();
+  showToast('Unlinked from project');
+}
+window._prjLinkExisting = _prjLinkExisting;
+window._prjConfirmLinkExisting = _prjConfirmLinkExisting;
+window._prjUnlinkExisting = _prjUnlinkExisting;
 
 function _prjUnlinkLot(lotId) {
   if (!_prjCanManage()) return;
