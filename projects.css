@@ -104,11 +104,25 @@
   border: 1px solid var(--border);
   border-radius: 8px;
 }
-.prj-row-ms    { grid-template-columns: auto 1fr 150px 24px; }
+.prj-row-ms    { grid-template-columns: auto auto 1fr 150px 24px; }
+.prj-ms-mover  { display: inline-flex; flex-direction: column; gap: 1px; }
+.prj-ms-mover button {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 8px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+.prj-ms-mover button:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
+.prj-ms-mover button:disabled { opacity: .35; cursor: default; }
 .prj-row-exp   { grid-template-columns: 24px 100px 1fr 1fr 110px 120px 24px; }
 .prj-row-grant { grid-template-columns: 1fr 1fr 130px auto 24px; }
 @media (max-width: 760px) {
-  .prj-row-ms    { grid-template-columns: auto 1fr; }
+  .prj-row-ms    { grid-template-columns: auto auto 1fr; }
+  .prj-row-ms .prj-ms-notes { grid-column: 1 / -1; }
   .prj-row-exp   { grid-template-columns: auto 1fr 1fr; }
   .prj-row-grant { grid-template-columns: 1fr 1fr; }
 }
@@ -151,8 +165,33 @@
   cursor: pointer;
 }
 .prj-doc-chip.prj-doc-missing:hover { color: var(--text); border-color: var(--muted); }
+.prj-doc-chip.prj-doc-missing:disabled { opacity: .55; cursor: default; }
+
+/* Vendor / payee contractor typeahead on the expense entry form */
+.prj-vendor-dd {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: 3px;
+}
+.prj-vendor-dd-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.prj-vendor-dd-item:last-child { border-bottom: none; }
+.prj-vendor-dd-item:hover { background: var(--bg); }
 .prj-row.prj-row-done { opacity: .72; }
-.prj-ms-notes { grid-column: 2 / -1; }
+.prj-ms-notes { grid-column: 3 / -1; }
 .prj-row-remove {
   background: none;
   border: none;

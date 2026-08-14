@@ -795,7 +795,12 @@ function _prjRenderMilestones() {
   var ms = d.data.milestones || [];
 
   var rows = ms.map(function(m, i) {
+    var mover = '<span class="prj-ms-mover">' +
+      '<button type="button" title="Move up" ' + (i === 0 ? 'disabled ' : '') + 'onclick="_prjMsMove(' + i + ', -1)">▲</button>' +
+      '<button type="button" title="Move down" ' + (i === ms.length - 1 ? 'disabled ' : '') + 'onclick="_prjMsMove(' + i + ', 1)">▼</button>' +
+    '</span>';
     return '<div class="prj-row prj-row-ms' + (m.done ? ' prj-row-done' : '') + '">' +
+      mover +
       '<input type="checkbox"' + (m.done ? ' checked' : '') + ' title="Mark complete" onchange="_prjMsToggle(' + i + ', this.checked)" style="accent-color:var(--yellow);width:16px;height:16px;cursor:pointer;"/>' +
       '<div style="min-width:0;">' +
         '<input class="tic-input" type="text" placeholder="Milestone name…" value="' + _prjEsc(m.name || '') + '" oninput="_prjMsField(' + i + ',\'name\',this.value)"/>' +
@@ -820,6 +825,15 @@ function _prjMsField(i, key, val) {
   var ms = window._prjDraft.data.milestones;
   if (ms && ms[i]) ms[i][key] = val;
 }
+function _prjMsMove(i, dir) {
+  var ms = window._prjDraft.data.milestones;
+  var j = i + dir;
+  if (!ms || !ms[i] || j < 0 || j >= ms.length) return;
+  var tmp = ms[i]; ms[i] = ms[j]; ms[j] = tmp;
+  _prjRenderMilestones();
+  _prjRenderPnl();   // the P & L rows follow milestone order
+}
+
 function _prjMsToggle(i, checked) {
   var ms = window._prjDraft.data.milestones;
   if (!ms || !ms[i]) return;
@@ -881,15 +895,19 @@ function _prjRenderCosts() {
       ? '<span style="font-size:11px;font-weight:700;color:#1d4ed8;background:#eff6ff;border-radius:10px;padding:2px 8px;white-space:nowrap;">Claimed · ' + _prjEsc(claimed.number) + '</span>'
       : '';
 
+    var vendorInfo = [e.vendorAddress, e.vendorPhone].filter(Boolean).join(' · ');
+    var vendorCell = e.contractorId
+      ? '<a href="contractors.html?openContractor=' + encodeURIComponent(e.contractorId) + '" title="Open the contractor file' + (vendorInfo ? ' — ' + _prjEsc(vendorInfo) : '') + '" style="color:var(--text);text-decoration:underline;">🔗 ' + _prjEsc(e.vendor || '—') + '</a>'
+      : '<span' + (vendorInfo ? ' title="' + _prjEsc(vendorInfo) + '"' : '') + '>' + _prjEsc(e.vendor || '—') + '</span>';
     return '<div class="prj-row prj-row-exp' + (claimed ? ' prj-row-claimed' : '') + '">' +
       '<div>' + selCell + '</div>' +
       '<div style="font-size:12px;white-space:nowrap;">' + _prjEsc(e.date || '—') + '</div>' +
-      '<div style="font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;">' + _prjEsc(e.vendor || '—') + '</div>' +
+      '<div style="font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;">' + vendorCell + '</div>' +
       '<div style="font-size:12px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;">' + _prjEsc(e.description || '') + '</div>' +
       '<div style="font-size:13px;font-weight:600;text-align:right;white-space:nowrap;">' + _prjMoney(e.amount, true) + '</div>' +
       '<div style="font-size:11px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;">' + (msName ? '🏁 ' + _prjEsc(msName) : '') + '</div>' +
       '<button type="button" class="prj-row-remove" title="Remove expense" onclick="_prjExpRemove(' + i + ')">✕</button>' +
-      '<div class="prj-exp-docs">' + docChips + '<span style="flex:1;"></span>' + docStatus + claimedBadge + '</div>' +
+      '<div class="prj-exp-docs"><span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Docs</span>' + docChips + '<span style="flex:1;"></span>' + docStatus + claimedBadge + '</div>' +
     '</div>';
   }).join('');
 
@@ -927,12 +945,27 @@ function _prjRenderCosts() {
       '<div class="tic-section-h">Log an Expense</div>' +
       '<div class="tic-grid-3">' +
         '<div class="f"><label>Date</label><input id="prj_exp_date" class="tic-input" type="date" value="' + new Date().toISOString().slice(0, 10) + '"/></div>' +
-        '<div class="f"><label>Vendor / Payee</label><input id="prj_exp_vendor" class="tic-input" type="text" placeholder="e.g. contractor, supplier"/></div>' +
+        '<div class="f" style="position:relative;"><label>Vendor / Payee *</label>' +
+          '<input id="prj_exp_vendor" class="tic-input" type="text" autocomplete="off" placeholder="Search contractors or type a business name…"' +
+            ' oninput="_prjVendorInput(this.value)" onfocus="_prjVendorSearch(this.value)"' +
+            ' onblur="setTimeout(function(){var dd=document.getElementById(\'prj_exp_vendor_dd\');if(dd)dd.style.display=\'none\';},180)"/>' +
+          '<input type="hidden" id="prj_exp_vendor_ctid"/>' +
+          '<div id="prj_exp_vendor_dd" class="prj-vendor-dd" style="display:none;"></div>' +
+          '<div id="prj_exp_vendor_link" style="display:none;font-size:11px;color:#15803d;margin-top:4px;"></div>' +
+        '</div>' +
         '<div class="f"><label>Amount (CAD) *</label><input id="prj_exp_amount" class="tic-input" type="number" min="0" step="0.01" placeholder="0.00"/></div>' +
+        '<div class="f" id="prj_exp_addr_f"><label>Business Address *</label><input id="prj_exp_vendor_addr" class="tic-input" type="text" placeholder="Street, town, province"/></div>' +
+        '<div class="f" id="prj_exp_phone_f"><label>Business Phone *</label><input id="prj_exp_vendor_phone" class="tic-input" type="tel" placeholder="e.g. 705-555-0100"/></div>' +
         '<div class="f"><label>Description</label><input id="prj_exp_desc" class="tic-input" type="text" placeholder="What was this for?"/></div>' +
         '<div class="f"><label>Milestone (optional)</label><select id="prj_exp_ms" class="tic-input">' + msOpts + '</select></div>' +
-        '<div class="f"><label>&nbsp;</label><button type="button" class="btn btn-primary" onclick="_prjExpAdd()">+ Add Expense</button></div>' +
       '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;">' +
+        '<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Attach docs</span>' +
+        '<span id="prj_exp_staged" style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;"></span>' +
+        '<span style="flex:1;"></span>' +
+        '<button type="button" class="btn btn-primary" onclick="_prjExpAdd()">+ Add Expense</button>' +
+      '</div>' +
+      (d.id ? '' : '<div style="font-size:11px;color:var(--muted);margin-top:6px;">Save the project to enable document attachments.</div>') +
     '</div>' +
     '<div class="tic-section">' +
       '<div class="tic-section-h">Expenses (' + exp.length + ')</div>' +
@@ -940,22 +973,205 @@ function _prjRenderCosts() {
       '<div class="prj-rows">' + (expRows || '<div style="color:var(--muted);font-size:13px;">No expenses logged yet.</div>') + '</div>' +
     '</div>' +
     _prjPaymentRequestSectionHtml();
+  _prjRenderStagedChips();
 }
 
-function _prjExpAdd() {
+// ── Vendor / payee picker ────────────────────────────────────────────────────
+// The vendor field searches the contractor registry (window._contractors —
+// loaded by loadHousingData at boot). Picking a contractor links the expense
+// to it (contractorId; address/phone come from the contractor file). Typing a
+// name without picking = a manual vendor, which requires business name,
+// address, and phone so the funder-compliance record is complete.
+function _prjVendorInput(val) {
+  var ctid = document.getElementById('prj_exp_vendor_ctid');
+  if (ctid && ctid.value) {   // typing breaks an existing contractor link
+    ctid.value = '';
+    _prjVendorSyncManualFields();
+  }
+  _prjVendorSearch(val);
+}
+
+function _prjVendorSearch(q) {
+  var dd = document.getElementById('prj_exp_vendor_dd');
+  if (!dd) return;
+  var list = (window._contractors || []).filter(function(c){ return c && c.name && !c.archived; });
+  var qq = (q || '').toLowerCase().trim();
+  if (qq) {
+    list = list.filter(function(c) {
+      return (c.name || '').toLowerCase().indexOf(qq) !== -1
+          || (c.trade || '').toLowerCase().indexOf(qq) !== -1;
+    });
+  }
+  list = list.slice(0, 8);
+  if (!list.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = list.map(function(c) {
+    return '<div class="prj-vendor-dd-item" onmousedown="_prjVendorPick(\'' + _prjEsc(String(c.id)) + '\')">' +
+      '<span style="font-weight:600;">' + _prjEsc(c.name) + '</span>' +
+      '<span style="color:var(--muted);font-size:11px;"> ' + _prjEsc(c.trade || '') + (c.phone ? ' · ' + _prjEsc(c.phone) : '') + '</span>' +
+    '</div>';
+  }).join('') +
+  '<div class="prj-vendor-dd-item" style="color:var(--muted);font-size:11px;cursor:default;" onmousedown="event.preventDefault()">…or keep typing to enter a vendor manually (address &amp; phone required)</div>';
+  dd.style.display = '';
+}
+
+function _prjVendorPick(ctId) {
+  var ct = (window._contractors || []).find(function(c){ return String(c.id) === ctId; });
+  if (!ct) return;
+  var nameEl = document.getElementById('prj_exp_vendor');
+  var ctidEl = document.getElementById('prj_exp_vendor_ctid');
+  var dd     = document.getElementById('prj_exp_vendor_dd');
+  if (nameEl) nameEl.value = ct.name || '';
+  if (ctidEl) ctidEl.value = String(ct.id);
+  if (dd) dd.style.display = 'none';
+  _prjVendorSyncManualFields();
+}
+
+function _prjVendorUnlink() {
+  var ctidEl = document.getElementById('prj_exp_vendor_ctid');
+  if (ctidEl) ctidEl.value = '';
+  _prjVendorSyncManualFields();
+}
+
+// Linked contractor → hide the manual address/phone fields and show the link
+// line; manual vendor → show + require them.
+function _prjVendorSyncManualFields() {
+  var ctidEl = document.getElementById('prj_exp_vendor_ctid');
+  var linked = !!(ctidEl && ctidEl.value);
+  var addrF  = document.getElementById('prj_exp_addr_f');
+  var phoneF = document.getElementById('prj_exp_phone_f');
+  var link   = document.getElementById('prj_exp_vendor_link');
+  if (addrF)  addrF.style.display  = linked ? 'none' : '';
+  if (phoneF) phoneF.style.display = linked ? 'none' : '';
+  if (link) {
+    if (linked) {
+      var ct = (window._contractors || []).find(function(c){ return String(c.id) === ctidEl.value; });
+      link.innerHTML = '🔗 Linked to contractor file' + (ct && ct.phone ? ' · ' + _prjEsc(ct.phone) : '') +
+        ' <a href="#" onclick="_prjVendorUnlink();return false;" style="color:var(--muted);">unlink</a>';
+      link.style.display = '';
+    } else {
+      link.style.display = 'none';
+    }
+  }
+}
+
+// ── Staged documents on the entry form ───────────────────────────────────────
+// The invoice / EFT / bank proof can be attached while logging the expense —
+// they upload when "+ Add Expense" is clicked, so the docs land on the new
+// cost line immediately instead of requiring a second trip to the row.
+window._prjExpStagedDocs = {};
+
+function _prjRenderStagedChips() {
+  var host = document.getElementById('prj_exp_staged');
+  if (!host) return;
+  var canAttach = !!(window._prjDraft && window._prjDraft.id);
+  host.innerHTML = PRJ_EXP_DOC_KINDS.map(function(k) {
+    var f = window._prjExpStagedDocs[k.k];
+    if (f) {
+      return '<span class="prj-doc-chip prj-doc-ok"><span title="' + _prjEsc(f.name) + '">📄 ' + _prjEsc(k.label) + '</span>' +
+        '<button type="button" title="Remove staged file" onclick="_prjUnstageExpDoc(\'' + k.k + '\')">✕</button></span>';
+    }
+    return '<button type="button" class="prj-doc-chip prj-doc-missing"' + (canAttach ? '' : ' disabled title="Save the project first"') +
+      ' onclick="_prjStageExpDoc(\'' + k.k + '\')">📎 ' + _prjEsc(k.label) + '</button>';
+  }).join('');
+}
+
+function _prjStageExpDoc(kind) {
+  if (!window._prjDraft || !window._prjDraft.id) { showToast('Save the project first, then attach documents', { type: 'error' }); return; }
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = function() {
+    var file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) { showToast('File is too large (25 MB max)', { type: 'error' }); return; }
+    window._prjExpStagedDocs[kind] = file;
+    _prjRenderStagedChips();
+  };
+  input.click();
+}
+
+function _prjUnstageExpDoc(kind) {
+  delete window._prjExpStagedDocs[kind];
+  _prjRenderStagedChips();
+}
+
+// Shared uploader: storage + DocLibrary meta + set the slot on the expense.
+// Does NOT save the project row — callers batch their own save.
+async function _prjUploadExpenseDocFile(e, kind, file) {
+  var d = window._prjDraft;
+  var safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
+  var path = 'projects/' + d.id + '/expenses/' + e.id + '/' + kind + '_' + safeName;
+  await sbUploadFile(path, file);
+  if (typeof sbSaveFileMeta === 'function') {
+    sbSaveFileMeta('project', d.id, path, file.name, file.size, file.type);
+  }
+  if (!e.docs) e.docs = {};
+  e.docs[kind] = { path: path, name: file.name };
+}
+
+async function _prjExpAdd() {
+  var d = window._prjDraft;
   var get = function(id){ var el = document.getElementById(id); return el ? el.value.trim() : ''; };
   var amount = Number(get('prj_exp_amount'));
   if (!amount || amount <= 0) { showToast('Enter an expense amount', { type: 'error' }); return; }
-  window._prjDraft.data.expenses.push({
+  var vendor = get('prj_exp_vendor');
+  if (!vendor) { showToast('Enter the vendor / payee', { type: 'error' }); return; }
+  var ctId = get('prj_exp_vendor_ctid') || null;
+  var addr = '', phone = '';
+  if (ctId) {
+    var ct = (window._contractors || []).find(function(c){ return String(c.id) === ctId; });
+    addr  = (ct && ct.address) || '';
+    phone = (ct && ct.phone) || '';
+  } else {
+    addr  = get('prj_exp_vendor_addr');
+    phone = get('prj_exp_vendor_phone');
+    if (!addr || !phone) {
+      showToast('This vendor is not a registered contractor — enter the business address and phone number', { type: 'error' });
+      return;
+    }
+  }
+
+  var expense = {
     id: _prjUuid(),
     date: get('prj_exp_date') || new Date().toISOString().slice(0, 10),
-    vendor: get('prj_exp_vendor'),
+    vendor: vendor,
+    contractorId: ctId,
+    vendorAddress: addr,
+    vendorPhone: phone,
     description: get('prj_exp_desc'),
     amount: Math.round(amount * 100) / 100,
     milestoneId: get('prj_exp_ms') || null,
     enteredBy: (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || 'staff',
     createdAt: new Date().toISOString(),
-  });
+  };
+  d.data.expenses.push(expense);
+
+  // Upload any staged compliance docs onto the new line, then persist so the
+  // uploads can't be orphaned. (Staging is disabled until the project is
+  // saved, so d.id is guaranteed here whenever staged files exist.)
+  var staged = Object.keys(window._prjExpStagedDocs || {});
+  if (staged.length && d.id) {
+    var failed = 0;
+    for (var i = 0; i < staged.length; i++) {
+      try { await _prjUploadExpenseDocFile(expense, staged[i], window._prjExpStagedDocs[staged[i]]); }
+      catch(e) { console.warn('[Projects] staged doc upload:', e); failed++; }
+    }
+    try {
+      await _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false);
+      _prjSyncCache(d);
+    } catch(e) { console.warn('[Projects] expense save:', e); }
+    if (failed) showToast(failed + ' document upload' + (failed === 1 ? '' : 's') + ' failed — re-attach from the cost line', { type: 'error' });
+  } else if (d.id) {
+    // Persist the new line right away (matches the attach-doc behavior).
+    _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false)
+      .then(function(){ _prjSyncCache(d); })
+      .catch(function(e){ console.warn('[Projects] expense save:', e); });
+  }
+
+  window._prjExpStagedDocs = {};
   _prjRenderCosts();
   _prjRefreshStrip();
 }
@@ -1474,7 +1690,9 @@ function _prjGenerateRequestPdf(req, exp) {
           var docsCol = PRJ_EXP_DOC_KINDS.map(function(k) {
             return (k.k === 'invoice' ? 'Inv' : k.k === 'eft' ? 'EFT' : 'Bank') + (_prjExpDoc(e, k.k) ? ' Y' : ' -');
           }).join('  ');
-          return [e.date || '', e.vendor || '', e.description || '', '$' + (Number(e.amount) || 0).toFixed(2), docsCol];
+          var vendorCol = (e.vendor || '') +
+            ((e.vendorAddress || e.vendorPhone) ? '\n' + [e.vendorAddress, e.vendorPhone].filter(Boolean).join(' / ') : '');
+          return [e.date || '', vendorCol, e.description || '', '$' + (Number(e.amount) || 0).toFixed(2), docsCol];
         });
         rows.push(['', '', 'TOTAL REQUESTED', '$' + (Number(req.total) || 0).toFixed(2), '']);
 
