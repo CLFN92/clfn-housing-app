@@ -678,7 +678,7 @@ function _prjRenderCosts() {
           '<a href="#" onclick="_prjOpenExpenseDoc(' + i + ');return false;" title="Open ' + _prjEsc(e.doc.name || 'document') + '" style="font-size:11px;color:var(--text);text-decoration:underline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70px;display:inline-block;">📎 ' + _prjEsc(e.doc.name || 'doc') + '</a>' +
           '<button type="button" class="prj-row-remove" title="Detach document" onclick="_prjUnlinkExpenseDoc(' + i + ')" style="font-size:10px;">✕</button>' +
         '</span>'
-      : '<button type="button" class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" title="Attach a document (invoice, receipt, PO)" onclick="_prjAttachExpenseDoc(' + i + ')">📎 Attach</button>';
+      : '<button type="button" class="btn btn-ghost" style="padding:4px 10px;font-size:11px;white-space:nowrap;" title="Attach a document (invoice, receipt, PO)" onclick="_prjAttachExpenseDoc(' + i + ')">📎 Attach doc</button>';
     return '<div class="prj-row prj-row-exp">' +
       '<div style="font-size:12px;white-space:nowrap;">' + _prjEsc(e.date || '—') + '</div>' +
       '<div style="font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;">' + _prjEsc(e.vendor || '—') + '</div>' +
@@ -787,19 +787,38 @@ function _prjRenderPnl() {
     return '<td style="text-align:right;font-weight:600;color:' + color + ';">' + (v < 0 ? '-' : '') + _prjMoney(Math.abs(v), true) + '</td>';
   };
 
+  // Rows a staff member removed from the P & L (e.g. "Funding confirmed" has
+  // no cost) carry pnlHidden on the milestone — the milestone itself stays on
+  // the Milestones tab. Hidden rows that still have money against them are
+  // rolled into one aggregate line so the totals never understate.
   var budgetTotal = 0, actualTotal = 0;
-  var rows = ms.map(function(m, i) {
+  var hiddenBudget = 0, hiddenActual = 0, hiddenNames = [];
+  var rows = '';
+  ms.forEach(function(m, i) {
     var budget = (m.budgetAmount != null && m.budgetAmount !== '') ? Number(m.budgetAmount) : null;
     var actual = actualFor(m.id);
     budgetTotal += budget || 0;
     actualTotal += actual;
-    return '<tr' + (m.done ? ' style="opacity:.72;"' : '') + '>' +
+    if (m.pnlHidden) {
+      hiddenBudget += budget || 0;
+      hiddenActual += actual;
+      hiddenNames.push({ i: i, name: m.name || '(unnamed)' });
+      return;
+    }
+    rows += '<tr' + (m.done ? ' style="opacity:.72;"' : '') + '>' +
       '<td>' + _prjEsc(m.name || '(unnamed)') + (m.done ? ' <span style="color:#15803d;" title="Milestone complete">✓</span>' : '') + '</td>' +
       '<td style="text-align:right;"><input class="tic-input" type="number" min="0" step="0.01" placeholder="0.00" value="' + (budget != null ? _prjEsc(budget) : '') + '" onchange="_prjMsBudget(' + i + ', this.value)" style="max-width:130px;text-align:right;padding:5px 9px;font-size:12px;display:inline-block;"/></td>' +
       '<td style="text-align:right;">' + (actual ? _prjMoney(actual, true) : '<span style="color:var(--muted);">—</span>') + '</td>' +
       varCell(budget != null ? budget - actual : 0, budget != null) +
+      '<td style="width:24px;"><button type="button" class="prj-row-remove" title="Remove this row from the P &amp; L (the milestone stays on the Milestones tab)" onclick="_prjPnlHide(' + i + ')">✕</button></td>' +
     '</tr>';
-  }).join('');
+  });
+  if (hiddenBudget > 0 || hiddenActual > 0) {
+    rows += '<tr><td style="color:var(--muted);">Removed rows (still counted)</td>' +
+      '<td style="text-align:right;color:var(--muted);">' + (hiddenBudget ? _prjMoney(hiddenBudget, true) : '—') + '</td>' +
+      '<td style="text-align:right;color:var(--muted);">' + (hiddenActual ? _prjMoney(hiddenActual, true) : '—') + '</td>' +
+      '<td style="text-align:right;color:var(--muted);">—</td><td></td></tr>';
+  }
 
   var untagged = exp.filter(function(e){ return !e.milestoneId; })
                     .reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0);
@@ -808,7 +827,7 @@ function _prjRenderPnl() {
     rows += '<tr><td style="color:var(--muted);">Not tied to a milestone</td>' +
       '<td style="text-align:right;color:var(--muted);">—</td>' +
       '<td style="text-align:right;">' + _prjMoney(untagged, true) + '</td>' +
-      '<td style="text-align:right;color:var(--muted);">—</td></tr>';
+      '<td style="text-align:right;color:var(--muted);">—</td><td></td></tr>';
   }
 
   var totalVar = budgetTotal - actualTotal;
@@ -822,14 +841,19 @@ function _prjRenderPnl() {
       '<div class="tic-section-h">Profit &amp; Loss — Budget vs Actual by Milestone</div>' +
       (ms.length
         ? '<div class="prj-table-wrap"><table class="prj-table"><thead><tr>' +
-            '<th>Milestone</th><th style="text-align:right;">Budget</th><th style="text-align:right;">Actual</th><th style="text-align:right;">Variance</th>' +
+            '<th>Milestone</th><th style="text-align:right;">Budget</th><th style="text-align:right;">Actual</th><th style="text-align:right;">Variance</th><th></th>' +
           '</tr></thead><tbody>' + rows +
           '<tr style="border-top:2px solid var(--border);"><td style="font-weight:700;">Total</td>' +
             '<td style="text-align:right;font-weight:700;">' + _prjMoney(budgetTotal, true) + '</td>' +
             '<td style="text-align:right;font-weight:700;">' + _prjMoney(actualTotal, true) + '</td>' +
             varCell(totalVar, budgetTotal > 0) +
-          '</tr></tbody></table></div>' + fundedNote +
-          '<div style="font-size:12px;color:var(--muted);margin-top:8px;">Enter each milestone\'s budget here; actuals come from expenses tagged to that milestone on the Costs tab. Variance = budget − actual (red means over budget).</div>'
+          '<td></td></tr></tbody></table></div>' + fundedNote +
+          (hiddenNames.length
+            ? '<div style="font-size:12px;color:var(--muted);margin-top:8px;">Hidden from P &amp; L: ' +
+                hiddenNames.map(function(h){ return _prjEsc(h.name) + ' <button type="button" class="btn btn-ghost" style="padding:1px 7px;font-size:10px;" onclick="_prjPnlRestore(' + h.i + ')">restore</button>'; }).join(' · ') +
+              '</div>'
+            : '') +
+          '<div style="font-size:12px;color:var(--muted);margin-top:8px;">Enter each milestone\'s budget here; actuals come from expenses tagged to that milestone on the Costs tab. Variance = budget − actual (red means over budget). Rows without a cost (e.g. "Funding confirmed") can be removed with the ✕ — the milestone itself stays on the Milestones tab.</div>'
         : '<div style="color:var(--muted);font-size:13px;">No milestones yet — add them on the Milestones tab to build the P &amp; L breakdown.</div>') +
     '</div>';
 }
@@ -838,6 +862,20 @@ function _prjMsBudget(i, val) {
   var ms = window._prjDraft.data.milestones;
   if (!ms || !ms[i]) return;
   ms[i].budgetAmount = (val === '' || val == null) ? null : Math.round(Number(val) * 100) / 100;
+  _prjRenderPnl();
+}
+
+function _prjPnlHide(i) {
+  var ms = window._prjDraft.data.milestones;
+  if (!ms || !ms[i]) return;
+  ms[i].pnlHidden = true;
+  _prjRenderPnl();
+}
+
+function _prjPnlRestore(i) {
+  var ms = window._prjDraft.data.milestones;
+  if (!ms || !ms[i]) return;
+  delete ms[i].pnlHidden;
   _prjRenderPnl();
 }
 
