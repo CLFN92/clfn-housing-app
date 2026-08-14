@@ -1746,7 +1746,16 @@ function _prjOpenPaymentRequestModal() {
           '<div class="f"><label>Request date</label><input id="prj_req_date" class="tic-input" type="date" value="' + new Date().toISOString().slice(0, 10) + '"/></div>' +
         '</div>' +
         (missingDocs.length
-          ? '<div style="margin-top:12px;padding:10px 14px;background:var(--warn-amber-bg,#fffbeb);border:1px solid var(--warn-amber-border,#fde68a);border-radius:8px;font-size:12px;color:var(--warn-amber-text,#b45309);">⚠️ ' + missingDocs.length + ' of the selected cost line' + (missingDocs.length === 1 ? ' is' : 's are') + ' missing compliance documents (invoice / EFT / bank proof). You can still export, but the funder may reject the claim.</div>'
+          ? '<div style="margin-top:12px;padding:10px 14px;background:var(--danger-bg,#fef2f2);border:1px solid var(--danger-border,#fecaca);border-radius:8px;font-size:12px;color:var(--danger,#b91c1c);">' +
+              '<b>⛔ The claim package cannot be generated yet.</b> Every cost line needs all three compliance documents (invoice, EFT payment confirmation, bank statement proof):' +
+              '<ul style="margin:6px 0 0;padding-left:18px;">' +
+                missingDocs.map(function(e) {
+                  var missing = PRJ_EXP_DOC_KINDS.filter(function(k){ return !_prjExpDoc(e, k.k); }).map(function(k){ return k.label; }).join(', ');
+                  return '<li>' + _prjEsc(e.vendor || 'expense') + ' · ' + _prjMoney(e.amount, true) + ' — missing: ' + _prjEsc(missing) + '</li>';
+                }).join('') +
+              '</ul>' +
+              '<div style="margin-top:6px;">Attach (or link) the missing documents on the Costs tab, or untick those lines.</div>' +
+            '</div>'
           : '') +
         (reClaimed.length
           ? '<div style="margin-top:12px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:12px;color:#1d4ed8;">ℹ️ ' + reClaimed.length + ' of the selected cost line' + (reClaimed.length === 1 ? ' was' : 's were') + ' already claimed in ' + _prjEsc(Object.keys(reClaimedNums).join(', ')) + '. Including a line in a second claim is for cost-shared projects (billing another funder) or completing a partial claim — make sure this is not a double bill to the same funder.</div>'
@@ -1765,7 +1774,7 @@ function _prjOpenPaymentRequestModal() {
       '</div>' +
       '<div class="modal-footer">' +
         '<button type="button" class="btn btn-ghost" onclick="document.getElementById(\'prjReqModal\').remove()">Cancel</button>' +
-        '<button id="prj_req_confirm" type="button" class="btn btn-primary" onclick="_prjRunPaymentRequest()">📤 Export &amp; Mark Claimed</button>' +
+        '<button id="prj_req_confirm" type="button" class="btn btn-primary"' + (missingDocs.length ? ' disabled title="Attach the missing compliance documents first"' : '') + ' onclick="_prjRunPaymentRequest()">📤 Export &amp; Mark Claimed</button>' +
       '</div>' +
     '</div>';
   document.body.appendChild(ov);
@@ -1776,6 +1785,16 @@ async function _prjRunPaymentRequest() {
   if (!d || !d.id || !_prjCanManage()) return;
   var sel = _prjSelectedExpenses();
   if (!sel.length) return;
+  // Hard gate (backstop to the disabled modal button): a claim package may
+  // only be generated when every included line carries its full compliance
+  // chain — invoice, EFT payment confirmation, bank statement proof.
+  var incomplete = sel.filter(function(e) {
+    return PRJ_EXP_DOC_KINDS.some(function(k){ return !_prjExpDoc(e, k.k); });
+  });
+  if (incomplete.length) {
+    showToast('Cannot generate the claim — ' + incomplete.length + ' cost line' + (incomplete.length === 1 ? ' is' : 's are') + ' missing compliance documents (invoice / EFT / bank proof)', { type: 'error' });
+    return;
+  }
   var total = Math.round(sel.reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0) * 100) / 100;
 
   var grants = d.data.grants || [];

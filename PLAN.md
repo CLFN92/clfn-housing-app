@@ -874,8 +874,11 @@ allocating the project total across delivered units to set each unit's cost.
   `paymentRequests[].expenseIds` (`_prjExpClaims`; legacy `claimedIn` no
   longer written), a line can be in multiple claims (cost-sharing /
   partial claims — badge lists all REQ numbers, modal warns on re-claims),
-  deletion still blocked while claimed. Phone layout fixes for the
-  milestone rows + modal footer (PR #43).
+  deletion still blocked while claimed. **Compliance docs are now a hard
+  gate on export** (was warn-only): the claim package can't be generated
+  unless every included line has invoice + EFT + bank proof (red itemized
+  box, disabled button, backstop check in `_prjRunPaymentRequest`). Phone
+  layout fixes for the milestone rows + modal footer (PR #43).
 - ✅ v1.3 **project status report** — "📄 Status Report" in the modal footer
   generates a one-click jsPDF+autotable snapshot (summary, description,
   grants, milestones with overdue flag, budget-vs-actual mirroring the
