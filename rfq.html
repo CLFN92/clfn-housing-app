@@ -410,7 +410,8 @@
 
     <!-- Footer actions -->
     <div class="rfq-footer-actions">
-      <button type="button" class="btn btn-ghost" onclick="saveRfqDraft()">Save Draft</button>
+      <span id="rfq_saved_indicator" class="txt-muted-sm" style="align-self:center;"></span>
+      <button type="button" class="btn btn-ghost" id="rfqSaveDraftBtn" onclick="saveRfqDraft()">Save Draft</button>
       <button type="button" class="btn btn-ghost" data-rfq-keep onclick="previewRfqPdf()">&#128202; Preview RFQ PDF</button>
       <button type="button" class="btn btn-ghost" id="rfqUnlockBtn" style="display:none;" onclick="unlockRfq()">&#128275; Unlock RFQ</button>
       <button type="button" class="btn btn-primary" id="rfqIssueBtn" onclick="issueRfq()">Issue RFQ &#8594;</button>
