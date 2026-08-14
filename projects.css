@@ -250,7 +250,10 @@ body.prj-no-select { user-select: none; -webkit-user-select: none; }
 @media (max-width: 700px) {
   #prjModal .tic-footer { padding: 10px 14px 12px; gap: 6px 8px; align-items: center; }
   #prjModal .tic-footer .btn { padding: 8px 11px; font-size: 12px; }
-  #prjModal .tic-footer .btn-primary { flex: 1 1 auto; }  /* Save = the big target */
+  /* Save = the big target; .btn is inline-flex with default flex-start, so a
+     stretched button needs its content re-centered or the label hugs the
+     left edge (same trick as the shared .action-pills-center .btn rule). */
+  #prjModal .tic-footer .btn-primary { flex: 1 1 auto; justify-content: center; }
   #prjModal #prj_saved_indicator { flex-basis: 100%; font-size: 11px; }
 }
 
