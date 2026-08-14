@@ -869,8 +869,13 @@ allocating the project total across delivered units to set each unit's cost.
   uploads, and the claim export downloads each unique file once. The claim
   summary PDF numbers the cost lines and adds a **Supporting Documents
   index** (one row per unique file, `REQ-NN_` download name, type, covered
-  line numbers) plus a note explaining shared files to the funder. Phone
-  layout fixes for the milestone rows + modal footer (PR #43).
+  line numbers) plus a note explaining shared files to the funder. **Claims
+  no longer lock cost lines**: membership is derived from
+  `paymentRequests[].expenseIds` (`_prjExpClaims`; legacy `claimedIn` no
+  longer written), a line can be in multiple claims (cost-sharing /
+  partial claims — badge lists all REQ numbers, modal warns on re-claims),
+  deletion still blocked while claimed. Phone layout fixes for the
+  milestone rows + modal footer (PR #43).
 - ✅ v1.3 **project status report** — "📄 Status Report" in the modal footer
   generates a one-click jsPDF+autotable snapshot (summary, description,
   grants, milestones with overdue flag, budget-vs-actual mirroring the
