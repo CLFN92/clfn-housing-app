@@ -852,7 +852,15 @@ allocating the project total across delivered units to set each unit's cost.
   PO # on Overview (`data.poNumber`), three new project types
   (`commercial_building`, `band_building`, `infrastructure`) with milestone
   templates, and a **P & L tab** (budget vs actual with variance, one row per
-  milestone; milestone `budgetAmount` entered there)
+  milestone; milestone `budgetAmount` entered there; rows removable via
+  `pnlHidden` with restore + aggregate line)
+- ✅ v1.2 funder-compliance & claims: three typed doc slots per expense
+  (invoice / EFT confirmation / bank proof, completeness indicator),
+  multiple **grants** per project (`data.grants[]`, budget = sum),
+  Department # on Overview, **RFQ→project linking** (dropdown on the RFQ
+  Details tab + Linked RFQs on the project Overview), and **payment
+  requests** — select cost lines, bill a grant, export a PDF claim summary
+  + all attached documents, lines marked Claimed REQ-NN (re-export / undo)
 - ⬜ **Redeploy the `ai-chat` Edge Function** (dashboard paste or
   `supabase functions deploy ai-chat`) so the server-side changes go live
 - 🔖 Deferred: project rows in the `project-schedule.js` Gantt,

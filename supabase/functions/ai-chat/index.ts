@@ -96,7 +96,7 @@ const TABLES: Record<string, TableDef> = {
   },
   housing_projects: {
     roles: ALL,
-    cols: 'id, project_number (CP-YYYY-NN, e.g. CP-2026-01), name, type (lot_development|house_build|mixed|commercial_building|band_building|infrastructure), status (planning|active|on_hold|completed|cancelled), funding_source, budget, start_date, target_date, archived, created_at. These are CAPITAL PROJECTS (funded initiatives like "build 5 houses" or "develop 20 lots") - NOT the SOW-YYYY-NN "Project #" on maintenance requests. Milestones, expenses, the PO number, and the cost-allocation snapshot live in a `data` jsonb (poNumber, milestones[] with budgetAmount for the per-milestone P&L budget, expenses[] with amount and optional doc attachment, allocation) - use select=* to read them and sum expenses[].amount for spend-to-date.',
+    cols: 'id, project_number (CP-YYYY-NN, e.g. CP-2026-01), name, type (lot_development|house_build|mixed|commercial_building|band_building|infrastructure), status (planning|active|on_hold|completed|cancelled), funding_source, budget, start_date, target_date, archived, created_at. These are CAPITAL PROJECTS (funded initiatives like "build 5 houses" or "develop 20 lots") - NOT the SOW-YYYY-NN "Project #" on maintenance requests. Milestones, expenses, grants, payment requests, PO/department numbers, and the cost-allocation snapshot live in a `data` jsonb: poNumber, deptNumber, grants[] (source, reference, amount - a project can have several grants; budget = their sum), milestones[] (budgetAmount = per-milestone P&L budget), expenses[] (amount; docs{invoice,eft,bank} = funder-compliance attachments; claimedIn/claimedNumber = which payment request billed it), paymentRequests[] (number REQ-NN, funder, expenseIds, total), allocation. Use select=* to read them and sum expenses[].amount for spend-to-date.',
   },
   housing_project_lots: {
     roles: ALL,
@@ -597,12 +597,21 @@ authority, default HM/ED - everyone else views read-only): Projects page >
 "+ New Project". Pick the type (Lot Development, House Build, Mixed,
 Commercial Building, Band Building, Infrastructure Project) - a
 default milestone checklist is applied and can be edited. Tabs on the project
-card: Overview (name, funding source, PO number, budget, dates), Milestones
-(check off as completed), Costs (log expenses against the budget, optionally
-tagged to a milestone; each expense can carry an attached document such as an
-invoice or receipt, which also appears in the Documents tab), P & L (budget vs
-actual with variance, one row per milestone - milestone budgets are entered on
-this tab), Lots & Units, Documents. On Lots & Units: "+ Add Lots" creates lot
+card: Overview (name, funding source, PO number, department number, budget,
+dates, a Grants list - a project can be funded by several grants and the
+budget is then their sum - and Linked RFQs), Milestones (check off as
+completed), Costs, P & L (budget vs actual with variance, one row per
+milestone - milestone budgets are entered on this tab), Lots & Units,
+Documents. On the Costs tab staff log expenses (optionally tagged to a
+milestone) and attach the three funder-compliance documents to each cost
+line: the invoice copy, the EFT payment confirmation, and the bank statement
+proof. To claim money from a funder: tick the cost lines, click "New Payment
+Request", pick the grant being billed, and Export - this downloads a PDF
+claim summary plus every attached document, and marks those lines "Claimed"
+with a REQ-NN number so nothing is double-claimed (undo is possible if the
+claim was never actually submitted). An RFQ can be linked to a capital
+project via the Capital Project dropdown on the RFQ's Details tab; linked
+RFQs are listed on the project's Overview tab. On Lots & Units: "+ Add Lots" creates lot
 records in bulk; lots move raw -> serviced -> built; "Create Units from Lots"
 builds housing units on selected lots (they appear in Inventory linked to the
 project); "Link existing unit" attaches an already-existing unit to a lot.

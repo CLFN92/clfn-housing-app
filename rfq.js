@@ -113,9 +113,27 @@ async function loadRfqPageData() {
     fetch(SUPABASE_URL + '/rest/v1/housing_sow?select=unit_id,data',                   { headers: HOUSING_HEADERS }),
     fetch(SUPABASE_URL + '/rest/v1/housing_settings?select=key,value',                 { headers: HOUSING_HEADERS }),
     fetch(SUPABASE_URL + '/rest/v1/housing_rfq?select=*&order=created_at.desc',        { headers: HOUSING_HEADERS }),
-    fetch(SUPABASE_URL + '/rest/v1/housing_contractors?select=*&order=name',           { headers: HOUSING_HEADERS })
+    fetch(SUPABASE_URL + '/rest/v1/housing_contractors?select=*&order=name',           { headers: HOUSING_HEADERS }),
+    fetch(SUPABASE_URL + '/rest/v1/housing_projects?select=id,project_number,name&archived=eq.false&order=created_at.desc&limit=200', { headers: HOUSING_HEADERS })
   ]);
-  var uR = results[0], sowR = results[1], stR = results[2], rfqR = results[3], ctR = results[4];
+  var uR = results[0], sowR = results[1], stR = results[2], rfqR = results[3], ctR = results[4], prjR = results[5];
+  // Capital-project link dropdown (Details tab). Hidden unless the projects
+  // module is on and at least one project exists.
+  if (prjR && prjR.ok) {
+    try {
+      window._rfqCapProjects = await prjR.json();
+      var cpSel = document.getElementById('rfq_capital_project');
+      var cpRow = document.getElementById('rfq_capital_project_row');
+      var prjModuleOn = (typeof moduleOn !== 'function') || moduleOn('projects');
+      if (cpSel && cpRow && prjModuleOn && window._rfqCapProjects.length) {
+        cpSel.innerHTML = '<option value="">— None —</option>' + window._rfqCapProjects.map(function(p) {
+          var label = ((p.project_number || '') + ' ' + (p.name || '')).trim().replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+          return '<option value="' + p.id + '">' + label + '</option>';
+        }).join('');
+        cpRow.style.display = '';
+      }
+    } catch(e) { console.warn('[RFQ] projects load:', e); }
+  }
   if (uR && uR.ok) {
     window.housingUnits = (await uR.json()).map(function(row) {
       return Object.assign({}, row.data || {}, {
@@ -596,6 +614,8 @@ function showRfqForm(rfqId, unitId, sowPn) {
     var session = window.HOUSING_SESSION || {};
     document.getElementById('rfq_contact').value = session.name || '';
     document.getElementById('rfq_contact_email').value = session.email || '';
+    var cpNewEl = document.getElementById('rfq_capital_project');
+    if (cpNewEl) cpNewEl.value = '';
     document.getElementById('rfqFormHeading').textContent = 'New Request for Quotes';
     document.getElementById('rfqIssueBtn').disabled = false;
     var _unlockBtnNew = document.getElementById('rfqUnlockBtn');
@@ -635,6 +655,7 @@ function _populateFormFields(rfq) {
   set('rfq_contact',        d.contact_person || '');
   set('rfq_contact_email',  d.contact_email  || '');
   set('rfq_sub_method',     d.submission_method || 'email');
+  set('rfq_capital_project', d.capital_project_id || '');
   set('rfq_issue_date',     d.issue_date || new Date().toISOString().slice(0,10));
   set('rfq_target_start',   d.target_start_date || '');
   set('rfq_target_end',     d.target_completion_date || '');
@@ -1128,6 +1149,7 @@ function _buildRfqPayload() {
       contact_person:         fv('rfq_contact'),
       contact_email:          fv('rfq_contact_email'),
       submission_method:      fv('rfq_sub_method'),
+      capital_project_id:     fv('rfq_capital_project') || null,
       issue_date:             fv('rfq_issue_date') || new Date().toISOString().slice(0,10),
       target_start_date:      fv('rfq_target_start'),
       target_completion_date: fv('rfq_target_end'),

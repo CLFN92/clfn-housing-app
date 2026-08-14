@@ -104,12 +104,53 @@
   border: 1px solid var(--border);
   border-radius: 8px;
 }
-.prj-row-ms  { grid-template-columns: auto 1fr 150px 24px; }
-.prj-row-exp { grid-template-columns: 110px 1fr 1fr 110px 130px 90px 24px; }
+.prj-row-ms    { grid-template-columns: auto 1fr 150px 24px; }
+.prj-row-exp   { grid-template-columns: 24px 100px 1fr 1fr 110px 120px 24px; }
+.prj-row-grant { grid-template-columns: 1fr 1fr 150px 24px; }
 @media (max-width: 760px) {
-  .prj-row-ms  { grid-template-columns: auto 1fr; }
-  .prj-row-exp { grid-template-columns: 1fr 1fr; }
+  .prj-row-ms    { grid-template-columns: auto 1fr; }
+  .prj-row-exp   { grid-template-columns: auto 1fr 1fr; }
+  .prj-row-grant { grid-template-columns: 1fr 1fr; }
 }
+.prj-row-claimed { background: #eff6ff; border-color: #bfdbfe; }
+
+/* Compliance-document chips on each expense row (invoice / EFT / bank) */
+.prj-exp-docs {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  border-top: 1px dashed var(--border);
+  padding-top: 7px;
+  margin-top: 2px;
+}
+.prj-doc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--sans);
+  border-radius: 14px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.prj-doc-chip.prj-doc-ok { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
+.prj-doc-chip.prj-doc-ok a { color: #15803d; text-decoration: none; }
+.prj-doc-chip.prj-doc-ok a:hover { text-decoration: underline; }
+.prj-doc-chip.prj-doc-ok button {
+  background: none; border: none; color: #15803d; cursor: pointer;
+  font-size: 10px; line-height: 1; padding: 0 0 0 2px;
+}
+.prj-doc-chip.prj-doc-ok button:hover { color: #b91c1c; }
+.prj-doc-chip.prj-doc-missing {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  cursor: pointer;
+}
+.prj-doc-chip.prj-doc-missing:hover { color: var(--text); border-color: var(--muted); }
 .prj-row.prj-row-done { opacity: .72; }
 .prj-ms-notes { grid-column: 2 / -1; }
 .prj-row-remove {

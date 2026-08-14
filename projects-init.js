@@ -37,6 +37,18 @@ var PRJ_STATUS_LABELS = {
 var PRJ_LOT_STATUSES = ['raw', 'serviced', 'built'];
 var PRJ_LOT_STATUS_LABELS = { raw: 'Raw', serviced: 'Serviced', built: 'Built' };
 
+// Funder-compliance document slots on every expense (cost line): funders ask
+// for the invoice copy, confirmation the contractor/supplier was paid (EFT
+// confirmation), and proof it cleared the bank account (statement).
+var PRJ_EXP_DOC_KINDS = [
+  { k: 'invoice', label: 'Invoice' },
+  { k: 'eft',     label: 'EFT / Payment' },
+  { k: 'bank',    label: 'Bank proof' },
+];
+
+// Selection state for building a payment request (expense id -> true).
+window._prjReqSel = {};
+
 // Default milestone checklists per project type. Staff can add / remove /
 // rename rows after the template is applied (mirrors INSP_CHECKLIST_TEMPLATE).
 var PRJ_MILESTONE_TEMPLATES = {
@@ -532,6 +544,17 @@ function _prjRenderOverview() {
   var selVal = d.funding_source ? (isPool ? d.funding_source : 'other') : '';
   var otherVal = (!isPool && d.funding_source) ? d.funding_source : '';
 
+  var grants = d.data.grants || [];
+  var hasGrants = grants.length > 0;
+  var grantRows = grants.map(function(g, i) {
+    return '<div class="prj-row prj-row-grant">' +
+      '<input class="tic-input" type="text" placeholder="Funder (e.g. ISC, CMHC, OFNLP)" value="' + _prjEsc(g.source || '') + '" oninput="_prjGrantField(' + i + ',\'source\',this.value)"/>' +
+      '<input class="tic-input" type="text" placeholder="Agreement / reference #" value="' + _prjEsc(g.reference || '') + '" oninput="_prjGrantField(' + i + ',\'reference\',this.value)"/>' +
+      '<input class="tic-input" type="number" min="0" step="0.01" placeholder="Amount" value="' + (g.amount != null ? _prjEsc(g.amount) : '') + '" onchange="_prjGrantField(' + i + ',\'amount\',this.value);_prjGrantsRecalc()"/>' +
+      '<button type="button" class="prj-row-remove" title="Remove grant" onclick="_prjGrantRemove(' + i + ')">✕</button>' +
+    '</div>';
+  }).join('');
+
   host.innerHTML =
     '<div class="tic-section">' +
       '<div class="tic-section-h">Project Details</div>' +
@@ -548,16 +571,28 @@ function _prjRenderOverview() {
           sources.map(function(s){ return '<option value="' + s.id + '"' + (selVal === s.id ? ' selected' : '') + '>' + _prjEsc(s.label) + '</option>'; }).join('') +
         '</select>' +
         '<input id="prj_f_funding_other" class="tic-input" type="text" placeholder="Funding source…" style="margin-top:6px;' + (selVal === 'other' ? '' : 'display:none;') + '" value="' + _prjEsc(otherVal) + '" oninput="window._prjDraft.funding_source=this.value"/></div>' +
-        '<div class="f"><label>Funded Budget (CAD)</label><input id="prj_f_budget" class="tic-input" type="number" min="0" step="0.01" placeholder="e.g. 2500000" value="' + (d.budget != null ? _prjEsc(d.budget) : '') + '" oninput="window._prjDraft.budget=(this.value===\'\'?null:Number(this.value));_prjRefreshStrip()"/></div>' +
+        '<div class="f"><label>Funded Budget (CAD)' + (hasGrants ? ' <span style="font-size:10px;font-weight:400;color:var(--muted);">(= sum of grants below)</span>' : '') + '</label><input id="prj_f_budget" class="tic-input" type="number" min="0" step="0.01" placeholder="e.g. 2500000" value="' + (d.budget != null ? _prjEsc(d.budget) : '') + '"' + (hasGrants ? ' disabled' : '') + ' oninput="window._prjDraft.budget=(this.value===\'\'?null:Number(this.value));_prjRefreshStrip()"/></div>' +
         '<div class="f"><label>PO # <span style="font-size:10px;font-weight:400;color:var(--muted);">(from accounting)</span></label><input id="prj_f_po" class="tic-input" type="text" placeholder="e.g. PO-2026-0042" value="' + _prjEsc(d.data.poNumber || '') + '" oninput="window._prjDraft.data.poNumber=this.value"/></div>' +
+        '<div class="f"><label>Department # <span style="font-size:10px;font-weight:400;color:var(--muted);">(cost-centre)</span></label><input id="prj_f_dept" class="tic-input" type="text" placeholder="e.g. 15-4200" value="' + _prjEsc(d.data.deptNumber || '') + '" oninput="window._prjDraft.data.deptNumber=this.value"/></div>' +
         '<div class="f"><label>Start Date</label><input id="prj_f_start" class="tic-input" type="date" value="' + _prjEsc(d.start_date || '') + '" onchange="window._prjDraft.start_date=this.value||null"/></div>' +
         '<div class="f"><label>Target Completion</label><input id="prj_f_target" class="tic-input" type="date" value="' + _prjEsc(d.target_date || '') + '" onchange="window._prjDraft.target_date=this.value||null;_prjRefreshStrip()"/></div>' +
       '</div>' +
     '</div>' +
     '<div class="tic-section">' +
+      '<div class="tic-section-h">Grants / Funding Agreements</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">A project can be funded by more than one grant. When grants are listed, the Funded Budget above is their sum, and payment requests are made against a specific grant.</div>' +
+      '<div class="prj-rows">' + grantRows + '</div>' +
+      '<button type="button" class="prj-addrow" onclick="_prjGrantAdd()">+ Add grant</button>' +
+    '</div>' +
+    '<div class="tic-section">' +
       '<div class="tic-section-h">Description</div>' +
       '<textarea id="prj_f_desc" class="tic-textarea" rows="4" placeholder="What this project delivers, funding agreement reference, conditions…" oninput="window._prjDraft.data.description=this.value">' + _prjEsc(d.data.description || '') + '</textarea>' +
+    '</div>' +
+    '<div class="tic-section" id="prj_linked_rfqs_section" style="display:none;">' +
+      '<div class="tic-section-h">Linked RFQs</div>' +
+      '<div id="prj_linked_rfqs"></div>' +
     '</div>';
+  _prjLoadLinkedRfqs();
 }
 
 function _prjFundingChanged(val) {
@@ -569,6 +604,74 @@ function _prjFundingChanged(val) {
     if (other) other.style.display = 'none';
     window._prjDraft.funding_source = val;
   }
+}
+
+// ── Grants (multiple funding agreements per project) ─────────────────────────
+function _prjGrantField(i, key, val) {
+  var g = window._prjDraft.data.grants;
+  if (!g || !g[i]) return;
+  g[i][key] = key === 'amount' ? ((val === '' || val == null) ? null : Math.round(Number(val) * 100) / 100) : val;
+  if (key === 'source') _prjGrantsSyncFundingSource();
+}
+function _prjGrantAdd() {
+  var d = window._prjDraft;
+  if (!d.data.grants) d.data.grants = [];
+  d.data.grants.push({ id: _prjUuid(), source: '', reference: '', amount: null });
+  _prjGrantsRecalc();
+}
+function _prjGrantRemove(i) {
+  var d = window._prjDraft;
+  if (!d.data.grants || !d.data.grants[i]) return;
+  d.data.grants.splice(i, 1);
+  _prjGrantsRecalc();
+}
+// When grants exist the project budget is their sum; funding_source becomes
+// the funder names joined (keeps the column searchable / meaningful).
+function _prjGrantsRecalc() {
+  var d = window._prjDraft;
+  var grants = d.data.grants || [];
+  if (grants.length) {
+    d.budget = Math.round(grants.reduce(function(s, g){ return s + (Number(g.amount) || 0); }, 0) * 100) / 100;
+  }
+  _prjGrantsSyncFundingSource();
+  _prjRenderOverview();
+  _prjRefreshStrip();
+}
+function _prjGrantsSyncFundingSource() {
+  var d = window._prjDraft;
+  var grants = d.data.grants || [];
+  if (grants.length) {
+    d.funding_source = grants.map(function(g){ return g.source; }).filter(Boolean).join(', ');
+  }
+}
+
+// ── Linked RFQs (rfq.data.capital_project_id set on the RFQ Details tab) ─────
+async function _prjLoadLinkedRfqs() {
+  var d = window._prjDraft;
+  if (!d || !d.id) return;
+  var pid = d.id;
+  try {
+    var r = await fetch(
+      window.SUPABASE_URL + '/rest/v1/housing_rfq?select=id,status,award_amount,sow_project_number,data&data-%3E%3Ecapital_project_id=eq.' + encodeURIComponent(pid) + '&order=created_at.desc&limit=100',
+      { headers: _prjHeaders() }
+    );
+    if (!r.ok) return;
+    var rfqs = await r.json();
+    // Modal may have moved on to another project while we fetched.
+    if (!window._prjDraft || window._prjDraft.id !== pid) return;
+    var section = document.getElementById('prj_linked_rfqs_section');
+    var host = document.getElementById('prj_linked_rfqs');
+    if (!section || !host || !rfqs.length) return;
+    section.style.display = '';
+    host.innerHTML = rfqs.map(function(q) {
+      return '<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;align-items:center;">' +
+        '<span><a href="rfq.html?rfq=' + encodeURIComponent(q.id) + '" style="color:var(--text);font-weight:600;">' + _prjEsc(q.id) + '</a>' +
+          (q.sow_project_number ? ' <span style="color:var(--muted);font-size:11px;">· ' + _prjEsc(q.sow_project_number) + '</span>' : '') + '</span>' +
+        '<span style="white-space:nowrap;color:var(--muted);">' + _prjEsc(q.status || '') +
+          (q.award_amount ? ' · ' + _prjMoney(q.award_amount, true) : '') + '</span>' +
+      '</div>';
+    }).join('');
+  } catch(e) { console.warn('[Projects] linked RFQs:', e); }
 }
 
 // Type change: offer to (re)apply the milestone template for the new type.
@@ -673,20 +776,33 @@ function _prjRenderCosts() {
       var m = ms.find(function(x){ return x.id === e.milestoneId; });
       msName = m ? (m.name || '(unnamed)') : '';
     }
-    var docCell = e.doc && e.doc.path
-      ? '<span style="display:inline-flex;align-items:center;gap:2px;min-width:0;">' +
-          '<a href="#" onclick="_prjOpenExpenseDoc(' + i + ');return false;" title="Open ' + _prjEsc(e.doc.name || 'document') + '" style="font-size:11px;color:var(--text);text-decoration:underline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70px;display:inline-block;">📎 ' + _prjEsc(e.doc.name || 'doc') + '</a>' +
-          '<button type="button" class="prj-row-remove" title="Detach document" onclick="_prjUnlinkExpenseDoc(' + i + ')" style="font-size:10px;">✕</button>' +
-        '</span>'
-      : '<button type="button" class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" title="Attach a document (invoice, receipt, PO)" onclick="_prjAttachExpenseDoc(' + i + ')">📎 Attach</button>';
-    return '<div class="prj-row prj-row-exp">' +
+    var claimed = _prjExpClaim(e);
+    // Selection cell: checkbox for unclaimed rows (builds the next payment
+    // request); a lock for rows already included in one.
+    var selCell = claimed
+      ? '<span title="Included in payment request ' + _prjEsc(claimed.number) + '" style="font-size:13px;">🔒</span>'
+      : '<input type="checkbox"' + (window._prjReqSel[e.id] ? ' checked' : '') + ' title="Include in the next payment request" onchange="_prjReqToggle(\'' + _prjEsc(e.id) + '\', this.checked)" style="accent-color:var(--yellow);width:15px;height:15px;cursor:pointer;"/>';
+
+    // Funder-compliance documents: invoice + proof of payment (EFT) + bank
+    // statement proof, one chip per slot.
+    var docChips = PRJ_EXP_DOC_KINDS.map(function(k){ return _prjDocChip(e, i, k.k, k.label); }).join('');
+    var attachedCount = PRJ_EXP_DOC_KINDS.filter(function(k){ return _prjExpDoc(e, k.k); }).length;
+    var docStatus = attachedCount === PRJ_EXP_DOC_KINDS.length
+      ? '<span style="font-size:11px;color:#15803d;font-weight:600;white-space:nowrap;">✓ Docs complete</span>'
+      : '<span style="font-size:11px;color:var(--warn-amber-text,#b45309);white-space:nowrap;">' + attachedCount + ' of ' + PRJ_EXP_DOC_KINDS.length + ' docs</span>';
+    var claimedBadge = claimed
+      ? '<span style="font-size:11px;font-weight:700;color:#1d4ed8;background:#eff6ff;border-radius:10px;padding:2px 8px;white-space:nowrap;">Claimed · ' + _prjEsc(claimed.number) + '</span>'
+      : '';
+
+    return '<div class="prj-row prj-row-exp' + (claimed ? ' prj-row-claimed' : '') + '">' +
+      '<div>' + selCell + '</div>' +
       '<div style="font-size:12px;white-space:nowrap;">' + _prjEsc(e.date || '—') + '</div>' +
       '<div style="font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;">' + _prjEsc(e.vendor || '—') + '</div>' +
       '<div style="font-size:12px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;">' + _prjEsc(e.description || '') + '</div>' +
       '<div style="font-size:13px;font-weight:600;text-align:right;white-space:nowrap;">' + _prjMoney(e.amount, true) + '</div>' +
       '<div style="font-size:11px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;">' + (msName ? '🏁 ' + _prjEsc(msName) : '') + '</div>' +
-      '<div style="min-width:0;">' + docCell + '</div>' +
       '<button type="button" class="prj-row-remove" title="Remove expense" onclick="_prjExpRemove(' + i + ')">✕</button>' +
+      '<div class="prj-exp-docs">' + docChips + '<span style="flex:1;"></span>' + docStatus + claimedBadge + '</div>' +
     '</div>';
   }).join('');
 
@@ -733,8 +849,10 @@ function _prjRenderCosts() {
     '</div>' +
     '<div class="tic-section">' +
       '<div class="tic-section-h">Expenses (' + exp.length + ')</div>' +
+      (exp.length ? '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Attach the funder-compliance documents to each cost line (invoice, EFT payment confirmation, bank statement proof), then tick the lines to include in the next payment request.</div>' : '') +
       '<div class="prj-rows">' + (expRows || '<div style="color:var(--muted);font-size:13px;">No expenses logged yet.</div>') + '</div>' +
-    '</div>';
+    '</div>' +
+    _prjPaymentRequestSectionHtml();
 }
 
 function _prjExpAdd() {
@@ -758,7 +876,11 @@ function _prjExpAdd() {
 function _prjExpRemove(i) {
   var exp = window._prjDraft.data.expenses;
   if (!exp || !exp[i]) return;
-  var doIt = function() { exp.splice(i, 1); _prjRenderCosts(); _prjRefreshStrip(); };
+  if (exp[i].claimedIn) {
+    showToast('This cost line is part of payment request ' + (exp[i].claimedNumber || '') + ' — undo that request first', { type: 'error' });
+    return;
+  }
+  var doIt = function() { delete window._prjReqSel[exp[i].id]; exp.splice(i, 1); _prjRenderCosts(); _prjRefreshStrip(); };
   if (typeof showConfirm === 'function') {
     showConfirm({ title: 'Remove expense?', message: 'Remove this ' + _prjMoney(exp[i].amount, true) + ' expense from the project?', confirmText: 'Remove', danger: true })
       .then(function(ok){ if (ok) doIt(); });
@@ -787,19 +909,38 @@ function _prjRenderPnl() {
     return '<td style="text-align:right;font-weight:600;color:' + color + ';">' + (v < 0 ? '-' : '') + _prjMoney(Math.abs(v), true) + '</td>';
   };
 
+  // Rows a staff member removed from the P & L (e.g. "Funding confirmed" has
+  // no cost) carry pnlHidden on the milestone — the milestone itself stays on
+  // the Milestones tab. Hidden rows that still have money against them are
+  // rolled into one aggregate line so the totals never understate.
   var budgetTotal = 0, actualTotal = 0;
-  var rows = ms.map(function(m, i) {
+  var hiddenBudget = 0, hiddenActual = 0, hiddenNames = [];
+  var rows = '';
+  ms.forEach(function(m, i) {
     var budget = (m.budgetAmount != null && m.budgetAmount !== '') ? Number(m.budgetAmount) : null;
     var actual = actualFor(m.id);
     budgetTotal += budget || 0;
     actualTotal += actual;
-    return '<tr' + (m.done ? ' style="opacity:.72;"' : '') + '>' +
+    if (m.pnlHidden) {
+      hiddenBudget += budget || 0;
+      hiddenActual += actual;
+      hiddenNames.push({ i: i, name: m.name || '(unnamed)' });
+      return;
+    }
+    rows += '<tr' + (m.done ? ' style="opacity:.72;"' : '') + '>' +
       '<td>' + _prjEsc(m.name || '(unnamed)') + (m.done ? ' <span style="color:#15803d;" title="Milestone complete">✓</span>' : '') + '</td>' +
       '<td style="text-align:right;"><input class="tic-input" type="number" min="0" step="0.01" placeholder="0.00" value="' + (budget != null ? _prjEsc(budget) : '') + '" onchange="_prjMsBudget(' + i + ', this.value)" style="max-width:130px;text-align:right;padding:5px 9px;font-size:12px;display:inline-block;"/></td>' +
       '<td style="text-align:right;">' + (actual ? _prjMoney(actual, true) : '<span style="color:var(--muted);">—</span>') + '</td>' +
       varCell(budget != null ? budget - actual : 0, budget != null) +
+      '<td style="width:24px;"><button type="button" class="prj-row-remove" title="Remove this row from the P &amp; L (the milestone stays on the Milestones tab)" onclick="_prjPnlHide(' + i + ')">✕</button></td>' +
     '</tr>';
-  }).join('');
+  });
+  if (hiddenBudget > 0 || hiddenActual > 0) {
+    rows += '<tr><td style="color:var(--muted);">Removed rows (still counted)</td>' +
+      '<td style="text-align:right;color:var(--muted);">' + (hiddenBudget ? _prjMoney(hiddenBudget, true) : '—') + '</td>' +
+      '<td style="text-align:right;color:var(--muted);">' + (hiddenActual ? _prjMoney(hiddenActual, true) : '—') + '</td>' +
+      '<td style="text-align:right;color:var(--muted);">—</td><td></td></tr>';
+  }
 
   var untagged = exp.filter(function(e){ return !e.milestoneId; })
                     .reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0);
@@ -808,7 +949,7 @@ function _prjRenderPnl() {
     rows += '<tr><td style="color:var(--muted);">Not tied to a milestone</td>' +
       '<td style="text-align:right;color:var(--muted);">—</td>' +
       '<td style="text-align:right;">' + _prjMoney(untagged, true) + '</td>' +
-      '<td style="text-align:right;color:var(--muted);">—</td></tr>';
+      '<td style="text-align:right;color:var(--muted);">—</td><td></td></tr>';
   }
 
   var totalVar = budgetTotal - actualTotal;
@@ -822,14 +963,19 @@ function _prjRenderPnl() {
       '<div class="tic-section-h">Profit &amp; Loss — Budget vs Actual by Milestone</div>' +
       (ms.length
         ? '<div class="prj-table-wrap"><table class="prj-table"><thead><tr>' +
-            '<th>Milestone</th><th style="text-align:right;">Budget</th><th style="text-align:right;">Actual</th><th style="text-align:right;">Variance</th>' +
+            '<th>Milestone</th><th style="text-align:right;">Budget</th><th style="text-align:right;">Actual</th><th style="text-align:right;">Variance</th><th></th>' +
           '</tr></thead><tbody>' + rows +
           '<tr style="border-top:2px solid var(--border);"><td style="font-weight:700;">Total</td>' +
             '<td style="text-align:right;font-weight:700;">' + _prjMoney(budgetTotal, true) + '</td>' +
             '<td style="text-align:right;font-weight:700;">' + _prjMoney(actualTotal, true) + '</td>' +
             varCell(totalVar, budgetTotal > 0) +
-          '</tr></tbody></table></div>' + fundedNote +
-          '<div style="font-size:12px;color:var(--muted);margin-top:8px;">Enter each milestone\'s budget here; actuals come from expenses tagged to that milestone on the Costs tab. Variance = budget − actual (red means over budget).</div>'
+          '<td></td></tr></tbody></table></div>' + fundedNote +
+          (hiddenNames.length
+            ? '<div style="font-size:12px;color:var(--muted);margin-top:8px;">Hidden from P &amp; L: ' +
+                hiddenNames.map(function(h){ return _prjEsc(h.name) + ' <button type="button" class="btn btn-ghost" style="padding:1px 7px;font-size:10px;" onclick="_prjPnlRestore(' + h.i + ')">restore</button>'; }).join(' · ') +
+              '</div>'
+            : '') +
+          '<div style="font-size:12px;color:var(--muted);margin-top:8px;">Enter each milestone\'s budget here; actuals come from expenses tagged to that milestone on the Costs tab. Variance = budget − actual (red means over budget). Rows without a cost (e.g. "Funding confirmed") can be removed with the ✕ — the milestone itself stays on the Milestones tab.</div>'
         : '<div style="color:var(--muted);font-size:13px;">No milestones yet — add them on the Milestones tab to build the P &amp; L breakdown.</div>') +
     '</div>';
 }
@@ -841,17 +987,58 @@ function _prjMsBudget(i, val) {
   _prjRenderPnl();
 }
 
-// ── Expense document attachments ─────────────────────────────────────────────
-// Each expense row can carry one supporting document (invoice, receipt, PO).
-// Files upload to projects/<id>/expenses/<expenseId>/ and the file_uploaded
-// meta row uses entity 'project', so the same document also appears in the
-// project's Documents tab DocLibrary.
-function _prjAttachExpenseDoc(i) {
+function _prjPnlHide(i) {
+  var ms = window._prjDraft.data.milestones;
+  if (!ms || !ms[i]) return;
+  ms[i].pnlHidden = true;
+  _prjRenderPnl();
+}
+
+function _prjPnlRestore(i) {
+  var ms = window._prjDraft.data.milestones;
+  if (!ms || !ms[i]) return;
+  delete ms[i].pnlHidden;
+  _prjRenderPnl();
+}
+
+// ── Expense document attachments (funder compliance) ─────────────────────────
+// Each expense (cost line) has three typed document slots — invoice, EFT
+// payment confirmation, bank statement proof — stored as e.docs[kind] =
+// {path, name}. Files upload to projects/<id>/expenses/<expenseId>/ and the
+// file_uploaded meta row uses entity 'project', so every document also
+// appears in the project's Documents tab DocLibrary.
+// Backward compat: the earlier single e.doc is treated as the invoice slot.
+function _prjExpDoc(e, kind) {
+  if (e.docs && e.docs[kind] && e.docs[kind].path) return e.docs[kind];
+  if (kind === 'invoice' && e.doc && e.doc.path) return e.doc;
+  return null;
+}
+
+function _prjExpClaim(e) {
+  if (!e.claimedIn) return null;
+  var reqs = (window._prjDraft && window._prjDraft.data.paymentRequests) || [];
+  var req = reqs.find(function(r){ return r.id === e.claimedIn; });
+  return req || { id: e.claimedIn, number: e.claimedNumber || 'REQ-?' };
+}
+
+function _prjDocChip(e, i, kind, label) {
+  var doc = _prjExpDoc(e, kind);
+  if (doc) {
+    return '<span class="prj-doc-chip prj-doc-ok">' +
+      '<a href="#" onclick="_prjOpenExpenseDoc(' + i + ',\'' + kind + '\');return false;" title="Open ' + _prjEsc(doc.name || 'document') + '">📄 ' + _prjEsc(label) + '</a>' +
+      '<button type="button" title="Detach ' + _prjEsc(label) + '" onclick="_prjUnlinkExpenseDoc(' + i + ',\'' + kind + '\')">✕</button>' +
+    '</span>';
+  }
+  return '<button type="button" class="prj-doc-chip prj-doc-missing" title="Attach the ' + _prjEsc(label) + ' document" onclick="_prjAttachExpenseDoc(' + i + ',\'' + kind + '\')">📎 ' + _prjEsc(label) + '</button>';
+}
+
+function _prjAttachExpenseDoc(i, kind) {
   var d = window._prjDraft;
   if (!d || !_prjCanManage()) return;
   if (!d.id) { showToast('Save the project first, then attach documents', { type: 'error' }); return; }
   var exp = d.data.expenses;
   if (!exp || !exp[i]) return;
+  kind = kind || 'invoice';
 
   var input = document.createElement('input');
   input.type = 'file';
@@ -864,20 +1051,22 @@ function _prjAttachExpenseDoc(i) {
     if (!file) return;
     if (file.size > 25 * 1024 * 1024) { showToast('File is too large (25 MB max)', { type: 'error' }); return; }
     var safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
-    var path = 'projects/' + d.id + '/expenses/' + exp[i].id + '/' + safeName;
+    var path = 'projects/' + d.id + '/expenses/' + exp[i].id + '/' + kind + '_' + safeName;
     try {
       showToast('Uploading ' + safeName + '…');
       await sbUploadFile(path, file);
       if (typeof sbSaveFileMeta === 'function') {
         sbSaveFileMeta('project', d.id, path, file.name, file.size, file.type);
       }
-      exp[i].doc = { path: path, name: file.name };
+      if (!exp[i].docs) exp[i].docs = {};
+      exp[i].docs[kind] = { path: path, name: file.name };
+      if (kind === 'invoice' && exp[i].doc) delete exp[i].doc;   // legacy slot superseded
       // Persist right away so the uploaded file can't be orphaned by an
       // unsaved draft.
       await _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false);
       _prjSyncCache(d);
       if (typeof auditEntry === 'function') {
-        auditEntry('PRJ:' + d.id, 'project_expense_doc_attached', file.name + ' attached to a ' + _prjMoney(exp[i].amount, true) + ' expense on ' + (d.project_number || d.name));
+        auditEntry('PRJ:' + d.id, 'project_expense_doc_attached', kind + ' document ' + file.name + ' attached to a ' + _prjMoney(exp[i].amount, true) + ' expense on ' + (d.project_number || d.name));
       }
       _prjRenderCosts();
       showToast('Document attached');
@@ -889,12 +1078,13 @@ function _prjAttachExpenseDoc(i) {
   input.click();
 }
 
-async function _prjOpenExpenseDoc(i) {
+async function _prjOpenExpenseDoc(i, kind) {
   var d = window._prjDraft;
   var e = d && d.data.expenses && d.data.expenses[i];
-  if (!e || !e.doc || !e.doc.path) return;
+  var doc = e && _prjExpDoc(e, kind || 'invoice');
+  if (!doc) return;
   try {
-    var url = await sbGetSignedUrl(e.doc.path);
+    var url = await sbGetSignedUrl(doc.path);
     if (url) window.open(url, '_blank', 'noopener');
     else showToast('Could not open the document', { type: 'error' });
   } catch(err) {
@@ -903,25 +1093,354 @@ async function _prjOpenExpenseDoc(i) {
   }
 }
 
-function _prjUnlinkExpenseDoc(i) {
+function _prjUnlinkExpenseDoc(i, kind) {
   var d = window._prjDraft;
   if (!d || !_prjCanManage()) return;
   var e = d.data.expenses && d.data.expenses[i];
-  if (!e || !e.doc) return;
+  kind = kind || 'invoice';
+  var doc = e && _prjExpDoc(e, kind);
+  if (!doc) return;
   if (typeof showConfirm !== 'function') return;
   showConfirm({
     title: 'Detach document?',
-    message: 'Detach "' + _prjEsc(e.doc.name || '') + '" from this expense? The file itself stays in the project\'s Documents tab.',
+    message: 'Detach "' + _prjEsc(doc.name || '') + '" from this expense? The file itself stays in the project\'s Documents tab.',
     confirmText: 'Detach',
   }).then(async function(ok) {
     if (!ok) return;
-    delete e.doc;
+    if (e.docs && e.docs[kind]) delete e.docs[kind];
+    if (kind === 'invoice' && e.doc) delete e.doc;
     if (d.id) {
       try {
         await _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false);
         _prjSyncCache(d);
       } catch(err) { console.warn('[Projects] detach doc save:', err); }
     }
+    _prjRenderCosts();
+  });
+}
+
+// ── Payment requests (claims to funders) ─────────────────────────────────────
+// Staff tick cost lines, pick the grant being billed, and export: a PDF claim
+// summary sheet plus every attached compliance document downloads, and the
+// included lines are marked "Claimed" with the request number so nothing is
+// double-claimed. Stored in data.paymentRequests[]:
+//   { id, number (REQ-NN within the project), date, grantId|null, funder,
+//     grantReference, expenseIds[], total, createdBy, createdAt }
+
+function _prjReqToggle(expId, checked) {
+  if (checked) window._prjReqSel[expId] = true;
+  else delete window._prjReqSel[expId];
+  _prjRenderCosts();
+}
+
+function _prjSelectedExpenses() {
+  var exp = (window._prjDraft && window._prjDraft.data.expenses) || [];
+  return exp.filter(function(e){ return window._prjReqSel[e.id] && !e.claimedIn; });
+}
+
+function _prjPaymentRequestSectionHtml() {
+  var d = window._prjDraft;
+  if (!d) return '';
+  var reqs = d.data.paymentRequests || [];
+  var sel = _prjSelectedExpenses();
+  var selTotal = sel.reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0);
+
+  var reqRows = reqs.map(function(r) {
+    return '<tr>' +
+      '<td style="font-weight:600;white-space:nowrap;">' + _prjEsc(r.number) + '</td>' +
+      '<td>' + _prjEsc(r.date || '') + '</td>' +
+      '<td style="min-width:0;overflow:hidden;text-overflow:ellipsis;">' + _prjEsc(r.funder || '—') + (r.grantReference ? ' <span style="color:var(--muted);font-size:11px;">· ' + _prjEsc(r.grantReference) + '</span>' : '') + '</td>' +
+      '<td style="text-align:right;">' + (r.expenseIds || []).length + '</td>' +
+      '<td style="text-align:right;font-weight:600;white-space:nowrap;">' + _prjMoney(r.total, true) + '</td>' +
+      '<td style="white-space:nowrap;">' +
+        '<button type="button" class="btn btn-ghost" style="padding:3px 9px;font-size:11px;" title="Re-export the summary sheet and documents" onclick="_prjExportRequest(\'' + _prjEsc(r.id) + '\')">⬇ Export</button> ' +
+        '<button type="button" class="prj-row-remove" title="Undo this payment request (unmarks its cost lines)" onclick="_prjUndoRequest(\'' + _prjEsc(r.id) + '\')">✕</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+
+  return '<div class="tic-section">' +
+    '<div class="tic-section-h">Payment Requests (Claims to Funders)</div>' +
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">' +
+      '<button type="button" class="btn btn-primary" ' + (sel.length ? '' : 'disabled ') + 'onclick="_prjOpenPaymentRequestModal()">📤 New Payment Request' + (sel.length ? ' (' + sel.length + ' selected · ' + _prjMoney(selTotal, true) + ')' : '') + '</button>' +
+      (!sel.length ? '<span style="font-size:12px;color:var(--muted);">Tick cost lines above to build a request.</span>' : '') +
+    '</div>' +
+    (reqs.length
+      ? '<div class="prj-table-wrap"><table class="prj-table"><thead><tr><th>Request</th><th>Date</th><th>Funder</th><th style="text-align:right;">Items</th><th style="text-align:right;">Total</th><th></th></tr></thead><tbody>' + reqRows + '</tbody></table></div>'
+      : '<div style="font-size:12px;color:var(--muted);">No payment requests yet.</div>') +
+  '</div>';
+}
+
+function _prjOpenPaymentRequestModal() {
+  var d = window._prjDraft;
+  if (!d || !_prjCanManage()) return;
+  if (!d.id) { showToast('Save the project first', { type: 'error' }); return; }
+  var sel = _prjSelectedExpenses();
+  if (!sel.length) return;
+  var total = sel.reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0);
+  var grants = d.data.grants || [];
+
+  var missingDocs = sel.filter(function(e) {
+    return PRJ_EXP_DOC_KINDS.some(function(k){ return !_prjExpDoc(e, k.k); });
+  });
+
+  var grantPicker = grants.length
+    ? '<div class="f"><label>Bill against grant</label><select id="prj_req_grant" class="tic-input">' +
+        grants.map(function(g, i){ return '<option value="' + _prjEsc(g.id) + '"' + (i === 0 ? ' selected' : '') + '>' + _prjEsc((g.source || 'Grant') + (g.reference ? ' — ' + g.reference : '') + (g.amount != null ? ' (' + _prjMoney(g.amount) + ')' : '')) + '</option>'; }).join('') +
+      '</select></div>'
+    : '<div class="f"><label>Funder</label><input id="prj_req_funder" class="tic-input" type="text" placeholder="Funder name" value="' + _prjEsc(d.funding_source || '') + '"/></div>';
+
+  var ov = document.createElement('div');
+  ov.id = 'prjReqModal';
+  ov.className = 'modal-overlay modal-overlay-centered modal-z-1100 is-open';
+  ov.innerHTML =
+    '<div class="modal-body modal-body-lg">' +
+      '<div class="modal-hdr">' +
+        '<div class="modal-hdr-title">New Payment Request</div>' +
+        '<button type="button" class="btn-close-dark-30" onclick="document.getElementById(\'prjReqModal\').remove()">&times;</button>' +
+      '</div>' +
+      '<div class="modal-body-stack" style="padding:18px 24px;max-height:70vh;overflow-y:auto;">' +
+        '<div class="tic-grid-2">' + grantPicker +
+          '<div class="f"><label>Request date</label><input id="prj_req_date" class="tic-input" type="date" value="' + new Date().toISOString().slice(0, 10) + '"/></div>' +
+        '</div>' +
+        (missingDocs.length
+          ? '<div style="margin-top:12px;padding:10px 14px;background:var(--warn-amber-bg,#fffbeb);border:1px solid var(--warn-amber-border,#fde68a);border-radius:8px;font-size:12px;color:var(--warn-amber-text,#b45309);">⚠️ ' + missingDocs.length + ' of the selected cost line' + (missingDocs.length === 1 ? ' is' : 's are') + ' missing compliance documents (invoice / EFT / bank proof). You can still export, but the funder may reject the claim.</div>'
+          : '') +
+        '<div style="margin-top:12px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">' +
+          sel.map(function(e) {
+            var n = PRJ_EXP_DOC_KINDS.filter(function(k){ return _prjExpDoc(e, k.k); }).length;
+            return '<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 12px;border-bottom:1px solid var(--border);font-size:12px;">' +
+              '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;">' + _prjEsc(e.date || '') + ' · ' + _prjEsc(e.vendor || '—') + (e.description ? ' · ' + _prjEsc(e.description) : '') + '</span>' +
+              '<span style="white-space:nowrap;">' + (n === PRJ_EXP_DOC_KINDS.length ? '<span style="color:#15803d;">✓</span>' : '<span style="color:var(--warn-amber-text,#b45309);">' + n + '/3</span>') + ' <b>' + _prjMoney(e.amount, true) + '</b></span>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+        '<div style="font-size:13px;font-weight:700;margin-top:10px;text-align:right;">Total requested: ' + _prjMoney(total, true) + '</div>' +
+        '<p class="txt-help" style="margin-top:10px;">Exporting downloads a PDF claim summary plus every attached document, and marks the included cost lines as claimed under this request number.</p>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button type="button" class="btn btn-ghost" onclick="document.getElementById(\'prjReqModal\').remove()">Cancel</button>' +
+        '<button id="prj_req_confirm" type="button" class="btn btn-primary" onclick="_prjRunPaymentRequest()">📤 Export &amp; Mark Claimed</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+}
+
+async function _prjRunPaymentRequest() {
+  var d = window._prjDraft;
+  if (!d || !d.id || !_prjCanManage()) return;
+  var sel = _prjSelectedExpenses();
+  if (!sel.length) return;
+  var total = Math.round(sel.reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0) * 100) / 100;
+
+  var grants = d.data.grants || [];
+  var grantId = null, funder = '', grantRef = '';
+  var grantSel = document.getElementById('prj_req_grant');
+  if (grantSel) {
+    grantId = grantSel.value || null;
+    var g = grants.find(function(x){ return x.id === grantId; });
+    if (g) { funder = g.source || ''; grantRef = g.reference || ''; }
+  } else {
+    var funderEl = document.getElementById('prj_req_funder');
+    funder = funderEl ? funderEl.value.trim() : '';
+  }
+  var dateEl = document.getElementById('prj_req_date');
+  var reqDate = (dateEl && dateEl.value) || new Date().toISOString().slice(0, 10);
+
+  var btn = document.getElementById('prj_req_confirm');
+  if (btn) { btn.disabled = true; btn.textContent = 'Exporting…'; }
+
+  if (!d.data.paymentRequests) d.data.paymentRequests = [];
+  var seq = d.data.paymentRequests.reduce(function(max, r) {
+    var m = /^REQ-(\d+)$/.exec(r.number || '');
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, 0) + 1;
+  var req = {
+    id: _prjUuid(),
+    number: 'REQ-' + ('0' + seq).slice(-2),
+    date: reqDate,
+    grantId: grantId,
+    funder: funder,
+    grantReference: grantRef,
+    expenseIds: sel.map(function(e){ return e.id; }),
+    total: total,
+    createdBy: (window.HOUSING_SESSION && HOUSING_SESSION.email) || window.currentRole || 'staff',
+    createdAt: new Date().toISOString(),
+  };
+  d.data.paymentRequests.push(req);
+  sel.forEach(function(e) { e.claimedIn = req.id; e.claimedNumber = req.number; });
+
+  try {
+    await _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false);
+    _prjSyncCache(d);
+  } catch(e) {
+    console.warn('[Projects] payment request save:', e);
+    showToast('Could not save the payment request — nothing was marked', { type: 'error' });
+    // Roll back the in-memory marking so the UI matches the server.
+    d.data.paymentRequests = d.data.paymentRequests.filter(function(r){ return r.id !== req.id; });
+    sel.forEach(function(e) { delete e.claimedIn; delete e.claimedNumber; });
+    if (btn) { btn.disabled = false; btn.textContent = '📤 Export & Mark Claimed'; }
+    return;
+  }
+
+  if (typeof auditEntry === 'function') {
+    auditEntry('PRJ:' + d.id, 'project_payment_request', req.number + ' — ' + _prjMoney(total, true) + ' (' + sel.length + ' items) to ' + (funder || 'funder') + ' on ' + (d.project_number || d.name));
+  }
+
+  window._prjReqSel = {};
+  var modal = document.getElementById('prjReqModal');
+  if (modal) modal.remove();
+  _prjRenderCosts();
+
+  await _prjExportRequestFiles(req);
+  showToast('Payment request ' + req.number + ' exported — cost lines marked claimed');
+}
+
+// Re-export (summary PDF + all attached documents) for an existing request.
+async function _prjExportRequest(reqId) {
+  var d = window._prjDraft;
+  var req = d && (d.data.paymentRequests || []).find(function(r){ return r.id === reqId; });
+  if (!req) return;
+  await _prjExportRequestFiles(req);
+}
+
+async function _prjExportRequestFiles(req) {
+  var d = window._prjDraft;
+  var exp = (d.data.expenses || []).filter(function(e){ return (req.expenseIds || []).indexOf(e.id) !== -1; });
+  try {
+    await _prjGenerateRequestPdf(req, exp);
+  } catch(e) {
+    console.warn('[Projects] request PDF:', e);
+    showToast('Could not generate the summary PDF', { type: 'error' });
+  }
+  // Download every attached compliance document, sequentially (parallel
+  // downloads get blocked as popups by most browsers).
+  var failed = 0;
+  for (var i = 0; i < exp.length; i++) {
+    for (var k = 0; k < PRJ_EXP_DOC_KINDS.length; k++) {
+      var doc = _prjExpDoc(exp[i], PRJ_EXP_DOC_KINDS[k].k);
+      if (!doc) continue;
+      try { await _prjDownloadDoc(doc, req.number); }
+      catch(e) { console.warn('[Projects] doc download:', e); failed++; }
+    }
+  }
+  if (failed) showToast(failed + ' document download' + (failed === 1 ? '' : 's') + ' failed — use the row links to fetch them individually', { type: 'error' });
+}
+
+async function _prjDownloadDoc(doc, prefix) {
+  var url = await sbGetSignedUrl(doc.path);
+  if (!url) throw new Error('no url');
+  var r = await fetch(url);
+  if (!r.ok) throw new Error('fetch failed');
+  var blob = await r.blob();
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (prefix ? prefix + '_' : '') + (doc.name || 'document');
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 10000);
+  // Small gap so the browser treats each download as user-initiated flow.
+  await new Promise(function(res){ setTimeout(res, 350); });
+}
+
+function _prjGenerateRequestPdf(req, exp) {
+  return new Promise(function(resolve, reject) {
+    var loadjsPDF = function(cb) {
+      if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable) { cb(); return; }
+      if (window.jspdf && window.jspdf.jsPDF && document.getElementById('prj_jspdf_at')) { cb(); return; }
+      var s1 = document.createElement('script');
+      s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s1.onload = function() {
+        var s2 = document.createElement('script');
+        s2.id = 'prj_jspdf_at';
+        s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
+        s2.onload = cb;
+        s2.onerror = reject;
+        document.head.appendChild(s2);
+      };
+      s1.onerror = reject;
+      if (window.jspdf && window.jspdf.jsPDF) { s1.onload(); return; }
+      document.head.appendChild(s1);
+    };
+
+    loadjsPDF(function() {
+      try {
+        var d = window._prjDraft;
+        var nc = window.NATION_CONFIG || {};
+        var doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+        var y = 16;
+
+        doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+        doc.text((nc.display_name || nc.short || '') + ' — Housing', 14, y); y += 7;
+        doc.setFontSize(12);
+        doc.text('Payment Request ' + req.number + ' — Claim Summary', 14, y); y += 8;
+
+        doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+        doc.text('Project: ' + (d.project_number || '') + '  ' + (d.name || ''), 14, y);
+        doc.text('Date: ' + (req.date || ''), 150, y); y += 5;
+        doc.text('Funder: ' + (req.funder || '—') + (req.grantReference ? '  (Ref: ' + req.grantReference + ')' : ''), 14, y); y += 5;
+        doc.text('Department #: ' + (d.data.deptNumber || '—') + '    PO #: ' + (d.data.poNumber || '—'), 14, y); y += 5;
+        doc.text('Prepared by: ' + ((window.HOUSING_SESSION && (HOUSING_SESSION.name || HOUSING_SESSION.email)) || ''), 14, y); y += 4;
+
+        var rows = exp.map(function(e) {
+          var docsCol = PRJ_EXP_DOC_KINDS.map(function(k) {
+            return (k.k === 'invoice' ? 'Inv' : k.k === 'eft' ? 'EFT' : 'Bank') + (_prjExpDoc(e, k.k) ? ' Y' : ' -');
+          }).join('  ');
+          return [e.date || '', e.vendor || '', e.description || '', '$' + (Number(e.amount) || 0).toFixed(2), docsCol];
+        });
+        rows.push(['', '', 'TOTAL REQUESTED', '$' + (Number(req.total) || 0).toFixed(2), '']);
+
+        doc.autoTable({
+          startY: y + 2,
+          head: [['Date', 'Vendor / Payee', 'Description', 'Amount', 'Docs attached']],
+          body: rows,
+          theme: 'striped',
+          headStyles: { fillColor: [17, 17, 15], textColor: [248, 228, 26], fontSize: 8, fontStyle: 'bold' },
+          bodyStyles: { fontSize: 8 },
+          columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 40 }, 2: { cellWidth: 60 }, 3: { cellWidth: 24, halign: 'right' }, 4: { cellWidth: 38 } },
+          margin: { left: 14, right: 14 },
+        });
+
+        var fy = doc.lastAutoTable.finalY + 8;
+        doc.setFontSize(8);
+        doc.text('Supporting documents (invoice, EFT payment confirmation, bank statement proof) accompany this summary.', 14, fy); fy += 10;
+        if (fy > 240) { doc.addPage(); fy = 20; }
+        doc.setDrawColor(150, 150, 150);
+        doc.line(14, fy + 12, 90, fy + 12);
+        doc.text('Authorized signature', 14, fy + 17);
+        doc.line(120, fy + 12, 170, fy + 12);
+        doc.text('Date', 120, fy + 17);
+
+        doc.save(((d.project_number || 'project') + '_' + req.number + '_PaymentRequest.pdf').replace(/\s+/g, '_'));
+        resolve();
+      } catch(e) { reject(e); }
+    });
+  });
+}
+
+function _prjUndoRequest(reqId) {
+  var d = window._prjDraft;
+  if (!d || !_prjCanManage()) return;
+  var req = (d.data.paymentRequests || []).find(function(r){ return r.id === reqId; });
+  if (!req || typeof showConfirm !== 'function') return;
+  showConfirm({
+    title: 'Undo payment request?',
+    message: 'Remove ' + _prjEsc(req.number) + ' (' + _prjMoney(req.total, true) + ')? Its cost lines are unmarked so they can be claimed again. Use this only if the request was not actually submitted to the funder.',
+    confirmText: 'Undo request', danger: true,
+  }).then(async function(ok) {
+    if (!ok) return;
+    d.data.paymentRequests = (d.data.paymentRequests || []).filter(function(r){ return r.id !== reqId; });
+    (d.data.expenses || []).forEach(function(e) {
+      if (e.claimedIn === reqId) { delete e.claimedIn; delete e.claimedNumber; }
+    });
+    try {
+      await _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false);
+      _prjSyncCache(d);
+      if (typeof auditEntry === 'function') {
+        auditEntry('PRJ:' + d.id, 'project_payment_request_undone', req.number + ' undone on ' + (d.project_number || d.name));
+      }
+    } catch(e) { console.warn('[Projects] undo request:', e); }
     _prjRenderCosts();
   });
 }
