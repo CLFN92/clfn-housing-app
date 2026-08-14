@@ -1558,18 +1558,16 @@ function _applySowModalLock(sow){
     nrBtn.style.display = (!!sow && !!sow.project_number) ? 'flex' : 'none';
   }
 
-  // RFQ button: show when SOW amount meets the threshold (or HM/ED override).
+  // RFQ button: show on ANY saved maintenance request that is still tenderable
+  // (not completed / already awarded), whenever the RFQ module is on -- no cost
+  // threshold. It requires the MR to be SAVED (a project number) so the RFQ has
+  // a SOW to link to; RFQ editing itself stays HM/ED-gated on the RFQ page.
   var rfqBtn = document.getElementById('sow_rfq_btn');
   if (rfqBtn) {
-    var _rfqRole = window.currentRole || '';
-    var _rfqShow = _sowRfqStillOpen(sow)
-      && (typeof moduleOn !== 'function' || moduleOn('rfq'))
-      && (
-        (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(sow)) ||
-        (_rfqRole === 'housing_manager' || _rfqRole === 'ed')
-      );
+    var _rfqShow = !!(sow && sow.project_number)
+      && _sowRfqStillOpen(sow)
+      && (typeof moduleOn !== 'function' || moduleOn('rfq'));
     rfqBtn.style.display = _rfqShow ? 'flex' : 'none';
-
   }
 
   // Save button: hidden in read-only mode.

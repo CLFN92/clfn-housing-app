@@ -1396,7 +1396,7 @@ function renderRenoApprovalsView() {
       // No SOWs yet — placeholder row so staff can start one from this view.
       var rs0 = calcRenoScore(u.id);
       rows.push({u:u, sow:null, projectNumber:null, prog:null, rs:rs0,
-                 appr:_getRaApprovalStatusForSow(u, null), cost:0});
+                 appr:_getRaApprovalStatusForSow(u, null), cost:0, dismissed: !!u.reno_dismissed});
       return;
     }
     list.forEach(function(sow){
@@ -1426,6 +1426,12 @@ function renderRenoApprovalsView() {
       ].filter(function(v){ return v != null && v !== ''; }).join(' ').toLowerCase();
       return hay.indexOf(_raSearch) !== -1;
     });
+  }
+
+  // Per-row Dismiss: hide dismissed 'No Request Filed' placeholder rows unless
+  // the user has toggled "Show dismissed".
+  if(!_raShowDismissed()){
+    filtered = filtered.filter(function(r){ return !r.dismissed; });
   }
 
   // Default sort — priority desc, then address, then project #. Stays in
@@ -1582,6 +1588,11 @@ function renderRenoApprovalsView() {
           ? '<a href="rfq.html?unit='+encodeURIComponent(uid)+'&sow='+encodeURIComponent(pn)+'" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;display:inline-flex;align-items:center;" title="Create Request for Quotes">RFQ</a>'
           : '')
         +'<button data-ra-prog="'+uid+'"'+dataProj+' style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;color:var(--muted);">📊</button>'
+        +(appr.key === 'no_sow'
+          ? (r.dismissed
+             ? '<button data-ra-restore="'+uid+'" title="Restore to pipeline" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;color:var(--muted);">↩</button>'
+             : '<button data-ra-dismiss="'+uid+'" title="Dismiss from pipeline (no request filed)" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-family:DM Sans,sans-serif;color:var(--muted);">🗄</button>')
+          : '')
       +'</div></td>'
       +'</tr>';
   }).join('');
@@ -1598,6 +1609,10 @@ function renderRenoApprovalsView() {
     if(sowBtn)  sowBtn.addEventListener('click',  function(e){e.stopPropagation(); openSowModal(uid, proj);});
     if(progBtn) progBtn.addEventListener('click', function(e){e.stopPropagation(); openRenoProgress(uid);});
     if(appBtn)  appBtn.addEventListener('click',  function(e){e.stopPropagation(); raQuickApprove(uid, appBtn.getAttribute('data-ra-role'), proj);});
+    var disBtn = row.querySelector('[data-ra-dismiss]');
+    var resBtn = row.querySelector('[data-ra-restore]');
+    if(disBtn) disBtn.addEventListener('click', function(e){e.stopPropagation(); _renoDismissUnit(uid);});
+    if(resBtn) resBtn.addEventListener('click', function(e){e.stopPropagation(); _renoRestoreUnit(uid);});
   });
 
   // Column-menu click + sort indicators
@@ -1631,6 +1646,12 @@ function _raCardTileFor(r, role, hmLimit) {
   }
   if ((typeof moduleOn !== 'function' || moduleOn('rfq')) && pn && (typeof _sowRfqStillOpen === 'function' ? _sowRfqStillOpen(r.sow) : appr.key !== 'approved') && (typeof _sowMeetsRfqThreshold === 'function' && _sowMeetsRfqThreshold(r)) && (typeof _raRfqAwarded !== 'function' || !_raRfqAwarded(r))) {
     actions.push({html:'<a href="rfq.html?unit='+encodeURIComponent(u.id)+'&sow='+encodeURIComponent(pn)+'" onclick="event.stopPropagation();" style="flex:1;background:#1d4ed8;color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:12px;font-weight:700;font-family:DM Sans,sans-serif;text-decoration:none;text-align:center;white-space:nowrap;">RFQ</a>'});
+  }
+  // Dismiss / Restore for 'No Request Filed' placeholder units.
+  if (appr.key === 'no_sow') {
+    actions.push(r.dismissed
+      ? {text:'↩ Restore', onclick:"event.stopPropagation();_renoRestoreUnit('"+uid+"')", ghost:true}
+      : {text:'🗄 Dismiss', onclick:"event.stopPropagation();_renoDismissUnit('"+uid+"')", ghost:true});
   }
   actions.push({text:'📊 Progress', onclick:"event.stopPropagation();openRenoProgress('"+uid+"')", ghost:true});
   return _cardTile({
@@ -1732,6 +1753,31 @@ function _raRenderKanban(rows, el, role, hmLimit) {
 function _raViewMode(){ try { var v = localStorage.getItem('clfn_reno_approvals_view'); return (v==='list'||v==='cards'||v==='kanban') ? v : 'kanban'; } catch(e){ return 'kanban'; } }
 function _raHideCompleted(){ try { return localStorage.getItem('clfn_ra_hide_completed') === '1'; } catch(e){ return false; } }
 window._raToggleHideCompleted = function(el){ try { localStorage.setItem('clfn_ra_hide_completed', (el&&el.checked)?'1':'0'); } catch(e){} renderRenoApprovalsView(); };
+
+// Per-row Dismiss for 'No Request Filed' placeholder rows (units with no
+// maintenance request). Dismissing sets a flag on the unit (round-trips through
+// the unit data blob via sbSaveUnit) so the unit's placeholder drops out of the
+// pipeline until restored. A "Show dismissed" toggle reveals them for restore.
+function _raShowDismissed(){ try { return localStorage.getItem('clfn_ra_show_dismissed') === '1'; } catch(e){ return false; } }
+window._raToggleShowDismissed = function(el){ try { localStorage.setItem('clfn_ra_show_dismissed', (el&&el.checked)?'1':'0'); } catch(e){} renderRenoApprovalsView(); };
+window._renoDismissUnit = function(unitId){
+  var u = (typeof getAllUnits==='function' ? getAllUnits() : (window.housingUnits||[])).find(function(x){ return String(x.id)===String(unitId); });
+  if(!u){ if(typeof showToast==='function') showToast('Unit not found'); return; }
+  u.reno_dismissed = true;
+  if(typeof sbSaveUnit==='function') sbSaveUnit(u);
+  if(typeof auditEntry==='function') auditEntry('UNIT:'+unitId, 'reno_dismissed', 'Dismissed from renovations pipeline (no request filed)', window.currentRole||'');
+  if(typeof showToast==='function') showToast('Removed from the renovations pipeline. Use "Show dismissed" to restore.');
+  renderRenoApprovalsView();
+};
+window._renoRestoreUnit = function(unitId){
+  var u = (typeof getAllUnits==='function' ? getAllUnits() : (window.housingUnits||[])).find(function(x){ return String(x.id)===String(unitId); });
+  if(!u){ if(typeof showToast==='function') showToast('Unit not found'); return; }
+  u.reno_dismissed = false;
+  if(typeof sbSaveUnit==='function') sbSaveUnit(u);
+  if(typeof auditEntry==='function') auditEntry('UNIT:'+unitId, 'reno_restored', 'Restored to renovations pipeline', window.currentRole||'');
+  if(typeof showToast==='function') showToast('Restored to the renovations pipeline.');
+  renderRenoApprovalsView();
+};
 function _raViewToggleHtml(){
   var cur = _raViewMode();
   function b(v,label,icon,pos){
@@ -1744,6 +1790,7 @@ function _raViewToggleHtml(){
   }
   return '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">'
     + '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;"><input type="checkbox" '+(_raHideCompleted()?'checked ':'')+'onchange="_raToggleHideCompleted(this)"/> Hide completed</label>'
+    + '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;margin-left:14px;"><input type="checkbox" '+(_raShowDismissed()?'checked ':'')+'onchange="_raToggleShowDismissed(this)"/> Show dismissed</label>'
     + '<div style="display:flex;">' + b('list','List','&#9776;','l') + b('cards','Cards','&#9638;','m') + b('kanban','Kanban','&#9707;','r') + '</div>'
     + '</div>';
 }
