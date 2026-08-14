@@ -254,6 +254,7 @@ function aiSendMessage() {
         type: p.type || '',
         status: p.status || '',
         funding_source: p.funding_source || '',
+        po_number: d.poNumber || '',
         budget: p.budget != null ? Number(p.budget) : null,
         spent: expenses.reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0),
         milestones_done: ms.filter(function(m){ return m.done; }).length,

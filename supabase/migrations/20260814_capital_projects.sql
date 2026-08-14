@@ -6,10 +6,12 @@
 -- allocation snapshot) rides the data jsonb blob, camelCase, mirroring the
 -- housing_units / housing_rfq pattern:
 --   data: {
---     description: "",
---     milestones: [ { id, name, targetDate, done, completedDate, notes } ],
+--     description: "", poNumber: "",
+--     milestones: [ { id, name, targetDate, done, completedDate, notes,
+--                     budgetAmount|null (per-milestone P&L budget) } ],
 --     expenses:   [ { id, date, vendor, description, amount,
---                     milestoneId|null, enteredBy, createdAt } ],
+--                     milestoneId|null, enteredBy, createdAt,
+--                     doc: {path, name}|absent (attached invoice/receipt) } ],
 --     allocation: { basis: 'actuals'|'budget', total, unitCount,
 --                   perUnit: [ { unitId, amount } ],
 --                   allocatedBy, allocatedAt } | null
@@ -28,7 +30,7 @@ create table if not exists public.housing_projects (
   id             uuid primary key default gen_random_uuid(),
   project_number text unique,
   name           text not null,
-  type           text not null default 'house_build',   -- lot_development | house_build | mixed
+  type           text not null default 'house_build',   -- lot_development | house_build | mixed | commercial_building | band_building | infrastructure
   status         text not null default 'planning',      -- planning | active | on_hold | completed | cancelled
   funding_source text,                                  -- BUDGET_POOLS id or free text
   budget         numeric,

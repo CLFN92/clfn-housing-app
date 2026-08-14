@@ -96,7 +96,7 @@ const TABLES: Record<string, TableDef> = {
   },
   housing_projects: {
     roles: ALL,
-    cols: 'id, project_number (CP-YYYY-NN, e.g. CP-2026-01), name, type (lot_development|house_build|mixed), status (planning|active|on_hold|completed|cancelled), funding_source, budget, start_date, target_date, archived, created_at. These are CAPITAL PROJECTS (funded initiatives like "build 5 houses" or "develop 20 lots") - NOT the SOW-YYYY-NN "Project #" on maintenance requests. Milestones, expenses, and the cost-allocation snapshot live in a `data` jsonb (milestones[], expenses[] with amount, allocation) - use select=* to read them and sum expenses[].amount for spend-to-date.',
+    cols: 'id, project_number (CP-YYYY-NN, e.g. CP-2026-01), name, type (lot_development|house_build|mixed|commercial_building|band_building|infrastructure), status (planning|active|on_hold|completed|cancelled), funding_source, budget, start_date, target_date, archived, created_at. These are CAPITAL PROJECTS (funded initiatives like "build 5 houses" or "develop 20 lots") - NOT the SOW-YYYY-NN "Project #" on maintenance requests. Milestones, expenses, the PO number, and the cost-allocation snapshot live in a `data` jsonb (poNumber, milestones[] with budgetAmount for the per-milestone P&L budget, expenses[] with amount and optional doc attachment, allocation) - use select=* to read them and sum expenses[].amount for spend-to-date.',
   },
   housing_project_lots: {
     roles: ALL,
@@ -594,11 +594,15 @@ dates.
 
 Capital Projects (under the Operations nav; edit needs the manageProjects
 authority, default HM/ED - everyone else views read-only): Projects page >
-"+ New Project". Pick the type (Lot Development, House Build, Mixed) - a
+"+ New Project". Pick the type (Lot Development, House Build, Mixed,
+Commercial Building, Band Building, Infrastructure Project) - a
 default milestone checklist is applied and can be edited. Tabs on the project
-card: Overview (name, funding source, budget, dates), Milestones (check off as
-completed), Costs (log expenses against the budget, optionally tagged to a
-milestone), Lots & Units, Documents. On Lots & Units: "+ Add Lots" creates lot
+card: Overview (name, funding source, PO number, budget, dates), Milestones
+(check off as completed), Costs (log expenses against the budget, optionally
+tagged to a milestone; each expense can carry an attached document such as an
+invoice or receipt, which also appears in the Documents tab), P & L (budget vs
+actual with variance, one row per milestone - milestone budgets are entered on
+this tab), Lots & Units, Documents. On Lots & Units: "+ Add Lots" creates lot
 records in bulk; lots move raw -> serviced -> built; "Create Units from Lots"
 builds housing units on selected lots (they appear in Inventory linked to the
 project); "Link existing unit" attaches an already-existing unit to a lot.

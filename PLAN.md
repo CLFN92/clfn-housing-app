@@ -847,6 +847,12 @@ allocating the project total across delivered units to set each unit's cost.
   (ai-assistant.js), `housing_projects`/`housing_project_lots` in the
   `query_database` allowlist, CP-vs-SOW terminology rule + Capital Projects
   HOW_TO section (`ai-chat/index.ts`)
+- ✅ v1.1 enhancements: per-expense document attachments (upload to
+  `projects/<id>/expenses/<expId>`, doubles into the Documents DocLibrary),
+  PO # on Overview (`data.poNumber`), three new project types
+  (`commercial_building`, `band_building`, `infrastructure`) with milestone
+  templates, and a **P & L tab** (budget vs actual with variance, one row per
+  milestone; milestone `budgetAmount` entered there)
 - ⬜ **Redeploy the `ai-chat` Edge Function** (dashboard paste or
   `supabase functions deploy ai-chat`) so the server-side changes go live
 - 🔖 Deferred: project rows in the `project-schedule.js` Gantt,
