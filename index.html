@@ -58,7 +58,12 @@
         onclick="startSignIn()">
         Sign in
       </button>
+      <button id="magic-link-btn" class="login-link login-link--block"
+        onclick="sendMagicLink()">
+        Email me a sign-in link instead
+      </button>
       <div id="signin-error" class="login-error"></div>
+      <div id="signin-info" class="login-msg" style="display:none;"></div>
     </div>
 
     <!-- Email verification panel -->

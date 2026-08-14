@@ -213,6 +213,115 @@ function _parseRecoveryHash() {
   return params;
 }
 
+// Generic auth-hash parser (any Supabase email link that returns a session in
+// the URL fragment: magic link, email confirmation). Returns the params when an
+// access_token is present, else null. Recovery is handled separately above.
+function _parseAuthHash() {
+  var hash = (window.location.hash || '').replace(/^#/, '');
+  if (!hash) return null;
+  var params = {};
+  hash.split('&').forEach(function(kv){
+    var eq = kv.indexOf('=');
+    if (eq < 0) return;
+    params[decodeURIComponent(kv.slice(0, eq))] = decodeURIComponent(kv.slice(eq + 1));
+  });
+  return params.access_token ? params : null;
+}
+
+// ── Magic-link (passwordless) sign-in ─────────────────────────────────────────
+// "Email me a sign-in link" -> Supabase GoTrue /otp with create_user:false, so a
+// link is only mailed to an EXISTING auth user (no account creation, no email
+// enumeration). The emailed link returns to THIS page with the session tokens in
+// the URL fragment; completeMagicLinkSignIn() picks them up. Access is still
+// hard-gated on an ACTIVE staff row, so mailbox possession alone is not enough.
+async function sendMagicLink() {
+  var email  = ((document.getElementById('signin-email') || {}).value || '').trim().toLowerCase();
+  var errEl  = document.getElementById('signin-error');
+  var infoEl = document.getElementById('signin-info');
+  var btn    = document.getElementById('magic-link-btn');
+  if (errEl)  errEl.style.display  = 'none';
+  if (infoEl) infoEl.style.display = 'none';
+  if (!email) {
+    if (errEl) { errEl.textContent = 'Enter your email first, then request a link.'; errEl.style.display = 'block'; }
+    return;
+  }
+  var _domain = '@' + ((window.NATION_CONFIG && NATION_CONFIG.email_domain) || 'clfn.on.ca');
+  if (!email.endsWith(_domain)) {
+    if (errEl) { errEl.textContent = 'Sign-in links are available for your organization email address.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending link…'; }
+  try {
+    var redirectTo = window.location.origin + window.location.pathname;
+    await fetch(SUPABASE_URL + '/auth/v1/otp?redirect_to=' + encodeURIComponent(redirectTo), {
+      method:  'POST',
+      headers: HOUSING_HEADERS,
+      body:    JSON.stringify({ email: email, create_user: false })
+    });
+    // GoTrue returns 200 whether or not the user exists (no enumeration) — always
+    // show the same neutral confirmation.
+    if (infoEl) { infoEl.textContent = 'If that address has an account, a sign-in link is on its way. It expires shortly — open it on this device.'; infoEl.style.display = 'block'; }
+  } catch (e) {
+    console.warn('[MAGIC LINK] send failed:', e);
+    if (errEl) { errEl.textContent = 'Could not send the link right now. Please try again.'; errEl.style.display = 'block'; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Email me a sign-in link instead'; }
+  }
+}
+
+// Complete a magic-link return: strip the tokens from the URL, identify the
+// user, confirm an ACTIVE staff row exists, apply the session, resolve role, and
+// hand off. Rejects back to login if the link is invalid/expired or the email is
+// not active staff.
+async function completeMagicLinkSignIn(h) {
+  var errEl = document.getElementById('signin-error');
+  try {
+    try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) {}
+
+    var token = h.access_token;
+    var ur = await fetch(SUPABASE_URL + '/auth/v1/user', {
+      headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + token }
+    });
+    var user  = ur.ok ? await ur.json() : null;
+    var email = (user && user.email || '').toLowerCase();
+    if (!email) throw new Error('invalid-link');
+
+    // HARD GATE: must be an ACTIVE staff row — mailbox possession alone is not
+    // enough. Stops any existing auth user without staff access from getting in.
+    var sr = await fetch(SUPABASE_URL + '/rest/v1/staff?select=id&is_active=eq.true&email=eq.' + encodeURIComponent(email), {
+      headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + token }
+    });
+    var srows = sr.ok ? await sr.json() : [];
+    if (!srows.length) throw new Error('not-staff');
+
+    if (typeof _applyTokenPayload === 'function') {
+      _applyTokenPayload({ access_token: token, refresh_token: h.refresh_token, expires_in: parseInt(h.expires_in || '3600', 10) });
+    } else {
+      HOUSING_SESSION.accessToken = token;
+      HOUSING_HEADERS['Authorization'] = 'Bearer ' + token;
+      try { sessionStorage.setItem('clfn_housing_token', token); } catch (e) {}
+    }
+    HOUSING_SESSION.email = email;
+    HOUSING_SESSION.name  = (user.user_metadata && user.user_metadata.full_name) || email;
+
+    await resolveHousingRole();
+    _stampStaffLastLogin(email);
+    try {
+      sessionStorage.setItem('clfn_housing_role',          window.currentRole || '');
+      sessionStorage.setItem('clfn_housing_name',          HOUSING_SESSION.name  || '');
+      sessionStorage.setItem('clfn_housing_email_session', HOUSING_SESSION.email || '');
+    } catch (e) {}
+
+    window.location.href = 'housing.html?view=home';
+  } catch (e) {
+    console.warn('[MAGIC LINK] completion failed:', e && e.message);
+    try { sessionStorage.removeItem('clfn_housing_token'); } catch (ee) {}
+    showLoginScreen();
+    if (errEl) { errEl.textContent = 'That sign-in link is invalid or has expired. Request a new one.'; errEl.style.display = 'block'; }
+  }
+}
+window.sendMagicLink = sendMagicLink;
+
 function showResetPasswordPanel() {
   var p = document.getElementById('signin-panel');
   var v = document.getElementById('verify-panel');
@@ -483,6 +592,23 @@ function initLoginPage() {
   if (recovery) {
     window._recoveryToken = recovery.access_token;
     showResetPasswordPanel();
+    return;
+  }
+
+  // Magic-link return — session tokens arrive in the URL fragment. Handle this
+  // before the stashed-session redirect so a magic link always takes effect,
+  // even if this browser already has a (possibly stale) session.
+  var authHash = _parseAuthHash();
+  if (authHash) {
+    completeMagicLinkSignIn(authHash);
+    return;
+  }
+  // An expired / already-used link returns with an error fragment (no token).
+  if ((window.location.hash || '').indexOf('error') !== -1) {
+    try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) {}
+    showLoginScreen();
+    var e2 = document.getElementById('signin-error');
+    if (e2) { e2.textContent = 'That sign-in link is invalid or has expired. Request a new one.'; e2.style.display = 'block'; }
     return;
   }
 
