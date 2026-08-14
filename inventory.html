@@ -106,6 +106,9 @@
       <p>All <span id="inv_count">—</span> <span data-nation="short">CLFN</span> housing units — <span id="inv_vacant_count" style="color:var(--success);font-weight:600;">—</span> vacant</p>
     </div>
     <div class="phb-actions">
+      <button type="button" onclick="openAddLotModal()" class="btn btn-ghost">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Lot
+      </button>
       <button type="button" onclick="openAddUnitModal()" class="btn btn-primary">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Unit
       </button>
@@ -136,7 +139,44 @@
     </div>
   </div>
   <div id="inv_cards" style="display:none;"></div>
+
+  <!-- ═══ VACANT LOTS ═══ -->
+  <div id="inv_lots_section" style="margin-top:26px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;flex-wrap:wrap;">
+      <h2 style="margin:0;font-size:15px;font-weight:700;">Vacant Lots <span id="inv_lots_count" style="font-size:12px;color:var(--muted);font-weight:500;"></span></h2>
+      <button type="button" onclick="openAddLotModal()" class="btn btn-ghost btn-sm">+ Add Lot</button>
+    </div>
+    <div class="std-table-card"><div class="doclib-table-wrap">
+      <table class="std-table" style="min-width:520px;">
+        <thead><tr>
+          <th style="width:80px;">Lot #</th><th>Address</th>
+          <th style="width:100px;">Status</th><th>Assigned Building</th>
+          <th style="width:130px;"></th>
+        </tr></thead>
+        <tbody id="inv_lots_tbody"><tr><td colspan="5" style="padding:20px;text-align:center;color:var(--muted);">No lots yet.</td></tr></tbody>
+      </table>
+    </div></div>
+  </div>
 </div></div><!-- end inventoryView -->
+
+<!-- Add Vacant Lot modal -->
+<div id="addLotModal" class="modal-overlay modal-z-800">
+  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:460px;box-shadow:0 24px 60px rgba(0,0,0,0.4);overflow:hidden;margin:auto;">
+    <div class="modal-hdr spacious">
+      <div class="panel-title">Add Vacant Lot</div>
+      <button onclick="closeAddLotModal()" class="btn-close-dark-30">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+      <div class="f"><label>Lot Number <span class="r">*</span></label><input type="text" id="al_lotnum" placeholder="e.g. 42"/></div>
+      <div class="f"><label>Street Address <span class="r">*</span></label><input type="text" id="al_street" placeholder="e.g. Musko Road"/></div>
+      <div class="f"><label>Notes</label><textarea id="al_notes" rows="2" placeholder="Size, servicing, etc."></textarea></div>
+    </div>
+    <div class="modal-footer" style="padding:14px 20px;display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeAddLotModal()" class="btn btn-ghost">Cancel</button>
+      <button onclick="saveNewLot()" class="btn btn-primary">Add Lot</button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══ MATCH VIEW ═══ -->
 <div id="addUnitModal" class="modal-overlay modal-z-800">
@@ -149,6 +189,7 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;">
         <div class="f"><label>Unit Number <span class="r">*</span></label><input type="text" id="au_num" placeholder="e.g. 11"/></div>
         <div class="f"><label>Street Address <span class="r">*</span></label><input type="text" id="au_street" placeholder="e.g. Musko Road"/></div>
+        <div class="f"><label>Build on Lot <span style="font-weight:normal;color:var(--muted);">(optional)</span></label><select id="au_lot"><option value="">— None —</option></select></div>
         <div class="f"><label id="au_bedrooms_label">Bedrooms</label><select id="au_bedrooms"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></div>
         <div class="f"><label>Bathrooms</label><select id="au_bathrooms"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
         <div class="f"><label>Type</label>

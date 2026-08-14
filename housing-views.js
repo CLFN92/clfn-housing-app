@@ -256,7 +256,10 @@ function renderInventoryView(){
   var showRenoCol = (ROLE.isManagement(window.currentRole));
   var th = document.getElementById('inv_reno_score_th');
   if(th) th.style.display = showRenoCol ? '' : 'none';
-  var units = getAllUnits().slice();
+  // Render the Vacant Lots panel (separate from the buildings table).
+  if(typeof _renderLotsList === 'function') _renderLotsList();
+  // The buildings table excludes lot records (record_type:'lot').
+  var units = getAllUnits().slice().filter(function(u){ return !(typeof _isLot==='function' && _isLot(u)); });
   var search = (document.getElementById('inv_search')||{}).value||'';
   var _searchLc = (search || '').toLowerCase().trim();
   // Pre-filter (search bar only — every other filter is now in the column-
@@ -1427,7 +1430,9 @@ function _renderLandingKpis(){
     if (el) el.textContent = (val == null ? '—' : String(val));
   }
   var apps  = (typeof applications !== 'undefined' && applications) ? applications : [];
-  var units = (typeof housingUnits  !== 'undefined' && housingUnits)  ? housingUnits  : [];
+  // Exclude lot records (record_type:'lot') from all housing-unit KPIs/counts.
+  var units = ((typeof housingUnits  !== 'undefined' && housingUnits)  ? housingUnits  : [])
+    .filter(function(u){ return !(typeof _isLot==='function' && _isLot(u)); });
 
   var STATUS = (typeof APP_STATUS !== 'undefined') ? APP_STATUS : {
     SUBMITTED: 'submitted', FILE_UPDATE: 'file_update',

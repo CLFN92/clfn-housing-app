@@ -363,6 +363,13 @@ window.canUseFeature = function(key, ctx){
 };
 window.isFeatureRestricted = function(ctx){ return !!window._resolveFeatureList(ctx); };
 
+// ── Vacant lots ───────────────────────────────────────────────────────────────
+// A lot is a land parcel (street + lot number) stored in housing_units with a
+// record_type:'lot' marker (rides in the data blob -- no migration). Lots use
+// status 'vacant_lot' and are excluded from unit/tenant/match views + counts.
+// A lot linked to a building carries builtUnitId (and status 'built').
+window._isLot = function(u){ return !!(u && (u.record_type === 'lot' || u.recordType === 'lot')); };
+
 // ── Application status constants ──────────────────────────────────────────────
 window.APP_STATUS = {
   DRAFT:        'draft',

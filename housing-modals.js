@@ -2099,6 +2099,21 @@ function saveNewUnit(){
     assignedTo: null, assignedDate: null, assignedName: null
   };
 
+  // Optional: build this unit on a vacant lot. Link the unit to the lot and
+  // mark the lot as built.
+  var _lotId = (document.getElementById('au_lot')||{}).value || '';
+  if(_lotId){
+    var _lot = housingUnits.find(function(x){ return String(x.id)===String(_lotId); });
+    if(_lot){
+      newUnit.lotId = _lotId;
+      newUnit.lotNumber = _lot.lotNumber || _lot.num || '';
+      _lot.builtUnitId = newId;
+      _lot.status = 'built';
+      saveUnitWithDraftFallback(_lot);
+      if(typeof auditEntry==='function') auditEntry('UNIT:'+newId, 'unit_on_lot', 'Built on Lot '+(_lot.lotNumber||_lot.num||'')+' '+(_lot.street||''), window.currentRole||'');
+    }
+  }
+
   housingUnits.push(newUnit);
   saveUnitWithDraftFallback(newUnit);
   if(_auStagedPhotos.length){ saveUnitPhotos(newId, _auStagedPhotos); _auStagedPhotos=[]; }
@@ -2138,9 +2153,102 @@ function openAddUnitModal(){
   var eldEl = document.getElementById('au_isElders'); if(eldEl) eldEl.checked=false;
   _auStagedPhotos = [];
   renderAddUnitPhotoPreview();
+  // Populate the "Build on Lot" picker with vacant (unbuilt) lots.
+  var lotSel = document.getElementById('au_lot');
+  if(lotSel){
+    var _allU = (typeof getAllUnits==='function') ? getAllUnits() : (window.housingUnits||[]);
+    var _vacLots = _allU.filter(function(u){ return _isLot(u) && !u.archived && !u.builtUnitId; });
+    lotSel.innerHTML = '<option value="">— None —</option>' + _vacLots.map(function(l){
+      var lbl = ((l.lotNumber||l.num||'?') + ' ' + (l.street||'')).trim();
+      return '<option value="'+String(l.id).replace(/"/g,'&quot;')+'">Lot '+_escAttrLite(lbl)+'</option>';
+    }).join('');
+    lotSel.value = '';
+  }
   var modal = document.getElementById('addUnitModal');
   if(modal){ modal.style.removeProperty('display'); modal.style.setProperty('display','flex','important'); }
 }
+function _escAttrLite(s){ return String(s==null?'':s).replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Vacant lots (land parcels stored in housing_units, record_type:'lot') ──────
+function openAddLotModal(){
+  ['al_lotnum','al_street','al_notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  var m = document.getElementById('addLotModal');
+  if(m){ m.style.removeProperty('display'); m.style.setProperty('display','flex','important'); }
+}
+function closeAddLotModal(){
+  var m = document.getElementById('addLotModal');
+  if(m) m.style.display='none';
+}
+function saveNewLot(){
+  var get = function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
+  var lotNum = get('al_lotnum'), street = get('al_street');
+  if(!lotNum || !street){ showToast('Lot number and street are required'); return; }
+  var newId = ('LOT-' + street.toUpperCase().replace(/\s+/g,'-') + '-' + lotNum).replace(/[^A-Z0-9\-]/g,'');
+  var units = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : [];
+  if(units.find(function(u){ return u.id === newId; })){ showToast('A lot at that address already exists'); return; }
+  var newLot = {
+    id:newId, street:street, num:lotNum, lotNumber:lotNum,
+    record_type:'lot', type:'Vacant Lot', status:'vacant_lot',
+    notes:get('al_notes')||'', builtUnitId:null,
+    bedrooms:null, bathrooms:null, assignedTo:null, assignedName:null, assignedDate:null
+  };
+  housingUnits.push(newLot);
+  saveUnitWithDraftFallback(newLot);
+  if(typeof auditEntry==='function') auditEntry('UNIT:'+newId, 'lot_added', 'Vacant lot added: Lot '+lotNum+' '+street, window.currentRole||'');
+  closeAddLotModal();
+  renderInventoryView();
+  showToast('Lot '+lotNum+' '+street+' added');
+}
+function _lotArchive(lotId){
+  var l = (typeof housingUnits!=='undefined'?housingUnits:[]).find(function(x){ return String(x.id)===String(lotId); });
+  if(!l) return;
+  var doIt = function(){
+    l.archived = true;
+    saveUnitWithDraftFallback(l);
+    if(typeof auditEntry==='function') auditEntry('UNIT:'+lotId, 'lot_archived', 'Vacant lot archived', window.currentRole||'');
+    renderInventoryView();
+    showToast('Lot archived');
+  };
+  if(typeof showConfirm==='function'){
+    showConfirm({ title:'Archive this lot?', message:'It will be removed from the Vacant Lots list.', confirmText:'Archive' }).then(function(ok){ if(ok) doIt(); });
+  } else { doIt(); }
+}
+// Render the Vacant Lots table on the Inventory page.
+function _renderLotsList(){
+  var tbody = document.getElementById('inv_lots_tbody'); if(!tbody) return;
+  var units = (typeof getAllUnits==='function') ? getAllUnits() : (window.housingUnits||[]);
+  var esc = (typeof escapeHtml==='function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+  var lots = units.filter(function(u){ return _isLot(u) && !u.archived; });
+  var cnt = document.getElementById('inv_lots_count'); if(cnt) cnt.textContent = lots.length ? ('· '+lots.length) : '';
+  if(!lots.length){ tbody.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--muted);">No lots yet. Click "+ Add Lot" to create one.</td></tr>'; return; }
+  lots.sort(function(a,b){
+    var s=(a.street||'').localeCompare(b.street||''); if(s!==0) return s;
+    return (parseInt(a.lotNumber||a.num||0,10)||0) - (parseInt(b.lotNumber||b.num||0,10)||0);
+  });
+  tbody.innerHTML = lots.map(function(l){
+    var built = !!l.builtUnitId;
+    var bldg = '';
+    if(built){ var bu = units.find(function(x){ return String(x.id)===String(l.builtUnitId); }); bldg = bu ? esc(((bu.num||'')+' '+(bu.street||'')).trim()) : '(building)'; }
+    var statusPill = built
+      ? '<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:#eff6ff;color:#1d4ed8;">Built</span>'
+      : '<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:#f0fdf4;color:#15803d;">Vacant</span>';
+    var lid = String(l.id).replace(/'/g,"\\'");
+    return '<tr>'
+      +'<td style="font-weight:700;">'+esc(l.lotNumber||l.num||'—')+'</td>'
+      +'<td>'+esc(l.street||'—')+'</td>'
+      +'<td>'+statusPill+'</td>'
+      +'<td style="color:var(--muted);font-size:12px;">'+(bldg||'—')+'</td>'
+      +'<td style="text-align:right;white-space:nowrap;">'
+        + (built ? '' : '<button onclick="_lotArchive(\''+lid+'\')" class="btn btn-ghost btn-sm" style="color:var(--danger);">Archive</button>')
+      +'</td>'
+    +'</tr>';
+  }).join('');
+}
+window.openAddLotModal = openAddLotModal;
+window.closeAddLotModal = closeAddLotModal;
+window.saveNewLot = saveNewLot;
+window._lotArchive = _lotArchive;
+window._renderLotsList = _renderLotsList;
 
 // ── renderBudgetPools ──
 var BUDGET_POOLS = [
