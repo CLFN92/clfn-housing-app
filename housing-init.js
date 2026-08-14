@@ -2094,20 +2094,32 @@ function renderHeaderNav(){
   if(!nav) return;
   var html = '';
   var hadDivider = false;
+  // Per-user Feature Access: hide a nav entry whose function this user isn't
+  // granted. canUseFeature() returns true when the user has no explicit list,
+  // so unrestricted users are unaffected. data-feature is also emitted so the
+  // post-resolve applyRoleVisibility() pass re-hides if the list loads later.
+  function _navFeatDenied(key){
+    return key && window.FEATURE_KEYS && FEATURE_KEYS.indexOf(key) !== -1 &&
+           typeof window.canUseFeature === 'function' && !window.canUseFeature(key);
+  }
+  function _featAttr(key){
+    return (key && window.FEATURE_KEYS && FEATURE_KEYS.indexOf(key) !== -1) ? ' data-feature="'+key+'"' : '';
+  }
   HEADER_NAV.forEach(function(item){
     if(item.module && window.CLFN_MODULES && !CLFN_MODULES.isEnabled(item.module)) return;
+    if(_navFeatDenied(item.key)) return;
     if(item.drawerOnly && !hadDivider){
       html += '<div class="nav-divider"></div>';
       hadDivider = true;
     }
     if(item.isGroup && item.children){
-      // Filter children by module enablement
+      // Filter children by module enablement + per-user feature access
       var visibleChildren = item.children.filter(function(c){
-        return !c.module || !window.CLFN_MODULES || CLFN_MODULES.isEnabled(c.module);
+        return (!c.module || !window.CLFN_MODULES || CLFN_MODULES.isEnabled(c.module)) && !_navFeatDenied(c.key);
       });
       if(!visibleChildren.length) return;
       var dropItems = visibleChildren.map(function(c){
-        return '<button class="nav-dropdown-item" data-nav="'+c.key+'" onclick="('+c.run.toString()+')();closeNavDropdowns()">'+c.svg+' '+c.label+'</button>';
+        return '<button class="nav-dropdown-item" data-nav="'+c.key+'"'+_featAttr(c.key)+' onclick="('+c.run.toString()+')();closeNavDropdowns()">'+c.svg+' '+c.label+'</button>';
       }).join('');
       html += '<div class="nav-group" data-group="'+item.key+'">'
             + '<button class="app-nav-item nav-group-toggle" data-nav="'+item.key+'" onclick="toggleNavGroup(\''+item.key+'\')">'
@@ -2130,7 +2142,7 @@ function renderHeaderNav(){
         }
       }
       var roles = roleList ? ' data-roles="'+roleList+'"' : '';
-      html += '<button class="'+cls+'" data-nav="'+item.key+'"'+roles+'>'+item.svg+' '+item.label+'</button>';
+      html += '<button class="'+cls+'" data-nav="'+item.key+'"'+roles+_featAttr(item.key)+'>'+item.svg+' '+item.label+'</button>';
     }
   });
   nav.innerHTML = html;
@@ -2201,14 +2213,22 @@ function setHeaderNavActive(key){
 // users (matches APPROVAL_AUTHORITY.can's inheritance rule).
 function applyRoleVisibility(role){
   role = role || window.currentRole || 'housing_employee_l1';
-  var els = document.querySelectorAll('[data-roles]');
+  // One pass over elements gated by role AND/OR per-user feature access. An
+  // element is visible only if BOTH gates pass (missing attr = that gate open).
+  var els = document.querySelectorAll('[data-roles],[data-feature]');
   for(var i=0;i<els.length;i++){
     var el = els[i];
-    var allowed = (el.getAttribute('data-roles')||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
-    var visible = !allowed.length
-      || allowed.indexOf(role) !== -1
-      || (role === 'super_user' && allowed.indexOf('ed') !== -1);
-    el.style.display = visible ? '' : 'none';
+    var roleAttr = el.getAttribute('data-roles');
+    var roleOk = true;
+    if(roleAttr){
+      var allowed = roleAttr.split(',').map(function(s){return s.trim();}).filter(Boolean);
+      roleOk = !allowed.length
+        || allowed.indexOf(role) !== -1
+        || (role === 'super_user' && allowed.indexOf('ed') !== -1);
+    }
+    var feat = el.getAttribute('data-feature');
+    var featOk = !feat || typeof window.canUseFeature !== 'function' || window.canUseFeature(feat);
+    el.style.display = (roleOk && featOk) ? '' : 'none';
   }
 }
 

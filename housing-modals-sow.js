@@ -804,6 +804,12 @@ function _openSowPicker(unitId, activeList) {
 }
 
 function openSowModal(unitId, projectNumber) {
+  // Per-user Feature Access: block Maintenance Requests for a user restricted
+  // away from that function (no-op for unrestricted users).
+  if (typeof window.canUseFeature === 'function' && !window.canUseFeature('maintenance_requests')) {
+    if (typeof showToast === 'function') showToast('You do not have access to Maintenance Requests.', { type:'error' });
+    return;
+  }
   // Mount the consolidated template on first call. Stays idempotent on
   // subsequent opens so element IDs survive between sessions.
   _ensureSowModal();

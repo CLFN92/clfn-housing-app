@@ -173,8 +173,10 @@ async function resolveHousingRole() {
     // fresh for the rest of this page's lifetime. Prevents "exp claim" 403s.
     try { await ensureFreshToken(); } catch (e) {}
     scheduleTokenRefresh();
+    // select=* (not a fixed column list) so newer columns like feature_access
+    // load if present but a pre-migration DB still resolves cleanly.
     var r = await fetch(
-      SUPABASE_URL + '/rest/v1/staff?select=role,department,name&email=eq.' +
+      SUPABASE_URL + '/rest/v1/staff?select=*&email=eq.' +
       encodeURIComponent(HOUSING_SESSION.email) + '&is_active=eq.true',
       { headers: HOUSING_HEADERS }
     );
@@ -184,6 +186,10 @@ async function resolveHousingRole() {
       var housingRole = (typeof sbMapRole === 'function')
         ? sbMapRole(staffRow)
         : (staffRow.role || 'housing_employee_l1');
+
+      // Per-user Feature Access (Phase FA): a non-empty array restricts this
+      // user to those functions; null/absent = no restriction (full access).
+      HOUSING_SESSION.featureAccess = Array.isArray(staffRow.feature_access) ? staffRow.feature_access : null;
 
       HOUSING_SESSION.name = staffRow.name || HOUSING_SESSION.name;
       HOUSING_SESSION.role = housingRole;
@@ -204,6 +210,11 @@ async function resolveHousingRole() {
       // housing.html without re-entering credentials) is captured too, not just
       // fresh sign-ins through startSignIn().
       _recordSessionLogin();
+
+      // Feature-access page guard: a feature-restricted user who lands on a page
+      // they aren't granted (nav hidden, but a direct URL still loads it) is
+      // bounced to the home page. Only affects users with an explicit list.
+      _enforcePageFeature();
     } else {
       HOUSING_SESSION.role = 'housing_employee_l1';
       window.currentRole   = 'housing_employee_l1';
@@ -216,6 +227,34 @@ async function resolveHousingRole() {
     window._booting = false;
   }
 }
+
+// ── _enforcePageFeature ───────────────────────────────────────────────────────
+// Redirect a feature-restricted user off a page whose function they aren't
+// granted. No-op for unrestricted users (the common case). Belt-and-suspenders
+// to the nav hiding — closes the direct-URL hole for external accounts.
+function _enforcePageFeature() {
+  try {
+    if (typeof window.isFeatureRestricted !== 'function' || !window.isFeatureRestricted()) return;
+    var path = (location.pathname || '').toLowerCase();
+    var MAP = {
+      'inventory.html':   'inventory',
+      'match.html':       'match',
+      'renos.html':       'renovations',
+      'rfq.html':         'rfq',
+      'contractors.html': 'contractors',
+      'inspections.html': 'inspections',
+      'tenants.html':     'tenants',
+      'finance.html':     'finance'
+    };
+    var feat = null;
+    Object.keys(MAP).forEach(function(f){ if (path.indexOf(f) !== -1) feat = MAP[f]; });
+    if (feat && typeof window.canUseFeature === 'function' && !window.canUseFeature(feat)) {
+      try { sessionStorage.setItem('clfn_feature_denied', feat); } catch(e) {}
+      location.href = 'housing.html';
+    }
+  } catch(e) {}
+}
+window._enforcePageFeature = _enforcePageFeature;
 
 // ── _recordSessionLogin ──────────────────────────────────────────────────────
 // Writes a single "Signed In" audit row per browser session. Guarded by the

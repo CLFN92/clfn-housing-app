@@ -3934,7 +3934,19 @@ async function _sbEditStaffModal(id) {
               }).join('');
             })()
           +'</select></div>'
-        +'<div class="box-bg-card txt-help">Changing the role takes effect the next time this staff member signs in.</div>'
+        +'<div class="f"><label>Feature Access <span style="font-weight:normal;color:var(--muted);">— untick to restrict; all ticked = full access</span></label>'
+          +'<div id="edit_staff_features" style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;padding:8px 2px;">'
+          + (function(){
+              var reg = window.FEATURE_REGISTRY || [];
+              var list = (Array.isArray(u.feature_access) && u.feature_access.length) ? u.feature_access : null;
+              return reg.map(function(f){
+                var checked = list ? (list.indexOf(f.key)!==-1) : true;
+                return '<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:normal;cursor:pointer;">'
+                  +'<input type="checkbox" class="ef-feat" value="'+escapeHtml(f.key)+'"'+(checked?' checked':'')+'/> '+escapeHtml(f.label)+'</label>';
+              }).join('');
+            })()
+          +'</div></div>'
+        +'<div class="box-bg-card txt-help">Role + feature changes take effect the next time this staff member signs in. Restricting features hides those functions and blocks their pages; it does not grant approval rights (set separately in Approval Authority).</div>'
       +'</div>'
       +'<div class="modal-footer">'
         +'<button id="editStaffCancel" class="btn btn-ghost">Cancel</button>'
@@ -8163,6 +8175,23 @@ async function saveStaffEdit(id, original, modal) {
       body: JSON.stringify(patch)
     });
     if(r.ok) {
+      // Feature access: subset of registry => restrict to it; all (or none)
+      // ticked => null (no restriction). Sent as a SEPARATE best-effort PATCH so
+      // that, before the staff.feature_access migration is applied, the name/role
+      // save above still succeeds (this one just no-ops).
+      try {
+        var featEls = document.querySelectorAll('#edit_staff_features .ef-feat');
+        var checked = [], total = 0;
+        featEls.forEach(function(cb){ total++; if(cb.checked) checked.push(cb.value); });
+        var featureAccess = (checked.length && checked.length < total) ? checked : null;
+        var fr = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id, {
+          method: 'PATCH',
+          headers: Object.assign({}, HOUSING_HEADERS, { 'Prefer': 'return=minimal' }),
+          body: JSON.stringify({ feature_access: featureAccess })
+        });
+        if(!fr.ok) console.warn('[feature-access] save skipped — run the staff.feature_access migration', fr.status);
+        else auditEntry('SETTINGS', 'settings_user_features', 'Feature access for '+name+': '+(featureAccess?featureAccess.join(', '):'full access'), window.currentRole||'ed');
+      } catch(e){ console.warn('[feature-access] save error', e); }
       modal.remove();
       showToast('✓ Staff member updated');
       auditEntry('SETTINGS', 'settings_user_edit', 'Staff updated: '+name+' — role set to '+hrole, window.currentRole||'ed');

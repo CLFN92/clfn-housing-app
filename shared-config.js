@@ -317,6 +317,52 @@ window.ROLE_FORCED_DEPT = {
   finance_l1:          'Finance'
 };
 
+// ── Per-user Feature Access (Phase FA) ────────────────────────────────────────
+// Controls WHICH app functions a user may reach, layered on top of nation-level
+// module gating (CLFN_MODULES) and role/approval gating (APPROVAL_AUTHORITY).
+//
+// Enforcement is BY OMISSION and zero-regression: a user whose staff row has no
+// explicit feature list keeps full access (their existing role/module gates
+// still apply). Only a user given an EXPLICIT list is confined to it. This lets
+// an ED lock a single account (e.g. an external consultant) down to, say,
+// Contractors / RFQ / Maintenance Requests without affecting anyone else.
+//
+// "Can SEE/USE a function" (this) is intentionally separate from "can APPROVE
+// it" (APPROVAL_AUTHORITY) -- a consultant may run tenders but never award.
+window.FEATURE_REGISTRY = [
+  { key:'inventory',            label:'Inventory' },
+  { key:'match',                label:'Match' },
+  { key:'renovations',          label:'Renovations' },
+  { key:'maintenance_requests', label:'Maintenance Requests' },
+  { key:'rfq',                  label:'RFQ / Tendering' },
+  { key:'contractors',          label:'Contractors' },
+  { key:'inspections',          label:'Inspections' },
+  { key:'tenants',              label:'Tenants' },
+  { key:'applications',         label:'Applications' },
+  { key:'finance',              label:'Finance' },
+  { key:'settings',             label:'Settings' }
+];
+window.FEATURE_KEYS = window.FEATURE_REGISTRY.map(function(f){ return f.key; });
+
+// Resolve the effective feature list for a user context; null = no restriction.
+//   ctx omitted  -> the signed-in user (HOUSING_SESSION.featureAccess)
+//   ctx array    -> that explicit list
+//   ctx object   -> ctx.featureAccess / ctx.feature_access
+window._resolveFeatureList = function(ctx){
+  var list;
+  if (Array.isArray(ctx)) list = ctx;
+  else if (ctx && typeof ctx === 'object') list = ctx.featureAccess || ctx.feature_access;
+  else if (ctx == null) list = (window.HOUSING_SESSION && window.HOUSING_SESSION.featureAccess);
+  return (Array.isArray(list) && list.length) ? list : null;
+};
+window.canUseFeature = function(key, ctx){
+  if (!key) return true;
+  var list = window._resolveFeatureList(ctx);
+  if (!list) return true;                 // no explicit restriction -> allow
+  return list.indexOf(key) !== -1;
+};
+window.isFeatureRestricted = function(ctx){ return !!window._resolveFeatureList(ctx); };
+
 // ── Application status constants ──────────────────────────────────────────────
 window.APP_STATUS = {
   DRAFT:        'draft',
