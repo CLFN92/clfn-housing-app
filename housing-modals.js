@@ -1750,8 +1750,8 @@ function udpRenderMap(u) {
     && APPROVAL_AUTHORITY.can('setUnitLocation', window.currentRole || '');
   var locBtn = canSetLoc
     ? '<button onclick="udpOpenLocationPicker(' + JSON.stringify(u.id) + ')" '
-        + 'style="background:none;border:1.5px solid var(--yellow);border-radius:7px;padding:4px 12px;'
-        + 'font-size:11px;font-weight:700;color:var(--dark);cursor:pointer;font-family:DM Sans,sans-serif;">'
+        + 'style="background:var(--yellow);border:1.5px solid var(--yellow);border-radius:7px;padding:5px 14px;'
+        + 'font-size:11px;font-weight:700;color:#111110;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">'
         + (lat && lng ? '&#128205; Edit Location' : '&#128205; Set Location')
         + '</button>'
     : '';
@@ -1940,8 +1940,17 @@ function _udpLocResetState(u) {
 }
 
 function _udpLocInitMap(u) {
-  setTimeout(function() {
-    if (typeof L === 'undefined') return;
+  var tries = 0;
+  (function attempt(){
+    // Leaflet is loaded on demand — wait for it (up to ~4s) instead of bailing
+    // silently, so a slightly-slow load doesn't leave a blank picker.
+    if (typeof L === 'undefined') {
+      if (++tries > 40) { if (typeof showToast === 'function') showToast('Map library could not load. Check your connection, then reopen.', { type:'error' }); return; }
+      setTimeout(attempt, 100);
+      return;
+    }
+    var mapEl = document.getElementById('udp-loc-map');
+    if (!mapEl) return;
     var startLat = u.latitude  ? parseFloat(u.latitude)  : _UDPLOC_CLFN_LAT;
     var startLng = u.longitude ? parseFloat(u.longitude) : _UDPLOC_CLFN_LNG;
     _udpLocMap = L.map('udp-loc-map', { center: [startLat, startLng], zoom: 13, scrollWheelZoom: true });
@@ -1952,7 +1961,7 @@ function _udpLocInitMap(u) {
     if (u.latitude && u.longitude) _udpLocPlacePin(startLat, startLng);
     _udpLocMap.on('click', function(e){ _udpLocPlacePin(e.latlng.lat, e.latlng.lng); });
     setTimeout(function(){ if (_udpLocMap) _udpLocMap.invalidateSize({ animate: false }); }, 300);
-  }, 60);
+  })();
 }
 
 function _udpLocPlacePin(lat, lng) {
