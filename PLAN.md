@@ -861,6 +861,13 @@ allocating the project total across delivered units to set each unit's cost.
   Details tab + Linked RFQs on the project Overview), and **payment
   requests** — select cost lines, bill a grant, export a PDF claim summary
   + all attached documents, lines marked Claimed REQ-NN (re-export / undo)
+- ✅ v1.4 **shared compliance docs** — the paper chain is invoice (per cost)
+  → EFT batch (pays several invoices) → bank statement (proves several
+  batches), so attaching an EFT/bank/invoice doc now offers **"link
+  existing"** (picker over same-kind docs on other cost lines, deduped by
+  path; audited `project_expense_doc_linked`) instead of forcing duplicate
+  uploads, and the claim export downloads each unique file once. Phone
+  layout fixes for the milestone rows + modal footer (PR #43).
 - ✅ v1.3 **project status report** — "📄 Status Report" in the modal footer
   generates a one-click jsPDF+autotable snapshot (summary, description,
   grants, milestones with overdue flag, budget-vs-actual mirroring the

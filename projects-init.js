@@ -1476,6 +1476,14 @@ function _prjDocChip(e, i, kind, label) {
   return '<button type="button" class="prj-doc-chip prj-doc-missing" title="Attach the ' + _prjEsc(label) + ' document" onclick="_prjAttachExpenseDoc(' + i + ',\'' + kind + '\')">📎 ' + _prjEsc(label) + '</button>';
 }
 
+// Attach a compliance document to an expense line. The real-world paper
+// chain is: invoice (one per cost) → EFT batch (one payment record can pay
+// several invoices) → bank statement (one statement proves several batches).
+// So when a document of the same kind is already attached to another cost
+// line on this project, staff can LINK it to this line instead of uploading
+// a duplicate copy — linking copies the {path, name} ref (one stored file,
+// many lines). Detach only ever clears the one line's ref, so shared links
+// are safe to remove independently.
 function _prjAttachExpenseDoc(i, kind) {
   var d = window._prjDraft;
   if (!d || !_prjCanManage()) return;
@@ -1483,6 +1491,85 @@ function _prjAttachExpenseDoc(i, kind) {
   var exp = d.data.expenses;
   if (!exp || !exp[i]) return;
   kind = kind || 'invoice';
+
+  // Documents of this kind already on other cost lines, deduped by path.
+  var byPath = {};
+  exp.forEach(function(e2, j) {
+    if (j === i) return;
+    var doc = _prjExpDoc(e2, kind);
+    if (!doc || !doc.path) return;
+    if (!byPath[doc.path]) byPath[doc.path] = { path: doc.path, name: doc.name || 'document', lines: [] };
+    byPath[doc.path].lines.push((e2.vendor || 'expense') + ' · ' + _prjMoney(e2.amount, true));
+  });
+  var cands = Object.keys(byPath).map(function(p){ return byPath[p]; });
+  if (!cands.length) { _prjPickAndUploadExpenseDoc(i, kind); return; }
+  _prjOpenDocPicker(i, kind, cands);
+}
+
+function _prjOpenDocPicker(i, kind, cands) {
+  window._prjDocPickCands = cands;
+  var kd = PRJ_EXP_DOC_KINDS.find(function(k){ return k.k === kind; });
+  var label = (kd && kd.label) || kind;
+  var rows = cands.map(function(c, ci) {
+    var linesTxt = c.lines.slice(0, 3).join(', ') + (c.lines.length > 3 ? ' +' + (c.lines.length - 3) + ' more' : '');
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📄 ' + _prjEsc(c.name) + '</div>' +
+        '<div style="font-size:11px;color:var(--muted);">Linked to: ' + _prjEsc(linesTxt) + '</div>' +
+      '</div>' +
+      '<button type="button" class="btn btn-primary" style="padding:6px 12px;font-size:12px;" onclick="_prjLinkExpenseDoc(' + i + ',\'' + kind + '\',' + ci + ')">Link</button>' +
+    '</div>';
+  }).join('');
+
+  var ov = document.createElement('div');
+  ov.id = 'prjDocPickModal';
+  ov.className = 'modal-overlay modal-overlay-centered modal-z-1100 is-open';
+  ov.innerHTML =
+    '<div class="modal-body" style="max-width:520px;">' +
+      '<div class="modal-hdr">' +
+        '<div class="modal-hdr-title">Attach ' + _prjEsc(label) + '</div>' +
+        '<button type="button" class="btn-close-dark-30" onclick="document.getElementById(\'prjDocPickModal\').remove()">&times;</button>' +
+      '</div>' +
+      '<div style="padding:14px 24px 4px;">' +
+        '<p class="txt-help m-0">One EFT batch or bank statement often covers several cost lines — link a document already on this project instead of uploading it again.</p>' +
+        rows +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button type="button" class="btn btn-ghost" onclick="document.getElementById(\'prjDocPickModal\').remove()">Cancel</button>' +
+        '<button type="button" class="btn btn-primary" onclick="document.getElementById(\'prjDocPickModal\').remove();_prjPickAndUploadExpenseDoc(' + i + ',\'' + kind + '\')">⬆ Upload new file</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+}
+
+async function _prjLinkExpenseDoc(i, kind, candIdx) {
+  var d = window._prjDraft;
+  var exp = d && d.data.expenses;
+  var cand = (window._prjDocPickCands || [])[candIdx];
+  if (!exp || !exp[i] || !cand) return;
+  var pick = document.getElementById('prjDocPickModal');
+  if (pick) pick.remove();
+  if (!exp[i].docs) exp[i].docs = {};
+  exp[i].docs[kind] = { path: cand.path, name: cand.name };
+  if (kind === 'invoice' && exp[i].doc) delete exp[i].doc;   // legacy slot superseded
+  try {
+    await _prjSaveProject({ id: d.id, data: d.data, updated_at: new Date().toISOString() }, false);
+    _prjSyncCache(d);
+    if (typeof auditEntry === 'function') {
+      auditEntry('PRJ:' + d.id, 'project_expense_doc_linked', kind + ' document ' + cand.name + ' linked to a ' + _prjMoney(exp[i].amount, true) + ' expense on ' + (d.project_number || d.name));
+    }
+    _prjRenderCosts();
+    showToast('Document linked');
+  } catch(e) {
+    console.warn('[Projects] link expense doc:', e);
+    showToast('Could not save the link — try again', { type: 'error' });
+  }
+}
+
+function _prjPickAndUploadExpenseDoc(i, kind) {
+  var d = window._prjDraft;
+  var exp = d && d.data.expenses;
+  if (!exp || !exp[i]) return;
 
   var input = document.createElement('input');
   input.type = 'file';
@@ -1494,16 +1581,9 @@ function _prjAttachExpenseDoc(i, kind) {
     input.remove();
     if (!file) return;
     if (file.size > 25 * 1024 * 1024) { showToast('File is too large (25 MB max)', { type: 'error' }); return; }
-    var safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
-    var path = 'projects/' + d.id + '/expenses/' + exp[i].id + '/' + kind + '_' + safeName;
     try {
-      showToast('Uploading ' + safeName + '…');
-      await sbUploadFile(path, file);
-      if (typeof sbSaveFileMeta === 'function') {
-        sbSaveFileMeta('project', d.id, path, file.name, file.size, file.type);
-      }
-      if (!exp[i].docs) exp[i].docs = {};
-      exp[i].docs[kind] = { path: path, name: file.name };
+      showToast('Uploading ' + file.name + '…');
+      await _prjUploadExpenseDocFile(exp[i], kind, file);
       if (kind === 'invoice' && exp[i].doc) delete exp[i].doc;   // legacy slot superseded
       // Persist right away so the uploaded file can't be orphaned by an
       // unsaved draft.
@@ -1758,12 +1838,16 @@ async function _prjExportRequestFiles(req) {
     showToast('Could not generate the summary PDF', { type: 'error' });
   }
   // Download every attached compliance document, sequentially (parallel
-  // downloads get blocked as popups by most browsers).
+  // downloads get blocked as popups by most browsers). A shared EFT batch or
+  // bank statement linked to several claimed lines downloads once, not once
+  // per line.
   var failed = 0;
+  var downloaded = {};
   for (var i = 0; i < exp.length; i++) {
     for (var k = 0; k < PRJ_EXP_DOC_KINDS.length; k++) {
       var doc = _prjExpDoc(exp[i], PRJ_EXP_DOC_KINDS[k].k);
-      if (!doc) continue;
+      if (!doc || downloaded[doc.path]) continue;
+      downloaded[doc.path] = true;
       try { await _prjDownloadDoc(doc, req.number); }
       catch(e) { console.warn('[Projects] doc download:', e); failed++; }
     }
