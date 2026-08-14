@@ -861,6 +861,12 @@ allocating the project total across delivered units to set each unit's cost.
   Details tab + Linked RFQs on the project Overview), and **payment
   requests** — select cost lines, bill a grant, export a PDF claim summary
   + all attached documents, lines marked Claimed REQ-NN (re-export / undo)
+- ✅ v1.3 **project status report** — "📄 Status Report" in the modal footer
+  generates a one-click jsPDF+autotable snapshot (summary, description,
+  grants, milestones with overdue flag, budget-vs-actual mirroring the
+  P & L tab, lot-by-lot table, payment requests + unclaimed total, paged
+  footer); available in the read-only modal (`data-prj-keep`), audited as
+  `project_status_report`
 - ⬜ **Redeploy the `ai-chat` Edge Function** (dashboard paste or
   `supabase functions deploy ai-chat`) so the server-side changes go live
 - 🔖 Deferred: project rows in the `project-schedule.js` Gantt,
