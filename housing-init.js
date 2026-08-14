@@ -1541,6 +1541,9 @@ window._appSettings   = window._appSettings   || {};
 
 function showAddHousingStaff() {
   var isED = APPROVAL_AUTHORITY.can('manageAllStaffRoles', window.currentRole);
+  var pend = window._pendingLookupUser || {};
+  var prefEmail = pend.email || '';
+  var isExt0 = !!pend.external && isED;   // external adds are ED-only
   var modal = document.getElementById('globalModal') || document.getElementById('approvalModal');
   // Use the existing showToast + a custom modal approach
   // Build inline modal
@@ -1578,16 +1581,19 @@ function showAddHousingStaff() {
     + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Full Name</label>'
     + '<input id="hs-name" placeholder="e.g. Edith Moore" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;"></div>'
     + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Work Email</label>'
-    + '<input id="hs-email" type="email" placeholder="edith.moore@' + nationEmailDomain() + '" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'
+    + '<input id="hs-email" type="email" placeholder="edith.moore@' + nationEmailDomain() + '" value="'+escapeHtml(prefEmail)+'" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'
     + '<div id="hs-email-hint" style="display:none;font-size:11px;color:var(--danger);margin-top:3px;">&#9888; Must be a @' + nationEmailDomain() + ' address</div></div>'
     + '</div>'
+    + (isED ? '<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;cursor:pointer;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">'
+        + '<input type="checkbox" id="hs-external" '+(isExt0?'checked':'')+' style="width:16px;height:16px;min-width:16px;flex:0 0 16px;margin:2px 0 0;accent-color:#2563eb;">'
+        + '<span><strong>External consultant</strong> &mdash; allow a non-@'+nationEmailDomain()+' email. The account is <strong>passwordless</strong> (admin-issued magic link only), gets a random password, and starts with restricted access. ED only.</span></label>' : '')
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
     + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Department</label>'
     + '<select id="hs-dept" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'+deptOptions+'</select></div>'
     + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Role</label>'
     + '<select id="hs-role" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'+roleOptions+'</select></div>'
     + '</div>'
-    + '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);">'
+    + '<div id="hs-pwnote" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);">'
     + '&#128274; A login account is created automatically. Default password: <strong>' + (window.NATION_CONFIG && NATION_CONFIG.short || '') + ' + FirstName + 2026!</strong>'
     + '</div>'
     + '<div id="hs-result" style="display:none;border-radius:8px;padding:10px 14px;font-size:12px;"></div>'
@@ -1599,12 +1605,28 @@ function showAddHousingStaff() {
 
   document.body.appendChild(overlay);
 
-  // Wire email hint
+  // Wire email hint — suppressed when "External consultant" is ticked (an
+  // external email is expected there).
   var emailEl = document.getElementById('hs-email');
   if(emailEl) emailEl.addEventListener('input', function(){
+    var ext = !!(document.getElementById('hs-external') && document.getElementById('hs-external').checked);
     var h = document.getElementById('hs-email-hint');
-    if(h) h.style.display = (this.value && !this.value.endsWith('@' + nationEmailDomain())) ? 'block' : 'none';
+    if(h) h.style.display = (!ext && this.value && !this.value.endsWith('@' + nationEmailDomain())) ? 'block' : 'none';
   });
+  // External-consultant toggle: swap the password note + clear the domain hint.
+  var extEl = document.getElementById('hs-external');
+  function _hsSyncExternal(){
+    var ext = !!(extEl && extEl.checked);
+    var pw = document.getElementById('hs-pwnote');
+    if(pw){
+      pw.innerHTML = ext
+        ? '&#128273; Passwordless account &mdash; no password to share. After adding, click <strong>Send Sign-in Link</strong> on their row to email them a magic link, then set their features + <strong>Access Expires</strong> via Edit.'
+        : '&#128274; A login account is created automatically. Default password: <strong>' + (window.NATION_CONFIG && NATION_CONFIG.short || '') + ' + FirstName + 2026!</strong>';
+    }
+    if(ext){ var h = document.getElementById('hs-email-hint'); if(h) h.style.display = 'none'; }
+  }
+  if(extEl) extEl.addEventListener('change', _hsSyncExternal);
+  _hsSyncExternal();
 }
 
 function closeStaffModal() {
@@ -1612,6 +1634,20 @@ function closeStaffModal() {
   if(m) m.remove();
 }
 
+// Cryptographically random password for external consultant accounts. They never
+// use it (sign-in is via admin-issued magic link only); a random password stops
+// the raw Supabase token endpoint being abused with a guessable one.
+function _randomStrongPassword(){
+  var chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  var out='';
+  try {
+    var arr=new Uint32Array(28); (window.crypto||window.msCrypto).getRandomValues(arr);
+    for(var i=0;i<arr.length;i++) out+=chars.charAt(arr[i]%chars.length);
+  } catch(e){
+    for(var j=0;j<28;j++) out+=chars.charAt(Math.floor(Math.random()*chars.length));
+  }
+  return out;
+}
 async function submitAddHousingStaff() {
   var name  = ((document.getElementById('hs-name')||{}).value||'').trim();
   var email = ((document.getElementById('hs-email')||{}).value||'').trim().toLowerCase();
@@ -1622,8 +1658,15 @@ async function submitAddHousingStaff() {
 
   if(!name)  { showToast("Please enter the employee's full name"); return; }
   if(!email||!email.includes('@')) { showToast('Please enter a valid email address'); return; }
+  var isExternal = !!(document.getElementById('hs-external') && document.getElementById('hs-external').checked);
   var _staffDomain = '@' + nationEmailDomain();
-  if(!email.endsWith(_staffDomain)) { showToast('Only ' + _staffDomain + ' email addresses can be registered'); return; }
+  if(isExternal){
+    // External consultants are ED-only and passwordless (magic-link).
+    if(!APPROVAL_AUTHORITY.can('manageAllStaffRoles', window.currentRole)){ showToast('Only the ED can add an external consultant'); return; }
+  } else if(!email.endsWith(_staffDomain)) {
+    showToast('Only ' + _staffDomain + ' email addresses can be registered (tick "External consultant" for an outside email)');
+    return;
+  }
 
   // Role-based add-staff gate. Only roles with manageAllStaffRoles can assign
   // anything other than HE-L1 / HE-L2. (HM is constrained to HE-L1/L2 by default.)
@@ -1654,9 +1697,10 @@ async function submitAddHousingStaff() {
     }
 
     var firstName = name.split(' ')[0];
-    // Default password format includes the nation short code so it's recognizable
-    // to staff but rotated per-nation when shipping to a new tenant.
-    var defaultPassword = nationShort()+firstName+'2026!';
+    // Internal staff get the recognizable default; an EXTERNAL consultant gets a
+    // cryptographically random password they never use (they sign in only via an
+    // admin-issued magic link). Random closes the raw-token-endpoint guess hole.
+    var defaultPassword = isExternal ? _randomStrongPassword() : (nationShort()+firstName+'2026!');
 
     // Step 1: Create Supabase Auth account
     var signupR = await fetch(SUPABASE_URL+'/auth/v1/signup',{
@@ -1733,6 +1777,20 @@ async function submitAddHousingStaff() {
       return;
     }
 
+    // External consultant: enable passwordless magic-link sign-in + restrict to
+    // the least-privilege consultant feature set. Best-effort PATCH so a missing
+    // column (migration not yet run) can't orphan the just-created auth user.
+    if(isExternal){
+      try {
+        await fetch(SUPABASE_URL+'/rest/v1/staff?email=eq.'+encodeURIComponent(email), {
+          method:'PATCH',
+          headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
+          body:JSON.stringify({ magic_link:true, feature_access:['inventory','renovations','maintenance_requests','rfq','contractors'] })
+        });
+      } catch(e){ console.warn('[external-consultant] magic_link/feature_access PATCH failed — run the migrations', e); }
+      if(typeof auditEntry==='function') auditEntry('SETTINGS','settings_user_add_external','External consultant added: '+email, window.currentRole||'ed');
+    }
+
     // Both succeeded. When we adopted an existing auth user (alreadyInAuth)
     // we don't know their current password, so suppress the default-password
     // hint and tell the admin to use Send Reset on the row instead.
@@ -1743,6 +1801,9 @@ async function submitAddHousingStaff() {
       if(alreadyInAuth) {
         res.innerHTML = head
           + '<span style="font-size:11px;opacity:.8;">A login account for this email already existed — it has been linked to the new staff record. Use <strong>Send Reset</strong> on their row to issue a fresh password.</span>';
+      } else if(isExternal) {
+        res.innerHTML = head
+          + '<span style="font-size:11px;opacity:.8;">External consultant account created — <strong>passwordless</strong>. Click <strong>Send Sign-in Link</strong> on their row to email them a magic link, then set their <strong>Access Expires</strong> via Edit. Access is restricted to Inventory / Renovations / Maintenance Requests / RFQ / Contractors.</span>';
       } else {
         var pwLine = 'Password: <code style="background:var(--success-border);padding:2px 6px;border-radius:4px;font-weight:700;">'+escapeHtml(defaultPassword)+'</code><br>';
         var tailLine = emailNeedsConfirmation

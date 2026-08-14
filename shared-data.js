@@ -4181,9 +4181,15 @@ async function lookupUser(){
   if(!resultEl) return;
   if(!email){ resultEl.style.display='none'; return; }
   var _lookupDomain = '@' + nationEmailDomain();
-  if(!email.endsWith(_lookupDomain)){
+  var _isExternal = !email.endsWith(_lookupDomain);
+  // External (non-nation-domain) emails are allowed ONLY for the ED, and only as
+  // external consultants (passwordless magic-link, restricted). This keeps the
+  // domain gate intact for regular staff while enabling a consultant to use
+  // their own email.
+  var _canExternal = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('manageAllStaffRoles', window.currentRole);
+  if(_isExternal && !_canExternal){
     resultEl.style.display='block';
-    resultEl.innerHTML='<div style="padding:10px 14px;background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:8px;font-size:12px;color:var(--danger);">Only ' + _lookupDomain + ' email addresses can be added.</div>';
+    resultEl.innerHTML='<div style="padding:10px 14px;background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:8px;font-size:12px;color:var(--danger);">External (non-' + _lookupDomain + ') emails can only be added by the Executive Director, as an external consultant.</div>';
     return;
   }
   resultEl.innerHTML='<div style="padding:10px;font-size:12px;color:var(--muted);">Searching…</div>';
@@ -4200,10 +4206,12 @@ async function lookupUser(){
         +'<span style="font-size:11px;color:var(--warn-amber);font-weight:600;">Already registered</span>'
         +'</div>';
     } else {
-      window._pendingLookupUser = {email:email};
-      resultEl.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">'
-        +'<div class="js-txt-muted">'+email+' — not yet in staff directory</div>'
-        +'<button onclick="showAddHousingStaff()" class="btn btn-primary" class="empty-sub">Add Staff Member</button>'
+      window._pendingLookupUser = {email:email, external:_isExternal};
+      resultEl.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">'
+        +'<div class="js-txt-muted">'+email+' — not yet in staff directory'
+        + (_isExternal ? '<div style="font-size:11px;color:var(--warn-amber);margin-top:3px;">External email — will be added as an external consultant: passwordless (magic-link) sign-in, restricted access.</div>' : '')
+        +'</div>'
+        +'<button onclick="showAddHousingStaff()" class="btn btn-primary empty-sub">Add Staff Member</button>'
         +'</div>';
     }
   } catch(e){
