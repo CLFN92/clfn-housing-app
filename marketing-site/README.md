@@ -59,7 +59,7 @@ Nothing on the site is invented — these are the deliberately-open slots:
 | 9 | **Pricing sign-off** — a full `#pricing` section is on the page with a market-researched schedule: tiers by homes managed, one-time setup (scoped per tier: data migration + 2/4/6 live training sessions), AI add-on. Monthly billing = annual rate +10%. Subscription is always full price; the **only discount is 50% off the setup fee** on a one-year term paid up front ($1,250/$2,250/$3,750). Benchmarked against Yardi Breeze (~$1–2/unit/mo), Buildium ($62–400/mo flat), AppFolio onboarding ($400–$5,000), enterprise implementations ($25k+); FN-sector vendors are mostly quote-only. Setup scope + messy-data handling is promised "in writing after a scoping call" — make sure the sales process actually does that. Adjust freely — plain HTML in one section | `#pricing` section in `index.html` |
 | 10 | ~~Land acknowledgement~~ ✅ written — Canada-wide framing tied to the data-sovereignty commitment | Footer in `index.html` |
 | 11 | ~~Legal entity name~~ ✅ © line reads "Home Land Homes" (no legal entity yet; update the line if/when one is incorporated) | Footer in `index.html` |
-| 12 | **OG/social image** — 1200×630 PNG at `assets/img/og-image.png` (referenced but not shipped) | `og:image` in `index.html` |
+| 12 | ~~OG/social image~~ ✅ generated from the brand (assets/img/og-image.png) |  |
 | 13 | **Authentic artwork/photography** (optional) — the hero illustration is a neutral placeholder SVG with a marked swap slot | `.hero-art` in `index.html` |
 
 ## ⚠️ Claims that need your confirmation before launch
