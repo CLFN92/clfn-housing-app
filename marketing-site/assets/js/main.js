@@ -103,6 +103,7 @@
     renos:        "Renovation scopes, RFQs, bids and awarded contracts flow through one tender process with generated paperwork.",
     contractors:  "Contractor approvals, insurance and WSIB expiries are tracked so nothing lapses unnoticed.",
     inspections:  "Room-by-room condition reports with photos, on a phone, that can spawn work orders on the spot.",
+    projects:     "Capital projects tracked from funding to finished homes — milestone budgets, multi-grant funding, and one-click claim packages with every invoice, EFT and bank statement your funder demands.",
     finance:      "Rent, arrears, arrangements and collections reconcile in the same system the housing team uses.",
     portal:       "Tenants and applicants apply, upload documents and get status updates online — without calling the office.",
     council:      "The Chief & Council dashboard gives leadership a live, read-only picture — no more assembling reports by hand.",

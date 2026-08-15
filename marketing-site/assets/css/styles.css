@@ -373,6 +373,33 @@ section { padding-block: clamp(3.4rem, 8vw, 6rem); }
 .icon-chip svg { width: 1.5rem; height: 1.5rem; }
 
 /* Feature groups */
+.feature-wide { grid-column: 1 / -1; }
+
+.new-pill {
+  margin-left: auto;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.8rem;
+  border-radius: 999px;
+}
+
+.feature-wide-intro {
+  color: var(--ink-soft);
+  margin-bottom: 1.1rem;
+  max-width: 60rem;
+}
+
+@media (min-width: 62em) {
+  .feature-wide .feature-wide-list {
+    grid-template-columns: 1fr 1fr;
+    column-gap: 2rem;
+  }
+}
+
 .feature-group {
   background: var(--surface);
   border: 1px solid var(--line);
