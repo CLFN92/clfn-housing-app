@@ -49,8 +49,8 @@ Nothing on the site is invented — these are the deliberately-open slots:
 | # | Item | Where |
 |---|------|-------|
 | 1 | ~~Final product name~~ ✅ **Home Land Homes** (applied everywhere) | — |
-| 2 | **Logo** (replaces the placeholder house mark + favicon) | `.brand` SVGs in `index.html`, `assets/img/favicon.svg` |
-| 3 | **Brand colors** | The `:root` (and dark-scheme) variables at the top of `assets/css/styles.css` — every color routes through them |
+| 2 | ~~Logo~~ ✅ "Homes together" mark (two homes on shared land) in header, footer and favicon | `.brand` SVGs in `index.html`, `assets/img/favicon.svg` |
+| 3 | ~~Brand colors~~ ✅ Clay palette confirmed (accent #9A4A1F, dark-mode #E39060) | `:root` variables in `assets/css/styles.css` |
 | 4 | ~~Production domain~~ ✅ **homelandhomes.ca** (applied to canonical/OG, `robots.txt`, `sitemap.xml`) | — |
 | 5 | **Contact email** | `SITE_CONFIG.contactEmail` in `assets/js/main.js` (footer + mailto form fallback pick it up automatically) |
 | 6 | **Form endpoint** (optional — a URL accepting a JSON POST; a tiny Cloudflare Worker works well) | `SITE_CONFIG.formEndpoint` in `assets/js/main.js`; if it's on another origin, also add it to `connect-src` in `_headers` |

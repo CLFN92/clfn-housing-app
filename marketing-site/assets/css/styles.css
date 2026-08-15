@@ -1,13 +1,13 @@
 /* ==========================================================================
    Home Land Homes — marketing site stylesheet
 
-   BRAND PLACEHOLDER PALETTE
+   BRAND PALETTE — "Clay" (decided 2026-08)
    Every brand decision routes through the custom properties below.
    To rebrand: change the :root block (and the dark-scheme block) only.
    ========================================================================== */
 
 :root {
-  /* -- Brand (PLACEHOLDER — replace with real brand values) -- */
+  /* -- Brand: Clay -- */
   --accent:        #9a4a1f;  /* warm clay — primary accent */
   --accent-ink:    #ffffff;  /* text on accent fills */
   --accent-soft:   #f3e4d8;  /* tinted backgrounds */
