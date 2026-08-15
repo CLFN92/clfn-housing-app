@@ -15,7 +15,7 @@
                    cookies, or sessions with this site).                  */
   var SITE_CONFIG = {
     formEndpoint: "",
-    contactEmail: "",
+    contactEmail: "hello@homelandhomes.ca",
     appLoginUrl: "https://fnhub.app"
   };
 

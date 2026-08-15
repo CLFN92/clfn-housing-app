@@ -52,7 +52,7 @@ Nothing on the site is invented — these are the deliberately-open slots:
 | 2 | ~~Logo~~ ✅ "Homes together" mark (two homes on shared land) in header, footer and favicon | `.brand` SVGs in `index.html`, `assets/img/favicon.svg` |
 | 3 | ~~Brand colors~~ ✅ Clay palette confirmed (accent #9A4A1F, dark-mode #E39060) | `:root` variables in `assets/css/styles.css` |
 | 4 | ~~Production domain~~ ✅ **homelandhomes.ca** (applied to canonical/OG, `robots.txt`, `sitemap.xml`) | — |
-| 5 | **Contact email** | `SITE_CONFIG.contactEmail` in `assets/js/main.js` (footer + mailto form fallback pick it up automatically) |
+| 5 | ~~Contact email~~ ✅ `hello@homelandhomes.ca` wired into `SITE_CONFIG` (footer + mailto form fallback). **Create the mailbox before launch** — Cloudflare → Email Routing can forward it to an existing inbox for free | `assets/js/main.js` |
 | 6 | **Form endpoint** (optional — a URL accepting a JSON POST; a tiny Cloudflare Worker works well) | `SITE_CONFIG.formEndpoint` in `assets/js/main.js`; if it's on another origin, also add it to `connect-src` in `_headers` |
 | 7 | **App login URL** (currently `https://fnhub.app`) | `SITE_CONFIG.appLoginUrl` + the two "Sign in" links in `index.html` |
 | 8 | ~~About / founding story~~ ✅ written from the founder's account (PM → ED → built the app). Optional signature line commented in the HTML — add name/title if wanted | `#about` in `index.html` |
