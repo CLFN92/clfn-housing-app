@@ -848,6 +848,23 @@ section { padding-block: clamp(3.4rem, 8vw, 6rem); }
 .placeholder-slot strong { color: var(--ink); }
 
 /* --------------------------------------------------------------------------
+   About story
+   -------------------------------------------------------------------------- */
+
+.about-story {
+  max-width: 46rem;
+  font-size: 1.1rem;
+}
+.about-story p:last-of-type {
+  font-weight: 650;
+  color: var(--accent-deep);
+}
+.about-sig {
+  font-style: italic;
+  color: var(--ink-soft);
+}
+
+/* --------------------------------------------------------------------------
    Footer
    -------------------------------------------------------------------------- */
 
