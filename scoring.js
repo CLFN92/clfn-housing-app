@@ -586,7 +586,9 @@ function renderNationPanel(){
     modsEl.innerHTML = '<div class="js-txt-muted-sm">Module registry not available.</div>';
     return;
   }
-  var canToggleModules = (typeof window.isSuperUser === 'function') && window.isSuperUser();
+  // Module enable/disable is managed centrally in the admin portal, not here.
+  // This list is read-only (status only) for everyone, including super users.
+  var canToggleModules = false;
 
   var pill = function(label, c, bg){
     return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+';">'+label+'</span>';
