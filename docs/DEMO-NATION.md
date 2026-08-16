@@ -192,7 +192,7 @@ others, so it can land while the Supabase project is being stood up.
 | **Google indexes the demo** | `noindex` meta from `shared.js` + a host-scoped Cloudflare Transform Rule; private credentials as the real control |
 | **AI assistant cost creep** | Demo-project-specific Anthropic key with a hard spend cap |
 | **A reset fires mid-demo** | 3am ET schedule + a pause flag |
-| **Supabase free-tier projects pause after inactivity** | Confirm the tier before launch; nightly `pg_cron` activity may be enough, but a paused demo during a sales call is not a risk worth taking — budget for Pro |
+| ~~**Supabase free-tier projects pause after inactivity**~~ | **Resolved 2026-08-16 — the demo needs a paid org anyway.** The free plan allows **two free projects per ACCOUNT** (across every org where you are Owner/Admin), and CLFN + the platform registry use both, so a third project cannot be free and a second free org does not help. Cheapest route: put the demo in its **own new organization on Pro** — $25/mo base including a $10 compute credit that covers its one Micro instance, so ≈**$25/mo**, while CLFN and the registry stay on the free plan. Upgrading the *existing* org instead would put all three projects on paid compute (≈$45/mo) for no benefit. Paid compute also removes the 7-day idle pause, which is what made free unusable for a demo you open on a sales call. Confirm against the org's billing preview before committing |
 | **Seeded data ages badly** | All dates seeded as intervals from `now()`, re-derived on every nightly reset |
 
 ---
@@ -201,5 +201,7 @@ others, so it can land while the Supabase project is being stood up.
 
 1. ~~**Nation name**~~ — settled 2026-08-16: **`Demo First Nation`** / `DEMO` / `demo.fnhub.app`, deliberately generic so it can never be mistaken for a real community. **Logo still open** — needs a generic invented mark.
 2. **Public portals** (`apply.html`, `report.html`, tenant maintenance request) — live on the demo, or disabled? Live shows off the whole intake story but means anyone with the URL can post into the demo. Recommendation: live, with the banner and email suppression; the nightly reset cleans up whatever they leave.
-3. **Supabase tier** for the demo project — free vs Pro (see the pausing risk above).
+3. ~~**Supabase tier**~~ — settled: the demo cannot be free (two free projects per account, both used). Create a **new organization on Pro** holding only the demo, ≈$25/mo, leaving CLFN and the registry free. See the risks table.
+
+   **Unit-economics note this surfaced:** database-per-nation means every customer nation is its own Supabase project, and any project beyond the two free ones costs roughly **$10/mo compute** plus storage/egress, inside an org paying $25/mo. That is a recurring per-nation cost of goods and belongs in the per-nation licence price, not absorbed. Worth modelling before the second nation signs, not after.
 4. **Who else gets the credentials** beyond you — that determines whether the password manager entry is shared or personal.
