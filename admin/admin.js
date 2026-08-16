@@ -475,12 +475,45 @@
       + '</div>'
       + '<div class="card"><h3>First ED and bootstrap schema</h3>'
       +   '<div style="' + g2 + '"><div><label>First ED email</label><input id="pv-ed-email" placeholder="ed@listuguj.ca"/></div><div><label>First ED name</label><input id="pv-ed-name" placeholder="Executive Director"/></div></div>'
-      +   '<label>Bootstrap schema file (supabase/bootstrap/schema.sql)</label><input id="pv-schema" type="file" accept=".sql,text/plain" title="The bootstrap schema shipped in the app repo at supabase/bootstrap/schema.sql. Download it from the repo, then choose it here."/>' + fieldHint('Ships in the app repo at <code>supabase/bootstrap/schema.sql</code> &mdash; ' + extLink(LINKS.gh.replace('/actions', '/blob/main/supabase/bootstrap/schema.sql'), 'open on GitHub &rarr;') + ', download the raw file, then choose it here.')
+      +   '<label>Bootstrap schema file (supabase/bootstrap/schema.sql)</label>'
+      +   '<div id="pv-drop" style="border:2px dashed var(--hair);border-radius:10px;padding:18px 16px;text-align:center;cursor:pointer;background:var(--bg);transition:border-color .15s, background .15s;">'
+      +     '<div style="font-size:22px;line-height:1;margin-bottom:6px;pointer-events:none;">&#128228;</div>'
+      +     '<div style="font-size:13px;color:var(--muted);pointer-events:none;">Drag &amp; drop <code>schema.sql</code> here, or <b style="color:var(--ink);">click to choose a file</b></div>'
+      +     '<input id="pv-schema" type="file" accept=".sql,text/plain" style="display:none;" title="The bootstrap schema shipped in the app repo at supabase/bootstrap/schema.sql."/>'
+      +     '<div id="pv-schema-name" style="font-size:12px;font-weight:600;color:var(--ok);margin-top:8px;min-height:16px;"></div>'
+      +   '</div>'
+      +   fieldHint('Ships in the app repo at <code>supabase/bootstrap/schema.sql</code> &mdash; ' + extLink(LINKS.gh.replace('/actions', '/raw/main/supabase/bootstrap/schema.sql'), 'download the raw file &rarr;') + ', then drop or choose it here. (Only needed when provisioning a brand-new nation.)')
       + '</div>'
       + '<div class="msg" id="pv-msg"></div>'
       + '<button class="btn" id="pv-btn" type="button" data-act="run-provision">Provision nation</button>'
       + '<div id="pv-results" style="margin-top:14px;"></div>';
+    wireSchemaDropzone();
   };
+
+  // Drag-and-drop + click-to-browse for the bootstrap schema file. The panel's
+  // CSP has no inline handlers, and drag events can't be delegated, so this is
+  // wired directly after showProvision paints. runProvision still reads
+  // document.getElementById('pv-schema').files[0], so we assign the dropped
+  // file back onto the hidden native input via a DataTransfer.
+  function wireSchemaDropzone(){
+    var dz = document.getElementById('pv-drop');
+    var input = document.getElementById('pv-schema');
+    var nameEl = document.getElementById('pv-schema-name');
+    if (!dz || !input) return;
+    function showName(){ if (nameEl) nameEl.textContent = (input.files && input.files[0]) ? ('✓ ' + input.files[0].name) : ''; }
+    function hot(on){ dz.style.borderColor = on ? 'var(--accent)' : 'var(--hair)'; dz.style.background = on ? 'var(--accent-light)' : 'var(--bg)'; }
+    input.addEventListener('change', showName);
+    dz.addEventListener('click', function(){ input.click(); });
+    ['dragenter','dragover'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); hot(true); }); });
+    ['dragleave','dragend'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); hot(false); }); });
+    dz.addEventListener('drop', function(e){
+      e.preventDefault(); e.stopPropagation(); hot(false);
+      var files = e.dataTransfer && e.dataTransfer.files;
+      if (!files || !files.length) return;
+      try { var dt = new DataTransfer(); dt.items.add(files[0]); input.files = dt.files; } catch(err){ /* older browsers: fall back to click */ }
+      showName();
+    });
+  }
 
   window.runProvision = async function(){
     var get = function(x){ return (document.getElementById(x) || {}).value || ''; };
