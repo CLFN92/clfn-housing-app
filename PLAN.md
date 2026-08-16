@@ -482,6 +482,44 @@ keys**, so it must run server-side and stay secured. Screens:
 4. Migration tooling: adopt Supabase CLI migrations now so the schema is versioned
    before onboarding anyone (foundational for N1+).
 
+### N-OWN — Who owns and pays for each Supabase project  ⬜ (decided 2026-08-16)
+
+Database-per-nation means **every nation is another Supabase project**, so
+project count and hosting cost grow with sales. Supabase's free plan allows
+**two free projects per ACCOUNT** (not per organization — a second free org does
+not help), and billing is **per organization**: $25/mo plus roughly $10/mo
+compute per project, with a $10 credit covering the first one. Free projects
+also pause after ~7 days idle. CLFN + the control plane already use both free
+slots, which is what surfaced this.
+
+Ownership and cost are the same decision, and the answer that wins on both is
+**each nation owns its own project, billed to that nation**:
+
+| Asset | Owning account | Billed to | Vendor role |
+| --- | --- | --- | --- |
+| CLFN nation project | CLFN | CLFN | admin member |
+| Future nation projects | that nation | that nation | admin member |
+| Platform registry / control plane | Home Land Homes | vendor | owner |
+| Demo nation (`demo.fnhub.app`) | Home Land Homes | vendor | owner |
+
+Consequences:
+- The **vendor's project count stays flat** (registry + demo), so the free-tier
+  ceiling stops being a recurring obstacle at each signing.
+- Per-nation compute leaves the vendor's P&L — but if a nation is ever hosted on
+  the vendor's account instead, that ~$10/mo+ is **cost of goods and belongs in
+  the licence price**, not absorbed silently.
+- It is the strongest **OCAP** answer, and a sellable one: *the project is in
+  your organization, billed to you; we are an administrator you can remove.*
+  A nation's IT or legal reviewer will ask, and this is the answer that holds up.
+- `provision-nation` is unaffected — it applies the schema to a project you point
+  it at with a one-time service_role key, and does not care who owns it.
+
+Follow-ups: move the control-plane project to the vendor account; keep the vendor
+role mailbox (`hello@homelandhomes.ca`) on MFA with more than one recovery path,
+since it becomes the keystone for the domain, repo and control plane; and write
+the **offboarding path** down once (what a nation gets, and how, if the vendor
+stops operating) before the second nation signs.
+
 ---
 
 ## Phase T — Tenant/Person model & BCR eligibility  ⬜
