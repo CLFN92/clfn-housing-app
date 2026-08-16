@@ -768,7 +768,7 @@ function renderDataUsagePanel(){
   }).then(function(res){
     var body = document.getElementById('nation_usage_body'); if (!body) return;
     var d = null; try { d = JSON.parse(res.text); } catch(e){}
-    if (res.ok && d) { body.innerHTML = _renderUsageHtml(d); return; }
+    if (res.ok && d) { body.innerHTML = _renderUsageHtml(d); _reportUsageToPlatform(d); return; }
     // Distinguish the real failure modes so this isn't always "run the migration".
     var msg;
     if (res.status === 404) {
@@ -784,6 +784,34 @@ function renderDataUsagePanel(){
   });
 }
 window.renderDataUsagePanel = renderDataUsagePanel;
+
+// Push model: report this nation's usage up to the control plane so the FN Hub
+// admin portal can show per-nation usage. The platform Edge Function re-verifies
+// the caller through the nation's own hs_data_usage() gate and re-reads the
+// authoritative numbers, so `d` here is only a "we have fresh usage" trigger,
+// not the source of truth. Fully fail-safe; once per browser session per nation.
+function _reportUsageToPlatform(d){
+  try {
+    var purl = String(window.PLATFORM_REGISTRY_URL || '');
+    var anon = String(window.PLATFORM_REGISTRY_ANON || '');
+    if (!purl || !anon || /REPLACE_WITH/.test(anon)) return;
+    // Subdomain must be a real <sub>.fnhub.app host (skips localhost / previews).
+    var host = (typeof location !== 'undefined' && location.hostname || '').toLowerCase();
+    var m = host.match(/^([a-z0-9-]+)\.fnhub\.app$/);
+    var sub = m && m[1]; if (!sub) return;
+    var token = (window.HOUSING_SESSION && HOUSING_SESSION.accessToken) || '';
+    if (!token) return;
+    var flag = '_fnhub_usage_reported_' + sub;
+    try { if (sessionStorage.getItem(flag)) return; } catch(e){}
+    try { sessionStorage.setItem(flag, '1'); } catch(e){}
+    fetch(purl.replace(/\/+$/, '') + '/functions/v1/report-nation-usage', {
+      method:  'POST',
+      headers: { apikey: anon, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ subdomain: sub })
+    }).catch(function(){ /* telemetry only -- never disrupts the page */ });
+  } catch(e){ /* never let reporting break the usage card */ }
+}
+window._reportUsageToPlatform = _reportUsageToPlatform;
 
 // Super-user toggle handler. Mutates CLFN_MODULES, persists to housing_settings,
 // audits, re-renders the panel, and — if disabling a module the user is

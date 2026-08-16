@@ -103,17 +103,53 @@
     var nations = nr.ok ? await nr.json().catch(function(){return[];}) : [];
     _nations = nations;
 
+    // Load per-nation usage (push-reported by each nation's app). Keyed by
+    // subdomain; absent until a nation manager has opened Settings -> Nation.
+    var ur = await api('GET', '/nation_usage?select=*');
+    var usageRows = ur.ok ? await ur.json().catch(function(){return[];}) : [];
+    var usageBySub = {};
+    usageRows.forEach(function(u){ if (u && u.subdomain) usageBySub[u.subdomain] = u; });
+
     app.innerHTML =
       '<h1>Nations</h1>'
       + '<p class="sub">Signed in as ' + esc(meEmail) + '</p>'
-      + nationsCard(nations)
+      + nationsCard(nations, usageBySub)
+      + addNationStepsCard()
       + addNationCard()
       + provisionCard()
       + adminsCard(admins, meEmail);
     wireAddNation();
   }
 
-  function nationsCard(nations){
+  // Human byte formatter for the admin panel (mirrors the nation app's _duFmtBytes).
+  function fmtBytes(b){
+    if (b == null) return '—';
+    b = Number(b) || 0;
+    if (b < 1024 * 1024)        return (b / 1024).toFixed(0) + ' KB';
+    if (b < 1024 * 1024 * 1024) return (b / 1024 / 1024).toFixed(1) + ' MB';
+    return (b / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+  }
+  function timeAgo(iso){
+    try {
+      var t = new Date(iso).getTime(); if (!t) return '';
+      var s = Math.floor((Date.now() - t) / 1000);
+      if (s < 60)    return 'just now';
+      if (s < 3600)  return Math.floor(s / 60) + 'm ago';
+      if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+      return Math.floor(s / 86400) + 'd ago';
+    } catch(e){ return ''; }
+  }
+  function usageCell(u){
+    if (!u) return '<span style="color:var(--muted);font-style:italic;">not reported</span>';
+    return '<div style="font-variant-numeric:tabular-nums;line-height:1.35;">'
+      + '<div>' + esc(fmtBytes(u.database_bytes)) + ' <span style="color:var(--muted);">db</span></div>'
+      + '<div>' + esc(fmtBytes(u.storage_bytes)) + ' <span style="color:var(--muted);">files</span></div>'
+      + '<div style="font-size:10px;color:var(--muted);">' + esc(timeAgo(u.reported_at)) + '</div>'
+      + '</div>';
+  }
+
+  function nationsCard(nations, usageBySub){
+    usageBySub = usageBySub || {};
     var rows = nations.length ? nations.map(function(n){
       var st = n.status || 'provisioning';
       var url = 'https://' + esc(n.subdomain) + '.fnhub.app';
@@ -122,6 +158,7 @@
         + '<td><b>' + esc(n.display_name) + '</b><div style="font-size:11px;color:var(--muted);">' + esc(n.subdomain) + '.fnhub.app</div></td>'
         + '<td><span class="pill ' + esc(st) + '">' + esc(st) + '</span></td>'
         + '<td style="font-size:11px;color:var(--muted);">' + esc(mods.join(', ') || '—') + '</td>'
+        + '<td style="font-size:12px;">' + usageCell(usageBySub[n.subdomain]) + '</td>'
         + '<td><div class="row-actions">'
         +   '<button class="btn sm ghost" type="button" data-act="configure" data-id="' + esc(n.id) + '">Configure</button>'
         +   '<a class="btn sm ghost" href="' + url + '" target="_blank" rel="noopener">Open</a>'
@@ -129,9 +166,37 @@
               ? '<button class="btn sm ghost" data-act="status" data-status="active" data-id="' + esc(n.id) + '">Resume</button>'
               : '<button class="btn sm danger" data-act="status" data-status="suspended" data-id="' + esc(n.id) + '">Suspend</button>')
         + '</div></td></tr>';
-    }).join('') : '<tr><td colspan="4" class="empty">No nations yet. Add one below.</td></tr>';
+    }).join('') : '<tr><td colspan="5" class="empty">No nations yet. Add one below.</td></tr>';
     return '<div class="card"><h3>Registered nations</h3>'
-      + '<table><thead><tr><th>Nation</th><th>Status</th><th>Licensed modules</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+      + '<table><thead><tr><th>Nation</th><th>Status</th><th>Licensed modules</th><th>Data usage</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
+      + '<p class="sub" style="margin:10px 0 0;font-size:11px;">Data usage is reported by each nation\'s app when a manager opens Settings &rarr; Nation (database size + file storage, against the 8 GB / 100 GB Supabase Pro tiers).</p>'
+      + '</div>';
+  }
+
+  // Sequential, numbered reference of the full "add a nation" workflow. Static
+  // guide (there is no per-nation step tracking) so an operator can follow it
+  // top to bottom. Kept in sync with the Add Nation card + provision wizard below.
+  function addNationStepsCard(){
+    var steps = [
+      ['Register the nation', 'Fill in the <b>Add a nation</b> card below (subdomain, display name, short code). This reserves <code>&lt;subdomain&gt;.fnhub.app</code> and creates the registry row.'],
+      ['Create its Supabase project', 'Stand up a fresh <b>database-per-nation</b> Supabase project. Copy its <b>Project URL</b> and <b>anon (publishable) key</b> — you\'ll paste them into the wizard.'],
+      ['Run the provisioning wizard', 'Use <b>Provision this nation</b>. It replays the bootstrap schema, creates the <code>housing-files</code> storage bucket, and seeds the first ED. The service_role key is used once and never stored.'],
+      ['Deploy Edge Functions &amp; secrets', 'Deploy the nation\'s Edge Functions to its project and set their secrets (email/Graph, AI keys). The <code>hs_data_usage</code> function is part of this so the usage figures above populate.'],
+      ['License the modules', 'Open <b>Configure</b> and tick which optional modules this nation may use (Finance, RFQ, Inspections, Capital Projects, …).'],
+      ['Set status to Active', 'Only <b>active</b> nations publish to <code>nations_public</code> and resolve at <code>&lt;subdomain&gt;.fnhub.app</code>. Flip status to Active in Configure.'],
+      ['Hand off to the nation\'s ED', 'The ED signs in at <code>&lt;subdomain&gt;.fnhub.app</code> and adds their own staff. You\'re done — the nation manages itself from here.']
+    ];
+    var items = steps.map(function(s, i){
+      return '<li style="display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);align-items:flex-start;">'
+        + '<span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--ink);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>'
+        + '<div style="flex:1;"><div style="font-weight:700;font-size:13px;margin-bottom:2px;">' + s[0] + '</div>'
+        + '<div style="font-size:12px;color:var(--muted);line-height:1.5;">' + s[1] + '</div></div>'
+        + '</li>';
+    }).join('');
+    return '<div class="card"><h3>Adding a nation &mdash; step by step</h3>'
+      + '<p class="sub" style="margin:2px 0 6px;">Follow these in order. Each step maps to a card or action on this page.</p>'
+      + '<ol style="list-style:none;margin:4px 0 0;padding:0;">' + items + '</ol>'
+      + '</div>';
   }
 
   function addNationCard(){
