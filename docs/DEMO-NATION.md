@@ -71,12 +71,24 @@ Everything here is configuration; the CLAUDE.md hard rule means **no literal
 belongs in code** — not the demo nation's name either. A hardcoded `"Demo First
 Nation"` is exactly the bug the rule exists to prevent.
 
-- **Name:** pick a clearly fictional nation. **Verify the chosen name against the ISC First Nation Profiles registry before committing to it** — accidentally shipping marketing material branded with a real community's name, without their consent, is a serious own-goal in this market. Candidate direction: a plainly invented place-name plus "First Nation", nothing that reads as a real band or a real treaty area.
-- **Set on the registry row:** `display_name`, `short`, `primary_color`, `email_domain`, `housing_email`, `modules_licensed` (turn **everything** on — the demo should show the full product).
-- **Set in `housing_settings`:** `nation_config_override` (display name, contact block, mailing address, province) and the `theme` key (primary colour + logo) so generated PDFs, leases, and emails carry demo branding.
-- **Logo:** a generic invented mark. Not the CLFN logo, not a real nation's.
+- **Name: `Demo First Nation` (short `DEMO`)** — decided 2026-08-16. A plausible invented name (e.g. "Riverbend First Nation") would look better on video, but carries a residual risk of colliding with a real band, and a screenshot could read as a real community's private housing file. A generic name removes both. Note this is a *configuration value*, not a code literal — the CLAUDE.md hard rule still applies, and a hardcoded `"Demo First Nation"` anywhere in the source is exactly the bug it exists to prevent.
+- **Registry row values** (admin panel → Add a nation):
 
-**Effort:** small, once the name is chosen.
+  | Field | Value | Note |
+  | --- | --- | --- |
+  | Subdomain | `demo` | the only field that is expensive to change later |
+  | Short code | `DEMO` | surfaces as `NATION_CONFIG.short` |
+  | Display name | `Demo First Nation` | editable any time via Configure |
+  | Supabase URL / anon key | **blank until D1 completes** | blank registers `status: 'provisioning'`, and `nations_public` only exposes `status = 'active'`, so the subdomain stays dark until the project is ready |
+  | Staff email domain | `demo.fnhub.app` | **a hard sign-in gate** (`auth-login.js:412` rejects any other domain before the network call) |
+  | Primary color | `#4FC3F7` | must be **light**: it is a fill behind dark text (PDF header strips + table headers, `shared-data.js:8829`; `--accent` on the public portals). A dark brand colour makes generated PDFs unreadable |
+  | Licensed modules | all **9** ticked | licensing only — the in-app Settings → Nation → Modules toggles (`_enabled`) are separate and also need turning on |
+
+- **Also set in `housing_settings`:** `nation_config_override` (display name, contact block, mailing address, province) and the `theme` key (primary colour + logo) so generated PDFs, leases, and emails carry demo branding.
+- **Logo:** a generic invented mark. Not the CLFN logo, not a real nation's. **Still open.**
+- **Demo accounts must match the email domain** — `ed@demo.fnhub.app`, `manager@demo.fnhub.app`, etc. Nothing delivers mail to that domain, so create them in the Supabase dashboard with **auto-confirm on**, or they will sit unverified with no way to receive a confirmation link.
+
+**Effort:** small. Name is settled; only the logo is outstanding.
 
 ### D3 — Demo-mode guardrails  *(the only shipped-app code change)*
 Add an `is_demo` boolean to the nation config (registry column + `nations_public`
@@ -88,9 +100,20 @@ demo, so CLFN's boot is unchanged. It then drives four behaviours:
 3. **A persistent demo banner** in `renderAppHeader` (`housing-init.js:2034`): *"DEMO — fictional data. Resets nightly."* Present on every page, including the public applicant/report portals.
 4. **`noindex`** — a `<meta name="robots" content="noindex,nofollow">` injected from `shared.js` when `is_demo`. The Cloudflare `_headers` file is path-scoped, not host-scoped, and the same static assets serve every subdomain, so a `_headers` rule or a `robots.txt` **cannot** target only the demo. The meta tag plus the D1 Transform Rule is how this actually gets done.
 
-Also in scope: give the demo project **its own** `ANTHROPIC_API_KEY` with a low
-spend cap, so the AI assistant stays enabled (it demos extremely well) without
-an unbounded bill from a crawler or a bored prospect.
+**The Anthropic key for `ai-chat`** — yes, load it; the assistant demos
+extremely well and a demo without it undersells the product. Three rules:
+- **A separate key from CLFN's**, created for the demo, so it can be revoked or
+  capped without touching production and demo usage never lands on CLFN's bill.
+- **A low spend cap** set on that key in the Anthropic Console.
+- **Stored only as an Edge Function secret** in the demo project (Project
+  Settings → Edge Functions → Secrets), never in the repo or client code.
+
+Exposure is narrower than it first appears: `ai-chat` requires a valid Supabase
+user JWT and resolves the caller's role from the `staff` table, rejecting
+non-staff with a 403 — so an anonymous crawler cannot spend anything. The cap
+guards against a logged-in prospect hammering it, which is a real but bounded
+risk. Load the key at D1 step 3, when `ai-chat` is deployed; it is not needed to
+register the nation row.
 
 **Effort:** small. Low risk — every branch is behind `is_demo`.
 
@@ -165,7 +188,7 @@ others, so it can land while the Supabase project is being stood up.
 | --- | --- |
 | **Schema drift** — demo falls behind CLFN and stops being a faithful preview | Regenerate `bootstrap/schema.sql` on every migration (D0's standing rule); re-provisioning the demo is the cheapest way to detect drift |
 | **The demo emails a real person** | Two independent layers: client-side suppression at `sendNotification`, and no working provider credentials on the demo project |
-| **The fictional nation name collides with a real community** | Verify against the ISC First Nation Profiles registry *before* the name reaches a logo, a URL, or a slide |
+| ~~**The fictional nation name collides with a real community**~~ | **Closed** — `Demo First Nation` is generic by design, so there is nothing to collide with. If the name is ever revisited in favour of something more immersive, verify it against the ISC First Nation Profiles registry *before* it reaches a logo, a URL, or a slide |
 | **Google indexes the demo** | `noindex` meta from `shared.js` + a host-scoped Cloudflare Transform Rule; private credentials as the real control |
 | **AI assistant cost creep** | Demo-project-specific Anthropic key with a hard spend cap |
 | **A reset fires mid-demo** | 3am ET schedule + a pause flag |
@@ -176,7 +199,7 @@ others, so it can land while the Supabase project is being stood up.
 
 ## 6. Open questions
 
-1. **Nation name and logo** — needs to be chosen and verified (D2).
+1. ~~**Nation name**~~ — settled 2026-08-16: **`Demo First Nation`** / `DEMO` / `demo.fnhub.app`, deliberately generic so it can never be mistaken for a real community. **Logo still open** — needs a generic invented mark.
 2. **Public portals** (`apply.html`, `report.html`, tenant maintenance request) — live on the demo, or disabled? Live shows off the whole intake story but means anyone with the URL can post into the demo. Recommendation: live, with the banner and email suppression; the nightly reset cleans up whatever they leave.
 3. **Supabase tier** for the demo project — free vs Pro (see the pausing risk above).
 4. **Who else gets the credentials** beyond you — that determines whether the password manager entry is shared or personal.

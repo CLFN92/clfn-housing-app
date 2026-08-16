@@ -14,10 +14,16 @@
   var LS_AT = 'fnhub_admin_at', LS_RT = 'fnhub_admin_rt';
 
   // Optional modules a nation can be licensed for (mirrors CLFN_MODULES keys).
+  // Must mirror the optional-module keys in CLFN_MODULES._licensed
+  // (shared-config.js). A key missing here cannot be licensed or un-licensed
+  // from this panel: applyNationLicensing() only overrides keys PRESENT in
+  // modules_licensed, so an omitted module silently keeps its default (true)
+  // for every nation. Add new modules to both places.
   var MODULES = [
     ['finance','Finance'], ['match','Match'], ['contractors','Contractors'],
     ['renovations','Renovations'], ['rfq','RFQ'], ['mapping','Mapping'],
-    ['inspections','Inspections'], ['ai_assistant','AI Assistant']
+    ['inspections','Inspections'], ['ai_assistant','AI Assistant'],
+    ['projects','Capital Projects']
   ];
 
   var app = document.getElementById('app');
