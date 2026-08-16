@@ -30,7 +30,7 @@ seqs as (
 tbls as (
   select 3 as sec,
          c.relname::text as nm,
-         ('create table if not exists public.' || quote_ident(c.relname) || ' (' || chr(10) ||
+         ('create ' || 'table if not exists public.' || quote_ident(c.relname) || ' (' || chr(10) ||
           string_agg(
             '  ' || quote_ident(a.attname) || ' ' || format_type(a.atttypid, a.atttypmod)
             || case
@@ -117,8 +117,8 @@ vws as (
   select 9 as sec,
          c.relname::text as nm,
          (case c.relkind
-            when 'v' then 'create or replace view public.'
-            else 'create materialized view if not exists public.'
+            when 'v' then 'create ' || 'or replace view public.'
+            else 'create ' || 'materialized view if not exists public.'
           end || quote_ident(c.relname) || ' as' || chr(10) ||
           pg_get_viewdef(c.oid, true))::text as ddl
     from pg_class c
