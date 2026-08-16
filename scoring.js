@@ -801,13 +801,17 @@ function _reportUsageToPlatform(d){
     var sub = m && m[1]; if (!sub) return;
     var token = (window.HOUSING_SESSION && HOUSING_SESSION.accessToken) || '';
     if (!token) return;
+    // Report once per session, but only mark it done on SUCCESS -- so if the
+    // platform function isn't deployed yet a later refresh retries instead of
+    // being permanently suppressed for the session.
     var flag = '_fnhub_usage_reported_' + sub;
     try { if (sessionStorage.getItem(flag)) return; } catch(e){}
-    try { sessionStorage.setItem(flag, '1'); } catch(e){}
     fetch(purl.replace(/\/+$/, '') + '/functions/v1/report-nation-usage', {
       method:  'POST',
       headers: { apikey: anon, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
       body:    JSON.stringify({ subdomain: sub })
+    }).then(function(r){
+      if (r && r.ok) { try { sessionStorage.setItem(flag, '1'); } catch(e){} }
     }).catch(function(){ /* telemetry only -- never disrupts the page */ });
   } catch(e){ /* never let reporting break the usage card */ }
 }

@@ -30,6 +30,22 @@
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); };
   var _nations = [];   // last-loaded nations list (so Configure can look one up)
 
+  // External destinations referenced by the checklist + field hints. Supabase
+  // dashboard deep links use the "/project/_/..." form, which resolves to the
+  // operator's last-opened project (or the picker) -- exact refs aren't known
+  // until the nation's project is created.
+  var LINKS = {
+    supaNew:  'https://supabase.com/dashboard/new',                       // create a project
+    supaApi:  'https://supabase.com/dashboard/project/_/settings/api',    // URL + keys
+    supaFns:  'https://supabase.com/dashboard/project/_/settings/functions', // Edge Function secrets
+    supaCli:  'https://supabase.com/docs/guides/functions/deploy',        // functions deploy docs
+    cf:       'https://dash.cloudflare.com',                              // Cloudflare (DNS + Workers)
+    gh:       'https://github.com/CLFN92/clfn-housing-app/actions'        // deploy workflows
+  };
+  function extLink(href, label){ return '<a href="' + href + '" target="_blank" rel="noopener" style="color:#1d4ed8;font-weight:600;">' + label + '</a>'; }
+  // Small muted "where to find it" line under a form field.
+  function fieldHint(html){ return '<div class="sub" style="margin:4px 0 0;font-size:11px;line-height:1.45;">' + html + '</div>'; }
+
   function getAT(){ return localStorage.getItem(LS_AT) || ''; }
   function getRT(){ return localStorage.getItem(LS_RT) || ''; }
   function setSession(at, rt){ if (at) localStorage.setItem(LS_AT, at); if (rt) localStorage.setItem(LS_RT, rt); }
@@ -114,9 +130,9 @@
       '<h1>Nations</h1>'
       + '<p class="sub">Signed in as ' + esc(meEmail) + '</p>'
       + nationsCard(nations, usageBySub)
+      + provisionCard()
       + addNationStepsCard()
       + addNationCard()
-      + provisionCard()
       + adminsCard(admins, meEmail);
     wireAddNation();
   }
@@ -173,28 +189,46 @@
       + '</div>';
   }
 
-  // Sequential, numbered reference of the full "add a nation" workflow. Static
-  // guide (there is no per-nation step tracking) so an operator can follow it
-  // top to bottom. Kept in sync with the Add Nation card + provision wizard below.
+  // Sequential, numbered reference of the full "add a nation" workflow across
+  // all three surfaces (Supabase, GitHub, Cloudflare). Static guide (no per-
+  // nation step tracking). Each step is tagged Automated (the platform already
+  // does it) or Manual (an external cloud action the operator performs).
+  function stepTag(kind){
+    return kind === 'auto'
+      ? '<span class="pill" style="font-size:9px;background:#dcfce7;color:#166534;">Automated</span>'
+      : '<span class="pill" style="font-size:9px;background:#f4f4f0;color:#696960;">Manual</span>';
+  }
   function addNationStepsCard(){
+    // [ title, kind('auto'|'manual'), html ]
     var steps = [
-      ['Register the nation', 'Fill in the <b>Add a nation</b> card below (subdomain, display name, short code). This reserves <code>&lt;subdomain&gt;.fnhub.app</code> and creates the registry row.'],
-      ['Create its Supabase project', 'Stand up a fresh <b>database-per-nation</b> Supabase project. Copy its <b>Project URL</b> and <b>anon (publishable) key</b> — you\'ll paste them into the wizard.'],
-      ['Run the provisioning wizard', 'Use <b>Provision this nation</b>. It replays the bootstrap schema, creates the <code>housing-files</code> storage bucket, and seeds the first ED. The service_role key is used once and never stored.'],
-      ['Deploy Edge Functions &amp; secrets', 'Deploy the nation\'s Edge Functions to its project and set their secrets (email/Graph, AI keys). The <code>hs_data_usage</code> function is part of this so the usage figures above populate.'],
-      ['License the modules', 'Open <b>Configure</b> and tick which optional modules this nation may use (Finance, RFQ, Inspections, Capital Projects, …).'],
-      ['Set status to Active', 'Only <b>active</b> nations publish to <code>nations_public</code> and resolve at <code>&lt;subdomain&gt;.fnhub.app</code>. Flip status to Active in Configure.'],
-      ['Hand off to the nation\'s ED', 'The ED signs in at <code>&lt;subdomain&gt;.fnhub.app</code> and adds their own staff. You\'re done — the nation manages itself from here.']
+      ['Register the nation', 'manual',
+        'Fill in the <b>Add a nation</b> card below (subdomain, display name, short code). Creates the registry row and reserves <code>&lt;subdomain&gt;.fnhub.app</code>.'],
+      ['Create its Supabase project', 'manual',
+        'Stand up a fresh <b>database-per-nation</b> project: ' + extLink(LINKS.supaNew, 'Supabase &rarr; New project') + '. Then grab the ref, URL, anon + service_role keys from ' + extLink(LINKS.supaApi, 'Settings &rarr; API') + '.'],
+      ['Provision (schema, bucket, first ED)', 'auto',
+        'Click <b>Provision this nation</b> below. The platform replays the bootstrap schema, creates the <code>housing-files</code> storage bucket, seeds the first ED, and writes the registry row &mdash; one action. (Requires <code>SUPABASE_MGMT_TOKEN</code> set on the platform function.) The service_role key is used once and never stored.'],
+      ['Set the project\'s Edge Function secrets', 'manual',
+        'On the new project, add the function secrets (email/Graph or Resend, <code>ANTHROPIC_API_KEY</code>, etc.): ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions') + '. Also run the <code>hs_data_usage</code> migration there so this panel\'s usage column fills in.'],
+      ['Deploy the Edge Functions to the project', 'manual',
+        'The ' + extLink(LINKS.gh, 'GitHub Actions') + ' deploy targets one project via the <code>SUPABASE_PROJECT_ID</code> repo secret. For a new nation, deploy to its ref: <code>supabase functions deploy --project-ref &lt;ref&gt;</code> (' + extLink(LINKS.supaCli, 'docs') + '), or point that secret at it and push. Control-plane-only functions (<code>provision-nation</code>, <code>report-nation-usage</code>) are excluded from that workflow by design.'],
+      ['Cloudflare subdomain', 'auto',
+        'The app deploys to Cloudflare on every push to <code>main</code> and serves <b>every</b> nation by hostname &mdash; no per-nation app deploy. Just confirm <code>&lt;subdomain&gt;.fnhub.app</code> resolves; with the wildcard <code>*.fnhub.app</code> DNS record + Worker route it is automatic. If not, add a DNS record + route in the ' + extLink(LINKS.cf, 'Cloudflare dashboard') + '.'],
+      ['License the modules', 'manual',
+        'Open <b>Configure</b> and tick which optional modules this nation may use (Finance, RFQ, Inspections, Capital Projects, …).'],
+      ['Set status to Active', 'manual',
+        'Only <b>active</b> nations publish to <code>nations_public</code> and resolve at <code>&lt;subdomain&gt;.fnhub.app</code>. Flip status to Active in Configure.'],
+      ['Hand off to the nation\'s ED', 'manual',
+        'The ED signs in at <code>&lt;subdomain&gt;.fnhub.app</code> and adds their own staff. Done &mdash; the nation manages itself from here.']
     ];
     var items = steps.map(function(s, i){
       return '<li style="display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);align-items:flex-start;">'
         + '<span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--ink);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>'
-        + '<div style="flex:1;"><div style="font-weight:700;font-size:13px;margin-bottom:2px;">' + s[0] + '</div>'
-        + '<div style="font-size:12px;color:var(--muted);line-height:1.5;">' + s[1] + '</div></div>'
+        + '<div style="flex:1;"><div style="font-weight:700;font-size:13px;margin-bottom:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + s[0] + ' ' + stepTag(s[1]) + '</div>'
+        + '<div style="font-size:12px;color:var(--muted);line-height:1.55;">' + s[2] + '</div></div>'
         + '</li>';
     }).join('');
     return '<div class="card"><h3>Adding a nation &mdash; step by step</h3>'
-      + '<p class="sub" style="margin:2px 0 6px;">Follow these in order. Each step maps to a card or action on this page.</p>'
+      + '<p class="sub" style="margin:2px 0 6px;"><span class="pill" style="font-size:9px;background:#dcfce7;color:#166534;">Automated</span> steps the platform already handles; <span class="pill" style="font-size:9px;background:#f4f4f0;color:#696960;">Manual</span> steps you do in Supabase, GitHub, or Cloudflare. Links open each destination.</p>'
       + '<ol style="list-style:none;margin:4px 0 0;padding:0;">' + items + '</ol>'
       + '</div>';
   }
@@ -430,15 +464,18 @@
       +   '<label>Housing email</label><input id="pv-housing" placeholder="housing@listuguj.ca" value="' + v(n && n.housing_email) + '"/>'
       +   '<label style="margin-top:10px;">Licensed modules</label><div>' + modChecks + '</div>'
       + '</div>'
-      + '<div class="card"><h3>Target Supabase project</h3>'
-      +   '<p class="sub" style="margin:2px 0 8px;">The new project you created. The service_role key is used once (bucket + ED) and never stored.</p>'
-      +   '<div style="' + g2 + '"><div><label>Project ref</label><input id="pv-ref" placeholder="abcdefgh...ref" value="' + v(_refFromUrl(n && n.supabase_url)) + '"/></div><div><label>Project URL</label><input id="pv-url" placeholder="https://&lt;ref&gt;.supabase.co" value="' + v(n && n.supabase_url) + '"/></div></div>'
-      +   '<label>Anon (publishable) key</label><input id="pv-anon" placeholder="eyJ..." value="' + v(n && n.supabase_anon) + '"/>'
-      +   '<label>Service role key (used once)</label><input id="pv-service" placeholder="eyJ... (service_role)"/>'
+      + '<div class="card"><h3>Target Supabase project ' + extLink(LINKS.supaApi, 'Where to find these &rarr;') + '</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">The new project you created (' + extLink(LINKS.supaNew, 'create one &rarr;') + '). All four values are on the project\'s <b>Settings &rarr; API</b> page. The service_role key is used once (bucket + ED) and never stored.</p>'
+      +   '<div style="' + g2 + '">'
+      +     '<div><label>Project ref</label><input id="pv-ref" placeholder="abcdefgh...ref" value="' + v(_refFromUrl(n && n.supabase_url)) + '" title="Supabase -> your project -> Settings -> General -> Reference ID. It is also the string in the dashboard URL: supabase.com/dashboard/project/<ref>"/>' + fieldHint('Settings &rarr; General &rarr; <b>Reference ID</b> (also the code in the dashboard URL).') + '</div>'
+      +     '<div><label>Project URL</label><input id="pv-url" placeholder="https://&lt;ref&gt;.supabase.co" value="' + v(n && n.supabase_url) + '" title="Supabase -> Settings -> API -> Project URL (https://<ref>.supabase.co)"/>' + fieldHint('Settings &rarr; API &rarr; <b>Project URL</b>.') + '</div>'
+      +   '</div>'
+      +   '<label>Anon (publishable) key</label><input id="pv-anon" placeholder="eyJ..." value="' + v(n && n.supabase_anon) + '" title="Supabase -> Settings -> API -> Project API keys -> anon / public. Publishable; safe to store."/>' + fieldHint('Settings &rarr; API &rarr; Project API keys &rarr; <b>anon / public</b>. Publishable &mdash; safe to store.')
+      +   '<label>Service role key (used once)</label><input id="pv-service" placeholder="eyJ... (service_role)" title="Supabase -> Settings -> API -> Project API keys -> service_role. SECRET. Used once here (bucket + first ED) and never stored."/>' + fieldHint('Settings &rarr; API &rarr; Project API keys &rarr; <b>service_role</b>. <b style="color:var(--danger);">Secret</b> &mdash; used once, never stored.')
       + '</div>'
       + '<div class="card"><h3>First ED and bootstrap schema</h3>'
       +   '<div style="' + g2 + '"><div><label>First ED email</label><input id="pv-ed-email" placeholder="ed@listuguj.ca"/></div><div><label>First ED name</label><input id="pv-ed-name" placeholder="Executive Director"/></div></div>'
-      +   '<label>Bootstrap schema file (supabase/bootstrap/schema.sql)</label><input id="pv-schema" type="file" accept=".sql,text/plain"/>'
+      +   '<label>Bootstrap schema file (supabase/bootstrap/schema.sql)</label><input id="pv-schema" type="file" accept=".sql,text/plain" title="The bootstrap schema shipped in the app repo at supabase/bootstrap/schema.sql. Download it from the repo, then choose it here."/>' + fieldHint('Ships in the app repo at <code>supabase/bootstrap/schema.sql</code> &mdash; ' + extLink(LINKS.gh.replace('/actions', '/blob/main/supabase/bootstrap/schema.sql'), 'open on GitHub &rarr;') + ', download the raw file, then choose it here.')
       + '</div>'
       + '<div class="msg" id="pv-msg"></div>'
       + '<button class="btn" id="pv-btn" type="button" data-act="run-provision">Provision nation</button>'
