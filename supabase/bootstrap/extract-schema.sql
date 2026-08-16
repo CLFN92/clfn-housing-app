@@ -20,7 +20,8 @@
 --   NOTE: `supabase db dump --linked -f supabase/bootstrap/schema.sql` is the
 --   authoritative way to produce that file and should be used whenever the CLI
 --   is available. This script is the fallback. Known gaps vs. a real dump:
---     - sequences are emitted bare (no START/INCREMENT/CACHE preserved)
+--     - sequence CURRENT values are not carried over (fresh sequences restart);
+--       type/increment/min/max/start/cache/cycle ARE preserved
 --     - column collations, storage/compression settings, comments, table
 --       partitioning, publications and event triggers are not emitted
 --     - only the `public` schema is covered, plus RLS policies on `storage`
@@ -33,7 +34,7 @@
 --
 -- Ordering is dependency-safe for the ordinary cases: extensions, sequences,
 -- tables, PK/unique constraints, check/FK constraints, indexes, functions,
--- triggers, views, RLS, policies, grants.
+-- triggers, views, RLS, policies, grants, sequence ownership.
 --
 -- If the SQL Editor reports an error, check first that you have no text
 -- SELECTED in the editor -- with a selection it runs only the highlighted
