@@ -41,9 +41,18 @@
 -- tables, PK/unique constraints, check/FK constraints, indexes, functions,
 -- triggers, views, RLS, policies, grants, sequence ownership.
 --
--- If the SQL Editor reports an error, check first that you have no text
--- SELECTED in the editor -- with a selection it runs only the highlighted
--- fragment, which is a common source of confusing errors on a long script.
+-- BEFORE PASTING: open a blank "New query" tab, then Ctrl+A / Delete so the
+-- editor buffer is EMPTY. Starting from one of the SQL Editor's sidebar
+-- templates (e.g. the RLS policy template) leaves starter SQL in the buffer
+-- that runs alongside whatever you paste. That template carries a placeholder
+-- where the table name belongs, so it fails with
+--   ERROR 42P01 relation "public" does not exist
+-- and it keeps failing that way no matter what you paste underneath it -- even
+-- `select 1`. If you see that error, the buffer is not empty; it is not coming
+-- from this script.
+--
+-- Also check that no text is SELECTED when you hit Run -- with a selection the
+-- editor executes only the highlighted fragment.
 -- ============================================================================
 
 with
