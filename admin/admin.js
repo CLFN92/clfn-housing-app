@@ -232,6 +232,11 @@
       var r = await api('GET', '/nations?select=*&id=eq.' + encodeURIComponent(id));
       var a = r.ok ? await r.json().catch(function(){return[];}) : [];
       n = a[0];
+      // Cache it: _nations is cold on a deep link or after a reload, and
+      // showProvision(id) reads this array to prefill. Without this the wizard
+      // would open blank with an EDITABLE subdomain and could mint a duplicate
+      // registry row instead of updating this one.
+      if (n) _nations = _nations.filter(function(x){ return String(x.id) !== String(n.id); }).concat([n]);
     }
     if (!n){ showDashboard(); return; }
     document.getElementById('btn_out').style.display = '';
@@ -274,6 +279,15 @@
       +   '<select id="cn-status">' + stOpt('provisioning','Provisioning') + stOpt('active','Active') + stOpt('suspended','Suspended') + '</select>'
       +   '<p class="sub" style="margin:6px 0 0;">Only <b>active</b> nations are published to <code>nations_public</code> and resolve at <code>&lt;subdomain&gt;.fnhub.app</code>.</p>'
       + '</div>'
+      + '<div class="card"><h3>Provisioning</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">'
+      +     (n.supabase_url
+              ? 'This nation already points at a Supabase project. Re-running provisioning replays the bootstrap schema and re-seeds the bucket and first ED against that project.'
+              : 'This nation is registered but has no Supabase project yet. Create the project first, then run the wizard to apply the bootstrap schema, create the storage bucket, and seed the first ED.')
+      +   '</p>'
+      +   '<button class="btn sm ghost" type="button" data-act="provision" data-id="' + esc(n.id) + '">'
+      +     (n.supabase_url ? 'Re-run provisioning &rarr;' : 'Provision this nation &rarr;') + '</button>'
+      + '</div>'
       + '<div class="msg" id="cn-msg"></div>'
       + '<button class="btn" id="cn-save" type="button" data-act="save-config" data-id="' + esc(n.id) + '">Save changes</button>';
   }
@@ -308,26 +322,53 @@
       + '<button class="btn" type="button" data-act="provision">Start provisioning wizard</button></div>';
   }
 
-  window.showProvision = function(){
+  // https://<ref>.supabase.co -> <ref>, so the wizard can prefill Project ref
+  // from the URL already stored on the registry row.
+  function _refFromUrl(url){
+    var m = /^https?:\/\/([a-z0-9-]+)\.supabase\.co/i.exec(String(url || '').trim());
+    return m ? m[1] : '';
+  }
+
+  // showProvision(id?) -- with an id, prefills from the registry row and locks
+  // the subdomain, so provisioning an ALREADY-REGISTERED nation (the normal
+  // flow: register first, create the project, then provision) updates that row
+  // instead of trying to mint a second one. provision-nation upserts on
+  // subdomain, so re-running against an existing nation is safe.
+  window.showProvision = async function(id){
     document.getElementById('btn_out').style.display = '';
+    var n = id ? (_nations.filter(function(x){ return String(x.id) === String(id); })[0] || null) : null;
+    // Defensive: if the cache missed, fetch before rendering rather than
+    // falling back to a blank wizard (see the note in configureNation).
+    if (id && !n){
+      var rr = await api('GET', '/nations?select=*&id=eq.' + encodeURIComponent(id));
+      var aa = rr.ok ? await rr.json().catch(function(){return[];}) : [];
+      n = aa[0] || null;
+      if (n) _nations = _nations.concat([n]);
+    }
+    var v = function(x){ return esc(x == null ? '' : x); };
     var g2 = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;';
+    var licensed = (n && n.modules_licensed) || null;
     var modChecks = MODULES.map(function(m){
-      return '<label style="display:inline-flex;align-items:center;gap:6px;font-weight:600;margin:0 12px 8px 0;"><input type="checkbox" class="pv-mod" value="' + m[0] + '" style="width:auto;"/> ' + esc(m[1]) + '</label>';
+      // Existing nation: mirror its licensing. New nation: all on by default,
+      // matching the Add Nation card.
+      var on = licensed ? !!licensed[m[0]] : true;
+      return '<label style="display:inline-flex;align-items:center;gap:6px;font-weight:600;margin:0 12px 8px 0;"><input type="checkbox" class="pv-mod" value="' + m[0] + '" style="width:auto;"' + (on ? ' checked' : '') + '/> ' + esc(m[1]) + '</label>';
     }).join('');
-    app.innerHTML = '<button class="btn sm ghost" type="button" data-act="home">&larr; Back</button>'
-      + '<h1 style="margin-top:12px;">Provision a nation</h1>'
+    app.innerHTML = '<button class="btn sm ghost" type="button" data-act="' + (n ? 'configure' : 'home') + '"' + (n ? ' data-id="' + v(n.id) + '"' : '') + '>&larr; Back</button>'
+      + '<h1 style="margin-top:12px;">' + (n ? 'Provision ' + v(n.display_name) : 'Provision a nation') + '</h1>'
       + '<p class="sub">Assisted: you created the Supabase project; this runs schema, bucket, first ED, and registry.</p>'
+      + (n ? '<div class="msg ok" style="display:block;">Prefilled from the registry. The registry row for <code>' + v(n.subdomain) + '</code> will be updated, not duplicated.</div>' : '')
       + '<div class="card"><h3>Nation</h3>'
-      +   '<div style="' + g2 + '"><div><label>Subdomain</label><input id="pv-sub" placeholder="listuguj"/></div><div><label>Short code</label><input id="pv-short" placeholder="LMG"/></div></div>'
-      +   '<label>Display name</label><input id="pv-name" placeholder="Listuguj Mi\'gmaq Government"/>'
-      +   '<div style="' + g2 + '"><div><label>Staff email domain</label><input id="pv-domain" placeholder="listuguj.ca"/></div><div><label>Primary color</label><input id="pv-color" placeholder="#f8e41a"/></div></div>'
-      +   '<label>Housing email</label><input id="pv-housing" placeholder="housing@listuguj.ca"/>'
+      +   '<div style="' + g2 + '"><div><label>Subdomain</label><input id="pv-sub" placeholder="listuguj" value="' + v(n && n.subdomain) + '"' + (n ? ' readonly style="background:var(--bg);color:var(--muted);"' : '') + '/></div><div><label>Short code</label><input id="pv-short" placeholder="LMG" value="' + v(n && n.short) + '"/></div></div>'
+      +   '<label>Display name</label><input id="pv-name" placeholder="Listuguj Mi\'gmaq Government" value="' + v(n && n.display_name) + '"/>'
+      +   '<div style="' + g2 + '"><div><label>Staff email domain</label><input id="pv-domain" placeholder="listuguj.ca" value="' + v(n && n.email_domain) + '"/></div><div><label>Primary color</label><input id="pv-color" placeholder="#f8e41a" value="' + v(n && n.primary_color) + '"/></div></div>'
+      +   '<label>Housing email</label><input id="pv-housing" placeholder="housing@listuguj.ca" value="' + v(n && n.housing_email) + '"/>'
       +   '<label style="margin-top:10px;">Licensed modules</label><div>' + modChecks + '</div>'
       + '</div>'
       + '<div class="card"><h3>Target Supabase project</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">The new project you created. The service_role key is used once (bucket + ED) and never stored.</p>'
-      +   '<div style="' + g2 + '"><div><label>Project ref</label><input id="pv-ref" placeholder="abcdefgh...ref"/></div><div><label>Project URL</label><input id="pv-url" placeholder="https://&lt;ref&gt;.supabase.co"/></div></div>'
-      +   '<label>Anon (publishable) key</label><input id="pv-anon" placeholder="eyJ..."/>'
+      +   '<div style="' + g2 + '"><div><label>Project ref</label><input id="pv-ref" placeholder="abcdefgh...ref" value="' + v(_refFromUrl(n && n.supabase_url)) + '"/></div><div><label>Project URL</label><input id="pv-url" placeholder="https://&lt;ref&gt;.supabase.co" value="' + v(n && n.supabase_url) + '"/></div></div>'
+      +   '<label>Anon (publishable) key</label><input id="pv-anon" placeholder="eyJ..." value="' + v(n && n.supabase_anon) + '"/>'
       +   '<label>Service role key (used once)</label><input id="pv-service" placeholder="eyJ... (service_role)"/>'
       + '</div>'
       + '<div class="card"><h3>First ED and bootstrap schema</h3>'
@@ -416,7 +457,9 @@
       case 'status':        window.adminSetStatus(id, el.getAttribute('data-status') || ''); break;
       case 'add-admin':     window.adminAdd(); break;
       case 'rm-admin':      window.adminRemove(el.getAttribute('data-email') || ''); break;
-      case 'provision':     window.showProvision(); break;
+      // id is '' from the standalone card, which falls through to the blank
+      // wizard; from a Configure page it prefills that nation.
+      case 'provision':     window.showProvision(id); break;
       case 'run-provision': window.runProvision(); break;
     }
   });
