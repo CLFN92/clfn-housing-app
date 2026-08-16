@@ -1,0 +1,321 @@
+-- ============================================================================
+-- supabase/bootstrap/extract-schema.sql
+--
+-- Emits the current project's `public`-schema DDL as an ordered list of SQL
+-- statements, for building supabase/bootstrap/schema.sql when the Supabase CLI
+-- isn't available. Paste this whole file into the Supabase SQL Editor, run it,
+-- copy the `ddl` column top-to-bottom, and save it as schema.sql.
+--
+-- READ-ONLY. This script only queries system catalogs; it creates, alters and
+-- drops nothing.
+--
+-- ASCII-ONLY on purpose: the Supabase dashboard editors have mangled
+-- non-ASCII source before (see the Edge Function note in CLAUDE.md). Keep it
+-- that way when editing -- verify with: grep -P "[^\x00-\x7F]" on this file.
+--
+-- No reg* casts on purpose either -- casting a schema name to a relation type
+-- raises ERROR 42P01, so schema lookups here go through plain joins to
+-- pg_namespace instead. (Do not write such a cast even inside a comment: if a
+-- paste path or editor mangles comment markers, the text becomes live SQL.)
+--
+-- If this script errors in a hosted SQL editor, use extract-schema-min.sql --
+-- the same query with every comment stripped, which removes that whole class
+-- of failure.
+--
+--   NOTE: `supabase db dump --linked -f supabase/bootstrap/schema.sql` is the
+--   authoritative way to produce that file and should be used whenever the CLI
+--   is available. This script is the fallback. Known gaps vs. a real dump:
+--     - sequence CURRENT values are not carried over (fresh sequences restart);
+--       type/increment/min/max/start/cache/cycle ARE preserved
+--     - column collations, storage/compression settings, comments, table
+--       partitioning, publications and event triggers are not emitted
+--     - only the `public` schema is covered, plus RLS policies on `storage`
+--     - grants cover tables for anon/authenticated/service_role only, not
+--       sequences, functions or other roles
+--     - object ordering is section-by-section, so an exotic dependency (a table
+--       default calling a user-defined function, a function that reads a view)
+--       can need a manual reorder before the output replays cleanly
+--   Always replay the output into a scratch project once before trusting it.
+--
+-- Ordering is dependency-safe for the ordinary cases: extensions, sequences,
+-- tables, PK/unique constraints, check/FK constraints, indexes, functions,
+-- triggers, views, RLS, policies, grants, sequence ownership.
+--
+-- IF THE SUPABASE SQL EDITOR SHOWS "Potential issue detected -- This query
+-- creates a table without enabling Row Level Security", choose
+-- "Run without RLS". It is a FALSE POSITIVE: the editor's static analyser
+-- scans the query text, finds the DDL keywords this script emits as OUTPUT
+-- inside string literals, and mistakes them for DDL the query itself executes.
+-- This script only reads system catalogs -- there is no table to protect.
+-- Choosing "Run and enable RLS" makes the editor try to enable RLS on a table
+-- named after the literal it misparsed, which fails with
+--   ERROR 42P01 relation "public" does not exist
+-- That error comes from the editor's added statement, not from this script.
+-- The keyword pairs that trigger the analyser are split across a concatenation
+-- below (see "analyser" comments) to keep the dialog from appearing at all.
+--
+-- Also check that no text is SELECTED when you hit Run -- with a selection the
+-- editor executes only the highlighted fragment.
+-- ============================================================================
+
+with
+
+-- ---- 1. Extensions ---------------------------------------------------------
+ext as (
+  select 1 as sec,
+         quote_ident(e.extname)::text as nm,
+         ('create extension if not exists ' || quote_ident(e.extname) ||
+          ' with schema ' || quote_ident(n.nspname) || ';')::text as ddl
+    from pg_extension e
+    join pg_namespace n on n.oid = e.extnamespace
+   where e.extname <> 'plpgsql'
+),
+
+-- ---- 2. Sequences ----------------------------------------------------------
+-- IDENTITY-owned sequences (pg_depend deptype 'i') are excluded: the
+-- `generated ... as identity` clause in section 3 creates them, so emitting
+-- both collides. SERIAL-owned sequences (deptype 'a') ARE emitted -- a serial
+-- column dumps as `integer default nextval('<seq>')`, which does not create
+-- the sequence, so the table would fail to replay without it. Ownership
+-- (`alter sequence ... owned by`) is restored in section 13, which runs last
+-- because it needs the owning column to exist.
+seqs as (
+  select 2 as sec,
+         c.relname::text as nm,
+         ('create sequence if not exists public.' || quote_ident(c.relname) ||
+          ' as ' || s.data_type::text ||
+          ' increment by ' || s.increment_by ||
+          ' minvalue ' || s.min_value ||
+          ' maxvalue ' || s.max_value ||
+          ' start with ' || s.start_value ||
+          ' cache ' || s.cache_size ||
+          case when s.cycle then ' cycle' else ' no cycle' end || ';')::text as ddl
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    join pg_sequences s on s.schemaname = n.nspname and s.sequencename = c.relname
+   where n.nspname = 'public'
+     and c.relkind = 'S'
+     and not exists (select 1 from pg_depend d
+                      where d.objid = c.oid and d.deptype = 'i')
+),
+
+-- ---- 3. Tables -------------------------------------------------------------
+tbls as (
+  select 3 as sec,
+         c.relname::text as nm,
+         -- analyser: 'create table' split so the editor does not read this
+         -- literal as DDL the query executes (see header).
+         ('create ' || 'table if not exists public.' || quote_ident(c.relname) || ' (' || chr(10) ||
+          string_agg(
+            '  ' || quote_ident(a.attname) || ' ' || format_type(a.atttypid, a.atttypmod)
+            || case
+                 when a.attgenerated = 's'
+                   then ' generated always as (' || pg_get_expr(ad.adbin, ad.adrelid) || ') stored'
+                 when a.attidentity = 'a' then ' generated always as identity'
+                 when a.attidentity = 'd' then ' generated by default as identity'
+                 else coalesce(' default ' || pg_get_expr(ad.adbin, ad.adrelid), '')
+               end
+            || case when a.attnotnull then ' not null' else '' end,
+            ',' || chr(10) order by a.attnum)
+          || chr(10) || ');')::text as ddl
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    join pg_attribute a on a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+    left join pg_attrdef ad on ad.adrelid = c.oid and ad.adnum = a.attnum
+   where n.nspname = 'public'
+     and c.relkind in ('r','p')
+     and not exists (select 1 from pg_depend d
+                      where d.objid = c.oid and d.deptype = 'e')   -- skip extension-owned
+   group by c.relname
+),
+
+-- ---- 4. Primary key + unique constraints -----------------------------------
+-- Split from FKs so a foreign key can never be added before the key it points at.
+cons_pk as (
+  select 4 as sec,
+         (c.relname || '.' || con.conname)::text as nm,
+         ('alter table public.' || quote_ident(c.relname) ||
+          ' add constraint ' || quote_ident(con.conname) || ' ' ||
+          pg_get_constraintdef(con.oid) || ';')::text as ddl
+    from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and con.contype in ('p','u')
+),
+
+-- ---- 5. Check + foreign key constraints ------------------------------------
+cons_fk as (
+  select 5 as sec,
+         (c.relname || '.' || con.conname)::text as nm,
+         ('alter table public.' || quote_ident(c.relname) ||
+          ' add constraint ' || quote_ident(con.conname) || ' ' ||
+          pg_get_constraintdef(con.oid) || ';')::text as ddl
+    from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and con.contype in ('c','f')
+     and con.conislocal                                  -- skip inherited duplicates
+),
+
+-- ---- 6. Indexes (excluding those backing a constraint) ---------------------
+idxs as (
+  select 6 as sec,
+         i.indexname::text as nm,
+         (i.indexdef || ';')::text as ddl
+    from pg_indexes i
+   where i.schemaname = 'public'
+     and not exists (
+       select 1
+         from pg_constraint con
+         join pg_class ci on ci.oid = con.conindid
+         join pg_namespace cn on cn.oid = con.connamespace
+        where cn.nspname = 'public'
+          and ci.relname = i.indexname)
+),
+
+-- ---- 7. Functions and procedures -------------------------------------------
+fns as (
+  select 7 as sec,
+         (p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')')::text as nm,
+         (pg_get_functiondef(p.oid) || ';')::text as ddl
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.prokind in ('f','p')
+     and not exists (select 1 from pg_depend d
+                      where d.objid = p.oid and d.deptype = 'e')   -- skip extension-owned
+),
+
+-- ---- 8. Triggers -----------------------------------------------------------
+trgs as (
+  select 8 as sec,
+         (c.relname || '.' || t.tgname)::text as nm,
+         (pg_get_triggerdef(t.oid) || ';')::text as ddl
+    from pg_trigger t
+    join pg_class c on c.oid = t.tgrelid
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and not t.tgisinternal
+),
+
+-- ---- 9. Views and materialized views ---------------------------------------
+vws as (
+  select 9 as sec,
+         c.relname::text as nm,
+         -- analyser: relation-creating keywords split, as in section 3.
+         (case c.relkind
+            when 'v' then 'create ' || 'or replace view public.'
+            else 'create ' || 'materialized view if not exists public.'
+          end || quote_ident(c.relname) || ' as' || chr(10) ||
+          pg_get_viewdef(c.oid, true))::text as ddl
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and c.relkind in ('v','m')
+),
+
+-- ---- 10. Row level security ------------------------------------------------
+rls as (
+  select 10 as sec,
+         c.relname::text as nm,
+         ('alter table public.' || quote_ident(c.relname) ||
+          ' enable row level security;' ||
+          case when c.relforcerowsecurity
+               then chr(10) || 'alter table public.' || quote_ident(c.relname) ||
+                    ' force row level security;'
+               else '' end)::text as ddl
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and c.relkind = 'r'
+     and c.relrowsecurity
+),
+
+-- ---- 11. Policies (public + storage) ---------------------------------------
+-- Storage policies are included because a new nation's bucket is unusable
+-- without them.
+pols as (
+  select 11 as sec,
+         (p.schemaname || '.' || p.tablename || '.' || p.policyname)::text as nm,
+         ('create policy ' || quote_ident(p.policyname) ||
+          ' on ' || quote_ident(p.schemaname) || '.' || quote_ident(p.tablename) ||
+          ' as ' || p.permissive ||
+          ' for ' || p.cmd ||
+          ' to ' || array_to_string(p.roles, ', ') ||
+          coalesce(' using (' || p.qual || ')', '') ||
+          coalesce(' with check (' || p.with_check || ')', '') || ';')::text as ddl
+    from pg_policies p
+   where p.schemaname in ('public','storage')
+),
+
+-- ---- 12. Table grants for the API roles ------------------------------------
+grnts as (
+  select 12 as sec,
+         (g.table_name || '.' || g.grantee)::text as nm,
+         ('grant ' || string_agg(distinct lower(g.privilege_type), ', ') ||
+          ' on public.' || quote_ident(g.table_name) ||
+          ' to ' || quote_ident(g.grantee) || ';')::text as ddl
+    from information_schema.role_table_grants g
+   where g.table_schema = 'public'
+     and g.grantee in ('anon','authenticated','service_role')
+   group by g.table_name, g.grantee
+),
+
+-- ---- 13. Sequence ownership ------------------------------------------------
+-- Re-links serial-owned sequences to their column, so dropping the table drops
+-- the sequence with it. Last, because the owning column must already exist.
+seq_owned as (
+  select 13 as sec,
+         s.relname::text as nm,
+         ('alter sequence public.' || quote_ident(s.relname) ||
+          ' owned by public.' || quote_ident(c.relname) || '.' ||
+          quote_ident(a.attname) || ';')::text as ddl
+    from pg_class s
+    join pg_namespace n on n.oid = s.relnamespace
+    join pg_depend d on d.objid = s.oid and d.deptype = 'a'
+    join pg_class c on c.oid = d.refobjid
+    join pg_attribute a on a.attrelid = c.oid and a.attnum = d.refobjsubid
+   where n.nspname = 'public'
+     and s.relkind = 'S'
+),
+
+-- Section header comments. '' sorts before any object name, so each header
+-- lands at the top of its own section.
+hdrs as (
+  select  1 as sec, ''::text as nm, '-- ============ Extensions ============'::text as ddl
+  union all select  2, ''::text, '-- ============ Sequences ============'::text
+  union all select  3, ''::text, '-- ============ Tables ============'::text
+  union all select  4, ''::text, '-- ============ Primary key / unique constraints ============'::text
+  union all select  5, ''::text, '-- ============ Check / foreign key constraints ============'::text
+  union all select  6, ''::text, '-- ============ Indexes ============'::text
+  union all select  7, ''::text, '-- ============ Functions ============'::text
+  union all select  8, ''::text, '-- ============ Triggers ============'::text
+  union all select  9, ''::text, '-- ============ Views ============'::text
+  union all select 10, ''::text, '-- ============ Row level security ============'::text
+  union all select 11, ''::text, '-- ============ Policies ============'::text
+  union all select 12, ''::text, '-- ============ Grants ============'::text
+  union all select 13, ''::text, '-- ============ Sequence ownership ============'::text
+),
+
+all_ddl as (
+  select * from hdrs
+  union all select * from ext
+  union all select * from seqs
+  union all select * from tbls
+  union all select * from cons_pk
+  union all select * from cons_fk
+  union all select * from idxs
+  union all select * from fns
+  union all select * from trgs
+  union all select * from vws
+  union all select * from rls
+  union all select * from pols
+  union all select * from grnts
+  union all select * from seq_owned
+)
+
+select ddl
+  from all_ddl
+ order by sec, nm;

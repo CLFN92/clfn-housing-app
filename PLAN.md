@@ -892,6 +892,52 @@ allocating the project total across delivered units to set each unit's cost.
 
 ---
 
+## Phase DEMO — Demo nation for marketing  ⬜ (planned)
+
+A permanently-live, self-contained instance at **`demo.fnhub.app`** running a
+**fictional nation** with synthetic data, for sales demos, screenshots, and
+marketing video. Its own Supabase project (database-per-nation, like any
+customer), private sales-team credentials, full writes, **nightly automated
+reset** to a pristine seeded state. No CLFN data, scrubbed or otherwise.
+
+Doubles as the **first end-to-end test of the Phase N provisioning path** — so
+it is gated on the one N1 item still open: committing
+`supabase/bootstrap/schema.sql` (`supabase db dump --linked`). Building the demo
+by hand instead would drift from the real schema and stop being a faithful
+preview of the product.
+
+Workstreams: **D0** schema dump (blocking) → **D1** provision project + registry
+row + subdomain → **D2** fictional nation identity (config only — the CLAUDE.md
+hard rule applies to the demo's name too) → **D3** `is_demo` guardrails (email
+suppressed at the `sendNotification` chokepoint *and* no provider credentials on
+the demo project; demo banner; `noindex` meta; capped Anthropic key) → **D4** the
+seed pack (all dates seeded as intervals from `now()` so the demo never ages) →
+**D5** `pg_cron` nightly reset preserving `auth.users`/`staff` → **D6** accounts
++ `docs/DEMO-SCRIPT.md`. D3 is the only shipped-app code change and is fully
+gated. Roughly a week, dominated by D4.
+
+**D0 is done** (2026-08-16): `supabase/bootstrap/schema.sql` is captured and
+committed — 39 tables, 143 policies, 19 triggers, 123 indexes — verified by
+applying it to an empty Postgres and exercising the tenant-sync trigger,
+append-only audit enforcement, the `APP-` id sequence, generated columns and
+check constraints. Captured via `bootstrap/extract-schema.sql` (SQL-Editor
+fallback) rather than the CLI; re-dump with `supabase db dump --linked`
+whenever a migration lands, or new nations start behind CLFN.
+
+Three pre-existing findings the capture surfaced, none blocking the demo:
+- ⬜ The RLS gate functions (`get_my_role`, `is_housing_role`,
+  `is_finance_role`, `clfn_is_active_staff`) are `SECURITY DEFINER` **without
+  `SET search_path`** — Supabase's `function_search_path_mutable` lint. These
+  gate every policy in the app, and `anon` holds full table grants with RLS as
+  the only barrier, so this is the one worth scheduling.
+- ⬜ `clfn_is_active_staff()` is referenced by no policy — dead code.
+- ⬜ Both audit tables carry two overlapping append-only trigger pairs
+  (`block_audit_modifications` + `_hs_block_mutation`); harmless, redundant.
+
+**Full plan, risks, and open questions: `docs/DEMO-NATION.md`.**
+
+---
+
 ## Rollback points
 - Pre-refactor snapshots (Phase C)
 
