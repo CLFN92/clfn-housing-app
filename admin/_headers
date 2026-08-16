@@ -3,8 +3,20 @@
 # so it carries its own CSP -- the nation repo's root _headers does not apply.
 # The panel loads no third-party scripts; it only talks to the control-plane
 # Supabase project (https://*.supabase.co) and uses one inline <style> block.
+#
+# script-src stays 'self' with NO 'unsafe-inline' -- that is deliberate, and it
+# means inline onclick="..." handlers are BLOCKED (they fail silently, the
+# button just does nothing). All panel buttons are wired through the delegated
+# data-act listener in admin.js. Do not add 'unsafe-inline' to make an inline
+# handler work; add a data-act case instead.
+#
+# fonts.googleapis.com (style-src) + fonts.gstatic.com (font-src) are allowed
+# solely so the panel can load DM Sans and match the nation app's typography.
+# Neither origin can execute script under this policy. To tighten back to
+# 'self' only, self-host the DM Sans woff2 files in admin/ and drop both
+# origins plus the <link> in index.html.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
   X-Robots-Tag: noindex, nofollow
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
