@@ -675,7 +675,71 @@ function renderNationPanel(){
       });
     }
   }
+  if (typeof renderDataUsagePanel === 'function') renderDataUsagePanel();
 }
+
+// ── Data & Storage usage card (Settings -> Nation) ────────────────────────────
+// Real byte sizes from the hs_data_usage() SQL function so staff can watch the
+// two Supabase tiers this app can exceed (database disk 8 GB, file storage
+// 100 GB). Management only; MAU/egress live in the Supabase dashboard.
+function _duFmtBytes(b){
+  if (b == null) return '—';
+  b = Number(b) || 0;
+  if (b < 1024*1024)             return (b/1024).toFixed(0) + ' KB';
+  if (b < 1024*1024*1024)        return (b/1024/1024).toFixed(1) + ' MB';
+  return (b/1024/1024/1024).toFixed(2) + ' GB';
+}
+function _duBar(usedBytes, limitGB, label, baseColor){
+  var used = Number(usedBytes) || 0;
+  var limitBytes = limitGB * 1024*1024*1024;
+  var pct = Math.min(100, Math.round(used/limitBytes*1000)/10);
+  var col = pct >= 90 ? '#b91c1c' : (pct >= 70 ? '#d97706' : (baseColor || '#15803d'));
+  return '<div style="margin-bottom:14px;">' +
+    '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:4px;">' +
+      '<span style="font-weight:600;">' + label + '</span>' +
+      '<span style="color:var(--muted);">' + _duFmtBytes(used) + ' of ' + limitGB + ' GB included</span></div>' +
+    '<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:' + col + ';border-radius:4px;transition:width .4s;"></div></div>' +
+    '<div style="font-size:11px;color:' + (pct>=70?col:'var(--muted)') + ';margin-top:3px;">' + pct + '% used' + (pct>=90?' — approaching the included limit':'') + '</div>' +
+  '</div>';
+}
+function _duProjectRef(){
+  try { var m = String(SUPABASE_URL||'').match(/https:\/\/([a-z0-9]+)\.supabase/); return (m && m[1]) || ''; } catch(e){ return ''; }
+}
+function _renderUsageHtml(d){
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
+  var tables = (d.tables || []).slice(0, 8).map(function(t){
+    return '<tr><td style="padding:4px 8px;">' + esc(t.table) + '</td>' +
+      '<td style="padding:4px 8px;text-align:right;font-variant-numeric:tabular-nums;">' + _duFmtBytes(t.bytes) + '</td></tr>';
+  }).join('');
+  var ref = _duProjectRef();
+  var billingLink = ref ? ('https://supabase.com/dashboard/project/' + ref + '/settings/billing') : 'https://supabase.com/dashboard';
+  return _duBar(d.database_bytes, 8, 'Database size', '#1d4ed8') +
+    _duBar(d.storage_bytes, 100, 'File storage (documents & photos)', '#7c3aed') +
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:16px 0 6px;">Largest tables</div>' +
+    '<div class="std-table-card"><table class="std-table" style="font-size:12px;"><tbody>' + tables + '</tbody></table></div>' +
+    '<div style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.55;">Included tiers are Supabase Pro. Overage: <strong>$0.125/GB</strong> over 8 GB database, <strong>$0.0213/GB</strong> over 100 GB storage. <strong>Monthly active users, egress, and log retention</strong> aren\'t measurable from the app — see the <a href="' + billingLink + '" target="_blank" rel="noopener" style="color:var(--info,#1d4ed8);font-weight:600;">Supabase Usage &amp; Billing</a> page. Audit-log rows grow fastest; they can be trimmed in the SQL Editor if needed.</div>';
+}
+function renderDataUsagePanel(){
+  var host = document.getElementById('nation_panel_usage');
+  if (!host) return;
+  var isMgmt = (typeof ROLE !== 'undefined' && ROLE.isManagement) ? ROLE.isManagement(window.currentRole) : false;
+  if (!isMgmt) { host.innerHTML = ''; return; }
+  host.innerHTML = '<div class="card card-flush"><div class="modal-hdr"><div class="lbl-yellow">&#128190; Data &amp; Storage Usage</div>' +
+    '<button type="button" onclick="renderDataUsagePanel()" class="btn btn-ghost btn-sm" title="Refresh">&#8635;</button></div>' +
+    '<div class="sec-pad" id="nation_usage_body"><div style="color:var(--muted);font-size:13px;">Loading usage…</div></div></div>';
+  fetch(SUPABASE_URL + '/rest/v1/rpc/hs_data_usage', {
+    method:  'POST',
+    headers: Object.assign({}, HOUSING_HEADERS, { 'Content-Type': 'application/json' }),
+    body:    '{}'
+  }).then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+    var body = document.getElementById('nation_usage_body'); if (!body) return;
+    if (!d) { body.innerHTML = '<div style="color:var(--muted);font-size:13px;">Usage data unavailable. Run the <code>hs_data_usage</code> migration in the Supabase SQL Editor, or view sizes in the Supabase dashboard.</div>'; return; }
+    body.innerHTML = _renderUsageHtml(d);
+  }).catch(function(){
+    var body = document.getElementById('nation_usage_body'); if (body) body.innerHTML = '<div style="color:var(--muted);font-size:13px;">Could not load usage right now.</div>';
+  });
+}
+window.renderDataUsagePanel = renderDataUsagePanel;
 
 // Super-user toggle handler. Mutates CLFN_MODULES, persists to housing_settings,
 // audits, re-renders the panel, and — if disabling a module the user is
