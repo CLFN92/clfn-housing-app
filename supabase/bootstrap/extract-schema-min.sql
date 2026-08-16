@@ -1,54 +1,4 @@
--- ============================================================================
--- supabase/bootstrap/extract-schema.sql
---
--- Emits the current project's `public`-schema DDL as an ordered list of SQL
--- statements, for building supabase/bootstrap/schema.sql when the Supabase CLI
--- isn't available. Paste this whole file into the Supabase SQL Editor, run it,
--- copy the `ddl` column top-to-bottom, and save it as schema.sql.
---
--- READ-ONLY. This script only queries system catalogs; it creates, alters and
--- drops nothing.
---
--- ASCII-ONLY on purpose: the Supabase dashboard editors have mangled
--- non-ASCII source before (see the Edge Function note in CLAUDE.md). Keep it
--- that way when editing -- verify with: grep -P "[^\x00-\x7F]" on this file.
---
--- No reg* casts on purpose either -- casting a schema name to a relation type
--- raises ERROR 42P01, so schema lookups here go through plain joins to
--- pg_namespace instead. (Do not write such a cast even inside a comment: if a
--- paste path or editor mangles comment markers, the text becomes live SQL.)
---
--- If this script errors in a hosted SQL editor, use extract-schema-min.sql --
--- the same query with every comment stripped, which removes that whole class
--- of failure.
---
---   NOTE: `supabase db dump --linked -f supabase/bootstrap/schema.sql` is the
---   authoritative way to produce that file and should be used whenever the CLI
---   is available. This script is the fallback. Known gaps vs. a real dump:
---     - sequence CURRENT values are not carried over (fresh sequences restart);
---       type/increment/min/max/start/cache/cycle ARE preserved
---     - column collations, storage/compression settings, comments, table
---       partitioning, publications and event triggers are not emitted
---     - only the `public` schema is covered, plus RLS policies on `storage`
---     - grants cover tables for anon/authenticated/service_role only, not
---       sequences, functions or other roles
---     - object ordering is section-by-section, so an exotic dependency (a table
---       default calling a user-defined function, a function that reads a view)
---       can need a manual reorder before the output replays cleanly
---   Always replay the output into a scratch project once before trusting it.
---
--- Ordering is dependency-safe for the ordinary cases: extensions, sequences,
--- tables, PK/unique constraints, check/FK constraints, indexes, functions,
--- triggers, views, RLS, policies, grants, sequence ownership.
---
--- If the SQL Editor reports an error, check first that you have no text
--- SELECTED in the editor -- with a selection it runs only the highlighted
--- fragment, which is a common source of confusing errors on a long script.
--- ============================================================================
-
 with
-
--- ---- 1. Extensions ---------------------------------------------------------
 ext as (
   select 1 as sec,
          quote_ident(e.extname)::text as nm,
@@ -58,15 +8,6 @@ ext as (
     join pg_namespace n on n.oid = e.extnamespace
    where e.extname <> 'plpgsql'
 ),
-
--- ---- 2. Sequences ----------------------------------------------------------
--- IDENTITY-owned sequences (pg_depend deptype 'i') are excluded: the
--- `generated ... as identity` clause in section 3 creates them, so emitting
--- both collides. SERIAL-owned sequences (deptype 'a') ARE emitted -- a serial
--- column dumps as `integer default nextval('<seq>')`, which does not create
--- the sequence, so the table would fail to replay without it. Ownership
--- (`alter sequence ... owned by`) is restored in section 13, which runs last
--- because it needs the owning column to exist.
 seqs as (
   select 2 as sec,
          c.relname::text as nm,
@@ -86,8 +27,6 @@ seqs as (
      and not exists (select 1 from pg_depend d
                       where d.objid = c.oid and d.deptype = 'i')
 ),
-
--- ---- 3. Tables -------------------------------------------------------------
 tbls as (
   select 3 as sec,
          c.relname::text as nm,
@@ -111,12 +50,9 @@ tbls as (
    where n.nspname = 'public'
      and c.relkind in ('r','p')
      and not exists (select 1 from pg_depend d
-                      where d.objid = c.oid and d.deptype = 'e')   -- skip extension-owned
+                      where d.objid = c.oid and d.deptype = 'e')
    group by c.relname
 ),
-
--- ---- 4. Primary key + unique constraints -----------------------------------
--- Split from FKs so a foreign key can never be added before the key it points at.
 cons_pk as (
   select 4 as sec,
          (c.relname || '.' || con.conname)::text as nm,
@@ -129,8 +65,6 @@ cons_pk as (
    where n.nspname = 'public'
      and con.contype in ('p','u')
 ),
-
--- ---- 5. Check + foreign key constraints ------------------------------------
 cons_fk as (
   select 5 as sec,
          (c.relname || '.' || con.conname)::text as nm,
@@ -142,10 +76,8 @@ cons_fk as (
     join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public'
      and con.contype in ('c','f')
-     and con.conislocal                                  -- skip inherited duplicates
+     and con.conislocal
 ),
-
--- ---- 6. Indexes (excluding those backing a constraint) ---------------------
 idxs as (
   select 6 as sec,
          i.indexname::text as nm,
@@ -160,8 +92,6 @@ idxs as (
         where cn.nspname = 'public'
           and ci.relname = i.indexname)
 ),
-
--- ---- 7. Functions and procedures -------------------------------------------
 fns as (
   select 7 as sec,
          (p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')')::text as nm,
@@ -171,10 +101,8 @@ fns as (
    where n.nspname = 'public'
      and p.prokind in ('f','p')
      and not exists (select 1 from pg_depend d
-                      where d.objid = p.oid and d.deptype = 'e')   -- skip extension-owned
+                      where d.objid = p.oid and d.deptype = 'e')
 ),
-
--- ---- 8. Triggers -----------------------------------------------------------
 trgs as (
   select 8 as sec,
          (c.relname || '.' || t.tgname)::text as nm,
@@ -185,8 +113,6 @@ trgs as (
    where n.nspname = 'public'
      and not t.tgisinternal
 ),
-
--- ---- 9. Views and materialized views ---------------------------------------
 vws as (
   select 9 as sec,
          c.relname::text as nm,
@@ -200,8 +126,6 @@ vws as (
    where n.nspname = 'public'
      and c.relkind in ('v','m')
 ),
-
--- ---- 10. Row level security ------------------------------------------------
 rls as (
   select 10 as sec,
          c.relname::text as nm,
@@ -217,10 +141,6 @@ rls as (
      and c.relkind = 'r'
      and c.relrowsecurity
 ),
-
--- ---- 11. Policies (public + storage) ---------------------------------------
--- Storage policies are included because a new nation's bucket is unusable
--- without them.
 pols as (
   select 11 as sec,
          (p.schemaname || '.' || p.tablename || '.' || p.policyname)::text as nm,
@@ -234,8 +154,6 @@ pols as (
     from pg_policies p
    where p.schemaname in ('public','storage')
 ),
-
--- ---- 12. Table grants for the API roles ------------------------------------
 grnts as (
   select 12 as sec,
          (g.table_name || '.' || g.grantee)::text as nm,
@@ -247,10 +165,6 @@ grnts as (
      and g.grantee in ('anon','authenticated','service_role')
    group by g.table_name, g.grantee
 ),
-
--- ---- 13. Sequence ownership ------------------------------------------------
--- Re-links serial-owned sequences to their column, so dropping the table drops
--- the sequence with it. Last, because the owning column must already exist.
 seq_owned as (
   select 13 as sec,
          s.relname::text as nm,
@@ -265,9 +179,6 @@ seq_owned as (
    where n.nspname = 'public'
      and s.relkind = 'S'
 ),
-
--- Section header comments. '' sorts before any object name, so each header
--- lands at the top of its own section.
 hdrs as (
   select  1 as sec, ''::text as nm, '-- ============ Extensions ============'::text as ddl
   union all select  2, ''::text, '-- ============ Sequences ============'::text
@@ -283,7 +194,6 @@ hdrs as (
   union all select 12, ''::text, '-- ============ Grants ============'::text
   union all select 13, ''::text, '-- ============ Sequence ownership ============'::text
 ),
-
 all_ddl as (
   select * from hdrs
   union all select * from ext
@@ -300,7 +210,6 @@ all_ddl as (
   union all select * from grnts
   union all select * from seq_owned
 )
-
 select ddl
   from all_ddl
  order by sec, nm;
