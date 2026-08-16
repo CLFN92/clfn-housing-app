@@ -916,6 +916,24 @@ seed pack (all dates seeded as intervals from `now()` so the demo never ages) �
 + `docs/DEMO-SCRIPT.md`. D3 is the only shipped-app code change and is fully
 gated. Roughly a week, dominated by D4.
 
+**D0 is done** (2026-08-16): `supabase/bootstrap/schema.sql` is captured and
+committed — 39 tables, 143 policies, 19 triggers, 123 indexes — verified by
+applying it to an empty Postgres and exercising the tenant-sync trigger,
+append-only audit enforcement, the `APP-` id sequence, generated columns and
+check constraints. Captured via `bootstrap/extract-schema.sql` (SQL-Editor
+fallback) rather than the CLI; re-dump with `supabase db dump --linked`
+whenever a migration lands, or new nations start behind CLFN.
+
+Three pre-existing findings the capture surfaced, none blocking the demo:
+- ⬜ The RLS gate functions (`get_my_role`, `is_housing_role`,
+  `is_finance_role`, `clfn_is_active_staff`) are `SECURITY DEFINER` **without
+  `SET search_path`** — Supabase's `function_search_path_mutable` lint. These
+  gate every policy in the app, and `anon` holds full table grants with RLS as
+  the only barrier, so this is the one worth scheduling.
+- ⬜ `clfn_is_active_staff()` is referenced by no policy — dead code.
+- ⬜ Both audit tables carry two overlapping append-only trigger pairs
+  (`block_audit_modifications` + `_hs_block_mutation`); harmless, redundant.
+
 **Full plan, risks, and open questions: `docs/DEMO-NATION.md`.**
 
 ---
