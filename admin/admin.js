@@ -77,7 +77,7 @@
       if (r.ok) {
         app.innerHTML = '<div class="center"><div style="font-size:40px;">📧</div><h1>Check your email</h1>'
           + '<p class="sub">A sign-in link was sent to <b>' + esc(em) + '</b>. Open it on this device.</p>'
-          + '<button class="btn ghost" type="button" onclick="location.reload()">Back</button></div>';
+          + '<button class="btn ghost" type="button" data-act="reload">Back</button></div>';
       } else { var d = await r.json().catch(function(){return{};}); setMsg('lmsg', (d && (d.msg||d.error_description||d.error)) || 'Could not send the link.'); btn.disabled=false; btn.textContent='Email me a sign-in link'; }
     } catch(e){ setMsg('lmsg','Network error. Please try again.'); btn.disabled=false; btn.textContent='Email me a sign-in link'; }
   }
@@ -93,7 +93,7 @@
     if (!amAdmin){
       app.innerHTML = '<div class="center"><div style="font-size:40px;">🚫</div><h1>Not authorized</h1>'
         + '<p class="sub">' + esc(meEmail) + ' is not a platform administrator.</p>'
-        + '<button class="btn" type="button" onclick="adminLogout()">Sign out</button></div>';
+        + '<button class="btn" type="button" data-act="logout">Sign out</button></div>';
       return;
     }
     document.getElementById('btn_out').style.display = '';
@@ -123,11 +123,11 @@
         + '<td><span class="pill ' + esc(st) + '">' + esc(st) + '</span></td>'
         + '<td style="font-size:11px;color:var(--muted);">' + esc(mods.join(', ') || '—') + '</td>'
         + '<td><div class="row-actions">'
-        +   '<button class="btn sm ghost" type="button" onclick="configureNation(\'' + esc(n.id) + '\')">Configure</button>'
+        +   '<button class="btn sm ghost" type="button" data-act="configure" data-id="' + esc(n.id) + '">Configure</button>'
         +   '<a class="btn sm ghost" href="' + url + '" target="_blank" rel="noopener">Open</a>'
         +   (st === 'suspended'
-              ? '<button class="btn sm ghost" onclick="adminSetStatus(\'' + esc(n.id) + '\',\'active\')">Resume</button>'
-              : '<button class="btn sm danger" onclick="adminSetStatus(\'' + esc(n.id) + '\',\'suspended\')">Suspend</button>')
+              ? '<button class="btn sm ghost" data-act="status" data-status="active" data-id="' + esc(n.id) + '">Resume</button>'
+              : '<button class="btn sm danger" data-act="status" data-status="suspended" data-id="' + esc(n.id) + '">Suspend</button>')
         + '</div></td></tr>';
     }).join('') : '<tr><td colspan="4" class="empty">No nations yet. Add one below.</td></tr>';
     return '<div class="card"><h3>Registered nations</h3>'
@@ -164,13 +164,13 @@
       var isMe = em.toLowerCase() === meEmail;
       return '<tr><td>' + esc(em) + (isMe ? ' <span style="color:var(--muted);font-size:11px;">(you)</span>' : '') + '</td>'
         + '<td style="font-size:11px;color:var(--muted);">' + esc(a.added_by||'') + '</td>'
-        + '<td>' + (isMe ? '' : '<button class="btn sm danger" onclick="adminRemove(\'' + esc(em) + '\')">Remove</button>') + '</td></tr>';
+        + '<td>' + (isMe ? '' : '<button class="btn sm danger" data-act="rm-admin" data-email="' + esc(em) + '">Remove</button>') + '</td></tr>';
     }).join('');
     return '<div class="card"><h3>Platform administrators</h3>'
       + '<table><thead><tr><th>Email</th><th>Added by</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
       + '<div style="display:flex;gap:8px;margin-top:12px;align-items:flex-end;flex-wrap:wrap;">'
       +   '<div style="flex:1;min-width:200px;"><label>Add administrator</label><input id="adm-email" type="email" placeholder="name@example.com"/></div>'
-      +   '<button class="btn sm" type="button" onclick="adminAdd()">Add</button>'
+      +   '<button class="btn sm" type="button" data-act="add-admin">Add</button>'
       + '</div><div class="msg" id="adm-msg"></div></div>';
   }
 
@@ -246,7 +246,7 @@
         + '<input type="checkbox" class="cn-mod" value="' + m[0] + '" style="width:auto;"' + (mods[m[0]] ? ' checked' : '') + '/> ' + esc(m[1]) + '</label>';
     }).join('');
     var stOpt = function(v,l){ return '<option value="' + v + '"' + (String(n.status||'provisioning') === v ? ' selected' : '') + '>' + l + '</option>'; };
-    return '<button class="btn sm ghost" type="button" onclick="adminHome()">&larr; Back</button>'
+    return '<button class="btn sm ghost" type="button" data-act="home">&larr; Back</button>'
       + '<h1 style="margin-top:12px;">Configure ' + esc(n.display_name) + '</h1>'
       + '<p class="sub"><code>' + esc(n.subdomain) + '.fnhub.app</code> &middot; subdomain is fixed</p>'
       + '<div class="card"><h3>Branding &amp; contact</h3>'
@@ -275,7 +275,7 @@
       +   '<p class="sub" style="margin:6px 0 0;">Only <b>active</b> nations are published to <code>nations_public</code> and resolve at <code>&lt;subdomain&gt;.fnhub.app</code>.</p>'
       + '</div>'
       + '<div class="msg" id="cn-msg"></div>'
-      + '<button class="btn" id="cn-save" type="button" onclick="saveNationConfig(\'' + esc(n.id) + '\')">Save changes</button>';
+      + '<button class="btn" id="cn-save" type="button" data-act="save-config" data-id="' + esc(n.id) + '">Save changes</button>';
   }
 
   window.saveNationConfig = async function(id){
@@ -305,7 +305,7 @@
   function provisionCard(){
     return '<div class="card"><h3>Provision a nation (assisted)</h3>'
       + '<p class="sub" style="margin:2px 0 8px;">Stand up a new nation on a Supabase project you already created: replay the bootstrap schema, create the storage bucket, seed the first ED, and register it. Needs the bootstrap schema file and the Management API token secret on the platform function.</p>'
-      + '<button class="btn" type="button" onclick="showProvision()">Start provisioning wizard</button></div>';
+      + '<button class="btn" type="button" data-act="provision">Start provisioning wizard</button></div>';
   }
 
   window.showProvision = function(){
@@ -314,7 +314,7 @@
     var modChecks = MODULES.map(function(m){
       return '<label style="display:inline-flex;align-items:center;gap:6px;font-weight:600;margin:0 12px 8px 0;"><input type="checkbox" class="pv-mod" value="' + m[0] + '" style="width:auto;"/> ' + esc(m[1]) + '</label>';
     }).join('');
-    app.innerHTML = '<button class="btn sm ghost" type="button" onclick="adminHome()">&larr; Back</button>'
+    app.innerHTML = '<button class="btn sm ghost" type="button" data-act="home">&larr; Back</button>'
       + '<h1 style="margin-top:12px;">Provision a nation</h1>'
       + '<p class="sub">Assisted: you created the Supabase project; this runs schema, bucket, first ED, and registry.</p>'
       + '<div class="card"><h3>Nation</h3>'
@@ -335,7 +335,7 @@
       +   '<label>Bootstrap schema file (supabase/bootstrap/schema.sql)</label><input id="pv-schema" type="file" accept=".sql,text/plain"/>'
       + '</div>'
       + '<div class="msg" id="pv-msg"></div>'
-      + '<button class="btn" id="pv-btn" type="button" onclick="runProvision()">Provision nation</button>'
+      + '<button class="btn" id="pv-btn" type="button" data-act="run-provision">Provision nation</button>'
       + '<div id="pv-results" style="margin-top:14px;"></div>';
   };
 
@@ -390,8 +390,36 @@
     var mel = document.getElementById('pv-msg'); if (mel){ mel.className = 'msg'; mel.textContent = ''; }
     document.getElementById('pv-results').innerHTML = head
       + '<div class="card"><h3>Result</h3><table><tbody>' + rows + '</tbody></table>'
-      + '<button class="btn sm" type="button" onclick="adminHome()" style="margin-top:10px;">Back to nations</button></div>';
+      + '<button class="btn sm" type="button" data-act="home" style="margin-top:10px;">Back to nations</button></div>';
   }
+
+  // ---- Event delegation ------------------------------------------------------
+  // Every button here is wired through ONE delegated listener keyed on
+  // data-act, because this panel's CSP is `script-src 'self'` with NO
+  // 'unsafe-inline' (admin/_headers). An inline onclick="..." is silently
+  // BLOCKED by the browser -- the button simply does nothing, with only a
+  // console CSP violation to show for it. Do not reintroduce inline handlers:
+  // add a data-act value and a case below instead.
+  // Delegation also survives app.innerHTML re-renders, so nothing needs
+  // re-wiring after a view change.
+  document.addEventListener('click', function(e){
+    var el = e.target && e.target.closest ? e.target.closest('[data-act]') : null;
+    if (!el) return;
+    var act = el.getAttribute('data-act');
+    var id  = el.getAttribute('data-id') || '';
+    switch (act){
+      case 'home':          window.adminHome(); break;
+      case 'logout':        window.adminLogout(); break;
+      case 'reload':        location.reload(); break;
+      case 'configure':     window.configureNation(id); break;
+      case 'save-config':   window.saveNationConfig(id); break;
+      case 'status':        window.adminSetStatus(id, el.getAttribute('data-status') || ''); break;
+      case 'add-admin':     window.adminAdd(); break;
+      case 'rm-admin':      window.adminRemove(el.getAttribute('data-email') || ''); break;
+      case 'provision':     window.showProvision(); break;
+      case 'run-provision': window.runProvision(); break;
+    }
+  });
 
   // ---- Boot ------------------------------------------------------------------
   function parseHash(){ var h = (location.hash||'').replace(/^#/,''); if (!h) return null; var o={}; h.split('&').forEach(function(kv){ var p=kv.split('='); if (p[0]) o[decodeURIComponent(p[0])] = decodeURIComponent(p[1]||''); }); return o; }
