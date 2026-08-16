@@ -727,16 +727,28 @@ function renderDataUsagePanel(){
   var isMgmt = (typeof ROLE !== 'undefined' && ROLE.isManagement) ? ROLE.isManagement(window.currentRole) : false;
   if (!isMgmt) { host.innerHTML = ''; return; }
   host.innerHTML = '<div class="card card-flush"><div class="modal-hdr"><div class="lbl-yellow">&#128190; Data &amp; Storage Usage</div>' +
-    '<button type="button" onclick="renderDataUsagePanel()" class="btn btn-ghost btn-sm" title="Refresh">&#8635;</button></div>' +
+    '<button type="button" onclick="renderDataUsagePanel()" class="btn btn-ghost-dark btn-sm" title="Refresh">&#8635;</button></div>' +
     '<div class="sec-pad" id="nation_usage_body"><div style="color:var(--muted);font-size:13px;">Loading usage…</div></div></div>';
   fetch(SUPABASE_URL + '/rest/v1/rpc/hs_data_usage', {
     method:  'POST',
     headers: Object.assign({}, HOUSING_HEADERS, { 'Content-Type': 'application/json' }),
     body:    '{}'
-  }).then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+  }).then(function(r){
+    return r.text().then(function(t){ return { ok: r.ok, status: r.status, text: t }; });
+  }).then(function(res){
     var body = document.getElementById('nation_usage_body'); if (!body) return;
-    if (!d) { body.innerHTML = '<div style="color:var(--muted);font-size:13px;">Usage data unavailable. Run the <code>hs_data_usage</code> migration in the Supabase SQL Editor, or view sizes in the Supabase dashboard.</div>'; return; }
-    body.innerHTML = _renderUsageHtml(d);
+    var d = null; try { d = JSON.parse(res.text); } catch(e){}
+    if (res.ok && d) { body.innerHTML = _renderUsageHtml(d); return; }
+    // Distinguish the real failure modes so this isn't always "run the migration".
+    var msg;
+    if (res.status === 404) {
+      msg = 'The <code>hs_data_usage</code> function isn\'t in the database yet. Run its migration in the Supabase SQL Editor.';
+    } else if (/not permitted/i.test(res.text)) {
+      msg = 'Your account doesn\'t have permission to view usage (management only).';
+    } else {
+      msg = 'Usage data unavailable right now. View sizes in the Supabase dashboard, or re-run the <code>hs_data_usage</code> migration.';
+    }
+    body.innerHTML = '<div style="color:var(--muted);font-size:13px;">' + msg + '</div>';
   }).catch(function(){
     var body = document.getElementById('nation_usage_body'); if (body) body.innerHTML = '<div style="color:var(--muted);font-size:13px;">Could not load usage right now.</div>';
   });
