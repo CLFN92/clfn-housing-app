@@ -707,10 +707,40 @@ function _duBar(usedBytes, limitGB, label, baseColor){
 function _duProjectRef(){
   try { var m = String(SUPABASE_URL||'').match(/https:\/\/([a-z0-9]+)\.supabase/); return (m && m[1]) || ''; } catch(e){ return ''; }
 }
+// Human-readable label for a raw table name (Largest Tables list). Uses the
+// app's user-facing vocabulary -- notably housing_sow -> "Maintenance Requests"
+// (the SOW/MR display rule in CLAUDE.md). Unknown tables fall back to a
+// prefix-stripped, title-cased form.
+function _duTableLabel(name){
+  var MAP = {
+    housing_audit_log:         'Audit Log',
+    housing_applications:      'Applications',
+    housing_application_notes: 'Application Notes',
+    housing_rfq:               'RFQs',
+    housing_units:             'Units',
+    housing_sow:               'Maintenance Requests',
+    housing_reno_progress:     'Renovation Progress',
+    housing_settings:          'Settings',
+    housing_contractors:       'Contractors',
+    housing_projects:          'Capital Projects',
+    housing_project_lots:      'Capital Project Lots',
+    tenants:                   'Tenants',
+    tenant_notes:              'Tenant Notes',
+    inspections:               'Inspections',
+    bcr_registry:              'BCR Registry',
+    staff:                     'Staff',
+    finance_audit_log:         'Finance Audit Log'
+  };
+  var n = String(name == null ? '' : name);
+  if (MAP[n]) return MAP[n];
+  var s = n.replace(/^housing_/, '').replace(/_/g, ' ').trim();
+  s = s.replace(/\bfinance\b/i, 'Finance').replace(/\brfq\b/i, 'RFQ');
+  return s.replace(/\b\w/g, function(m){ return m.toUpperCase(); });
+}
 function _renderUsageHtml(d){
   var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s==null?'':s); };
   var tables = (d.tables || []).slice(0, 8).map(function(t){
-    return '<tr><td style="padding:4px 8px;">' + esc(t.table) + '</td>' +
+    return '<tr><td style="padding:4px 8px;">' + esc(_duTableLabel(t.table)) + '</td>' +
       '<td style="padding:4px 8px;text-align:right;font-variant-numeric:tabular-nums;">' + _duFmtBytes(t.bytes) + '</td></tr>';
   }).join('');
   var ref = _duProjectRef();
@@ -727,7 +757,7 @@ function renderDataUsagePanel(){
   var isMgmt = (typeof ROLE !== 'undefined' && ROLE.isManagement) ? ROLE.isManagement(window.currentRole) : false;
   if (!isMgmt) { host.innerHTML = ''; return; }
   host.innerHTML = '<div class="card card-flush"><div class="modal-hdr"><div class="lbl-yellow">&#128190; Data &amp; Storage Usage</div>' +
-    '<button type="button" onclick="renderDataUsagePanel()" class="btn btn-ghost-dark btn-sm" title="Refresh">&#8635;</button></div>' +
+    '<button type="button" onclick="renderDataUsagePanel()" class="btn btn-ghost-dark btn-sm" title="Refresh" style="color:var(--yellow);border-color:var(--yellow);font-size:15px;line-height:1;padding:5px 11px;">&#8635;</button></div>' +
     '<div class="sec-pad" id="nation_usage_body"><div style="color:var(--muted);font-size:13px;">Loading usage…</div></div></div>';
   fetch(SUPABASE_URL + '/rest/v1/rpc/hs_data_usage', {
     method:  'POST',
