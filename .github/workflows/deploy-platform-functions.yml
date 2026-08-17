@@ -15,6 +15,10 @@ name: Deploy platform (control-plane) Edge Functions
 # Settings -> Edge Functions -> Secrets) so it can run the bootstrap schema on a
 # new nation's project via the Management API. Deploying the function does not
 # set that secret.
+#
+# recurring-invoices needs a CRON_SECRET secret (shared with the pg_cron job)
+# and, for auto_send emails, RESEND_API_KEY + EMAIL_FROM. See
+# docs/RECURRING-INVOICING.md for the full setup (schema, secrets, cron).
 
 on:
   push:
@@ -22,6 +26,7 @@ on:
     paths:
       - 'supabase/functions/provision-nation/**'
       - 'supabase/functions/report-nation-usage/**'
+      - 'supabase/functions/recurring-invoices/**'
       - '.github/workflows/deploy-platform-functions.yml'
   workflow_dispatch:
 
@@ -59,4 +64,6 @@ jobs:
           supabase functions deploy provision-nation --project-ref "$REF"
           echo "──── Deploying report-nation-usage to $REF (JWT verify OFF) ────"
           supabase functions deploy report-nation-usage --project-ref "$REF" --no-verify-jwt
+          echo "──── Deploying recurring-invoices to $REF (JWT verify OFF; x-cron-secret gated) ────"
+          supabase functions deploy recurring-invoices --project-ref "$REF" --no-verify-jwt
           echo "Platform functions deployed."

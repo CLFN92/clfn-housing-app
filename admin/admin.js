@@ -541,6 +541,7 @@
     renderNationNotes(n.subdomain);
     renderNationInvoices(n.subdomain);
     window.invAddLine();          // seed one empty invoice line
+    renderNationBilling(n.subdomain);
     loadNicSummary(n.subdomain);
   };
 
@@ -616,7 +617,11 @@
       + '</div>';
 
     var pInvoices =
-        '<div class="card"><h3>Invoices</h3>'
+        '<div class="card"><h3>Recurring billing</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">Automated subscription invoicing. On each due date the scheduler generates an invoice from this schedule, advances the next date, and (when Auto-send is on) emails the nation. Set up the daily scheduler once &mdash; see <code>docs/RECURRING-INVOICING.md</code>.</p>'
+      +   '<div id="cn-billing"><div class="empty">Loading schedule...</div></div>'
+      + '</div>'
+      + '<div class="card"><h3>Invoices</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">Subscription, setup and add-on billing for this nation. Creating an invoice generates a PDF and files it in Documents.</p>'
       +   '<div id="cn-invoices"><div class="empty">Loading invoices...</div></div>'
       +   '<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px;">'
@@ -1664,6 +1669,131 @@
     return doc;
   }
 
+  // ---- Recurring billing schedule --------------------------------------------
+  var BILL_CADENCE = [['monthly', 'Monthly'], ['annual', 'Annual']];
+  window._nicBilling = null;
+  // Advance a YYYY-MM-DD by the cadence, holding the anchor day-of-month.
+  function _advanceBillDate(day, cadence, anchor){
+    var d = new Date(day + 'T00:00:00Z');
+    var wantDay = (anchor && anchor >= 1 && anchor <= 31) ? anchor : d.getUTCDate();
+    if (cadence === 'annual') d.setUTCFullYear(d.getUTCFullYear() + 1); else d.setUTCMonth(d.getUTCMonth() + 1);
+    var last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+    d.setUTCDate(Math.min(wantDay, last));
+    return d.toISOString().slice(0, 10);
+  }
+  async function renderNationBilling(sub){
+    var host = document.getElementById('cn-billing'); if (!host) return;
+    var r = await api('GET', '/nation_billing?subdomain=eq.' + encodeURIComponent(sub) + '&order=created_at.asc&limit=1');
+    var row = (r.ok ? await r.json().catch(function(){ return []; }) : [])[0] || null;
+    window._nicBilling = row;
+    var b = row || { cadence: 'monthly', description: '', unit_amount: '', tax_rate: 0, next_run_date: _dPlus(30), anchor_day: '', due_days: 30, auto_send: false, recipient_email: '', cc_emails: '', active: true };
+    var cadOpts = BILL_CADENCE.map(function(c){ return '<option value="' + c[0] + '"' + (b.cadence === c[0] ? ' selected' : '') + '>' + c[1] + '</option>'; }).join('');
+    var g2 = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;';
+    var statusLine = row
+      ? '<div style="font-size:12px;margin-bottom:8px;">'
+        + (row.active ? '<span class="pill active">Active</span>' : '<span class="pill suspended">Paused</span>')
+        + ' &middot; next invoice <b>' + esc(row.next_run_date) + '</b>'
+        + (row.last_invoice ? ' &middot; last ' + esc(row.last_invoice) + ' on ' + esc(row.last_run_date || '') : '')
+        + '</div>'
+      : '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">No schedule yet &mdash; fill this in and Save to start automated billing.</div>';
+    host.innerHTML = statusLine
+      + '<div style="' + g2 + '">'
+      +   '<div><label>Cadence</label><select id="cn-bill-cadence">' + cadOpts + '</select></div>'
+      +   '<div><label>Next invoice date</label><input id="cn-bill-next" type="date" value="' + esc(b.next_run_date || '') + '"/></div>'
+      + '</div>'
+      + '<label>Line description</label><input id="cn-bill-desc" value="' + esc(b.description || '') + '" placeholder="Subscription - Mid-size (101-300 homes), monthly"/>'
+      + '<div style="' + g2 + '">'
+      +   '<div><label>Amount per period (CAD)</label><input id="cn-bill-amount" type="number" step="0.01" value="' + esc(b.unit_amount === '' ? '' : b.unit_amount) + '"/></div>'
+      +   '<div><label>Tax rate (%)</label><input id="cn-bill-tax" type="number" step="0.01" value="' + esc(b.tax_rate || 0) + '"/></div>'
+      + '</div>'
+      + '<div style="' + g2 + '">'
+      +   '<div><label>Bill on day of month (1-28, optional)</label><input id="cn-bill-anchor" type="number" min="1" max="28" value="' + esc(b.anchor_day || '') + '"/></div>'
+      +   '<div><label>Payment due (days)</label><input id="cn-bill-due" type="number" min="0" value="' + esc(b.due_days == null ? 30 : b.due_days) + '"/></div>'
+      + '</div>'
+      + '<label style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;font-weight:600;"><input type="checkbox" id="cn-bill-autosend" style="width:auto;"' + (b.auto_send ? ' checked' : '') + '/> <span>Auto-send the invoice by email when generated</span></label>'
+      + '<div style="' + g2 + '">'
+      +   '<div><label>Billing email</label><input id="cn-bill-email" type="email" value="' + esc(b.recipient_email || '') + '" placeholder="finance@nation.ca"/></div>'
+      +   '<div><label>CC (comma-separated, optional)</label><input id="cn-bill-cc" value="' + esc(b.cc_emails || '') + '"/></div>'
+      + '</div>'
+      + '<div class="msg" id="cn-bill-msg"></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">'
+      +   '<button class="btn" type="button" data-act="bill-save" data-sub="' + esc(sub) + '">Save schedule</button>'
+      +   (row ? '<button class="btn ghost" type="button" data-act="bill-toggle" data-sub="' + esc(sub) + '">' + (row.active ? 'Pause' : 'Resume') + '</button>' : '')
+      +   (row ? '<button class="btn ghost" type="button" data-act="bill-run" data-sub="' + esc(sub) + '">Generate now</button>' : '')
+      + '</div>';
+  }
+  function _readBilling(){
+    function v(id){ var el = document.getElementById(id); return el ? (el.value || '').trim() : ''; }
+    function cb(id){ var el = document.getElementById(id); return !!(el && el.checked); }
+    return {
+      cadence: v('cn-bill-cadence') || 'monthly',
+      next_run_date: v('cn-bill-next'),
+      description: v('cn-bill-desc'),
+      unit_amount: parseFloat(v('cn-bill-amount')) || 0,
+      tax_rate: parseFloat(v('cn-bill-tax')) || 0,
+      anchor_day: v('cn-bill-anchor') ? parseInt(v('cn-bill-anchor'), 10) : null,
+      due_days: v('cn-bill-due') ? parseInt(v('cn-bill-due'), 10) : 30,
+      auto_send: cb('cn-bill-autosend'),
+      recipient_email: v('cn-bill-email'),
+      cc_emails: v('cn-bill-cc')
+    };
+  }
+  window.saveNationBilling = async function(sub){
+    var b = _readBilling();
+    if (!b.description){ setMsg('cn-bill-msg', 'Enter a line description.'); return; }
+    if (!(b.unit_amount > 0)){ setMsg('cn-bill-msg', 'Enter an amount greater than zero.'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(b.next_run_date)){ setMsg('cn-bill-msg', 'Pick the next invoice date.'); return; }
+    if (b.auto_send && !b.recipient_email){ setMsg('cn-bill-msg', 'Auto-send needs a billing email.'); return; }
+    var existing = window._nicBilling, r;
+    if (existing){
+      b.updated_at = new Date().toISOString();
+      r = await api('PATCH', '/nation_billing?id=eq.' + encodeURIComponent(existing.id), b, 'return=minimal');
+    } else {
+      b.subdomain = sub; b.active = true; b.created_by = jwtEmail();
+      r = await api('POST', '/nation_billing', b, 'return=minimal');
+    }
+    if (r.ok){ setMsg('cn-bill-msg', 'Schedule saved.', 'ok'); await audit('nation_billing_saved', sub, b.cadence + ' ' + _money(b.unit_amount)); renderNationBilling(sub); }
+    else { setMsg('cn-bill-msg', 'Could not save the schedule.'); }
+  };
+  window.toggleNationBilling = async function(sub){
+    var existing = window._nicBilling; if (!existing) return;
+    var r = await api('PATCH', '/nation_billing?id=eq.' + encodeURIComponent(existing.id), { active: !existing.active, updated_at: new Date().toISOString() }, 'return=minimal');
+    if (r.ok){ await audit('nation_billing_' + (existing.active ? 'paused' : 'resumed'), sub, ''); renderNationBilling(sub); }
+  };
+  // Generate an invoice from the schedule immediately (manual run / test) and
+  // advance the schedule the same way the scheduler would. Email (auto_send) is
+  // only sent by the automated scheduler, not this manual run.
+  window.runNationBilling = async function(sub){
+    var b = window._nicBilling; if (!b){ setMsg('cn-bill-msg', 'Save the schedule first.'); return; }
+    var n = _nations.filter(function(x){ return x.subdomain === sub; })[0];
+    var total = Math.round((Number(b.unit_amount) || 0) * (1 + (Number(b.tax_rate) || 0) / 100) * 100) / 100;
+    if (!(await dlgConfirm('Generate an invoice now from this schedule for ' + (n ? n.display_name : sub) + '?\n\nThis creates ' + _money(total) + ' and advances the next date. Email is only sent by the automated scheduler, not this manual run.', { title: 'Generate now', okText: 'Generate' }))) return;
+    setMsg('cn-bill-msg', 'Generating...', 'ok');
+    ensureJsPdf(async function(){
+      try {
+        var subtotal = Math.round((Number(b.unit_amount) || 0) * 100) / 100;
+        var taxRate = Number(b.tax_rate) || 0;
+        var tax = Math.round(subtotal * taxRate) / 100;
+        var tot = Math.round((subtotal + tax) * 100) / 100;
+        var today = new Date().toISOString().slice(0, 10);
+        var due = _dPlus(Number(b.due_days) || 30);
+        var number = await nextInvoiceNumber();
+        var inv = { subdomain: sub, number: number, issue_date: today, due_date: due, currency: 'CAD',
+          line_items: [{ description: b.description, qty: 1, unit_price: subtotal }], subtotal: subtotal, tax_rate: taxRate, tax: tax, total: tot,
+          amount_paid: 0, status: 'sent', notes: 'Generated from recurring schedule.', created_by: jwtEmail() };
+        var r = await api('POST', '/nation_invoices', inv, 'return=minimal');
+        if (!r.ok){ var t = await r.text(); setMsg('cn-bill-msg', /duplicate|unique/i.test(t) ? 'Number collision, try again.' : 'Could not create invoice.'); return; }
+        var doc = buildInvoicePdf(n, inv); var fname = number + '.pdf'; var blob = doc.output('blob'); var viewUrl = URL.createObjectURL(blob); doc.save(fname);
+        try { await uploadDoc(sub, new File([blob], fname, { type: 'application/pdf' }), 'invoice'); } catch(e){}
+        var nextRun = _advanceBillDate(b.next_run_date, b.cadence, b.anchor_day);
+        await api('PATCH', '/nation_billing?id=eq.' + encodeURIComponent(b.id), { next_run_date: nextRun, last_run_date: today, last_invoice: number, updated_at: new Date().toISOString() }, 'return=minimal');
+        await audit('nation_invoice_auto', sub, number + ': ' + _money(tot) + ' (manual run); next ' + nextRun);
+        setMsgWithView('cn-bill-msg', 'Invoice ' + number + ' generated. Next invoice on ' + nextRun + '.', viewUrl);
+        renderNationBilling(sub); renderNationInvoices(sub); renderNationDocsCard(sub); loadNicSummary(sub);
+      } catch (e){ setMsg('cn-bill-msg', 'Could not generate: ' + String(e && e.message || e)); }
+    }, function(){ setMsg('cn-bill-msg', 'Could not load the PDF generator (offline?).'); });
+  };
+
   // ---- Event delegation ------------------------------------------------------
   // Every button here is wired through ONE delegated listener keyed on
   // data-act, because this panel's CSP is `script-src 'self'` with NO
@@ -1705,6 +1835,9 @@
       case 'inv-view':      window.viewNationInvoice(el.getAttribute('data-id') || '', el.getAttribute('data-sub') || ''); break;
       case 'inv-pay':       window.invRecordPayment(el.getAttribute('data-id') || '', el.getAttribute('data-sub') || ''); break;
       case 'inv-carry':     window.invCarryForward(el.getAttribute('data-sub') || ''); break;
+      case 'bill-save':     window.saveNationBilling(el.getAttribute('data-sub') || ''); break;
+      case 'bill-toggle':   window.toggleNationBilling(el.getAttribute('data-sub') || ''); break;
+      case 'bill-run':      window.runNationBilling(el.getAttribute('data-sub') || ''); break;
       case 'logo-clear':    { var _lh = document.getElementById('cn-logo'); var _lp = document.getElementById('cn-logo-preview'); var _lf = document.getElementById('cn-logo-file'); if (_lh) _lh.value = ''; if (_lp) _lp.style.backgroundImage = ''; if (_lf) _lf.value = ''; break; }
       case 'inv-interest':  window.invAddInterest(el.getAttribute('data-id') || '', el.getAttribute('data-sub') || ''); break;
     }
