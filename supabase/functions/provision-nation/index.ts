@@ -20,7 +20,7 @@
 //
 // Secrets required on the platform project:
 //   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY  (auto-injected)
-//   SUPABASE_MGMT_TOKEN  - a Supabase Management API token (org access token),
+//   SB_MGMT_TOKEN  - a Supabase Management API token (org access token),
 //                          required for step 1 to run the schema.
 //   BOOTSTRAP_SCHEMA_URL - optional override for the auto-fetched schema URL.
 // Source ASCII-only.
@@ -31,7 +31,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
 const ANON_KEY     = Deno.env.get('SUPABASE_ANON_KEY') || ''
 const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-const MGMT_TOKEN   = Deno.env.get('SUPABASE_MGMT_TOKEN') || ''
+// Supabase reserves the SUPABASE_ prefix for its own secrets, so the custom
+// Management API token secret must be named SB_MGMT_TOKEN (legacy name kept as
+// a fallback in case it was ever set another way).
+const MGMT_TOKEN   = Deno.env.get('SB_MGMT_TOKEN') || Deno.env.get('SUPABASE_MGMT_TOKEN') || ''
 const MGMT_BASE    = 'https://api.supabase.com'
 const SCHEMA_URL   = Deno.env.get('BOOTSTRAP_SCHEMA_URL') ||
   'https://raw.githubusercontent.com/CLFN92/clfn-housing-app/main/supabase/bootstrap/schema.sql'
@@ -130,7 +133,7 @@ serve(async (req) => {
     } catch (e) { step('bootstrap_schema', false, 'Error: ' + String(e).slice(0, 200)) }
   } else {
     const miss: string[] = []
-    if (!MGMT_TOKEN)    miss.push('SUPABASE_MGMT_TOKEN secret (set once on the platform project)')
+    if (!MGMT_TOKEN)    miss.push('SB_MGMT_TOKEN secret (set once on the platform project)')
     if (!ref)          miss.push('project ref or URL')
     if (!schemaToRun)  miss.push('schema (upload one, or the repo URL was unreachable)')
     step('bootstrap_schema', false, 'Skipped: needs ' + miss.join(' + ') + '.')

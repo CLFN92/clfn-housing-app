@@ -17,7 +17,7 @@ created** (assisted mode). Deployed on the **fnhub-platform** project, gated to
 2. **Management API token** — a Supabase **account/organization access token**
    (Supabase dashboard -> Account -> Access Tokens). Set it as a function secret:
    ```
-   supabase secrets set SUPABASE_MGMT_TOKEN=sbp_xxx --project-ref <platform-ref>
+   supabase secrets set SB_MGMT_TOKEN=sbp_xxx --project-ref <platform-ref>
    ```
    Without it, Step 1 (schema) is skipped and reported as such.
 
@@ -27,7 +27,7 @@ created** (assisted mode). Deployed on the **fnhub-platform** project, gated to
 supabase functions deploy provision-nation --project-ref <platform-ref>
 ```
 `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` are injected
-automatically; only `SUPABASE_MGMT_TOKEN` must be set manually.
+automatically; only `SB_MGMT_TOKEN` must be set manually.
 
 ## Request (from the panel, super-admin JWT as bearer)
 

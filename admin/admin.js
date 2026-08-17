@@ -310,7 +310,7 @@
       ['Create its Supabase project', 'manual',
         'Stand up a fresh <b>database-per-nation</b> project: ' + extLink(LINKS.supaNew, 'Supabase &rarr; New project') + '. Then grab the ref, URL, anon + service_role keys from ' + extLink(LINKS.supaApi, 'Settings &rarr; API') + '.'],
       ['Provision (schema, bucket, first ED)', 'auto',
-        'Click <b>Provision this nation</b> below. The platform replays the bootstrap schema, creates the <code>housing-files</code> storage bucket, seeds the first ED, and writes the registry row &mdash; one action. (Requires <code>SUPABASE_MGMT_TOKEN</code> set on the platform function.) The service_role key is used once and never stored.'],
+        'Click <b>Provision this nation</b> below. The platform replays the bootstrap schema, creates the <code>housing-files</code> storage bucket, seeds the first ED, and writes the registry row &mdash; one action. (Requires <code>SB_MGMT_TOKEN</code> set on the platform function.) The service_role key is used once and never stored.'],
       ['Set the project\'s Edge Function secrets', 'manual',
         'On the new project, add the non-email function secrets (e.g. <code>ANTHROPIC_API_KEY</code> for the AI assistant): ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions') + '. Email secrets are the next step. Also run the <code>hs_data_usage</code> migration there so this panel\'s usage column fills in.'],
       ['Set up email notifications (Microsoft 365 / Azure or Resend)', 'manual',

@@ -10,7 +10,7 @@ name: Deploy platform (control-plane) Edge Functions
 # publishable ref below; override with an optional SUPABASE_PLATFORM_PROJECT_ID
 # repository secret if it ever changes.
 #
-# IMPORTANT: provision-nation also needs a SUPABASE_MGMT_TOKEN secret set on the
+# IMPORTANT: provision-nation also needs a SB_MGMT_TOKEN secret set on the
 # platform project's Edge Function secrets (Supabase dashboard -> Project
 # Settings -> Edge Functions -> Secrets) so it can run the bootstrap schema on a
 # new nation's project via the Management API. Deploying the function does not

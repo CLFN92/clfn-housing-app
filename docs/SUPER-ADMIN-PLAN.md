@@ -12,7 +12,7 @@ P3 = Configure Nation (branding/contact/Supabase/module-licensing/status).
 P4 = assisted provisioning: `provision-nation` control-plane function +
 panel wizard (schema replay via Management API, bucket, first ED, registry).
 **P4 blocked on P0 prereqs:** `supabase/bootstrap/schema.sql` (`supabase db
-dump`) + `SUPABASE_MGMT_TOKEN` secret on the platform project. "Open with
+dump`) + `SB_MGMT_TOKEN` secret on the platform project. "Open with
 full access" chosen = **impersonation token** (its own phase, not yet built).
 
 ## File structure (isolation boundary)
