@@ -231,18 +231,46 @@
       + '<div style="font-size:10px;color:var(--muted);">' + esc(timeAgo(u.reported_at)) + '</div>'
       + '</div>';
   }
+  // Supabase cost model (per the user's plan / published pricing).
+  var SUPA_COST = { computeMonthly: 10, dbIncludedGB: 8, storageIncludedGB: 100, dbOverPerGB: 0.125, storageOverPerGB: 0.0213, proOrgMonthly: 25 };
+  // Estimated monthly Supabase cost for a nation. A nation counts the $10 Micro
+  // compute base only once it has a live project (supabase_url set) -- a bare
+  // "provisioning" registry row with no project is $0. Overage from reported usage.
+  function estCost(n, u){
+    var live = !!(n && n.supabase_url);
+    var base = live ? SUPA_COST.computeMonthly : 0;
+    var over = 0;
+    if (u){
+      var dbGB = (Number(u.database_bytes) || 0) / 1073741824;
+      var stGB = (Number(u.storage_bytes)  || 0) / 1073741824;
+      over += Math.max(0, dbGB - SUPA_COST.dbIncludedGB) * SUPA_COST.dbOverPerGB;
+      over += Math.max(0, stGB - SUPA_COST.storageIncludedGB) * SUPA_COST.storageOverPerGB;
+    }
+    over = Math.round(over * 100) / 100;
+    return { live: live, base: base, over: over, total: Math.round((base + over) * 100) / 100 };
+  }
 
   function nationsCard(nations, usageBySub){
     usageBySub = usageBySub || {};
+    var totLive = 0, totBase = 0, totOver = 0;
     var rows = nations.length ? nations.map(function(n){
       var st = n.status || 'provisioning';
       var url = 'https://' + esc(n.subdomain) + '.fnhub.app';
       var mods = Object.keys(n.modules_licensed || {}).filter(function(k){ return n.modules_licensed[k]; });
+      var u = usageBySub[n.subdomain];
+      var c = estCost(n, u);
+      if (c.live) totLive++;
+      totBase += c.base; totOver += c.over;
+      var costLine = '<div style="font-size:11px;margin-top:4px;padding-top:4px;border-top:1px dotted var(--line);' + (c.live ? '' : 'color:var(--muted);') + '">'
+        + (c.live
+            ? '<b>' + _money(c.total) + '</b>/mo <span style="color:var(--muted);">' + (c.over > 0 ? '($10 + ' + _money(c.over) + ' over)' : '(compute)') + '</span>'
+            : 'no project &middot; $0')
+        + '</div>';
       return '<tr>'
         + '<td><b>' + esc(n.display_name) + '</b><div style="font-size:11px;color:var(--muted);">' + esc(n.subdomain) + '.fnhub.app</div></td>'
         + '<td><span class="pill ' + esc(st) + '">' + esc(st) + '</span></td>'
         + '<td style="font-size:11px;color:var(--muted);">' + esc(mods.join(', ') || '—') + '</td>'
-        + '<td style="font-size:12px;">' + usageCell(usageBySub[n.subdomain]) + '</td>'
+        + '<td style="font-size:12px;">' + usageCell(u) + costLine + '</td>'
         + '<td><div class="row-actions">'
         +   '<button class="btn sm ghost" type="button" data-act="configure" data-id="' + esc(n.id) + '">Dashboard</button>'
         +   '<a class="btn sm ghost" href="' + url + '" target="_blank" rel="noopener">Open</a>'
@@ -251,9 +279,17 @@
               : '<button class="btn sm danger" data-act="status" data-status="suspended" data-id="' + esc(n.id) + '">Suspend</button>')
         + '</div></td></tr>';
     }).join('') : '<tr><td colspan="5" class="empty">No nations yet. Add one below.</td></tr>';
+    var grand = Math.round((totBase + totOver) * 100) / 100;
+    var summary = nations.length
+      ? '<div style="display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);">'
+        +   '<div style="font-size:16px;font-weight:800;">Est. Supabase cost: ' + _money(grand) + '/mo</div>'
+        +   '<div style="font-size:12px;color:var(--muted);">' + totLive + ' live project' + (totLive === 1 ? '' : 's') + ' &times; $10 compute = ' + _money(totBase) + (totOver > 0 ? ' + ' + _money(totOver) + ' overage' : '') + '</div>'
+        + '</div>'
+        + '<p class="sub" style="margin:6px 0 0;font-size:11px;">Per-project Micro compute is $10/mo; overage is $0.125/GB over 8 GB database and $0.0213/GB over 100 GB storage. A nation counts $10 only once it has a live Supabase project (a provisioning-only registry row is $0). <b>Excludes</b> the $25/mo Supabase Pro org base (which includes some compute credit), plus MAU and egress &mdash; see Supabase billing for the exact invoice. Usage is reported by each nation\'s app when a manager opens Settings &rarr; Nation.</p>'
+      : '';
     return '<div class="card"><h3>Registered nations</h3>'
-      + '<table><thead><tr><th>Nation</th><th>Status</th><th>Licensed modules</th><th>Data usage</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
-      + '<p class="sub" style="margin:10px 0 0;font-size:11px;">Data usage is reported by each nation\'s app when a manager opens Settings &rarr; Nation (database size + file storage, against the 8 GB / 100 GB Supabase Pro tiers).</p>'
+      + '<table><thead><tr><th>Nation</th><th>Status</th><th>Licensed modules</th><th>Usage &amp; est. cost</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
+      + summary
       + '</div>';
   }
 
