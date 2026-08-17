@@ -61,8 +61,14 @@
   --border:       #D8CFC0;
   --text:         #26221C;
   --muted:        #57503F;
-  --yellow:       #9A4A1F;   /* brand accent (Clay) */
+  --yellow:       #9A4A1F;   /* brand accent (Clay) — links, badges, chips, focus */
   --accent-rgb:   154, 74, 31; /* accent as R,G,B for rgba() glows/tints */
+  /* Action / CTA — the bright colour reserved for PRIMARY action buttons
+     (Create, Save, primary submit) so they pop against the dark brand header.
+     Deliberately separate from the brand accent. */
+  --action:       #F8E41A;
+  --action-text:  #26221C;
+  --action-mid:   #E4CE00;   /* action-button hover */
   --yellow-light: #F3E4D8;   /* soft tint / highlight */
   --yellow-mid:   #7C3B17;   /* hover accent (Deep clay) */
   --dark:         #26221C;   /* header / dark surface (Ink) */
@@ -671,8 +677,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-family: var(--sans); cursor: pointer; border: 1.5px solid transparent;
   transition: var(--tr); text-decoration: none; white-space: nowrap;
 }
-.btn-primary { background: var(--yellow);   color: var(--dark);  border-color: var(--yellow); }
-.btn-primary:hover { background: #e8d418; }
+.btn-primary { background: var(--action);   color: var(--action-text);  border-color: var(--action); }
+.btn-primary:hover { background: var(--action-mid); }
 .btn-ghost   { background: transparent;     color: var(--text); border-color: var(--border); }
 .btn-ghost:hover   { background: var(--bg); border-color: var(--muted); }
 .btn-ghost-dark { background: transparent; color: var(--txt-on-dark); border-color: var(--muted); }
@@ -1711,7 +1717,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .login-checkbox      { width: 16px; height: 16px; cursor: pointer; accent-color: var(--yellow); margin: 0; }
 .login-link          { background: none; border: none; font-size: 12px; color: var(--yellow); cursor: pointer; padding: 0; font-family: var(--sans); }
 .login-link--block   { width: 100%; }
-.login-btn           { background: var(--yellow); border: none; color: var(--dark); padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 700; font-family: var(--sans); cursor: pointer; width: 100%; }
+.login-btn           { background: var(--action); border: none; color: var(--action-text); padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 700; font-family: var(--sans); cursor: pointer; width: 100%; }
 .login-btn:disabled  { opacity: .65; cursor: wait; }
 .login-btn--sm       { font-size: 13px; padding: 10px; margin-bottom: 10px; }
 .login-error         { display: none; background: var(--err-bg); border: 1px solid var(--err-border); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--err-text); text-align: left; }
@@ -1838,12 +1844,12 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .app-header-v2 .create-wrap { position: relative; }
 .app-header-v2 .btn-create {
   display: flex; align-items: center; gap: 8px;
-  background: var(--yellow); color: var(--dark);
+  background: var(--action); color: var(--action-text);
   border: none; border-radius: 999px; padding: 9px 16px;
   font-weight: 700; font-size: 13px; cursor: pointer;
-  box-shadow: 0 2px 8px rgba(var(--accent-rgb),.25); font-family: inherit;
+  box-shadow: 0 2px 8px rgba(0,0,0,.28); font-family: inherit;
 }
-.app-header-v2 .btn-create:hover { background: var(--yellow-mid); }
+.app-header-v2 .btn-create:hover { background: var(--action-mid); }
 .app-header-v2 .btn-create svg { width: 14px; height: 14px; }
 .app-header-v2 .create-menu {
   position: absolute; top: calc(100% + 8px); right: 0;
@@ -1865,7 +1871,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .app-header-v2 .avatar-wrap { position: relative; cursor: pointer; }
 .app-header-v2 .header-avatar {
   width: 36px; height: 36px; border-radius: 50%;
-  background: var(--yellow); color: var(--dark);
+  background: var(--action); color: var(--action-text);
   display: grid; place-items: center;
   font-weight: 700; font-size: 13px;
   border: 2px solid var(--dark2); flex-shrink: 0;
