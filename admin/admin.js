@@ -686,16 +686,19 @@
       +   '<label>Anon (publishable) key</label><input id="pv-anon" placeholder="eyJ..." value="' + v(n && n.supabase_anon) + '" title="Supabase -> Settings -> API -> Project API keys -> anon / public. Publishable; safe to store."/>' + fieldHint('Settings &rarr; API &rarr; Project API keys &rarr; <b>anon / public</b>. Publishable &mdash; safe to store.')
       +   '<label>Service role key (used once)</label><input id="pv-service" placeholder="eyJ... (service_role)" title="Supabase -> Settings -> API -> Project API keys -> service_role. SECRET. Used once here (bucket + first ED) and never stored."/>' + fieldHint('Settings &rarr; API &rarr; Project API keys &rarr; <b>service_role</b>. <b style="color:var(--danger);">Secret</b> &mdash; used once, never stored.')
       + '</div>'
-      + '<div class="card"><h3>First ED and bootstrap schema</h3>'
+      + '<div class="card"><h3>First ED</h3>'
       +   '<div style="' + g2 + '"><div><label>First ED email</label><input id="pv-ed-email" placeholder="ed@listuguj.ca"/></div><div><label>First ED name</label><input id="pv-ed-name" placeholder="Executive Director"/></div></div>'
-      +   '<label>Bootstrap schema file (supabase/bootstrap/schema.sql)</label>'
-      +   '<div id="pv-drop" style="border:2px dashed var(--hair);border-radius:10px;padding:18px 16px;text-align:center;cursor:pointer;background:var(--bg);transition:border-color .15s, background .15s;">'
-      +     '<div style="font-size:22px;line-height:1;margin-bottom:6px;pointer-events:none;">&#128228;</div>'
-      +     '<div style="font-size:13px;color:var(--muted);pointer-events:none;">Drag &amp; drop <code>schema.sql</code> here, or <b style="color:var(--ink);">click to choose a file</b></div>'
-      +     '<input id="pv-schema" type="file" accept=".sql,text/plain" style="display:none;" title="The bootstrap schema shipped in the app repo at supabase/bootstrap/schema.sql."/>'
+      +   '<label>First ED password (optional)</label><input id="pv-ed-pass" placeholder="leave blank to auto-generate"/>'
+      +   fieldHint('Creates the ED\'s actual sign-in on the new project. Leave blank and a strong password is generated and shown once in the result &mdash; hand it to the ED to change on first login.')
+      + '</div>'
+      + '<div class="card"><h3>Bootstrap schema <span style="font-weight:400;color:var(--muted);font-size:12px;">(optional)</span></h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">Leave this empty &mdash; the function <b>auto-fetches</b> the current schema from the app repo. Only drop a file to pin a specific version.</p>'
+      +   '<div id="pv-drop" style="border:2px dashed var(--hair);border-radius:10px;padding:16px;text-align:center;cursor:pointer;background:var(--bg);transition:border-color .15s, background .15s;">'
+      +     '<div style="font-size:20px;line-height:1;margin-bottom:6px;pointer-events:none;">&#128228;</div>'
+      +     '<div style="font-size:13px;color:var(--muted);pointer-events:none;">Optional &mdash; drag &amp; drop <code>schema.sql</code>, or <b style="color:var(--ink);">click to choose</b></div>'
+      +     '<input id="pv-schema" type="file" accept=".sql,text/plain" style="display:none;" title="Optional. If empty, the current schema is auto-fetched from the repo."/>'
       +     '<div id="pv-schema-name" style="font-size:12px;font-weight:600;color:var(--ok);margin-top:8px;min-height:16px;"></div>'
       +   '</div>'
-      +   fieldHint('Ships in the app repo at <code>supabase/bootstrap/schema.sql</code> &mdash; ' + extLink(LINKS.gh.replace('/actions', '/raw/main/supabase/bootstrap/schema.sql'), 'download the raw file &rarr;') + ', then drop or choose it here. (Only needed when provisioning a brand-new nation.)')
       + '</div>'
       + '<div class="msg" id="pv-msg"></div>'
       + '<button class="btn" id="pv-btn" type="button" data-act="run-provision">Provision nation</button>'
@@ -745,9 +748,10 @@
       nation: { subdomain: sub, display_name: name, short: short,
                 email_domain: get('pv-domain').trim() || null, housing_email: get('pv-housing').trim() || null,
                 primary_color: get('pv-color').trim() || null, modules_licensed: mods },
-      target: { ref: get('pv-ref').trim() || null, url: get('pv-url').trim() || null,
+      target: { ref: get('pv-ref').trim() || _refFromUrl(get('pv-url').trim()) || null, url: get('pv-url').trim() || null,
                 anon: get('pv-anon').trim() || null, service_role: get('pv-service').trim() || null },
-      first_ed: { email: get('pv-ed-email').trim() || null, name: get('pv-ed-name').trim() || null },
+      first_ed: { email: get('pv-ed-email').trim() || null, name: get('pv-ed-name').trim() || null,
+                  password: get('pv-ed-pass').trim() || null },
       schema_sql: schemaSql
     };
     var btn = document.getElementById('pv-btn'); if (btn){ btn.disabled = true; btn.textContent = 'Provisioning...'; }
@@ -776,8 +780,12 @@
     var head = d.ok
       ? '<div class="msg ok" style="display:block;">Provisioned <b>' + esc(d.subdomain) + '</b>. Registry updated.</div>'
       : '<div class="msg err" style="display:block;">Finished with issues - review the steps below.</div>';
+    // Show the generated ED password once, prominently.
+    var pwBox = (d && d.ed_password)
+      ? '<div class="msg ok" style="display:block;">Sign-in created for <b>' + esc(d.ed_email || '') + '</b>. Temporary password (shown once): <code style="font-size:14px;">' + esc(d.ed_password) + '</code><br><span style="font-size:12px;">Give this to the ED and have them change it on first login. Save it in your password manager now.</span></div>'
+      : '';
     var mel = document.getElementById('pv-msg'); if (mel){ mel.className = 'msg'; mel.textContent = ''; }
-    document.getElementById('pv-results').innerHTML = head
+    document.getElementById('pv-results').innerHTML = head + pwBox
       + '<div class="card"><h3>Result</h3><table><tbody>' + rows + '</tbody></table>'
       + '<button class="btn sm" type="button" data-act="home" style="margin-top:10px;">Back to nations</button></div>';
   }
