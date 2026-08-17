@@ -824,7 +824,9 @@ function generateInspectionPDF() {
 
     if (typeof initModuleEnablement         === 'function') try { initModuleEnablement(); } catch(e) {}
     if (window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('inspections')) {
-      window.location.href = 'housing.html'; return;
+      if (typeof showModuleDisabledNotice === 'function') showModuleDisabledNotice('Inspections');
+      else window.location.href = 'housing.html';
+      return;
     }
 
     if (typeof updateHeaderUser             === 'function') updateHeaderUser(role);

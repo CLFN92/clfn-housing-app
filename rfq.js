@@ -48,8 +48,8 @@ var _rfqDocLib           = null; // DocLibrary instance for this RFQ
   // module overrides now and bounce back to the dashboard if RFQ is turned off.
   if (typeof initModuleEnablement === 'function') initModuleEnablement();
   if (window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('rfq')) {
-    if (typeof showToast === 'function') showToast('The RFQ module is turned off for your nation.');
-    window.location.href = 'housing.html';
+    if (typeof showModuleDisabledNotice === 'function') showModuleDisabledNotice('RFQ / Tendering');
+    else window.location.href = 'housing.html';
     return;
   }
 

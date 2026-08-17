@@ -3025,7 +3025,9 @@ function _prjArchiveProject() {
 
     if (typeof initModuleEnablement === 'function') try { initModuleEnablement(); } catch(e) {}
     if (window.CLFN_MODULES && !window.CLFN_MODULES.isEnabled('projects')) {
-      window.location.href = 'housing.html'; return;
+      if (typeof showModuleDisabledNotice === 'function') showModuleDisabledNotice('Capital Projects');
+      else window.location.href = 'housing.html';
+      return;
     }
 
     if (typeof updateHeaderUser             === 'function') updateHeaderUser(role);

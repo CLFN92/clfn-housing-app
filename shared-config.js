@@ -521,6 +521,25 @@ window.moduleOn = function(mod) {
   catch(e) { return true; }
 };
 
+// Full-page "this module isn't part of your plan" notice, shown when a module
+// entry point is reached while the module is disabled (deep link / direct URL;
+// nav links for disabled modules are already hidden). Directs the user to the
+// Home Land Homes provider support mailbox to enable it. Replaces the old
+// silent redirect to housing.html. `label` is the human module name.
+window.showModuleDisabledNotice = function(label){
+  label = label || 'This module';
+  var esc = function(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]; }); };
+  var nation = (window.NATION_CONFIG && window.NATION_CONFIG.display_name) || 'your nation';
+  document.body.innerHTML =
+    '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg,#FAF7F2);font-family:var(--sans,system-ui,sans-serif);">'
+    + '<div style="max-width:460px;text-align:center;background:var(--surface,#fff);border:1px solid var(--border,#D8CFC0);border-radius:14px;padding:34px 28px;box-shadow:0 10px 34px rgba(0,0,0,.08);">'
+    +   '<div style="font-size:34px;line-height:1;margin-bottom:12px;">&#128274;</div>'
+    +   '<h1 style="font-family:var(--serif,Georgia,serif);font-size:22px;margin:0 0 10px;color:var(--text,#26221C);">' + esc(label) + ' isn’t enabled</h1>'
+    +   '<p style="color:var(--muted,#57503F);font-size:14px;line-height:1.6;margin:0 0 20px;">The ' + esc(label) + ' module is not part of ' + esc(nation) + '’s current plan. To turn it on, contact Home Land Homes at <a href="mailto:hello@homelandhomes.ca" style="color:var(--yellow,#9A4A1F);font-weight:600;">hello@homelandhomes.ca</a>.</p>'
+    +   '<a href="housing.html" style="display:inline-block;background:var(--yellow,#9A4A1F);color:#fff;text-decoration:none;font-weight:700;padding:11px 22px;border-radius:9px;">Back to Home</a>'
+    + '</div></div>';
+};
+
 // ── Nation config ─────────────────────────────────────────────────────────────
 // Per-nation branding + display overrides. The role *keys* ('ed',
 // 'housing_manager', etc.) are stable identifiers across all nations — only
