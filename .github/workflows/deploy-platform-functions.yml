@@ -1,0 +1,62 @@
+name: Deploy platform (control-plane) Edge Functions
+
+# Deploys the CONTROL-PLANE Edge Functions to the fnhub-platform project:
+#   - provision-nation      (admin calls it; keep JWT verification ON)
+#   - report-nation-usage   (nation apps call it; JWT verification OFF)
+#
+# These are excluded from deploy-supabase-functions.yml (which targets the
+# NATION project). This workflow reuses the same account-scoped
+# SUPABASE_ACCESS_TOKEN secret. The platform project ref defaults to the
+# publishable ref below; override with an optional SUPABASE_PLATFORM_PROJECT_ID
+# repository secret if it ever changes.
+#
+# IMPORTANT: provision-nation also needs a SUPABASE_MGMT_TOKEN secret set on the
+# platform project's Edge Function secrets (Supabase dashboard -> Project
+# Settings -> Edge Functions -> Secrets) so it can run the bootstrap schema on a
+# new nation's project via the Management API. Deploying the function does not
+# set that secret.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'supabase/functions/provision-nation/**'
+      - 'supabase/functions/report-nation-usage/**'
+      - '.github/workflows/deploy-platform-functions.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for Supabase token
+        id: secrets
+        run: |
+          if [ -n "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Add SUPABASE_ACCESS_TOKEN to enable platform function deploys."
+          fi
+
+      - name: Set up Supabase CLI
+        if: steps.secrets.outputs.ready == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy control-plane functions
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PLATFORM_REF_SECRET: ${{ secrets.SUPABASE_PLATFORM_PROJECT_ID }}
+        run: |
+          set -e
+          REF="${PLATFORM_REF_SECRET:-dnaxulsdetlnpupegoiq}"
+          echo "──── Deploying provision-nation to $REF (JWT verify ON) ────"
+          supabase functions deploy provision-nation --project-ref "$REF"
+          echo "──── Deploying report-nation-usage to $REF (JWT verify OFF) ────"
+          supabase functions deploy report-nation-usage --project-ref "$REF" --no-verify-jwt
+          echo "Platform functions deployed."
