@@ -349,6 +349,8 @@
     if (!n){ showDashboard(); return; }
     document.getElementById('btn_out').style.display = '';
     app.innerHTML = configureView(n);
+    renderNationDocsCard(n.subdomain);
+    wireDocFileInput();
   };
 
   function configureView(n){
@@ -395,6 +397,24 @@
       +   '</p>'
       +   '<button class="btn sm ghost" type="button" data-act="provision" data-id="' + esc(n.id) + '">'
       +     (n.supabase_url ? 'Re-run provisioning &rarr;' : 'Provision this nation &rarr;') + '</button>'
+      + '</div>'
+      + '<div class="card"><h3>Subscription agreement</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">Generate the Home Land Homes software subscription agreement for this nation as a PDF. It fills in the nation party details below and is saved to the document library.</p>'
+      +   '<label>Nation legal name (party)</label><input id="cn-agr-name" value="' + esc(n.display_name || '') + '"/>'
+      +   '<label>Administrative office address</label><input id="cn-agr-addr" placeholder="123 Main St, Town, ON  A1A 1A1" value="' + esc(n.office_address || '') + '"/>'
+      +   '<div class="msg" id="cn-agr-msg"></div>'
+      +   '<button class="btn" type="button" data-act="gen-agreement" data-id="' + esc(n.id) + '">Generate agreement PDF</button>'
+      + '</div>'
+      + '<div class="card"><h3>Documents</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">Signed agreements, BCRs and other files for this nation. Stored privately on the control plane.</p>'
+      +   '<div id="cn-docs"><div class="empty">Loading documents...</div></div>'
+      +   '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:12px;">'
+      +     '<div style="flex:1;min-width:160px;"><label>Add a document</label>'
+      +       '<select id="cn-doc-kind"><option value="agreement">Agreement</option><option value="bcr">BCR</option><option value="other" selected>Other</option></select></div>'
+      +     '<input id="cn-doc-file" type="file" style="display:none;" data-sub="' + esc(n.subdomain) + '"/>'
+      +     '<button class="btn sm" type="button" data-act="doc-pick">Choose &amp; upload</button>'
+      +   '</div>'
+      +   '<div class="msg" id="cn-doc-msg"></div>'
       + '</div>'
       + '<div class="msg" id="cn-msg"></div>'
       + '<button class="btn" id="cn-save" type="button" data-act="save-config" data-id="' + esc(n.id) + '">Save changes</button>';
@@ -578,6 +598,307 @@
       + '<button class="btn sm" type="button" data-act="home" style="margin-top:10px;">Back to nations</button></div>';
   }
 
+  // ==========================================================================
+  // Subscription agreement PDF + per-nation document library
+  // ==========================================================================
+  var STORE = PBASE + '/storage/v1';
+  var DOC_BUCKET = 'nation-docs';
+
+  // Lazy-load jsPDF (same build the nation app uses). CSP allows cdnjs here.
+  var _jspdfLoading = null;
+  function ensureJsPdf(cb, onerr){
+    if (window.jspdf && window.jspdf.jsPDF) { cb(); return; }
+    if (_jspdfLoading) { _jspdfLoading.then(cb, onerr); return; }
+    _jspdfLoading = new Promise(function(resolve, reject){
+      var s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = resolve; s.onerror = function(){ reject(new Error('jspdf load failed')); };
+      document.head.appendChild(s);
+    });
+    _jspdfLoading.then(cb, onerr);
+  }
+
+  // The agreement, marker-formatted. Placeholders: {{NATION}} {{ADDRESS}} {{DATE}}.
+  // Markers:  >disclaimer  #title  %subtitle  ##section  ###clause  -bullet  (blank)=gap
+  var AGREEMENT_TPL = [
+    '>TEMPLATE - This agreement was prepared as a working draft and is not legal advice. Have it reviewed by a lawyer (ideally one experienced with First Nations clients) before first use, and update the Provider party details upon incorporation.',
+    '#SOFTWARE SUBSCRIPTION AGREEMENT',
+    '%Home Land Homes - Housing Management Platform',
+    'This Software Subscription Agreement (the "Agreement") is made as of the date of last signature below (the "Effective Date") between:',
+    'Kevin Proctor, operating as "Home Land Homes" (the "Provider"), and',
+    '{{NATION}}, a First Nation with administrative offices at {{ADDRESS}} (the "Nation").',
+    '##Background',
+    '-The Nation operates a housing department that manages homes, applications, tenancies, maintenance, capital projects and related finances for its members.',
+    '-The Provider makes available a housing-management software platform designed for First Nations housing departments.',
+    "-Both parties intend that the Nation's data remain under the Nation's ownership and control at all times, consistent with the principles of OCAP(R) (Ownership, Control, Access and Possession).",
+    "-The parties acknowledge the United Nations Declaration on the Rights of Indigenous Peoples (UNDRIP), including Article 23 (the right of Indigenous peoples to be actively involved in developing and administering housing programmes through their own institutions) and Article 31 (the right of Indigenous peoples to maintain, control, protect and develop their data and cultural heritage), and the United Nations Declaration on the Rights of Indigenous Peoples Act, S.C. 2021, c. 14. This Agreement is intended to support the Nation's administration of its own housing programme through its own institutions.",
+    '-The parties therefore agree as follows.',
+    '##1. Definitions',
+    '"Customer Data" means all data, records, documents, images and other content submitted to or generated within the Platform by or for the Nation, including personal information of the Nation\'s members, applicants, tenants, staff and contractors.',
+    '"Platform" means the Provider\'s hosted housing-management software, including its staff application, tenant/applicant portal, and all modules listed in Schedule A, together with associated documentation.',
+    '"Order Form" means Schedule A to this Agreement, which records the subscription tier, fees, term and options selected by the Nation.',
+    '"Users" means individuals authorized by the Nation to access the Platform, including staff, leadership, consultants (subject to Section 2.4), and members using the tenant/applicant portal.',
+    '"Setup Services" means the one-time onboarding services described in Schedule B.',
+    '"Subscription Term" means the Initial Term and each Renewal Term described in Section 8.',
+    '##2. Subscription and Access',
+    '###2.1 Grant',
+    'Subject to this Agreement and payment of the Fees, the Provider grants the Nation a non-exclusive, non-transferable right during the Subscription Term for its Users to access and use the Platform for the Nation\'s internal housing-administration purposes.',
+    "###2.2 The Nation's workspace",
+    "The Provider will provision a dedicated workspace for the Nation, including a database used solely for the Nation's Customer Data (no other customer's data is stored in the Nation's database), the Nation's own subdomain, and the Nation's branding as supplied by the Nation.",
+    '###2.3 Users',
+    'The Nation may authorize an unlimited number of Users. The Nation is responsible for its Users\' compliance with this Agreement, for maintaining the accuracy of role assignments, and for promptly deactivating Users who should no longer have access. Login credentials are personal and must not be shared.',
+    '###2.4 Consultants and outside contractors',
+    "The Nation may grant restricted access to external consultants using the Platform's per-user feature-access controls. Such access is at the Nation's direction and risk, and consultants are Users for the purposes of this Agreement.",
+    '###2.5 Restrictions',
+    "The Nation will not (and will not permit anyone to): resell or provide the Platform to any third party other than Users; copy, modify or create derivative works of the Platform; reverse engineer the Platform except to the extent permitted by law; use the Platform to violate applicable law; or attempt to access another customer's data.",
+    '##3. Provider Obligations',
+    '###3.1 Hosting and data location',
+    "The Provider will host the Platform and store Customer Data (including backups) on infrastructure located in Canada, and will not transfer Customer Data outside Canada without the Nation's prior written consent, except as strictly required to deliver a feature the Nation has enabled (in which case the Provider will identify the subprocessor and location in advance).",
+    '###3.2 Availability and support',
+    'The Provider will provide the Platform and support in accordance with Schedule C (Support and Service Levels).',
+    '###3.3 Backups',
+    "The Provider will maintain automated daily backups of the Nation's database, retained for at least seven (7) days, and will restore from backup without additional charge where data loss results from a Platform failure.",
+    '###3.4 Security',
+    'The Provider will maintain administrative, technical and organizational safeguards appropriate to the sensitivity of Customer Data, including encryption of data in transit, role-based access control, per-action approval authorities, and tamper-resistant (append-only) audit logging of material actions within the Platform.',
+    '###3.5 Updates',
+    'The Provider will maintain and update the Platform at no additional charge. Updates will not materially reduce the functionality the Nation has subscribed to during a Subscription Term.',
+    '###3.6 Transparency reporting',
+    'At least once per contract year, and additionally on the Nation\'s reasonable request, the Provider will give the Nation a written transparency summary covering: availability performance against Schedule C; any security incidents affecting the Nation and their resolution; written confirmation that Customer Data (including backups) remained on infrastructure in Canada in accordance with Section 3.1; any subprocessor additions or changes (Schedule D); and material changes to the Platform. The Provider does not place advertising trackers or third-party analytics in the Platform; operational logs are used only to operate, support and secure the service.',
+    '##4. Customer Data - Ownership and Sovereignty',
+    '###4.1 Ownership',
+    'As between the parties, the Nation owns all right, title and interest in and to Customer Data. The Provider acquires no rights in Customer Data other than the limited license in Section 4.2.',
+    '###4.2 Limited license',
+    'The Nation grants the Provider a limited, non-exclusive license to host, process, transmit, display and back up Customer Data solely as necessary to provide and support the Platform, and for no other purpose.',
+    '###4.3 Prohibited uses',
+    'The Provider will not sell Customer Data; will not share Customer Data with any third party except subprocessors necessary to deliver the service; will not use Customer Data for advertising or profiling; and will not use Customer Data to train any artificial-intelligence model. The optional AI Assistant operates only if the Nation selects and initials that add-on in Schedule A; that selection constitutes the Nation\'s prior written approval under Section 3.1 for the limited out-of-Canada processing described in Schedule D. AI queries are processed by the Provider\'s AI subprocessor under agreements that prohibit the use of the Nation\'s data for model training; the AI Assistant has read-only access governed by the requesting User\'s permissions, and the Nation may disable it at any time in Platform settings.',
+    '###4.4 Access and control',
+    "The Nation controls which Users may access which functions and records through the Platform's role, approval-authority and feature-access settings. The Provider will access the Nation's workspace only for support, maintenance, or as directed by the Nation, and such access is logged.",
+    '###4.5 Export',
+    'The Nation may request, and the Provider will deliver within fifteen (15) business days, a complete export of Customer Data in machine-readable formats (such as CSV/JSON, plus stored files in their native formats) at no charge no more than twice per year, and at a reasonable fee thereafter.',
+    '###4.6 Return and deletion on termination',
+    "For sixty (60) days following expiry or termination of this Agreement, the Provider will make a complete export of Customer Data available to the Nation as described in Section 4.5 at no charge. Following that period (or earlier at the Nation's written direction), the Provider will permanently delete Customer Data from production systems, with deletion from rolling backups occurring in the ordinary course within seven (7) days thereafter, and will certify deletion on request.",
+    '###4.7 Privacy compliance and breach notice',
+    'Each party will comply with privacy laws applicable to it in respect of personal information contained in Customer Data, including the Personal Information Protection and Electronic Documents Act (Canada) to the extent applicable. The Provider will notify the Nation without undue delay, and in any event within seventy-two (72) hours, after becoming aware of any breach of security leading to unauthorized access to or disclosure of Customer Data, and will cooperate with the Nation\'s reasonable investigation and notification obligations.',
+    '###4.8 OCAP(R) alignment',
+    'The parties record how this Agreement gives effect to the principles of OCAP(R): Ownership - the Nation owns all Customer Data (Section 4.1); Control - the Nation controls access, roles and approvals within the Platform, and the Provider may use Customer Data only as the Nation permits (Sections 4.2-4.4); Access - the Nation may access and export its complete data at any time (Section 4.5); Possession - on exit, the Nation takes possession of its complete records and the Provider deletes its copies (Section 4.6). OCAP(R) is a registered trademark of the First Nations Information Governance Centre (FNIGC); the Provider is not affiliated with, endorsed by, or certified by FNIGC, and this Section describes contractual commitments, not a certification.',
+    '###4.9 UNDRIP and interpretation',
+    'This Agreement shall be interpreted in a manner consistent with the United Nations Declaration on the Rights of Indigenous Peoples, including the Nation\'s right of self-determination, its right to administer its housing programmes through its own institutions (Article 23), and its rights in respect of its data and information (Article 31 and the principles of Indigenous data sovereignty). Nothing in this Agreement abrogates or derogates from the Nation\'s inherent, Aboriginal or treaty rights, or from the Nation\'s own laws, customs and governance processes. If any provision of this Agreement is ambiguous, the interpretation that best upholds the Nation\'s ownership and control of Customer Data prevails.',
+    '###4.10 Government and third-party demands',
+    'If the Provider receives a court order, subpoena, or other governmental or third-party demand for Customer Data, the Provider will (unless legally prohibited from doing so): promptly notify the Nation before any disclosure; disclose only the minimum Customer Data it is legally compelled to disclose; and reasonably cooperate, at the Nation\'s request and expense, with the Nation\'s efforts to contest, limit or seek protective treatment of the demand. The Provider will not voluntarily disclose Customer Data to any government or third party.',
+    '##5. Setup Services and Data Migration',
+    'The Provider will perform the Setup Services described in Schedule B for the one-time fee in Schedule A. Before signature, the Provider will confirm the setup scope in writing following a scoping call, including any additional flat-fee line items for unusually large or complex historical data. The setup fee and any such line items stated in Schedule A are fixed: the Provider will not invoice the Nation for setup amounts beyond those stated in Schedule A.',
+    '##6. Nation Obligations',
+    "The Nation will: designate a primary administrative contact; provide source records reasonably required for migration in the condition described in Schedule B; ensure information it submits is, to its knowledge, accurate; use the Platform in compliance with applicable law, including privacy law applicable to the Nation's handling of member and tenant information; and pay Fees when due.",
+    '##7. Fees and Payment',
+    '###7.1 Fees',
+    'The Nation will pay the subscription fees, one-time setup fee, and any selected add-on fees stated in Schedule A (the "Fees"). All amounts are in Canadian dollars and exclusive of applicable taxes, if any.',
+    '###7.2 Billing',
+    'Unless Schedule A states otherwise, subscription Fees are invoiced annually in advance, with billing aligned to the April-March fiscal year where the Nation requests it. Monthly billing, where selected, is charged at the monthly rate stated in Schedule A. Invoices are payable within thirty (30) days.',
+    '###7.3 Setup discount',
+    "Where the Nation signs a one-year term and pays the first year's subscription in advance, the one-time setup fee is reduced by fifty percent (50%), as reflected in Schedule A.",
+    '###7.4 Fee changes',
+    'Fees are fixed for the Initial Term. The Provider may adjust Fees effective at a Renewal Term by giving at least sixty (60) days\' written notice before renewal; the Nation may decline renewal in accordance with Section 8.',
+    '###7.5 Late amounts',
+    'Amounts more than thirty (30) days overdue may bear interest at 1% per month (12.68% annually). The Provider will not suspend the Nation\'s access for non-payment without first giving at least thirty (30) days\' written notice specifically referencing suspension, and will not delete Customer Data as a consequence of non-payment except in accordance with Section 4.6 following termination.',
+    '##8. Term and Termination',
+    '###8.1 Term',
+    'This Agreement begins on the Effective Date and continues for the initial term stated in Schedule A (the "Initial Term"). It renews automatically for successive one-year terms (each a "Renewal Term") unless either party gives written notice of non-renewal at least sixty (60) days before the end of the then-current term.',
+    '###8.2 Termination for cause',
+    'Either party may terminate this Agreement if the other party materially breaches it and fails to cure the breach within thirty (30) days of written notice describing the breach.',
+    '###8.3 Termination by the Nation for data-commitment breach',
+    'Without limiting Section 8.2, a breach by the Provider of Section 3.1 (data location) or Section 4.3 (prohibited uses) is deemed material and, if not cured (where curable) within ten (10) days of notice, entitles the Nation to terminate immediately and receive a pro-rata refund of prepaid subscription Fees for the unused portion of the term.',
+    '###8.4 Effect of termination',
+    'Upon expiry or termination: the Nation\'s access ends (subject to the export period in Section 4.6); Fees accrued to the termination date remain payable; and Sections 4.5-4.10, 9, 11, 12, 13, 14 and 16 survive.',
+    '###8.5 Business continuity',
+    "If the Provider decides to permanently discontinue the Platform, the Provider will give the Nation at least ninety (90) days' written notice, will extend the export period in Section 4.6 to cover that notice period, and will provide reasonable transition assistance (data export, format documentation, and orderly handover) at the hourly rate in Schedule B. The Provider will maintain current documentation of the Platform's data formats sufficient for the Nation, or a successor provider acting for it, to make full use of exported Customer Data.",
+    '##9. Confidentiality',
+    "Each party will protect the other party's non-public information received under this Agreement with at least the care it uses for its own confidential information (and no less than reasonable care), will use it only to perform this Agreement, and will not disclose it except to personnel and advisors bound by confidentiality obligations, or as required by law with prompt notice to the other party where permitted. Customer Data is the Nation's confidential information. Pricing granted to the Nation under Schedule A is confidential to both parties; this Section does not restrict the Nation's internal governance processes (including Chief and Council review) or any disclosure required by the Nation's accountability obligations to its members or funders.",
+    '##10. Intellectual Property',
+    'The Provider owns the Platform and all related intellectual property, including improvements. No rights are granted to the Nation other than the subscription rights in Section 2. The Nation owns its Customer Data (Section 4.1) and its own names, marks and branding; the Nation grants the Provider a limited license to display them within the Nation\'s own workspace solely to provide the service. If the Nation provides suggestions or feedback, the Provider may use it to improve the Platform without obligation, provided doing so never incorporates Customer Data.',
+    '##11. Warranties and Disclaimers',
+    'The Provider warrants that: (a) it will provide the Platform with reasonable skill and care; (b) the Platform will materially conform to its documentation; and (c) it will not knowingly introduce malicious code. Except as stated in this Agreement, the Platform is provided "as is" and the Provider disclaims all other warranties, express or implied, including merchantability, fitness for a particular purpose and non-infringement, and does not warrant that the Platform will be uninterrupted or error-free. The Platform supports, but does not replace, the Nation\'s own decision-making; housing decisions (including allocations, approvals and financial decisions) remain the Nation\'s.',
+    '##12. Indemnities',
+    "The Provider will defend and indemnify the Nation against third-party claims alleging that the Platform, as provided by the Provider and used as permitted, infringes Canadian intellectual-property rights, and will pay resulting damages finally awarded or agreed in settlement. If such a claim arises, the Provider may procure the right to continue, modify the Platform to be non-infringing, or terminate the affected subscription with a pro-rata refund. The Nation will defend and indemnify the Provider against third-party claims arising from Customer Data content the Nation submits or the Nation's use of the Platform in violation of law, except to the extent caused by the Provider's breach of this Agreement.",
+    '##13. Limitation of Liability',
+    "Except for (i) a party's indemnity obligations under Section 12, (ii) the Provider's breach of Section 4.3 (prohibited uses of Customer Data), or (iii) either party's gross negligence or wilful misconduct: neither party is liable for indirect, incidental, special or consequential damages, or loss of profits or revenue; and each party's total aggregate liability under this Agreement is limited to the Fees paid or payable by the Nation in the twelve (12) months preceding the event giving rise to the claim. For breaches described in clause (ii), the Provider's aggregate liability cap is instead two (2) times such Fees.",
+    '##14. Publicity',
+    "Neither party will publicly name the other, or use the other's name, logo or marks in marketing, case studies, references or announcements, without the other party's prior written consent. For the Nation, such consent may only be given in accordance with the Nation's own governance processes.",
+    '##15. Dispute Resolution and Governing Law',
+    'The parties will first attempt in good faith to resolve any dispute through discussion between designated representatives for at least thirty (30) days. Failing resolution, the parties will attempt mediation with a mutually agreed mediator before commencing proceedings, except where urgent injunctive relief is required. This Agreement is governed by the laws of the Province of Ontario and the federal laws of Canada applicable in it, without prejudice to the Nation\'s inherent and treaty rights, which are not affected by this Agreement. The parties attorn to the non-exclusive jurisdiction of the courts of Ontario. [Note to counsel: jurisdiction, venue and any dispute-resolution preferences of the Nation - including arbitration or the Nation\'s own processes - should be settled per negotiation.]',
+    '##16. General',
+    '-Entire agreement. This Agreement (including its Schedules) is the entire agreement between the parties regarding its subject matter and supersedes prior discussions.',
+    '-Amendment. Amendments must be in writing and signed by both parties.',
+    '-Assignment. Neither party may assign this Agreement without the other\'s written consent, except the Provider may assign it to a corporation it forms to carry on the Home Land Homes business, or in connection with a merger or sale of that business, with written notice to the Nation; the Nation may terminate within sixty (60) days of such notice if the assignee is unacceptable to it, acting reasonably, with a pro-rata refund of prepaid Fees.',
+    '-Subcontracting. The Provider may use the subprocessors and third-party systems listed in Schedule D to deliver the Platform and remains responsible for them. The Provider will give the Nation at least thirty (30) days\' written notice before adding or replacing a subprocessor that will process Customer Data; if the Nation reasonably objects on data-protection grounds and no resolution is found, the Nation may terminate the affected feature or this Agreement with a pro-rata refund of prepaid Fees.',
+    '-Force majeure. Neither party is liable for delay or failure caused by events beyond its reasonable control, provided it uses reasonable efforts to mitigate.',
+    '-Notices. Notices must be in writing and delivered to the contacts listed in Schedule A (email is sufficient, with confirmation of receipt for termination or breach notices).',
+    '-Severability; waiver. Invalid provisions are severed without affecting the remainder; a waiver applies only to the instance given in writing.',
+    '-Counterparts. This Agreement may be signed in counterparts, including electronically.',
+    '##Signatures',
+    'Each signatory confirms they are authorized to bind the party they sign for. Where the Nation\'s governance requires it, the Nation\'s signature may be supported by a Band Council Resolution referenced below.',
+    '###PROVIDER: Kevin Proctor, operating as Home Land Homes',
+    'Signature: ______________________________     Date: ____________________',
+    'Name: Kevin Proctor',
+    '###THE NATION: {{NATION}}',
+    'Signature: ______________________________     Date: ____________________',
+    'Name: ______________________________     Title: ____________________',
+    'Band Council Resolution No. (if applicable): ____________________'
+  ].join('\n');
+
+  function _fmtDateLong(){
+    // Admin panel runs in a browser; Date is available here (unlike workflow scripts).
+    var d = new Date();
+    var mo = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return mo[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+
+  function buildAgreementPdf(nationName, address){
+    var jsPDF = window.jspdf.jsPDF;
+    var doc = new jsPDF({ unit: 'pt', format: 'letter' });
+    var M = 56, W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+    var maxW = W - M * 2, y = M;
+    function ensure(h){ if (y + h > H - M - 20) { doc.addPage(); y = M; } }
+    function block(text, o){
+      o = o || {};
+      doc.setFont('helvetica', o.style || 'normal');
+      doc.setFontSize(o.size || 10);
+      if (o.color) doc.setTextColor(o.color[0], o.color[1], o.color[2]); else doc.setTextColor(20, 20, 20);
+      var indent = o.indent || 0;
+      var lines = doc.splitTextToSize(text, maxW - indent);
+      var lh = (o.size || 10) * 1.32;
+      for (var i = 0; i < lines.length; i++){
+        ensure(lh);
+        if (o.align === 'center') doc.text(lines[i], W / 2, y, { align: 'center' });
+        else doc.text(lines[i], M + indent, y);
+        y += lh;
+      }
+      y += (o.after == null ? 6 : o.after);
+    }
+    var tpl = AGREEMENT_TPL
+      .replace(/\{\{NATION\}\}/g, nationName)
+      .replace(/\{\{ADDRESS\}\}/g, address || '______________________________')
+      .replace(/\{\{DATE\}\}/g, _fmtDateLong());
+    tpl.split('\n').forEach(function(raw){
+      var line = raw;
+      if (line === '') { y += 4; return; }
+      if (line.charAt(0) === '>') { // disclaimer
+        y += 2; block(line.slice(1), { style: 'italic', size: 9, color: [140, 90, 0], after: 10 });
+        ensure(1); doc.setDrawColor(220); doc.line(M, y - 4, W - M, y - 4); y += 6; return;
+      }
+      if (line.slice(0, 1) === '#' && line.slice(0, 2) !== '##') { block(line.slice(1), { style: 'bold', size: 16, align: 'center', after: 3 }); return; }
+      if (line.charAt(0) === '%') { block(line.slice(1), { size: 11, align: 'center', color: [90, 90, 90], after: 12 }); return; }
+      if (line.slice(0, 3) === '###') { ensure(30); block(line.slice(3), { style: 'bold', size: 10.5, after: 3 }); return; }
+      if (line.slice(0, 2) === '##') { ensure(40); y += 6; block(line.slice(2), { style: 'bold', size: 12.5, after: 5 }); return; }
+      if (line.charAt(0) === '-') { block('•  ' + line.slice(1), { size: 10, indent: 14, after: 5 }); return; }
+      block(line, { size: 10 });
+    });
+    // Footer: brand + page x of y.
+    var pages = doc.internal.getNumberOfPages();
+    for (var p = 1; p <= pages; p++){
+      doc.setPage(p);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(130, 130, 130);
+      doc.text('Home Land Homes - Software Subscription Agreement', M, H - 26);
+      doc.text('Page ' + p + ' of ' + pages, W - M, H - 26, { align: 'right' });
+    }
+    return doc;
+  }
+
+  window.generateNationAgreement = function(id){
+    var n = _nations.filter(function(x){ return String(x.id) === String(id); })[0];
+    if (!n){ setMsg('cn-agr-msg', 'Nation not loaded.'); return; }
+    var name = ((document.getElementById('cn-agr-name') || {}).value || n.display_name || '').trim();
+    var addr = ((document.getElementById('cn-agr-addr') || {}).value || '').trim();
+    if (!name){ setMsg('cn-agr-msg', 'Enter the nation legal name.'); return; }
+    setMsg('cn-agr-msg', 'Generating...', 'ok');
+    ensureJsPdf(async function(){
+      try {
+        var doc = buildAgreementPdf(name, addr);
+        var safe = name.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
+        var fname = 'Subscription-Agreement-' + safe + '.pdf';
+        doc.save(fname);                                   // download for immediate use
+        var blob = doc.output('blob');
+        await uploadDoc(n.subdomain, new File([blob], fname, { type: 'application/pdf' }), 'agreement');
+        setMsg('cn-agr-msg', 'Generated and saved to the document library.', 'ok');
+        renderNationDocsCard(n.subdomain);
+      } catch (e){ setMsg('cn-agr-msg', 'Could not generate: ' + String(e && e.message || e)); }
+    }, function(){ setMsg('cn-agr-msg', 'Could not load the PDF generator (offline?).'); });
+  };
+
+  // ---- Document library (control-plane Storage) ------------------------------
+  function docPath(sub, filename){
+    var safe = String(filename).replace(/[^a-z0-9._-]+/gi, '_');
+    // No Math.random/Date entropy needed for uniqueness beyond time; use a short
+    // random token from crypto (available in-browser) to avoid collisions.
+    var tok = (self.crypto && self.crypto.randomUUID) ? self.crypto.randomUUID().slice(0, 8) : String(performance.now()).replace('.', '');
+    return sub + '/' + tok + '_' + safe;
+  }
+  async function uploadDoc(sub, file, kind){
+    var path = docPath(sub, file.name);
+    var up = await fetch(STORE + '/object/' + DOC_BUCKET + '/' + encodeURI(path), {
+      method: 'POST',
+      headers: { apikey: ANON, Authorization: 'Bearer ' + getAT(), 'Content-Type': file.type || 'application/octet-stream' },
+      body: file
+    });
+    if (!up.ok) { var t = await up.text(); throw new Error('upload failed: ' + t.slice(0, 120)); }
+    var r = await api('POST', '/nation_documents', {
+      subdomain: sub, name: file.name, path: path, kind: kind || 'other',
+      size_bytes: file.size || null, uploaded_by: jwtEmail()
+    }, 'return=minimal');
+    if (!r.ok) throw new Error('metadata write failed');
+    await audit('nation_doc_added', sub, file.name);
+  }
+  window.downloadNationDoc = async function(path){
+    var r = await fetch(STORE + '/object/sign/' + DOC_BUCKET + '/' + encodeURI(path), {
+      method: 'POST',
+      headers: { apikey: ANON, Authorization: 'Bearer ' + getAT(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresIn: 3600 })
+    });
+    if (!r.ok){ alert('Could not create a download link.'); return; }
+    var d = await r.json();
+    if (d && d.signedURL) window.open(STORE + d.signedURL, '_blank', 'noopener');
+  };
+  window.deleteNationDoc = async function(id, path, sub){
+    if (!confirm('Delete this document? This cannot be undone.')) return;
+    await fetch(STORE + '/object/' + DOC_BUCKET + '/' + encodeURI(path), {
+      method: 'DELETE', headers: { apikey: ANON, Authorization: 'Bearer ' + getAT() }
+    }).catch(function(){});
+    var r = await api('DELETE', '/nation_documents?id=eq.' + encodeURIComponent(id), null, 'return=minimal');
+    if (r.ok){ await audit('nation_doc_deleted', sub, path); renderNationDocsCard(sub); }
+  };
+  function _docKindLabel(k){ return ({ agreement: 'Agreement', bcr: 'BCR', other: 'Other' })[k] || (k || 'Other'); }
+  async function renderNationDocsCard(sub){
+    var host = document.getElementById('cn-docs'); if (!host) return;
+    var r = await api('GET', '/nation_documents?subdomain=eq.' + encodeURIComponent(sub) + '&order=uploaded_at.desc');
+    var docs = r.ok ? await r.json().catch(function(){ return []; }) : [];
+    if (!docs.length){ host.innerHTML = '<div class="empty">No documents yet.</div>'; return; }
+    var rows = docs.map(function(d){
+      var when = '';
+      try { when = new Date(d.uploaded_at).toLocaleDateString(); } catch(e){}
+      return '<tr>'
+        + '<td><b>' + esc(d.name) + '</b></td>'
+        + '<td style="font-size:11px;color:var(--muted);">' + esc(_docKindLabel(d.kind)) + '</td>'
+        + '<td style="font-size:11px;color:var(--muted);">' + esc(when) + (d.uploaded_by ? ' &middot; ' + esc(d.uploaded_by) : '') + '</td>'
+        + '<td><div class="row-actions">'
+        +   '<button class="btn sm ghost" type="button" data-act="doc-dl" data-path="' + esc(d.path) + '">Download</button>'
+        +   '<button class="btn sm danger" type="button" data-act="doc-del" data-id="' + esc(d.id) + '" data-path="' + esc(d.path) + '" data-sub="' + esc(sub) + '">Delete</button>'
+        + '</div></td></tr>';
+    }).join('');
+    host.innerHTML = '<table><thead><tr><th>Document</th><th>Type</th><th>Added</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+  // The file <input> change can't be delegated; wire it after Configure renders.
+  function wireDocFileInput(){
+    var input = document.getElementById('cn-doc-file'); if (!input) return;
+    input.addEventListener('change', async function(){
+      var file = input.files && input.files[0]; if (!file) return;
+      var sub = input.getAttribute('data-sub');
+      var kind = (document.getElementById('cn-doc-kind') || {}).value || 'other';
+      setMsg('cn-doc-msg', 'Uploading ' + file.name + '...', 'ok');
+      try { await uploadDoc(sub, file, kind); setMsg('cn-doc-msg', 'Uploaded.', 'ok'); renderNationDocsCard(sub); }
+      catch (e){ setMsg('cn-doc-msg', 'Upload failed: ' + String(e && e.message || e)); }
+      input.value = '';
+    });
+  }
+
   // ---- Event delegation ------------------------------------------------------
   // Every button here is wired through ONE delegated listener keyed on
   // data-act, because this panel's CSP is `script-src 'self'` with NO
@@ -605,6 +926,10 @@
       // wizard; from a Configure page it prefills that nation.
       case 'provision':     window.showProvision(id); break;
       case 'run-provision': window.runProvision(); break;
+      case 'gen-agreement': window.generateNationAgreement(id); break;
+      case 'doc-pick':      { var fi = document.getElementById('cn-doc-file'); if (fi) fi.click(); break; }
+      case 'doc-dl':        window.downloadNationDoc(el.getAttribute('data-path') || ''); break;
+      case 'doc-del':       window.deleteNationDoc(el.getAttribute('data-id') || '', el.getAttribute('data-path') || '', el.getAttribute('data-sub') || ''); break;
     }
   });
 
