@@ -85,6 +85,12 @@
     document.getElementById('em').addEventListener('keydown', function(e){ if (e.key === 'Enter') sendLink(); });
   }
   function setMsg(id, t, k){ var el = document.getElementById(id); if (el){ el.className = 'msg ' + (k||'err'); el.textContent = t; } }
+  // Success message with an inline "View PDF" link (opens a blob URL in a new tab).
+  function setMsgWithView(id, text, url){
+    var el = document.getElementById(id); if (!el) return;
+    el.className = 'msg ok';
+    el.innerHTML = esc(text) + ' <a href="' + url + '" target="_blank" rel="noopener" style="font-weight:700;text-decoration:underline;color:inherit;">View PDF &rarr;</a>';
+  }
 
   async function sendLink(){
     var em = (document.getElementById('em').value || '').trim();
@@ -888,10 +894,11 @@
         var doc = buildAgreementPdf(name, addr);
         var safe = name.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
         var fname = 'Subscription-Agreement-' + safe + '.pdf';
-        doc.save(fname);                                   // download for immediate use
         var blob = doc.output('blob');
+        var viewUrl = URL.createObjectURL(blob);
+        doc.save(fname);                                   // download for immediate use
         await uploadDoc(n.subdomain, new File([blob], fname, { type: 'application/pdf' }), 'agreement');
-        setMsg('cn-agr-msg', 'Generated and saved to the document library.', 'ok');
+        setMsgWithView('cn-agr-msg', 'Generated and saved to the document library.', viewUrl);
         renderNationDocsCard(n.subdomain);
       } catch (e){ setMsg('cn-agr-msg', 'Could not generate: ' + String(e && e.message || e)); }
     }, function(){ setMsg('cn-agr-msg', 'Could not load the PDF generator (offline?).'); });
@@ -1131,10 +1138,12 @@
         if (!r.ok){ var t = await r.text(); setMsg('cn-inv-msg', /duplicate|unique/i.test(t) ? 'Number collision, try again.' : 'Could not save invoice.'); return; }
         var doc = buildInvoicePdf(n, inv);
         var fname = number + '.pdf';
+        var blob = doc.output('blob');
+        var viewUrl = URL.createObjectURL(blob);
         doc.save(fname);
-        try { await uploadDoc(sub, new File([doc.output('blob')], fname, { type: 'application/pdf' }), 'invoice'); } catch(e){}
+        try { await uploadDoc(sub, new File([blob], fname, { type: 'application/pdf' }), 'invoice'); } catch(e){}
         await audit('nation_invoice_created', sub, number);
-        setMsg('cn-inv-msg', 'Invoice ' + number + ' created (PDF downloaded + filed in Documents).', 'ok');
+        setMsgWithView('cn-inv-msg', 'Invoice ' + number + ' created and filed in Documents.', viewUrl);
         document.getElementById('cn-inv-lines').innerHTML = ''; invAddLine();
         var tn = document.getElementById('cn-inv-notes'); if (tn) tn.value = '';
         renderNationInvoices(sub); renderNationDocsCard(sub); loadNicSummary(sub);
