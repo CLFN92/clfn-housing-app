@@ -1,0 +1,50 @@
+name: Deploy admin panel to Cloudflare
+
+# Deploys the platform admin panel (wrangler.admin.jsonc -> the fnhub-admin
+# Worker at admin.fnhub.app) via `wrangler deploy`, which promotes the version
+# to live traffic. Separate from the nation-app deploy (deploy-cloudflare.yml):
+# that one serves the repo root and excludes admin/ via .assetsignore, so the
+# admin panel needs its own deploy step.
+#
+# Runs on push to main that touches admin/ (or this workflow / the admin
+# wrangler config), and on manual dispatch (Actions -> this workflow ->
+# "Run workflow").
+#
+# Reuses the same two repository secrets as the nation-app deploy:
+#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+# Until both exist the job runs green and simply skips (no red failures).
+#
+# NOTE: if the fnhub-admin Worker also has a Git-connected Cloudflare "Workers
+# Build", disable that build to avoid deploying the panel twice.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'admin/**'
+      - 'wrangler.admin.jsonc'
+      - '.github/workflows/deploy-admin-cloudflare.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for Cloudflare secrets
+        id: secrets
+        run: |
+          if [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] && [ -n "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping admin deploy - add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repo secrets to enable live deploys."
+          fi
+
+      - name: Deploy admin panel with Wrangler
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 deploy -c wrangler.admin.jsonc
