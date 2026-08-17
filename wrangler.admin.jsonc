@@ -16,13 +16,16 @@
   "compatibility_date": "2026-07-30",
   "assets": {
     "directory": "admin"
-  },
-  // Bind the custom domain to THIS worker so `wrangler deploy` (which promotes
-  // to live traffic) also points admin.fnhub.app at the promoted version. The
-  // Cloudflare Workers Build for this project uses `versions upload` (no
-  // promote), so without this the domain can serve a stale, never-promoted
-  // version.
-  "routes": [
-    { "pattern": "admin.fnhub.app", "custom_domain": true }
-  ]
+  }
+  // NOTE: the admin.fnhub.app custom domain is bound to this Worker ONCE, in the
+  // Cloudflare dashboard (Workers & Pages -> fnhub-admin -> Settings -> Domains).
+  // We deliberately do NOT declare it as a route here: a `custom_domain: true`
+  // route makes every `wrangler deploy` reconcile the binding via the zone
+  // Workers-Routes API, which fails (Authentication error 10000) unless the
+  // CLOUDFLARE_API_TOKEN carries the Zone -> Workers Routes -> Edit permission --
+  // turning every admin deploy red even though the Worker + assets uploaded
+  // fine. Once the custom domain is bound, `wrangler deploy` promotes the new
+  // version and the existing binding serves it automatically, so the route
+  // declaration is unnecessary. If you ever need wrangler to manage the binding
+  // again, add that token permission first, then restore the "routes" block.
 }
