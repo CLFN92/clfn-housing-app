@@ -40,7 +40,9 @@
     supaFns:  'https://supabase.com/dashboard/project/_/settings/functions', // Edge Function secrets
     supaCli:  'https://supabase.com/docs/guides/functions/deploy',        // functions deploy docs
     cf:       'https://dash.cloudflare.com',                              // Cloudflare (DNS + Workers)
-    gh:       'https://github.com/CLFN92/clfn-housing-app/actions'        // deploy workflows
+    gh:       'https://github.com/CLFN92/clfn-housing-app/actions',       // deploy workflows
+    azure:    'https://portal.azure.com',                                // Entra app registrations
+    resend:   'https://resend.com/domains'                               // verify domain + API keys
   };
   function extLink(href, label){ return '<a href="' + href + '" target="_blank" rel="noopener" style="color:#1d4ed8;font-weight:600;">' + label + '</a>'; }
   // Small muted "where to find it" line under a form field.
@@ -208,7 +210,14 @@
       ['Provision (schema, bucket, first ED)', 'auto',
         'Click <b>Provision this nation</b> below. The platform replays the bootstrap schema, creates the <code>housing-files</code> storage bucket, seeds the first ED, and writes the registry row &mdash; one action. (Requires <code>SUPABASE_MGMT_TOKEN</code> set on the platform function.) The service_role key is used once and never stored.'],
       ['Set the project\'s Edge Function secrets', 'manual',
-        'On the new project, add the function secrets (email/Graph or Resend, <code>ANTHROPIC_API_KEY</code>, etc.): ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions') + '. Also run the <code>hs_data_usage</code> migration there so this panel\'s usage column fills in.'],
+        'On the new project, add the non-email function secrets (e.g. <code>ANTHROPIC_API_KEY</code> for the AI assistant): ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions') + '. Email secrets are the next step. Also run the <code>hs_data_usage</code> migration there so this panel\'s usage column fills in.'],
+      ['Set up email notifications (Microsoft 365 / Azure or Resend)', 'manual',
+        'Transactional email goes through the <code>send-notification</code> function; each nation picks a provider with the <code>EMAIL_PROVIDER</code> secret, then adds the matching secrets in ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions') + '.'
+        + '<div style="margin-top:6px;padding-left:10px;border-left:3px solid var(--hair);">'
+        +   '<div style="margin-bottom:5px;"><b>Microsoft 365 / Azure</b> (<code>EMAIL_PROVIDER=graph</code>) &mdash; register an Entra app with the <b>Mail.Send</b> application permission in the ' + extLink(LINKS.azure, 'Azure portal') + ', then set <code>GRAPH_TENANT_ID</code>, <code>GRAPH_CLIENT_ID</code>, <code>GRAPH_CLIENT_SECRET</code>, and <code>GRAPH_FROM_USER</code> (a licensed/shared mailbox to send from).</div>'
+        +   '<div><b>Resend</b> (<code>EMAIL_PROVIDER=resend</code>) &mdash; verify the sending domain and create an API key at ' + extLink(LINKS.resend, 'Resend') + ', then set <code>RESEND_API_KEY</code>, <code>EMAIL_FROM</code>, and <code>EMAIL_FROM_NAME</code>. (No M365 needed &mdash; good for nations without Microsoft.)</div>'
+        + '</div>'
+        + 'Optional for either provider: <code>EMAIL_BRAND</code> (footer wordmark) and <code>EMAIL_REPLY_TO</code>. Defaults to <code>graph</code> if unset.'],
       ['Deploy the Edge Functions to the project', 'manual',
         'The ' + extLink(LINKS.gh, 'GitHub Actions') + ' deploy targets one project via the <code>SUPABASE_PROJECT_ID</code> repo secret. For a new nation, deploy to its ref: <code>supabase functions deploy --project-ref &lt;ref&gt;</code> (' + extLink(LINKS.supaCli, 'docs') + '), or point that secret at it and push. Control-plane-only functions (<code>provision-nation</code>, <code>report-nation-usage</code>) are excluded from that workflow by design.'],
       ['Cloudflare subdomain', 'auto',
