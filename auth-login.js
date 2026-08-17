@@ -554,7 +554,11 @@ function initLoginPage() {
   var logoEl = document.getElementById('login-logo');
   var _nc = window.NATION_CONFIG || {};
   if (logoEl) logoEl.src = _nc.logo || window.HLH_LOGO_DATA_URL || (typeof CLFN_LOGO_DATA_URL === 'string' ? CLFN_LOGO_DATA_URL : '');
-  if (_nc.primary_color) { try { document.documentElement.style.setProperty('--yellow', _nc.primary_color); } catch (e) {} }
+  if (_nc.primary_color) {
+    try { document.documentElement.style.setProperty('--yellow', _nc.primary_color); } catch (e) {}
+    // Header / dark surfaces on the sign-in screen follow the brand colour too.
+    try { if (typeof window._applyBrandDark === 'function') window._applyBrandDark(_nc.primary_color); } catch (e) {}
+  }
 
   loadRememberedEmail();
 

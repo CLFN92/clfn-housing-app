@@ -152,6 +152,69 @@
     el.innerHTML = esc(text) + ' <a href="' + url + '" target="_blank" rel="noopener" style="font-weight:700;text-decoration:underline;color:inherit;">View PDF &rarr;</a>';
   }
 
+  // ---- Branded modal dialogs (replace native alert/confirm/prompt) -----------
+  // The browser's own alert()/confirm()/prompt() render an unbranded
+  // "admin.fnhub.app says" box. These build DOM styled to the panel brand
+  // (--ink header, --accent primary button) and return Promises so the async
+  // invoice/flow code can `await` them. CSP is script-src 'self', so listeners
+  // are wired directly (no inline handlers).
+  function _dlgEnsureStyle(){
+    if (document.getElementById('dlg-style')) return;
+    var s = document.createElement('style'); s.id = 'dlg-style';
+    s.textContent =
+      '.dlg-ov{position:fixed;inset:0;background:rgba(17,17,16,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:18px;}'
+    + '.dlg{background:var(--surface);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.3);max-width:440px;width:100%;overflow:hidden;animation:dlgin .12s ease-out;}'
+    + '@keyframes dlgin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}'
+    + '.dlg-hd{background:var(--ink);color:#fff;padding:12px 18px;font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;}'
+    + '.dlg-hd .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;}'
+    + '.dlg-bd{padding:16px 18px;font-size:14px;color:var(--ink);white-space:pre-wrap;line-height:1.5;}'
+    + '.dlg-bd label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:12px 0 4px;white-space:normal;}'
+    + '.dlg-err{color:var(--danger);font-size:12px;margin-top:6px;min-height:14px;}'
+    + '.dlg-ft{display:flex;justify-content:flex-end;gap:8px;padding:4px 18px 16px;}'
+    + '.dlg-ft .btn{margin-top:0;padding:9px 16px;font-size:14px;}';
+    document.head.appendChild(s);
+  }
+  function _dlgOpen(opts){
+    _dlgEnsureStyle();
+    return new Promise(function(resolve){
+      var ov = document.createElement('div'); ov.className = 'dlg-ov';
+      var html = '<div class="dlg-hd"><span class="dot"></span>' + esc(opts.title || 'Home Land Homes') + '</div>'
+        + '<div class="dlg-bd">' + (opts.bodyHtml || esc(opts.message || ''));
+      if (opts.prompt){
+        html += '<label>' + esc(opts.label || '') + '</label>'
+          + '<input id="dlg-input" type="' + (opts.inputType || 'text') + '" value="' + esc(opts.defaultValue == null ? '' : opts.defaultValue) + '"'
+          + (opts.placeholder ? ' placeholder="' + esc(opts.placeholder) + '"' : '')
+          + (opts.step ? ' step="' + esc(opts.step) + '"' : '') + '/>'
+          + '<div class="dlg-err" id="dlg-err"></div>';
+      }
+      html += '</div><div class="dlg-ft">';
+      if (opts.cancel !== false) html += '<button class="btn ghost" type="button" id="dlg-cancel">' + esc(opts.cancelText || 'Cancel') + '</button>';
+      html += '<button class="btn" type="button" id="dlg-ok">' + esc(opts.okText || 'OK') + '</button></div>';
+      var box = document.createElement('div'); box.className = 'dlg'; box.innerHTML = html;
+      ov.appendChild(box); document.body.appendChild(ov);
+      var input = box.querySelector('#dlg-input');
+      var errEl = box.querySelector('#dlg-err');
+      if (input){ try { input.focus(); input.select(); } catch(e){} }
+      function done(val){ if (ov.parentNode) ov.parentNode.removeChild(ov); document.removeEventListener('keydown', onKey); resolve(val); }
+      function ok(){
+        if (opts.prompt){
+          var v = (input && input.value || '').trim();
+          if (opts.validate){ var m = opts.validate(v); if (m){ if (errEl) errEl.textContent = m; return; } }
+          done(v);
+        } else done(true);
+      }
+      function cancel(){ done(opts.prompt ? null : false); }
+      var okBtn = box.querySelector('#dlg-ok'); if (okBtn) okBtn.onclick = ok;
+      var cBtn = box.querySelector('#dlg-cancel'); if (cBtn) cBtn.onclick = cancel;
+      ov.addEventListener('click', function(e){ if (e.target === ov) cancel(); });
+      function onKey(e){ if (e.key === 'Escape'){ e.preventDefault(); cancel(); } else if (e.key === 'Enter'){ e.preventDefault(); ok(); } }
+      document.addEventListener('keydown', onKey);
+    });
+  }
+  function dlgAlert(message, opts){ opts = opts || {}; return _dlgOpen({ title: opts.title, message: message, bodyHtml: opts.bodyHtml, cancel: false, okText: opts.okText || 'OK' }); }
+  function dlgConfirm(message, opts){ opts = opts || {}; return _dlgOpen({ title: opts.title, message: message, bodyHtml: opts.bodyHtml, okText: opts.okText || 'Confirm', cancelText: opts.cancelText }); }
+  function dlgPrompt(label, defaultValue, opts){ opts = opts || {}; return _dlgOpen({ title: opts.title, message: opts.message || '', bodyHtml: opts.bodyHtml, prompt: true, label: label, defaultValue: defaultValue, inputType: opts.inputType, step: opts.step, placeholder: opts.placeholder, validate: opts.validate, okText: opts.okText || 'Save' }); }
+
   async function sendLink(){
     var em = (document.getElementById('em').value || '').trim();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { setMsg('lmsg','Please enter a valid email address.'); return; }
@@ -537,6 +600,7 @@
       +   '<div id="cn-invoices"><div class="empty">Loading invoices...</div></div>'
       +   '<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px;">'
       +     '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">New invoice</div>'
+      +     '<div id="cn-inv-carry" style="display:none;background:var(--accent-light);border:1px solid #fde68a;border-radius:9px;padding:9px 11px;margin-bottom:10px;"></div>'
       +     '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px;">'
       +       '<div style="flex:1;min-width:230px;"><label>Fee schedule</label>' + _feeScheduleSelectHtml() + '</div>'
       +       '<button class="btn sm" type="button" data-act="inv-add-catalog">Add selected &darr;</button>'
@@ -944,17 +1008,77 @@
     '-Notices. Notices must be in writing and delivered to the contacts listed in Schedule A (email is sufficient, with confirmation of receipt for termination or breach notices).',
     '-Severability; waiver. Invalid provisions are severed without affecting the remainder; a waiver applies only to the instance given in writing.',
     '-Counterparts. This Agreement may be signed in counterparts, including electronically.',
-    '##Signatures',
-    'Each signatory confirms they are authorized to bind the party they sign for. Where the Nation\'s governance requires it, the Nation\'s signature may be supported by a Band Council Resolution referenced below.',
-    '###PROVIDER: Kevin Proctor, operating as Home Land Homes',
-    'Signature: ______________________________     Date: ____________________',
-    'Name: Kevin Proctor',
-    'Title: Founder, Home Land Homes',
-    '{{PROVIDER_CONTACT}}',
-    '###THE NATION: {{NATION}}',
+    '##17. Execution',
+    'IN WITNESS WHEREOF, the parties have executed this Agreement by their duly authorized representatives as of the Effective Date. Each signatory confirms that they are authorized to bind the party for which they sign. Where the Nation\'s governance processes require it, the Nation\'s signature may be supported by a Band Council Resolution referenced below.',
+    '###FOR THE NATION: {{NATION}}',
     'Signature: ______________________________     Date: ____________________',
     'Name: ______________________________     Title: ____________________',
-    'Band Council Resolution No. (if applicable): ____________________'
+    'Band Council Resolution No. (if applicable): ____________________',
+    '###FOR THE PROVIDER: Kevin Proctor, operating as Home Land Homes',
+    'Signature: ______________________________     Date: ____________________',
+    'Name: Kevin Proctor     Title: Founder, Home Land Homes',
+    '{{PROVIDER_CONTACT}}',
+    '##Schedule A - Order Form',
+    'Select one tier and one billing option. Prices are in Canadian dollars and match the Provider\'s published schedule as of the Effective Date.',
+    '###Subscription tiers',
+    '-[ ] Small - up to 100 homes: $4,740/year ($395/mo) or $435/month; one-time setup $2,500.',
+    '-[ ] Mid-size - 101-300 homes: $8,340/year ($695/mo) or $765/month; one-time setup $4,500.',
+    '-[ ] Large - 301-600 homes: $13,140/year ($1,095/mo) or $1,205/month; one-time setup $7,500.',
+    '-[ ] 600+ / Tribal Council - custom: annual per quote; monthly per quote; setup per quote.',
+    '###Billing and options',
+    'Billing option selected: [ ] Annual (invoiced annually in advance)     [ ] Monthly (+10% rate above)',
+    'Setup discount: [ ] One-year term with first year prepaid - setup fee reduced 50% to $______ (Section 7.3)',
+    'Optional add-on: [ ] AI Staff Assistant - $95/month. Acknowledgement and approval: by selecting this add-on, the Nation acknowledges and approves that each AI query (the staff question and the minimum related housing records needed to answer it) is processed in the United States by the Provider\'s AI subprocessor (Anthropic) as described in Schedule D; that this data is read-only for the query, is not retained for model training, and that the feature may be disabled by the Nation at any time in Platform settings. This selection is the Nation\'s written approval under Section 3.1. Initials: ____________',
+    'Email delivery method (Schedule D): [ ] Nation\'s own Microsoft 365 tenant (requires the Nation\'s Microsoft administrator to grant application consent during setup)     [ ] Provider-managed transactional email service (Resend or SendGrid - United States; see Schedule D)',
+    'Additional setup line items from scoping call (if any; flat fees - Section 5): ______________________________',
+    '###Term and contacts',
+    'Initial Term: [ ] One (1) year from the Effective Date     [ ] Other: ______________',
+    'Included modules: applications & waitlist, unit inventory, tenants, matching, maintenance & work orders, renovations & RFQ tendering, contractor registry, inspections, capital projects, finance, Chief & Council dashboard, tenant/applicant portal.',
+    'Nation\'s primary contact for notices: name ____________________ email ____________________',
+    'Provider contact for notices: Kevin Proctor - hello@homelandhomes.ca',
+    '##Schedule B - Setup Services (Scope)',
+    '###Included in the setup fee',
+    '-Provisioning of the Nation\'s dedicated workspace, database, subdomain and branding.',
+    '-Configuration of roles, approval authorities and module settings with the Nation\'s administrator.',
+    '-Email notification setup using the delivery method selected in Schedule A. Where the Nation\'s own Microsoft 365 tenant is selected, the Nation is responsible for having its Microsoft administrator grant the required application consent; if that consent is not obtained within thirty (30) days of the Effective Date, the parties will proceed with the transactional email service option (Schedule D) so go-live is not delayed.',
+    '-Migration of the Nation\'s current unit, tenant and application/waitlist records from up to three (3) source files or systems supplied in reasonably usable condition (spreadsheets, exports, or organized paper records).',
+    '-Migration method: where AI tools assist with data mapping, they are used on column structure and synthetic sample data only (Section 4.3); the Nation\'s actual records are transformed and loaded by the Provider directly onto the Nation\'s infrastructure in Canada and are never submitted to AI systems.',
+    '-Live remote training: two (2) sessions (Small tier), four (4) sessions (Mid-size tier), or six (6) sessions (Large tier), each up to 90 minutes, recorded for the Nation\'s reuse.',
+    '-Go-live support for sixty (60) days following the training period.',
+    '###Not included (quoted as flat line items in Schedule A before signature, if requested)',
+    '-Entry or cleanup of extensive historical/archival records beyond current state.',
+    '-Migration from more than three source systems, or data requiring substantial cleanup or deduplication.',
+    '-On-site (in-community) training and related travel.',
+    'The Provider will not invoice setup amounts beyond those stated in Schedule A (Section 5). If source data turns out to be materially worse than represented, the parties will discuss scope in good faith, but any additional fee requires the Nation\'s written agreement.',
+    '###Additional services and travel (hourly)',
+    '-Work outside the included scope that the Nation requests in writing - for example extended data cleanup or entry of historical records, additional training sessions, custom reports, or consulting - is billed at $150 per hour, in fifteen (15) minute increments. The Provider will give a written estimate before starting, and will not exceed the estimate without the Nation\'s written approval.',
+    '-Where the Nation requests on-site work, travel expenses (transportation, accommodation, meals and incidentals) are billed at the rates in the National Joint Council (NJC) Travel Directive in effect at the time of travel, at cost, with no markup.',
+    '-Time spent in travel is billed at fifty percent (50%) of the hourly rate ($75 per hour), to a maximum of eight (8) hours of travel time per travel day.',
+    '##Schedule C - Support and Service Levels',
+    '###Support',
+    '-Email support at hello@homelandhomes.ca, business hours 9:00-17:00 Eastern, Monday to Friday excluding statutory holidays.',
+    '-Response service level: every support request receives a response within twenty-four (24) business hours of receipt (business hours as defined above; hours resume the next business day). Critical issues (Platform unavailable or data at risk) are prioritized ahead of all other requests.',
+    '###Availability',
+    '-Target availability of 99.5% per calendar month, excluding scheduled maintenance (announced at least 24 hours in advance and scheduled outside business hours where practicable) and force majeure.',
+    '-If availability falls below target in two consecutive months, the Nation may request a service credit of 5% of that month\'s subscription fee per full percentage point below target, up to 25% of the monthly fee, as its exclusive remedy for availability shortfalls.',
+    '###Data protection operations',
+    '-Automated daily database backups retained for at least seven (7) days (Section 3.3).',
+    '-Offline-capable field workflows: work entered on degraded connections is queued on-device and synchronized when connectivity returns.',
+    '-Append-only audit logging of material actions, available to the Nation\'s authorized administrators within the Platform.',
+    '##Schedule D - Third-Party Systems and Subprocessors',
+    'The Provider uses the following third-party systems to deliver the Platform. Systems marked "core" are required for the service; systems marked "optional" process Customer Data only if the Nation enables the corresponding feature.',
+    '###Supabase (core)',
+    'Role: Database, authentication, file storage, serverless functions. Customer Data processed: all Customer Data in the Nation\'s dedicated database and storage. Data location: Canada (Canadian region project).',
+    '###Cloudflare (core)',
+    'Role: Web delivery, DNS, network security for the application. Customer Data processed: data in transit only; no persistent storage of Customer Data. Data location: global edge network (transit); no storage.',
+    '###Email delivery (core) - one of the following, as recorded in Schedule A',
+    'Role: outbound email notifications (e.g., application confirmations, work orders, tenant copies). Customer Data processed: names, email addresses, notification content and any attached documents (e.g., PDF copies) of outbound messages. Data location: (a) Nation\'s own Microsoft 365 tenant (Graph): per the Nation\'s Microsoft tenant region. (b) Transactional email service (Resend or SendGrid): United States (message content in transit and delivery logs).',
+    '###Anthropic (optional - AI Assistant add-on)',
+    'Role: processes staff questions for the AI Assistant. Customer Data processed: the staff question and the minimum related housing records needed to answer it; read-only; not used for model training. Data location: United States.',
+    '###OpenStreetMap (core - mapping features)',
+    'Role: map display for unit locations. Customer Data processed: unit coordinates only (no names or personal information). Data location: global (OpenStreetMap Foundation infrastructure).',
+    'Email delivery depends on the Nation\'s setup, and the method used is recorded in Schedule A. Where the Nation operates Microsoft 365 and its Microsoft administrator grants the required application consent, notifications are sent from the Nation\'s own mailbox and message content remains within the Nation\'s Microsoft environment (option (a)). Where that is not available - including where the Provider is not granted administrator access to configure the Nation\'s Microsoft tenant - the Provider uses a transactional email service (option (b)), in which case message content transits, and delivery logs are held on, infrastructure located in the United States. In all cases, email by its nature leaves the Platform to reach recipients\' own mail systems. The parties may switch between email delivery options after the Effective Date by written agreement (email sufficient), and this Schedule is deemed updated accordingly.',
+    'For clarity: the AI Assistant is a paid optional add-on that operates only where the Nation has selected and initialled it in Schedule A, which constitutes the Nation\'s acknowledgement and approval of the processing described above (Sections 3.1 and 4.3). Query data is processed outside Canada only for the duration of each query, is not retained for training, and the feature can be disabled by the Nation at any time in Platform settings, at which point no Customer Data flows to that subprocessor. Apart from outbound email delivered under option (b) above and the optional AI Assistant, no listed system stores Customer Data outside Canada. The Provider will keep this Schedule current under the subcontracting terms in Section 16.'
   ].join('\n');
 
   function _fmtDateLong(){
@@ -1001,7 +1125,13 @@
       if (line.slice(0, 1) === '#' && line.slice(0, 2) !== '##') { block(line.slice(1), { style: 'bold', size: 16, align: 'center', after: 3 }); return; }
       if (line.charAt(0) === '%') { block(line.slice(1), { size: 11, align: 'center', color: [90, 90, 90], after: 12 }); return; }
       if (line.slice(0, 3) === '###') { ensure(30); block(line.slice(3), { style: 'bold', size: 10.5, after: 3 }); return; }
-      if (line.slice(0, 2) === '##') { ensure(40); y += 6; block(line.slice(2), { style: 'bold', size: 12.5, after: 5 }); return; }
+      if (line.slice(0, 2) === '##') {
+        var htext = line.slice(2);
+        if (htext.indexOf('Schedule ') === 0 || htext.indexOf('17. Execution') === 0) { doc.addPage(); y = M; }
+        else { ensure(40); y += 6; }
+        block(htext, { style: 'bold', size: 12.5, after: 5 });
+        return;
+      }
       if (line.charAt(0) === '-') { block('•  ' + line.slice(1), { size: 10, indent: 14, after: 5 }); return; }
       block(line, { size: 10 });
     });
@@ -1178,10 +1308,9 @@
       }
     } catch(e){}
     try {
-      var iv = await api('GET', '/nation_invoices?subdomain=eq.' + encodeURIComponent(sub) + '&select=total,status');
+      var iv = await api('GET', '/nation_invoices?subdomain=eq.' + encodeURIComponent(sub) + '&select=total,amount_paid,status');
       var ivr = iv.ok ? await iv.json().catch(function(){ return []; }) : [];
-      var out = ivr.filter(function(x){ return x.status === 'sent' || x.status === 'draft'; })
-                   .reduce(function(a, x){ return a + Number(x.total || 0); }, 0);
+      var out = ivr.filter(_invOwing).reduce(function(a, x){ return a + _invBalance(x); }, 0);
       var iel = document.getElementById('cn-sum-inv');
       if (iel){ iel.style.color = ''; iel.innerHTML = _money(out); }
     } catch(e){}
@@ -1211,7 +1340,11 @@
   };
 
   // ---- Invoices --------------------------------------------------------------
-  var INV_STATUS = { draft: ['Draft', 'provisioning'], sent: ['Sent', 'provisioning'], paid: ['Paid', 'active'], void: ['Void', 'suspended'] };
+  var INV_STATUS = { draft: ['Draft', 'provisioning'], sent: ['Sent', 'provisioning'], partial: ['Partially paid', 'provisioning'], paid: ['Paid', 'active'], void: ['Void', 'suspended'], carried: ['Carried forward', 'active'] };
+  // Outstanding balance on an invoice = total minus what's been received.
+  function _invBalance(x){ return Math.round(((Number(x.total) || 0) - (Number(x.amount_paid) || 0)) * 100) / 100; }
+  // Statuses that still owe money (feed the Outstanding KPI + carry-forward).
+  function _invOwing(x){ return (x.status === 'draft' || x.status === 'sent' || x.status === 'partial') && _invBalance(x) > 0.005; }
   window.invAddLine = function(prefill){
     var host = document.getElementById('cn-inv-lines'); if (!host) return;
     prefill = prefill || {};
@@ -1256,40 +1389,149 @@
     var host = document.getElementById('cn-invoices'); if (!host) return;
     var r = await api('GET', '/nation_invoices?subdomain=eq.' + encodeURIComponent(sub) + '&order=issue_date.desc');
     var inv = r.ok ? await r.json().catch(function(){ return []; }) : [];
-    if (!inv.length){ host.innerHTML = '<div class="empty">No invoices yet.</div>'; return; }
-    var rows = inv.map(function(x){
-      var st = INV_STATUS[x.status] || ['?', 'provisioning'];
-      var acts = '';
-      if (x.status === 'draft') acts += '<button class="btn sm ghost" type="button" data-act="inv-status" data-id="' + esc(x.id) + '" data-status="sent" data-sub="' + esc(sub) + '">Mark sent</button>';
-      if (x.status === 'draft' || x.status === 'sent') acts += '<button class="btn sm ghost" type="button" data-act="inv-paid" data-id="' + esc(x.id) + '" data-sub="' + esc(sub) + '">Mark paid</button>';
-      if (x.status === 'sent' || x.status === 'paid') acts += '<button class="btn sm ghost" type="button" data-act="inv-interest" data-id="' + esc(x.id) + '" data-sub="' + esc(sub) + '" title="Add past-due interest (1%/month)">+ Interest</button>';
-      if (x.status !== 'void' && x.status !== 'paid') acts += '<button class="btn sm danger" type="button" data-act="inv-status" data-id="' + esc(x.id) + '" data-status="void" data-sub="' + esc(sub) + '">Void</button>';
-      var meta = [];
-      if (x.due_date)  meta.push('due ' + esc(x.due_date));
-      if (x.paid_date) meta.push('paid ' + esc(x.paid_date));
-      return '<tr>'
-        + '<td><b>' + esc(x.number) + '</b></td>'
-        + '<td style="font-size:11px;color:var(--muted);">' + esc(x.issue_date || '') + '</td>'
-        + '<td style="font-variant-numeric:tabular-nums;">' + _money(x.total, x.currency) + '</td>'
-        + '<td><span class="pill ' + st[1] + '">' + st[0] + '</span>' + (meta.length ? '<div style="font-size:10px;color:var(--muted);margin-top:2px;">' + meta.join(' · ') + '</div>' : '') + '</td>'
-        + '<td><div class="row-actions">' + acts + '</div></td></tr>';
-    }).join('');
-    host.innerHTML = '<table><thead><tr><th>Invoice</th><th>Issued</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+    // Stash for on-demand PDF view + carry-forward. Clearing any pending
+    // carry-forward intent here means a re-render (nation switch / tab reopen)
+    // can't leak it onto an unrelated invoice; the create flow runs before any
+    // re-render, so the normal carry->create path is unaffected.
+    window._nicInvoices = inv;
+    window._nicCarryIds = null;
+    if (!inv.length){ host.innerHTML = '<div class="empty">No invoices yet.</div>'; }
+    else {
+      var rows = inv.map(function(x){
+        var bal = _invBalance(x);
+        var paidAmt = Number(x.amount_paid) || 0;
+        // Show "Partially paid" for a sent invoice with some (but not full) payment.
+        var effStatus = (x.status === 'sent' && paidAmt > 0.005 && bal > 0.005) ? 'partial' : x.status;
+        var st = INV_STATUS[effStatus] || ['?', 'provisioning'];
+        var acts = '';
+        if (x.status === 'draft') acts += '<button class="btn sm ghost" type="button" data-act="inv-status" data-id="' + esc(x.id) + '" data-status="sent" data-sub="' + esc(sub) + '">Mark sent</button>';
+        if (_invOwing(x)) acts += '<button class="btn sm ghost" type="button" data-act="inv-pay" data-id="' + esc(x.id) + '" data-sub="' + esc(sub) + '">Record payment</button>';
+        if (x.status === 'sent' || x.status === 'partial' || x.status === 'paid') acts += '<button class="btn sm ghost" type="button" data-act="inv-interest" data-id="' + esc(x.id) + '" data-sub="' + esc(sub) + '" title="Add past-due interest (1%/month)">+ Interest</button>';
+        if (x.status !== 'void' && x.status !== 'paid' && x.status !== 'carried') acts += '<button class="btn sm danger" type="button" data-act="inv-status" data-id="' + esc(x.id) + '" data-status="void" data-sub="' + esc(sub) + '">Void</button>';
+        var meta = [];
+        if (x.due_date)  meta.push('due ' + esc(x.due_date));
+        if (paidAmt > 0.005 && bal > 0.005) meta.push('paid ' + _money(paidAmt) + ' of ' + _money(x.total));
+        if (x.paid_date) meta.push((bal > 0.005 ? 'last pmt ' : 'paid ') + esc(x.paid_date));
+        if (bal > 0.005 && (x.status === 'sent' || x.status === 'partial')) meta.push('<b style="color:var(--danger);">balance ' + _money(bal) + '</b>');
+        return '<tr>'
+          + '<td><button class="btn sm ghost" type="button" data-act="inv-view" data-id="' + esc(x.id) + '" data-sub="' + esc(sub) + '" title="View invoice PDF" style="margin:0;padding:2px 6px;font-weight:700;text-decoration:underline;">' + esc(x.number) + '</button></td>'
+          + '<td style="font-size:11px;color:var(--muted);">' + esc(x.issue_date || '') + '</td>'
+          + '<td style="font-variant-numeric:tabular-nums;">' + _money(x.total, x.currency) + '</td>'
+          + '<td><span class="pill ' + st[1] + '">' + st[0] + '</span>' + (meta.length ? '<div style="font-size:10px;color:var(--muted);margin-top:2px;">' + meta.join(' · ') + '</div>' : '') + '</td>'
+          + '<td><div class="row-actions">' + acts + '</div></td></tr>';
+      }).join('');
+      host.innerHTML = '<table><thead><tr><th>Invoice</th><th>Issued</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+    // Carry-forward banner in the New invoice area: total unpaid balance across
+    // all owing invoices, one click to add it as a line on the next invoice.
+    var cf = document.getElementById('cn-inv-carry');
+    if (cf){
+      var owing = inv.filter(_invOwing);
+      var total = Math.round(owing.reduce(function(a, x){ return a + _invBalance(x); }, 0) * 100) / 100;
+      if (owing.length){
+        cf.style.display = '';
+        cf.innerHTML = '<div style="font-size:12px;color:var(--ink);">Outstanding from ' + owing.length + ' invoice' + (owing.length > 1 ? 's' : '')
+          + ': <b>' + _money(total) + '</b> (' + owing.map(function(x){ return esc(x.number); }).join(', ') + ')</div>'
+          + '<button class="btn sm ghost" type="button" data-act="inv-carry" data-sub="' + esc(sub) + '" style="margin:6px 0 0;">+ Carry forward ' + _money(total) + ' onto this invoice</button>';
+      } else { cf.style.display = 'none'; cf.innerHTML = ''; }
+    }
   }
   window.setInvoiceStatus = async function(id, status, sub){
-    if (status === 'void' && !confirm('Void this invoice?')) return;
+    if (status === 'void' && !(await dlgConfirm('Void this invoice? This cannot be undone.', { title: 'Void invoice', okText: 'Void invoice' }))) return;
     var r = await api('PATCH', '/nation_invoices?id=eq.' + encodeURIComponent(id), { status: status, updated_at: new Date().toISOString() }, 'return=minimal');
     if (r.ok){ await audit('nation_invoice_' + status, sub, id); renderNationInvoices(sub); loadNicSummary(sub); }
   };
-  // Mark paid + capture the payment date (used by the interest calculation).
-  window.invMarkPaid = async function(id, sub){
-    var d = prompt('Payment received date (YYYY-MM-DD):', _dPlus(0));
+  // Re-generate this invoice's PDF from its CURRENT stored data (so interest
+  // lines, carried balances, etc. are included) and open it in a new tab.
+  window.viewNationInvoice = function(id, sub){
+    var inv = (window._nicInvoices || []).filter(function(x){ return String(x.id) === String(id); })[0];
+    if (!inv){ dlgAlert('Invoice not loaded — reopen the Invoices tab and try again.'); return; }
+    var n = _nations.filter(function(x){ return x.subdomain === sub; })[0];
+    ensureJsPdf(function(){
+      try {
+        var doc = buildInvoicePdf(n, inv);
+        var url = URL.createObjectURL(doc.output('blob'));
+        window.open(url, '_blank', 'noopener');
+      } catch (e){ dlgAlert('Could not open the invoice: ' + String(e && e.message || e)); }
+    }, function(){ dlgAlert('Could not load the PDF generator (offline?).'); });
+  };
+  // Record a (full or partial) payment: accrue amount_paid, stamp the last
+  // payment date, and settle the invoice once the balance reaches zero.
+  window.invRecordPayment = async function(id, sub){
+    var g = await api('GET', '/nation_invoices?id=eq.' + encodeURIComponent(id));
+    var inv = (g.ok ? await g.json().catch(function(){ return []; }) : [])[0];
+    if (!inv){ dlgAlert('Invoice not found.'); return; }
+    var bal = _invBalance(inv);
+    var amt = await dlgPrompt('Amount received (CAD)', bal.toFixed(2), {
+      title: 'Record payment', inputType: 'number', step: '0.01',
+      message: 'Invoice ' + inv.number + ' — total ' + _money(inv.total) + ', balance ' + _money(bal) + '.',
+      validate: function(v){ var f = parseFloat(v); if (isNaN(f) || f <= 0) return 'Enter an amount greater than zero.'; if (f > bal + 0.005) return 'Amount exceeds the outstanding balance (' + _money(bal) + ').'; return ''; }
+    });
+    if (amt === null) return;
+    var d = await dlgPrompt('Payment received date', _dPlus(0), {
+      title: 'Record payment', inputType: 'text', placeholder: 'YYYY-MM-DD',
+      validate: function(v){ return /^\d{4}-\d{2}-\d{2}$/.test(v) ? '' : 'Enter the date as YYYY-MM-DD.'; }
+    });
     if (d === null) return;
-    d = String(d).trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)){ alert('Enter the date as YYYY-MM-DD.'); return; }
-    var r = await api('PATCH', '/nation_invoices?id=eq.' + encodeURIComponent(id), { status: 'paid', paid_date: d, updated_at: new Date().toISOString() }, 'return=minimal');
-    if (r.ok){ await audit('nation_invoice_paid', sub, id + ' ' + d); renderNationInvoices(sub); loadNicSummary(sub); }
-    else { alert('Could not record payment.'); }
+    var paid = Math.round(((Number(inv.amount_paid) || 0) + parseFloat(amt)) * 100) / 100;
+    var newBal = Math.round(((Number(inv.total) || 0) - paid) * 100) / 100;
+    var status = newBal <= 0.005 ? 'paid' : 'sent';
+    var r = await api('PATCH', '/nation_invoices?id=eq.' + encodeURIComponent(id), { amount_paid: paid, paid_date: d, status: status, updated_at: new Date().toISOString() }, 'return=minimal');
+    if (r.ok){
+      await audit('nation_invoice_payment', sub, inv.number + ': ' + _money(parseFloat(amt)) + ' on ' + d + ' (bal ' + _money(newBal) + ')');
+      renderNationInvoices(sub); loadNicSummary(sub);
+      if (newBal > 0.005) dlgAlert('Payment of ' + _money(parseFloat(amt)) + ' recorded. Remaining balance: ' + _money(newBal) + '.', { title: 'Payment recorded' });
+    }
+    else { dlgAlert('Could not record the payment.'); }
+  };
+  // Carry every owing invoice's balance forward as a single line on the next
+  // invoice, and mark the source invoices "carried forward" so the balance
+  // isn't double-counted. Uses the loaded invoice list.
+  window.invCarryForward = async function(sub){
+    var owing = (window._nicInvoices || []).filter(_invOwing);
+    if (!owing.length){ setMsg('cn-inv-msg', 'No outstanding balances to carry forward.', 'ok'); return; }
+    var total = Math.round(owing.reduce(function(a, x){ return a + _invBalance(x); }, 0) * 100) / 100;
+    var refs = owing.map(function(x){ return x.number; }).join(', ');
+    if (!(await dlgConfirm('Carry ' + _money(total) + ' forward from ' + refs + ' onto this new invoice?\n\nThose invoice(s) will be marked "Carried forward" so the balance is only billed once.', { title: 'Carry forward balance', okText: 'Add line' }))) return;
+    window.invAddLine({ d: 'Balance carried forward (' + refs + ')', q: 1, p: total });
+    window._nicCarryIds = owing.map(function(x){ return x.id; });
+    setMsg('cn-inv-msg', 'Carried ' + _money(total) + ' forward as a line. It will be billed when you create this invoice.', 'ok');
+  };
+  // Generate a past-due interest charge (Section 7.5: 1%/month) and add it as a
+  // line item. Interest is assessed as of the payment date if recorded, else
+  // today. Applies only when more than 30 days past the due date. Idempotent:
+  // any prior interest line is recomputed, not stacked.
+  window.invAddInterest = async function(id, sub){
+    var r = await api('GET', '/nation_invoices?id=eq.' + encodeURIComponent(id));
+    var inv = (r.ok ? await r.json().catch(function(){ return []; }) : [])[0];
+    if (!inv){ dlgAlert('Invoice not found.'); return; }
+    if (!inv.due_date){ dlgAlert('This invoice has no due date, so overdue interest cannot be computed. Set a due date first.'); return; }
+    var asOf = inv.paid_date || _dPlus(0);
+    var days = Math.floor((Date.parse(asOf) - Date.parse(inv.due_date)) / 86400000);
+    if (days <= 30){
+      dlgAlert('As of ' + asOf + ', this invoice is ' + (days < 0 ? Math.abs(days) + ' day(s) before the due date' : days + ' day(s) past due') + '. Per Section 7.5, interest applies only to amounts more than 30 days overdue.', { title: 'No interest added' });
+      return;
+    }
+    // Base = existing non-interest lines; interest accrues on the pre-tax amount.
+    var base = (inv.line_items || []).filter(function(l){ return !l.interest; });
+    var principal = base.reduce(function(a, l){ return a + (Number(l.qty) || 0) * (Number(l.unit_price) || 0); }, 0);
+    var months = days / 30;
+    var interest = Math.round(principal * INTEREST_MONTHLY * months * 100) / 100;
+    if (interest <= 0){ dlgAlert('Computed interest is $0.00 — nothing to add.'); return; }
+    if (!(await dlgConfirm('Invoice ' + inv.number + ' is ' + days + ' days past the due date (' + inv.due_date + '), assessed as of ' + asOf + '.\n\nInterest at 1%/month (12.68%/yr) on ' + _money(principal) + ' = ' + _money(interest) + '.\n\nAdd this as a line item?', { title: 'Add past-due interest', okText: 'Add interest' }))) return;
+    var line = { description: 'Interest — ' + days + ' days past due at 1%/month (Section 7.5), assessed ' + asOf, qty: 1, unit_price: interest, interest: true };
+    var lines = base.concat([line]);
+    var subtotal = Math.round(lines.reduce(function(a, l){ return a + (Number(l.qty) || 0) * (Number(l.unit_price) || 0); }, 0) * 100) / 100;
+    var taxRate = Number(inv.tax_rate) || 0;
+    var tax = Math.round(subtotal * taxRate) / 100;
+    var total = Math.round((subtotal + tax) * 100) / 100;
+    var pr = await api('PATCH', '/nation_invoices?id=eq.' + encodeURIComponent(id), { line_items: lines, subtotal: subtotal, tax: tax, total: total, updated_at: new Date().toISOString() }, 'return=minimal');
+    if (pr.ok){
+      await audit('nation_invoice_interest', sub, inv.number + ': ' + _money(interest) + ' (' + days + 'd)');
+      renderNationInvoices(sub); loadNicSummary(sub);
+      dlgAlert('Interest of ' + _money(interest) + ' added to ' + inv.number + '. New total: ' + _money(total) + '. Click the invoice number to view the updated PDF.', { title: 'Interest added' });
+    }
+    else { dlgAlert('Could not add the interest line.'); }
   };
   // Generate a past-due interest charge (Section 7.5: 1%/month) and add it as a
   // line item. Interest is assessed as of the payment date if recorded, else
@@ -1341,9 +1583,17 @@
         var today = new Date().toISOString().slice(0, 10);
         var inv = { subdomain: sub, number: number, issue_date: today, due_date: due, currency: 'CAD',
                     line_items: lines, subtotal: subtotal, tax_rate: taxRate, tax: tax, total: total,
-                    status: 'draft', notes: inotes, created_by: jwtEmail() };
+                    amount_paid: 0, status: 'draft', notes: inotes, created_by: jwtEmail() };
         var r = await api('POST', '/nation_invoices', inv, 'return=minimal');
         if (!r.ok){ var t = await r.text(); setMsg('cn-inv-msg', /duplicate|unique/i.test(t) ? 'Number collision, try again.' : 'Could not save invoice.'); return; }
+        // Settle any invoices whose balance was carried onto this one, so the
+        // outstanding amount isn't billed twice.
+        var carried = window._nicCarryIds || [];
+        for (var ci = 0; ci < carried.length; ci++){
+          try { await api('PATCH', '/nation_invoices?id=eq.' + encodeURIComponent(carried[ci]), { status: 'carried', notes: ('Carried forward into ' + number), updated_at: new Date().toISOString() }, 'return=minimal'); } catch(e){}
+        }
+        if (carried.length) await audit('nation_invoice_carried', sub, carried.length + ' invoice(s) -> ' + number);
+        window._nicCarryIds = null;
         var doc = buildInvoicePdf(n, inv);
         var fname = number + '.pdf';
         var blob = doc.output('blob');
@@ -1405,6 +1655,13 @@
     totalRow('Subtotal', _money(inv.subtotal));
     if (Number(inv.tax_rate)) totalRow('Tax (' + inv.tax_rate + '%)', _money(inv.tax));
     totalRow('Total (' + inv.currency + ')', _money(inv.total), true);
+    // Payment status: show amount received + balance due once a payment exists.
+    var _paid = Number(inv.amount_paid) || 0;
+    if (_paid > 0.005){
+      var _bal = Math.round(((Number(inv.total) || 0) - _paid) * 100) / 100;
+      totalRow('Amount paid' + (inv.paid_date ? ' (' + inv.paid_date + ')' : ''), '-' + _money(_paid));
+      totalRow(_bal <= 0.005 ? 'Balance due — PAID IN FULL' : 'Balance due', _money(_bal), true);
+    }
     if (inv.notes){ y += 14; t('Notes', M, y, { style: 'bold', size: 9, color: [120, 120, 120] }); y += 14; doc.splitTextToSize(String(inv.notes), W - M * 2).forEach(function(ln){ t(ln, M, y, { size: 10 }); y += 13; }); }
     // Standard terms -- printed on every invoice.
     if (y > H - 130) { doc.addPage(); y = M; }
@@ -1457,8 +1714,10 @@
       case 'inv-del-line':  { var lr = el.closest && el.closest('.inv-line'); if (lr) lr.remove(); break; }
       case 'inv-create':    window.createNationInvoice(el.getAttribute('data-sub') || '', id); break;
       case 'inv-status':    window.setInvoiceStatus(el.getAttribute('data-id') || '', el.getAttribute('data-status') || '', el.getAttribute('data-sub') || ''); break;
+      case 'inv-view':      window.viewNationInvoice(el.getAttribute('data-id') || '', el.getAttribute('data-sub') || ''); break;
+      case 'inv-pay':       window.invRecordPayment(el.getAttribute('data-id') || '', el.getAttribute('data-sub') || ''); break;
+      case 'inv-carry':     window.invCarryForward(el.getAttribute('data-sub') || ''); break;
       case 'logo-clear':    { var _lh = document.getElementById('cn-logo'); var _lp = document.getElementById('cn-logo-preview'); var _lf = document.getElementById('cn-logo-file'); if (_lh) _lh.value = ''; if (_lp) _lp.style.backgroundImage = ''; if (_lf) _lf.value = ''; break; }
-      case 'inv-paid':      window.invMarkPaid(el.getAttribute('data-id') || '', el.getAttribute('data-sub') || ''); break;
       case 'inv-interest':  window.invAddInterest(el.getAttribute('data-id') || '', el.getAttribute('data-sub') || ''); break;
     }
   });

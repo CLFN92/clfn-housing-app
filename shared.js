@@ -109,6 +109,43 @@ window.showAlert = function(opts) {
   });
 };
 
+// Mix two hex colours by fraction t (0 = a, 1 = b). Returns #rrggbb, or null
+// for an unparseable input so callers can fall back to the stock palette.
+window._mixHex = function(a, b, t){
+  function parse(h){
+    h = String(h||'').trim().replace('#','');
+    if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+    var n = parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255];
+  }
+  var ca = parse(a), cb = parse(b); if (!ca || !cb) return null;
+  var out = ca.map(function(v,i){ return Math.round(v + (cb[i]-v)*t); });
+  return '#' + out.map(function(x){ return ('0'+Math.max(0,Math.min(255,x)).toString(16)).slice(-2); }).join('');
+};
+// Deep brand-tinted "ink" — the accent colour mixed heavily toward black. Used
+// for the app header / modal headers / print banners so they carry the nation's
+// brand hue while staying dark enough for white text on any brand colour.
+window._brandInk = function(hex, k){ return window._mixHex(hex, '#000000', k==null?0.88:k); };
+
+// Paint the dark surfaces (--dark/--dark2/--dark3) from the brand accent so the
+// header aligns to the nation's brand colour. When the ED has NOT explicitly
+// chosen a header colour (customDark falsy or the stock near-black), a deep ink
+// is derived from the accent; otherwise the chosen colour is used and its two
+// lighter companion surfaces are derived from it. A bad accent hex leaves the
+// stock CSS palette untouched.
+window._applyBrandDark = function(accent, customDark){
+  var root  = document.documentElement;
+  var stock = (window.THEME_DEFAULTS||{}).dark || '#111110';
+  var isCustom = customDark && String(customDark).toLowerCase() !== stock.toLowerCase();
+  var base  = isCustom ? customDark : window._brandInk(accent, 0.88);
+  if (!base) return;                       // unparseable accent — keep defaults
+  root.style.setProperty('--dark', base);
+  var d2 = window._mixHex(base, '#ffffff', 0.06);
+  var d3 = window._mixHex(base, '#ffffff', 0.14);
+  if (d2) root.style.setProperty('--dark2', d2);
+  if (d3) root.style.setProperty('--dark3', d3);
+};
+
 window._applyTheme = function(theme) {
   theme = theme || {};
   var root = document.documentElement;
@@ -129,6 +166,9 @@ window._applyTheme = function(theme) {
       else     root.style.removeProperty('--' + k);
     }
   });
+  // Header / dark surfaces follow the brand accent unless the ED has explicitly
+  // overridden the header colour (theme.dark set to something other than stock).
+  window._applyBrandDark(theme.yellow || (window.THEME_DEFAULTS||{}).yellow, theme.dark);
   // Logo src + transparency — also covers the Themes panel preview thumbnail.
   document.querySelectorAll('img.hlogo, #login-logo, #theme_logo_preview').forEach(function(img){
     if (theme.logo) img.src = theme.logo;

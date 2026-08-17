@@ -1252,9 +1252,16 @@ function renderThemesPanel() {
   var theme = (window._appSettings && window._appSettings.theme) || {};
   var defaults = window.THEME_DEFAULTS || { yellow:'#F8E41A', dark:'#111110', text:'#111110' };
   var hasLogo = !!theme.logo;
+  // Header follows the brand accent automatically: when no explicit header colour
+  // is saved, show the derived brand "ink" (accent mixed toward black) so the
+  // picker matches what's on screen. Stash it so _readThemeFromForm can tell an
+  // untouched auto value apart from a deliberate override.
+  var _accent    = theme.yellow || defaults.yellow;
+  var _brandDark = (typeof _brandInk === 'function' ? _brandInk(_accent, 0.88) : '') || defaults.dark;
+  window._themeAutoDark = _brandDark;
   body.innerHTML =
       _themeFieldRow('yellow',  'Brand Accent',       'Primary highlight — buttons, badges, links',  theme.yellow,  defaults.yellow)
-    + _themeFieldRow('dark',    'Header / Dark Surface','App header, modal headers, print banners',   theme.dark,    defaults.dark)
+    + _themeFieldRow('dark',    'Header / Dark Surface','Derived from the Brand Accent — override to pin a custom header colour',   theme.dark,    _brandDark)
     + _themeFieldRow('text',    'Body Text',            'Default text color across the app',           theme.text,    defaults.text)
     + _themeFieldRow('bg',      'Page Background',      'Main background behind all cards',            theme.bg,      defaults.bg)
     + _themeFieldRow('surface', 'Card Surface',         'Card and panel background color',             theme.surface, defaults.surface)
@@ -1397,9 +1404,14 @@ function _themeClearLogo() {
 function _readThemeFromForm() {
   function v(id){ var el=document.getElementById(id); return el ? (el.value||'').trim() : ''; }
   function cb(id){ var el=document.getElementById(id); return !!(el && el.checked); }
+  // Header colour: if left at the auto-derived brand ink, store it empty so the
+  // header keeps following the brand accent (re-derives if the accent changes).
+  // A different value is a deliberate override and is persisted as-is.
+  var darkVal = v('theme_dark_hex') || v('theme_dark');
+  if (window._themeAutoDark && darkVal.toLowerCase() === String(window._themeAutoDark).toLowerCase()) darkVal = '';
   return {
     yellow:           v('theme_yellow_hex')  || v('theme_yellow'),
-    dark:             v('theme_dark_hex')    || v('theme_dark'),
+    dark:             darkVal,
     text:             v('theme_text_hex')    || v('theme_text'),
     bg:               v('theme_bg_hex')      || v('theme_bg'),
     surface:          v('theme_surface_hex') || v('theme_surface'),
