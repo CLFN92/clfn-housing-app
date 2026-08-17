@@ -21,3 +21,7 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   X-Frame-Options: DENY
+  # The panel has no cache-busting on its filenames (admin.js is a fixed name),
+  # so force revalidation -- otherwise a deploy can be masked by a stale edge/
+  # browser cache. Low-traffic control plane; revalidation cost is negligible.
+  Cache-Control: no-cache
