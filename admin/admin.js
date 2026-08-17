@@ -278,14 +278,42 @@
     var usageBySub = {};
     usageRows.forEach(function(u){ if (u && u.subdomain) usageBySub[u.subdomain] = u; });
 
+    // Platform summary for the strip.
+    var activeCount = nations.filter(function(n){ return (n.status || '') === 'active'; }).length;
+    var totDb = 0, totFiles = 0, totCost = 0;
+    nations.forEach(function(n){
+      var u = usageBySub[n.subdomain];
+      if (u){ totDb += Number(u.database_bytes) || 0; totFiles += Number(u.storage_bytes) || 0; }
+      totCost += estCost(n, u).total;
+    });
+    totCost = Math.round(totCost * 100) / 100;
+
+    var tab = function(k, l, active){ return '<button class="nic-tab' + (active ? ' active' : '') + '" type="button" data-act="nic-tab" data-tab="' + k + '">' + l + '</button>'; };
+    var panel = function(k, html, active){ return '<div class="nic-panel' + (active ? ' active' : '') + '" data-panel="' + k + '">' + html + '</div>'; };
+    var tile = function(l, v){ return '<div class="nic-strip-tile"><div class="l">' + esc(l) + '</div><div class="v">' + v + '</div></div>'; };
+
     app.innerHTML =
-      '<h1>Nations</h1>'
-      + '<p class="sub">Signed in as ' + esc(meEmail) + '</p>'
-      + nationsCard(nations, usageBySub)
-      + provisionCard()
-      + addNationStepsCard()
-      + addNationCard()
-      + adminsCard(admins, meEmail);
+      '<div class="nic-shell">'
+      + '<div class="nic-hero">'
+      +   '<h1>Platform Admin</h1>'
+      +   '<div class="nic-sub">Home Land Homes control plane &middot; signed in as <code>' + esc(meEmail) + '</code></div>'
+      + '</div>'
+      + '<div class="nic-strip">'
+      +   tile('Nations', String(nations.length))
+      +   tile('Active', String(activeCount))
+      +   tile('Data usage', esc(fmtBytes(totDb)) + ' db &middot; ' + esc(fmtBytes(totFiles)) + ' files')
+      +   tile('Est. monthly cost', _money(totCost))
+      + '</div>'
+      + '<div class="nic-tabs">'
+      +   tab('nations', 'Nations', true) + tab('provision', 'Provision') + tab('addnation', 'Add a nation') + tab('admins', 'Administrators')
+      + '</div>'
+      + '<div class="nic-body">'
+      +   panel('nations',   nationsCard(nations, usageBySub), true)
+      +   panel('provision', provisionCard() + addNationStepsCard(), false)
+      +   panel('addnation', addNationCard(), false)
+      +   panel('admins',    adminsCard(admins, meEmail), false)
+      + '</div>'
+      + '</div>';
     wireAddNation();
   }
 
