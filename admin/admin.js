@@ -26,6 +26,53 @@
     ['projects','Capital Projects']
   ];
 
+  // Home Land Homes fee schedule for the invoice builder. EXACT prices -- do not
+  // alter. g=group, d=line description, p=unit price (CAD), q=default qty;
+  // hours=qty is entered in hours (unit is per-hour); custom=price is free-entry.
+  var FEE_SCHEDULE = [
+    // Subscription -- billed annually in advance
+    { g: 'Subscription — annual (billed annually in advance)', d: 'Subscription — Small (up to 100 homes), annual', p: 4740, q: 1 },
+    { g: 'Subscription — annual (billed annually in advance)', d: 'Subscription — Mid-size (101-300 homes), annual', p: 8340, q: 1 },
+    { g: 'Subscription — annual (billed annually in advance)', d: 'Subscription — Large (301-600 homes), annual', p: 13140, q: 1 },
+    // Subscription -- monthly (higher rate, already includes +10%)
+    { g: 'Subscription — monthly (higher rate, incl. +10%)', d: 'Subscription — Small (up to 100 homes), monthly', p: 435, q: 1 },
+    { g: 'Subscription — monthly (higher rate, incl. +10%)', d: 'Subscription — Mid-size (101-300 homes), monthly', p: 765, q: 1 },
+    { g: 'Subscription — monthly (higher rate, incl. +10%)', d: 'Subscription — Large (301-600 homes), monthly', p: 1205, q: 1 },
+    // One-time setup (once per client)
+    { g: 'One-time setup (once per client)', d: 'One-time setup — Small', p: 2500, q: 1 },
+    { g: 'One-time setup (once per client)', d: 'One-time setup — Mid-size', p: 4500, q: 1 },
+    { g: 'One-time setup (once per client)', d: 'One-time setup — Large', p: 7500, q: 1 },
+    // Setup with the 50% discount (one-year term, prepaid) -- the only discount that exists
+    { g: 'Setup — 50% discount (1-year term, prepaid)', d: 'One-time setup — Small (50% discount)', p: 1250, q: 1 },
+    { g: 'Setup — 50% discount (1-year term, prepaid)', d: 'One-time setup — Mid-size (50% discount)', p: 2250, q: 1 },
+    { g: 'Setup — 50% discount (1-year term, prepaid)', d: 'One-time setup — Large (50% discount)', p: 3750, q: 1 },
+    // Add-on
+    { g: 'Add-on', d: 'AI Staff Assistant (per month)', p: 95, q: 1 },
+    // Additional services (hourly; written authorization required)
+    { g: 'Additional services (hourly, written authorization)', d: 'Consulting / data cleanup / training / custom reports (per hour, 0.25 incr.)', p: 150, q: 1, hours: true },
+    { g: 'Additional services (hourly, written authorization)', d: 'Travel time (per hour, max 8 hrs/travel day)', p: 75, q: 1, hours: true },
+    // Custom / at cost (free-entry amount)
+    { g: 'Custom / at cost (enter amount)', d: 'Subscription — 600+ / Tribal Council (custom per quote)', p: 0, q: 1, custom: true },
+    { g: 'Custom / at cost (enter amount)', d: 'Travel expenses (at cost, NJC Travel Directive, no markup)', p: 0, q: 1, custom: true }
+  ];
+  // Grouped <select> of the fee schedule (built at render time so _money exists).
+  function _feeScheduleSelectHtml(){
+    var groups = [];
+    FEE_SCHEDULE.forEach(function(it, i){
+      var gi = null;
+      for (var k = 0; k < groups.length; k++){ if (groups[k].g === it.g){ gi = groups[k]; break; } }
+      if (!gi){ gi = { g: it.g, items: [] }; groups.push(gi); }
+      gi.items.push({ i: i, it: it });
+    });
+    var opts = groups.map(function(g){
+      return '<optgroup label="' + esc(g.g) + '">' + g.items.map(function(x){
+        var price = x.it.custom ? 'enter amount' : (x.it.hours ? _money(x.it.p) + '/hr' : _money(x.it.p));
+        return '<option value="' + x.i + '">' + esc(x.it.d) + '  —  ' + price + '</option>';
+      }).join('') + '</optgroup>';
+    }).join('');
+    return '<select id="cn-inv-catalog">' + opts + '</select>';
+  }
+
   var app = document.getElementById('app');
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); };
   var _nations = [];   // last-loaded nations list (so Configure can look one up)
@@ -429,8 +476,13 @@
       +   '<div id="cn-invoices"><div class="empty">Loading invoices...</div></div>'
       +   '<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px;">'
       +     '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">New invoice</div>'
+      +     '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px;">'
+      +       '<div style="flex:1;min-width:230px;"><label>Fee schedule</label>' + _feeScheduleSelectHtml() + '</div>'
+      +       '<button class="btn sm" type="button" data-act="inv-add-catalog">Add selected &darr;</button>'
+      +     '</div>'
+      +     '<p class="sub" style="margin:0 0 8px;font-size:11px;">Pick a fee-schedule item and Add, or use &ldquo;+ Add line&rdquo; for a free-form line. For hourly items, enter the number of hours in <b>Qty</b> (0.25 precision); for custom / at-cost items, fill in the amount.</p>'
       +     '<div id="cn-inv-lines"></div>'
-      +     '<button class="btn sm ghost" type="button" data-act="inv-add-line" style="margin-top:2px;">+ Add line</button>'
+      +     '<button class="btn sm ghost" type="button" data-act="inv-add-line" style="margin-top:2px;">+ Add blank line</button>'
       +     '<div style="' + g2 + 'margin-top:12px;">'
       +       '<div><label>Tax rate (%)</label><input id="cn-inv-tax" type="number" step="0.01" min="0" placeholder="0" value="0"/></div>'
       +       '<div><label>Due date</label><input id="cn-inv-due" type="date"/></div>'
@@ -1060,17 +1112,27 @@
 
   // ---- Invoices --------------------------------------------------------------
   var INV_STATUS = { draft: ['Draft', 'provisioning'], sent: ['Sent', 'provisioning'], paid: ['Paid', 'active'], void: ['Void', 'suspended'] };
-  window.invAddLine = function(){
+  window.invAddLine = function(prefill){
     var host = document.getElementById('cn-inv-lines'); if (!host) return;
+    prefill = prefill || {};
+    var desc  = esc(prefill.d || '');
+    var qty   = (prefill.q != null ? prefill.q : 1);
+    var price = (prefill.p != null && prefill.p !== '' ? prefill.p : '');
     var row = document.createElement('div');
     row.className = 'inv-line';
     row.style.cssText = 'display:grid;grid-template-columns:1fr 64px 88px 30px;gap:6px;margin-bottom:6px;align-items:center;';
     row.innerHTML =
-        '<input class="inv-desc" placeholder="Description" style="font-size:14px;padding:8px 10px;"/>'
-      + '<input class="inv-qty" type="number" step="0.01" value="1" title="Quantity" style="font-size:14px;padding:8px 10px;"/>'
-      + '<input class="inv-price" type="number" step="0.01" placeholder="Unit $" title="Unit price" style="font-size:14px;padding:8px 10px;"/>'
+        '<input class="inv-desc" placeholder="Description" value="' + desc + '" style="font-size:14px;padding:8px 10px;"/>'
+      + '<input class="inv-qty" type="number" step="0.01" value="' + qty + '" title="Quantity" style="font-size:14px;padding:8px 10px;"/>'
+      + '<input class="inv-price" type="number" step="0.01" value="' + price + '" placeholder="Unit $" title="Unit price" style="font-size:14px;padding:8px 10px;"/>'
       + '<button class="btn sm danger" type="button" data-act="inv-del-line" title="Remove line" style="padding:6px 0;">&times;</button>';
     host.appendChild(row);
+  };
+  // Add the selected fee-schedule item as a prefilled invoice line.
+  window.invAddCatalogLine = function(){
+    var sel = document.getElementById('cn-inv-catalog'); if (!sel) return;
+    var it = FEE_SCHEDULE[parseInt(sel.value, 10)]; if (!it) return;
+    window.invAddLine({ d: it.d, q: (it.q != null ? it.q : 1), p: it.custom ? '' : it.p });
   };
   function _collectInvLines(){
     var out = [];
@@ -1196,6 +1258,15 @@
     if (Number(inv.tax_rate)) totalRow('Tax (' + inv.tax_rate + '%)', _money(inv.tax));
     totalRow('Total (' + inv.currency + ')', _money(inv.total), true);
     if (inv.notes){ y += 14; t('Notes', M, y, { style: 'bold', size: 9, color: [120, 120, 120] }); y += 14; doc.splitTextToSize(String(inv.notes), W - M * 2).forEach(function(ln){ t(ln, M, y, { size: 10 }); y += 13; }); }
+    // Standard terms -- printed on every invoice.
+    if (y > H - 130) { doc.addPage(); y = M; }
+    y += 16; t('Terms', M, y, { style: 'bold', size: 9, color: [120, 120, 120] }); y += 14;
+    ['Payment due within 30 days of invoice date.',
+     'Amounts more than 30 days overdue may bear interest at 1% per month (12.68% annually).',
+     'All amounts are in Canadian dollars, plus applicable taxes if any.'
+    ].forEach(function(line){
+      doc.splitTextToSize(line, W - M * 2).forEach(function(ln){ t(ln, M, y, { size: 9, color: [90, 90, 90] }); y += 12; });
+    });
     t('Home Land Homes - Housing Management Platform', M, H - 26, { size: 8, color: [130, 130, 130] });
     return doc;
   }
@@ -1234,6 +1305,7 @@
       case 'nic-tab':       window.nicTab(el.getAttribute('data-tab') || ''); break;
       case 'note-add':      window.addNationNote(el.getAttribute('data-sub') || ''); break;
       case 'inv-add-line':  window.invAddLine(); break;
+      case 'inv-add-catalog': window.invAddCatalogLine(); break;
       case 'inv-del-line':  { var lr = el.closest && el.closest('.inv-line'); if (lr) lr.remove(); break; }
       case 'inv-create':    window.createNationInvoice(el.getAttribute('data-sub') || '', id); break;
       case 'inv-status':    window.setInvoiceStatus(el.getAttribute('data-id') || '', el.getAttribute('data-status') || '', el.getAttribute('data-sub') || ''); break;
