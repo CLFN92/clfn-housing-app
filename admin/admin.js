@@ -184,7 +184,7 @@
         + '<td style="font-size:11px;color:var(--muted);">' + esc(mods.join(', ') || '—') + '</td>'
         + '<td style="font-size:12px;">' + usageCell(usageBySub[n.subdomain]) + '</td>'
         + '<td><div class="row-actions">'
-        +   '<button class="btn sm ghost" type="button" data-act="configure" data-id="' + esc(n.id) + '">Configure</button>'
+        +   '<button class="btn sm ghost" type="button" data-act="configure" data-id="' + esc(n.id) + '">Dashboard</button>'
         +   '<a class="btn sm ghost" href="' + url + '" target="_blank" rel="noopener">Open</a>'
         +   (st === 'suspended'
               ? '<button class="btn sm ghost" data-act="status" data-status="active" data-id="' + esc(n.id) + '">Resume</button>'
@@ -229,7 +229,7 @@
       ['Cloudflare subdomain', 'auto',
         'The app deploys to Cloudflare on every push to <code>main</code> and serves <b>every</b> nation by hostname &mdash; no per-nation app deploy. Just confirm <code>&lt;subdomain&gt;.fnhub.app</code> resolves; with the wildcard <code>*.fnhub.app</code> DNS record + Worker route it is automatic. If not, add a DNS record + route in the ' + extLink(LINKS.cf, 'Cloudflare dashboard') + '.'],
       ['License the modules', 'manual',
-        'Open <b>Configure</b> and tick which optional modules this nation may use (Finance, RFQ, Inspections, Capital Projects, …).'],
+        'Open the nation\'s <b>Dashboard</b> and tick which optional modules this nation may use (Finance, RFQ, Inspections, Capital Projects, …).'],
       ['Set status to Active', 'manual',
         'Only <b>active</b> nations publish to <code>nations_public</code> and resolve at <code>&lt;subdomain&gt;.fnhub.app</code>. Flip status to Active in Configure.'],
       ['Hand off to the nation\'s ED', 'manual',
