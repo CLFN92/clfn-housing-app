@@ -89,6 +89,7 @@ window._mapNationRow = function(r){
     supabase_url:  r.supabase_url || '',
     supabase_anon: r.supabase_anon || '',
     primary_color: r.primary_color || null,
+    logo:          r.logo || '',
     portal_base:   'https://' + sub + '.fnhub.app',
     email_domain:  r.email_domain || '',
     housing_email: r.housing_email || '',

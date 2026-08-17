@@ -453,6 +453,7 @@
     app.innerHTML = configureView(n);
     renderNationDocsCard(n.subdomain);
     wireDocFileInput();
+    wireLogoUpload();
     renderNationNotes(n.subdomain);
     renderNationInvoices(n.subdomain);
     window.invAddLine();          // seed one empty invoice line
@@ -483,6 +484,14 @@
       +     '<div><label>Staff email domain</label><input id="cn-domain" placeholder="nation.ca" value="' + esc(n.email_domain || '') + '"/></div>'
       +   '</div>'
       +   '<label>Housing email</label><input id="cn-housing" placeholder="housing@nation.ca" value="' + esc(n.housing_email || '') + '"/>'
+      +   '<label>Logo</label>'
+      +   '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">'
+      +     '<div id="cn-logo-preview" style="width:56px;height:56px;border-radius:10px;border:1px solid var(--hair);background-color:var(--bg);background-position:center;background-size:contain;background-repeat:no-repeat;flex:0 0 auto;"></div>'
+      +     '<div style="flex:1;min-width:180px;"><input id="cn-logo-file" type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp"/>'
+      +       '<div class="sub" style="font-size:11px;margin-top:2px;">Square PNG/JPG/SVG. Applied to the nation\'s header, login, favicon and PDFs. Keep it small (a few hundred KB max).</div></div>'
+      +     '<button class="btn sm ghost" type="button" data-act="logo-clear">Remove</button>'
+      +   '</div>'
+      +   '<input id="cn-logo" type="hidden" value="' + esc(n.logo || '') + '"/>'
       + '</div>'
       + '<div class="card"><h3>Licensed modules</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">Which optional modules this nation is allowed to use. The nation still turns each one on or off in its own in-app settings.</p>'
@@ -612,6 +621,7 @@
     var patch = {
       display_name: name, short: short,
       primary_color: get('cn-color').trim() || null,
+      logo: get('cn-logo') || null,
       email_domain:  get('cn-domain').trim() || null,
       housing_email: get('cn-housing').trim() || null,
       supabase_url:  get('cn-url').trim() || null,
@@ -1102,6 +1112,24 @@
     }).join('');
     host.innerHTML = '<table><thead><tr><th>Document</th><th>Type</th><th>Added</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
   }
+  // Logo uploader for the NIC branding card: reads the chosen image into a data
+  // URI kept in a hidden input, saved to nations.logo. Preview shows the current
+  // logo; the app applies it as the nation's brand mark.
+  function wireLogoUpload(){
+    var input = document.getElementById('cn-logo-file');
+    var hidden = document.getElementById('cn-logo');
+    var preview = document.getElementById('cn-logo-preview');
+    if (!preview) return;
+    function paint(){ var v = (hidden && hidden.value) || ''; preview.style.backgroundImage = v ? 'url("' + v.replace(/"/g, '\\"') + '")' : ''; }
+    paint();
+    if (input) input.addEventListener('change', function(){
+      var f = input.files && input.files[0]; if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function(){ if (hidden) hidden.value = String(reader.result || ''); paint(); };
+      reader.readAsDataURL(f);
+    });
+  }
+
   // Drag-and-drop + click-to-browse for the Documents uploader. Drag events
   // can't be delegated, so this is wired directly after Configure renders.
   function wireDocFileInput(){
@@ -1429,6 +1457,7 @@
       case 'inv-del-line':  { var lr = el.closest && el.closest('.inv-line'); if (lr) lr.remove(); break; }
       case 'inv-create':    window.createNationInvoice(el.getAttribute('data-sub') || '', id); break;
       case 'inv-status':    window.setInvoiceStatus(el.getAttribute('data-id') || '', el.getAttribute('data-status') || '', el.getAttribute('data-sub') || ''); break;
+      case 'logo-clear':    { var _lh = document.getElementById('cn-logo'); var _lp = document.getElementById('cn-logo-preview'); var _lf = document.getElementById('cn-logo-file'); if (_lh) _lh.value = ''; if (_lp) _lp.style.backgroundImage = ''; if (_lf) _lf.value = ''; break; }
       case 'inv-paid':      window.invMarkPaid(el.getAttribute('data-id') || '', el.getAttribute('data-sub') || ''); break;
       case 'inv-interest':  window.invAddInterest(el.getAttribute('data-id') || '', el.getAttribute('data-sub') || ''); break;
     }

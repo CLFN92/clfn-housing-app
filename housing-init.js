@@ -1939,7 +1939,18 @@ async function loadHousingData() {
     // customer-saved values from Settings → Admin → Themes / Nation.
     // _applyTheme rewrites every img.hlogo src; applyBrandingToHeader (called
     // from inside applyNationOverrides) updates [data-nation*] text nodes.
-    if (typeof _applyTheme === 'function')           _applyTheme((window._appSettings||{}).theme || {});
+    // Base theme from the platform registry (per-nation brand colour + logo set
+    // in the admin portal), with the nation's own saved Themes-tab settings
+    // layered on top so a local customisation still wins. This is what makes a
+    // freshly-provisioned nation show its own colour/logo before the ED has
+    // touched Settings -- instead of the CLFN default accent + logo.
+    if (typeof _applyTheme === 'function') {
+      var _regTheme = {};
+      var _nc = window.NATION_CONFIG || {};
+      if (_nc.primary_color) _regTheme.yellow = _nc.primary_color;
+      if (_nc.logo)          _regTheme.logo   = _nc.logo;
+      _applyTheme(Object.assign(_regTheme, (window._appSettings||{}).theme || {}));
+    }
     if (typeof applyNationOverrides === 'function')  applyNationOverrides();
     if (typeof applyRequiredFields === 'function')   applyRequiredFields();
     if (typeof initApprovalAuthority === 'function') initApprovalAuthority();
@@ -2042,7 +2053,13 @@ function renderAppHeader(){
       var c = sessionStorage.getItem('clfn_logo_cache');
       if (c) return c;
     } catch(e) {}
-    return window.CLFN_LOGO_DATA_URL || '';
+    // Registry logo for this nation, if any. CLFN's hardcoded mark is the
+    // fallback ONLY for CLFN itself -- another nation with no logo yet shows no
+    // mark (its name still renders in the header) rather than CLFN's logo.
+    var _regLogo = (window.NATION_CONFIG && window.NATION_CONFIG.logo) || '';
+    if (_regLogo) return _regLogo;
+    var _natId = (window._NATION && window._NATION.id) || 'clfn';
+    return _natId === 'clfn' ? (window.CLFN_LOGO_DATA_URL || '') : '';
   })();
   var _logoTransparent = (function(){
     try { return sessionStorage.getItem('clfn_logo_transparent') === '1'; } catch(e) { return false; }
