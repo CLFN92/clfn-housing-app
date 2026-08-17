@@ -55,6 +55,19 @@
     { g: 'Custom / at cost (enter amount)', d: 'Subscription — 600+ / Tribal Council (custom per quote)', p: 0, q: 1, custom: true },
     { g: 'Custom / at cost (enter amount)', d: 'Travel expenses (at cost, NJC Travel Directive, no markup)', p: 0, q: 1, custom: true }
   ];
+
+  // Provider (Home Land Homes) details -- printed on invoices.
+  var PROVIDER = {
+    name:  'Home Land Homes',
+    addr1: '916 Piper Street, Box 2251',
+    addr2: 'Hearst, Ontario  P0L 1N0',
+    phone: '705-960-5076',
+    email: 'hello@homelandhomes.ca'
+  };
+  // Past-due interest rate per the agreement (Section 7.5): 1% per month.
+  var INTEREST_MONTHLY = 0.01;
+  // YYYY-MM-DD for today + n days (browser Date is available here).
+  function _dPlus(n){ return new Date(Date.now() + n * 86400000).toISOString().slice(0, 10); }
   // Grouped <select> of the fee schedule (built at render time so _money exists).
   function _feeScheduleSelectHtml(){
     var groups = [];
@@ -485,7 +498,7 @@
       +     '<button class="btn sm ghost" type="button" data-act="inv-add-line" style="margin-top:2px;">+ Add blank line</button>'
       +     '<div style="' + g2 + 'margin-top:12px;">'
       +       '<div><label>Tax rate (%)</label><input id="cn-inv-tax" type="number" step="0.01" min="0" placeholder="0" value="0"/></div>'
-      +       '<div><label>Due date</label><input id="cn-inv-due" type="date"/></div>'
+      +       '<div><label>Due date</label><input id="cn-inv-due" type="date" value="' + _dPlus(30) + '"/><div class="sub" style="font-size:11px;margin-top:2px;">Defaults to 30 days after today (net 30).</div></div>'
       +     '</div>'
       +     '<label>Invoice notes (optional)</label><input id="cn-inv-notes" placeholder="Payable within 30 days; e-transfer to..."/>'
       +     '<div class="msg" id="cn-inv-msg"></div>'
@@ -1161,13 +1174,17 @@
       var st = INV_STATUS[x.status] || ['?', 'provisioning'];
       var acts = '';
       if (x.status === 'draft') acts += '<button class="btn sm ghost" type="button" data-act="inv-status" data-id="' + esc(x.id) + '" data-status="sent" data-sub="' + esc(sub) + '">Mark sent</button>';
-      if (x.status === 'draft' || x.status === 'sent') acts += '<button class="btn sm ghost" type="button" data-act="inv-status" data-id="' + esc(x.id) + '" data-status="paid" data-sub="' + esc(sub) + '">Mark paid</button>';
+      if (x.status === 'draft' || x.status === 'sent') acts += '<button class="btn sm ghost" type="button" data-act="inv-paid" data-id="' + esc(x.id) + '" data-sub="' + esc(sub) + '">Mark paid</button>';
+      if (x.status === 'sent' || x.status === 'paid') acts += '<button class="btn sm ghost" type="button" data-act="inv-interest" data-id="' + esc(x.id) + '" data-sub="' + esc(sub) + '" title="Add past-due interest (1%/month)">+ Interest</button>';
       if (x.status !== 'void' && x.status !== 'paid') acts += '<button class="btn sm danger" type="button" data-act="inv-status" data-id="' + esc(x.id) + '" data-status="void" data-sub="' + esc(sub) + '">Void</button>';
+      var meta = [];
+      if (x.due_date)  meta.push('due ' + esc(x.due_date));
+      if (x.paid_date) meta.push('paid ' + esc(x.paid_date));
       return '<tr>'
         + '<td><b>' + esc(x.number) + '</b></td>'
         + '<td style="font-size:11px;color:var(--muted);">' + esc(x.issue_date || '') + '</td>'
         + '<td style="font-variant-numeric:tabular-nums;">' + _money(x.total, x.currency) + '</td>'
-        + '<td><span class="pill ' + st[1] + '">' + st[0] + '</span></td>'
+        + '<td><span class="pill ' + st[1] + '">' + st[0] + '</span>' + (meta.length ? '<div style="font-size:10px;color:var(--muted);margin-top:2px;">' + meta.join(' · ') + '</div>' : '') + '</td>'
         + '<td><div class="row-actions">' + acts + '</div></td></tr>';
     }).join('');
     host.innerHTML = '<table><thead><tr><th>Invoice</th><th>Issued</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
@@ -1177,12 +1194,54 @@
     var r = await api('PATCH', '/nation_invoices?id=eq.' + encodeURIComponent(id), { status: status, updated_at: new Date().toISOString() }, 'return=minimal');
     if (r.ok){ await audit('nation_invoice_' + status, sub, id); renderNationInvoices(sub); loadNicSummary(sub); }
   };
+  // Mark paid + capture the payment date (used by the interest calculation).
+  window.invMarkPaid = async function(id, sub){
+    var d = prompt('Payment received date (YYYY-MM-DD):', _dPlus(0));
+    if (d === null) return;
+    d = String(d).trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)){ alert('Enter the date as YYYY-MM-DD.'); return; }
+    var r = await api('PATCH', '/nation_invoices?id=eq.' + encodeURIComponent(id), { status: 'paid', paid_date: d, updated_at: new Date().toISOString() }, 'return=minimal');
+    if (r.ok){ await audit('nation_invoice_paid', sub, id + ' ' + d); renderNationInvoices(sub); loadNicSummary(sub); }
+    else { alert('Could not record payment.'); }
+  };
+  // Generate a past-due interest charge (Section 7.5: 1%/month) and add it as a
+  // line item. Interest is assessed as of the payment date if recorded, else
+  // today. Applies only when more than 30 days past the due date. Idempotent:
+  // any prior interest line is recomputed, not stacked.
+  window.invAddInterest = async function(id, sub){
+    var r = await api('GET', '/nation_invoices?id=eq.' + encodeURIComponent(id));
+    var inv = (r.ok ? await r.json().catch(function(){ return []; }) : [])[0];
+    if (!inv){ alert('Invoice not found.'); return; }
+    if (!inv.due_date){ alert('This invoice has no due date, so overdue interest cannot be computed. Set a due date first.'); return; }
+    var asOf = inv.paid_date || _dPlus(0);
+    var days = Math.floor((Date.parse(asOf) - Date.parse(inv.due_date)) / 86400000);
+    if (days <= 30){
+      alert('No interest added.\n\nAs of ' + asOf + ', this invoice is ' + (days < 0 ? Math.abs(days) + ' day(s) before the due date' : days + ' day(s) past due') + '. Per Section 7.5, interest applies only to amounts more than 30 days overdue.');
+      return;
+    }
+    // Base = existing non-interest lines; interest accrues on the pre-tax amount.
+    var base = (inv.line_items || []).filter(function(l){ return !l.interest; });
+    var principal = base.reduce(function(a, l){ return a + (Number(l.qty) || 0) * (Number(l.unit_price) || 0); }, 0);
+    var months = days / 30;
+    var interest = Math.round(principal * INTEREST_MONTHLY * months * 100) / 100;
+    if (interest <= 0){ alert('Computed interest is $0.00 — nothing to add.'); return; }
+    if (!confirm('Invoice ' + inv.number + ' is ' + days + ' days past the due date (' + inv.due_date + '), assessed as of ' + asOf + '.\n\nInterest at 1%/month (12.68%/yr) on ' + _money(principal) + ' = ' + _money(interest) + '.\n\nAdd this as a line item?')) return;
+    var line = { description: 'Interest — ' + days + ' days past due at 1%/month (Section 7.5), assessed ' + asOf, qty: 1, unit_price: interest, interest: true };
+    var lines = base.concat([line]);
+    var subtotal = Math.round(lines.reduce(function(a, l){ return a + (Number(l.qty) || 0) * (Number(l.unit_price) || 0); }, 0) * 100) / 100;
+    var taxRate = Number(inv.tax_rate) || 0;
+    var tax = Math.round(subtotal * taxRate) / 100;
+    var total = Math.round((subtotal + tax) * 100) / 100;
+    var pr = await api('PATCH', '/nation_invoices?id=eq.' + encodeURIComponent(id), { line_items: lines, subtotal: subtotal, tax: tax, total: total, updated_at: new Date().toISOString() }, 'return=minimal');
+    if (pr.ok){ await audit('nation_invoice_interest', sub, inv.number + ': ' + _money(interest) + ' (' + days + 'd)'); renderNationInvoices(sub); loadNicSummary(sub); }
+    else { alert('Could not add the interest line.'); }
+  };
   window.createNationInvoice = function(sub, id){
     var n = _nations.filter(function(x){ return String(x.id) === String(id); })[0];
     var lines = _collectInvLines();
     if (!lines.length){ setMsg('cn-inv-msg', 'Add at least one line with a description and amount.'); return; }
     var taxRate = parseFloat((document.getElementById('cn-inv-tax') || {}).value || '0') || 0;
-    var due = (document.getElementById('cn-inv-due') || {}).value || null;
+    var due = (document.getElementById('cn-inv-due') || {}).value || _dPlus(30);
     var inotes = (document.getElementById('cn-inv-notes') || {}).value || '';
     var subtotal = lines.reduce(function(a, l){ return a + (l.qty * l.unit_price); }, 0);
     var tax = Math.round(subtotal * taxRate) / 100;
@@ -1223,7 +1282,9 @@
     t('INVOICE', W - M, y, { style: 'bold', size: 18, align: 'right', color: [120, 120, 120] });
     y += 16; t('Housing Management Platform', M, y, { size: 10, color: [110, 110, 110] });
     t(inv.number, W - M, y, { size: 11, align: 'right' });
-    y += 26; doc.setDrawColor(220); doc.line(M, y, W - M, y); y += 20;
+    y += 13; t(PROVIDER.addr1 + ', ' + PROVIDER.addr2, M, y, { size: 9, color: [110, 110, 110] });
+    y += 12; t(PROVIDER.phone + '   ·   ' + PROVIDER.email, M, y, { size: 9, color: [110, 110, 110] });
+    y += 20; doc.setDrawColor(220); doc.line(M, y, W - M, y); y += 20;
     // Bill to + meta
     t('BILL TO', M, y, { style: 'bold', size: 9, color: [120, 120, 120] });
     t('DETAILS', W - 200, y, { style: 'bold', size: 9, color: [120, 120, 120] });
@@ -1309,6 +1370,8 @@
       case 'inv-del-line':  { var lr = el.closest && el.closest('.inv-line'); if (lr) lr.remove(); break; }
       case 'inv-create':    window.createNationInvoice(el.getAttribute('data-sub') || '', id); break;
       case 'inv-status':    window.setInvoiceStatus(el.getAttribute('data-id') || '', el.getAttribute('data-status') || '', el.getAttribute('data-sub') || ''); break;
+      case 'inv-paid':      window.invMarkPaid(el.getAttribute('data-id') || '', el.getAttribute('data-sub') || ''); break;
+      case 'inv-interest':  window.invAddInterest(el.getAttribute('data-id') || '', el.getAttribute('data-sub') || ''); break;
     }
   });
 
