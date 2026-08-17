@@ -141,7 +141,7 @@ function printBatchStatements() {
   var printDate = today_d.toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
   var allTxns  = getAllTransactions();
 
-  var logoSrc    = sessionStorage.getItem('clfn_logo_cache') || window.CLFN_LOGO_DATA_URL || '';
+  var logoSrc    = sessionStorage.getItem('clfn_logo_cache') || window.HLH_LOGO_DATA_URL || window.CLFN_LOGO_DATA_URL || '';
   var nationName = nc.display_name || nc.short_name || '';
   var nationAddr = nc.mailing_address || '';
   var nationPhone = nc.phone || '';

@@ -553,23 +553,7 @@ function initLoginPage() {
   // any other nation without a logo shows no mark rather than CLFN's.
   var logoEl = document.getElementById('login-logo');
   var _nc = window.NATION_CONFIG || {};
-  var _isClfn = (((window._NATION && window._NATION.id) || 'clfn') === 'clfn');
-  if (logoEl) {
-    if (_nc.logo) { logoEl.src = _nc.logo; }
-    else if (_isClfn && typeof CLFN_LOGO_DATA_URL === 'string') { logoEl.src = CLFN_LOGO_DATA_URL; }
-    else {
-      // Other nation, no logo yet: show its short code instead of CLFN's logo.
-      var wrap = logoEl.parentElement;
-      logoEl.style.display = 'none';
-      if (wrap && !wrap.querySelector('.login-logo-text')) {
-        var t = document.createElement('div');
-        t.className = 'login-logo-text';
-        t.textContent = _nc.short || (_nc.display_name || '').slice(0, 4).toUpperCase() || '';
-        t.style.cssText = 'display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-weight:800;font-size:22px;color:#111110;';
-        wrap.appendChild(t);
-      }
-    }
-  }
+  if (logoEl) logoEl.src = _nc.logo || window.HLH_LOGO_DATA_URL || (typeof CLFN_LOGO_DATA_URL === 'string' ? CLFN_LOGO_DATA_URL : '');
   if (_nc.primary_color) { try { document.documentElement.style.setProperty('--yellow', _nc.primary_color); } catch (e) {} }
 
   loadRememberedEmail();

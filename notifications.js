@@ -927,7 +927,7 @@ async function _fetchLogoForPdf() {
     // header is branded even when no theme logo is configured on this page.
     var logoUrl = (window._appSettings && _appSettings.theme && _appSettings.theme.logo) || null;
     if (!logoUrl) { try { logoUrl = sessionStorage.getItem('clfn_logo_cache'); } catch(e) {} }
-    if (!logoUrl) logoUrl = window.CLFN_LOGO_DATA_URL || null;
+    if (!logoUrl) logoUrl = window.HLH_LOGO_DATA_URL || window.CLFN_LOGO_DATA_URL || null;
     if (!logoUrl) { _logoDataUrlCache = ''; return null; }
     // Already a data URL (embedded / cached) — use directly, no fetch needed.
     if (logoUrl.indexOf('data:') === 0) { _logoDataUrlCache = logoUrl; return logoUrl; }

@@ -2053,13 +2053,11 @@ function renderAppHeader(){
       var c = sessionStorage.getItem('clfn_logo_cache');
       if (c) return c;
     } catch(e) {}
-    // Registry logo for this nation, if any. CLFN's hardcoded mark is the
-    // fallback ONLY for CLFN itself -- another nation with no logo yet shows no
-    // mark (its name still renders in the header) rather than CLFN's logo.
+    // This nation's own logo, else the Home Land Homes platform default. CLFN's
+    // mark is only ever CLFN's own (set on its directory entry), never a fallback
+    // for other nations.
     var _regLogo = (window.NATION_CONFIG && window.NATION_CONFIG.logo) || '';
-    if (_regLogo) return _regLogo;
-    var _natId = (window._NATION && window._NATION.id) || 'clfn';
-    return _natId === 'clfn' ? (window.CLFN_LOGO_DATA_URL || '') : '';
+    return _regLogo || window.HLH_LOGO_DATA_URL || window.CLFN_LOGO_DATA_URL || '';
   })();
   var _logoTransparent = (function(){
     try { return sessionStorage.getItem('clfn_logo_transparent') === '1'; } catch(e) { return false; }
