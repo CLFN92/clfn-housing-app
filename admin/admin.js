@@ -498,7 +498,10 @@
         '<div class="card"><h3>Supabase project</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">The nation\'s own database-per-nation project. The anon key is publishable.</p>'
       +   '<label>Supabase URL</label><input id="cn-url" placeholder="https://xxxx.supabase.co" value="' + esc(n.supabase_url || '') + '"/>'
+      +   '<label>Project ref</label><input id="cn-ref-view" value="' + esc(_refFromUrl(n.supabase_url) || '') + '" readonly style="background:var(--bg);color:var(--muted);" title="Derived from the Supabase URL (the code in https://<ref>.supabase.co). This is what the cost tracker and provisioning key off."/>'
       +   '<label>Supabase anon key</label><input id="cn-anon" placeholder="eyJ..." value="' + esc(n.supabase_anon || '') + '"/>'
+      +   '<label>Credentials stored in (reference only — never the secret)</label><input id="cn-cred" placeholder="e.g. 1Password › Supabase › ' + esc(n.subdomain) + '" value="' + esc(n.credentials_note || '') + '"/>'
+      +   '<p class="sub" style="margin:4px 0 0;font-size:11px;">Points to where this project\'s <b>database password</b> and <b>service-role key</b> live (a password manager). <b>Do not paste secrets here</b> — this panel is not a secret store; any value saved is readable by a signed-in admin\'s browser.</p>'
       + '</div>'
       + '<div class="card"><h3>Provisioning</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">'
@@ -613,6 +616,7 @@
       housing_email: get('cn-housing').trim() || null,
       supabase_url:  get('cn-url').trim() || null,
       supabase_anon: get('cn-anon').trim() || null,
+      credentials_note: get('cn-cred').trim() || null,
       modules_licensed: mods,
       status: get('cn-status') || 'provisioning',
       updated_at: new Date().toISOString()
