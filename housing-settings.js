@@ -1252,15 +1252,22 @@ function renderThemesPanel() {
   var theme = (window._appSettings && window._appSettings.theme) || {};
   var defaults = window.THEME_DEFAULTS || { yellow:'#F8E41A', dark:'#111110', text:'#111110' };
   var hasLogo = !!theme.logo;
+  // Effective brand accent: a saved theme override wins, else the nation's
+  // registry colour (admin-set primary_color in NATION_CONFIG), else the stock
+  // default. Without the registry fallback the editor showed the stock yellow
+  // for every nation whose colour lives only in the registry (e.g. Demo's blue,
+  // which is applied live at boot but never written into _appSettings.theme).
+  var _nc = window.NATION_CONFIG || {};
+  var _brandAccent = _nc.primary_color || defaults.yellow;
   // Header follows the brand accent automatically: when no explicit header colour
   // is saved, show the derived brand "ink" (accent mixed toward black) so the
   // picker matches what's on screen. Stash it so _readThemeFromForm can tell an
   // untouched auto value apart from a deliberate override.
-  var _accent    = theme.yellow || defaults.yellow;
+  var _accent    = theme.yellow || _brandAccent;
   var _brandDark = (typeof _brandInk === 'function' ? _brandInk(_accent, 0.88) : '') || defaults.dark;
   window._themeAutoDark = _brandDark;
   body.innerHTML =
-      _themeFieldRow('yellow',  'Brand Accent',       'Primary highlight — buttons, badges, links',  theme.yellow,  defaults.yellow)
+      _themeFieldRow('yellow',  'Brand Accent',       'Primary highlight — buttons, badges, links',  theme.yellow,  _brandAccent)
     + _themeFieldRow('dark',    'Header / Dark Surface','Derived from the Brand Accent — override to pin a custom header colour',   theme.dark,    _brandDark)
     + _themeFieldRow('text',    'Body Text',            'Default text color across the app',           theme.text,    defaults.text)
     + _themeFieldRow('bg',      'Page Background',      'Main background behind all cards',            theme.bg,      defaults.bg)
