@@ -59,6 +59,34 @@
   .center{text-align:center;padding:40px 18px}
   .foot{color:var(--muted);font-size:11px;text-align:center;margin-top:26px}
   code{background:var(--accent-light);border:1px solid var(--hair);border-radius:5px;padding:1px 5px;font-size:12px}
+  /* Nation Information Card -- TIC-style shell (hero + strip + tabs + body + footer) */
+  .nic-shell{background:var(--surface);border:1px solid var(--hair);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-top:14px}
+  .nic-hero{background:var(--ink);color:#fff;padding:14px 18px 16px}
+  .nic-hero .back{background:none;border:1px solid #444;color:#ccc;border-radius:7px;padding:5px 11px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:10px}
+  .nic-hero .back:hover{border-color:var(--accent);color:var(--accent)}
+  .nic-hero h1{color:#fff;margin:0 0 2px;font-size:21px}
+  .nic-hero .nic-sub{color:#bdbdb6;font-size:12px}
+  .nic-hero .nic-sub code{background:rgba(255,255,255,.12);border-color:transparent;color:#fff}
+  .nic-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line)}
+  .nic-strip-tile{background:var(--surface);padding:10px 14px;min-width:0}
+  .nic-strip-tile .l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:4px}
+  .nic-strip-tile .v{font-size:13px;font-weight:600;overflow-wrap:anywhere}
+  .nic-tabs{display:flex;flex-wrap:wrap;gap:2px;padding:0 10px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg)}
+  .nic-tab{background:none;border:none;border-bottom:2px solid transparent;padding:11px 14px;font-size:13px;font-weight:600;font-family:inherit;color:var(--muted);cursor:pointer}
+  .nic-tab:hover{color:var(--ink)}
+  .nic-tab.active{color:var(--ink);border-bottom-color:var(--accent)}
+  .nic-body{padding:4px 18px 6px}
+  .nic-panel{display:none}
+  .nic-panel.active{display:block}
+  .nic-panel .card{border:none;box-shadow:none;padding:0;margin:16px 0 0;border-radius:0}
+  .nic-panel .card:first-child{margin-top:8px}
+  .nic-panel .card+.card{margin-top:20px;padding-top:18px;border-top:1px solid var(--line)}
+  .nic-footer{display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid var(--line);background:var(--bg);position:sticky;bottom:0}
+  .nic-footer .btn{margin-top:0}
+  .nic-footer .msg{margin:0;flex:1;padding:0;background:none;border:none}
+  .nic-footer .msg.err{background:none;border:none;color:var(--danger);padding:0}
+  .nic-footer .msg.ok{background:none;border:none;color:var(--ok);padding:0}
+  @media(max-width:640px){.nic-strip{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>

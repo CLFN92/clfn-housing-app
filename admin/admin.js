@@ -365,16 +365,13 @@
         + '<input type="checkbox" class="cn-mod" value="' + m[0] + '" style="width:auto;"' + (mods[m[0]] ? ' checked' : '') + '/> ' + esc(m[1]) + '</label>';
     }).join('');
     var stOpt = function(v,l){ return '<option value="' + v + '"' + (String(n.status||'provisioning') === v ? ' selected' : '') + '>' + l + '</option>'; };
-    return '<button class="btn sm ghost" type="button" data-act="home">&larr; Back</button>'
-      + '<h1 style="margin-top:12px;">' + esc(n.display_name) + '</h1>'
-      + '<p class="sub"><code>' + esc(n.subdomain) + '.fnhub.app</code> &middot; Nation Information Card</p>'
-      + '<div class="card" style="padding-top:12px;"><div id="cn-summary" style="display:flex;flex-wrap:wrap;gap:18px;font-size:12px;">'
-      +   '<div><div style="color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-size:10px;font-weight:700;">Status</div><span class="pill ' + esc(n.status||'provisioning') + '">' + esc(n.status||'provisioning') + '</span></div>'
-      +   '<div><div style="color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-size:10px;font-weight:700;">Licensed modules</div><b>' + Object.keys(n.modules_licensed||{}).filter(function(k){return n.modules_licensed[k];}).length + '</b></div>'
-      +   '<div id="cn-sum-usage"><div style="color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-size:10px;font-weight:700;">Data usage</div><span style="color:var(--muted);">—</span></div>'
-      +   '<div id="cn-sum-inv"><div style="color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-size:10px;font-weight:700;">Outstanding</div><span style="color:var(--muted);">—</span></div>'
-      + '</div></div>'
-      + '<div class="card"><h3>Branding &amp; contact</h3>'
+    var tab = function(k, l, active){ return '<button class="nic-tab' + (active ? ' active' : '') + '" type="button" data-act="nic-tab" data-tab="' + k + '">' + l + '</button>'; };
+    var panel = function(k, html, active){ return '<div class="nic-panel' + (active ? ' active' : '') + '" data-panel="' + k + '">' + html + '</div>'; };
+    var modCount = Object.keys(n.modules_licensed || {}).filter(function(k){ return n.modules_licensed[k]; }).length;
+
+    // Panel content (existing card markup, regrouped under tabs).
+    var pOverview =
+        '<div class="card"><h3>Branding &amp; contact</h3>'
       +   '<div style="' + g2 + '">'
       +     '<div><label>Display name</label><input id="cn-name" value="' + esc(n.display_name) + '"/></div>'
       +     '<div><label>Short code</label><input id="cn-short" value="' + esc(n.short) + '"/></div>'
@@ -385,11 +382,6 @@
       +   '</div>'
       +   '<label>Housing email</label><input id="cn-housing" placeholder="housing@nation.ca" value="' + esc(n.housing_email || '') + '"/>'
       + '</div>'
-      + '<div class="card"><h3>Supabase project</h3>'
-      +   '<p class="sub" style="margin:2px 0 8px;">The nation\'s own database-per-nation project. The anon key is publishable.</p>'
-      +   '<label>Supabase URL</label><input id="cn-url" placeholder="https://xxxx.supabase.co" value="' + esc(n.supabase_url || '') + '"/>'
-      +   '<label>Supabase anon key</label><input id="cn-anon" placeholder="eyJ..." value="' + esc(n.supabase_anon || '') + '"/>'
-      + '</div>'
       + '<div class="card"><h3>Licensed modules</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">Which optional modules this nation is allowed to use. The nation still turns each one on or off in its own in-app settings.</p>'
       +   '<div>' + modChecks + '</div>'
@@ -398,6 +390,13 @@
       +   '<label>Registry status</label>'
       +   '<select id="cn-status">' + stOpt('provisioning','Provisioning') + stOpt('active','Active') + stOpt('suspended','Suspended') + '</select>'
       +   '<p class="sub" style="margin:6px 0 0;">Only <b>active</b> nations are published to <code>nations_public</code> and resolve at <code>&lt;subdomain&gt;.fnhub.app</code>.</p>'
+      + '</div>';
+
+    var pSupabase =
+        '<div class="card"><h3>Supabase project</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">The nation\'s own database-per-nation project. The anon key is publishable.</p>'
+      +   '<label>Supabase URL</label><input id="cn-url" placeholder="https://xxxx.supabase.co" value="' + esc(n.supabase_url || '') + '"/>'
+      +   '<label>Supabase anon key</label><input id="cn-anon" placeholder="eyJ..." value="' + esc(n.supabase_anon || '') + '"/>'
       + '</div>'
       + '<div class="card"><h3>Provisioning</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">'
@@ -407,22 +406,19 @@
       +   '</p>'
       +   '<button class="btn sm ghost" type="button" data-act="provision" data-id="' + esc(n.id) + '">'
       +     (n.supabase_url ? 'Re-run provisioning &rarr;' : 'Provision this nation &rarr;') + '</button>'
-      + '</div>'
-      + '<div class="card"><h3>Subscription agreement</h3>'
-      +   '<p class="sub" style="margin:2px 0 8px;">Generate the Home Land Homes software subscription agreement for this nation as a PDF. It fills in the nation party details below and is saved to the document library.</p>'
-      +   '<label>Nation legal name (party)</label><input id="cn-agr-name" value="' + esc(n.display_name || '') + '"/>'
-      +   '<label>Administrative office address</label><input id="cn-agr-addr" placeholder="123 Main St, Town, ON  A1A 1A1" value="' + esc(n.office_address || '') + '"/>'
-      +   '<div class="msg" id="cn-agr-msg"></div>'
-      +   '<button class="btn" type="button" data-act="gen-agreement" data-id="' + esc(n.id) + '">Generate agreement PDF</button>'
-      + '</div>'
-      + '<div class="card"><h3>Notes</h3>'
+      + '</div>';
+
+    var pNotes =
+        '<div class="card"><h3>Notes</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">Internal log for this nation (calls, decisions, follow-ups). Visible to platform admins only.</p>'
       +   '<div id="cn-notes"><div class="empty">Loading notes...</div></div>'
       +   '<div style="margin-top:10px;"><textarea id="cn-note-body" rows="2" placeholder="Add a note..." style="width:100%;padding:10px 12px;border:1px solid var(--hair);border-radius:9px;font-size:14px;font-family:inherit;resize:vertical;"></textarea></div>'
       +   '<div class="msg" id="cn-note-msg"></div>'
       +   '<button class="btn sm" type="button" data-act="note-add" data-sub="' + esc(n.subdomain) + '">Add note</button>'
-      + '</div>'
-      + '<div class="card"><h3>Invoices</h3>'
+      + '</div>';
+
+    var pInvoices =
+        '<div class="card"><h3>Invoices</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">Subscription, setup and add-on billing for this nation. Creating an invoice generates a PDF and files it in Documents.</p>'
       +   '<div id="cn-invoices"><div class="empty">Loading invoices...</div></div>'
       +   '<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px;">'
@@ -437,8 +433,19 @@
       +     '<div class="msg" id="cn-inv-msg"></div>'
       +     '<button class="btn" type="button" data-act="inv-create" data-sub="' + esc(n.subdomain) + '" data-id="' + esc(n.id) + '">Create invoice &amp; PDF</button>'
       +   '</div>'
-      + '</div>'
-      + '<div class="card"><h3>Documents</h3>'
+      + '</div>';
+
+    var pAgreement =
+        '<div class="card"><h3>Subscription agreement</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">Generate the Home Land Homes software subscription agreement for this nation as a PDF. It fills in the nation party details below and is saved to the document library.</p>'
+      +   '<label>Nation legal name (party)</label><input id="cn-agr-name" value="' + esc(n.display_name || '') + '"/>'
+      +   '<label>Administrative office address</label><input id="cn-agr-addr" placeholder="123 Main St, Town, ON  A1A 1A1" value="' + esc(n.office_address || '') + '"/>'
+      +   '<div class="msg" id="cn-agr-msg"></div>'
+      +   '<button class="btn" type="button" data-act="gen-agreement" data-id="' + esc(n.id) + '">Generate agreement PDF</button>'
+      + '</div>';
+
+    var pDocuments =
+        '<div class="card"><h3>Documents</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">Signed agreements, BCRs, invoices and other files for this nation. Stored privately on the control plane.</p>'
       +   '<div id="cn-docs"><div class="empty">Loading documents...</div></div>'
       +   '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:12px;">'
@@ -448,10 +455,39 @@
       +     '<button class="btn sm" type="button" data-act="doc-pick">Choose &amp; upload</button>'
       +   '</div>'
       +   '<div class="msg" id="cn-doc-msg"></div>'
+      + '</div>';
+
+    return '<div class="nic-shell">'
+      + '<div class="nic-hero">'
+      +   '<button class="back" type="button" data-act="home">&larr; All nations</button>'
+      +   '<h1>' + esc(n.display_name) + '</h1>'
+      +   '<div class="nic-sub"><code>' + esc(n.subdomain) + '.fnhub.app</code> &middot; Nation Information Card</div>'
       + '</div>'
-      + '<div class="msg" id="cn-msg"></div>'
-      + '<button class="btn" id="cn-save" type="button" data-act="save-config" data-id="' + esc(n.id) + '">Save changes</button>';
+      + '<div class="nic-strip">'
+      +   '<div class="nic-strip-tile"><div class="l">Status</div><div class="v"><span class="pill ' + esc(n.status||'provisioning') + '">' + esc(n.status||'provisioning') + '</span></div></div>'
+      +   '<div class="nic-strip-tile"><div class="l">Licensed modules</div><div class="v">' + modCount + '</div></div>'
+      +   '<div class="nic-strip-tile"><div class="l">Data usage</div><div class="v" id="cn-sum-usage" style="color:var(--muted);">&mdash;</div></div>'
+      +   '<div class="nic-strip-tile"><div class="l">Outstanding</div><div class="v" id="cn-sum-inv" style="color:var(--muted);">&mdash;</div></div>'
+      + '</div>'
+      + '<div class="nic-tabs">'
+      +   tab('overview', 'Overview', true) + tab('supabase', 'Supabase') + tab('agreement', 'Agreement')
+      +   tab('invoices', 'Invoices') + tab('notes', 'Notes') + tab('documents', 'Documents')
+      + '</div>'
+      + '<div class="nic-body">'
+      +   panel('overview', pOverview, true) + panel('supabase', pSupabase)
+      +   panel('agreement', pAgreement) + panel('invoices', pInvoices)
+      +   panel('notes', pNotes) + panel('documents', pDocuments)
+      + '</div>'
+      + '<div class="nic-footer">'
+      +   '<div class="msg" id="cn-msg"></div>'
+      +   '<button class="btn" id="cn-save" type="button" data-act="save-config" data-id="' + esc(n.id) + '">Save changes</button>'
+      + '</div>'
+      + '</div>';
   }
+  window.nicTab = function(name){
+    Array.prototype.forEach.call(document.querySelectorAll('.nic-tab'), function(b){ b.classList.toggle('active', b.getAttribute('data-tab') === name); });
+    Array.prototype.forEach.call(document.querySelectorAll('.nic-panel'), function(p){ p.classList.toggle('active', p.getAttribute('data-panel') === name); });
+  };
 
   window.saveNationConfig = async function(id){
     var get = function(x){ return (document.getElementById(x) || {}).value || ''; };
@@ -943,9 +979,12 @@
       var u = await api('GET', '/nation_usage?subdomain=eq.' + encodeURIComponent(sub));
       var usg = (u.ok ? await u.json().catch(function(){ return []; }) : [])[0];
       var el = document.getElementById('cn-sum-usage');
-      if (el) el.innerHTML = _sumLbl('Data usage') + (usg
-        ? '<b>' + esc(fmtBytes(usg.database_bytes)) + '</b> db &middot; <b>' + esc(fmtBytes(usg.storage_bytes)) + '</b> files'
-        : '<span style="color:var(--muted);">not reported</span>');
+      if (el){
+        el.style.color = usg ? '' : 'var(--muted)';
+        el.innerHTML = usg
+          ? esc(fmtBytes(usg.database_bytes)) + ' db &middot; ' + esc(fmtBytes(usg.storage_bytes)) + ' files'
+          : 'not reported';
+      }
     } catch(e){}
     try {
       var iv = await api('GET', '/nation_invoices?subdomain=eq.' + encodeURIComponent(sub) + '&select=total,status');
@@ -953,7 +992,7 @@
       var out = ivr.filter(function(x){ return x.status === 'sent' || x.status === 'draft'; })
                    .reduce(function(a, x){ return a + Number(x.total || 0); }, 0);
       var iel = document.getElementById('cn-sum-inv');
-      if (iel) iel.innerHTML = _sumLbl('Outstanding') + '<b>' + _money(out) + '</b>';
+      if (iel){ iel.style.color = ''; iel.innerHTML = _money(out); }
     } catch(e){}
   }
 
@@ -1151,6 +1190,7 @@
       case 'doc-pick':      { var fi = document.getElementById('cn-doc-file'); if (fi) fi.click(); break; }
       case 'doc-dl':        window.downloadNationDoc(el.getAttribute('data-path') || ''); break;
       case 'doc-del':       window.deleteNationDoc(el.getAttribute('data-id') || '', el.getAttribute('data-path') || '', el.getAttribute('data-sub') || ''); break;
+      case 'nic-tab':       window.nicTab(el.getAttribute('data-tab') || ''); break;
       case 'note-add':      window.addNationNote(el.getAttribute('data-sub') || ''); break;
       case 'inv-add-line':  window.invAddLine(); break;
       case 'inv-del-line':  { var lr = el.closest && el.closest('.inv-line'); if (lr) lr.remove(); break; }
