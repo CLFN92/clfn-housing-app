@@ -883,6 +883,8 @@
     '###PROVIDER: Kevin Proctor, operating as Home Land Homes',
     'Signature: ______________________________     Date: ____________________',
     'Name: Kevin Proctor',
+    'Title: Founder, Home Land Homes',
+    '{{PROVIDER_CONTACT}}',
     '###THE NATION: {{NATION}}',
     'Signature: ______________________________     Date: ____________________',
     'Name: ______________________________     Title: ____________________',
@@ -921,7 +923,8 @@
     var tpl = AGREEMENT_TPL
       .replace(/\{\{NATION\}\}/g, nationName)
       .replace(/\{\{ADDRESS\}\}/g, address || '______________________________')
-      .replace(/\{\{DATE\}\}/g, _fmtDateLong());
+      .replace(/\{\{DATE\}\}/g, _fmtDateLong())
+      .replace(/\{\{PROVIDER_CONTACT\}\}/g, PROVIDER.name + ' - ' + PROVIDER.addr1 + ', ' + PROVIDER.addr2 + '   ·   ' + PROVIDER.phone + '   ·   ' + PROVIDER.email);
     tpl.split('\n').forEach(function(raw){
       var line = raw;
       if (line === '') { y += 4; return; }
