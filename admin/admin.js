@@ -351,6 +351,10 @@
     app.innerHTML = configureView(n);
     renderNationDocsCard(n.subdomain);
     wireDocFileInput();
+    renderNationNotes(n.subdomain);
+    renderNationInvoices(n.subdomain);
+    window.invAddLine();          // seed one empty invoice line
+    loadNicSummary(n.subdomain);
   };
 
   function configureView(n){
@@ -362,8 +366,14 @@
     }).join('');
     var stOpt = function(v,l){ return '<option value="' + v + '"' + (String(n.status||'provisioning') === v ? ' selected' : '') + '>' + l + '</option>'; };
     return '<button class="btn sm ghost" type="button" data-act="home">&larr; Back</button>'
-      + '<h1 style="margin-top:12px;">Configure ' + esc(n.display_name) + '</h1>'
-      + '<p class="sub"><code>' + esc(n.subdomain) + '.fnhub.app</code> &middot; subdomain is fixed</p>'
+      + '<h1 style="margin-top:12px;">' + esc(n.display_name) + '</h1>'
+      + '<p class="sub"><code>' + esc(n.subdomain) + '.fnhub.app</code> &middot; Nation Information Card</p>'
+      + '<div class="card" style="padding-top:12px;"><div id="cn-summary" style="display:flex;flex-wrap:wrap;gap:18px;font-size:12px;">'
+      +   '<div><div style="color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-size:10px;font-weight:700;">Status</div><span class="pill ' + esc(n.status||'provisioning') + '">' + esc(n.status||'provisioning') + '</span></div>'
+      +   '<div><div style="color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-size:10px;font-weight:700;">Licensed modules</div><b>' + Object.keys(n.modules_licensed||{}).filter(function(k){return n.modules_licensed[k];}).length + '</b></div>'
+      +   '<div id="cn-sum-usage"><div style="color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-size:10px;font-weight:700;">Data usage</div><span style="color:var(--muted);">—</span></div>'
+      +   '<div id="cn-sum-inv"><div style="color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-size:10px;font-weight:700;">Outstanding</div><span style="color:var(--muted);">—</span></div>'
+      + '</div></div>'
       + '<div class="card"><h3>Branding &amp; contact</h3>'
       +   '<div style="' + g2 + '">'
       +     '<div><label>Display name</label><input id="cn-name" value="' + esc(n.display_name) + '"/></div>'
@@ -405,8 +415,31 @@
       +   '<div class="msg" id="cn-agr-msg"></div>'
       +   '<button class="btn" type="button" data-act="gen-agreement" data-id="' + esc(n.id) + '">Generate agreement PDF</button>'
       + '</div>'
+      + '<div class="card"><h3>Notes</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">Internal log for this nation (calls, decisions, follow-ups). Visible to platform admins only.</p>'
+      +   '<div id="cn-notes"><div class="empty">Loading notes...</div></div>'
+      +   '<div style="margin-top:10px;"><textarea id="cn-note-body" rows="2" placeholder="Add a note..." style="width:100%;padding:10px 12px;border:1px solid var(--hair);border-radius:9px;font-size:14px;font-family:inherit;resize:vertical;"></textarea></div>'
+      +   '<div class="msg" id="cn-note-msg"></div>'
+      +   '<button class="btn sm" type="button" data-act="note-add" data-sub="' + esc(n.subdomain) + '">Add note</button>'
+      + '</div>'
+      + '<div class="card"><h3>Invoices</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">Subscription, setup and add-on billing for this nation. Creating an invoice generates a PDF and files it in Documents.</p>'
+      +   '<div id="cn-invoices"><div class="empty">Loading invoices...</div></div>'
+      +   '<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px;">'
+      +     '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">New invoice</div>'
+      +     '<div id="cn-inv-lines"></div>'
+      +     '<button class="btn sm ghost" type="button" data-act="inv-add-line" style="margin-top:2px;">+ Add line</button>'
+      +     '<div style="' + g2 + 'margin-top:12px;">'
+      +       '<div><label>Tax rate (%)</label><input id="cn-inv-tax" type="number" step="0.01" min="0" placeholder="0" value="0"/></div>'
+      +       '<div><label>Due date</label><input id="cn-inv-due" type="date"/></div>'
+      +     '</div>'
+      +     '<label>Invoice notes (optional)</label><input id="cn-inv-notes" placeholder="Payable within 30 days; e-transfer to..."/>'
+      +     '<div class="msg" id="cn-inv-msg"></div>'
+      +     '<button class="btn" type="button" data-act="inv-create" data-sub="' + esc(n.subdomain) + '" data-id="' + esc(n.id) + '">Create invoice &amp; PDF</button>'
+      +   '</div>'
+      + '</div>'
       + '<div class="card"><h3>Documents</h3>'
-      +   '<p class="sub" style="margin:2px 0 8px;">Signed agreements, BCRs and other files for this nation. Stored privately on the control plane.</p>'
+      +   '<p class="sub" style="margin:2px 0 8px;">Signed agreements, BCRs, invoices and other files for this nation. Stored privately on the control plane.</p>'
       +   '<div id="cn-docs"><div class="empty">Loading documents...</div></div>'
       +   '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:12px;">'
       +     '<div style="flex:1;min-width:160px;"><label>Add a document</label>'
@@ -899,6 +932,194 @@
     });
   }
 
+  // ==========================================================================
+  // Nation Information Card: summary, notes, invoices
+  // ==========================================================================
+  function _money(n, cur){ return (cur || 'CAD') === 'CAD' ? '$' + (Number(n) || 0).toFixed(2) : (Number(n) || 0).toFixed(2) + ' ' + cur; }
+  function _sumLbl(t){ return '<div style="color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-size:10px;font-weight:700;">' + t + '</div>'; }
+
+  async function loadNicSummary(sub){
+    try {
+      var u = await api('GET', '/nation_usage?subdomain=eq.' + encodeURIComponent(sub));
+      var usg = (u.ok ? await u.json().catch(function(){ return []; }) : [])[0];
+      var el = document.getElementById('cn-sum-usage');
+      if (el) el.innerHTML = _sumLbl('Data usage') + (usg
+        ? '<b>' + esc(fmtBytes(usg.database_bytes)) + '</b> db &middot; <b>' + esc(fmtBytes(usg.storage_bytes)) + '</b> files'
+        : '<span style="color:var(--muted);">not reported</span>');
+    } catch(e){}
+    try {
+      var iv = await api('GET', '/nation_invoices?subdomain=eq.' + encodeURIComponent(sub) + '&select=total,status');
+      var ivr = iv.ok ? await iv.json().catch(function(){ return []; }) : [];
+      var out = ivr.filter(function(x){ return x.status === 'sent' || x.status === 'draft'; })
+                   .reduce(function(a, x){ return a + Number(x.total || 0); }, 0);
+      var iel = document.getElementById('cn-sum-inv');
+      if (iel) iel.innerHTML = _sumLbl('Outstanding') + '<b>' + _money(out) + '</b>';
+    } catch(e){}
+  }
+
+  // ---- Notes -----------------------------------------------------------------
+  async function renderNationNotes(sub){
+    var host = document.getElementById('cn-notes'); if (!host) return;
+    var r = await api('GET', '/nation_notes?subdomain=eq.' + encodeURIComponent(sub) + '&order=created_at.desc');
+    var notes = r.ok ? await r.json().catch(function(){ return []; }) : [];
+    if (!notes.length){ host.innerHTML = '<div class="empty">No notes yet.</div>'; return; }
+    host.innerHTML = notes.map(function(nt){
+      var when = ''; try { when = new Date(nt.created_at).toLocaleString(); } catch(e){}
+      return '<div style="padding:8px 0;border-bottom:1px solid var(--line);">'
+        + '<div style="font-size:13px;white-space:pre-wrap;">' + esc(nt.body) + '</div>'
+        + '<div style="font-size:11px;color:var(--muted);margin-top:3px;">' + esc(nt.author || '') + (when ? ' &middot; ' + esc(when) : '') + '</div>'
+        + '</div>';
+    }).join('');
+  }
+  window.addNationNote = async function(sub){
+    var ta = document.getElementById('cn-note-body');
+    var body = (ta && ta.value || '').trim();
+    if (!body){ setMsg('cn-note-msg', 'Enter a note first.'); return; }
+    var r = await api('POST', '/nation_notes', { subdomain: sub, body: body, author: jwtEmail() }, 'return=minimal');
+    if (r.ok){ if (ta) ta.value = ''; setMsg('cn-note-msg', 'Note added.', 'ok'); await audit('nation_note_added', sub, ''); renderNationNotes(sub); }
+    else { setMsg('cn-note-msg', 'Could not save the note.'); }
+  };
+
+  // ---- Invoices --------------------------------------------------------------
+  var INV_STATUS = { draft: ['Draft', 'provisioning'], sent: ['Sent', 'provisioning'], paid: ['Paid', 'active'], void: ['Void', 'suspended'] };
+  window.invAddLine = function(){
+    var host = document.getElementById('cn-inv-lines'); if (!host) return;
+    var row = document.createElement('div');
+    row.className = 'inv-line';
+    row.style.cssText = 'display:grid;grid-template-columns:1fr 64px 88px 30px;gap:6px;margin-bottom:6px;align-items:center;';
+    row.innerHTML =
+        '<input class="inv-desc" placeholder="Description" style="font-size:14px;padding:8px 10px;"/>'
+      + '<input class="inv-qty" type="number" step="0.01" value="1" title="Quantity" style="font-size:14px;padding:8px 10px;"/>'
+      + '<input class="inv-price" type="number" step="0.01" placeholder="Unit $" title="Unit price" style="font-size:14px;padding:8px 10px;"/>'
+      + '<button class="btn sm danger" type="button" data-act="inv-del-line" title="Remove line" style="padding:6px 0;">&times;</button>';
+    host.appendChild(row);
+  };
+  function _collectInvLines(){
+    var out = [];
+    Array.prototype.forEach.call(document.querySelectorAll('#cn-inv-lines .inv-line'), function(row){
+      var desc = (row.querySelector('.inv-desc') || {}).value || '';
+      var qty  = parseFloat((row.querySelector('.inv-qty') || {}).value || '0') || 0;
+      var price = parseFloat((row.querySelector('.inv-price') || {}).value || '0') || 0;
+      if (desc.trim() && (qty || price)) out.push({ description: desc.trim(), qty: qty, unit_price: price });
+    });
+    return out;
+  }
+  async function nextInvoiceNumber(){
+    var year = new Date().getFullYear();
+    var r = await api('GET', '/nation_invoices?select=number');
+    var rows = r.ok ? await r.json().catch(function(){ return []; }) : [];
+    var re = new RegExp('^HLH-' + year + '-(\\d+)$'), max = 0;
+    rows.forEach(function(x){ var m = re.exec(String(x.number || '')); if (m){ var nn = parseInt(m[1], 10); if (nn > max) max = nn; } });
+    return 'HLH-' + year + '-' + String(max + 1).padStart(2, '0');
+  }
+  async function renderNationInvoices(sub){
+    var host = document.getElementById('cn-invoices'); if (!host) return;
+    var r = await api('GET', '/nation_invoices?subdomain=eq.' + encodeURIComponent(sub) + '&order=issue_date.desc');
+    var inv = r.ok ? await r.json().catch(function(){ return []; }) : [];
+    if (!inv.length){ host.innerHTML = '<div class="empty">No invoices yet.</div>'; return; }
+    var rows = inv.map(function(x){
+      var st = INV_STATUS[x.status] || ['?', 'provisioning'];
+      var acts = '';
+      if (x.status === 'draft') acts += '<button class="btn sm ghost" type="button" data-act="inv-status" data-id="' + esc(x.id) + '" data-status="sent" data-sub="' + esc(sub) + '">Mark sent</button>';
+      if (x.status === 'draft' || x.status === 'sent') acts += '<button class="btn sm ghost" type="button" data-act="inv-status" data-id="' + esc(x.id) + '" data-status="paid" data-sub="' + esc(sub) + '">Mark paid</button>';
+      if (x.status !== 'void' && x.status !== 'paid') acts += '<button class="btn sm danger" type="button" data-act="inv-status" data-id="' + esc(x.id) + '" data-status="void" data-sub="' + esc(sub) + '">Void</button>';
+      return '<tr>'
+        + '<td><b>' + esc(x.number) + '</b></td>'
+        + '<td style="font-size:11px;color:var(--muted);">' + esc(x.issue_date || '') + '</td>'
+        + '<td style="font-variant-numeric:tabular-nums;">' + _money(x.total, x.currency) + '</td>'
+        + '<td><span class="pill ' + st[1] + '">' + st[0] + '</span></td>'
+        + '<td><div class="row-actions">' + acts + '</div></td></tr>';
+    }).join('');
+    host.innerHTML = '<table><thead><tr><th>Invoice</th><th>Issued</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+  window.setInvoiceStatus = async function(id, status, sub){
+    if (status === 'void' && !confirm('Void this invoice?')) return;
+    var r = await api('PATCH', '/nation_invoices?id=eq.' + encodeURIComponent(id), { status: status, updated_at: new Date().toISOString() }, 'return=minimal');
+    if (r.ok){ await audit('nation_invoice_' + status, sub, id); renderNationInvoices(sub); loadNicSummary(sub); }
+  };
+  window.createNationInvoice = function(sub, id){
+    var n = _nations.filter(function(x){ return String(x.id) === String(id); })[0];
+    var lines = _collectInvLines();
+    if (!lines.length){ setMsg('cn-inv-msg', 'Add at least one line with a description and amount.'); return; }
+    var taxRate = parseFloat((document.getElementById('cn-inv-tax') || {}).value || '0') || 0;
+    var due = (document.getElementById('cn-inv-due') || {}).value || null;
+    var inotes = (document.getElementById('cn-inv-notes') || {}).value || '';
+    var subtotal = lines.reduce(function(a, l){ return a + (l.qty * l.unit_price); }, 0);
+    var tax = Math.round(subtotal * taxRate) / 100;
+    var total = Math.round((subtotal + tax) * 100) / 100;
+    subtotal = Math.round(subtotal * 100) / 100;
+    setMsg('cn-inv-msg', 'Creating...', 'ok');
+    ensureJsPdf(async function(){
+      try {
+        var number = await nextInvoiceNumber();
+        var today = new Date().toISOString().slice(0, 10);
+        var inv = { subdomain: sub, number: number, issue_date: today, due_date: due, currency: 'CAD',
+                    line_items: lines, subtotal: subtotal, tax_rate: taxRate, tax: tax, total: total,
+                    status: 'draft', notes: inotes, created_by: jwtEmail() };
+        var r = await api('POST', '/nation_invoices', inv, 'return=minimal');
+        if (!r.ok){ var t = await r.text(); setMsg('cn-inv-msg', /duplicate|unique/i.test(t) ? 'Number collision, try again.' : 'Could not save invoice.'); return; }
+        var doc = buildInvoicePdf(n, inv);
+        var fname = number + '.pdf';
+        doc.save(fname);
+        try { await uploadDoc(sub, new File([doc.output('blob')], fname, { type: 'application/pdf' }), 'invoice'); } catch(e){}
+        await audit('nation_invoice_created', sub, number);
+        setMsg('cn-inv-msg', 'Invoice ' + number + ' created (PDF downloaded + filed in Documents).', 'ok');
+        document.getElementById('cn-inv-lines').innerHTML = ''; invAddLine();
+        var tn = document.getElementById('cn-inv-notes'); if (tn) tn.value = '';
+        renderNationInvoices(sub); renderNationDocsCard(sub); loadNicSummary(sub);
+      } catch (e){ setMsg('cn-inv-msg', 'Could not create: ' + String(e && e.message || e)); }
+    }, function(){ setMsg('cn-inv-msg', 'Could not load the PDF generator (offline?).'); });
+  };
+
+  function buildInvoicePdf(nation, inv){
+    var jsPDF = window.jspdf.jsPDF;
+    var doc = new jsPDF({ unit: 'pt', format: 'letter' });
+    var M = 56, W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), y = M;
+    function t(s, x, yy, o){ o = o || {}; doc.setFont('helvetica', o.style || 'normal'); doc.setFontSize(o.size || 10); if (o.color) doc.setTextColor(o.color[0], o.color[1], o.color[2]); else doc.setTextColor(20, 20, 20); doc.text(String(s), x, yy, o.align ? { align: o.align } : undefined); }
+    // Header
+    t('Home Land Homes', M, y, { style: 'bold', size: 16 });
+    t('INVOICE', W - M, y, { style: 'bold', size: 18, align: 'right', color: [120, 120, 120] });
+    y += 16; t('Housing Management Platform', M, y, { size: 10, color: [110, 110, 110] });
+    t(inv.number, W - M, y, { size: 11, align: 'right' });
+    y += 26; doc.setDrawColor(220); doc.line(M, y, W - M, y); y += 20;
+    // Bill to + meta
+    t('BILL TO', M, y, { style: 'bold', size: 9, color: [120, 120, 120] });
+    t('DETAILS', W - 200, y, { style: 'bold', size: 9, color: [120, 120, 120] });
+    y += 14;
+    t(nation ? nation.display_name : '', M, y, { style: 'bold', size: 11 });
+    t('Issue date: ' + (inv.issue_date || ''), W - 200, y, { size: 10 });
+    y += 14;
+    if (nation && nation.subdomain) t(nation.subdomain + '.fnhub.app', M, y, { size: 10, color: [110, 110, 110] });
+    if (inv.due_date) { t('Due date:  ' + inv.due_date, W - 200, y, { size: 10 }); }
+    y += 26;
+    // Table header
+    var cX = M, cQty = W - M - 190, cUnit = W - M - 110, cAmt = W - M;
+    doc.setFillColor(245, 245, 242); doc.rect(M - 6, y - 12, W - M * 2 + 12, 22, 'F');
+    t('Description', cX, y, { style: 'bold', size: 9, color: [90, 90, 90] });
+    t('Qty', cQty, y, { style: 'bold', size: 9, align: 'right', color: [90, 90, 90] });
+    t('Unit', cUnit, y, { style: 'bold', size: 9, align: 'right', color: [90, 90, 90] });
+    t('Amount', cAmt, y, { style: 'bold', size: 9, align: 'right', color: [90, 90, 90] });
+    y += 20;
+    (inv.line_items || []).forEach(function(l){
+      var amt = (Number(l.qty) || 0) * (Number(l.unit_price) || 0);
+      var lines = doc.splitTextToSize(String(l.description), cQty - cX - 16);
+      for (var i = 0; i < lines.length; i++){ t(lines[i], cX, y + i * 13, { size: 10 }); }
+      t(String(l.qty), cQty, y, { size: 10, align: 'right' });
+      t(_money(l.unit_price), cUnit, y, { size: 10, align: 'right' });
+      t(_money(amt), cAmt, y, { size: 10, align: 'right' });
+      y += Math.max(lines.length * 13, 16) + 4;
+      if (y > H - 140) { doc.addPage(); y = M; }
+    });
+    doc.setDrawColor(225); doc.line(cQty - 10, y, cAmt, y); y += 16;
+    function totalRow(label, val, bold){ t(label, cUnit, y, { size: bold ? 11 : 10, align: 'right', style: bold ? 'bold' : 'normal' }); t(val, cAmt, y, { size: bold ? 11 : 10, align: 'right', style: bold ? 'bold' : 'normal' }); y += bold ? 18 : 15; }
+    totalRow('Subtotal', _money(inv.subtotal));
+    if (Number(inv.tax_rate)) totalRow('Tax (' + inv.tax_rate + '%)', _money(inv.tax));
+    totalRow('Total (' + inv.currency + ')', _money(inv.total), true);
+    if (inv.notes){ y += 14; t('Notes', M, y, { style: 'bold', size: 9, color: [120, 120, 120] }); y += 14; doc.splitTextToSize(String(inv.notes), W - M * 2).forEach(function(ln){ t(ln, M, y, { size: 10 }); y += 13; }); }
+    t('Home Land Homes - Housing Management Platform', M, H - 26, { size: 8, color: [130, 130, 130] });
+    return doc;
+  }
+
   // ---- Event delegation ------------------------------------------------------
   // Every button here is wired through ONE delegated listener keyed on
   // data-act, because this panel's CSP is `script-src 'self'` with NO
@@ -930,6 +1151,11 @@
       case 'doc-pick':      { var fi = document.getElementById('cn-doc-file'); if (fi) fi.click(); break; }
       case 'doc-dl':        window.downloadNationDoc(el.getAttribute('data-path') || ''); break;
       case 'doc-del':       window.deleteNationDoc(el.getAttribute('data-id') || '', el.getAttribute('data-path') || '', el.getAttribute('data-sub') || ''); break;
+      case 'note-add':      window.addNationNote(el.getAttribute('data-sub') || ''); break;
+      case 'inv-add-line':  window.invAddLine(); break;
+      case 'inv-del-line':  { var lr = el.closest && el.closest('.inv-line'); if (lr) lr.remove(); break; }
+      case 'inv-create':    window.createNationInvoice(el.getAttribute('data-sub') || '', id); break;
+      case 'inv-status':    window.setInvoiceStatus(el.getAttribute('data-id') || '', el.getAttribute('data-status') || '', el.getAttribute('data-sub') || ''); break;
     }
   });
 
