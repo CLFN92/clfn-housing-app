@@ -40,8 +40,12 @@ window._printThemeStyles = function() {
 // Logo data URL is applied to all <img class="hlogo"> + #login-logo elements.
 // ═══════════════════════════════════════════════════════════════════════
 window.THEME_KEYS = ['yellow','dark','text','bg','surface','border','muted','sans','serif','radius'];
-window.THEME_DEFAULTS = { yellow:'#F8E41A', dark:'#111110', text:'#111110',
-                          bg:'#fafaf8', surface:'#ffffff', border:'#e8e6df', muted:'#696960',
+// Platform default palette = Home Land Homes brand (Clay). A nation overrides
+// the accent (and the header ink derives from it) via the admin portal; a
+// nation with no override inherits this palette. Keep in sync with :root in
+// shared.css.
+window.THEME_DEFAULTS = { yellow:'#9A4A1F', dark:'#26221C', text:'#26221C',
+                          bg:'#FAF7F2', surface:'#FFFDF9', border:'#D8CFC0', muted:'#57503F',
                           sans:'DM Sans', serif:'DM Serif Display', radius:'10px' };
 
 // Font definitions — maps font name → { css: full font-family stack, google: needs Google Fonts }
@@ -135,15 +139,33 @@ window._brandInk = function(hex, k){ return window._mixHex(hex, '#000000', k==nu
 // stock CSS palette untouched.
 window._applyBrandDark = function(accent, customDark){
   var root  = document.documentElement;
-  var stock = (window.THEME_DEFAULTS||{}).dark || '#111110';
+  var D     = window.THEME_DEFAULTS || {};
+  var stock = D.dark || '#111110';
+  var defAccent = String(D.yellow || '').toLowerCase();
+  var accentIsDefault = accent && String(accent).toLowerCase() === defAccent;
+  // Header / dark surfaces:
+  //  - an explicit non-stock header colour wins;
+  //  - the platform-default accent keeps the curated default ink (so the brand's
+  //    own Ink shows, not a near-black derivation of the accent);
+  //  - a distinct brand accent derives a matching deep ink.
   var isCustom = customDark && String(customDark).toLowerCase() !== stock.toLowerCase();
-  var base  = isCustom ? customDark : window._brandInk(accent, 0.88);
-  if (!base) return;                       // unparseable accent — keep defaults
-  root.style.setProperty('--dark', base);
-  var d2 = window._mixHex(base, '#ffffff', 0.06);
-  var d3 = window._mixHex(base, '#ffffff', 0.14);
-  if (d2) root.style.setProperty('--dark2', d2);
-  if (d3) root.style.setProperty('--dark3', d3);
+  var base  = isCustom ? customDark : (accentIsDefault ? stock : window._brandInk(accent, 0.88));
+  if (base){
+    root.style.setProperty('--dark', base);
+    var d2 = window._mixHex(base, '#ffffff', 0.06);
+    var d3 = window._mixHex(base, '#ffffff', 0.14);
+    if (d2) root.style.setProperty('--dark2', d2);
+    if (d3) root.style.setProperty('--dark3', d3);
+  }
+  // Accent companions (hover + soft tint) — derive from a DISTINCT brand accent
+  // so hover/tint don't stay the default clay on a differently-coloured nation.
+  // The platform-default accent keeps the curated --yellow-mid/--yellow-light.
+  if (accent && !accentIsDefault){
+    var hov = window._mixHex(accent, '#000000', 0.20);
+    var tnt = window._mixHex(accent, '#ffffff', 0.85);
+    if (hov) root.style.setProperty('--yellow-mid', hov);
+    if (tnt) root.style.setProperty('--yellow-light', tnt);
+  }
 };
 
 window._applyTheme = function(theme) {

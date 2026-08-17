@@ -1264,7 +1264,11 @@ function renderThemesPanel() {
   // picker matches what's on screen. Stash it so _readThemeFromForm can tell an
   // untouched auto value apart from a deliberate override.
   var _accent    = theme.yellow || _brandAccent;
-  var _brandDark = (typeof _brandInk === 'function' ? _brandInk(_accent, 0.88) : '') || defaults.dark;
+  // Mirror _applyBrandDark: the platform-default accent keeps the curated
+  // default ink; a distinct brand accent derives a matching deep ink.
+  var _brandDark = (String(_accent).toLowerCase() === String(defaults.yellow).toLowerCase())
+    ? defaults.dark
+    : ((typeof _brandInk === 'function' ? _brandInk(_accent, 0.88) : '') || defaults.dark);
   window._themeAutoDark = _brandDark;
   body.innerHTML =
       _themeFieldRow('yellow',  'Brand Accent',       'Primary highlight — buttons, badges, links',  theme.yellow,  _brandAccent)

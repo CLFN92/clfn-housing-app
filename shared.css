@@ -53,18 +53,20 @@
 *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* Colour palette */
-  --bg:           #fafaf8;
-  --surface:      #fff;
-  --border:       #e8e6df;
-  --text:         #111110;
-  --muted:        #696960;
-  --yellow:       #F8E41A;
-  --yellow-light: #fffce8;
-  --yellow-mid:   #fef08a;
-  --dark:         #111110;
-  --dark2:        #1c1c1a;
-  --dark3:        #2a2a28;
+  /* Colour palette — Home Land Homes brand (platform default). Individual
+     nations override the accent (and derived header ink) from the admin
+     portal; nations without an override inherit this clay palette. */
+  --bg:           #FAF7F2;
+  --surface:      #FFFDF9;
+  --border:       #D8CFC0;
+  --text:         #26221C;
+  --muted:        #57503F;
+  --yellow:       #9A4A1F;   /* brand accent (Clay) */
+  --yellow-light: #F3E4D8;   /* soft tint / highlight */
+  --yellow-mid:   #7C3B17;   /* hover accent (Deep clay) */
+  --dark:         #26221C;   /* header / dark surface (Ink) */
+  --dark2:        #332f2a;
+  --dark3:        #44413c;
   --gray:         #888;
   --danger:       #b91c1c;
   --success:      #15803d;
@@ -2324,7 +2326,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 }
 #clfn_msgbox_title {
   font-size: 11px; font-weight: 700; letter-spacing: .5px;
-  text-transform: uppercase; color: #F8E41A;
+  text-transform: uppercase; color: var(--yellow);
 }
 #clfn_msgbox_clear {
   background: none; border: none; color: #999; font-size: 11px;
@@ -2335,11 +2337,11 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .clfn-msg-item {
   display: flex; align-items: flex-start; gap: 8px;
   padding: 10px 12px; border-bottom: 1px solid #222;
-  border-left: 3px solid #F8E41A;
+  border-left: 3px solid var(--yellow);
   font-size: 13px; font-weight: 500; line-height: 1.4;
 }
 .clfn-msg-item:last-child { border-bottom: none; }
-.clfn-msg-default { border-left-color: #F8E41A; color: #f4f4f0; }
+.clfn-msg-default { border-left-color: var(--yellow); color: #f4f4f0; }
 .clfn-msg-error   { border-left-color: #ef4444; color: #fca5a5; background: #1a0a0a; }
 .clfn-msg-info    { border-left-color: #3b82f6; color: #bfdbfe; background: #0a1020; }
 .clfn-msg-text    { flex: 1 1 auto; white-space: pre-wrap; word-break: break-word; }
