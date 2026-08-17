@@ -448,11 +448,15 @@
         '<div class="card"><h3>Documents</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">Signed agreements, BCRs, invoices and other files for this nation. Stored privately on the control plane.</p>'
       +   '<div id="cn-docs"><div class="empty">Loading documents...</div></div>'
-      +   '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:12px;">'
-      +     '<div style="flex:1;min-width:160px;"><label>Add a document</label>'
-      +       '<select id="cn-doc-kind"><option value="agreement">Agreement</option><option value="bcr">BCR</option><option value="other" selected>Other</option></select></div>'
-      +     '<input id="cn-doc-file" type="file" style="display:none;" data-sub="' + esc(n.subdomain) + '"/>'
-      +     '<button class="btn sm" type="button" data-act="doc-pick">Choose &amp; upload</button>'
+      +   '<div style="margin-top:14px;">'
+      +     '<label>Document type for new uploads</label>'
+      +     '<select id="cn-doc-kind"><option value="agreement">Agreement</option><option value="bcr">BCR</option><option value="other" selected>Other</option></select>'
+      +     '<div id="cn-doc-drop" style="margin-top:10px;border:2px dashed var(--hair);border-radius:10px;padding:18px 16px;text-align:center;cursor:pointer;background:var(--bg);transition:border-color .15s, background .15s;">'
+      +       '<div style="font-size:22px;line-height:1;margin-bottom:6px;pointer-events:none;">&#128228;</div>'
+      +       '<div style="font-size:13px;color:var(--muted);pointer-events:none;">Drag &amp; drop a file here, or <b style="color:var(--ink);">click to choose</b></div>'
+      +       '<input id="cn-doc-file" type="file" style="display:none;" data-sub="' + esc(n.subdomain) + '"/>'
+      +       '<div id="cn-doc-name" style="font-size:12px;font-weight:600;color:var(--ok);margin-top:8px;min-height:16px;"></div>'
+      +     '</div>'
       +   '</div>'
       +   '<div class="msg" id="cn-doc-msg"></div>'
       + '</div>';
@@ -916,15 +920,27 @@
     if (!r.ok) throw new Error('metadata write failed');
     await audit('nation_doc_added', sub, file.name);
   }
-  window.downloadNationDoc = async function(path){
+  async function _signedDocUrl(path){
     var r = await fetch(STORE + '/object/sign/' + DOC_BUCKET + '/' + encodeURI(path), {
       method: 'POST',
       headers: { apikey: ANON, Authorization: 'Bearer ' + getAT(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ expiresIn: 3600 })
     });
-    if (!r.ok){ alert('Could not create a download link.'); return; }
+    if (!r.ok) return null;
     var d = await r.json();
-    if (d && d.signedURL) window.open(STORE + d.signedURL, '_blank', 'noopener');
+    return (d && d.signedURL) ? d.signedURL : null;
+  }
+  // View: open inline in a new tab (PDFs/images render in the browser).
+  window.viewNationDoc = async function(path){
+    var s = await _signedDocUrl(path);
+    if (s) window.open(STORE + s, '_blank', 'noopener'); else alert('Could not open the document.');
+  };
+  // Download: force a save via the &download flag on the signed URL.
+  window.downloadNationDoc = async function(path, name){
+    var s = await _signedDocUrl(path);
+    if (!s){ alert('Could not create a download link.'); return; }
+    var sep = s.indexOf('?') >= 0 ? '&' : '?';
+    window.open(STORE + s + sep + 'download=' + encodeURIComponent(name || ''), '_blank', 'noopener');
   };
   window.deleteNationDoc = async function(id, path, sub){
     if (!confirm('Delete this document? This cannot be undone.')) return;
@@ -948,23 +964,39 @@
         + '<td style="font-size:11px;color:var(--muted);">' + esc(_docKindLabel(d.kind)) + '</td>'
         + '<td style="font-size:11px;color:var(--muted);">' + esc(when) + (d.uploaded_by ? ' &middot; ' + esc(d.uploaded_by) : '') + '</td>'
         + '<td><div class="row-actions">'
-        +   '<button class="btn sm ghost" type="button" data-act="doc-dl" data-path="' + esc(d.path) + '">Download</button>'
+        +   '<button class="btn sm ghost" type="button" data-act="doc-view" data-path="' + esc(d.path) + '">View</button>'
+        +   '<button class="btn sm ghost" type="button" data-act="doc-dl" data-path="' + esc(d.path) + '" data-name="' + esc(d.name) + '">Download</button>'
         +   '<button class="btn sm danger" type="button" data-act="doc-del" data-id="' + esc(d.id) + '" data-path="' + esc(d.path) + '" data-sub="' + esc(sub) + '">Delete</button>'
         + '</div></td></tr>';
     }).join('');
     host.innerHTML = '<table><thead><tr><th>Document</th><th>Type</th><th>Added</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
   }
-  // The file <input> change can't be delegated; wire it after Configure renders.
+  // Drag-and-drop + click-to-browse for the Documents uploader. Drag events
+  // can't be delegated, so this is wired directly after Configure renders.
   function wireDocFileInput(){
-    var input = document.getElementById('cn-doc-file'); if (!input) return;
-    input.addEventListener('change', async function(){
-      var file = input.files && input.files[0]; if (!file) return;
+    var input = document.getElementById('cn-doc-file');
+    var dz = document.getElementById('cn-doc-drop');
+    var nameEl = document.getElementById('cn-doc-name');
+    if (!input || !dz) return;
+    function hot(on){ dz.style.borderColor = on ? 'var(--accent)' : 'var(--hair)'; dz.style.background = on ? 'var(--accent-light)' : 'var(--bg)'; }
+    async function handle(file){
+      if (!file) return;
       var sub = input.getAttribute('data-sub');
       var kind = (document.getElementById('cn-doc-kind') || {}).value || 'other';
+      if (nameEl) nameEl.textContent = file.name;
       setMsg('cn-doc-msg', 'Uploading ' + file.name + '...', 'ok');
-      try { await uploadDoc(sub, file, kind); setMsg('cn-doc-msg', 'Uploaded.', 'ok'); renderNationDocsCard(sub); }
+      try { await uploadDoc(sub, file, kind); setMsg('cn-doc-msg', 'Uploaded.', 'ok'); if (nameEl) nameEl.textContent = ''; renderNationDocsCard(sub); }
       catch (e){ setMsg('cn-doc-msg', 'Upload failed: ' + String(e && e.message || e)); }
       input.value = '';
+    }
+    dz.addEventListener('click', function(){ input.click(); });
+    input.addEventListener('change', function(){ handle(input.files && input.files[0]); });
+    ['dragenter','dragover'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); hot(true); }); });
+    ['dragleave','dragend'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); hot(false); }); });
+    dz.addEventListener('drop', function(e){
+      e.preventDefault(); e.stopPropagation(); hot(false);
+      var files = e.dataTransfer && e.dataTransfer.files;
+      if (files && files.length) handle(files[0]);
     });
   }
 
@@ -1187,8 +1219,8 @@
       case 'provision':     window.showProvision(id); break;
       case 'run-provision': window.runProvision(); break;
       case 'gen-agreement': window.generateNationAgreement(id); break;
-      case 'doc-pick':      { var fi = document.getElementById('cn-doc-file'); if (fi) fi.click(); break; }
-      case 'doc-dl':        window.downloadNationDoc(el.getAttribute('data-path') || ''); break;
+      case 'doc-view':      window.viewNationDoc(el.getAttribute('data-path') || ''); break;
+      case 'doc-dl':        window.downloadNationDoc(el.getAttribute('data-path') || '', el.getAttribute('data-name') || ''); break;
       case 'doc-del':       window.deleteNationDoc(el.getAttribute('data-id') || '', el.getAttribute('data-path') || '', el.getAttribute('data-sub') || ''); break;
       case 'nic-tab':       window.nicTab(el.getAttribute('data-tab') || ''); break;
       case 'note-add':      window.addNationNote(el.getAttribute('data-sub') || ''); break;
