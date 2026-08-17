@@ -738,6 +738,14 @@
     if (!sub || !name || !short){ setMsg('pv-msg', 'Subdomain, display name, and short code are required.'); return; }
     var mods = {};
     Array.prototype.forEach.call(document.querySelectorAll('.pv-mod'), function(c){ mods[c.value] = c.checked; });
+    // Guard: refuse to target the control-plane project (a nation must go on its
+    // own Supabase project). PBASE is the control-plane URL this panel talks to.
+    var cpRef = String(PBASE || '').replace(/^https?:\/\//, '').split('.')[0];
+    var tRef  = get('pv-ref').trim() || _refFromUrl(get('pv-url').trim());
+    if (cpRef && tRef && tRef === cpRef){
+      setMsg('pv-msg', 'That is the control-plane project (' + cpRef + '). Enter the NATION\'s own Supabase project URL/ref/keys instead.');
+      return;
+    }
     var schemaSql = '';
     var fileEl = document.getElementById('pv-schema');
     if (fileEl && fileEl.files && fileEl.files[0]) {

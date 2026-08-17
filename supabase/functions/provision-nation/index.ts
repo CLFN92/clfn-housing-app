@@ -105,6 +105,17 @@ serve(async (req) => {
 
   const targetUrl = trimSlash(target.url)
   const ref = (target.ref && String(target.ref).trim()) || refFromUrl(targetUrl)
+
+  // Guard: never provision a nation onto the control-plane project itself.
+  // SUPABASE_URL is THIS (platform) project's own URL; if the target resolves to
+  // the same ref, the operator pasted the control-plane project by mistake --
+  // which would put housing tables + a nation ED onto the platform database.
+  const PLATFORM_REF = refFromUrl(SUPABASE_URL)
+  if (ref && PLATFORM_REF && ref === PLATFORM_REF) {
+    return json({ error: 'target_is_control_plane',
+      message: 'The target Supabase project (' + ref + ') is the control-plane project. A nation must be provisioned onto its OWN project, not the platform project. Re-enter the nation project\'s URL, ref, anon and service_role keys.' }, 400)
+  }
+
   const steps: Array<{ name: string; ok: boolean; detail: string }> = []
   const step = (name: string, ok: boolean, detail: string) => { steps.push({ name, ok, detail }) }
 
