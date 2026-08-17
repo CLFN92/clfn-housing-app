@@ -62,6 +62,7 @@
   --text:         #26221C;
   --muted:        #57503F;
   --yellow:       #9A4A1F;   /* brand accent (Clay) */
+  --accent-rgb:   154, 74, 31; /* accent as R,G,B for rgba() glows/tints */
   --yellow-light: #F3E4D8;   /* soft tint / highlight */
   --yellow-mid:   #7C3B17;   /* hover accent (Deep clay) */
   --dark:         #26221C;   /* header / dark surface (Ink) */
@@ -357,7 +358,7 @@ body {
   transition: background 0.15s ease, box-shadow 0.15s ease;
   white-space: nowrap;
 }
-.back-btn-yellow:hover { background: #fff0a6; box-shadow: 0 2px 6px rgba(248,228,26,0.35); }
+.back-btn-yellow:hover { background: var(--yellow-light); box-shadow: 0 2px 6px rgba(var(--accent-rgb),0.35); }
 .back-btn-yellow svg   { flex-shrink: 0; }
 
 /* View containers — zero out top padding so page-back-row sits flush.
@@ -372,10 +373,10 @@ body {
 #page-collections, #page-hydro { padding-top: 0 !important; }
 .back-link {
   color: var(--yellow); font-size: 12px; font-weight: 600;
-  text-decoration: none; border: 1px solid rgba(248,228,26,.3);
+  text-decoration: none; border: 1px solid rgba(var(--accent-rgb),.3);
   padding: 5px 12px; border-radius: 6px; transition: var(--tr);
 }
-.back-link:hover { background: rgba(248,228,26,.1); }
+.back-link:hover { background: rgba(var(--accent-rgb),.1); }
 
 .page-header-bar {
   position: relative;
@@ -587,7 +588,7 @@ select {
 .f input:focus, .f select:focus, .f textarea:focus,
 input:focus, select:focus, textarea:focus {
   outline: none; border-color: var(--yellow);
-  box-shadow: 0 0 0 3px rgba(248,228,26,0.15);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.15);
 }
 .f textarea { resize: vertical; min-height: 80px; }
 .f input:disabled, .f select:disabled, .f textarea:disabled,
@@ -694,8 +695,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                          background: var(--surface); border-bottom: 1px solid var(--border); }
 .action-pills-center .btn { flex: 1; justify-content: center; }
 .btn-green   { background: var(--success);  color: #fff;  border-color: var(--success); }
-.btn-sec     { background: rgba(248,228,26,0.1); color: var(--yellow); border-color: rgba(248,228,26,0.35); }
-.btn-sec:hover { background: rgba(248,228,26,0.18); }
+.btn-sec     { background: rgba(var(--accent-rgb),0.1); color: var(--yellow); border-color: rgba(var(--accent-rgb),0.35); }
+.btn-sec:hover { background: rgba(var(--accent-rgb),0.18); }
 .btn-sm      { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
 .btn-xs      { padding: 3px 8px;  font-size: 11px; border-radius: 5px; }
 .btn-rm      { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 12px; font-family: var(--sans); padding: 4px 8px; }
@@ -1166,7 +1167,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
    beneath them. Applied opt-in per table — non-sortable th tags are
    unaffected.                                                             */
 .std-th-sortable          { cursor: pointer; user-select: none; transition: background-color 0.12s ease, color 0.12s ease; position: relative; }
-.std-th-sortable:hover    { background: rgba(248,228,26,0.18) !important; color: var(--text) !important; }
+.std-th-sortable:hover    { background: rgba(var(--accent-rgb),0.18) !important; color: var(--text) !important; }
 /* Default sortable indicator — faded ⇅ on every sortable header so users
    see at-a-glance which columns can be sorted. Replaced by the bright
    yellow ▲/▼ when the column is actively sorted. */
@@ -1212,7 +1213,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
   font: inherit; color: var(--text);
   cursor: pointer;
 }
-.std-col-menu-action:hover:not(:disabled) { background: rgba(248,228,26,0.18); }
+.std-col-menu-action:hover:not(:disabled) { background: rgba(var(--accent-rgb),0.18); }
 .std-col-menu-action.is-active            { background: var(--yellow); color: #111; font-weight: 700; }
 .std-col-menu-action:disabled             { color: var(--muted); cursor: default; }
 .std-col-menu-divider { border-top: 1px solid var(--border); margin: 4px 0; }
@@ -1231,7 +1232,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
   cursor: pointer; user-select: none;
   border-radius: 6px;
 }
-.std-col-menu-value:hover { background: rgba(248,228,26,0.12); }
+.std-col-menu-value:hover { background: rgba(var(--accent-rgb),0.12); }
 .std-col-menu-value input[type="checkbox"] { accent-color: var(--yellow); cursor: pointer; }
 .std-col-menu-value-label { flex: 1; }
 .std-col-menu-value-count { color: var(--muted); font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; background: var(--bg); }
@@ -1840,7 +1841,7 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
   background: var(--yellow); color: var(--dark);
   border: none; border-radius: 999px; padding: 9px 16px;
   font-weight: 700; font-size: 13px; cursor: pointer;
-  box-shadow: 0 2px 8px rgba(248,228,26,.25); font-family: inherit;
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb),.25); font-family: inherit;
 }
 .app-header-v2 .btn-create:hover { background: var(--yellow-mid); }
 .app-header-v2 .btn-create svg { width: 14px; height: 14px; }

@@ -126,6 +126,14 @@ window._mixHex = function(a, b, t){
   var out = ca.map(function(v,i){ return Math.round(v + (cb[i]-v)*t); });
   return '#' + out.map(function(x){ return ('0'+Math.max(0,Math.min(255,x)).toString(16)).slice(-2); }).join('');
 };
+// Parse a hex colour to an "r, g, b" string for rgba() var interpolation, or
+// null if unparseable.
+window._hexToRgbStr = function(hex){
+  var h = String(hex||'').trim().replace('#','');
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+  var n = parseInt(h,16); return ((n>>16)&255)+', '+((n>>8)&255)+', '+(n&255);
+};
 // Deep brand-tinted "ink" — the accent colour mixed heavily toward black. Used
 // for the app header / modal headers / print banners so they carry the nation's
 // brand hue while staying dark enough for white text on any brand colour.
@@ -157,14 +165,17 @@ window._applyBrandDark = function(accent, customDark){
     if (d2) root.style.setProperty('--dark2', d2);
     if (d3) root.style.setProperty('--dark3', d3);
   }
-  // Accent companions (hover + soft tint) — derive from a DISTINCT brand accent
-  // so hover/tint don't stay the default clay on a differently-coloured nation.
-  // The platform-default accent keeps the curated --yellow-mid/--yellow-light.
+  // Accent companions (hover + soft tint + rgba glow base) — derive from a
+  // DISTINCT brand accent so hover/tint/glows don't stay the default clay on a
+  // differently-coloured nation. The platform-default accent keeps the curated
+  // --yellow-mid/--yellow-light/--accent-rgb from :root.
   if (accent && !accentIsDefault){
     var hov = window._mixHex(accent, '#000000', 0.20);
     var tnt = window._mixHex(accent, '#ffffff', 0.85);
+    var rgb = window._hexToRgbStr(accent);
     if (hov) root.style.setProperty('--yellow-mid', hov);
     if (tnt) root.style.setProperty('--yellow-light', tnt);
+    if (rgb) root.style.setProperty('--accent-rgb', rgb);
   }
 };
 
