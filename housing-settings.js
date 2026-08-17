@@ -1271,7 +1271,9 @@ function renderThemesPanel() {
     : ((typeof _brandInk === 'function' ? _brandInk(_accent, 0.88) : '') || defaults.dark);
   window._themeAutoDark = _brandDark;
   body.innerHTML =
-      _themeFieldRow('yellow',  'Brand Accent',       'Primary highlight — buttons, badges, links',  theme.yellow,  _brandAccent)
+      _themeFieldRow('yellow',  'Brand Accent',       'On-card buttons, links, badges, focus',        theme.yellow,  _brandAccent)
+    + _themeFieldRow('action',  'Action Button',       'Create / avatar / sign-in buttons on the dark header (white pops there)', theme.action, defaults.action || '#FFFFFF')
+    + _themeFieldRow('tint',    'Tint / Highlight',    'Soft hover/highlight background (rows, chips, menus)', theme.tint, defaults.tint || '#F3E4D8')
     + _themeFieldRow('dark',    'Header / Dark Surface','Derived from the Brand Accent — override to pin a custom header colour',   theme.dark,    _brandDark)
     + _themeFieldRow('text',    'Body Text',            'Default text color across the app',           theme.text,    defaults.text)
     + _themeFieldRow('bg',      'Page Background',      'Main background behind all cards',            theme.bg,      defaults.bg)
@@ -1342,12 +1344,15 @@ function _themeOnFontChange(key) {
   if (def && def.google) window._loadGoogleFont(name);
   document.documentElement.style.setProperty('--' + key, css);
 }
+// Map a theme field key to the CSS custom property it drives (most are 1:1;
+// 'tint' drives --yellow-light).
+function _themeCssVar(key){ return key === 'tint' ? '--yellow-light' : '--' + key; }
 // Sync hex input → color picker, and apply preview live
 function _themeOnPickerChange(key) {
   var picker = document.getElementById('theme_'+key);
   var hex    = document.getElementById('theme_'+key+'_hex');
   if(picker && hex) hex.value = picker.value;
-  document.documentElement.style.setProperty('--'+key, picker.value);
+  document.documentElement.style.setProperty(_themeCssVar(key), picker.value);
 }
 function _themeOnHexChange(key) {
   var hex    = document.getElementById('theme_'+key+'_hex');
@@ -1356,7 +1361,7 @@ function _themeOnHexChange(key) {
   var v = (hex.value||'').trim();
   if(!/^#[0-9a-fA-F]{6}$/.test(v)) return;       // wait for a valid hex
   if(picker) picker.value = v;
-  document.documentElement.style.setProperty('--'+key, v);
+  document.documentElement.style.setProperty(_themeCssVar(key), v);
 }
 function _themeApplyLogoFile(f) {
   var msg = document.getElementById('theme_logo_msg');
@@ -1422,6 +1427,8 @@ function _readThemeFromForm() {
   if (window._themeAutoDark && darkVal.toLowerCase() === String(window._themeAutoDark).toLowerCase()) darkVal = '';
   return {
     yellow:           v('theme_yellow_hex')  || v('theme_yellow'),
+    action:           v('theme_action_hex')  || v('theme_action'),
+    tint:             v('theme_tint_hex')    || v('theme_tint'),
     dark:             darkVal,
     text:             v('theme_text_hex')    || v('theme_text'),
     bg:               v('theme_bg_hex')      || v('theme_bg'),

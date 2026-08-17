@@ -39,12 +39,12 @@ window._printThemeStyles = function() {
 // Any field may be missing/empty — that token then keeps its CSS default.
 // Logo data URL is applied to all <img class="hlogo"> + #login-logo elements.
 // ═══════════════════════════════════════════════════════════════════════
-window.THEME_KEYS = ['yellow','dark','text','bg','surface','border','muted','sans','serif','radius'];
+window.THEME_KEYS = ['yellow','action','dark','text','bg','surface','border','muted','sans','serif','radius'];
 // Platform default palette = Home Land Homes brand (Clay). A nation overrides
 // the accent (and the header ink derives from it) via the admin portal; a
 // nation with no override inherits this palette. Keep in sync with :root in
 // shared.css.
-window.THEME_DEFAULTS = { yellow:'#9A4A1F', dark:'#26221C', text:'#26221C',
+window.THEME_DEFAULTS = { yellow:'#9A4A1F', action:'#FFFFFF', tint:'#F3E4D8', dark:'#26221C', text:'#26221C',
                           bg:'#FAF7F2', surface:'#FFFDF9', border:'#D8CFC0', muted:'#57503F',
                           sans:'DM Sans', serif:'DM Serif Display', radius:'10px' };
 
@@ -202,6 +202,10 @@ window._applyTheme = function(theme) {
   // Header / dark surfaces follow the brand accent unless the ED has explicitly
   // overridden the header colour (theme.dark set to something other than stock).
   window._applyBrandDark(theme.yellow || (window.THEME_DEFAULTS||{}).yellow, theme.dark);
+  // Explicit tint override (Themes editor "Tint / highlight") wins over the
+  // value derived from the accent. Handled here, not in the THEME_KEYS loop,
+  // so leaving it unset doesn't wipe the derived/default --yellow-light.
+  if (theme.tint) root.style.setProperty('--yellow-light', theme.tint);
   // Logo src + transparency — also covers the Themes panel preview thumbnail.
   document.querySelectorAll('img.hlogo, #login-logo, #theme_logo_preview').forEach(function(img){
     if (theme.logo) img.src = theme.logo;

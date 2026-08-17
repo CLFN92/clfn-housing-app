@@ -63,12 +63,13 @@
   --muted:        #57503F;
   --yellow:       #9A4A1F;   /* brand accent (Clay) — links, badges, chips, focus */
   --accent-rgb:   154, 74, 31; /* accent as R,G,B for rgba() glows/tints */
-  /* Action / CTA — the bright colour reserved for PRIMARY action buttons
-     (Create, Save, primary submit) so they pop against the dark brand header.
-     Deliberately separate from the brand accent. */
-  --action:       #F8E41A;
+  /* Action / CTA — colour for the buttons that sit on the DARK brand header
+     (Create, avatar, sign-in). White pops cleanly on the dark header like the
+     nav. Configurable in Settings -> Admin -> Themes. Deliberately separate
+     from the brand accent (which drives on-light-card primary buttons). */
+  --action:       #FFFFFF;
   --action-text:  #26221C;
-  --action-mid:   #E4CE00;   /* action-button hover */
+  --action-mid:   #F3E4D8;   /* action-button hover (soft warm tint) */
   --yellow-light: #F3E4D8;   /* soft tint / highlight */
   --yellow-mid:   #7C3B17;   /* hover accent (Deep clay) */
   --dark:         #26221C;   /* header / dark surface (Ink) */
@@ -677,8 +678,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-family: var(--sans); cursor: pointer; border: 1.5px solid transparent;
   transition: var(--tr); text-decoration: none; white-space: nowrap;
 }
-.btn-primary { background: var(--action);   color: var(--action-text);  border-color: var(--action); }
-.btn-primary:hover { background: var(--action-mid); }
+/* On-light-card primary buttons use the brand accent with white text (readable
+   on cream cards); the header/login/avatar use --action (white) instead. */
+.btn-primary { background: var(--yellow);   color: #fff;  border-color: var(--yellow); }
+.btn-primary:hover { background: var(--yellow-mid); }
 .btn-ghost   { background: transparent;     color: var(--text); border-color: var(--border); }
 .btn-ghost:hover   { background: var(--bg); border-color: var(--muted); }
 .btn-ghost-dark { background: transparent; color: var(--txt-on-dark); border-color: var(--muted); }
