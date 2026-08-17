@@ -180,7 +180,15 @@
       var ov = document.createElement('div'); ov.className = 'dlg-ov';
       var html = '<div class="dlg-hd"><span class="dot"></span>' + esc(opts.title || 'Home Land Homes') + '</div>'
         + '<div class="dlg-bd">' + (opts.bodyHtml || esc(opts.message || ''));
-      if (opts.prompt){
+      if (opts.fields){
+        opts.fields.forEach(function(f){
+          html += '<label for="dlg-f-' + esc(f.key) + '">' + esc(f.label || '') + '</label>'
+            + '<input id="dlg-f-' + esc(f.key) + '" type="' + (f.inputType || 'text') + '" value="' + esc(f.defaultValue == null ? '' : f.defaultValue) + '"'
+            + (f.placeholder ? ' placeholder="' + esc(f.placeholder) + '"' : '')
+            + (f.step ? ' step="' + esc(f.step) + '"' : '') + '/>';
+        });
+        html += '<div class="dlg-err" id="dlg-err"></div>';
+      } else if (opts.prompt){
         html += '<label>' + esc(opts.label || '') + '</label>'
           + '<input id="dlg-input" type="' + (opts.inputType || 'text') + '" value="' + esc(opts.defaultValue == null ? '' : opts.defaultValue) + '"'
           + (opts.placeholder ? ' placeholder="' + esc(opts.placeholder) + '"' : '')
@@ -192,18 +200,28 @@
       html += '<button class="btn" type="button" id="dlg-ok">' + esc(opts.okText || 'OK') + '</button></div>';
       var box = document.createElement('div'); box.className = 'dlg'; box.innerHTML = html;
       ov.appendChild(box); document.body.appendChild(ov);
-      var input = box.querySelector('#dlg-input');
+      var input = box.querySelector('#dlg-input') || box.querySelector('.dlg-bd input');
       var errEl = box.querySelector('#dlg-err');
       if (input){ try { input.focus(); input.select(); } catch(e){} }
       function done(val){ if (ov.parentNode) ov.parentNode.removeChild(ov); document.removeEventListener('keydown', onKey); resolve(val); }
       function ok(){
-        if (opts.prompt){
+        if (opts.fields){
+          var out = {};
+          for (var i = 0; i < opts.fields.length; i++){
+            var f = opts.fields[i];
+            var el = box.querySelector('#dlg-f-' + f.key);
+            var val = (el && el.value || '').trim();
+            if (f.validate){ var em = f.validate(val, out); if (em){ if (errEl) errEl.textContent = em; if (el){ try { el.focus(); } catch(e){} } return; } }
+            out[f.key] = val;
+          }
+          done(out);
+        } else if (opts.prompt){
           var v = (input && input.value || '').trim();
           if (opts.validate){ var m = opts.validate(v); if (m){ if (errEl) errEl.textContent = m; return; } }
           done(v);
         } else done(true);
       }
-      function cancel(){ done(opts.prompt ? null : false); }
+      function cancel(){ done((opts.prompt || opts.fields) ? null : false); }
       var okBtn = box.querySelector('#dlg-ok'); if (okBtn) okBtn.onclick = ok;
       var cBtn = box.querySelector('#dlg-cancel'); if (cBtn) cBtn.onclick = cancel;
       ov.addEventListener('click', function(e){ if (e.target === ov) cancel(); });
@@ -214,6 +232,9 @@
   function dlgAlert(message, opts){ opts = opts || {}; return _dlgOpen({ title: opts.title, message: message, bodyHtml: opts.bodyHtml, cancel: false, okText: opts.okText || 'OK' }); }
   function dlgConfirm(message, opts){ opts = opts || {}; return _dlgOpen({ title: opts.title, message: message, bodyHtml: opts.bodyHtml, okText: opts.okText || 'Confirm', cancelText: opts.cancelText }); }
   function dlgPrompt(label, defaultValue, opts){ opts = opts || {}; return _dlgOpen({ title: opts.title, message: opts.message || '', bodyHtml: opts.bodyHtml, prompt: true, label: label, defaultValue: defaultValue, inputType: opts.inputType, step: opts.step, placeholder: opts.placeholder, validate: opts.validate, okText: opts.okText || 'Save' }); }
+  // Multi-field branded form. fields: [{key,label,inputType,defaultValue,step,placeholder,validate(value,soFar)->errMsg|''}].
+  // Resolves an object of {key:value} on OK, or null on cancel.
+  function dlgForm(title, fields, opts){ opts = opts || {}; return _dlgOpen({ title: title, message: opts.message || '', bodyHtml: opts.bodyHtml, fields: fields, okText: opts.okText || 'Save', cancelText: opts.cancelText }); }
 
   async function sendLink(){
     var em = (document.getElementById('em').value || '').trim();
@@ -1204,17 +1225,17 @@
   // View: open inline in a new tab (PDFs/images render in the browser).
   window.viewNationDoc = async function(path){
     var s = await _signedDocUrl(path);
-    if (s) window.open(STORE + s, '_blank', 'noopener'); else alert('Could not open the document.');
+    if (s) window.open(STORE + s, '_blank', 'noopener'); else dlgAlert('Could not open the document.');
   };
   // Download: force a save via the &download flag on the signed URL.
   window.downloadNationDoc = async function(path, name){
     var s = await _signedDocUrl(path);
-    if (!s){ alert('Could not create a download link.'); return; }
+    if (!s){ dlgAlert('Could not create a download link.'); return; }
     var sep = s.indexOf('?') >= 0 ? '&' : '?';
     window.open(STORE + s + sep + 'download=' + encodeURIComponent(name || ''), '_blank', 'noopener');
   };
   window.deleteNationDoc = async function(id, path, sub){
-    if (!confirm('Delete this document? This cannot be undone.')) return;
+    if (!(await dlgConfirm('Delete this document? This cannot be undone.', { title: 'Delete document', okText: 'Delete' }))) return;
     await fetch(STORE + '/object/' + DOC_BUCKET + '/' + encodeURI(path), {
       method: 'DELETE', headers: { apikey: ANON, Authorization: 'Bearer ' + getAT() }
     }).catch(function(){});
@@ -1462,17 +1483,16 @@
     var inv = (g.ok ? await g.json().catch(function(){ return []; }) : [])[0];
     if (!inv){ dlgAlert('Invoice not found.'); return; }
     var bal = _invBalance(inv);
-    var amt = await dlgPrompt('Amount received (CAD)', bal.toFixed(2), {
-      title: 'Record payment', inputType: 'number', step: '0.01',
-      message: 'Invoice ' + inv.number + ' — total ' + _money(inv.total) + ', balance ' + _money(bal) + '.',
-      validate: function(v){ var f = parseFloat(v); if (isNaN(f) || f <= 0) return 'Enter an amount greater than zero.'; if (f > bal + 0.005) return 'Amount exceeds the outstanding balance (' + _money(bal) + ').'; return ''; }
-    });
-    if (amt === null) return;
-    var d = await dlgPrompt('Payment received date', _dPlus(0), {
-      title: 'Record payment', inputType: 'text', placeholder: 'YYYY-MM-DD',
-      validate: function(v){ return /^\d{4}-\d{2}-\d{2}$/.test(v) ? '' : 'Enter the date as YYYY-MM-DD.'; }
-    });
-    if (d === null) return;
+    // Amount + date captured together; the date defaults to today but can be
+    // back-dated when a payment is entered after the fact.
+    var res = await dlgForm('Record payment', [
+      { key: 'amount', label: 'Amount received (CAD)', inputType: 'number', step: '0.01', defaultValue: bal.toFixed(2),
+        validate: function(v){ var f = parseFloat(v); if (isNaN(f) || f <= 0) return 'Enter an amount greater than zero.'; if (f > bal + 0.005) return 'Amount exceeds the outstanding balance (' + _money(bal) + ').'; return ''; } },
+      { key: 'date', label: 'Payment received date', inputType: 'date', defaultValue: _dPlus(0),
+        validate: function(v){ return /^\d{4}-\d{2}-\d{2}$/.test(v) ? '' : 'Pick the date the payment was received.'; } }
+    ], { message: 'Invoice ' + inv.number + ' — total ' + _money(inv.total) + ', balance ' + _money(bal) + '.', okText: 'Record payment' });
+    if (res === null) return;
+    var amt = res.amount, d = res.date;
     var paid = Math.round(((Number(inv.amount_paid) || 0) + parseFloat(amt)) * 100) / 100;
     var newBal = Math.round(((Number(inv.total) || 0) - paid) * 100) / 100;
     var status = newBal <= 0.005 ? 'paid' : 'sent';
@@ -1532,38 +1552,6 @@
       dlgAlert('Interest of ' + _money(interest) + ' added to ' + inv.number + '. New total: ' + _money(total) + '. Click the invoice number to view the updated PDF.', { title: 'Interest added' });
     }
     else { dlgAlert('Could not add the interest line.'); }
-  };
-  // Generate a past-due interest charge (Section 7.5: 1%/month) and add it as a
-  // line item. Interest is assessed as of the payment date if recorded, else
-  // today. Applies only when more than 30 days past the due date. Idempotent:
-  // any prior interest line is recomputed, not stacked.
-  window.invAddInterest = async function(id, sub){
-    var r = await api('GET', '/nation_invoices?id=eq.' + encodeURIComponent(id));
-    var inv = (r.ok ? await r.json().catch(function(){ return []; }) : [])[0];
-    if (!inv){ alert('Invoice not found.'); return; }
-    if (!inv.due_date){ alert('This invoice has no due date, so overdue interest cannot be computed. Set a due date first.'); return; }
-    var asOf = inv.paid_date || _dPlus(0);
-    var days = Math.floor((Date.parse(asOf) - Date.parse(inv.due_date)) / 86400000);
-    if (days <= 30){
-      alert('No interest added.\n\nAs of ' + asOf + ', this invoice is ' + (days < 0 ? Math.abs(days) + ' day(s) before the due date' : days + ' day(s) past due') + '. Per Section 7.5, interest applies only to amounts more than 30 days overdue.');
-      return;
-    }
-    // Base = existing non-interest lines; interest accrues on the pre-tax amount.
-    var base = (inv.line_items || []).filter(function(l){ return !l.interest; });
-    var principal = base.reduce(function(a, l){ return a + (Number(l.qty) || 0) * (Number(l.unit_price) || 0); }, 0);
-    var months = days / 30;
-    var interest = Math.round(principal * INTEREST_MONTHLY * months * 100) / 100;
-    if (interest <= 0){ alert('Computed interest is $0.00 — nothing to add.'); return; }
-    if (!confirm('Invoice ' + inv.number + ' is ' + days + ' days past the due date (' + inv.due_date + '), assessed as of ' + asOf + '.\n\nInterest at 1%/month (12.68%/yr) on ' + _money(principal) + ' = ' + _money(interest) + '.\n\nAdd this as a line item?')) return;
-    var line = { description: 'Interest — ' + days + ' days past due at 1%/month (Section 7.5), assessed ' + asOf, qty: 1, unit_price: interest, interest: true };
-    var lines = base.concat([line]);
-    var subtotal = Math.round(lines.reduce(function(a, l){ return a + (Number(l.qty) || 0) * (Number(l.unit_price) || 0); }, 0) * 100) / 100;
-    var taxRate = Number(inv.tax_rate) || 0;
-    var tax = Math.round(subtotal * taxRate) / 100;
-    var total = Math.round((subtotal + tax) * 100) / 100;
-    var pr = await api('PATCH', '/nation_invoices?id=eq.' + encodeURIComponent(id), { line_items: lines, subtotal: subtotal, tax: tax, total: total, updated_at: new Date().toISOString() }, 'return=minimal');
-    if (pr.ok){ await audit('nation_invoice_interest', sub, inv.number + ': ' + _money(interest) + ' (' + days + 'd)'); renderNationInvoices(sub); loadNicSummary(sub); }
-    else { alert('Could not add the interest line.'); }
   };
   window.createNationInvoice = function(sub, id){
     var n = _nations.filter(function(x){ return String(x.id) === String(id); })[0];
