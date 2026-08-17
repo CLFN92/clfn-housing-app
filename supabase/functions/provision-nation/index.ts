@@ -134,9 +134,13 @@ serve(async (req) => {
       const r = await fetch(MGMT_BASE + '/v1/projects/' + encodeURIComponent(ref) + '/database/query', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + MGMT_TOKEN, 'Content-Type': 'application/json' },
-        // Trailing NOTIFY forces PostgREST to reload its schema cache so the
-        // seed steps below can see the freshly-created tables.
-        body: JSON.stringify({ query: schemaToRun + "\n;\nnotify pgrst, 'reload schema';" }),
+        // After the schema: grant sequence usage to the API roles (tables created
+        // via the Management API as `postgres` don't auto-grant sequence access,
+        // so inserts on serial-id tables like staff 403 on their *_id_seq), then
+        // NOTIFY so PostgREST reloads its cache and sees the new tables.
+        body: JSON.stringify({ query: schemaToRun +
+          "\n;\ngrant usage, select on all sequences in schema public to anon, authenticated, service_role;" +
+          "\n;\nnotify pgrst, 'reload schema';" }),
       })
       const txt = await r.text()
       step('bootstrap_schema', r.ok, r.ok ? ('Schema applied (' + schemaSource + ').') : ('Management API ' + r.status + ': ' + txt.slice(0, 300)))
