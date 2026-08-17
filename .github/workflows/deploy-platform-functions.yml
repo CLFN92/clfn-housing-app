@@ -27,6 +27,7 @@ on:
       - 'supabase/functions/provision-nation/**'
       - 'supabase/functions/report-nation-usage/**'
       - 'supabase/functions/recurring-invoices/**'
+      - 'supabase/functions/set-nation-secret/**'
       - '.github/workflows/deploy-platform-functions.yml'
   workflow_dispatch:
 
@@ -66,4 +67,6 @@ jobs:
           supabase functions deploy report-nation-usage --project-ref "$REF" --no-verify-jwt
           echo "──── Deploying recurring-invoices to $REF (JWT verify OFF; x-cron-secret gated) ────"
           supabase functions deploy recurring-invoices --project-ref "$REF" --no-verify-jwt
+          echo "──── Deploying set-nation-secret to $REF (verifies caller against super_admins) ────"
+          supabase functions deploy set-nation-secret --project-ref "$REF" --no-verify-jwt
           echo "Platform functions deployed."

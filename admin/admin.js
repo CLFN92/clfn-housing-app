@@ -633,6 +633,18 @@
       +   '</p>'
       +   '<button class="btn sm ghost" type="button" data-act="provision" data-id="' + esc(n.id) + '">'
       +     (n.supabase_url ? 'Re-run provisioning &rarr;' : 'Provision this nation &rarr;') + '</button>'
+      + '</div>'
+      + '<div class="card"><h3>AI Assistant key</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">Sets this nation\'s <b>Anthropic API key</b> directly on its Supabase project (the <code>ANTHROPIC_API_KEY</code> Edge Function secret the <code>ai-chat</code> function reads). The key is written to the project and is <b>never stored here</b> &mdash; only a masked marker is kept.</p>'
+      +   '<div style="font-size:12px;margin-bottom:8px;">'
+      +     (n.ai_key_last4
+              ? 'Current: <b>set</b> &middot; ...' + esc(n.ai_key_last4) + (n.ai_key_updated_at ? ' &middot; updated ' + esc(timeAgo(n.ai_key_updated_at)) : '')
+              : '<span style="color:var(--muted);">No key set for this nation yet.</span>')
+      +   '</div>'
+      +   '<label>Anthropic API key</label><input id="cn-ai-key" type="password" autocomplete="off" placeholder="sk-ant-..." value=""/>'
+      +   '<p class="sub" style="margin:4px 0 0;font-size:11px;">Requires the nation to have a Supabase project, and the <code>ai-chat</code> function deployed to it (see the provisioning checklist). Leave blank and Save does nothing.</p>'
+      +   '<div class="msg" id="cn-ai-msg"></div>'
+      +   '<button class="btn sm" type="button" data-act="ai-key-save" data-sub="' + esc(n.subdomain) + '">Save &amp; apply to project</button>'
       + '</div>';
 
     var pNotes =
@@ -1384,6 +1396,29 @@
         + '</div>';
     }).join('');
   }
+  // Push a nation's Anthropic API key to its project's ANTHROPIC_API_KEY secret
+  // via the control-plane set-nation-secret function. The key never persists in
+  // the control plane or the browser beyond this call.
+  window.saveNationAiKey = async function(sub){
+    var el = document.getElementById('cn-ai-key');
+    var key = (el && el.value || '').trim();
+    if (!key){ setMsg('cn-ai-msg', 'Enter a key first.'); return; }
+    if (key.length < 8){ setMsg('cn-ai-msg', 'That does not look like a valid key.'); return; }
+    setMsg('cn-ai-msg', 'Applying to project...', 'ok');
+    try {
+      var r = await fetch(PBASE + '/functions/v1/set-nation-secret', {
+        method: 'POST',
+        headers: { apikey: ANON, Authorization: 'Bearer ' + getAT(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subdomain: sub, name: 'ANTHROPIC_API_KEY', value: key })
+      });
+      var d = await r.json().catch(function(){ return {}; });
+      if (!r.ok){ setMsg('cn-ai-msg', (d && d.error) ? ('Failed: ' + d.error + (d.detail ? ' (' + d.detail + ')' : '')) : ('Failed: HTTP ' + r.status)); return; }
+      if (el) el.value = '';
+      setMsg('cn-ai-msg', 'Key applied to the project (...' + esc(d.last4 || '') + '). AI chat will use it on the next request.', 'ok');
+      await audit('nation_ai_key_set', sub, '...' + (d.last4 || ''));
+    } catch (e){ setMsg('cn-ai-msg', 'Network error: ' + String(e).slice(0, 120)); }
+  };
+
   window.addNationNote = async function(sub){
     var ta = document.getElementById('cn-note-body');
     var body = (ta && ta.value || '').trim();
@@ -1855,6 +1890,7 @@
       case 'doc-del':       window.deleteNationDoc(el.getAttribute('data-id') || '', el.getAttribute('data-path') || '', el.getAttribute('data-sub') || ''); break;
       case 'nic-tab':       window.nicTab(el.getAttribute('data-tab') || ''); break;
       case 'note-add':      window.addNationNote(el.getAttribute('data-sub') || ''); break;
+      case 'ai-key-save':   window.saveNationAiKey(el.getAttribute('data-sub') || ''); break;
       case 'inv-add-line':  window.invAddLine(); break;
       case 'inv-add-catalog': window.invAddCatalogLine(); break;
       case 'inv-del-line':  { var lr = el.closest && el.closest('.inv-line'); if (lr) lr.remove(); break; }
