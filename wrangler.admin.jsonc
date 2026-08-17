@@ -16,5 +16,13 @@
   "compatibility_date": "2026-07-30",
   "assets": {
     "directory": "admin"
-  }
+  },
+  // Bind the custom domain to THIS worker so `wrangler deploy` (which promotes
+  // to live traffic) also points admin.fnhub.app at the promoted version. The
+  // Cloudflare Workers Build for this project uses `versions upload` (no
+  // promote), so without this the domain can serve a stale, never-promoted
+  // version.
+  "routes": [
+    { "pattern": "admin.fnhub.app", "custom_domain": true }
+  ]
 }
