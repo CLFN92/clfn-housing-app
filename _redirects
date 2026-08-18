@@ -1,0 +1,10 @@
+# Cloudflare Workers Static Assets redirect rules (same mechanism as _headers).
+#
+# Short maintenance-QR links: the printed QR encodes <base>/u/<slug> (kept short
+# so the printed QR modules stay >= 0.6 mm and scan reliably). This 302 sends the
+# scan to the public report form, which resolves the slug -> unit + token via the
+# tenant-mr Edge Function (action: resolve_slug) and proceeds.
+#
+# A 302 (not a 200 rewrite) is deliberate: report.html loads its scripts by
+# relative path, so it must be served from /report.html, not from under /u/.
+/u/*  /report.html?s=:splat  302

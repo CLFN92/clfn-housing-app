@@ -171,6 +171,28 @@ serve(async (req) => {
 
     const body   = await req.json().catch(() => ({}))
     const action = String(body.action || '')
+
+    // --- resolve_slug: map a short /u/<slug> code to its unit + token so the
+    // report form can proceed. The slug is enumerable, so the token returned
+    // here is a link-validity marker, not a secret (the redirect issues it).
+    // Minted on first resolve if the unit has none yet.
+    if (action === 'resolve_slug') {
+      const slug = parseInt(String(body.slug || ''), 10)
+      if (!slug || slug < 1) return json({ error: 'Invalid code.' }, 400)
+      const { data: sRows, error: sErr } = await admin
+        .from('housing_units').select('id, num, street, data').eq('label_slug', slug).limit(1)
+      if (sErr) return json({ error: 'Lookup failed.' }, 500)
+      const su = sRows && sRows[0]
+      if (!su) return json({ error: 'This code is not linked to a unit.' }, 404)
+      let tok = su.data && (su.data.qr_token || su.data.qrToken)
+      if (!tok) {
+        tok = crypto.randomUUID()
+        const newData = Object.assign({}, su.data || {}, { qrToken: tok })
+        await admin.from('housing_units').update({ data: newData }).eq('id', su.id)
+      }
+      return json({ ok: true, unit_id: su.id, token: tok, address: ((su.num || '') + ' ' + (su.street || '')).trim() })
+    }
+
     const unitId = String(body.unit_id || '').trim()
     const token  = String(body.token || '').trim()
     if (!unitId || !token) return json({ error: 'Missing unit or code.' }, 400)

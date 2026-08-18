@@ -13,6 +13,8 @@
   var qp    = new URLSearchParams(location.search);
   var unit  = (qp.get('u') || '').trim();
   var token = (qp.get('t') || '').trim();
+  // Short QR form: /u/<slug> is rewritten to report.html?s=<slug> (see _redirects).
+  var slug  = (qp.get('s') || '').trim();
 
   var app     = document.getElementById('app');
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); };
@@ -163,11 +165,26 @@
   }
 
   // ── Boot ──────────────────────────────────────────────────────────────────
-  if (!unit || !token) { fail('This link is missing its unit code. Please scan the QR code on the unit again.'); return; }
-  if (!SB || !ANON)    { fail('Configuration error. Please contact the Housing office.'); return; }
+  if (!SB || !ANON) { fail('Configuration error. Please contact the Housing office.'); return; }
 
-  call('validate').then(function (res) {
-    if (res.ok && res.data && res.data.ok) renderForm(res.data.address);
-    else fail((res.data && res.data.error) || 'This code is invalid or has expired.');
-  }).catch(function () { fail('Could not reach the server. Please try again shortly.'); });
+  function startValidate() {
+    call('validate').then(function (res) {
+      if (res.ok && res.data && res.data.ok) renderForm(res.data.address);
+      else fail((res.data && res.data.error) || 'This code is invalid or has expired.');
+    }).catch(function () { fail('Could not reach the server. Please try again shortly.'); });
+  }
+
+  if (!unit || !token) {
+    // Short-link path: resolve the /u/<slug> code to a unit + token, then validate.
+    if (slug) {
+      call('resolve_slug', { slug: slug }).then(function (res) {
+        if (res.ok && res.data && res.data.ok) { unit = res.data.unit_id; token = res.data.token; startValidate(); }
+        else fail((res.data && res.data.error) || 'This code is invalid or has expired.');
+      }).catch(function () { fail('Could not reach the server. Please try again shortly.'); });
+      return;
+    }
+    fail('This link is missing its unit code. Please scan the QR code on the unit again.');
+    return;
+  }
+  startValidate();
 })();
