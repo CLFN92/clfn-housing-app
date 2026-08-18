@@ -386,6 +386,7 @@ function showSettingsSection(section) {
   if(section==='sec_contracts'      && typeof renderContractsTab==='function')  renderContractsTab();
   if(section==='sec_config'         && typeof renderConfigPanel==='function')   renderConfigPanel();
   if(section==='sec_maint_qr'       && typeof renderMaintenanceQrPanel==='function') renderMaintenanceQrPanel();
+  if(section==='sec_labels'         && typeof renderLabelsPanel==='function')     renderLabelsPanel();
   if(section==='sec_approval_authority' && typeof renderApprovalAuthorityPanel==='function') renderApprovalAuthorityPanel();
 }
 
