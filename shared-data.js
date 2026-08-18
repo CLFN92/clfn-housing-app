@@ -4200,8 +4200,10 @@ async function lookupUser(){
   var resultEl = document.getElementById('user_lookup_result');
   if(!resultEl) return;
   if(!email){ resultEl.style.display='none'; return; }
-  var _lookupDomain = '@' + nationEmailDomain();
-  var _isExternal = !email.endsWith(_lookupDomain);
+  // No domain configured for this nation -> no domain gate (not "everyone is
+  // external"). Never substitute another nation's domain here (OCAP).
+  var _lkDom = nationEmailDomain();
+  var _isExternal = _lkDom ? !email.endsWith('@' + _lkDom) : false;
   // External (non-nation-domain) emails are allowed ONLY for the ED, and only as
   // external consultants (passwordless magic-link, restricted). This keeps the
   // domain gate intact for regular staff while enabling a consultant to use
@@ -8815,7 +8817,7 @@ window._sowMeetsRfqThreshold = _sowMeetsRfqThreshold;
 
 function buildRfqDocumentHtml(rfq, sow, unit) {
   var nc       = window.NATION_CONFIG || {};
-  var natDisp  = nc.display_name || nc.name || 'Constance Lake First Nation';
+  var natDisp  = nc.display_name || nc.name || nationDisplay() || '';
   var natShort = nationShort();
 
   // Editable RFQ-document strings (Settings -> Contracts -> RFQ Bid Document).

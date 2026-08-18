@@ -409,8 +409,11 @@ async function startSignIn() {
 
   // Silent domain prefilter: skip the network call for obviously-wrong emails.
   // Defensive read (no nationEmailDomain() call) in case config didn't load.
-  var _domain = '@' + ((window.NATION_CONFIG && NATION_CONFIG.email_domain) || 'clfn.on.ca');
-  if (!email.endsWith(_domain)) {
+  // Only prefilter when THIS nation has a domain configured -- never fall back to
+  // a hardcoded CLFN domain, which would both leak CLFN and lock out any other
+  // nation's staff whose config has no email_domain (OCAP).
+  var _rawDomain = (window.NATION_CONFIG && NATION_CONFIG.email_domain) || '';
+  if (_rawDomain && !email.endsWith('@' + _rawDomain)) {
     if (errEl) { errEl.textContent = GENERIC_AUTH_ERROR; errEl.style.display = 'block'; }
     return;
   }

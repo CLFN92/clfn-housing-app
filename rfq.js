@@ -626,7 +626,7 @@ function showRfqForm(rfqId, unitId, sowPn) {
     var cdEl = document.getElementById('rfq_contract_date');
     if (cdEl) cdEl.value = new Date().toISOString().slice(0,10);
     var apEl = document.getElementById('rfq_ap_email');
-    if (apEl) apEl.value = (window.NATION_CONFIG && NATION_CONFIG.housing_email) || 'housing@clfn.on.ca';
+    if (apEl) apEl.value = (window.NATION_CONFIG && NATION_CONFIG.housing_email) || '';
     renderMilestoneRows();
   }
 
@@ -670,7 +670,7 @@ function _populateFormFields(rfq) {
   set('rfq_contract_start',        d.contract_start  || d.target_start_date || '');
   set('rfq_substantial_completion',d.substantial_completion_date || '');
   set('rfq_total_completion',      d.total_completion_date || d.target_completion_date || '');
-  set('rfq_ap_email',              d.ap_email || (window.NATION_CONFIG && NATION_CONFIG.housing_email) || 'housing@clfn.on.ca');
+  set('rfq_ap_email',              d.ap_email || (window.NATION_CONFIG && NATION_CONFIG.housing_email) || '');
   set('rfq_site_lead_name',        d.site_lead_name        || '');
   set('rfq_site_lead_phone',       d.site_lead_phone       || '');
   set('rfq_ct_signatory_name',     d.ct_signatory_name     || '');

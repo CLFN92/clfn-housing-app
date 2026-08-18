@@ -1581,12 +1581,12 @@ function showAddHousingStaff() {
     + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Full Name</label>'
     + '<input id="hs-name" placeholder="e.g. Edith Moore" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;"></div>'
     + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Work Email</label>'
-    + '<input id="hs-email" type="email" placeholder="edith.moore@' + nationEmailDomain() + '" value="'+escapeHtml(prefEmail)+'" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'
+    + '<input id="hs-email" type="email" placeholder="' + (nationEmailDomain() ? ('edith.moore@' + nationEmailDomain()) : 'name@example.com') + '" value="'+escapeHtml(prefEmail)+'" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'
     + '<div id="hs-email-hint" style="display:none;font-size:11px;color:var(--danger);margin-top:3px;">&#9888; Must be a @' + nationEmailDomain() + ' address</div></div>'
     + '</div>'
     + (isED ? '<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;cursor:pointer;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">'
         + '<input type="checkbox" id="hs-external" '+(isExt0?'checked':'')+' style="width:16px;height:16px;min-width:16px;flex:0 0 16px;margin:2px 0 0;accent-color:#2563eb;">'
-        + '<span><strong>External consultant</strong> &mdash; allow a non-@'+nationEmailDomain()+' email. The account is <strong>passwordless</strong> (admin-issued magic link only), gets a random password, and starts with restricted access. ED only.</span></label>' : '')
+        + '<span><strong>External consultant</strong> &mdash; allow ' + (nationEmailDomain() ? ('a non-@'+nationEmailDomain()) : 'an external') + ' email. The account is <strong>passwordless</strong> (admin-issued magic link only), gets a random password, and starts with restricted access. ED only.</span></label>' : '')
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
     + '<div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">Department</label>'
     + '<select id="hs-dept" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:DM Sans,sans-serif;box-sizing:border-box;">'+deptOptions+'</select></div>'
@@ -1611,7 +1611,8 @@ function showAddHousingStaff() {
   if(emailEl) emailEl.addEventListener('input', function(){
     var ext = !!(document.getElementById('hs-external') && document.getElementById('hs-external').checked);
     var h = document.getElementById('hs-email-hint');
-    if(h) h.style.display = (!ext && this.value && !this.value.endsWith('@' + nationEmailDomain())) ? 'block' : 'none';
+    var _d = nationEmailDomain();   // no domain configured -> no gate, no hint
+    if(h) h.style.display = (_d && !ext && this.value && !this.value.endsWith('@' + _d)) ? 'block' : 'none';
   });
   // External-consultant toggle: swap the password note + clear the domain hint.
   var extEl = document.getElementById('hs-external');
@@ -1659,11 +1660,12 @@ async function submitAddHousingStaff() {
   if(!name)  { showToast("Please enter the employee's full name"); return; }
   if(!email||!email.includes('@')) { showToast('Please enter a valid email address'); return; }
   var isExternal = !!(document.getElementById('hs-external') && document.getElementById('hs-external').checked);
-  var _staffDomain = '@' + nationEmailDomain();
+  var _staffDom = nationEmailDomain();               // '' -> this nation has no domain gate
+  var _staffDomain = '@' + _staffDom;
   if(isExternal){
     // External consultants are ED-only and passwordless (magic-link).
     if(!APPROVAL_AUTHORITY.can('manageAllStaffRoles', window.currentRole)){ showToast('Only the ED can add an external consultant'); return; }
-  } else if(!email.endsWith(_staffDomain)) {
+  } else if(_staffDom && !email.endsWith(_staffDomain)) {
     showToast('Only ' + _staffDomain + ' email addresses can be registered (tick "External consultant" for an outside email)');
     return;
   }
@@ -1763,7 +1765,11 @@ async function submitAddHousingStaff() {
     var staffR = await fetch(SUPABASE_URL+'/rest/v1/staff',{
       method:'POST',
       headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
-      body:JSON.stringify({name:name, email:email, role:role, department:dept, is_active:true, manager_email:'kevin.proctor@clfn.on.ca'})
+      body:JSON.stringify({name:name, email:email, role:role, department:dept, is_active:true,
+        // Manager = whoever is adding the staff member (the signed-in HM/ED),
+        // else this nation's housing mailbox. Never a hardcoded CLFN admin --
+        // that wrote a CLFN address into every other nation's staff table (OCAP).
+        manager_email:((typeof HOUSING_SESSION!=='undefined' && HOUSING_SESSION && HOUSING_SESSION.email) || (window.NATION_CONFIG && NATION_CONFIG.housing_email) || '')})
     });
 
     if(!staffR.ok){

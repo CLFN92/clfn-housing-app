@@ -3182,7 +3182,16 @@ async function renderConfigPanel() {
   var body = document.getElementById('config_panel_body');
   if (!body) return;
 
-  var gc = window.CLFN_GRAPH_CONFIG || {};
+  // Per-nation email pipeline config (resolved from this nation's own directory
+  // entry / registry row). NEVER a global -- a global CLFN_GRAPH_CONFIG used to
+  // render CLFN's Entra tenant/client + mailbox on every nation's settings page.
+  var gc = (window.NATION_CONFIG && window.NATION_CONFIG.email_config) || {};
+  var gcProvider = String(gc.provider || '').toLowerCase();
+  var gcIsGraph  = gcProvider === 'graph';
+  var gcProviderLabel = gcIsGraph ? 'Microsoft 365 (Graph)'
+    : gcProvider === 'resend'   ? 'Resend'
+    : gcProvider === 'sendgrid' ? 'SendGrid'
+    : (gc.from ? (gcProvider || 'Email service') : 'Not configured');
 
   // Project ref from the Supabase URL drives the deep-link to the
   // Edge Function secrets page. Falls back to the dashboard root if
@@ -3196,7 +3205,7 @@ async function renderConfigPanel() {
     ? 'https://supabase.com/dashboard/project/' + projectRef + '/settings/functions'
     : 'https://supabase.com/dashboard';
   var entraUrl = 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Overview/appId/'
-               + encodeURIComponent(gc.clientId || '');
+               + encodeURIComponent(gc.client_id || '');
 
   // Pipeline health — recent email_sent rows from the audit log.
   var health = await _renderPipelineHealth();
@@ -3238,23 +3247,29 @@ async function renderConfigPanel() {
     + '</div>'
 
     + '<div class="cfg-section">'
-    +   '<div class="cfg-section-title">Email pipeline (Microsoft Graph)</div>'
-    +   '<div class="cfg-section-sub">Reference only. Update the actual secrets via the Supabase Dashboard.</div>'
+    +   '<div class="cfg-section-title">Email pipeline (' + _ntfEsc(gcProviderLabel) + ')</div>'
+    +   '<div class="cfg-section-sub">Reference only for this nation. Update the actual secrets via the Supabase Dashboard.</div>'
 
     +   '<div class="cfg-grid">'
-    +     _cfgRow('Entra app',          gc.appName  || '—')
-    +     _cfgRow('Tenant ID',          gc.tenantId || '—', { mono: true, copy: true })
-    +     _cfgRow('Client ID',          gc.clientId || '—', { mono: true, copy: true })
-    +     _cfgRow('FROM mailbox',       gc.fromUser || '—', { mono: true, copy: true })
-    +     _cfgRow('Reply-To',           gc.replyTo  || '—', { mono: true })
-    +     _cfgRow('Client secret',      'Stored in Supabase secrets - not shown', { muted: true })
+    +     _cfgRow('Provider',           gcProviderLabel)
+    +     _cfgRow('FROM address',       gc.from      || '—', { mono: true, copy: true })
+    +     _cfgRow('From name',          gc.from_name || '—')
+    +     _cfgRow('Reply-To',           gc.reply_to  || '—', { mono: true })
+    +     (gcIsGraph ? (
+            _cfgRow('Entra app',        gc.app_name  || '—')
+          + _cfgRow('Tenant ID',        gc.tenant_id || '—', { mono: true, copy: true })
+          + _cfgRow('Client ID',        gc.client_id || '—', { mono: true, copy: true })
+          ) : '')
+    +     _cfgRow(gcIsGraph ? 'Client secret' : 'API key', 'Stored in Supabase secrets - not shown', { muted: true })
     +   '</div>'
 
     +   '<div class="cfg-health">' + health + '</div>'
 
     +   '<div class="cfg-actions">'
     +     '<a class="btn btn-primary" href="' + _ntfEsc(secretsUrl) + '" target="_blank" rel="noopener">Open Supabase Edge Function Secrets</a>'
-    +     '<a class="btn btn-ghost"   href="' + _ntfEsc(entraUrl)   + '" target="_blank" rel="noopener">Open Entra App Registration</a>'
+    +     (gcIsGraph
+          ? '<a class="btn btn-ghost" href="' + _ntfEsc(entraUrl) + '" target="_blank" rel="noopener">Open Entra App Registration</a>'
+          : '')
     +   '</div>'
     + '</div>'
 

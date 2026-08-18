@@ -64,7 +64,20 @@ window.NATIONS_DIRECTORY = window.NATIONS_DIRECTORY || {
     // path only (Graph ignores them). CLFN uses Microsoft 365; a nation without
     // M365 would set provider:'resend' with a `from` on an SPF/DKIM/DMARC-verified
     // domain. See the resend example in the additional-nation template below.
-    email: { provider: 'graph', from: 'housing@clfn.on.ca', from_name: 'Constance Lake First Nation' },
+    email: {
+      provider: 'graph', from: 'housing@clfn.on.ca', from_name: 'Constance Lake First Nation',
+      reply_to: 'housing@clfn.on.ca',
+      // Non-secret Microsoft 365 / Entra reference values, shown READ-ONLY in
+      // Settings -> Admin -> Config so a CLFN admin can verify what's configured.
+      // These belong to CLFN ONLY and live in CLFN's directory entry (per-nation
+      // config) so they NEVER surface on another nation. The actual send auth
+      // reads the GRAPH_* Edge Function secrets server-side; the client secret is
+      // never here. (Was a global window.CLFN_GRAPH_CONFIG that leaked onto every
+      // nation's settings page -- an OCAP/privacy defect; scoped to CLFN here.)
+      app_name:  'CLFN Housing App - Notifications',
+      tenant_id: '603975c1-4d60-4e17-80bd-61a2b2bb721a',
+      client_id: 'fba694aa-791a-4aa4-aeef-f7ce3a1505cb'
+    },
     modules_licensed: null   // null → all optional modules licensed (defaults apply)
   }
   // Example additional nation (one entry per hostname AND/OR subdomain label):
@@ -111,6 +124,10 @@ window._mapNationRow = function(r){
     portal_base:   'https://' + sub + '.fnhub.app',
     email_domain:  r.email_domain || '',
     housing_email: r.housing_email || '',
+    // Per-nation email delivery config from the registry, when present. Never
+    // inherits another nation's mailbox/provider (OCAP): absent -> the app's
+    // email_config falls back to the nation's own housing_email or empty.
+    email:         (r.email && typeof r.email === 'object') ? r.email : null,
     role_labels:   {},
     modules_licensed: (r.modules_licensed && typeof r.modules_licensed === 'object')
                         ? r.modules_licensed : null
@@ -198,20 +215,13 @@ window.CLFN_CONFIG_LOADED = true;
 })();
 
 // ── Email pipeline reference (display-only) ──────────────────────────────────
-// Mirror of the non-secret GRAPH_* values configured as Supabase Edge
-// Function secrets. Shown in Settings -> Admin -> Config so an admin can
-// verify what's configured without opening the Supabase Dashboard.
-// CLIENT_SECRET deliberately omitted - it's a secret and never leaves
-// Supabase's secrets storage. Update these constants if the Entra app
-// registration or shared mailbox changes; the actual sending continues
-// to read from the Edge Function env vars.
-window.CLFN_GRAPH_CONFIG = {
-  tenantId: '603975c1-4d60-4e17-80bd-61a2b2bb721a',  // CLFN Entra tenant
-  clientId: 'fba694aa-791a-4aa4-aeef-f7ce3a1505cb',  // "CLFN Housing App - Notifications" app
-  fromUser: 'housing@clfn.on.ca',                      // Shared mailbox sent items appear here
-  appName:  'CLFN Housing App - Notifications',
-  replyTo:  'housing@clfn.on.ca'
-};
+// The non-secret email-pipeline reference values shown in Settings -> Admin ->
+// Config are now PER-NATION: they come from NATION_CONFIG.email_config (resolved
+// from each nation's own directory entry / registry row), NOT a global. This
+// used to be a hardcoded window.CLFN_GRAPH_CONFIG that rendered CLFN's Entra
+// tenant/client + mailbox on EVERY nation's settings page (an OCAP/privacy leak
+// -- e.g. it showed on the Demo nation). CLFN's own values live under
+// NATIONS_DIRECTORY.clfn.email; other nations only ever see their own.
 
 // ── Build-time fallback logo ────────────────────────────────────────────────
 // Used when no theme.logo override is saved in housing_settings. Lives here
@@ -557,17 +567,21 @@ window.showModuleDisabledNotice = function(label){
 // applyNationOverrides().
 window.NATION_CONFIG = window.NATION_CONFIG || (function(){
   var n = window._NATION || {};
-  var disp = n.display_name || 'Constance Lake First Nation';
+  // Fallbacks are nation-NEUTRAL (platform default / empty), never CLFN literals.
+  // CLFN sets each of these in its own directory entry, so CLFN is unaffected;
+  // other nations must never inherit CLFN's name, domain, or mailbox (OCAP).
+  var disp = n.display_name || 'Home Land Homes';
+  var em = (n.email && typeof n.email === 'object') ? n.email : {};
   return {
-    id:           n.id    || 'clfn',
+    id:           n.id    || 'default',
     name:         disp,
     display_name: disp,
-    short:        n.short || 'CLFN',
+    short:        n.short || 'HLH',
     primary_color: n.primary_color || null,   // brand accent (--yellow) applied by _applyTheme
     logo:          n.logo || '',              // brand mark; '' → platform default (Home Land Homes)
     role_labels:  n.role_labels || {}, // empty for CLFN — CLFN_PERMS.ROLE_LABELS defaults apply
-    email_domain:  n.email_domain  || 'clfn.on.ca',
-    housing_email: n.housing_email || 'housing@clfn.on.ca',
+    email_domain:  n.email_domain  || '',
+    housing_email: n.housing_email || '',
     landlord_committee: n.landlord_committee || 'Housing Committee',
     mailing_po_box:     n.mailing_po_box     || '',
     mailing_postal:     n.mailing_postal     || '',
@@ -576,10 +590,16 @@ window.NATION_CONFIG = window.NATION_CONFIG || (function(){
     // passed to the Edge Function (which honours it only when that provider's
     // keys are configured, else falls back to its own EMAIL_PROVIDER secret).
     // Named email_config (not email) to avoid colliding with any reply-to use.
+    // The *_id/app_name/reply_to fields are the display-only pipeline reference
+    // (per-nation; empty unless the nation's own entry provides them).
     email_config: {
-      provider:  (n.email && n.email.provider)  || 'graph',
-      from:      (n.email && n.email.from)       || n.housing_email || 'housing@clfn.on.ca',
-      from_name: (n.email && n.email.from_name)  || disp
+      provider:  em.provider  || 'graph',
+      from:      em.from       || n.housing_email || '',
+      from_name: em.from_name  || disp,
+      reply_to:  em.reply_to   || em.from || n.housing_email || '',
+      app_name:  em.app_name   || '',
+      tenant_id: em.tenant_id  || '',
+      client_id: em.client_id  || ''
     }
   };
 })();
@@ -724,8 +744,11 @@ window.nationDisplay = function nationDisplay(){
 };
 
 // Single accessor for the nation's staff email domain (no leading '@').
-// Consumers build gates/placeholders as '@' + nationEmailDomain(). The CLFN
-// literal here is the config-file default (the sanctioned home for it).
+// Returns '' when this nation has no domain configured -- consumers must treat
+// empty as "no domain gate" (skip the check), NOT substitute another nation's
+// domain. Previously fell back to 'clfn.on.ca', which surfaced CLFN's domain on
+// other nations' add-staff forms and could lock out their staff (OCAP). CLFN
+// sets email_domain in its own directory entry, so CLFN is unaffected.
 window.nationEmailDomain = function nationEmailDomain(){
-  return (window.NATION_CONFIG && NATION_CONFIG.email_domain) || 'clfn.on.ca';
+  return (window.NATION_CONFIG && NATION_CONFIG.email_domain) || '';
 };
