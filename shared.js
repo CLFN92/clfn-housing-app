@@ -173,6 +173,25 @@ window._onAccent = function(accent){
   return _contrast(la, window._luminance('#131313')) >= _contrast(la, window._luminance('#ffffff')) ? '#131313' : '#ffffff';
 };
 
+// ── Theme accent for PDF / print code (which can't read CSS variables) ───────
+// _themeAccentHex/_themeAccentInkHex return the LIVE resolved --yellow /
+// --accent-ink; the *Rgb variants return [r,g,b] for jsPDF. Use the ACCENT for
+// FILLS (a coloured bar/header) and the INK for accent TEXT on white paper (a
+// bright accent is unreadable there — same rule as the on-screen tokens).
+window._themeAccentHex = function(){
+  try { var v = getComputedStyle(document.documentElement).getPropertyValue('--yellow').trim(); if (v) return v; } catch(e){}
+  return (window.NATION_CONFIG && window.NATION_CONFIG.primary_color) || (window.THEME_DEFAULTS && window.THEME_DEFAULTS.yellow) || '#9A4A1F';
+};
+window._themeAccentInkHex = function(){
+  try { var v = getComputedStyle(document.documentElement).getPropertyValue('--accent-ink').trim(); if (v) return v; } catch(e){}
+  return window._accentInk(window._themeAccentHex()) || '#6B6100';
+};
+window._themeOnAccentHex = function(){ return window._onAccent(window._themeAccentHex()); };
+function _hexToRgbArr(hex){ var s = window._hexToRgbStr(hex); return s ? s.split(',').map(function(n){ return parseInt(n, 10); }) : [154, 74, 31]; }
+window._themeAccentRgb    = function(){ return _hexToRgbArr(window._themeAccentHex()); };
+window._themeAccentInkRgb = function(){ return _hexToRgbArr(window._themeAccentInkHex()); };
+window._themeOnAccentRgb  = function(){ return _hexToRgbArr(window._themeOnAccentHex()); };
+
 // Paint the dark surfaces (--dark/--dark2/--dark3) from the brand accent so the
 // header aligns to the nation's brand colour. When the ED has NOT explicitly
 // chosen a header colour (customDark falsy or the stock near-black), a deep ink
