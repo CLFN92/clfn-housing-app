@@ -1800,6 +1800,8 @@
       +   '<div><label>Bill on day of month (1-28, optional)</label><input id="cn-bill-anchor" type="number" min="1" max="28" value="' + esc(b.anchor_day || '') + '"/></div>'
       +   '<div><label>Payment due (days)</label><input id="cn-bill-due" type="number" min="0" value="' + esc(b.due_days == null ? 30 : b.due_days) + '"/></div>'
       + '</div>'
+      + '<label style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;font-weight:600;"><input type="checkbox" id="cn-bill-carry" style="width:auto;"' + (b.carry_forward ? ' checked' : '') + '/> <span>Carry any prior unpaid balance forward onto each generated invoice</span></label>'
+      + '<div style="font-size:11px;color:var(--muted);margin:2px 0 0 26px;">When on, each auto-invoice adds a "Balance carried forward" line for every still-owing invoice and marks those as carried, so the nation sees one running total owing.</div>'
       + '<label style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;font-weight:600;"><input type="checkbox" id="cn-bill-autosend" style="width:auto;"' + (b.auto_send ? ' checked' : '') + '/> <span>Auto-send the invoice by email when generated</span></label>'
       + '<div style="' + g2 + '">'
       +   '<div><label>Billing email</label><input id="cn-bill-email" type="email" value="' + esc(b.recipient_email || '') + '" placeholder="finance@nation.ca"/></div>'
@@ -1827,6 +1829,7 @@
       anchor_day: v('cn-bill-anchor') ? parseInt(v('cn-bill-anchor'), 10) : null,
       due_days: v('cn-bill-due') ? parseInt(v('cn-bill-due'), 10) : 30,
       auto_send: cb('cn-bill-autosend'),
+      carry_forward: cb('cn-bill-carry'),
       recipient_email: v('cn-bill-email'),
       cc_emails: v('cn-bill-cc')
     };

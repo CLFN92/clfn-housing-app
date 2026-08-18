@@ -103,15 +103,40 @@ serve(async (req) => {
       const { data: nrows } = await admin.from('nations').select('display_name, office_address').eq('subdomain', sub).limit(1)
       const nation = (nrows && nrows[0]) || { display_name: sub }
 
-      const subtotal = Math.round((Number(sch.unit_amount) || 0) * 100) / 100
-      const taxRate  = Number(sch.tax_rate) || 0
-      const tax      = Math.round(subtotal * taxRate) / 100
+      const feeSubtotal = Math.round((Number(sch.unit_amount) || 0) * 100) / 100
+      const taxRate     = Number(sch.tax_rate) || 0
+      const feeTax      = Math.round(feeSubtotal * taxRate) / 100
+      const dueDate     = addDays(today, Number(sch.due_days) || 30)
+      const lineItems: any[] = [{ description: sch.description, qty: 1, unit_price: feeSubtotal }]
+
+      // Optional carry-forward: roll every still-owing invoice's balance onto this
+      // one as a single line, then mark the sources 'carried' (below) so a balance
+      // is billed once. The carried amount is already tax-inclusive, so tax is
+      // charged only on the current period's fee -- never re-taxed.
+      let carried = 0
+      const carriedIds: string[] = []
+      const carriedRefs: string[] = []
+      if (sch.carry_forward) {
+        const { data: prior } = await admin.from('nation_invoices')
+          .select('id, number, total, amount_paid, status')
+          .eq('subdomain', sub)
+          .in('status', ['draft', 'sent', 'partial'])
+        for (const p of (prior || [])) {
+          const bal = Math.round(((Number(p.total) || 0) - (Number(p.amount_paid) || 0)) * 100) / 100
+          if (bal > 0.005) { carried += bal; carriedIds.push(p.id); carriedRefs.push(p.number) }
+        }
+        carried = Math.round(carried * 100) / 100
+        if (carried > 0) {
+          lineItems.unshift({ description: 'Balance carried forward (' + carriedRefs.join(', ') + ')', qty: 1, unit_price: carried })
+        }
+      }
+
+      const subtotal = Math.round((feeSubtotal + carried) * 100) / 100
+      const tax      = feeTax
       const total    = Math.round((subtotal + tax) * 100) / 100
-      const dueDate  = addDays(today, Number(sch.due_days) || 30)
-      const lineItems = [{ description: sch.description, qty: 1, unit_price: subtotal }]
 
       if (dryRun) {
-        results.push({ subdomain: sub, would_bill: total, next_run_date: sch.next_run_date, dryRun: true })
+        results.push({ subdomain: sub, would_bill: total, would_carry: carried, carried_from: carriedRefs, next_run_date: sch.next_run_date, dryRun: true })
         continue
       }
 
@@ -139,6 +164,15 @@ serve(async (req) => {
       }
       if (!inserted) throw new Error('could not allocate invoice number')
 
+      // Mark carried-forward sources so their balance is not billed again.
+      for (const cid of carriedIds) {
+        try {
+          await admin.from('nation_invoices').update({
+            status: 'carried', notes: 'Carried forward into ' + number, updated_at: new Date().toISOString(),
+          }).eq('id', cid)
+        } catch (_e) { /* best-effort; the new invoice already carries the balance */ }
+      }
+
       // Advance the schedule.
       const nextRun = advance(sch.next_run_date, sch.cadence, sch.anchor_day)
       await admin.from('nation_billing').update({
@@ -149,7 +183,9 @@ serve(async (req) => {
       try {
         await admin.from('platform_audit').insert({
           action: 'nation_invoice_auto', subdomain: sub,
-          detail: number + ': ' + money(total) + ' (' + sch.cadence + '); next ' + nextRun,
+          detail: number + ': ' + money(total) + ' (' + sch.cadence
+            + (carried > 0 ? '; carried ' + money(carried) + ' from ' + carriedRefs.join(', ') : '')
+            + '); next ' + nextRun,
         })
       } catch (_e) { /* audit best-effort */ }
 
@@ -179,7 +215,7 @@ serve(async (req) => {
         }
       }
 
-      results.push({ subdomain: sub, invoice: number, total, next_run_date: nextRun, emailed, emailNote })
+      results.push({ subdomain: sub, invoice: number, total, carried, carried_from: carriedRefs, next_run_date: nextRun, emailed, emailNote })
     } catch (e) {
       results.push({ subdomain: sub, error: String(e && (e as Error).message || e) })
     }

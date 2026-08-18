@@ -20,6 +20,7 @@ create table if not exists public.nation_billing (
   anchor_day     int,                                     -- day-of-month to bill on (1-28); null = next_run_date's day
   due_days       int not null default 30,                 -- invoice due N days after issue
   auto_send      boolean not null default false,          -- email the invoice to the nation on generation
+  carry_forward  boolean not null default false,          -- roll prior unpaid balances onto each generated invoice
   recipient_email text,                                   -- billing contact (required when auto_send)
   cc_emails      text,                                     -- comma-separated CCs (optional)
   last_run_date  date,                                     -- last date an invoice was generated
@@ -28,6 +29,9 @@ create table if not exists public.nation_billing (
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
 );
+-- Idempotent add for tables created before carry_forward existed.
+alter table public.nation_billing add column if not exists carry_forward boolean not null default false;
+
 create index if not exists nation_billing_sub_idx on public.nation_billing (subdomain);
 create index if not exists nation_billing_due_idx on public.nation_billing (active, next_run_date);
 
