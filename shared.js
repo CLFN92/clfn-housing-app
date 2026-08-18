@@ -272,10 +272,17 @@ window._applyTheme = function(theme) {
   if (theme.accentHover)  root.style.setProperty('--yellow-mid', theme.accentHover);
   if (theme.borderStrong) root.style.setProperty('--border-strong', theme.borderStrong);
   if (theme.inputBorder)  root.style.setProperty('--input-border', theme.inputBorder);
-  if (theme.success) root.style.setProperty('--success', theme.success);
-  if (theme.danger)  root.style.setProperty('--danger', theme.danger);
-  if (theme.info)    root.style.setProperty('--info-blue', theme.info);
-  if (theme.warning){ root.style.setProperty('--warn-amber', theme.warning); root.style.setProperty('--warn-amber-text', theme.warning); }
+  // Semantic status colours: set the base colour AND derive its light pill
+  // background + border (a tint toward white) so the whole pill follows.
+  function _semantic(colour, base, bgVar, borderVar){
+    root.style.setProperty(base, colour);
+    if (bgVar)     { var b = window._mixHex(colour, '#ffffff', 0.90); if (b) root.style.setProperty(bgVar, b); }
+    if (borderVar) { var d = window._mixHex(colour, '#ffffff', 0.68); if (d) root.style.setProperty(borderVar, d); }
+  }
+  if (theme.success) _semantic(theme.success, '--success', '--success-bg', '--success-border');
+  if (theme.danger)  _semantic(theme.danger,  '--danger',  '--danger-bg',  '--danger-border');
+  if (theme.info)    _semantic(theme.info,     '--info-blue', '--info-blue-bg', null);
+  if (theme.warning){ _semantic(theme.warning, '--warn-amber', '--warn-amber-bg', '--warn-amber-border'); root.style.setProperty('--warn-amber-text', theme.warning); }
   // Logo src + transparency — also covers the Themes panel preview thumbnail.
   document.querySelectorAll('img.hlogo, #login-logo, #theme_logo_preview').forEach(function(img){
     if (theme.logo) img.src = theme.logo;

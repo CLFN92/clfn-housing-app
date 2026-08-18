@@ -1366,12 +1366,23 @@ function _themeCssVar(key){
             warning:'--warn-amber', info:'--info-blue' };
   return M[key] || ('--' + key);   // success/danger map 1:1 to --success/--danger
 }
+// Apply a live theme value, deriving the pill bg/border for the semantic keys
+// so the whole status pill previews (mirrors _applyTheme's _semantic()).
+function _themeLiveApply(key, value){
+  var root = document.documentElement;
+  function mix(t){ return (typeof _mixHex === 'function') ? _mixHex(value, '#ffffff', t) : value; }
+  if(key === 'warning'){ root.style.setProperty('--warn-amber', value); root.style.setProperty('--warn-amber-text', value); root.style.setProperty('--warn-amber-bg', mix(0.90)); root.style.setProperty('--warn-amber-border', mix(0.68)); return; }
+  if(key === 'success'){ root.style.setProperty('--success', value); root.style.setProperty('--success-bg', mix(0.90)); root.style.setProperty('--success-border', mix(0.68)); return; }
+  if(key === 'danger'){  root.style.setProperty('--danger', value);  root.style.setProperty('--danger-bg', mix(0.92)); root.style.setProperty('--danger-border', mix(0.68)); return; }
+  if(key === 'info'){    root.style.setProperty('--info-blue', value); root.style.setProperty('--info-blue-bg', mix(0.92)); return; }
+  root.style.setProperty(_themeCssVar(key), value);
+}
 // Sync hex input → color picker, and apply preview live
 function _themeOnPickerChange(key) {
   var picker = document.getElementById('theme_'+key);
   var hex    = document.getElementById('theme_'+key+'_hex');
   if(picker && hex) hex.value = picker.value;
-  document.documentElement.style.setProperty(_themeCssVar(key), picker.value);
+  _themeLiveApply(key, picker.value);
 }
 function _themeOnHexChange(key) {
   var hex    = document.getElementById('theme_'+key+'_hex');
@@ -1380,7 +1391,7 @@ function _themeOnHexChange(key) {
   var v = (hex.value||'').trim();
   if(!/^#[0-9a-fA-F]{6}$/.test(v)) return;       // wait for a valid hex
   if(picker) picker.value = v;
-  document.documentElement.style.setProperty(_themeCssVar(key), v);
+  _themeLiveApply(key, v);
 }
 function _themeApplyLogoFile(f) {
   var msg = document.getElementById('theme_logo_msg');
