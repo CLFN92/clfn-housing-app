@@ -293,21 +293,17 @@ Captured 2026-07-31 after P1-P3 shipped and `admin.fnhub.app` went live:
    to **Resend Custom SMTP** (same provider the nation app uses) before adding
    more platform admins or relying on it heavily.
 
-3. **"Open" should open the nation site with full super-admin access.** Today the
-   panel's per-nation **Open** button just links to `https://<sub>.fnhub.app`
-   (the nation's normal login screen). Desired: clicking Open drops the platform
-   super-admin straight into that nation's app with full access. **Design
-   constraint to resolve first:** the platform admin is a Gmail
-   (`kevint.proctor@gmail.com`), but nation staff auth is a *separate* per-nation
-   Supabase project AND gated to the nation's own email domain
-   (`@clfn.on.ca`), so a Gmail can't be a nation staff user as-is. Options to
-   decide: (a) seed the super-admin as a `super_user` staff row in each nation
-   (still needs a login that passes the email gate); (b) a short-lived
-   impersonation token minted by a nation-side Edge Function that trusts the
-   control plane (powerful + security-sensitive — must be auditable and
-   scoped); (c) leave Open as a plain link and rely on the operator having their
-   own nation login. Recommend (b) as the real feature, gated behind an explicit
-   "enter nation" audit event, built as its own phase.
+3. **"Open" should open the nation site with full super-admin access.** ✅ BUILT
+   (option **b**). The nations table now has an **Enter** button next to Open.
+   Flow: admin panel (super-admin JWT) -> `enter-nation` (platform, JWT-verified)
+   -> `support-login` (nation project, `--no-verify-jwt`, gated by the shared
+   `SUPPORT_LOGIN_SECRET`) mints a one-time magic link into a same-day
+   `super_user` "Platform Support" staff row. The magic link (not a Gmail
+   password) sidesteps the domain gate. Audited on both sides
+   (`entered_nation` + `support_session_started`), and a nation can refuse it via
+   **Settings -> Admin -> Config -> Platform Support Access**. Setup + hardening
+   notes: **docs/SUPPORT-LOGIN.md**. Remaining hardening (future): per-nation
+   secret (vs one platform-wide value) and sub-day expiry.
 
 ---
 

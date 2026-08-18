@@ -3,6 +3,11 @@ name: Deploy platform (control-plane) Edge Functions
 # Deploys the CONTROL-PLANE Edge Functions to the fnhub-platform project:
 #   - provision-nation      (admin calls it; keep JWT verification ON)
 #   - report-nation-usage   (nation apps call it; JWT verification OFF)
+#   - recurring-invoices    (pg_cron calls it; JWT verification OFF)
+#   - set-nation-secret     (admin calls it; verifies super_admins itself)
+#   - enter-nation          (admin calls it; keep JWT verification ON) - support login;
+#                           needs SUPPORT_LOGIN_SECRET here AND on each nation project.
+#                           See docs/SUPPORT-LOGIN.md.
 #
 # These are excluded from deploy-supabase-functions.yml (which targets the
 # NATION project). This workflow reuses the same account-scoped
@@ -28,6 +33,7 @@ on:
       - 'supabase/functions/report-nation-usage/**'
       - 'supabase/functions/recurring-invoices/**'
       - 'supabase/functions/set-nation-secret/**'
+      - 'supabase/functions/enter-nation/**'
       - '.github/workflows/deploy-platform-functions.yml'
   workflow_dispatch:
 
@@ -69,4 +75,6 @@ jobs:
           supabase functions deploy recurring-invoices --project-ref "$REF" --no-verify-jwt
           echo "──── Deploying set-nation-secret to $REF (verifies caller against super_admins) ────"
           supabase functions deploy set-nation-secret --project-ref "$REF" --no-verify-jwt
+          echo "──── Deploying enter-nation to $REF (JWT verify ON; super-admin support login) ────"
+          supabase functions deploy enter-nation --project-ref "$REF"
           echo "Platform functions deployed."

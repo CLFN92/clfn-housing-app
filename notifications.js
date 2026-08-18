@@ -3274,6 +3274,21 @@ async function renderConfigPanel() {
     + '</div>'
 
     + '<div class="cfg-section">'
+    +   '<div class="cfg-section-title">Platform Support Access</div>'
+    +   '<div class="cfg-section-sub">Controls whether ' + _ntfEsc((window.NATION_CONFIG && NATION_CONFIG.display_name) ? 'the platform operator' : 'platform support') + ' can open a signed-in support session on your app for troubleshooting. When ON, a platform super-admin can enter as a full-access &ldquo;Platform Support&rdquo; user; every entry is written to your Audit Log and the access lapses the same day. Turn OFF to refuse platform support login entirely.</div>'
+    +   '<div class="cfg-grid">'
+    +     '<div class="cfg-row">'
+    +       '<div class="cfg-label">Allow platform support login</div>'
+    +       '<div class="cfg-value" style="display:flex;align-items:center;gap:10px;">'
+    +         '<label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:700;font-size:13px;"><input type="checkbox" id="cfg_support_login" style="width:auto;"' + (((window._appSettings && window._appSettings.support_login_enabled) !== false) ? ' checked' : '') + '/> <span id="cfg_support_login_lbl">' + (((window._appSettings && window._appSettings.support_login_enabled) !== false) ? 'Enabled' : 'Disabled') + '</span></label>'
+    +         '<button type="button" class="btn btn-primary btn-sm" onclick="saveSupportLoginEnabled()">Save</button>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div style="font-size:11px;color:var(--muted);margin-top:8px;padding:0 0 4px;">Only the Executive Director can change this. Support sessions always appear in the Audit Log (action &ldquo;support_session_started&rdquo;).</div>'
+    + '</div>'
+
+    + '<div class="cfg-section">'
     +   '<div class="cfg-section-title">Duplicate Application Audit</div>'
     +   '<div class="cfg-section-sub">Scans active applications for duplicate email addresses (hard conflict) or matching name + date of birth (soft conflict). Archived and declined applications are excluded.</div>'
     +   '<div class="cfg-grid" style="margin-top:12px;">'
@@ -3347,6 +3362,23 @@ function saveEldersAgeMin() {
     auditAction: 'elders_age_min_save',
     auditDetail: 'Elders minimum age set to ' + val,
     okMsg:       'Elders minimum age saved — ' + val + ' yrs'
+  });
+}
+
+// Toggle whether the platform operator may open a support session on this
+// nation (OCAP consent switch; read server-side by the support-login function).
+function saveSupportLoginEnabled() {
+  var role = window.currentRole || window._realRole;
+  if (role !== 'ed') { showToast('Only the Executive Director can change platform support access'); return; }
+  var inp = document.getElementById('cfg_support_login');
+  if (!inp) return;
+  var enabled = !!inp.checked;
+  var lbl = document.getElementById('cfg_support_login_lbl');
+  if (lbl) lbl.textContent = enabled ? 'Enabled' : 'Disabled';
+  persistSetting('support_login_enabled', enabled, {
+    auditAction: 'support_login_toggle',
+    auditDetail: 'Platform support login ' + (enabled ? 'ENABLED' : 'DISABLED'),
+    okMsg:       enabled ? 'Platform support login enabled' : 'Platform support login disabled — the operator can no longer enter'
   });
 }
 

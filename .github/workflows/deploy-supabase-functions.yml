@@ -65,12 +65,18 @@ jobs:
             # Skip control-plane functions: they deploy to the fnhub-platform
             # project (not this nation project) via `supabase functions deploy
             # <name> --project-ref <platform-ref>`. See supabase/functions/<name>/README.
-            case "$name" in provision-nation|report-nation-usage|recurring-invoices|set-nation-secret) echo "Skipping platform-only function: $name"; continue;; esac
+            case "$name" in provision-nation|report-nation-usage|recurring-invoices|set-nation-secret|enter-nation) echo "Skipping platform-only function: $name"; continue;; esac
             if [ ! -f "${dir}index.ts" ]; then
               echo "No index.ts in $name - skipping"
               continue
             fi
             echo "──────── Deploying: $name ────────"
-            supabase functions deploy "$name" --project-ref "$REF"
+            # support-login is called server-to-server (gated by SUPPORT_LOGIN_SECRET,
+            # not a Supabase JWT), so it must deploy WITHOUT JWT verification.
+            if [ "$name" = "support-login" ]; then
+              supabase functions deploy "$name" --project-ref "$REF" --no-verify-jwt
+            else
+              supabase functions deploy "$name" --project-ref "$REF"
+            fi
           done
           echo "All functions deployed."

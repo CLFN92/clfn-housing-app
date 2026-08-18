@@ -386,6 +386,7 @@
         + '<td><div class="row-actions">'
         +   '<button class="btn sm ghost" type="button" data-act="configure" data-id="' + esc(n.id) + '">Dashboard</button>'
         +   '<a class="btn sm ghost" href="' + url + '" target="_blank" rel="noopener">Open</a>'
+        +   (n.supabase_url ? '<button class="btn sm ghost" type="button" data-act="enter" data-id="' + esc(n.id) + '" title="Sign in to this nation as Platform Support (logged both sides)">Enter</button>' : '')
         +   (st === 'suspended'
               ? '<button class="btn sm ghost" data-act="status" data-status="active" data-id="' + esc(n.id) + '">Resume</button>'
               : '<button class="btn sm danger" data-act="status" data-status="suspended" data-id="' + esc(n.id) + '">Suspend</button>')
@@ -985,6 +986,45 @@
       } else { renderProvisionResults(d); }
     } catch (e){ setMsg('pv-msg', 'Network error: ' + String(e).slice(0, 120)); document.getElementById('pv-results').innerHTML = ''; }
     if (btn){ btn.disabled = false; btn.textContent = 'Provision nation'; }
+  };
+
+  // Support impersonation (SUPER-ADMIN-PLAN 12.3): open a signed-in session on a
+  // nation's app as "Platform Support" (super_user, expires end-of-day), audited
+  // on both the control plane and the nation. Calls the platform enter-nation
+  // function (super-admin JWT), which server-to-server calls the nation's
+  // support-login function with the shared secret and returns a magic link.
+  window.enterNation = async function(id){
+    var n = _nations.filter(function(x){ return String(x.id) === String(id); })[0];
+    if (!n){ dlgAlert('Nation not loaded.'); return; }
+    if (!n.supabase_url){ dlgAlert('This nation has no Supabase project yet, so there is nothing to enter.'); return; }
+    var ok = await dlgConfirm(
+      'Open a SUPPORT SESSION on ' + esc(n.display_name) + ' (' + esc(n.subdomain) + '.fnhub.app)?\n\n'
+      + 'You will be signed in as Platform Support with full (super_user) access to this nation\'s live data. '
+      + 'This is logged on both the control plane and the nation, and the access lapses at end of day. '
+      + 'Only enter with the nation\'s awareness.',
+      { title: 'Enter nation for support', okText: 'Enter nation' });
+    if (!ok) return;
+    var r;
+    try {
+      r = await fetch(PBASE + '/functions/v1/enter-nation', {
+        method: 'POST',
+        headers: { apikey: ANON, Authorization: 'Bearer ' + getAT(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subdomain: n.subdomain })
+      });
+    } catch (e){ dlgAlert('Network error: ' + String(e).slice(0, 120)); return; }
+    var d = await r.json().catch(function(){ return {}; });
+    if (!r.ok || !d.action_link){
+      var msg = d.message || d.error || ('HTTP ' + r.status);
+      if (d.error === 'support_disabled') msg = esc(n.display_name) + ' has turned OFF platform support login. Ask the nation to re-enable it in Settings before you can enter.';
+      else if (d.error === 'support_secret_not_set') msg = 'SUPPORT_LOGIN_SECRET is not set. Add it on the platform project AND on this nation\'s project, then redeploy the functions.';
+      dlgAlert('Could not enter: ' + msg, { title: 'Support login' });
+      return;
+    }
+    // The action link is a one-time Supabase magic link that lands on the nation
+    // app already signed in; open it in a new tab.
+    window.open(d.action_link, '_blank', 'noopener');
+    dlgAlert('A support session for ' + esc(n.display_name) + ' opened in a new tab (signed in as Platform Support; access ends '
+      + esc(d.access_expires_at || 'today') + '). This was logged on both sides.', { title: 'Entered nation' });
   };
 
   function renderProvisionResults(d){
@@ -2006,6 +2046,7 @@
       case 'logout':        window.adminLogout(); break;
       case 'reload':        location.reload(); break;
       case 'configure':     window.configureNation(id); break;
+      case 'enter':         window.enterNation(id); break;
       case 'save-config':   window.saveNationConfig(id); break;
       case 'status':        window.adminSetStatus(id, el.getAttribute('data-status') || ''); break;
       case 'add-admin':     window.adminAdd(); break;
