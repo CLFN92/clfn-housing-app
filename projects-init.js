@@ -1968,7 +1968,7 @@ function _prjGenerateRequestPdf(req, exp) {
           head: [['#', 'Date', 'Vendor / Payee', 'Description', 'Amount', 'Docs attached']],
           body: rows,
           theme: 'striped',
-          headStyles: { fillColor: [17, 17, 15], textColor: [248, 228, 26], fontSize: 8, fontStyle: 'bold' },
+          headStyles: { fillColor: [17, 17, 15], textColor: window._themeAccentHex(), fontSize: 8, fontStyle: 'bold' },
           bodyStyles: { fontSize: 8 },
           columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 20 }, 2: { cellWidth: 38 }, 3: { cellWidth: 56 }, 4: { cellWidth: 24, halign: 'right' }, 5: { cellWidth: 36 } },
           margin: { left: 14, right: 14 },
@@ -2001,7 +2001,7 @@ function _prjGenerateRequestPdf(req, exp) {
             head: [['File (as downloaded)', 'Type', 'Covers cost line(s)']],
             body: docRows,
             theme: 'striped',
-            headStyles: { fillColor: [17, 17, 15], textColor: [248, 228, 26], fontSize: 8, fontStyle: 'bold' },
+            headStyles: { fillColor: [17, 17, 15], textColor: window._themeAccentHex(), fontSize: 8, fontStyle: 'bold' },
             bodyStyles: { fontSize: 8 },
             columnStyles: { 0: { cellWidth: 92 }, 1: { cellWidth: 32 }, 2: { cellWidth: 58 } },
             margin: { left: 14, right: 14 },
@@ -2054,7 +2054,7 @@ function _prjBuildStatusReportPdf(d) {
   var data = d.data || {};
   var ms   = data.milestones || [];
   var exp  = data.expenses || [];
-  var head = { fillColor: [17, 17, 15], textColor: [248, 228, 26], fontSize: 8, fontStyle: 'bold' };
+  var head = { fillColor: [17, 17, 15], textColor: window._themeAccentHex(), fontSize: 8, fontStyle: 'bold' };
   var money = function(n) { return _prjMoney(n, true); };
   var signedMoney = function(v) { return (v < 0 ? '-' : '') + money(Math.abs(v)); };
 

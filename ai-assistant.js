@@ -625,7 +625,7 @@ function _aiBuildReplyPdf(work, explicitImages, tableImages){
         ensure(12);
         doc.autoTable({ startY:y, head:[tbl[0]], body:tbl.slice(1), theme:'striped',
           styles:{ fontSize:8, cellPadding:2 },
-          headStyles:{ fillColor:[17,17,15], textColor:[248,228,26], fontStyle:'bold', fontSize:8 },
+          headStyles:{ fillColor:[17,17,15], textColor: window._themeAccentHex(), fontStyle:'bold', fontSize:8 },
           margin:{ left:margin, right:margin } });
         y = doc.lastAutoTable.finalY + 5;
         // Derived chart for this count table (when the model didn't emit one).

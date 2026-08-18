@@ -3280,7 +3280,7 @@
     }
     // Closing highlighted row: the value at end of term = cost to the community.
     ctx.needSpace(8);
-    pdf.setFillColor(248,228,26); pdf.rect(ctx.marginL, ctx.y, tableW, 6, 'F');
+    pdf.setFillColor(window._themeAccentHex()); pdf.rect(ctx.marginL, ctx.y, tableW, 6, 'F');
     pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(20);
     var _closeMsg = paidOff
       ? ('HOME VALUE FULLY RECOVERED AT PAYMENT ' + n + ' - COST TO COMMUNITY ' + _ticMoney(0))
@@ -4336,7 +4336,7 @@
       ctx.needSpace(9); ctx.y += 2.6;
       pdf.setFont('helvetica','bold'); pdf.setFontSize(8.5); pdf.setTextColor(90);
       pdf.text(String(title).toUpperCase(), L, ctx.y + 2.6);
-      pdf.setDrawColor(248,228,26); pdf.setLineWidth(0.6);
+      pdf.setDrawColor(window._themeAccentHex()); pdf.setLineWidth(0.6);
       pdf.line(L, ctx.y + 3.6, RX, ctx.y + 3.6); pdf.setDrawColor(0);
       ctx.y += 5.6; pdf.setTextColor(0); pdf.setFont('helvetica','normal');
     }
@@ -4493,7 +4493,7 @@
       ctx.needSpace(9); ctx.y += 2.6;
       pdf.setFont('helvetica','bold'); pdf.setFontSize(8.5); pdf.setTextColor(90);
       pdf.text(String(title).toUpperCase(), L, ctx.y + 2.6);
-      pdf.setDrawColor(248,228,26); pdf.setLineWidth(0.6);
+      pdf.setDrawColor(window._themeAccentHex()); pdf.setLineWidth(0.6);
       pdf.line(L, ctx.y + 3.6, RX, ctx.y + 3.6); pdf.setDrawColor(0);
       ctx.y += 5.6; pdf.setTextColor(0); pdf.setFont('helvetica','normal');
     }

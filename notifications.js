@@ -1041,7 +1041,7 @@ function _makePdfDoc(opts) {
 
     // Yellow separator rule
     var ruleY = marginT - 4;
-    pdf.setDrawColor(248, 228, 26);
+    pdf.setDrawColor(window._themeAccentHex());
     pdf.setLineWidth(0.6);
     pdf.line(lx, ruleY, rx, ruleY);
     pdf.setDrawColor(0);
@@ -1076,7 +1076,7 @@ function _makePdfDoc(opts) {
     pdf.setFontSize(10);
     pdf.setTextColor(100);
     pdf.text(String(title).toUpperCase(), marginL, ctx.y + 3);
-    pdf.setDrawColor(248, 228, 26);
+    pdf.setDrawColor(window._themeAccentHex());
     pdf.setLineWidth(0.8);
     pdf.line(marginL, ctx.y + 4.5, pageW - marginR, ctx.y + 4.5);
     pdf.setDrawColor(0);
@@ -1219,7 +1219,7 @@ async function _generateApplicationPdfBase64() {
   pdf.text(appId,             pageW - marginR, ctx.y + 10, { align: 'right' });
   pdf.text('Date: ' + today,  pageW - marginR, ctx.y + 15, { align: 'right' });
   ctx.y += 17;
-  pdf.setDrawColor(248, 228, 26);
+  pdf.setDrawColor(window._themeAccentHex());
   pdf.setLineWidth(1);
   pdf.line(marginL, ctx.y, pageW - marginR, ctx.y);
   pdf.setDrawColor(0);
@@ -1554,7 +1554,7 @@ async function _generateSowPdfBase64() {
   pdf.text(projNum,            pageW - marginR, ctx.y + 10, { align: 'right' });
   pdf.text('Date: ' + today,   pageW - marginR, ctx.y + 15, { align: 'right' });
   ctx.y += 17;
-  pdf.setDrawColor(248, 228, 26);
+  pdf.setDrawColor(window._themeAccentHex());
   pdf.setLineWidth(1);
   pdf.line(marginL, ctx.y, pageW - marginR, ctx.y);
   pdf.setDrawColor(0);
@@ -1921,7 +1921,7 @@ async function _generateRfqPdfBase64(rfq, unit) {
     ctx.needSpace(hH + 2);
 
     // Header row (yellow fill)
-    pdf.setFillColor(248, 228, 26);
+    pdf.setFillColor(window._themeAccentHex());
     pdf.rect(tX, ctx.y, contentW, hH, 'F');
     pdf.setDrawColor(160); pdf.setLineWidth(0.3);
     pdf.rect(tX, ctx.y, contentW, hH);
@@ -1949,7 +1949,7 @@ async function _generateRfqPdfBase64(rfq, unit) {
 
     // Total row
     ctx.needSpace(9);
-    pdf.setFillColor(248, 228, 26);
+    pdf.setFillColor(window._themeAccentHex());
     pdf.rect(tX, ctx.y, contentW, 9, 'F');
     pdf.setDrawColor(160); pdf.setLineWidth(0.3);
     pdf.rect(tX, ctx.y, contentW, 9);
@@ -1966,7 +1966,7 @@ async function _generateRfqPdfBase64(rfq, unit) {
     gap(1);
     var bc1 = contentW * 0.68, bH = 7;
     ctx.needSpace(bH + 2);
-    pdf.setFillColor(248, 228, 26); pdf.rect(tX, ctx.y, contentW, bH, 'F');
+    pdf.setFillColor(window._themeAccentHex()); pdf.rect(tX, ctx.y, contentW, bH, 'F');
     pdf.setDrawColor(160); pdf.setLineWidth(0.3); pdf.rect(tX, ctx.y, contentW, bH);
     pdf.line(tX + bc1, ctx.y, tX + bc1, ctx.y + bH);
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.5); pdf.setTextColor(30);
@@ -1982,7 +1982,7 @@ async function _generateRfqPdfBase64(rfq, unit) {
       ctx.y += 9;
     });
     ctx.needSpace(9);
-    pdf.setFillColor(248, 228, 26); pdf.rect(tX, ctx.y, contentW, 9, 'F');
+    pdf.setFillColor(window._themeAccentHex()); pdf.rect(tX, ctx.y, contentW, 9, 'F');
     pdf.setDrawColor(160); pdf.setLineWidth(0.3); pdf.rect(tX, ctx.y, contentW, 9);
     pdf.line(tX + bc1, ctx.y, tX + bc1, ctx.y + 9);
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(20);
@@ -2131,7 +2131,7 @@ async function _generateWorkOrderPdfBase64() {
   pdf.text(projNum,            pageW - marginR, ctx.y + 10, { align: 'right' });
   pdf.text('Date: ' + today,   pageW - marginR, ctx.y + 15, { align: 'right' });
   ctx.y += 17;
-  pdf.setDrawColor(248, 228, 26);
+  pdf.setDrawColor(window._themeAccentHex());
   pdf.setLineWidth(1);
   pdf.line(marginL, ctx.y, pageW - marginR, ctx.y);
   pdf.setDrawColor(0);

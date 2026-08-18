@@ -2521,7 +2521,7 @@ function _doExport(format, headers, data, filename, colWidths, pdfLandscape) {
       if(cellW) cellW.forEach(function(w,i){ colStyles[i]={cellWidth:w}; });
       doc.autoTable({
         startY:27, head:[headers], body:data, theme:'striped',
-        headStyles:{fillColor:[17,17,15],textColor:[248,228,26],fontSize:8,fontStyle:'bold'},
+        headStyles:{fillColor:[17,17,15],textColor: window._themeAccentHex(),fontSize:8,fontStyle:'bold'},
         bodyStyles:{fontSize:7.5},
         alternateRowStyles:{fillColor:[248,248,246]},
         columnStyles: colStyles,

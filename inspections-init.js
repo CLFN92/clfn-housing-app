@@ -766,7 +766,7 @@ function generateInspectionPDF() {
       head: [['Section','Item','Rating','Notes']],
       body: tableRows,
       theme: 'striped',
-      headStyles: { fillColor:[17,17,15], textColor:[248,228,26], fontSize:7, fontStyle:'bold' },
+      headStyles: { fillColor:[17,17,15], textColor: window._themeAccentHex(), fontSize:7, fontStyle:'bold' },
       bodyStyles: { fontSize:7 },
       columnStyles: { 0:{cellWidth:35}, 1:{cellWidth:65}, 2:{cellWidth:22}, 3:{cellWidth:55} },
       margin: { left:14, right:14 }

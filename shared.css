@@ -375,7 +375,7 @@ body {
   transition: background 0.15s ease, box-shadow 0.15s ease;
   white-space: nowrap;
 }
-.back-btn-yellow:hover { background: var(--yellow-light); box-shadow: 0 2px 6px rgba(var(--accent-rgb),0.35); }
+.back-btn-yellow:hover { background: var(--yellow-mid); }
 .back-btn-yellow svg   { flex-shrink: 0; }
 
 /* View containers — zero out top padding so page-back-row sits flush.
