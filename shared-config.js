@@ -584,6 +584,23 @@ window.NATION_CONFIG = window.NATION_CONFIG || (function(){
   };
 })();
 
+// Apply the nation's brand accent SYNCHRONOUSLY at config load. shared-config.js
+// runs on every page and BEFORE the DOMContentLoaded boot, so this pre-paints
+// the accent (and the derived header ink) before housing-init renders the
+// header/views. Without it, each page briefly showed the CSS :root default
+// (Home Land Homes clay) palette before the nation's colour was applied at boot
+// -- the cross-page FOUC that made CLFN's pages flash the demo/default colours.
+// The full theme (saved overrides + logo) still applies at boot via _applyTheme.
+(function(){
+  try {
+    var pc = window.NATION_CONFIG && window.NATION_CONFIG.primary_color;
+    if (pc) {
+      document.documentElement.style.setProperty('--yellow', pc);
+      if (typeof window._applyBrandDark === 'function') window._applyBrandDark(pc);
+    }
+  } catch(e){}
+})();
+
 // Apply per-nation module licensing from the directory (which paid-for modules
 // this nation has). null → leave the all-licensed defaults in place.
 (function(){
