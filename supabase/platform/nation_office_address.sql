@@ -1,0 +1,12 @@
+-- ============================================================================
+-- FN Hub CONTROL PLANE -- add nations.office_address.
+-- Runs on the "fnhub-platform" project. Super-admins only. Run in the platform
+-- SQL Editor.
+--
+-- The nation's administrative / mailing address, entered on the admin panel's
+-- nation card (Agreement tab) and used on the generated subscription agreement
+-- and the recurring-invoice header. Admin-only: it is NOT exposed in the public
+-- `nations_public` view (nations resolve branding/keys from that view, not this).
+-- Idempotent -- safe to run more than once.
+-- ============================================================================
+alter table public.nations add column if not exists office_address text;

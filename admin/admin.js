@@ -752,9 +752,13 @@
         '<div class="card"><h3>Subscription agreement</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">Generate the Home Land Homes software subscription agreement for this nation as a PDF. It fills in the nation party details below and is saved to the document library.</p>'
       +   '<label>Nation legal name (party)</label><input id="cn-agr-name" value="' + esc(n.display_name || '') + '"/>'
-      +   '<label>Administrative office address</label><input id="cn-agr-addr" placeholder="123 Main St, Town, ON  A1A 1A1" value="' + esc(n.office_address || '') + '"/>'
+      +   '<label>Administrative / mailing office address</label><input id="cn-agr-addr" placeholder="123 Main St, Town, ON  A1A 1A1" value="' + esc(n.office_address || '') + '"/>'
+      +   '<div class="sub" style="margin:4px 0 0;font-size:11px;">Saved on the nation record and reused on the agreement + recurring-invoice header. Generating the agreement also saves it.</div>'
       +   '<div class="msg" id="cn-agr-msg"></div>'
-      +   '<button class="btn" type="button" data-act="gen-agreement" data-id="' + esc(n.id) + '">Generate agreement PDF</button>'
+      +   '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      +     '<button class="btn ghost" type="button" data-act="agr-save-addr" data-id="' + esc(n.id) + '">Save address</button>'
+      +     '<button class="btn" type="button" data-act="gen-agreement" data-id="' + esc(n.id) + '">Generate agreement PDF</button>'
+      +   '</div>'
       + '</div>';
 
     var pDocuments =
@@ -1276,6 +1280,28 @@
     return doc;
   }
 
+  // Persist the nation's mailing/office address to the registry row. The field
+  // lives on the Agreement tab but had no save path before -- editing it (or
+  // generating the agreement) never wrote it back, so it always reloaded blank.
+  window.saveNationAgreementAddress = async function(id){
+    var n = _nations.filter(function(x){ return String(x.id) === String(id); })[0];
+    if (!n){ setMsg('cn-agr-msg', 'Nation not loaded.'); return; }
+    var addr = ((document.getElementById('cn-agr-addr') || {}).value || '').trim();
+    setMsg('cn-agr-msg', 'Saving...', 'ok');
+    var r = await api('PATCH', '/nations?id=eq.' + encodeURIComponent(id),
+      { office_address: addr || null, updated_at: new Date().toISOString() }, 'return=minimal');
+    if (r.ok){
+      n.office_address = addr;                       // keep the in-memory row in sync
+      await audit('nation_address_saved', n.subdomain || String(id), addr || '(cleared)');
+      setMsg('cn-agr-msg', 'Mailing address saved.', 'ok');
+    } else {
+      var t = await r.text();
+      setMsg('cn-agr-msg', /office_address|column|schema cache/i.test(t)
+        ? 'Save failed: the nations.office_address column is missing. Run supabase/platform/nation_office_address.sql on the platform project, then try again.'
+        : ('Could not save the address: ' + t));
+    }
+  };
+
   window.generateNationAgreement = function(id){
     var n = _nations.filter(function(x){ return String(x.id) === String(id); })[0];
     if (!n){ setMsg('cn-agr-msg', 'Nation not loaded.'); return; }
@@ -1285,6 +1311,15 @@
     setMsg('cn-agr-msg', 'Generating...', 'ok');
     ensureJsPdf(async function(){
       try {
+        // Persist the address alongside generation so it isn't lost between
+        // sessions (best-effort; a missing column must not block the PDF).
+        if (addr !== (n.office_address || '')){
+          try {
+            var pr = await api('PATCH', '/nations?id=eq.' + encodeURIComponent(id),
+              { office_address: addr || null, updated_at: new Date().toISOString() }, 'return=minimal');
+            if (pr.ok) n.office_address = addr;
+          } catch (_e){ /* keep generating even if the save fails */ }
+        }
         var doc = buildAgreementPdf(name, addr);
         var safe = name.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
         var fname = 'Subscription-Agreement-' + safe + '.pdf';
@@ -1979,6 +2014,7 @@
       // wizard; from a Configure page it prefills that nation.
       case 'provision':     window.showProvision(id); break;
       case 'run-provision': window.runProvision(); break;
+      case 'agr-save-addr': window.saveNationAgreementAddress(id); break;
       case 'gen-agreement': window.generateNationAgreement(id); break;
       case 'doc-view':      window.viewNationDoc(el.getAttribute('data-path') || ''); break;
       case 'doc-dl':        window.downloadNationDoc(el.getAttribute('data-path') || '', el.getAttribute('data-name') || ''); break;
