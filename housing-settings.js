@@ -1270,8 +1270,12 @@ function renderThemesPanel() {
     ? defaults.dark
     : ((typeof _brandInk === 'function' ? _brandInk(_accent, 0.88) : '') || defaults.dark);
   window._themeAutoDark = _brandDark;
+  // Accent Ink = the readable-on-light version of the accent (links, active tab
+  // labels, focus). Auto-derived from the accent unless explicitly set here.
+  var _brandInkText = (typeof _accentInk === 'function' ? _accentInk(_accent) : '') || '#6B6100';
   body.innerHTML =
-      _themeFieldRow('yellow',  'Brand Accent',       'On-card buttons, links, badges, focus',        theme.yellow,  _brandAccent)
+      _themeFieldRow('yellow',  'Brand Accent',       'Accent FILLS — buttons, pills, chips, bars (not text on light)', theme.yellow,  _brandAccent)
+    + _themeFieldRow('accentInk','Accent Ink',        'Accent as TEXT on light — links, active tabs, focus (auto-darkened to stay readable)', theme.accentInk, _brandInkText)
     + _themeFieldRow('action',  'Action Button',       'Create / avatar / sign-in buttons on the dark header (white pops there)', theme.action, defaults.action || '#FFFFFF')
     + _themeFieldRow('tint',    'Tint / Highlight',    'Soft hover/highlight background (rows, chips, menus)', theme.tint, defaults.tint || '#F3E4D8')
     + _themeFieldRow('dark',    'Header / Dark Surface','Derived from the Brand Accent — override to pin a custom header colour',   theme.dark,    _brandDark)
@@ -1346,7 +1350,7 @@ function _themeOnFontChange(key) {
 }
 // Map a theme field key to the CSS custom property it drives (most are 1:1;
 // 'tint' drives --yellow-light).
-function _themeCssVar(key){ return key === 'tint' ? '--yellow-light' : '--' + key; }
+function _themeCssVar(key){ return key === 'tint' ? '--yellow-light' : (key === 'accentInk' ? '--accent-ink' : '--' + key); }
 // Sync hex input → color picker, and apply preview live
 function _themeOnPickerChange(key) {
   var picker = document.getElementById('theme_'+key);
@@ -1429,6 +1433,7 @@ function _readThemeFromForm() {
     yellow:           v('theme_yellow_hex')  || v('theme_yellow'),
     action:           v('theme_action_hex')  || v('theme_action'),
     tint:             v('theme_tint_hex')    || v('theme_tint'),
+    accentInk:        v('theme_accentInk_hex') || v('theme_accentInk'),
     dark:             darkVal,
     text:             v('theme_text_hex')    || v('theme_text'),
     bg:               v('theme_bg_hex')      || v('theme_bg'),

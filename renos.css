@@ -10,7 +10,7 @@
 /* Info boxes */
 .ibox         { border-radius: 8px; padding: 10px 14px; font-size: 13px; line-height: 1.5; border: 1px solid; }
 .ibox-yellow,
-.ibox.yellow  { background: var(--yellow-light); border-color: var(--yellow-mid); color: #7a6000; }
+.ibox.yellow  { background: var(--yellow-light); border-color: var(--yellow-mid); color: var(--accent-ink); }
 .ibox.dark    { background: var(--dark2); border-color: var(--dark3); color: #aaa; }
 .ibox.danger  { background: #fef2f2; border-color: #fecaca; color: var(--danger); }
 

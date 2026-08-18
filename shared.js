@@ -139,6 +139,40 @@ window._hexToRgbStr = function(hex){
 // brand hue while staying dark enough for white text on any brand colour.
 window._brandInk = function(hex, k){ return window._mixHex(hex, '#000000', k==null?0.88:k); };
 
+// Relative luminance (WCAG) of a hex colour, 0..1.
+window._luminance = function(hex){
+  var h = String(hex||'').trim().replace('#','');
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+  var n = parseInt(h,16);
+  var c = [(n>>16)&255, (n>>8)&255, n&255].map(function(v){ v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); });
+  return 0.2126*c[0] + 0.7152*c[1] + 0.0722*c[2];
+};
+function _contrast(l1, l2){ var a=Math.max(l1,l2), b=Math.min(l1,l2); return (a+0.05)/(b+0.05); }
+// A readable "ink" version of the accent for TEXT on a light (white) surface:
+// the accent darkened just enough to clear ~5:1 contrast, so a bright accent
+// (e.g. yellow) becomes a legible dark-accent text colour while an already-dark
+// accent (e.g. clay) is left essentially as-is. Returns null on a bad hex.
+window._accentInk = function(accent){
+  var lw = window._luminance('#ffffff');
+  var la = window._luminance(accent);
+  if (la == null) return null;
+  if (_contrast(la, lw) >= 4.8) return accent;         // already readable as text
+  var ink = accent;
+  for (var m = 0.1; m <= 0.9; m += 0.05){
+    ink = window._mixHex(accent, '#000000', m);
+    if (ink && _contrast(window._luminance(ink), lw) >= 4.8) return ink;
+  }
+  return ink;
+};
+// Text colour to place ON an accent FILL (button, pill): black on a light
+// accent, white on a dark one — whichever contrasts better.
+window._onAccent = function(accent){
+  var la = window._luminance(accent);
+  if (la == null) return '#131313';
+  return _contrast(la, window._luminance('#131313')) >= _contrast(la, window._luminance('#ffffff')) ? '#131313' : '#ffffff';
+};
+
 // Paint the dark surfaces (--dark/--dark2/--dark3) from the brand accent so the
 // header aligns to the nation's brand colour. When the ED has NOT explicitly
 // chosen a header colour (customDark falsy or the stock near-black), a deep ink
@@ -177,6 +211,15 @@ window._applyBrandDark = function(accent, customDark){
     if (tnt) root.style.setProperty('--yellow-light', tnt);
     if (rgb) root.style.setProperty('--accent-rgb', rgb);
   }
+  // Accent INK (readable accent text on light) + ON-ACCENT (text on an accent
+  // fill) are derived for EVERY accent, since they must stay legible no matter
+  // how light/dark the accent is. An explicit theme.accentInk override wins
+  // (applied in _applyTheme after this).
+  if (accent){
+    var ink = window._accentInk(accent);
+    if (ink) root.style.setProperty('--accent-ink', ink);
+    root.style.setProperty('--on-accent', window._onAccent(accent));
+  }
 };
 
 window._applyTheme = function(theme) {
@@ -206,6 +249,7 @@ window._applyTheme = function(theme) {
   // value derived from the accent. Handled here, not in the THEME_KEYS loop,
   // so leaving it unset doesn't wipe the derived/default --yellow-light.
   if (theme.tint) root.style.setProperty('--yellow-light', theme.tint);
+  if (theme.accentInk) root.style.setProperty('--accent-ink', theme.accentInk);
   // Logo src + transparency — also covers the Themes panel preview thumbnail.
   document.querySelectorAll('img.hlogo, #login-logo, #theme_logo_preview').forEach(function(img){
     if (theme.logo) img.src = theme.logo;

@@ -195,7 +195,7 @@
   padding: 4px 10px;
   cursor: pointer;
 }
-.insp-ai-btn:hover { border-color: var(--yellow); color: var(--yellow); }
+.insp-ai-btn:hover { border-color: var(--accent-ink); color: var(--accent-ink); }
 .insp-ai-btn:disabled { opacity: .6; cursor: default; }
 
 /* SOW prompt banner */
