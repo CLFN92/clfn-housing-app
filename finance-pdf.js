@@ -57,9 +57,9 @@ function previewArrangementAgreement(arr) {
     var html = '<div style="font-family:Georgia,serif;font-size:13px;line-height:1.7;color:#111;">';
 
     // Header
-    html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #F8E41A;padding-bottom:12px;margin-bottom:16px;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid '+window._themeAccentHex()+';padding-bottom:12px;margin-bottom:16px;">';
     html += '<div><div style="font-size:17px;font-weight:700;">'+(window.NATION_CONFIG && window.NATION_CONFIG.display_name || "")+'</div><div style="font-size:12px;color:#666;">Housing Finance Department</div></div>';
-    html += '<div style="text-align:right;"><div style="background:#000;color:#F8E41A;padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700;">PENDING ED APPROVAL</div>';
+    html += '<div style="text-align:right;"><div style="background:#000;color:'+window._themeAccentHex()+';padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700;">PENDING ED APPROVAL</div>';
     html += '<div style="font-size:10px;color:#999;margin-top:3px;">Ref: ' + ref + ' | ' + todayStr + '</div></div>';
     html += '</div>';
 
@@ -321,9 +321,9 @@ function _previewLoanAgreementInner(loan) {
   var html = '<div style="font-family:Georgia,serif;font-size:13px;line-height:1.7;color:#111;">';
 
   // Header
-  html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #F8E41A;padding-bottom:12px;margin-bottom:16px;">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid '+window._themeAccentHex()+';padding-bottom:12px;margin-bottom:16px;">';
   html += '<div><div style="font-size:17px;font-weight:700;">'+(window.NATION_CONFIG && window.NATION_CONFIG.display_name || "")+'</div><div style="font-size:12px;color:#666;">Housing Finance Department</div></div>';
-  html += '<div style="text-align:right;"><div style="background:#000;color:#F8E41A;padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700;">PENDING ED APPROVAL</div>';
+  html += '<div style="text-align:right;"><div style="background:#000;color:'+window._themeAccentHex()+';padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700;">PENDING ED APPROVAL</div>';
   html += '<div style="font-size:10px;color:#999;margin-top:3px;">Ref: ' + ref + ' | ' + todayStr + '</div></div>';
   html += '</div>';
 

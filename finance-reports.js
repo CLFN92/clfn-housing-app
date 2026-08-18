@@ -138,7 +138,7 @@ function printReport(type) {
     '.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}'+
     '@media print{button{display:none!important;}}'+
   '</style></head><body>');
-  w.document.write('<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #F8E41A;padding-bottom:12px;margin-bottom:16px;">'+
+  w.document.write('<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid '+window._themeAccentHex()+';padding-bottom:12px;margin-bottom:16px;">'+
     '<div><div style="font-size:18px;font-weight:bold;">'+(window.NATION_CONFIG && window.NATION_CONFIG.display_name || "")+'</div>'+
     '<div style="font-size:13px;color:#666;">Housing Finance \u2014 '+titleMap[type]+'</div></div>'+
     '<div style="text-align:right;font-size:11px;color:#888;">'+new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'})+'<br>CONFIDENTIAL</div>'+
@@ -148,7 +148,7 @@ function printReport(type) {
     '<div><div style="border-bottom:1px solid #333;height:40px;margin-bottom:6px;"></div><div style="font-size:11px;">Prepared by (Housing Manager)</div></div>'+
     '<div><div style="border-bottom:1px solid #333;height:40px;margin-bottom:6px;"></div><div style="font-size:11px;">Received by (Finance)</div></div>'+
   '</div>');
-  w.document.write('<div style="margin-top:20px;text-align:center;"><button onclick="window.print()" style="background:#111;color:#F8E41A;border:none;padding:10px 28px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;">&#128424; Print / Save PDF</button></div>');
+  w.document.write('<div style="margin-top:20px;text-align:center;"><button onclick="window.print()" style="background:#111;color:'+window._themeAccentHex()+';border:none;padding:10px 28px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;">&#128424; Print / Save PDF</button></div>');
   w.document.write('</body></html>');
   w.document.close();
   setTimeout(function(){w.print();},400);

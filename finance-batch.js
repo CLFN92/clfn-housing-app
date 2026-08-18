@@ -151,7 +151,7 @@ function printBatchStatements() {
     '@page{size:letter;margin:38mm 16mm 22mm;}',
     '@page{@bottom-left{content:"CONFIDENTIAL";font-size:9px;color:#888;}@bottom-right{content:"Page " counter(page);font-size:9px;color:#888;}}',
     'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#111;margin:0;padding:0;}',
-    '.pg-hdr{position:fixed;top:0;left:0;right:0;background:#fff;border-bottom:2px solid #F8E41A;padding:8px 16px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;}',
+    '.pg-hdr{position:fixed;top:0;left:0;right:0;background:#fff;border-bottom:2px solid '+window._themeAccentHex()+';padding:8px 16px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;}',
     '.pg-hdr-logo{height:44px;width:auto;}',
     '.pg-hdr-nation{font-size:11px;line-height:1.5;color:#666;}',
     '.pg-hdr-nation strong{font-size:11px;color:#111;display:block;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}',
@@ -161,7 +161,7 @@ function printBatchStatements() {
     '.content{padding:0;}',
     '.stmt{break-before:page;}',
     '.stmt:first-child{break-before:auto;}',
-    '.section-hdr{color:#555;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:12px 0 3px;margin:0;border-bottom:1.5px solid #F8E41A;}',
+    '.section-hdr{color:#555;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:12px 0 3px;margin:0;border-bottom:1.5px solid '+window._themeAccentHex()+';}',
     '.tenant-block{padding:12px 0 14px;}',
     '.tenant-name{font-size:15px;font-weight:700;margin:0 0 2px;}',
     '.tenant-meta{font-size:11px;color:#666;}',
@@ -253,7 +253,7 @@ function printBatchStatements() {
   }
 
   var printBtn = '<div style="margin-top:24px;text-align:center;" class="no-print">'
-    + '<button onclick="window.print()" style="background:#111;color:#F8E41A;border:none;padding:10px 28px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;">&#128424; Print / Save PDF</button>'
+    + '<button onclick="window.print()" style="background:#111;color:'+window._themeAccentHex()+';border:none;padding:10px 28px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;">&#128424; Print / Save PDF</button>'
     + '</div>';
 
   var fullHTML = '<!DOCTYPE html><html><head>'

@@ -1942,7 +1942,7 @@ function printApplicationPreview() {
   function section(title, body) {
     return '<div style="margin-bottom:12px;page-break-inside:avoid;">'
       +'<div style="font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;'
-      +'color:var(--muted);border-bottom:2.5px solid #F8E41A;padding-bottom:3px;margin-bottom:0;">'
+      +'color:var(--muted);border-bottom:2.5px solid '+window._themeAccentHex()+';padding-bottom:3px;margin-bottom:0;">'
       +title+'</div>'
       +'<table class="std-tbl">'+body+'</table>'
       +'</div>';
@@ -2072,7 +2072,7 @@ function printApplicationPreview() {
 
     // HEADER
     +'<div style="display:flex;align-items:center;justify-content:space-between;'
-    +     'border-bottom:3px solid #F8E41A;padding-bottom:10px;margin-bottom:14px;">'
+    +     'border-bottom:3px solid '+window._themeAccentHex()+';padding-bottom:10px;margin-bottom:14px;">'
     +  '<div class="flex-g10">'
     +    (logoSrc?'<img src="'+logoSrc+'" style="width:40px;height:40px;object-fit:contain;" alt="'+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+'"/>'     :'')
     +    '<div><div class="js-txt-lg">'+(window.NATION_CONFIG&&NATION_CONFIG.short||'')+' Housing Application</div>'
@@ -2169,7 +2169,7 @@ function printApplicationPreview() {
           +'<li>I agree to comply with all ' + _short + ' Housing policies, lease agreements, and community by-laws as a condition of tenancy.</li>'
           +'<li>I authorize ' + _short + ' to verify any information in this application with relevant third parties including employers, financial institutions, and utility providers.</li>');
       return '<div style="margin-top:14px;padding:10px 12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);page-break-inside:avoid;">'
-           + '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:7px;padding-bottom:4px;border-bottom:1.5px solid #F8E41A;">'
+           + '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:7px;padding-bottom:4px;border-bottom:1.5px solid '+window._themeAccentHex()+';">'
            + 'Terms &amp; Conditions — Applicant Declaration</div>'
            + introHtml
            + '<ol style="font-size:9.5px;color:var(--text);line-height:1.7;padding-left:14px;">'
@@ -2198,7 +2198,7 @@ function printApplicationPreview() {
     // SIGNATURES
     +'<div style="margin-top:14px;page-break-inside:avoid;">'
     +'<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;'
-    +     'color:var(--muted);border-bottom:2.5px solid #F8E41A;padding-bottom:3px;margin-bottom:10px;">Signatures</div>'
+    +     'color:var(--muted);border-bottom:2.5px solid '+window._themeAccentHex()+';padding-bottom:3px;margin-bottom:10px;">Signatures</div>'
     +'<div style="display:grid;grid-template-columns:'+sigCols+';gap:12px;">'
     +sigBlock('Applicant', sigName, sigDate, sigApp)
     +sigBlock('Co-Applicant', coSigName, sigDate, sigCo)
