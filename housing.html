@@ -20,7 +20,6 @@
 <script src="housing-views.js"></script>
 <script src="notifications.js"></script>
 <script src="housing-settings.js"></script>
-<script src="housing-labels.js"></script>
 <script src="housing-modals.js"></script>
 <script src="housing-modals-sow.js"></script>
 <script src="housing-tic.js"></script>
@@ -1037,7 +1036,6 @@
   <button onclick="showSettingsSection('sec_contracts');renderContractsTab();" id="stab_contracts" class="tab-btn" data-roles="ed,super_user">&#128196; Contracts</button>
   <button onclick="showSettingsSection('sec_config')" id="stab_config" class="tab-btn" data-roles="ed,super_user">&#128295; Config</button>
   <button onclick="showSettingsSection('sec_maint_qr');renderMaintenanceQrPanel();" id="stab_maint_qr" class="tab-btn" data-roles="ed,super_user">&#127991;&#65039; Maintenance QR</button>
-  <button onclick="showSettingsSection('sec_labels');renderLabelsPanel();" id="stab_labels" class="tab-btn" data-roles="ed,super_user">&#127991;&#65039; Labels</button>
   <button onclick="showSettingsSection('sec_audit');renderAuditLog();" id="stab_audit" class="tab-btn">&#128203; Audit Log</button>
   <button onclick="showSettingsSection('sec_approval_authority');renderApprovalAuthorityPanel();" id="stab_approval_authority" class="tab-btn">&#128274; Approval Authority</button>
 </div>
@@ -1340,21 +1338,6 @@
       </div>
     </div>
     <div class="sec-pad" id="maint_qr_panel_body">
-      <div class="empty-state-ctr">Loading&hellip;</div>
-    </div>
-  </div>
-</div>
-
-<!-- LABELS (printable 2x1 unit labels) -->
-<div id="sec_labels" class="settings-section">
-  <div class="card card-flush">
-    <div class="modal-hdr">
-      <div>
-        <div class="lbl-yellow">&#127991;&#65039; Unit Labels</div>
-        <div class="txt-sm-meta">Configure and print real 2&quot;&times;1&quot; unit labels with a short scan-to-report QR. Laser sheet / roll, or a metal-press PDF. Print history tracks which labels are stale.</div>
-      </div>
-    </div>
-    <div id="labels_panel_body">
       <div class="empty-state-ctr">Loading&hellip;</div>
     </div>
   </div>

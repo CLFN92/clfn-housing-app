@@ -386,7 +386,6 @@ function showSettingsSection(section) {
   if(section==='sec_contracts'      && typeof renderContractsTab==='function')  renderContractsTab();
   if(section==='sec_config'         && typeof renderConfigPanel==='function')   renderConfigPanel();
   if(section==='sec_maint_qr'       && typeof renderMaintenanceQrPanel==='function') renderMaintenanceQrPanel();
-  if(section==='sec_labels'         && typeof renderLabelsPanel==='function')     renderLabelsPanel();
   if(section==='sec_approval_authority' && typeof renderApprovalAuthorityPanel==='function') renderApprovalAuthorityPanel();
 }
 
@@ -1674,6 +1673,29 @@ function _maintQrUnits(occupiedOnly){
 function _maintQrToggleOcc(v){ window._maintQrOccupiedOnly = !!v; renderMaintenanceQrPanel(); }
 window._maintQrToggleOcc = _maintQrToggleOcc;
 
+// Short-QR URL for a unit. When the unit has a short slug (after the
+// 20260818_qr_short_slug migration + assign), encode <host>/u/<slug> (no
+// scheme -> short -> larger, more scannable QR modules); otherwise fall back to
+// the existing long report.html?u=&t= link so labels still work pre-migration.
+function _maintQrUrl(u){
+  var base = (typeof nationPortalBase === 'function') ? nationPortalBase() : location.origin;
+  if(u && u.label_slug != null){
+    return String(base).replace(/^https?:\/\//,'').replace(/\/+$/,'') + '/u/' + u.label_slug;
+  }
+  return String(base).replace(/\/+$/,'') + '/report.html?u=' + encodeURIComponent(u.id) + '&t=' + encodeURIComponent(u.qrToken);
+}
+// Best-effort: give every unit a short slug in one RPC call, then read them back
+// onto the in-memory units. Silently no-ops if the migration hasn't been run.
+async function _maintEnsureSlugs(units){
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/rpc/assign_all_label_slugs', { method:'POST', headers: Object.assign({}, HOUSING_HEADERS, { 'Content-Type':'application/json' }), body: '{}' });
+    var r = await fetch(SUPABASE_URL + '/rest/v1/housing_units?select=id,label_slug', { headers: HOUSING_HEADERS });
+    if(!r.ok) return;
+    var map = {}; (await r.json()).forEach(function(row){ map[row.id] = row.label_slug; });
+    units.forEach(function(u){ if(map[u.id] != null) u.label_slug = map[u.id]; });
+  } catch(e){ /* pre-migration: fall back to the long URL */ }
+}
+
 async function renderMaintenanceQrPanel(){
   var body = document.getElementById('maint_qr_panel_body');
   if(!body) return;
@@ -1715,12 +1737,15 @@ async function renderMaintenanceQrPanel(){
   }
 
   var nation = (window.NATION_CONFIG && (NATION_CONFIG.display_name || NATION_CONFIG.short)) || 'Housing';
-  var _qrBase = (typeof nationPortalBase === 'function') ? nationPortalBase() : location.origin;
+  await _maintEnsureSlugs(units);   // best-effort short-QR slugs (no-op until the migration runs)
+  var anyShort = units.some(function(u){ return u.label_slug != null; });
   window._maintQrList = units.map(function(u){
     var addr = ((u.num||'') + ' ' + (u.street||'')).trim() || ('Unit ' + u.id);
-    return { url: _qrBase + '/report.html?u=' + encodeURIComponent(u.id) + '&t=' + encodeURIComponent(u.qrToken),
-             addr: addr, nation: nation };
+    return { url: _maintQrUrl(u), addr: addr, nation: nation };
   });
+  if(!anyShort){
+    controls += '<div class="txt-sm-meta" style="margin:-6px 0 14px;color:var(--warn-amber-text);">Tip: run the <code>20260818_qr_short_slug</code> migration to shrink these QR codes (shorter link) so they scan more reliably on printed labels.</div>';
+  }
 
   var grid = window._maintQrList.map(function(L, i){
     return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;background:var(--surface);">'
@@ -1759,24 +1784,33 @@ function printAllMaintenanceQr(){
   if(!w){ if(typeof showToast==='function') showToast('Allow pop-ups to print the labels'); return; }
   var cells = labels.map(function(L){
     return '<div class="label">'
-      + '<div class="hdr">' + _qresc(L.nation||'Housing') + '</div>'
-      + '<div class="sub">Maintenance Request</div>'
-      + (L.src ? '<img src="' + L.src + '"/>' : '<div style="height:150px;"></div>')
-      + '<div class="addr">' + _qresc(L.addr||'') + '</div>'
-      + '<div class="hint">Scan with your phone camera to report a maintenance issue for this unit.</div>'
+      + (L.src ? '<img class="qr" src="' + L.src + '"/>' : '<div class="qr"></div>')
+      + '<div class="body">'
+      +   '<div class="addr">' + _qresc(L.addr||'') + '</div>'
+      +   '<div class="cta">SCAN TO REPORT A MAINTENANCE ISSUE</div>'
+      +   '<div class="nation">' + _qresc(L.nation||'Housing') + '</div>'
+      + '</div>'
       + '</div>';
   }).join('');
-  w.document.write('<html><head><title>Maintenance QR Labels</title><style>'
-    + '*{box-sizing:border-box;} body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:14px;}'
-    + '.sheet{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}'
-    + '.label{border:1px dashed #bbb;border-radius:8px;padding:12px 10px;text-align:center;page-break-inside:avoid;break-inside:avoid;}'
-    + '.hdr{font-size:13px;font-weight:800;} .sub{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:#555;margin-bottom:6px;}'
-    + '.label img{width:150px;height:150px;} .addr{font-size:14px;font-weight:800;margin-top:6px;word-break:break-word;}'
-    + '.hint{font-size:9px;color:#555;margin-top:4px;line-height:1.35;}'
-    + '@media print{ .label{border-color:#ddd;} @page{margin:12mm;} }'
-    + '</style></head><body><div class="sheet">' + cells + '</div></body></html>');
+  // Real 2" x 1" labels laid out on a Letter sheet. Print at 100% scale (no
+  // "fit to page") so a label measures exactly 2" x 1". Defaults match common
+  // 2x1 stock (Avery 5163 / 10-up); tune margins/pitch to your supplier.
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Maintenance QR Labels</title><style>'
+    + '*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+    + 'html,body{margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;}'
+    + '@page{size:letter;margin:0.5in 0.19in;}'
+    + '.sheet{display:grid;grid-template-columns:repeat(2,2in);column-gap:0.13in;row-gap:0;justify-content:center;}'
+    + '.label{width:2in;height:1in;overflow:hidden;display:flex;align-items:center;gap:0.06in;padding:0.06in;page-break-inside:avoid;break-inside:avoid;}'
+    + '.qr{width:0.82in;height:0.82in;flex:0 0 auto;}'
+    + '.body{flex:1 1 auto;min-width:0;}'
+    + '.addr{font-size:12.5pt;font-weight:800;line-height:1.02;color:#111;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}'
+    + '.cta{font-size:5.6pt;font-weight:700;letter-spacing:.2px;color:#555;margin-top:0.03in;line-height:1.1;}'
+    + '.nation{font-size:6.5pt;color:#888;margin-top:0.02in;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}'
+    + '@media screen{body{background:#eee;padding:16px;}.sheet{background:#fff;}.label{outline:1px dashed #ccc;}}'
+    + '</style></head><body><div class="sheet">' + cells + '</div>'
+    + '<scr'+'ipt>setTimeout(function(){window.focus();window.print();},300);</scr'+'ipt>'
+    + '</body></html>');
   w.document.close();
-  setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} }, 500);
 }
 window.printAllMaintenanceQr = printAllMaintenanceQr;
 

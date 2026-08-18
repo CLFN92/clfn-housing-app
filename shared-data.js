@@ -858,6 +858,7 @@ async function sbLoadUnits() {
         assignedTo:       row.assigned_to,
         assignedName:     row.assigned_name,
         assignedDate:     row.assigned_date,
+        label_slug:       (row.label_slug != null ? row.label_slug : (row.data && row.data.label_slug)) || null,
         constructionCost: (row.construction_cost != null) ? Number(row.construction_cost) : null,
         latitude:  row.latitude  != null ? Number(row.latitude)
                  : (row.data && row.data.latitude  != null ? Number(row.data.latitude)  : null),
