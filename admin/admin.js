@@ -656,12 +656,14 @@
       +   '<button class="btn sm" type="button" data-act="note-add" data-sub="' + esc(n.subdomain) + '">Add note</button>'
       + '</div>';
 
-    var pInvoices =
+    var pBilling =
         '<div class="card"><h3>Recurring billing</h3>'
-      +   '<p class="sub" style="margin:2px 0 8px;">Automated subscription invoicing. On each due date the scheduler generates an invoice from this schedule, advances the next date, and (when Auto-send is on) emails the nation. Set up the daily scheduler once &mdash; see <code>docs/RECURRING-INVOICING.md</code>.</p>'
+      +   '<p class="sub" style="margin:2px 0 8px;">Automated subscription invoicing. On each due date the scheduler generates an invoice from this schedule, advances the next date, and (when Auto-send is on) emails the nation. Generated invoices land in the Invoices tab and count toward Outstanding. Set up the daily scheduler once &mdash; see <code>docs/RECURRING-INVOICING.md</code>.</p>'
       +   '<div id="cn-billing"><div class="empty">Loading schedule...</div></div>'
-      + '</div>'
-      + '<div class="card"><h3>Invoices</h3>'
+      + '</div>';
+
+    var pInvoices =
+        '<div class="card"><h3>Invoices</h3>'
       +   '<p class="sub" style="margin:2px 0 8px;">Subscription, setup and add-on billing for this nation. Creating an invoice generates a PDF and files it in Documents.</p>'
       +   '<div id="cn-invoices"><div class="empty">Loading invoices...</div></div>'
       +   '<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px;">'
@@ -724,11 +726,11 @@
       + '</div>'
       + '<div class="nic-tabs">'
       +   tab('overview', 'Overview', true) + tab('supabase', 'Supabase') + tab('agreement', 'Agreement')
-      +   tab('invoices', 'Invoices') + tab('notes', 'Notes') + tab('documents', 'Documents')
+      +   tab('billing', 'Billing') + tab('invoices', 'Invoices') + tab('notes', 'Notes') + tab('documents', 'Documents')
       + '</div>'
       + '<div class="nic-body">'
       +   panel('overview', pOverview, true) + panel('supabase', pSupabase)
-      +   panel('agreement', pAgreement) + panel('invoices', pInvoices)
+      +   panel('agreement', pAgreement) + panel('billing', pBilling) + panel('invoices', pInvoices)
       +   panel('notes', pNotes) + panel('documents', pDocuments)
       + '</div>'
       + '<div class="nic-footer">'
@@ -1735,6 +1737,31 @@
   // ---- Recurring billing schedule --------------------------------------------
   var BILL_CADENCE = [['monthly', 'Monthly'], ['annual', 'Annual']];
   window._nicBilling = null;
+  // The schedule's line item is chosen from the fee schedule (same catalog as
+  // manual invoices). Picking a fee fills the amount; a previously-saved custom
+  // description is preserved as its own selected option.
+  function _billFeeSelectHtml(selDesc){
+    var groups = [], found = false;
+    FEE_SCHEDULE.forEach(function(it){
+      var gi = null; for (var k = 0; k < groups.length; k++){ if (groups[k].g === it.g){ gi = groups[k]; break; } }
+      if (!gi){ gi = { g: it.g, items: [] }; groups.push(gi); }
+      gi.items.push(it);
+    });
+    var opts = groups.map(function(g){
+      return '<optgroup label="' + esc(g.g) + '">' + g.items.map(function(it){
+        var sel = (it.d === selDesc); if (sel) found = true;
+        var price = it.custom ? 'enter amount' : (it.hours ? _money(it.p) + '/hr' : _money(it.p));
+        return '<option value="' + esc(it.d) + '" data-amt="' + (it.custom ? '' : it.p) + '"' + (sel ? ' selected' : '') + '>' + esc(it.d) + '  —  ' + price + '</option>';
+      }).join('') + '</optgroup>';
+    }).join('');
+    var custom = (selDesc && !found) ? '<option value="' + esc(selDesc) + '" data-amt="" selected>' + esc(selDesc) + ' (custom)</option>' : '';
+    return '<select id="cn-bill-desc">' + custom + opts + '</select>';
+  }
+  window._billApplyFee = function(sel){
+    var opt = sel && sel.options[sel.selectedIndex];
+    var amt = opt && opt.getAttribute('data-amt');
+    if (amt){ var a = document.getElementById('cn-bill-amount'); if (a) a.value = amt; }
+  };
   // Advance a YYYY-MM-DD by the cadence, holding the anchor day-of-month.
   function _advanceBillDate(day, cadence, anchor){
     var d = new Date(day + 'T00:00:00Z');
@@ -1764,7 +1791,7 @@
       +   '<div><label>Cadence</label><select id="cn-bill-cadence">' + cadOpts + '</select></div>'
       +   '<div><label>Next invoice date</label><input id="cn-bill-next" type="date" value="' + esc(b.next_run_date || '') + '"/></div>'
       + '</div>'
-      + '<label>Line description</label><input id="cn-bill-desc" value="' + esc(b.description || '') + '" placeholder="Subscription - Mid-size (101-300 homes), monthly"/>'
+      + '<label>Line item (fee schedule)</label>' + _billFeeSelectHtml(b.description)
       + '<div style="' + g2 + '">'
       +   '<div><label>Amount per period (CAD)</label><input id="cn-bill-amount" type="number" step="0.01" value="' + esc(b.unit_amount === '' ? '' : b.unit_amount) + '"/></div>'
       +   '<div><label>Tax rate (%)</label><input id="cn-bill-tax" type="number" step="0.01" value="' + esc(b.tax_rate || 0) + '"/></div>'
@@ -1784,6 +1811,9 @@
       +   (row ? '<button class="btn ghost" type="button" data-act="bill-toggle" data-sub="' + esc(sub) + '">' + (row.active ? 'Pause' : 'Resume') + '</button>' : '')
       +   (row ? '<button class="btn ghost" type="button" data-act="bill-run" data-sub="' + esc(sub) + '">Generate now</button>' : '')
       + '</div>';
+    // Wire the fee-schedule select programmatically (admin CSP blocks inline handlers).
+    var _feeSel = document.getElementById('cn-bill-desc');
+    if (_feeSel) _feeSel.onchange = function(){ window._billApplyFee(_feeSel); };
   }
   function _readBilling(){
     function v(id){ var el = document.getElementById(id); return el ? (el.value || '').trim() : ''; }
