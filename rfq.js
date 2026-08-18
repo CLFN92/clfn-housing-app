@@ -351,7 +351,7 @@ function renderRfqList() {
     var amt   = rfq.award_amount ? '$' + Number(rfq.award_amount).toLocaleString('en-CA',{minimumFractionDigits:2}) : '--';
     var stCls = 'rfq-status-' + (rfq.status || 'draft');
     return '<tr style="border-bottom:1px solid var(--border);" class="clickable" onclick="showRfqForm(\'' + escapeHtml(rfq.id) + '\',null,null)">'
-      + '<td style="padding:11px 14px;font-weight:600;font-size:13px;">' + escapeHtml(rfq.id) + '</td>'
+      + '<td style="padding:11px 14px;font-weight:600;font-size:13px;white-space:nowrap;">' + escapeHtml(rfq.id) + '</td>'
       + '<td style="padding:11px 14px;font-size:12px;">' + escapeHtml(r.addr) + (rfq.sow_project_number ? '<div class="txt-xs-muted">' + escapeHtml(rfq.sow_project_number) + '</div>' : '') + '</td>'
       + '<td style="padding:11px 14px;"><span class="rfq-status-pill ' + stCls + '">' + escapeHtml(rfq.status||'draft') + '</span></td>'
       + '<td style="padding:11px 14px;font-size:12px;color:var(--muted);">' + iss + '</td>'
