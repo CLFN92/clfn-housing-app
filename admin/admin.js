@@ -309,7 +309,7 @@
       + '</div>'
       + '<div class="nic-body">'
       +   panel('nations',   nationsCard(nations, usageBySub), true)
-      +   panel('provision', provisionCard() + addNationStepsCard(), false)
+      +   panel('provision', provisionCard() + addNationStepsCard() + emailSetupCard(), false)
       +   panel('addnation', addNationCard(), false)
       +   panel('admins',    adminsCard(admins, meEmail), false)
       + '</div>'
@@ -426,12 +426,7 @@
       ['Set the project\'s Edge Function secrets', 'manual',
         'On the new project, add the non-email function secrets (e.g. <code>ANTHROPIC_API_KEY</code> for the AI assistant): ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions') + '. Email secrets are the next step. Also run the <code>hs_data_usage</code> migration there so this panel\'s usage column fills in.'],
       ['Set up email notifications (Microsoft 365 / Azure or Resend)', 'manual',
-        'Transactional email goes through the <code>send-notification</code> function; each nation picks a provider with the <code>EMAIL_PROVIDER</code> secret, then adds the matching secrets in ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions') + '.'
-        + '<div style="margin-top:6px;padding-left:10px;border-left:3px solid var(--hair);">'
-        +   '<div style="margin-bottom:5px;"><b>Microsoft 365 / Azure</b> (<code>EMAIL_PROVIDER=graph</code>) &mdash; register an Entra app with the <b>Mail.Send</b> application permission in the ' + extLink(LINKS.azure, 'Azure portal') + ', then set <code>GRAPH_TENANT_ID</code>, <code>GRAPH_CLIENT_ID</code>, <code>GRAPH_CLIENT_SECRET</code>, and <code>GRAPH_FROM_USER</code> (a licensed/shared mailbox to send from).</div>'
-        +   '<div><b>Resend</b> (<code>EMAIL_PROVIDER=resend</code>) &mdash; verify the sending domain and create an API key at ' + extLink(LINKS.resend, 'Resend') + ', then set <code>RESEND_API_KEY</code>, <code>EMAIL_FROM</code>, and <code>EMAIL_FROM_NAME</code>. (No M365 needed &mdash; good for nations without Microsoft.)</div>'
-        + '</div>'
-        + 'Optional for either provider: <code>EMAIL_BRAND</code> (footer wordmark) and <code>EMAIL_REPLY_TO</code>. Defaults to <code>graph</code> if unset.'],
+        'Transactional email goes through the <code>send-notification</code> function; each nation picks a provider with the <code>EMAIL_PROVIDER</code> secret, then adds the matching secrets in ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions') + '. <b>See the &ldquo;Email delivery setup&rdquo; card below</b> for the full Microsoft 365 (Graph) and Resend walkthroughs, secret-by-secret.'],
       ['Deploy the Edge Functions to the project', 'manual',
         'The ' + extLink(LINKS.gh, 'GitHub Actions') + ' deploy targets one project via the <code>SUPABASE_PROJECT_ID</code> repo secret. For a new nation, deploy to its ref: <code>supabase functions deploy --project-ref &lt;ref&gt;</code> (' + extLink(LINKS.supaCli, 'docs') + '), or point that secret at it and push. Control-plane-only functions (<code>provision-nation</code>, <code>report-nation-usage</code>) are excluded from that workflow by design.'],
       ['Point the subdomain at the app (Cloudflare)', 'manual',
@@ -454,6 +449,73 @@
       + '<p class="sub" style="margin:2px 0 6px;"><span class="pill" style="font-size:9px;background:#dcfce7;color:#166534;">Automated</span> steps the platform already handles; <span class="pill" style="font-size:9px;background:#f4f4f0;color:#696960;">Manual</span> steps you do in Supabase, GitHub, or Cloudflare. Links open each destination.</p>'
       + '<ol style="list-style:none;margin:4px 0 0;padding:0;">' + items + '</ol>'
       + '</div>';
+  }
+
+  // Detailed, provider-by-provider email setup reference (Microsoft 365 / Graph
+  // and Resend). Static guide -- links open each destination. The secret names
+  // mirror supabase/functions/send-notification/index.ts exactly.
+  function emailSetupCard(){
+    function numList(items){
+      return '<ol style="margin:8px 0 0;padding-left:20px;font-size:12px;color:var(--muted);line-height:1.6;">'
+        + items.map(function(t){ return '<li style="margin-bottom:5px;">' + t + '</li>'; }).join('')
+        + '</ol>';
+    }
+    // One provider block: heading + EMAIL_PROVIDER value + numbered steps + secrets line.
+    function providerBlock(title, providerVal, blurb, steps, secretsLabel, secrets){
+      return '<div style="border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin-top:12px;">'
+        + '<div style="font-weight:800;font-size:13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + title
+        +   ' <code style="background:#f4f4f0;padding:1px 6px;border-radius:5px;">EMAIL_PROVIDER=' + providerVal + '</code></div>'
+        + (blurb ? '<div style="font-size:12px;color:var(--muted);margin-top:4px;">' + blurb + '</div>' : '')
+        + numList(steps)
+        + '<div style="font-size:12px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><b>' + secretsLabel + ':</b> ' + secrets + '</div>'
+        + '</div>';
+    }
+    var graph = providerBlock(
+      'Microsoft 365 (Graph)', 'graph',
+      'For a nation that has Microsoft 365. Mail sends <b>from a real mailbox</b>, so it authenticates as internal M365 and is not phishing-flagged &mdash; best deliverability.',
+      [
+        'In the ' + extLink(LINKS.azure, 'Azure / Entra portal') + ' &rarr; <b>App registrations</b> &rarr; <b>New registration</b>. Name it e.g. &ldquo;&lt;Nation&gt; Housing &mdash; Notifications&rdquo;, single tenant. Create it.',
+        '<b>API permissions</b> &rarr; <b>Add a permission</b> &rarr; <b>Microsoft Graph</b> &rarr; <b>Application permissions</b> &rarr; tick <code>Mail.Send</code> &rarr; Add. Then click <b>Grant admin consent</b> (a Global Admin must do this).',
+        '<b>Certificates &amp; secrets</b> &rarr; <b>New client secret</b> &rarr; copy the secret <b>Value</b> immediately (not the Secret ID &mdash; the value is shown only once).',
+        '<b>Overview</b> &rarr; copy the <b>Directory (tenant) ID</b> and <b>Application (client) ID</b>.',
+        'Choose a licensed or shared mailbox to send <b>from</b> (e.g. <code>housing@yournation.ca</code>).',
+        '<b>Hardening (recommended):</b> <code>Mail.Send</code> is tenant-wide by default &mdash; the app could send as any mailbox. Scope it to just the housing mailbox with an <b>Application Access Policy</b> (<code>New-ApplicationAccessPolicy</code> in Exchange Online PowerShell).'
+      ],
+      'Secrets to set',
+      secretList(['GRAPH_TENANT_ID', 'GRAPH_CLIENT_ID', 'GRAPH_CLIENT_SECRET', 'GRAPH_FROM_USER (the send-from mailbox)'])
+    );
+    var resend = providerBlock(
+      'Resend', 'resend',
+      'For a nation <b>without</b> Microsoft 365. Sends from your own verified domain over an email service.',
+      [
+        'At ' + extLink(LINKS.resend, 'Resend &rarr; Domains') + ' &rarr; <b>Add Domain</b>, enter the sending domain (e.g. <code>mail.yournation.ca</code>).',
+        'Add the DNS records Resend shows (<b>SPF</b>, <b>DKIM</b>, and the return-path record) at your DNS host, then wait for the domain to read <b>Verified</b>. (Unverified domains cannot send.)',
+        '<b>API Keys</b> &rarr; <b>Create API Key</b> with sending access &rarr; copy it.',
+        'Pick a FROM address <b>on the verified domain</b> (e.g. <code>housing@mail.yournation.ca</code>) and the nation\'s display name.'
+      ],
+      'Secrets to set',
+      secretList(['RESEND_API_KEY', 'EMAIL_FROM (a from-address on the verified domain)', 'EMAIL_FROM_NAME (the nation\'s display name)'])
+    );
+    var shared = '<div style="margin-top:14px;padding:11px 13px;background:var(--accent-light);border:1px solid var(--hair);border-radius:9px;font-size:12px;line-height:1.6;">'
+      + '<div style="font-weight:800;margin-bottom:4px;">For either provider</div>'
+      + '<div>&bull; Set <code>EMAIL_REPLY_TO</code> (reply-to) and <code>EMAIL_BRAND</code> (footer wordmark) <b>per nation</b> &mdash; don\'t leave them blank, or the function falls back to its built-in defaults. The nation app also injects these from its own config on each send.</div>'
+      + '<div>&bull; <code>EMAIL_PROVIDER</code> defaults to <code>graph</code> if unset.</div>'
+      + '<div>&bull; <b>SendGrid</b> is also supported (<code>EMAIL_PROVIDER=sendgrid</code>) with <code>SENDGRID_API_KEY</code> + <code>EMAIL_FROM</code> + <code>EMAIL_FROM_NAME</code>.</div>'
+      + '<div>&bull; After adding or changing any secret, <b>redeploy <code>send-notification</code></b> to that project so it reads the new values.</div>'
+      + '<div>&bull; Verify it: the nation app\'s <b>Settings &rarr; Admin &rarr; Config &rarr; Email pipeline</b> shows the resolved provider + from-address (read-only) for that nation.</div>'
+      + '</div>';
+    return '<div class="card"><h3>Email delivery setup &mdash; Microsoft 365 (Graph) &amp; Resend</h3>'
+      + '<p class="sub" style="margin:2px 0 4px;">Each nation sends its own workflow email through the <code>send-notification</code> Edge Function on <b>that nation\'s Supabase project</b>. Pick <b>one</b> provider per nation via <code>EMAIL_PROVIDER</code>, then add its secrets in ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions &rarr; Secrets') + ' (never in code).</p>'
+      + graph + resend + shared
+      + '</div>';
+  }
+  // Render a set of secret names as inline code chips.
+  function secretList(names){
+    return names.map(function(n){
+      var parts = n.split(' ('); var code = parts[0];
+      var tail = parts.length > 1 ? ' <span style="color:var(--muted);">(' + parts[1] : '';
+      return '<code>' + code + '</code>' + tail;
+    }).join(', &nbsp;');
   }
 
   function addNationCard(){
