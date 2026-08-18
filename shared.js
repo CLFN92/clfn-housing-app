@@ -269,6 +269,13 @@ window._applyTheme = function(theme) {
   // so leaving it unset doesn't wipe the derived/default --yellow-light.
   if (theme.tint) root.style.setProperty('--yellow-light', theme.tint);
   if (theme.accentInk) root.style.setProperty('--accent-ink', theme.accentInk);
+  if (theme.accentHover)  root.style.setProperty('--yellow-mid', theme.accentHover);
+  if (theme.borderStrong) root.style.setProperty('--border-strong', theme.borderStrong);
+  if (theme.inputBorder)  root.style.setProperty('--input-border', theme.inputBorder);
+  if (theme.success) root.style.setProperty('--success', theme.success);
+  if (theme.danger)  root.style.setProperty('--danger', theme.danger);
+  if (theme.info)    root.style.setProperty('--info-blue', theme.info);
+  if (theme.warning){ root.style.setProperty('--warn-amber', theme.warning); root.style.setProperty('--warn-amber-text', theme.warning); }
   // Logo src + transparency — also covers the Themes panel preview thumbnail.
   document.querySelectorAll('img.hlogo, #login-logo, #theme_logo_preview').forEach(function(img){
     if (theme.logo) img.src = theme.logo;

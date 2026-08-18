@@ -1273,9 +1273,13 @@ function renderThemesPanel() {
   // Accent Ink = the readable-on-light version of the accent (links, active tab
   // labels, focus). Auto-derived from the accent unless explicitly set here.
   var _brandInkText = (typeof _accentInk === 'function' ? _accentInk(_accent) : '') || '#6B6100';
+  // Live resolved value of a CSS var, so the extended-token pickers show what's
+  // actually applied now (some are derived from the accent).
+  function _liveVar(name, fb){ try { var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return v || fb; } catch(e){ return fb; } }
   body.innerHTML =
       _themeFieldRow('yellow',  'Brand Accent',       'Accent FILLS — buttons, pills, chips, bars (not text on light)', theme.yellow,  _brandAccent)
     + _themeFieldRow('accentInk','Accent Ink',        'Accent as TEXT on light — links, active tabs, focus (auto-darkened to stay readable)', theme.accentInk, _brandInkText)
+    + _themeFieldRow('accentHover','Accent Hover',    'Hover / pressed state for accent fills', theme.accentHover, _liveVar('--yellow-mid', '#E0D800'))
     + _themeFieldRow('action',  'Action Button',       'Create / avatar / sign-in buttons on the dark header (white pops there)', theme.action, defaults.action || '#FFFFFF')
     + _themeFieldRow('tint',    'Tint / Highlight',    'Soft hover/highlight background (rows, chips, menus)', theme.tint, defaults.tint || '#F3E4D8')
     + _themeFieldRow('dark',    'Header / Dark Surface','Derived from the Brand Accent — override to pin a custom header colour',   theme.dark,    _brandDark)
@@ -1283,7 +1287,13 @@ function renderThemesPanel() {
     + _themeFieldRow('bg',      'Page Background',      'Main background behind all cards',            theme.bg,      defaults.bg)
     + _themeFieldRow('surface', 'Card Surface',         'Card and panel background color',             theme.surface, defaults.surface)
     + _themeFieldRow('border',  'Borders',              'Lines separating sections and cards',         theme.border,  defaults.border)
+    + _themeFieldRow('borderStrong','Strong Border',    'Table rules and dividers that must be seen',  theme.borderStrong, _liveVar('--border-strong', '#C9C8BE'))
+    + _themeFieldRow('inputBorder','Input Border',      'Text inputs, selects, checkboxes (WCAG contrast)', theme.inputBorder, _liveVar('--input-border', '#767670'))
     + _themeFieldRow('muted',   'Muted Text',           'Secondary labels and helper text',            theme.muted,   defaults.muted)
+    + _themeFieldRow('success', 'Success',              'Approved / paid / complete status',           theme.success, _liveVar('--success', '#1E6E3C'))
+    + _themeFieldRow('warning', 'Warning',              'Overdue / pending / needs review status',     theme.warning, _liveVar('--warn-amber', '#8A5A00'))
+    + _themeFieldRow('danger',  'Danger',               'Errors / rejected / delete actions',          theme.danger, _liveVar('--danger', '#B3261E'))
+    + _themeFieldRow('info',    'Info',                 'Neutral notices and help callouts',           theme.info, _liveVar('--info-blue', '#1C5B8C'))
     + _themeRangeRow('radius',  'Border Radius',        'Roundness of cards, buttons, and inputs (0–24 px)', 0, 24, theme.radius, defaults.radius)
     + _themeSelectRow('sans',  'Body Font',            'Used for all body copy, labels, and UI text',
         [{value:'DM Sans',label:'DM Sans (default)'},{value:'Inter',label:'Inter'},
@@ -1350,7 +1360,12 @@ function _themeOnFontChange(key) {
 }
 // Map a theme field key to the CSS custom property it drives (most are 1:1;
 // 'tint' drives --yellow-light).
-function _themeCssVar(key){ return key === 'tint' ? '--yellow-light' : (key === 'accentInk' ? '--accent-ink' : '--' + key); }
+function _themeCssVar(key){
+  var M = { tint:'--yellow-light', accentInk:'--accent-ink', accentHover:'--yellow-mid',
+            borderStrong:'--border-strong', inputBorder:'--input-border',
+            warning:'--warn-amber', info:'--info-blue' };
+  return M[key] || ('--' + key);   // success/danger map 1:1 to --success/--danger
+}
 // Sync hex input → color picker, and apply preview live
 function _themeOnPickerChange(key) {
   var picker = document.getElementById('theme_'+key);
@@ -1434,6 +1449,13 @@ function _readThemeFromForm() {
     action:           v('theme_action_hex')  || v('theme_action'),
     tint:             v('theme_tint_hex')    || v('theme_tint'),
     accentInk:        v('theme_accentInk_hex') || v('theme_accentInk'),
+    accentHover:      v('theme_accentHover_hex') || v('theme_accentHover'),
+    borderStrong:     v('theme_borderStrong_hex') || v('theme_borderStrong'),
+    inputBorder:      v('theme_inputBorder_hex') || v('theme_inputBorder'),
+    success:          v('theme_success_hex') || v('theme_success'),
+    warning:          v('theme_warning_hex') || v('theme_warning'),
+    danger:           v('theme_danger_hex') || v('theme_danger'),
+    info:             v('theme_info_hex')   || v('theme_info'),
     dark:             darkVal,
     text:             v('theme_text_hex')    || v('theme_text'),
     bg:               v('theme_bg_hex')      || v('theme_bg'),
