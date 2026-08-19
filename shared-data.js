@@ -9299,39 +9299,51 @@ async function awardRfq(rfqId, contractorId, amount, notes, opts) {
     var units = (typeof housingUnits !== 'undefined' ? housingUnits : []);
     var unit  = units.find(function(u){ return u && u.id === rfq.sow_unit_id; }) || {};
     var addr  = ((unit.num || '') + ' ' + (unit.street || '')).trim() || rfq.sow_unit_id;
-    if (!opts.skipNotify && ct && ct.email && typeof window.sendNotification === 'function') {
-      window.sendNotification({
-        to: ct.email, to_name: ct.name || '',
-        subject: rfq.id + ' -- Contract Award Notification',
-        bodyHtml: '<p>Dear ' + escapeHtml(ct.name || 'Contractor') + ',</p><p>We are pleased to inform you that your bid for <strong>' + escapeHtml(rfq.id) + '</strong> (' + escapeHtml(addr) + ') has been accepted. The awarded amount is <strong>$' + (parseFloat(amount)||0).toFixed(2) + ' CDN</strong>.</p>' + (notes ? '<p>Notes: ' + escapeHtml(notes) + '</p>' : '') + '<p>The Housing Department will contact you shortly to arrange commencement. Thank you for your submission.</p>',
-        event: 'rfq_award', entity_type: 'rfq', entity_id: rfqId
-      }).catch(function(e){ console.warn('[rfq] award notify failed:', e); });
+    // Winner notification — composed from the editable `rfq_award` template
+    // (Settings -> Notifications) via notifyRfqAward. Inline send kept only as a
+    // defensive fallback for pages without notifications.js loaded.
+    if (!opts.skipNotify && ct && ct.email) {
+      if (typeof notifyRfqAward === 'function') {
+        notifyRfqAward(rfq, ct, amount, notes, addr).catch(function(e){ console.warn('[rfq] award notify failed:', e); });
+      } else if (typeof window.sendNotification === 'function') {
+        window.sendNotification({
+          to: ct.email, to_name: ct.name || '',
+          subject: rfq.id + ' -- Contract Award Notification',
+          bodyHtml: '<p>Dear ' + escapeHtml(ct.name || 'Contractor') + ',</p><p>We are pleased to inform you that your bid for <strong>' + escapeHtml(rfq.id) + '</strong> (' + escapeHtml(addr) + ') has been accepted. The awarded amount is <strong>$' + (parseFloat(amount)||0).toFixed(2) + ' CDN</strong>.</p>' + (notes ? '<p>Notes: ' + escapeHtml(notes) + '</p>' : '') + '<p>The Housing Department will contact you shortly to arrange commencement. Thank you for your submission.</p>',
+          event: 'rfq_award', entity_type: 'rfq', entity_id: rfqId
+        }).catch(function(e){ console.warn('[rfq] award notify failed:', e); });
+      }
     }
-    // Regret notices to the OTHER bidders (recorded a bid, not the winner).
-    // Serialized (sequential await) in a detached task so we don't block the
-    // award and don't trip the Graph ~4-concurrent sendMail throttle.
+    // Regret notices to the OTHER bidders (recorded a bid, not the winner) —
+    // composed from the editable `rfq_regret` template via notifyRfqRegret,
+    // which serializes the sends. Inline fallback as above.
     var _bids = (rfq.data && rfq.data.bids) || {};
     var _loserIds = Object.keys(_bids).filter(function(bid){ return bid !== contractorId; });
-    if (!opts.skipNotify && _loserIds.length && typeof window.sendNotification === 'function') {
-      (async function(){
-        var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || 'Housing';
-        for (var i = 0; i < _loserIds.length; i++) {
-          var loser = (window._contractors || []).find(function(c){ return c && c.id === _loserIds[i]; });
-          if (!loser || !loser.email) continue;
-          try {
-            await window.sendNotification({
-              to: loser.email, to_name: loser.name || '',
-              subject: rfq.id + ' -- Request for Quotes Outcome',
-              bodyHtml: '<p>Dear ' + escapeHtml(loser.name || 'Contractor') + ',</p>'
-                + '<p>Thank you for submitting a quote for <strong>' + escapeHtml(rfq.id) + '</strong>'
-                + (addr ? ' (' + escapeHtml(addr) + ')' : '') + '. After review, the contract has been awarded to '
-                + 'another bidder on this occasion. We appreciate your interest and encourage you to quote on future opportunities.</p>'
-                + '<p>Sincerely,<br/>' + escapeHtml(natShort) + ' Housing</p>',
-              event: 'rfq_regret', entity_type: 'rfq', entity_id: rfqId
-            });
-          } catch(e){ console.warn('[rfq] regret notify failed:', e); }
-        }
-      })();
+    if (!opts.skipNotify && _loserIds.length) {
+      var _losers = _loserIds.map(function(id){ return (window._contractors || []).find(function(c){ return c && c.id === id; }); }).filter(Boolean);
+      if (typeof notifyRfqRegret === 'function') {
+        notifyRfqRegret(rfq, _losers, addr).catch(function(e){ console.warn('[rfq] regret notify failed:', e); });
+      } else if (typeof window.sendNotification === 'function') {
+        (async function(){
+          var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || 'Housing';
+          for (var i = 0; i < _losers.length; i++) {
+            var loser = _losers[i];
+            if (!loser || !loser.email) continue;
+            try {
+              await window.sendNotification({
+                to: loser.email, to_name: loser.name || '',
+                subject: rfq.id + ' -- Request for Quotes Outcome',
+                bodyHtml: '<p>Dear ' + escapeHtml(loser.name || 'Contractor') + ',</p>'
+                  + '<p>Thank you for submitting a quote for <strong>' + escapeHtml(rfq.id) + '</strong>'
+                  + (addr ? ' (' + escapeHtml(addr) + ')' : '') + '. After review, the contract has been awarded to '
+                  + 'another bidder on this occasion. We appreciate your interest and encourage you to quote on future opportunities.</p>'
+                  + '<p>Sincerely,<br/>' + escapeHtml(natShort) + ' Housing</p>',
+                event: 'rfq_regret', entity_type: 'rfq', entity_id: rfqId
+              });
+            } catch(e){ console.warn('[rfq] regret notify failed:', e); }
+          }
+        })();
+      }
     }
     if (typeof showToast === 'function') showToast('RFQ ' + rfqId + ' awarded' + (opts.skipNotify ? ' (no notifications) — Maintenance Request approved' : ' — Maintenance Request approved'));
     return true;

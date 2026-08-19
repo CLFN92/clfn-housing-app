@@ -188,6 +188,40 @@ var EMAIL_EVENT_REGISTRY = [
     }
   },
   {
+    key:                   'rfq_award',
+    label:                 'RFQ Award Notification to Winner',
+    description:           'Sent to the winning contractor when an RFQ is awarded (full-tender / Recipients-tab Award or Generate & Award). Skipped for the "no notifications" manual award, or if the winner has no email on file.',
+    recipientType:         'contractor',
+    defaultRecipientRoles: [],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['contractorName','rfqNumber','projectAddress','awardAmount','awardNotes','nationShort'],
+    defaults: {
+      subject:  '{rfqNumber} — Contract Award Notification',
+      bodyHtml: '<p>Dear {contractorName},</p>'
+              + '<p>We are pleased to inform you that your bid for <strong>{rfqNumber}</strong> ({projectAddress}) has been accepted. The awarded amount is <strong>{awardAmount}</strong>.</p>'
+              + '{awardNotes}'
+              + '<p>The Housing Department will contact you shortly to arrange commencement. Thank you for your submission.</p>'
+              + '<p>Sincerely,<br/>{nationShort} Housing</p>'
+    }
+  },
+  {
+    key:                   'rfq_regret',
+    label:                 'RFQ Regret Notice to Other Bidders',
+    description:           'Sent to each OTHER contractor who submitted a bid (not the winner) when an RFQ is awarded. Serialized to respect the email throttle. Skipped for the "no notifications" manual award.',
+    recipientType:         'contractor',
+    defaultRecipientRoles: [],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['contractorName','rfqNumber','projectAddress','nationShort'],
+    defaults: {
+      subject:  '{rfqNumber} — Request for Quotes Outcome',
+      bodyHtml: '<p>Dear {contractorName},</p>'
+              + '<p>Thank you for submitting a quote for <strong>{rfqNumber}</strong> ({projectAddress}). After review, the contract has been awarded to another bidder on this occasion. We appreciate your interest and encourage you to quote on future opportunities.</p>'
+              + '<p>Sincerely,<br/>{nationShort} Housing</p>'
+    }
+  },
+  {
     key:                   'rfq_cancelled',
     label:                 'RFQ Cancellation Notice to Contractor',
     description:           'Sent to the awarded contractor when an awarded RFQ is cancelled (only when the canceller ticks the inline checkbox on the Cancel dialog and the contractor has an email on file).',
@@ -2533,6 +2567,68 @@ async function notifyWorkOrderToContractor(sow, unit, contractor, recipientEmail
 // caller (cancelRfq) already gated on the user's "email" checkbox + contractor
 // email. `addr` is the resolved unit/project address for the {projectAddress}
 // token.
+// RFQ award notification to the winning contractor. Uses the editable
+// `rfq_award` template. Fire-and-forget; caller gates on skipNotify + email.
+async function notifyRfqAward(rfq, contractor, amount, notes, addr) {
+  if (!rfq || !contractor) return;
+  var eventKey = 'rfq_award';
+  var seen = {}, emails = [];
+  function _addEmail(a){ if(!a) return; var c=String(a).trim().toLowerCase(); if(!c||seen[c]) return; if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c)) return; seen[c]=true; emails.push(c); }
+  if (contractor.email) _addEmail(contractor.email);
+  var extraRoles = _emailEventRecipientRoles(eventKey).concat(_emailEventCcRoles(eventKey));
+  if (extraRoles.length) {
+    var extra = await _resolveActiveStaffForRoles(extraRoles);
+    extra.forEach(function(r){ _addEmail(r.email); });
+  }
+  if (!emails.length) { console.log('[notify] rfq_award skipped — no winner email or CC recipients for ' + (rfq.id || '—')); return; }
+  var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || 'Housing';
+  var amtNum = parseFloat(amount) || 0;
+  var esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s){ return String(s == null ? '' : s); };
+  var rendered = _renderEmailTemplate(eventKey, {
+    contractorName: contractor.name || 'Contractor',
+    rfqNumber:      rfq.id || '',
+    projectAddress: addr || rfq.sow_unit_id || '',
+    awardAmount:    '$' + amtNum.toFixed(2) + ' CDN',
+    awardNotes:     notes ? ('<p>Notes: ' + esc(notes) + '</p>') : '',
+    nationShort:    natShort
+  });
+  if (!rendered) return;
+  await _sendSerially(emails.map(function(e){ return { email: e }; }), function(rcp){
+    return { to: rcp.email, to_name: '', subject: rendered.subject, bodyHtml: rendered.bodyHtml, event: eventKey, entity_type: 'rfq', entity_id: rfq.id || '—' };
+  }, eventKey);
+}
+window.notifyRfqAward = notifyRfqAward;
+
+// RFQ regret notices to the OTHER bidders (recorded a bid, not the winner).
+// `losers` is an array of contractor records. Uses the editable `rfq_regret`
+// template, rendered per-recipient (each gets their own {contractorName}), and
+// serialized to respect the Graph ~4-concurrent sendMail throttle.
+async function notifyRfqRegret(rfq, losers, addr) {
+  if (!rfq || !Array.isArray(losers) || !losers.length) return;
+  var eventKey = 'rfq_regret';
+  var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || 'Housing';
+  var seen = {}, recipients = [];
+  losers.forEach(function(ct){
+    if (!ct || !ct.email) return;
+    var c = String(ct.email).trim().toLowerCase();
+    if (!c || seen[c] || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c)) return;
+    seen[c] = true;
+    recipients.push({ email: c, name: ct.name || 'Contractor' });
+  });
+  if (!recipients.length) return;
+  await _sendSerially(recipients, function(rcp){
+    var rendered = _renderEmailTemplate(eventKey, {
+      contractorName: rcp.name || 'Contractor',
+      rfqNumber:      rfq.id || '',
+      projectAddress: addr || rfq.sow_unit_id || '',
+      nationShort:    natShort
+    });
+    if (!rendered) return null;
+    return { to: rcp.email, to_name: '', subject: rendered.subject, bodyHtml: rendered.bodyHtml, event: eventKey, entity_type: 'rfq', entity_id: rfq.id || '—' };
+  }, eventKey);
+}
+window.notifyRfqRegret = notifyRfqRegret;
+
 async function notifyRfqCancelled(rfq, contractor, addr) {
   if (!rfq || !contractor) return;
   var eventKey = 'rfq_cancelled';
@@ -3152,6 +3248,26 @@ function _ntfMockTokensForEvent(eventKey) {
       trade:          'General Contractor',
       classification: 'internal_indigenous'
     });
+  }
+  if (eventKey === 'rfq_award') {
+    return {
+      nationShort:    _emailNationShort(),
+      appLink:        _emailAppLink(),
+      contractorName: 'Sample Contractor Ltd.',
+      rfqNumber:      'RFQ-2026-0007',
+      projectAddress: '123 Test Street',
+      awardAmount:    '$15,000.00 CDN',
+      awardNotes:     '<p>Notes: Award subject to a signed contract.</p>'
+    };
+  }
+  if (eventKey === 'rfq_regret') {
+    return {
+      nationShort:    _emailNationShort(),
+      appLink:        _emailAppLink(),
+      contractorName: 'Sample Contractor Ltd.',
+      rfqNumber:      'RFQ-2026-0007',
+      projectAddress: '123 Test Street'
+    };
   }
   if (eventKey === 'rfq_cancelled') {
     return {
