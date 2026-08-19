@@ -15,6 +15,7 @@ var _rfqMilestoneRows    = [];
 var _rfqMaterialsRows    = [];
 var _rfqExclusionsRows   = [];
 var _rfqClfnSuppliedRows = [];
+var _rfqSubcontractorRows = [];  // {contractorId, name, trade, scope} — sub-trades from the contractor registry
 var _rfqDocFiles         = [];   // cached list from audit log
 var _rfqAttachedPaths    = [];   // paths selected to attach to email
 var _rfqContractEmailed  = false; // true once the generated contract has been emailed (locks attach-to-email)
@@ -573,6 +574,7 @@ function showRfqForm(rfqId, unitId, sowPn) {
   _rfqMaterialsRows        = [];
   _rfqExclusionsRows       = [];
   _rfqClfnSuppliedRows     = [];
+  _rfqSubcontractorRows    = [];
   _rfqContractingTabInited = false;
   _rfqDocFiles         = [];
   _rfqAttachedPaths    = [];
@@ -708,6 +710,7 @@ function _populateFormFields(rfq) {
   _rfqMaterialsRows    = d.materials_rows      || [];
   _rfqExclusionsRows   = d.exclusions_rows     || [];
   _rfqClfnSuppliedRows = d.clfn_supplied_rows  || [];
+  _rfqSubcontractorRows = d.subcontractor_rows || [];
   _rfqMilestoneRows    = (d.milestones || []).filter(function(m){ return m && (m.name || m.gross); });
   setMoney('rfq_holdback_release', d.holdback_release);  // recomputed by _rfqRecalcPrices on tab open
   set('rfq_holdback_days', (d.holdback_days != null && d.holdback_days !== '') ? d.holdback_days : '60');  // default 60-day lien period
@@ -813,6 +816,7 @@ function _loadRfqSowContext() {
   renderMaterialsRows();
   renderExclusionsRows();
   renderClfnSuppliedRows();
+  renderSubcontractorRows();
   renderMilestoneRows();
 }
 
@@ -836,6 +840,7 @@ function switchRfqTab(tab) {
     renderMaterialsRows();
     renderExclusionsRows();
     renderClfnSuppliedRows();
+    renderSubcontractorRows();
     _rfqSeedDefaultMilestonesIfEmpty();   // tiered default payment schedule when none set yet
     renderMilestoneRows();
     _rfqRecalcPrices();   // compute subtotal/total/holdback + refresh milestones from the loaded prices
@@ -1147,6 +1152,7 @@ function _buildRfqPayload() {
   var materialsRows    = _readMaterialsRows();
   var exclusionsRows   = _readExclusionsRows();
   var clfnSuppliedRows = _readClfnSuppliedRows();
+  var subcontractorRows = _readSubcontractorRows();
 
   return {
     id:                      id,
@@ -1198,6 +1204,7 @@ function _buildRfqPayload() {
       materials_rows:     materialsRows,
       exclusions_rows:    exclusionsRows,
       clfn_supplied_rows: clfnSuppliedRows,
+      subcontractor_rows: subcontractorRows,
       // Price breakdown — stored as clean numbers (formatting is display-only).
       price_materials:      _rfqParseNum(fv('rfq_price_materials')),
       price_labour:         _rfqParseNum(fv('rfq_price_labour')),
@@ -1749,6 +1756,81 @@ function _readClfnSuppliedRows() {
     i++;
   }
   _rfqClfnSuppliedRows = rows; return rows;
+}
+
+// ── Subcontractors dynamic rows ───────────────────────────────────────────
+// Sub-trades the awarded contractor will engage, picked from the contractor
+// registry. Stored as {contractorId, name, trade, scope}; name/trade are
+// snapshotted from the registry at pick time so the contract prints even if the
+// registry later changes. Rendered onto the contract with a mandatory
+// WSIB + $2M liability clause (see _rfqBuildContractPdf).
+function _rfqSubOptions(selectedId) {
+  var opts = '<option value="">— Select from contractor registry —</option>';
+  (window._contractors || []).slice()
+    .sort(function(a,b){ return ((a&&a.name)||'').localeCompare((b&&b.name)||''); })
+    .forEach(function(c){
+      if (!c || !c.name) return;
+      var trade = c.trade ? ' (' + c.trade + ')' : '';
+      opts += '<option value="' + escapeHtml(c.id) + '"' + (c.id === selectedId ? ' selected' : '') + '>' + escapeHtml(c.name + trade) + '</option>';
+    });
+  return opts;
+}
+function renderSubcontractorRows() {
+  var el = document.getElementById('rfq_subcontractor_rows');
+  if (!el) return;
+  if (!_rfqSubcontractorRows.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:8px 0;font-style:italic;">No subcontractors — click "+ Add Subcontractor" or leave empty if the contractor is self-performing.</div>';
+    return;
+  }
+  var today = new Date().toISOString().slice(0,10);
+  el.innerHTML = '<div style="overflow-x:auto;"><table class="std-table" style="width:100%;table-layout:fixed;">'
+    + '<thead><tr><th style="width:34%;">Subcontractor</th><th style="width:44%;">Scope of Work</th><th style="width:14%;">Compliance</th><th style="width:8%;"></th></tr></thead><tbody>'
+    + _rfqSubcontractorRows.map(function(r, i) {
+        // Live compliance flag from the registry (WSIB / insurance expiry).
+        var ct = (window._contractors || []).find(function(c){ return c && c.id === r.contractorId; });
+        var flag = '<span style="font-size:10px;color:var(--muted);">—</span>';
+        if (ct) {
+          var issues = (typeof _rfqContractorEligibility === 'function') ? _rfqContractorEligibility(ct) : [];
+          flag = issues.length
+            ? '<span title="' + escapeHtml(issues.join('; ')) + '" style="font-size:10px;font-weight:700;color:var(--danger);">&#9888; Check</span>'
+            : '<span style="font-size:10px;font-weight:700;color:var(--success);">&#10003; OK</span>';
+        }
+        return '<tr>'
+          + '<td style="padding:4px 6px;"><select id="rfq_sub_ct_'+i+'" onchange="_rfqOnSubContractorChange('+i+')" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;">'+_rfqSubOptions(r.contractorId||'')+'</select></td>'
+          + '<td style="padding:4px 6px;"><input type="text" id="rfq_sub_scope_'+i+'" value="'+escapeHtml(r.scope||'')+'" class="stg-lookup-input" style="padding:4px 6px;font-size:12px;" placeholder="e.g. Electrical rough-in and finish"/></td>'
+          + '<td style="padding:4px 6px;text-align:center;">'+flag+'</td>'
+          + '<td style="padding:4px 6px;text-align:center;"><button type="button" onclick="removeSubcontractorRow('+i+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;" title="Remove">&times;</button></td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+  if (window._rfqReadOnly && typeof _rfqApplyReadOnly === 'function') _rfqApplyReadOnly();
+}
+function addSubcontractorRow() { _readSubcontractorRows(); _rfqSubcontractorRows.push({contractorId:'',name:'',trade:'',scope:''}); renderSubcontractorRows(); }
+function removeSubcontractorRow(i) { _readSubcontractorRows(); _rfqSubcontractorRows.splice(i,1); renderSubcontractorRows(); }
+// Selecting a contractor snapshots their name + trade onto the row.
+function _rfqOnSubContractorChange(i) {
+  _readSubcontractorRows();
+  var row = _rfqSubcontractorRows[i]; if (!row) return;
+  var ct = (window._contractors || []).find(function(c){ return c && c.id === row.contractorId; });
+  row.name  = ct ? (ct.name || '')  : '';
+  row.trade = ct ? (ct.trade || '') : '';
+  renderSubcontractorRows();
+}
+function _readSubcontractorRows() {
+  var rows = []; var i = 0;
+  while (document.getElementById('rfq_sub_ct_'+i)) {
+    var ctId = (document.getElementById('rfq_sub_ct_'+i)||{}).value||'';
+    var prev = _rfqSubcontractorRows[i] || {};
+    var ct = (window._contractors || []).find(function(c){ return c && c.id === ctId; });
+    rows.push({
+      contractorId: ctId,
+      name:  ct ? (ct.name || '')  : (prev.name  || ''),
+      trade: ct ? (ct.trade || '') : (prev.trade || ''),
+      scope: (document.getElementById('rfq_sub_scope_'+i)||{}).value||''
+    });
+    i++;
+  }
+  _rfqSubcontractorRows = rows; return rows;
 }
 
 // ── Milestone dynamic rows ────────────────────────────────────────────────
@@ -2453,6 +2535,38 @@ async function _rfqBuildContractPdf(tokens, d, savedBody, numFmt) {
         + '. The holdback shall be released ' + _hbDays + ' days after the date of Substantial Completion'
         + (_hbDate ? ' (on or about ' + _hbDate + ')' : '')
         + ', following expiry of the applicable lien period under the Construction Act and provided no liens have been preserved.', 9);
+
+      // ── Subcontractors + mandatory WSIB / liability clause ──
+      (function _subcontractors(){
+        var subs = (d.subcontractor_rows || []).filter(function(s){ return s && (s.name || s.contractorId || s.scope); });
+        h2Heading('Subcontractors');
+        if (subs.length) {
+          var cW = ctx.contentW, mL = ctx.marginL;
+          var cols = [
+            { w:0.32, label:'Subcontractor' },
+            { w:0.24, label:'Trade' },
+            { w:0.44, label:'Scope of Work' }
+          ];
+          var xs = [], xacc = mL; cols.forEach(function(c){ xs.push(xacc); xacc += c.w * cW; });
+          ctx.needSpace(8);
+          pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(90);
+          cols.forEach(function(c,i){ pdf.text(c.label, xs[i], ctx.y + 3); });
+          ctx.y += 5; pdf.setDrawColor(210); pdf.setLineWidth(0.2); pdf.line(mL, ctx.y, mL + cW, ctx.y); ctx.y += 1;
+          pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(30);
+          subs.forEach(function(s){
+            var vals = [ s.name || '—', s.trade || '', s.scope || '' ];
+            var wrapped = cols.map(function(c,i){ return pdf.splitTextToSize(String(vals[i]||''), c.w*cW - 2); });
+            var lines = wrapped.reduce(function(m,w){ return Math.max(m, w.length); }, 1);
+            ctx.needSpace(lines * 4.6 + 2);
+            cols.forEach(function(c,i){ pdf.text(wrapped[i], xs[i], ctx.y + 3); });
+            ctx.y += lines * 4.6 + 1.5;
+          });
+          pdf.setTextColor(0); ctx.gap(2);
+        } else {
+          ctx.paragraph('The Contractor has not identified any subcontractors for this project as of the date of this Agreement. Any subcontractor subsequently engaged is subject to the requirements below.', 9);
+        }
+        ctx.paragraph('Subcontractor / Sub-Trade Requirements: Prior to commencing any work, every subcontractor or sub-trade engaged by the Contractor for this project must provide the Owner with (a) a valid WSIB Clearance Certificate confirming coverage in good standing, and (b) proof of Commercial General Liability insurance with a minimum limit of $2,000,000 per occurrence. The Contractor is fully responsible for the work, acts, and omissions of all subcontractors, and shall ensure each subcontractor complies with this Agreement, the Construction Act, and the Occupational Health and Safety Act (OHSA).', 9);
+      })();
 
       // ── Contractor Acknowledgement (initialled) ──
       h2Heading('Contractor Acknowledgement');
