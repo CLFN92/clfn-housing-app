@@ -283,7 +283,11 @@ function sowStatusBadge(sow, opts) {
   // {approval_status: status}.
   var st = (sow.approval_status == null) ? '' : sow.approval_status;
   var badge, key;
-  if (v.archived && sow.archived) {
+  if (sow.cancelled) {
+    // A cancelled request is terminal and overrides every other state.
+    badge = {bg:'var(--danger-bg)', c:'var(--danger)', label:'Cancelled'};
+    key = 'cancelled';
+  } else if (v.archived && sow.archived) {
     badge = v.archived;
     key = 'archived';
   } else if (sow.system_approved && (v.systemEvenIfCompleted || st !== 'completed')) {

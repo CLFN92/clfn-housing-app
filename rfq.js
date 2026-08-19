@@ -241,7 +241,7 @@ function _rfqRenderCard(r) {
   var actions = [];
   if (st === 'draft')  actions.push({ text: 'Edit',  ghost: true, onclick: "event.stopPropagation();showRfqForm('" + id + "',null,null)" });
   if (st === 'issued') actions.push({ text: 'Award', ghost: true, onclick: "event.stopPropagation();showAwardModal('" + id + "')" });
-  if (st !== 'cancelled' && st !== 'awarded') actions.push({ text: 'Cancel', ghost: true, onclick: "event.stopPropagation();cancelRfq('" + id + "')" });
+  if (st !== 'cancelled') actions.push({ text: 'Cancel', ghost: true, onclick: "event.stopPropagation();cancelRfq('" + id + "')" });
   return _rfqCardTile({
     title: id,
     pill:  { text: st },
@@ -363,7 +363,7 @@ function renderRfqList() {
       +   '<div style="display:inline-flex;gap:4px;align-items:center;">'
       +     (rfq.status === 'draft'  ? '<button class="btn btn-ghost btn-sm" onclick="showRfqForm(\'' + escapeHtml(rfq.id) + '\',null,null)">Edit</button>' : '')
       +     (rfq.status === 'issued' ? '<button class="btn btn-ghost btn-sm" onclick="showAwardModal(\'' + escapeHtml(rfq.id) + '\')">Award</button>' : '')
-      +     (rfq.status !== 'cancelled' && rfq.status !== 'awarded' ? '<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="cancelRfq(\'' + escapeHtml(rfq.id) + '\')">Cancel</button>' : '')
+      +     (rfq.status !== 'cancelled' ? '<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="cancelRfq(\'' + escapeHtml(rfq.id) + '\')">Cancel</button>' : '')
       +   '</div>'
       + '</td>'
       + '</tr>';
@@ -598,6 +598,11 @@ function showRfqForm(rfqId, unitId, sowPn) {
       var _isEd = (_rr === 'ed' || _rr === 'super_user');
       _unlockBtn.style.display = (_isEd && rfq.status === 'issued') ? '' : 'none';
     }
+    // Cancel is available on any non-cancelled saved RFQ (incl. awarded — a
+    // contracted job that falls through) for editors; awarded cancels prompt to
+    // notify the contractor. See cancelRfq.
+    var _cancelBtn = document.getElementById('rfqCancelBtn');
+    if (_cancelBtn) _cancelBtn.style.display = (rfq.status !== 'cancelled' && (typeof _rfqCanEdit !== 'function' || _rfqCanEdit())) ? '' : 'none';
   } else {
     // New RFQ
     _rfqSowUnitId = unitId || null;
@@ -620,6 +625,8 @@ function showRfqForm(rfqId, unitId, sowPn) {
     document.getElementById('rfqIssueBtn').disabled = false;
     var _unlockBtnNew = document.getElementById('rfqUnlockBtn');
     if (_unlockBtnNew) _unlockBtnNew.style.display = 'none';
+    var _cancelBtnNew = document.getElementById('rfqCancelBtn');
+    if (_cancelBtnNew) _cancelBtnNew.style.display = 'none';
     // Contract defaults
     var cnEl = document.getElementById('rfq_contract_number');
     if (cnEl) cnEl.value = generateContractNumber();
@@ -1017,6 +1024,12 @@ function _rfqSetBid(id, field, val) {
 function _rfqSetBidAmount(id, raw) {
   var clean = String(raw || '').replace(/[$,\s]/g, '');
   _rfqSetBid(id, 'amount', clean === '' ? '' : (parseFloat(clean) || 0));
+  // If this contractor is already the awarded one, flow the edited bid straight
+  // through to the Scope Award card's Award Amount.
+  var awardedSel = document.getElementById('rfq_awarded_to');
+  if (awardedSel && awardedSel.value === id && typeof _rfqSyncAwardAmountFromBid === 'function') {
+    _rfqSyncAwardAmountFromBid();
+  }
 }
 
 // Drag-and-drop onto a bid row's file dropzone.
@@ -1366,8 +1379,28 @@ async function unlockRfq() {
 // ── Cancel RFQ ────────────────────────────────────────────────────────────────
 async function cancelRfq(rfqId) {
   if (!_rfqCanEdit()) { showToast('View only — only the Housing Manager or ED can edit this RFQ'); return; }
-  var confirmed = await showConfirm({ title: 'Cancel ' + rfqId + '?', message: 'This marks the RFQ as cancelled. It cannot be re-issued.', confirmText: 'Cancel RFQ', danger: true });
-  if (!confirmed) return;
+  var rfq = (window._rfqCache || {})[rfqId] || {};
+  var wasAwarded = rfq.status === 'awarded' && !!rfq.awarded_contractor_id;
+  var awardedCt  = wasAwarded ? (window._contractors || []).find(function(c){ return c && c.id === rfq.awarded_contractor_id; }) : null;
+  var canNotify  = wasAwarded && awardedCt && awardedCt.email;
+
+  // When cancelling an AWARDED RFQ, offer to email a cancellation notice to the
+  // awarded contractor (default on). Plain confirm otherwise.
+  var conf;
+  if (canNotify) {
+    conf = await showConfirm({
+      title:       'Cancel ' + rfqId + '?',
+      message:     'This RFQ was awarded to <strong>' + escapeHtml(awardedCt.name || 'the contractor') + '</strong>. Cancelling marks it cancelled (it cannot be re-issued).',
+      confirmText: 'Cancel RFQ', danger: true,
+      checkbox:    { label: 'Email a cancellation notice to ' + (awardedCt.name || 'the awarded contractor'), defaultChecked: true }
+    });
+  } else {
+    conf = await showConfirm({ title: 'Cancel ' + rfqId + '?', message: 'This marks the RFQ as cancelled. It cannot be re-issued.', confirmText: 'Cancel RFQ', danger: true });
+  }
+  var ok = (typeof conf === 'object' && conf !== null) ? !!conf.ok : !!conf;
+  if (!ok) return;
+  var doNotify = canNotify && (typeof conf === 'object' && conf !== null ? !!conf.checked : false);
+
   try {
     var r = await fetch(SUPABASE_URL + '/rest/v1/housing_rfq?id=eq.' + encodeURIComponent(rfqId), {
       method: 'PATCH', headers: Object.assign({}, HOUSING_HEADERS, {'Prefer':'return=minimal'}),
@@ -1375,8 +1408,27 @@ async function cancelRfq(rfqId) {
     });
     if (!r.ok) throw new Error(await r.text());
     if (window._rfqCache && window._rfqCache[rfqId]) window._rfqCache[rfqId].status = 'cancelled';
-    if (typeof auditEntry === 'function') auditEntry('RFQ:' + rfqId, 'cancelled', 'RFQ cancelled', window.currentRole || 'staff');
-    showToast(rfqId + ' cancelled');
+    if (typeof auditEntry === 'function') auditEntry('RFQ:' + rfqId, 'cancelled', 'RFQ cancelled' + (wasAwarded ? ' (was awarded to ' + ((awardedCt && awardedCt.name) || rfq.awarded_contractor_id) + ')' : '') + (doNotify ? ' — contractor notified' : ''), window.currentRole || 'staff');
+
+    if (doNotify && typeof window.sendNotification === 'function') {
+      var units = (typeof housingUnits !== 'undefined' ? housingUnits : []);
+      var unit  = (units || []).find(function(u){ return u && u.id === rfq.sow_unit_id; }) || {};
+      var addr  = ((unit.num || '') + ' ' + (unit.street || '')).trim() || rfq.sow_unit_id || '';
+      var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || 'Housing';
+      window.sendNotification({
+        to: awardedCt.email, to_name: awardedCt.name || '',
+        subject: rfqId + ' — Contract Cancellation Notice',
+        bodyHtml: '<p>Dear ' + escapeHtml(awardedCt.name || 'Contractor') + ',</p>'
+          + '<p>We are writing to inform you that <strong>' + escapeHtml(rfqId) + '</strong>'
+          + (addr ? ' (' + escapeHtml(addr) + ')' : '') + ', previously awarded to you, has been <strong>cancelled</strong>.</p>'
+          + '<p>Please do not proceed with any further work under this award. If work was already underway, contact the Housing Department to arrange settlement for work completed to date.</p>'
+          + '<p>We apologize for any inconvenience and thank you for your understanding.</p>'
+          + '<p>Sincerely,<br/>' + escapeHtml(natShort) + ' Housing</p>',
+        event: 'rfq_cancelled', entity_type: 'rfq', entity_id: rfqId
+      }).catch(function(e){ console.warn('[rfq] cancel notify failed:', e); });
+    }
+
+    showToast(rfqId + ' cancelled' + (doNotify ? ' — contractor notified' : ''));
     renderRfqList();
   } catch(e) { console.error('[rfq] cancel failed:', e); showToast('Cancel failed'); }
 }
@@ -1978,7 +2030,25 @@ function _rfqAutoFillContractor() {
     setIfBlank('rfq_ct_signatory_title', ct.sigCt && ct.sigCt.title ? ct.sigCt.title : '');
     setIfBlank('rfq_site_lead_phone',    ct.phone || '');
   }
+  // Flow the awarded contractor's recorded bid through to the award amount so a
+  // bid entered on the Recipients tab populates the award (and the contract).
+  _rfqSyncAwardAmountFromBid();
   _rfqRenderAwardedContractorInfo();
+}
+
+// Set the Scope Award card's Award Amount from the awarded contractor's recorded
+// bid (Recipients tab). Called when the awarded contractor is (re)selected and
+// whenever that contractor's bid amount is edited, so the quoted amount flows
+// through the RFQ -> award -> contract without re-keying.
+function _rfqSyncAwardAmountFromBid() {
+  var sel  = document.getElementById('rfq_awarded_to');
+  var ctId = sel && sel.value;
+  if (!ctId) return;
+  var bid = (_rfqBids && _rfqBids[ctId]) || {};
+  var amt = parseFloat(bid.amount);
+  if (isNaN(amt) || amt <= 0) return;
+  var amtEl = document.getElementById('rfq_award_amount');
+  if (amtEl) amtEl.value = (typeof _rfqFmtMoney === 'function') ? _rfqFmtMoney(amt) : String(amt);
 }
 
 // (Removed _rfqSeedPriceFromAward — it auto-filled the "Other" price line with

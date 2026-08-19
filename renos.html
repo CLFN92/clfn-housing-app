@@ -1353,6 +1353,8 @@ function _getRaApprovalStatusForSow(u, sow) {
   // and falls back to the old unit-level sig / progress pattern if approval_status is missing.
   var hmLimit = _getHmLimit();
   if(!sow) return {key:'no_sow', label:'No Request Filed', bg:'#f4f4f0', c:'#888'};
+  // A cancelled request is terminal and overrides every other state.
+  if(sow.cancelled) return {key:'cancelled', label:'Cancelled', bg:'var(--danger-bg)', c:'var(--danger)'};
   // A "completed" SOW is terminal — the renovations are done for that project.
   if(sow.approval_status === 'completed') return {key:'complete', label:'Complete', bg:'#f0fdf4', c:'#15803d'};
   var cost = (typeof sow.amount === 'number' ? sow.amount : parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))) || 0;
@@ -1432,7 +1434,7 @@ function renderRenoApprovalsView() {
   // Hide dismissed 'No Request Filed' placeholders AND archived requests unless
   // the user has toggled "Show dismissed / archived".
   if(!_raShowDismissed()){
-    filtered = filtered.filter(function(r){ return !r.dismissed && !r.archived; });
+    filtered = filtered.filter(function(r){ return !r.dismissed && !r.archived && !(r.sow && r.sow.cancelled); });
   }
 
   // Default sort — priority desc, then address, then project #. Stays in

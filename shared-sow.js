@@ -150,7 +150,7 @@ function unarchiveSow(unitId, projectNumber){
 function hasActiveSows(unitId){
   var list = getUnitSowList(unitId);
   return list.some(function(s){
-    return !s.archived && s.approval_status !== 'completed';
+    return !s.archived && !s.cancelled && s.approval_status !== 'completed';
   });
 }
 

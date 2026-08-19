@@ -528,6 +528,7 @@ function _buildSowModalHTML() {
         '<button id="sow_approve_btn" type="button" onclick="sowApproveInline()" class="btn btn-ghost" style="display:none;">✓ Approve</button>' +
         '<button id="sow_mark_complete_btn" type="button" onclick="markSowComplete()" class="btn btn-ghost" style="display:none;">✓ Mark Complete</button>' +
         '<button id="sow_reopen_btn" type="button" onclick="reopenSow()" class="btn btn-ghost" style="display:none;">↺ Reopen</button>' +
+        '<button id="sow_cancel_btn" type="button" onclick="cancelSow()" class="btn btn-ghost" style="display:none;color:var(--danger);border-color:var(--danger-border);">✖ Cancel Request</button>' +
         '<button id="sow_archive_btn" type="button" onclick="archiveCurrentSow()" class="btn btn-ghost" style="display:none;">🗄 Archive</button>' +
         // Start ANOTHER request for the same unit (e.g. a second work order under
         // a different contractor). Shown when a saved request is open — you do
@@ -853,7 +854,7 @@ function openSowModal(unitId, projectNumber) {
   // window._sowForceNew (set by the Reno Questionnaire or SOW picker) forces a
   // brand-new SOW even when the unit already has requests. One-shot — cleared on read.
   var _forceNew = !!window._sowForceNew; window._sowForceNew = false;
-  var activeList = existingList.filter(function(s){ return !s.archived && s.approval_status !== 'completed'; });
+  var activeList = existingList.filter(function(s){ return !s.archived && !s.cancelled && s.approval_status !== 'completed'; });
   if(!projectNumber && !_forceNew){
     if(activeList.length > 1){
       // Multiple active requests — show a picker so the user can choose which to open.
@@ -1476,8 +1477,12 @@ function _applySowModalLock(sow){
   var modal = document.getElementById('sowModal');
   if(!modal) return;
   var completed = isSowCompleted(sow);
+  var cancelled = !!(sow && sow.cancelled);
   var canEdit   = canEditSow(sow);
-  var readOnly  = completed && !canEdit;
+  var _canReopen = (typeof canReopenSow === 'function') && canReopenSow();
+  // A cancelled request is frozen for everyone except the ED tier (who can
+  // reopen it). Completed keeps its existing lock rule.
+  var readOnly  = (completed && !canEdit) || (cancelled && !_canReopen);
 
   // Banner
   var banner = document.getElementById('sow_readonly_banner');
@@ -1538,22 +1543,34 @@ function _applySowModalLock(sow){
     var _needsEd = (typeof sowRequiresEdApproval === 'function') && sowRequiresEdApproval(sow);
     var _showEd  = _canEd && _hasPn && _hasItems && !completed &&
                    ((_sowSt === 'hm_approved' && _needsEd) || _sowSt === '' || _sowSt === 'draft' || _sowSt === 'signed' || _sowSt === 'submitted');
-    var _showAp  = _showHm || _showEd;
+    var _showAp  = (_showHm || _showEd) && !cancelled;
     apBtn.style.display = _showAp ? 'flex' : 'none';
     apBtn.textContent   = (_sowSt === 'hm_approved') ? '✓ Final Approve' : '✓ Approve';
   }
 
-  // Mark Complete button: only show when SOW is NOT completed AND viewer is HM or ED AND there's a unit/saved SOW.
+  // Mark Complete button: only show when SOW is NOT completed/cancelled AND viewer is HM or ED AND there's a unit/saved SOW.
   var mcBtn = document.getElementById('sow_mark_complete_btn');
   if(mcBtn){
-    var showMC = !completed && canMarkSowComplete() && !!_sowUnitId && !!window._sowEditingProjectNumber;
+    var showMC = !completed && !cancelled && canMarkSowComplete() && !!_sowUnitId && !!window._sowEditingProjectNumber;
     mcBtn.style.display = showMC ? 'flex' : 'none';
   }
 
-  // Reopen button: only show when completed AND viewer is ED.
+  // Cancel Request button: management-only, on a SAVED request that isn't
+  // already cancelled or completed. Cancelling a request whose work order was
+  // sent to a contractor offers to email them a cancellation notice.
+  var cxBtn = document.getElementById('sow_cancel_btn');
+  if(cxBtn){
+    var _cxRole = window._realRole || window.currentRole || '';
+    var _cxMgmt = (typeof ROLE !== 'undefined' && ROLE.isManagement) ? ROLE.isManagement(_cxRole) : true;
+    var showCx  = _cxMgmt && !cancelled && !completed && !!_sowUnitId && !!(sow && sow.project_number);
+    cxBtn.style.display = showCx ? 'flex' : 'none';
+  }
+
+  // Reopen button: show when completed OR cancelled AND viewer is ED (reopen
+  // un-cancels / un-completes back to an editable state).
   var roBtn = document.getElementById('sow_reopen_btn');
   if(roBtn){
-    roBtn.style.display = (completed && canReopenSow()) ? 'flex' : 'none';
+    roBtn.style.display = ((completed || cancelled) && _canReopen) ? 'flex' : 'none';
   }
 
   // Archive button: visible whenever the SOW has been initiated (has a
@@ -1583,6 +1600,7 @@ function _applySowModalLock(sow){
   var rfqBtn = document.getElementById('sow_rfq_btn');
   if (rfqBtn) {
     var _rfqShow = !!(sow && sow.project_number)
+      && !cancelled
       && _sowRfqStillOpen(sow)
       && (typeof moduleOn !== 'function' || moduleOn('rfq'));
     rfqBtn.style.display = _rfqShow ? 'flex' : 'none';
@@ -1835,18 +1853,23 @@ function markSowComplete(){
 function reopenSow(){
   if(!_sowUnitId || !window._sowEditingProjectNumber) return;
   if(!canReopenSow()){
-    showToast('Only the Executive Director can reopen a completed request.');
+    showToast('Only the Executive Director can reopen a completed or cancelled request.');
     return;
   }
   var pn = window._sowEditingProjectNumber;
+  var _wasCancelled = (function(){ var s = getSowByProjectNumber(_sowUnitId, pn); return !!(s && s.cancelled); })();
   showConfirm({
     title:       'Reopen Request ' + pn + ' for editing?',
-    message:     'This returns the request to its prior approval state so it can be modified.',
+    message:     _wasCancelled
+      ? 'This un-cancels the request and returns it to its prior approval state so it can be modified.'
+      : 'This returns the request to its prior approval state so it can be modified.',
     confirmText: 'Reopen'
   }).then(function(ok){
     if (!ok) return;
     var sow = getSowByProjectNumber(_sowUnitId, pn);
     if(!sow){ showToast('Request not found'); return; }
+    // Clear a cancelled state on reopen (un-cancel).
+    if(sow.cancelled){ sow.cancelled = false; sow.cancelled_at = null; sow.cancelled_by = null; }
     if(sow.edName && sow.edDate) sow.approval_status = 'ed_approved';
     else if(sow.hmName && sow.hmDate) sow.approval_status = 'hm_approved';
     else if((sow.tenantSig && sow.tenantSig.image) || (sow.staffSig && sow.staffSig.image)) sow.approval_status = 'signed';
@@ -1854,11 +1877,104 @@ function reopenSow(){
     sow.reopened_at = new Date().toISOString();
     sow.reopened_by = window.currentUserName || _realRoleForPermissions();
     upsertSowInList(_sowUnitId, sow);
-    auditEntry('SOW:'+_sowUnitId, 'sow_reopened', 'SOW '+pn+' reopened for editing', _realRoleForPermissions());
-    showToast('Request reopened');
+    window._sowCurrentSowMeta = {approval_status: sow.approval_status, system_approved: sow.system_approved, archived: sow.archived, cancelled: sow.cancelled};
+    auditEntry('SOW:'+_sowUnitId, 'sow_reopened', 'SOW '+pn+(_wasCancelled?' un-cancelled and reopened':' reopened for editing'), _realRoleForPermissions());
+    if(typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
+    if(typeof udpRenderSowTable === 'function' && document.getElementById('udp_sow_table_wrap')) udpRenderSowTable(_sowUnitId);
+    showToast(_wasCancelled ? 'Request reopened (un-cancelled)' : 'Request reopened');
     _applySowModalLock(sow);
   });
 }
+
+// ── Cancel a Maintenance Request ──────────────────────────────────────────
+// Management-only. Marks the request cancelled (frozen; ED can reopen), and —
+// when the work order was assigned to a contractor with an email on file —
+// offers to send them a cancellation notice.
+function cancelSow(){
+  if(!_sowUnitId || !window._sowEditingProjectNumber){
+    showToast('Save the request before cancelling.');
+    return;
+  }
+  var _cxRole = window._realRole || window.currentRole || '';
+  if(!(typeof ROLE !== 'undefined' && ROLE.isManagement && ROLE.isManagement(_cxRole))){
+    showToast('Only the Housing Manager or Executive Director can cancel a request.');
+    return;
+  }
+  var pn  = window._sowEditingProjectNumber;
+  var sow = getSowByProjectNumber(_sowUnitId, pn);
+  if(!sow){ showToast('Request not found'); return; }
+
+  // Resolve an assigned contractor with an email (only for contractor-assigned
+  // work — in-house jobs have no external party to notify).
+  var _isContractor = (sow.assignedTeam === 'contractor') || (!sow.assignedTeam && (sow.contractorId || sow.contractor));
+  var _ctId = sow.contractorId || sow.contractor_id || '';
+
+  (async function(){
+    var ct = null;
+    if(_isContractor && _ctId && typeof _resolveContractorForEmail === 'function'){
+      try { ct = await _resolveContractorForEmail(_ctId); } catch(e){ ct = null; }
+    }
+    var canNotify = !!(ct && ct.email);
+    var conf;
+    if(canNotify){
+      conf = await showConfirm({
+        title:       'Cancel Request ' + pn + '?',
+        message:     'This marks the Maintenance Request cancelled and frees the unit. The work order was assigned to <strong>' + escapeHtml(ct.name || 'the contractor') + '</strong>. Only the Executive Director can reopen it.',
+        confirmText: 'Cancel Request', danger: true,
+        checkbox:    { label: 'Email a cancellation notice to ' + (ct.name || 'the contractor'), defaultChecked: true }
+      });
+    } else {
+      conf = await showConfirm({
+        title:       'Cancel Request ' + pn + '?',
+        message:     'This marks the Maintenance Request cancelled and frees the unit. Only the Executive Director can reopen it.',
+        confirmText: 'Cancel Request', danger: true
+      });
+    }
+    var ok = (typeof conf === 'object' && conf !== null) ? !!conf.ok : !!conf;
+    if(!ok) return;
+    var doNotify = canNotify && (typeof conf === 'object' && conf !== null ? !!conf.checked : false);
+
+    sow.cancelled = true;
+    sow.cancelled_at = new Date().toISOString();
+    sow.cancelled_by = window.currentUserName || _realRoleForPermissions();
+    upsertSowInList(_sowUnitId, sow);
+    window._sowCurrentSowMeta = {approval_status: sow.approval_status, system_approved: sow.system_approved, archived: sow.archived, cancelled: true};
+    auditEntry('SOW:'+_sowUnitId, 'sow_cancelled', 'MR '+pn+' cancelled'+(doNotify?' — contractor notified':''), _realRoleForPermissions());
+
+    // Revert the unit's status if this drained the last active request.
+    try {
+      var _allUnits = (typeof housingUnits !== 'undefined' && housingUnits.length) ? housingUnits : [];
+      var _u = _allUnits.find(function(x){ return x.id === _sowUnitId; });
+      if(_u && typeof hasActiveSows === 'function' && !hasActiveSows(_sowUnitId)
+         && typeof revertUnitFromRepair === 'function' && revertUnitFromRepair(_u)){
+        saveUnitWithDraftFallback(_u);
+      }
+    } catch(e){ console.warn('[SOW] cancel-revert threw:', e); }
+
+    if(doNotify && ct && ct.email && typeof window.sendNotification === 'function'){
+      var _u2 = (typeof housingUnits !== 'undefined' ? housingUnits : []).find(function(x){ return x.id === _sowUnitId; }) || {};
+      var _addr = ((_u2.num||'') + ' ' + (_u2.street||'')).trim() || _sowUnitId || '';
+      var _natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || 'Housing';
+      window.sendNotification({
+        to: ct.email, to_name: ct.name || '',
+        subject: 'Work Order Cancellation — ' + (_addr || pn),
+        bodyHtml: '<p>Dear ' + escapeHtml(ct.name || 'Contractor') + ',</p>'
+          + '<p>The work order for <strong>' + escapeHtml(_addr || pn) + '</strong> (ref ' + escapeHtml(pn) + ') has been <strong>cancelled</strong>.</p>'
+          + '<p>Please do not proceed with any further work. If work was already underway, contact the Housing Department to arrange settlement for work completed to date.</p>'
+          + '<p>We apologize for any inconvenience.</p>'
+          + '<p>Sincerely,<br/>' + escapeHtml(_natShort) + ' Housing</p>',
+        event: 'sow_cancelled', entity_type: 'sow', entity_id: pn
+      }).catch(function(e){ console.warn('[SOW] cancel notify failed:', e); });
+    }
+
+    showToast('✖ Request ' + pn + ' cancelled' + (doNotify ? ' — contractor notified' : ''));
+    _applySowModalLock(sow);
+    if(typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
+    if(typeof udpRenderSowTable === 'function' && document.getElementById('udp_sow_table_wrap')) udpRenderSowTable(_sowUnitId);
+    if(typeof renderRenoApprovalsView === 'function' && document.getElementById('renoApprovalsView')) renderRenoApprovalsView();
+  })();
+}
+window.cancelSow = cancelSow;
 
 
 
@@ -1950,7 +2066,7 @@ function udpRenderSowTable(unitId){
     // Build row actions based on completion state + viewer role.
     // Completed SOW + non-ED → View (opens read-only) instead of Edit.
     // Work Order stays available to everyone regardless of status.
-    var locked = isSowCompleted(sow) && !canEditSow(sow);
+    var locked = (isSowCompleted(sow) && !canEditSow(sow)) || (sow.cancelled && !(typeof canReopenSow === 'function' && canReopenSow()));
     var isArchived = !!sow.archived;
     // Archived SOWs always render the "Archived" pill (overrides the
     // approval-status pill) so the row's state is unmistakable when the
@@ -2402,6 +2518,10 @@ function saveSOW(opts){
     data.created_at = (existing && existing.created_at) || data.date || new Date().toISOString().slice(0,10);
     // Preserve progress block so editing SOW doesn't wipe progress.
     if(existing && existing.progress) data.progress = existing.progress;
+    // Preserve a cancelled state across edits — only cancelSow / reopenSow flip
+    // it. Without this, saving a cancelled request (ED, who can edit it) would
+    // silently un-cancel it since `data` is rebuilt from the form.
+    if(existing && existing.cancelled){ data.cancelled = existing.cancelled; data.cancelled_at = existing.cancelled_at; data.cancelled_by = existing.cancelled_by; }
   } else {
     data.created_at = data.date || new Date().toISOString().slice(0,10);
   }
