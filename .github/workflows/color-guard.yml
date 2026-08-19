@@ -1,0 +1,31 @@
+name: Hardcoded-color guard
+
+# Fails a push/PR that ADDS hardcoded color literals to UI JavaScript (they should
+# use theme tokens var(--...) so the app themes per nation). A ratchet against
+# tools/color-baseline.json -- decreases are fine (re-baseline after cleanup with
+# `node tools/check-colors.js --update`). Runs only when UI JS changes; does not
+# block the deploy workflows.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '*.js'
+      - 'tools/check-colors.js'
+      - 'tools/color-baseline.json'
+      - '.github/workflows/color-guard.yml'
+  pull_request:
+    paths:
+      - '*.js'
+      - 'tools/**'
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check for new hardcoded colors
+        run: node tools/check-colors.js
