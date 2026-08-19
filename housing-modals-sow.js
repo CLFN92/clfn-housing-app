@@ -1946,7 +1946,7 @@ function udpRenderSowTable(unitId){
     var progressCell = progressPct == null
       ? '<span style="color:var(--muted);font-size:11px;">—</span>'
       : '<div style="display:flex;align-items:center;gap:6px;min-width:80px;"><div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="height:100%;width:'+Math.min(100,Math.max(0,progressPct))+'%;background:'+(progressPct>=100?'var(--success)':'var(--info-blue)')+';"></div></div><span style="font-size:10px;font-weight:700;color:var(--muted);min-width:26px;text-align:right;">'+progressPct+'%</span></div>';
-    // Project # cell is clickable — opens the full SOW document in print-ready view.
+    // Project # cell is clickable — opens the Maintenance Request form (edit modal).
     // Build row actions based on completion state + viewer role.
     // Completed SOW + non-ED → View (opens read-only) instead of Edit.
     // Work Order stays available to everyone regardless of status.
@@ -1972,7 +1972,7 @@ function udpRenderSowTable(unitId){
       +'<td style="padding:8px 10px;font-size:11px;color:var(--muted);white-space:nowrap;">'+date+'</td>'
       +'<td style="padding:8px 10px;"><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:'+ss.bg+';color:'+ss.c+';white-space:nowrap;">'+ss.label+(locked?' 🔒':'')+'</span></td>'
       +'<td style="padding:8px 10px;font-size:12px;font-weight:700;white-space:nowrap;">'+amount+'</td>'
-      +'<td style="padding:8px 10px;font-size:11px;"><button onclick="udpOpenSowDocument(\''+esc(unitId)+'\',\''+pn+'\')" style="background:none;border:none;color:var(--text);padding:0;font-family:ui-monospace,Menlo,Monaco,\'Courier New\',monospace;font-size:11px;font-weight:600;cursor:pointer;text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;" title="Open full SOW document">'+pn+'</button></td>'
+      +'<td style="padding:8px 10px;font-size:11px;"><button onclick="udpEditSow(\''+esc(unitId)+'\',\''+pn+'\')" style="background:none;border:none;color:var(--text);padding:0;font-family:ui-monospace,Menlo,Monaco,\'Courier New\',monospace;font-size:11px;font-weight:600;cursor:pointer;text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;" title="Open the Maintenance Request">'+pn+'</button></td>'
       +'<td style="padding:8px 10px;font-size:10px;">'+progressCell+'</td>'
       +'<td style="padding:6px 8px;white-space:nowrap;text-align:right;">'
         +editBtn
