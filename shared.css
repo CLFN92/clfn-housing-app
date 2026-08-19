@@ -1053,6 +1053,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .empty-row { }
 .std-table tr.empty-row td,
 tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
+/* On phones a wide multi-column table would overflow the card (which is
+   overflow:hidden for its rounded corners) and get clipped. Let the table body
+   scroll horizontally instead, keeping the card header (title + count) put. */
+@media (max-width: 600px) {
+  .std-table-card .std-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .std-table-card .std-table th,
+  .std-table-card .std-table td { white-space: nowrap; }
+  .std-table-card .std-table tr.empty-row td { white-space: normal; }
+}
 .std-row-avatar-cell  { width: 40px; padding-right: 0; }
 .std-row-avatar       { width: 32px; height: 32px; border-radius: 50%; background: var(--dark2); color: var(--yellow); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
 .std-cell-primary     { font-weight: 600; }
