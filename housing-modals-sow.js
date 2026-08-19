@@ -228,6 +228,7 @@ function _buildSowModalHTML() {
         '<button type="button" class="tic-tab tic-active" data-modal-tab="overview"  onclick="setSowTab(\'overview\')"  role="tab">Overview</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="scope"     onclick="setSowTab(\'scope\')"     role="tab">Work Items</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="workorder" onclick="setSowTab(\'workorder\')" role="tab">Work Order</button>' +
+        '<button type="button" class="tic-tab"            data-modal-tab="payments"  onclick="setSowTab(\'payments\')"  role="tab" id="sow_tab_payments">Payments</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="documents" onclick="setSowTab(\'documents\')" role="tab">Documents</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="safety"    onclick="setSowTab(\'safety\')"    role="tab">Health &amp; Safety</button>' +
         '<button type="button" class="tic-tab"            data-modal-tab="acct"      onclick="setSowTab(\'acct\')"      role="tab">Accountability</button>' +
@@ -488,6 +489,17 @@ function _buildSowModalHTML() {
           '</div>' +
         '</div>' +
 
+        // ── PAYMENTS (PO draw-down + progress) ───────────────────────────
+        // Purchase-order draw-down tracking: PO total (from an awarded RFQ or
+        // entered manually), a multi-step payment schedule (Material / Phase
+        // 1..N / Holdback), an invoice attached to each payment, and a
+        // paid-vs-outstanding progress bar. Reaching 100% paid surfaces the
+        // "Mark Job Complete" action. Rendered on demand by _sowRenderPayments
+        // (setSowTab hook) so it always reflects the current saved record.
+        '<div class="tic-panel" data-modal-panel="payments">' +
+          '<div id="sow_payments_body"></div>' +
+        '</div>' +
+
         // Approvals tab removed — HM / ED approval flow is handled outside
         // the SOW form (Renovation Approvals view, internal-only). The
         // hidden inputs below preserve the IDs that saveSOW reads so the
@@ -600,6 +612,7 @@ function setSowTab(name) {
   // The Work Order (execution) tab renders its checklist from the current
   // work items on open, so items added on the Work Items tab show up here.
   if (name === 'workorder' && typeof _sowRenderWorkOrderItems === 'function') _sowRenderWorkOrderItems();
+  if (name === 'payments'  && typeof _sowRenderPayments === 'function') _sowRenderPayments();
   if (typeof _sowRefreshStrip === 'function') _sowRefreshStrip();
   _updateSowSaveButtonState();
 }
@@ -951,6 +964,11 @@ function openSowModal(unitId, projectNumber) {
 
   // Apply the locked/unlocked state based on the SOW's status and the current user's role.
   _applySowModalLock(saved);
+
+  // Initialize the PO draw-down / payments working state once per open, from
+  // the saved record (or prefilled from an awarded RFQ / the MR total for a
+  // new one). _sowRenderPayments reads this; input handlers mutate it in place.
+  if (typeof _sowInitPayState === 'function') _sowInitPayState(saved);
 
   // Apply a one-shot seed handed off by the Reno Questionnaire. Done in-flow
   // (the modal DOM is fully mounted here) instead of a post-open setTimeout
@@ -2388,6 +2406,12 @@ function saveSOW(opts){
   var totalNum = parseFloat(String(data.totalCost||'').replace(/[^0-9.\-]/g,'')) || 0;
   data.amount = totalNum;
 
+  // PO draw-down / payments — copy the working state onto the record and
+  // compute progress (paid vs PO total) into data.progress.percent, which the
+  // unit SOW table already renders. Preserves any po/draws saved earlier when
+  // the payments tab was never opened this session (state seeded from `saved`).
+  if (typeof _sowCollectPayments === 'function') _sowCollectPayments(data);
+
   // ── Approval-chain authority gate + status derivation ────────────────────
   // Extracted to _sowComputeApprovalStatus (mutates data in place): authority
   // gate, completed / System Approved preservation, review-all-tabs draft gate.
@@ -2783,3 +2807,489 @@ function printSOW(){
   // Offer to email a copy of the request to the tenant.
   if (typeof _sowPromptTenantEmail === 'function') _sowPromptTenantEmail();
 }
+
+/* =====================================================================
+ * PO draw-down / Payments (Maintenance Request)
+ * ---------------------------------------------------------------------
+ * A Maintenance Request with a Purchase Order can be paid down in steps:
+ * a Material deposit, one or more construction Phases, and a Holdback
+ * (with a release date). Each payment carries its own invoice (PDF/photo)
+ * and a paid flag. The panel shows a paid-vs-outstanding progress bar; at
+ * 100% paid the "Mark Job Complete" action appears (calls markSowComplete).
+ *
+ * State lives on window._sowPayState = { po:{number,amount,source,...},
+ * draws:[{id,type,phaseNo,label,amount,paid,paidDate,releaseDate,invoice}] }
+ * seeded once per open from the saved record (or an awarded RFQ / MR total).
+ * On save, _sowCollectPayments copies it onto the record and stamps
+ * data.progress.percent (which the unit SOW table already renders).
+ * ===================================================================== */
+
+function _sowPayUid(){ return 'dr_' + Math.random().toString(36).slice(2,9) + Date.now().toString(36); }
+
+function _sowPayMoney(n){
+  n = Number(n) || 0;
+  return (typeof formatCurrency === 'function') ? formatCurrency(n) : ('$' + n.toLocaleString('en-CA', {minimumFractionDigits:2}));
+}
+function _sowPayNum(v){ return parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,'')) || 0; }
+
+// Find an AWARDED RFQ linked to this SOW (unit + project number) so the PO can
+// prefill from its awarded contract value + contract number.
+function _sowResolveAwardedRfq(unitId, pn){
+  if(!unitId || !pn) return null;
+  var cache = window._rfqCache || {};
+  var found = null;
+  Object.keys(cache).forEach(function(k){
+    var r = cache[k];
+    if(r && r.sow_unit_id === unitId && r.sow_project_number === pn && r.status === 'awarded') found = r;
+  });
+  return found;
+}
+
+// Seed the working payments state once per modal open.
+function _sowInitPayState(saved){
+  var st = { po:null, draws:[] };
+  if(saved){
+    if(saved.po && typeof saved.po === 'object') st.po = JSON.parse(JSON.stringify(saved.po));
+    if(Array.isArray(saved.draws)) st.draws = JSON.parse(JSON.stringify(saved.draws));
+  }
+  if(!st.po){
+    var poNumEl = document.getElementById('sow_po_number');
+    var poNum   = (poNumEl && poNumEl.value) ? poNumEl.value.trim() : '';
+    var rfq     = _sowResolveAwardedRfq(_sowUnitId, window._sowEditingProjectNumber);
+    var mrTotal = _sowPayNum((document.getElementById('sow_total_cost')||{}).value);
+    if(rfq){
+      var conNum = (rfq.data && rfq.data.contract_number) || '';
+      st.po = {
+        number: poNum || conNum || '',
+        amount: Number(rfq.award_amount) || mrTotal || 0,
+        source: 'rfq',
+        rfqId: rfq.id || '',
+        contractorId: rfq.awarded_contractor_id || ''
+      };
+    } else {
+      st.po = { number: poNum, amount: mrTotal || 0, source: 'manual' };
+    }
+  }
+  window._sowPayState = st;
+}
+
+// Editing gate: management only (PO draw-downs are an accounting concern), and
+// never on a completed request the viewer can't reopen.
+function _sowPayEditable(){
+  var meta = window._sowCurrentSowMeta || {};
+  if(meta.approval_status === 'completed'){
+    if(typeof canReopenSow === 'function' && !canReopenSow()) return false;
+  }
+  var role = window._realRole || window.currentRole || 'staff';
+  if(typeof ROLE !== 'undefined' && ROLE.isManagement) return !!ROLE.isManagement(role);
+  return true;
+}
+
+// Sum of paid draws.
+function _sowPayPaidTotal(){
+  var st = window._sowPayState || {po:null,draws:[]};
+  return (st.draws||[]).reduce(function(s,d){ return s + (d.paid ? (_sowPayNum(d.amount)) : 0); }, 0);
+}
+function _sowPayScheduledTotal(){
+  var st = window._sowPayState || {po:null,draws:[]};
+  return (st.draws||[]).reduce(function(s,d){ return s + _sowPayNum(d.amount); }, 0);
+}
+function _sowPayPercent(){
+  var st = window._sowPayState || {po:null,draws:[]};
+  var po = (st.po && _sowPayNum(st.po.amount)) || 0;
+  if(po <= 0) return 0;
+  return Math.round(_sowPayPaidTotal() / po * 100);
+}
+
+// Default multi-step schedule: 20% material, remainder = Phase 1, 10% holdback.
+function _sowPayStandardSchedule(){
+  var st = window._sowPayState;
+  var total = (st.po && _sowPayNum(st.po.amount)) || 0;
+  var holdback = Math.round(total * 0.10);
+  var material = Math.round(total * 0.20);
+  var phase1   = Math.max(0, total - holdback - material);
+  return [
+    { id:_sowPayUid(), type:'material', label:'Material Deposit', amount:material, paid:false, paidDate:'', invoice:null },
+    { id:_sowPayUid(), type:'phase', phaseNo:1, label:'Phase 1', amount:phase1, paid:false, paidDate:'', invoice:null },
+    { id:_sowPayUid(), type:'holdback', label:'Holdback', amount:holdback, paid:false, paidDate:'', releaseDate:'', invoice:null }
+  ];
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+function _sowRenderPayments(){
+  var mount = document.getElementById('sow_payments_body');
+  if(!mount) return;
+  if(!window._sowPayState) _sowInitPayState(null);
+  var st = window._sowPayState;
+  var editable = _sowPayEditable();
+  var isSaved  = !!(window._sowWasPreviouslySaved && _sowUnitId && window._sowEditingProjectNumber);
+  var esc = function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  var dis = editable ? '' : ' disabled';
+
+  var poAmt = (st.po && _sowPayNum(st.po.amount)) || 0;
+  var srcBadge = (st.po && st.po.source === 'rfq')
+    ? '<span style="margin-left:8px;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;background:var(--info-blue-bg);color:var(--info-blue);vertical-align:middle;">From awarded RFQ</span>'
+    : '';
+
+  var html = '';
+
+  // ── PO summary ────────────────────────────────────────────────────────
+  html += '<div class="tic-section">';
+  html +=   '<div class="tic-section-h">Purchase Order' + srcBadge + '</div>';
+  html +=   '<div class="grid-c2-10">';
+  html +=     '<div class="f"><label>PO / Contract #</label><input id="sow_pay_po_number" type="text" placeholder="e.g. PO-2026-0042" value="' + esc(st.po ? st.po.number : '') + '"' + dis + ' oninput="_sowPaySetPoField(\'number\', this.value)"/></div>';
+  html +=     '<div class="f"><label>PO Total <span style="font-size:10px;font-weight:400;color:var(--muted);">(the amount to be paid down)</span></label><input id="sow_pay_po_amount" type="text" inputmode="decimal" placeholder="0.00" value="' + (poAmt ? esc(String(poAmt)) : '') + '"' + dis + ' oninput="_sowPaySetPoField(\'amount\', this.value)"/></div>';
+  html +=   '</div>';
+  if(editable){
+    var mrTotal = _sowPayNum((document.getElementById('sow_total_cost')||{}).value);
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">';
+    if(mrTotal > 0 && Math.abs(mrTotal - poAmt) > 0.005){
+      html += '<button type="button" class="btn btn-ghost btn-sm" onclick="_sowPayUseMrTotal()">Use MR total (' + _sowPayMoney(mrTotal) + ')</button>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // ── Progress bar ──────────────────────────────────────────────────────
+  html += '<div class="tic-section"><div id="sow_pay_summary">' + _sowPaySummaryHtml() + '</div></div>';
+
+  // ── Payment schedule ──────────────────────────────────────────────────
+  html += '<div class="tic-section">';
+  html +=   '<div class="tic-section-h flex-sb"><span>Payment Schedule</span></div>';
+  if(!(st.draws && st.draws.length)){
+    html += '<div class="txt-muted-xs" style="margin-bottom:10px;">No payments set up yet. A standard schedule is a Material deposit, one or more Phases, and a Holdback.</div>';
+    if(editable){
+      html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
+      html +=   '<button type="button" class="btn btn-primary btn-sm" onclick="_sowPaySetupSchedule()">+ Set up standard schedule</button>';
+      html +=   '<button type="button" class="btn btn-ghost btn-sm" onclick="_sowPayAddDraw(\'material\')">+ Material</button>';
+      html +=   '<button type="button" class="btn btn-ghost btn-sm" onclick="_sowPayAddDraw(\'phase\')">+ Phase</button>';
+      html +=   '<button type="button" class="btn btn-ghost btn-sm" onclick="_sowPayAddDraw(\'holdback\')">+ Holdback</button>';
+      html += '</div>';
+    }
+  } else {
+    html += '<div class="sow-pay-rows" style="display:flex;flex-direction:column;gap:10px;">';
+    (st.draws||[]).forEach(function(d){ html += _sowPayDrawRowHtml(d, editable, isSaved); });
+    html += '</div>';
+    if(editable){
+      html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">';
+      html +=   '<button type="button" class="btn btn-ghost btn-sm" onclick="_sowPayAddDraw(\'phase\')">+ Add Phase</button>';
+      html +=   '<button type="button" class="btn btn-ghost btn-sm" onclick="_sowPayAddDraw(\'material\')">+ Material</button>';
+      html +=   '<button type="button" class="btn btn-ghost btn-sm" onclick="_sowPayAddDraw(\'holdback\')">+ Holdback</button>';
+      html += '</div>';
+    }
+    if(!isSaved){
+      html += '<div class="txt-muted-xs" style="margin-top:10px;">Save the Maintenance Request to attach invoice files to each payment.</div>';
+    }
+  }
+  html += '</div>';
+
+  mount.innerHTML = html;
+}
+
+// Progress bar + totals — updated on its own so amount edits don't lose focus.
+function _sowPaySummaryHtml(){
+  var st = window._sowPayState || {po:null,draws:[]};
+  var po  = (st.po && _sowPayNum(st.po.amount)) || 0;
+  var paid = _sowPayPaidTotal();
+  var pct  = _sowPayPercent();
+  var outstanding = Math.max(0, po - paid);
+  var sched = _sowPayScheduledTotal();
+  var barColor = pct >= 100 ? 'var(--success)' : 'var(--info-blue)';
+
+  var h = '';
+  h += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">';
+  h +=   '<span style="font-size:12px;font-weight:700;color:var(--text);">Payment progress</span>';
+  h +=   '<span style="font-size:13px;font-weight:800;color:' + (pct>=100?'var(--success)':'var(--text)') + ';">' + pct + '%</span>';
+  h += '</div>';
+  h += '<div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;"><div style="height:100%;width:' + Math.min(100,Math.max(0,pct)) + '%;background:' + barColor + ';transition:width .2s;"></div></div>';
+  h += '<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;">';
+  h +=   '<div><div class="txt-muted-xs">PO Total</div><div style="font-weight:800;font-size:14px;">' + _sowPayMoney(po) + '</div></div>';
+  h +=   '<div><div class="txt-muted-xs">Paid</div><div style="font-weight:800;font-size:14px;color:var(--success);">' + _sowPayMoney(paid) + '</div></div>';
+  h +=   '<div><div class="txt-muted-xs">Outstanding</div><div style="font-weight:800;font-size:14px;color:' + (outstanding>0?'var(--warn-amber-text,var(--text))':'var(--muted)') + ';">' + _sowPayMoney(outstanding) + '</div></div>';
+  h += '</div>';
+
+  // Schedule vs PO reconciliation hint.
+  if(po > 0 && st.draws && st.draws.length){
+    var diff = sched - po;
+    if(Math.abs(diff) > 0.005){
+      var msg = diff > 0
+        ? ('Scheduled payments exceed the PO by ' + _sowPayMoney(diff))
+        : (_sowPayMoney(-diff) + ' of the PO is not yet scheduled');
+      h += '<div style="margin-top:8px;font-size:11px;font-weight:600;color:var(--warn-amber-text,#8a6d3b);">&#9888; ' + msg + '</div>';
+    }
+  }
+
+  // Job-complete CTA at 100% paid.
+  if(po > 0 && pct >= 100){
+    var meta = window._sowCurrentSowMeta || {};
+    if(meta.approval_status === 'completed'){
+      h += '<div style="margin-top:12px;padding:10px 12px;border-radius:8px;background:var(--success-bg);border:1px solid var(--success-border);font-size:12px;font-weight:700;color:var(--success);">&#10003; Fully paid &mdash; this request is marked Completed.</div>';
+    } else {
+      h += '<div style="margin-top:12px;padding:10px 12px;border-radius:8px;background:var(--success-bg);border:1px solid var(--success-border);display:flex;gap:10px;align-items:center;flex-wrap:wrap;">';
+      h +=   '<span style="font-size:12px;font-weight:700;color:var(--success);flex:1;min-width:180px;">&#10003; All payments recorded &mdash; the job is fully paid.</span>';
+      if(typeof canMarkSowComplete === 'function' && canMarkSowComplete()){
+        h += '<button type="button" class="btn btn-primary btn-sm" onclick="_sowPayMarkComplete()">&#10003; Mark Job Complete</button>';
+      }
+      h += '</div>';
+    }
+  }
+  return h;
+}
+
+function _sowPayRefreshSummary(){
+  var el = document.getElementById('sow_pay_summary');
+  if(el) el.innerHTML = _sowPaySummaryHtml();
+  // Keep the unit SOW table progress cell live if it's mounted behind us.
+  if(typeof _sowRefreshStrip === 'function') _sowRefreshStrip();
+}
+
+// One payment row.
+function _sowPayDrawRowHtml(d, editable, isSaved){
+  var esc = function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  var dis = editable ? '' : ' disabled';
+  var typeBadge = {
+    material: '<span style="padding:1px 7px;border-radius:9px;font-size:9px;font-weight:800;background:rgba(var(--accent-rgb),.16);color:var(--accent-ink,var(--text));">MATERIAL</span>',
+    phase:    '<span style="padding:1px 7px;border-radius:9px;font-size:9px;font-weight:800;background:var(--info-blue-bg);color:var(--info-blue);">PHASE</span>',
+    holdback: '<span style="padding:1px 7px;border-radius:9px;font-size:9px;font-weight:800;background:var(--warn-amber-bg);color:var(--warn-amber-text,#8a6d3b);">HOLDBACK</span>'
+  }[d.type] || '';
+  var idJs = "'" + d.id + "'";
+
+  var h = '<div class="box-bg-card" style="padding:12px;border:1px solid var(--border);border-radius:8px;' + (d.paid ? 'background:var(--success-bg);' : '') + '">';
+
+  // Header: badge + label + remove
+  h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
+  h +=   typeBadge;
+  h +=   '<input type="text" value="' + esc(d.label||'') + '"' + dis + ' oninput="_sowPaySetDrawField(' + idJs + ',\'label\',this.value)" style="flex:1;min-width:120px;border:none;background:transparent;font-weight:700;font-size:13px;color:var(--text);padding:2px 0;" placeholder="Payment name"/>';
+  if(editable) h += '<button type="button" title="Remove" onclick="_sowPayRemoveDraw(' + idJs + ')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;">&times;</button>';
+  h += '</div>';
+
+  // Amount + paid toggle + dates
+  h += '<div class="grid-c2-10">';
+  h +=   '<div class="f"><label>Amount</label><input type="text" inputmode="decimal" value="' + (d.amount ? esc(String(d.amount)) : '') + '"' + dis + ' oninput="_sowPaySetDrawField(' + idJs + ',\'amount\',this.value)" placeholder="0.00"/></div>';
+  if(d.type === 'holdback'){
+    h += '<div class="f"><label>Holdback release date</label><input type="date" value="' + esc(d.releaseDate||'') + '"' + dis + ' onchange="_sowPaySetDrawField(' + idJs + ',\'releaseDate\',this.value)"/></div>';
+  } else {
+    h += '<div class="f"></div>';
+  }
+  h += '</div>';
+
+  // Paid row
+  h += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px;">';
+  h +=   '<label class="check-row" style="margin:0;"><input type="checkbox"' + (d.paid?' checked':'') + dis + ' onchange="_sowPayTogglePaid(' + idJs + ',this.checked)" class="icon-sm"/> Paid</label>';
+  if(d.paid){
+    h += '<div class="f" style="margin:0;"><input type="date" value="' + esc(d.paidDate||'') + '"' + dis + ' onchange="_sowPaySetDrawField(' + idJs + ',\'paidDate\',this.value)" title="Date paid"/></div>';
+  }
+  h += '</div>';
+
+  // Invoice chip
+  h += '<div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);">';
+  if(d.invoice && d.invoice.path){
+    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
+    h +=   '<span style="font-size:11px;font-weight:700;color:var(--success);">&#128206; Invoice:</span>';
+    h +=   '<button type="button" class="link-yellow" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0;text-decoration:underline;" onclick="_sowViewDrawInvoice(' + idJs + ')">' + esc(d.invoice.name||'View invoice') + '</button>';
+    if(editable) h += '<button type="button" onclick="_sowRemoveDrawInvoice(' + idJs + ')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;text-decoration:underline;">remove</button>';
+    h += '</div>';
+  } else if(editable){
+    if(isSaved){
+      h += '<label style="font-size:11px;font-weight:600;color:var(--info-blue);cursor:pointer;">';
+      h +=   '&#128206; Attach invoice (PDF/photo)';
+      h +=   '<input type="file" accept="application/pdf,image/*" style="display:none;" onchange="_sowUploadDrawInvoice(' + idJs + ',this)"/>';
+      h += '</label>';
+    } else {
+      h += '<span class="txt-muted-xs">&#128206; Save the request first to attach an invoice.</span>';
+    }
+  } else {
+    h += '<span class="txt-muted-xs">No invoice attached.</span>';
+  }
+  h += '</div>';
+
+  h += '</div>';
+  return h;
+}
+
+// ── Mutators ────────────────────────────────────────────────────────────────
+function _sowPaySetPoField(field, v){
+  var st = window._sowPayState; if(!st) return;
+  if(!st.po) st.po = { number:'', amount:0, source:'manual' };
+  if(field === 'amount'){ st.po.amount = _sowPayNum(v); st.po.source = 'manual'; }
+  else st.po[field] = v;
+  if(field === 'amount') _sowPayRefreshSummary();
+  // Mirror PO number back onto the Overview field so the two stay in step.
+  if(field === 'number'){ var o = document.getElementById('sow_po_number'); if(o) o.value = v; }
+}
+function _sowPayUseMrTotal(){
+  var st = window._sowPayState; if(!st) return;
+  if(!st.po) st.po = { number:'', amount:0, source:'manual' };
+  st.po.amount = _sowPayNum((document.getElementById('sow_total_cost')||{}).value);
+  st.po.source = 'manual';
+  _sowRenderPayments();
+}
+function _sowPaySetupSchedule(){
+  var st = window._sowPayState; if(!st) return;
+  if(st.draws && st.draws.length){ if(typeof showToast==='function') showToast('A schedule already exists.'); return; }
+  if(!st.po || _sowPayNum(st.po.amount) <= 0){ if(typeof showToast==='function') showToast('Enter the PO total first.', {type:'error'}); return; }
+  st.draws = _sowPayStandardSchedule();
+  _sowRenderPayments();
+}
+function _sowPayAddDraw(type){
+  var st = window._sowPayState; if(!st) return;
+  if(!st.draws) st.draws = [];
+  var draw;
+  if(type === 'phase'){
+    var maxPhase = 0;
+    st.draws.forEach(function(d){ if(d.type==='phase' && (d.phaseNo||0) > maxPhase) maxPhase = d.phaseNo||0; });
+    var no = maxPhase + 1;
+    draw = { id:_sowPayUid(), type:'phase', phaseNo:no, label:'Phase ' + no, amount:0, paid:false, paidDate:'', invoice:null };
+  } else if(type === 'holdback'){
+    draw = { id:_sowPayUid(), type:'holdback', label:'Holdback', amount:0, paid:false, paidDate:'', releaseDate:'', invoice:null };
+  } else {
+    draw = { id:_sowPayUid(), type:'material', label:'Material', amount:0, paid:false, paidDate:'', invoice:null };
+  }
+  // Keep holdback rows last; insert new phases/material before any holdback.
+  if(type !== 'holdback'){
+    var hbIdx = st.draws.findIndex(function(d){ return d.type==='holdback'; });
+    if(hbIdx >= 0) st.draws.splice(hbIdx, 0, draw); else st.draws.push(draw);
+  } else {
+    st.draws.push(draw);
+  }
+  _sowRenderPayments();
+}
+function _sowPayRemoveDraw(id){
+  var st = window._sowPayState; if(!st || !st.draws) return;
+  st.draws = st.draws.filter(function(d){ return d.id !== id; });
+  _sowRenderPayments();
+  _sowPersistPayments();
+}
+function _sowPaySetDrawField(id, field, v){
+  var st = window._sowPayState; if(!st || !st.draws) return;
+  var d = st.draws.find(function(x){ return x.id === id; });
+  if(!d) return;
+  d[field] = (field === 'amount') ? _sowPayNum(v) : v;
+  if(field === 'amount') _sowPayRefreshSummary();
+  if(field === 'paidDate' || field === 'releaseDate') _sowPersistPayments();
+}
+function _sowPayTogglePaid(id, checked){
+  var st = window._sowPayState; if(!st || !st.draws) return;
+  var d = st.draws.find(function(x){ return x.id === id; });
+  if(!d) return;
+  d.paid = !!checked;
+  if(d.paid && !d.paidDate) d.paidDate = new Date().toISOString().slice(0,10);
+  _sowRenderPayments();
+  _sowPersistPayments();
+}
+
+// ── Invoice files ───────────────────────────────────────────────────────────
+async function _sowUploadDrawInvoice(id, input){
+  var file = input && input.files && input.files[0];
+  if(!file) return;
+  if(!(window._sowWasPreviouslySaved && _sowUnitId && window._sowEditingProjectNumber)){
+    if(typeof showToast==='function') showToast('Save the request first, then attach invoices.');
+    input.value = '';
+    return;
+  }
+  var st = window._sowPayState;
+  var d = st && st.draws && st.draws.find(function(x){ return x.id === id; });
+  if(!d){ input.value=''; return; }
+  var safe = file.name.replace(/[^A-Za-z0-9._-]/g,'_');
+  var path = 'sow/' + _sowUnitId + '/' + window._sowEditingProjectNumber + '/payments/' + id + '_' + safe;
+  if(typeof showToast==='function') showToast('Uploading invoice…');
+  try{
+    await sbUploadFile(path, file);
+    if(typeof sbSaveFileMeta === 'function'){
+      try { sbSaveFileMeta('tenant', _sowUnitId, path, file.name, file.size, file.type); } catch(e){}
+    }
+    d.invoice = { path:path, name:file.name };
+    _sowPersistPayments();     // persist immediately so the file can't be orphaned
+    if(typeof showToast==='function') showToast('✓ Invoice attached');
+    _sowRenderPayments();
+  }catch(e){
+    console.warn('[SOW pay] invoice upload failed:', e);
+    if(typeof showToast==='function') showToast('Invoice upload failed', {type:'error'});
+  }
+  input.value = '';
+}
+async function _sowViewDrawInvoice(id){
+  var st = window._sowPayState;
+  var d = st && st.draws && st.draws.find(function(x){ return x.id === id; });
+  if(!d || !d.invoice || !d.invoice.path) return;
+  try{
+    var url = (typeof sbGetSignedUrl === 'function') ? await sbGetSignedUrl(d.invoice.path) : null;
+    if(url) window.open(url, '_blank');
+    else if(typeof showToast==='function') showToast('Could not open invoice', {type:'error'});
+  }catch(e){
+    console.warn('[SOW pay] view invoice failed:', e);
+    if(typeof showToast==='function') showToast('Could not open invoice', {type:'error'});
+  }
+}
+function _sowRemoveDrawInvoice(id){
+  var st = window._sowPayState;
+  var d = st && st.draws && st.draws.find(function(x){ return x.id === id; });
+  if(!d) return;
+  // Clears the link only — the stored file remains (also surfaces on the unit
+  // Documents tab), mirroring the Capital Projects "detach" behaviour.
+  d.invoice = null;
+  _sowRenderPayments();
+  _sowPersistPayments();
+}
+
+// ── Persist / collect ───────────────────────────────────────────────────────
+// Copy the working payment state onto a SOW record and stamp progress.
+function _sowCollectPayments(data){
+  var st = window._sowPayState;
+  if(!st) return;
+  var hasPo    = st.po && _sowPayNum(st.po.amount) > 0;
+  var hasDraws = st.draws && st.draws.length;
+  if(!hasPo && !hasDraws) return;   // nothing configured — leave data.progress untouched
+  data.po = st.po ? {
+    number: st.po.number || '',
+    amount: _sowPayNum(st.po.amount),
+    source: st.po.source || 'manual',
+    rfqId: st.po.rfqId || undefined,
+    contractorId: st.po.contractorId || undefined
+  } : null;
+  data.draws = (st.draws||[]).map(function(d){
+    return {
+      id: d.id, type: d.type, phaseNo: d.phaseNo,
+      label: d.label || '', amount: _sowPayNum(d.amount),
+      paid: !!d.paid, paidDate: d.paidDate || '',
+      releaseDate: d.releaseDate || undefined,
+      invoice: (d.invoice && d.invoice.path) ? { path:d.invoice.path, name:d.invoice.name } : null
+    };
+  });
+  data.progress = { percent: _sowPayPercent(), paid: _sowPayPaidTotal(), po: (st.po ? _sowPayNum(st.po.amount) : 0), updatedAt: new Date().toISOString() };
+}
+
+// Immediately persist payments onto the already-saved SOW (paid toggles /
+// invoice attach/detach). No-op for an unsaved request.
+function _sowPersistPayments(){
+  if(!(_sowUnitId && window._sowEditingProjectNumber)) return;
+  var sow = (typeof getSowByProjectNumber === 'function') ? getSowByProjectNumber(_sowUnitId, window._sowEditingProjectNumber) : null;
+  if(!sow) return;
+  _sowCollectPayments(sow);
+  if(typeof upsertSowInList === 'function') upsertSowInList(_sowUnitId, sow);
+  // Light refresh of any visible SOW table / worklist so the progress cell updates.
+  try {
+    if(typeof udpRenderSowTable === 'function' && window._currentDetailUnitId === _sowUnitId) udpRenderSowTable(_sowUnitId);
+    if(typeof renderWorklist === 'function' && document.getElementById('worklist_body')) renderWorklist();
+  } catch(e){}
+}
+
+function _sowPayMarkComplete(){
+  if(typeof markSowComplete === 'function') markSowComplete();
+}
+
+// Expose for inline handlers.
+window._sowRenderPayments   = _sowRenderPayments;
+window._sowInitPayState     = _sowInitPayState;
+window._sowCollectPayments  = _sowCollectPayments;
+window._sowPaySetPoField    = _sowPaySetPoField;
+window._sowPayUseMrTotal    = _sowPayUseMrTotal;
+window._sowPaySetupSchedule = _sowPaySetupSchedule;
+window._sowPayAddDraw       = _sowPayAddDraw;
+window._sowPayRemoveDraw    = _sowPayRemoveDraw;
+window._sowPaySetDrawField  = _sowPaySetDrawField;
+window._sowPayTogglePaid    = _sowPayTogglePaid;
+window._sowUploadDrawInvoice= _sowUploadDrawInvoice;
+window._sowViewDrawInvoice  = _sowViewDrawInvoice;
+window._sowRemoveDrawInvoice= _sowRemoveDrawInvoice;
+window._sowPayMarkComplete  = _sowPayMarkComplete;
