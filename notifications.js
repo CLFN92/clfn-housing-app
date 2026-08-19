@@ -188,6 +188,24 @@ var EMAIL_EVENT_REGISTRY = [
     }
   },
   {
+    key:                   'rfq_cancelled',
+    label:                 'RFQ Cancellation Notice to Contractor',
+    description:           'Sent to the awarded contractor when an awarded RFQ is cancelled (only when the canceller ticks the inline checkbox on the Cancel dialog and the contractor has an email on file).',
+    recipientType:         'contractor',
+    defaultRecipientRoles: [],
+    defaultCcRoles:        [],
+    wired:                 true,
+    placeholders:          ['contractorName','rfqNumber','projectAddress','nationShort'],
+    defaults: {
+      subject:  '{rfqNumber} — Contract Cancellation Notice',
+      bodyHtml: '<p>Dear {contractorName},</p>'
+              + '<p>We are writing to inform you that <strong>{rfqNumber}</strong> ({projectAddress}), previously awarded to you, has been <strong>cancelled</strong>.</p>'
+              + '<p>Please do not proceed with any further work under this award. If work was already underway, contact the Housing Department to arrange settlement for work completed to date.</p>'
+              + '<p>We apologize for any inconvenience and thank you for your understanding.</p>'
+              + '<p>Sincerely,<br/>{nationShort} Housing</p>'
+    }
+  },
+  {
     key:                   'sow_work_order_to_contractor',
     label:                 'Work Order to Contractor (PDF)',
     description:           'Sent to the assigned contractor when an HM or ED approves the maintenance request (only if the contractor has an email on file and the approver ticks the inline checkbox). PDF work order is attached.',
@@ -2509,6 +2527,39 @@ async function notifyWorkOrderToContractor(sow, unit, contractor, recipientEmail
   }, eventKey);
 }
 
+// RFQ cancellation notice to the awarded contractor. Mirrors
+// notifyWorkOrderToContractor (no PDF attachment). Uses the editable
+// `rfq_cancelled` template (Settings -> Notifications). Fire-and-forget; the
+// caller (cancelRfq) already gated on the user's "email" checkbox + contractor
+// email. `addr` is the resolved unit/project address for the {projectAddress}
+// token.
+async function notifyRfqCancelled(rfq, contractor, addr) {
+  if (!rfq || !contractor) return;
+  var eventKey = 'rfq_cancelled';
+  var seen = {}, emails = [];
+  function _addEmail(a){ if(!a) return; var c=String(a).trim().toLowerCase(); if(!c||seen[c]) return; if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c)) return; seen[c]=true; emails.push(c); }
+  if (contractor.email) _addEmail(contractor.email);
+  // Optional staff recipients from the template's primary + CC role checkboxes.
+  var extraRoles = _emailEventRecipientRoles(eventKey).concat(_emailEventCcRoles(eventKey));
+  if (extraRoles.length) {
+    var extra = await _resolveActiveStaffForRoles(extraRoles);
+    extra.forEach(function(r){ _addEmail(r.email); });
+  }
+  if (!emails.length) { console.log('[notify] rfq_cancelled skipped — no contractor email or CC recipients for ' + (rfq.id || '—')); return; }
+  var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || 'Housing';
+  var rendered = _renderEmailTemplate(eventKey, {
+    contractorName: contractor.name || 'Contractor',
+    rfqNumber:      rfq.id || '',
+    projectAddress: addr || rfq.sow_unit_id || '',
+    nationShort:    natShort
+  });
+  if (!rendered) return;
+  await _sendSerially(emails.map(function(e){ return { email: e }; }), function(rcp){
+    return { to: rcp.email, to_name: '', subject: rendered.subject, bodyHtml: rendered.bodyHtml, event: eventKey, entity_type: 'rfq', entity_id: rfq.id || '—' };
+  }, eventKey);
+}
+window.notifyRfqCancelled = notifyRfqCancelled;
+
 // Tokens for the in-house field-employee work-order email — reuses the work
 // order token set and adds the assignee's name.
 function _emailTokensForFieldWorkOrder(sow, unit) {
@@ -3101,6 +3152,15 @@ function _ntfMockTokensForEvent(eventKey) {
       trade:          'General Contractor',
       classification: 'internal_indigenous'
     });
+  }
+  if (eventKey === 'rfq_cancelled') {
+    return {
+      nationShort:    _emailNationShort(),
+      appLink:        _emailAppLink(),
+      contractorName: 'Sample Contractor Ltd.',
+      rfqNumber:      'RFQ-2026-0007',
+      projectAddress: '123 Test Street'
+    };
   }
   // Fallback — only the always-available tokens are populated.
   return {

@@ -1417,22 +1417,29 @@ async function cancelRfq(rfqId) {
     if (window._rfqCache && window._rfqCache[rfqId]) window._rfqCache[rfqId].status = 'cancelled';
     if (typeof auditEntry === 'function') auditEntry('RFQ:' + rfqId, 'cancelled', 'RFQ cancelled' + (wasAwarded ? ' (was awarded to ' + ((awardedCt && awardedCt.name) || rfq.awarded_contractor_id) + ')' : '') + (doNotify ? ' — contractor notified' : ''), window.currentRole || 'staff');
 
-    if (doNotify && typeof window.sendNotification === 'function') {
+    if (doNotify) {
       var units = (typeof housingUnits !== 'undefined' ? housingUnits : []);
       var unit  = (units || []).find(function(u){ return u && u.id === rfq.sow_unit_id; }) || {};
       var addr  = ((unit.num || '') + ' ' + (unit.street || '')).trim() || rfq.sow_unit_id || '';
-      var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || 'Housing';
-      window.sendNotification({
-        to: awardedCt.email, to_name: awardedCt.name || '',
-        subject: rfqId + ' — Contract Cancellation Notice',
-        bodyHtml: '<p>Dear ' + escapeHtml(awardedCt.name || 'Contractor') + ',</p>'
-          + '<p>We are writing to inform you that <strong>' + escapeHtml(rfqId) + '</strong>'
-          + (addr ? ' (' + escapeHtml(addr) + ')' : '') + ', previously awarded to you, has been <strong>cancelled</strong>.</p>'
-          + '<p>Please do not proceed with any further work under this award. If work was already underway, contact the Housing Department to arrange settlement for work completed to date.</p>'
-          + '<p>We apologize for any inconvenience and thank you for your understanding.</p>'
-          + '<p>Sincerely,<br/>' + escapeHtml(natShort) + ' Housing</p>',
-        event: 'rfq_cancelled', entity_type: 'rfq', entity_id: rfqId
-      }).catch(function(e){ console.warn('[rfq] cancel notify failed:', e); });
+      // Composes from the editable `rfq_cancelled` template (Settings ->
+      // Notifications). Falls back to an inline send if notifications.js isn't
+      // loaded on this page (defensive — it normally is).
+      if (typeof notifyRfqCancelled === 'function') {
+        notifyRfqCancelled(rfq, awardedCt, addr).catch(function(e){ console.warn('[rfq] cancel notify failed:', e); });
+      } else if (typeof window.sendNotification === 'function') {
+        var natShort = (window.NATION_CONFIG && NATION_CONFIG.short) || 'Housing';
+        window.sendNotification({
+          to: awardedCt.email, to_name: awardedCt.name || '',
+          subject: rfqId + ' — Contract Cancellation Notice',
+          bodyHtml: '<p>Dear ' + escapeHtml(awardedCt.name || 'Contractor') + ',</p>'
+            + '<p>We are writing to inform you that <strong>' + escapeHtml(rfqId) + '</strong>'
+            + (addr ? ' (' + escapeHtml(addr) + ')' : '') + ', previously awarded to you, has been <strong>cancelled</strong>.</p>'
+            + '<p>Please do not proceed with any further work under this award. If work was already underway, contact the Housing Department to arrange settlement for work completed to date.</p>'
+            + '<p>We apologize for any inconvenience and thank you for your understanding.</p>'
+            + '<p>Sincerely,<br/>' + escapeHtml(natShort) + ' Housing</p>',
+          event: 'rfq_cancelled', entity_type: 'rfq', entity_id: rfqId
+        }).catch(function(e){ console.warn('[rfq] cancel notify failed:', e); });
+      }
     }
 
     showToast(rfqId + ' cancelled' + (doNotify ? ' — contractor notified' : ''));
