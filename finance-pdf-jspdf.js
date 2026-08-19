@@ -1,14 +1,17 @@
 /* ============================================================================
- * finance-pdf-jspdf.js -- jsPDF statement generator (Phase 1 of the finance
- * PDF migration; see docs/FINANCE-JSPDF-MIGRATION.md).
+ * finance-pdf-jspdf.js -- jsPDF finance documents (finance PDF migration;
+ * see docs/FINANCE-JSPDF-MIGRATION.md).
  *
- * Replaces the HTML print-window "Statement of Account" with a jsPDF document,
- * so the statement can be DOWNLOADED as a real PDF or EMAILED to the tenant
- * (print windows can't hand you the bytes). Branded per-nation: logo + name +
- * contact from NATION_CONFIG/theme, accent from the runtime _themeAccentHex()
- * helper (jsPDF takes hex strings; CSS var() would not work here).
+ * Replaces HTML print-window finance docs with jsPDF so each can be DOWNLOADED
+ * as a real PDF or EMAILED to the tenant (print windows can't hand you the
+ * bytes). Covers: statement of account (Phase 1), transaction voucher / payment
+ * receipt (Phase 1b), and invoice (Phase 2). All share headerFooter(doc,title)
+ * for an identical per-nation branded header -- logo + name + contact from
+ * NATION_CONFIG/theme, accent from the runtime _themeAccentHex() helpers (jsPDF
+ * takes hex strings; CSS var() would not work here).
  *
- * Data is collected the same way printTenantStatement() does (finance-statement.js).
+ * The voucher modal (modalVoucher) hosts both vouchers and invoices, so its
+ * Download/Email buttons call buildDoc(), which dispatches on txn.invoiceBalance.
  * ==========================================================================*/
 (function () {
   'use strict';
@@ -293,10 +296,94 @@
     return r.vref + '-' + nm + '.pdf';
   }
 
+  // ---- Invoice (a rent-ledger charge with a balance + applied payments) -----
+  function buildInvoice(txn) {
+    if (!txn) return null;
+    var t = (typeof getTenant === 'function') ? getTenant(txn.tenantId) : null;
+    var nm = t ? ((typeof tenantName === 'function') ? tenantName(t) : (t.name || '')) : (txn.tenantId || '');
+    var vref = txn.ref || ('INV-' + String(txn.id || '').slice(-6).toUpperCase());
+    var payList = (txn.payments || []);
+    var paid = payList.reduce(function (s, p) { return s + (p.amount || 0); }, 0);
+    var balance = (txn.invoiceBalance != null) ? txn.invoiceBalance : Math.max(0, (txn.charge || 0) - paid);
+    var isPaid = balance <= 0.005;
+    var isPartial = !isPaid && payList.length > 0;
+    var statusLabel = isPaid ? 'PAID IN FULL' : isPartial ? 'PARTIALLY PAID' : 'UNPAID';
+    var notes = ((document.getElementById('voucher-notes') || {}).value || '').trim();
+
+    var jsPDF = window.jspdf.jsPDF;
+    var doc = new jsPDF({ unit: 'mm', format: 'letter' });
+    var hf = headerFooter(doc, 'Invoice');
+    var pageW = hf.pageW, M = hf.M, aRGB = hf.aRGB;
+
+    var startY = 34;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+    doc.text('INVOICE NO.', M, startY);
+    doc.text('BILL TO', pageW / 2, startY);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(20, 20, 20);
+    doc.text(vref, M, startY + 6);
+    doc.text(String(nm), pageW / 2, startY + 6);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100, 100, 100);
+    doc.text('Invoice date: ' + (txn.date || ''), M, startY + 12);
+    if (t && t.unit) doc.text(String(t.unit), pageW / 2, startY + 12);
+
+    // Charge line(s).
+    doc.autoTable({
+      startY: startY + 18, margin: { top: 30, left: M, right: M },
+      head: [['Description', 'Amount']],
+      body: [[txn.desc || 'Charge', money(txn.charge || 0)]],
+      foot: (function () {
+        var f = [['Total Charged', money(txn.charge || 0)]];
+        if (paid > 0.005) f.push(['Total Paid', money(paid)]);
+        f.push([{ content: 'Balance Owing', styles: { fontStyle: 'bold' } }, { content: money(balance), styles: { fontStyle: 'bold' } }]);
+        return f;
+      })(),
+      styles: { fontSize: 10, cellPadding: 2.5 },
+      headStyles: { fillColor: aRGB, textColor: onAccentRgb(), fontStyle: 'bold' },
+      footStyles: { fillColor: [245, 245, 245], textColor: [20, 20, 20] },
+      columnStyles: { 1: { halign: 'right', cellWidth: 40 } },
+      didDrawPage: function (data) { hf.header(); hf.footer(data); }
+    });
+
+    // Payments applied.
+    if (payList.length) {
+      doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 6, margin: { top: 30, left: M, right: M },
+        head: [['Date', 'Method', 'Payment Applied']],
+        body: payList.map(function (p) { return [p.date || '', (typeof methodLabel === 'function') ? methodLabel(p.method) : (p.method || ''), money(p.amount || 0)]; }),
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [80, 80, 80], textColor: [255, 255, 255], fontStyle: 'bold' },
+        columnStyles: { 2: { halign: 'right', cellWidth: 40 } },
+        didDrawPage: function (data) { hf.header(); hf.footer(data); }
+      });
+    }
+
+    // Status + Amount Due box (accent).
+    var y = doc.lastAutoTable.finalY + 6, boxH = 16;
+    doc.setFillColor(aRGB[0], aRGB[1], aRGB[2]); doc.rect(M, y, pageW - 2 * M, boxH, 'F');
+    var oa = onAccentRgb(); doc.setTextColor(oa[0], oa[1], oa[2]);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+    doc.text(statusLabel, M + 5, y + 10);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+    doc.text((isPaid ? money(txn.charge || 0) : money(balance) + ' due'), pageW - M - 5, y + 11, { align: 'right' });
+
+    if (notes) {
+      y = y + boxH + 8; doc.setTextColor(60, 60, 60); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      doc.text('Notes', M, y); doc.setFont('helvetica', 'normal');
+      doc.text(doc.splitTextToSize(notes, pageW - 2 * M), M, y + 5);
+    }
+
+    return { doc: doc, tenant: t, amount: (isPaid ? (txn.charge || 0) : balance), vref: vref, title: 'Invoice' };
+  }
+
+  // Pick the right document for the currently-open modal txn.
+  function buildDoc(txn) {
+    return (txn && txn.invoiceBalance !== undefined) ? buildInvoice(txn) : buildVoucher(txn);
+  }
+
   window.finVoucherDownload = function () {
     var txn = window.currentVoucherData; if (!txn) { if (typeof toast === 'function') toast('Open a voucher first'); return; }
     _load(function () {
-      var r = buildVoucher(txn); if (!r) { if (typeof toast === 'function') toast('Could not build the voucher'); return; }
+      var r = buildDoc(txn); if (!r) { if (typeof toast === 'function') toast('Could not build the voucher'); return; }
       r.doc.save(voucherFileName(r));
     }, function () { if (typeof toast === 'function') toast('Could not load the PDF engine (offline?)'); });
   };
@@ -304,7 +391,7 @@
   window.finVoucherEmailTenant = function () {
     var txn = window.currentVoucherData; if (!txn) { if (typeof toast === 'function') toast('Open a voucher first'); return; }
     _load(function () {
-      var r = buildVoucher(txn); if (!r) { if (typeof toast === 'function') toast('Could not build the voucher'); return; }
+      var r = buildDoc(txn); if (!r) { if (typeof toast === 'function') toast('Could not build the voucher'); return; }
       var email = (r.tenant && r.tenant.email || '').trim();
       if (!email) { if (typeof toast === 'function') toast('No email on file for this tenant'); return; }
       var b64 = '';
