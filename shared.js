@@ -303,6 +303,15 @@ window._applyTheme = function(theme) {
   try {
     if (theme.logo && typeof _setFavicon === 'function') _setFavicon(theme.logo);
   } catch(e) {}
+  // Cache the fully-resolved theme CSS custom properties (everything _applyTheme
+  // set inline on <html>, incl. derived tokens) so the tiny inline <head> script
+  // on each page can re-apply them SYNCHRONOUSLY before first paint on the next
+  // navigation — eliminating the flash of the default colour scheme between page
+  // load and settings load. Logo lives in its own cache (img src, not here).
+  try {
+    var _css = document.documentElement.style.cssText || '';
+    if (_css) sessionStorage.setItem('clfn_theme_css', _css);
+  } catch(e) {}
 };
 
 // _setFavicon — point the tab/bookmark icon at `href` (a data URL or path).
