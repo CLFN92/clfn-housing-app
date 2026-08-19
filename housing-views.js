@@ -1400,9 +1400,10 @@ function showLanding() {
     tagEl.style.display = 'inline-flex';
   }
 
-  // Subtitle
+  // Subtitle — one consistent landing message app-wide (see finance.html home
+  // subtitle + the other landing renderer below; keep all three in sync).
   var subEl = document.getElementById('emp_home_subtitle');
-  if (subEl) subEl.textContent = subtitles[role] || '';
+  if (subEl) subEl.textContent = "Here's what's happening today.";
 
   // KPI strip — housing-only metrics from the in-memory caches.
   _renderLandingKpis();
@@ -2276,7 +2277,7 @@ function showEmployeeHome(){
     }
   }
   var subEl = document.getElementById('emp_home_subtitle');
-  if(subEl) subEl.textContent = subtitles[role] || '';
+  if(subEl) subEl.textContent = "Here's what's happening today.";
 
   // Build role-appropriate tile grid
   var tilesEl = document.getElementById('emp_tiles_grid');

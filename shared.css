@@ -1157,6 +1157,20 @@ tr.empty-row td { text-align: center; padding: 40px; color: var(--muted); }
 .std-filter-label     { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
 .std-filter-control   { border: 1.5px solid var(--border); border-radius: 7px; padding: 6px 10px; font-size: 12px; font-family: var(--sans); background: var(--surface); color: var(--text); width: auto; }
 .std-filter-control.narrow { min-width: 0; }
+/* On phones the flat label/control siblings wrap independently, splitting each
+   label from its control and blowing the amount inputs full-width. Stack the row
+   into a clean label-over-control form instead. */
+@media (max-width: 600px) {
+  .std-filter-row { flex-direction: column; align-items: stretch; gap: 4px; }
+  .std-filter-row .std-filter-divider,
+  .std-filter-row .std-filter-spacer { display: none; }
+  .std-filter-row .std-filter-label { margin-top: 6px; }
+  .std-filter-row .std-filter-control,
+  .std-filter-row .std-amount-range { width: 100%; box-sizing: border-box; }
+  .std-filter-row .std-amount-range { display: flex; align-items: center; gap: 8px; }
+  .std-filter-row .std-amount-range input { flex: 1; min-width: 0; }
+  .std-filter-row .std-filter-clear { align-self: flex-start; margin-top: 8px; }
+}
 
 /* Standalone primary search bar — one consistent style across every list
    view (Inventory, Match, Tenants, Contractors, Renovations, Worklist).
