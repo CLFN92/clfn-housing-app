@@ -6,6 +6,11 @@ function showPage(id) {
   if (_curId !== id && id !== 'home') _prevPage = _curId;
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('on');});
   var pg = document.getElementById('page-'+id); if(pg) pg.classList.add('on');
+  // The "Show voided entries" bar is only relevant to the Rent Ledger and
+  // Transactions views (the only ones that honour _finShowVoided); hide it
+  // everywhere else (dashboard, tenants, loans, etc.).
+  var _vb = document.getElementById('fin-void-bar');
+  if (_vb) _vb.style.display = (id === 'rent' || id === 'transactions') ? 'flex' : 'none';
   // Return to top whenever a new page is shown so users don't land mid-scroll
   window.scrollTo({top:0, behavior:'instant'});
   if(id==='home') renderHome();
