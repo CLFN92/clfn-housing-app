@@ -106,7 +106,7 @@
     projects:     "Capital projects tracked from funding to finished homes — milestone budgets, multi-grant funding, and one-click claim packages with every invoice, EFT and bank statement your funder demands.",
     finance:      "Rent, arrears, arrangements and collections reconcile in the same system the housing team uses.",
     portal:       "Tenants and applicants apply, upload documents and get status updates online — without calling the office.",
-    council:      "The Chief & Council dashboard gives leadership a live, read-only picture — no more assembling reports by hand.",
+    council:      "The leadership Reports dashboard gives Chief & Council a live, read-only picture — no more assembling reports by hand.",
     ai:           "Staff ask plain-language questions and get answers from your nation's own records — read-only and permission-aware.",
     audit:        "Every change is logged to a tamper-resistant audit trail, with role-based permissions on every action."
   };
