@@ -2092,7 +2092,7 @@ window.archiveCurrentSow = function(){
 
 function udpNewSow(){
   if(!_currentDetailUnitId) return;
-  closeUnitEditModal();
+  closeUnitEditModal({handoff:true});
   // Force a brand-new request — otherwise openSowModal opens the unit's most
   // recent ACTIVE SOW (and this button would never actually create a new one).
   window._sowForceNew = true;
@@ -2100,7 +2100,7 @@ function udpNewSow(){
 }
 
 function udpEditSow(unitId, projectNumber){
-  closeUnitEditModal();
+  closeUnitEditModal({handoff:true});
   openSowModal(unitId, projectNumber);
 }
 
@@ -2109,7 +2109,7 @@ function udpOpenSowDocument(unitId, projectNumber){
   // Loads the SOW into the modal first so printSOW() has the right data, then triggers print.
   var sow = getSowByProjectNumber(unitId, projectNumber);
   if(!sow){ showToast('Request not found'); return; }
-  closeUnitEditModal();
+  closeUnitEditModal({handoff:true});
   openSowModal(unitId, projectNumber);
   // Give the modal a tick to populate before printing.
   setTimeout(function(){ if(true) printSOW(); }, 250);
@@ -2120,7 +2120,7 @@ function udpPrintWorkOrder(unitId, projectNumber){
   // the existing printWorkOrder() (which reads from modal state) produces the right output.
   var sow = getSowByProjectNumber(unitId, projectNumber);
   if(!sow){ showToast('Request not found'); return; }
-  closeUnitEditModal();
+  closeUnitEditModal({handoff:true});
   openSowModal(unitId, projectNumber);
   setTimeout(function(){ if(true) printWorkOrder(); }, 250);
 }

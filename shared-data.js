@@ -3609,8 +3609,15 @@ function cancelCtAction() {
   var ni = document.getElementById(prefix + '_notes');
   if(ni) ni.value='';
 }
-function closeAddContractorModal(){
+function closeAddContractorModal(opts){
+  opts = opts || {};
   var acm=document.getElementById('addContractorModal');if(acm){acm.style.display='none';acm.style.zIndex='';}
+  // Deep-link return: a card opened via a cross-page worklist link goes back to
+  // the origin page on close (only when a nav referrer was actually set).
+  if(!opts.handoff && window._ctDeepLinkReturn){
+    window._ctDeepLinkReturn = false;
+    if(typeof _returnToNavReferrer === 'function' && _returnToNavReferrer()) return;
+  }
   // If search modal was the caller and is still mounted, refresh its results
   var sm = document.getElementById('contractorSearchModal');
   if(sm && sm.style.display !== 'none') {
@@ -3652,9 +3659,15 @@ function closeSowModal() {
       var data = JSON.parse(ret);
       if (data && data.page === 'contractors') {
         window.location.href = 'contractors.html?openContractor=' + encodeURIComponent(data.ctId || '');
+        return;
       }
     }
   } catch (e) { /* harmless */ }
+  // Deep-link / worklist return: if a nav referrer was set (e.g. a SOW opened
+  // via a cross-page worklist link, or handed off from a deep-linked unit
+  // card), closing the request returns the user to where they came from.
+  // No referrer (a SOW opened in-place on this page) → stays here.
+  if (typeof _returnToNavReferrer === 'function') _returnToNavReferrer();
 }
 function collectSowItems(){
   var items=[];
@@ -6411,16 +6424,19 @@ function renderWorklist() {
       + '</div></div>';
   }
 
-  function actionRow(href, cols, btn) {
-    // Row = info columns (clickable link) + yellow action button on the right
+  function actionRow(href, cols, btn, navRef) {
+    // Row = info columns (clickable link) + yellow action button on the right.
+    // navRef (optional): a CLFN_PAGE_ROUTES key stamped as the nav referrer on
+    // click, so CLOSING the deep-link-opened destination modal returns here.
+    var refOnclick = navRef ? ' onclick="if(typeof setNavReferrer===\'function\')setNavReferrer(\'' + navRef + '\')"' : '';
     return '<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;'
       + 'border-top:1px solid var(--border);background:var(--surface);" '
       + 'onmouseover="this.style.background=\'var(--bg)\'" '
       + 'onmouseout="this.style.background=\'var(--surface)\'">'
-      + '<a href="' + esc(href) + '" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-decoration:none;color:inherit;">'
+      + '<a href="' + esc(href) + '"' + refOnclick + ' style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-decoration:none;color:inherit;">'
       + cols.map(function(c){ return '<span style="' + (c.style||'flex:1;font-size:12px;') + '">' + esc(c.text||'') + '</span>'; }).join('')
       + '</a>'
-      + '<a href="' + esc((btn && btn.href) || href) + '" '
+      + '<a href="' + esc((btn && btn.href) || href) + '"' + refOnclick + ' '
       + 'style="flex-shrink:0;background:var(--yellow);color:var(--dark);border-radius:6px;'
       + 'padding:5px 12px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;'
       + 'text-decoration:none;white-space:nowrap;display:inline-block;">'
@@ -6756,10 +6772,10 @@ function renderWorklist() {
       return actionRow(href, [
         { text: u.addr, style: 'flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
         { text: u.lbl,  style: 'font-size:11px;color:var(--muted);width:200px;flex-shrink:0;' }
-      ], { text: 'Review →', href: href });
+      ], { text: 'Review →', href: href }, 'home');
     }).join('');
     var unitApprCards = unitApprItems.map(function(u) {
-      var open = 'window.location.href=\'inventory.html?unit=' + encodeURIComponent(u.id) + '\'';
+      var open = 'if(typeof setNavReferrer===\'function\')setNavReferrer(\'home\');window.location.href=\'inventory.html?unit=' + encodeURIComponent(u.id) + '\'';
       return wlCard({ title:u.addr, pill:{text:u.lbl}, open:open, metas:[], actions:[{text:'Review →',onclick:open}] });
     }).join('');
     html += sectionWrap('🏘️', 'Inventory Approvals', unitApprItems.length, 'inventory.html', _view==='cards' ? wlGrid(unitApprCards) : unitApprRows, 0);

@@ -497,7 +497,7 @@
           <div id="ue_tenant_notfound">
             <div style="font-size:12px;font-weight:700;color:var(--warn-amber);margin-bottom:6px;">No approved application found</div>
             <div style="font-size:12px;color:var(--warn-amber);margin-bottom:10px;">The applicant needs an approved housing application before being assigned to a unit.</div>
-            <button type="button" onclick="closeUnitEditModal();newApp();" class="btn btn-primary" style="font-size:12px;padding:7px 16px;">📝 Start New Application</button>
+            <button type="button" onclick="closeUnitEditModal({handoff:true});newApp();" class="btn btn-primary" style="font-size:12px;padding:7px 16px;">📝 Start New Application</button>
           </div>
 
           <!-- Move-in date -->

@@ -460,16 +460,27 @@ function unitEditStatusChange(){
     if(pill){ pill.classList.remove('ue-reno-locked'); pill.classList.toggle('active', !!urChk && urChk.checked); }
   }
 }
-function closeUnitEditModal(){
-  document.getElementById('unitEditModal').style.display='none';
+function closeUnitEditModal(opts){
+  opts = opts || {};
+  var _m = document.getElementById('unitEditModal');
+  if(_m) _m.style.display='none';
   window._editingUnitId=null;
+  // If this card was opened via a cross-page deep link (landing → Inventory
+  // Approvals), a plain user close returns to the origin page. `opts.handoff`
+  // is passed by internal callers that close the card only to open ANOTHER
+  // modal (SOW / TIC / New Application) on this same page — those must NOT
+  // navigate away, and they keep the flag armed for the next modal's close.
+  if(window._ueDeepLinkReturn){
+    window._ueDeepLinkReturn = false;   // clear on ANY close so it can't linger
+    if(!opts.handoff && typeof _returnToNavReferrer === 'function' && _returnToNavReferrer()) return;
+  }
 }
 
 // ── SOW link from edit unit modal ─────────────────────────────────────────────
 function ueOpenSow() {
   var uid = window._editingUnitId;
   if(!uid) return;
-  closeUnitEditModal();
+  closeUnitEditModal({handoff:true});
   openSowModal(uid);
 }
 
@@ -481,7 +492,7 @@ function ueOpenTenantCard() {
   var uid = window._editingUnitId;
   if(!uid) return;
   if(typeof openTenantCard === 'function'){
-    closeUnitEditModal();
+    closeUnitEditModal({handoff:true});
     openTenantCard(uid);
   } else {
     window.location.href = 'tenants.html?tic=' + encodeURIComponent(uid);

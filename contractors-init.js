@@ -147,6 +147,10 @@ async function loadRenosData() {
       // "Verify"/"Approve" worklist actions land on the same card layout as
       // every other contractor view, not the old standalone approval panel.
       if (idx >= 0 && typeof openAddContractorModal === 'function') {
+        // Opened via a cross-page deep link — arm the return so closing the
+        // card goes back to the origin page (e.g. the landing worklist) when a
+        // nav referrer was set. No referrer (a SOW round-trip) → stays here.
+        window._ctDeepLinkReturn = true;
         setTimeout(function(){ openAddContractorModal(idx); }, 80);
       } else if (idx >= 0 && typeof openCtApprovalPanel === 'function') {
         setTimeout(function(){ openCtApprovalPanel(idx); }, 80);

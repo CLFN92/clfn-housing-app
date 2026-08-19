@@ -44,6 +44,10 @@
     }
     var deepUnit = qp.get('unit');
     if (deepUnit && typeof openUnitEditModal === 'function') {
+      // Opened via a cross-page deep link (e.g. landing → Inventory Approvals).
+      // Arm the return so CLOSING the card sends the user back where they came
+      // from instead of stranding them on inventory.html.
+      window._ueDeepLinkReturn = true;
       setTimeout(function(){ openUnitEditModal(deepUnit); }, 100);
     }
     if (qp.get('action') === 'newUnit' && typeof openAddUnitModal === 'function') {

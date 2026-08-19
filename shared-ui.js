@@ -193,6 +193,21 @@ function consumeNavReferrer() {
   try { sessionStorage.removeItem(CLFN_NAV_REFERRER_KEY); } catch(e) {}
   return v;
 }
+// Read-and-clear the nav referrer and navigate to its route. Returns true when
+// it navigated (so a modal close can `return` early), false when there was no
+// referrer to honour (the caller should just stay on the current page). Used by
+// deep-link-opened modals (unit card, contractor card, …) so that CLOSING a
+// form opened via a cross-page worklist link returns the user to where they
+// came from (e.g. the landing page) instead of stranding them on the
+// destination page.
+function _returnToNavReferrer() {
+  if (typeof consumeNavReferrer !== 'function') return false;
+  var ref = consumeNavReferrer();
+  var routes = window.CLFN_PAGE_ROUTES || {};
+  if (ref && routes[ref]) { window.location.href = routes[ref]; return true; }
+  return false;
+}
+window._returnToNavReferrer = _returnToNavReferrer;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TABLE SORT + COLUMN-MENU FILTER — shared scaffolding (Phase 2)
