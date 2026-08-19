@@ -34,6 +34,7 @@
   <script src="finance-modals.js?v=20260603a"></script>
   <script src="finance-dashboard.js?v=20260608a"></script>
   <script src="finance-statement.js?v=20260608a"></script>
+  <script src="finance-pdf-jspdf.js?v=20260819a"></script>
   <script src="finance-rent-display.js?v=20260608a"></script>
   <script src="finance-init.js?v=20260603a"></script>
 <style>
@@ -1015,7 +1016,11 @@
       <div id="stmt-tenant-name" style="font-size:20px;font-weight:700;"></div>
       <div id="stmt-tenant-sub" style="font-size:12px;color:var(--muted);"></div>
     </div>
-    <button class="btn btn-ghost btn-sm" onclick="printTenantStatement()">🖨️ Print / Save PDF</button>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="btn btn-primary btn-sm" onclick="finStatementDownload()">⬇️ Download PDF</button>
+      <button class="btn btn-ghost btn-sm" onclick="finStatementEmail()">✉️ Email Tenant</button>
+      <button class="btn btn-ghost btn-sm" onclick="printTenantStatement()">🖨️ Print</button>
+    </div>
   </div>
 
   <!-- Balance summary bar -->

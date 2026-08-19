@@ -18,6 +18,7 @@
   "finance-modals.js": 1,
   "finance-nav.js": 0,
   "finance-payments.js": 12,
+  "finance-pdf-jspdf.js": 1,
   "finance-pdf.js": 46,
   "finance-rent-display.js": 6,
   "finance-reports.js": 13,
