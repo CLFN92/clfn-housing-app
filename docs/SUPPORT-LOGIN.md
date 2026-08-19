@@ -54,8 +54,11 @@ audit row on **both** sides, and an **email to the nation's ED** on every entry.
 3. Deploy `support-login` to that nation project (nation-functions workflow with
    the `project_ref` input, or
    `supabase functions deploy support-login --project-ref <ref> --no-verify-jwt`).
-4. Allow a redirect to `https://<sub>.fnhub.app/` in the nation project's Auth
-   settings (Site URL or an added Redirect URL).
+4. Auth redirect URLs are now set **automatically during provisioning** (Site URL
+   + `https://<sub>.fnhub.app/**`). For a nation provisioned *before* that change,
+   re-run provisioning once, or set them by hand in the nation project's Auth
+   settings — otherwise the magic link redirects to `http://localhost:3000`
+   (GoTrue drops an un-allowlisted redirect and falls back to the Site URL).
 
 **No shared secret** to distribute or rotate globally. Rotate a single nation's
 key anytime from the Supabase tab (**Rotate key**) — it locks the old key until

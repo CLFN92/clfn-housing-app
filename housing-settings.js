@@ -868,7 +868,10 @@ var AUDIT_ACTION_LABELS = {
   // Misc
   'tenants_merged':               '🔗 Tenant Records Merged',
   'archived_duplicate':           '📦 Duplicate Archived',
-  'required_fields_reset':        '📋 Required Fields Reset'
+  'required_fields_reset':        '📋 Required Fields Reset',
+  // Platform support login
+  'support_session_started':      '🛟 Platform Support Session',
+  'support_login_toggle':         '🛟 Platform Support Access Changed'
 };
 
 // Compact codes for the on-screen Event column (the export keeps full labels).
@@ -929,7 +932,9 @@ var AUDIT_ABBR = {
   'tenants_merged':'🔗 Ten Merge', 'tenant_vacated':'📤 Vacated',
   // Settings misc
   'required_fields_updated':'📋 Req Flds', 'required_fields_reset':'📋 Req Rst', 'theme_reset':'🎨 Theme Rst',
-  'settings_saved':'⚙️ Settings'
+  'settings_saved':'⚙️ Settings',
+  // Platform support login
+  'support_session_started':'🛟 Support In', 'support_login_toggle':'🛟 Support Tgl'
 };
 
 // Word-level abbreviation for the Event column — keeps it tight even for

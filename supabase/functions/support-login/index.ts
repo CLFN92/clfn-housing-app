@@ -45,6 +45,13 @@ function json(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
 }
 function todayIso(): string { return new Date().toISOString().slice(0, 10) }
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+// 'YYYY-MM-DD' -> 'Aug 19, 2026'
+function prettyDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '')
+  if (!m) return iso
+  return MONTHS[(+m[2]) - 1] + ' ' + (+m[3]) + ', ' + m[1]
+}
 function safeRedirect(u: string): string {
   try {
     const url = new URL(String(u || ''))
@@ -114,9 +121,12 @@ serve(async (req) => {
 
   // 4. Audit (append-only; awaited so it lands before we return).
   try {
+    const sentence = 'Platform support session opened by ' + operator
+      + ' - full super-user access through ' + prettyDate(staffRow.access_expires_at) + ' (end of day).'
     await admin.from('housing_audit_log').insert({
       action: 'support_session_started', actor: operator, entity_type: 'support', entity_id: 'SUPPORT',
-      detail: JSON.stringify({ summary: 'Platform support login for ' + operator, role: 'super_user',
+      // `detail` is the clean line the audit UI shows; the rest is kept for forensics.
+      detail: JSON.stringify({ detail: sentence, summary: sentence, role: 'super_user',
         access_expires_at: staffRow.access_expires_at, redirect_to: redirectTo, jti: claims.jti || null }),
     })
   } catch (_e) { /* never block the login on an audit hiccup */ }

@@ -209,6 +209,31 @@ serve(async (req) => {
     step('ed_login', false, 'Skipped: needs target.url + target.service_role + first_ed.email.')
   }
 
+  // --- Step 4b: configure Auth URLs (Site URL + redirect allowlist) -----------
+  // So magic links (password reset, admin-issued sign-in links, and the
+  // support-login "Enter" flow) redirect back to the NATION app instead of the
+  // Supabase default (http://localhost:3000). Without this, GoTrue drops our
+  // requested redirect and falls back to the Site URL. Needs ref + MGMT_TOKEN.
+  if (ref && MGMT_TOKEN) {
+    const siteUrl = 'https://' + sub + '.fnhub.app'
+    const allow = siteUrl + ',' + siteUrl + '/**'
+    try {
+      const r = await fetch(MGMT_BASE + '/v1/projects/' + encodeURIComponent(ref) + '/config/auth', {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + MGMT_TOKEN, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ site_url: siteUrl, uri_allow_list: allow }),
+      })
+      const txt = await r.text()
+      step('auth_urls', r.ok, r.ok ? ('Site URL + redirect allowlist set to ' + siteUrl + '.')
+        : ('Management API ' + r.status + ': ' + txt.slice(0, 200)))
+    } catch (e) { step('auth_urls', false, 'Error: ' + String(e).slice(0, 200)) }
+  } else {
+    const miss: string[] = []
+    if (!MGMT_TOKEN) miss.push('SB_MGMT_TOKEN secret')
+    if (!ref)        miss.push('project ref or URL')
+    step('auth_urls', false, 'Skipped: needs ' + miss.join(' + ') + '.')
+  }
+
   // --- Step 5: upsert the control-plane registry row (platform) ---------------
   let registryOk = false
   try {
