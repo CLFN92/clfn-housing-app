@@ -34,7 +34,7 @@
   <script src="finance-modals.js?v=20260603a"></script>
   <script src="finance-dashboard.js?v=20260608a"></script>
   <script src="finance-statement.js?v=20260608a"></script>
-  <script src="finance-pdf-jspdf.js?v=20260819a"></script>
+  <script src="finance-pdf-jspdf.js?v=20260819b"></script>
   <script src="finance-rent-display.js?v=20260608a"></script>
   <script src="finance-init.js?v=20260603a"></script>
 <style>
@@ -2364,8 +2364,10 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modalVoucher')">Close</button>
       <button class="btn btn-danger btn-sm" id="voidInvoiceBtn" onclick="voidCurrentInvoice()" style="display:none;">&#128683; Void Invoice</button>
-      <button class="btn btn-ghost" onclick="printVoucherWithSigs()">&#128424; Print Voucher</button>
-      <button class="btn btn-primary" onclick="emailVoucher()">&#128231; Email to Finance</button>
+      <button class="btn btn-primary btn-sm" onclick="finVoucherDownload()">&#11015;&#65039; Download PDF</button>
+      <button class="btn btn-ghost btn-sm" onclick="finVoucherEmailTenant()">&#9993;&#65039; Email Tenant</button>
+      <button class="btn btn-ghost btn-sm" onclick="printVoucherWithSigs()">&#128424; Print</button>
+      <button class="btn btn-ghost btn-sm" onclick="emailVoucher()">&#128231; Email Finance</button>
     </div>
   </div>
 </div>

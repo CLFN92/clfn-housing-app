@@ -41,6 +41,40 @@
     var n = parseInt(m[1], 16);
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   }
+  function onAccentRgb() { return (typeof window._themeOnAccentHex === 'function') ? rgb(window._themeOnAccentHex()) : [255, 255, 255]; }
+
+  // Shared branded header + footer, bound to one doc. Reused by every finance PDF
+  // so the nation header/footer stay identical across documents.
+  function headerFooter(doc, title) {
+    var pageW = doc.internal.pageSize.getWidth(), M = 14, aRGB = rgb(accent()), logo = nationLogo();
+    var nc = window.NATION_CONFIG || {};
+    var nationName = nc.display_name || nc.short || 'Housing';
+    var contact = [nc.mailing_address, nc.phone, (nc.email || nc.housing_email)].filter(Boolean).join('   ');
+    var generatedOn = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+    return {
+      M: M, pageW: pageW, aRGB: aRGB,
+      header: function () {
+        var y = 12;
+        if (logo) { try { doc.addImage(logo, 'PNG', M, y - 2, 16, 16); } catch (e) {} }
+        var tx = logo ? M + 20 : M;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(20, 20, 20);
+        doc.text(String(nationName).toUpperCase(), tx, y + 2);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(110, 110, 110);
+        if (contact) doc.text(String(contact), tx, y + 6.5, { maxWidth: pageW / 2 });
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(20, 20, 20);
+        doc.text(String(title), pageW - M, y + 1, { align: 'right' });
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(140, 140, 140);
+        doc.text('Generated: ' + generatedOn, pageW - M, y + 6, { align: 'right' });
+        doc.setDrawColor(aRGB[0], aRGB[1], aRGB[2]); doc.setLineWidth(0.7); doc.line(M, y + 12, pageW - M, y + 12);
+      },
+      footer: function (data) {
+        var ph = doc.internal.pageSize.getHeight();
+        doc.setFontSize(8); doc.setTextColor(140, 140, 140); doc.setFont('helvetica', 'normal');
+        doc.text('CONFIDENTIAL', M, ph - 8);
+        doc.text('Page ' + data.pageNumber, pageW - M, ph - 8, { align: 'right' });
+      }
+    };
+  }
 
   // Build the statement jsPDF doc for a tenant id. Returns { doc, tenant } or null.
   function buildStatement(tid) {
@@ -85,31 +119,8 @@
 
     var jsPDF = window.jspdf.jsPDF;
     var doc = new jsPDF({ unit: 'mm', format: 'letter' });
-    var pageW = doc.internal.pageSize.getWidth();
-    var M = 14, aH = accent(), aRGB = rgb(aH), logo = nationLogo();
-    var nationName = nc.display_name || nc.short || 'Housing';
-    var contact = [nc.mailing_address, nc.phone, (nc.email || nc.housing_email)].filter(Boolean).join('   ');
-
-    function header() {
-      var y = 12;
-      if (logo) { try { doc.addImage(logo, 'PNG', M, y - 2, 16, 16); } catch (e) {} }
-      var tx = logo ? M + 20 : M;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(20, 20, 20);
-      doc.text(String(nationName).toUpperCase(), tx, y + 2);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(110, 110, 110);
-      if (contact) doc.text(String(contact), tx, y + 6.5, { maxWidth: pageW / 2 });
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(20, 20, 20);
-      doc.text('Statement of Account', pageW - M, y + 1, { align: 'right' });
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(140, 140, 140);
-      doc.text('Generated: ' + generatedOn, pageW - M, y + 6, { align: 'right' });
-      doc.setDrawColor(aRGB[0], aRGB[1], aRGB[2]); doc.setLineWidth(0.7); doc.line(M, y + 12, pageW - M, y + 12);
-    }
-    function footer(data) {
-      var ph = doc.internal.pageSize.getHeight();
-      doc.setFontSize(8); doc.setTextColor(140, 140, 140); doc.setFont('helvetica', 'normal');
-      doc.text('CONFIDENTIAL', M, ph - 8);
-      doc.text('Page ' + data.pageNumber, pageW - M, ph - 8, { align: 'right' });
-    }
+    var hf = headerFooter(doc, 'Statement of Account');
+    var pageW = hf.pageW, M = hf.M, aRGB = hf.aRGB;
 
     // Tenant block + Total Owing summary (drawn once, above the first table).
     var startY = 34;
@@ -140,7 +151,7 @@
       headStyles: { fillColor: aRGB, textColor: (typeof window._themeOnAccentHex === 'function') ? rgb(window._themeOnAccentHex()) : [255, 255, 255], fontStyle: 'bold' },
       footStyles: { fillColor: [245, 245, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
       columnStyles: { 0: { cellWidth: 26 }, 2: { halign: 'right', cellWidth: 30 } },
-      didDrawPage: function (data) { header(); footer(data); }
+      didDrawPage: function (data) { hf.header(); hf.footer(data); }
     });
 
     // Payments this month.
@@ -154,7 +165,7 @@
       headStyles: { fillColor: aRGB, textColor: (typeof window._themeOnAccentHex === 'function') ? rgb(window._themeOnAccentHex()) : [255, 255, 255], fontStyle: 'bold' },
       footStyles: { fillColor: [245, 245, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
       columnStyles: { 0: { cellWidth: 24 }, 1: { cellWidth: 24 }, 4: { halign: 'right', cellWidth: 26 } },
-      didDrawPage: function (data) { header(); footer(data); }
+      didDrawPage: function (data) { hf.header(); hf.footer(data); }
     });
 
     return { doc: doc, tenant: t, grandTotal: grandTotal, monthLabel: monthLabel };
@@ -197,6 +208,118 @@
       }).then(function () {
         if (typeof toast === 'function') toast('Statement emailed to ' + email);
         if (typeof auditEntry === 'function') auditEntry(tid, 'statement_emailed', 'Statement of account emailed to ' + email, window.currentRole || 'staff');
+      }).catch(function () { if (typeof toast === 'function') toast('Could not send the email'); });
+    }, function () { if (typeof toast === 'function') toast('Could not load the PDF engine (offline?)'); });
+  };
+
+  // ---- Transaction voucher / receipt ---------------------------------------
+  // Build from the currently-open voucher (currentVoucherData). Returns { doc, tenant }.
+  function buildVoucher(txn) {
+    if (!txn) return null;
+    var d = getData();
+    var t = (typeof getTenant === 'function') ? getTenant(txn.tenantId) : null;
+    var isPayment = (txn.payment || 0) > 0;
+    var amount = isPayment ? (txn.payment || 0) : (txn.charge || 0);
+    var ledgerLabels = { rent: 'Rent', arrangement: 'Payment Arrangement', loan: 'Loan', combined: 'Rent + Arrangement + Loan', journal: 'Journal Entry', overpayment: 'Credit / Overpayment' };
+    var method = (typeof methodLabel === 'function') ? methodLabel(txn.method) : (txn.method || '');
+    var vref = txn.id ? ('VCH-' + String(txn.id).slice(-8)) : ('VCH-' + Date.now().toString().slice(-8));
+    var nm = t ? ((typeof tenantName === 'function') ? tenantName(t) : (t.name || '')) : (txn.tenantId || '');
+    var notes = ((document.getElementById('voucher-notes') || {}).value || '').trim();
+
+    var jsPDF = window.jspdf.jsPDF;
+    var doc = new jsPDF({ unit: 'mm', format: 'letter' });
+    var title = isPayment ? 'Payment Receipt' : 'Transaction Voucher';
+    var hf = headerFooter(doc, title);
+    var pageW = hf.pageW, M = hf.M, aRGB = hf.aRGB;
+
+    var startY = 34;
+    // Voucher meta.
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+    doc.text('VOUCHER NO.', M, startY);
+    doc.text('BILLED TO', pageW / 2, startY);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(20, 20, 20);
+    doc.text(vref, M, startY + 6);
+    doc.text(String(nm), pageW / 2, startY + 6);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100, 100, 100);
+    doc.text('Date: ' + (txn.date || ''), M, startY + 12);
+    if (t && t.unit) doc.text(String(t.unit), pageW / 2, startY + 12);
+
+    // Detail rows.
+    var rows = [
+      ['Ledger', ledgerLabels[txn.ledger] || txn.ledger || ''],
+      ['Description', txn.desc || ''],
+      ['Payment Method', method],
+      ['Status', txn.status || '']
+    ];
+    if ((txn.charge || 0) > 0) rows.push(['Charge / Debit', money(txn.charge)]);
+    if ((txn.payment || 0) > 0) rows.push(['Payment / Credit', money(txn.payment)]);
+    doc.autoTable({
+      startY: startY + 18, margin: { top: 30, left: M, right: M },
+      body: rows,
+      styles: { fontSize: 10, cellPadding: 2.5 },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 45, textColor: [90, 90, 90] }, 1: { textColor: [20, 20, 20] } },
+      theme: 'plain',
+      didDrawPage: function (data) { hf.header(); hf.footer(data); }
+    });
+
+    // Amount box (accent).
+    var y = doc.lastAutoTable.finalY + 6, boxH = 16;
+    doc.setFillColor(aRGB[0], aRGB[1], aRGB[2]); doc.rect(M, y, pageW - 2 * M, boxH, 'F');
+    var oa = onAccentRgb(); doc.setTextColor(oa[0], oa[1], oa[2]);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+    doc.text(isPayment ? 'AMOUNT PAID' : 'AMOUNT CHARGED', M + 5, y + 10);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+    doc.text(money(amount), pageW - M - 5, y + 11, { align: 'right' });
+
+    if (notes) {
+      y = y + boxH + 8; doc.setTextColor(60, 60, 60); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      doc.text('Notes', M, y); doc.setFont('helvetica', 'normal');
+      doc.text(doc.splitTextToSize(notes, pageW - 2 * M), M, y + 5);
+    }
+
+    // Signature lines.
+    var sy = doc.internal.pageSize.getHeight() - 34, colW = (pageW - 2 * M - 12) / 2;
+    doc.setDrawColor(120, 120, 120); doc.setLineWidth(0.3);
+    doc.line(M, sy, M + colW, sy); doc.line(pageW - M - colW, sy, pageW - M, sy);
+    doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+    doc.text('Received by (tenant)', M, sy + 4);
+    doc.text('Authorized by', pageW - M - colW, sy + 4);
+
+    return { doc: doc, tenant: t, amount: amount, vref: vref, title: title };
+  }
+
+  function voucherFileName(r) {
+    var nm = (r.tenant ? ((typeof tenantName === 'function') ? tenantName(r.tenant) : (r.tenant.name || 'tenant')) : 'tenant').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
+    return r.vref + '-' + nm + '.pdf';
+  }
+
+  window.finVoucherDownload = function () {
+    var txn = window.currentVoucherData; if (!txn) { if (typeof toast === 'function') toast('Open a voucher first'); return; }
+    _load(function () {
+      var r = buildVoucher(txn); if (!r) { if (typeof toast === 'function') toast('Could not build the voucher'); return; }
+      r.doc.save(voucherFileName(r));
+    }, function () { if (typeof toast === 'function') toast('Could not load the PDF engine (offline?)'); });
+  };
+
+  window.finVoucherEmailTenant = function () {
+    var txn = window.currentVoucherData; if (!txn) { if (typeof toast === 'function') toast('Open a voucher first'); return; }
+    _load(function () {
+      var r = buildVoucher(txn); if (!r) { if (typeof toast === 'function') toast('Could not build the voucher'); return; }
+      var email = (r.tenant && r.tenant.email || '').trim();
+      if (!email) { if (typeof toast === 'function') toast('No email on file for this tenant'); return; }
+      var b64 = '';
+      try { b64 = r.doc.output('datauristring').split(',')[1]; } catch (e) { if (typeof toast === 'function') toast('Could not render the PDF'); return; }
+      var nm = (typeof tenantName === 'function' && r.tenant) ? tenantName(r.tenant) : '';
+      var nationName = (window.NATION_CONFIG && NATION_CONFIG.display_name) || 'Housing';
+      if (typeof window.sendNotification !== 'function') { if (typeof toast === 'function') toast('Email is not available on this page'); return; }
+      window.sendNotification({
+        to: email, to_name: nm,
+        subject: nationName + ' - ' + r.title + ' ' + r.vref,
+        html: '<p>Hello ' + nm + ',</p><p>Please find your ' + r.title.toLowerCase() + ' (' + r.vref + ') for <b>' + money(r.amount) + '</b> attached.</p><p>Thank you.</p>',
+        attachments: [{ name: voucherFileName(r), contentType: 'application/pdf', contentBytes: b64 }]
+      }).then(function () {
+        if (typeof toast === 'function') toast('Receipt emailed to ' + email);
+        if (typeof auditEntry === 'function') auditEntry(txn.tenantId || '', 'voucher_emailed', r.title + ' ' + r.vref + ' emailed to ' + email, window.currentRole || 'staff');
       }).catch(function () { if (typeof toast === 'function') toast('Could not send the email'); });
     }, function () { if (typeof toast === 'function') toast('Could not load the PDF engine (offline?)'); });
   };
