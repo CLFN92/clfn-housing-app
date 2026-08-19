@@ -34,7 +34,7 @@ function openInvoiceVoucher(txn) {
   var isPaid = (txn.invoiceBalance||0) <= 0.005;
   var isPartial = !isPaid && txn.payments && txn.payments.length > 0;
   var statusLabel = isPaid ? 'PAID IN FULL' : isPartial ? 'PARTIALLY PAID' : 'UNPAID';
-  var statusBg = isPaid ? '#15803d' : isPartial ? 'var(--warn-amber-text)' : '#dc2626';
+  var statusBg = isPaid ? 'var(--success)' : isPartial ? 'var(--warn-amber-text)' : 'var(--danger)';
   var voucherNum = txn.ref || ('INV-'+txn.id.slice(-6).toUpperCase());
   var paymentsHtml = '';
   if (txn.payments && txn.payments.length) {

@@ -137,18 +137,18 @@ function calcDenomTotal() {
     msg.style.display='none'; btn.disabled=true; btn.style.opacity='.45';
   } else if (Math.abs(diff) < 0.01) {
     balEl.textContent='Balanced'; balEl.style.color='#4ade80'; balLbl.textContent='Status';
-    msg.style.display='block'; msg.style.background='#f0fdf4'; msg.style.color='#15803d';
-    msg.style.border='1px solid #bbf7d0'; msg.textContent='\u2713 Cash balances exactly. Ready to record.';
+    msg.style.display='block'; msg.style.background='var(--success-bg)'; msg.style.color='var(--success)';
+    msg.style.border='1px solid var(--success-border)'; msg.textContent='\u2713 Cash balances exactly. Ready to record.';
     btn.disabled=false; btn.style.opacity='1';
   } else if (diff > 0) {
     balEl.textContent=fmt(diff)+' change'; balEl.style.color='#fb923c'; balLbl.textContent='Change Due';
-    msg.style.display='block'; msg.style.background='#fff7ed'; msg.style.color='#c2410c';
+    msg.style.display='block'; msg.style.background='var(--warn-amber-bg)'; msg.style.color='var(--warn-amber-text)';
     msg.style.border='1px solid #fed7aa'; msg.textContent='Tenant overpaid by '+fmt(diff)+'. Return '+fmt(diff)+' in change.';
     btn.disabled=false; btn.style.opacity='1';
   } else {
     balEl.textContent=fmt(Math.abs(diff))+' short'; balEl.style.color='#f87171'; balLbl.textContent='Still Owing';
-    msg.style.display='block'; msg.style.background='#fef2f2'; msg.style.color='#b91c1c';
-    msg.style.border='1px solid #fecaca'; msg.textContent='\u2717 Cash is '+fmt(Math.abs(diff))+' short. Cannot record until balanced.';
+    msg.style.display='block'; msg.style.background='var(--danger-bg)'; msg.style.color='var(--danger)';
+    msg.style.border='1px solid var(--danger-border)'; msg.textContent='\u2717 Cash is '+fmt(Math.abs(diff))+' short. Cannot record until balanced.';
     btn.disabled=true; btn.style.opacity='.45';
   }
   return total;

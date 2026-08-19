@@ -285,7 +285,7 @@ function _renderNoRentList(tenants, isAll) {
       '<td><button class="btn btn-ghost btn-sm" onclick="closeModal(\'modalBatchAccounting\');openFinanceCard(\'' + sid + '\')">Set Rent</button></td>'+
     '</tr>';
   }).join('');
-  return '<div style="margin-bottom:12px;border:1px solid #fde68a;border-radius:10px;overflow:hidden;">'+
+  return '<div style="margin-bottom:12px;border:1px solid var(--warn-amber-border);border-radius:10px;overflow:hidden;">'+
     '<div style="background:var(--warn-amber-bg);padding:10px 14px;font-size:12px;">' + label + '</div>'+
     '<div style="max-height:220px;overflow-y:auto;">'+
       '<table class="tbl" style="margin:0;">'+
@@ -459,10 +459,10 @@ function runBatchAccounting(dryRun) {
   if (dryRun) {
     // Show preview only
     var html = '<div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;">'+
-      '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 14px;font-size:12px;">'+
+      '<div style="background:var(--success-bg);border:1px solid var(--success-border);border-radius:8px;padding:8px 14px;font-size:12px;">'+
         '<strong style="color:var(--success);">'+pending.length+'</strong> entries to post'+
       '</div>'+
-      '<div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:8px 14px;font-size:12px;">'+
+      '<div style="background:var(--warn-amber-bg);border:1px solid var(--warn-amber-border);border-radius:8px;padding:8px 14px;font-size:12px;">'+
         '<strong>'+fmt(totalAmt)+'</strong> total amount'+
       '</div>'+
       '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px;">'+

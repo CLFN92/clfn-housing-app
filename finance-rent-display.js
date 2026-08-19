@@ -627,7 +627,7 @@ function renderLoanDetail(ln, d, t){
     _stageBanner+
 
     // Loan detail card
-    '<div class="card" style="margin-bottom:16px;'+(isPending?'border-left:4px solid #eab308;':'')+'">'+
+    '<div class="card" style="margin-bottom:16px;'+(isPending?'border-left:4px solid var(--warn-amber-text);':'')+'">'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:16px;">'+
         '<div>'+
           '<div style="font-family:\'DM Serif Display\',serif;font-size:20px;">'+typeLabel+'</div>'+

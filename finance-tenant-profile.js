@@ -35,7 +35,7 @@ function renderTenantProfile(tid) {
   // Collections warning
   if (inCol) {
     var colBanner = s2.appendChild(document.createElement('div'));
-    colBanner.style.cssText = 'background:#fef2f2;border:1.5px solid var(--danger);border-radius:8px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:flex-start;gap:12px;';
+    colBanner.style.cssText = 'background:var(--danger-bg);border:1.5px solid var(--danger);border-radius:8px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:flex-start;gap:12px;';
     colBanner.innerHTML =
       '<span style="font-size:22px;flex-shrink:0;">&#128680;</span>'+
       '<div style="flex:1;">'+
@@ -101,7 +101,7 @@ function renderTenantProfile(tid) {
     var owing = tile.val > 0.005;
     var isTotal = tile.bold;
     cell.style.cssText = 'border-radius:8px;padding:8px 10px;text-align:center;transition:var(--tr);' +
-      'background:' + (isTotal ? 'var(--dark)' : owing ? '#fef2f2' : '#f0fdf4') + ';' +
+      'background:' + (isTotal ? 'var(--dark)' : owing ? 'var(--danger-bg)' : 'var(--success-bg)') + ';' +
       (tile.key !== 'total' ? 'cursor:pointer;' : '');
     if (tile.key !== 'total') {
       cell.title = 'Click to view ' + tile.lbl + ' details';
@@ -173,7 +173,7 @@ function renderTenantProfile(tid) {
   var hcBadge = nameRow.appendChild(document.createElement('span'));
   if (t.homeCare) {
     hcBadge.className = 'pill';
-    hcBadge.style.cssText = 'font-size:10px;cursor:pointer;background:#0891b2;color:#fff;border:none;';
+    hcBadge.style.cssText = 'font-size:10px;cursor:pointer;background:var(--info-blue);color:#fff;border:none;';
     hcBadge.innerHTML = '&#127968; H&amp;CC &mdash; <u>Remove</u>';
     hcBadge.onclick = function(){ toggleHomeCare(tid); };
   } else {

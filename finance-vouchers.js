@@ -222,7 +222,7 @@ function printVoucherWithSigs(){
   var vHtml=document.getElementById('voucherContent').innerHTML;
   var notes=(document.getElementById('voucher-notes')||{}).value||'';
   var isLocked = !!(window._voucherSig && window._voucherSig.isLocked && window._voucherSig.isLocked());
-  var lockedNote=isLocked?'<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 12px;font-size:11px;font-weight:700;color:#15803d;margin-bottom:16px;">&#10004; Signatures Locked — This voucher is finalized.</div>':'';
+  var lockedNote=isLocked?'<div style="background:var(--success-bg);border:1px solid var(--success-border);border-radius:6px;padding:8px 12px;font-size:11px;font-weight:700;color:var(--success);margin-bottom:16px;">&#10004; Signatures Locked — This voucher is finalized.</div>':'';
 
   // Nation branding
   var nc = window.NATION_CONFIG || {};
