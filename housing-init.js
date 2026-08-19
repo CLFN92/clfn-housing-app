@@ -1704,11 +1704,30 @@ async function submitAddHousingStaff() {
     // admin-issued magic link). Random closes the raw-token-endpoint guess hole.
     var defaultPassword = isExternal ? _randomStrongPassword() : (nationShort()+firstName+'2026!');
 
-    // Step 1: Create Supabase Auth account
-    var signupR = await fetch(SUPABASE_URL+'/auth/v1/signup',{
-      method:'POST', headers:HOUSING_HEADERS,
-      body:JSON.stringify({email:email, password:defaultPassword, data:{full_name:name}})
-    });
+    // Step 1: Create Supabase Auth account. Guard with a timeout: when a project
+    // has "Confirm email" ON but no working SMTP, GoTrue STALLS here trying to
+    // send the verification email, so the button hangs on "Adding..." forever.
+    var _ac = new AbortController();
+    var _to = setTimeout(function(){ _ac.abort(); }, 20000);
+    var signupR;
+    try {
+      signupR = await fetch(SUPABASE_URL+'/auth/v1/signup',{
+        method:'POST', headers:HOUSING_HEADERS, signal:_ac.signal,
+        body:JSON.stringify({email:email, password:defaultPassword, data:{full_name:name}})
+      });
+    } catch(_fe) {
+      clearTimeout(_to);
+      if(res){
+        res.style.background='var(--danger-bg)'; res.style.border='1px solid var(--danger-border)'; res.style.color='var(--danger)';
+        res.innerHTML = '<strong>The sign-in account request timed out.</strong><br>'
+          + '<span style="font-size:11px;">This usually means the project has <b>&ldquo;Confirm email&rdquo; ON without working SMTP</b>, so Supabase hangs trying to send the verification email. '
+          + 'In this nation\'s Supabase &rarr; <b>Authentication &rarr; Sign In / Providers &rarr; Email</b>, turn <b>Confirm email OFF</b> (or configure SMTP), then try again.</span>';
+        res.style.display='block';
+      }
+      if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';}
+      return;
+    }
+    clearTimeout(_to);
     var signupData = await signupR.json();
     // Supabase /auth/v1/signup returns two different shapes depending on
     // whether "Confirm email" is enabled in the dashboard:
