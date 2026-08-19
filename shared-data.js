@@ -3845,22 +3845,51 @@ async function deactivateStaff(id, btn){
 // fully restores app access. The admin should follow up with Send Reset
 // if the returning employee can't recall their password.
 async function reactivateStaff(id, btn){
+  var u = (window._staffCache||{})[id] || {};
+  var email = (u.email||'').toLowerCase();
+  var name  = u.name || email;
   var ok = await showConfirm({
     title:       'Reactivate this staff member?',
-    message:     'They will regain access to the app. If they have forgotten their password, use Send Reset afterwards.',
+    message:     'They regain access to the app. If their Supabase login was deleted, it is recreated with a temporary password (shown after). If the login still exists, it is kept — use Send Reset if they forgot the password.',
     confirmText: 'Reactivate'
   });
   if (!ok) return;
   if(btn){btn.disabled=true;btn.textContent='...';}
   try {
+    // Recreate/adopt the login (idempotent): signup creates the auth user if it
+    // was deleted out-of-band; if it still exists, Supabase reports "already
+    // registered" and we keep it. Fixes the "reactivated but can't log in"
+    // orphaned-record case.
+    var pw = (typeof nationShort==='function' ? nationShort() : 'HOME') + ((name||'').split(' ')[0]||'') + '2026!';
+    var newLogin = false;
+    if(email){
+      try {
+        var sr = await fetch(SUPABASE_URL+'/auth/v1/signup',{ method:'POST', headers:HOUSING_HEADERS,
+          body:JSON.stringify({email:email, password:pw, data:{full_name:name}}) });
+        var sd = await sr.json().catch(function(){ return {}; });
+        var already = (sd.code==='user_already_exists') || /already.*(registered|exists)/i.test((sd.msg||'')+' '+(sd.error_description||'')+' '+(sd.error||''));
+        newLogin = !!(sr.ok && ((sd.user && sd.user.id) || sd.id) && !already);
+      } catch(_e){ /* best-effort; the PATCH below still reactivates the record */ }
+    }
     var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+id,{
       method:'PATCH',
       headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
       body:JSON.stringify({is_active:true})
     });
     if(r.ok){
-      showToast('Staff member reactivated');
-      auditEntry('SETTINGS','settings_user_reactivate','Staff reactivated (id='+id+')',window.currentRole||'ed');
+      showToast(newLogin ? ('Reactivated + login recreated — temporary password: '+pw) : 'Staff member reactivated');
+      auditEntry('SETTINGS','settings_user_reactivate','Staff reactivated (id='+id+')'+(newLogin?' + login recreated':''),window.currentRole||'ed');
+      if(newLogin && email && typeof sendNotification==='function'){
+        try {
+          var portal = (window.NATION_CONFIG && NATION_CONFIG.portal_base) || location.origin;
+          var nname  = (window.NATION_CONFIG && (NATION_CONFIG.display_name||NATION_CONFIG.short)) || 'Housing';
+          sendNotification({ to: email, to_name: name, subject: 'Your '+nname+' Housing account is ready',
+            html: '<p>Hello '+escapeHtml(name)+',</p><p>Your access to the '+escapeHtml(nname)+' Housing app has been restored.</p>'
+              + '<p><b>Sign in:</b> <a href="'+escapeHtml(portal)+'">'+escapeHtml(portal)+'</a><br>'
+              + '<b>Email:</b> '+escapeHtml(email)+'<br><b>Temporary password:</b> '+escapeHtml(pw)+'</p>'
+              + '<p>Please sign in and change your password from Settings.</p>' });
+        } catch(_we){}
+      }
       renderHousingUserTable();
     } else {
       showToast('Could not reactivate — check permissions');
@@ -3871,43 +3900,6 @@ async function reactivateStaff(id, btn){
     if(btn){btn.disabled=false;btn.textContent='Reactivate';}
   }
 }
-// Permanently delete a DEACTIVATED staff row (ED/super_user only, enforced by the
-// staff_delete_ed_inactive RLS policy). For orphaned/mistaken records so the
-// person can be re-added cleanly; normal departures should stay deactivated for
-// audit history. Only offered on the Inactive tab.
-async function hardDeleteStaff(id, btn){
-  var u = (window._staffCache||{})[id] || {};
-  var ok = await showConfirm({
-    title:       'Delete permanently?',
-    message:     'This permanently removes ' + (u.name || 'this staff record') + ' from the directory and cannot be undone. Use this only for a mistaken or orphaned entry — normal departures should stay deactivated so their history is preserved.',
-    confirmText: 'Delete permanently'
-  });
-  if (!ok) return;
-  if(btn){ btn.disabled=true; btn.textContent='Deleting…'; }
-  try {
-    // return=representation so we can tell a REAL delete from an RLS no-op: a
-    // DELETE that the staff_no_delete policy filters to zero rows still returns
-    // 204/200 OK but deletes nothing (and would silently "refresh" with the row
-    // still present). Only treat it as deleted when a row actually comes back.
-    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+encodeURIComponent(id),{
-      method:'DELETE', headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=representation'})
-    });
-    var deleted = r.ok ? await r.json().catch(function(){ return []; }) : [];
-    if(r.ok && deleted && deleted.length){
-      showToast('Staff record permanently deleted');
-      auditEntry('SETTINGS','settings_user_delete','Staff permanently deleted: '+(u.email||('id='+id)),window.currentRole||'ed');
-      renderHousingUserTable();
-    } else {
-      // r.ok but nothing removed => the RLS policy still blocks delete.
-      showToast('Delete blocked — the staff-delete migration (20260819_staff_ed_delete.sql) has not been run on this project yet. Run it (or use the control-plane Migrations tab), then try again.');
-      if(btn){ btn.disabled=false; btn.textContent='Delete'; }
-    }
-  } catch(e){
-    showToast('Error: '+e.message);
-    if(btn){ btn.disabled=false; btn.textContent='Delete'; }
-  }
-}
-window.hardDeleteStaff = hardDeleteStaff;
 // Send a password-reset email to a staff member from the admin table. Uses
 // the same /auth/v1/recover endpoint + redirect_to as the public Forgot
 // Password flow, so the email link lands on the reset panel on index.html.
@@ -5538,7 +5530,6 @@ async function renderHousingUserTable(){
           // apply uniformly.
           actionsHtml = '<div class="flex-end gap-8">'
             +'<button onclick="reactivateStaff('+u.id+',this)" class="btn btn-sm btn-primary">Reactivate</button>'
-            +'<button onclick="hardDeleteStaff('+u.id+',this)" class="btn btn-sm btn-ghost" style="color:var(--danger);border-color:var(--danger-border);" title="Permanently remove this orphaned/mistaken record">Delete</button>'
             +'</div>';
         } else {
           // Active: Edit + (Send Reset | Send Sign-in Link) + Deactivate.
