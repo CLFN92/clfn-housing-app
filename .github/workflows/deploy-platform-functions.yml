@@ -37,6 +37,7 @@ on:
       - 'supabase/functions/set-nation-secret/**'
       - 'supabase/functions/enter-nation/**'
       - 'supabase/functions/gen-support-key/**'
+      - 'supabase/functions/run-nation-migration/**'
       - 'supabase/functions/_shared/**'
       - '.github/workflows/deploy-platform-functions.yml'
   workflow_dispatch:
@@ -83,4 +84,6 @@ jobs:
           supabase functions deploy enter-nation --project-ref "$REF"
           echo "──── Deploying gen-support-key to $REF (JWT verify ON; generates per-nation keypairs) ────"
           supabase functions deploy gen-support-key --project-ref "$REF"
+          echo "──── Deploying run-nation-migration to $REF (JWT verify ON; fleet schema updates) ────"
+          supabase functions deploy run-nation-migration --project-ref "$REF"
           echo "Platform functions deployed."

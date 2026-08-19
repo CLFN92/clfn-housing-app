@@ -305,12 +305,13 @@
       +   tile('Est. monthly cost', _money(totCost))
       + '</div>'
       + '<div class="nic-tabs">'
-      +   tab('nations', 'Nations', true) + tab('provision', 'Provision') + tab('addnation', 'Add a nation') + tab('admins', 'Administrators')
+      +   tab('nations', 'Nations', true) + tab('provision', 'Provision') + tab('addnation', 'Add a nation') + tab('migrations', 'Migrations') + tab('admins', 'Administrators')
       + '</div>'
       + '<div class="nic-body">'
       +   panel('nations',   nationsCard(nations, usageBySub), true)
       +   panel('provision', provisionCard() + addNationStepsCard() + emailSetupCard() + supportLoginSetupCard(), false)
       +   panel('addnation', addNationCard(), false)
+      +   panel('migrations', migrationsCard(nations), false)
       +   panel('admins',    adminsCard(admins, meEmail), false)
       + '</div>'
       + '</div>';
@@ -549,6 +550,71 @@
       + '</div>'
       + '</div>';
   }
+
+  // Fleet migrations: apply one schema update to many nation projects at once
+  // (via the run-nation-migration control-plane function). Avoids pasting a
+  // migration into every nation's SQL editor by hand.
+  function migrationsCard(nations){
+    var provisioned = (nations || []).filter(function(n){ return n.supabase_url; });
+    var checks = provisioned.map(function(n){
+      var active = n.status === 'active';
+      return '<label style="display:inline-flex;align-items:center;gap:6px;font-weight:600;margin:0 14px 6px 0;font-size:12px;">'
+        + '<input type="checkbox" class="fm-nation" value="' + esc(n.subdomain) + '"' + (active ? ' checked' : '') + ' style="width:auto;"/> '
+        + esc(n.subdomain) + (active ? '' : ' <span style="color:var(--muted);">(' + esc(n.status) + ')</span>') + '</label>';
+    }).join('') || '<span class="sub">No provisioned nations yet.</span>';
+    return '<div class="card"><h3>Fleet migrations</h3>'
+      + '<p class="sub" style="margin:2px 0 8px;">Apply one schema update to many nation projects at once. Give a <b>migration filename</b> from <code>supabase/migrations/</code> (fetched from the repo) OR paste raw SQL. Migrations must be <b>idempotent</b> (<code>create ... if not exists</code>, add-column-if-not-exists) so a re-run is safe. Uses the Management API + <code>SB_MGMT_TOKEN</code>; every run is recorded so already-applied nations are skipped.</p>'
+      + '<label>Migration filename (under supabase/migrations/)</label>'
+      + '<input id="fm-file" placeholder="20260819_labels_module.sql"/>'
+      + '<label style="margin-top:8px;">…or paste raw SQL (leave the filename blank)</label>'
+      + '<textarea id="fm-sql" rows="5" placeholder="alter table public.housing_units add column if not exists ..." style="width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:8px;border:1px solid var(--line);border-radius:8px;resize:vertical;box-sizing:border-box;"></textarea>'
+      + '<label style="margin-top:8px;">Label for pasted SQL (ledger name; optional)</label>'
+      + '<input id="fm-label" placeholder="e.g. add_unit_flag_2026_08"/>'
+      + '<div style="margin-top:10px;font-size:12px;font-weight:700;color:var(--muted);">Target nations</div>'
+      + '<div style="margin:6px 0 10px;">' + checks + '</div>'
+      + '<label style="display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:12px;"><input type="checkbox" id="fm-force" style="width:auto;"/> Force re-run where already applied</label>'
+      + '<div class="msg" id="fm-msg"></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">'
+      +   '<button class="btn ghost" type="button" data-act="fleet-dry">Dry run (preview)</button>'
+      +   '<button class="btn" type="button" data-act="fleet-apply">Apply to selected</button>'
+      + '</div>'
+      + '<div id="fm-results" style="margin-top:12px;"></div>'
+      + '</div>';
+  }
+  function _fmSelectedTargets(){
+    var out = [];
+    Array.prototype.forEach.call(document.querySelectorAll('.fm-nation'), function(c){ if (c.checked) out.push(c.value); });
+    return out;
+  }
+  window.runFleetMigration = async function(dryRun){
+    var file  = ((document.getElementById('fm-file')  || {}).value || '').trim();
+    var sql   = ((document.getElementById('fm-sql')   || {}).value || '');
+    var label = ((document.getElementById('fm-label') || {}).value || '').trim();
+    var force = !!(document.getElementById('fm-force') || {}).checked;
+    var targets = _fmSelectedTargets();
+    if (!file && !sql.trim()){ setMsg('fm-msg', 'Enter a migration filename or paste SQL.'); return; }
+    if (!targets.length){ setMsg('fm-msg', 'Select at least one target nation.'); return; }
+    setMsg('fm-msg', dryRun ? 'Previewing...' : 'Applying...', 'ok');
+    var payload = { targets: targets, dryRun: !!dryRun, force: force };
+    if (file) payload.migration = file; else { payload.sql = sql; if (label) payload.label = label; }
+    var r;
+    try {
+      r = await fetch(PBASE + '/functions/v1/run-nation-migration', {
+        method: 'POST', headers: { apikey: ANON, Authorization: 'Bearer ' + getAT(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (e){ setMsg('fm-msg', 'Network error: ' + String(e).slice(0, 120)); return; }
+    var d = await r.json().catch(function(){ return {}; });
+    if (!r.ok){ setMsg('fm-msg', 'Failed: ' + (d.message || d.error || ('HTTP ' + r.status))); return; }
+    setMsg('fm-msg', (dryRun ? 'Preview' : 'Done') + ' — ' + esc(d.migration) + ' (' + d.count + ' nation(s))', 'ok');
+    var rows = (d.results || []).map(function(x){
+      var color = x.status === 'applied' ? '#166534' : x.status === 'failed' ? 'var(--danger)' : x.status === 'would_run' ? '#1d4ed8' : 'var(--muted)';
+      return '<tr><td><b>' + esc(x.subdomain) + '</b></td><td style="color:' + color + ';font-weight:700;">' + esc(x.status) + '</td>'
+        + '<td style="font-size:12px;color:var(--muted);">' + esc(x.detail || '') + '</td></tr>';
+    }).join('');
+    document.getElementById('fm-results').innerHTML =
+      '<table><thead><tr><th>Nation</th><th>Result</th><th>Detail</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  };
 
   function addNationCard(){
     var modChecks = MODULES.map(function(m){
@@ -2147,6 +2213,8 @@
       // wizard; from a Configure page it prefills that nation.
       case 'provision':     window.showProvision(id); break;
       case 'run-provision': window.runProvision(); break;
+      case 'fleet-dry':     window.runFleetMigration(true); break;
+      case 'fleet-apply':   window.runFleetMigration(false); break;
       case 'agr-save-addr': window.saveNationAgreementAddress(id); break;
       case 'gen-agreement': window.generateNationAgreement(id); break;
       case 'doc-view':      window.viewNationDoc(el.getAttribute('data-path') || ''); break;
