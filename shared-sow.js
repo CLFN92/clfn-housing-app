@@ -17,6 +17,21 @@
  *   nextProjectNumber(unitId)
  * ============================================================ */
 
+// PO draw-down payment rollup for a SOW. Recomputes from the authoritative
+// po/draws on the record (not the stored paymentProgress mirror) so callers
+// always see the live figure. hasPo is true once a PO amount or any draw
+// exists. Used by the reno approvals "Payments" column.
+function sowPaymentInfo(sow){
+  if(!sow) return { hasPo:false, po:0, paid:0, percent:0, outstanding:0 };
+  var po = (sow.po && typeof sow.po === 'object') ? (parseFloat(sow.po.amount) || 0) : 0;
+  var draws = Array.isArray(sow.draws) ? sow.draws : [];
+  var paid = draws.reduce(function(s,d){ return s + (d && d.paid ? (parseFloat(d.amount) || 0) : 0); }, 0);
+  var hasPo = po > 0 || draws.length > 0;
+  var percent = po > 0 ? Math.round(paid / po * 100) : 0;
+  return { hasPo:hasPo, po:po, paid:paid, percent:percent, outstanding:Math.max(0, po - paid) };
+}
+window.sowPaymentInfo = sowPaymentInfo;
+
 function getSowByProjectNumber(unitId, projectNumber){
   var list = getUnitSowList(unitId);
   for(var i=0; i<list.length; i++){

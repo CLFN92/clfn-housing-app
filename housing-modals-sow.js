@@ -2407,9 +2407,10 @@ function saveSOW(opts){
   data.amount = totalNum;
 
   // PO draw-down / payments — copy the working state onto the record and
-  // compute progress (paid vs PO total) into data.progress.percent, which the
-  // unit SOW table already renders. Preserves any po/draws saved earlier when
-  // the payments tab was never opened this session (state seeded from `saved`).
+  // compute paid-vs-PO into data.paymentProgress (a field distinct from
+  // data.progress, which is renovation work-progress). Preserves any po/draws
+  // saved earlier when the payments tab was never opened this session (state
+  // was seeded from `saved` at open).
   if (typeof _sowCollectPayments === 'function') _sowCollectPayments(data);
 
   // ── Approval-chain authority gate + status derivation ────────────────────
@@ -2821,7 +2822,10 @@ function printSOW(){
  * draws:[{id,type,phaseNo,label,amount,paid,paidDate,releaseDate,invoice}] }
  * seeded once per open from the saved record (or an awarded RFQ / MR total).
  * On save, _sowCollectPayments copies it onto the record and stamps
- * data.progress.percent (which the unit SOW table already renders).
+ * data.paymentProgress = {percent,paid,po} — a field DISTINCT from
+ * data.progress (renovation work-progress, owned by saveRenoProgress in
+ * renos.html). The reno approvals "Payments" column reads paymentProgress
+ * via the shared sowPaymentInfo(sow) helper (shared-sow.js).
  * ===================================================================== */
 
 function _sowPayUid(){ return 'dr_' + Math.random().toString(36).slice(2,9) + Date.now().toString(36); }
@@ -3239,7 +3243,7 @@ function _sowCollectPayments(data){
   if(!st) return;
   var hasPo    = st.po && _sowPayNum(st.po.amount) > 0;
   var hasDraws = st.draws && st.draws.length;
-  if(!hasPo && !hasDraws) return;   // nothing configured — leave data.progress untouched
+  if(!hasPo && !hasDraws) return;   // nothing configured — don't write paymentProgress
   data.po = st.po ? {
     number: st.po.number || '',
     amount: _sowPayNum(st.po.amount),
@@ -3256,7 +3260,12 @@ function _sowCollectPayments(data){
       invoice: (d.invoice && d.invoice.path) ? { path:d.invoice.path, name:d.invoice.name } : null
     };
   });
-  data.progress = { percent: _sowPayPercent(), paid: _sowPayPaidTotal(), po: (st.po ? _sowPayNum(st.po.amount) : 0), updatedAt: new Date().toISOString() };
+  // NOTE: payment progress is a DISTINCT concept from renovation work-progress.
+  // saveRenoProgress (renos.html) owns sow.progress.percent (physical work % —
+  // rendered by the unit SOW table's Progress column and the reno approvals
+  // Progress column). Payment progress lives in its OWN field so the two never
+  // clobber each other; the reno approvals "Payments" column reads this.
+  data.paymentProgress = { percent: _sowPayPercent(), paid: _sowPayPaidTotal(), po: (st.po ? _sowPayNum(st.po.amount) : 0), updatedAt: new Date().toISOString() };
 }
 
 // Immediately persist payments onto the already-saved SOW (paid toggles /

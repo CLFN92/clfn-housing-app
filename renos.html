@@ -87,10 +87,11 @@
             <th class="std-th-sortable" data-sort-key="approval" style="width:130px;">Approval Status</th>
             <th class="std-th-sortable" data-sort-key="contractor" style="width:150px;min-width:100px;">Contractor</th>
             <th class="std-th-sortable" data-sort-key="progress" style="width:80px;">Progress</th>
+            <th class="std-th-sortable" data-sort-key="payments" style="width:80px;">Payments</th>
             <th style="width:1%;white-space:nowrap;"></th>
           </tr>
         </thead>
-        <tbody id="ra_tbody" data-table-page="ra"><tr><td colspan="8" class="empty-state" style="padding:40px;text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+        <tbody id="ra_tbody" data-table-page="ra"><tr><td colspan="9" class="empty-state" style="padding:40px;text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1453,7 +1454,8 @@ function renderRenoApprovalsView() {
     cost:          { label: 'Request Value',   accessor: function(r){ return r.cost || 0; } },
     approval:      { label: 'Approval Status', accessor: function(r){ return (r.appr && r.appr.label) || '(none)'; } },
     contractor:    { label: 'Contractor',      accessor: function(r){ return (r.sow && r.sow.contractor) || '(none)'; } },
-    progress:      { label: 'Progress',        accessor: function(r){ return (r.prog && r.prog.overallPct) || 0; } }
+    progress:      { label: 'Progress',        accessor: function(r){ return (r.prog && r.prog.overallPct) || 0; } },
+    payments:      { label: 'Payments',        accessor: function(r){ var pi = (typeof sowPaymentInfo==='function') ? sowPaymentInfo(r.sow) : {hasPo:false,percent:0}; return pi.hasPo ? pi.percent : -1; } }
   };
   var _raAccessors = {};
   Object.keys(_raColumns).forEach(function(k){ _raAccessors[k] = _raColumns[k].accessor; });
@@ -1533,7 +1535,7 @@ function renderRenoApprovalsView() {
   if(!tbody) return;
 
   if(!_raRows.length) {
-    tbody.innerHTML='<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--muted);">No renovation records match the current filters.</td></tr>';
+    tbody.innerHTML='<tr><td colspan="9" style="padding:40px;text-align:center;color:var(--muted);">No renovation records match the current filters.</td></tr>';
     var _raTheadEmpty = document.getElementById('ra_thead');
     if (typeof tableBindColumnMenuClicks === 'function')   tableBindColumnMenuClicks(_raTheadEmpty, 'ra');
     if (typeof tableRefreshSortIndicators === 'function') tableRefreshSortIndicators(_raTheadEmpty, 'ra');
@@ -1547,6 +1549,12 @@ function renderRenoApprovalsView() {
     var costStr = r.cost>0?('$'+Math.round(r.cost).toLocaleString()):'—';
     var needsED = r.cost > hmLimit;
     var pct = prog?(prog.overallPct||0):0;
+    // Payments column — PO draw-down paid-vs-outstanding %. Distinct from the
+    // work-progress bar above; blue while paying down, green when fully paid.
+    var payInfo = (typeof sowPaymentInfo === 'function') ? sowPaymentInfo(sow) : {hasPo:false,percent:0,paid:0,po:0};
+    var payCell = !payInfo.hasPo
+      ? '<span style="font-size:11px;color:var(--muted);">—</span>'
+      : '<div style="display:flex;align-items:center;gap:6px;" title="$'+Math.round(payInfo.paid).toLocaleString()+' of $'+Math.round(payInfo.po).toLocaleString()+' paid"><div style="width:56px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0;"><div style="height:100%;width:'+Math.min(100,payInfo.percent)+'%;background:'+(payInfo.percent>=100?'var(--success)':'var(--info-blue)')+';border-radius:2px;"></div></div><span style="font-size:11px;color:var(--muted);">'+payInfo.percent+'%</span></div>';
     var uid = u.id;
     var pn = r.projectNumber || '';
     // Data-attrs carry unit ID + project number so click handlers know which SOW to open.
@@ -1581,6 +1589,7 @@ function renderRenoApprovalsView() {
       +'<td style="padding:10px 10px;"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+appr.bg+';color:'+appr.c+';white-space:nowrap;">'+appr.label+'</span></td>'
       +'<td style="padding:10px 10px;font-size:12px;color:var(--muted);word-break:break-word;max-width:160px;">'+(sow&&sow.contractor?sow.contractor:'—')+'</td>'
       +'<td style="padding:10px 10px;"><div style="display:flex;align-items:center;gap:6px;"><div style="width:56px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'var(--success)':'var(--yellow)')+';border-radius:2px;"></div></div><span style="font-size:11px;color:var(--muted);">'+pct+'%</span></div></td>'
+      +'<td style="padding:10px 10px;">'+payCell+'</td>'
       +'<td style="padding:10px 14px;width:1%;white-space:nowrap;"><div style="display:flex;gap:5px;align-items:center;">'
         +approveBtn
         +'<button data-ra-sow="'+uid+'"'+dataProj+' style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:600;font-family:DM Sans,sans-serif;color:var(--muted);"> Request</button>'
