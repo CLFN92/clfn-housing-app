@@ -257,7 +257,7 @@
 
     var html = ''
       + '<div class="page-header-bar" style="margin-bottom:14px;">'
-      +   '<div><h1 style="margin:0;">Chief &amp; Council Dashboard</h1>'
+      +   '<div><h1 style="margin:0;">Reports</h1>'
       +   '<p style="margin:2px 0 0;color:var(--muted);font-size:13px;">' + _esc(nation ? nation + ' — ' : '') + 'Housing at a glance · read-only</p></div>'
       +   '<button class="btn btn-ghost" onclick="renderLeadershipDashboard()" title="Refresh">&#8635; Refresh</button>'
       + '</div>';
