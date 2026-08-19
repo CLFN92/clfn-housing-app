@@ -1649,6 +1649,17 @@ function _randomStrongPassword(){
   }
   return out;
 }
+// fetch() with a hard timeout so an add-staff step can never hang the button on
+// "Adding..." forever. On timeout the promise rejects (AbortError) and the
+// caller surfaces a message + re-enables the button.
+function _staffFetch(url, opts, ms){
+  var ac = new AbortController();
+  var to = setTimeout(function(){ ac.abort(); }, ms || 20000);
+  return fetch(url, Object.assign({}, opts||{}, { signal: ac.signal }))
+    .then(function(r){ clearTimeout(to); return r; })
+    .catch(function(e){ clearTimeout(to); throw e; });
+}
+
 async function submitAddHousingStaff() {
   var name  = ((document.getElementById('hs-name')||{}).value||'').trim();
   var email = ((document.getElementById('hs-email')||{}).value||'').trim().toLowerCase();
@@ -1686,7 +1697,7 @@ async function submitAddHousingStaff() {
     // Check staff table without filtering on is_active so we can also flag
     // deactivated records (the renderHousingUserTable view hides them, but
     // the row still exists in the DB and would 409 on insert).
-    var checkR = await fetch(SUPABASE_URL+'/rest/v1/staff?select=id,is_active&email=eq.'+encodeURIComponent(email),{headers:HOUSING_HEADERS});
+    var checkR = await _staffFetch(SUPABASE_URL+'/rest/v1/staff?select=id,is_active&email=eq.'+encodeURIComponent(email),{headers:HOUSING_HEADERS});
     var existing = await checkR.json();
     if(existing && existing.length){
       var existRow = existing[0];
@@ -1781,7 +1792,7 @@ async function submitAddHousingStaff() {
     }
 
     // Step 2: Add to staff table (only after auth succeeds)
-    var staffR = await fetch(SUPABASE_URL+'/rest/v1/staff',{
+    var staffR = await _staffFetch(SUPABASE_URL+'/rest/v1/staff',{
       method:'POST',
       headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
       body:JSON.stringify({name:name, email:email, role:role, department:dept, is_active:true,
@@ -1840,12 +1851,43 @@ async function submitAddHousingStaff() {
       showToast('\u2713 '+name+' added successfully');
     }
 
+    // Branded welcome email via the nation's OWN provider (Graph/Resend) --
+    // reliable and independent of Supabase's built-in SMTP. Best-effort. External
+    // consultants get a magic link instead (via "Send Sign-in Link"), so skip
+    // them; and skip when we adopted an existing auth user (password unknown).
+    if(!isExternal && !alreadyInAuth && typeof sendNotification==='function'){
+      try {
+        var _portal = (window.NATION_CONFIG && NATION_CONFIG.portal_base) || location.origin;
+        var _nname  = (window.NATION_CONFIG && (NATION_CONFIG.display_name||NATION_CONFIG.short)) || 'Housing';
+        sendNotification({
+          to: email, to_name: name,
+          subject: 'Your ' + _nname + ' Housing account is ready',
+          html: '<p>Hello ' + escapeHtml(name) + ',</p>'
+            + '<p>An account has been created for you in the ' + escapeHtml(_nname) + ' Housing app.</p>'
+            + '<p><b>Sign in:</b> <a href="' + escapeHtml(_portal) + '">' + escapeHtml(_portal) + '</a><br>'
+            + '<b>Email:</b> ' + escapeHtml(email) + '<br>'
+            + '<b>Temporary password:</b> ' + escapeHtml(defaultPassword) + '</p>'
+            + '<p>Please sign in and change your password from Settings after your first login.</p>'
+        });
+        if(typeof auditEntry==='function') auditEntry('SETTINGS','staff_welcome_email','Welcome email sent to '+email, window.currentRole||'ed');
+      } catch(_we){ console.warn('[add-staff] welcome email failed', _we); }
+    }
+
     // Refresh user table if visible
     if(true) renderHousingUserTable();
     if(btn) btn.style.display='none';
 
   } catch(e) {
-    showToast('Error: '+e.message);
+    var timedOut = e && (e.name === 'AbortError' || /abort/i.test(e.message||''));
+    var emsg = timedOut
+      ? 'A request timed out. This usually means a slow/blocked connection or a Supabase Auth misconfiguration. Check your connection and try again; if it persists, open the browser console and share the error.'
+      : ('Error: ' + (e && e.message || e));
+    if(res){
+      res.style.background='var(--danger-bg)'; res.style.border='1px solid var(--danger-border)'; res.style.color='var(--danger)';
+      res.innerHTML = '<strong>Could not add the staff member.</strong><br><span style="font-size:11px;">'+escapeHtml(emsg)+'</span>';
+      res.style.display='block';
+    }
+    showToast(timedOut ? 'Add staff timed out — try again' : ('Error: '+(e&&e.message||e)));
     if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';}
   }
 }
