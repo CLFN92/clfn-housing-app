@@ -294,16 +294,23 @@ Captured 2026-07-31 after P1-P3 shipped and `admin.fnhub.app` went live:
    more platform admins or relying on it heavily.
 
 3. **"Open" should open the nation site with full super-admin access.** ✅ BUILT
-   (option **b**). The nations table now has an **Enter** button next to Open.
-   Flow: admin panel (super-admin JWT) -> `enter-nation` (platform, JWT-verified)
-   -> `support-login` (nation project, `--no-verify-jwt`, gated by the shared
-   `SUPPORT_LOGIN_SECRET`) mints a one-time magic link into a same-day
-   `super_user` "Platform Support" staff row. The magic link (not a Gmail
-   password) sidesteps the domain gate. Audited on both sides
-   (`entered_nation` + `support_session_started`), and a nation can refuse it via
-   **Settings -> Admin -> Config -> Platform Support Access**. Setup + hardening
-   notes: **docs/SUPPORT-LOGIN.md**. Remaining hardening (future): per-nation
-   secret (vs one platform-wide value) and sub-day expiry.
+   (option **b**, hardened). The nations table has an **Enter** button next to
+   Open. Trust is **per-nation asymmetric signing** (no shared secret): each
+   nation has its own ES256 keypair — the private key lives only in the
+   control-plane `nation_support_keys` table, the nation holds only its public key
+   (`SUPPORT_LOGIN_PUBKEY`). Flow: admin (super-admin JWT) -> `enter-nation`
+   (platform, JWT-verified) signs a 2-min token with the nation's private key ->
+   `support-login` (nation, `--no-verify-jwt`) verifies it with the public key,
+   mints a one-time magic link into a same-day `super_user` "Platform Support"
+   staff row (the magic link sidesteps the domain gate). Keys are generated
+   server-side by `gen-support-key` and managed from **Configure -> Supabase ->
+   Support login key** (generate / locked / rotate). Every entry is audited on
+   both sides (`entered_nation` + `support_session_started`) **and emails the
+   nation's ED** via the nation's own provider; a nation can refuse it via
+   **Settings -> Admin -> Config -> Platform Support Access**. Setup: **run
+   `supabase/platform/nation_support_keys.sql`**, then per nation generate a key +
+   set `SUPPORT_LOGIN_PUBKEY`. Full notes: **docs/SUPPORT-LOGIN.md**. Remaining
+   hardening: sub-day expiry, replay (jti) tracking, super-admin MFA.
 
 ---
 

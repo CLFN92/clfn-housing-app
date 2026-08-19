@@ -528,21 +528,22 @@
         + '</ol>';
     }
     return '<div class="card"><h3>Support login setup &mdash; the &ldquo;Enter&rdquo; button</h3>'
-      + '<p class="sub" style="margin:2px 0 6px;">The <b>Enter</b> button (next to a nation\'s <b>Open</b>) opens a signed-in <b>Platform Support</b> session on that nation\'s app for troubleshooting &mdash; full access, logged on both sides, and refusable by the nation. It works only once the shared secret below is set on the platform project <b>and</b> that nation\'s project.</p>'
+      + '<p class="sub" style="margin:2px 0 6px;">The <b>Enter</b> button (next to a nation\'s <b>Open</b>) opens a signed-in <b>Platform Support</b> session on that nation\'s app for troubleshooting &mdash; full access, logged on both sides, refusable by the nation, and the nation\'s ED is emailed each time. Each nation has its <b>own signing key</b>: the private key stays on the control plane; the nation holds only its <b>public</b> key (useless if stolen), so there is <b>no shared secret</b>.</p>'
       + '<div style="border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin-top:10px;">'
-      +   '<div style="font-weight:800;font-size:13px;">One-time setup</div>'
+      +   '<div style="font-weight:800;font-size:13px;">Per-nation setup (once each)</div>'
       +   numList([
-              'Generate one strong secret &mdash; run <code>openssl rand -hex 32</code> (or any 32+ byte random hex). Use the <b>same value</b> everywhere below.',
-              'On the <b>platform</b> project &rarr; ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions &rarr; Secrets') + ', add <code>SUPPORT_LOGIN_SECRET</code> = that value. (Lets <code>enter-nation</code> send it.)',
-              'On <b>each nation</b> project &rarr; Settings &rarr; Edge Functions &rarr; Secrets, add the <b>same</b> <code>SUPPORT_LOGIN_SECRET</code> = that value. (Lets that nation\'s <code>support-login</code> verify it.)',
-              'Deploy the functions (CI does this on push to <code>main</code>): <code>enter-nation</code> to the platform project, and <code>support-login</code> to <b>each</b> nation project (deployed with <code>--no-verify-jwt</code>; the nation-functions workflow targets one project at a time via its <code>project_ref</code> input).',
-              'In each nation project\'s <b>Auth</b> settings, allow a redirect to <code>https://&lt;subdomain&gt;.fnhub.app/</code> (Site URL or an added Redirect URL), or the magic link\'s redirect is dropped.'
+              'Open the nation in <b>Configure &rarr; Supabase</b> and click <b>Generate keypair</b> under &ldquo;Support login key.&rdquo; The private key is stored here; the public key is shown (and locked).',
+              'Copy that <b>public key</b> into the nation project &rarr; ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions &rarr; Secrets') + ' as <code>SUPPORT_LOGIN_PUBKEY</code>.',
+              'Deploy the functions (CI does this on push to <code>main</code>): <code>enter-nation</code> + <code>gen-support-key</code> to the platform project, and <code>support-login</code> to <b>each</b> nation project (deployed with <code>--no-verify-jwt</code>; the nation-functions workflow targets one project at a time via its <code>project_ref</code> input).',
+              'In the nation project\'s <b>Auth</b> settings, allow a redirect to <code>https://&lt;subdomain&gt;.fnhub.app/</code> (Site URL or an added Redirect URL), or the magic link\'s redirect is dropped.',
+              '(One-time, platform DB) run <code>supabase/platform/nation_support_keys.sql</code> in the platform SQL Editor so the keys have somewhere to live.'
             ])
-      +   '<div style="font-size:12px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><b>Secret:</b> <code>SUPPORT_LOGIN_SECRET</code> &mdash; identical value on the platform project and every nation project. Server-side only; it must never appear in the app or the browser. Rotate by updating it in every project at once.</div>'
+      +   '<div style="font-size:12px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);">No shared secret to manage. Only <code>SUPPORT_LOGIN_PUBKEY</code> (a <b>public</b> key) sits on the nation. Rotate anytime from the Supabase tab &mdash; it locks the old key until you re-copy the new public key.</div>'
       + '</div>'
       + '<div style="margin-top:12px;padding:11px 13px;background:var(--accent-light);border:1px solid var(--hair);border-radius:9px;font-size:12px;line-height:1.6;">'
       +   '<div style="font-weight:800;margin-bottom:4px;">Good to know</div>'
-      +   '<div>&bull; The secret is sent <b>server-to-server</b> (admin panel &rarr; <code>enter-nation</code> with your super-admin login &rarr; the nation) &mdash; it never reaches the browser.</div>'
+      +   '<div>&bull; <code>enter-nation</code> signs a 2-minute token with the nation\'s private key; the nation verifies it with its public key. A stolen public key can\'t forge a login, and there is no secret that, if leaked, exposes every nation.</div>'
+      +   '<div>&bull; The nation\'s <b>ED is emailed</b> on every entry, via that nation\'s own email provider (skipped only if the nation hasn\'t set up email &mdash; the entry is still audited).</div>'
       +   '<div>&bull; A nation can <b>refuse</b> support login: their ED toggles <b>Settings &rarr; Admin &rarr; Config &rarr; Platform Support Access</b> off. Then Enter returns &ldquo;support login is turned off.&rdquo;</div>'
       +   '<div>&bull; Every entry is audited: <code>entered_nation</code> (control plane) + <code>support_session_started</code> (the nation\'s Audit Log). Access is a full super_user session that lapses the same day.</div>'
       + '</div>'
@@ -663,6 +664,7 @@
     renderNationInvoices(n.subdomain);
     window.invAddLine();          // seed one empty invoice line
     renderNationBilling(n.subdomain);
+    renderSupportKey(n.subdomain);
     loadNicSummary(n.subdomain);
   };
 
@@ -738,6 +740,10 @@
       +   '<p class="sub" style="margin:4px 0 0;font-size:11px;">Requires the nation to have a Supabase project, and the <code>ai-chat</code> function deployed to it (see the provisioning checklist). Leave blank and Save does nothing.</p>'
       +   '<div class="msg" id="cn-ai-msg"></div>'
       +   '<button class="btn sm" type="button" data-act="ai-key-save" data-sub="' + esc(n.subdomain) + '">Save &amp; apply to project</button>'
+      + '</div>'
+      + '<div class="card"><h3>Support login key</h3>'
+      +   '<p class="sub" style="margin:2px 0 8px;">Per-nation signing key for the <b>Enter</b> (support login) feature. The <b>private</b> key stays here on the control plane; you copy the <b>public</b> key into this nation\'s <code>SUPPORT_LOGIN_PUBKEY</code> Edge Function secret. A stolen public key cannot forge a login. Once generated the key is <b>locked</b> &mdash; rotating it invalidates the nation\'s current public key until you re-copy it.</p>'
+      +   '<div id="cn-supportkey"><div class="empty">Loading key status...</div></div>'
       + '</div>';
 
     var pNotes =
@@ -1046,7 +1052,8 @@
     if (!r.ok || !d.action_link){
       var msg = d.message || d.error || ('HTTP ' + r.status);
       if (d.error === 'support_disabled') msg = esc(n.display_name) + ' has turned OFF platform support login. Ask the nation to re-enable it in Settings before you can enter.';
-      else if (d.error === 'support_secret_not_set') msg = 'SUPPORT_LOGIN_SECRET is not set. Add it on the platform project AND on this nation\'s project, then redeploy the functions.';
+      else if (d.error === 'no_support_key') msg = 'No support key for this nation yet. Generate one in Configure → Supabase → Support login key, then set SUPPORT_LOGIN_PUBKEY on the nation project.';
+      else if (d.error === 'pubkey_not_set') msg = 'This nation has no SUPPORT_LOGIN_PUBKEY set. Copy its public key (Configure → Supabase → Support login key) into the nation project\'s Edge Function secrets, then redeploy support-login.';
       dlgAlert('Could not enter: ' + msg, { title: 'Support login' });
       return;
     }
@@ -1055,6 +1062,58 @@
     window.open(d.action_link, '_blank', 'noopener');
     dlgAlert('A support session for ' + esc(n.display_name) + ' opened in a new tab (signed in as Platform Support; access ends '
       + esc(d.access_expires_at || 'today') + '). This was logged on both sides.', { title: 'Entered nation' });
+  };
+
+  // Support-login signing key (per-nation, asymmetric). The PRIVATE key stays in
+  // the control-plane DB; the operator copies the PUBLIC key into the nation's
+  // SUPPORT_LOGIN_PUBKEY secret. Generated server-side via gen-support-key.
+  function _supportKeyPubBlock(jwk){
+    var val = ''; try { val = JSON.stringify(jwk); } catch (e) { val = ''; }
+    return '<label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Public key (SUPPORT_LOGIN_PUBKEY)</label>'
+      + '<textarea id="cn-supportkey-jwk" readonly rows="3" style="width:100%;font-family:ui-monospace,Menlo,monospace;font-size:11px;background:var(--bg);color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:8px;resize:vertical;box-sizing:border-box;">' + esc(val) + '</textarea>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;align-items:center;">'
+      +   '<button class="btn sm ghost" type="button" data-act="supportkey-copy">Copy public key</button>'
+      +   '<span class="sub" style="font-size:11px;">Paste as <code>SUPPORT_LOGIN_PUBKEY</code> in this nation\'s Settings &rarr; Edge Functions &rarr; Secrets, then (re)deploy <code>support-login</code>.</span>'
+      + '</div>';
+  }
+  async function renderSupportKey(sub){
+    var host = document.getElementById('cn-supportkey'); if (!host) return;
+    var r = await api('GET', '/nation_support_keys_public?subdomain=eq.' + encodeURIComponent(sub) + '&select=public_jwk,created_at,algorithm&limit=1');
+    var row = (r.ok ? await r.json().catch(function(){ return []; }) : [])[0] || null;
+    if (row){
+      host.innerHTML =
+          '<div style="font-size:12px;margin-bottom:8px;"><span class="pill active">Key set</span> &middot; ' + esc(row.algorithm || 'ES256')
+            + (row.created_at ? ' &middot; created ' + esc(timeAgo(row.created_at)) : '') + '</div>'
+        + _supportKeyPubBlock(row.public_jwk)
+        + '<div class="msg" id="cn-supportkey-msg"></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">'
+        +   '<button class="btn sm ghost" type="button" data-act="supportkey-rotate" data-sub="' + esc(sub) + '">Rotate key</button>'
+        + '</div>';
+    } else {
+      host.innerHTML =
+          '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">No support key yet. Generate one, then set <code>SUPPORT_LOGIN_PUBKEY</code> on this nation\'s project.</div>'
+        + '<div class="msg" id="cn-supportkey-msg"></div>'
+        + '<button class="btn sm" type="button" data-act="supportkey-gen" data-sub="' + esc(sub) + '">Generate keypair</button>';
+    }
+  }
+  window.genSupportKey = async function(sub, rotate){
+    if (rotate){
+      var ok = await dlgConfirm('Rotate the support key for ' + esc(sub) + '?\n\nThis generates a NEW keypair. The nation\'s CURRENT public key stops working immediately — support login fails for this nation until you copy the new public key into its SUPPORT_LOGIN_PUBKEY secret and redeploy support-login.', { title: 'Rotate support key', okText: 'Rotate key' });
+      if (!ok) return;
+    }
+    setMsg('cn-supportkey-msg', rotate ? 'Rotating...' : 'Generating...', 'ok');
+    var r;
+    try {
+      r = await fetch(PBASE + '/functions/v1/gen-support-key', {
+        method: 'POST',
+        headers: { apikey: ANON, Authorization: 'Bearer ' + getAT(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subdomain: sub, rotate: !!rotate })
+      });
+    } catch (e){ setMsg('cn-supportkey-msg', 'Network error: ' + String(e).slice(0, 120)); return; }
+    var d = await r.json().catch(function(){ return {}; });
+    if (!r.ok || !d.public_jwk){ setMsg('cn-supportkey-msg', 'Failed: ' + (d.message || d.error || ('HTTP ' + r.status))); return; }
+    await renderSupportKey(sub);
+    setMsg('cn-supportkey-msg', (d.rotated ? 'Rotated' : 'Generated') + '. Copy the public key into the nation\'s SUPPORT_LOGIN_PUBKEY secret, then redeploy support-login.', 'ok');
   };
 
   function renderProvisionResults(d){
@@ -2077,6 +2136,9 @@
       case 'reload':        location.reload(); break;
       case 'configure':     window.configureNation(id); break;
       case 'enter':         window.enterNation(id); break;
+      case 'supportkey-gen':    window.genSupportKey(el.getAttribute('data-sub') || '', false); break;
+      case 'supportkey-rotate': window.genSupportKey(el.getAttribute('data-sub') || '', true); break;
+      case 'supportkey-copy':   (function(){ var t = document.getElementById('cn-supportkey-jwk'); if (t){ try { t.select(); } catch(e){} try { navigator.clipboard.writeText(t.value); } catch(e){} setMsg('cn-supportkey-msg', 'Public key copied.', 'ok'); } })(); break;
       case 'save-config':   window.saveNationConfig(id); break;
       case 'status':        window.adminSetStatus(id, el.getAttribute('data-status') || ''); break;
       case 'add-admin':     window.adminAdd(); break;

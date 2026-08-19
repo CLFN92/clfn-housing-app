@@ -6,8 +6,10 @@ name: Deploy platform (control-plane) Edge Functions
 #   - recurring-invoices    (pg_cron calls it; JWT verification OFF)
 #   - set-nation-secret     (admin calls it; verifies super_admins itself)
 #   - enter-nation          (admin calls it; keep JWT verification ON) - support login;
-#                           needs SUPPORT_LOGIN_SECRET here AND on each nation project.
-#                           See docs/SUPPORT-LOGIN.md.
+#                           signs a per-nation token with the private key in
+#                           nation_support_keys. See docs/SUPPORT-LOGIN.md.
+#   - gen-support-key       (admin calls it; keep JWT verification ON) - generates a
+#                           per-nation ES256 keypair; needs nation_support_keys.sql run.
 #
 # These are excluded from deploy-supabase-functions.yml (which targets the
 # NATION project). This workflow reuses the same account-scoped
@@ -34,6 +36,8 @@ on:
       - 'supabase/functions/recurring-invoices/**'
       - 'supabase/functions/set-nation-secret/**'
       - 'supabase/functions/enter-nation/**'
+      - 'supabase/functions/gen-support-key/**'
+      - 'supabase/functions/_shared/**'
       - '.github/workflows/deploy-platform-functions.yml'
   workflow_dispatch:
 
@@ -77,4 +81,6 @@ jobs:
           supabase functions deploy set-nation-secret --project-ref "$REF" --no-verify-jwt
           echo "──── Deploying enter-nation to $REF (JWT verify ON; super-admin support login) ────"
           supabase functions deploy enter-nation --project-ref "$REF"
+          echo "──── Deploying gen-support-key to $REF (JWT verify ON; generates per-nation keypairs) ────"
+          supabase functions deploy gen-support-key --project-ref "$REF"
           echo "Platform functions deployed."
