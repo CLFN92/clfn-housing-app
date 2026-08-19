@@ -2149,8 +2149,11 @@ async function sowSaveClicked() {
   var mode = (btn && btn.dataset) ? btn.dataset.mode : 'draft';
   // "Save Changes" on an already-created request: plain save, no confusing
   // Submit dialog. data-mode stays 'submit' so saveSOW preserves approval_status.
-  if (btn && btn.dataset && btn.dataset.existing === '1') { saveSOW(); return; }
-  if (mode !== 'submit') { saveSOW(); return; }
+  // keepOpen — the user is editing an existing request, so leave the form open
+  // and just toast a confirmation instead of closing + navigating away.
+  if (btn && btn.dataset && btn.dataset.existing === '1') { saveSOW({keepOpen:true}); return; }
+  // "Save Draft" on a new/draft request: also stay open (still authoring).
+  if (mode !== 'submit') { saveSOW({keepOpen:true}); return; }
 
   if (typeof showConfirm !== 'function') { saveSOW(); return; }
 
@@ -2505,21 +2508,42 @@ function saveSOW(opts){
   var ind=document.getElementById('sow_saved_indicator');
   if(ind) ind.textContent='✓ Saved '+new Date().toLocaleTimeString();
 
-  // Close the SOW modal, then show a centered branded confirmation.
-  // Dismissing the confirmation routes the user to the Renovation Approvals
-  if(typeof closeSowModal === 'function') closeSowModal();
+  // keepOpen (a plain "Save Changes" / "Save Draft"): leave the form open and
+  // just confirm with a toast — the user is still working the request, not
+  // moving it forward. Submit and inline-approval saves still close + navigate.
+  var _keepOpen = opts.keepOpen === true;
 
-  var _msg = isNew ? '✓ Maintenance request submitted' : '✓ Request saved';
-  if(typeof showToast === 'function') showToast(_msg);
+  if(!_keepOpen){
+    // Close the SOW modal, then show a centered branded confirmation.
+    // Dismissing the confirmation routes the user to the Renovation Approvals
+    if(typeof closeSowModal === 'function') closeSowModal();
+  }
 
-  // Return to whichever page opened the SOW modal:
-  //   • Landing page (housing.html) → refresh worklist in-place, stay here
+  var _msg = _keepOpen ? (isNew ? '✓ Draft saved' : '✓ Changes saved') : (isNew ? '✓ Maintenance request submitted' : '✓ Request saved');
+  if(typeof showToast === 'function') showToast(_msg, {type:'info'});
+
+  if(_keepOpen){
+    // Keep the open modal in sync with what was just persisted: status tile,
+    // lock state, info strip, and the Save button label all read from the
+    // saved record's approval_status.
+    window._sowCurrentSowMeta = {approval_status: data.approval_status, system_approved: data.system_approved, archived: data.archived};
+    if(typeof _applySowModalLock === 'function') _applySowModalLock(data);
+    if(typeof _sowRefreshStrip === 'function') _sowRefreshStrip();
+    if(typeof _updateSowSaveButtonState === 'function') _updateSowSaveButtonState();
+  }
+
+  // Return to whichever page opened the SOW modal (background refresh even when
+  // the modal stays open, so the underlying list reflects the save):
+  //   • Landing page (housing.html) → refresh worklist in-place
   //   • Renos approvals page        → refresh the approvals table in-place
   //   • Any other page              → just the toast; no navigation
   if (document.getElementById('worklist_body') && typeof renderWorklist === 'function') {
     renderWorklist();
-  } else if (typeof showRenoApprovals === 'function' && document.getElementById('renoApprovalsView')) {
+  } else if (!_keepOpen && typeof showRenoApprovals === 'function' && document.getElementById('renoApprovalsView')) {
     showRenoApprovals();
+  } else if (_keepOpen && typeof renderRenoApprovalsView === 'function' && document.getElementById('renoApprovalsView')) {
+    // Refresh the approvals table in place without switching the active view.
+    renderRenoApprovalsView();
   }
   // Inventory unit detail panel: refresh its in-place SOW table. The panel may be
   // hidden but is still in the DOM, so the new/edited request shows up without
