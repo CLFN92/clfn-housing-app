@@ -1434,7 +1434,11 @@ function renderRenoApprovalsView() {
   // Hide dismissed 'No Request Filed' placeholders AND archived requests unless
   // the user has toggled "Show dismissed / archived".
   if(!_raShowDismissed()){
-    filtered = filtered.filter(function(r){ return !r.dismissed && !r.archived && !(r.sow && r.sow.cancelled); });
+    filtered = filtered.filter(function(r){ return !r.dismissed && !r.archived; });
+  }
+  // Cancelled requests have their own toggle ("Show cancelled").
+  if(!_raShowCancelled()){
+    filtered = filtered.filter(function(r){ return !(r.sow && r.sow.cancelled); });
   }
 
   // Default sort — priority desc, then address, then project #. Stays in
@@ -1783,6 +1787,10 @@ window._raToggleHideCompleted = function(el){ try { localStorage.setItem('clfn_r
 // pipeline until restored. A "Show dismissed" toggle reveals them for restore.
 function _raShowDismissed(){ try { return localStorage.getItem('clfn_ra_show_dismissed') === '1'; } catch(e){ return false; } }
 window._raToggleShowDismissed = function(el){ try { localStorage.setItem('clfn_ra_show_dismissed', (el&&el.checked)?'1':'0'); } catch(e){} renderRenoApprovalsView(); };
+// Cancelled requests are hidden by default; this toggle reveals them (with the
+// red "Cancelled" badge). Independent of "Show dismissed / archived".
+function _raShowCancelled(){ try { return localStorage.getItem('clfn_ra_show_cancelled') === '1'; } catch(e){ return false; } }
+window._raToggleShowCancelled = function(el){ try { localStorage.setItem('clfn_ra_show_cancelled', (el&&el.checked)?'1':'0'); } catch(e){} renderRenoApprovalsView(); };
 window._renoDismissUnit = function(unitId){
   var u = (typeof getAllUnits==='function' ? getAllUnits() : (window.housingUnits||[])).find(function(x){ return String(x.id)===String(unitId); });
   if(!u){ if(typeof showToast==='function') showToast('Unit not found'); return; }
@@ -1850,6 +1858,7 @@ function _raViewToggleHtml(){
   return '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">'
     + '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;"><input type="checkbox" '+(_raHideCompleted()?'checked ':'')+'onchange="_raToggleHideCompleted(this)"/> Hide completed</label>'
     + '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;margin-left:14px;"><input type="checkbox" '+(_raShowDismissed()?'checked ':'')+'onchange="_raToggleShowDismissed(this)"/> Show dismissed / archived</label>'
+    + '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;margin-left:14px;"><input type="checkbox" '+(_raShowCancelled()?'checked ':'')+'onchange="_raToggleShowCancelled(this)"/> Show cancelled</label>'
     + '<div style="display:flex;">' + b('list','List','&#9776;','l') + b('cards','Cards','&#9638;','m') + b('kanban','Kanban','&#9707;','r') + '</div>'
     + '</div>';
 }
