@@ -1699,21 +1699,24 @@ async function submitAddHousingStaff() {
     // the row still exists in the DB and would 409 on insert).
     var checkR = await _staffFetch(SUPABASE_URL+'/rest/v1/staff?select=id,is_active&email=eq.'+encodeURIComponent(email),{headers:HOUSING_HEADERS});
     var existing = await checkR.json();
+    // An ACTIVE duplicate stops here; a DEACTIVATED/orphaned row is REVIVED
+    // instead of blocked (recreate the login + reactivate + refresh details in
+    // one click). Uses UPDATE (ED-allowed) so no hard-delete is needed.
+    var reviving = false, existId = null;
     if(existing && existing.length){
       var existRow = existing[0];
-      var msg = existRow.is_active === false
-        ? escapeHtml(email) + ' is already in the directory but <b>deactivated</b>. Close this and use the <b>Inactive</b> tab &rarr; <b>Reactivate</b> (don\'t re-add).'
-        : escapeHtml(email) + ' is <b>already in the staff directory</b>. They\'re listed in the Users table &mdash; no need to add them again.';
-      // Paint the message IN THE FORM (not just a toast, which is easy to miss on
-      // mobile) so it's obvious why the add didn't proceed.
-      if(res){
-        res.style.background='var(--warn-amber-bg)'; res.style.border='1px solid var(--warn-amber-border)'; res.style.color='var(--warn-amber-text)';
-        res.innerHTML = '<strong>Already exists.</strong><br><span style="font-size:11px;">'+msg+'</span>';
-        res.style.display='block';
+      if(existRow.is_active !== false){
+        if(res){
+          res.style.background='var(--warn-amber-bg)'; res.style.border='1px solid var(--warn-amber-border)'; res.style.color='var(--warn-amber-text)';
+          res.innerHTML = '<strong>Already exists.</strong><br><span style="font-size:11px;">'+escapeHtml(email)+' is <b>already in the staff directory</b> &mdash; they\'re in the Users table, no need to add again.</span>';
+          res.style.display='block';
+        }
+        showToast('Already in the staff directory');
+        if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';}
+        return;
       }
-      showToast(existRow.is_active === false ? 'Already exists (deactivated) — use Reactivate' : 'Already in the staff directory');
-      if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';}
-      return;
+      reviving = true; existId = existRow.id;
+      if(btn){ btn.textContent='Reactivating…'; }
     }
 
     var firstName = name.split(' ')[0];
@@ -1798,22 +1801,29 @@ async function submitAddHousingStaff() {
       return;
     }
 
-    // Step 2: Add to staff table (only after auth succeeds)
-    var staffR = await _staffFetch(SUPABASE_URL+'/rest/v1/staff',{
-      method:'POST',
-      headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
-      body:JSON.stringify({name:name, email:email, role:role, department:dept, is_active:true,
-        // Manager = whoever is adding the staff member (the signed-in HM/ED),
-        // else this nation's housing mailbox. Never a hardcoded CLFN admin --
-        // that wrote a CLFN address into every other nation's staff table (OCAP).
-        manager_email:((typeof HOUSING_SESSION!=='undefined' && HOUSING_SESSION && HOUSING_SESSION.email) || (window.NATION_CONFIG && NATION_CONFIG.housing_email) || '')})
-    });
+    // Step 2: staff table. INSERT a new row, or (revive) PATCH the existing
+    // deactivated row back to active + refresh its details. Manager = whoever is
+    // adding (the signed-in HM/ED), else the nation mailbox -- never a hardcoded
+    // CLFN admin (OCAP).
+    var _mgr = ((typeof HOUSING_SESSION!=='undefined' && HOUSING_SESSION && HOUSING_SESSION.email) || (window.NATION_CONFIG && NATION_CONFIG.housing_email) || '');
+    var staffR;
+    if(reviving){
+      staffR = await _staffFetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+encodeURIComponent(existId),{
+        method:'PATCH', headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
+        body:JSON.stringify({name:name, role:role, department:dept, is_active:true, manager_email:_mgr})
+      });
+    } else {
+      staffR = await _staffFetch(SUPABASE_URL+'/rest/v1/staff',{
+        method:'POST', headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'}),
+        body:JSON.stringify({name:name, email:email, role:role, department:dept, is_active:true, manager_email:_mgr})
+      });
+    }
 
     if(!staffR.ok){
       var staffErr = await staffR.text();
       if(res){
         res.style.background='var(--danger-bg)'; res.style.border='1px solid var(--danger-border)'; res.style.color='var(--danger)';
-        res.innerHTML = '<strong>Auth account created but staff record failed.</strong><br><span style="font-size:11px;">'+staffErr+'</span>';
+        res.innerHTML = '<strong>Auth account ready but the staff record '+(reviving?'update':'insert')+' failed.</strong><br><span style="font-size:11px;">'+escapeHtml(staffErr)+'</span>';
         res.style.display='block';
       }
       if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';}
@@ -1839,7 +1849,8 @@ async function submitAddHousingStaff() {
     // hint and tell the admin to use Send Reset on the row instead.
     if(res){
       res.style.background='var(--success-bg)'; res.style.border='1px solid var(--success-border)'; res.style.color='var(--success)';
-      var head = '<strong>&#10003; '+escapeHtml(name)+' added successfully!</strong><br>'
+      var head = '<strong>&#10003; '+escapeHtml(name)+(reviving?' reactivated':' added')+' successfully!</strong><br>'
+        + (reviving ? '<span style="font-size:11px;opacity:.8;">This deactivated record was reactivated and its login re-created.</span><br>' : '')
         + 'Email: <code style="background:var(--success-border);padding:2px 6px;border-radius:4px;">'+escapeHtml(email)+'</code><br>';
       if(alreadyInAuth) {
         res.innerHTML = head

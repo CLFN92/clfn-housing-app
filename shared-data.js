@@ -3871,6 +3871,40 @@ async function reactivateStaff(id, btn){
     if(btn){btn.disabled=false;btn.textContent='Reactivate';}
   }
 }
+// Permanently delete a DEACTIVATED staff row (ED/super_user only, enforced by the
+// staff_delete_ed_inactive RLS policy). For orphaned/mistaken records so the
+// person can be re-added cleanly; normal departures should stay deactivated for
+// audit history. Only offered on the Inactive tab.
+async function hardDeleteStaff(id, btn){
+  var u = (window._staffCache||{})[id] || {};
+  var ok = await showConfirm({
+    title:       'Delete permanently?',
+    message:     'This permanently removes ' + (u.name || 'this staff record') + ' from the directory and cannot be undone. Use this only for a mistaken or orphaned entry — normal departures should stay deactivated so their history is preserved.',
+    confirmText: 'Delete permanently'
+  });
+  if (!ok) return;
+  if(btn){ btn.disabled=true; btn.textContent='Deleting…'; }
+  try {
+    var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+encodeURIComponent(id),{
+      method:'DELETE', headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'})
+    });
+    if(r.ok){
+      showToast('Staff record permanently deleted');
+      auditEntry('SETTINGS','settings_user_delete','Staff permanently deleted: '+(u.email||('id='+id)),window.currentRole||'ed');
+      renderHousingUserTable();
+    } else {
+      var t = await r.text();
+      showToast(/policy|permission|denied|row-level|violates/i.test(t)
+        ? 'Delete blocked — run the staff-delete migration (20260819_staff_ed_delete.sql) on this project'
+        : 'Could not delete this record');
+      if(btn){ btn.disabled=false; btn.textContent='Delete'; }
+    }
+  } catch(e){
+    showToast('Error: '+e.message);
+    if(btn){ btn.disabled=false; btn.textContent='Delete'; }
+  }
+}
+window.hardDeleteStaff = hardDeleteStaff;
 // Send a password-reset email to a staff member from the admin table. Uses
 // the same /auth/v1/recover endpoint + redirect_to as the public Forgot
 // Password flow, so the email link lands on the reset panel on index.html.
@@ -5501,6 +5535,7 @@ async function renderHousingUserTable(){
           // apply uniformly.
           actionsHtml = '<div class="flex-end gap-8">'
             +'<button onclick="reactivateStaff('+u.id+',this)" class="btn btn-sm btn-primary">Reactivate</button>'
+            +'<button onclick="hardDeleteStaff('+u.id+',this)" class="btn btn-sm btn-ghost" style="color:var(--danger);border-color:var(--danger-border);" title="Permanently remove this orphaned/mistaken record">Delete</button>'
             +'</div>';
         } else {
           // Active: Edit + (Send Reset | Send Sign-in Link) + Deactivate.

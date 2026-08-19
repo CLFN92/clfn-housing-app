@@ -779,6 +779,8 @@ var AUDIT_ACTION_LABELS = {
   'settings_budget_save':     '💰 Budget Saved',
   'settings_user_add':        '👤 User Added',
   'settings_user_remove':     '👤 User Removed',
+  'settings_user_delete':     '🗑️ User Deleted',
+  'staff_welcome_email':      '✉️ Staff Welcome Email',
   'settings_saved':           '⚙️ Settings Saved',
   'user_login':               '🔑 Signed In',
   'user_logout':              '🚪 Signed Out',
