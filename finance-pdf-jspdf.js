@@ -418,6 +418,56 @@
     }, function () { if (typeof toast === 'function') toast('Could not load the PDF engine (offline?)'); });
   };
 
+  // ---- Batch statements (one statement per selected tenant, one PDF) --------
+  window.finBatchStatementsDownload = function () {
+    var checked = document.querySelectorAll('.rs-chk:checked');
+    if (!checked.length) { if (typeof toast === 'function') toast('No tenants selected.'); return; }
+    var tids = []; for (var i = 0; i < checked.length; i++) tids.push(checked[i].getAttribute('data-tid'));
+    _load(function () {
+      var d = getData();
+      var totals = (typeof calcAllTotals === 'function') ? calcAllTotals(d) : {};
+      var allTxns = (typeof getAllTransactions === 'function') ? getAllTransactions() : [];
+      var jsPDF = window.jspdf.jsPDF;
+      var doc = new jsPDF({ unit: 'mm', format: 'letter' });
+      var hf = headerFooter(doc, 'Statement of Account');
+      var pageW = hf.pageW, M = hf.M, aRGB = hf.aRGB;
+      var rendered = 0;
+      for (var j = 0; j < tids.length; j++) {
+        var tid = tids[j];
+        var t = (typeof getTenant === 'function') ? getTenant(tid) : null;
+        if (!t) continue;
+        if (rendered > 0) doc.addPage();
+        rendered++;
+        var v = totals[tid] || {}, rentOwe = v.rent || 0, loanOwe = v.loan || 0, arrOwe = v.arrangement || 0, grand = rentOwe + loanOwe + arrOwe;
+        var startY = 34;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(20, 20, 20);
+        doc.text(String((typeof tenantName === 'function') ? tenantName(t) : (t.name || '')), M, startY);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(100, 100, 100);
+        doc.text([t.unit, (t.type || '').replace(/-/g, ' ')].filter(Boolean).join('  -  '), M, startY + 5.5);
+        // Balances line, Total Owing emphasized in the accent colour.
+        doc.setFontSize(9); doc.setTextColor(90, 90, 90);
+        doc.text('Rent ' + money(rentOwe) + '     Arrangements ' + money(arrOwe) + '     Loans ' + money(loanOwe), M, startY + 12);
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(aRGB[0], aRGB[1], aRGB[2]);
+        doc.text('Total Owing ' + money(grand), pageW - M, startY + 12, { align: 'right' });
+
+        var entries = allTxns.filter(function (e) { return e.tenantId === tid; }).slice().sort(function (a, b) { return (a.date || '').localeCompare(b.date || ''); });
+        doc.autoTable({
+          startY: startY + 18, margin: { top: 30, left: M, right: M },
+          head: [['Date', 'Description', 'Ledger', 'Charge', 'Payment', 'Method']],
+          body: entries.length ? entries.map(function (r) {
+            return [r.date || '', r.desc || '', (r.ledger || 'rent'), (r.charge > 0 ? money(r.charge) : '-'), (r.payment > 0 ? money(r.payment) : '-'), r.method || ''];
+          }) : [[{ content: 'No transactions on file.', colSpan: 6, styles: { textColor: [150, 150, 150], fontStyle: 'italic' } }]],
+          styles: { fontSize: 8.5, cellPadding: 1.6 },
+          headStyles: { fillColor: aRGB, textColor: onAccentRgb(), fontStyle: 'bold' },
+          columnStyles: { 0: { cellWidth: 22 }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+          didDrawPage: function (data) { hf.header(); hf.footer(data); }
+        });
+      }
+      if (!rendered) { if (typeof toast === 'function') toast('No valid tenants selected.'); return; }
+      doc.save('Tenant-Statements-' + new Date().toISOString().slice(0, 10) + '.pdf');
+    }, function () { if (typeof toast === 'function') toast('Could not load the PDF engine (offline?)'); });
+  };
+
   window.finVoucherDownload = function () {
     var txn = window.currentVoucherData; if (!txn) { if (typeof toast === 'function') toast('Open a voucher first'); return; }
     _load(function () {

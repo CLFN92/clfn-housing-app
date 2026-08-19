@@ -86,7 +86,7 @@ function showRunStatementsModal() {
     '</div>'+
     '<div class="modal-footer">'+
       '<button class="btn btn-ghost" onclick="closeModal(\'modalRunStatements\')">Cancel</button>'+
-      '<button class="btn btn-primary" onclick="printBatchStatements()">&#128438; Print Selected</button>'+
+      '<button class="btn btn-primary" onclick="finBatchStatementsDownload()">&#11015;&#65039; Download PDF</button>'+
     '</div>'+
     '</div>';
 
