@@ -322,8 +322,8 @@ function openUnitEditModal(unitId){
     var _hb = document.getElementById('ue_sig_hm_badge');
     if(_hb && u.unitHmSig.decision) {
       _hb.textContent  = u.unitHmSig.decision === 'approved' ? 'Approved ✓' : u.unitHmSig.decision;
-      _hb.style.background = u.unitHmSig.decision === 'approved' ? '#f0fdf4' : '#eff6ff';
-      _hb.style.color      = u.unitHmSig.decision === 'approved' ? '#15803d' : '#1d4ed8';
+      _hb.style.background = u.unitHmSig.decision === 'approved' ? 'var(--success-bg)' : 'var(--info-blue-bg)';
+      _hb.style.color      = u.unitHmSig.decision === 'approved' ? 'var(--success)' : '#1d4ed8';
     }
   }
   if(u.unitEdSig) {
@@ -336,7 +336,7 @@ function openUnitEditModal(unitId){
     if(_eb && u.unitEdSig.decision) {
       _eb.textContent  = u.unitEdSig.decision === 'approved' ? 'Approved ✓' : u.unitEdSig.decision;
       _eb.style.background = u.unitEdSig.decision === 'approved' ? 'var(--warn-amber-bg)' : 'var(--warn-amber-bg)';
-      _eb.style.color      = '#15803d';
+      _eb.style.color      = 'var(--success)';
     }
   }
 
@@ -614,7 +614,7 @@ function ueUpdateBudgetRouting() {
     indicator.style.display = 'block';
     if(overBudget) {
       indicator.style.background = 'var(--warn-amber-bg)';
-      indicator.style.border = '1.5px solid #fde68a';
+      indicator.style.border = '1.5px solid var(--warn-amber-border)';
       indicator.style.color  = '#7a5c00';
       indicator.innerHTML = '<div class="flex-g8">'
         +'<span style="font-size:16px;">⚠️</span>'
@@ -623,9 +623,9 @@ function ueUpdateBudgetRouting() {
         +'<span style="font-size:11px;">Executive Director must sign off before work begins.</span></div>'
         +'</div>';
     } else {
-      indicator.style.background = '#f0fdf4';
+      indicator.style.background = 'var(--success-bg)';
       indicator.style.border = '1.5px solid #86efac';
-      indicator.style.color  = '#15803d';
+      indicator.style.color  = 'var(--success)';
       indicator.innerHTML = '<div class="flex-g8">'
         +'<span style="font-size:16px;">✅</span>'
         +'<div><strong>HM Approval Sufficient</strong><br>'
@@ -696,14 +696,14 @@ function saveUnitEdit(){
     u.unitHmSig = { name: get('ue_sig_hm_name'), date: get('ue_sig_hm_date'), decision: hmDec, notes: get('ue_sig_hm_notes'), savedAt: new Date().toISOString().split('T')[0] };
     // Update budget indicator badge
     var _hb = document.getElementById('ue_sig_hm_badge');
-    if(_hb && hmDec) { _hb.textContent = hmDec==='approved'?'Approved ✓':hmDec; _hb.style.color = hmDec==='approved'?'#15803d':'#1d4ed8'; }
+    if(_hb && hmDec) { _hb.textContent = hmDec==='approved'?'Approved ✓':hmDec; _hb.style.color = hmDec==='approved'?'var(--success)':'#1d4ed8'; }
   }
   // ED approval
   var edDec = (document.getElementById('ue_sig_ed_decision')||{}).value||'';
   if(get('ue_sig_ed_name') || edDec) {
     u.unitEdSig = { name: get('ue_sig_ed_name'), date: get('ue_sig_ed_date'), decision: edDec, notes: get('ue_sig_ed_notes'), savedAt: new Date().toISOString().split('T')[0] };
     var _eb = document.getElementById('ue_sig_ed_badge');
-    if(_eb && edDec) { _eb.textContent = edDec==='approved'?'Approved ✓':edDec; _eb.style.color = '#15803d'; }
+    if(_eb && edDec) { _eb.textContent = edDec==='approved'?'Approved ✓':edDec; _eb.style.color = 'var(--success)'; }
   }
   // Read from hidden fields (populated by tenant search)
   var toVal=(document.getElementById('ue_assignedTo')||{}).value||'';
@@ -831,8 +831,8 @@ function ueTenantSearch(q) {
     var name = ((a.fn || '') + ' ' + (a.ln || '')).trim() || 'Unknown';
     var isED = a.status === APP_STATUS.ED_APPROVED;
     var statusLabel = isED ? 'ED Approved' : 'HM Recommended';
-    var statusColor = isED ? '#15803d' : '#1d4ed8';
-    var statusBg    = isED ? '#f0fdf4'  : '#eff6ff';
+    var statusColor = isED ? 'var(--success)' : '#1d4ed8';
+    var statusBg    = isED ? 'var(--success-bg)'  : 'var(--info-blue-bg)';
     window._ueTenantMatches[a.id] = {name: name, status: a.status};
     return '<div onmousedown="ueTenantSelectById(\''+a.id+'\')"'
       + ' style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;"'
@@ -901,8 +901,8 @@ function ueTenantSelect(appId, name, status) {
   var isHMApp   = status === APP_STATUS.HM_APPROVED;      // HM final approval (file-update terminal)
   var isApprovedAtAll = isED || isHMRec || isHMApp;
   var statusLabel = (typeof formatAppStatusLabel === 'function') ? formatAppStatusLabel(status) : status.replace(/_/g,' ');
-  var statusColor = isED ? '#15803d' : isHMApp ? '#15803d' : isHMRec ? '#1d4ed8' : 'var(--warn-amber-text)';
-  var statusBg    = isED ? '#f0fdf4' : isHMApp ? '#f0fdf4' : isHMRec ? '#eff6ff' : 'var(--warn-amber-bg)';
+  var statusColor = isED ? 'var(--success)' : isHMApp ? 'var(--success)' : isHMRec ? '#1d4ed8' : 'var(--warn-amber-text)';
+  var statusBg    = isED ? 'var(--success-bg)' : isHMApp ? 'var(--success-bg)' : isHMRec ? 'var(--info-blue-bg)' : 'var(--warn-amber-bg)';
 
   // Role-based warning
   var role = window.currentRole || 'housing_employee_l1';
@@ -1687,11 +1687,11 @@ function openMatchScorecard(appId, unitId) {
   var total = bedScore + accScore + eldScore;
   var maxScore = 24;
   var pct = Math.round(Math.max(0,total)/maxScore*100);
-  var tierColor = total>=16?'#15803d':total>=10?'#d97706':'#b91c1c';
+  var tierColor = total>=16?'var(--success)':total>=10?'var(--warn-amber-text)':'var(--danger)';
 
   // Build rows
   var rows = breakdown.map(function(b){
-    var col = b.pts > 0 ? '#15803d' : b.pts < 0 ? '#b91c1c' : 'var(--gray)';
+    var col = b.pts > 0 ? 'var(--success)' : b.pts < 0 ? 'var(--danger)' : 'var(--gray)';
     var bar = Math.round(Math.max(0,b.pts)/b.max*100);
     return '<tr class="row-divider">'
       +'<td style="padding:10px 14px;font-size:13px;color:var(--text);">'+b.label+'</td>'
@@ -2239,8 +2239,8 @@ function _renderLotsList(){
     var bldg = '';
     if(built){ var bu = units.find(function(x){ return String(x.id)===String(l.builtUnitId); }); bldg = bu ? esc(((bu.num||'')+' '+(bu.street||'')).trim()) : '(building)'; }
     var statusPill = built
-      ? '<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:#eff6ff;color:#1d4ed8;">Built</span>'
-      : '<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:#f0fdf4;color:#15803d;">Vacant</span>';
+      ? '<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--info-blue-bg);color:#1d4ed8;">Built</span>'
+      : '<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--success-bg);color:var(--success);">Vacant</span>';
     var lid = String(l.id).replace(/'/g,"\\'");
     return '<tr>'
       +'<td style="font-weight:700;">'+esc(l.lotNumber||l.num||'—')+'</td>'
@@ -2261,10 +2261,10 @@ window._renderLotsList = _renderLotsList;
 
 // ── renderBudgetPools ──
 var BUDGET_POOLS = [
-  { id:'emergency', label:'Emergency Repairs',  icon:'🚨', color:'#b91c1c', bg:'#fef2f2' },
-  { id:'isc',       label:'ISC Funds',          icon:'🏛️', color:'#1d4ed8', bg:'#eff6ff' },
+  { id:'emergency', label:'Emergency Repairs',  icon:'🚨', color:'var(--danger)', bg:'var(--danger-bg)' },
+  { id:'isc',       label:'ISC Funds',          icon:'🏛️', color:'#1d4ed8', bg:'var(--info-blue-bg)' },
   { id:'rrap',      label:'RRAP Funds',         icon:'🏠', color:'#7c3aed', bg:'#faf5ff' },
-  { id:'band',      label:'Band Funds',         icon:'🌲', color:'#15803d', bg:'#f0fdf4' },
+  { id:'band',      label:'Band Funds',         icon:'🌲', color:'var(--success)', bg:'var(--success-bg)' },
   { id:'cmhc',      label:'CMHC',               icon:'🏗️', color:'var(--warn-amber-text)', bg:'var(--warn-amber-bg)' },
   { id:'ofnlp',     label:'OFNLP',              icon:'🤝', color:'#0e7490', bg:'#ecfeff' },
   { id:'fncfs',     label:'FNCFS Funds',        icon:'👶', color:'#be185d', bg:'#fdf2f8', requiresDependants:true },
@@ -2371,10 +2371,10 @@ function renoSearchFilter(q) {
   }
 
   var statusStyle = {
-    vacant:    {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
-    occupied:  {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
+    vacant:    {bg:'var(--success-bg)',c:'var(--success)',label:'Vacant'},
+    occupied:  {bg:'var(--info-blue-bg)',c:'#1d4ed8',label:'Occupied'},
     reserved:  {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
-    condemned: {bg:'#fef2f2', c:'#b91c1c', label:'Condemned'}
+    condemned: {bg:'var(--danger-bg)', c:'var(--danger)', label:'Condemned'}
   };
 
   var container = document.getElementById('reno_search_results');
@@ -2592,8 +2592,8 @@ function atSearchApps(q){
     var isED=a.status===APP_STATUS.ED_APPROVED; var isHM=a.status===APP_STATUS.MGR_APPROVED;
     var isHMApp=a.status===APP_STATUS.HM_APPROVED;
     var statusLabel=(typeof formatAppStatusLabel === 'function') ? formatAppStatusLabel(a.status) : (isED?'ED Approved':isHM?'HM Recommended':a.status.replace(/_/g,' '));
-    var statusCol=isED?'#15803d':isHMApp?'#15803d':isHM?'#1d4ed8':'var(--gray)';
-    var statusBg=isED?'#f0fdf4':isHMApp?'#f0fdf4':isHM?'#eff6ff':'var(--bg)';
+    var statusCol=isED?'var(--success)':isHMApp?'var(--success)':isHM?'#1d4ed8':'var(--gray)';
+    var statusBg=isED?'var(--success-bg)':isHMApp?'var(--success-bg)':isHM?'var(--info-blue-bg)':'var(--bg)';
     return '<div onmousedown="atSelectApp(\''+escapeHtml(a.id)+'\',\''+escapeHtml(safeName)+'\',\''+escapeHtml(a.status)+'\') " '
       +'style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;" '
       +'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'none\'">'

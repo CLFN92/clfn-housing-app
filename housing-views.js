@@ -49,8 +49,8 @@ function _roomBedLabel(u) {
 // (scoring.js) for how each type affects Match placement order.
 function _assignmentTypeBadge(u) {
   if (!u || !u.assignmentType) return '';
-  if (u.assignmentType === 'temporary') return '<span style="font-size:9px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:1px 5px;border-radius:6px;">TEMPORARY</span>';
-  if (u.assignmentType === 'transition') return '<span style="font-size:9px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:1px 5px;border-radius:6px;">TRANSITION</span>';
+  if (u.assignmentType === 'temporary') return '<span style="font-size:9px;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:1px 5px;border-radius:6px;">TEMPORARY</span>';
+  if (u.assignmentType === 'transition') return '<span style="font-size:9px;background:var(--info-blue-bg);color:#1d4ed8;border:1px solid #bfdbfe;padding:1px 5px;border-radius:6px;">TRANSITION</span>';
   return '';
 }
 
@@ -304,11 +304,11 @@ function renderInventoryView(){
   }
 
   var statusStyle = {
-    vacant:      {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
-    occupied:    {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
+    vacant:      {bg:'var(--success-bg)',c:'var(--success)',label:'Vacant'},
+    occupied:    {bg:'var(--info-blue-bg)',c:'#1d4ed8',label:'Occupied'},
     under_repair:{bg:'var(--warn-amber-bg)',c:'var(--warn-amber-text)',label:'Vacant'},
     reserved:    {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
-    condemned:   {bg:'#fef2f2',c:'#b91c1c',label:'Condemned'},
+    condemned:   {bg:'var(--danger-bg)',c:'var(--danger)',label:'Condemned'},
     archived:    {bg:'#f4f4f0',c:'var(--gray)',   label:'Archived'}
   };
 
@@ -385,7 +385,7 @@ function renderInventoryView(){
         var _hasProg = !!(window._renoProgress && window._renoProgress[u.id]);
         if(_hasSow||_hasProg){
           var _rs=calcRenoScore(u.id); var _sc=_rs.score;
-          var _tier=_sc>=40?{label:'Critical',c:'#b91c1c',bg:'#fef2f2'}:_sc>=25?{label:'High',c:'#7a6000',bg:'#fef9ec'}:_sc>=12?{label:'Medium',c:'#1d4ed8',bg:'#eff6ff'}:{label:'Low',c:'#15803d',bg:'#f0fdf4'};
+          var _tier=_sc>=40?{label:'Critical',c:'var(--danger)',bg:'var(--danger-bg)'}:_sc>=25?{label:'High',c:'#7a6000',bg:'#fef9ec'}:_sc>=12?{label:'Medium',c:'#1d4ed8',bg:'var(--info-blue-bg)'}:{label:'Low',c:'var(--success)',bg:'var(--success-bg)'};
           return '<td style="padding:9px 10px;">'
             +'<div data-inv-reno-sow="'+uid+'" style="display:flex;align-items:center;gap:5px;cursor:pointer;" title="Open Maintenance Request">'
             +'<span style="font-size:14px;font-weight:800;color:var(--text);">'+_sc+'</span>'
@@ -593,9 +593,9 @@ function renderMatchView(){
   }
 
   var tierColor = {
-    'Critical Priority': '#15803d',
+    'Critical Priority': 'var(--success)',
     'High Priority':   '#1d4ed8',
-    'Medium Priority': '#d97706',
+    'Medium Priority': 'var(--warn-amber-text)',
     'Low Priority':    '#6b7280'
   };
   // Status wording comes from the shared 'match' variant of
@@ -1003,7 +1003,7 @@ function renderTenantsView(){
     var _openCall = u.assignedName ? "openTenantCard('"+uid+"')" : "openUnitEditModal('"+uid+"')";
     return _cardTile({
       title: u.assignedName || 'No tenant assigned',
-      pill: {text: (u.status==='reserved'?'Reserved':'Occupied'), bg: (u.status==='reserved'?'#faf5ff':'#eff6ff'), color: (u.status==='reserved'?'#7c3aed':'#1d4ed8')},
+      pill: {text: (u.status==='reserved'?'Reserved':'Occupied'), bg: (u.status==='reserved'?'#faf5ff':'var(--info-blue-bg)'), color: (u.status==='reserved'?'#7c3aed':'#1d4ed8')},
       badges: badges,
       metas: [{k:'Address', v: ((u.num||'')+' '+(u.street||'')).trim()}].concat(metas),
       open: _openCall,
@@ -1035,13 +1035,13 @@ function renderTenantsView(){
     var name=u.assignedName||'<span style="color:var(--muted);font-style:italic;">No tenant assigned</span>';
     var date=u.assignedDate||'—';
     var fileCount=0; // loaded async when panel opens
-    var statusBg=u.status==='reserved'?'#faf5ff':'#eff6ff';
+    var statusBg=u.status==='reserved'?'#faf5ff':'var(--info-blue-bg)';
     var statusC=u.status==='reserved'?'#7c3aed':'#1d4ed8';
     var renoCell='';
     var _showRenoScore=(ROLE.isManagement(window.currentRole));
     if(_showRenoScore && hasSowOrReno(u.id)){
       var rs=calcRenoScore(u.id); var s=rs.score;
-      var tier=s>=40?{label:'Critical',c:'#b91c1c',bg:'#fef2f2'}:s>=25?{label:'High',c:'#7a6000',bg:'#fef9ec'}:s>=12?{label:'Medium',c:'#1d4ed8',bg:'#eff6ff'}:{label:'Low',c:'#15803d',bg:'#f0fdf4'};
+      var tier=s>=40?{label:'Critical',c:'var(--danger)',bg:'var(--danger-bg)'}:s>=25?{label:'High',c:'#7a6000',bg:'#fef9ec'}:s>=12?{label:'Medium',c:'#1d4ed8',bg:'var(--info-blue-bg)'}:{label:'Low',c:'var(--success)',bg:'var(--success-bg)'};
       renoCell='<div data-reno-sow="'+u.id+'" style="display:flex;align-items:center;gap:5px;cursor:pointer;" title="Open Maintenance Request"><span style="font-size:14px;font-weight:800;color:var(--text);">'+s+'</span><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+tier.bg+';color:'+tier.c+';">'+tier.label+'</span></div>';
     } else if(_showRenoScore) {
       renoCell='<span style="font-size:11px;color:var(--border);">—</span>';
@@ -1239,7 +1239,7 @@ function tenantSearchFilter(q) {
   }
 
   container.innerHTML = filtered.map(function(r) {
-    var bg = r.status==='reserved' ? '#faf5ff' : '#eff6ff';
+    var bg = r.status==='reserved' ? '#faf5ff' : 'var(--info-blue-bg)';
     return '<div onclick="selectTenantRecord('+JSON.stringify({id:r.id,name:r.name,addr:r.addr,appId:r.appId}).replace(/"/g,"'")+')" '
       + 'style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:7px;cursor:pointer;background:'+bg+';margin-bottom:6px;transition:opacity .1s;" '
       + 'onmouseover="this.style.opacity=\'0.8\'" onmouseout="this.style.opacity=\'1\'">'
@@ -1280,11 +1280,11 @@ function unitSearchFilter(q) {
     : allUnits.slice(0,20);
 
   var statusStyle = {
-    vacant:      {bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
-    occupied:    {bg:'#eff6ff',c:'#1d4ed8',label:'Occupied'},
-    under_repair:{bg:'#f0fdf4',c:'#15803d',label:'Vacant'},
+    vacant:      {bg:'var(--success-bg)',c:'var(--success)',label:'Vacant'},
+    occupied:    {bg:'var(--info-blue-bg)',c:'#1d4ed8',label:'Occupied'},
+    under_repair:{bg:'var(--success-bg)',c:'var(--success)',label:'Vacant'},
     reserved:    {bg:'#faf5ff',c:'#7c3aed',label:'Reserved'},
-    condemned:   {bg:'#fef2f2',c:'#b91c1c',label:'Condemned'}
+    condemned:   {bg:'var(--danger-bg)',c:'var(--danger)',label:'Condemned'}
   };
 
   var container = document.getElementById('unit_search_results');
@@ -1511,7 +1511,7 @@ function showHousingKpiDrilldown(type) {
     'none':'','':''
   };
   function tierPill(tier) {
-    var colors = {'Critical Priority':'var(--danger)','High Priority':'#d97706','Medium Priority':'#0891b2'};
+    var colors = {'Critical Priority':'var(--danger)','High Priority':'var(--warn-amber-text)','Medium Priority':'var(--info-blue)'};
     var c = colors[tier] || 'var(--muted)';
     return '<span style="font-size:11px;font-weight:700;color:'+c+';">'+(tier||'—')+'</span>';
   }
@@ -2305,7 +2305,7 @@ function showEmployeeHome(){
     var ctCount = 0;
 
     function makeStat(label, value, type) {
-      var c = type==='alert'?'#b91c1c':type==='good'?'#15803d':type==='info'?'#1d4ed8':'var(--muted)';
+      var c = type==='alert'?'var(--danger)':type==='good'?'var(--success)':type==='info'?'#1d4ed8':'var(--muted)';
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);">'
         +'<span class="js-lbl-sm">'+label+'</span>'
         +'<span style="font-size:16px;font-weight:800;color:'+c+';">'+value+'</span>'
@@ -2347,7 +2347,7 @@ function showEmployeeHome(){
       makeStat('Occupied', occupied, 'info') +
       makeStat('Total Units', totalUnits, 'neutral'));
 
-    var matchTile = tile('🔗','Match','showMatch()','#15803d',
+    var matchTile = tile('🔗','Match','showMatch()','var(--success)',
       makeStat('Ready to Match', readyMatch, readyMatch>0?'good':'neutral') +
       makeStat('Matched', matched, matched>0?'good':'neutral') +
       makeStat('Vacant Units', vacant, vacant>0?'good':'alert'));
@@ -2377,7 +2377,7 @@ function showEmployeeHome(){
         else{sowPendingHM++;}
       });
     }catch(e){}
-    var renoTile = tile('🔨','Renovations','showRenos()','#d97706',
+    var renoTile = tile('🔨','Renovations','showRenos()','var(--warn-amber-text)',
       makeStat('Under Repair', underRepair, underRepair>0?'alert':'good') +
       makeStat('Condemned',    condemned,   condemned>0?'alert':'good') +
       makeStat('Pending HM Approval',  sowPendingHM,  sowPendingHM>0?(APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role)?'alert':'info'):'neutral') +
@@ -2539,42 +2539,42 @@ async function renderRecentActivity(role) {
 
   // ── Icon + colour map ──────────────────────────────────────────────────────
   var icons = {
-    'application_submitted':    {icon:'📨', color:'#15803d', label:'Application Submitted'},
-    'file_update_submitted':    {icon:'📨', color:'#15803d', label:'File Update Submitted'},
+    'application_submitted':    {icon:'📨', color:'var(--success)', label:'Application Submitted'},
+    'file_update_submitted':    {icon:'📨', color:'var(--success)', label:'File Update Submitted'},
     'draft_saved':              {icon:'💾', color:'var(--muted)', label:'Draft Saved'},
     'signature_captured':       {icon:'✍️', color:'var(--muted)', label:'Signature Captured'},
     'status_change':            {icon:'🔄', color:'#1d4ed8', label:'Status Changed'},
     'status':                   {icon:'🔄', color:'#1d4ed8', label:'Status Changed'},
     'application_opened':       {icon:'📂', color:'var(--muted)', label:'Opened for Edit'},
-    'declined':                 {icon:'✕',  color:'#b91c1c', label:'Declined'},
+    'declined':                 {icon:'✕',  color:'var(--danger)', label:'Declined'},
     'archived':                 {icon:'📦', color:'var(--muted)', label:'Archived'},
     'unarchived':               {icon:'📤', color:'var(--muted)', label:'Unarchived'},
     'ed_adjustment':            {icon:'⭐', color:'#7a5c00', label:'Score Adjusted'},
     'unit_edit':                {icon:'🏠', color:'#7c3aed', label:'Unit Updated'},
-    'unit_assigned':            {icon:'🔑', color:'#15803d', label:'Unit Assigned'},
+    'unit_assigned':            {icon:'🔑', color:'var(--success)', label:'Unit Assigned'},
     'unit_archived':            {icon:'🏚️', color:'var(--gray)',    label:'Unit Archived'},
     'unit_unarchived':          {icon:'📤', color:'#1d4ed8', label:'Unit Restored'},
-    'sow_created':              {icon:'🔨', color:'#d97706', label:'Request Created'},
-    'sow_updated':              {icon:'🔨', color:'#d97706', label:'Request Updated'},
-    'sow_hm_approval':          {icon:'✅', color:'#15803d', label:'Request Approved'},
-    'sow_ed_approval':          {icon:'✅', color:'#15803d', label:'Request Approved (ED)'},
+    'sow_created':              {icon:'🔨', color:'var(--warn-amber-text)', label:'Request Created'},
+    'sow_updated':              {icon:'🔨', color:'var(--warn-amber-text)', label:'Request Updated'},
+    'sow_hm_approval':          {icon:'✅', color:'var(--success)', label:'Request Approved'},
+    'sow_ed_approval':          {icon:'✅', color:'var(--success)', label:'Request Approved (ED)'},
     'sow_tenant_signed':        {icon:'✍️', color:'#1d4ed8', label:'Tenant Signed Request'},
     'sow_staff_signed':         {icon:'✍️', color:'var(--muted)', label:'Staff Signed Request'},
-    'sow_accountability':       {icon:'⚠️', color:'#b91c1c', label:'Accountability Flagged'},
-    'ct_submitted':             {icon:'🧰', color:'#15803d', label:'Contractor Application'},
+    'sow_accountability':       {icon:'⚠️', color:'var(--danger)', label:'Accountability Flagged'},
+    'ct_submitted':             {icon:'🧰', color:'var(--success)', label:'Contractor Application'},
     'ct_updated':               {icon:'🧰', color:'var(--gray)',    label:'Contractor Updated'},
     'hm_recommended':           {icon:'✅', color:'#1d4ed8', label:'HM Recommended'},
-    'approved':                 {icon:'✅', color:'#15803d', label:'Approved'},
+    'approved':                 {icon:'✅', color:'var(--success)', label:'Approved'},
     'returned':                 {icon:'↩️', color:'#7c3aed', label:'Returned for Info'},
     'settings_scoring_change':  {icon:'⚙️', color:'#7c3aed', label:'Rubric Value Changed'},
-    'settings_scoring_add':     {icon:'⚙️', color:'#15803d', label:'Rubric Criteria Added'},
-    'settings_scoring_delete':  {icon:'⚙️', color:'#b91c1c', label:'Rubric Criteria Removed'},
-    'settings_scoring_reset':   {icon:'⚙️', color:'#b91c1c', label:'Scoring Model Reset'},
+    'settings_scoring_add':     {icon:'⚙️', color:'var(--success)', label:'Rubric Criteria Added'},
+    'settings_scoring_delete':  {icon:'⚙️', color:'var(--danger)', label:'Rubric Criteria Removed'},
+    'settings_scoring_reset':   {icon:'⚙️', color:'var(--danger)', label:'Scoring Model Reset'},
     'settings_unit_score_save': {icon:'⚙️', color:'#7c3aed', label:'Unit Scoring Updated'},
-    'settings_reno_score_save': {icon:'⚙️', color:'#d97706', label:'Reno Scoring Updated'},
-    'settings_budget_save':     {icon:'💰', color:'#15803d', label:'Budget Saved'},
-    'settings_user_add':        {icon:'👤', color:'#15803d', label:'User Added'},
-    'settings_user_remove':     {icon:'👤', color:'#b91c1c', label:'User Removed'},
+    'settings_reno_score_save': {icon:'⚙️', color:'var(--warn-amber-text)', label:'Reno Scoring Updated'},
+    'settings_budget_save':     {icon:'💰', color:'var(--success)', label:'Budget Saved'},
+    'settings_user_add':        {icon:'👤', color:'var(--success)', label:'User Added'},
+    'settings_user_remove':     {icon:'👤', color:'var(--danger)', label:'User Removed'},
     'settings_saved':           {icon:'⚙️', color:'var(--muted)', label:'Settings Saved'}
   };
 

@@ -22,10 +22,10 @@
                'Basement','Laundry','Utility / Mechanical','Exterior','Whole Unit'];
 
   var SEVERITY = [
-    { v:'Urgent — safety / habitability', c:'#b91c1c' },
-    { v:'High — needs prompt repair',     c:'#d97706' },
-    { v:'Medium — schedule soon',         c:'#0891b2' },
-    { v:'Low — cosmetic / when able',     c:'#15803d' }
+    { v:'Urgent — safety / habitability', c:'var(--danger)' },
+    { v:'High — needs prompt repair',     c:'var(--warn-amber-text)' },
+    { v:'Medium — schedule soon',         c:'var(--info-blue)' },
+    { v:'Low — cosmetic / when able',     c:'var(--success)' }
   ];
 
   var TRADES = [

@@ -992,7 +992,7 @@ function renderBidsSection() {
         + '<span>&#128206; Drop or choose</span></label>';
     html += '<tr' + (isLow ? ' style="background:var(--success-bg,#f0fdf4);"' : '') + '>'
       + '<td style="padding:6px 10px;font-size:12px;font-weight:600;">' + escapeHtml(r.ct.name||r.id)
-      +   (isLow ? ' <span style="font-size:10px;color:#15803d;font-weight:700;">LOWEST</span>' : '') + '</td>'
+      +   (isLow ? ' <span style="font-size:10px;color:var(--success);font-weight:700;">LOWEST</span>' : '') + '</td>'
       + '<td style="padding:4px 8px;"><input type="text" inputmode="decimal" value="' + escapeHtml(amtDisp) + '" onfocus="_rfqCurrencyFocus(this)" oninput="_rfqSetBidAmount(\'' + idEsc + '\',this.value)" onblur="_rfqCurrencyBlur(this)" onchange="renderBidsSection()" class="stg-lookup-input" style="width:118px;" placeholder="$0.00"/></td>'
       + '<td style="padding:4px 8px;"><input type="text" value="' + escapeHtml(r.notes) + '" oninput="_rfqSetBid(\'' + idEsc + '\',\'notes\',this.value)" class="stg-lookup-input" placeholder="Optional"/></td>'
       + '<td style="padding:4px 8px;"><input type="date" value="' + escapeHtml(r.received) + '" oninput="_rfqSetBid(\'' + idEsc + '\',\'received_at\',this.value)" class="stg-lookup-input"/></td>'

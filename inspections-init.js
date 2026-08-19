@@ -138,7 +138,7 @@ function renderInspectionsList() {
   }
   tbody.innerHTML = list.map(function(insp) {
     var badge   = _inspBadge(insp.overall_status);
-    var apprMark = insp.approved_by ? ' <span title="Approved by ' + _esc(insp.approved_by) + '" style="color:#15803d;font-weight:700;">✓</span>' : '';
+    var apprMark = insp.approved_by ? ' <span title="Approved by ' + _esc(insp.approved_by) + '" style="color:var(--success);font-weight:700;">✓</span>' : '';
     var items   = insp.checklist ? JSON.parse(typeof insp.checklist === 'string' ? insp.checklist : JSON.stringify(insp.checklist)) : [];
     var repairs = items.filter(function(it){ return it.rating === 'repair'; }).length;
     var photoCount = (insp.photos ? (typeof insp.photos === 'string' ? JSON.parse(insp.photos) : insp.photos) : []).length;
@@ -155,7 +155,7 @@ function renderInspectionsList() {
 }
 
 function _inspKpi(val, lbl, status) {
-  var color = status === 'pass' ? '#15803d' : status === 'needs_repair' ? '#b45309' : status === 'fail' ? '#b91c1c' : 'var(--text)';
+  var color = status === 'pass' ? 'var(--success)' : status === 'needs_repair' ? '#b45309' : status === 'fail' ? 'var(--danger)' : 'var(--text)';
   return '<div class="insp-kpi"><div class="insp-kpi-val" style="color:' + color + ';">' + val + '</div><div class="insp-kpi-lbl">' + lbl + '</div></div>';
 }
 
@@ -283,7 +283,7 @@ function openInspectionModal(id) {
   var inspApprovedAt = insp && insp.approved_at ? String(insp.approved_at).slice(0, 10) : '';
   var apprBanner = '';
   if (inspApprovedBy) {
-    apprBanner = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:9px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:12px;color:#15803d;font-weight:600;">'
+    apprBanner = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:9px 12px;background:var(--success-bg);border:1px solid var(--success-border);border-radius:8px;font-size:12px;color:var(--success);font-weight:600;">'
       + '✓ Approved by ' + _esc(inspApprovedBy) + (inspApprovedAt ? ' on ' + _esc(inspApprovedAt) : '') + '</div>';
   } else if (!canApproveInsp) {
     apprBanner = '<div style="margin-bottom:16px;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted);">Report not yet approved — awaiting sign-off by an authorized approver.</div>';
@@ -335,7 +335,7 @@ function openInspectionModal(id) {
     +   '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
     +     (insp ? '<button type="button" class="btn btn-ghost" onclick="_inspConfirmDelete()">Delete</button>' : '')
     +     (insp ? '<button type="button" class="btn btn-ghost" onclick="generateInspectionPDF()">⬇ PDF</button>' : '')
-    +     (canApproveInsp && !inspApprovedBy && inspApprovalRequired ? '<button type="button" class="btn" style="background:#15803d;color:#fff;border:1px solid #15803d;" onclick="saveInspection(\'approve\')">✓ Approve Report</button>' : '')
+    +     (canApproveInsp && !inspApprovedBy && inspApprovalRequired ? '<button type="button" class="btn" style="background:var(--success);color:#fff;border:1px solid var(--success);" onclick="saveInspection(\'approve\')">✓ Approve Report</button>' : '')
     +     (canApproveInsp && inspApprovedBy ? '<button type="button" class="btn btn-ghost" onclick="saveInspection(\'revoke\')">Revoke Approval</button>' : '')
     +   '</div>'
     +   '<div style="display:flex;gap:8px;">'
@@ -445,7 +445,7 @@ function _inspUpdateSectionSummaries() {
     if (repairs) txt += ' · ' + repairs + ' repair';
     if (fails)   txt += ' · ' + fails + ' fail';
     el.textContent = txt;
-    el.style.color = fails ? '#b91c1c' : repairs ? '#b45309' : 'var(--muted)';
+    el.style.color = fails ? 'var(--danger)' : repairs ? '#b45309' : 'var(--muted)';
   });
 }
 

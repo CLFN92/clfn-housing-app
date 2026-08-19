@@ -1019,10 +1019,10 @@ function _prjRenderCosts() {
     var docChips = PRJ_EXP_DOC_KINDS.map(function(k){ return _prjDocChip(e, i, k.k, k.label); }).join('');
     var attachedCount = PRJ_EXP_DOC_KINDS.filter(function(k){ return _prjExpDoc(e, k.k); }).length;
     var docStatus = attachedCount === PRJ_EXP_DOC_KINDS.length
-      ? '<span style="font-size:11px;color:#15803d;font-weight:600;white-space:nowrap;">✓ Docs complete</span>'
+      ? '<span style="font-size:11px;color:var(--success);font-weight:600;white-space:nowrap;">✓ Docs complete</span>'
       : '<span style="font-size:11px;color:var(--warn-amber-text,#b45309);white-space:nowrap;">' + attachedCount + ' of ' + PRJ_EXP_DOC_KINDS.length + ' docs</span>';
     var claimedBadge = claims.length
-      ? '<span style="font-size:11px;font-weight:700;color:#1d4ed8;background:#eff6ff;border-radius:10px;padding:2px 8px;white-space:nowrap;">Claimed · ' + _prjEsc(claimNums) + '</span>'
+      ? '<span style="font-size:11px;font-weight:700;color:#1d4ed8;background:var(--info-blue-bg);border-radius:10px;padding:2px 8px;white-space:nowrap;">Claimed · ' + _prjEsc(claimNums) + '</span>'
       : '';
 
     var vendorInfo = [e.vendorAddress, e.vendorPhone].filter(Boolean).join(' · ');
@@ -1062,7 +1062,7 @@ function _prjRenderCosts() {
     '<div class="tic-section">' +
       '<div class="tic-section-h">Budget vs Actual</div>' +
       '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;">' +
-        '<span>Spent: <b>' + _prjMoney(spent, true) + '</b>' + (over ? ' <span style="color:#b91c1c;font-weight:700;">(over budget)</span>' : '') + '</span>' +
+        '<span>Spent: <b>' + _prjMoney(spent, true) + '</b>' + (over ? ' <span style="color:var(--danger);font-weight:700;">(over budget)</span>' : '') + '</span>' +
         '<span>Budget: <b>' + (budget > 0 ? _prjMoney(budget, true) : '—') + '</b></span>' +
       '</div>' +
       '<div class="prj-budget-bar"><div class="prj-budget-fill' + (over ? ' prj-over' : '') + '" style="width:' + (budget > 0 ? pct : 0) + '%;"></div></div>' +
@@ -1081,7 +1081,7 @@ function _prjRenderCosts() {
             ' onblur="setTimeout(function(){var dd=document.getElementById(\'prj_exp_vendor_dd\');if(dd)dd.style.display=\'none\';},180)"/>' +
           '<input type="hidden" id="prj_exp_vendor_ctid"/>' +
           '<div id="prj_exp_vendor_dd" class="prj-vendor-dd" style="display:none;"></div>' +
-          '<div id="prj_exp_vendor_link" style="display:none;font-size:11px;color:#15803d;margin-top:4px;"></div>' +
+          '<div id="prj_exp_vendor_link" style="display:none;font-size:11px;color:var(--success);margin-top:4px;"></div>' +
         '</div>' +
         '<div class="f"><label>Amount (CAD) *</label><input id="prj_exp_amount" class="tic-input" type="number" min="0" step="0.01" placeholder="0.00"/></div>' +
         '<div class="f" id="prj_exp_addr_f"><label>Business Address *</label><input id="prj_exp_vendor_addr" class="tic-input" type="text" placeholder="Street, town, province"/></div>' +
@@ -1339,7 +1339,7 @@ function _prjRenderPnl() {
   };
   var varCell = function(v, hasBudget) {
     if (!hasBudget) return '<td style="text-align:right;color:var(--muted);">—</td>';
-    var color = v < 0 ? '#b91c1c' : '#15803d';
+    var color = v < 0 ? 'var(--danger)' : 'var(--success)';
     return '<td style="text-align:right;font-weight:600;color:' + color + ';">' + (v < 0 ? '-' : '') + _prjMoney(Math.abs(v), true) + '</td>';
   };
 
@@ -1362,7 +1362,7 @@ function _prjRenderPnl() {
       return;
     }
     rows += '<tr' + (m.done ? ' style="opacity:.72;"' : '') + '>' +
-      '<td>' + _prjEsc(m.name || '(unnamed)') + (m.done ? ' <span style="color:#15803d;" title="Milestone complete">✓</span>' : '') + '</td>' +
+      '<td>' + _prjEsc(m.name || '(unnamed)') + (m.done ? ' <span style="color:var(--success);" title="Milestone complete">✓</span>' : '') + '</td>' +
       '<td style="text-align:right;"><input class="tic-input" type="number" min="0" step="0.01" placeholder="0.00" value="' + (budget != null ? _prjEsc(budget) : '') + '" onchange="_prjMsBudget(' + i + ', this.value)" style="max-width:130px;text-align:right;padding:5px 9px;font-size:12px;display:inline-block;"/></td>' +
       '<td style="text-align:right;">' + (actual ? _prjMoney(actual, true) : '<span style="color:var(--muted);">—</span>') + '</td>' +
       varCell(budget != null ? budget - actual : 0, budget != null) +
@@ -1758,14 +1758,14 @@ function _prjOpenPaymentRequestModal() {
             '</div>'
           : '') +
         (reClaimed.length
-          ? '<div style="margin-top:12px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:12px;color:#1d4ed8;">ℹ️ ' + reClaimed.length + ' of the selected cost line' + (reClaimed.length === 1 ? ' was' : 's were') + ' already claimed in ' + _prjEsc(Object.keys(reClaimedNums).join(', ')) + '. Including a line in a second claim is for cost-shared projects (billing another funder) or completing a partial claim — make sure this is not a double bill to the same funder.</div>'
+          ? '<div style="margin-top:12px;padding:10px 14px;background:var(--info-blue-bg);border:1px solid #bfdbfe;border-radius:8px;font-size:12px;color:#1d4ed8;">ℹ️ ' + reClaimed.length + ' of the selected cost line' + (reClaimed.length === 1 ? ' was' : 's were') + ' already claimed in ' + _prjEsc(Object.keys(reClaimedNums).join(', ')) + '. Including a line in a second claim is for cost-shared projects (billing another funder) or completing a partial claim — make sure this is not a double bill to the same funder.</div>'
           : '') +
         '<div style="margin-top:12px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">' +
           sel.map(function(e) {
             var n = PRJ_EXP_DOC_KINDS.filter(function(k){ return _prjExpDoc(e, k.k); }).length;
             return '<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 12px;border-bottom:1px solid var(--border);font-size:12px;">' +
               '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;">' + _prjEsc(e.date || '') + ' · ' + _prjEsc(e.vendor || '—') + (e.description ? ' · ' + _prjEsc(e.description) : '') + '</span>' +
-              '<span style="white-space:nowrap;">' + (n === PRJ_EXP_DOC_KINDS.length ? '<span style="color:#15803d;">✓</span>' : '<span style="color:var(--warn-amber-text,#b45309);">' + n + '/3</span>') + ' <b>' + _prjMoney(e.amount, true) + '</b></span>' +
+              '<span style="white-space:nowrap;">' + (n === PRJ_EXP_DOC_KINDS.length ? '<span style="color:var(--success);">✓</span>' : '<span style="color:var(--warn-amber-text,#b45309);">' + n + '/3</span>') + ' <b>' + _prjMoney(e.amount, true) + '</b></span>' +
             '</div>';
           }).join('') +
         '</div>' +
@@ -2312,7 +2312,7 @@ function _prjAllocPreview() {
   var btn   = document.getElementById('prj_alloc_confirm');
 
   if (total <= 0) {
-    host.innerHTML = '<div style="font-size:13px;color:#b91c1c;">' + (basis === 'budget' ? 'No funded budget is set on this project.' : 'No expenses have been logged yet.') + '</div>';
+    host.innerHTML = '<div style="font-size:13px;color:var(--danger);">' + (basis === 'budget' ? 'No funded budget is set on this project.' : 'No expenses have been logged yet.') + '</div>';
     if (btn) btn.disabled = true;
     return;
   }
@@ -2431,7 +2431,7 @@ function _prjRenderLots() {
   var directRows = directLinked.map(function(u){
     var isLot = (typeof _isLot === 'function' && _isLot(u));
     var tag = isLot
-      ? '<span style="font-size:10px;font-weight:700;color:#15803d;">LOT</span>'
+      ? '<span style="font-size:10px;font-weight:700;color:var(--success);">LOT</span>'
       : '<span style="font-size:10px;font-weight:700;color:#1d4ed8;">UNIT</span>';
     return '<tr><td>' + tag + '</td>' +
       '<td style="font-weight:600;">' + _prjEsc(((u.num || '') + ' ' + (u.street || '')).trim()) + '</td>' +

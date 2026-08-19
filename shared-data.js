@@ -216,11 +216,11 @@ var _SOW_BADGE_VARIANTS = {
     map: {
       '':           {bg:'#f4f4f0', c:'#666',    label:'Draft'},
       draft:        {bg:'#f4f4f0', c:'#666',    label:'Draft'},
-      signed:       {bg:'#eff6ff', c:'#1d4ed8', label:'Signed'},
+      signed:       {bg:'var(--info-blue-bg)', c:'#1d4ed8', label:'Signed'},
       submitted:    {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'Submitted'},
       hm_approved:  {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'HM Approved'},
-      ed_approved:  {bg:'#f0fdf4', c:'#15803d', label:'ED Approved'},
-      completed:    {bg:'#f0fdf4', c:'#15803d', label:'Completed'}
+      ed_approved:  {bg:'var(--success-bg)', c:'var(--success)', label:'ED Approved'},
+      completed:    {bg:'var(--success-bg)', c:'var(--success)', label:'Completed'}
     },
     fallback: function(st){ return {bg:'#f4f4f0', c:'#666', label: st || '—'}; }
   },
@@ -228,10 +228,10 @@ var _SOW_BADGE_VARIANTS = {
     map: {
       '':           {bg:'#f4f4f0', c:'#666',    label:'Draft'},
       draft:        {bg:'#f4f4f0', c:'#666',    label:'Draft'},
-      signed:       {bg:'#eff6ff', c:'#1d4ed8', label:'Signed'},
+      signed:       {bg:'var(--info-blue-bg)', c:'#1d4ed8', label:'Signed'},
       submitted:    {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'Submitted'},
       hm_approved:  {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'HM Approved'},
-      ed_approved:  {bg:'#f0fdf4', c:'#15803d', label:'ED Approved'}
+      ed_approved:  {bg:'var(--success-bg)', c:'var(--success)', label:'ED Approved'}
     },
     systemEvenIfCompleted: true,
     fallback: function(st){ return {bg:'#f4f4f0', c:'#666', label: st || 'Draft'}; }
@@ -239,10 +239,10 @@ var _SOW_BADGE_VARIANTS = {
   unit_table: {
     map: {
       draft:        {bg:'#f4f4f0', c:'#666',    label:'Draft'},
-      signed:       {bg:'#eff6ff', c:'#1d4ed8', label:'Signed'},
+      signed:       {bg:'var(--info-blue-bg)', c:'#1d4ed8', label:'Signed'},
       hm_approved:  {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'HM Approved'},
-      ed_approved:  {bg:'#f0fdf4', c:'#15803d', label:'ED Approved'},
-      completed:    {bg:'#f0fdf4', c:'#15803d', label:'Completed'}
+      ed_approved:  {bg:'var(--success-bg)', c:'var(--success)', label:'ED Approved'},
+      completed:    {bg:'var(--success-bg)', c:'var(--success)', label:'Completed'}
     },
     // Archived SOWs always render the "Archived" pill on this surface (it
     // overrides the approval-status pill AND the System Approved badge).
@@ -254,10 +254,10 @@ var _SOW_BADGE_VARIANTS = {
   contractor_list: {
     map: {
       draft:        {bg:'#f4f4f0', c:'#666',    label:'Draft'},
-      signed:       {bg:'#eff6ff', c:'#1d4ed8', label:'Signed'},
+      signed:       {bg:'var(--info-blue-bg)', c:'#1d4ed8', label:'Signed'},
       hm_approved:  {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'HM Approved'},
-      ed_approved:  {bg:'#f0fdf4', c:'#15803d', label:'ED Approved'},
-      completed:    {bg:'#f0fdf4', c:'#15803d', label:'Completed'}
+      ed_approved:  {bg:'var(--success-bg)', c:'var(--success)', label:'ED Approved'},
+      completed:    {bg:'var(--success-bg)', c:'var(--success)', label:'Completed'}
     },
     systemEvenIfCompleted: true,
     fallback: function(st){ return {bg:'#f4f4f0', c:'#666', label: st || '—'}; }
@@ -304,9 +304,9 @@ window.sowStatusBadge = sowStatusBadge;
 // null for unknown statuses — call sites keep their own historical fallbacks.
 var _CT_BADGE_BANNER = {
   pending_review: {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)', label:'⏳ Pending Housing Manager Review'},
-  hm_recommended: {bg:'#eff6ff', c:'#1d4ed8', label:'📋 HM Recommended — Awaiting Final Approval'},
-  approved:       {bg:'#f0fdf4', c:'#15803d', label:'✅ Approved — Active Contractor'},
-  declined:       {bg:'#fef2f2', c:'#b91c1c', label:'❌ Declined'},
+  hm_recommended: {bg:'var(--info-blue-bg)', c:'#1d4ed8', label:'📋 HM Recommended — Awaiting Final Approval'},
+  approved:       {bg:'var(--success-bg)', c:'var(--success)', label:'✅ Approved — Active Contractor'},
+  declined:       {bg:'var(--danger-bg)', c:'var(--danger)', label:'❌ Declined'},
   returned:       {bg:'#faf5ff', c:'#7c3aed', label:'↩ Returned for More Information'}
 };
 var _CT_BADGE_TABLE = {
@@ -2427,7 +2427,7 @@ function _ctRenderFlow(status, ct, prefix) {
   flow.innerHTML = steps.map(function(step, i){
     var done = i < currentIdx || (i===2 && status==='approved');
     var active = i === currentIdx && !declined && !returned;
-    var bg = done?'#15803d':active?'var(--yellow)':'var(--border)';
+    var bg = done?'var(--success)':active?'var(--yellow)':'var(--border)';
     var col = done?'#fff':active?'#111':'var(--gray)';
     var note = i===1&&hmAt?hmAt:i===2&&edAt?edAt:'';
     return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;">'
@@ -2799,7 +2799,7 @@ function openTenantMrReview(id){
     : '';
   var when = s.created_at ? new Date(s.created_at).toLocaleString() : '';
   var urg = (s.urgency || 'routine');
-  var urgColor = urg === 'emergency' ? 'var(--danger)' : (urg === 'urgent' ? '#d97706' : 'var(--muted)');
+  var urgColor = urg === 'emergency' ? 'var(--danger)' : (urg === 'urgent' ? 'var(--warn-amber-text)' : 'var(--muted)');
   var ex = document.getElementById('tenant_mr_modal'); if(ex) ex.remove();
   var m = document.createElement('div');
   m.id = 'tenant_mr_modal';
@@ -2998,7 +2998,7 @@ function openApplicationSubmissionReview(id){
     return '<button type="button" onclick="_appSubPickLink(\'' + e(a.id) + '\')" class="btn btn-ghost" style="font-size:12px;padding:3px 9px;margin:2px 4px 2px 0;">' + e(a.id) + (nm ? ' &middot; ' + e(nm) : '') + '</button>';
   }).join('');
   var linkSection =
-      '<div class="tic-field-lbl" style="margin-top:14px;">Link to existing application ' + (isUpdateType ? '<span style="color:#d97706;">(recommended for ' + e(s.submission_type) + ')</span>' : '(optional)') + '</div>'
+      '<div class="tic-field-lbl" style="margin-top:14px;">Link to existing application ' + (isUpdateType ? '<span style="color:var(--warn-amber-text);">(recommended for ' + e(s.submission_type) + ')</span>' : '(optional)') + '</div>'
     + (cands.length
         ? '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Possible match' + (cands.length>1?'es':'') + ': ' + candChips + '</div>'
         : '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Blank = create a new application. Enter an APP id to merge these changes into it.</div>')
@@ -3565,15 +3565,15 @@ function _updateRbaAllocSummary(totalCost, eligiblePools, budgetData) {
   var statusBadge = document.getElementById('rba_status_badge');
 
   if(overBudget) {
-    summaryEl.style.background='#fef2f2'; summaryEl.style.border='1px solid #b91c1c';
+    summaryEl.style.background='var(--danger-bg)'; summaryEl.style.border='1px solid var(--danger)';
     summaryEl.innerHTML = '<div style="color:var(--danger);font-weight:700;margin-bottom:4px;">⚠️ Over Budget</div>'
       +'<div style="font-size:11px;color:var(--danger);">'+poolWarnings.join('<br/>')+'</div>';
     overBudgetSection.style.display='block';
     var msg = document.getElementById('rba_over_budget_msg');
     if(msg) msg.textContent = 'The allocated amounts exceed available pool balances. Executive Director approval and written justification are required.';
-    statusBadge.textContent='Over Budget — ED Approval Required'; statusBadge.style.background='#fef2f2'; statusBadge.style.color='#b91c1c';
+    statusBadge.textContent='Over Budget — ED Approval Required'; statusBadge.style.background='var(--danger-bg)'; statusBadge.style.color='var(--danger)';
   } else {
-    summaryEl.style.background='#f0fdf4'; summaryEl.style.border='1px solid #bbf7d0';
+    summaryEl.style.background='var(--success-bg)'; summaryEl.style.border='1px solid var(--success-border)';
     summaryEl.innerHTML = '<div style="color:var(--success);font-weight:700;">✓ Within Budget</div>'
       +'<div style="font-size:11px;color:var(--success);">Total allocated: '+formatCurrency(totalAlloc)+' of '+formatCurrency(totalCost)+' SOW cost</div>';
     overBudgetSection.style.display='none';
@@ -5426,8 +5426,8 @@ function _staffExpiryChip(u){
   var now = Date.now();
   var days = Math.ceil((endOfDay - now)/86400000);
   var style, label;
-  if(now >= endOfDay){ style='background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;'; label='Expired'; }
-  else if(days <= 14){ style='background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;'; label='Expires '+s+' ('+days+'d)'; }
+  if(now >= endOfDay){ style='background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);'; label='Expired'; }
+  else if(days <= 14){ style='background:var(--warn-amber-bg);color:var(--warn-amber-text);border:1px solid #fed7aa;'; label='Expires '+s+' ('+days+'d)'; }
   else { style='background:#f4f4f0;color:#555;border:1px solid var(--border);'; label='Expires '+s; }
   return '<span title="Access expiry" style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;'+style+'">🕒 '+label+'</span>';
 }
@@ -5459,13 +5459,13 @@ async function renderHousingUserTable(){
     }
     var roleColors = {
       super_user:          {bg:'#1e293b', c:'#f8fafc'},
-      ed:                  {bg:'#f0fdf4', c:'#15803d'},
-      housing_manager:     {bg:'#eff6ff', c:'#1d4ed8'},
+      ed:                  {bg:'var(--success-bg)', c:'var(--success)'},
+      housing_manager:     {bg:'var(--info-blue-bg)', c:'#1d4ed8'},
       housing_employee_l2: {bg:'#faf5ff', c:'#7c3aed'},
       housing_employee_l1: {bg:'#f4f4f0', c:'#555'},
       employee:            {bg:'#f4f4f0', c:'#555'},
-      cfo:                 {bg:'#fff7ed', c:'#c2410c'},
-      finance_l1:          {bg:'#fff7ed', c:'#c2410c'}
+      cfo:                 {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)'},
+      finance_l1:          {bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)'}
     };
     // Source labels from CLFN_PERMS so display titles stay nation-configurable.
     // Legacy 'employee' key is kept for old DB rows that haven't been normalized.
@@ -5543,10 +5543,10 @@ function renderRenoScoreBadge(unitId) {
   if(!el) return;
   var result = calcRenoScore(unitId);
   var s = result.score;
-  var tier = s >= 40 ? {label:'Critical',  bg:'#fef2f2', c:'#b91c1c'}
+  var tier = s >= 40 ? {label:'Critical',  bg:'var(--danger-bg)', c:'var(--danger)'}
            : s >= 25 ? {label:'High',      bg:'#fef9ec', c:'#7a6000'}
-           : s >= 12 ? {label:'Medium',    bg:'#eff6ff', c:'#1d4ed8'}
-           :           {label:'Low',       bg:'#f0fdf4', c:'#15803d'};
+           : s >= 12 ? {label:'Medium',    bg:'var(--info-blue-bg)', c:'#1d4ed8'}
+           :           {label:'Low',       bg:'var(--success-bg)', c:'var(--success)'};
   el.innerHTML = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
     +'<div style="font-size:30px;font-weight:800;color:var(--text);">'+s+'</div>'
     +'<div>'
@@ -5576,7 +5576,7 @@ function renderRenoScoreTable() {
   tbody.innerHTML = model.map(function(row) {
     var isNew = row.factor !== prevFactor;
     prevFactor = row.factor;
-    var ptsColor = row.pts > 0 ? '#15803d' : row.pts < 0 ? '#b91c1c' : 'var(--gray)';
+    var ptsColor = row.pts > 0 ? 'var(--success)' : row.pts < 0 ? 'var(--danger)' : 'var(--gray)';
     return '<tr class="row-divider">'
       +'<td style="padding:9px 12px;font-size:13px;font-weight:600;color:var(--text);">'+(isNew?row.factor:'')+'</td>'
       +'<td style="padding:9px 12px;font-size:13px;color:var(--muted);">'+row.condition+'</td>'
@@ -5584,7 +5584,7 @@ function renderRenoScoreTable() {
         +(row.editable
           ?'<input type="number" data-rsm-id="'+row.id+'" value="'+row.pts+'" step="1" min="-50" max="50"'
             +' style="width:60px;text-align:center;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;color:'+ptsColor+';background:var(--surface);"'
-            +' onchange="this.style.color=+this.value>0?\'#15803d\':\'var(--gray)\'"/>'
+            +' onchange="this.style.color=+this.value>0?\'var(--success)\':\'var(--gray)\'"/>'
           :'<span style="font-size:13px;font-weight:700;color:'+ptsColor+';">'+row.pts+'</span>')
       +'</td>'
       +'<td style="padding:9px 12px;font-size:11px;color:var(--muted);">'+row.notes+'</td>'
@@ -5621,7 +5621,7 @@ function renderRenosView(){
 
   function scoreBadge(uid){
     var r=calcRenoScore(uid); var s=r.score;
-    var tier=s>=40?{label:'Critical',c:'#b91c1c',bg:'#fef2f2'}:s>=25?{label:'High',c:'#7a6000',bg:'#fef9ec'}:s>=12?{label:'Medium',c:'#1d4ed8',bg:'#eff6ff'}:{label:'Low',c:'#15803d',bg:'#f0fdf4'};
+    var tier=s>=40?{label:'Critical',c:'var(--danger)',bg:'var(--danger-bg)'}:s>=25?{label:'High',c:'#7a6000',bg:'#fef9ec'}:s>=12?{label:'Medium',c:'#1d4ed8',bg:'var(--info-blue-bg)'}:{label:'Low',c:'var(--success)',bg:'var(--success-bg)'};
     return '<span style="font-size:15px;font-weight:800;color:var(--text);">'+s+'</span>'
       +' <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:'+tier.bg+';color:'+tier.c+';">'+tier.label+'</span>';
   }
@@ -5713,7 +5713,7 @@ function renderRenosView(){
         var pct = prog.overallPct || 0;
         var uid = String(u.id).replace(/'/g,"\\'");
         var _rs = calcRenoScore(u.id).score;
-        var _tier = _rs>=40?{l:'Critical',c:'#b91c1c',bg:'#fef2f2'}:_rs>=25?{l:'High',c:'#7a6000',bg:'#fef9ec'}:_rs>=12?{l:'Medium',c:'#1d4ed8',bg:'#eff6ff'}:{l:'Low',c:'#15803d',bg:'#f0fdf4'};
+        var _tier = _rs>=40?{l:'Critical',c:'var(--danger)',bg:'var(--danger-bg)'}:_rs>=25?{l:'High',c:'#7a6000',bg:'#fef9ec'}:_rs>=12?{l:'Medium',c:'#1d4ed8',bg:'var(--info-blue-bg)'}:{l:'Low',c:'var(--success)',bg:'var(--success-bg)'};
         return _cardTile({
           title: _rnEsc(((u.num||'')+' '+(u.street||'')).trim()),
           pill: isCondemned ? {text:'🚫 Condemned', bg:'var(--danger-bg)', color:'var(--danger)'} : {text:'🔨 Under Repair', bg:'var(--warn-amber-bg)', color:'var(--warn-amber)'},
@@ -5843,7 +5843,7 @@ function renderUnitScoreTable(){
     var isNew=row.factor!==prevFactor;
     prevFactor=row.factor;
     var rowStyle='border-bottom:1px solid var(--border);'+(isNew&&prevFactor!==model[0].factor?'border-top:2px solid var(--border);':'');
-    var ptsColor=row.pts>0?'#15803d':row.pts<0?'#b91c1c':'var(--gray)';
+    var ptsColor=row.pts>0?'var(--success)':row.pts<0?'var(--danger)':'var(--gray)';
     var ptsDisplay=(row.pts>0?'+':'')+row.pts;
     return '<tr style="'+rowStyle+'">'
       +'<td style="padding:9px 12px;font-size:13px;font-weight:600;color:var(--text);">'+(isNew?row.factor:'')+'</td>'
@@ -6479,7 +6479,7 @@ function renderWorklist() {
       var idJs = esc(s.id).replace(/'/g, "\\'");
       var open = 'openTenantMrReview(\'' + idJs + '\')';
       var urg = (s.urgency || 'routine');
-      var urgColor = urg === 'emergency' ? 'var(--danger)' : (urg === 'urgent' ? '#d97706' : 'var(--muted)');
+      var urgColor = urg === 'emergency' ? 'var(--danger)' : (urg === 'urgent' ? 'var(--warn-amber-text)' : 'var(--muted)');
       var info = '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(s.unit_address || s.unit_id) + '</span>'
                + '<span style="font-size:11px;color:var(--muted);width:130px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(s.category || '—') + '</span>'
                + '<span style="font-size:10px;font-weight:800;color:' + urgColor + ';width:78px;flex-shrink:0;">' + esc(urg.toUpperCase()) + '</span>';
@@ -6511,7 +6511,7 @@ function renderWorklist() {
       var stLbl = _asStatusLbl[s.status] || s.status;
       var info = '<span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(nm) + '</span>'
                + '<span style="font-size:11px;color:var(--muted);width:140px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(typeLbl) + '</span>'
-               + '<span style="font-size:10px;font-weight:800;color:' + (s.status==='changes_requested'?'#d97706':'var(--muted)') + ';width:64px;flex-shrink:0;">' + esc(String(stLbl).toUpperCase()) + '</span>';
+               + '<span style="font-size:10px;font-weight:800;color:' + (s.status==='changes_requested'?'var(--warn-amber-text)':'var(--muted)') + ';width:64px;flex-shrink:0;">' + esc(String(stLbl).toUpperCase()) + '</span>';
       asRows += '<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid var(--border);background:var(--surface);" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'var(--surface)\'">'
         + '<div onclick="' + open + '" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;">' + info + '</div>'
         + '<button onclick="' + open + '" style="flex-shrink:0;background:var(--yellow);color:var(--dark);border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;white-space:nowrap;">Review</button>'
@@ -6661,7 +6661,7 @@ function renderWorklist() {
     var fsCards = fieldSowItems.map(function(s) {
       var openCall = 'if(typeof openSowModal===\'function\'){openSowModal(\'' + escapeHtml(s.uid).replace(/'/g, "\\'") + '\');}else{window.location.href=\'renos.html?sow=' + encodeURIComponent(s.uid) + '\';}';
       var statLbl = (s.status === 'ed_approved') ? 'Approved — Ready to Work' : 'HM Approved — Ready to Work';
-      return wlCard({ title:s.addr, pill:{text:statLbl,color:'#15803d',bg:'#f0fdf4'}, open:openCall,
+      return wlCard({ title:s.addr, pill:{text:statLbl,color:'var(--success)',bg:'var(--success-bg)'}, open:openCall,
         metas:[{k:'Project',v:s.pn||'—'}], actions:[{text:'Open →',onclick:openCall}] });
     }).join('');
     html += sectionWrap('🔧', 'Work Orders to Complete', fieldSowItems.length, 'renos.html', _view==='cards' ? wlGrid(fsCards) : fsRows, 0);
@@ -6683,7 +6683,7 @@ function renderWorklist() {
     }).join('');
     var rfqCards = rfqItems.map(function(r) {
       var open = 'window.location.href=\'rfq.html?rfq=' + encodeURIComponent(r.id) + '\'';
-      return wlCard({ title:r.id, pill:{text:'Open for Bids',color:'#1d4ed8',bg:'#eff6ff'}, open:open,
+      return wlCard({ title:r.id, pill:{text:'Open for Bids',color:'#1d4ed8',bg:'var(--info-blue-bg)'}, open:open,
         metas:[{k:'Unit',v:r.addr},{k:'Closes',v:r.closes},{k:'Invited',v:r.recipients},{k:'Bids in',v:r.bids}],
         actions:[{text:'Award →',onclick:open}] });
     }).join('');
@@ -6713,7 +6713,7 @@ function renderWorklist() {
     }).join('');
     var ctCards = ctItems.map(function(c) {
       var ctNav = 'if(typeof setNavReferrer===\'function\')setNavReferrer(\'home\');window.location.href=\'contractors.html?openContractor=' + encodeURIComponent(c.id) + '\';';
-      return wlCard({ title:c.name, pill:{text:ctStatusLabel[c.status] || c.status, color:'#b45309', bg:'#fffbeb'}, open:ctNav,
+      return wlCard({ title:c.name, pill:{text:ctStatusLabel[c.status] || c.status, color:'#b45309', bg:'var(--warn-amber-bg)'}, open:ctNav,
         metas:[{k:'Trade',v:c.trade},{k:'Submitted',v:(c.submitted?String(c.submitted).slice(0,10):'')}],
         actions:[{text:ctBtnText[c.status] || 'Review →',onclick:ctNav}] });
     }).join('');
@@ -6740,9 +6740,9 @@ function renderWorklist() {
   // (housing-views.js) so a tier reads identically in both places.
   if (matchItems.length) {
     var _wlTierColor = {
-      'Critical Priority': { color: '#15803d', bg: '#f0fdf4' },
-      'High Priority':     { color: '#1d4ed8', bg: '#eff6ff' },
-      'Medium Priority':   { color: '#d97706', bg: '#fffbeb' },
+      'Critical Priority': { color: 'var(--success)', bg: 'var(--success-bg)' },
+      'High Priority':     { color: '#1d4ed8', bg: 'var(--info-blue-bg)' },
+      'Medium Priority':   { color: 'var(--warn-amber-text)', bg: 'var(--warn-amber-bg)' },
       'Low Priority':      { color: '#6b7280', bg: 'var(--bg)' }
     };
     // Allocate one vacant unit per applicant, in the same score order the
@@ -8643,10 +8643,10 @@ function showScorecard(app){
   var s=app.score||0;
   // Use V2 tier thresholds (ED-adjustable, stored in liveV2Tiers) for both color and tier label
   var _t = (typeof liveV2Tiers === 'object' && liveV2Tiers) ? liveV2Tiers : {critical:80, high:60, medium:40};
-  var tc = s >= _t.critical ? {bg:'#f0fdf4',c:'#15803d',bar:'#15803d'}
+  var tc = s >= _t.critical ? {bg:'var(--success-bg)',c:'var(--success)',bar:'var(--success)'}
          : s >= _t.high     ? {bg:'#e8eef5',c:'#1e3a5f',bar:'#3b82f6'}
-         : s >= _t.medium   ? {bg:'#fef9ec',c:'#7a6000',bar:'#d97706'}
-         :                    {bg:'#fef2f2',c:'#b91c1c',bar:'#b91c1c'};
+         : s >= _t.medium   ? {bg:'#fef9ec',c:'#7a6000',bar:'var(--warn-amber-text)'}
+         :                    {bg:'var(--danger-bg)',c:'var(--danger)',bar:'var(--danger)'};
   setText('sc_score_total',s);
   var tierEl=document.getElementById('sc_score_tier');if(tierEl){tierEl.textContent=app.tier||'—';tierEl.style.background=tc.bg;tierEl.style.color=tc.c;}
   // Bar: scale against the critical threshold so Low/Med/High/Critical labels align visually with tier boundaries

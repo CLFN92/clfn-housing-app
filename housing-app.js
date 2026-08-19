@@ -876,18 +876,18 @@ window.openAppMenu = function(e, appId) {
     if (isArchived) {
       items.push({ icon: '📤', label: 'Unarchive', action: 'unarchive', color: '#1d4ed8' });
     } else {
-      items.push({ icon: '📦', label: 'Archive', action: 'archive', color: '#d97706' });
+      items.push({ icon: '📦', label: 'Archive', action: 'archive', color: 'var(--warn-amber-text)' });
     }
   }
 
   // Decline — HM and ED only, not already declined
   if ((ROLE.isManagement(role)) && !isDeclined && !isArchived) {
-    items.push({ icon: '✕', label: 'Decline Application', action: 'decline', color: '#b91c1c' });
+    items.push({ icon: '✕', label: 'Decline Application', action: 'decline', color: 'var(--danger)' });
   }
 
   // Restore declined
   if (isDeclined && (ROLE.isManagement(role))) {
-    items.push({ icon: '↩', label: 'Restore to Submitted', action: 'restore', color: '#15803d' });
+    items.push({ icon: '↩', label: 'Restore to Submitted', action: 'restore', color: 'var(--success)' });
   }
 
   // View scorecard — always
@@ -1498,7 +1498,7 @@ function popReview(){
   var appId = (document.getElementById('appNumCard')||{}).textContent || (typeof currentAppId!=='undefined'?currentAppId:'—');
 
   function row(k,v,highlight){
-    var vColor = highlight ? 'color:#b91c1c;' : '';
+    var vColor = highlight ? 'color:var(--danger);' : '';
     return '<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">'
       +'<span style="color:var(--muted);flex-shrink:0;font-size:12px;">'+k+'</span>'
       +'<span style="font-weight:600;text-align:right;'+vColor+'">'+(v||'—')+'</span>'
@@ -2454,7 +2454,7 @@ function renderAppNotes() {
     listEl.innerHTML = html;
   }).catch(function(e) {
     console.warn('[notes] render failed:', e);
-    listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#b91c1c;font-size:12px;">Failed to load notes. Try refreshing.</div>';
+    listEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--danger);font-size:12px;">Failed to load notes. Try refreshing.</div>';
   });
 }
 

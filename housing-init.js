@@ -721,7 +721,7 @@ function openAssignModal(appId, suggestedUnitId) {
   document.getElementById('am_app_id').textContent    = app.id;
   var scoreEl = document.getElementById('am_app_score');
   if(scoreEl) scoreEl.textContent = (app.score||0)+' pts · '+(app.tier||'—').replace(' Priority','');
-  var statusColors={ed_approved:'#15803d',hm_approved:'#15803d',mgr_approved:'#1d4ed8',submitted:'var(--warn-amber-text)'};
+  var statusColors={ed_approved:'var(--success)',hm_approved:'var(--success)',mgr_approved:'#1d4ed8',submitted:'var(--warn-amber-text)'};
   var statusEl=document.getElementById('am_app_status');
   if(statusEl){
     statusEl.textContent = (typeof formatAppStatusLabel === 'function') ? formatAppStatusLabel(app.status) : (app.status||'—');
@@ -955,7 +955,7 @@ function amSelectUnit(unitId) {
       // Below tied band — user can't override, ED approval required
       if(ow) ow.style.display = 'none';
       var cb = document.getElementById('am_confirm_btn');
-      if(cb){ cb.textContent='⛔ ED Approval Required'; cb.disabled=true; cb.style.opacity='1'; cb.style.cursor='not-allowed'; cb.style.background='#fef2f2'; cb.style.color='#b91c1c'; }
+      if(cb){ cb.textContent='⛔ ED Approval Required'; cb.disabled=true; cb.style.opacity='1'; cb.style.cursor='not-allowed'; cb.style.background='var(--danger-bg)'; cb.style.color='var(--danger)'; }
     }
   } else if(canOverride) {
     // Always show the notes wrap for override-authority users so the field is
@@ -967,7 +967,7 @@ function amSelectUnit(unitId) {
       onLabel.textContent = isEdOverride
         ? 'Override Notes (required) — this unit scores below the top match band.'
         : 'Selection Notes (optional) — why this unit for this applicant?';
-      onLabel.style.color = isEdOverride ? '#d97706' : 'var(--text)';
+      onLabel.style.color = isEdOverride ? 'var(--warn-amber-text)' : 'var(--text)';
     }
     if(onReq) onReq.style.display = isEdOverride ? '' : 'none';
     if(onPlaceholder) onPlaceholder.placeholder = isEdOverride
@@ -985,7 +985,7 @@ function amSelectUnit(unitId) {
     if(isOversized && !canOverride) warnMsgs.push('⛔ This unit is 2+ bedrooms larger than the applicant needs — only the Executive Director can assign it');
     else if(canAssignTie && !canOverride && !isTied) warnMsgs.push('⛔ This unit scores below the recommended match band — only the Executive Director can assign a lower-scored unit');
     if(warnMsgs.length){
-      warn.style.display='block'; warn.style.background='#fef2f2'; warn.style.color='#b91c1c';
+      warn.style.display='block'; warn.style.background='var(--danger-bg)'; warn.style.color='var(--danger)';
       warn.textContent = warnMsgs.join(' · ');
     } else { warn.style.display='none'; }
   }
@@ -1221,12 +1221,12 @@ function _getRaApprovalStatus(u, sow) {
   var edDec = (u.unitEdSig && u.unitEdSig.decision) || '';
   var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
   var pct = prog ? (prog.overallPct||0) : 0;
-  if(pct >= 100) return {key:'complete',    label:'Complete',        bg:'#f0fdf4', c:'#15803d'};
+  if(pct >= 100) return {key:'complete',    label:'Complete',        bg:'var(--success-bg)', c:'var(--success)'};
   if(pct > 0)    return {key:'in_progress', label:'In Progress',     bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)'};
-  if(edDec === 'approved')                  return {key:'approved',  label:'ED Approved',     bg:'#f0fdf4', c:'#15803d'};
-  if(hmDec === 'approved' && !needsED)      return {key:'approved',  label:'HM Approved',     bg:'#f0fdf4', c:'#15803d'};
-  if(hmDec === 'approved' && needsED)       return {key:'pending_ed',label:'Pending ED',       bg:'#eff6ff', c:'#1d4ed8'};
-  if(hmDec === 'declined' || edDec === 'declined') return {key:'declined', label:'Declined',  bg:'#fef2f2', c:'#b91c1c'};
+  if(edDec === 'approved')                  return {key:'approved',  label:'ED Approved',     bg:'var(--success-bg)', c:'var(--success)'};
+  if(hmDec === 'approved' && !needsED)      return {key:'approved',  label:'HM Approved',     bg:'var(--success-bg)', c:'var(--success)'};
+  if(hmDec === 'approved' && needsED)       return {key:'pending_ed',label:'Pending ED',       bg:'var(--info-blue-bg)', c:'#1d4ed8'};
+  if(hmDec === 'declined' || edDec === 'declined') return {key:'declined', label:'Declined',  bg:'var(--danger-bg)', c:'var(--danger)'};
   return {key:'pending_hm', label:'Pending HM', bg:'var(--warn-amber-bg)', c:'var(--warn-amber-text)'};
 }
 
@@ -1258,10 +1258,10 @@ function renderRenoApprovalsView() {
     rows.forEach(function(r){ counts[r.appr.key]=(counts[r.appr.key]||0)+1; });
     var chipDefs = [
       {key:'pending_hm', label:'Pending HM',  c:'var(--warn-amber-text)', bg:'var(--warn-amber-bg)'},
-      {key:'pending_ed', label:'Pending ED',  c:'#1d4ed8', bg:'#eff6ff'},
-      {key:'approved',   label:'Approved',    c:'#15803d', bg:'#f0fdf4'},
+      {key:'pending_ed', label:'Pending ED',  c:'#1d4ed8', bg:'var(--info-blue-bg)'},
+      {key:'approved',   label:'Approved',    c:'var(--success)', bg:'var(--success-bg)'},
       {key:'in_progress',label:'In Progress', c:'var(--warn-amber-text)', bg:'var(--warn-amber-bg)'},
-      {key:'complete',   label:'Complete',    c:'#15803d', bg:'#f0fdf4'},
+      {key:'complete',   label:'Complete',    c:'var(--success)', bg:'var(--success-bg)'},
       {key:'no_sow',     label:'No Request',  c:'var(--gray)',    bg:'#f4f4f0'},
     ];
     chipsEl.innerHTML = chipDefs.map(function(d){
@@ -1319,7 +1319,7 @@ function renderRenoApprovalsView() {
   var hmLimit = _getHmLimit();
   tbody.innerHTML = filtered.map(function(r) {
     var u=r.u; var sow=r.sow; var prog=r.prog; var rs=r.rs; var appr=r.appr;
-    var tier = rs.score>=40?{l:'Critical',c:'#b91c1c',bg:'#fef2f2'}:rs.score>=25?{l:'High',c:'#7a6000',bg:'#fef9ec'}:rs.score>=12?{l:'Medium',c:'#1d4ed8',bg:'#eff6ff'}:{l:'Low',c:'#15803d',bg:'#f0fdf4'};
+    var tier = rs.score>=40?{l:'Critical',c:'var(--danger)',bg:'var(--danger-bg)'}:rs.score>=25?{l:'High',c:'#7a6000',bg:'#fef9ec'}:rs.score>=12?{l:'Medium',c:'#1d4ed8',bg:'var(--info-blue-bg)'}:{l:'Low',c:'var(--success)',bg:'var(--success-bg)'};
     var costStr = r.cost>0 ? formatCurrency(r.cost) : '—';
     var needsED = r.cost > hmLimit;
     var pct = prog?(prog.overallPct||0):0;
@@ -1451,7 +1451,7 @@ function exportRenoApprovalsPDF() {
     var sow=null;sow = getSowData(u.id);
     var prog = (window._renoProgress && window._renoProgress[u.id]) || null;
     var rs=calcRenoScore(u.id);
-    var tier=rs.score>=40?{l:'Critical',c:'#b91c1c'}:rs.score>=25?{l:'High',c:'var(--warn-amber-text)'}:rs.score>=12?{l:'Medium',c:'#1d4ed8'}:{l:'Low',c:'#15803d'};
+    var tier=rs.score>=40?{l:'Critical',c:'var(--danger)'}:rs.score>=25?{l:'High',c:'var(--warn-amber-text)'}:rs.score>=12?{l:'Medium',c:'#1d4ed8'}:{l:'Low',c:'var(--success)'};
     var appr=_getRaApprovalStatus(u,sow);
     var cost=sow?(parseFloat((sow.totalCost||'').toString().replace(/[^0-9.]/g,''))||0):0;
     var pct=prog?(prog.overallPct||0):0;
@@ -1747,7 +1747,7 @@ async function submitAddHousingStaff() {
       // doesn't address this error at all).
       var errMsg = signupData.msg || signupData.error_description || signupData.error || JSON.stringify(signupData);
       if(res){
-        res.style.background='#fef2f2'; res.style.border='1px solid #fecaca'; res.style.color='#b91c1c';
+        res.style.background='var(--danger-bg)'; res.style.border='1px solid var(--danger-border)'; res.style.color='var(--danger)';
         var html = '<strong>Could not create login account.</strong><br>'
           + '<span style="font-size:11px;">'+errMsg+'</span>';
         if(signupsDisabled){
@@ -1775,7 +1775,7 @@ async function submitAddHousingStaff() {
     if(!staffR.ok){
       var staffErr = await staffR.text();
       if(res){
-        res.style.background='#fef2f2'; res.style.border='1px solid #fecaca'; res.style.color='#b91c1c';
+        res.style.background='var(--danger-bg)'; res.style.border='1px solid var(--danger-border)'; res.style.color='var(--danger)';
         res.innerHTML = '<strong>Auth account created but staff record failed.</strong><br><span style="font-size:11px;">'+staffErr+'</span>';
         res.style.display='block';
       }
