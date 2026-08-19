@@ -3885,18 +3885,21 @@ async function hardDeleteStaff(id, btn){
   if (!ok) return;
   if(btn){ btn.disabled=true; btn.textContent='Deleting…'; }
   try {
+    // return=representation so we can tell a REAL delete from an RLS no-op: a
+    // DELETE that the staff_no_delete policy filters to zero rows still returns
+    // 204/200 OK but deletes nothing (and would silently "refresh" with the row
+    // still present). Only treat it as deleted when a row actually comes back.
     var r = await fetch(SUPABASE_URL+'/rest/v1/staff?id=eq.'+encodeURIComponent(id),{
-      method:'DELETE', headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=minimal'})
+      method:'DELETE', headers:Object.assign({},HOUSING_HEADERS,{'Prefer':'return=representation'})
     });
-    if(r.ok){
+    var deleted = r.ok ? await r.json().catch(function(){ return []; }) : [];
+    if(r.ok && deleted && deleted.length){
       showToast('Staff record permanently deleted');
       auditEntry('SETTINGS','settings_user_delete','Staff permanently deleted: '+(u.email||('id='+id)),window.currentRole||'ed');
       renderHousingUserTable();
     } else {
-      var t = await r.text();
-      showToast(/policy|permission|denied|row-level|violates/i.test(t)
-        ? 'Delete blocked — run the staff-delete migration (20260819_staff_ed_delete.sql) on this project'
-        : 'Could not delete this record');
+      // r.ok but nothing removed => the RLS policy still blocks delete.
+      showToast('Delete blocked — the staff-delete migration (20260819_staff_ed_delete.sql) has not been run on this project yet. Run it (or use the control-plane Migrations tab), then try again.');
       if(btn){ btn.disabled=false; btn.textContent='Delete'; }
     }
   } catch(e){
