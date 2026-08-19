@@ -1702,9 +1702,16 @@ async function submitAddHousingStaff() {
     if(existing && existing.length){
       var existRow = existing[0];
       var msg = existRow.is_active === false
-        ? email + ' is a deactivated staff member. Use the Inactive tab → Reactivate.'
-        : email + ' is already in the staff directory';
-      showToast(msg);
+        ? escapeHtml(email) + ' is already in the directory but <b>deactivated</b>. Close this and use the <b>Inactive</b> tab &rarr; <b>Reactivate</b> (don\'t re-add).'
+        : escapeHtml(email) + ' is <b>already in the staff directory</b>. They\'re listed in the Users table &mdash; no need to add them again.';
+      // Paint the message IN THE FORM (not just a toast, which is easy to miss on
+      // mobile) so it's obvious why the add didn't proceed.
+      if(res){
+        res.style.background='var(--warn-amber-bg)'; res.style.border='1px solid var(--warn-amber-border)'; res.style.color='var(--warn-amber-text)';
+        res.innerHTML = '<strong>Already exists.</strong><br><span style="font-size:11px;">'+msg+'</span>';
+        res.style.display='block';
+      }
+      showToast(existRow.is_active === false ? 'Already exists (deactivated) — use Reactivate' : 'Already in the staff directory');
       if(btn){btn.disabled=false;btn.textContent='+ Add to Staff Directory';}
       return;
     }
