@@ -309,7 +309,7 @@
       + '</div>'
       + '<div class="nic-body">'
       +   panel('nations',   nationsCard(nations, usageBySub), true)
-      +   panel('provision', provisionCard() + addNationStepsCard() + emailSetupCard(), false)
+      +   panel('provision', provisionCard() + addNationStepsCard() + emailSetupCard() + supportLoginSetupCard(), false)
       +   panel('addnation', addNationCard(), false)
       +   panel('admins',    adminsCard(admins, meEmail), false)
       + '</div>'
@@ -517,6 +517,36 @@
       var tail = parts.length > 1 ? ' <span style="color:var(--muted);">(' + parts[1] : '';
       return '<code>' + code + '</code>' + tail;
     }).join(', &nbsp;');
+  }
+
+  // Setup reference for the per-nation support-login ("Enter") feature. Static
+  // guide -- never renders the actual secret VALUE (secrets stay in Supabase).
+  function supportLoginSetupCard(){
+    function numList(items){
+      return '<ol style="margin:8px 0 0;padding-left:20px;font-size:12px;color:var(--muted);line-height:1.6;">'
+        + items.map(function(t){ return '<li style="margin-bottom:5px;">' + t + '</li>'; }).join('')
+        + '</ol>';
+    }
+    return '<div class="card"><h3>Support login setup &mdash; the &ldquo;Enter&rdquo; button</h3>'
+      + '<p class="sub" style="margin:2px 0 6px;">The <b>Enter</b> button (next to a nation\'s <b>Open</b>) opens a signed-in <b>Platform Support</b> session on that nation\'s app for troubleshooting &mdash; full access, logged on both sides, and refusable by the nation. It works only once the shared secret below is set on the platform project <b>and</b> that nation\'s project.</p>'
+      + '<div style="border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin-top:10px;">'
+      +   '<div style="font-weight:800;font-size:13px;">One-time setup</div>'
+      +   numList([
+              'Generate one strong secret &mdash; run <code>openssl rand -hex 32</code> (or any 32+ byte random hex). Use the <b>same value</b> everywhere below.',
+              'On the <b>platform</b> project &rarr; ' + extLink(LINKS.supaFns, 'Settings &rarr; Edge Functions &rarr; Secrets') + ', add <code>SUPPORT_LOGIN_SECRET</code> = that value. (Lets <code>enter-nation</code> send it.)',
+              'On <b>each nation</b> project &rarr; Settings &rarr; Edge Functions &rarr; Secrets, add the <b>same</b> <code>SUPPORT_LOGIN_SECRET</code> = that value. (Lets that nation\'s <code>support-login</code> verify it.)',
+              'Deploy the functions (CI does this on push to <code>main</code>): <code>enter-nation</code> to the platform project, and <code>support-login</code> to <b>each</b> nation project (deployed with <code>--no-verify-jwt</code>; the nation-functions workflow targets one project at a time via its <code>project_ref</code> input).',
+              'In each nation project\'s <b>Auth</b> settings, allow a redirect to <code>https://&lt;subdomain&gt;.fnhub.app/</code> (Site URL or an added Redirect URL), or the magic link\'s redirect is dropped.'
+            ])
+      +   '<div style="font-size:12px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><b>Secret:</b> <code>SUPPORT_LOGIN_SECRET</code> &mdash; identical value on the platform project and every nation project. Server-side only; it must never appear in the app or the browser. Rotate by updating it in every project at once.</div>'
+      + '</div>'
+      + '<div style="margin-top:12px;padding:11px 13px;background:var(--accent-light);border:1px solid var(--hair);border-radius:9px;font-size:12px;line-height:1.6;">'
+      +   '<div style="font-weight:800;margin-bottom:4px;">Good to know</div>'
+      +   '<div>&bull; The secret is sent <b>server-to-server</b> (admin panel &rarr; <code>enter-nation</code> with your super-admin login &rarr; the nation) &mdash; it never reaches the browser.</div>'
+      +   '<div>&bull; A nation can <b>refuse</b> support login: their ED toggles <b>Settings &rarr; Admin &rarr; Config &rarr; Platform Support Access</b> off. Then Enter returns &ldquo;support login is turned off.&rdquo;</div>'
+      +   '<div>&bull; Every entry is audited: <code>entered_nation</code> (control plane) + <code>support_session_started</code> (the nation\'s Audit Log). Access is a full super_user session that lapses the same day.</div>'
+      + '</div>'
+      + '</div>';
   }
 
   function addNationCard(){
