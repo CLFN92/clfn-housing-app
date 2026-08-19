@@ -380,6 +380,44 @@
     return (txn && txn.invoiceBalance !== undefined) ? buildInvoice(txn) : buildVoucher(txn);
   }
 
+  // ---- Batch invoice worksheet ---------------------------------------------
+  // The tenants pending their monthly rent invoice (same rule as renderBatchList).
+  window.finBatchWorksheetDownload = function () {
+    _load(function () {
+      var d = getData();
+      var now = new Date();
+      var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      var monthLabel = months[now.getMonth()] + ' ' + now.getFullYear();
+      var ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      var pending = (d.tenants || []).filter(function (t) {
+        var already = (d.rentLedger || []).some(function (r) { return r.tenantId === t.id && r.type === 'invoice' && (r.date || '').slice(0, 7) === ym && r.status !== 'reversed'; });
+        return !already && t.active !== false && (t.rent || 0) > 0;
+      });
+      if (!pending.length) { if (typeof toast === 'function') toast('No pending invoices for ' + monthLabel); return; }
+
+      var jsPDF = window.jspdf.jsPDF;
+      var doc = new jsPDF({ unit: 'mm', format: 'letter' });
+      var hf = headerFooter(doc, 'Batch Invoice Worksheet');
+      var pageW = hf.pageW, M = hf.M, aRGB = hf.aRGB;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(90, 90, 90);
+      doc.text('Tenants to be invoiced for ' + monthLabel + '  (' + pending.length + ')', M, 34);
+      var total = pending.reduce(function (s, t) { return s + (t.rent || 0); }, 0);
+
+      doc.autoTable({
+        startY: 38, margin: { top: 30, left: M, right: M },
+        head: [['#', 'Tenant', 'Unit', 'Monthly Rent']],
+        body: pending.map(function (t, i) { return [String(i + 1), (typeof tenantName === 'function') ? tenantName(t) : (t.name || ''), t.unit || '', money(t.rent || 0)]; }),
+        foot: [['', '', 'Total', money(total)]],
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: aRGB, textColor: onAccentRgb(), fontStyle: 'bold' },
+        footStyles: { fillColor: [245, 245, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
+        columnStyles: { 0: { cellWidth: 12 }, 3: { halign: 'right', cellWidth: 34 } },
+        didDrawPage: function (data) { hf.header(); hf.footer(data); }
+      });
+      doc.save('Batch-Invoice-Worksheet-' + ym + '.pdf');
+    }, function () { if (typeof toast === 'function') toast('Could not load the PDF engine (offline?)'); });
+  };
+
   window.finVoucherDownload = function () {
     var txn = window.currentVoucherData; if (!txn) { if (typeof toast === 'function') toast('Open a voucher first'); return; }
     _load(function () {
