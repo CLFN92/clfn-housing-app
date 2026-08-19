@@ -267,6 +267,60 @@ finance.html don't need to change.
 
 ---
 
+## Phase F4 — Finance PDF migration (HTML print → jsPDF)  ✅ (shipped 2026-08)
+
+**Goal:** Move every finance document off HTML print windows
+(`window.open`+`document.write`+`window.print()`) to **jsPDF**, so each can be
+**downloaded** as a real PDF or **emailed** to the tenant (a print window can't
+hand you the bytes), with deterministic per-nation branding. Spec:
+`docs/FINANCE-JSPDF-MIGRATION.md`.
+
+### Why (locked rationale)
+- jsPDF returns the **bytes** (`doc.output('datauristring')`) → attach to
+  `send-notification` (nation's own provider) or file on the ledger. Print
+  windows can only print.
+- Deterministic output (no browser header/URL, no "Save as PDF" click, no
+  pop-up-blocker failures); consistent with the rest of the app (applicant PDF,
+  work orders, RFQ contracts, Capital claims, Labels metal PDF already use jsPDF).
+- **Colours can't be `var()`** in jsPDF (no CSS) — the accent resolves at runtime
+  via `_themeAccentHex()` / `_themeOnAccentHex()`; those are the ONLY themed
+  colours, everything else is a fixed print literal.
+
+### Delivered (all in `finance-pdf-jspdf.js`, loaded by `finance.html`)
+- ✅ Shared **`headerFooter(doc, title)`** — one branded per-nation header (logo
+  from theme/`NATION_CONFIG`, name + contact) + `CONFIDENTIAL` / `Page N` footer,
+  reused by every document below.
+- ✅ **Statement of Account** (P1) — `buildStatement(tid)`; Total-Owing box +
+  autotable of outstanding charges + this-month payments. `finStatementDownload()`
+  / `finStatementEmail()` (audited `statement_emailed`).
+- ✅ **Voucher / Payment Receipt** (P1b) — `buildVoucher(txn)` from
+  `currentVoucherData`; detail rows + accent amount box + signature lines.
+- ✅ **Invoice** (P2) — `buildInvoice(txn)`; invoice no. + bill-to + charge line +
+  applied-payments table + PAID/PARTIAL/UNPAID status + Amount-Due box. Opens in
+  the same `modalVoucher`, so **`buildDoc()`** dispatches on `txn.invoiceBalance`
+  and the shared Download/Email buttons handle both. `finVoucherDownload()` /
+  `finVoucherEmailTenant()` (audited `voucher_emailed`).
+- ✅ **Batch invoice worksheet** — `finBatchWorksheetDownload()`; the tenants
+  pending this month's rent invoice (same rule as `renderBatchList`) as a numbered
+  autotable + total. Replaced the old `window.print()`.
+- ✅ **Batch statements** — `finBatchStatementsDownload()`; one PDF, one page per
+  selected tenant (balances line + full transaction-history autotable). Replaced
+  `printBatchStatements()` (left as dead code, unwired).
+
+### Not migrated (deliberate)
+- Internal cash sheet / batch accounting worksheets — print-once, no email need;
+  left as print windows.
+- Loan / arrangement **agreements** (`finance-pdf.js`) — signature-heavy legal
+  docs, out of scope for this pass.
+
+### Related
+- Finance screen styles fully tokenized to the nation theme in the same period
+  (`finance.css` + the `finance-*.js` renderers); app-wide screen-colour token
+  sweep + a hardcoded-colour ratchet guard (`tools/check-colors.js` +
+  `.github/workflows/color-guard.yml`) shipped alongside.
+
+---
+
 ## Phase C — Refactor to shared.js  ✅
 
 ### Pre-flight
