@@ -1715,12 +1715,27 @@ function sowApproveInline() {
 // sowApproveInline + saveSOW. Reuses _sowComputeApprovalStatus + _sowFireEmails
 // so status derivation and the contractor work-order email stay identical to the
 // modal path.
+// The ED tier (real role ed / super_user) always retains final SOW approval
+// authority, regardless of the configurable Approval Authority lists. Those
+// lists exist to DELEGATE approval down to the Housing Manager — they must not
+// be able to lock the ED out of their own final sign-off (which stranded
+// over-threshold requests in "Awaiting ED" with the ED unable to approve them).
+function _isEdApprovalTier(role){
+  var r = role || window._realRole || window.currentRole || '';
+  if (window.CLFN_PERMS && typeof CLFN_PERMS.normalizeRole === 'function') {
+    try { r = CLFN_PERMS.normalizeRole(r) || r; } catch(e){}
+  }
+  return r === 'ed' || r === 'super_user' || (window.ROLE && r === ROLE.ED);
+}
+window._isEdApprovalTier = _isEdApprovalTier;
+
 function _wlApproveSow(uid, pn){
   var role  = window._realRole || window.currentRole || '';
-  var canHm = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role);
-  var canEd = (typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('approveSowOverThreshold', role);
+  var _edTier = _isEdApprovalTier(role);
+  var canHm = _edTier || ((typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('approveSowUnderThreshold', role));
+  var canEd = _edTier || ((typeof APPROVAL_AUTHORITY !== 'undefined') && APPROVAL_AUTHORITY.can('approveSowOverThreshold', role));
   if(!canHm && !canEd){
-    if(typeof showToast === 'function') showToast('You do not have approval authority for this request.');
+    if(typeof showToast === 'function') showToast('Your role (' + (role || 'unknown') + ') is not set up to approve this request. Check Settings → Approval Authority.', {type:'error'});
     return;
   }
   // Fall back to opening the modal if we can't resolve the specific SOW here.
@@ -1756,8 +1771,19 @@ function _wlApproveSow(uid, pn){
     // the review-all-tabs gate doesn't force it back to draft).
     if(typeof _sowComputeApprovalStatus === 'function'){
       _sowComputeApprovalStatus(sow, sow, role, 'submit');
-    } else {
-      sow.approval_status = approver === 'ed' ? 'ed_approved' : 'hm_approved';
+    }
+    // Explicitly stamp the target status for a worklist approval. This is a
+    // deliberate, direct action (the ED/HM clicked Approve on this request), so
+    // it must advance the status even if _sowComputeApprovalStatus hit an
+    // edge-case branch that preserved the prior status — e.g. a stale
+    // `approval_auto` flag (auto-approved earlier under a higher ED threshold
+    // that has since been lowered) kept it at 'hm_approved', leaving the request
+    // stuck in "Awaiting ED" no matter how many times the ED approved it.
+    if(approver === 'ed'){
+      sow.approval_status = 'ed_approved';
+      sow.approval_auto = false;   // a real human ED sign-off supersedes any auto-approval
+    } else if(sow.approval_status !== 'ed_approved'){
+      sow.approval_status = 'hm_approved';
     }
     if(typeof upsertSowInList === 'function') upsertSowInList(uid, sow);
     if(typeof auditEntry === 'function'){
@@ -2369,15 +2395,24 @@ function _sowReconcileAssignment(data){
 // terminal 'completed' and System Approved states), then applies the
 // review-all-tabs draft gate. Extracted verbatim from saveSOW.
 function _sowComputeApprovalStatus(data, existingForStatus, saveRole, saveMode){
+  // The ED tier always retains SOW approval authority (see _isEdApprovalTier).
+  var _edTier = (typeof _isEdApprovalTier === 'function') && _isEdApprovalTier(saveRole);
   // Strip name/date fields the actor isn't authorized to fill so the
   // auto-promotion below cannot bump status past what they're allowed.
-  if(!APPROVAL_AUTHORITY.can('approveSowOverThreshold', saveRole)){
+  if(!_edTier && !APPROVAL_AUTHORITY.can('approveSowOverThreshold', saveRole)){
     data.edName = ''; data.edDate = '';
   }
-  if(!APPROVAL_AUTHORITY.can('approveSowUnderThreshold', saveRole) &&
+  if(!_edTier && !APPROVAL_AUTHORITY.can('approveSowUnderThreshold', saveRole) &&
      !APPROVAL_AUTHORITY.can('approveSowOverThreshold', saveRole)){
     data.hmName = ''; data.hmDate = '';
   }
+  // A fresh, authorized ED sign-off now present on the form (one the existing
+  // record didn't already carry). This must WIN over the auto-approval /
+  // preserve branches below — otherwise a request that was auto-approved earlier
+  // (approval_auto) can never be manually advanced by the ED.
+  var _freshEdApproval = !!(data.edName && data.edDate
+    && (_edTier || APPROVAL_AUTHORITY.can('approveSowOverThreshold', saveRole))
+    && !(existingForStatus && existingForStatus.edName));
 
   // Compute a simple approval_status from the signature / approval fields on the form.
   // EXCEPTION: if the SOW was already marked 'completed', preserve that — only markSowComplete/reopenSow
@@ -2399,17 +2434,19 @@ function _sowComputeApprovalStatus(data, existingForStatus, saveRole, saveMode){
     if(existingForStatus.approved_via_rfq) data.approved_via_rfq = true;
     data.edName = existingForStatus.edName || 'System';
     data.edDate = existingForStatus.edDate || '';
-  } else if(existingForStatus && existingForStatus.approval_auto){
+  } else if(existingForStatus && existingForStatus.approval_auto && !_freshEdApproval){
     // Auto-approved because a Maintenance Request approval step was switched
     // OFF in Settings. Terminal like completed/System Approved — a routine
     // re-save (the authority gate above strips name/date for non-approvers)
-    // must not recompute it back down into the approval queue.
+    // must not recompute it back down into the approval queue. EXCEPTION: a
+    // fresh ED sign-off (_freshEdApproval) advances it to ed_approved instead of
+    // preserving the auto status.
     data.approval_status = existingForStatus.approval_status || 'hm_approved';
     data.approval_auto   = true;
     if(existingForStatus.hmName){ data.hmName = existingForStatus.hmName; data.hmDate = existingForStatus.hmDate; }
     if(existingForStatus.edName){ data.edName = existingForStatus.edName; data.edDate = existingForStatus.edDate; }
-  } else if(data.edName && data.edDate && APPROVAL_AUTHORITY.can('approveSowOverThreshold', saveRole)) data.approval_status = 'ed_approved';
-  else if(data.hmName && data.hmDate && APPROVAL_AUTHORITY.can('approveSowUnderThreshold', saveRole)) data.approval_status = 'hm_approved';
+  } else if(data.edName && data.edDate && (_edTier || APPROVAL_AUTHORITY.can('approveSowOverThreshold', saveRole))){ data.approval_status = 'ed_approved'; if(_freshEdApproval) data.approval_auto = false; }
+  else if(data.hmName && data.hmDate && (_edTier || APPROVAL_AUTHORITY.can('approveSowUnderThreshold', saveRole))) data.approval_status = 'hm_approved';
   else if((data.tenantSig && data.tenantSig.image) || (data.staffSig && data.staffSig.image)) data.approval_status = 'signed';
   else data.approval_status = 'draft';
 
