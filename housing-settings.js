@@ -88,14 +88,14 @@ function renderApprovalAuthorityPanel() {
       if(!isThreshold && Array.isArray(cur) && Array.isArray(def)) {
         if(cur.length < def.length)
           badgeHtml = ' <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;'
-            + 'background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;">Tighter</span>';
+            + 'background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);">Tighter</span>';
         else if(cur.length > def.length)
           badgeHtml = ' <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;'
-            + 'background:#f0fdf4;color:#15803d;border:1px solid #86efac;">Looser</span>';
+            + 'background:var(--success-bg);color:var(--success);border:1px solid #86efac;">Looser</span>';
       }
       if(isModified && !badgeHtml)
         badgeHtml = ' <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;'
-                  + 'background:var(--warn-amber-bg);color:#d97706;border:1px solid #fde68a;">Modified</span>';
+                  + 'background:var(--warn-amber-bg);color:var(--warn-amber-text);border:1px solid var(--warn-amber-border);">Modified</span>';
 
       // Single-row layout: label | pills ... | reset
       html += '<div style="display:grid;grid-template-columns:220px 1fr auto;align-items:center;'
@@ -121,8 +121,8 @@ function renderApprovalAuthorityPanel() {
           html += '<button onclick="aaToggleApproval(\'' + key + '\')" title="Turn this approval step on or off"'
             + ' style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:800;cursor:pointer;'
             + 'font-family:DM Sans,sans-serif;white-space:nowrap;margin-right:6px;'
-            + 'background:' + (reqd ? '#f0fdf4' : '#fff7ed') + ';'
-            + 'color:'      + (reqd ? '#15803d' : '#c2410c') + ';'
+            + 'background:' + (reqd ? 'var(--success-bg)' : 'var(--warn-amber-bg)') + ';'
+            + 'color:'      + (reqd ? 'var(--success)' : 'var(--warn-amber-text)') + ';'
             + 'border:1.5px solid ' + (reqd ? '#86efac' : '#fdba74') + ';">'
             + (reqd ? '&#10003; Approval required' : '&#9889; Auto-approve (off)') + '</button>';
         }

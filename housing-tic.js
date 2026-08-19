@@ -401,7 +401,7 @@
     var stale = days > _TIC_NOTE_STALE_DAYS;
     var ago = days <= 0 ? 'today' : days === 1 ? '1 day ago' : days + ' days ago';
     var style = stale
-      ? 'background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;'
+      ? 'background:var(--danger-bg);color:var(--danger);border:1px solid #fca5a5;font-weight:700;'
       : 'background:#f4f4f0;color:var(--muted);';
     return { days: days, stale: stale,
       badge: '<span class="std-pill" style="' + style + '" title="Newest note on this tenant file">🕑 Last note: ' + ago + '</span>' };
@@ -456,7 +456,7 @@
     }
     if (hccTile) {
       hccTile.title = isHcc ? 'Click to remove H&CC flag' : 'Click to flag as Home & Community Care';
-      hccTile.style.background = isHcc ? '#f0fdf4' : '';
+      hccTile.style.background = isHcc ? 'var(--success-bg)' : '';
     }
   }
 

@@ -3434,9 +3434,9 @@ function runDuplicateAppsAudit() {
     var a    = r.app;
     var name = (((a.fn||'')+' '+(a.ln||'')).trim()) || '—';
     var badgeHtml = r.badge === 'Email'
-      ? '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;background:#fee2e2;color:#b91c1c;">&#128308; Email</span>'
+      ? '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;background:#fee2e2;color:var(--danger);">&#128308; Email</span>'
       : r.badge === 'Name+DOB'
-      ? '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;background:#fef9c3;color:#854d0e;">&#128993; Name+DOB</span>'
+      ? '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;background:var(--warn-amber-bg);color:#854d0e;">&#128993; Name+DOB</span>'
       : '';
     var appHref = 'housing.html?openApp=' + encodeURIComponent(a.id);
     return '<tr style="border-bottom:1px solid var(--border);">'

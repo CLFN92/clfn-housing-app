@@ -116,21 +116,21 @@ function renderV2ScoringEditor() {
   var t = liveV2Tiers;
 
   function pts(val, cat, key) {
-    var col = val > 0 ? '#15803d' : val < 0 ? '#b91c1c' : 'var(--gray)';
+    var col = val > 0 ? 'var(--success)' : val < 0 ? 'var(--danger)' : 'var(--gray)';
     var sign = val > 0 ? '+' : '';
     return '<input type="number" value="' + val + '" step="1" min="-30" max="30" data-cat="' + cat + '" data-key="' + key + '" '
       + 'style="width:60px;padding:4px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;'
       + 'color:' + col + ';text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);" '
-      + 'onchange="updateV2ScoreOption(this)" oninput="this.style.color=+this.value>0?\x27#15803d\x27:+this.value<0?\x27#b91c1c\x27:\x27var(--gray)\x27"/>';
+      + 'onchange="updateV2ScoreOption(this)" oninput="this.style.color=+this.value>0?\x27var(--success)\x27:+this.value<0?\x27var(--danger)\x27:\x27var(--gray)\x27"/>';
   }
 
   function maxPts(cat, key) {
     var val = typeof m[cat] === 'object' && m[cat][key] !== undefined ? m[cat][key] : 0;
-    var col = val > 0 ? '#15803d' : val < 0 ? '#b91c1c' : 'var(--gray)';
+    var col = val > 0 ? 'var(--success)' : val < 0 ? 'var(--danger)' : 'var(--gray)';
     return '<input type="number" value="' + val + '" step="1" min="0" max="30" data-cat="' + cat + '" data-key="' + key + '" '
       + 'style="width:60px;padding:4px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;'
       + 'color:' + col + ';text-align:center;font-family:DM Sans,sans-serif;background:var(--surface);" '
-      + 'onchange="updateV2ScoreOption(this)" oninput="this.style.color=+this.value>0?\x27#15803d\x27:\x27var(--gray)\x27"/>';
+      + 'onchange="updateV2ScoreOption(this)" oninput="this.style.color=+this.value>0?\x27var(--success)\x27:\x27var(--gray)\x27"/>';
   }
 
   // Standard borderless section header (matches .tic-section-h, used by the
@@ -607,8 +607,8 @@ function renderNationPanel(){
   var coreRow = function(name){
     return '<tr class="row-divider">'
          +   '<td style="padding:10px 12px;font-size:13px;font-weight:600;color:var(--text);">'+humanize(name)+'</td>'
-         +   '<td class="pad-12">'+pill('Core','#1d4ed8','#eff6ff')+'</td>'
-         +   '<td class="pad-12">'+pill('Enabled','#15803d','#f0fdf4')+'</td>'
+         +   '<td class="pad-12">'+pill('Core','#1d4ed8','var(--info-blue-bg)')+'</td>'
+         +   '<td class="pad-12">'+pill('Enabled','var(--success)','var(--success-bg)')+'</td>'
          +   (canToggleModules ? '<td class="pad-12"></td>' : '')
          + '</tr>';
   };
@@ -616,11 +616,11 @@ function renderNationPanel(){
     var enabled  = modApi.isEnabled(name);
     var licensed = (typeof modApi.isLicensed === 'function') ? modApi.isLicensed(name) : true;
     var statusPill = enabled
-      ? pill('Enabled','#15803d','#f0fdf4')
+      ? pill('Enabled','var(--success)','var(--success-bg)')
       : pill('Disabled','var(--gray)','#f4f4f0');
     var licensePill = licensed
-      ? pill('Licensed','#1d4ed8','#eff6ff')
-      : pill('Not Licensed','#b91c1c','#fef2f2');
+      ? pill('Licensed','#1d4ed8','var(--info-blue-bg)')
+      : pill('Not Licensed','var(--danger)','var(--danger-bg)');
     var typeCell = '<td class="pad-12">'+pill('Optional','#7a6000','#fef9ec')+' '+licensePill+'</td>';
     var toggleCell = '';
     if(canToggleModules){
@@ -649,7 +649,7 @@ function renderNationPanel(){
   modsEl.innerHTML =
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
     +   '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;">Modules</div>'
-    +   (canToggleModules ? '<div style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:#fef9ec;color:#7a6000;border:1px solid #fde68a;">Super User</div>' : '')
+    +   (canToggleModules ? '<div style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:#fef9ec;color:#7a6000;border:1px solid var(--warn-amber-border);">Super User</div>' : '')
     + '</div>'
     + '<div class="overflow-x">'
     + '<table class="std-tbl">'
@@ -695,7 +695,7 @@ function _duBar(usedBytes, limitGB, label, baseColor){
   var used = Number(usedBytes) || 0;
   var limitBytes = limitGB * 1024*1024*1024;
   var pct = Math.min(100, Math.round(used/limitBytes*1000)/10);
-  var col = pct >= 90 ? '#b91c1c' : (pct >= 70 ? '#d97706' : (baseColor || '#15803d'));
+  var col = pct >= 90 ? 'var(--danger)' : (pct >= 70 ? 'var(--warn-amber-text)' : (baseColor || 'var(--success)'));
   return '<div style="margin-bottom:14px;">' +
     '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:4px;">' +
       '<span style="font-weight:600;">' + label + '</span>' +
@@ -985,8 +985,8 @@ function setPts(elId,score){
   const el=document.getElementById(elId);if(!el)return;
   const abs=Math.abs(score);
   el.textContent=score>0?'+'+score+' pts':score<0?score+' pts':'0 pts';
-  el.style.background=score>0?'#f0fdf4':score<0?'#fef2f2':'var(--yellow-light)';
-  el.style.color=score>0?'#15803d':score<0?'#b91c1c':'#7a6000';
+  el.style.background=score>0?'var(--success-bg)':score<0?'var(--danger-bg)':'var(--yellow-light)';
+  el.style.color=score>0?'var(--success)':score<0?'var(--danger)':'#7a6000';
 }
 
 // ── V2 tenancy prior toggle ──
@@ -1506,7 +1506,7 @@ function autoPopulateScore(){
     if(emptyMsg)emptyMsg.style.display='none';
     if(breakdown)breakdown.innerHTML=people.map(function(p){
       var pts=calcAgeScore(p.dob);
-      const col=pts>=3?'#15803d':pts>=2?'#1e3a5f':'#7a6000';
+      const col=pts>=3?'var(--success)':pts>=2?'#1e3a5f':'#7a6000';
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg);border-radius:6px;font-size:12px;">'
         +'<span class="js-lbl-xs">'+p.label+'</span>'
         +'<span style="font-weight:700;color:'+col+';">+'+pts+' pts</span></div>';
@@ -1723,7 +1723,7 @@ function renderRubricTableV2(breakdown, targetEl) {
   function row(label, pts, maxPts, value, note) {
     var pos  = pts > 0;
     var neg  = pts < 0;
-    var col  = pos ? '#15803d' : neg ? '#b91c1c' : 'var(--gray)';
+    var col  = pos ? 'var(--success)' : neg ? 'var(--danger)' : 'var(--gray)';
     var bg   = pos ? 'rgba(21,128,61,0.15)' : neg ? 'rgba(185,28,28,0.15)' : 'var(--bg)';
     var sign = pts > 0 ? '+' : '';
     var pct  = maxPts > 0 ? Math.round(Math.abs(pts) / maxPts * 100) : 0;
@@ -2030,16 +2030,16 @@ window._openScoreById=function(id){
 // ── Tier/score helpers ──
 function scoreMiniBar(score) {
   var pct = Math.min(100, Math.max(0, Math.round((score || 0) / 100 * 100)));
-  var color = score >= 80 ? '#b91c1c' : score >= 60 ? '#1d4ed8' : score >= 40 ? '#7a6000' : '#15803d';
+  var color = score >= 80 ? 'var(--danger)' : score >= 60 ? '#1d4ed8' : score >= 40 ? '#7a6000' : 'var(--success)';
   return '<div style="height:3px;width:48px;background:var(--border);border-radius:2px;margin-top:3px;">'
        + '<div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:2px;"></div></div>';
 }
 
 function tierColor(tier){
-  if(tier==='Critical Priority')return{bg:'#f0fdf4',c:'#15803d'};
+  if(tier==='Critical Priority')return{bg:'var(--success-bg)',c:'var(--success)'};
   if(tier==='High Priority')return{bg:'#e8eef5',c:'#1e3a5f'};
   if(tier==='Medium Priority')return{bg:'#fef9ec',c:'#7a6000'};
-  return{bg:'#fef2f2',c:'#b91c1c'};
+  return{bg:'var(--danger-bg)',c:'var(--danger)'};
 }
 
 
